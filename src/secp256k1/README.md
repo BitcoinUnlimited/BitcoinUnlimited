@@ -58,8 +58,21 @@ Build steps
 
 libsecp256k1 is built using autotools:
 
-    $ ./autogen.sh
-    $ ./configure
-    $ make
-    $ ./tests
-    $ sudo make install  # optional
+```bash
+./autogen.sh
+mkdir build
+cd build
+../configure
+make
+make check
+sudo make install  # optional
+```
+
+Exhaustive tests
+-----------
+
+    $ ./exhaustive_tests
+
+With valgrind, you might need to increase the max stack size:
+
+    $ valgrind --max-stackframe=2500000 ./exhaustive_tests
