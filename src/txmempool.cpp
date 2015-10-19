@@ -1144,7 +1144,7 @@ bool CCoinsViewMemPool::HaveCoin(const COutPoint &outpoint) const
 size_t CTxMemPool::DynamicMemoryUsage() const
 {
     READLOCK(cs);
-    // Estimate the overhead of mapTx to be 12 pointers + an allocation, as no exact formula for
+    // Estimate the overhead of mapTx to be 15 pointers + an allocation, as no exact formula for
     // boost::multi_index_contained is implemented.
     return _DynamicMemoryUsage();
 }
@@ -1152,9 +1152,9 @@ size_t CTxMemPool::DynamicMemoryUsage() const
 size_t CTxMemPool::_DynamicMemoryUsage() const
 {
     AssertLockHeld(cs);
-    // Estimate the overhead of mapTx to be 12 pointers + an allocation, as no exact formula for
+    // Estimate the overhead of mapTx to be 15 pointers + an allocation, as no exact formula for
     // boost::multi_index_contained is implemented.
-    return memusage::MallocUsage(sizeof(CTxMemPoolEntry) + 12 * sizeof(void *)) * mapTx.size() +
+    return memusage::MallocUsage(sizeof(CTxMemPoolEntry) + 15 * sizeof(void *)) * mapTx.size() +
            memusage::DynamicUsage(mapNextTx) + memusage::DynamicUsage(mapDeltas) + memusage::DynamicUsage(mapLinks) +
            cachedInnerUsage;
 }
