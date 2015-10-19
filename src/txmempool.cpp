@@ -647,13 +647,13 @@ void CTxMemPool::_CalculateDescendants(txiter entryit, setEntries &setDescendant
     }
 }
 
-void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransactionRef> &removed, bool fRecursive)
+void CTxMemPool::removeRecursive(const CTransaction &origTx, std::list<CTransactionRef> &removed)
 {
     WRITELOCK(cs);
-    _remove(origTx, removed, fRecursive);
+    _removeRecursive(origTx, removed);
 }
 
-void CTxMemPool::_remove(const CTransaction &origTx, std::list<CTransactionRef> &removed, bool fRecursive)
+void CTxMemPool::_removeRecursive(const CTransaction &origTx, std::list<CTransactionRef> &removed)
 {
     AssertWriteLockHeld(cs);
     // Remove transaction from memory pool
@@ -663,9 +663,9 @@ void CTxMemPool::_remove(const CTransaction &origTx, std::list<CTransactionRef> 
     {
         txToRemove.insert(origit);
     }
-    else if (fRecursive)
+    else
     {
-        // If recursively removing but origTx isn't in the mempool
+        // When recursively removing but origTx isn't in the mempool
         // be sure to remove any children that are in the pool. This can
         // happen during chain re-orgs if origTx isn't re-accepted into
         // the mempool for any reason.
@@ -680,16 +680,9 @@ void CTxMemPool::_remove(const CTransaction &origTx, std::list<CTransactionRef> 
         }
     }
     setEntries setAllRemoves;
-    if (fRecursive)
+    for (txiter it : txToRemove)
     {
-        for (txiter it : txToRemove)
-        {
-            _CalculateDescendants(it, setAllRemoves);
-        }
-    }
-    else
-    {
-        setAllRemoves.swap(txToRemove);
+        _CalculateDescendants(it, setAllRemoves);
     }
     for (txiter it : setAllRemoves)
     {
@@ -740,7 +733,7 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
     for (const CTransaction &tx : transactionsToRemove)
     {
         std::list<CTransactionRef> removed;
-        _remove(tx, removed, true);
+        _removeRecursive(tx, removed);
     }
 }
 
@@ -762,7 +755,7 @@ void CTxMemPool::_removeConflicts(const CTransaction &tx, std::list<CTransaction
             const CTransaction &txConflict = *it->second.ptx;
             if (txConflict != tx)
             {
-                _remove(txConflict, removed, true);
+                _removeRecursive(txConflict, removed);
                 _ClearPrioritisation(txConflict.GetHash());
             }
         }

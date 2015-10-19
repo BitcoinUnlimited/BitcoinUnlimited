@@ -2282,7 +2282,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
             if (ptx->IsCoinBase() ||
                 !AcceptToMemoryPool(mempool, stateDummy, ptx, AreFreeTxnsDisallowed(), nullptr, true))
             {
-                mempool.remove(*ptx, removed, true);
+                mempool.removeRecursive(*ptx, removed);
             }
             else if (mempool.exists(ptx->GetHash()))
             {

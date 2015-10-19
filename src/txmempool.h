@@ -502,8 +502,8 @@ public:
         setEntries &setAncestors,
         bool fCurrentEstimate = true);
 
-    void remove(const CTransaction &tx, std::list<CTransactionRef> &removed, bool fRecursive = false);
-    void _remove(const CTransaction &tx, std::list<CTransactionRef> &removed, bool fRecursive = false);
+    void removeRecursive(const CTransaction &tx, std::list<CTransactionRef> &removed);
+    void _removeRecursive(const CTransaction &tx, std::list<CTransactionRef> &removed);
     void removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags);
     void removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
     void _removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
