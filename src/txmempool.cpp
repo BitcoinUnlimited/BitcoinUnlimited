@@ -789,8 +789,13 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
     }
     for (const auto &tx : vtx)
     {
-        std::list<CTransactionRef> dummy;
-        _remove(*tx, dummy, false);
+        txiter it = mapTx.find(tx->GetHash());
+        if (it != mapTx.end())
+        {
+            setEntries stage;
+            stage.insert(it);
+            _RemoveStaged(stage);
+        }
         _removeConflicts(*tx, conflicts);
         _ClearPrioritisation(tx->GetHash());
     }
