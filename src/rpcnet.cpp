@@ -18,6 +18,7 @@
 #include "version.h"
 
 #include <boost/foreach.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <univalue.h>
 
@@ -49,15 +50,13 @@ UniValue ping(const UniValue& params, bool fHelp)
             "\nRequests that a ping be sent to all other nodes, to measure ping time.\n"
             "Results provided in getpeerinfo, pingtime and pingwait fields are decimal seconds.\n"
             "Ping command is handled in queue with all other commands, so it measures processing backlog, not just network ping.\n"
-            "\nExamples:\n"
-            + HelpExampleCli("ping", "")
-            + HelpExampleRpc("ping", "")
-        );
+            "\nExamples:\n" +
+            HelpExampleCli("ping", "") + HelpExampleRpc("ping", ""));
 
     // Request that each node send a ping during next message processing pass
     LOCK2(cs_main, cs_vNodes);
 
-    BOOST_FOREACH(CNode* pNode, vNodes) {
+    BOOST_FOREACH (CNode* pNode, vNodes) {
         pNode->fPingQueued = true;
     }
 
@@ -70,7 +69,7 @@ static void CopyNodeStats(std::vector<CNodeStats>& vstats)
 
     LOCK(cs_vNodes);
     vstats.reserve(vNodes.size());
-    BOOST_FOREACH(CNode* pnode, vNodes) {
+    BOOST_FOREACH (CNode* pnode, vNodes) {
         CNodeStats stats;
         pnode->copyStats(stats);
         vstats.push_back(stats);
@@ -113,10 +112,8 @@ UniValue getpeerinfo(const UniValue& params, bool fHelp)
             "  }\n"
             "  ,...\n"
             "]\n"
-            "\nExamples:\n"
-            + HelpExampleCli("getpeerinfo", "")
-            + HelpExampleRpc("getpeerinfo", "")
-        );
+            "\nExamples:\n" +
+            HelpExampleCli("getpeerinfo", "") + HelpExampleRpc("getpeerinfo", ""));
 
     LOCK(cs_main);
 
@@ -169,6 +166,109 @@ UniValue getpeerinfo(const UniValue& params, bool fHelp)
     return ret;
 }
 
+
+UniValue gettrafficshaping(const UniValue& params, bool fHelp)
+{
+    string strCommand;
+    if (params.size() == 1) {
+        strCommand = params[0].get_str();
+    }
+
+    if (fHelp || (params.size() != 0))
+        throw runtime_error(
+            "gettrafficshaping"
+            "\nReturns the current settings for the network send and receive bandwidth and burst in kilobytes per second.\n"
+            "\nArguments: None\n"
+            "\nResult:\n"
+            "  {\n"
+            "    \"sendBurst\" : 40,   (string) The maximum send bandwidth in Kbytes/sec\n"
+            "    \"sendAve\" : 30,   (string) The average send bandwidth in Kbytes/sec\n"
+            "    \"recvBurst\" : 20,   (string) The maximum receive bandwidth in Kbytes/sec\n"
+            "    \"recvAve\" : 10,   (string) The average receive bandwidth in Kbytes/sec\n"
+            "  }\n"
+            "\n NOTE: if the send and/or recv parameters do not exist, shaping in that direction is disabled.\n"
+            "\nExamples:\n" +
+            HelpExampleCli("gettrafficshaping", "") + HelpExampleRpc("gettrafficshaping", ""));
+
+    UniValue ret(UniValue::VARR);
+    int64_t max, ave;
+    sendShaper.get(&max, &ave);
+    if (ave != LONG_MAX) {
+        ret.push_back(Pair("sendBurst", max / 1024));
+        ret.push_back(Pair("sendAve", ave / 1024));
+    }
+    receiveShaper.get(&max, &ave);
+    if (ave != LONG_MAX) {
+        ret.push_back(Pair("recvBurst", max / 1024));
+        ret.push_back(Pair("recvAve", ave / 1024));
+    }
+    return ret;
+}
+
+UniValue settrafficshaping(const UniValue& params, bool fHelp)
+{
+    bool disable = false;
+    bool badArg = false;
+    string strCommand;
+    CLeakyBucket* bucket = NULL;
+    if (params.size() >= 2) {
+        strCommand = params[0].get_str();
+        if (strCommand == "send")
+            bucket = &sendShaper;
+        if (strCommand == "receive")
+            bucket = &receiveShaper;
+        if (strCommand == "recv")
+            bucket = &receiveShaper;
+    }
+    if (params.size() == 2) {
+        if (params[1].get_str() == "disable")
+            disable = true;
+        else
+            badArg = true;
+    } else if (params.size() != 3)
+        badArg = true;
+
+    if (fHelp || badArg || bucket == NULL)
+        throw runtime_error(
+            "settrafficshaping \"send|receive\" \"burstKB\" \"averageKB\""
+            "\nSets the network send or receive bandwidth and burst in kilobytes per second.\n"
+            "\nArguments:\n"
+            "1. \"send|receive\"     (string, required) Are you setting the transmit or receive bandwidth\n"
+            "2. \"burst\"  (integer, required) Specify the maximum burst size in Kbytes/sec (actual max will be 1 packet larger than this number)\n"
+            "2. \"average\"  (integer, required) Specify the average throughput in Kbytes/sec\n"
+            "\nExamples:\n" +
+            HelpExampleCli("settrafficshaping", "\"receive\" 10000 1024") + HelpExampleCli("settrafficshaping", "\"receive\" disable") + HelpExampleRpc("settrafficshaping", "\"receive\" 10000 1024"));
+
+    if (disable) {
+        if (bucket)
+            bucket->disable();
+    } else {
+        uint64_t burst;
+        uint64_t ave;
+        if (params[1].isNum())
+            burst = params[1].get_int64();
+        else {
+            string temp = params[1].get_str();
+            burst = boost::lexical_cast<uint64_t>(temp);
+        }
+        if (params[2].isNum())
+            ave = params[2].get_int64();
+        else {
+            string temp = params[2].get_str();
+            ave = boost::lexical_cast<uint64_t>(temp);
+        }
+        if (burst < ave) {
+            throw runtime_error("Burst rate must be greater than the average rate"
+                                "\nsettrafficshaping \"send|receive\" \"burst\" \"average\"");
+        }
+
+        bucket->set(burst * 1024, ave * 1024);
+    }
+
+    return NullUniValue;
+}
+
+
 UniValue addnode(const UniValue& params, bool fHelp)
 {
     string strCommand;
@@ -183,15 +283,12 @@ UniValue addnode(const UniValue& params, bool fHelp)
             "\nArguments:\n"
             "1. \"node\"     (string, required) The node (see getpeerinfo for nodes)\n"
             "2. \"command\"  (string, required) 'add' to add a node to the list, 'remove' to remove a node from the list, 'onetry' to try a connection to the node once\n"
-            "\nExamples:\n"
-            + HelpExampleCli("addnode", "\"192.168.0.6:8333\" \"onetry\"")
-            + HelpExampleRpc("addnode", "\"192.168.0.6:8333\", \"onetry\"")
-        );
+            "\nExamples:\n" +
+            HelpExampleCli("addnode", "\"192.168.0.6:8333\" \"onetry\"") + HelpExampleRpc("addnode", "\"192.168.0.6:8333\", \"onetry\""));
 
     string strNode = params[0].get_str();
 
-    if (strCommand == "onetry")
-    {
+    if (strCommand == "onetry") {
         CAddress addr;
         OpenNetworkConnection(addr, NULL, strNode.c_str());
         return NullUniValue;
@@ -199,18 +296,15 @@ UniValue addnode(const UniValue& params, bool fHelp)
 
     LOCK(cs_vAddedNodes);
     vector<string>::iterator it = vAddedNodes.begin();
-    for(; it != vAddedNodes.end(); it++)
+    for (; it != vAddedNodes.end(); it++)
         if (strNode == *it)
             break;
 
-    if (strCommand == "add")
-    {
+    if (strCommand == "add") {
         if (it != vAddedNodes.end())
             throw JSONRPCError(RPC_CLIENT_NODE_ALREADY_ADDED, "Error: Node already added");
         vAddedNodes.push_back(strNode);
-    }
-    else if(strCommand == "remove")
-    {
+    } else if (strCommand == "remove") {
         if (it == vAddedNodes.end())
             throw JSONRPCError(RPC_CLIENT_NODE_NOT_ADDED, "Error: Node has not been added.");
         vAddedNodes.erase(it);
@@ -370,10 +464,8 @@ UniValue getnettotals(const UniValue& params, bool fHelp)
             "  \"totalbytessent\": n,   (numeric) Total bytes sent\n"
             "  \"timemillis\": t        (numeric) Total cpu time\n"
             "}\n"
-            "\nExamples:\n"
-            + HelpExampleCli("getnettotals", "")
-            + HelpExampleRpc("getnettotals", "")
-       );
+            "\nExamples:\n" +
+            HelpExampleCli("getnettotals", "") + HelpExampleRpc("getnettotals", ""));
 
     UniValue obj(UniValue::VOBJ);
     obj.push_back(Pair("totalbytesrecv", CNode::GetTotalBytesRecv()));

@@ -6,17 +6,43 @@
 #define BITCOIN_QT_OPTIONSDIALOG_H
 
 #include <QDialog>
+#include <QIntValidator>
 
 class OptionsModel;
 class QValidatedLineEdit;
+class QLineEdit;
+class QLabel;
 
 QT_BEGIN_NAMESPACE
 class QDataWidgetMapper;
 QT_END_NAMESPACE
 
-namespace Ui {
+namespace Ui
+{
 class OptionsDialog;
 }
+
+/** Ensures that one edit box is always less than another */
+class LessThanValidator : public QIntValidator
+{
+    QLineEdit* other;
+    QLabel* errorDisplay;
+
+public:
+    LessThanValidator(int minimum, int maximum, QObject* parent = 0) : QIntValidator(minimum, maximum, parent), other(NULL), errorDisplay(NULL)
+    {
+    }
+    
+    // This cannot be part of the constructor because these widgets may not be created at construction time.
+    void initialize(QLineEdit* otherp, QLabel* errorDisplayp)
+    {
+        other = otherp;
+        errorDisplay = errorDisplayp;
+    }
+
+
+    virtual State validate(QString& input, int& pos) const;
+};
 
 /** Preferences dialog. */
 class OptionsDialog : public QDialog
@@ -24,14 +50,14 @@ class OptionsDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit OptionsDialog(QWidget *parent, bool enableWallet);
+    explicit OptionsDialog(QWidget* parent, bool enableWallet);
     ~OptionsDialog();
 
-    void setModel(OptionsModel *model);
+    void setModel(OptionsModel* model);
     void setMapper();
 
 protected:
-    bool eventFilter(QObject *object, QEvent *event);
+    bool eventFilter(QObject* object, QEvent* event);
 
 private Q_SLOTS:
     /* enable OK button */
@@ -47,6 +73,10 @@ private Q_SLOTS:
     void showRestartWarning(bool fPersistent = false);
     void clearStatusLabel();
     void doProxyIpChecks(QValidatedLineEdit *pUiProxyIp, int nProxyPort);
+    void shapingSliderChanged();         // Pushes the traffic shaping slider changes into the traffic shaping edit boxes
+    void shapingMaxEditFinished(void);   // auto-corrects cases where max is lower then average
+    void shapingAveEditFinished(void);   // auto-corrects cases where max is lower then average
+    void shapingEnableChanged(bool val); // Pushes the traffic shaping slider changes into the traffic shaping edit boxes
     /* query the networks, for which the default proxy is used */
     void updateDefaultProxyNets();
 
@@ -58,6 +88,12 @@ private:
     OptionsModel *model;
     QDataWidgetMapper *mapper;
     bool fProxyIpsValid;
+
+    QIntValidator torPortValidator;
+    QIntValidator portValidator;
+    QIntValidator burstValidator;
+    LessThanValidator sendAveValidator;
+    LessThanValidator recvAveValidator;    
 };
 
 #endif // BITCOIN_QT_OPTIONSDIALOG_H

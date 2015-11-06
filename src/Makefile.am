@@ -118,6 +118,7 @@ BITCOIN_CORE_H = \
   miner.h \
   mruset.h \
   net.h \
+  leakybucket.h \
   netbase.h \
   noui.h \
   policy/fees.h \
