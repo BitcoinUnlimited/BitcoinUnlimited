@@ -657,6 +657,8 @@ int main(int argc, char *argv[])
     if (GetBoolArg("-splash", true) && !GetBoolArg("-min", false))
         app.createSplashScreen(networkStyle.data());
 
+    UnlimitedSetup();
+
     try
     {
         app.createWindow(networkStyle.data());

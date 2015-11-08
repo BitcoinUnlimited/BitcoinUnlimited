@@ -13,6 +13,7 @@
 #include "httpserver.h"
 #include "httprpc.h"
 #include "rpcserver.h"
+#include "unlimited.h"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
@@ -157,6 +158,8 @@ bool AppInit(int argc, char* argv[])
         PrintExceptionContinue(NULL, "AppInit()");
     }
 
+    UnlimitedSetup();
+    
     if (!fRet)
     {
         Interrupt(threadGroup);
