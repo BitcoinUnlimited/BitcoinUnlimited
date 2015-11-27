@@ -991,12 +991,14 @@ BOOST_AUTO_TEST_CASE(bloom_full_and_size_tests)
     {
         // a rolling bloom filter can be constructed with much larger size than a regular one
         CRollingBloomFilter rollbloom(120000, 0.000001);
-        BOOST_CHECK(rollbloom.vDataTotalSize() > 800000);
+        printf("Roll Bloom filter size: %u\n", rollbloom.vDataSize());
+        BOOST_CHECK(rollbloom.vDataSize() > 150000);
     }
 
     {
         // a regular one, not so much
         CBloomFilter filter(120000, 0.000001, 0, 0);
+        printf("Bloom filter size: %u\n", filter.vDataSize());
         BOOST_CHECK(filter.vDataSize() < 50000);
     }
 }
