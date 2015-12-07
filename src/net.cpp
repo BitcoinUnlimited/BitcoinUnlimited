@@ -74,6 +74,15 @@ namespace {
     };
 }
 
+//immutable thread safe array of allowed commands for logging inbound traffic
+const static std::string logAllowIncomingMsgCmds[] = {
+    "version", "addr", "inv", "getdata", "merkleblock",
+    "getblocks", "getheaders", "tx", "headers", "block",
+    "getaddr", "mempool", "ping", "pong", "alert", "notfound",
+    "filterload", "filteradd", "filterclear", "reject"};
+
+const static std::string NET_MESSAGE_COMMAND_OTHER = "*other*";
+
 //
 // Global state variables
 //
@@ -91,7 +100,7 @@ int nMaxConnections = DEFAULT_MAX_PEER_CONNECTIONS;
 bool fAddressesInitialized = false;
 std::string strSubVersion;
 
-// BU moved to global.cpp 
+// BU moved to global.cpp
 // extern vector<CNode*> vNodes;
 // extern CCriticalSection cs_vNodes;
 // map<CInv, CDataStream> mapRelay;
@@ -670,7 +679,9 @@ void CNode::copyStats(CNodeStats& stats)
     X(fInbound);
     X(nStartingHeight);
     X(nSendBytes);
+    X(mapSendBytesPerMsgCmd);
     X(nRecvBytes);
+    X(mapRecvBytesPerMsgCmd);
     X(fWhitelisted);
 
     // It is common for nodes with good ping times to suddenly become lagged,
@@ -715,9 +726,9 @@ bool CNode::ReceiveMsgBytes(const char* pch, unsigned int nBytes)
         if (handled < 0)
                 return false;
 
-        // BU: only reject the message if it is some multiple of the excessive 
+        // BU: only reject the message if it is some multiple of the excessive
         // block size.  Since traffic shaping will keep the bandwidth in check
-        // this basically eliminates nodes that are deliberately trying to screw us up. 
+        // this basically eliminates nodes that are deliberately trying to screw us up.
         if (maxMessageSizeMultiplier && msg.in_data && (msg.hdr.nMessageSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE) && (msg.hdr.nMessageSize > (maxMessageSizeMultiplier*excessiveBlockSize))) {
             LogPrint("net", "Oversized message from peer=%i, disconnecting\n", GetId());
             //BU: TODO warn if too many nodes are doing this
@@ -740,21 +751,30 @@ bool CNode::ReceiveMsgBytes(const char* pch, unsigned int nBytes)
                 nActivityBytes += msg.hdr.nMessageSize;
 
                 // BU: furthermore, if the message is a priority message then move from the back to the front of the deque
-                // NOTE: for GET_XTHIN we don't jump the queue on test environments because the GET_XTHIN can get ahead of 
+                // NOTE: for GET_XTHIN we don't jump the queue on test environments because the GET_XTHIN can get ahead of
                 // a previous GET_XTHIN/HEADER requests and result in a DOS if the block returns out of order and with no headers
                 // in the block index or the setblockindexcandidates.
-                if ((strCommand == NetMsgType::GET_XTHIN && Params().NetworkIDString() == "main") || 
-                    strCommand == NetMsgType::XTHINBLOCK || 
-                    strCommand == NetMsgType::THINBLOCK || 
-                    strCommand == NetMsgType::XBLOCKTX || 
+                if ((strCommand == NetMsgType::GET_XTHIN && Params().NetworkIDString() == "main") ||
+                    strCommand == NetMsgType::XTHINBLOCK ||
+                    strCommand == NetMsgType::THINBLOCK ||
+                    strCommand == NetMsgType::XBLOCKTX ||
                     strCommand == NetMsgType::GET_XBLOCKTX )
                 {
                     vRecvMsg.push_front(msg);
                     vRecvMsg.pop_back();
                     LogPrint("thin", "Receive Queue: pushed %s to the front of the queue\n", strCommand);
                 }
-           }
+            }
             // BU: end
+
+            //store received bytes per message command
+            //to prevent a memory DOS, only allow valid commands
+            mapMsgCmdSize::iterator i = mapRecvBytesPerMsgCmd.find(msg.hdr.pchCommand);
+            if (i == mapRecvBytesPerMsgCmd.end())
+                i = mapRecvBytesPerMsgCmd.find(NET_MESSAGE_COMMAND_OTHER);
+            assert(i != mapRecvBytesPerMsgCmd.end());
+            i->second += msg.hdr.nMessageSize + CMessageHeader::HEADER_SIZE;
+
             msg.nTime = GetTimeMicros();
             messageHandlerCondition.notify_one();
         }
@@ -829,9 +849,9 @@ int SocketSendData(CNode* pnode)
         int amt2Send = min((int64_t)(data.size() - pnode->nSendOffset), sendShaper.available(SEND_SHAPER_MIN_FRAG));
         if (amt2Send == 0)
             break;
-        SOCKET hSocket = pnode->hSocket;  
+        SOCKET hSocket = pnode->hSocket;
         if (hSocket == INVALID_SOCKET)
-            break;        
+            break;
         int nBytes = send(hSocket, &data[pnode->nSendOffset], amt2Send, MSG_NOSIGNAL | MSG_DONTWAIT);
         if (nBytes > 0) {
             progress++;  // BU
@@ -975,7 +995,7 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection) {
         static int64_t nLastTime = GetTime();
         BOOST_FOREACH(CNode *node, vNodes)
         {
-            // Decay the activity bytes for each node over a period of 2 hours.  This gradually de-prioritizes a connection 
+            // Decay the activity bytes for each node over a period of 2 hours.  This gradually de-prioritizes a connection
             // that was once active but has gone stale for some reason and allows lower priority active nodes to climb the ladder.
             int64_t nNow = GetTime();
             node->nActivityBytes *= pow(1.0 - 1.0/7200, (double)(nNow - nLastTime)); // exponential 2 hour decay
@@ -1082,7 +1102,7 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection) {
             int64_t nTimeElapsed = GetTime() - mapInboundConnectionTracker[ipAddress].nLastEvictionTime;
             double nRatioElapsed = (double)nTimeElapsed / 1800;
             nEvictions = mapInboundConnectionTracker[ipAddress].nEvictions - (nRatioElapsed * mapInboundConnectionTracker[ipAddress].nEvictions);
-            if (nEvictions < 0) 
+            if (nEvictions < 0)
                 nEvictions = 0;
         }
 
@@ -1200,7 +1220,7 @@ static void AcceptConnection(const ListenSocket& hListenSocket) {
             int64_t nTimeElapsed = GetTime() - mapInboundConnectionTracker[ipAddress].nLastConnectionTime;
             double nRatioElapsed = (double)nTimeElapsed / 60;
             nConnections = mapInboundConnectionTracker[ipAddress].nConnections - (nRatioElapsed * mapInboundConnectionTracker[ipAddress].nConnections);
-            if (nConnections < 0) 
+            if (nConnections < 0)
                 nConnections = 0;
         }
 
@@ -1218,7 +1238,7 @@ static void AcceptConnection(const ListenSocket& hListenSocket) {
         }
     }
     // BU - end section
- 
+
     CNode* pnode = new CNode(hSocket, addr, "", true);
     pnode->AddRef();
     pnode->fWhitelisted = whitelisted;
@@ -1326,7 +1346,7 @@ void ThreadSocketHandler()
             BOOST_FOREACH (CNode* pnode, vNodes) {
                 // It is necessary to use a temporary variable to ensure that pnode->hSocket is not changed by another thread during execution.
                 // If the socket is closed and even reopened for some unrelated connection, the worst case is that we get a spurious wakeup, so a mutex is not needed to protect the entire use of the socket.
-  	        SOCKET hSocket = pnode->hSocket;  
+  	        SOCKET hSocket = pnode->hSocket;
                 if (hSocket == INVALID_SOCKET)
                     continue;
                 FD_SET(hSocket, &fdsetError);
@@ -1495,7 +1515,7 @@ void ThreadSocketHandler()
                 pnode->Release();
         }
 
-        if (progress == 0 && fAquiredAllRecvLocks) // BU: Nothing happened even though select did not block.  So slow us down. 
+        if (progress == 0 && fAquiredAllRecvLocks) // BU: Nothing happened even though select did not block.  So slow us down.
             MilliSleep(5);
     }
 }
@@ -1915,15 +1935,15 @@ void ThreadOpenAddedConnections()
             BOOST_FOREACH(const std::string& strAddNode, lAddresses) {
   	            CAddress addr;
                 // BU: always allow us to add a node manually. Whenever we use -addnode the maximum InBound connections are reduced by
-                //     the same number.  Here we use our own semaphore to ensure we have the outbound slots we need and can reconnect to 
+                //     the same number.  Here we use our own semaphore to ensure we have the outbound slots we need and can reconnect to
                 //     nodes that have restarted.
                 CSemaphoreGrant grant(*semOutboundAddNode);
                 OpenNetworkConnection(addr, &grant, strAddNode.c_str());
                 MilliSleep(500);
             }
-            // Retry every 15 seconds.  It is important to check often to make sure the Xpedited Relay network 
+            // Retry every 15 seconds.  It is important to check often to make sure the Xpedited Relay network
             // nodes reconnect quickly after the remote peers restart
-            MilliSleep(15000); 
+            MilliSleep(15000);
         }
     }
 
@@ -1967,15 +1987,15 @@ void ThreadOpenAddedConnections()
         BOOST_FOREACH(vector<CService>& vserv, lservAddressesToAdd)
         {
             // BU: always allow us to add a node manually. Whenever we use -addnode the maximum InBound connections are reduced by
-            //     the same number.  Here we use our own semaphore to ensure we have the outbound slots we need and can reconnect to 
+            //     the same number.  Here we use our own semaphore to ensure we have the outbound slots we need and can reconnect to
             //     nodes that have restarted.
             CSemaphoreGrant grant(*semOutboundAddNode);
             OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant);
             MilliSleep(500);
         }
-        // Retry every 15 seconds.  It is important to check often to make sure the Xpedited Relay network 
+        // Retry every 15 seconds.  It is important to check often to make sure the Xpedited Relay network
         // nodes reconnect quickly after the remote peers restart
-        MilliSleep(15000); 
+        MilliSleep(15000);
     }
 }
 
@@ -2022,7 +2042,7 @@ void ThreadMessageHandler()
 
     // SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
     while (true) {
-        requester.SendRequests();  // BU send out any requests for tx or blks that I don't know about yet        
+        requester.SendRequests();  // BU send out any requests for tx or blks that I don't know about yet
 
         vector<CNode*> vNodesCopy;
         {
@@ -2724,6 +2744,11 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
 
     sendGap.init("node/" + xmledName + "/sendGap",STAT_OP_MAX);
     recvGap.init("node/" + xmledName + "/recvGap",STAT_OP_MAX);
+    // BU instrumentation end
+
+    for (unsigned int i = 0; i < sizeof(logAllowIncomingMsgCmds)/sizeof(logAllowIncomingMsgCmds[0]); i++)
+        mapRecvBytesPerMsgCmd[logAllowIncomingMsgCmds[i]] = 0;
+    mapRecvBytesPerMsgCmd[NET_MESSAGE_COMMAND_OTHER] = 0;
 
     {
         LOCK(cs_nLastNodeId);
@@ -2826,7 +2851,7 @@ void CNode::AbortMessage() UNLOCK_FUNCTION(cs_vSend)
     LogPrint("net", "(aborted)\n");
 }
 
-void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
+void CNode::EndMessage(const char* pszCommand) UNLOCK_FUNCTION(cs_vSend)
 {
     // The -*messagestest options are intentionally not documented in the help message,
     // since they are only used during development to debug the networking code and are
@@ -2850,6 +2875,9 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
 
     UpdateSendStats(this, currentCommand, nSize + CMessageHeader::HEADER_SIZE, GetTimeMicros());
 
+    //log total amount of bytes per command
+    mapSendBytesPerMsgCmd[std::string(pszCommand)] += nSize + CMessageHeader::HEADER_SIZE;
+
     // Set the checksum
     uint256 hash = Hash(ssSend.begin() + CMessageHeader::HEADER_SIZE, ssSend.end());
     unsigned int nChecksum = 0;
@@ -2866,7 +2894,7 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
     char strCommand[CMessageHeader::COMMAND_SIZE + 1];
     strncpy(strCommand, &(*(ssSend.begin() + MESSAGE_START_SIZE)), CMessageHeader::COMMAND_SIZE);
     strCommand[CMessageHeader::COMMAND_SIZE] = '\0';
-    if (strcmp(strCommand, NetMsgType::PING) != 0 && 
+    if (strcmp(strCommand, NetMsgType::PING) != 0 &&
         strcmp(strCommand, NetMsgType::PONG) != 0 &&
         strcmp(strCommand, NetMsgType::ADDR) != 0 &&
         strcmp(strCommand, NetMsgType::VERSION) != 0 &&
@@ -2876,10 +2904,10 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
         nActivityBytes += nSize;
 
         // BU: furthermore, if the message is a priority message then move to the front of the deque
-        if (strcmp(strCommand, NetMsgType::GET_XTHIN) == 0 || 
-            strcmp(strCommand, NetMsgType::XTHINBLOCK) == 0 || 
-            strcmp(strCommand, NetMsgType::THINBLOCK) == 0 || 
-            strcmp(strCommand, NetMsgType::XBLOCKTX) == 0 || 
+        if (strcmp(strCommand, NetMsgType::GET_XTHIN) == 0 ||
+            strcmp(strCommand, NetMsgType::XTHINBLOCK) == 0 ||
+            strcmp(strCommand, NetMsgType::THINBLOCK) == 0 ||
+            strcmp(strCommand, NetMsgType::XBLOCKTX) == 0 ||
             strcmp(strCommand, NetMsgType::GET_XBLOCKTX) == 0 ) {
             it = vSendMsg.insert(vSendMsg.begin(), CSerializeData());
             LogPrint("thin", "Send Queue: pushed %s to the front of the queue\n", strCommand);
@@ -2991,14 +3019,14 @@ bool CBanDB::Read(banmap_t& banSet)
         // ... verify the network matches ours
         if (memcmp(pchMsgTmp, Params().MessageStart(), sizeof(pchMsgTmp)))
             return error("%s: Invalid network magic number", __func__);
-        
+
         // de-serialize address data into one CAddrMan object
         ssBanlist >> banSet;
     }
     catch (const std::exception& e) {
         return error("%s: Deserialize or I/O error - %s", __func__, e.what());
     }
-    
+
     return true;
 }
 
