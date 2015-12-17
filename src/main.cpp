@@ -4364,14 +4364,6 @@ bool ProcessNewBlock(CValidationState &state,
     if (IsChainNearlySyncd())
         SendExpeditedBlock(*pblock, pfrom);
 
-    bool checked = CheckBlock(*pblock, state);
-    if (!checked)
-    {
-        int byteLen = ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION);
-        LogPrintf("Invalid block: ver:%x time:%d Tx size:%d len:%d\n", pblock->nVersion, pblock->nTime,
-            pblock->vtx.size(), byteLen);
-    }
-
     // WARNING: cs_main is not locked here throughout but is released and then re-locked during ActivateBestChain
     //          If you lock cs_main throughout ProcessNewBlock then you will in effect prevent PV from happening.
     //          TODO: in order to lock cs_main all the way through we must remove the locking from ActivateBestChain
@@ -4381,10 +4373,6 @@ bool ProcessNewBlock(CValidationState &state,
         LOCK(cs_main);
         bool fRequested = MarkBlockAsReceived(pblock->GetHash());
         fRequested |= fForceProcessing;
-        if (!checked)
-        {
-            return error("%s: CheckBlock FAILED", __func__);
-        }
 
         // Store to disk
         CBlockIndex *pindex = NULL;
