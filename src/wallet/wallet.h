@@ -64,6 +64,9 @@ static const unsigned int DEFAULT_TX_CONFIRM_TARGET = 2;
 static const unsigned int MAX_FREE_TRANSACTION_CREATE_SIZE = MAX_STANDARD_TX_SIZE;
 static const bool DEFAULT_WALLETBROADCAST = true;
 
+//! if set, all keys will be derived by using BIP32
+static const bool DEFAULT_USE_HD_WALLET = true;
+
 extern const char *DEFAULT_WALLET_DAT;
 
 class CBlockIndex;
@@ -571,6 +574,9 @@ private:
 
     void SyncMetaData(std::pair<TxSpends::iterator, TxSpends::iterator>);
 
+    /* the hd chain data model (external chain counters) */
+    CHDChain hdChain;
+
 public:
     /*
      * Main wallet lock.
@@ -914,6 +920,14 @@ public:
 
     /* Wallets parameter interaction */
     static bool ParameterInteraction();
+
+    bool BackupWallet(const std::string &strDest);
+
+    /* Set the hd chain model (chain child index counters) */
+    bool SetHDChain(const CHDChain &chain, bool memonly);
+
+    /* Set the current hd master key (will reset the chain child index counters) */
+    bool SetHDMasterKey(const CKey &key);
 };
 
 /** A key allocated from the key pool. */
