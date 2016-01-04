@@ -631,6 +631,11 @@ public:
         std::string &errString,
         bool fSearchForParents = true) const;
 
+    /** Populate setDescendants with all in-mempool descendants of hash.
+ *  Assumes that setDescendants includes all in-mempool descendants of anything
+ *  already in it.  */
+    void _CalculateDescendants(txiter it, setEntries &setDescendants);
+
     /** Similar to CalculateMemPoolAncestors, except only requires the inputs and just returns true/false depending on
      * whether the input set conforms to the passed limits */
     bool ValidateMemPoolAncestors(const std::vector<CTxIn> &txIn,
@@ -723,11 +728,6 @@ public:
 
     size_t DynamicMemoryUsage() const;
     size_t _DynamicMemoryUsage() const; // no locks taken
-protected:
-    /** Populate setDescendants with all in-mempool descendants of hash.
- *  Assumes that setDescendants includes all in-mempool descendants of anything
- *  already in it.  */
-    void _CalculateDescendants(txiter it, setEntries &setDescendants);
 
 private:
     /** UpdateForDescendants is used by UpdateTransactionsFromBlock to update
