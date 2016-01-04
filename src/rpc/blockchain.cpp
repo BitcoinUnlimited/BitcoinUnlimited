@@ -304,6 +304,75 @@ UniValue getrawmempool(const UniValue &params, bool fHelp)
     return mempoolToJSON(fVerbose);
 }
 
+UniValue getmempoolancestors(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)
+    {
+        throw runtime_error(
+            "getmempoolancestors txid (verbose)\n"
+            "\nIf txid is in the mempool, returns all in-mempool ancestors.\n"
+            "\nArguments:\n"
+            "1. \"txid\"                   (string, required) The transaction id (must be in mempool)\n"
+            "2. verbose                  (boolean, optional, default=false) true for a json object, false for array of "
+            "transaction ids\n"
+            "\nResult (for verbose=false):\n"
+            "[                       (json array of string)\n"
+            "  \"transactionid\"           (string) The transaction id of an in-mempool ancestor transaction\n"
+            "  ,...\n"
+            "]\n"
+            "\nResult (for verbose=true):\n"
+            "{                           (json object)\n"
+            "  \"transactionid\" : {       (json object)\n" +
+            EntryDescriptionString() + "  }, ...\n"
+                                       "}\n"
+                                       "\nExamples\n" +
+            HelpExampleCli("getmempoolancestors", "\"mytxid\"") + HelpExampleRpc("getmempoolancestors", "\"mytxid\""));
+    }
+
+    bool fVerbose = false;
+    if (params.size() > 1)
+        fVerbose = params[1].get_bool();
+
+    uint256 paramhash = ParseHashV(params[0], "parameter 1");
+
+    READLOCK(mempool.cs);
+
+    CTxMemPool::txiter it = mempool.mapTx.find(paramhash);
+    if (it == mempool.mapTx.end())
+    {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction not in mempool");
+    }
+
+    CTxMemPool::setEntries setAncestors;
+    uint64_t noLimit = std::numeric_limits<uint64_t>::max();
+    std::string dummy;
+    mempool._CalculateMemPoolAncestors(*it, setAncestors, noLimit, noLimit, noLimit, noLimit, dummy, false);
+
+    if (!fVerbose)
+    {
+        UniValue o(UniValue::VARR);
+        for (CTxMemPool::txiter ancestorIt : setAncestors)
+        {
+            o.push_back(ancestorIt->GetTx().GetHash().ToString());
+        }
+
+        return o;
+    }
+    else
+    {
+        UniValue o(UniValue::VOBJ);
+        for (CTxMemPool::txiter ancestorIt : setAncestors)
+        {
+            const CTxMemPoolEntry &e = *ancestorIt;
+            const uint256 &hash = e.GetTx().GetHash();
+            UniValue info(UniValue::VOBJ);
+            entryToJSON(info, e);
+            o.push_back(Pair(hash.ToString(), info));
+        }
+        return o;
+    }
+}
+
 UniValue getblockhash(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
@@ -1320,7 +1389,9 @@ static const CRPCCommand commands[] = {
     {"blockchain", "getbestblockhash", &getbestblockhash, true}, {"blockchain", "getblockcount", &getblockcount, true},
     {"blockchain", "getblock", &getblock, true}, {"blockchain", "getblockhash", &getblockhash, true},
     {"blockchain", "getblockheader", &getblockheader, true}, {"blockchain", "getchaintips", &getchaintips, true},
-    {"blockchain", "getdifficulty", &getdifficulty, true}, {"blockchain", "getmempoolinfo", &getmempoolinfo, true},
+    {"blockchain", "getdifficulty", &getdifficulty, true},
+    {"blockchain", "getmempoolancestors", &getmempoolancestors, true},
+    {"blockchain", "getmempoolinfo", &getmempoolinfo, true},
     {"blockchain", "getorphanpoolinfo", &getorphanpoolinfo, true},
     {"blockchain", "getrawmempool", &getrawmempool, true}, {"blockchain", "gettxout", &gettxout, true},
     {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true}, {"blockchain", "verifychain", &verifychain, true},
