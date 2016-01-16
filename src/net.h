@@ -12,6 +12,7 @@
 #include "limitedmap.h"
 #include "mruset.h"
 #include "netbase.h"
+#include "primitives/block.h"
 #include "protocol.h"
 #include "random.h"
 #include "streams.h"
@@ -286,6 +287,13 @@ public:
     CBloomFilter* pfilter;
     int nRefCount;
     NodeId id;
+
+    // If we've received a thin block from this peer, it's stored here until we have enough data to complete it.
+    CBlock thinBlock;
+    std::vector<uint256> thinBlockHashes;
+    int thinBlockWaitingForTxns;   // if -1 then not currently waiting
+    std::map<uint256, uint64_t> mapThinBlocksInFlight; // map of the hashes of thin blocks in flight with the time they were requested.
+    std::map<uint256, CTransaction> mapThinBlockTxEvictionCache; // map of transactions that were evicted between requesting and receiving a thinblock
 
 protected:
     // Denial-of-service detection/prevention
