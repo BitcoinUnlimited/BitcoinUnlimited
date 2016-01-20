@@ -9,7 +9,7 @@
  * network protocol versioning
  */
 
-static const int PROTOCOL_VERSION = 80001;
+static const int PROTOCOL_VERSION = 80000;
 
 //! initial proto version, to be increased after version/verack negotiation
 static const int INIT_PROTO_VERSION = 209;
@@ -35,6 +35,6 @@ static const int BIP0031_VERSION = 60000;
 static const int MEMPOOL_GD_VERSION = 60002;
 
 //! Thinblocks enabled in this version
-static const int THINBLOCKS_VERSION = 80001;
+static const int THINBLOCKS_VERSION = 80000;
 
 #endif // BITCOIN_VERSION_H

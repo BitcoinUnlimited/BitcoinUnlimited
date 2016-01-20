@@ -1,5 +1,4 @@
-// Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2016 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -16,7 +15,6 @@
 class CThinBlock
 {
 public:
-    /** Public only for unit testing */
     CBlockHeader header;
     std::vector<uint256> vTxHashes; // List of all transactions id's in the block
     std::map<uint256, CTransaction> mapMissingTx; // map of transactions that did not match the bloom filter
@@ -43,24 +41,54 @@ public:
     }
 };
 
+class CXThinBlock
+{
+public:
+    CBlockHeader header;
+    std::vector<uint64_t> vTxHashes; // List of all transactions id's in the block
+    std::map<uint256, CTransaction> mapMissingTx; // map of transactions that did not match the bloom filter
+    bool collision;
+
+public:
+
+    /**
+     * Create from a CThinBlock, finding missing transactions according to filter
+     */
+    CXThinBlock(const CBlock& block, CBloomFilter& filter);
+
+    CXThinBlock() {}
+
+    int64_t GetBlockTime() { return header.GetBlockTime(); }
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+        READWRITE(header);
+        READWRITE(vTxHashes);
+        READWRITE(mapMissingTx);
+
+    }
+};
+
 // This class is used for retrieving a list of still missing transactions after receiving a "thinblock" message.
-// The CThinBlockTx when recieved can be used to fill in the missing transactions after which it is sent
-// back to the requestor.
-class CThinBlockTx
+// The CXThinBlockTx when recieved can be used to fill in the missing transactions after which it is sent
+// back to the requestor.  This class uses a 64bit hash as opposed to the normal 256bit hash.
+class CXThinBlockTx
 {
 public:
     /** Public only for unit testing */
     uint256 blockhash;
-    std::map<uint256, CTransaction> mapTx; // map of missing transactions
+    std::map<uint64_t, CTransaction> mapTx; // map of missing transactions
 
 public:
 
     /**
      * Create from a CThinBlockTx, finding missing transactions
      */
-    CThinBlockTx(uint256 blockHash, std::vector<uint256>& vHashesToRequest);
+    CXThinBlockTx(uint256 blockHash, std::vector<uint64_t>& vHashesToRequest);
 
-    CThinBlockTx() {}
+    CXThinBlockTx() {}
 
     ADD_SERIALIZE_METHODS;
 
