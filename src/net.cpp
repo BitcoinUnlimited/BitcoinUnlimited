@@ -627,8 +627,11 @@ void SocketSendData(CNode* pnode)
         assert(data.size() > pnode->nSendOffset);
 
         int amt2Send = min((int64_t)(data.size() - pnode->nSendOffset), sendShaper.available(SEND_SHAPER_MIN_FRAG));
-        if (amt2Send == 0)
+        if (amt2Send == 0) {
+            if (sendShaper.available(SEND_SHAPER_MIN_FRAG) != INT_MAX) //Sleep if traffic shaping is turned on
+                MilliSleep(10);
             break;
+        }
         int nBytes = send(pnode->hSocket, &data[pnode->nSendOffset], amt2Send, MSG_NOSIGNAL | MSG_DONTWAIT);
         if (nBytes > 0) {
             pnode->nLastSend = GetTime();
