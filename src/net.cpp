@@ -1166,11 +1166,23 @@ void static ProcessOneShot()
 void ThreadOpenConnections()
 {
     // Connect to specific addresses
-    if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0)
+    if ((mapArgs.count("-connect-thinblock") && mapMultiArgs["-connect-thinblock"].size() > 0) ||
+        (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0))
+
     {
         for (int64_t nLoop = 0;; nLoop++)
         {
             ProcessOneShot();
+            BOOST_FOREACH(string strAddr, mapMultiArgs["-connect-thinblock"])
+            {
+                CAddress addr;
+                OpenNetworkConnection(addr, NULL, strAddr.c_str());
+                for (int i = 0; i < 10 && i < nLoop; i++)
+                {
+                    MilliSleep(500);
+                }
+            }
+
             BOOST_FOREACH(string strAddr, mapMultiArgs["-connect"])
             {
                 CAddress addr;
@@ -1910,6 +1922,7 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     nPingUsecStart = 0;
     nPingUsecTime = 0;
     fPingQueued = false;
+    thinBlockWaitingForTxns = -1;
 
     {
         LOCK(cs_nLastNodeId);

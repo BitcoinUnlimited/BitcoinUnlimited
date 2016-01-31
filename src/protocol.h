@@ -153,6 +153,12 @@ enum {
     // Nodes may always request a MSG_FILTERED_BLOCK in a getdata, however,
     // MSG_FILTERED_BLOCK should not appear in any invs except as a part of getdata.
     MSG_FILTERED_BLOCK,
+    // A thin block contains all the transactions hashes in a block
+    // and also provides the missing transactions that are needed at the other end to reconstruct the block
+    MSG_THINBLOCK,
+    // An X (Extreme) thin block contains the first 8 bytes of all the transactions hashes in a block
+    // and also provides the missing transactions that are needed at the other end to reconstruct the block
+    MSG_XTHINBLOCK,
 };
 
 #endif // BITCOIN_PROTOCOL_H
