@@ -24,6 +24,7 @@
 
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
+#include <iomanip>
 #include <boost/thread.hpp>
 #include <inttypes.h>
 
@@ -35,6 +36,8 @@ uint64_t maxGeneratedBlock = DEFAULT_MAX_GENERATED_BLOCK_SIZE;
 unsigned int excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
 unsigned int excessiveAcceptDepth = DEFAULT_EXCESSIVE_ACCEPT_DEPTH;
 unsigned int maxMessageSizeMultiplier = DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER;
+
+std::vector<std::string> BUComments = std::vector<std::string>();
 
 // Variables for traffic shaping
 CLeakyBucket receiveShaper(DEFAULT_MAX_RECV_BURST, DEFAULT_AVE_RECV);
@@ -115,12 +118,29 @@ void UnlimitedPushTxns(CNode* dest)
         dest->PushMessage("inv", vInv);
 }
 
+void settingsToUserAgentString()
+{
+    BUComments.clear();
+
+    double ebInMegaBytes = (double)excessiveBlockSize/1000000;
+    std::stringstream ebss;
+    ebss <<std::fixed << std::setprecision(1) << ebInMegaBytes;
+    std::string eb =  ebss.str();
+    std::string eb_formatted;
+    eb_formatted = (eb.at(eb.size() - 1) == '0' ? eb.substr(0, eb.size() - 2) : eb); //strip zero decimal
+    BUComments.push_back("EB" + eb_formatted);
+
+    int ad_formatted;
+    ad_formatted = (excessiveAcceptDepth >= 9999999 ? 9999999 : excessiveAcceptDepth);
+    BUComments.push_back("AD" + boost::lexical_cast<std::string>(ad_formatted));
+}
+
 void UnlimitedSetup(void)
 {
-    maxGeneratedBlock = GetArg("-blockmaxsize", DEFAULT_MAX_GENERATED_BLOCK_SIZE);
-    excessiveBlockSize = GetArg("-excessiveblocksize", DEFAULT_EXCESSIVE_BLOCK_SIZE);
-    excessiveAcceptDepth = GetArg("-excessiveacceptdepth", DEFAULT_EXCESSIVE_ACCEPT_DEPTH);
-
+    maxGeneratedBlock = GetArg("-blockmaxsize", maxGeneratedBlock);
+    excessiveBlockSize = GetArg("-excessiveblocksize", excessiveBlockSize);
+    excessiveAcceptDepth = GetArg("-excessiveacceptdepth", excessiveAcceptDepth);
+    settingsToUserAgentString();
     //  Init network shapers
     int64_t rb = GetArg("-receiveburst", DEFAULT_MAX_RECV_BURST);
     // parameter is in KBytes/sec, leaky bucket is in bytes/sec.  But if it is "off" then don't multiply
@@ -216,7 +236,7 @@ UniValue getexcessiveblock(const UniValue& params, bool fHelp)
 
 UniValue setexcessiveblock(const UniValue& params, bool fHelp)
 {
-    if (fHelp || params.size() >= 3)
+    if (fHelp || params.size() < 2 || params.size() >= 3)
         throw runtime_error(
             "setexcessiveblock blockSize acceptDepth\n"
             "\nSet the excessive block size and accept depth.  Excessive blocks will not be used in the active chain or relayed until they are several blocks deep in the blockchain.  This discourages the propagation of blocks that you consider excessively large.  However, if the mining majority of the network builds upon the block then you will eventually accept it, maintaining consensus."
@@ -230,6 +250,7 @@ UniValue setexcessiveblock(const UniValue& params, bool fHelp)
         excessiveBlockSize = params[0].get_int64();
     else {
         string temp = params[0].get_str();
+        if (temp[0] == '-') boost::throw_exception( boost::bad_lexical_cast() );
         excessiveBlockSize = boost::lexical_cast<unsigned int>(temp);
     }
 
@@ -237,9 +258,11 @@ UniValue setexcessiveblock(const UniValue& params, bool fHelp)
         excessiveAcceptDepth = params[1].get_int64();
     else {
         string temp = params[1].get_str();
+        if (temp[0] == '-') boost::throw_exception( boost::bad_lexical_cast() );
         excessiveAcceptDepth = boost::lexical_cast<unsigned int>(temp);
     }
 
+    settingsToUserAgentString();
     return NullUniValue;
 }
 
@@ -277,6 +300,7 @@ UniValue setminingmaxblock(const UniValue& params, bool fHelp)
         arg = params[0].get_int64();
     else {
         string temp = params[0].get_str();
+        if (temp[0] == '-') boost::throw_exception( boost::bad_lexical_cast() );
         arg = boost::lexical_cast<uint64_t>(temp);
     }
 
@@ -391,6 +415,7 @@ UniValue settrafficshaping(const UniValue& params, bool fHelp)
     return NullUniValue;
 }
 
+
 /**
  *  BUIP010 Xtreme Thinblocks Section 
  */
@@ -441,6 +466,7 @@ bool HaveConnectThinblockNodes()
         LogPrint("thin", "You have a cross connected thinblock node - we may download regular blocks until you resolve the issue\n");
     return false; // Connections are either not open or they are cross connected.
 } 
+
 
 bool HaveThinblockNodes()
 {
@@ -493,30 +519,41 @@ bool IsChainNearlySyncd()
     return true;
 }
 
-void SendSeededBloomFilter(CNode *pto)
+void BuildSeededBloomFilter(CBloomFilter& filterMemPool)
 {
     LogPrint("thin", "Starting creation of bloom filter\n");
     seed_insecure_rand();
-    CBloomFilter memPoolFilter;
     double nBloomPoolSize = (double)mempool.mapTx.size();
     if (nBloomPoolSize > MAX_BLOOM_FILTER_SIZE / 1.8)
         nBloomPoolSize = MAX_BLOOM_FILTER_SIZE / 1.8;
     double nBloomDecay = 1.5 - (nBloomPoolSize * 1.8 / MAX_BLOOM_FILTER_SIZE);  // We should never go below 0.5 as we will start seeing re-requests for tx's
     int nElements = std::max((int)((int)mempool.mapTx.size() * nBloomDecay), 1); // Must make sure nElements is greater than zero or will assert
-                                                                // TODO: we should probably rather fix the bloom.cpp constructor
     double nFPRate = .001 + (((double)nElements * 1.8 / MAX_BLOOM_FILTER_SIZE) * .004); // The false positive rate in percent decays as the mempool grows
-    memPoolFilter = CBloomFilter(nElements, nFPRate, insecure_rand(), BLOOM_UPDATE_ALL);
+    filterMemPool = CBloomFilter(nElements, nFPRate, insecure_rand(), BLOOM_UPDATE_ALL);
     LogPrint("thin", "Bloom multiplier: %f FPrate: %f Num elements in bloom filter: %d num mempool entries: %d\n", nBloomDecay, nFPRate, nElements, (int)mempool.mapTx.size());
 
     // Seed the filter with the transactions in the memory pool
     LOCK(cs_main);
-    std::vector<uint256> memPoolHashes;
-    mempool.queryHashes(memPoolHashes);
-    for (uint64_t i = 0; i < memPoolHashes.size(); i++)
-         memPoolFilter.insert(memPoolHashes[i]);
+    std::vector<uint256> vMemPoolHashes;
+    mempool.queryHashes(vMemPoolHashes);
+    for (uint64_t i = 0; i < vMemPoolHashes.size(); i++)
+         filterMemPool.insert(vMemPoolHashes[i]);
+    LogPrint("thin", "Created bloom filter: %d bytes\n",::GetSerializeSize(filterMemPool, SER_NETWORK, PROTOCOL_VERSION));
+}
 
-    LogPrint("thin", "Sending bloom filter: %d bytes peer=%d\n",::GetSerializeSize(memPoolFilter, SER_NETWORK, PROTOCOL_VERSION), pto->id);
-    pto->PushMessage(NetMsgType::FILTERLOAD, memPoolFilter);
+void LoadFilter(CNode *pfrom, CBloomFilter *filter)
+{
+    if (!filter->IsWithinSizeConstraints())
+        // There is no excuse for sending a too-large filter
+        Misbehaving(pfrom->GetId(), 100);
+    else
+    {
+        LOCK(pfrom->cs_filter);
+        delete pfrom->pfilter;
+        pfrom->pfilter = new CBloomFilter(*filter);
+        pfrom->pfilter->UpdateEmptyFull();
+    }
+    pfrom->fRelayTxes = true;
 }
 
 void HandleBlockMessage(CNode *pfrom, const string &strCommand, CBlock &block, const CInv &inv)
@@ -540,7 +577,7 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, CBlock &block, c
             Misbehaving(pfrom->GetId(), nDoS);
         }
     }
-    LogPrint("thin", "Processed thinblock %s in %.2f seconds\n", inv.hash.ToString(), (double)(GetTimeMicros() - startTime) / 1000000.0);
+    LogPrint("thin", "Processed Block %s in %.2f seconds\n", inv.hash.ToString(), (double)(GetTimeMicros() - startTime) / 1000000.0);
     
     // When we request a thinblock we may get back a regular block if it is smaller than a thinblock
     // Therefore we have to remove the thinblock in flight if it exists and we also need to check that 
@@ -675,4 +712,31 @@ void SendXThinBlock(CBlock &block, CNode* pfrom, const CInv &inv)
             LogPrint("thin", "Sent regular block instead - thinblock size: %d vs block size: %d => tx hashes: %d transactions: %d  peerid=%d\n", nSizeThinBlock, nSizeBlock, thinBlock.vTxHashes.size(), thinBlock.mapMissingTx.size(), pfrom->id);
         }
     }
+}
+
+// Similar to TestBlockValidity but is very conservative in parameters (used in mining)
+bool TestConservativeBlockValidity(CValidationState& state, const CChainParams& chainparams, const CBlock& block, CBlockIndex* pindexPrev, bool fCheckPOW, bool fCheckMerkleRoot)
+{
+    AssertLockHeld(cs_main);
+    assert(pindexPrev && pindexPrev == chainActive.Tip());
+    if (fCheckpointsEnabled && !CheckIndexAgainstCheckpoint(pindexPrev, state, chainparams, block.GetHash()))
+        return error("%s: CheckIndexAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
+
+    CCoinsViewCache viewNew(pcoinsTip);
+    CBlockIndex indexDummy(block);
+    indexDummy.pprev = pindexPrev;
+    indexDummy.nHeight = pindexPrev->nHeight + 1;
+
+    // NOTE: CheckBlockHeader is called by CheckBlock
+    if (!ContextualCheckBlockHeader(block, state, pindexPrev))
+        return false;
+    if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot, true))
+        return false;
+    if (!ContextualCheckBlock(block, state, pindexPrev))
+        return false;
+    if (!ConnectBlock(block, state, &indexDummy, viewNew, true))
+        return false;
+    assert(state.IsValid());
+
+    return true;
 }

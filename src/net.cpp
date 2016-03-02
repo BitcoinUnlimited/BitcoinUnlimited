@@ -19,6 +19,8 @@
 #include "scheduler.h"
 #include "ui_interface.h"
 #include "utilstrencodings.h"
+#include "crypto/common.h"
+#include "unlimited.h"
 
 #ifdef WIN32
 #include <string.h>
@@ -33,6 +35,7 @@
 #include <miniupnpc/upnperrors.h>
 #endif
 
+#include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 
@@ -457,11 +460,12 @@ void CNode::PushVersion()
         LogPrint("net", "send version message: version %d, blocks=%d, us=%s, them=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), addrYou.ToString(), id);
     else
         LogPrint("net", "send version message: version %d, blocks=%d, us=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), id);
+
+    // BUIP005 add our special subversion string
     PushMessage(NetMsgType::VERSION, PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
-                nLocalHostNonce, strSubVersion, nBestHeight, !GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY));
+                nLocalHostNonce, FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, BUComments),
+                nBestHeight, !GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY));
 }
-
-
 
 
 
@@ -675,7 +679,7 @@ bool CNode::ReceiveMsgBytes(const char* pch, unsigned int nBytes)
         // BU: only reject the message if it is some multiple of the excessive 
         // block size.  Since traffic shaping will keep the bandwidth in check
         // this basically eliminates nodes that are deliberately trying to screw us up. 
-        if (maxMessageSizeMultiplier && msg.in_data && msg.hdr.nMessageSize > (maxMessageSizeMultiplier*excessiveBlockSize)) {
+        if (maxMessageSizeMultiplier && msg.in_data && (msg.hdr.nMessageSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE) && (msg.hdr.nMessageSize > (maxMessageSizeMultiplier*excessiveBlockSize))) {
             LogPrint("net", "Oversized message from peer=%i, disconnecting\n", GetId());
             //BU: TODO warn if too many nodes are doing this
             return false;
@@ -740,9 +744,10 @@ int CNetMessage::readData(const char* pch, unsigned int nBytes)
 }
 
 
-// requires LOCK(cs_vSend)
-void SocketSendData(CNode* pnode)
+// requires LOCK(cs_vSend), BU: returns > 0 if any data was sent, 0 if nothing accomplished.
+int SocketSendData(CNode* pnode)
 {
+    int progress=0; // BU This variable is incremented if something happens.  If it is zero at the bottom of the loop, we delay.  This solves spin loop issues where the select does not block but no bytes can be transferred (traffic shaping limited, for example).
     std::deque<CSerializeData>::iterator it = pnode->vSendMsg.begin();
 
     while (it != pnode->vSendMsg.end()) {
@@ -754,6 +759,7 @@ void SocketSendData(CNode* pnode)
             break;
         int nBytes = send(pnode->hSocket, &data[pnode->nSendOffset], amt2Send, MSG_NOSIGNAL | MSG_DONTWAIT);
         if (nBytes > 0) {
+            progress++;  // BU
             pnode->nLastSend = GetTime();
             pnode->nSendBytes += nBytes;
             pnode->nSendOffset += nBytes;
@@ -788,6 +794,7 @@ void SocketSendData(CNode* pnode)
         assert(pnode->nSendSize == 0);
     }
     pnode->vSendMsg.erase(pnode->vSendMsg.begin(), it);
+    return progress;
 }
 
 static list<CNode*> vNodesDisconnected;
@@ -1235,8 +1242,7 @@ void ThreadSocketHandler()
             if (FD_ISSET(pnode->hSocket, &fdsetSend)) {
                 TRY_LOCK(pnode->cs_vSend, lockSend);
                 if (lockSend && sendShaper.try_leak(0)) {
-                    progress++;
-                    SocketSendData(pnode);
+                    progress += SocketSendData(pnode);
                 }
             }
 
@@ -1266,7 +1272,7 @@ void ThreadSocketHandler()
                 pnode->Release();
         }
 
-        if (progress == 0) // Nothing happened even though select did not block.  So slow us down.
+        if (progress == 0) // BU: Nothing happened even though select did not block.  So slow us down.
             MilliSleep(50);
     }
 }

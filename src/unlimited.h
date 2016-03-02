@@ -22,11 +22,15 @@ class CBlockIndex;
 class CValidationState;
 class CDiskBlockPos;
 class CNode;
+class CChainParams;
 
 extern uint64_t maxGeneratedBlock;
 extern unsigned int excessiveBlockSize;
 extern unsigned int excessiveAcceptDepth;
 extern unsigned int maxMessageSizeMultiplier;
+
+extern std::vector<std::string> BUComments;
+extern void settingsToUserAgentString();
 
 extern void UnlimitedSetup(void);
 extern std::string UnlimitedCmdLineHelp();
@@ -35,6 +39,9 @@ extern std::string UnlimitedCmdLineHelp();
 extern void UnlimitedAcceptBlock(const CBlock& block, CValidationState& state, CBlockIndex* ppindex, CDiskBlockPos* dbp);
 
 extern void UnlimitedLogBlock(const CBlock& block, const std::string& hash, uint64_t receiptTime);
+
+// used during mining
+extern bool TestConservativeBlockValidity(CValidationState& state, const CChainParams& chainparams, const CBlock& block, CBlockIndex* pindexPrev, bool fCheckPOW, bool fCheckMerkleRoot);
 
 // Check whether this block is bigger in some metric than we really want to accept
 extern bool CheckExcessive(const CBlock& block, uint64_t blockSize, uint64_t nSigOps, uint64_t nTx);
@@ -64,7 +71,8 @@ extern bool CheckThinblockTimer(uint256 hash);
 extern void ClearThinblockTimer(uint256 hash);
 extern bool IsThinBlocksEnabled();
 extern bool IsChainNearlySyncd();
-extern void SendSeededBloomFilter(CNode *pto);
+extern void BuildSeededBloomFilter(CBloomFilter& memPoolFilter);
+extern void LoadFilter(CNode *pfrom, CBloomFilter *filter);
 extern void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, CBlock &block, const CInv &inv);
 extern void ConnectToThinBlockNodes();
 extern void CheckNodeSupportForThinBlocks();

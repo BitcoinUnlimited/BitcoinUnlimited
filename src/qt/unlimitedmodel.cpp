@@ -48,10 +48,23 @@ void UnlimitedModel::Init()
 
     if (!settings.contains("excessiveBlockSize"))
       settings.setValue("excessiveBlockSize", QString::number(excessiveBlockSize));
+    else excessiveBlockSize = settings.value("excessiveBlockSize").toInt();
     if (!settings.contains("excessiveAcceptDepth"))
       settings.setValue("excessiveAcceptDepth", QString::number(excessiveAcceptDepth));
+    else excessiveAcceptDepth = settings.value("excessiveAcceptDepth").toInt();
     if (!settings.contains("maxGeneratedBlock"))
+      {
       settings.setValue("maxGeneratedBlock", QString::number(maxGeneratedBlock));
+      }
+    else
+      {
+        maxGeneratedBlock = settings.value("maxGeneratedBlock").toInt();
+      }
+
+    if (!SoftSetArg("-excessiveblocksize",boost::lexical_cast<std::string>(excessiveBlockSize)))
+      addOverriddenOption("-excessiveblocksize");
+    if (!SoftSetArg("-excessiveacceptdepth",boost::lexical_cast<std::string>(excessiveAcceptDepth)))
+      addOverriddenOption("-excessiveacceptdepth");
 
     bool inUse = settings.value("fUseReceiveShaping").toBool();
     int64_t burstKB = settings.value("nReceiveBurst").toLongLong();
@@ -104,7 +117,7 @@ QVariant UnlimitedModel::data(const QModelIndex& index, int role) const
       switch (index.row())
         {
         case MaxGeneratedBlock:
-          return static_cast<qlonglong>(maxGeneratedBlock);
+          return QVariant((unsigned int) maxGeneratedBlock);
         case ExcessiveBlockSize:
           return QVariant(excessiveBlockSize);
         case ExcessiveAcceptDepth:
@@ -140,18 +153,42 @@ bool UnlimitedModel::setData(const QModelIndex& index, const QVariant& value, in
       switch (index.row())
         {
         case MaxGeneratedBlock:
-          maxGeneratedBlock = value.toULongLong();
-          settings.setValue("maxGeneratedBlock",
-                            static_cast<qlonglong>(maxGeneratedBlock));
-          break;
+          {
+            uint64_t mgb = value.toULongLong(&successful);
+            if (successful)
+              {
+                maxGeneratedBlock = mgb;
+                settings.setValue("maxGeneratedBlock", (unsigned int) maxGeneratedBlock);
+              }
+          } break;
         case ExcessiveBlockSize:
-          excessiveBlockSize = value.toUInt();
-          settings.setValue("excessiveBlockSize", excessiveBlockSize);
-          break;
+          {
+          unsigned int ebs = excessiveBlockSize;
+          ebs = value.toUInt();
+          if (ebs == 0)
+            {
+              float tmp = value.toFloat();
+              if (tmp<1000.0) ebs = (int) (tmp*1000000); // If the user put in a size in MB then just auto fix -- handle float separately to not round
+            }
+          if (ebs == 0) successful = false;
+          else
+            { 
+            if (ebs < 1000) ebs *= 1000000;  // If the user put in a size in MB then just auto fix
+            excessiveBlockSize = ebs;
+            settingsToUserAgentString();
+            settings.setValue("excessiveBlockSize", excessiveBlockSize);
+            }
+          } break;
         case ExcessiveAcceptDepth:
-          excessiveAcceptDepth = value.toUInt();
-          settings.setValue("excessiveAcceptDepth",excessiveAcceptDepth);
-          break;
+          {
+          unsigned int ead = value.toUInt(&successful);
+          if (successful)
+            {
+              excessiveAcceptDepth = ead;
+              settingsToUserAgentString();
+              settings.setValue("excessiveAcceptDepth",excessiveAcceptDepth);
+            }
+          } break;
         case UseReceiveShaping:
           if (settings.value("fUseReceiveShaping") != value)
             {
