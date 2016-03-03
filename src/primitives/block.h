@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2013 The Bitcoin Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,6 +9,11 @@
 #include "primitives/transaction.h"
 #include "serialize.h"
 #include "uint256.h"
+
+const uint32_t BIP_009_MASK = 0x20000000;
+const uint32_t BASE_VERSION = 0x20000000;  // Will accept 2MB blocks
+const uint32_t FORK_BIT_2MB = 0x10000000;  // Vote for 2MB fork
+const bool DEFAULT_2MB_VOTE = false;
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
@@ -21,7 +26,7 @@ class CBlockHeader
 {
 public:
     // header
-    static const int32_t CURRENT_VERSION=0x40000007;
+    static const int32_t CURRENT_VERSION=BASE_VERSION;
     int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
@@ -78,7 +83,7 @@ public:
     std::vector<CTransaction> vtx;
 
     // memory only
-    mutable std::vector<uint256> vMerkleTree;
+        // 0.11: mutable std::vector<uint256> vMerkleTree;
     mutable bool fChecked;
     mutable bool fExcessive;  // BU: is the block "excessive" (bigger than this node prefers to accept)
 
@@ -93,6 +98,20 @@ public:
         *((CBlockHeader*)this) = header;
     }
 
+    static bool VersionKnown(int32_t nVersion, int32_t voteBits)
+    {
+        if (nVersion >= 1 && nVersion <= 4)
+            return true;
+        // BIP009 / versionbits:
+        if (nVersion & BIP_009_MASK)
+        {
+            uint32_t v = nVersion & ~BIP_009_MASK;
+            if ((v & ~voteBits) == 0)
+                return true;
+        }
+        return false;
+    }
+    
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
@@ -105,7 +124,7 @@ public:
     {
         CBlockHeader::SetNull();
         vtx.clear();
-        vMerkleTree.clear();
+        // vMerkleTree.clear();
         fChecked = false;
         fExcessive = false;
     }
@@ -122,14 +141,6 @@ public:
         return block;
     }
 
-    // Build the in-memory merkle tree for this block and return the merkle root.
-    // If non-NULL, *mutated is set to whether mutation was detected in the merkle
-    // tree (a duplication of transactions in the block leading to an identical
-    // merkle root).
-    uint256 BuildMerkleTree(bool* mutated = NULL) const;
-
-    std::vector<uint256> GetMerkleBranch(int nIndex) const;
-    static uint256 CheckMerkleBranch(uint256 hash, const std::vector<uint256>& vMerkleBranch, int nIndex);
     std::string ToString() const;
 };
 

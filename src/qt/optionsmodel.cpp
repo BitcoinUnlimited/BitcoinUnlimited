@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2014 The Bitcoin Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,7 +15,7 @@
 
 #include "amount.h"
 #include "init.h"
-#include "main.h"
+#include "main.h" // For DEFAULT_SCRIPTCHECK_THREADS
 #include "net.h"
 #include "txdb.h" // for -dbcache defaults
 
@@ -28,9 +28,10 @@
 #include <QSettings>
 #include <QStringList>
 
-OptionsModel::OptionsModel(QObject* parent) : QAbstractListModel(parent)
+OptionsModel::OptionsModel(QObject *parent, bool resetSettings) :
+    QAbstractListModel(parent)
 {
-    Init();
+    Init(resetSettings);
 }
 
 void OptionsModel::addOverriddenOption(const std::string& option)
@@ -39,8 +40,11 @@ void OptionsModel::addOverriddenOption(const std::string& option)
 }
 
 // Writes all missing QSettings with their default values
-void OptionsModel::Init()
+void OptionsModel::Init(bool resetSettings)
 {
+    if (resetSettings)
+        Reset();
+
     QSettings settings;
 
     // Ensure restart flag is unset on client startup
@@ -99,44 +103,6 @@ void OptionsModel::Init()
 
     // Network
 
-    if (!settings.contains("fUseReceiveShaping"))
-        settings.setValue("fUseReceiveShaping", DEFAULT_AVE_RECV != LONG_LONG_MAX);
-    if (!settings.contains("fUseSendShaping"))
-        settings.setValue("fUseSendShaping", DEFAULT_AVE_SEND != LONG_LONG_MAX);
-
-    if (!settings.contains("nReceiveBurst"))
-        settings.setValue("nReceiveBurst", (qint64)DEFAULT_MAX_RECV_BURST / 1024);
-    if (!settings.contains("nReceiveAve"))
-        settings.setValue("nReceiveAve", DEFAULT_AVE_RECV == LONG_LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_RECV / 1024));
-    if (!settings.contains("nSendBurst"))
-        settings.setValue("nSendBurst", (qint64)DEFAULT_MAX_SEND_BURST / 1024);
-    if (!settings.contains("nSendAve"))
-        settings.setValue("nSendAve", DEFAULT_AVE_SEND == LONG_LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_SEND / 1024));
-
-    bool inUse = settings.value("fUseReceiveShaping").toBool();
-    int64_t burstKB = settings.value("nReceiveBurst").toLongLong();
-    int64_t aveKB = settings.value("nReceiveAve").toLongLong();
-
-    std::string avg = QString::number(inUse ? aveKB : LONG_LONG_MAX).toStdString();
-    std::string burst = QString::number(inUse ? burstKB : LONG_LONG_MAX).toStdString();
-
-    if (!SoftSetArg("-receiveavg", avg))
-        addOverriddenOption("-receiveavg");
-    if (!SoftSetArg("-receiveburst", burst))
-        addOverriddenOption("-receiveburst");
-
-    inUse = settings.value("fUseSendShaping").toBool();
-    burstKB = settings.value("nSendBurst").toLongLong();
-    aveKB = settings.value("nSendAve").toLongLong();
-
-    avg = boost::lexical_cast<std::string>(inUse ? aveKB : LONG_LONG_MAX);
-    burst = boost::lexical_cast<std::string>(inUse ? burstKB : LONG_LONG_MAX);
-
-    if (!SoftSetArg("-sendavg", avg))
-        addOverriddenOption("-sendavg");
-    if (!SoftSetArg("-sendburst", burst))
-        addOverriddenOption("-sendburst");
-
     if (!settings.contains("fUseUPnP"))
         settings.setValue("fUseUPnP", DEFAULT_UPNP);
     if (!SoftSetBoolArg("-upnp", settings.value("fUseUPnP").toBool()))
@@ -156,6 +122,16 @@ void OptionsModel::Init()
         addOverriddenOption("-proxy");
     else if (!settings.value("fUseProxy").toBool() && !GetArg("-proxy", "").empty())
         addOverriddenOption("-proxy");
+
+    if (!settings.contains("fUseSeparateProxyTor"))
+        settings.setValue("fUseSeparateProxyTor", false);
+    if (!settings.contains("addrSeparateProxyTor"))
+        settings.setValue("addrSeparateProxyTor", "127.0.0.1:9050");
+    // Only try to set -onion, if user has enabled fUseSeparateProxyTor
+    if (settings.value("fUseSeparateProxyTor").toBool() && !SoftSetArg("-onion", settings.value("addrSeparateProxyTor").toString().toStdString()))
+        addOverriddenOption("-onion");
+    else if(!settings.value("fUseSeparateProxyTor").toBool() && !GetArg("-onion", "").empty())
+        addOverriddenOption("-onion");
 
     // Display
     if (!settings.contains("language"))
@@ -216,6 +192,20 @@ QVariant OptionsModel::data(const QModelIndex& index, int role) const
             return strlIpPort.at(1);
         }
 
+        // separate Tor proxy
+        case ProxyUseTor:
+            return settings.value("fUseSeparateProxyTor", false);
+        case ProxyIPTor: {
+            // contains IP at index 0 and port at index 1
+            QStringList strlIpPort = settings.value("addrSeparateProxyTor").toString().split(":", QString::SkipEmptyParts);
+            return strlIpPort.at(0);
+        }
+        case ProxyPortTor: {
+            // contains IP at index 0 and port at index 1
+            QStringList strlIpPort = settings.value("addrSeparateProxyTor").toString().split(":", QString::SkipEmptyParts);
+            return strlIpPort.at(1);
+        }
+
 #ifdef ENABLE_WALLET
         case SpendZeroConfChange:
             return settings.value("bSpendZeroConfChange");
@@ -234,18 +224,6 @@ QVariant OptionsModel::data(const QModelIndex& index, int role) const
             return settings.value("nThreadsScriptVerif");
         case Listen:
             return settings.value("fListen");
-        case UseReceiveShaping:
-            return settings.value("fUseReceiveShaping");
-        case UseSendShaping:
-            return settings.value("fUseSendShaping");
-        case ReceiveBurst:
-            return settings.value("nReceiveBurst");
-        case ReceiveAve:
-            return settings.value("nReceiveAve");
-        case SendBurst:
-            return settings.value("nSendBurst");
-        case SendAve:
-            return settings.value("nSendAve");
         default:
             return QVariant();
         }
@@ -308,6 +286,39 @@ bool OptionsModel::setData(const QModelIndex& index, const QVariant& value, int 
             }
         }
         break;
+
+        // separate Tor proxy
+        case ProxyUseTor:
+            if (settings.value("fUseSeparateProxyTor") != value) {
+                settings.setValue("fUseSeparateProxyTor", value.toBool());
+                setRestartRequired(true);
+            }
+            break;
+        case ProxyIPTor: {
+            // contains current IP at index 0 and current port at index 1
+            QStringList strlIpPort = settings.value("addrSeparateProxyTor").toString().split(":", QString::SkipEmptyParts);
+            // if that key doesn't exist or has a changed IP
+            if (!settings.contains("addrSeparateProxyTor") || strlIpPort.at(0) != value.toString()) {
+                // construct new value from new IP and current port
+                QString strNewValue = value.toString() + ":" + strlIpPort.at(1);
+                settings.setValue("addrSeparateProxyTor", strNewValue);
+                setRestartRequired(true);
+            }
+        }
+        break;
+        case ProxyPortTor: {
+            // contains current IP at index 0 and current port at index 1
+            QStringList strlIpPort = settings.value("addrSeparateProxyTor").toString().split(":", QString::SkipEmptyParts);
+            // if that key doesn't exist or has a changed port
+            if (!settings.contains("addrSeparateProxyTor") || strlIpPort.at(1) != value.toString()) {
+                // construct new value from current IP and new port
+                QString strNewValue = strlIpPort.at(0) + ":" + value.toString();
+                settings.setValue("addrSeparateProxyTor", strNewValue);
+                setRestartRequired(true);
+            }
+        }
+        break;
+
 #ifdef ENABLE_WALLET
         case SpendZeroConfChange:
             if (settings.value("bSpendZeroConfChange") != value) {
@@ -355,66 +366,12 @@ bool OptionsModel::setData(const QModelIndex& index, const QVariant& value, int 
                 setRestartRequired(true);
             }
             break;
-        case UseReceiveShaping:
-            if (settings.value("fUseReceiveShaping") != value) {
-                settings.setValue("fUseReceiveShaping", value);
-                changeReceiveShaper = true;
-            }
-            break;
-        case UseSendShaping:
-            if (settings.value("fUseSendShaping") != value) {
-                settings.setValue("fUseSendShaping", value);
-                changeSendShaper = true;
-            }
-            break;
-        case ReceiveBurst:
-            if (settings.value("nReceiveBurst") != value) {
-                settings.setValue("nReceiveBurst", value);
-                changeReceiveShaper = true;
-            }
-            break;
-        case ReceiveAve:
-            if (settings.value("nReceiveAve") != value) {
-                settings.setValue("nReceiveAve", value);
-                changeReceiveShaper = true;
-            }
-            break;
-        case SendBurst:
-            if (settings.value("nSendBurst") != value) {
-                settings.setValue("nSendBurst", value);
-                changeSendShaper = true;
-            }
-            break;
-        case SendAve:
-            if (settings.value("nSendAve") != value) {
-                settings.setValue("nSendAve", value);
-                changeSendShaper = true;
-            }
-            break;
         default:
             break;
         }
 
-
-        if (changeReceiveShaper) {
-            if (settings.value("fUseReceiveShaping").toBool()) {
-                int64_t burst = 1024 * settings.value("nReceiveBurst").toLongLong();
-                int64_t ave = 1024 * settings.value("nReceiveAve").toLongLong();
-                receiveShaper.set(burst, ave);
-            } else
-                receiveShaper.disable();
-        }
-
-        if (changeSendShaper) {
-            if (settings.value("fUseSendShaping").toBool()) {
-                int64_t burst = 1024 * settings.value("nSendBurst").toLongLong();
-                int64_t ave = 1024 * settings.value("nSendAve").toLongLong();
-                sendShaper.set(burst, ave);
-            } else
-                sendShaper.disable();
-        }
     }
-
+    
     Q_EMIT dataChanged(index, index);
 
     return successful;
