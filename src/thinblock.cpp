@@ -18,13 +18,19 @@ CThinBlock::CThinBlock(const CBlock& block, CBloomFilter& filter)
         // These are the ones we need to relay back to the requesting peer.
         // NOTE: We always add the first tx, the coinbase as it is the one
         //       most often missing.
-        if (!filter.contains(hash) || i == 0)
+        if ((&filter && !filter.contains(hash)) || i == 0)
             mapMissingTx[hash] = block.vtx[i];
     }
 }
 
 CXThinBlock::CXThinBlock(const CBlock& block, CBloomFilter* filter)
 {
+  Init(block,filter);
+}
+
+void CXThinBlock::Init(const CBlock& block, CBloomFilter* filter)
+    {
+
     header = block.GetBlockHeader();
     this->collision = false;
 
@@ -48,6 +54,33 @@ CXThinBlock::CXThinBlock(const CBlock& block, CBloomFilter* filter)
             mapMissingTx[hash256] = block.vtx[i];
     }
 }
+
+void CXThinBlock::Init(const CBlock& block, CTxMemPool& mpool)
+    {
+    header = block.GetBlockHeader();
+    this->collision = false;
+
+    vTxHashes.reserve(block.vtx.size());
+    std::set<uint64_t> setPartialTxHash;
+    for (unsigned int i = 0; i < block.vtx.size(); i++)
+    {
+        const uint256 hash256 = block.vtx[i].GetHash();
+        uint64_t cheapHash = hash256.GetCheapHash();
+        vTxHashes.push_back(cheapHash);
+
+        if (setPartialTxHash.count(cheapHash))
+                this->collision = true;
+        setPartialTxHash.insert(cheapHash);
+
+        // Find the transactions that do not match the filter.
+        // These are the ones we need to relay back to the requesting peer.
+        // NOTE: We always add the first tx, the coinbase as it is the one
+        //       most often missing.
+        if ((!mpool.exists(hash256)) || i == 0)
+            mapMissingTx[hash256] = block.vtx[i];
+    }
+}
+
 
 CXThinBlock::CXThinBlock(const CBlock& block)
 {

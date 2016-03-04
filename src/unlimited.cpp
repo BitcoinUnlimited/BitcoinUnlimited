@@ -21,6 +21,7 @@
 #include "util.h"
 #include "validationinterface.h"
 #include "version.h"
+#include "stat.h"
 
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
@@ -36,15 +37,228 @@ unsigned int excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
 unsigned int excessiveAcceptDepth = DEFAULT_EXCESSIVE_ACCEPT_DEPTH;
 unsigned int maxMessageSizeMultiplier = DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER;
 
+unsigned int MIN_REQUEST_RETRY_INTERVAL = 5*1000*1000;  // When should I request an object from someone else (5 seconds in microseconds)
+
 // Variables for traffic shaping
 CLeakyBucket receiveShaper(DEFAULT_MAX_RECV_BURST, DEFAULT_AVE_RECV);
 CLeakyBucket sendShaper(DEFAULT_MAX_SEND_BURST, DEFAULT_AVE_SEND);
 boost::chrono::steady_clock CLeakyBucket::clock;
 
+// Variables for statistics tracking, must be before the "requester" singleton instantiation
+const char* sampleNames[] = { "sec10", "min5", "hourly", "daily","monthly"};
+int operateSampleCount[] = { 30,       12,   24,  30 };
+int interruptIntervals[] = { 30,       30*12,   30*12*24,   30*12*24*30 };
+
+boost::asio::io_service stat_io_service;
+boost::posix_time::milliseconds statMinInterval(10000);
+
+CStatMap statistics __attribute__((init_priority(2)));
+
+CStatHistory<unsigned int, MinValMax<unsigned int> > txAdded; //"memPool/txAdded");
+CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize; // "memPool/size",STAT_OP_AVE);
+CStatHistory<unsigned int, MinValMax<unsigned int> > txFee; //"memPool/txFee");
+
+// Request management
+CRequestManager requester;
+
 void UnlimitedPushTxns(CNode* dest);
+
+
 
 // BUIP010 Xtreme Thinblocks Variables
 std::map<uint256, uint64_t> mapThinBlockTimer;
+
+CRequestManager::CRequestManager(): inFlightTxns("reqMgr/inFlight",STAT_OP_MAX),receivedTxns("reqMgr/received"),rejectedTxns("reqMgr/rejected"),droppedTxns("reqMgr/dropped", STAT_KEEP)
+{
+  inFlight=0;
+  maxInFlight = 256;
+  sendIter = mapTxnInfo.end();
+}
+
+
+void CRequestManager::cleanup(OdMap::iterator& itemIt)
+{
+  CUnknownObj& item = itemIt->second;
+  inFlight-= item.outstandingReqs; // Because we'll ignore anything deleted from the map, reduce the # of requests in flight by every request we made for this object
+  droppedTxns -= (item.outstandingReqs-1);
+
+  // Got the data, now add the node as a source
+  LOCK(cs_vNodes);
+  for (int i=0;i<CUnknownObj::MAX_AVAIL_FROM;i++)
+    if (item.availableFrom[i] != NULL)
+      {
+        CNode * node = item.availableFrom[i];
+	node->Release();
+        LogPrint("req", "ReqMgr: %s removed ref to %d count %d.\n",item.obj.ToString(), node->GetId(), node->GetRefCount());
+	item.availableFrom[i]=NULL; // unnecessary but let's make it very clear
+      }
+
+  if (sendIter == itemIt) ++sendIter;
+  mapTxnInfo.erase(itemIt);
+}
+
+// Get this object from somewhere, asynchronously.
+void CRequestManager::AskFor(const CInv& obj, CNode* from)
+{
+  LogPrint("req", "ReqMgr: Ask for %s.\n",obj.ToString().c_str());
+
+  LOCK(cs_objDownloader);
+  if (obj.type == MSG_TX)
+    {
+      uint256 temp = obj.hash;
+      OdMap::value_type v(temp,CUnknownObj());
+      std::pair<OdMap::iterator,bool> result = mapTxnInfo.insert(v);
+      OdMap::iterator& item = result.first;
+      CUnknownObj& data = item->second;
+      if (result.second)  // inserted
+	{
+	  data.obj = obj;
+	  // all other fields are zeroed on creation
+	}
+      else  // existing
+	{
+	}
+
+      // Got the data, now add the node as a source
+      for (int i=0;i<CUnknownObj::MAX_AVAIL_FROM;i++)
+	{
+	  if (data.availableFrom[i] == from) break;  // don't add the same node twice
+	  if (data.availableFrom[i] == NULL)
+	  {
+	    if (1)
+	    {
+              LOCK(cs_vNodes);
+	      data.availableFrom[i] = from->AddRef();
+	    }
+            LogPrint("req", "ReqMgr: %s added ref to %d count %d.\n",obj.ToString(), from->GetId(), from->GetRefCount());
+	    // I Don't need to clear this bit in receivingFrom, it should already be 0
+            if (i==0) // First request for this object
+	      {
+		from->firstTx += 1;
+	      }
+	    break;
+	  }
+	}
+    }
+  else
+    {
+      assert(!"TBD");
+      // from->firstBlock += 1;
+    }
+
+}
+
+// Get these objects from somewhere, asynchronously.
+void CRequestManager::AskFor(const std::vector<CInv>& objArray, CNode* from)
+{
+  unsigned int sz = objArray.size();
+  for (unsigned int nInv = 0; nInv < sz; nInv++)
+    {
+      AskFor(objArray[nInv],from);
+    }
+}
+
+
+// Indicate that we got this object, from and bytes are optional (for node performance tracking)
+void CRequestManager::Received(const CInv& obj, CNode* from, int bytes)
+{
+  LOCK(cs_objDownloader);
+  OdMap::iterator item = mapTxnInfo.find(obj.hash);
+  if (item ==  mapTxnInfo.end()) return;  // item has already been removed
+  LogPrint("req", "ReqMgr: Request received for %s.\n",item->second.obj.ToString().c_str());
+  int64_t now = GetTimeMicros();
+  from->txReqLatency << (now - item->second.lastRequestTime);  // keep track of response latency of this node
+  // will be decremented in the item cleanup: if (inFlight) inFlight--;
+  cleanup(item); // remove the item
+  receivedTxns += 1;
+}
+
+// Indicate that we got this object, from and bytes are optional (for node performance tracking)
+void CRequestManager::Rejected(const CInv& obj, CNode* from, unsigned char reason)
+{
+  LOCK(cs_objDownloader);
+  OdMap::iterator item = mapTxnInfo.find(obj.hash);
+  if (item ==  mapTxnInfo.end()) 
+    {
+    LogPrint("req", "ReqMgr: Unknown object rejected %s.\n",obj.ToString().c_str());
+    return;  // item has already been removed
+    }
+  if (inFlight) inFlight--;
+  if (item->second.outstandingReqs) item->second.outstandingReqs--;
+
+  LogPrint("req", "ReqMgr: Request rejected for %s.\n",item->second.obj.ToString().c_str());
+  rejectedTxns += 1;
+		  
+  if (reason == REJECT_INSUFFICIENTFEE)
+    {
+      item->second.rateLimited = true;
+    }
+  else
+    {
+      assert(0); // TODO
+    }
+}
+
+
+void CRequestManager::SendRequests()
+{
+  LOCK(cs_objDownloader);
+  if (sendIter == mapTxnInfo.end()) sendIter = mapTxnInfo.begin();
+
+  while ((inFlight < maxInFlight + droppedTxns())&&(sendIter != mapTxnInfo.end()))
+    {
+      OdMap::iterator itemIter = sendIter;
+      CUnknownObj& item = itemIter->second;
+      ++sendIter;  // move it forward up here in case we need to erase the item we are working with.
+
+      int64_t now = GetTimeMicros();
+
+      if (now-item.lastRequestTime > MIN_REQUEST_RETRY_INTERVAL)  // if never requested then lastRequestTime==0 so this will always be true
+	{
+          if (!item.rateLimited)
+	    {
+	      if (item.lastRequestTime)  // if this is positive, we've requested at least once
+		{
+		  LogPrint("req", "Request timeout for %s.  Retrying\n",item.obj.ToString().c_str());
+		  // Not reducing inFlight; its still outstanding; will be cleaned up when item is removed from map
+                  droppedTxns += 1;
+		}
+	      int next = item.outstandingReqs%CUnknownObj::MAX_AVAIL_FROM;
+	      while (next < CUnknownObj::MAX_AVAIL_FROM)
+		{
+
+		  if (item.availableFrom[next]) break;
+		  next++;
+		}
+	      if (next == CUnknownObj::MAX_AVAIL_FROM)
+		for (next=0;next<CUnknownObj::MAX_AVAIL_FROM;next++)
+		  if (item.availableFrom[next]) break;
+	      if (next == CUnknownObj::MAX_AVAIL_FROM)  // I can't get the object from anywhere.  now what?
+		{
+		  // TODO: tell someone about this issue, look in a random node, or something.
+		  cleanup(itemIter);
+		}
+	      else // Ok request this item.
+		{
+		  CNode* from = item.availableFrom[next];
+                  LOCK(from->cs_vSend);
+		  item.receivingFrom |= (1<<next);
+		  item.outstandingReqs++;
+		  item.lastRequestTime = now;
+		  // from->AskFor(item.obj); basically just shoves the req into mapAskFor
+		  from->mapAskFor.insert(std::make_pair(now, item.obj));
+		  inFlight++;
+                  inFlightTxns << inFlight;
+		}
+	    }
+	}
+
+    }
+}
+
+
+
+
 
 std::string UnlimitedCmdLineHelp()
 {
@@ -117,6 +331,7 @@ void UnlimitedPushTxns(CNode* dest)
 
 void UnlimitedSetup(void)
 {
+   
     maxGeneratedBlock = GetArg("-blockmaxsize", DEFAULT_MAX_GENERATED_BLOCK_SIZE);
     excessiveBlockSize = GetArg("-excessiveblocksize", DEFAULT_EXCESSIVE_BLOCK_SIZE);
     excessiveAcceptDepth = GetArg("-excessiveacceptdepth", DEFAULT_EXCESSIVE_ACCEPT_DEPTH);
@@ -138,6 +353,10 @@ void UnlimitedSetup(void)
 
     receiveShaper.set(rb, ra);
     sendShaper.set(sb, sa);
+
+    txAdded.init("memPool/txAdded");
+    poolSize.init("memPool/size",STAT_OP_AVE | STAT_KEEP);
+    txFee.init("memPool/txFee");
 }
 
 
@@ -154,7 +373,7 @@ extern void UnlimitedLogBlock(const CBlock& block, const std::string& hash, uint
         fprintf(blockReceiptLog, "%" PRIu64 ",%" PRIu64 ",%ld,%ld,%s\n", receiptTime, (uint64_t)bh.nTime, byteLen, block.vtx.size(), hash.c_str());
         fflush(blockReceiptLog);
     }
-#endif    
+#endif
 }
 
 
@@ -392,7 +611,7 @@ UniValue settrafficshaping(const UniValue& params, bool fHelp)
 }
 
 /**
- *  BUIP010 Xtreme Thinblocks Section 
+ *  BUIP010 Xtreme Thinblocks Section
  */
 bool HaveConnectThinblockNodes()
 {
@@ -412,11 +631,11 @@ bool HaveConnectThinblockNodes()
     // Create a set used to check for cross connected nodes.
     // A cross connected node is one where we have a connect-thinblock connection to
     // but we also have another inbound connection which is also using
-    // connect-thinblock. In those cases we have created a dead-lock where no blocks 
-    // can be downloaded unless we also have at least one additional connect-thinblock 
+    // connect-thinblock. In those cases we have created a dead-lock where no blocks
+    // can be downloaded unless we also have at least one additional connect-thinblock
     // connection to a different node.
     std::set<std::string> nNotCrossConnected;
- 
+
     int nConnectionsOpen = 0;
     BOOST_FOREACH(const std::string& strAddrNode, mapMultiArgs["-connect-thinblock"]) {
         std::string strThinblockNode;
@@ -440,7 +659,7 @@ bool HaveConnectThinblockNodes()
     else if (nConnectionsOpen > 0)
         LogPrint("thin", "You have a cross connected thinblock node - we may download regular blocks until you resolve the issue\n");
     return false; // Connections are either not open or they are cross connected.
-} 
+}
 
 bool HaveThinblockNodes()
 {
@@ -480,12 +699,12 @@ void ClearThinBlockTimer(uint256 hash)
     }
 }
 
-bool IsThinBlocksEnabled() 
+bool IsThinBlocksEnabled()
 {
     return GetBoolArg("-use-thinblocks", true);
 }
 
-bool IsChainNearlySyncd() 
+bool IsChainNearlySyncd()
 {
     LOCK(cs_main);
     if(chainActive.Height() < pindexBestHeader->nHeight - 2)
@@ -540,17 +759,17 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, CBlock &block, c
             Misbehaving(pfrom->GetId(), nDoS);
         }
     }
-    LogPrint("thin", "Processed thinblock %s in %.2f seconds\n", inv.hash.ToString(), (double)(GetTimeMicros() - startTime) / 1000000.0);
-    
+    LogPrint("thin", "Processed block %s in %.2f seconds\n", inv.hash.ToString(), (double)(GetTimeMicros() - startTime) / 1000000.0);
+
     // When we request a thinblock we may get back a regular block if it is smaller than a thinblock
-    // Therefore we have to remove the thinblock in flight if it exists and we also need to check that 
+    // Therefore we have to remove the thinblock in flight if it exists and we also need to check that
     // the block didn't arrive from some other peer.  This code ALSO cleans up the thin block that
     // was passed to us (&block), so do not use it after this.
     {
         LOCK(cs_vNodes);
         BOOST_FOREACH(CNode* pnode, vNodes) {
             if (pnode->mapThinBlocksInFlight.count(inv.hash)) {
-                pnode->mapThinBlocksInFlight.erase(inv.hash); 
+                pnode->mapThinBlocksInFlight.erase(inv.hash);
                 pnode->thinBlockWaitingForTxns = -1;
                 pnode->thinBlock.SetNull();
                 if (pnode != pfrom) LogPrintf("Removing thinblock in flight %s from %s (%d)\n",inv.hash.ToString(), pnode->addrName.c_str(), pnode->id);
@@ -613,7 +832,7 @@ void CheckNodeSupportForThinBlocks()
     BOOST_FOREACH(string& strAddr, mapMultiArgs["-connect-thinblock"]) {
         if(CNode* pnode = FindNode(strAddr)) {
             if(pnode->nVersion < THINBLOCKS_VERSION && pnode->nVersion > 0) {
-                LogPrintf("ERROR: You are trying to use connect-thinblocks but to a node that does not support it - Protocol Version: %d peer=%d\n", 
+                LogPrintf("ERROR: You are trying to use connect-thinblocks but to a node that does not support it - Protocol Version: %d peer=%d\n",
                            pnode->nVersion, pnode->id);
             }
         }
@@ -622,12 +841,16 @@ void CheckNodeSupportForThinBlocks()
 
 void SendXThinBlock(CBlock &block, CNode* pfrom, const CInv &inv)
 {
-    if (inv.type == MSG_XTHINBLOCK)
+    if (inv.type == MSG_XTHINBLOCK || inv.type == MSG_XTHINBLOCK_HASH_ONLY || inv.type == MSG_XTHINBLOCK_SENDER_DIFF)
     {
-      CXThinBlock xThinBlock(block, pfrom->pfilter);
-      //CXThinBlock xThinBlock(block);
-        int nSizeBlock = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-        if (xThinBlock.collision == true) // If there is a cheapHash collision in this block then send a normal thinblock
+      CXThinBlock xThinBlock;
+
+      if (inv.type == MSG_XTHINBLOCK) xThinBlock.Init(block, pfrom->pfilter);
+      else if (inv.type == MSG_XTHINBLOCK_HASH_ONLY) xThinBlock.Init(block, NULL);
+      else xThinBlock.Init(block,mempool);
+
+      int nSizeBlock = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+      if (xThinBlock.collision == true) // If there is a cheapHash collision in this block then send a normal thinblock
         {
             CThinBlock thinBlock(block, *pfrom->pfilter);
             int nSizeThinBlock = ::GetSerializeSize(xThinBlock, SER_NETWORK, PROTOCOL_VERSION);
@@ -672,3 +895,120 @@ void SendXThinBlock(CBlock &block, CNode* pfrom, const CInv &inv)
 }
 
 
+
+
+// Statistics:
+
+CStatBase* FindStatistic(const char* name)
+{
+  CStatMap::iterator item = statistics.find(name);
+  if (item != statistics.end())
+    return item->second;
+  return NULL;
+}
+
+UniValue getstatlist(const UniValue& params, bool fHelp)
+{
+  if (fHelp || (params.size() != 0))
+        throw runtime_error(
+            "getstatlist"
+            "\nReturns a list of all statistics available on this node.\n"
+            "\nArguments: None\n"
+            "\nResult:\n"
+            "  {\n"
+            "    \"name\" : (string) name of the statistic\n"
+            "    ...\n"
+            "  }\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getstatlist", "") + HelpExampleRpc("getstatlist", ""));
+
+  CStatMap::iterator it;
+
+  UniValue ret(UniValue::VARR);
+  for (it = statistics.begin(); it != statistics.end(); ++it)
+    {
+    ret.push_back(it->first);
+    }
+
+  return ret;
+}
+
+UniValue getstat(const UniValue& params, bool fHelp)
+{
+    string specificIssue;
+
+    int count = 0;
+    if (params.size() < 3) count = 0x7fffffff; // give all that is available
+    else
+      {
+	if (!params[2].isNum()) 
+	  {
+          try
+	    {
+	      count =  boost::lexical_cast<int>(params[2].get_str());
+	    }
+          catch (const boost::bad_lexical_cast &)
+	    {
+            fHelp=true;
+            specificIssue = "Invalid argument 3 \"count\" -- not a number";
+  	    }
+	  }
+        else
+	  {
+	    count = params[2].get_int();
+	  }
+      }
+    if (fHelp || (params.size() < 1))
+        throw runtime_error(
+            "getstat"
+            "\nReturns the current settings for the network send and receive bandwidth and burst in kilobytes per second.\n"
+            "\nArguments: \n"
+            "1. \"statistic\"     (string, required) Specify what statistic you want\n"
+            "2. \"series\"  (string, optional) Specify what data series you want.  Options are \"now\",\"all\", \"sec10\", \"min5\", \"hourly\", \"daily\",\"monthly\".  Default is all.\n"
+            "3. \"count\"  (string, optional) Specify the number of samples you want.\n"
+
+            "\nResult:\n"
+            "  {\n"
+            "    \"<statistic name>\"\n"
+            "    {\n"
+            "    \"<series name>\"\n"
+            "      [\n"
+            "      <data>, (any type) The data points in the series\n"
+            "      ],\n"
+            "    ...\n"
+            "    },\n"
+            "  ...\n"            
+            "  }\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getstat", "") + HelpExampleRpc("getstat", "")
+            + "\n" + specificIssue);
+
+    UniValue ret(UniValue::VARR);
+
+    string seriesStr;
+    if (params.size() < 2)
+      seriesStr = "now";
+    else seriesStr = params[1].get_str();
+    //uint_t series = 0; 
+    //if (series == "now") series |= 1;
+    //if (series == "all") series = 0xfffffff;
+
+    CStatBase* base = FindStatistic(params[0].get_str().c_str());
+    if (base)
+      {
+        UniValue ustat(UniValue::VOBJ);
+        if (seriesStr == "now")
+          {
+	    ustat.push_back(Pair("now", base->GetNow()));
+	  }
+        else
+	  {
+            UniValue series = base->GetSeries(seriesStr,count);
+	    ustat.push_back(Pair(seriesStr,series));
+	  }
+
+        ret.push_back(ustat);  
+      }
+
+    return ret;
+}

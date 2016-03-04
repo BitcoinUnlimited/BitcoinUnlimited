@@ -9,6 +9,7 @@
 #include "uint256.h"
 #include "primitives/block.h"
 #include "bloom.h"
+#include "txmempool.h"
 
 #include <vector>
 
@@ -45,6 +46,9 @@ public:
     CXThinBlock(const CBlock& block, CBloomFilter* filter); // Use the filter to determine which txns the client has
     CXThinBlock(const CBlock& block);  // Assume client has all of the transactions (except coinbase)
     CXThinBlock() {}
+
+    void Init(const CBlock& block, CBloomFilter* filter);
+    void Init(const CBlock& block, CTxMemPool& mpool);
 
     ADD_SERIALIZE_METHODS;
 

@@ -102,7 +102,7 @@ void OptionsModel::Init(bool resetSettings)
 #endif
 
     // Network
-
+#if 0
     if (!settings.contains("fUseReceiveShaping"))
         settings.setValue("fUseReceiveShaping", DEFAULT_AVE_RECV != LONG_LONG_MAX);
     if (!settings.contains("fUseSendShaping"))
@@ -140,6 +140,7 @@ void OptionsModel::Init(bool resetSettings)
         addOverriddenOption("-sendavg");
     if (!SoftSetArg("-sendburst", burst))
         addOverriddenOption("-sendburst");
+#endif
 
     if (!settings.contains("fUseUPnP"))
         settings.setValue("fUseUPnP", DEFAULT_UPNP);
@@ -456,7 +457,7 @@ bool OptionsModel::setData(const QModelIndex& index, const QVariant& value, int 
             break;
         }
 
-
+#if 0
         if (changeReceiveShaper) {
             if (settings.value("fUseReceiveShaping").toBool()) {
                 int64_t burst = 1024 * settings.value("nReceiveBurst").toLongLong();
@@ -474,8 +475,9 @@ bool OptionsModel::setData(const QModelIndex& index, const QVariant& value, int 
             } else
                 sendShaper.disable();
         }
+#endif        
     }
-
+    
     Q_EMIT dataChanged(index, index);
 
     return successful;

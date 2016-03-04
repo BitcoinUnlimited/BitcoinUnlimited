@@ -16,8 +16,14 @@
 #include "utilmoneystr.h"
 #include "utiltime.h"
 #include "version.h"
+#include "stat.h"
 
 using namespace std;
+
+// BU
+extern CStatHistory<unsigned int, MinValMax<unsigned int> > txAdded;
+extern CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize;
+extern CStatHistory<unsigned int, MinValMax<unsigned int> > txFee;
 
 CTxMemPoolEntry::CTxMemPoolEntry(const CTransaction& _tx, const CAmount& _nFee,
                                  int64_t _nTime, double _entryPriority, unsigned int _entryHeight,
@@ -412,6 +418,8 @@ bool CTxMemPool::addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry,
 
     nTransactionsUpdated++;
     totalTxSize += entry.GetTxSize();
+    txAdded +=1;  // BU
+    poolSize() = totalTxSize; // BU    
     minerPolicyEstimator->processTransaction(entry, fCurrentEstimate);
 
     return true;

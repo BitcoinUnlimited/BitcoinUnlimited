@@ -16,7 +16,7 @@
 #include "streams.h"
 #include "sync.h"
 #include "uint256.h"
-
+#include "stat.h"
 #include <deque>
 #include <stdint.h>
 
@@ -27,8 +27,6 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/foreach.hpp>
 #include <boost/signals2/signal.hpp>
-
-#include "unlimited.h"
 
 class CAddrMan;
 class CScheduler;
@@ -379,6 +377,7 @@ public:
     uint64_t nGetXBlockTxLastTime;  // The last time a get_xblocktx request was made
     // BUIP010 Xtreme Thinblocks: end section
 
+
 protected:
     // Denial-of-service detection/prevention
     // Key is IP address, value is banned-until-time
@@ -428,6 +427,21 @@ public:
     int64_t nMinPingUsecTime;
     // Whether a ping is requested.
     bool fPingQueued;
+
+    // BU instrumentation
+    // track the number of bytes sent to this node
+    //CStatHistory<unsigned int, MinValMax<unsigned int> > bytesSent;
+    CStatHistory<unsigned int > bytesSent;
+    // track the number of bytes received from this node
+    // CStatHistory<unsigned int, MinValMax<unsigned int> > bytesReceived;
+    CStatHistory<unsigned int > bytesReceived;
+    // track the average round trip latency for transaction requests to this node
+    CStatHistory<unsigned int > txReqLatency;
+    //CStatHistory<unsigned int, MinValMax<unsigned int> > txReqLatency;
+    // track the # of times this node is the first to send us a transaction INV
+    CStatHistory<unsigned int> firstTx;
+    // track the # of times this node is the first to send us a block INV
+    CStatHistory<unsigned int> firstBlock;
 
     CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
     ~CNode();
@@ -800,6 +814,6 @@ public:
 void DumpBanlist();
 
 /** Return a timestamp in the future (in microseconds) for exponentially distributed events. */
-int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds);
+int64_t PoissonNextSend(int64_t nNow, float average_interval_seconds);  // BU need finer granularity
 
 #endif // BITCOIN_NET_H

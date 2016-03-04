@@ -8,7 +8,7 @@
 #include "primitives/block.h"
 #include "test/test_bitcoin.h"
 #include "utiltime.h"
-
+#include "unlimited.h"
 #include <cstdio>
 
 #include <boost/filesystem/operations.hpp>

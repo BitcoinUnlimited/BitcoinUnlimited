@@ -97,7 +97,7 @@ static const unsigned int AVG_LOCAL_ADDRESS_BROADCAST_INTERVAL = 24 * 24 * 60;
 static const unsigned int AVG_ADDRESS_BROADCAST_INTERVAL = 30;
 /** Average delay between trickled inventory broadcasts in seconds.
  *  Blocks, whitelisted receivers, and a random 25% of transactions bypass this. */
-static const unsigned int AVG_INVENTORY_BROADCAST_INTERVAL = 5;
+extern float AVG_INVENTORY_BROADCAST_INTERVAL; // BU: We are allowing this to be adjusted based on the node's role in the larger network
 
 static const unsigned int DEFAULT_LIMITFREERELAY = 15;
 static const bool DEFAULT_RELAYPRIORITY = true;
@@ -120,6 +120,8 @@ struct BlockHasher
 {
     size_t operator()(const uint256& hash) const { return hash.GetCheapHash(); }
 };
+
+extern bool SEND_ALL_INV;  // BU: set to true for routing nodes that aren't being used as wallets
 
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;

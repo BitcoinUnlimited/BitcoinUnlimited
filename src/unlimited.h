@@ -1,4 +1,5 @@
 // Copyright (c) 2015 G. Andrew Stone
+// Copyright (c) 2016 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #pragma once
@@ -7,6 +8,7 @@
 
 #include "leakybucket.h"
 #include "net.h"
+#include "requestManager.h"
 #include <univalue.h>
 #include <vector>
 
@@ -52,6 +54,12 @@ extern UniValue setminingmaxblock(const UniValue& params, bool fHelp);
 
 extern UniValue getexcessiveblock(const UniValue& params, bool fHelp);
 extern UniValue setexcessiveblock(const UniValue& params, bool fHelp);
+
+// Return a list of all available statistics
+extern UniValue getstatlist(const UniValue& params, bool fHelp);
+// Get a particular statistic
+extern UniValue getstat(const UniValue& params, bool fHelp);
+
 
 // These variables for traffic shaping need to be globally scoped so the GUI and CLI can adjust the parameters
 extern CLeakyBucket receiveShaper;

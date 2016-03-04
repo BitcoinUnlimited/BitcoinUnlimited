@@ -338,6 +338,12 @@ enum {
     // BUIP010 Xtreme Thinblocks: an Xtreme thin block contains the first 8 bytes of all the tx hashes 
     // and also provides the missing transactions that are needed at the other end to reconstruct the block
     MSG_XTHINBLOCK,
+    // BUIP010 Xtreme Thinblocks: an Xtreme thin block contains the first 8 bytes of all the tx hashes 
+    MSG_XTHINBLOCK_HASH_ONLY,
+    // BUIP010 Xtreme Thinblocks: an Xtreme thin block contains the first 8 bytes of all the tx hashes 
+    // and also provides the transactions that were missing from the source node's memory pool
+    MSG_XTHINBLOCK_SENDER_DIFF
+    
 };
 
 #endif // BITCOIN_PROTOCOL_H

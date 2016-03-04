@@ -79,7 +79,13 @@ uint64_t nPruneTarget = 0;
 bool fAlerts = DEFAULT_ALERTS;
 bool fEnableReplacement = DEFAULT_ENABLE_REPLACEMENT;
 
-/** Fees smaller than this (in satoshi) are considered zero fee (for relaying, mining and transaction creation) */
+// BU
+float AVG_INVENTORY_BROADCAST_INTERVAL = 3.0f;  // 5.0;
+bool SEND_ALL_INV = true;  // false;
+int  MIN_TX_FAST_INV = 50; // We only override the normal send rate if there is lots of tx to send
+bool MEMPOOL_PULL = false;  // synchronize mempools with node upon connection
+
+ /** Fees smaller than this (in satoshi) are considered zero fee (for relaying, mining and transaction creation) */
 CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
 
 CTxMemPool mempool(::minRelayTxFee);
@@ -4143,7 +4149,7 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
             it++;
 
             // BUIP010 Xtreme Thinblocks: if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK || inv.type == MSG_XTHINBLOCK)
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK || inv.type == MSG_XTHINBLOCK || inv.type == MSG_XTHINBLOCK_HASH_ONLY || inv.type == MSG_XTHINBLOCK_SENDER_DIFF )
             {
                 bool send = false;
                 BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
@@ -4192,12 +4198,9 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
                         pfrom->PushMessage(NetMsgType::BLOCK, block);
 
                     // BUIP010 Xtreme Thinblocks: begin section
-                    else if (inv.type == MSG_THINBLOCK || inv.type == MSG_XTHINBLOCK)
-                      {                 
+                    else if (inv.type == MSG_THINBLOCK || inv.type == MSG_XTHINBLOCK || inv.type == MSG_XTHINBLOCK_HASH_ONLY || inv.type == MSG_XTHINBLOCK_SENDER_DIFF)
+                      {
                         SendXThinBlock(block, pfrom, inv);
-                        //LOCK(pfrom->cs_filter);  // PROPOSED: clean up this filter; it will no longer be relevant to the next block
-                        //if (pfrom->pfilter) delete pfrom->pfilter;
-                        //pfrom->pfilter=NULL;
                       }
                     // BUIP010 Xtreme Thinblocks: end section
 
@@ -4273,7 +4276,7 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
             GetMainSignals().Inventory(inv.hash);
 
             // BUIP010 Xtreme Thinblocks: if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK || inv.type == MSG_XTHINBLOCK)
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK || inv.type == MSG_XTHINBLOCK || inv.type == MSG_XTHINBLOCK_HASH_ONLY || inv.type == MSG_XTHINBLOCK_SENDER_DIFF)
                 break;
         }
     }
@@ -4297,7 +4300,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     int64_t receiptTime = GetTime();
     const CChainParams& chainparams = Params();
     RandAddSeedPerfmon();
-    LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
+    int msgSize = vRecv.size(); // BU for statistics
+    LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), msgSize, pfrom->id);
     if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
     {
         LogPrintf("dropmessagestest DROPPING RECV MESSAGE\n");
@@ -4443,6 +4447,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         int64_t nTimeOffset = nTime - GetTime();
         pfrom->nTimeOffset = nTimeOffset;
         AddTimeData(pfrom->addr, nTimeOffset);
+
+        if (MEMPOOL_PULL && (pfrom->nVersion >=MEMPOOL_GD_VERSION))  // BU: grab the new connection's inflight transactions
+          {
+            SendSeededBloomFilter(pfrom);  // send a bloom filter of the txns I know about
+            pfrom->PushMessage(NetMsgType::MEMPOOL); // Ok now let's get INVs for all the txns I dont know about
+          }
     }
 
 
@@ -4607,6 +4617,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                                 if (pfrom->mapThinBlocksInFlight.size() < 1 && pfrom->nVersion >= THINBLOCKS_VERSION) { // We can only send one thinblock per peer at a time
                                     pfrom->mapThinBlocksInFlight[inv2.hash] = GetTime();
                                     inv2.type = MSG_XTHINBLOCK;
+                                    //inv2.type = MSG_XTHINBLOCK_HASH_ONLY;
                                     vToFetch.push_back(inv2);
                                     SendSeededBloomFilter(pfrom);
                                     MarkBlockAsInFlight(pfrom->GetId(), inv.hash, chainparams.GetConsensus());
@@ -4642,7 +4653,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 if (fBlocksOnly)
                     LogPrint("net", "transaction (%s) inv sent in violation of protocol peer=%d\n", inv.hash.ToString(), pfrom->id);
                 else if (!fAlreadyHave && !fImporting && !fReindex)
-                    pfrom->AskFor(inv);
+                  requester.AskFor(inv,pfrom); // BU manage outgoing requests.  was: pfrom->AskFor(inv);
             }
 
             // Track requests for our stuff
@@ -4790,7 +4801,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         CInv inv(MSG_TX, tx.GetHash());
         pfrom->AddInventoryKnown(inv);
-
+        requester.Received(inv, pfrom, msgSize);
         LOCK(cs_main);
 
         bool fMissingInputs = false;
@@ -5504,28 +5515,40 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
 
     else if (strCommand == NetMsgType::REJECT)
-    {
-        if (fDebug) {
-            try {
-                string strMsg; unsigned char ccode; string strReason;
-                vRecv >> LIMITED_STRING(strMsg, CMessageHeader::COMMAND_SIZE) >> ccode >> LIMITED_STRING(strReason, MAX_REJECT_MESSAGE_LENGTH);
+      {
+	try {
+	  string strMsg; unsigned char ccode; string strReason;
+	  uint256 hash;
 
-                ostringstream ss;
-                ss << strMsg << " code " << itostr(ccode) << ": " << strReason;
+	  vRecv >> LIMITED_STRING(strMsg, CMessageHeader::COMMAND_SIZE) >> ccode >> LIMITED_STRING(strReason, MAX_REJECT_MESSAGE_LENGTH);
+	  if (strMsg == NetMsgType::BLOCK || strMsg == NetMsgType::TX)
+	    {
+	      vRecv >> hash;
+	    }
+          if (strMsg == NetMsgType::BLOCK)
+	    {
+	      requester.Rejected(CInv(MSG_BLOCK,hash),pfrom,ccode);
+	    }
+	  else if (strMsg == NetMsgType::TX)
+	    {
+	      requester.Rejected(CInv(MSG_TX,hash),pfrom,ccode);
+	    }
+	  if (fDebug) {
+	    ostringstream ss;
+	    ss << strMsg << " code " << itostr(ccode) << ": " << strReason;
 
-                if (strMsg == NetMsgType::BLOCK || strMsg == NetMsgType::TX)
-                {
-                    uint256 hash;
-                    vRecv >> hash;
-                    ss << ": hash " << hash.ToString();
-                }
-                LogPrint("net", "Reject %s\n", SanitizeString(ss.str()));
-            } catch (const std::ios_base::failure&) {
-                // Avoid feedback loops by preventing reject messages from triggering a new reject message.
-                LogPrint("net", "Unparseable reject message received\n");
-            }
-        }
-    }
+	    if (strMsg == NetMsgType::BLOCK || strMsg == NetMsgType::TX)
+	      {
+		ss << ": hash " << hash.ToString();
+	      }
+	    LogPrint("net", "Reject %s\n", SanitizeString(ss.str()));
+	  } 
+	} catch (const std::ios_base::failure&) {
+	  // Avoid feedback loops by preventing reject messages from triggering a new reject message.
+	  LogPrint("net", "Unparseable reject message received\n");
+	}
+        
+      }
 
     else
     {
@@ -5688,13 +5711,17 @@ bool SendMessages(CNode* pto)
             }
             pto->fPingQueued = false;
             pto->nPingUsecStart = GetTimeMicros();
-            if (pto->nVersion > BIP0031_VERSION) {
+
+            TRY_LOCK(pto->cs_vSend, lockSend);
+            if (lockSend) {
+              if (pto->nVersion > BIP0031_VERSION) {
                 pto->nPingNonceSent = nonce;
                 pto->PushMessage(NetMsgType::PING, nonce);
-            } else {
+              } else {
                 // Peer is too old to support ping command with nonce, pong will never arrive.
                 pto->nPingNonceSent = 0;
                 pto->PushMessage(NetMsgType::PING);
+              }
             }
         }
 
@@ -5704,7 +5731,7 @@ bool SendMessages(CNode* pto)
         TRY_LOCK(pto->cs_vSend, lockSend);
         if (!lockSend)
           return true;
-
+        
         // Address refresh broadcast
         int64_t nNow = GetTimeMicros();
         if (!IsInitialBlockDownload() && pto->nNextLocalAddrSend < nNow) {
@@ -5896,6 +5923,8 @@ bool SendMessages(CNode* pto)
                 pto->nNextInvSend = PoissonNextSend(nNow, AVG_INVENTORY_BROADCAST_INTERVAL);
             }
             LOCK(pto->cs_inventory);
+            int invSize = pto->vInventoryToSend.size();
+            if (invSize >= MIN_TX_FAST_INV && SEND_ALL_INV) fSendTrickle = true;  // BU override the trickle feature for some nodes (mostly used for walletless nodes that are acting as fast message routers).  Note that the sense of fSendTrickle is backwards
             vInv.reserve(std::min<size_t>(1000, pto->vInventoryToSend.size()));
             vInvWait.reserve(pto->vInventoryToSend.size());
             BOOST_FOREACH(const CInv& inv, pto->vInventoryToSend)
@@ -5926,6 +5955,7 @@ bool SendMessages(CNode* pto)
                 vInv.push_back(inv);
                 if (vInv.size() >= 1000)
                 {
+                    LogPrint("net", "sending INV of size %d to peer %s (%d)\n", vInv.size(), pto->addrName.c_str(), pto->id);
                     pto->PushMessage(NetMsgType::INV, vInv);
                     vInv.clear();
                 }
@@ -5933,7 +5963,10 @@ bool SendMessages(CNode* pto)
             pto->vInventoryToSend = vInvWait;
         }
         if (!vInv.empty())
+          {
+            LogPrint("net", "sending INV of size %d to peer %s (%d)\n", vInv.size(), pto->addrName.c_str(), pto->id);
             pto->PushMessage(NetMsgType::INV, vInv);
+          }
 
         // Detect whether we're stalling
         nNow = GetTimeMicros();

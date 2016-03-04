@@ -19,7 +19,7 @@
 #include "scheduler.h"
 #include "ui_interface.h"
 #include "utilstrencodings.h"
-
+#include "unlimited.h"
 #ifdef WIN32
 #include <string.h>
 #else
@@ -756,6 +756,7 @@ void SocketSendData(CNode* pnode)
         if (nBytes > 0) {
             pnode->nLastSend = GetTime();
             pnode->nSendBytes += nBytes;
+            pnode->bytesSent += nBytes;  // BU stats
             pnode->nSendOffset += nBytes;
             pnode->RecordBytesSent(nBytes);
             bool empty = !sendShaper.leak(nBytes);
@@ -1027,6 +1028,8 @@ void ThreadSocketHandler()
     int progress; // This variable is incremented if something happens.  If it is zero at the bottom of the loop, we delay.  This solves spin loop issues where the select does not block but no bytes can be transferred (traffic shaping limited, for example).
     while (true) {
         progress = 0;
+        stat_io_service.poll(); // BU
+        requester.SendRequests(); // BU
         //
         // Disconnect nodes
         //
@@ -1208,6 +1211,7 @@ void ThreadSocketHandler()
                                 pnode->CloseSocketDisconnect();
                             pnode->nLastRecv = GetTime();
                             pnode->nRecvBytes += nBytes;
+                            pnode->bytesReceived += nBytes;  // BU stats
                             pnode->RecordBytesRecv(nBytes);
                         } else if (nBytes == 0) {
                             // socket closed gracefully
@@ -2276,9 +2280,23 @@ unsigned int SendBufferSize() { return 1000*GetArg("-maxsendbuffer", DEFAULT_MAX
 
 CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNameIn, bool fInboundIn) :
     ssSend(SER_NETWORK, INIT_PROTO_VERSION),
+    addr(addrIn),  // BU must be before the instrumentation objects
+    addrName(addrNameIn == "" ? addr.ToStringIPPort() : addrNameIn),
     addrKnown(5000, 0.001),
     filterInventoryKnown(50000, 0.000001)
 {
+    std::string xmledName;
+    if (addrNameIn != "") xmledName = addrNameIn;
+    else
+      {
+	xmledName="ip" + addr.ToStringIP() + "p" + addr.ToStringPort();
+      }
+    bytesSent.init("node/" + xmledName + "/bytesSent");
+    bytesReceived.init("node/" + xmledName + "/bytesReceived");
+    txReqLatency.init("node/" + xmledName + "/txLatency", STAT_OP_AVE);
+    firstTx.init("node/" + xmledName + "/firstTxn");
+    firstBlock.init("node/" + xmledName + "/firstBlock");
+
     nServices = 0;
     hSocket = hSocketIn;
     nRecvVersion = INIT_PROTO_VERSION;
@@ -2289,7 +2307,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     nTimeConnected = GetTime();
     nTimeOffset = 0;
     addr = addrIn;
-    addrName = addrNameIn == "" ? addr.ToStringIPPort() : addrNameIn;
     nVersion = 0;
     strSubVer = "";
     fWhitelisted = false;
@@ -2554,6 +2571,6 @@ void DumpBanlist()
              banmap.size(), GetTimeMillis() - nStart);
 }
 
-int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds) {
+int64_t PoissonNextSend(int64_t nNow, float average_interval_seconds) {
     return nNow + (int64_t)(log1p(GetRand(1ULL << 48) * -0.0000000000000035527136788 /* -1/2^48 */) * average_interval_seconds * -1000000.0 + 0.5);
 }

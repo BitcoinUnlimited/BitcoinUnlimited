@@ -16,7 +16,7 @@ class UnlimitedModel;
 
 // Minimum time in ms to show notifications (used in BitcoinGUI not the Unlimited dialog)
 #define NOTIFY_MIN_SHOW_TIME 1000
-
+#include "unlimited.h"
 #include "ui_unlimited.h"
 /** Ensures that one edit box is always less than another */
 class LessThanValidator : public QIntValidator

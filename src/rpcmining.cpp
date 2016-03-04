@@ -19,7 +19,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validationinterface.h"
-
+#include "unlimited.h"
 #include <stdint.h>
 
 #include <boost/assign/list_of.hpp>
