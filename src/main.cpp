@@ -65,6 +65,7 @@ int nScriptCheckThreads = 0;
 bool fImporting = false;
 bool fReindex = false;
 bool fTxIndex = false;
+bool fAddressIndex = false;
 bool fHavePruned = false;
 bool fPruneMode = false;
 bool fIsBareMultisigStd = DEFAULT_PERMIT_BAREMULTISIG;
@@ -1232,6 +1233,17 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     return res;
 }
 
+bool GetAddressIndex(uint160 addressHash, int type, std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex)
+{
+    if (!fAddressIndex)
+        return error("%s: address index not enabled");
+
+    if (!pblocktree->ReadAddressIndex(addressHash, type, addressIndex))
+        return error("%s: unable to get txids for address");
+
+    return true;
+}
+
 /** Return transaction in tx, and if it was found inside a block, its hash is placed in hashBlock */
 bool GetTransaction(const uint256 &hash, CTransaction &txOut, const Consensus::Params& consensusParams, uint256 &hashBlock, bool fAllowSlow)
 {
@@ -2063,9 +2075,12 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     std::vector<std::pair<uint256, CDiskTxPos> > vPos;
     vPos.reserve(block.vtx.size());
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
+    std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
+
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
         const CTransaction &tx = block.vtx[i];
+        const uint256 txhash = tx.GetHash();
 
         nInputs += tx.vin.size();
         nSigOps += GetLegacySigOpCount(tx);
@@ -2078,6 +2093,22 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             if (!view.HaveInputs(tx))
                 return state.DoS(100, error("ConnectBlock(): inputs missing/spent"),
                                  REJECT_INVALID, "bad-txns-inputs-missingorspent");
+
+            if (fAddressIndex)
+            {
+                for (size_t j = 0; j < tx.vin.size(); j++) {
+                    const CTxOut &prevout = view.GetOutputFor(tx.vin[j]);
+                    if (prevout.scriptPubKey.IsPayToScriptHash()) {
+                        vector<unsigned char> hashBytes(prevout.scriptPubKey.begin()+2, prevout.scriptPubKey.begin()+22);
+                        addressIndex.push_back(make_pair(CAddressIndexKey(uint160(hashBytes), 2, txhash, j), prevout.nValue * -1));
+                    } else if (prevout.scriptPubKey.IsPayToPublicKeyHash()) {
+                        vector<unsigned char> hashBytes(prevout.scriptPubKey.begin()+3, prevout.scriptPubKey.begin()+23);
+                        addressIndex.push_back(make_pair(CAddressIndexKey(uint160(hashBytes), 1, txhash, j), prevout.nValue * -1));
+                    } else {
+                        continue;
+                    }
+                }
+            }
 
             if (fStrictPayToScriptHash)
             {
@@ -2099,6 +2130,24 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                     tx.GetHash().ToString(), FormatStateMessage(state));
             control.Add(vChecks);
         }
+
+        if (fAddressIndex) {
+            for (unsigned int k = 0; k < tx.vout.size(); k++) {
+                const CTxOut &out = tx.vout[k];
+
+                if (out.scriptPubKey.IsPayToScriptHash()) {
+                    vector<unsigned char> hashBytes(out.scriptPubKey.begin()+2, out.scriptPubKey.begin()+22);
+                    addressIndex.push_back(make_pair(CAddressIndexKey(uint160(hashBytes), 2, txhash, k), out.nValue));
+                } else if (out.scriptPubKey.IsPayToPublicKeyHash()) {
+                    vector<unsigned char> hashBytes(out.scriptPubKey.begin()+3, out.scriptPubKey.begin()+23);
+                    addressIndex.push_back(make_pair(CAddressIndexKey(uint160(hashBytes), 1, txhash, k), out.nValue));
+                } else {
+                    continue;
+                }
+
+            }
+        }
+
 
         CTxUndo undoDummy;
         if (i > 0) {
@@ -2149,6 +2198,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (fTxIndex)
         if (!pblocktree->WriteTxIndex(vPos))
             return AbortNode(state, "Failed to write transaction index");
+
+    if (fAddressIndex)
+	if (!pblocktree->WriteAddressIndex(addressIndex))
+	    return AbortNode(state, "Failed to write address index");
 
     // add this block to the view's block chain
     view.SetBestBlock(pindex->GetBlockHash());
@@ -3515,6 +3568,10 @@ bool static LoadBlockIndexDB()
     pblocktree->ReadFlag("txindex", fTxIndex);
     LogPrintf("%s: transaction index %s\n", __func__, fTxIndex ? "enabled" : "disabled");
 
+    // Check whether we have an address index
+    pblocktree->ReadFlag("addressindex", fAddressIndex);
+    LogPrintf("%s: address index %s\n", __func__, fAddressIndex ? "enabled" : "disabled");
+
     // Load pointer to end of best chain
     BlockMap::iterator it = mapBlockIndex.find(pcoinsTip->GetBestBlock());
     if (it == mapBlockIndex.end())
@@ -3672,6 +3729,11 @@ bool InitBlockIndex(const CChainParams& chainparams)
     // Use the provided setting for -txindex in the new database
     fTxIndex = GetBoolArg("-txindex", DEFAULT_TXINDEX);
     pblocktree->WriteFlag("txindex", fTxIndex);
+
+    // Use the provided setting for -addressindex in the new database
+    fAddressIndex = GetBoolArg("-addressindex", DEFAULT_ADDRESSINDEX);
+    pblocktree->WriteFlag("addressindex", fAddressIndex);
+
     LogPrintf("Initializing databases...\n");
 
     // Only add the genesis block if not reindexing (in which case we reuse the one already on disk)
