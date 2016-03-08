@@ -96,6 +96,7 @@ testScripts = [
     'walletbackup.py',
     'nodehandling.py',
     'reindex.py',
+    'addressindex.py',
     'decodescript.py',
     'p2p-fullblocktest.py',
     'blockchain.py',
