@@ -621,7 +621,7 @@ public:
         uint64_t limitDescendantCount,
         uint64_t limitDescendantSize,
         std::string &errString,
-        bool fSearchForParents = true);
+        bool fSearchForParents = true) const;
     bool _CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
         setEntries &setAncestors,
         uint64_t limitAncestorCount,
@@ -629,7 +629,7 @@ public:
         uint64_t limitDescendantCount,
         uint64_t limitDescendantSize,
         std::string &errString,
-        bool fSearchForParents = true);
+        bool fSearchForParents = true) const;
 
     /** Similar to CalculateMemPoolAncestors, except only requires the inputs and just returns true/false depending on
      * whether the input set conforms to the passed limits */

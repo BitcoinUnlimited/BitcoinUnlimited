@@ -203,7 +203,7 @@ bool CTxMemPool::CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
     uint64_t limitDescendantCount,
     uint64_t limitDescendantSize,
     std::string &errString,
-    bool fSearchForParents /* = true */)
+    bool fSearchForParents /* = true */) const
 {
     READLOCK(cs);
     setEntries setAncestors;
@@ -219,7 +219,7 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
     uint64_t limitDescendantCount,
     uint64_t limitDescendantSize,
     std::string &errString,
-    bool fSearchForParents /* = true */)
+    bool fSearchForParents /* = true */) const
 {
     AssertLockHeld(cs);
     setEntries parentHashes;
@@ -897,10 +897,28 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
             i++;
         }
         assert(setParentCheck == GetMemPoolParents(it));
-        // Also check to make sure ancestor size/sigops are >= sum with immediate
-        // parents.
-        assert(it->GetSizeWithAncestors() >= parentSizes + it->GetTxSize());
-        assert(it->GetSigOpCountWithAncestors() >= parentSigOpCount + it->GetSigOpCount());
+        // Verify ancestor state is correct.
+        setEntries setAncestors;
+        uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
+        std::string dummy;
+        _CalculateMemPoolAncestors(*it, setAncestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy);
+        uint64_t nCountCheck = setAncestors.size() + 1;
+        uint64_t nSizeCheck = it->GetTxSize();
+        CAmount nFeesCheck = it->GetModifiedFee();
+        unsigned int nSigOpCheck = it->GetSigOpCount();
+
+        for (txiter ancestorIt : setAncestors)
+        {
+            nSizeCheck += ancestorIt->GetTxSize();
+            nFeesCheck += ancestorIt->GetModifiedFee();
+            nSigOpCheck += ancestorIt->GetSigOpCount();
+        }
+
+        assert(it->GetCountWithAncestors() == nCountCheck);
+        assert(it->GetSizeWithAncestors() == nSizeCheck);
+        assert(it->GetSigOpCountWithAncestors() == nSigOpCheck);
+        assert(it->GetModFeesWithAncestors() == nFeesCheck);
+
         // Check children against mapNextTx
         CTxMemPool::setEntries setChildrenCheck;
         std::map<COutPoint, CInPoint>::const_iterator iter = mapNextTx.lower_bound(COutPoint(it->GetTx().GetHash(), 0));
