@@ -351,6 +351,7 @@ struct CAddressIndexKey {
     unsigned int txindex;
     uint256 txhash;
     size_t outindex;
+    bool spending;
 
     size_t GetSerializeSize(int nType, int nVersion) const {
         return 65;
@@ -364,6 +365,8 @@ struct CAddressIndexKey {
         ser_writedata32be(s, txindex);
         txhash.Serialize(s, nType, nVersion);
         ser_writedata32(s, outindex);
+        char f = spending;
+        ser_writedata8(s, f);
     }
     template<typename Stream>
     void Unserialize(Stream& s, int nType, int nVersion) {
@@ -373,16 +376,19 @@ struct CAddressIndexKey {
         txindex = ser_readdata32be(s);
         txhash.Unserialize(s, nType, nVersion);
         outindex = ser_readdata32(s);
+        char f = ser_readdata8(s);
+        spending = f;
     }
 
     CAddressIndexKey(unsigned int addressType, uint160 addressHash, int height, int blockindex,
-                     uint256 txid, size_t outputIndex) {
+                     uint256 txid, size_t outputIndex, bool isSpending) {
         type = addressType;
         hashBytes = addressHash;
         blockHeight = height;
         txindex = blockindex;
         txhash = txid;
         outindex = outputIndex;
+        spending = isSpending;
     }
 
     CAddressIndexKey() {
@@ -396,6 +402,7 @@ struct CAddressIndexKey {
         txindex = 0;
         txhash.SetNull();
         outindex = 0;
+        spending = false;
     }
 
 };
