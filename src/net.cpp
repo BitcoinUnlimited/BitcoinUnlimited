@@ -80,6 +80,9 @@ namespace
     };
 }
 
+/** Services this node implementation cares about */
+static const uint64_t nRelevantServices = NODE_NETWORK;
+
 //
 // Global state variables
 //
@@ -462,6 +465,7 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure
             vNodes.push_back(pnode);
         }
 
+        pnode->nServicesExpected = addrConnect.nServices & nRelevantServices;
         pnode->nTimeConnected = GetTime();
 
         return pnode;
@@ -2765,6 +2769,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     filterInventoryKnown(50000, 0.000001)
 {
     nServices = 0;
+    nServicesExpected = 0;
     hSocket = hSocketIn;
     nRecvVersion = INIT_PROTO_VERSION;
     nLastSend = 0;
