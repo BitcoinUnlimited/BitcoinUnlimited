@@ -5095,6 +5095,10 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, in
         CAddress addrFrom;
         uint64_t nNonce = 1;
         vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
+        if (!pfrom->fInbound)
+        {
+            addrman.SetServices(pfrom->addr, pfrom->nServices);
+        }
 
         CheckNodeSupportForThinBlocks(); // BUIP010 Xtreme Thinblocks
 
