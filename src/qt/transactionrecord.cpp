@@ -306,8 +306,12 @@ bool TransactionRecord::statusUpdateNeeded()
     return status.cur_num_blocks != chainActive.Height();
 }
 
-QString TransactionRecord::getTxID() const { return formatSubTxId(hash, idx); }
-QString TransactionRecord::formatSubTxId(const uint256 &hash, int vout)
+QString TransactionRecord::getTxID() const
 {
-    return QString::fromStdString(hash.ToString() + strprintf("-%03d", vout));
+    return QString::fromStdString(hash.ToString());
+}
+
+int TransactionRecord::getOutputIndex() const
+{
+    return idx;
 }
