@@ -98,6 +98,7 @@ testScripts = [
     'reindex.py',
     'addressindex.py',
     'timestampindex.py',
+    'spentindex.py',
     'decodescript.py',
     'p2p-fullblocktest.py',
     'blockchain.py',
