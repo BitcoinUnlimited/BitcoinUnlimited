@@ -689,6 +689,18 @@ bool CNode::ReceiveMsgBytes(const char* pch, unsigned int nBytes)
         nBytes -= handled;
 
         if (msg.complete()) {
+            // BU: If the messages is a priority message then move from the back to the front of the deque
+            std::string strCommand = msg.hdr.GetCommand();
+            if (strCommand == NetMsgType::GET_XTHIN || 
+                strCommand == NetMsgType::XTHINBLOCK || 
+                strCommand == NetMsgType::THINBLOCK || 
+                strCommand == NetMsgType::XBLOCKTX || 
+                strCommand == NetMsgType::GET_XBLOCKTX ) {
+                vRecvMsg.push_front(msg);
+                vRecvMsg.pop_back();
+                LogPrint("thin", "Receive Queue: pushed %s to the front of the queue\n", strCommand);
+            }
+            // BU: end
             msg.nTime = GetTimeMicros();
             messageHandlerCondition.notify_one();
         }
@@ -2454,7 +2466,23 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
 
     LogPrint("net", "(%d bytes) peer=%d\n", nSize, id);
 
-    std::deque<CSerializeData>::iterator it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
+    // BU: If the messages is a priority message then move to the front of the deque
+    std::deque<CSerializeData>::iterator it;
+    char strCommand[CMessageHeader::COMMAND_SIZE + 1];
+    strncpy(strCommand, &(*(ssSend.begin() + MESSAGE_START_SIZE)), CMessageHeader::COMMAND_SIZE);
+    strCommand[CMessageHeader::COMMAND_SIZE] = '\0';
+    if (strcmp(strCommand, NetMsgType::GET_XTHIN) == 0 || 
+        strcmp(strCommand, NetMsgType::XTHINBLOCK) == 0 || 
+        strcmp(strCommand, NetMsgType::THINBLOCK) == 0 || 
+        strcmp(strCommand, NetMsgType::XBLOCKTX) == 0 || 
+        strcmp(strCommand, NetMsgType::GET_XBLOCKTX) == 0 ) {
+        it = vSendMsg.insert(vSendMsg.begin(), CSerializeData());
+        LogPrint("thin", "Send Queue: pushed %s to the front of the queue\n", strCommand);
+    }
+    else
+        it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
+    // BU: end
+
     ssSend.GetAndClear(*it);
     nSendSize += (*it).size();
 
