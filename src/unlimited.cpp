@@ -601,14 +601,7 @@ void ClearThinBlockTimer(uint256 hash)
 
 bool IsThinBlocksEnabled() 
 {
-    bool fThinblocksEnabled = GetBoolArg("-use-thinblocks", true);
-
-    // Enabling the XTHIN service should really be in init.cpp but because
-    // we want to avoid possile future merge conflicts with Core we can enable
-    // it here as it has little performance impact.
-    if (fThinblocksEnabled)
-        nLocalServices |= NODE_XTHIN;
-    return fThinblocksEnabled;
+    return GetBoolArg("-use-thinblocks", true);
 }
 
 bool IsChainNearlySyncd() 
@@ -768,8 +761,10 @@ void CheckNodeSupportForThinBlocks()
         BOOST_FOREACH(string& strAddr, mapMultiArgs["-connect-thinblock"]) {
             if(CNode* pnode = FindNode(strAddr)) {
                 if(!pnode->ThinBlockCapable()) {
-                    LogPrintf("ERROR: You are trying to use connect-thinblocks but to a node that does not support it - Protocol Version: %d peer=%d\n", 
-                               pnode->nVersion, pnode->id);
+                    bool fBloom = pnode->nServices & NODE_BLOOM;
+                    bool fXthin = pnode->nServices & NODE_XTHIN;
+                    LogPrintf("ERROR: You are trying to use connect-thinblocks but to a node that does not support it - NODE_XTHIN: %d  NODE_BLOOM: %d peer=%d\n", 
+                               fXthin, fBloom, pnode->id);
                 }
             }
         }
