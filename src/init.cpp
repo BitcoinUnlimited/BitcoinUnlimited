@@ -378,6 +378,9 @@ std::string HelpMessage(HelpMessageMode mode)
     //strUsage += HelpMessageOpt("-peerbloomfilters", strprintf(_("Support filtering of blocks and transaction with bloom filters (default: %u)"), 1));
     //if (showDebug)
     //    strUsage += HelpMessageOpt("-enforcenodebloom", strprintf("Enforce minimum protocol version to limit use of bloom filters (default: %u)", 0));
+    // Enable the XTHIN service
+    if (GetBoolArg("-use-thinblocks", true))
+        nLocalServices |= NODE_XTHIN;
     // BUIP010 Xtreme Thinblocks - end section: we do not allow bloom filters to be turned off
     strUsage += HelpMessageOpt("-port=<port>", strprintf(_("Listen for connections on <port> (default: %u or testnet: %u)"), Params(CBaseChainParams::MAIN).GetDefaultPort(), Params(CBaseChainParams::TESTNET).GetDefaultPort()));
     strUsage += HelpMessageOpt("-proxy=<ip:port>", _("Connect through SOCKS5 proxy"));
