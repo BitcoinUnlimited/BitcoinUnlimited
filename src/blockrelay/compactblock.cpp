@@ -96,9 +96,6 @@ void validateCompactBlock(const CompactBlock &cmpctblock)
     if (cmpctblock.header.IsNull() || (cmpctblock.shorttxids.empty() && cmpctblock.prefilledtxn.empty()))
         throw std::invalid_argument("empty data in compact block");
 
-    if (cmpctblock.shorttxids.size() + cmpctblock.prefilledtxn.size() > excessiveBlockSize / MIN_TRANSACTION_SIZE)
-        throw std::invalid_argument("compact block exceeds max txs in a block");
-
     int32_t lastprefilledindex = -1;
     for (size_t i = 0; i < cmpctblock.prefilledtxn.size(); i++)
     {
