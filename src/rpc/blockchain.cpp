@@ -208,6 +208,10 @@ std::string EntryDescriptionString()
            "    \"descendantsize\" : n,   (numeric) size of in-mempool descendants (including this one)\n"
            "    \"descendantfees\" : n,   (numeric) modified fees (see above) of in-mempool descendants (including "
            "this one)\n"
+           "    \"ancestorcount\" : n,    (numeric) number of in-mempool ancestor transactions (including this one)\n"
+           "    \"ancestorsize\" : n,     (numeric) size of in-mempool ancestors (including this one)\n"
+           "    \"ancestorfees\" : n,     (numeric) modified fees (see above) of in-mempool ancestors (including this "
+           "one)\n"
            "    \"depends\" : [           (array) unconfirmed transactions used as inputs for this transaction\n"
            "        \"transactionid\",    (string) parent transaction id\n"
            "       ... ]\n"
@@ -228,6 +232,9 @@ void entryToJSON(UniValue &info, const CTxMemPoolEntry &e)
     info.push_back(Pair("descendantcount", e.GetCountWithDescendants()));
     info.push_back(Pair("descendantsize", e.GetSizeWithDescendants()));
     info.push_back(Pair("descendantfees", e.GetModFeesWithDescendants()));
+    info.push_back(Pair("ancestorcount", e.GetCountWithAncestors()));
+    info.push_back(Pair("ancestorsize", e.GetSizeWithAncestors()));
+    info.push_back(Pair("ancestorfees", e.GetModFeesWithAncestors()));
     const CTransaction &tx = e.GetTx();
     set<string> setDepends;
     for (const CTxIn &txin : tx.vin)
