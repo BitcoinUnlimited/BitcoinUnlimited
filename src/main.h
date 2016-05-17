@@ -16,6 +16,7 @@
 #include "net.h"
 #include "script/script_error.h"
 #include "sync.h"
+#include "spentindex.h"
 
 #include <algorithm>
 #include <exception>
@@ -282,69 +283,6 @@ struct CNodeStateStats {
     int nSyncHeight;
     int nCommonHeight;
     std::vector<int> vHeightInFlight;
-};
-
-struct CSpentIndexKey {
-    uint256 txid;
-    unsigned int outputIndex;
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        READWRITE(txid);
-        READWRITE(outputIndex);
-    }
-
-    CSpentIndexKey(uint256 t, unsigned int i) {
-        txid = t;
-        outputIndex = i;
-    }
-
-    CSpentIndexKey() {
-        SetNull();
-    }
-
-    void SetNull() {
-        txid.SetNull();
-        outputIndex = 0;
-    }
-
-};
-
-struct CSpentIndexValue {
-    uint256 txid;
-    unsigned int inputIndex;
-    int blockHeight;
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        READWRITE(txid);
-        READWRITE(inputIndex);
-        READWRITE(blockHeight);
-    }
-
-    CSpentIndexValue(uint256 t, unsigned int i, int h) {
-        txid = t;
-        inputIndex = i;
-        blockHeight = h;
-    }
-
-    CSpentIndexValue() {
-        SetNull();
-    }
-
-    void SetNull() {
-        txid.SetNull();
-        inputIndex = 0;
-        blockHeight = 0;
-    }
-
-    bool IsNull() const {
-        return txid.IsNull();
-    }
 };
 
 struct CTimestampIndexIteratorKey {
