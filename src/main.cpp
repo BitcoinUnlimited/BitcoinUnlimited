@@ -1,7 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2017 The Bitcoin Unlimited developers
-// Copyright (c) 2016 Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -2439,7 +2438,7 @@ static int64_t nTimeTotal = 0;
 
 bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, CCoinsViewCache& view, bool fJustCheck, bool fParallel)
 {
-    /** BU: Start Section to validate inputs - if there are parallel blocks being checked 
+    /** BU: Start Section to validate inputs - if there are parallel blocks being checked
      *      then the winner of this race will get to update the UTXO.
      */
 
@@ -2467,7 +2466,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     const int64_t timeBarrier = GetTime() - (24 * 3600 * checkScriptDays.value);
     // Blocks that have various days of POW behind them makes them secure in that
     // real online nodes have checked the scripts.  Therefore, during initial block
-    // download we don't need to check most of those scripts except for the most 
+    // download we don't need to check most of those scripts except for the most
     // recent ones.
     bool fScriptChecks = !fCheckpointsEnabled || block.nTime > timeBarrier;
 
@@ -3226,10 +3225,9 @@ static void PruneBlockIndexCandidates() {
  * Try to make some progress towards making pindexMostWork the active block.
  * pblock is either NULL or a pointer to a CBlock corresponding to pindexMostWork.
  */
-static bool ActivateBestChainStep(CValidationState& state, const CChainParams& chainparams, CBlockIndex* pindexMostWork, const CBlock* pblock, bool fParallel)
+static bool ActivateBestChainStep(CValidationState& state, const CChainParams& chainparams, CBlockIndex* pindexMostWork, const CBlock* pblock, bool& fInvalidFound, bool fParallel)
 {
     AssertLockHeld(cs_main);
-    bool fInvalidFound = false;
     const CBlockIndex *pindexOldTip = chainActive.Tip();
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
 
@@ -3321,7 +3319,7 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
 
                 PruneBlockIndexCandidates();
                 if (!pindexOldTip || chainActive.Tip()->nChainWork > pindexOldTip->nChainWork) {
-                    /* BU: these are commented out for parallel validation: 
+                    /* BU: these are commented out for parallel validation:
                            We must always continue so as to find if the pindexMostWork has advanced while we've
                            been trying to connect the last block.
                     // We're in a better position than we were. Return temporarily to release the lock.
@@ -3345,6 +3343,7 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
         // Update the syncd status after each block is handled
         IsChainNearlySyncdInit();
         IsInitialBlockDownloadInit();
+        NotifyHeaderTip();
     }
     if (fBlocksDisconnected) {
         mempool.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
@@ -3361,6 +3360,28 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
         CheckForkWarningConditions();
 
     return true;
+}
+
+static void NotifyHeaderTip() {
+    bool fNotify = false;
+    bool fInitialBlockDownload = false;
+    static CBlockIndex* pindexHeaderOld = NULL;
+    CBlockIndex* pindexHeader = NULL;
+    {
+        LOCK(cs_main);
+        if (!setBlockIndexCandidates.empty()) {
+            pindexHeader = *setBlockIndexCandidates.rbegin();
+        }
+        if (pindexHeader != pindexHeaderOld) {
+            fNotify = true;
+            fInitialBlockDownload = IsInitialBlockDownload();
+            pindexHeaderOld = pindexHeader;
+        }
+    }
+    // Send block tip changed notifications without cs_main
+    if (fNotify) {
+        uiInterface.NotifyHeaderTip(fInitialBlockDownload, pindexHeader);
+    }
 }
 
 /**
@@ -3380,7 +3401,9 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
         const CBlockIndex *pindexFork;
         {
             CBlockIndex *pindexOldTip = chainActive.Tip();
-            pindexMostWork = FindMostWorkChain();
+            if (pindexMostWork == NULL) {
+                pindexMostWork = FindMostWorkChain();
+            }
 
             // This is needed for PV because FindMostWorkChain does not necessarily return the block with the lowest nSequenceId
             if (fParallel)
@@ -3406,8 +3429,8 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
             //** PARALLEL BLOCK VALIDATION
             // Find the CBlockIndex of this block if this blocks previous hash matches the old chaintip.  In the
             // case of parallel block validation we may have two or more blocks processing at the same time however
-            // their block headers may not represent what is considered the best block as returned by pindexMostWork. 
-            // Therefore we must supply the blockindex of this block explicitly as being the one with potentially 
+            // their block headers may not represent what is considered the best block as returned by pindexMostWork.
+            // Therefore we must supply the blockindex of this block explicitly as being the one with potentially
             // the most work and which will subsequently advance the chain tip if it wins the validation race.
             if (pblock != NULL && pindexOldTip != NULL && chainActive.Tip() != chainActive.Genesis() && fParallel)
             {
@@ -3429,9 +3452,14 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
                 }
             }
 
-            if (!ActivateBestChainStep(state, chainparams, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL, fParallel))
+            bool fInvalidFound = false;
+            if (!ActivateBestChainStep(state, chainparams, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL, fInvalidFound, fParallel))
                 return false;
 
+            if (fInvalidFound) {
+                // Wipe cache, we may need another branch now.
+                pindexMostWork = NULL;
+            }
             pindexNewTip = chainActive.Tip();
             pindexFork = chainActive.FindFork(pindexOldTip);
         }
@@ -3953,11 +3981,12 @@ static bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state
 }
 
 /** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
-static bool AcceptBlock(const CBlock& block, CValidationState& state, const CChainParams& chainparams, CBlockIndex** ppindex, bool fRequested, CDiskBlockPos* dbp)
+static bool AcceptBlock(const CBlock& block, CValidationState& state, const CChainParams& chainparams, CBlockIndex** ppindex, bool fRequested, const CDiskBlockPos* dbp)
 {
     AssertLockHeld(cs_main);
 
-    CBlockIndex *&pindex = *ppindex;
+    CBlockIndex *pindexDummy = NULL;
+    CBlockIndex *&pindex = ppindex ? *ppindex : pindexDummy;
 
     if (!AcceptBlockHeader(block, state, chainparams, &pindex))
         return false;
@@ -4031,7 +4060,7 @@ static bool IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned 
 }
 
 
-bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, const CNode* pfrom, const CBlock* pblock, bool fForceProcessing, CDiskBlockPos* dbp, bool fParallel)
+bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, const CNode* pfrom, const CBlock* pblock, bool fForceProcessing, const CDiskBlockPos* dbp, bool fParallel)
 {
     int64_t start = GetTimeMicros();
     LogPrint("thin", "Processing new block %s from peer %s (%d).\n", pblock->GetHash().ToString(), pfrom ? pfrom->addrName.c_str():"myself",pfrom ? pfrom->id: 0);
@@ -4066,8 +4095,10 @@ bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, c
         if (!ret) {
             // BU TODO: if block comes out of order (before its parent) this will happen.  We should cache the block until the parents arrive.
             return error("%s: AcceptBlock FAILED", __func__);
-	}
+        }
     }
+
+    NotifyHeaderTip();
 
     if (!ActivateBestChain(state, chainparams, pblock, fParallel)) {
         if (state.IsInvalid() || state.IsError())
@@ -4084,7 +4115,7 @@ bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, c
     CTransaction txIn;
     CTransaction txOut;
     CTransaction txLen;
-   
+
     for (unsigned int i = 0; i < pblock->vtx.size(); i++)
       {
         if (pblock->vtx[i].vin.size() > maxVin)
@@ -4667,14 +4698,25 @@ bool LoadExternalBlockFile(const CChainParams& chainparams, FILE* fileIn, CDiskB
 
                 // process in case the block isn't known yet
                 if (mapBlockIndex.count(hash) == 0 || (mapBlockIndex[hash]->nStatus & BLOCK_HAVE_DATA) == 0) {
+                    LOCK(cs_main);
                     CValidationState state;
-                    if (ProcessNewBlock(state, chainparams, NULL, &block, true, dbp, false))
+                    if (AcceptBlock(block, state, chainparams, NULL, true, dbp))
                         nLoaded++;
                     if (state.IsError())
                         break;
                 } else if (hash != chainparams.GetConsensus().hashGenesisBlock && mapBlockIndex[hash]->nHeight % 1000 == 0) {
-		  LogPrint("reindex", "Block Import: already had block %s at height %d\n", hash.ToString(), mapBlockIndex[hash]->nHeight);
+                    LogPrint("reindex", "Block Import: already had block %s at height %d\n", hash.ToString(), mapBlockIndex[hash]->nHeight);
                 }
+
+                // Activate the genesis block so normal node progress can continue
+                if (hash == chainparams.GetConsensus().hashGenesisBlock) {
+                    CValidationState state;
+                    if (!ActivateBestChain(state, chainparams)) {
+                        break;
+                    }
+                }
+
+                NotifyHeaderTip();
 
                 // Recursively process earlier encountered successors of this block
                 deque<uint256> queue;
@@ -4687,10 +4729,11 @@ bool LoadExternalBlockFile(const CChainParams& chainparams, FILE* fileIn, CDiskB
                         std::multimap<uint256, CDiskBlockPos>::iterator it = range.first;
                         if (ReadBlockFromDisk(block, it->second, chainparams.GetConsensus()))
                         {
-                            LogPrintf("%s: Processing out of order child %s of %s\n", __func__, block.GetHash().ToString(),
+                            LogPrint("reindex", "%s: Processing out of order child %s of %s\n", __func__, block.GetHash().ToString(),
                                     head.ToString());
+                            LOCK(cs_main);
                             CValidationState dummy;
-                            if (ProcessNewBlock(dummy, chainparams, NULL, &block, true, &it->second, false))
+                            if (AcceptBlock(block, dummy, chainparams, NULL, true, &it->second))
                             {
                                 nLoaded++;
                                 queue.push_back(block.GetHash());
@@ -4698,6 +4741,7 @@ bool LoadExternalBlockFile(const CChainParams& chainparams, FILE* fileIn, CDiskB
                         }
                         range.first++;
                         mapBlocksUnknownParent.erase(it);
+                        NotifyHeaderTip();
                     }
                 }
             } catch (const std::exception& e) {
@@ -5794,6 +5838,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             ReadCompactSize(vRecv); // ignore tx count; assume it is 0.
         }
 
+        {
         LOCK(cs_main);
 
         if (nCount == 0) {
@@ -5878,9 +5923,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         }
 
         CheckBlockIndex(chainparams.GetConsensus());
-
         IsChainNearlySyncdInit(); // BUIP010 XTHIN
         IsInitialBlockDownloadInit();
+        }
+
+        NotifyHeaderTip();
     }
 
     // BUIP010 Xtreme Thinblocks: begin section
