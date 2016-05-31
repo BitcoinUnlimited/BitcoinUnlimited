@@ -13,6 +13,11 @@
 #include "util.h"
 #include "utilstrencodings.h"
 
+#ifdef ENABLE_WALLET
+#include "wallet/wallet.h"
+#endif
+#include "unlimited.h"
+
 #include <univalue.h>
 
 #include <boost/bind.hpp>
@@ -272,6 +277,11 @@ static const CRPCCommand vRPCCommands[] =
     { "network",            "setban",                 &setban,                 true  },
     { "network",            "listbanned",             &listbanned,             true  },
     { "network",            "clearbanned",            &clearbanned,            true  },
+    { "network",            "settrafficshaping",      &settrafficshaping,      true  },  // BU
+    { "network",            "gettrafficshaping",      &gettrafficshaping,      true  },  // BU
+    { "network",            "pushtx",                 &pushtx,                 true  },  // BU
+    { "network",            "getexcessiveblock",      &getexcessiveblock,      true  },  // BU
+    { "network",            "setexcessiveblock",      &setexcessiveblock,      true  },  // BU
 
     /* Block chain and UTXO */
     { "blockchain",         "getblockchaininfo",      &getblockchaininfo,      true  },
@@ -298,6 +308,10 @@ static const CRPCCommand vRPCCommands[] =
     { "mining",             "getnetworkhashps",       &getnetworkhashps,       true  },
     { "mining",             "prioritisetransaction",  &prioritisetransaction,  true  },
     { "mining",             "submitblock",            &submitblock,            true  },
+    { "mining",             "getminingmaxblock",      &getminingmaxblock,      true  },  // BU
+    { "mining",             "setminingmaxblock",      &setminingmaxblock,      true  },  // BU
+    { "mining",             "getminercomment",        &getminercomment,        true  },  // BU
+    { "mining",             "setminercomment",        &setminercomment,        true  },  // BU
 
     /* Coin generation */
     { "generating",         "getgenerate",            &getgenerate,            true  },
@@ -330,6 +344,8 @@ static const CRPCCommand vRPCCommands[] =
     { "util",               "estimatepriority",       &estimatepriority,       true  },
     { "util",               "estimatesmartfee",       &estimatesmartfee,       true  },
     { "util",               "estimatesmartpriority",  &estimatesmartpriority,  true  },
+    { "util",               "getstatlist",            &getstatlist,            true  },  // BU
+    { "util",               "getstat",                &getstat,                true  },  // BU
 
     /* Not shown in help */
     { "hidden",             "invalidateblock",        &invalidateblock,        true  },

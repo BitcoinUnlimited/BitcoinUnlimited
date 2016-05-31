@@ -2,6 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <boost/lexical_cast.hpp>
+
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
 #endif
@@ -32,7 +34,7 @@ OptionsModel::OptionsModel(QObject *parent, bool resetSettings) :
     Init(resetSettings);
 }
 
-void OptionsModel::addOverriddenOption(const std::string &option)
+void OptionsModel::addOverriddenOption(const std::string& option)
 {
     strOverriddenByCommandLine += QString::fromStdString(option) + "=" + QString::fromStdString(mapArgs[option]) + " ";
 }
@@ -91,7 +93,7 @@ void OptionsModel::Init(bool resetSettings)
     if (!SoftSetArg("-par", settings.value("nThreadsScriptVerif").toString().toStdString()))
         addOverriddenOption("-par");
 
-    // Wallet
+// Wallet
 #ifdef ENABLE_WALLET
     if (!settings.contains("bSpendZeroConfChange"))
         settings.setValue("bSpendZeroConfChange", true);
@@ -100,6 +102,7 @@ void OptionsModel::Init(bool resetSettings)
 #endif
 
     // Network
+
     if (!settings.contains("fUseUPnP"))
         settings.setValue("fUseUPnP", DEFAULT_UPNP);
     if (!SoftSetBoolArg("-upnp", settings.value("fUseUPnP").toBool()))
@@ -117,7 +120,7 @@ void OptionsModel::Init(bool resetSettings)
     // Only try to set -proxy, if user has enabled fUseProxy
     if (settings.value("fUseProxy").toBool() && !SoftSetArg("-proxy", settings.value("addrProxy").toString().toStdString()))
         addOverriddenOption("-proxy");
-    else if(!settings.value("fUseProxy").toBool() && !GetArg("-proxy", "").empty())
+    else if (!settings.value("fUseProxy").toBool() && !GetArg("-proxy", "").empty())
         addOverriddenOption("-proxy");
 
     if (!settings.contains("fUseSeparateProxyTor"))
@@ -151,19 +154,17 @@ void OptionsModel::Reset()
         GUIUtil::SetStartOnSystemStartup(false);
 }
 
-int OptionsModel::rowCount(const QModelIndex & parent) const
+int OptionsModel::rowCount(const QModelIndex& parent) const
 {
     return OptionIDRowCount;
 }
 
 // read QSettings values and return them
-QVariant OptionsModel::data(const QModelIndex & index, int role) const
+QVariant OptionsModel::data(const QModelIndex& index, int role) const
 {
-    if(role == Qt::EditRole)
-    {
+    if (role == Qt::EditRole) {
         QSettings settings;
-        switch(index.row())
-        {
+        switch (index.row()) {
         case StartAtStartup:
             return GUIUtil::GetStartOnSystemStartup();
         case MinimizeToTray:
@@ -231,14 +232,12 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
 }
 
 // write QSettings values
-bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, int role)
+bool OptionsModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
     bool successful = true; /* set to false on parse error */
-    if(role == Qt::EditRole)
-    {
+    if (role == Qt::EditRole) {
         QSettings settings;
-        switch(index.row())
-        {
+        switch (index.row()) {
         case StartAtStartup:
             successful = GUIUtil::SetStartOnSystemStartup(value.toBool());
             break;
@@ -272,8 +271,7 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
                 settings.setValue("addrProxy", strNewValue);
                 setRestartRequired(true);
             }
-        }
-        break;
+        } break;
         case ProxyPort: {
             // contains current IP at index 0 and current port at index 1
             QStringList strlIpPort = settings.value("addrProxy").toString().split(":", QString::SkipEmptyParts);
@@ -369,18 +367,18 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
         default:
             break;
         }
-    }
 
+    }
+    
     Q_EMIT dataChanged(index, index);
 
     return successful;
 }
 
 /** Updates current unit in memory, settings and emits displayUnitChanged(newUnit) signal */
-void OptionsModel::setDisplayUnit(const QVariant &value)
+void OptionsModel::setDisplayUnit(const QVariant& value)
 {
-    if (!value.isNull())
-    {
+    if (!value.isNull()) {
         QSettings settings;
         nDisplayUnit = value.toInt();
         settings.setValue("nDisplayUnit", nDisplayUnit);
@@ -399,8 +397,7 @@ bool OptionsModel::getProxySettings(QNetworkProxy& proxy) const
         proxy.setPort(curProxy.proxy.GetPort());
 
         return true;
-    }
-    else
+    } else
         proxy.setType(QNetworkProxy::NoProxy);
 
     return false;

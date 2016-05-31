@@ -16,8 +16,11 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "version.h"
+#include "thinblock.h"
+#include "unlimited.h"
 
 #include <boost/foreach.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <univalue.h>
 
@@ -49,15 +52,13 @@ UniValue ping(const UniValue& params, bool fHelp)
             "\nRequests that a ping be sent to all other nodes, to measure ping time.\n"
             "Results provided in getpeerinfo, pingtime and pingwait fields are decimal seconds.\n"
             "Ping command is handled in queue with all other commands, so it measures processing backlog, not just network ping.\n"
-            "\nExamples:\n"
-            + HelpExampleCli("ping", "")
-            + HelpExampleRpc("ping", "")
-        );
+            "\nExamples:\n" +
+            HelpExampleCli("ping", "") + HelpExampleRpc("ping", ""));
 
     // Request that each node send a ping during next message processing pass
     LOCK2(cs_main, cs_vNodes);
 
-    BOOST_FOREACH(CNode* pNode, vNodes) {
+    BOOST_FOREACH (CNode* pNode, vNodes) {
         pNode->fPingQueued = true;
     }
 
@@ -70,7 +71,7 @@ static void CopyNodeStats(std::vector<CNodeStats>& vstats)
 
     LOCK(cs_vNodes);
     vstats.reserve(vNodes.size());
-    BOOST_FOREACH(CNode* pnode, vNodes) {
+    BOOST_FOREACH (CNode* pnode, vNodes) {
         CNodeStats stats;
         pnode->copyStats(stats);
         vstats.push_back(stats);
@@ -114,10 +115,8 @@ UniValue getpeerinfo(const UniValue& params, bool fHelp)
             "  }\n"
             "  ,...\n"
             "]\n"
-            "\nExamples:\n"
-            + HelpExampleCli("getpeerinfo", "")
-            + HelpExampleRpc("getpeerinfo", "")
-        );
+            "\nExamples:\n" +
+            HelpExampleCli("getpeerinfo", "") + HelpExampleRpc("getpeerinfo", ""));
 
     LOCK(cs_main);
 
@@ -185,15 +184,12 @@ UniValue addnode(const UniValue& params, bool fHelp)
             "\nArguments:\n"
             "1. \"node\"     (string, required) The node (see getpeerinfo for nodes)\n"
             "2. \"command\"  (string, required) 'add' to add a node to the list, 'remove' to remove a node from the list, 'onetry' to try a connection to the node once\n"
-            "\nExamples:\n"
-            + HelpExampleCli("addnode", "\"192.168.0.6:8333\" \"onetry\"")
-            + HelpExampleRpc("addnode", "\"192.168.0.6:8333\", \"onetry\"")
-        );
+            "\nExamples:\n" +
+            HelpExampleCli("addnode", "\"192.168.0.6:8333\" \"onetry\"") + HelpExampleRpc("addnode", "\"192.168.0.6:8333\", \"onetry\""));
 
     string strNode = params[0].get_str();
 
-    if (strCommand == "onetry")
-    {
+    if (strCommand == "onetry") {
         CAddress addr;
         OpenNetworkConnection(addr, NULL, strNode.c_str());
         return NullUniValue;
@@ -201,18 +197,15 @@ UniValue addnode(const UniValue& params, bool fHelp)
 
     LOCK(cs_vAddedNodes);
     vector<string>::iterator it = vAddedNodes.begin();
-    for(; it != vAddedNodes.end(); it++)
+    for (; it != vAddedNodes.end(); it++)
         if (strNode == *it)
             break;
 
-    if (strCommand == "add")
-    {
+    if (strCommand == "add") {
         if (it != vAddedNodes.end())
             throw JSONRPCError(RPC_CLIENT_NODE_ALREADY_ADDED, "Error: Node already added");
         vAddedNodes.push_back(strNode);
-    }
-    else if(strCommand == "remove")
-    {
+    } else if (strCommand == "remove") {
         if (it == vAddedNodes.end())
             throw JSONRPCError(RPC_CLIENT_NODE_NOT_ADDED, "Error: Node has not been added.");
         vAddedNodes.erase(it);
@@ -381,10 +374,8 @@ UniValue getnettotals(const UniValue& params, bool fHelp)
             "    \"time_left_in_cycle\": t                 (numeric) Seconds left in current time cycle\n"
             "  }\n"
             "}\n"
-            "\nExamples:\n"
-            + HelpExampleCli("getnettotals", "")
-            + HelpExampleRpc("getnettotals", "")
-       );
+            "\nExamples:\n" +
+            HelpExampleCli("getnettotals", "") + HelpExampleRpc("getnettotals", ""));
 
     UniValue obj(UniValue::VOBJ);
     obj.push_back(Pair("totalbytesrecv", CNode::GetTotalBytesRecv()));
@@ -423,6 +414,20 @@ static UniValue GetNetworksInfo()
     return networks;
 }
 
+// BitcoinUnlimited BUIP010 : Start
+static UniValue GetThinBlockStats()
+{
+    UniValue obj(UniValue::VOBJ);
+    bool enabled = IsThinBlocksEnabled();
+    obj.push_back(Pair("enabled", enabled));
+    if (enabled) {
+        obj.push_back(Pair("summary", CThinBlockStats::ToString()));
+    }
+    return obj;
+}
+// BitcoinUnlimited BUIP010 : End
+
+
 UniValue getnetworkinfo(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -432,7 +437,7 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
             "\nResult:\n"
             "{\n"
             "  \"version\": xxxxx,                      (numeric) the server version\n"
-            "  \"subversion\": \"/Satoshi:x.x.x/\",     (string) the server subversion string\n"
+            "  \"subversion\": \"/BitcoinUnlimited:x.x.x/\",     (string) the server subversion string\n"
             "  \"protocolversion\": xxxxx,              (numeric) the protocol version\n"
             "  \"localservices\": \"xxxxxxxxxxxxxxxx\", (string) the services we offer to the network\n"
             "  \"timeoffset\": xxxxx,                   (numeric) the time offset\n"
@@ -456,6 +461,7 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
             "  ,...\n"
             "  ]\n"
             "  \"warnings\": \"...\"                    (string) any network warnings (such as alert messages) \n"
+            "  \"thinblockstats\": \"...\"              (string) thin block related statistics \n" 
             "}\n"
             "\nExamples:\n"
             + HelpExampleCli("getnetworkinfo", "")
@@ -466,7 +472,7 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
 
     UniValue obj(UniValue::VOBJ);
     obj.push_back(Pair("version",       CLIENT_VERSION));
-    obj.push_back(Pair("subversion",    strSubVersion));
+    obj.push_back(Pair("subversion", FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, BUComments)));  // BUIP005: special subversion
     obj.push_back(Pair("protocolversion",PROTOCOL_VERSION));
     obj.push_back(Pair("localservices",       strprintf("%016x", nLocalServices)));
     obj.push_back(Pair("timeoffset",    GetTimeOffset()));
@@ -486,6 +492,9 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
         }
     }
     obj.push_back(Pair("localaddresses", localAddresses));
+// BitcoinUnlimited BUIP010: Start
+    obj.push_back(Pair("thinblockstats", GetThinBlockStats()));
+// BitcoinUnlimited BUIP010: End
     obj.push_back(Pair("warnings",       GetWarnings("statusbar")));
     return obj;
 }

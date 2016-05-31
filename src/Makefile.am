@@ -120,6 +120,7 @@ BITCOIN_CORE_H = \
   merkleblock.h \
   miner.h \
   net.h \
+  leakybucket.h \
   netbase.h \
   noui.h \
   policy/fees.h \
@@ -150,6 +151,7 @@ BITCOIN_CORE_H = \
   support/cleanse.h \
   support/pagelocker.h \
   sync.h \
+  thinblock.h \
   threadsafety.h \
   timedata.h \
   tinyformat.h \
@@ -159,6 +161,8 @@ BITCOIN_CORE_H = \
   ui_interface.h \
   uint256.h \
   undo.h \
+  unlimited.h \
+  stat.h \
   util.h \
   utilmoneystr.h \
   utilstrencodings.h \
@@ -211,10 +215,12 @@ libbitcoin_server_a_SOURCES = \
   rpcrawtransaction.cpp \
   rpcserver.cpp \
   script/sigcache.cpp \
+  thinblock.cpp \
   timedata.cpp \
   torcontrol.cpp \
   txdb.cpp \
   txmempool.cpp \
+  unlimited.cpp \
   validationinterface.cpp \
   $(BITCOIN_CORE_H)
 

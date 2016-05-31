@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
+// Copyright (c) 2016 Bitcoin Unlimited Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -16,7 +17,11 @@
 #include "net.h"
 #include "script/script_error.h"
 #include "sync.h"
+<<<<<<< HEAD
 #include "spentindex.h"
+=======
+#include "consensus/consensus.h"
+>>>>>>> BitcoinUnlimited/0.12bu
 
 #include <algorithm>
 #include <exception>
@@ -41,16 +46,17 @@ class CValidationState;
 
 struct CNodeStateStats;
 
-/** Default for accepting alerts from the P2P network. */
-static const bool DEFAULT_ALERTS = true;
+/** Default for accepting alerts from the P2P network. BUIP013 disables network alerts. */
+static const bool DEFAULT_ALERTS = false;
 /** Default for DEFAULT_WHITELISTRELAY. */
 static const bool DEFAULT_WHITELISTRELAY = true;
 /** Default for DEFAULT_WHITELISTFORCERELAY. */
 static const bool DEFAULT_WHITELISTFORCERELAY = true;
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
 static const unsigned int DEFAULT_MIN_RELAY_TX_FEE = 1000;
+
 /** Default for -maxorphantx, maximum number of orphan transactions kept in memory */
-static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 100;
+static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 5000;  // BU Xtreme Thinblocks change to 5000 or 25MB (5000 x 5000KB max orphan size)
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
 static const unsigned int DEFAULT_ANCESTOR_LIMIT = 25;
 /** Default for -limitancestorsize, maximum kilobytes of tx + all in-mempool ancestors */
@@ -113,7 +119,7 @@ static const unsigned int DEFAULT_BANSCORE_THRESHOLD = 100;
 
 static const bool DEFAULT_TESTSAFEMODE = false;
 /** Default for -mempoolreplacement */
-static const bool DEFAULT_ENABLE_REPLACEMENT = true;
+static const bool DEFAULT_ENABLE_REPLACEMENT = false;  // BUIP004: Replace by fee is NOT allowed.
 
 /** Maximum number of headers to announce when relaying blocks with headers message.*/
 static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 8;
@@ -145,7 +151,21 @@ extern bool fCheckpointsEnabled;
 extern size_t nCoinCacheUsage;
 extern CFeeRate minRelayTxFee;
 extern bool fAlerts;
-extern bool fEnableReplacement;
+extern bool fEnableReplacement;  // BU TODO is this RBF flag?
+
+// BU - Xpress Validation: begin section
+/**
+ * Transactions that have already been accepted into the memory pool do not need to be
+ * re-verified and can avoid having to do a second and expensive CheckInputs() when 
+ * processing a new block.  (Protected by cs_main)
+ */
+static std::set<uint256> setPreVerifiedTxHash;
+/**
+ * Orphans that are added to the thinblock must be verifed since they have never been
+ *  accepted into the memory pool.
+ */
+static std::set<uint256> setUnVerifiedOrphanTxHash;
+// BU - Xpress Validation: end section
 
 /** Best header we've seen so far (used for getheaders queries' starting points). */
 extern CBlockIndex *pindexBestHeader;
@@ -690,7 +710,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
 /** Context-independent validity checks */
 bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool fCheckPOW = true);
-bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
+bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW = true, bool fCheckMerkleRoot = true, bool conservative = false);
 
 /** Context-dependent validity checks */
 bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex *pindexPrev);
@@ -698,6 +718,13 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
 
 /** Check a block is completely valid from start to finish (only works on top of our current best block, with cs_main held) */
 bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams, const CBlock& block, CBlockIndex* pindexPrev, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
+
+// BU needed in unlimited.cpp
+bool CheckIndexAgainstCheckpoint(const CBlockIndex* pindexPrev, CValidationState& state, const CChainParams& chainparams, const uint256& hash);
+/** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
+bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex **pindex, bool fRequested, CDiskBlockPos* dbp);
+bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex **ppindex= NULL);
+
 
 
 class CBlockFileInfo
