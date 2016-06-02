@@ -354,7 +354,20 @@ bool MarkBlockAsReceived(const uint256& hash) {
         // BUIP010 Xtreme Thinblocks: begin section
         int64_t getdataTime = itInFlight->second.second->nTime;
         int64_t now = GetTimeMicros();
-        LogPrint("thin", "Received block %s in %.2f seconds\n", hash.ToString(), (now - getdataTime) / 1000000.0);
+        double nResponseTime = (double)(now - getdataTime) / 1000000.0;
+        LogPrint("thin", "Received block %s in %.2f seconds\n", hash.ToString(), nResponseTime);
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodes) {
+                if (pnode->mapThinBlocksInFlight.count(hash)) {
+                    // Only update thinstats if this is actually a thinblock and not a regular block.
+                    // Sometimes we request a thinblock but then revert to requesting a regular block
+                    // as can happen when the thinblock preferential timer is exceeded.
+                    CThinBlockStats::UpdateResponseTime(nResponseTime);
+                    break;
+                }
+            }
+        }
         // BUIP010 Xtreme Thinblocks: end section
         CNodeState *state = State(itInFlight->second.first);
         nQueuedValidatedHeaders -= itInFlight->second.second->fValidatedHeaders;
@@ -1005,6 +1018,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
         static const double maxFeeCutoff = boost::lexical_cast<double>(GetArg("-maxlimitertxfee", DEFAULT_MAXLIMITERTXFEE)); /* maximum feeCutoff in satoshi per byte */
 	static const double initFeeCutoff = boost::lexical_cast<double>(GetArg("-minlimitertxfee", DEFAULT_MINLIMITERTXFEE)); /* starting value for feeCutoff in satoshi per byte*/
         static const int nLimitFreeRelay = GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY); 
+
         // get current memory pool size
         uint64_t poolBytes = pool.GetTotalTxSize();
 
@@ -1043,7 +1057,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
             nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
         }
 
-        minRelayTxFee = CFeeRate(feeCutoff * 1000); 
+        minRelayTxFee = CFeeRate(feeCutoff * 1000);
         LogPrint("mempool",
                  "MempoolBytes:%d  LimitFreeRelay:%.5g  FeeCutOff:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d  TxFees:%d\n",
                   poolBytes, nFreeLimit, ((double)::minRelayTxFee.GetFee(nSize)) / nSize, ((double)nFees) / nSize, nSize, nFees);
@@ -1058,10 +1072,12 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
             // -limitfreerelay unit is thousand-bytes-per-minute
             // At default rate it would take over a month to fill 1GB
             LogPrint("mempool", "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount+nSize);
-            if ((dFreeCount + nSize) >= (nFreeLimit*10*1000 * nLargestBlockSeen / BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
+            if ((dFreeCount + nSize) >= (nFreeLimit*10*1000 * nLargestBlockSeen / BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)) {
+                CThinBlockStats::UpdateMempoolLimiterBytesSaved(nSize);
                 return state.DoS(0, 
                        error("AcceptToMemoryPool : free transaction rejected by rate limiter"),
                        REJECT_INSUFFICIENTFEE, "rate limited free transaction");
+            }
             dFreeCount += nSize;
         }
         nLastTime = nNow;
@@ -5270,9 +5286,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                      );
 
             // Update run-time statistics of thin block bandwidth savings
-            CThinBlockStats::Update(nSizeThinBlock, blockSize);
-            std::string ss = CThinBlockStats::ToString();
-            LogPrint("thin", "thin block stats: %s\n", ss.c_str());
+            CThinBlockStats::UpdateInBound(nSizeThinBlock, blockSize);
+            LogPrint("thin", "thin block stats: %s\n", CThinBlockStats::ToString());
 
             HandleBlockMessage(pfrom, strCommand, pfrom->thinBlock, inv);  // clears the thin block
             BOOST_FOREACH(uint64_t &cheapHash, thinBlock.vTxHashes)
@@ -5293,6 +5308,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             pfrom->PushMessage(NetMsgType::GET_XBLOCKTX, thinBlockTx);
             LogPrint("thin", "Missing %d transactions for xthinblock, re-requesting\n", 
                       pfrom->thinBlockWaitingForTxns);
+            CThinBlockStats::UpdateInBoundReRequestedTx(pfrom->thinBlockWaitingForTxns);
         }
     }
 
@@ -5374,9 +5390,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                      );
 
             // Update run-time statistics of thin block bandwidth savings
-            CThinBlockStats::Update(nSizeThinBlock, blockSize);
-            std::string ss = CThinBlockStats::ToString();
-            LogPrint("thin", "thin block stats: %s\n", ss.c_str());
+            CThinBlockStats::UpdateInBound(nSizeThinBlock, blockSize);
+            LogPrint("thin", "thin block stats: %s\n", CThinBlockStats::ToString());
 
             HandleBlockMessage(pfrom, strCommand, pfrom->thinBlock, inv);
             BOOST_FOREACH(uint256 &hash, thinBlock.vTxHashes)
@@ -5391,6 +5406,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             setPreVerifiedTxHash.clear(); // Xpress Validation - clear the set since we do not do XVal on regular blocks
             LogPrint("thin", "Missing %d Thinblock transactions, re-requesting a regular block\n",  
                        pfrom->thinBlockWaitingForTxns);
+            CThinBlockStats::UpdateInBoundReRequestedTx(pfrom->thinBlockWaitingForTxns);
+
         }
     }
 
@@ -5437,9 +5454,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                      );
 
             // Update run-time statistics of thin block bandwidth savings
-            CThinBlockStats::Update(nSizeThinBlockTx + pfrom->nSizeThinBlock, blockSize);
-            std::string ss = CThinBlockStats::ToString();
-            LogPrint("thin", "thin block stats: %s\n", ss.c_str());
+            CThinBlockStats::UpdateInBound(nSizeThinBlockTx + pfrom->nSizeThinBlock, blockSize);
+            LogPrint("thin", "thin block stats: %s\n", CThinBlockStats::ToString());
 
             std::vector<CTransaction> vTx = pfrom->thinBlock.vtx;
             HandleBlockMessage(pfrom, strCommand, pfrom->thinBlock, inv);
