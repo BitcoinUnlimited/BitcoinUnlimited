@@ -310,8 +310,26 @@ extern const char *XVERSION;
  */
 extern const char *XVERACK;
 
-
 extern const char *XUPDATE;
+
+/**
+ * Contains a CBlockHeaderAndShortTxIDs object - providing a header and
+ * list of "short txids".
+ * @since protocol version 70014 as described by BIP 152
+ */
+extern const char *CMPCTBLOCK;
+/**
+ * Contains a BlockTransactionsRequest
+ * Peer should respond with "blocktxn" message.
+ * @since protocol version 70014 as described by BIP 152
+ */
+extern const char *GETBLOCKTXN;
+/**
+ * Contains a BlockTransactions.
+ * Sent in response to a "getblocktxn" message.
+ * @since protocol version 70014 as described by BIP 152
+ */
+extern const char *BLOCKTXN;
 };
 
 
@@ -437,12 +455,17 @@ enum
 {
     MSG_TX = 1,
     MSG_BLOCK,
-    // Nodes may always request a MSG_FILTERED_BLOCK in a getdata, however,
-    // MSG_FILTERED_BLOCK should not appear in any invs except as a part of getdata.
+    // Nodes may always request a MSG_FILTERED_BLOCK/MSG_CMPCT_BLOCK in a getdata, however,
+    // MSG_FILTERED_BLOCK/MSG_CMPCT_BLOCK should not appear in any invs except as a part of getdata.
     MSG_FILTERED_BLOCK,
     // BUIP010 Xtreme Thinblocks: a thin block contains all the transactions hashes in a block
     // and also provides the missing transactions that are needed at the other end to reconstruct the block
     MSG_THINBLOCK,
+
+    // BitcoinCore had chosen the same enum for compact blocks as thinblocks. As a result we have to work
+    // around this in our code when we handle either of these messages.
+    MSG_CMPCT_BLOCK = MSG_THINBLOCK,
+
     // BUIP010 Xtreme Thinblocks: an Xtreme thin block contains the first 8 bytes of all the tx hashes
     // and also provides the missing transactions that are needed at the other end to reconstruct the block
     MSG_XTHINBLOCK,
