@@ -601,14 +601,28 @@ void ClearThinBlockTimer(uint256 hash)
 
 bool IsThinBlocksEnabled() 
 {
-    bool fThinblocksEnabled = GetBoolArg("-use-thinblocks", true);
+    return GetBoolArg("-use-thinblocks", true);
+}
 
-    // Enabling the XTHIN service should really be in init.cpp but because
-    // we want to avoid possile future merge conflicts with Core we can enable
-    // it here as it has little performance impact.
-    if (fThinblocksEnabled)
-        nLocalServices |= NODE_XTHIN;
-    return fThinblocksEnabled;
+bool CanThinBlockBeDownloaded(CNode* pto)
+{
+    if (pto->ThinBlockCapable() && !GetBoolArg("-connect-thinblock-force", false))
+        return true;
+    else if (pto->ThinBlockCapable() && GetBoolArg("-connect-thinblock-force", false)) {
+        // If connect-thinblock-force is true then we have to check that this node is in fact a connect-thinblock node.
+
+        // When -connect-thinblock-force is true we will only download thinblocks from a peer or peers that
+        // are using -connect-thinblock=<ip>.  This is an undocumented setting used for setting up performance testing
+        // of thinblocks, such as, going over the GFC and needing to have thinblocks always come from the same peer or 
+        // group of peers.  Also, this is a one way street.  Thinblocks will flow ONLY from the remote peer to the peer
+        // that has invoked -connect-thinblock.
+
+        // Check if this node is also a connect-thinblock node
+        BOOST_FOREACH(const std::string& strAddrNode, mapMultiArgs["-connect-thinblock"])
+            if (pto->addrName == strAddrNode)
+                return true;
+    }
+    return false;
 }
 
 bool IsChainNearlySyncd() 
@@ -619,7 +633,7 @@ bool IsChainNearlySyncd()
     return true;
 }
 
-void BuildSeededBloomFilter(CBloomFilter& filterMemPool, std::vector<uint256>& vOrphanHashes)
+void BuildSeededBloomFilter(CBloomFilter& filterMemPool, std::vector<uint256>& vOrphanHashes, uint256 hash)
 {
     LogPrint("thin", "Starting creation of bloom filter\n");
     seed_insecure_rand();
@@ -640,7 +654,9 @@ void BuildSeededBloomFilter(CBloomFilter& filterMemPool, std::vector<uint256>& v
          filterMemPool.insert(vMemPoolHashes[i]);
     for (uint64_t i = 0; i < vOrphanHashes.size(); i++)
          filterMemPool.insert(vOrphanHashes[i]);
-    LogPrint("thin", "Created bloom filter: %d bytes\n",::GetSerializeSize(filterMemPool, SER_NETWORK, PROTOCOL_VERSION));
+    uint64_t nSizeFilter = ::GetSerializeSize(filterMemPool, SER_NETWORK, PROTOCOL_VERSION);
+    LogPrint("thin", "Created bloom filter: %d bytes\n", nSizeFilter);
+    CThinBlockStats::UpdateOutBoundBloomFilter(nSizeFilter);
 }
 
 void LoadFilter(CNode *pfrom, CBloomFilter *filter)
@@ -657,6 +673,7 @@ void LoadFilter(CNode *pfrom, CBloomFilter *filter)
     }
     uint64_t nSizeFilter = ::GetSerializeSize(*pfrom->pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION);
     LogPrint("thin", "Thinblock Bloom filter size: %d\n", nSizeFilter);
+    CThinBlockStats::UpdateInBoundBloomFilter(nSizeFilter);
 }
 
 void HandleBlockMessage(CNode *pfrom, const string &strCommand, CBlock &block, const CInv &inv)
@@ -682,11 +699,18 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, CBlock &block, c
             Misbehaving(pfrom->GetId(), nDoS);
         }
     }
-    else 
+    else {
         nLargestBlockSeen = std::max(nSizeBlock, nLargestBlockSeen);
 
-    LogPrint("thin", "Processed Block %s in %.2f seconds\n", inv.hash.ToString(), (double)(GetTimeMicros() - startTime) / 1000000.0);
-    
+        double nValidationTime = (double)(GetTimeMicros() - startTime) / 1000000.0;
+        if (strCommand != NetMsgType::BLOCK) {
+            LogPrint("thin", "Processed ThinBlock %s in %.2f seconds\n", inv.hash.ToString(), (double)(GetTimeMicros() - startTime) / 1000000.0);
+            CThinBlockStats::UpdateValidationTime(nValidationTime);
+        }
+        else
+            LogPrint("thin", "Processed Regular Block %s in %.2f seconds\n", inv.hash.ToString(), (double)(GetTimeMicros() - startTime) / 1000000.0);
+    }
+
     // When we request a thinblock we may get back a regular block if it is smaller than a thinblock
     // Therefore we have to remove the thinblock in flight if it exists and we also need to check that 
     // the block didn't arrive from some other peer.  This code ALSO cleans up the thin block that
@@ -788,6 +812,7 @@ void SendXThinBlock(CBlock &block, CNode* pfrom, const CInv &inv)
             int nSizeThinBlock = ::GetSerializeSize(xThinBlock, SER_NETWORK, PROTOCOL_VERSION);
             if (nSizeThinBlock < nSizeBlock) {
                 pfrom->PushMessage(NetMsgType::THINBLOCK, thinBlock);
+                CThinBlockStats::UpdateOutBound(nSizeThinBlock, nSizeBlock);
                 LogPrint("thin", "TX HASH COLLISION: Sent thinblock - size: %d vs block size: %d => tx hashes: %d transactions: %d  peerid=%d\n", nSizeThinBlock, nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(), pfrom->id);
             }
             else {
@@ -800,6 +825,7 @@ void SendXThinBlock(CBlock &block, CNode* pfrom, const CInv &inv)
             // Only send a thinblock if smaller than a regular block
             int nSizeThinBlock = ::GetSerializeSize(xThinBlock, SER_NETWORK, PROTOCOL_VERSION);
             if (nSizeThinBlock < nSizeBlock) {
+                CThinBlockStats::UpdateOutBound(nSizeThinBlock, nSizeBlock);
                 pfrom->PushMessage(NetMsgType::XTHINBLOCK, xThinBlock);
                 LogPrint("thin", "Sent xthinblock - size: %d vs block size: %d => tx hashes: %d transactions: %d  peerid=%d\n", nSizeThinBlock, nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(), pfrom->id);
             }
@@ -815,6 +841,7 @@ void SendXThinBlock(CBlock &block, CNode* pfrom, const CInv &inv)
         int nSizeBlock = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
         int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);
         if (nSizeThinBlock < nSizeBlock) { // Only send a thinblock if smaller than a regular block
+            CThinBlockStats::UpdateOutBound(nSizeThinBlock, nSizeBlock);
             pfrom->PushMessage(NetMsgType::THINBLOCK, thinBlock);
             LogPrint("thin", "Sent thinblock - size: %d vs block size: %d => tx hashes: %d transactions: %d  peerid=%d\n", nSizeThinBlock, nSizeBlock, thinBlock.vTxHashes.size(), thinBlock.vMissingTx.size(), pfrom->id);
         }
