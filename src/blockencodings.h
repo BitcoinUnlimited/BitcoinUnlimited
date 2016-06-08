@@ -217,6 +217,7 @@ class PartiallyDownloadedBlock
 {
 protected:
     std::vector<CTransactionRef> txn_available;
+    size_t prefilled_count = 0, mempool_count = 0;
     CTxMemPool *pool;
 
 public:

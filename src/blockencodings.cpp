@@ -11,6 +11,7 @@
 #include "random.h"
 #include "streams.h"
 #include "txmempool.h"
+#include "util.h"
 #include "validation/validation.h"
 
 #include <unordered_map>
@@ -79,6 +80,7 @@ ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs &c
         }
         txn_available[lastprefilledindex] = std::make_shared<CTransaction>(cmpctblock.prefilledtxn[i].tx);
     }
+    prefilled_count = cmpctblock.prefilledtxn.size();
 
     // Calculate map of txids -> positions and check mempool to see what we have (or dont)
     // Because well-formed cmpctblock messages will have a (relatively) uniform distribution
@@ -115,13 +117,18 @@ ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs &c
             {
                 txn_available[idit->second] = it->GetSharedTx();
                 have_txn[idit->second] = true;
+                mempool_count++;
             }
             else
             {
                 // If we find two mempool txn that match the short id, just request it.
                 // This should be rare enough that the extra bandwidth doesn't matter,
                 // but eating a round-trip due to FillBlock failure would be annoying
-                txn_available[idit->second].reset();
+                if (txn_available[idit->second])
+                {
+                    txn_available[idit->second].reset();
+                    mempool_count--;
+                }
             }
         }
         // Though ideally we'd continue scanning for the two-txn-match-shortid case,
@@ -130,6 +137,9 @@ ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs &c
         if (mempool_count == shorttxids.size())
             break;
     }
+
+    LOGA(CMPCT, "Initialized PartiallyDownloadedBlock for block %s using a cmpctblock of size %lu\n",
+        cmpctblock.header.GetHash().ToString(), ::GetSerializeSize(cmpctblock, SER_NETWORK, PROTOCOL_VERSION));
 
     return READ_STATUS_OK;
 }
@@ -172,6 +182,16 @@ ReadStatus PartiallyDownloadedBlock::FillBlock(CBlock &block, const std::vector<
         if (state.CorruptionPossible())
             return READ_STATUS_FAILED; // Possible Short ID collision
         return READ_STATUS_INVALID;
+    }
+
+    LOGA(CMPCT,
+        "Successfully reconstructed block %s with %lu txn prefilled, %lu txn from mempool and %lu txn requested\n",
+        header.GetHash().ToString(), prefilled_count, mempool_count, vtx_missing.size());
+    if (vtx_missing.size() < 5)
+    {
+        for (const CTransaction &tx : vtx_missing)
+            LOGA(
+                CMPCT, "Reconstructed block %s required tx %s\n", header.GetHash().ToString(), tx.GetHash().ToString());
     }
 
     return READ_STATUS_OK;
