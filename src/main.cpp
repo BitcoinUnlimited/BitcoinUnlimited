@@ -5094,7 +5094,9 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, in
         CAddress addrMe;
         CAddress addrFrom;
         uint64_t nNonce = 1;
-        vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
+        uint64_t nServiceInt;
+        vRecv >> pfrom->nVersion >> nServiceInt >> nTime >> addrMe;
+        pfrom->nServices = ServiceFlags(nServiceInt);
         if (!pfrom->fInbound)
         {
             addrman.SetServices(pfrom->addr, pfrom->nServices);
