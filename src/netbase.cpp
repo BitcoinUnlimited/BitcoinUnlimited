@@ -11,6 +11,8 @@
 #include "util.h"
 #include "utilstrencodings.h"
 
+#include <atomic>
+
 #ifdef HAVE_GETADDRINFO_A
 #include <netdb.h>
 #endif
