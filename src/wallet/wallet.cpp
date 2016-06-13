@@ -3403,6 +3403,16 @@ bool CWallet::InitLoadWallet()
 
         walletInstance->SetBestChain(chainActive.GetLocator());
     }
+    else if (mapArgs.count("-usehd"))
+    {
+        bool useHD = GetBoolArg("-usehd", DEFAULT_USE_HD_WALLET);
+        if (!walletInstance->hdChain.masterKeyID.IsNull() && !useHD)
+            return InitError(
+                strprintf(_("Error loading %s: You can't disable HD on a already existing HD wallet"), walletFile));
+        if (walletInstance->hdChain.masterKeyID.IsNull() && useHD)
+            return InitError(
+                strprintf(_("Error loading %s: You can't enable HD on a already existing non-HD wallet"), walletFile));
+    }
 
     LOGA(" wallet      %15dms\n", GetTimeMillis() - nStart);
 
