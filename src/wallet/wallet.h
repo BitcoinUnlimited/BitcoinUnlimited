@@ -923,12 +923,11 @@ public:
 
     bool BackupWallet(const std::string &strDest);
 
-    /* Set the hd chain model (chain child index counters) */
-    bool SetHDChain(const CHDChain &chain, bool memonly);
-
     /* Set the current hd master key (will reset the chain child index counters) */
     bool SetHDMasterKey(const CKey &key);
 
+    /* Set the HD chain model (chain child index counters) */
+    bool SetHDChain(const CHDChain &chain, bool memonly);
     const CHDChain &GetHDChain() { return hdChain; }
     /* Returns true if HD is enabled */
     bool IsHDEnabled();
