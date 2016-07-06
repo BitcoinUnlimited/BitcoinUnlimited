@@ -423,7 +423,7 @@ static void addWalletOptions(AllowedArgs &allowedArgs)
                         "abort large transactions (default: %s)"),
                     CURRENCY_UNIT, FormatMoney(DEFAULT_TRANSACTION_MAXFEE)))
         .addArg("upgradewallet", optionalInt, _("Upgrade wallet to latest format on startup"))
-        .addArg("-usehd", optionalBool,
+        .addArg("usehd", optionalBool,
             _("Use hierarchical deterministic key generation (HD) after bip32. Only has effect during "
               "wallet creation/first start") +
                 " " + strprintf(_("(default: %u)"), DEFAULT_USE_HD_WALLET))
