@@ -10,6 +10,7 @@
 #include "chainparams.h"
 #include "connmgr.h"
 #include "consensus/merkle.h"
+#include "consensus/tx_verify.h"
 #include "dosman.h"
 #include "expedited.h"
 #include "net.h"
