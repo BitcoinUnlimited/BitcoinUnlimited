@@ -161,10 +161,15 @@ class NodeConnCB(object):
     def on_mempool(self, conn): pass
 
     def on_pong(self, conn, message): pass
+
     def on_sendheaders(self, conn, message): pass
+
     def on_sendcmpct(self, conn, message): pass
+
     def on_cmpctblock(self, conn, message): pass
+
     def on_getblocktxn(self, conn, message): pass
+
     def on_blocktxn(self, conn, message): pass
 
     def on_xverack(self, conn, message):

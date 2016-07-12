@@ -9,8 +9,9 @@ from codecs import encode
 from threading import RLock
 from io import BytesIO
 import copy
+from test_framework.siphash import siphash256
 
-MY_VERSION = 60001  # past bip-31 for ping/pong
+MY_VERSION = 70014 # past bip-252 for compactblocks
 
 from .constants import SIGHASH_ALL, \
     SIGHASH_FORKID, SIGHASH_ANYONECANPAY, \
@@ -300,6 +301,27 @@ def ser_uint256_vector(l):
         r += ser_uint256(i)
     return r
 
+def ser_compact_size(l):
+    r = b""
+    if l < 253:
+        r = struct.pack("B", l)
+    elif l < 0x10000:
+        r = struct.pack("<BH", 253, l)
+    elif l < 0x100000000:
+        r = struct.pack("<BI", 254, l)
+    else:
+        r = struct.pack("<BQ", 255, l)
+    return r
+
+def deser_compact_size(f):
+    nit = struct.unpack("<B", f.read(1))[0]
+    if nit == 253:
+        nit = struct.unpack("<H", f.read(2))[0]
+    elif nit == 254:
+        nit = struct.unpack("<I", f.read(4))[0]
+    elif nit == 255:
+        nit = struct.unpack("<Q", f.read(8))[0]
+    return nit
 
 def deser_string_vector(f):
     nit = struct.unpack("<B", f.read(1))[0]
@@ -406,14 +428,15 @@ class CInv(object):
     MSG_TX = 1
     MSG_BLOCK = 2
     MSG_FILTERED_BLOCK = 3
-    MSG_THINBLOCK = 4
+    MSG_CMPCT_BLOCK = 4
     MSG_XTHINBLOCK = 5
+    MSG_THINBLOCK = MSG_CMPCT_BLOCK
     typemap = {
         0: "Error",
         1: "TX",
         2: "Block",
         3: "FilteredBlock",
-        4: "ThinBlock",
+        4: "CompactBlock",
         5: "XThinBlock",
     }
 
@@ -972,13 +995,10 @@ class PrefilledTransaction(object):
         self.tx = CTransaction()
         self.tx.deserialize(f)
 
-    def serialize(self, with_witness=False):
+    def serialize(self):
         r = b""
         r += ser_compact_size(self.index)
-        if with_witness:
-            r += self.tx.serialize_with_witness()
-        else:
-            r += self.tx.serialize_without_witness()
+        r += self.tx.serialize()
         return r
 
     def __repr__(self):
@@ -1005,7 +1025,7 @@ class P2PHeaderAndShortIDs(object):
         self.prefilled_txn = deser_vector(f, PrefilledTransaction)
         self.prefilled_txn_length = len(self.prefilled_txn)
 
-    def serialize(self, with_witness=False):
+    def serialize(self):
         r = b""
         r += self.header.serialize()
         r += struct.pack("<Q", self.nonce)

@@ -160,15 +160,16 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                             pfrom->blocksSent += 1;
                             pfrom->PushMessage(NetMsgType::BLOCK, block);
                         }
-                        // Only send a full thinblock if they do not have a BU_XTHIN_VERSION.
                         else if (inv.type == MSG_THINBLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) < 2)
                         {
+                            // TODO: This code path enables backward compatibility for older BU nodes
+                            // and can be removed in the future.
                             LOG(THIN, "Sending thinblock via getdata message\n");
                             SendXThinBlock(MakeBlockRef(block), pfrom, inv);
                         }
                         else if (inv.type == MSG_CMPCT_BLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) >= 2)
                         {
-                            LOG(CMPCT, "Sending compact block via getdata message\n");
+                            LOG(CMPCT, "Sending compactblock via getdata message\n");
                             SendCompactBlock(MakeBlockRef(block), pfrom, inv);
                         }
                         else // MSG_FILTERED_BLOCK)
@@ -975,7 +976,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
 
             // Make basic checks
-            if (inv.type == MSG_THINBLOCK && !pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION))
+            if (inv.type == MSG_THINBLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) < 2)
             {
                 if (!BasicThinblockChecks(pfrom, chainparams))
                     return false;

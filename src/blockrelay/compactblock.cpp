@@ -562,9 +562,11 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     LOG(CMPCT, "Got %d Re-requested txs, needed %d of them from peer=%s\n", compactReReqResponse.txn.size(), count,
         pfrom->GetLogName());
 
+
     // At this point we should have all the full hashes in the block. Check that the merkle
     // root in the block header matches the merkleroot calculated from the hashes provided.
     bool mutated;
+
     uint256 merkleroot = ComputeMerkleRoot(pfrom->vCompactBlockHashes, &mutated);
     if (pfrom->compactBlock.hashMerkleRoot != merkleroot || mutated)
     {
