@@ -41,6 +41,10 @@ import traceback
 from .nodemessages import *
 from .bumessages import *
 
+import math
+from .siphash import siphash256
+
+
 MAX_INV_SZ = 50000
 MAX_BLOCK_SIZE = 1000000
 
@@ -157,6 +161,11 @@ class NodeConnCB(object):
     def on_mempool(self, conn): pass
 
     def on_pong(self, conn, message): pass
+    def on_sendheaders(self, conn, message): pass
+    def on_sendcmpct(self, conn, message): pass
+    def on_cmpctblock(self, conn, message): pass
+    def on_getblocktxn(self, conn, message): pass
+    def on_blocktxn(self, conn, message): pass
 
     def on_xverack(self, conn, message):
         self.xverack_received = True
@@ -182,6 +191,10 @@ class SingleNodeConnCB(NodeConnCB):
     # Wrapper for the NodeConn's send_message function
     def send_message(self, message, pushbuf = False):
         self.connection.send_message(message, pushbuf)
+
+    def send_and_ping(self, message):
+        self.send_message(message)
+        self.sync_with_ping()
 
     def on_pong(self, conn, message):
         self.last_pong = message
@@ -236,7 +249,11 @@ class NodeConn(asyncore.dispatcher):
         b"sendheaders": msg_sendheaders,
         b"xversion" : msg_xversion,
         b"xverack" : msg_xverack,
-        b"xupdate" : msg_xupdate
+        b"xupdate" : msg_xupdate,
+        b"sendcmpct": msg_sendcmpct,
+        b"cmpctblock": msg_cmpctblock,
+        b"getblocktxn": msg_getblocktxn,
+        b"blocktxn": msg_blocktxn
     }, bumessagemap)
 
     BTC_MAGIC_BYTES = {
