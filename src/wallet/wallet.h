@@ -574,7 +574,7 @@ private:
 
     void SyncMetaData(std::pair<TxSpends::iterator, TxSpends::iterator>);
 
-    /* the hd chain data model (external chain counters) */
+    /* the HD chain data model (external chain counters) */
     CHDChain hdChain;
 
 public:

@@ -45,7 +45,7 @@ enum DBErrors
     DB_NEED_REWRITE
 };
 
-/* simple hd chain data model */
+/* simple HD chain data model */
 class CHDChain
 {
 public:
