@@ -68,6 +68,7 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, const Config *cfg, Q
     // Clicking on a transaction on the overview pre-selects the transaction on the transaction history page
     connect(
         overviewPage, SIGNAL(transactionClicked(QModelIndex)), transactionView, SLOT(focusTransaction(QModelIndex)));
+    connect(overviewPage, SIGNAL(outOfSyncWarningClicked()), this, SLOT(requestedOfSyncWarningInfo()));
 
     // Double-clicking on a transaction on the transaction history page shows details
     connect(transactionView, SIGNAL(doubleClicked(QModelIndex)), transactionView, SLOT(showDetails()));
@@ -307,4 +308,9 @@ void WalletView::showProgress(const QString &title, int nProgress)
     }
     else if (progressDialog)
         progressDialog->setValue(nProgress);
+}
+
+void WalletView::requestedOfSyncWarningInfo()
+{
+    Q_EMIT outOfSyncWarningClicked();
 }
