@@ -13,6 +13,7 @@
 #include "clientmodel.h"
 #include "guiconstants.h"
 #include "guiutil.h"
+#include "modaloverlay.h"
 #include "networkstyle.h"
 #include "notificator.h"
 #include "openuridialog.h"
@@ -61,19 +62,49 @@
 
 const QString BitcoinGUI::DEFAULT_WALLET = "~Default";
 
-BitcoinGUI::BitcoinGUI(const Config *_cfg,
-    const PlatformStyle *_platformStyle,
-    const NetworkStyle *networkStyle,
-    QWidget *parent)
-    : QMainWindow(parent), clientModel(0), walletFrame(0), unitDisplayControl(0), labelWalletEncryptionIcon(0),
-      labelWalletHDStatusIcon(0), labelConnectionsIcon(0), labelBlocksIcon(0), progressBarLabel(0), progressBar(0),
-      progressDialog(0), appMenuBar(0), overviewAction(0), historyAction(0), quitAction(0), sendCoinsAction(0),
-      sendCoinsMenuAction(0), usedSendingAddressesAction(0), usedReceivingAddressesAction(0), signMessageAction(0),
-      verifyMessageAction(0), aboutAction(0), receiveCoinsAction(0), receiveCoinsMenuAction(0), optionsAction(0),
-      unlimitedAction(0), toggleHideAction(0), encryptWalletAction(0), backupWalletAction(0), changePassphraseAction(0),
-      aboutQtAction(0), openRPCConsoleAction(0), openAction(0), showHelpMessageAction(0), trayIcon(0), trayIconMenu(0),
-      notificator(0), rpcConsole(0), helpMessageDialog(0), prevBlocks(0), spinnerFrame(0),
-      platformStyle(_platformStyle), cfg(_cfg)
+BitcoinGUI::BitcoinGUI(const Config *_cfg, const PlatformStyle *platformStyle, const NetworkStyle *networkStyle, QWidget *parent) :
+    QMainWindow(parent),
+    clientModel(0),
+    walletFrame(0),
+    unitDisplayControl(0),
+    labelWalletEncryptionIcon(0),
+    labelWalletHDStatusIcon(0),
+    labelConnectionsIcon(0),
+    labelBlocksIcon(0),
+    progressBarLabel(0),
+    progressBar(0),
+    progressDialog(0),
+    appMenuBar(0),
+    overviewAction(0),
+    historyAction(0),
+    quitAction(0),
+    sendCoinsAction(0),
+    sendCoinsMenuAction(0),
+    usedSendingAddressesAction(0),
+    usedReceivingAddressesAction(0),
+    signMessageAction(0),
+    verifyMessageAction(0),
+    aboutAction(0),
+    receiveCoinsAction(0),
+    receiveCoinsMenuAction(0),
+    optionsAction(0),
+    toggleHideAction(0),
+    encryptWalletAction(0),
+    backupWalletAction(0),
+    changePassphraseAction(0),
+    aboutQtAction(0),
+    openRPCConsoleAction(0),
+    openAction(0),
+    showHelpMessageAction(0),
+    trayIcon(0),
+    trayIconMenu(0),
+    notificator(0),
+    rpcConsole(0),
+    helpMessageDialog(0),
+    modalOverlay(0),
+    prevBlocks(0),
+    spinnerFrame(0),
+    platformStyle(platformStyle)
 {
     GUIUtil::restoreWindowGeometry("nWindow", QSize(850, 550), this);
 
@@ -198,6 +229,12 @@ BitcoinGUI::BitcoinGUI(const Config *_cfg,
 
     // Subscribe to notifications from core
     subscribeToCoreSignals();
+
+    modalOverlay = new ModalOverlay(this->centralWidget());
+#ifdef ENABLE_WALLET
+    if(enableWallet)
+        connect(walletFrame, SIGNAL(requestedOfSyncWarningInfo()), this, SLOT(showModalOverlay()));
+#endif
 }
 
 BitcoinGUI::~BitcoinGUI()
@@ -695,6 +732,10 @@ void BitcoinGUI::setNumConnections(int count)
 
 void BitcoinGUI::setNumBlocks(int count, const QDateTime &blockDate, double nVerificationProgress)
 {
+    if (modalOverlay)
+    {
+        modalOverlay->tipUpdate(count, blockDate, nVerificationProgress);
+    }
     if (!clientModel)
         return;
 
@@ -735,8 +776,11 @@ void BitcoinGUI::setNumBlocks(int count, const QDateTime &blockDate, double nVer
             platformStyle->SingleColorIcon(":/icons/synced").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
 
 #ifdef ENABLE_WALLET
-        if (walletFrame)
+        if(walletFrame)
+        {
             walletFrame->showOutOfSyncWarning(false);
+            modalOverlay->showHide(true, true);
+        }
 #endif // ENABLE_WALLET
 
         progressBarLabel->setVisible(false);
@@ -763,8 +807,11 @@ void BitcoinGUI::setNumBlocks(int count, const QDateTime &blockDate, double nVer
         prevBlocks = count;
 
 #ifdef ENABLE_WALLET
-        if (walletFrame)
+        if(walletFrame)
+        {
             walletFrame->showOutOfSyncWarning(true);
+            modalOverlay->showHide();
+        }
 #endif // ENABLE_WALLET
 
         tooltip += QString("<br>");
@@ -1072,10 +1119,21 @@ void BitcoinGUI::showProgress(const QString &title, int nProgress)
         progressDialog->setValue(nProgress);
 }
 
-static bool ThreadSafeMessageBox(BitcoinGUI *gui,
-    const std::string &message,
-    const std::string &caption,
-    unsigned int style)
+void BitcoinGUI::setTrayIconVisible(bool fHideTrayIcon)
+{
+    if (trayIcon)
+    {
+        trayIcon->setVisible(!fHideTrayIcon);
+    }
+}
+
+void BitcoinGUI::showModalOverlay()
+{
+    if (modalOverlay)
+        modalOverlay->showHide(false, true);
+}
+
+static bool ThreadSafeMessageBox(BitcoinGUI *gui, const std::string& message, const std::string& caption, unsigned int style)
 {
     bool modal = (style & CClientUIInterface::MODAL);
     // The SECURE flag has no effect in the Qt GUI.
