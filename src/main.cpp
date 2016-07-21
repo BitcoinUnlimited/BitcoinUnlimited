@@ -126,15 +126,7 @@ extern CCriticalSection cs_mapInboundConnectionTracker;
 /** A cache to store headers that have arrived but can not yet be connected **/
 std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders;
 
-/**
- * Returns true if there are nRequired or more blocks of minVersion or above
- * in the last Consensus::Params::nMajorityWindow blocks, starting at pstart and going backwards.
- */
-static bool IsSuperMajority(int minVersion,
-    const CBlockIndex *pstart,
-    unsigned nRequired,
-    const Consensus::Params &consensusParams);
-static void CheckBlockIndex(const Consensus::Params &consensusParams);
+static void CheckBlockIndex(const Consensus::Params& consensusParams);
 
 /** Constant stuff for coinbase transactions we create: */
 CScript COINBASE_FLAGS;
@@ -935,7 +927,7 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints *lp, bool 
 }
 
 // Returns the script flags which should be checked for a given block
-static unsigned int GetBlockScriptFlags(const CBlockIndex* pindex, const Consensus::Params& chainparams, const CBlock &block);
+static unsigned int GetBlockScriptFlags(const CBlockIndex* pindex, const Consensus::Params& chainparams);
 
 void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
 {
@@ -2141,7 +2133,7 @@ public:
 // Protected by cs_main
 static ThresholdConditionCache warningcache[VERSIONBITS_NUM_BITS];
 
-static uint32_t GetBlockScriptFlags(const CBlockIndex* pindex, const Consensus::Params &consensusparams, const CBlock &block)
+static uint32_t GetBlockScriptFlags(const CBlockIndex* pindex, const Consensus::Params &consensusparams)
 {
     AssertLockHeld(cs_main);
 
@@ -2157,18 +2149,14 @@ static uint32_t GetBlockScriptFlags(const CBlockIndex* pindex, const Consensus::
         flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
     }
 
-    // Start enforcing the DERSIG (BIP66) rules, for block.nVersion=3 blocks,
-    // when 75% of the network has upgraded:
-    if (block.nVersion >= 3 && IsSuperMajority(3, pindex->pprev,
-                                   consensusparams.nMajorityEnforceBlockUpgrade, consensusparams))
+    // Start enforcing the DERSIG (BIP66) rule
+    if (pindex->nHeight >= consensusparams.BIP66Height)
     {
         flags |= SCRIPT_VERIFY_DERSIG;
     }
 
-    // Start enforcing CHECKLOCKTIMEVERIFY, (BIP65) for block.nVersion=4
-    // blocks, when 75% of the network has upgraded:
-    if (block.nVersion >= 4 && IsSuperMajority(4, pindex->pprev,
-        consensusparams.nMajorityEnforceBlockUpgrade, consensusparams))
+    // Start enforcing CHECKLOCKTIMEVERIFY (BIP65) rule
+    if (pindex->nHeight >= consensusparams.BIP65Height)
     {
         flags |= SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
     }
@@ -2315,7 +2303,7 @@ bool ConnectBlock(const CBlock &block,
     }
 
     // Get the script flags for this block
-    uint32_t  flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus(), block);
+    uint32_t  flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus());
     bool fStrictPayToScriptHash = flags & SCRIPT_VERIFY_P2SH;
 
 
@@ -3894,6 +3882,8 @@ bool CheckIndexAgainstCheckpoint(const CBlockIndex *pindexPrev,
 bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex *const pindexPrev)
 {
     const Consensus::Params &consensusParams = Params().GetConsensus();
+    const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
+
     // Check proof of work
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
     {
@@ -3905,27 +3895,21 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
     if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())
         return state.Invalid(error("%s: block's timestamp is too early", __func__), REJECT_INVALID, "time-too-old");
 
-    // Reject block.nVersion=1 blocks when 95% (75% on testnet) of the network has upgraded:
-    if (block.nVersion < 2 &&
-        IsSuperMajority(2, pindexPrev, consensusParams.nMajorityRejectBlockOutdated, consensusParams))
-        return state.Invalid(error("%s: rejected nVersion=1 block", __func__), REJECT_OBSOLETE, "bad-version");
-
-    // Reject block.nVersion=2 blocks when 95% (75% on testnet) of the network has upgraded:
-    if (block.nVersion < 3 &&
-        IsSuperMajority(3, pindexPrev, consensusParams.nMajorityRejectBlockOutdated, consensusParams))
-        return state.Invalid(error("%s: rejected nVersion=2 block", __func__), REJECT_OBSOLETE, "bad-version");
-
-    // Reject block.nVersion=3 blocks when 95% (75% on testnet) of the network has upgraded:
-    if (block.nVersion < 4 &&
-        IsSuperMajority(4, pindexPrev, consensusParams.nMajorityRejectBlockOutdated, consensusParams))
-        return state.Invalid(error("%s : rejected nVersion=3 block", __func__), REJECT_OBSOLETE, "bad-version");
+    // Reject outdated version blocks when 95% (75% on testnet) of the network has upgraded:
+    // check for version 2, 3 and 4 upgrades
+    if((block.nVersion < 2 && nHeight >= consensusParams.BIP34Height) ||
+       (block.nVersion < 3 && nHeight >= consensusParams.BIP66Height) ||
+       (block.nVersion < 4 && nHeight >= consensusParams.BIP65Height))
+    {
+        return state.Invalid(error("%s: rejected nVersion=0x%08x block", __func__, block.nVersion), REJECT_OBSOLETE, "bad-version");
+    }
 
     return true;
 }
 
 bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIndex *const pindexPrev)
 {
-    const int nHeight = pindexPrev == NULL ? 0 : pindexPrev->nHeight + 1;
+    const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
     const Consensus::Params &consensusParams = Params().GetConsensus();
 
     // Start enforcing BIP113 (Median Time Past) using versionbits logic.
@@ -3936,14 +3920,14 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
     }
 
     int64_t nLockTimeCutoff;
-    if (pindexPrev == NULL)
+    if (pindexPrev == nullptr)
         nLockTimeCutoff = block.GetBlockTime();
     else
         nLockTimeCutoff =
             (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST) ? pindexPrev->GetMedianTimePast() : block.GetBlockTime();
 
     // Check that all transactions are finalized
-    BOOST_FOREACH (const CTransaction &tx, block.vtx)
+    for (const CTransaction &tx : block.vtx)
     {
         if (!IsFinalTx(tx, nHeight, nLockTimeCutoff))
         {
@@ -3952,10 +3936,8 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
         }
     }
 
-    // Enforce block.nVersion=2 rule that the coinbase starts with serialized block height
-    // if 750 of the last 1,000 blocks are version 2 or greater (51/100 if testnet):
-    if (block.nVersion >= 2 &&
-        IsSuperMajority(2, pindexPrev, consensusParams.nMajorityEnforceBlockUpgrade, consensusParams))
+    // Enforce block nVersion=2 rule that the coinbase starts with serialized block height
+    if (block.nVersion >= 2 || nHeight >= consensusParams.BIP34Height)
     {
         CScript expect = CScript() << nHeight;
         if (block.vtx[0].vin[0].scriptSig.size() < expect.size() ||
@@ -4136,22 +4118,6 @@ static bool AcceptBlock(const CBlock &block,
 
     return true;
 }
-
-static bool IsSuperMajority(int minVersion,
-    const CBlockIndex *pstart,
-    unsigned nRequired,
-    const Consensus::Params &consensusParams)
-{
-    unsigned int nFound = 0;
-    for (int i = 0; i < consensusParams.nMajorityWindow && nFound < nRequired && pstart != NULL; i++)
-    {
-        if (pstart->nVersion >= minVersion)
-            ++nFound;
-        pstart = pstart->pprev;
-    }
-    return (nFound >= nRequired);
-}
-
 
 bool ProcessNewBlock(CValidationState &state,
     const CChainParams &chainparams,
