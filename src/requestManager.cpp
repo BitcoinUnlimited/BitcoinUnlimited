@@ -30,7 +30,7 @@ using namespace std;
 CRequestManager requester;
 
 unsigned int MIN_REQUEST_RETRY_INTERVAL = 2*1000*1000;  // When should I request an object from someone else (in microseconds)
-unsigned int MIN_BLK_REQUEST_RETRY_INTERVAL = 2*1000*1000;  // When should I request a block from someone else (in microseconds)
+unsigned int MIN_BLK_REQUEST_RETRY_INTERVAL = 5*1000*1000;  // When should I request a block from someone else (in microseconds)
 
 // defined in main.cpp.  should be moved into a utilities file but want to make rebasing easier
 extern bool CanDirectFetch(const Consensus::Params &consensusParams);
