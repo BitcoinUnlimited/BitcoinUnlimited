@@ -406,7 +406,7 @@ void CRequestManager::SendRequests()
 
       if (now-item.lastRequestTime > MIN_BLK_REQUEST_RETRY_INTERVAL)  // if never requested then lastRequestTime==0 so this will always be true
 	{
-          if (!item.availableFrom.empty())
+          if (!item.availableFrom.empty() && IsChainNearlySyncd())
 	    {
 	      CNodeRequestData next;
               while ((!item.availableFrom.empty())&&(next.node == NULL)) // Go thru the availableFrom list, looking for the first node that isn't disconnected
