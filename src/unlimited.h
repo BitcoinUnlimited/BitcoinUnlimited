@@ -11,11 +11,16 @@
 #include "net.h"
 #include "stat.h"
 #include "thinblock.h"
+#include "chain.h"
+#include "coins.h"
 #include "consensus/validation.h"
 #include "consensus/params.h"
 #include "requestManager.h"
+#include "script/script_error.h"
+#include "checkqueue.h"
 #include <univalue.h>
 #include <vector>
+#include <boost/thread.hpp>
 
 enum {
     DEFAULT_MAX_GENERATED_BLOCK_SIZE = 1000000,
@@ -135,6 +140,8 @@ extern CLeakyBucket sendShaper;
 // Test to determine if traffic shaping is enabled
 extern bool IsTrafficShapingEnabled();
 
+class CScriptCheck;
+
 // BUIP010 Xtreme Thinblocks: begin
 
 // Xpress Validation: begin
@@ -151,20 +158,21 @@ extern CCriticalSection cs_xval;
 // Xpress Validation: end
 
 extern bool fIsChainNearlySyncd;
+extern uint64_t LargestBlockSeen(uint64_t nBlockSize = 0);
 extern CCriticalSection cs_ischainnearlysyncd;
 
 extern bool HaveConnectThinblockNodes();
 extern bool HaveThinblockNodes();
 extern bool CheckThinblockTimer(uint256 hash);
 extern bool IsThinBlocksEnabled();
+extern bool IsParallelValidationEnabled();
 extern bool CanThinBlockBeDownloaded(CNode* pto);
 extern bool IsChainNearlySyncd();
 extern void IsChainNearlySyncdInit();
-extern bool fIsChainNearlySyncd;
-extern uint64_t LargestBlockSeen(uint64_t nBlockSize = 0);
 extern void BuildSeededBloomFilter(CBloomFilter& memPoolFilter, std::vector<uint256>& vOrphanHashes, uint256 hash);
 extern void LoadFilter(CNode *pfrom, CBloomFilter *filter);
-extern void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, CBlock &block, const CInv &inv);
+extern void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, const CBlock &block, const CInv &inv);
+extern void HandleBlockMessageThread(CNode *pfrom, const std::string &strCommand, const CBlock &block, const CInv &inv, bool fSem);
 extern void ConnectToThinBlockNodes();
 extern void CheckNodeSupportForThinBlocks();
 extern void SendXThinBlock(CBlock &block, CNode* pfrom, const CInv &inv);
@@ -210,6 +218,60 @@ extern CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize;
 std::string ExcessiveBlockValidator(const unsigned int& value,unsigned int* item,bool validate);
 std::string OutboundConnectionValidator(const int& value,int* item,bool validate);
 std::string SubverValidator(const std::string& value,std::string* item,bool validate);
+
+/**  Parallel Block Validation - begin **/
+
+// handling and tracking block validation threads
+struct CHandleBlockMsgThreads {
+    boost::thread* tRef;
+    CCheckQueue<CScriptCheck>* pScriptQueue;
+    uint256 hash;
+    uint256 hashPrevBlock;
+    uint32_t nSequenceId;
+    int64_t nStartTime;
+    uint64_t nBlockSize;
+    bool fQuit;
+};
+extern CCriticalSection cs_blockvalidationthread;
+extern std::map<boost::thread::id, CHandleBlockMsgThreads> mapBlockValidationThreads GUARDED_BY(cs_blockvalidationthread);
+void InterruptBlockValidationThreads();
+
+
+/**
+ * Closure representing one script verification
+ * Note that this stores references to the spending transaction 
+ */
+class CScriptCheck
+{
+private:
+    CScript scriptPubKey;
+    const CTransaction *ptxTo;
+    unsigned int nIn;
+    unsigned int nFlags;
+    bool cacheStore;
+    ScriptError error;
+
+public:
+    CScriptCheck(): ptxTo(0), nIn(0), nFlags(0), cacheStore(false), error(SCRIPT_ERR_UNKNOWN_ERROR) {}
+    CScriptCheck(const CCoins& txFromIn, const CTransaction& txToIn, unsigned int nInIn, unsigned int nFlagsIn, bool cacheIn) :
+        scriptPubKey(txFromIn.vout[txToIn.vin[nInIn].prevout.n].scriptPubKey),
+        ptxTo(&txToIn), nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn), error(SCRIPT_ERR_UNKNOWN_ERROR) { }
+
+    bool operator()();
+
+    void swap(CScriptCheck &check) {
+        scriptPubKey.swap(check.scriptPubKey);
+        std::swap(ptxTo, check.ptxTo);
+        std::swap(nIn, check.nIn);
+        std::swap(nFlags, check.nFlags);
+        std::swap(cacheStore, check.cacheStore);
+        std::swap(error, check.error);
+    }
+
+    ScriptError GetScriptError() const { return error; }
+};
+
+/** Parallel Block Validation - end **/
 
 // Protocol changes:
 

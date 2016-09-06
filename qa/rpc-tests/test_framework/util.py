@@ -151,6 +151,8 @@ def initialize_datadir(dirname, n):
         f.write("debug=lck\n")
         f.write("debug=mempool\n")
         f.write("debug=req\n")
+        f.write("debug=parallel\n")
+        f.write("debug=bench\n")
         f.write("maxlimitertxfee=0\n")
     return datadir
 
@@ -432,6 +434,10 @@ def random_transaction(nodes, amount, min_fee, fee_increment, fee_variants):
     txid = from_node.sendrawtransaction(signresult["hex"], True)
 
     return (txid, signresult["hex"], fee)
+
+def assert_not_equal(thing1, thing2):
+    if thing1 == thing2:
+        raise AssertionError("%s != %s"%(str(thing1),str(thing2)))
 
 def assert_equal(thing1, thing2):
     if thing1 != thing2:

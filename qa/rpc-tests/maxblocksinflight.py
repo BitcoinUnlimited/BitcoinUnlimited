@@ -14,8 +14,10 @@ In this test we connect to one node over p2p, send it numerous inv's, and
 compare the resulting number of getdata requests to a max allowed value.  We
 test for exceeding 128 blocks in flight, which was the limit an 0.9 client will
 reach. [0.10 clients shouldn't request more than 16 from a single peer.]
+
+BU: We allow for 256 blocks in flight with 32 from a single peer
 '''
-MAX_REQUESTS = 128
+MAX_REQUESTS = 256
 
 class TestManager(NodeConnCB):
     # set up NodeConnCB callbacks, overriding base class
@@ -45,7 +47,7 @@ class TestManager(NodeConnCB):
             fail = False
             self.connection.rpc.generate(1) # Leave IBD
 
-            numBlocksToGenerate = [ 8, 16, 128, 1024 ]
+            numBlocksToGenerate = [ 8, 16, 128, 256, 1024]
             for count in range(len(numBlocksToGenerate)):
                 current_invs = []
                 for i in range(numBlocksToGenerate[count]):

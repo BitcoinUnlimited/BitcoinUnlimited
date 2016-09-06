@@ -167,6 +167,9 @@ static boost::scoped_ptr<ECCVerifyHandle> globalVerifyHandle;
 
 void Interrupt(boost::thread_group& threadGroup)
 {
+    // Interrupt Parallel Block Validation threads if there are any running.
+    InterruptBlockValidationThreads();
+
     InterruptHTTPServer();
     InterruptHTTPRPC();
     InterruptRPC();
@@ -1127,6 +1130,22 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         for (int i=0; i<nScriptCheckThreads-1; i++)
             threadGroup.create_thread(&ThreadScriptCheck);
     }
+    // BU: parallel block validation - begin
+    if (nScriptCheckThreads) {
+        for (int i=0; i<nScriptCheckThreads-1; i++)
+            threadGroup.create_thread(&ThreadScriptCheck2);
+    }
+    if (nScriptCheckThreads) {
+        for (int i=0; i<nScriptCheckThreads-1; i++)
+            threadGroup.create_thread(&ThreadScriptCheck3);
+    }
+    if (nScriptCheckThreads) {
+        for (int i=0; i<nScriptCheckThreads-1; i++)
+            threadGroup.create_thread(&ThreadScriptCheck4);
+    }
+
+    AddAllScriptCheckQueues(); // This initializes and creates 4 separate script thread queues
+    // BU: parallel block validation - end
 
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
