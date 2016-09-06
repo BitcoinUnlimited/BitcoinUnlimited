@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <vector>
 
+#include <boost/atomic.hpp>
 #include <boost/foreach.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
@@ -61,7 +62,7 @@ private:
     unsigned int nTodo;
 
     //! Whether we're shutting down.
-    bool fQuit;
+    boost::atomic<bool> fQuit;
 
     //! The maximum number of elements to be processed in one batch
     unsigned int nBatchSize;
@@ -80,23 +81,32 @@ private:
                 // first do the clean-up of the previous loop run (allowing us to do it in the same critsect)
                 if (nNow) {
                     fAllOk &= fOk;
-                    nTodo -= nNow;
-                    if (nTodo == 0 && !fMaster)
+                    if (nTodo >= nNow)
+                        nTodo -= nNow;
+                    if (nTodo == 0 && !fMaster) {
                         // We processed the last element; inform the master it can exit and return the result
+                        queue.clear();
                         condMaster.notify_one();
+                    }
+                    if (fQuit.load() && !fMaster) {
+                        nTodo = 0;
+                        queue.clear();
+                        condMaster.notify_one();
+                    }
                 } else {
                     // first iteration
                     nTotal++;
                 }
                 // logically, the do loop starts here
                 while (queue.empty()) {
-                    if ((fMaster || fQuit) && nTodo == 0) {
+                    if ((fMaster) && nTodo == 0) {
                         nTotal--;
                         bool fRet = fAllOk;
                         // reset the status for new work later
                         if (fMaster)
                             fAllOk = true;
                         // return the current status
+                        fQuit.store(false); // reset the flag before returning
                         return fRet;
                     }
                     nIdle++;
@@ -129,7 +139,7 @@ private:
 
 public:
     //! Create a new check queue
-    CCheckQueue(unsigned int nBatchSizeIn) : nIdle(0), nTotal(0), fAllOk(true), nTodo(0), fQuit(false), nBatchSize(nBatchSizeIn) {}
+    CCheckQueue(unsigned int nBatchSizeIn) : nIdle(0), nTotal(0), fAllOk(true), nTodo(0), nBatchSize(nBatchSizeIn) {fQuit.store(false);}
 
     //! Worker thread
     void Thread()
@@ -141,6 +151,12 @@ public:
     bool Wait()
     {
         return Loop(true);
+    }
+
+    //! Quit execution of any remaining checks.
+    void Quit()
+    {
+       fQuit.store(true);
     }
 
     //! Add a batch of checks to the queue
@@ -182,6 +198,7 @@ private:
     bool fDone;
 
 public:
+    CCheckQueueControl() {} // BU: parallel block validation
     CCheckQueueControl(CCheckQueue<T>* pqueueIn) : pqueue(pqueueIn), fDone(false)
     {
         // passed queue is supposed to be unused, or NULL
@@ -191,9 +208,22 @@ public:
         }
     }
 
+    void Queue(CCheckQueue<T>* pqueueIn)
+    {
+        pqueue = pqueueIn;
+        // passed queue is supposed to be unused, or NULL
+        if (pqueue != NULL) {
+            bool isIdle = pqueue->IsIdle();
+            assert(isIdle);
+            fDone = false;
+        }
+    }
+
     bool Wait()
     {
-        if (pqueue == NULL)
+        if (fDone)
+            return true;
+        else if (pqueue == NULL)
             return true;
         bool fRet = pqueue->Wait();
         fDone = true;

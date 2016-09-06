@@ -535,10 +535,12 @@ class ExcessiveBlockTest (BitcoinTestFramework):
             except JSONRPCException: # could be spent all the txouts
               pass
           logging.debug("%d transactions" % ntxs)
-          time.sleep(1)
           self.nodes[random.randint(0,3)].generate(1)
           time.sleep(1)
 
+        #stop nodes
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
 
 if __name__ == '__main__':
     

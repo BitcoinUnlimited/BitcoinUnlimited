@@ -201,7 +201,7 @@ void UnregisterNodeSignals(CNodeSignals& nodeSignals);
  * @param[out]  dbp     If pblock is stored to disk (or already there), this will be set to its location.
  * @return True if state.IsValid()
  */
-bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, const CNode* pfrom, const CBlock* pblock, bool fForceProcessing, CDiskBlockPos* dbp);
+bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, const CNode* pfrom, const CBlock* pblock, bool fForceProcessing, CDiskBlockPos* dbp, bool fParallel);
 /** Check whether enough disk space is available for an incoming block */
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 /** Open a block file (blk?????.dat) */
@@ -226,8 +226,10 @@ bool ProcessMessages(CNode* pfrom);
  * @param[in]   pto             The node which we are sending messages to.
  */
 bool SendMessages(CNode* pto);
+// BU: moves to parallel.h
 /** Run an instance of the script checking thread */
-void ThreadScriptCheck();
+//void ThreadScriptCheck();
+
 /** Try to detect Partition (network isolation) attacks against us */
 void PartitionCheck(bool (*initialDownloadCheck)(), CCriticalSection& cs, const CBlockIndex *const &bestHeader, int64_t nPowTargetSpacing);
 /** Check whether we are doing an initial block download (synchronizing from disk or network) */
@@ -243,7 +245,7 @@ std::string GetWarnings(const std::string& strFor);
 /** Retrieve a transaction (from memory pool, or from disk, if possible) */
 bool GetTransaction(const uint256 &hash, CTransaction &tx, const Consensus::Params& params, uint256 &hashBlock, bool fAllowSlow = false);
 /** Find the best known block, and make it the tip of the block chain */
-bool ActivateBestChain(CValidationState& state, const CChainParams& chainparams, const CBlock* pblock = NULL);
+bool ActivateBestChain(CValidationState& state, const CChainParams& chainparams, const CBlock* pblock = NULL, bool fParallel = false);
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams);
 
 /**
@@ -393,6 +395,7 @@ bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int>* prevHeig
  */
 bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp = NULL, bool useExistingLockPoints = false);
 
+//  BU: This was all moved to parallel.cpp
 /**
  * Class that keeps track of number of signature operations
  * and bytes hashed to compute signature hashes.
@@ -429,36 +432,112 @@ public:
  * Closure representing one script verification
  * Note that this stores references to the spending transaction 
  */
-class CScriptCheck
+//class CScriptCheck
+//{
+//private:
+//    CScript scriptPubKey;
+//    const CTransaction *ptxTo;
+//    unsigned int nIn;
+//    unsigned int nFlags;
+//    bool cacheStore;
+//    ScriptError error;
+//
+//public:
+//    CScriptCheck(): ptxTo(0), nIn(0), nFlags(0), cacheStore(false), error(SCRIPT_ERR_UNKNOWN_ERROR) {}
+//    CScriptCheck(const CCoins& txFromIn, const CTransaction& txToIn, unsigned int nInIn, unsigned int nFlagsIn, bool cacheIn) :
+//        scriptPubKey(txFromIn.vout[txToIn.vin[nInIn].prevout.n].scriptPubKey),
+//        ptxTo(&txToIn), nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn), error(SCRIPT_ERR_UNKNOWN_ERROR) { }
+//
+//    bool operator()();
+//
+//    void swap(CScriptCheck &check) {
+//        scriptPubKey.swap(check.scriptPubKey);
+//        std::swap(ptxTo, check.ptxTo);
+//        std::swap(nIn, check.nIn);
+//        std::swap(nFlags, check.nFlags);
+//        std::swap(cacheStore, check.cacheStore);
+//        std::swap(error, check.error);
+//    }
+
+//    ScriptError GetScriptError() const { return error; }
+//};
+
+/**
+ * Hold all script check queues in one vector along with their associated mutex
+ * When we use a queue we must always have a distinct mutex for it.  This way during IBD we
+ * can repeately lock a queue without needing to worry about scheduling threads.  They'll just
+ * wait until they're free to continue.  During parallel validation of new blocks we'll only
+ * have the maximum number of 4 queues/blocks validating so locking won't be needed for scheduling in that case.
+ */
+class CAllScriptCheckQueues
 {
 private:
-    ValidationResourceTracker* resourceTracker;
-    CScript scriptPubKey;
-    const CTransaction *ptxTo;
-    unsigned int nIn;
-    unsigned int nFlags;
-    bool cacheStore;
-    ScriptError error;
+
+    class CScriptCheckQueue
+    {
+        public:
+            CCheckQueue<CScriptCheck>* scriptcheckqueue;
+            bool InUse;
+            boost::shared_ptr<boost::mutex> scriptcheck_mutex;
+
+            CScriptCheckQueue(CCheckQueue<CScriptCheck>* pqueueIn) : InUse(false), scriptcheck_mutex(new boost::mutex)
+            {
+                scriptcheckqueue = pqueueIn;
+            }
+    };
+    std::vector<CScriptCheckQueue> vScriptCheckQueues;
+    boost::shared_ptr<boost::mutex> dummy_mutex;
 
 public:
-    CScriptCheck(): resourceTracker(NULL), ptxTo(0), nIn(0), nFlags(0), cacheStore(false), error(SCRIPT_ERR_UNKNOWN_ERROR) {}
-    CScriptCheck(ValidationResourceTracker* resourceTrackerIn, const CCoins& txFromIn, const CTransaction& txToIn, unsigned int nInIn, unsigned int nFlagsIn, bool cacheIn) :
-        resourceTracker(resourceTrackerIn), scriptPubKey(txFromIn.vout[txToIn.vin[nInIn].prevout.n].scriptPubKey),
-        ptxTo(&txToIn), nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn), error(SCRIPT_ERR_UNKNOWN_ERROR) { }
+    CAllScriptCheckQueues() : dummy_mutex(new boost::mutex) {}
 
-    bool operator()();
-
-    void swap(CScriptCheck &check) {
-        std::swap(resourceTracker, check.resourceTracker);
-        scriptPubKey.swap(check.scriptPubKey);
-        std::swap(ptxTo, check.ptxTo);
-        std::swap(nIn, check.nIn);
-        std::swap(nFlags, check.nFlags);
-        std::swap(cacheStore, check.cacheStore);
-        std::swap(error, check.error);
+    void Add(CCheckQueue<CScriptCheck>* pqueueIn)
+    {
+        vScriptCheckQueues.push_back(CScriptCheckQueue(pqueueIn));
     }
 
-    ScriptError GetScriptError() const { return error; }
+    /* Returns a pointer to an available or selected scriptcheckqueue.
+     * 1) during IBD each queue is selected in order.  There is no need to check if the queue is busy or not.
+     * 2) for new block validation there is a more complex selection process and also the ability to terminate long
+     *    running threads in the case where there are more requests for validation than queues.
+     */
+    CCheckQueue<CScriptCheck>* GetScriptCheckQueue(boost::shared_ptr<boost::mutex> mutex)
+    {
+        // find the scriptcheckqueue that is associated with this mutex
+        for (unsigned int i = 0; i < vScriptCheckQueues.size(); i++) {
+            if (vScriptCheckQueues[i].scriptcheck_mutex == mutex) {
+                LogPrint("parallel", "next script check queue selected is %d\n", i);
+                return vScriptCheckQueues[i].scriptcheckqueue;
+            }
+        }
+        return  NULL;
+    }
+
+    boost::shared_ptr<boost::mutex> GetScriptCheckMutex()
+    {
+        // for newly mined block validation, return the first queue not in use.
+        if (IsChainNearlySyncd() && vScriptCheckQueues.size() > 0) {
+            for (unsigned int i = 0; i < vScriptCheckQueues.size(); i++) {
+                if (vScriptCheckQueues[i].scriptcheckqueue->IsIdle()) {
+                    LogPrint("parallel", "next mutex not in use is %d\n", i);
+                    return vScriptCheckQueues[i].scriptcheck_mutex;
+                }
+                else 
+                    assert("Could not select Queue since none were idle");
+            }
+        }
+        // for IBD return the next queue. It doesn't matter if it's in use or not.
+        else if (vScriptCheckQueues.size() > 0){
+            static unsigned int nextQueue = 0;
+            nextQueue++;
+
+            if (nextQueue >= vScriptCheckQueues.size())
+                nextQueue = 0;
+            LogPrint("parallel", "next mutex selected is %d\n", nextQueue);
+            return vScriptCheckQueues[nextQueue].scriptcheck_mutex;
+        }
+        return dummy_mutex;
+    }
 };
 
 
@@ -476,7 +555,7 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus
 bool DisconnectBlock(const CBlock& block, CValidationState& state, const CBlockIndex* pindex, CCoinsViewCache& coins, bool* pfClean = NULL);
 
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins */
-bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, CCoinsViewCache& coins, bool fJustCheck = false);
+bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, CCoinsViewCache& coins, bool fJustCheck = false, bool fParallel = false);
 
 /** Context-independent validity checks */
 bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool fCheckPOW = true);

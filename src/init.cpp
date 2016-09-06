@@ -24,6 +24,7 @@
 #include "main.h"
 #include "miner.h"
 #include "net.h"
+#include "parallel.h"
 #include "policy/policy.h"
 #include "rpc/server.h"
 #include "script/standard.h"
@@ -164,6 +165,10 @@ static boost::scoped_ptr<ECCVerifyHandle> globalVerifyHandle;
 
 void Interrupt(boost::thread_group& threadGroup)
 {
+    // Interrupt Parallel Block Validation threads if there are any running.
+    PV.StopAllValidationThreads();
+    PV.WaitForAllValidationThreadsToStop();
+
     InterruptHTTPServer();
     InterruptHTTPRPC();
     InterruptRPC();
@@ -1042,8 +1047,24 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     LogPrintf("Using %u threads for script verification\n", nScriptCheckThreads);
     if (nScriptCheckThreads) {
         for (int i=0; i<nScriptCheckThreads-1; i++)
-            threadGroup.create_thread(&ThreadScriptCheck);
+            threadGroup.create_thread(&ThreadScriptCheck1);
     }
+    // BU: parallel block validation - begin
+    if (nScriptCheckThreads) {
+        for (int i=0; i<nScriptCheckThreads-1; i++)
+            threadGroup.create_thread(&ThreadScriptCheck2);
+    }
+    if (nScriptCheckThreads) {
+        for (int i=0; i<nScriptCheckThreads-1; i++)
+            threadGroup.create_thread(&ThreadScriptCheck3);
+    }
+    if (nScriptCheckThreads) {
+        for (int i=0; i<nScriptCheckThreads-1; i++)
+            threadGroup.create_thread(&ThreadScriptCheck4);
+    }
+
+    AddAllScriptCheckQueues(); // This initializes and creates 4 separate script thread queues
+    // BU: parallel block validation - end
 
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
