@@ -3806,8 +3806,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     }
     
     if (fConservative && (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS))  // BU only enforce sigops during block generation not acceptance
-      return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"),
-        REJECT_INVALID, "bad-blk-sigops", true);
+      return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"), REJECT_INVALID, "bad-blk-sigops", true);
 
     if (fCheckPOW && fCheckMerkleRoot)
         block.fChecked = true;
