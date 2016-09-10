@@ -201,7 +201,7 @@ bool CTxMemPool::CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntr
             if (piter != mapTx.end()) {
                 parentHashes.insert(piter);
                 if (parentHashes.size() + 1 > limitAncestorCount) {
-                    errString = strprintf("too many unconfirmed parents [limit: %u]", limitAncestorCount);
+		    errString = strprintf("too many unconfirmed parents: %u [limit: %u]", parentHashes.size(), limitAncestorCount);
                     return false;
                 }
             }
@@ -229,7 +229,7 @@ bool CTxMemPool::CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntr
             errString = strprintf("too many descendants for tx %s [limit: %u]", stageit->GetTx().GetHash().ToString(), limitDescendantCount);
             return false;
         } else if (totalSizeWithAncestors > limitAncestorSize) {
-            errString = strprintf("exceeds ancestor size limit [limit: %u]", limitAncestorSize);
+  	    errString = strprintf(" %u exceeds ancestor size limit [limit: %u]", totalSizeWithAncestors, limitAncestorSize);
             return false;
         }
 
@@ -241,7 +241,7 @@ bool CTxMemPool::CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntr
             }
             // removed +1 from test below as per BU: Fix use after free bug
             if (parentHashes.size() + setAncestors.size() > limitAncestorCount) {
-                errString = strprintf("too many unconfirmed ancestors [limit: %u]", limitAncestorCount);
+                errString = strprintf("too many unconfirmed ancestors (%u+%u) [limit: %u]", parentHashes.size(), setAncestors.size(), limitAncestorCount);
                 return false;
             }
         }

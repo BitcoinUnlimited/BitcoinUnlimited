@@ -473,8 +473,11 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     if (vNodes.empty())
         throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Bitcoin is not connected!");
 
-    if (IsInitialBlockDownload())
-        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Bitcoin is downloading blocks...");
+    if (Params().NetworkIDString() == "main")  // other chains may not produce blocks periodically if all hash rate goes away
+      {
+      if (IsInitialBlockDownload())
+          throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Bitcoin is downloading blocks...");
+      }
 
     static unsigned int nTransactionsUpdatedLast;
 

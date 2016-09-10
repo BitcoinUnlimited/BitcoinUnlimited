@@ -31,6 +31,7 @@ public:
 
     //! Check whether a key corresponding to a given address is present in the store.
     virtual bool HaveKey(const CKeyID &address) const =0;
+    virtual bool _HaveKey(const CKeyID &address) const =0;  // BU lockless version
     virtual bool GetKey(const CKeyID &address, CKey& keyOut) const =0;
     virtual void GetKeys(std::set<CKeyID> &setAddress) const =0;
     virtual bool GetPubKey(const CKeyID &address, CPubKey& vchPubKeyOut) const =0;
@@ -71,6 +72,12 @@ public:
             LOCK(cs_KeyStore);
             result = (mapKeys.count(address) > 0);
         }
+        return result;
+    }
+    bool _HaveKey(const CKeyID &address) const  // BU lockless version
+    {
+        bool result;
+        result = (mapKeys.count(address) > 0);
         return result;
     }
     void GetKeys(std::set<CKeyID> &setAddress) const
