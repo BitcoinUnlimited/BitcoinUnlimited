@@ -210,10 +210,12 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                 (iter->GetModifiedFee() < ::minRelayTxFee.GetFee(nTxSize) && nBlockSize >= nBlockMinSize)) {
                 break;
             }
-            if (nBlockSize + nTxSize >= nBlockMaxSize) {
-                if (nBlockSize >  nBlockMaxSize - 100 || lastFewTxs > 50) {
-                    break;
-                }
+            if (nBlockSize + nTxSize >= nBlockMaxSize) 
+                {
+                if (nBlockSize >  nBlockMaxSize - 100 || lastFewTxs > 50) 
+                  {
+                  break;
+                  }
                 // Once we're within 1000 bytes of a full block, only look at 50 more txs
                 // to try to fill the remaining space.
                 if (nBlockSize > nBlockMaxSize - 1000) {
@@ -226,13 +228,14 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                 continue;
 
             unsigned int nTxSigOps = iter->GetSigOpCount();
-            if (nBlockSigOps + nTxSigOps >= BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS) {  // BU: be conservative about what is generated
-                if (nBlockSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS - 2) {
-                    break;
-                }
-                continue;
-            }
-
+            if (Params().NetworkIDString() == "main") // BU: be conservative about what is generated on mainchain
+	      {
+		if (nBlockSigOps + nTxSigOps >= BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS)
+		  {  
+		    if (nBlockSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS - 2) break;   // If no more tx will fit then done adding tx
+		    continue;  // otherwise loop around looking for a smaller transaction
+		  }
+	      }
             CAmount nTxFees = iter->GetFee();
             // Added
             pblock->vtx.push_back(tx);

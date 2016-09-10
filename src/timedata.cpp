@@ -26,8 +26,14 @@ static int64_t nTimeOffset = 0;
  */
 int64_t GetTimeOffset()
 {
+    int64_t t1;
+#ifdef __GNUC__  // BU optimze -- do a barrier rather than a lock
+    t1 = __sync_fetch_and_add(&nTimeOffset,0);
+#else
     LOCK(cs_nTimeOffset);
-    return nTimeOffset;
+    t1 = nTimeOffset;
+#endif
+    return t1;
 }
 
 int64_t GetAdjustedTime()

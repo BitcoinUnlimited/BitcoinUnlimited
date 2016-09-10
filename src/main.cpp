@@ -1094,7 +1094,9 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
         *pfMissingInputs = false;
 
     if (!CheckTransaction(tx, state))
+      {
         return false;
+      }
 
     // Coinbase is only valid in a block, not as a loose transaction
     if (tx.IsCoinBase())
@@ -1266,6 +1268,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
             return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool min fee not met", false, strprintf("%d < %d", nFees, mempoolRejectFee));
         } else if (GetBoolArg("-relaypriority", DEFAULT_RELAYPRIORITY) && nModifiedFees < ::minRelayTxFee.GetFee(nSize) && !AllowFree(entry.GetPriority(chainActive.Height() + 1))) {
             // Require that free transactions have sufficient priority to be mined in the next block.
+	    LogPrint("mempool","Txn fee %lld (%d - %d), priority fee delta was %lld\n",nFees, nValueIn, nValueOut, nModifiedFees - nFees);
             return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "insufficient priority");
         }
         
@@ -3493,9 +3496,11 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
         nSigOps += GetLegacySigOpCount(tx);
     }
 
-    if (fConservative && (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS))  // BU only enforce sigops during block generation not acceptance
-      return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"),
-        REJECT_INVALID, "bad-blk-sigops", true);
+    if (Params().NetworkIDString() == "main") // BU only enforce sigops during block generation not acceptance on the main chain
+      {
+      if (fConservative && (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS))  
+        return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"), REJECT_INVALID, "bad-blk-sigops", true);
+      }
 
     if (fCheckPOW && fCheckMerkleRoot)
         block.fChecked = true;
@@ -5298,8 +5303,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                      ++mi)
                 {
                     const uint256& orphanHash = *mi;
-                    const CTransaction& orphanTx = mapOrphanTransactions[orphanHash].tx;
-                    NodeId fromPeer = mapOrphanTransactions[orphanHash].fromPeer;
+                    std::map<uint256, COrphanTx>::iterator item = mapOrphanTransactions.find(orphanHash);
+                    if (item == mapOrphanTransactions.end()) continue;
+                    const CTransaction& orphanTx = item->second.tx;
+                    NodeId fromPeer = item->second.fromPeer;
                     bool fMissingInputs2 = false;
                     // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
                     // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get

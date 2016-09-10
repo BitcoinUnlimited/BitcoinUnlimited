@@ -7,7 +7,7 @@
 #define BITCOIN_CONSENSUS_VALIDATION_H
 
 #include <string>
-
+#include "util.h"
 /** "reject" message codes */
 static const unsigned char REJECT_MALFORMED = 0x01;
 static const unsigned char REJECT_INVALID = 0x10;
@@ -41,6 +41,7 @@ public:
         strRejectReason = strRejectReasonIn;
         corruptionPossible = corruptionIn;
         strDebugMessage = strDebugMessageIn;
+        LogPrintf("ValidationState Error: %s, debug msg: %s\n", strRejectReasonIn.c_str(), strDebugMessageIn.c_str());
         if (mode == MODE_ERROR)
             return ret;
         nDoS += level;
