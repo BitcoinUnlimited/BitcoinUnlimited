@@ -169,6 +169,16 @@ public:
         }
         return false;
     }
+    bool _HaveKey(const CKeyID &address) const  // Lockless version, you must have already taken the locks
+    {
+        {
+            if (!IsCrypted())
+                return CBasicKeyStore::_HaveKey(address);
+            return mapCryptedKeys.count(address) > 0;
+        }
+        return false;
+    }
+
     bool GetKey(const CKeyID &address, CKey& keyOut) const;
     bool GetPubKey(const CKeyID &address, CPubKey& vchPubKeyOut) const;
     void GetKeys(std::set<CKeyID> &setAddress) const

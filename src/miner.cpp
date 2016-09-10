@@ -258,10 +258,12 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                 (iter->GetModifiedFee() < ::minRelayTxFee.GetFee(nTxSize) && nBlockSize >= nBlockMinSize)) {
                 break;
             }
-            if (nBlockSize + nTxSize >= nBlockMaxSize) {
-                if (nBlockSize >  nBlockMaxSize - 100 || lastFewTxs > 50) {
-                    break;
-                }
+            if (nBlockSize + nTxSize >= nBlockMaxSize) 
+                {
+                if (nBlockSize >  nBlockMaxSize - 100 || lastFewTxs > 50) 
+                  {
+                  break;
+                  }
                 // Once we're within 1000 bytes of a full block, only look at 50 more txs
                 // to try to fill the remaining space.
                 if (nBlockSize > nBlockMaxSize - 1000) {
@@ -295,7 +297,6 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                   continue;  // find another TX
                   }
               }
-
             CAmount nTxFees = iter->GetFee();
             // Added
             pblock->vtx.push_back(tx);

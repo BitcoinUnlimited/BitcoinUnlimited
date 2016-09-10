@@ -430,7 +430,18 @@ public:
     std::string ToString() const;
 };
 
+typedef std::multimap<CAmount, COutput> SpendableTxos;
 
+struct TxoIterLess // : binary_function <T,T,bool> 
+  {
+    typedef SpendableTxos::iterator T;
+    bool operator() (const T& x, const T& y) const {return x->first < y->first;}
+  };
+
+typedef std::set<SpendableTxos::iterator,TxoIterLess> TxoItVec;
+typedef std::pair<CAmount, TxoItVec > TxoGroup;  // A set of coins and how much they sum to.
+
+extern TxoGroup CoinSelection(/* const */ SpendableTxos& available, const CAmount targetValue);
 
 
 /** Private key that includes an expiration date in case it never gets used. */
@@ -592,6 +603,9 @@ public:
      */
     mutable CCriticalSection cs_wallet;
 
+    SpendableTxos available;
+    bool fOnlyConfirmed;  // Only allow spending of confirmed coins
+
     bool fFileBacked;
     std::string strWalletFile;
 
@@ -637,7 +651,7 @@ public:
 
     std::map<uint256, CWalletTx> mapWallet;
     std::list<CAccountingEntry> laccentries;
-
+    std::vector<COutput> availCoins;
     typedef std::pair<CWalletTx*, CAccountingEntry*> TxPair;
     typedef std::multimap<int64_t, TxPair > TxItems;
     TxItems wtxOrdered;
@@ -654,6 +668,10 @@ public:
     int64_t nTimeFirstKey;
 
     const CWalletTx* GetWalletTx(const uint256& hash) const;
+
+    bool IsTxSpendable(const CWalletTx*);
+    void FillAvailableCoins(); // populate available COutputs.
+    bool SelectCoinsBU(const CAmount& nTargetValue, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, const CCoinControl *coinControl = NULL);
 
     //! check whether we are allowed to upgrade (or already support) to the named feature
     bool CanSupportFeature(enum WalletFeature wf) { AssertLockHeld(cs_wallet); return nWalletMaxVersion >= wf; }

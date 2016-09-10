@@ -219,11 +219,12 @@ endif
 libbitcoin_wallet_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_wallet_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_wallet_a_SOURCES = \
+  wallet/coinselection.cpp \
+  wallet/wallet.cpp \
   wallet/crypter.cpp \
   wallet/db.cpp \
   wallet/rpcdump.cpp \
   wallet/rpcwallet.cpp \
-  wallet/wallet.cpp \
   wallet/wallet_ismine.cpp \
   wallet/walletdb.cpp \
   policy/rbf.cpp \
