@@ -69,6 +69,18 @@ int ClientModel::getNumConnections(unsigned int flags) const
 int ClientModel::getNumBlocks() const { return chainActive.Height(); }
 quint64 ClientModel::getTotalBytesRecv() const { return CNode::GetTotalBytesRecv(); }
 quint64 ClientModel::getTotalBytesSent() const { return CNode::GetTotalBytesSent(); }
+int ClientModel::getHeaderTipHeight() const
+{
+    if (!pindexBestHeader)
+        return 0;
+    return pindexBestHeader.load()->nHeight;
+}
+int64_t ClientModel::getHeaderTipTime() const
+{
+    if (!pindexBestHeader)
+        return 0;
+    return pindexBestHeader.load()->GetBlockTime();
+}
 QDateTime ClientModel::getLastBlockDate() const
 {
     if (chainActive.Tip())
