@@ -187,5 +187,5 @@ void WalletFrame::usedReceivingAddresses()
 WalletView *WalletFrame::currentWalletView() { return qobject_cast<WalletView *>(walletStack->currentWidget()); }
 void WalletFrame::outOfSyncWarningClicked()
 {
-    Q_EMIT requestedOfSyncWarningInfo();
+    Q_EMIT requestedSyncWarningInfo();
 }

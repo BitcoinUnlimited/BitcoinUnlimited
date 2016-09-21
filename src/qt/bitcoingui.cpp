@@ -233,7 +233,7 @@ BitcoinGUI::BitcoinGUI(const Config *_cfg, const PlatformStyle *platformStyle, c
     modalOverlay = new ModalOverlay(this->centralWidget());
 #ifdef ENABLE_WALLET
     if(enableWallet)
-        connect(walletFrame, SIGNAL(requestedOfSyncWarningInfo()), this, SLOT(showModalOverlay()));
+        connect(walletFrame, SIGNAL(requestedSyncWarningInfo()), this, SLOT(showModalOverlay()));
 #endif
 }
 
