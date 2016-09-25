@@ -5930,30 +5930,36 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             pfrom->fDisconnect = true;
             return true;
         }
+      
         std::vector<uint256> vtxid;
-        if (1)  // Keep this lock for as short as possible, causing 2.6 second locks
-	  {
-          LOCK2(cs_main, pfrom->cs_filter);
-          mempool.queryHashes(vtxid);
-	  }
         vector<CInv> vInv;
-        BOOST_FOREACH(uint256& hash, vtxid) {
-            CInv inv(MSG_TX, hash);
-            if (pfrom->pfilter) {
-                CTransaction tx;
-                bool fInMemPool = mempool.lookup(hash, tx);
-                if (!fInMemPool) continue; // another thread removed since queryHashes, maybe...
-                if (!pfrom->pfilter->IsRelevantAndUpdate(tx)) continue;
-            }
-            vInv.push_back(inv);
-            if (vInv.size() == MAX_INV_SZ) {
-                pfrom->PushMessage(NetMsgType::INV, vInv);
-                vInv.clear();
+        mempool.queryHashes(vtxid); // BU: No lock required here. This has it's own internal lock
+        {
+            LOCK(pfrom->cs_filter);
+            BOOST_FOREACH(uint256& hash, vtxid) {
+                CInv inv(MSG_TX, hash);
+                if (pfrom->pfilter) {
+                    CTransaction tx;
+                    // BU: the following is commented out and is not worth the effort.  If we do this will
+                    //     repeatedly lock and unlock the memory pool.
+                    //bool fInMemPool = mempool.lookup(hash, tx);
+                    //if (!fInMemPool) continue; // another thread removed since queryHashes, maybe...
+                    if (!pfrom->pfilter->IsRelevantAndUpdate(tx)) continue;
+                }
+                vInv.push_back(inv);
+                if (vInv.size() == MAX_INV_SZ) {
+                    pfrom->cs_filter.unlock();
+                    pfrom->PushMessage(NetMsgType::INV, vInv);
+                    vInv.clear();
+                    pfrom->cs_filter.lock();
+                }
             }
         }
+
         if (vInv.size() > 0)
             pfrom->PushMessage(NetMsgType::INV, vInv);
     }
+
 
 
     else if (strCommand == NetMsgType::PING)
