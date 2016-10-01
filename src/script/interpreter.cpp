@@ -97,6 +97,21 @@ bool static IsCompressedOrUncompressedPubKey(const valtype &vchPubKey)
     return true;
 }
 
+static bool IsCompressedPubKey(const valtype &vchPubKey)
+{
+    if (vchPubKey.size() != 33)
+    {
+        //  Non-canonical public key: invalid length for compressed key
+        return false;
+    }
+    if (vchPubKey[0] != 0x02 && vchPubKey[0] != 0x03)
+    {
+        //  Non-canonical public key: invalid prefix for compressed key
+        return false;
+    }
+    return true;
+}
+
 /**
  * A canonical signature exists of: <30> <total len> <02> <len R> <R> <02> <len S> <S> <hashtype>
  * Where R and S are not negative (their first byte has its highest bit not set), and not
