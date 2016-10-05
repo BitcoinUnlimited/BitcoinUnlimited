@@ -20,6 +20,7 @@
 #include "random.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
+#include "script/sigcache.h"
 #include "test/testutil.h"
 #include "txdb.h"
 #include "txmempool.h"
@@ -42,6 +43,7 @@ BasicTestingSetup::BasicTestingSetup(const std::string &chainName)
     ECC_Start();
     SetupEnvironment();
     SetupNetworking();
+    InitSignatureCache();
     fPrintToDebugLog = false; // don't want to write to debug.log file
     fCheckBlockIndex = true;
     SelectParams(chainName);
