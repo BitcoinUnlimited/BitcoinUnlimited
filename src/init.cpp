@@ -962,6 +962,8 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         LOGA("Using %d transaction admission threads\n", numTxAdmissionThreads.Value());
     }
 
+    InitSignatureCache();
+
     // Create the parallel block validator
     PV.reset(new CParallelValidation());
 

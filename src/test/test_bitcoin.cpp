@@ -20,17 +20,18 @@
 #include "random.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
+#include "script/sigcache.h"
 #include "test/testutil.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
 #include "validation/validation.h"
-#include <boost/program_options.hpp>
-#include <boost/test/unit_test.hpp>
 
 #include <memory>
 
 #include <boost/thread.hpp>
+#include <boost/program_options.hpp>
+#include <boost/test/unit_test.hpp>
 
 FastRandomContext insecure_rand_ctx(true);
 
@@ -43,6 +44,7 @@ BasicTestingSetup::BasicTestingSetup(const std::string &chainName)
     ECC_Start();
     SetupEnvironment();
     SetupNetworking();
+    InitSignatureCache();
     fPrintToDebugLog = false; // don't want to write to debug.log file
     fCheckBlockIndex = true;
     SelectParams(chainName);
