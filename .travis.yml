@@ -7,10 +7,9 @@
 #   IPv6 support
 
 sudo: required
-dist: precise
-group: legacy
-
+dist: trusty
 os: linux
+group: legacy
 language: cpp
 compiler: gcc
 env:
@@ -25,6 +24,9 @@ env:
     - SDK_URL=https://bitcoincore.org/depends-sources/sdks
     - PYTHON_DEBUG=1
     - WINEDEBUG=fixme-all
+branhces:
+  only:
+  - 0.12.1bu
 cache:
   apt: true
   directories:
