@@ -6,6 +6,7 @@
 #define BITCOIN_POLICYESTIMATOR_H
 
 #include "amount.h"
+#include "random.h"
 #include "uint256.h"
 
 #include <map>

@@ -26,12 +26,6 @@ int GetRandInt(int nMax);
 uint256 GetRandHash();
 
 /**
- * Seed insecure_rand using the random pool.
- * @param Deterministic Use a deterministic seed
- */
-void seed_insecure_rand(bool fDeterministic = false);
-
-/**
  * Fast randomness source. This is seeded once with secure random data, but
  * is completely deterministic and insecure after that.
  * This class is not thread-safe.
@@ -103,17 +97,5 @@ static const ssize_t NUM_OS_RANDOM_BYTES = 32;
  * GetStrongRandBytes instead.
  */
 void GetOSRand(unsigned char *ent32);
-
-/** Check that OS randomness is available and returning the requested number
- * of bytes.
- */
-extern uint32_t insecure_rand_Rz;
-extern uint32_t insecure_rand_Rw;
-static inline uint32_t insecure_rand(void)
-{
-    insecure_rand_Rz = 36969 * (insecure_rand_Rz & 65535) + (insecure_rand_Rz >> 16);
-    insecure_rand_Rw = 18000 * (insecure_rand_Rw & 65535) + (insecure_rand_Rw >> 16);
-    return (insecure_rand_Rw << 16) + insecure_rand_Rz;
-}
 
 #endif // BITCOIN_RANDOM_H
