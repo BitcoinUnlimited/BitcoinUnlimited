@@ -84,7 +84,7 @@ CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfReachable[NET_MAX] = {};
 static bool vfLimited[NET_MAX] = {};
-static CNode* pnodeLocalHost = NULL;
+//static CNode* pnodeLocalHost = NULL;
 uint64_t nLocalHostNonce = 0;
 static std::vector<ListenSocket> vhListenSocket;
 CAddrMan addrman;
@@ -888,12 +888,12 @@ static bool ReverseCompareNodeMinPingTime(const CNodeRef &a, const CNodeRef &b)
 {
     return a->nMinPingUsecTime > b->nMinPingUsecTime;
 }
-#endif
 
 static bool ReverseCompareNodeTimeConnected(const CNodeRef &a, const CNodeRef &b)
 {
     return a->nTimeConnected > b->nTimeConnected;
 }
+#endif
 
 // BU: connection slot exhaustion mitigation
 static bool CompareNodeActivityBytes(const CNodeRef &a, const CNodeRef &b)
@@ -2204,8 +2204,8 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
         vAddedNodes = mapMultiArgs["-addnode"];
     }
 
-    if (pnodeLocalHost == NULL)
-        pnodeLocalHost = new CNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), nLocalServices));
+//    if (pnodeLocalHost == NULL)
+//        pnodeLocalHost = new CNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), nLocalServices));
 
     Discover(threadGroup);
 
@@ -2248,9 +2248,9 @@ bool StopNode()
 {
     LogPrintf("StopNode()\n");
     MapPort(false);
-    if (semOutbound)
-        for (int i=0; i<nMaxOutConnections; i++)
-            semOutbound->post();
+//    if (semOutbound)
+//        for (int i=0; i<nMaxOutConnections; i++)
+//            semOutbound->post();
 
     if (fAddressesInitialized)
     {
@@ -2277,16 +2277,27 @@ CNetCleanup::~CNetCleanup()
             delete pnode;
         BOOST_FOREACH (CNode* pnode, vNodesDisconnected)
             delete pnode;
-        vNodes.clear();
-        vNodesDisconnected.clear();
-        vhListenSocket.clear();
+//        vNodes.clear();
+//        vNodesDisconnected.clear();
+//        vhListenSocket.clear();
+//        delete pnodeLocalHost;
+//        pnodeLocalHost = NULL;
+
+        // cleanup semaphores
+        if (semOutbound) {
+            for (int i=0; i<nMaxOutConnections; i++)
+                semOutbound->post();
+        }   
         delete semOutbound;
         semOutbound = NULL;
+
         //BU: clean up the "-addnode" semaphore
+        if (semOutboundAddNode) {
+            for (int i=0; i<nMaxOutConnections; i++)
+                semOutboundAddNode->post();
+        }
         delete semOutboundAddNode;
         semOutboundAddNode = NULL;
-        delete pnodeLocalHost;
-        pnodeLocalHost = NULL;
 
 #ifdef WIN32
         // Shutdown Windows Sockets
