@@ -6766,19 +6766,16 @@ ThresholdState VersionBitsTipState(const Consensus::Params& params, Consensus::D
     return VersionBitsState(chainActive.Tip(), params, pos, versionbitscache);
 }
 
-class CMainCleanup
+//BU: Moved instance to globals.cpp and class declaration to main.h
+CMainCleanup::~CMainCleanup()
 {
-public:
-    CMainCleanup() {}
-    ~CMainCleanup() {
-        // block headers
-        BlockMap::iterator it1 = mapBlockIndex.begin();
-        for (; it1 != mapBlockIndex.end(); it1++)
-            delete (*it1).second;
-        mapBlockIndex.clear();
+    // block headers
+    BlockMap::iterator it1 = mapBlockIndex.begin();
+    for (; it1 != mapBlockIndex.end(); it1++)
+        delete (*it1).second;
+    mapBlockIndex.clear();
 
-        // orphan transactions
-        mapOrphanTransactions.clear();
-        mapOrphanTransactionsByPrev.clear();
-    }
-} instance_of_cmaincleanup;
+    // orphan transactions
+    mapOrphanTransactions.clear();
+    mapOrphanTransactionsByPrev.clear();
+}

@@ -135,4 +135,5 @@ std::map<uint256, uint64_t> mapThinBlockTimer;
 //! The largest block size that we have seen since startup
 uint64_t nLargestBlockSeen=BLOCKSTREAM_CORE_MAX_BLOCK_SIZE; // BU - Xtreme Thinblocks
 
-CNetCleanup cnet_instance_cleanup __attribute__((init_priority(1000)));  // Must construct after statistics, because CNodes use statistics.  In particular, seg fault on osx during exit because constructor/destructor order is not guaranteed between modules in clang.
+CNetCleanup cnet_instance_cleanup __attribute__((init_priority(65535)));  // Must construct after statistics, because CNodes use statistics.  In particular, seg fault on osx during exit because constructor/destructor order is not guaranteed between modules in clang.
+CMainCleanup instance_of_cmaincleanup __attribute__((init_priority(65535)));
