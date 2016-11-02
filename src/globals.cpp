@@ -8,6 +8,7 @@
 // Independent global variables may be placed here for organizational
 // purposes.
 
+#include "alert.h"
 #include "chain.h"
 #include "clientversion.h"
 #include "chainparams.h"
@@ -44,6 +45,13 @@
 
 using namespace std;
 
+proxyType proxyInfo[NET_MAX];
+proxyType nameProxy;
+CCriticalSection cs_proxyInfos;
+
+map<uint256, CAlert> mapAlerts;
+CCriticalSection cs_mapAlerts;
+
 set<uint256> setPreVerifiedTxHash;
 set<uint256> setUnVerifiedOrphanTxHash;
 CCriticalSection cs_xval;
@@ -59,8 +67,8 @@ int nMaxOutConnections = DEFAULT_MAX_OUTBOUND_CONNECTIONS;
 
 uint32_t blockVersion = 0;  // Overrides the mined block version if non-zero
 
-std::vector<std::string> BUComments = std::vector<std::string>();
-std::string minerComment;
+vector<string> BUComments = vector<string>();
+string minerComment;
 
 // Variables for traffic shaping
 CLeakyBucket receiveShaper(DEFAULT_MAX_RECV_BURST, DEFAULT_AVE_RECV);
@@ -78,14 +86,38 @@ boost::posix_time::milliseconds statMinInterval(10000);
 boost::asio::io_service stat_io_service __attribute__((init_priority(101)));
 
 CStatMap statistics __attribute__((init_priority(102)));
-CTweakMap tweaks __attribute__((init_priority(102)));
+CTweakMap tweaks;
 
-vector<CNode*> vNodes __attribute__((init_priority(109)));
-CCriticalSection cs_vNodes __attribute__((init_priority(109)));
-list<CNode*> vNodesDisconnected __attribute__((init_priority(109)));
+// The following are from net.cpp
+CCriticalSection cs_mapLocalHost;
+map<CNetAddr, LocalServiceInfo> mapLocalHost;
+map<CInv, CDataStream> mapRelay;
+deque<pair<int64_t, CInv> > vRelayExpiration;
+CCriticalSection cs_mapRelay;
+
+vector<CNode*> vNodes;
+CCriticalSection cs_vNodes;
+list<CNode*> vNodesDisconnected;
 CSemaphore*  semOutbound = NULL;
 CSemaphore*  semOutboundAddNode = NULL; // BU: separate semaphore for -addnodes
-CNodeSignals g_signals __attribute__((init_priority(109)));
+CNodeSignals g_signals;
+
+deque<string> vOneShots;
+CCriticalSection cs_vOneShots;
+
+set<CNetAddr> setservAddNodeAddresses;
+CCriticalSection cs_setservAddNodeAddresses;
+
+vector<std::string> vAddedNodes;
+CCriticalSection cs_vAddedNodes;
+
+vector<std::string> vUseDNSSeeds;
+CCriticalSection cs_vUseDNSSeeds;
+
+CCriticalSection cs_nLastNodeId;
+
+map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
+CCriticalSection cs_mapInboundConnectionTracker;
 
 // BU: change locking of orphan map from using cs_main to cs_orphancache.  There is too much dependance on cs_main locks which
 //     are generally too broad in scope.
@@ -114,25 +146,30 @@ CStatHistory<uint64_t> CThinBlockStats::nBlocks("thin/numBlocks", STAT_OP_SUM | 
 CStatHistory<uint64_t> CThinBlockStats::nMempoolLimiterBytesSaved("nSize", STAT_OP_SUM | STAT_KEEP);
 CStatHistory<uint64_t> CThinBlockStats::nTotalBloomFilterBytes("nSizeBloom", STAT_OP_SUM | STAT_KEEP);
 CCriticalSection cs_thinblockstats;
-std::map<int64_t, std::pair<uint64_t, uint64_t> > CThinBlockStats::mapThinBlocksInBound;
-std::map<int64_t, int> CThinBlockStats::mapThinBlocksInBoundReRequestedTx;
-std::map<int64_t, std::pair<uint64_t, uint64_t> > CThinBlockStats::mapThinBlocksOutBound;
-std::map<int64_t, uint64_t> CThinBlockStats::mapBloomFiltersInBound;
-std::map<int64_t, uint64_t> CThinBlockStats::mapBloomFiltersOutBound;
-std::map<int64_t, double> CThinBlockStats::mapThinBlockResponseTime;
-std::map<int64_t, double> CThinBlockStats::mapThinBlockValidationTime;
+map<int64_t, pair<uint64_t, uint64_t> > CThinBlockStats::mapThinBlocksInBound;
+map<int64_t, int> CThinBlockStats::mapThinBlocksInBoundReRequestedTx;
+map<int64_t, pair<uint64_t, uint64_t> > CThinBlockStats::mapThinBlocksOutBound;
+map<int64_t, uint64_t> CThinBlockStats::mapBloomFiltersInBound;
+map<int64_t, uint64_t> CThinBlockStats::mapBloomFiltersOutBound;
+map<int64_t, double> CThinBlockStats::mapThinBlockResponseTime;
+map<int64_t, double> CThinBlockStats::mapThinBlockValidationTime;
 
 
 
 // Expedited blocks
-std::vector<CNode*> xpeditedBlk; // (256,(CNode*)NULL);    // Who requested expedited blocks from us
-std::vector<CNode*> xpeditedBlkUp; //(256,(CNode*)NULL);  // Who we requested expedited blocks from
-std::vector<CNode*> xpeditedTxn; // (256,(CNode*)NULL);  
+vector<CNode*> xpeditedBlk; // (256,(CNode*)NULL);    // Who requested expedited blocks from us
+vector<CNode*> xpeditedBlkUp; //(256,(CNode*)NULL);  // Who we requested expedited blocks from
+vector<CNode*> xpeditedTxn; // (256,(CNode*)NULL);  
+
+// Request management
+CRequestManager requester;
 
 // BUIP010 Xtreme Thinblocks Variables
-std::map<uint256, uint64_t> mapThinBlockTimer;
+map<uint256, uint64_t> mapThinBlockTimer;
 
 //! The largest block size that we have seen since startup
 uint64_t nLargestBlockSeen=BLOCKSTREAM_CORE_MAX_BLOCK_SIZE; // BU - Xtreme Thinblocks
 
-CNetCleanup cnet_instance_cleanup __attribute__((init_priority(1000)));  // Must construct after statistics, because CNodes use statistics.  In particular, seg fault on osx during exit because constructor/destructor order is not guaranteed between modules in clang.
+CMainCleanup instance_of_cmaincleanup;
+
+CNetCleanup cnet_instance_cleanup;  // Must construct after statistics, because CNodes use statistics.  In particular, seg fault on osx during exit because constructor/destructor order is not guaranteed between modules in clang.

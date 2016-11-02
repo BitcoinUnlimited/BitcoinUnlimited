@@ -37,9 +37,9 @@
 #endif
 
 // Settings
-static proxyType proxyInfo[NET_MAX];
-static proxyType nameProxy;
-static CCriticalSection cs_proxyInfos;
+extern proxyType proxyInfo[NET_MAX];
+extern proxyType nameProxy;
+extern CCriticalSection cs_proxyInfos;
 int nConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 bool fNameLookup = DEFAULT_NAME_LOOKUP;
 

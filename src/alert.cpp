@@ -25,8 +25,8 @@
 
 using namespace std;
 
-map<uint256, CAlert> mapAlerts;
-CCriticalSection cs_mapAlerts;
+extern map<uint256, CAlert> mapAlerts;
+extern CCriticalSection cs_mapAlerts;
 
 void CUnsignedAlert::SetNull()
 {
