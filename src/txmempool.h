@@ -502,14 +502,14 @@ public:
         setEntries &setAncestors,
         bool fCurrentEstimate = true);
 
-    void remove(const CTransaction &tx, std::list<std::shared_ptr<const CTransaction> > &removed, bool fRecursive = false);
-    void _remove(const CTransaction &tx, std::list<std::shared_ptr<const CTransaction> > &removed, bool fRecursive = false);
+    void remove(const CTransaction &tx, std::list<CTransactionRef> &removed, bool fRecursive = false);
+    void _remove(const CTransaction &tx, std::list<CTransactionRef> &removed, bool fRecursive = false);
     void removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags);
-    void removeConflicts(const CTransaction &tx, std::list<std::shared_ptr<const CTransaction> > &removed);
-    void _removeConflicts(const CTransaction &tx, std::list<std::shared_ptr<const CTransaction> > &removed);
-    void removeForBlock(const std::vector<std::shared_ptr<const CTransaction> > &vtx,
+    void removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
+    void _removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
+    void removeForBlock(const std::vector<CTransactionRef> &vtx,
         unsigned int nBlockHeight,
-        std::list<std::shared_ptr<const CTransaction> > &conflicted,
+        std::list<CTransactionRef> &conflicted,
         bool fCurrentEstimate = true);
     void clear();
     void _clear(); // lock free
@@ -644,6 +644,7 @@ public:
     }
 
     CTransactionRef get(const uint256 &hash) const;
+    CTransactionRef _get(const uint256 &hash) const;
     TxMempoolInfo info(const uint256 &hash) const;
     std::vector<TxMempoolInfo> infoAll() const;
 

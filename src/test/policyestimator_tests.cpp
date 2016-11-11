@@ -55,7 +55,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
     CFeeRate baseRate(basefee, ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION));
 
     // Create a fake block
-    std::vector<std::shared_ptr<const CTransaction>> block;
+    std::vector<CTransactionRef> block;
     int blocknum = 0;
 
     // Loop through 200 blocks
@@ -186,7 +186,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
     {
         while(txHashes[j].size())
         {
-            std::shared_ptr<const CTransaction> ptx = mpool.get(txHashes[j].back());
+            CTransactionRef ptx = mpool.get(txHashes[j].back());
             if (ptx)
                 block.push_back(ptx);
             txHashes[j].pop_back();
@@ -215,7 +215,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
                                              .Priority(priV[k / 4][j])
                                              .Height(blocknum)
                                              .FromTx(tx, &mpool));
-                std::shared_ptr<const CTransaction> ptx = mpool.get(hash);
+                CTransactionRef ptx = mpool.get(hash);
                 if (ptx)
                     block.push_back(ptx);
             }

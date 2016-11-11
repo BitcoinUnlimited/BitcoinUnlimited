@@ -550,6 +550,6 @@ void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce)
     txCoinbase.vin[0].scriptSig = script + COINBASE_FLAGS;
     assert(txCoinbase.vin[0].scriptSig.size() <= MAX_COINBASE_SCRIPTSIG_SIZE);
 
-    pblock->vtx[0] = std::make_shared<const CTransaction>(std::move(txCoinbase));
+    pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
     pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
 }

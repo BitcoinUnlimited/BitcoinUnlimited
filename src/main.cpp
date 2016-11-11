@@ -1075,7 +1075,8 @@ bool GetTransaction(const uint256 &hash,
 
     LOCK(cs_main);
 
-    if (mempool.lookup(hash, txOut))
+    CTransactionRef ptx = mempool.get(hash);
+    if (ptx)
     {
         return true;
     }

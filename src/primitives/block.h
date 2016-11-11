@@ -72,7 +72,7 @@ class CBlock : public CBlockHeader
 {
 public:
     // network and disk
-    std::vector<std::shared_ptr<const CTransaction>> vtx;
+    std::vector<CTransactionRef> vtx;
 
     // memory only
     // 0.11: mutable std::vector<uint256> vMerkleTree;

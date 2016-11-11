@@ -115,7 +115,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         txCoinbase.vin[0].scriptSig.push_back(blockinfo[i].extranonce);
         txCoinbase.vin[0].scriptSig.push_back(chainActive.Height());
         txCoinbase.vout[0].scriptPubKey = CScript();
-        pblock->vtx[0] = std::make_shared<const CTransaction>(std::move(txCoinbase));
+        pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
         if (txFirst.size() == 0)
             baseheight = chainActive.Height();
         if (txFirst.size() < 4)

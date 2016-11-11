@@ -16,7 +16,7 @@ static uint256 BlockBuildMerkleTree(const CBlock &block, bool *fMutated, std::ve
 {
     vMerkleTree.clear();
     vMerkleTree.reserve(block.vtx.size() * 2 + 16); // Safe upper bound for the number of total nodes.
-    for (std::vector<std::shared_ptr<const CTransaction>>::const_iterator it(block.vtx.begin()); it != block.vtx.end(); ++it)
+    for (std::vector<CTransactionRef>::const_iterator it(block.vtx.begin()); it != block.vtx.end(); ++it)
         vMerkleTree.push_back((*it)->GetHash());
     int j = 0;
     bool mutated = false;
@@ -101,7 +101,7 @@ BOOST_AUTO_TEST_CASE(merkle_test)
             {
                 CMutableTransaction mtx;
                 mtx.nLockTime = j;
-                block.vtx[j] = std::make_shared<const CTransaction>(mtx);
+                block.vtx[j] = MakeTransactionRef(std::move(mtx));
             }
             // Compute the root of the block before mutating it.
             bool unmutatedMutated = false;

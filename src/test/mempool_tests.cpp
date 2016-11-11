@@ -55,7 +55,7 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest)
 
 
     CTxMemPool testPool(CFeeRate(0));
-    std::list<std::shared_ptr<const CTransaction> > removed;
+    std::list<CTransactionRef> removed;
 
     // Nothing in pool, remove should do nothing:
     testPool.remove(txParent, removed, true);
@@ -475,8 +475,8 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest)
     pool.addUnchecked(tx5.GetHash(), entry.Fee(1000LL).FromTx(tx5, &pool));
     pool.addUnchecked(tx7.GetHash(), entry.Fee(9000LL).FromTx(tx7, &pool));
 
-    std::vector<std::shared_ptr<const CTransaction>> vtx;
-    std::list<std::shared_ptr<const CTransaction>> conflicts;
+    std::vector<CTransactionRef> vtx;
+    std::list<CTransactionRef> conflicts;
     SetMockTime(42);
     SetMockTime(42 + CTxMemPool::ROLLING_FEE_HALFLIFE);
     BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(), maxFeeRateRemoved.GetFeePerK() + 1000);

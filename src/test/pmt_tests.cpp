@@ -51,7 +51,7 @@ BOOST_AUTO_TEST_CASE(pmt_test1)
         {
             CMutableTransaction tx;
             tx.nLockTime = j; // actual transaction data doesn't matter; just make the nLockTime's unique
-            block.vtx.push_back(std::make_shared<const CTransaction>(tx));
+            block.vtx.push_back(MakeTransactionRef(std::move(tx)));
         }
 
         // calculate actual merkle root and height
