@@ -587,7 +587,7 @@ bool AreFreeTxnsDisallowed()
 
 bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     CValidationState &state,
-    const CTransaction &consttx,
+    const CTransactionRef &ptx,
     bool fLimitFree,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit,
@@ -596,7 +596,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     std::vector<COutPoint> &vCoinsToUncache)
 {
     unsigned int forkVerifyFlags = 0;
-    CTransaction tx = consttx;
+    const CTransaction &tx = *ptx;
     unsigned int nSigOps = 0;
     ValidationResourceTracker resourceTracker;
     unsigned int nSize = 0;
@@ -636,7 +636,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         fRequireStandard = true;
     else if (allowedTx == TransactionClass::NONSTANDARD)
         fRequireStandard = false;
-    if (fRequireStandard && !IsStandardTx(tx, reason))
+    if (fRequireStandard && !IsStandardTx(*ptx, reason))
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
 
     // Don't relay version 2 transactions until CSV is active, and we can be
@@ -651,7 +651,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     // Only accept nLockTime-using transactions that can be mined in the next
     // block; we don't want our mempool filled up with transactions that can't
     // be mined yet.
-    if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS))
+    if (!CheckFinalTx(*ptx, STANDARD_LOCKTIME_VERIFY_FLAGS))
         return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
 
     // is it already in the memory pool?
@@ -662,7 +662,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     // Check for conflicts with in-memory transactions
     {
         READLOCK(pool.cs); // protect pool.mapNextTx
-        BOOST_FOREACH (const CTxIn &txin, tx.vin)
+        BOOST_FOREACH (const CTxIn &txin, ptx->vin)
         {
             auto itConflicting = pool.mapNextTx.find(txin.prevout);
             if (itConflicting != pool.mapNextTx.end())
@@ -688,7 +688,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             if (pfMissingInputs)
             {
                 *pfMissingInputs = false;
-                BOOST_FOREACH (const CTxIn txin, tx.vin)
+                for (const CTxIn &txin : ptx->vin)
                 {
                     // At this point we begin to collect coins that are potential candidates for uncaching because as
                     // soon as we make the call below to view.HaveCoin() any missing coins will be pulled into cache.
@@ -752,7 +752,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         // Keep track of transactions that spend a coinbase, which we re-scan
         // during reorgs to ensure COINBASE_MATURITY is still met.
         bool fSpendsCoinbase = false;
-        BOOST_FOREACH (const CTxIn &txin, tx.vin)
+        for (const CTxIn &txin : tx.vin)
         {
             const Coin &coin = view.AccessCoin(txin.prevout);
             if (coin.IsCoinBase())
@@ -762,7 +762,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             }
         }
 
-        CTxMemPoolEntry entry(tx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(tx),
+        CTxMemPoolEntry entry(ptx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(tx),
             inChainInputValue, fSpendsCoinbase, nSigOps, lp);
         nSize = entry.GetTxSize();
 
@@ -991,7 +991,7 @@ TransactionClass ParseTransactionClass(const std::string &s)
 
 bool AcceptToMemoryPool(CTxMemPool &pool,
     CValidationState &state,
-    const CTransaction &tx,
+    const CTransactionRef &ptx,
     bool fLimitFree,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit,
@@ -999,7 +999,7 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     TransactionClass allowedTx)
 {
     std::vector<COutPoint> vCoinsToUncache;
-    bool res = AcceptToMemoryPoolWorker(pool, state, tx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit,
+    bool res = AcceptToMemoryPoolWorker(pool, state, ptx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit,
         fRejectAbsurdFee, allowedTx, vCoinsToUncache);
 
     // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
@@ -2577,20 +2577,19 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     if (!fRollBack)
     {
         std::vector<uint256> vHashUpdate;
-        for (const auto &it : block.vtx)
+        for (const auto &ptx : block.vtx)
         {
-            const CTransaction tx = *it;
-
             // ignore validation errors in resurrected transactions
             std::list<CTransactionRef> removed;
             CValidationState stateDummy;
-            if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, AreFreeTxnsDisallowed(), nullptr, true))
+            if (ptx->IsCoinBase() ||
+                !AcceptToMemoryPool(mempool, stateDummy, ptx, AreFreeTxnsDisallowed(), nullptr, true))
             {
-                mempool.remove(tx, removed, true);
+                mempool.remove(*ptx, removed, true);
             }
-            else if (mempool.exists(tx.GetHash()))
+            else if (mempool.exists(ptx->GetHash()))
             {
-                vHashUpdate.push_back(tx.GetHash());
+                vHashUpdate.push_back(ptx->GetHash());
             }
         }
         // AcceptToMemoryPool/addUnchecked all assume that new mempool entries have
@@ -2607,7 +2606,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     // 0-confirmed or conflicted:
     for (const auto &tx : block.vtx)
     {
-        SyncWithWallets(*tx, NULL, -1);
+        SyncWithWallets(*tx, nullptr, -1);
     }
 
     return true;
@@ -5826,8 +5825,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         std::vector<uint256> vWorkQueue;
         std::vector<uint256> vEraseQueue;
-        CTransaction tx;
-        vRecv >> tx;
+        CTransactionRef ptx;
+        vRecv >> ptx;
+        const CTransaction &tx = *ptx;
 
         CInv inv(MSG_TX, tx.GetHash());
         pfrom->AddInventoryKnown(inv);
@@ -5839,7 +5839,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CValidationState state;
 
         // Check for recently rejected (and do other quick existence checks)
-        if (!AlreadyHaveTx(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
+        if (!AlreadyHaveTx(inv) && AcceptToMemoryPool(mempool, state, ptx, true, &fMissingInputs))
         {
             mempool.check(pcoinsTip);
             RelayTransaction(tx);
@@ -5869,7 +5869,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     if (!fOk)
                         continue;
 
-                    const CTransaction &orphanTx = *orphanpool.mapOrphanTransactions[orphanHash].ptx;
+                    const CTransactionRef pOrphanTx = orphanpool.mapOrphanTransactions[orphanHash].ptx;
                     NodeId fromPeer = orphanpool.mapOrphanTransactions[orphanHash].fromPeer;
                     bool fMissingInputs2 = false;
                     // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
@@ -5880,10 +5880,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
                     if (setMisbehaving.count(fromPeer))
                         continue;
-                    if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2))
+                    if (AcceptToMemoryPool(mempool, stateDummy, pOrphanTx, true, &fMissingInputs2))
                     {
                         LOG(MEMPOOL, "   accepted orphan tx %s\n", orphanHash.ToString());
-                        RelayTransaction(orphanTx);
+                        RelayTransaction(*pOrphanTx);
                         vWorkQueue.push_back(orphanHash);
                         vEraseQueue.push_back(orphanHash);
                     }
@@ -5919,7 +5919,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (!IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) || IsTxProbablyNewSigHash(tx))
             {
                 LOCK(orphanpool.cs);
-                orphanpool.AddOrphanTx(tx, pfrom->GetId());
+                orphanpool.AddOrphanTx(ptx, pfrom->GetId());
 
                 // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
                 static unsigned int nMaxOrphanTx =
@@ -5949,20 +5949,20 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 int nDoS = 0;
                 if (!state.IsInvalid(nDoS) || nDoS == 0)
                 {
-                    LOGA("Force relaying tx %s from whitelisted peer=%d\n", tx.GetHash().ToString(), pfrom->id);
+                    LOGA("Force relaying tx %s from whitelisted peer=%d\n", ptx->GetHash().ToString(), pfrom->id);
                     RelayTransaction(tx);
                 }
                 else
                 {
-                    LOGA("Not relaying invalid transaction %s from whitelisted peer=%d (%s)\n", tx.GetHash().ToString(),
-                        pfrom->id, FormatStateMessage(state));
+                    LOGA("Not relaying invalid transaction %s from whitelisted peer=%d (%s)\n",
+                        ptx->GetHash().ToString(), pfrom->id, FormatStateMessage(state));
                 }
             }
         }
         int nDoS = 0;
         if (state.IsInvalid(nDoS))
         {
-            LOG(MEMPOOLREJ, "%s from peer=%d was not accepted: %s\n", tx.GetHash().ToString(), pfrom->id,
+            LOG(MEMPOOLREJ, "%s from peer=%d was not accepted: %s\n", ptx->GetHash().ToString(), pfrom->id,
                 FormatStateMessage(state));
             if (state.GetRejectCode() < REJECT_INTERNAL) // Never send AcceptToMemoryPool's internal codes over P2P
                 pfrom->PushMessage(NetMsgType::REJECT, strCommand, (unsigned char)state.GetRejectCode(),

@@ -376,7 +376,7 @@ TransactionClass ParseTransactionClass(const std::string &s);
 /** (try to) add transaction to memory pool **/
 bool AcceptToMemoryPool(CTxMemPool &pool,
     CValidationState &state,
-    const CTransaction &tx,
+    const CTransactionRef &ptx,
     bool fLimitFree,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit = false,

@@ -19,29 +19,28 @@ bool CTxOrphanPool::AlreadyHaveOrphan(const uint256 &hash)
     return false;
 }
 
-bool CTxOrphanPool::AddOrphanTx(const CTransaction &tx, NodeId peer)
+bool CTxOrphanPool::AddOrphanTx(const CTransactionRef &ptx, NodeId peer)
 {
     AssertLockHeld(cs);
 
     if (mapOrphanTransactions.empty())
         DbgAssert(nBytesOrphanPool == 0, nBytesOrphanPool = 0);
 
-    uint256 hash = tx.GetHash();
+    uint256 hash = ptx->GetHash();
     if (mapOrphanTransactions.count(hash))
         return false;
 
     // Ignore orphans larger than the largest txn size allowed.
-    unsigned int sz = ::GetSerializeSize(tx, SER_NETWORK, CTransaction::CURRENT_VERSION);
+    unsigned int sz = ::GetSerializeSize(*ptx, SER_NETWORK, CTransaction::CURRENT_VERSION);
     if (sz > MAX_STANDARD_TX_SIZE)
     {
         LOG(MEMPOOL, "ignoring large orphan tx (size: %u, hash: %s)\n", sz, hash.ToString());
         return false;
     }
 
-    CTransactionRef ptx = MakeTransactionRef(tx);
-    uint64_t nTxMemoryUsed = RecursiveDynamicUsage(tx) + sizeof(ptx);
+    uint64_t nTxMemoryUsed = RecursiveDynamicUsage(*ptx) + sizeof(ptx);
     mapOrphanTransactions.emplace(hash, COrphanTx{ptx, peer, GetTime(), nTxMemoryUsed});
-    for (const CTxIn &txin : tx.vin)
+    for (const CTxIn &txin : ptx->vin)
         mapOrphanTransactionsByPrev[txin.prevout.hash].insert(hash);
 
     nBytesOrphanPool += nTxMemoryUsed;
