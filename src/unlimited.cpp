@@ -533,7 +533,7 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phas
 static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainparams)
 {
     LOGA("%s\n", pblock->ToString());
-    LOGA("generated %s\n", FormatMoney(pblock->vtx[0].vout[0].nValue));
+    LOGA("generated %s\n", FormatMoney(pblock->vtx[0]->vout[0].nValue));
 
     // Found a solution
     {

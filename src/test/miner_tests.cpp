@@ -103,23 +103,23 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     // We can't make transactions until we have inputs
     // Therefore, load 100 blocks :)
     int baseheight = 0;
-    std::vector<CTransaction *> txFirst;
+    std::vector<CTransactionRef> txFirst;
     for (unsigned int i = 0; i < sizeof(blockinfo) / sizeof(*blockinfo); ++i)
     {
         CBlock *pblock = &pblocktemplate->block; // pointer for convenience
         pblock->nVersion = 1;
         pblock->nTime = chainActive.Tip()->GetMedianTimePast() + 1;
-        CMutableTransaction txCoinbase(pblock->vtx[0]);
+        CMutableTransaction txCoinbase(*pblock->vtx[0]);
         txCoinbase.nVersion = 1;
         txCoinbase.vin[0].scriptSig = CScript();
         txCoinbase.vin[0].scriptSig.push_back(blockinfo[i].extranonce);
         txCoinbase.vin[0].scriptSig.push_back(chainActive.Height());
         txCoinbase.vout[0].scriptPubKey = CScript();
-        pblock->vtx[0] = CTransaction(txCoinbase);
+        pblock->vtx[0] = std::make_shared<const CTransaction>(std::move(txCoinbase));
         if (txFirst.size() == 0)
             baseheight = chainActive.Height();
         if (txFirst.size() < 4)
-            txFirst.push_back(new CTransaction(pblock->vtx[0]));
+            txFirst.push_back(pblock->vtx[0]);
         pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
         pblock->nNonce = blockinfo[i].nonce;
         CValidationState state;
@@ -477,9 +477,6 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     chainActive.Tip()->nHeight--;
     SetMockTime(0);
     mempool.clear();
-
-    BOOST_FOREACH (CTransaction *_tx, txFirst)
-        delete _tx;
 
     fCheckpointsEnabled = true;
 }

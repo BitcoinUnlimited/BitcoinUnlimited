@@ -140,7 +140,7 @@ BOOST_AUTO_TEST_CASE(thinblock_test)
     BOOST_CHECK_EQUAL(9, xthinblock1.vMissingTx.size());
 
     /* insert txid in block */
-    const uint256 hash_in_block = block.vtx[1].GetHash();
+    const uint256 hash_in_block = block.vtx[1]->GetHash();
     filter.insert(hash_in_block);
     CThinBlock thinblock2(block, filter);
     CXThinBlock xthinblock2(block, &filter);
@@ -176,7 +176,7 @@ BOOST_AUTO_TEST_CASE(thinblock_test)
     BOOST_CHECK(xthinblock5.vMissingTx.size() >= 8 && xthinblock5.vMissingTx.size() <= 9);
 
     /* insert txid in block */
-    const uint256 hash_in_block1 = block.vtx[1].GetHash();
+    const uint256 hash_in_block1 = block.vtx[1]->GetHash();
     filter1.insert(hash_in_block1);
     CThinBlock thinblock6(block1, filter1);
     CXThinBlock xthinblock6(block1, &filter1);

@@ -126,7 +126,7 @@ uint64_t BlockAssembler::reserveBlockSize(const CScript &scriptPubKeyIn)
     return nHeaderSize + std::max(nCoinbaseSize, coinbaseReserve.value);
 }
 
-CMutableTransaction BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue)
+CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue)
 {
     CMutableTransaction tx;
 
@@ -150,7 +150,8 @@ CMutableTransaction BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, in
     }
     tx.vin[0].scriptSig = tx.vin[0].scriptSig + COINBASE_FLAGS;
 
-    return tx;
+    
+    return MakeTransactionRef(std::move(tx));
 }
 
 CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn)
@@ -179,7 +180,7 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
     CBlock *pblock = &pblocktemplate->block;
 
     // Add dummy coinbase tx as first transaction
-    pblock->vtx.push_back(CTransaction());
+    pblock->vtx.emplace_back();
     pblocktemplate->vTxFees.push_back(-1); // updated at end
     pblocktemplate->vTxSigOps.push_back(-1); // updated at end
 
@@ -223,7 +224,7 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
         UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
         pblock->nNonce = 0;
-        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
+        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(*pblock->vtx[0]);
     }
 
     CValidationState state;
@@ -331,7 +332,7 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
 
 void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, CTxMemPool::txiter iter)
 {
-    pblocktemplate->block.vtx.push_back(iter->GetTx());
+    pblocktemplate->block.vtx.push_back(iter->GetSharedTx());
     pblocktemplate->vTxFees.push_back(iter->GetFee());
     pblocktemplate->vTxSigOps.push_back(iter->GetSigOpCount());
     nBlockSize += iter->GetTxSize();
@@ -539,7 +540,7 @@ void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce)
     }
     ++nExtraNonce;
     unsigned int nHeight = pblock->GetHeight(); // Height first in coinbase required for block.version=2
-    CMutableTransaction txCoinbase(pblock->vtx[0]);
+    CMutableTransaction txCoinbase(*pblock->vtx[0]);
 
     CScript script = (CScript() << nHeight << CScriptNum(nExtraNonce));
     if (script.size() + COINBASE_FLAGS.size() > MAX_COINBASE_SCRIPTSIG_SIZE)
@@ -549,6 +550,6 @@ void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce)
     txCoinbase.vin[0].scriptSig = script + COINBASE_FLAGS;
     assert(txCoinbase.vin[0].scriptSig.size() <= MAX_COINBASE_SCRIPTSIG_SIZE);
 
-    pblock->vtx[0] = txCoinbase;
+    pblock->vtx[0] = std::make_shared<const CTransaction>(std::move(txCoinbase));
     pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
 }

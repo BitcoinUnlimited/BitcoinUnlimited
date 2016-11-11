@@ -72,7 +72,7 @@ class CBlock : public CBlockHeader
 {
 public:
     // network and disk
-    std::vector<CTransaction> vtx;
+    std::vector<std::shared_ptr<const CTransaction>> vtx;
 
     // memory only
     // 0.11: mutable std::vector<uint256> vMerkleTree;
@@ -92,7 +92,7 @@ public:
     {
         int nIndex;
         for (nIndex = 0; nIndex < (int)vtx.size(); nIndex++)
-            if (vtx[nIndex] == *(CTransaction *)this)
+            if (vtx[nIndex] == *(std::shared_ptr<const CTransaction> *)this)
                 break;
         if (nIndex == (int)vtx.size())
         {
@@ -140,7 +140,7 @@ public:
 
     uint64_t GetHeight() const // Returns the block's height as specified in its coinbase transaction
     {
-        const CScript &sig = vtx[0].vin[0].scriptSig;
+        const CScript &sig = vtx[0]->vin[0].scriptSig;
         int numlen = sig[0];
         if (numlen == OP_0)
             return 0;

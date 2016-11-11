@@ -115,6 +115,7 @@ public:
     CTxMemPoolEntry(const CTxMemPoolEntry &other);
 
     const CTransaction &GetTx() const { return this->tx; }
+    CTransactionRef GetSharedTx() const {return MakeTransactionRef(std::move(this->tx)); }
     /**
      * Fast calculation of lower bound of current priority as update
      * from entry priority. Only inputs that were originally in-chain will age.
@@ -501,14 +502,14 @@ public:
         setEntries &setAncestors,
         bool fCurrentEstimate = true);
 
-    void remove(const CTransaction &tx, std::list<CTransaction> &removed, bool fRecursive = false);
-    void _remove(const CTransaction &tx, std::list<CTransaction> &removed, bool fRecursive = false);
+    void remove(const CTransaction &tx, std::list<std::shared_ptr<const CTransaction> > &removed, bool fRecursive = false);
+    void _remove(const CTransaction &tx, std::list<std::shared_ptr<const CTransaction> > &removed, bool fRecursive = false);
     void removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags);
-    void removeConflicts(const CTransaction &tx, std::list<CTransaction> &removed);
-    void _removeConflicts(const CTransaction &tx, std::list<CTransaction> &removed);
-    void removeForBlock(const std::vector<CTransaction> &vtx,
+    void removeConflicts(const CTransaction &tx, std::list<std::shared_ptr<const CTransaction> > &removed);
+    void _removeConflicts(const CTransaction &tx, std::list<std::shared_ptr<const CTransaction> > &removed);
+    void removeForBlock(const std::vector<std::shared_ptr<const CTransaction> > &vtx,
         unsigned int nBlockHeight,
-        std::list<CTransaction> &conflicts,
+        std::list<std::shared_ptr<const CTransaction> > &conflicted,
         bool fCurrentEstimate = true);
     void clear();
     void _clear(); // lock free

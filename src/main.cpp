@@ -1117,13 +1117,10 @@ bool GetTransaction(const uint256 &hash,
     if (pindexSlow)
     {
         CBlock block;
-        if (ReadBlockFromDisk(block, pindexSlow, consensusParams))
-        {
-            BOOST_FOREACH (const CTransaction &tx, block.vtx)
-            {
-                if (tx.GetHash() == hash)
-                {
-                    txOut = tx;
+        if (ReadBlockFromDisk(block, pindexSlow, consensusParams)){
+            for (const auto& tx : block.vtx) {
+                if (tx->GetHash() == hash) {
+                    txOut = *tx;
                     hashBlock = pindexSlow->GetBlockHash();
                     return true;
                 }
@@ -1643,9 +1640,8 @@ static DisconnectResult DisconnectBlock(const CBlock &block, const CBlockIndex *
     }
 
     // undo transactions in reverse order
-    for (int i = block.vtx.size() - 1; i >= 0; i--)
-    {
-        const CTransaction &tx = block.vtx[i];
+    for (int i = block.vtx.size() - 1; i >= 0; i--) {
+        const CTransaction &tx = *(block.vtx[i]);
         uint256 hash = tx.GetHash();
 
         // Check that all outputs are available and match the outputs in the block itself
@@ -1986,9 +1982,9 @@ bool ConnectBlock(const CBlock &block,
         {
             for (const auto &tx : block.vtx)
             {
-                for (size_t o = 0; o < tx.vout.size(); o++)
+                for (size_t o = 0; o < tx->vout.size(); o++)
                 {
-                    if (view.HaveCoin(COutPoint(tx.GetHash(), o)))
+                    if (view.HaveCoin(COutPoint(tx->GetHash(), o)))
                     {
                         return state.DoS(100, error("ConnectBlock(): tried to overwrite transaction"), REJECT_INVALID,
                             "bad-txns-BIP30");
@@ -2071,7 +2067,7 @@ bool ConnectBlock(const CBlock &block,
         //       internally grabs the cs_main lock when needed.
         for (unsigned int i = 0; i < block.vtx.size(); i++)
         {
-            const CTransaction &tx = block.vtx[i];
+            const CTransaction &tx = *(block.vtx[i]);
 
             nInputs += tx.vin.size();
             nSigOps += GetLegacySigOpCount(tx);
@@ -2194,9 +2190,9 @@ bool ConnectBlock(const CBlock &block,
         }
 
         CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
-        if (block.vtx[0].GetValueOut() > blockReward)
+        if (block.vtx[0]->GetValueOut() > blockReward)
             return state.DoS(100, error("ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)",
-                                      block.vtx[0].GetValueOut(), blockReward),
+                                      block.vtx[0]->GetValueOut(), blockReward),
                 REJECT_INVALID, "bad-cb-amount");
 
         if (fJustCheck)
@@ -2274,7 +2270,7 @@ bool ConnectBlock(const CBlock &block,
     // Watch for changes to the previous coinbase transaction.
     static uint256 hashPrevBestCoinBase;
     GetMainSignals().UpdatedTransaction(hashPrevBestCoinBase);
-    hashPrevBestCoinBase = block.vtx[0].GetHash();
+    hashPrevBestCoinBase = block.vtx[0]->GetHash();
 
     int64_t nTime6 = GetTimeMicros();
     nTimeCallbacks += nTime6 - nTime5;
@@ -2573,10 +2569,11 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     if (!fRollBack)
     {
         std::vector<uint256> vHashUpdate;
-        for (const CTransaction &tx : block.vtx)
-        {
+        for (const auto& it : block.vtx) {
+            const CTransaction tx = *it;
+
             // ignore validation errors in resurrected transactions
-            std::list<CTransaction> removed;
+            std::list<std::shared_ptr<const CTransaction> > removed;
             CValidationState stateDummy;
             if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, AreFreeTxnsDisallowed(), nullptr, true))
             {
@@ -2599,9 +2596,9 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     UpdateTip(pindexDelete->pprev);
     // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
-    for (const CTransaction &tx : block.vtx)
+    for (const auto& tx : block.vtx)
     {
-        SyncWithWallets(tx, NULL, -1);
+        SyncWithWallets(*tx, NULL, -1);
     }
 
     return true;
@@ -2689,21 +2686,21 @@ bool static ConnectTip(CValidationState &state,
     LOG(BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
 
     // Remove conflicting transactions from the mempool.
-    std::list<CTransaction> txConflicted;
+    std::list<std::shared_ptr<const CTransaction> > txConflicted;
     mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload());
     // Update chainActive & related variables.
     UpdateTip(pindexNew);
     // Tell wallet about transactions that went from mempool
     // to conflicted:
-    BOOST_FOREACH (const CTransaction &tx, txConflicted)
+    for (const auto &tx : txConflicted)
     {
-        SyncWithWallets(tx, NULL, -1);
+        SyncWithWallets(*tx, nullptr, -1);
     }
     // ... and about transactions that got confirmed:
     int txIdx = 0;
-    BOOST_FOREACH (const CTransaction &tx, pblock->vtx)
+    for (const auto &tx : pblock->vtx)
     {
-        SyncWithWallets(tx, pblock, txIdx);
+        SyncWithWallets(*tx, pblock, txIdx);
         txIdx++;
     }
 
@@ -3539,16 +3536,16 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
         return state.DoS(100, error("CheckBlock(): size limits failed"), REJECT_INVALID, "bad-blk-length");
 
     // First transaction must be coinbase, the rest must not be
-    if (block.vtx.empty() || !block.vtx[0].IsCoinBase())
+    if (block.vtx.empty() || !block.vtx[0]->IsCoinBase())
         return state.DoS(100, error("CheckBlock(): first tx is not coinbase"), REJECT_INVALID, "bad-cb-missing");
     for (unsigned int i = 1; i < block.vtx.size(); i++)
-        if (block.vtx[i].IsCoinBase())
+        if (block.vtx[i]->IsCoinBase())
             return state.DoS(100, error("CheckBlock(): more than one coinbase"), REJECT_INVALID, "bad-cb-multiple");
 
     // Check transactions
-    BOOST_FOREACH (const CTransaction &tx, block.vtx)
-        if (!CheckTransaction(tx, state))
-            return error("CheckBlock(): CheckTransaction of %s failed with %s", tx.GetHash().ToString(),
+    for (const auto& tx : block.vtx)
+        if (!CheckTransaction(*tx, state))
+            return error("CheckBlock(): CheckTransaction of %s failed with %s", tx->GetHash().ToString(),
                 FormatStateMessage(state));
 
     uint64_t nSigOps = 0;
@@ -3556,11 +3553,11 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
     uint64_t nTx = 0;
     uint64_t nLargestTx = 0; // BU: track the longest transaction
 
-    BOOST_FOREACH (const CTransaction &tx, block.vtx)
+    for (const auto &tx : block.vtx)
     {
         nTx++;
-        nSigOps += GetLegacySigOpCount(tx);
-        uint64_t nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
+        nSigOps += GetLegacySigOpCount(*tx);
+        uint64_t nTxSize = ::GetSerializeSize(*tx, SER_NETWORK, PROTOCOL_VERSION);
         if (nTxSize > nLargestTx)
             nLargestTx = nTxSize;
     }
@@ -3644,9 +3641,9 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
             (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST) ? pindexPrev->GetMedianTimePast() : block.GetBlockTime();
 
     // Check that all transactions are finalized
-    for (const CTransaction &tx : block.vtx)
+    for (const auto &tx : block.vtx)
     {
-        if (!IsFinalTx(tx, nHeight, nLockTimeCutoff))
+        if (!IsFinalTx(*tx, nHeight, nLockTimeCutoff))
         {
             return state.DoS(
                 10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
@@ -3657,8 +3654,8 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
     if (nHeight >= consensusParams.BIP34Height)
     {
         CScript expect = CScript() << nHeight;
-        if (block.vtx[0].vin[0].scriptSig.size() < expect.size() ||
-            !std::equal(expect.begin(), expect.end(), block.vtx[0].vin[0].scriptSig.begin()))
+        if (block.vtx[0]->vin[0].scriptSig.size() < expect.size() ||
+            !std::equal(expect.begin(), expect.end(), block.vtx[0]->vin[0].scriptSig.begin()))
         {
             int blockCoinbaseHeight = block.GetHeight();
             uint256 hashp = block.hashPrevBlock;
@@ -3920,21 +3917,21 @@ bool ProcessNewBlock(CValidationState &state,
 
         for (unsigned int i = 0; i < pblock->vtx.size(); i++)
         {
-            if (pblock->vtx[i].vin.size() > maxVin)
+            if (pblock->vtx[i]->vin.size() > maxVin)
             {
-                maxVin = pblock->vtx[i].vin.size();
-                txIn = pblock->vtx[i];
+                maxVin = pblock->vtx[i]->vin.size();
+                txIn = *pblock->vtx[i];
             }
-            if (pblock->vtx[i].vout.size() > maxVout)
+            if (pblock->vtx[i]->vout.size() > maxVout)
             {
-                maxVout = pblock->vtx[i].vout.size();
-                txOut = pblock->vtx[i];
+                maxVout = pblock->vtx[i]->vout.size();
+                txOut = *pblock->vtx[i];
             }
             uint64_t len = ::GetSerializeSize(pblock->vtx[i], SER_NETWORK, PROTOCOL_VERSION);
             if (len > maxTxSize)
             {
                 maxTxSize = len;
-                txLen = pblock->vtx[i];
+                txLen = *pblock->vtx[i];
             }
         }
 
