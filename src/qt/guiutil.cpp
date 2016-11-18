@@ -614,8 +614,10 @@ void TableViewLastColumnResizingFixer::on_geometriesChanged()
  */
 TableViewLastColumnResizingFixer::TableViewLastColumnResizingFixer(QTableView *table,
     int lastColMinimumWidth,
-    int allColsMinimumWidth)
-    : tableView(table), lastColumnMinimumWidth(lastColMinimumWidth), allColumnsMinimumWidth(allColsMinimumWidth)
+    int allColsMinimumWidth,
+    QObject *parent)
+    : QObject(parent), tableView(table), lastColumnMinimumWidth(lastColMinimumWidth),
+      allColumnsMinimumWidth(allColsMinimumWidth)
 {
     columnCount = tableView->horizontalHeader()->count();
     lastColumnIndex = columnCount - 1;

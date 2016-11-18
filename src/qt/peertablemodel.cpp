@@ -107,12 +107,12 @@ public:
 PeerTableModel::PeerTableModel(ClientModel *parent) : QAbstractTableModel(parent), clientModel(parent), timer(0)
 {
     columns << tr("Node/Service") << tr("User Agent") << tr("Ping Time");
-    priv = new PeerTablePriv();
+    priv.reset(new PeerTablePriv());
     // default to unsorted
     priv->sortColumn = -1;
 
     // set up timer for auto refresh
-    timer = new QTimer();
+    timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), SLOT(refresh()));
     timer->setInterval(MODEL_UPDATE_DELAY1);
 
@@ -122,6 +122,11 @@ PeerTableModel::PeerTableModel(ClientModel *parent) : QAbstractTableModel(parent
 
 void PeerTableModel::startAutoRefresh() { timer->start(); }
 void PeerTableModel::stopAutoRefresh() { timer->stop(); }
+PeerTableModel::~PeerTableModel()
+{
+    // Intentionally left empty
+}
+
 int PeerTableModel::rowCount(const QModelIndex &parent) const
 {
     Q_UNUSED(parent);
