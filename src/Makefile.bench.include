@@ -23,7 +23,9 @@ bench_bench_bitcoin_SOURCES = \
   bench/rollingbloom.cpp \
   bench/bloom.cpp \
   bench/prevector.cpp \
-  bench/base58.cpp
+  bench/base58.cpp \
+  bench/perf.cpp \
+  bench/perf.h
 
 nodist_bench_bench_bitcoin_SOURCES = $(GENERATED_TEST_FILES)
 
