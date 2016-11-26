@@ -22,8 +22,7 @@ enum {
     DEFAULT_EXCESSIVE_ACCEPT_DEPTH = 4,
     DEFAULT_EXCESSIVE_BLOCK_SIZE = 16000000,
     DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER = 10,
-    MAX_COINBASE_SCRIPTSIG_SIZE = 100,
-    EXCESSIVE_BLOCK_CHAIN_RESET = 6*24,  // After 1 day of non-excessive blocks, reset the checker
+    MAX_COINBASE_SCRIPTSIG_SIZE = 100
 };
 
 class CBlock;
@@ -92,11 +91,8 @@ extern bool TestConservativeBlockValidity(CValidationState& state, const CChainP
 // Check whether this block is bigger in some metric than we really want to accept
 extern bool CheckExcessive(const CBlock& block, uint64_t blockSize, uint64_t nSigOps, uint64_t nTx);
 
-// Check whether this chain qualifies as excessive.
-extern int isChainExcessive(const CBlockIndex* blk, unsigned int checkDepth = excessiveAcceptDepth);
-
 // Check whether any block N back in this chain is an excessive block
-extern int chainContainsExcessive(const CBlockIndex* blk, unsigned int goBack=0);
+extern bool isChainExcessive(const CBlockIndex* blk, unsigned int checkDepth = excessiveAcceptDepth);
 
 // RPC calls
 

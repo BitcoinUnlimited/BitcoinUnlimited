@@ -87,12 +87,15 @@ enum BlockStatus {
     BLOCK_HAVE_DATA          =    8, //! full block available in blk*.dat
     BLOCK_HAVE_UNDO          =   16, //! undo data available in rev*.dat
     BLOCK_HAVE_MASK          =   BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO,
- 
-    BLOCK_EXCESSIVE          =   32, // BU: This block is bigger than what we really want to accept.
 
     BLOCK_FAILED_VALID       =   64, //! stage after last reached validness failed
     BLOCK_FAILED_CHILD       =   128, //! descends from failed block
     BLOCK_FAILED_MASK        =   BLOCK_FAILED_VALID | BLOCK_FAILED_CHILD,
+};
+
+enum ExcessiveStatus {
+    BLOCK_EXCESSIVE          =   1, // BU: This block is bigger than what we really want to accept.
+    BLOCK_EXCESSIVE_CHILD    =   2, // BU: This block has been unlinked as the child of an excessive block
 };
 
 /** The block chain is a tree shaped structure starting with the
@@ -139,6 +142,9 @@ public:
     //! Verification status of this block. See enum BlockStatus
     unsigned int nStatus;
 
+    //! (memory only) Excessive status of this block. See enum ExcessiveStatus
+    unsigned int nExcessiveStatus;
+
     //! block header
     int nVersion;
     uint256 hashMerkleRoot;
@@ -162,6 +168,7 @@ public:
         nTx = 0;
         nChainTx = 0;
         nStatus = 0;
+        nExcessiveStatus = 0;
         nSequenceId = 0;
 
         nVersion       = 0;
