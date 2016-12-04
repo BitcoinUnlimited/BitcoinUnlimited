@@ -3589,7 +3589,9 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
 
             pindexNewTip = chainActive.Tip();
             pindexFork = chainActive.FindFork(pindexOldTip);
-            fInitialDownload = IsInitialBlockDownload();
+            //fInitialDownload = IsInitialBlockDownload();
+            IsChainNearlySyncdInit();
+            fInitialDownload = !IsChainNearlySyncd();
         }
         // When we reach this point, we switched to a new tip (stored in pindexNewTip).
 
