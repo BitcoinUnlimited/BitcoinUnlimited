@@ -3486,6 +3486,8 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
                     return false;
                 }
             } else {
+                // Notify external zmq listeners about the new tip.
+                GetMainSignals().UpdatedBlockTip(pindexConnect);
                 PruneBlockIndexCandidates();
                 if (!pindexOldTip || chainActive.Tip()->nChainWork > pindexOldTip->nChainWork) {
                     /* BU: these are commented out for parallel validation: 
@@ -3622,10 +3624,11 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
                         }
                     }
                 }
+                // BU: commented out and added in ActivateBestChainStep to support PV
                 // Notify external listeners about the new tip.
-                if (!vHashes.empty()) {
-                    GetMainSignals().UpdatedBlockTip(pindexNewTip);
-                }
+                //if (!vHashes.empty()) {
+                    //GetMainSignals().UpdatedBlockTip(pindexNewTip);
+                //}
             }
         }
     } while(pindexMostWork != chainActive.Tip());
