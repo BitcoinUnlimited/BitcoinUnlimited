@@ -20,6 +20,7 @@
 #include "init.h"
 #include "merkleblock.h"
 #include "net.h"
+#include "parallel.h"
 #include "policy/policy.h"
 #include "pow.h"
 #include "primitives/block.h"
@@ -110,11 +111,6 @@ static unsigned int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 1;
  *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
 static unsigned int BLOCK_DOWNLOAD_WINDOW = 8;
 
-/** thread group map for parallel block validation */
-CCriticalSection cs_blockvalidationthread;
-map<boost::thread::id, CHandleBlockMsgThreads> mapBlockValidationThreads GUARDED_BY(cs_blockvalidationthread);
-
-/** BU: end **/
 
 /**
  * Returns true if there are nRequired or more blocks of minVersion or above
@@ -2303,41 +2299,14 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
 
 
 
-// BU: setup for the script checking queues.  For parallel block validation to work we need several separate
-//     queues that we can handle blocks in order to check their inputs and finally update the UTXO.
-// BU: parallel block validation - begin
-static CCheckQueue<CScriptCheck> scriptcheckqueue(128);
-static CCheckQueue<CScriptCheck> scriptcheckqueue2(128);
-static CCheckQueue<CScriptCheck> scriptcheckqueue3(128);
-static CCheckQueue<CScriptCheck> scriptcheckqueue4(128);
+// BU: moved to parallel.h
+//static CCheckQueue<CScriptCheck> scriptcheckqueue(128);
 
-void ThreadScriptCheck() {
-    RenameThread("bitcoin-scriptch");
-    scriptcheckqueue.Thread();
-}
-void ThreadScriptCheck2() {
-    RenameThread("bitcoin-scriptch2");
-    scriptcheckqueue2.Thread();
-}
-void ThreadScriptCheck3() {
-    RenameThread("bitcoin-scriptch3");
-    scriptcheckqueue3.Thread();
-}
-void ThreadScriptCheck4() {
-    RenameThread("bitcoin-scriptch4");
-    scriptcheckqueue4.Thread();
-}
+//void ThreadScriptCheck() {
+//    RenameThread("bitcoin-scriptch");
+//    scriptcheckqueue.Thread();
+//}
 
-CAllScriptCheckQueues allScriptCheckQueues;
-static CCriticalSection cs_allscriptcheckqueues;
-void AddAllScriptCheckQueues()
-{
-    allScriptCheckQueues.Add(&scriptcheckqueue);
-    allScriptCheckQueues.Add(&scriptcheckqueue2);
-    allScriptCheckQueues.Add(&scriptcheckqueue3);
-    allScriptCheckQueues.Add(&scriptcheckqueue4);
-}
-// BU: parallel block validation - end
 
 //
 // Called periodically asynchronously; alerts if it smells like
@@ -2600,30 +2569,14 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     if (fParallel)
     {
-        ENTER_CRITICAL_SECTION(cs_blockvalidationthread);
-
-        // We need to place a Quit here because we do not want to assign a script queue to a thread of activity
-        // if another thread has just won the race and has sent an fQuit.
-        if (mapBlockValidationThreads[this_id].fQuit) {
-            LogPrint("parallel", "fQuit 0 called - Stopping validation of %s and returning\n", mapBlockValidationThreads[this_id].hash.ToString());
-            LEAVE_CRITICAL_SECTION(cs_blockvalidationthread); // must unlock before locking cs_main or may deadlock.
-            cs_main.lock(); // must lock before returning.
+        // Initialize a PV thread session.
+        if (!PV.Initialize(this_id, pindex, pScriptQueue))
             return false;
-        }
-
-        // Now that we have a scriptqueue we can add it to the tracking map so we can call Quit() on it later if needed.
-        mapBlockValidationThreads[this_id].pScriptQueue = pScriptQueue;
-        LEAVE_CRITICAL_SECTION(cs_blockvalidationthread); // must unlock before re-aquire cs_main below or may deadlock.
-
-        // Re-aquire cs_main
-        cs_main.lock();
-        // Assign the nSequenceId for the block being validated in this thread. cs_main must be locked for lookup on pindex.
-        LOCK(cs_blockvalidationthread);
-        if (pindex->nSequenceId > 0)
-            mapBlockValidationThreads[this_id].nSequenceId = pindex->nSequenceId;
     }
 
     // Start checking Inputs
+    bool inOrphanCache;
+    bool inVerifiedCache;
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
         const CTransaction &tx = block.vtx[i];
@@ -2648,8 +2601,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                                   chainActive.Tip()->nChainWork.ToString(), nStartingChainWork.ToString());
                         return false;
                     }
-                    LOCK(cs_blockvalidationthread);
-                    if (mapBlockValidationThreads[this_id].fQuit) {
+                    if (PV.QuitReceived(this_id)) {
                         LogPrint("parallel", "fQuit called - Stopping validation of this block and returning\n");
                         return false;
                     }
@@ -2689,10 +2641,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             // happen if this were a regular block or when a tx is found w?ithin the returning XThinblock.
             uint256 hash = tx.GetHash();
             {
-                ENTER_CRITICAL_SECTION(cs_xval);
-                bool inOrphanCache = setUnVerifiedOrphanTxHash.count(hash);
-                bool inVerifiedCache = setPreVerifiedTxHash.count(hash);
-                LEAVE_CRITICAL_SECTION(cs_xval); /* We don't want to hold the lock while inputs are being checked or we'll slow down the competing thread, if there is one */
+                {
+                LOCK(cs_xval);
+                inOrphanCache = setUnVerifiedOrphanTxHash.count(hash);
+                inVerifiedCache = setPreVerifiedTxHash.count(hash);
+                } /* We don't want to hold the lock while inputs are being checked or we'll slow down the competing thread, if there is one */
 
                 if ((inOrphanCache) || (!inVerifiedCache && !inOrphanCache))
                 {
@@ -2734,8 +2687,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         // Return if Quit thread received.
         if (fParallel)
         {
-            LOCK(cs_blockvalidationthread);
-            if (mapBlockValidationThreads[this_id].fQuit) {
+            if (PV.QuitReceived(this_id)) {
                 LogPrint("parallel", "fQuit 1 called - Stopping validation of this block and returning\n");
                 return false;
             }
@@ -2764,8 +2716,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         cs_main.lock();
 
         // Return if Quit thread received.
-        LOCK(cs_blockvalidationthread);
-        if (mapBlockValidationThreads[this_id].fQuit) {
+        if (PV.QuitReceived(this_id)) {
             LogPrint("parallel", "fQuit 2 called - Stopping validation of this block and returning\n");
             return false;
         }
@@ -2795,8 +2746,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                                   chainActive.Tip()->nChainWork.ToString(), nStartingChainWork.ToString());
             return false;
         }
-        LOCK(cs_blockvalidationthread);
-        if (mapBlockValidationThreads[this_id].fQuit) {
+        if (PV.QuitReceived(this_id)) {
             LogPrint("parallel", "fQuit 3 called - Stopping validation of this block and returning\n");
             return false;
         }
@@ -2887,80 +2837,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     LogPrint("bench", "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nTime6 - nTime5), nTimeCallbacks * 0.000001);
 
 
-    // After successful commit to UTXO, perform cleanup
+    // After successful commit to UTXO, perform cleanup for Parallel Validation threads.
     // This section must be peformed whether we are in fParallel or not because if we are validating a block we just
-    // mined we also have to check if there are any other threads we are running against which need to be terminated.
-    if (fParallel)
-    {
-        LOCK(cs_blockvalidationthread);
-        // First swap the block index sequence id's such that the winning block has the lowest id and all other id's
-        // are still in their same order relative to each other.
-        // Then terminate all other threads that match our previous blockhash, and cleanup map before updating the tip.  
-        // This is in the case where we're doing IBD and we receive two of the same blocks, one a re-request.  
-        // Also, this handles an attack vector where someone blasts us with many of the same block.
-        if (mapBlockValidationThreads.size() > 1)
-        {
-            boost::thread::id this_id(boost::this_thread::get_id()); // get this thread's id
-
-            // Create a vector sorted by nSequenceId so that we can iterate through in desc order and adjust the
-            // nSequenceId values according to which block won the validation race.
-            std::vector<std::pair<uint32_t, uint256> > vSequenceId;
-            map<boost::thread::id, CHandleBlockMsgThreads>::iterator mi = mapBlockValidationThreads.begin();
-            while (mi != mapBlockValidationThreads.end())
-            {
-                if ((*mi).first != this_id && (*mi).second.hashPrevBlock == block.GetBlockHeader().hashPrevBlock)
-                    vSequenceId.push_back(make_pair((*mi).second.nSequenceId, (*mi).second.hash));
-                mi++;
-            }
-            std::sort(vSequenceId.begin(), vSequenceId.end());
-
-            std::vector<std::pair<uint32_t, uint256> >::reverse_iterator riter = vSequenceId.rbegin();
-            while (riter != vSequenceId.rend())
-            {
-                // Swap the nSequenceId so that we end up with the lowest index for the winning block.  This is so
-                // later if we need to look up pindexMostWork it will be pointing to this winning block.
-                if (pindex->nSequenceId > (*riter).first) {
-                    uint32_t nId = pindex->nSequenceId;
-                    if (nId == 0) nId = 1;
-                    if ((*riter).first == 0) (*riter).first = 1;
-                    LogPrint("parallel", "swapping sequence id for block %s before %d after %d\n", 
-                          block.GetHash().ToString(), pindex->nSequenceId, (*riter).first);
-                    pindex->nSequenceId = (*riter).first;
-                    (*riter).first = nId;
-
-                    BlockMap::iterator it = mapBlockIndex.find((*riter).second);
-                    if (it != mapBlockIndex.end())
-                        it->second->nSequenceId = nId;
-                }
-                riter++;
-            }
-
-            map<boost::thread::id, CHandleBlockMsgThreads>::iterator iter = mapBlockValidationThreads.begin();
-            while (iter != mapBlockValidationThreads.end())
-            {
-                map<boost::thread::id, CHandleBlockMsgThreads>::iterator mi = iter++; // increment to avoid iterator becoming 
-                // Interrupt threads:  We want to stop any threads that have lost the validation race. We have to compare
-                //                     at the previous block hashes to make the determination.  If they match then it must
-                //                     be a parallel block validation that was happening.
-                if ((*mi).first != this_id && (*mi).second.hashPrevBlock == block.GetBlockHeader().hashPrevBlock) {
-                    if ((*mi).second.pScriptQueue != NULL) {
-                        LogPrint("parallel", "Terminating script queue with blockhash %s and previous blockhash %s\n", 
-                                  (*mi).second.hash.ToString(), block.GetBlockHeader().hashPrevBlock.ToString());
-                        // Send Quit to any other scriptcheckques that were running a parallel validation for the same block.
-                        // NOTE: the scriptcheckqueue may or may not have finished, but sending a quit here ensures
-                        // that it breaks from its processing loop in the event that it is still at the control.Wait() step.
-                        // This allows us to end any long running block validations and allow a smaller block to begin 
-                        // processing when/if all the queues have been jammed by large blocks during an attack.
-                        LogPrint("parallel", "Sending Quit() to scriptcheckqueue\n");
-                        (*mi).second.pScriptQueue->Quit();
-                    }
-                    (*mi).second.fQuit = true; // quit the thread
-                    LogPrint("parallel", "interrupting a thread with blockhash %s and previous blockhash %s\n", 
-                              (*mi).second.hash.ToString(), block.GetBlockHeader().hashPrevBlock.ToString());
-                }
-            }
-        }
-    }
+    // mined we also have to check if there are any other threads we are running against which need to be terminated
+    // and also whether the nSequenceId needs to be updated.
+    PV.Cleanup(block, pindex); // NOTE: this must be run whether in fParallel or not!
 
     // Delete hashes from unverified and preverified sets that will no longer be needed after the block is accepted.
     {
@@ -3409,13 +3290,13 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
         // When running in parallel block validation mode it is possible that this competing block could get to this
         // point just after the chaintip had already been advanced.  If that were to happen then it could initiate a
-        // re-org when in fact a Quit had already been called on this thread.  So we do a check and quit here if needed.
+        // re-org when in fact a Quit had already been called on this thread.  So we do a check if Quit was previously
+        // called and return if true.
         if (fParallel)
         {
-            LOCK(cs_blockvalidationthread);
-            if (mapBlockValidationThreads[this_id].fQuit) {
+            if (PV.QuitReceived(this_id)) {
                 LogPrint("parallel", "fQuit before Disconnecttip called - Stopping validation of %s and returning\n", 
-                                      mapBlockValidationThreads[this_id].hash.ToString());
+                                      PV.mapBlockValidationThreads[this_id].hash.ToString());
                 return false;
             }
         }
@@ -3430,18 +3311,7 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
         // to be sure we are not waiting on script threads to finish we can issue the termination here.
         if (fParallel && !fBlocksDisconnected)
         {
-             LOCK(cs_blockvalidationthread);
-            map<boost::thread::id, CHandleBlockMsgThreads>::iterator mi = mapBlockValidationThreads.begin();
-            while (mi != mapBlockValidationThreads.end())
-            {
-                if ((*mi).first != this_id) // we don't want to kill our own thread
-                { 
-                    if ((*mi).second.pScriptQueue != NULL)
-                        (*mi).second.pScriptQueue->Quit(); // quit any active script queue threads
-                    (*mi).second.fQuit = true; // quit the PV thread
-                }
-                mi++;
-            }
+            PV.StopAllValidationThreads(this_id);
         }
         fBlocksDisconnected = true;
 

@@ -16,6 +16,7 @@
 #include "hash.h"
 #include "main.h"
 #include "net.h"
+#include "parallel.h"
 #include "policy/policy.h"
 #include "pow.h"
 #include "primitives/transaction.h"
@@ -393,22 +394,9 @@ static bool ProcessBlockFound(const CBlock* pblock, const CChainParams& chainpar
     // Inform about the new block
     GetMainSignals().BlockFound(pblock->GetHash());
 
-    // In the event that a re-org may be under way we must terminate any block validation threads that are 
-    // currently running.
-    {
-    LOCK(cs_blockvalidationthread);
-    if (mapBlockValidationThreads.size() > 0)
-    {
-        map<boost::thread::id, CHandleBlockMsgThreads>::iterator mi = mapBlockValidationThreads.begin();
-        while (mi != mapBlockValidationThreads.end())
-        {
-            if ((*mi).second.pScriptQueue != NULL)
-                (*mi).second.pScriptQueue->Quit(); // interrupt any running script threads
-            (*mi).second.fQuit = true; // quit the block validation thread
-            mi++;
-        }
-    }
-    }
+    // In the event that a re-org may be under way we must terminate any block validation
+    // threads that are currently running.
+    PV.StopAllValidationThreads();
 
     // Process this block the same as if we had received it from another node
     CValidationState state;

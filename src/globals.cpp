@@ -20,6 +20,7 @@
 #include "net.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
+#include "parallel.h"
 #include "rpcserver.h"
 #include "thinblock.h"
 #include "timedata.h"
@@ -163,6 +164,11 @@ CTweakRef<std::string> subverOverrideTweak("net.subversionOveride","If set, this
 
 CRequestManager requester;  // after the maps nodes and tweaks
 
+// Parallel Validation Variables
+CCriticalSection cs_blockvalidationthread;
+CParallelValidation PV;  // Singleton class
+CAllScriptCheckQueues allScriptCheckQueues; // Singleton class
+
 CStatHistory<unsigned int, MinValMax<unsigned int> > txAdded; //"memPool/txAdded");
 CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize; // "memPool/size",STAT_OP_AVE);
 CStatHistory<uint64_t > recvAmt; 
@@ -192,3 +198,4 @@ std::vector<CNode*> xpeditedTxn; // (256,(CNode*)NULL);
 
 // BUIP010 Xtreme Thinblocks Variables
 std::map<uint256, uint64_t> mapThinBlockTimer;
+

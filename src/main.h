@@ -225,12 +225,9 @@ bool ProcessMessages(CNode* pfrom);
  * @param[in]   pto             The node which we are sending messages to.
  */
 bool SendMessages(CNode* pto);
+// BU: moves to parallel.h
 /** Run an instance of the script checking thread */
-void ThreadScriptCheck();
-void ThreadScriptCheck2(); // BU: parallel block validation
-void ThreadScriptCheck3(); // BU: parallel block validation
-void ThreadScriptCheck4(); // BU: parallel block validation
-void AddAllScriptCheckQueues(); // BU: parallel block validation
+//void ThreadScriptCheck();
 
 /** Try to detect Partition (network isolation) attacks against us */
 void PartitionCheck(bool (*initialDownloadCheck)(), CCriticalSection& cs, const CBlockIndex *const &bestHeader, int64_t nPowTargetSpacing);
@@ -396,6 +393,7 @@ bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int>* prevHeig
  */
 bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp = NULL, bool useExistingLockPoints = false);
 
+//  BU: This was all moved to parallel.cpp
 /**
  * Closure representing one script verification
  * Note that this stores references to the spending transaction 
@@ -430,82 +428,7 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp = NULL
 //    ScriptError GetScriptError() const { return error; }
 //};
 
-/**
- * Hold all script check queues in one vector along with their associated mutex
- * When we use a queue we must always have a distinct mutex for it.  This way during IBD we
- * can repeately lock a queue without needing to worry about scheduling threads.  They'll just
- * wait until they're free to continue.  During parallel validation of new blocks we'll only
- * have the maximum number of 4 queues/blocks validating so locking won't be needed for scheduling in that case.
- */
-class CAllScriptCheckQueues
-{
-private:
-    class CScriptCheckQueue
-    {
-        public:
-            CCheckQueue<CScriptCheck>* scriptcheckqueue;
-            bool InUse;
-            boost::shared_ptr<boost::mutex> scriptcheck_mutex;
 
-            CScriptCheckQueue(CCheckQueue<CScriptCheck>* pqueueIn) : InUse(false), scriptcheck_mutex(new boost::mutex)
-            {
-                scriptcheckqueue = pqueueIn;
-            }
-    };
-    std::vector<CScriptCheckQueue> vScriptCheckQueues;
-    boost::shared_ptr<boost::mutex> dummy_mutex;
-
-public:
-    CAllScriptCheckQueues() : dummy_mutex(new boost::mutex) {}
-
-    void Add(CCheckQueue<CScriptCheck>* pqueueIn)
-    {
-        vScriptCheckQueues.push_back(CScriptCheckQueue(pqueueIn));
-    }
-
-    /* Returns a pointer to an available or selected scriptcheckqueue.
-     * 1) during IBD each queue is selected in order.  There is no need to check if the queue is busy or not.
-     * 2) for new block validation there is a more complex selection process and also the ability to terminate long
-     *    running threads in the case where there are more requests for validation than queues.
-     */
-    CCheckQueue<CScriptCheck>* GetScriptCheckQueue(boost::shared_ptr<boost::mutex> mutex)
-    {
-        // find the scriptcheckqueue that is associated with this mutex
-        for (unsigned int i = 0; i < vScriptCheckQueues.size(); i++) {
-            if (vScriptCheckQueues[i].scriptcheck_mutex == mutex) {
-                LogPrint("parallel", "next script check queue selected is %d\n", i);
-                return vScriptCheckQueues[i].scriptcheckqueue;
-            }
-        }
-        return  NULL;
-    }
-
-    boost::shared_ptr<boost::mutex> GetScriptCheckMutex()
-    {
-        // for newly mined block validation, return the first queue not in use.
-        if (IsChainNearlySyncd() && vScriptCheckQueues.size() > 0) {
-            for (unsigned int i = 0; i < vScriptCheckQueues.size(); i++) {
-                if (vScriptCheckQueues[i].scriptcheckqueue->IsIdle()) {
-                    LogPrint("parallel", "next mutex not in use is %d\n", i);
-                    return vScriptCheckQueues[i].scriptcheck_mutex;
-                }
-                else 
-                    assert("Could not select Queue since none were idle");
-            }
-        }
-        // for IBD return the next queue. It doesn't matter if it's in use or not.
-        else if (vScriptCheckQueues.size() > 0){
-            static unsigned int nextQueue = 0;
-            nextQueue++;
-
-            if (nextQueue >= vScriptCheckQueues.size())
-                nextQueue = 0;
-            LogPrint("parallel", "next mutex selected is %d\n", nextQueue);
-            return vScriptCheckQueues[nextQueue].scriptcheck_mutex;
-        }
-        return dummy_mutex;
-    }
-};
 
 /** Functions for disk access for blocks */
 bool WriteBlockToDisk(const CBlock& block, CDiskBlockPos& pos, const CMessageHeader::MessageStartChars& messageStart);

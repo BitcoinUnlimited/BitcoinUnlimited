@@ -12,6 +12,7 @@
 #include "leakybucket.h"
 #include "main.h"
 #include "net.h"
+#include "parallel.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
 #include "rpcserver.h"
@@ -40,6 +41,9 @@ using namespace std;
 
 extern CTxMemPool mempool; // from main.cpp
 static boost::atomic<uint64_t> nLargestBlockSeen(BLOCKSTREAM_CORE_MAX_BLOCK_SIZE); // track the largest block we've seen
+
+/** thread group map for parallel block validation */
+extern CCriticalSection cs_blockvalidationthread;
 
 bool IsTrafficShapingEnabled();
 
@@ -393,7 +397,7 @@ std::string UnlimitedCmdLineHelp()
     strUsage += HelpMessageOpt("-maxexpeditedblockrecipients=<n>", _("The maximum number of nodes this node will forward expedited blocks to"));
     strUsage += HelpMessageOpt("-maxexpeditedtxrecipients=<n>", _("The maximum number of nodes this node will forward expedited transactions to"));
     strUsage += HelpMessageOpt("-maxoutconnections=<n>", strprintf(_("Initiate at most <n> connections to peers (default: %u).  If this number is higher than --maxconnections, it will be reduced to --maxconnections."), DEFAULT_MAX_OUTBOUND_CONNECTIONS));
-    strUsage += HelpMessageOpt("-parallel-blocks=<n>",  strprintf(_("Turn Parallel Block Validation on or off (off: 0, on: 1, default: %d)"), 1));
+    strUsage += HelpMessageOpt("-parallel=<n>",  strprintf(_("Turn Parallel Block Validation on or off (off: 0, on: 1, default: %d)"), 1));
     return strUsage;
 }
 
@@ -1114,11 +1118,6 @@ bool IsThinBlocksEnabled()
     return GetBoolArg("-use-thinblocks", true);
 }
 
-bool IsParallelValidationEnabled() 
-{
-    return GetBoolArg("-parallel-blocks", true);
-}
-
 bool CanThinBlockBeDownloaded(CNode* pto)
 {
     if (pto->ThinBlockCapable() && !GetBoolArg("-connect-thinblock-force", false))
@@ -1426,15 +1425,15 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, const CBlock &bl
 
             {
                 LOCK(cs_blockvalidationthread);
-                if (mapBlockValidationThreads.size() >= NUM_SCRIPTCHECKQUEUES)
+                if (PV.mapBlockValidationThreads.size() >= NUM_SCRIPTCHECKQUEUES)
                 {
                     uint64_t nLargestBlockSize = 0;
-                    map<boost::thread::id, CHandleBlockMsgThreads>::iterator miLargestBlock;
-                    map<boost::thread::id, CHandleBlockMsgThreads>::iterator iter = mapBlockValidationThreads.begin();
-                    while (iter != mapBlockValidationThreads.end())
+                    map<boost::thread::id, CParallelValidation::CHandleBlockMsgThreads>::iterator miLargestBlock;
+                    map<boost::thread::id, CParallelValidation::CHandleBlockMsgThreads>::iterator iter = PV.mapBlockValidationThreads.begin();
+                    while (iter != PV.mapBlockValidationThreads.end())
                     {
                         // Find largest block where the previous block hash matches. Meaning this is a new block and it's a competitor to to your block.
-                        map<boost::thread::id, CHandleBlockMsgThreads>::iterator mi = iter++;
+                        map<boost::thread::id, CParallelValidation::CHandleBlockMsgThreads>::iterator mi = iter++;
                         if ((*mi).second.hashPrevBlock == block.GetBlockHeader().hashPrevBlock) {
                             if ((*mi).second.nBlockSize > nLargestBlockSize) {
                                 nLargestBlockSize = (*mi).second.nBlockSize;
@@ -1451,7 +1450,7 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, const CBlock &bl
                     else { // interrupt the chosen thread
                         LogPrint("parallel", "Sending Quit() to scriptcheckqueue\n");
                         (*miLargestBlock).second.pScriptQueue->Quit(); // terminate the script queue threads
-                        (*miLargestBlock).second.fQuit = true; // Quit the thread
+                        (*miLargestBlock).second.fQuit = true; // Quit the PV thread
                         LogPrint("parallel", "Too many blocks being validated, interrupting thread with blockhash %s and previous blockhash %s\n", 
                                (*miLargestBlock).second.hash.ToString(), (*miLargestBlock).second.hashPrevBlock.ToString());
                     }
@@ -1475,16 +1474,16 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, const CBlock &bl
     {
 
         LOCK(cs_blockvalidationthread);
-        mapBlockValidationThreads[thread->get_id()].tRef = thread;
-        mapBlockValidationThreads[thread->get_id()].pScriptQueue = NULL;
-        mapBlockValidationThreads[thread->get_id()].hash = inv.hash;
-        mapBlockValidationThreads[thread->get_id()].hashPrevBlock = block.GetBlockHeader().hashPrevBlock;
-        mapBlockValidationThreads[thread->get_id()].nSequenceId = INT_MAX;
-        mapBlockValidationThreads[thread->get_id()].nStartTime = GetTimeMillis();
-        mapBlockValidationThreads[thread->get_id()].nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-        mapBlockValidationThreads[thread->get_id()].fQuit = false;
+        PV.mapBlockValidationThreads[thread->get_id()].tRef = thread;
+        PV.mapBlockValidationThreads[thread->get_id()].pScriptQueue = NULL;
+        PV.mapBlockValidationThreads[thread->get_id()].hash = inv.hash;
+        PV.mapBlockValidationThreads[thread->get_id()].hashPrevBlock = block.GetBlockHeader().hashPrevBlock;
+        PV.mapBlockValidationThreads[thread->get_id()].nSequenceId = INT_MAX;
+        PV.mapBlockValidationThreads[thread->get_id()].nStartTime = GetTimeMillis();
+        PV.mapBlockValidationThreads[thread->get_id()].nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+        PV.mapBlockValidationThreads[thread->get_id()].fQuit = false;
         LogPrint("parallel", "Launching validation for %s with number of block validation threads running: %d\n", 
-                              block.GetHash().ToString(), mapBlockValidationThreads.size());
+                              block.GetHash().ToString(), PV.mapBlockValidationThreads.size());
 
         thread->detach();
    }
@@ -1503,7 +1502,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlo
     bool forceProcessing = pfrom->fWhitelisted && !IsInitialBlockDownload();
     const CChainParams& chainparams = Params();
     pfrom->firstBlock += 1;
-    if (!IsChainNearlySyncd() || !IsParallelValidationEnabled()) // Don't run parallel validation during IBD.
+    if (!IsChainNearlySyncd() || !PV.Enabled()) // Don't run parallel validation during IBD.
         fParallel = false;
     ProcessNewBlock(state, chainparams, pfrom, &block, forceProcessing, NULL, fParallel);
     int nDoS;
@@ -1570,14 +1569,9 @@ void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlo
             EraseOrphanTx(block.vtx[i].GetHash());
     }
     
-    // Cleanup thread data - this must be done before the thread completes or else some other new
+    // Clear thread data - this must be done before the thread completes or else some other new
     // thread may grab the same thread id and we would end up deleting the entry for the new thread instead.
-    {
-        LOCK(cs_blockvalidationthread);
-        boost::thread::id this_id(boost::this_thread::get_id()); 
-        if (mapBlockValidationThreads.count(this_id))
-            mapBlockValidationThreads.erase(this_id);
-    }
+    PV.Erase();
  
     // release semaphores depending on whether this was IBD or not.  We can not use IsChainNearlySyncd()
     // because the return value will switch over when IBD is nearly finished and we may end up not releasing
@@ -1589,35 +1583,6 @@ void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlo
         semNewBlocks->post();
     else
         semIBD->post();
-    }
-}
-
-void InterruptBlockValidationThreads()
-{
-    {
-    LOCK(cs_blockvalidationthread);
-    map<boost::thread::id, CHandleBlockMsgThreads>::iterator mi = mapBlockValidationThreads.begin();
-    while (mi != mapBlockValidationThreads.end())
-    {
-        if ((*mi).second.pScriptQueue != NULL) {
-            (*mi).second.pScriptQueue->Quit(); // interrupt any running script threads
-        }
-        (*mi).second.fQuit = true; // interrupt the thread
-        mi++;
-    }
-    }
-
-
-    // Wait for threads to finish and cleanup
-    while (true) {
-        // We must unlock before sleeping so that any blockvalidation threads 
-        // that are quitting can grab the lock and cleanup
-        {
-        LOCK(cs_blockvalidationthread);
-        if (mapBlockValidationThreads.size() == 0)
-            break;
-        }
-        MilliSleep(100);
     }
 }
 

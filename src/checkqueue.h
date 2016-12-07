@@ -6,6 +6,7 @@
 #ifndef BITCOIN_CHECKQUEUE_H
 #define BITCOIN_CHECKQUEUE_H
 
+#include "util.h"
 #include <algorithm>
 #include <vector>
 
