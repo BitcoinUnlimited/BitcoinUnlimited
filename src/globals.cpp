@@ -199,3 +199,4 @@ std::vector<CNode*> xpeditedTxn; // (256,(CNode*)NULL);
 // BUIP010 Xtreme Thinblocks Variables
 std::map<uint256, uint64_t> mapThinBlockTimer;
 
+

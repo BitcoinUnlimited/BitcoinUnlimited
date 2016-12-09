@@ -51,19 +51,21 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
 {
 
     ENTER_CRITICAL_SECTION(cs_blockvalidationthread);
+    CHandleBlockMsgThreads * pValidationThread = &mapBlockValidationThreads[this_id];
 
     // We need to place a Quit here because we do not want to assign a script queue to a thread of activity
     // if another thread has just won the race and has sent an fQuit.
-    if (mapBlockValidationThreads[this_id].fQuit) {
+    //if (mapBlockValidationThreads[this_id].fQuit) {
+    if (pValidationThread->fQuit) {
         LogPrint("parallel", "fQuit 0 called - Stopping validation of %s and returning\n", 
-                              mapBlockValidationThreads[this_id].hash.ToString());
+                              pValidationThread->hash.ToString());
         LEAVE_CRITICAL_SECTION(cs_blockvalidationthread); // must unlock before locking cs_main or may deadlock.
         cs_main.lock(); // must lock before returning.
         return false;
     }
 
     // Now that we have a scriptqueue we can add it to the tracking map so we can call Quit() on it later if needed.
-    mapBlockValidationThreads[this_id].pScriptQueue = pScriptQueue;
+    pValidationThread->pScriptQueue = pScriptQueue;
     LEAVE_CRITICAL_SECTION(cs_blockvalidationthread); // must unlock before re-aquire cs_main below or may deadlock.
 
     // Re-aquire cs_main
@@ -71,7 +73,7 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
     // Assign the nSequenceId for the block being validated in this thread. cs_main must be locked for lookup on pindex.
     LOCK(cs_blockvalidationthread);
     if (pindex->nSequenceId > 0)
-        mapBlockValidationThreads[this_id].nSequenceId = pindex->nSequenceId;
+        pValidationThread->nSequenceId = pindex->nSequenceId;
     
     return true;
 }

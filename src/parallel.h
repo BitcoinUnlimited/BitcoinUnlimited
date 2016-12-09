@@ -107,6 +107,17 @@ public:
      * 2) for new block validation there is a more complex selection process and also the ability to terminate long
      *    running threads in the case where there are more requests for validation than queues.
      */
+    void GetScriptCheckQueueAndMutex(boost::shared_ptr<boost::mutex>& mutex, CCheckQueue<CScriptCheck>*& pqueue)
+    {
+         // Get the next available mutex
+         mutex = GetScriptCheckMutex();
+
+         // Get the next available scriptcheckqueue associated with this mutex
+         pqueue = GetScriptCheckQueue(mutex);
+         assert(pqueue != NULL);
+    }
+
+
     CCheckQueue<CScriptCheck>* GetScriptCheckQueue(boost::shared_ptr<boost::mutex> mutex)
     {
         // find the scriptcheckqueue that is associated with this mutex

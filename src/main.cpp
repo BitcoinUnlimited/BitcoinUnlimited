@@ -2553,23 +2553,21 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     boost::thread::id this_id(boost::this_thread::get_id());
     {
 
-    // Get the next available mutex and then use it to find the associated scriptcheckqueue. Then lock this thread
-    // with the mutex so other thread can used this scriptcheckqueue until all inputs have been checked and the 
-    // scriptcheckqueue threads have all returned.
-    boost::shared_ptr<boost::mutex> scriptcheck_mutex = allScriptCheckQueues.GetScriptCheckMutex();
-    if (fParallel) cs_main.unlock(); // unlock cs_main, we may be waiting here for a while before aquiring the scoped lock below
-    boost::mutex::scoped_lock lock(*scriptcheck_mutex);
+    // Get the next available mutex and the associated scriptcheckqueue. Then lock this thread
+    // with the mutex so that the checking of inputs can be done with the chosen scriptcheckqueue.
+    boost::shared_ptr<boost::mutex> scriptcheck_mutex;
+    CCheckQueue<CScriptCheck>* pScriptQueue = NULL;
+    allScriptCheckQueues.GetScriptCheckQueueAndMutex(scriptcheck_mutex, pScriptQueue);
 
-    // Get the next available scriptcheckqueue.
-    CCheckQueue<CScriptCheck>* pScriptQueue = allScriptCheckQueues.GetScriptCheckQueue(scriptcheck_mutex);
-    assert(pScriptQueue != NULL);
-
-    //CCheckQueueControl<CScriptCheck> control(fScriptChecks && nScriptCheckThreads ? &scriptcheckqueue : NULL);
+    // Aquire the control that is used to wait for the script threads to finish
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && nScriptCheckThreads ? pScriptQueue : NULL);
 
-    if (fParallel)
+    if (fParallel) cs_main.unlock(); // unlock cs_main, we may be waiting here for a while before aquiring the scoped lock below
+    boost::mutex::scoped_lock lock(*scriptcheck_mutex); // aquire lock for then script check queue
+
+    if (fParallel) // you will require cs_main which was unlocked in the previous step.
     {
-        // Initialize a PV thread session.
+        // Initialize a PV thread session.  This will lock cs_main.
         if (!PV.Initialize(this_id, pindex, pScriptQueue))
             return false;
     }
@@ -2590,9 +2588,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         if (!tx.IsCoinBase())
         {
             if (!viewTempCache.HaveInputs(tx)) {
-                // ** In the event of a big block DDOS attack, by checking the Chain Work here, we ensure that
-                //    the thread that is validating the big block will immediately exit and finish up (while still keeping the block on disk if needed
-                //    for a reorg) as soon as the first block makes it through and wins the validation race.
+                // ** In the event of a big block DDOS attack, by checking the Chain Work here, we ensure that the thread 
+                //    that is validating the block will immediately exit and finish up (while still keeping the block on 
+                //    disk if needed or a reorg) as soon as the first block makes it through and wins the validation race.
                 if (fParallel)
                 {
                     if (chainActive.Tip()->nChainWork != nStartingChainWork)
@@ -3295,8 +3293,7 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
         if (fParallel)
         {
             if (PV.QuitReceived(this_id)) {
-                LogPrint("parallel", "fQuit before Disconnecttip called - Stopping validation of %s and returning\n", 
-                                      PV.mapBlockValidationThreads[this_id].hash.ToString());
+                LogPrint("parallel", "fQuit before Disconnecttip called - Stopping validation and returning\n");
                 return false;
             }
         }
