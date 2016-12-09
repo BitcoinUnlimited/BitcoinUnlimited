@@ -2563,7 +2563,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && nScriptCheckThreads ? pScriptQueue : NULL);
 
     if (fParallel) cs_main.unlock(); // unlock cs_main, we may be waiting here for a while before aquiring the scoped lock below
-    boost::mutex::scoped_lock lock(*scriptcheck_mutex); // aquire lock for then script check queue
+    boost::mutex::scoped_lock lock(*scriptcheck_mutex); // aquire lock for the script check queue
 
     if (fParallel) {
         // Initialize a PV thread session.  This will lock cs_main again.
@@ -3239,11 +3239,9 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
         // point just after the chaintip had already been advanced.  If that were to happen then it could initiate a
         // re-org when in fact a Quit had already been called on this thread.  So we do a check if Quit was previously
         // called and return if true.
-        if (fParallel)
-        {
-            if (PV.QuitReceived(this_id)) {
+        if (fParallel) {
+            if (PV.QuitReceived(this_id))
                 return false;
-            }
         }
 
         // Disconnect active blocks which are no longer in the best chain.
@@ -3254,8 +3252,7 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
         // currently running PV threads that are validating.  They will likley have self terminated
         // at this point anyway because the chain tip and UTXO base view will have changed but just
         // to be sure we are not waiting on script threads to finish we can issue the termination here.
-        if (fParallel && !fBlocksDisconnected)
-        {
+        if (fParallel && !fBlocksDisconnected) {
             PV.StopAllValidationThreads(this_id);
         }
         fBlocksDisconnected = true;
