@@ -1474,14 +1474,15 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, const CBlock &bl
     {
 
         LOCK(cs_blockvalidationthread);
-        PV.mapBlockValidationThreads[thread->get_id()].tRef = thread;
-        PV.mapBlockValidationThreads[thread->get_id()].pScriptQueue = NULL;
-        PV.mapBlockValidationThreads[thread->get_id()].hash = inv.hash;
-        PV.mapBlockValidationThreads[thread->get_id()].hashPrevBlock = block.GetBlockHeader().hashPrevBlock;
-        PV.mapBlockValidationThreads[thread->get_id()].nSequenceId = INT_MAX;
-        PV.mapBlockValidationThreads[thread->get_id()].nStartTime = GetTimeMillis();
-        PV.mapBlockValidationThreads[thread->get_id()].nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-        PV.mapBlockValidationThreads[thread->get_id()].fQuit = false;
+        CParallelValidation::CHandleBlockMsgThreads * pValidationThread = &PV.mapBlockValidationThreads[thread->get_id()];
+        pValidationThread->tRef = thread;
+        pValidationThread->pScriptQueue = NULL;
+        pValidationThread->hash = inv.hash;
+        pValidationThread->hashPrevBlock = block.GetBlockHeader().hashPrevBlock;
+        pValidationThread->nSequenceId = INT_MAX;
+        pValidationThread->nStartTime = GetTimeMillis();
+        pValidationThread->nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+        pValidationThread->fQuit = false;
         LogPrint("parallel", "Launching validation for %s with number of block validation threads running: %d\n", 
                               block.GetHash().ToString(), PV.mapBlockValidationThreads.size());
 
