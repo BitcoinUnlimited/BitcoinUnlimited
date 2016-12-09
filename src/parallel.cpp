@@ -165,8 +165,21 @@ void CParallelValidation::Erase()
 bool CParallelValidation::QuitReceived(const boost::thread::id this_id)
 {
     LOCK(cs_blockvalidationthread);
-    if (mapBlockValidationThreads[this_id].fQuit)
+    if (mapBlockValidationThreads[this_id].fQuit) {
+        LogPrint("parallel", "fQuit called - Stopping validation of this block and returning\n");
         return true;
+    }
+    return false;
+}
+
+bool CParallelValidation::ChainWorkHasChanged(const arith_uint256& nStartingChainWork) // requires cs_main
+{
+    if (chainActive.Tip()->nChainWork != nStartingChainWork)
+    {
+        LogPrint("parallel", "Quitting - Chain Work %s is not the same as the starting Chain Work %s\n",
+                              chainActive.Tip()->nChainWork.ToString(), nStartingChainWork.ToString());
+        return true;
+    }
     return false;
 }
 

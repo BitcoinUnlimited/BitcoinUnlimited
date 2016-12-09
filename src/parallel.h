@@ -197,6 +197,9 @@ public:
     /* Was the fQuit flag set to true which causes the PV thread to exit */
     bool QuitReceived(const boost::thread::id this_id);
 
+    /* Used to determine if another thread has already updated the utxo and advance the chain tip */
+    bool ChainWorkHasChanged(const arith_uint256& nStartingChainWork);
+
 };
 extern CParallelValidation PV;  // Singleton class
 

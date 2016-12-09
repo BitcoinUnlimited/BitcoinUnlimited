@@ -2539,7 +2539,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
     int nChecked = 0;
     int nOrphansChecked = 0;
-    arith_uint256 nStartingChainWork = chainActive.Tip()->nChainWork;
+    const arith_uint256 nStartingChainWork = chainActive.Tip()->nChainWork;
 
     // Create a vector for storing hashes that will be deleted from the unverified and perverified txn sets.
     // We will delete these hashes only if and when this block is the one that is accepted saving us the unnecessary 
@@ -2593,14 +2593,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 //    disk if needed or a reorg) as soon as the first block makes it through and wins the validation race.
                 if (fParallel)
                 {
-                    if (chainActive.Tip()->nChainWork != nStartingChainWork)
+                    if (PV.ChainWorkHasChanged(nStartingChainWork))
                     {
-                        LogPrint("parallel", "Quitting - Chain Work %s is not the same as the starting Chain Work %s\n",
-                                  chainActive.Tip()->nChainWork.ToString(), nStartingChainWork.ToString());
                         return false;
                     }
                     if (PV.QuitReceived(this_id)) {
-                        LogPrint("parallel", "fQuit called - Stopping validation of this block and returning\n");
                         return false;
                     }
                 }
@@ -2686,7 +2683,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         if (fParallel)
         {
             if (PV.QuitReceived(this_id)) {
-                LogPrint("parallel", "fQuit 1 called - Stopping validation of this block and returning\n");
                 return false;
             }
         }
@@ -2715,7 +2711,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
         // Return if Quit thread received.
         if (PV.QuitReceived(this_id)) {
-            LogPrint("parallel", "fQuit 2 called - Stopping validation of this block and returning\n");
             return false;
         }
     }
@@ -2738,14 +2733,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (fParallel)
     {
         // Last check for chain work just in case the thread manages to get here before being terminated.
-        if (chainActive.Tip()->nChainWork != nStartingChainWork)
+        if (PV.ChainWorkHasChanged(nStartingChainWork))
         {
-            LogPrint("parallel", "Quitting - Chain Work %s is not the same as the starting Chain Work %s\n",
-                                  chainActive.Tip()->nChainWork.ToString(), nStartingChainWork.ToString());
             return false;
         }
         if (PV.QuitReceived(this_id)) {
-            LogPrint("parallel", "fQuit 3 called - Stopping validation of this block and returning\n");
             return false;
         }
     }
@@ -3293,7 +3285,6 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
         if (fParallel)
         {
             if (PV.QuitReceived(this_id)) {
-                LogPrint("parallel", "fQuit before Disconnecttip called - Stopping validation and returning\n");
                 return false;
             }
         }
