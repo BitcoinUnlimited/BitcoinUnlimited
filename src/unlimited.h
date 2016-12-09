@@ -140,8 +140,6 @@ extern CLeakyBucket sendShaper;
 // Test to determine if traffic shaping is enabled
 extern bool IsTrafficShapingEnabled();
 
-class CScriptCheck;
-
 // BUIP010 Xtreme Thinblocks: begin
 
 // Xpress Validation: begin

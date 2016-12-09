@@ -1398,7 +1398,7 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, const CBlock &bl
     // additional parallel block validation. TODO: this value should be a global and we should be able to 
     // automatically generate the scriptcheck queues needed based on this value.  Currently they are individually
     // defined in main.cpp
-    uint8_t NUM_SCRIPTCHECKQUEUES = 4;
+    const uint8_t NUM_SCRIPTCHECKQUEUES = 4;
 
     uint64_t nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
 
@@ -1445,12 +1445,12 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, const CBlock &bl
                     // if your block is the biggest or of equal size to the biggest then reject it.
                     if (nLargestBlockSize <= nBlockSize) {
                         LogPrint("parallel", "Block validation terminated - Too many blocks currently being validated: %s\n", block.GetHash().ToString());
-                        return; // block is rejected
+                        return; // new block is rejected and does not enter PV
                     }
-                    else { // interrupt the chosen thread
-                        LogPrint("parallel", "Sending Quit() to scriptcheckqueue\n");
+                    else { // terminate the chosen PV thread
                         (*miLargestBlock).second.pScriptQueue->Quit(); // terminate the script queue threads
-                        (*miLargestBlock).second.fQuit = true; // Quit the PV thread
+                        LogPrint("parallel", "Sending Quit() to scriptcheckqueue\n");
+                        (*miLargestBlock).second.fQuit = true; // terminate the PV thread
                         LogPrint("parallel", "Too many blocks being validated, interrupting thread with blockhash %s and previous blockhash %s\n", 
                                (*miLargestBlock).second.hash.ToString(), (*miLargestBlock).second.hashPrevBlock.ToString());
                     }
@@ -1509,14 +1509,13 @@ void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlo
     int nDoS;
     if (state.IsInvalid(nDoS)) {
         LogPrintf("Invalid block due to %s\n", state.GetRejectReason().c_str());
-        if (!strCommand.empty())
-	  {
-          pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
-                           state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
-          if (nDoS > 0) {
-            LOCK(cs_main);
-            Misbehaving(pfrom->GetId(), nDoS);
-          }
+        if (!strCommand.empty() {
+            pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
+                                state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
+            if (nDoS > 0) {
+                LOCK(cs_main);
+                Misbehaving(pfrom->GetId(), nDoS);
+            }
 	}
     }
     else {
@@ -1552,8 +1551,8 @@ void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlo
 
         // When we no longer have any thinblocks in flight then clear the set
         // just to make sure we don't somehow get growth over time.
-        LOCK(cs_xval);
         if (nTotalThinBlocksInFlight == 0) {
+            LOCK(cs_xval);
             setPreVerifiedTxHash.clear();
             setUnVerifiedOrphanTxHash.clear();
         }
@@ -1563,8 +1562,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlo
     ClearThinBlockTimer(inv.hash);
 
     // Erase any txns in the block from the orphan cache as they are no longer needed
-    if (IsChainNearlySyncd())
-    {
+    if (IsChainNearlySyncd()) {
         LOCK(cs_orphancache);
         for (unsigned int i = 0; i < block.vtx.size(); i++)
             EraseOrphanTx(block.vtx[i].GetHash());
