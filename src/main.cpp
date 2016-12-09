@@ -2565,9 +2565,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (fParallel) cs_main.unlock(); // unlock cs_main, we may be waiting here for a while before aquiring the scoped lock below
     boost::mutex::scoped_lock lock(*scriptcheck_mutex); // aquire lock for then script check queue
 
-    if (fParallel) // you will require cs_main which was unlocked in the previous step.
-    {
-        // Initialize a PV thread session.  This will lock cs_main.
+    if (fParallel) {
+        // Initialize a PV thread session.  This will lock cs_main again.
         if (!PV.Initialize(this_id, pindex, pScriptQueue))
             return false;
     }
@@ -2591,15 +2590,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 // ** In the event of a big block DDOS attack, by checking the Chain Work here, we ensure that the thread 
                 //    that is validating the block will immediately exit and finish up (while still keeping the block on 
                 //    disk if needed or a reorg) as soon as the first block makes it through and wins the validation race.
-                if (fParallel)
-                {
-                    if (PV.ChainWorkHasChanged(nStartingChainWork))
-                    {
+                if (fParallel) {
+                    if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id))
                         return false;
-                    }
-                    if (PV.QuitReceived(this_id)) {
-                        return false;
-                    }
                 }
 
                 return state.DoS(100, error("ConnectBlock(): inputs missing/spent"),
@@ -2679,12 +2672,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         vPos.push_back(std::make_pair(tx.GetHash(), pos));
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
 
-        // Return if Quit thread received.
-        if (fParallel)
-        {
-            if (PV.QuitReceived(this_id)) {
+        if (fParallel) {
+            if (PV.QuitReceived(this_id))
                 return false;
-            }
         }
     }
     LogPrint("thin", "Number of CheckInputs() performed: %d  Orphan count: %d\n", nChecked, nOrphansChecked);
@@ -2705,14 +2695,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         return state.DoS(100, false);
     }
 
-    if (fParallel)
-    {
-        cs_main.lock();
+    if (fParallel) {
+        cs_main.lock(); // must reaquire cs_main before any final checks
 
-        // Return if Quit thread received.
-        if (PV.QuitReceived(this_id)) {
+        if (PV.QuitReceived(this_id))
             return false;
-        }
     }
 
     if (fJustCheck)
@@ -2730,16 +2717,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     static CCriticalSection cs_updateutxo;
     LOCK(cs_updateutxo);
  
-    if (fParallel)
-    {
+    if (fParallel) {
         // Last check for chain work just in case the thread manages to get here before being terminated.
-        if (PV.ChainWorkHasChanged(nStartingChainWork))
-        {
+        if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id))
             return false;
-        }
-        if (PV.QuitReceived(this_id)) {
-            return false;
-        }
     }
  
     //BU: parallel validation - Flush the temporary view to the base view.  This will now update the UTXO on disk.
@@ -2747,39 +2728,15 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     LogPrint("parallel", "Updating UTXO for %s\n", block.GetHash().ToString());
     viewTempCache.Flush();
 
-//    for (unsigned int i = 0; i < block.vtx.size(); i++)
-//    {
-//        const CTransaction &tx = block.vtx[i];
-//        CTxUndo undoDummy;
-//        if (i > 0) {
-//            blockundo.vtxundo.push_back(CTxUndo());
-//        }
-//        LogPrint("parallel", "updating utxo for tx: %d\n", i);
-//        UpdateCoins(tx, state, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
-//        vPos.push_back(std::make_pair(tx.GetHash(), pos));
-//        pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
-//    }
     int64_t nUpdateCoinsTimeEnd = GetTimeMicros(); 
     LogPrint("bench", "      - Update Coins %.3fms\n", nUpdateCoinsTimeEnd - nUpdateCoinsTimeBegin);
 
     int64_t nTime3 = GetTimeMicros(); nTimeConnect += nTime3 - nTime2;
     LogPrint("bench", "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(), 0.001 * (nTime3 - nTime2), 0.001 * (nTime3 - nTime2) / block.vtx.size(), nInputs <= 1 ? 0 : 0.001 * (nTime3 - nTime2) / (nInputs-1), nTimeConnect * 0.000001);
 
-//  BU: this is now checked in the block validation section above
-//    CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
-//    if (block.vtx[0].GetValueOut() > blockReward)
-//        return state.DoS(100,
-//                         error("ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)",
-//                               block.vtx[0].GetValueOut(), blockReward),
-//                               REJECT_INVALID, "bad-cb-amount");
-
-//    if (!control.Wait())
-//        return state.DoS(100, false);
     int64_t nTime4 = GetTimeMicros(); nTimeVerify += nTime4 - nTime2;
     LogPrint("bench", "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs]\n", nInputs - 1, 0.001 * (nTime4 - nTime2), nInputs <= 1 ? 0 : 0.001 * (nTime4 - nTime2) / (nInputs-1), nTimeVerify * 0.000001);
 
-//    if (fJustCheck)
-//        return true;
 
     // Write undo information to disk
     if (pindex->GetUndoPos().IsNull() || !pindex->IsValid(BLOCK_VALID_SCRIPTS))
