@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <vector>
 
+#include <boost/atomic.hpp>
 #include <boost/foreach.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
@@ -60,11 +61,8 @@ private:
      */
     unsigned int nTodo;
 
-    //! Mutex to protect fQuit
-    boost::mutex mutex_fQuit;
-
     //! Whether we're shutting down.
-    bool fQuit;
+    boost::atomic<bool> fQuit;
 
     //! The maximum number of elements to be processed in one batch
     unsigned int nBatchSize;
@@ -90,8 +88,7 @@ private:
                         queue.clear();
                         condMaster.notify_one();
                     }
-                    boost::mutex::scoped_lock lock(mutex_fQuit);
-                    if (fQuit && !fMaster) {
+                    if (fQuit.load() && !fMaster) {
                         nTodo = 0;
                         queue.clear();
                         condMaster.notify_one();
@@ -102,7 +99,6 @@ private:
                 }
                 // logically, the do loop starts here
                 while (queue.empty()) {
-                    //if ((fMaster || fQuit) && nTodo == 0) {
                     if ((fMaster) && nTodo == 0) {
                         nTotal--;
                         bool fRet = fAllOk;
@@ -110,8 +106,7 @@ private:
                         if (fMaster)
                             fAllOk = true;
                         // return the current status
-                        boost::mutex::scoped_lock lock(mutex_fQuit);
-                        fQuit = false; // reset the flag before returning
+                        fQuit.store(false); // reset the flag before returning
                         return fRet;
                     }
                     nIdle++;
@@ -144,7 +139,7 @@ private:
 
 public:
     //! Create a new check queue
-    CCheckQueue(unsigned int nBatchSizeIn) : nIdle(0), nTotal(0), fAllOk(true), nTodo(0), fQuit(false), nBatchSize(nBatchSizeIn) {}
+    CCheckQueue(unsigned int nBatchSizeIn) : nIdle(0), nTotal(0), fAllOk(true), nTodo(0), nBatchSize(nBatchSizeIn) {fQuit.store(false);}
 
     //! Worker thread
     void Thread()
@@ -161,8 +156,7 @@ public:
     //! Quit execution of any remaining checks.
     void Quit()
     {
-       boost::mutex::scoped_lock lock(mutex_fQuit);
-       fQuit = true;
+       fQuit.store(true);
     }
 
     //! Add a batch of checks to the queue
