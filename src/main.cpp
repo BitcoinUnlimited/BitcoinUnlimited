@@ -2568,8 +2568,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         }
         cs_main.unlock(); // unlock cs_main, we may be waiting here for a while before aquiring the scoped lock below
     }
-    {
-    boost::mutex::scoped_lock lock(*scriptcheck_mutex); // aquire lock for the script check queue
+    boost::mutex::scoped_lock scriptlock(*scriptcheck_mutex); // aquire lock for the script check queue
 
     
     // Start checking Inputs
@@ -2597,6 +2596,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 //    disk if needed or a reorg) as soon as the first block makes it through and wins the validation race.
                 if (fParallel) {
                     if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id)) {
+                        scriptlock.unlock(); // must maintain locking order with cs_main
                         cs_main.lock();
                         return false;
                     }
@@ -2651,7 +2651,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                     std::vector<CScriptCheck> vChecks;
                     bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks (still consult the cache, though) */
                     if (!CheckInputs(tx, state, viewTempCache, fScriptChecks, flags, fCacheResults, nScriptCheckThreads ? &vChecks : NULL)) {
-                        if (fParallel) cs_main.lock();
+                        if (fParallel) {
+                            scriptlock.unlock(); // must maintain locking order with cs_main
+                            cs_main.lock();
+                        }
                         return error("ConnectBlock(): CheckInputs on %s failed with %s", 
                                               tx.GetHash().ToString(), FormatStateMessage(state));
                     }
@@ -2674,6 +2677,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
         if (fParallel) {
             if (PV.QuitReceived(this_id)) {
+                scriptlock.unlock(); // must maintain locking order with cs_main.
                 cs_main.lock();
                 return false;
             }
@@ -2686,16 +2690,22 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     LogPrint("parallel", "Waiting for script threads to finish\n");
     if (!control.Wait()) {
         // if we end up here then the signature verification failed and we must re-lock cs_main before returning.
-        if (fParallel) cs_main.lock();
+        if (fParallel) {
+            scriptlock.unlock(); // must maintain locking order with cs_main
+            cs_main.lock();
+        }
         return state.DoS(100, false);
     }
 
+
     if (fParallel) {
+        scriptlock.unlock(); // must maintain locking order with cs_main
         cs_main.lock(); // must reaquire cs_main before any final checks
 
         if (PV.QuitReceived(this_id))
             return false;
     }
+
 
     CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
     if (block.vtx[0].GetValueOut() > blockReward)
@@ -2706,9 +2716,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     if (fJustCheck)
         return true;
-
-
-    } // end section for scoped lock
 
 
     /*****************************************************************************************************************
@@ -2722,7 +2729,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (fParallel) {
         // Last check for chain work just in case the thread manages to get here before being terminated.
         if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id))
-            return false;
+            return false; // no need to lock cs_main before returing as it should already be locked.
     }
  
     //BU: parallel validation - Flush the temporary view to the base view.  This will now update the UTXO on disk.
