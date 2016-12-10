@@ -2551,7 +2551,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     // Section for boost scoped lock on the scriptcheck_mutex
     boost::thread::id this_id(boost::this_thread::get_id());
-    {
 
     // Get the next available mutex and the associated scriptcheckqueue. Then lock this thread
     // with the mutex so that the checking of inputs can be done with the chosen scriptcheckqueue.
@@ -2562,18 +2561,24 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     // Aquire the control that is used to wait for the script threads to finish
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && nScriptCheckThreads ? pScriptQueue : NULL);
 
-    if (fParallel) cs_main.unlock(); // unlock cs_main, we may be waiting here for a while before aquiring the scoped lock below
+    if (fParallel) {
+        // Initialize a PV thread session.
+        if (!PV.Initialize(this_id, pindex, pScriptQueue)) {
+            return false;
+        }
+        cs_main.unlock(); // unlock cs_main, we may be waiting here for a while before aquiring the scoped lock below
+    }
+    {
     boost::mutex::scoped_lock lock(*scriptcheck_mutex); // aquire lock for the script check queue
 
-    if (fParallel) {
-        // Initialize a PV thread session.  This will lock cs_main again.
-        if (!PV.Initialize(this_id, pindex, pScriptQueue))
-            return false;
-    }
-
+    
     // Start checking Inputs
     bool inOrphanCache;
     bool inVerifiedCache;
+    // When in parallel mode then unlock cs_main for this loop to give any other threads
+    // a chance to process in parallel. This is crucial for parallel validation to work. 
+    // NOTE: the only place where cs_main is needed is if we hit PV.ChainWorkHasChanged, which
+    //       internally grabs the cs_main lock when needed.
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
         const CTransaction &tx = block.vtx[i];
@@ -2591,8 +2596,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 //    that is validating the block will immediately exit and finish up (while still keeping the block on 
                 //    disk if needed or a reorg) as soon as the first block makes it through and wins the validation race.
                 if (fParallel) {
-                    if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id))
+                    if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id)) {
+                        cs_main.lock();
                         return false;
+                    }
                 }
 
                 return state.DoS(100, error("ConnectBlock(): inputs missing/spent"),
@@ -2637,12 +2644,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
                 if ((inOrphanCache) || (!inVerifiedCache && !inOrphanCache))
                 {
-                    // ** if in parallel mode then unlock cs_main for a short while to give any other threads
-                    // a chance to process in parallel. This is crucial for parallel validation to work. 
-                    // NOTE: CheckInputs() does not have to be locked with cs_main as it has it's own UTXO view to work 
-                    // with and the scriptcheckqueue's have their own internal locking mechanism.
-                    if (fParallel) cs_main.unlock();
-
                     LogPrint("parallel_2", "checking inputs for tx: %d\n", i);
                     if (inOrphanCache)
                         nOrphansChecked++;
@@ -2656,7 +2657,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                     }
                     control.Add(vChecks);
                     nChecked++;
-                    if (fParallel) cs_main.lock();
                 }
                 else {
                     vHashesToDelete.push_back(hash);
@@ -2673,21 +2673,16 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
 
         if (fParallel) {
-            if (PV.QuitReceived(this_id))
+            if (PV.QuitReceived(this_id)) {
+                cs_main.lock();
                 return false;
+            }
         }
     }
     LogPrint("thin", "Number of CheckInputs() performed: %d  Orphan count: %d\n", nChecked, nOrphansChecked);
 
-    CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
-    if (block.vtx[0].GetValueOut() > blockReward)
-        return state.DoS(100,
-                         error("ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)",
-                               block.vtx[0].GetValueOut(), blockReward),
-                               REJECT_INVALID, "bad-cb-amount");
 
     // Wait for all sig check threads to finish before updating utxo
-    if (fParallel) cs_main.unlock(); // unlock while waiting.
     LogPrint("parallel", "Waiting for script threads to finish\n");
     if (!control.Wait()) {
         // if we end up here then the signature verification failed and we must re-lock cs_main before returning.
@@ -2701,6 +2696,13 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         if (PV.QuitReceived(this_id))
             return false;
     }
+
+    CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
+    if (block.vtx[0].GetValueOut() > blockReward)
+        return state.DoS(100,
+                         error("ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)",
+                               block.vtx[0].GetValueOut(), blockReward),
+                               REJECT_INVALID, "bad-cb-amount");
 
     if (fJustCheck)
         return true;

@@ -50,7 +50,8 @@ CParallelValidation::CParallelValidation()
 bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlockIndex* pindex, CCheckQueue<CScriptCheck>* pScriptQueue)
 {
 
-    ENTER_CRITICAL_SECTION(cs_blockvalidationthread);
+    // Re-aquire cs_main
+    LOCK(cs_blockvalidationthread);
     CHandleBlockMsgThreads * pValidationThread = &mapBlockValidationThreads[this_id];
 
     // We need to place a Quit here because we do not want to assign a script queue to a thread of activity
@@ -58,19 +59,13 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
     if (pValidationThread->fQuit) {
         LogPrint("parallel", "fQuit 0 called - Stopping validation of %s and returning\n", 
                               pValidationThread->hash.ToString());
-        LEAVE_CRITICAL_SECTION(cs_blockvalidationthread); // must unlock before locking cs_main or may deadlock.
-        cs_main.lock(); // must lock before returning.
         return false;
     }
 
     // Now that we have a scriptqueue we can add it to the tracking map so we can call Quit() on it later if needed.
     pValidationThread->pScriptQueue = pScriptQueue;
-    LEAVE_CRITICAL_SECTION(cs_blockvalidationthread); // must unlock before re-aquire cs_main below or may deadlock.
 
-    // Re-aquire cs_main
-    cs_main.lock();
     // Assign the nSequenceId for the block being validated in this thread. cs_main must be locked for lookup on pindex.
-    LOCK(cs_blockvalidationthread);
     if (pindex->nSequenceId > 0)
         pValidationThread->nSequenceId = pindex->nSequenceId;
     
@@ -173,6 +168,7 @@ bool CParallelValidation::QuitReceived(const boost::thread::id this_id)
 
 bool CParallelValidation::ChainWorkHasChanged(const arith_uint256& nStartingChainWork) // requires cs_main
 {
+    LOCK(cs_main);
     if (chainActive.Tip()->nChainWork != nStartingChainWork)
     {
         LogPrint("parallel", "Quitting - Chain Work %s is not the same as the starting Chain Work %s\n",
