@@ -55,7 +55,6 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
 
     // We need to place a Quit here because we do not want to assign a script queue to a thread of activity
     // if another thread has just won the race and has sent an fQuit.
-    //if (mapBlockValidationThreads[this_id].fQuit) {
     if (pValidationThread->fQuit) {
         LogPrint("parallel", "fQuit 0 called - Stopping validation of %s and returning\n", 
                               pValidationThread->hash.ToString());

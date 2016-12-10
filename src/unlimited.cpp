@@ -1509,7 +1509,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlo
     int nDoS;
     if (state.IsInvalid(nDoS)) {
         LogPrintf("Invalid block due to %s\n", state.GetRejectReason().c_str());
-        if (!strCommand.empty() {
+        if (!strCommand.empty()) {
             pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
                                 state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
             if (nDoS > 0) {

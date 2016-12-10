@@ -2596,7 +2596,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 }
 
                 return state.DoS(100, error("ConnectBlock(): inputs missing/spent"),
-                             REJECT_INVALID, "bad-txns-inputs-missingorspent");
+                                 REJECT_INVALID, "bad-txns-inputs-missingorspent");
             }
 
             // Check that transaction is BIP68 final
