@@ -2596,8 +2596,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 //    disk if needed or a reorg) as soon as the first block makes it through and wins the validation race.
                 if (fParallel) {
                     if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id)) {
-                        scriptlock.unlock(); // must maintain locking order with cs_main
-                        cs_main.lock();
+                        PV.SetLocks(scriptlock);
                         return false;
                     }
                 }
@@ -2615,8 +2614,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             }
 
             if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex)) {
-                scriptlock.unlock(); // must maintain locking order with cs_main
-                cs_main.lock();
+                PV.SetLocks(scriptlock);
                 return state.DoS(100, error("%s: contains a non-BIP68-final transaction", __func__),
                                  REJECT_INVALID, "bad-txns-nonfinal");
             }
@@ -2654,8 +2652,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                     bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks (still consult the cache, though) */
                     if (!CheckInputs(tx, state, viewTempCache, fScriptChecks, flags, fCacheResults, nScriptCheckThreads ? &vChecks : NULL)) {
                         if (fParallel) {
-                            scriptlock.unlock(); // must maintain locking order with cs_main
-                            cs_main.lock();
+                            PV.SetLocks(scriptlock);
                         }
                         return error("ConnectBlock(): CheckInputs on %s failed with %s", 
                                               tx.GetHash().ToString(), FormatStateMessage(state));
@@ -2677,12 +2674,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         vPos.push_back(std::make_pair(tx.GetHash(), pos));
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
 
-        if (fParallel) {
-            if (PV.QuitReceived(this_id)) {
-                scriptlock.unlock(); // must maintain locking order with cs_main.
-                cs_main.lock();
-                return false;
-            }
+        if (fParallel && PV.QuitReceived(this_id)) {
+            PV.SetLocks(scriptlock);
+            return false;
         }
     }
     LogPrint("thin", "Number of CheckInputs() performed: %d  Orphan count: %d\n", nChecked, nOrphansChecked);
@@ -2693,17 +2687,14 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (!control.Wait()) {
         // if we end up here then the signature verification failed and we must re-lock cs_main before returning.
         if (fParallel) {
-            scriptlock.unlock(); // must maintain locking order with cs_main
-            cs_main.lock();
+            PV.SetLocks(scriptlock);
         }
         return state.DoS(100, false);
     }
 
 
     if (fParallel) {
-        scriptlock.unlock(); // must maintain locking order with cs_main
-        cs_main.lock(); // must reaquire cs_main before any final checks
-
+        PV.SetLocks(scriptlock); // cs_main is re-aquired here before any final checks and updates
         if (PV.QuitReceived(this_id))
             return false;
     }

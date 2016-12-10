@@ -179,6 +179,9 @@ public:
     /* Used to determine if another thread has already updated the utxo and advance the chain tip */
     bool ChainWorkHasChanged(const arith_uint256& nStartingChainWork);
 
+    /* Set the correct locks and locking order before returning from a PV session */
+    void SetLocks(boost::mutex::scoped_lock& scriptlock);
+
 };
 extern CParallelValidation PV;  // Singleton class
 

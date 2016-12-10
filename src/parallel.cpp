@@ -143,6 +143,52 @@ void CParallelValidation::Cleanup(const CBlock& block, CBlockIndex* pindex)
     }
 }
 
+
+void CParallelValidation::StopAllValidationThreads()
+{
+    LOCK(cs_blockvalidationthread);
+    map<boost::thread::id, CHandleBlockMsgThreads>::iterator mi = mapBlockValidationThreads.begin();
+    while (mi != mapBlockValidationThreads.end())
+    {
+        if ((*mi).second.pScriptQueue != NULL) {
+            (*mi).second.pScriptQueue->Quit(); // interrupt any running script threads
+        }
+        (*mi).second.fQuit = true; // quit the PV thread
+        mi++;
+    }
+}
+
+void CParallelValidation::StopAllValidationThreads(const boost::thread::id this_id)
+{
+    LOCK(cs_blockvalidationthread);
+    map<boost::thread::id, CHandleBlockMsgThreads>::iterator mi = mapBlockValidationThreads.begin();
+    while (mi != mapBlockValidationThreads.end())
+    {
+        if ((*mi).first != this_id) // we don't want to kill our own thread
+        { 
+            if ((*mi).second.pScriptQueue != NULL)
+                (*mi).second.pScriptQueue->Quit(); // quit any active script queue threads
+            (*mi).second.fQuit = true; // quit the PV thread
+        }
+        mi++;
+    }
+}
+
+void CParallelValidation::WaitForAllValidationThreadsToStop()
+{
+    // Wait for threads to finish and cleanup
+    while (true) {
+        // We must unlock before sleeping so that any blockvalidation threads 
+        // that are quitting can grab the lock and cleanup
+        {
+        LOCK(cs_blockvalidationthread);
+        if (mapBlockValidationThreads.size() == 0)
+            break;
+        }
+        MilliSleep(100);
+    }
+}
+
 bool CParallelValidation::Enabled()
 {
     return GetBoolArg("-parallel", true);
@@ -178,47 +224,16 @@ bool CParallelValidation::ChainWorkHasChanged(const arith_uint256& nStartingChai
     return false;
 }
 
-void CParallelValidation::StopAllValidationThreads()
+void CParallelValidation::SetLocks(boost::mutex::scoped_lock& scriptlock)
 {
-    LOCK(cs_blockvalidationthread);
-    map<boost::thread::id, CHandleBlockMsgThreads>::iterator mi = mapBlockValidationThreads.begin();
-    while (mi != mapBlockValidationThreads.end())
-    {
-        if ((*mi).second.pScriptQueue != NULL) {
-            (*mi).second.pScriptQueue->Quit(); // interrupt any running script threads
-        }
-        (*mi).second.fQuit = true; // quit the PV thread
-        mi++;
-    }
-}
-
-void CParallelValidation::StopAllValidationThreads(const boost::thread::id this_id)
-{
-    LOCK(cs_blockvalidationthread);
-    map<boost::thread::id, CHandleBlockMsgThreads>::iterator mi = mapBlockValidationThreads.begin();
-    while (mi != mapBlockValidationThreads.end())
-    {
-        if ((*mi).first != this_id) // we don't want to kill our own thread
-        { 
-            if ((*mi).second.pScriptQueue != NULL)
-                (*mi).second.pScriptQueue->Quit(); // quit any active script queue threads
-            (*mi).second.fQuit = true; // quit the PV thread
-        }
-        mi++;
-    }
-}
-void CParallelValidation::WaitForAllValidationThreadsToStop()
-{
-    // Wait for threads to finish and cleanup
-    while (true) {
-        // We must unlock before sleeping so that any blockvalidation threads 
-        // that are quitting can grab the lock and cleanup
-        {
-        LOCK(cs_blockvalidationthread);
-        if (mapBlockValidationThreads.size() == 0)
-            break;
-        }
-        MilliSleep(100);
-    }
+    // We must maintain locking order with cs_main, therefore we must make sure the scoped
+    // scriptcheck lock is unlocked prior to locking cs_main.  That is because in the case
+    // where we are not running in parallel the cs_main lock is aquired before the scoped
+    // lock and we do not want to then do the reverse here and aquire cs_main "after" the scoped
+    // lock is held, thereby reversing the locking order and creating a possible deadlock.
+    // Therefore to remedy the situation we simply unlock the scriptlock and do not enter into
+    // any reversal of the locking order.
+    scriptlock.unlock();
+    cs_main.lock();
 }
 
