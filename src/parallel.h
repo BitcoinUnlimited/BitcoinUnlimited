@@ -18,22 +18,14 @@
 
 using namespace std;
 
+// The number of script check queues we have available.  For every script check queue we can run an
+// additional parallel block validation.
+
 extern CCriticalSection cs_blockvalidationthread;
+extern uint8_t NUM_SCRIPTCHECKQUEUES;
 
-static CCheckQueue<CScriptCheck> scriptcheckqueue1(128);
-static CCheckQueue<CScriptCheck> scriptcheckqueue2(128);
-static CCheckQueue<CScriptCheck> scriptcheckqueue3(128);
-static CCheckQueue<CScriptCheck> scriptcheckqueue4(128);
-
-
-void ThreadScriptCheck1();
-void ThreadScriptCheck2();
-void ThreadScriptCheck3();
-void ThreadScriptCheck4();
-
-void AddAllScriptCheckQueues();
-
-
+void AddAllScriptCheckQueuesAndThreads(int nScriptCheckThreads, boost::thread_group* threadGroup);
+void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck>* pqueue);
 
 /**
  * Closure representing one script verification
@@ -101,6 +93,16 @@ public:
     {
         vScriptCheckQueues.push_back(CScriptCheckQueue(pqueueIn));
     }
+
+    uint8_t Size()
+    {
+        return vScriptCheckQueues.size();
+    }
+
+    std::vector<CScriptCheckQueue> AllQueues()
+    {
+        return vScriptCheckQueues;
+    } 
 
     /* Returns a pointer to an available or selected scriptcheckqueue and mutex.
      * 1) during IBD each queue is selected in order.  There is no need to check if the queue is busy or not.
