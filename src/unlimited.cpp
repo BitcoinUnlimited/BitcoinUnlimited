@@ -1394,12 +1394,6 @@ void LoadFilter(CNode *pfrom, CBloomFilter *filter)
 //  the UTXO if the block has been accepted and the tip updated. We cleanup and release the semaphore after the thread has finished.
 void HandleBlockMessage(CNode *pfrom, const string &strCommand, const CBlock &block, const CInv &inv)
 {
-    // The number of script check queues we have available.  For every script check queue we can run one
-    // additional parallel block validation. TODO: this value should be a global and we should be able to 
-    // automatically generate the scriptcheck queues needed based on this value.  Currently they are individually
-    // defined in main.cpp
-    const uint8_t NUM_SCRIPTCHECKQUEUES = 4;
-
     uint64_t nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
 
     /** Initialize Semaphores used to limit the total number of concurrent validation threads. */

@@ -73,16 +73,7 @@ TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(cha
 #endif
 
         nScriptCheckThreads = 3;
-        for (int i=0; i < nScriptCheckThreads-1; i++)
-            threadGroup.create_thread(&ThreadScriptCheck1);
-        for (int i=0; i<nScriptCheckThreads-1; i++)
-            threadGroup.create_thread(&ThreadScriptCheck2);
-        for (int i=0; i<nScriptCheckThreads-1; i++)
-            threadGroup.create_thread(&ThreadScriptCheck3);
-        for (int i=0; i<nScriptCheckThreads-1; i++)
-            threadGroup.create_thread(&ThreadScriptCheck4);
-
-        AddAllScriptCheckQueues();
+        AddAllScriptCheckQueuesAndThreads(nScriptCheckThreads, &threadGroup);
         RegisterNodeSignals(GetNodeSignals());
 }
 

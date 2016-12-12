@@ -14,32 +14,44 @@
 #include <string>
 #include <vector>
 
+#include <boost/thread/thread.hpp>
+
+uint8_t NUM_SCRIPTCHECKQUEUES = 0;
+
+static CCheckQueue<CScriptCheck> scriptcheckqueue1(128);
+static CCheckQueue<CScriptCheck> scriptcheckqueue2(128);
+static CCheckQueue<CScriptCheck> scriptcheckqueue3(128);
+static CCheckQueue<CScriptCheck> scriptcheckqueue4(128);
+
+
 using namespace std;
 
 
-void ThreadScriptCheck1() {
-    RenameThread("bitcoin-scriptch");
-    scriptcheckqueue1.Thread();
-}
-void ThreadScriptCheck2() {
-    RenameThread("bitcoin-scriptch2");
-    scriptcheckqueue2.Thread();
-}
-void ThreadScriptCheck3() {
-    RenameThread("bitcoin-scriptch3");
-    scriptcheckqueue3.Thread();
-}
-void ThreadScriptCheck4() {
-    RenameThread("bitcoin-scriptch4");
-    scriptcheckqueue4.Thread();
+void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck>* pqueue)
+{
+    string tName = "bitcoin-scriptchk" + i;
+    RenameThread(tName.c_str());
+    pqueue->Thread();
 }
 
-void AddAllScriptCheckQueues()
+void AddAllScriptCheckQueuesAndThreads(int nScriptCheckThreads, boost::thread_group* threadGroup)
 {
-    allScriptCheckQueues.Add(&scriptcheckqueue1);
-    allScriptCheckQueues.Add(&scriptcheckqueue2);
-    allScriptCheckQueues.Add(&scriptcheckqueue3);
-    allScriptCheckQueues.Add(&scriptcheckqueue4);
+    vector<CCheckQueue<CScriptCheck>* > vScriptCheckQueue;
+    vScriptCheckQueue.push_back(&scriptcheckqueue1);
+    vScriptCheckQueue.push_back(&scriptcheckqueue2);
+    vScriptCheckQueue.push_back(&scriptcheckqueue3);
+    vScriptCheckQueue.push_back(&scriptcheckqueue4);
+
+    int i = 1;
+    BOOST_FOREACH(CCheckQueue<CScriptCheck>* pqueue, vScriptCheckQueue)
+    {
+        allScriptCheckQueues.Add(pqueue);
+        for (int j = 0; j < nScriptCheckThreads; j++)
+            threadGroup->create_thread(boost::bind(&AddScriptCheckThreads, i, pqueue));
+        i++;
+    }
+
+    NUM_SCRIPTCHECKQUEUES = allScriptCheckQueues.Size();
 }
 
 CParallelValidation::CParallelValidation()
