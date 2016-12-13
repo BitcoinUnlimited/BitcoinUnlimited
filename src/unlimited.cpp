@@ -42,8 +42,8 @@ using namespace std;
 extern CTxMemPool mempool; // from main.cpp
 static boost::atomic<uint64_t> nLargestBlockSeen(BLOCKSTREAM_CORE_MAX_BLOCK_SIZE); // track the largest block we've seen
 
-/** thread group map for parallel block validation */
 extern CCriticalSection cs_blockvalidationthread;
+extern CCriticalSection cs_blocksemaphore;
 
 bool IsTrafficShapingEnabled();
 
@@ -1570,7 +1570,6 @@ void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlo
     // because the return value will switch over when IBD is nearly finished and we may end up not releasing
     // the correct semaphore.
     {
-    static CCriticalSection cs_blocksemaphore;
     LOCK(cs_blocksemaphore);
     if (fSem)
         semNewBlocks->post();

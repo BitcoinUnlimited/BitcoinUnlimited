@@ -100,6 +100,9 @@ CCriticalSection cs_nLastNodeId;
 CCriticalSection cs_mapInboundConnectionTracker;
 CCriticalSection cs_vOneShots;
 
+// from unlimited.cpp
+CCriticalSection cs_blocksemaphore;
+
 deque<string> vOneShots;
 std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
 vector<std::string> vUseDNSSeeds;
