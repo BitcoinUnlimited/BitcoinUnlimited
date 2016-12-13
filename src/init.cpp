@@ -798,6 +798,17 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     if (fStandard != Params().RequireStandard())
         return InitError(
             strprintf("acceptnonstdtxn is not currently supported for %s chain", chainparams.NetworkIDString()));
+
+    // Feerate used to define dust.  Shouldn't be changed lightly as old
+    // implementations may inadvertently create non-standard transactions
+    if (mapArgs.count("-dustrelayfee"))
+    {
+        CAmount nFee = 0;
+        if (!ParseMoney(GetArg("-dustrelayfee", ""), nFee) || nFee == 0)
+            return InitError(strprintf("invalid dustrelayfee: %s", GetArg("-dustrelayfee", "")));
+        dustRelayFee = CFeeRate(nFee);
+    }
+
     nBytesPerSigOp = GetArg("-bytespersigop", nBytesPerSigOp);
 
 #ifdef ENABLE_WALLET
