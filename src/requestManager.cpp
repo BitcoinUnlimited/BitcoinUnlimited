@@ -17,6 +17,7 @@
 #include "tinyformat.h"
 #include "txmempool.h"
 #include "unlimited.h"
+#include "parallel.h"
 #include "utilstrencodings.h"
 #include "util.h"
 #include "validationinterface.h"

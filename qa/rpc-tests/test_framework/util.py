@@ -514,7 +514,6 @@ def random_transaction(nodes, amount, min_fee, fee_increment, fee_variants):
 
     return (txid, signresult["hex"], fee)
 
-<<<<<<< HEAD
 def split_transaction(node, prevouts, toAddrs, txfeePer=DEFAULT_TX_FEE_PER_BYTE,**kwargs):
     """
       Create a transaction that divides the sum of all the passed utxos into all the destination addresses
@@ -604,11 +603,10 @@ def split_transaction(node, prevouts, toAddrs, txfeePer=DEFAULT_TX_FEE_PER_BYTE,
               return (txn,inp,outp,txid)
     finally:
       decimal.getcontext().prec = decContext
-=======
+
 def assert_not_equal(thing1, thing2):
     if thing1 == thing2:
         raise AssertionError("%s != %s"%(str(thing1),str(thing2)))
->>>>>>> 6888afd... Parallel Block Validation to mitigate DDOS big block attack
 
 def assert_equal(thing1, thing2):
     if thing1 != thing2:
