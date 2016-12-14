@@ -61,8 +61,11 @@ private:
      */
     unsigned int nTodo;
 
+    //! mutex to protect fQuit.
+    boost::mutex mutex_fQuit;
+
     //! Whether we're shutting down.
-    boost::atomic<bool> fQuit;
+    bool fQuit;
 
     //! The maximum number of elements to be processed in one batch
     unsigned int nBatchSize;
@@ -88,7 +91,8 @@ private:
                         queue.clear();
                         condMaster.notify_one();
                     }
-                    if (fQuit.load() && !fMaster) {
+                    boost::mutex::scoped_lock lock(mutex_fQuit);
+                    if (fQuit && !fMaster) {
                         nTodo = 0;
                         queue.clear();
                         condMaster.notify_one();
@@ -106,7 +110,8 @@ private:
                         if (fMaster)
                             fAllOk = true;
                         // return the current status
-                        fQuit.store(false); // reset the flag before returning
+                        boost::mutex::scoped_lock lock(mutex_fQuit);
+                        fQuit = false; // reset the flag before returning
                         return fRet;
                     }
                     nIdle++;
@@ -139,7 +144,7 @@ private:
 
 public:
     //! Create a new check queue
-    CCheckQueue(unsigned int nBatchSizeIn) : nIdle(0), nTotal(0), fAllOk(true), nTodo(0), nBatchSize(nBatchSizeIn) {fQuit.store(false);}
+    CCheckQueue(unsigned int nBatchSizeIn) : nIdle(0), nTotal(0), fAllOk(true), nTodo(0), fQuit(false), nBatchSize(nBatchSizeIn) {}
 
     //! Worker thread
     void Thread()
@@ -156,7 +161,8 @@ public:
     //! Quit execution of any remaining checks.
     void Quit()
     {
-       fQuit.store(true);
+        boost::mutex::scoped_lock lock(mutex_fQuit);
+        fQuit = true;
     }
 
     //! Add a batch of checks to the queue
