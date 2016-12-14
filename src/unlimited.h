@@ -169,7 +169,7 @@ extern void IsChainNearlySyncdInit();
 extern void BuildSeededBloomFilter(CBloomFilter& memPoolFilter, std::vector<uint256>& vOrphanHashes, uint256 hash);
 extern void LoadFilter(CNode *pfrom, CBloomFilter *filter);
 extern void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, const CBlock &block, const CInv &inv);
-extern void HandleBlockMessageThread(CNode *pfrom, const std::string &strCommand, const CBlock &block, const CInv &inv, bool fSem);
+extern void HandleBlockMessageThread(CNode *pfrom, const std::string &strCommand, const CBlock &block, const CInv &inv);
 extern void ConnectToThinBlockNodes();
 extern void CheckNodeSupportForThinBlocks();
 extern void SendXThinBlock(CBlock &block, CNode* pfrom, const CInv &inv);

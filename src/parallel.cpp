@@ -50,8 +50,6 @@ void AddAllScriptCheckQueuesAndThreads(int nScriptCheckThreads, boost::thread_gr
             threadGroup->create_thread(boost::bind(&AddScriptCheckThreads, i, pqueue));
         i++;
     }
-
-    NUM_SCRIPTCHECKQUEUES = allScriptCheckQueues.Size();
 }
 
 CParallelValidation::CParallelValidation()

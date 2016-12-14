@@ -22,7 +22,6 @@ using namespace std;
 // additional parallel block validation.
 
 extern CCriticalSection cs_blockvalidationthread;
-extern uint8_t NUM_SCRIPTCHECKQUEUES;
 
 void AddAllScriptCheckQueuesAndThreads(int nScriptCheckThreads, boost::thread_group* threadGroup);
 void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck>* pqueue);

@@ -47,6 +47,8 @@ extern CCriticalSection cs_blocksemaphore;
 
 bool IsTrafficShapingEnabled();
 
+extern CSemaphore *semPV; // semaphore for parallel validation threads
+
 std::string ExcessiveBlockValidator(const unsigned int& value,unsigned int* item,bool validate)
 {
   if (validate)
@@ -102,9 +104,6 @@ std::string SubverValidator(const std::string& value,std::string* item,bool vali
   }
   return std::string();
 }
-
-static CSemaphore *semIBD;       // semaphore for IBD threads
-static CSemaphore *semNewBlocks; // semaphore for parallel validation threads
 
 #define NUM_XPEDITED_STORE 10
 uint256 xpeditedBlkSent[NUM_XPEDITED_STORE];  // Just save the last few expedited sent blocks so we don't resend (uint256 zeros on construction)
@@ -1395,20 +1394,18 @@ void LoadFilter(CNode *pfrom, CBloomFilter *filter)
 void HandleBlockMessage(CNode *pfrom, const string &strCommand, const CBlock &block, const CInv &inv)
 {
     uint64_t nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+    uint8_t nScriptCheckQueues = allScriptCheckQueues.Size();
 
     /** Initialize Semaphores used to limit the total number of concurrent validation threads. */
-    if (semIBD == NULL)
-        semIBD = new CSemaphore(NUM_SCRIPTCHECKQUEUES * 8);
-    if (semNewBlocks == NULL)
-        semNewBlocks = new CSemaphore(NUM_SCRIPTCHECKQUEUES);
+    if (semPV == NULL)
+        semPV = new CSemaphore(nScriptCheckQueues);
   
     // NOTE: You must not have a cs_main lock before you aquire the semaphore grant or you can end up deadlocking
     //AssertLockNotHeld(cs_main); TODO: need to create this
 
     // Aquire semaphore grant
-    bool fSemNewBlocks;
     if (IsChainNearlySyncd()) {
-        if (!semNewBlocks->try_wait()) {
+        if (!semPV->try_wait()) {
 
             /** The following functionality is for the case when ALL thread queues and grants are in use, meaning somehow an attacker
              *  has been able to craft blocks or sustain an attack in such a way as to use up every availabe thread queue.
@@ -1419,7 +1416,7 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, const CBlock &bl
 
             {
                 LOCK(cs_blockvalidationthread);
-                if (PV.mapBlockValidationThreads.size() >= NUM_SCRIPTCHECKQUEUES)
+                if (PV.mapBlockValidationThreads.size() >= nScriptCheckQueues)
                 {
                     uint64_t nLargestBlockSize = 0;
                     map<boost::thread::id, CParallelValidation::CHandleBlockMsgThreads>::iterator miLargestBlock;
@@ -1455,16 +1452,14 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, const CBlock &bl
             } // We must not hold the lock here because we could be waiting for a grant, below.
 
             // wait for semaphore grant
-            semNewBlocks->wait();
+            semPV->wait();
         }
-        fSemNewBlocks = true;
     }
-    else {
-        semIBD->wait();
-        fSemNewBlocks = false;
+    else { // for IBD just wait for the next available
+        semPV->wait();
     }
 
-    boost::thread * thread = new boost::thread(boost::bind(&HandleBlockMessageThread, pfrom, strCommand, block, inv, fSemNewBlocks));
+    boost::thread * thread = new boost::thread(boost::bind(&HandleBlockMessageThread, pfrom, strCommand, block, inv));
     {
 
         LOCK(cs_blockvalidationthread);
@@ -1483,7 +1478,7 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, const CBlock &bl
         thread->detach();
    }
 }
-void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlock &block, const CInv &inv, bool fSem)
+void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlock &block, const CInv &inv)
 {
     bool fParallel = true;
     int64_t startTime = GetTimeMicros();
@@ -1571,10 +1566,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlo
     // the correct semaphore.
     {
     LOCK(cs_blocksemaphore);
-    if (fSem)
-        semNewBlocks->post();
-    else
-        semIBD->post();
+    semPV->post();
     }
 }
 
