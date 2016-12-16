@@ -12,8 +12,11 @@
 #include "script/sign.h"
 #include "uint256.h"
 #include "test/test_bitcoin.h"
+#include "chain.h" // Freeze CBlockIndex
+#include "base58.h" // Freeze CBitcoinAddress
 
 #ifdef ENABLE_WALLET
+#include "wallet/wallet.h"  // Freeze wallet test
 #include "wallet/wallet_ismine.h"
 #endif
 
@@ -212,8 +215,9 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1)
         BOOST_CHECK(ExtractDestination(s, addr));
         BOOST_CHECK(addr == keyaddr[0]);
 #ifdef ENABLE_WALLET
-        BOOST_CHECK(IsMine(keystore, s));
-        BOOST_CHECK(!IsMine(emptykeystore, s));
+        CBlockIndex *nullBestBlock;
+        BOOST_CHECK(IsMine(keystore, s, nullBestBlock));
+        BOOST_CHECK(!IsMine(emptykeystore, s, nullBestBlock));
 #endif
     }
     {
@@ -227,8 +231,9 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1)
         BOOST_CHECK(ExtractDestination(s, addr));
         BOOST_CHECK(addr == keyaddr[0]);
 #ifdef ENABLE_WALLET
-        BOOST_CHECK(IsMine(keystore, s));
-        BOOST_CHECK(!IsMine(emptykeystore, s));
+        CBlockIndex *nullBestBlock;
+        BOOST_CHECK(IsMine(keystore, s, nullBestBlock));
+        BOOST_CHECK(!IsMine(emptykeystore, s, nullBestBlock));
 #endif
     }
     {
@@ -241,9 +246,10 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1)
         CTxDestination addr;
         BOOST_CHECK(!ExtractDestination(s, addr));
 #ifdef ENABLE_WALLET
-        BOOST_CHECK(IsMine(keystore, s));
-        BOOST_CHECK(!IsMine(emptykeystore, s));
-        BOOST_CHECK(!IsMine(partialkeystore, s));
+        CBlockIndex *nullBestBlock;
+        BOOST_CHECK(IsMine(keystore, s, nullBestBlock));
+        BOOST_CHECK(!IsMine(emptykeystore, s, nullBestBlock));
+        BOOST_CHECK(!IsMine(partialkeystore, s, nullBestBlock));
 #endif
     }
     {
@@ -260,9 +266,10 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1)
         BOOST_CHECK(addrs[1] == keyaddr[1]);
         BOOST_CHECK(nRequired == 1);
 #ifdef ENABLE_WALLET
-        BOOST_CHECK(IsMine(keystore, s));
-        BOOST_CHECK(!IsMine(emptykeystore, s));
-        BOOST_CHECK(!IsMine(partialkeystore, s));
+        CBlockIndex *nullBestBlock;
+        BOOST_CHECK(IsMine(keystore, s, nullBestBlock));
+        BOOST_CHECK(!IsMine(emptykeystore, s, nullBestBlock));
+        BOOST_CHECK(!IsMine(partialkeystore, s, nullBestBlock));
 #endif
     }
     {
@@ -315,6 +322,32 @@ BOOST_AUTO_TEST_CASE(multisig_Sign)
     {
         BOOST_CHECK_MESSAGE(SignSignature(keystore, txFrom, txTo[i], 0), strprintf("SignSignature %d", i));
     }
+}
+BOOST_AUTO_TEST_CASE(cltv_freeze)
+{
+    ScriptError err;
+    CKey key[4];
+    for (int i = 0; i < 1; i++)
+         key[i].MakeNewKey(true);
+
+    // Create and unpack a CLTV script
+    CPubKey newKey = ToByteVector(key[0].GetPubKey());
+    CBitcoinAddress newAddr(newKey.GetID());
+    int64_t nFreezeLockTime = 50000;
+
+    CScript freezeScript = GetScriptForFreeze(nFreezeLockTime, newKey);
+
+    txnouttype type = TX_CLTV;
+    vector<CTxDestination> addresses;
+    int nRequiredReturn;
+
+    ExtractDestinations(freezeScript, type, addresses, nRequiredReturn);
+
+    BOOST_FOREACH(const CTxDestination& addr, addresses)
+		BOOST_CHECK(newAddr.ToString() == CBitcoinAddress(addr).ToString());
+
+    BOOST_CHECK(nRequiredReturn == 1);
+
 }
 
 
