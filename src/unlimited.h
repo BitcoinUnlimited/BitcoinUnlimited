@@ -73,7 +73,7 @@ void HandleExpeditedBlock(CDataStream& vRecv,CNode* pfrom);
 extern void settingsToUserAgentString();
 // Convert a list of client comments (typically BUcomments) and a custom comment into a string appropriate for the coinbase txn
 // The coinbase size restriction is NOT enforced
-extern std::string FormatCoinbaseMessage(const std::vector<std::string>& comments,const std::string& customComment);  
+extern std::string FormatCoinbaseMessage(const std::vector<std::string>& comments,const std::string& customComment);
 
 extern void UnlimitedSetup(void);
 extern std::string UnlimitedCmdLineHelp();
@@ -139,7 +139,7 @@ extern bool IsTrafficShapingEnabled();
 
 // Xpress Validation: begin
 // Transactions that have already been accepted into the memory pool do not need to be
-// re-verified and can avoid having to do a second and expensive CheckInputs() when 
+// re-verified and can avoid having to do a second and expensive CheckInputs() when
 // processing a new block.  (Protected by cs_xval)
 extern std::set<uint256> setPreVerifiedTxHash;
 
@@ -183,8 +183,8 @@ extern CSemaphore*  semOutboundAddNode;
 extern std::vector<CNode*> xpeditedBlk; // Who requested expedited blocks from us
 extern std::vector<CNode*> xpeditedBlkUp; // Who we requested expedited blocks from
 extern std::vector<CNode*> xpeditedTxn;
-extern CStatHistory<uint64_t > recvAmt; 
-extern CStatHistory<uint64_t > sendAmt; 
+extern CStatHistory<uint64_t > recvAmt;
+extern CStatHistory<uint64_t > sendAmt;
 
 // Connection Slot mitigation - used to track connection attempts and evictions
 struct ConnectionHistory
