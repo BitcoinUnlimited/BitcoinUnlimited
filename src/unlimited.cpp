@@ -45,58 +45,58 @@ bool IsTrafficShapingEnabled();
 
 std::string ExcessiveBlockValidator(const unsigned int& value,unsigned int* item,bool validate)
 {
-  if (validate)
+    if (validate)
     {
-      if (value < maxGeneratedBlock) 
-	{
-        std::ostringstream ret;
-        ret << "Sorry, your maximum mined block (" << maxGeneratedBlock << ") is larger than your proposed excessive size (" << value << ").  This would cause you to orphan your own blocks.";    
-        return ret.str();
-	}
+        if (value < maxGeneratedBlock)
+        {
+            std::ostringstream ret;
+            ret << "Sorry, your maximum mined block (" << maxGeneratedBlock << ") is larger than your proposed excessive size (" << value << ").  This would cause you to orphan your own blocks.";
+            return ret.str();
+        }
     }
-  else  // Do anything to "take" the new value
+    else  // Do anything to "take" the new value
     {
-      // nothing needed
+        // nothing needed
     }
-  return std::string();
+    return std::string();
 }
 
 std::string OutboundConnectionValidator(const int& value,int* item,bool validate)
 {
-  if (validate)
+    if (validate)
     {
-      if ((value < 0)||(value > 10000))  // sanity check
-	{
-        return "Invalid Value";
-	}
-      if (value < *item)
-	{
-	  return "This field cannot be reduced at run time since that would kick out existing connections";
-	}
-    }
-  else  // Do anything to "take" the new value
-    {
-      if (value < *item)  // note that now value is the old value and *item has been set to the new.
+        if ((value < 0)||(value > 10000))  // sanity check
         {
-	  int diff = *item - value;
-          if (semOutboundAddNode)  // Add the additional slots to the outbound semaphore
-            for (int i=0; i<diff; i++)
-              semOutboundAddNode->post();
-	}
+            return "Invalid Value";
+        }
+        if (value < *item)
+        {
+            return "This field cannot be reduced at run time since that would kick out existing connections";
+        }
     }
-  return std::string();
+    else  // Do anything to "take" the new value
+    {
+        if (value < *item)  // note that now value is the old value and *item has been set to the new.
+        {
+            int diff = *item - value;
+            if (semOutboundAddNode)  // Add the additional slots to the outbound semaphore
+                for (int i=0; i<diff; i++)
+                    semOutboundAddNode->post();
+        }
+    }
+    return std::string();
 }
 
 std::string SubverValidator(const std::string& value,std::string* item,bool validate)
 {
-  if (validate)
+    if (validate)
     {
-    if (value.size() > MAX_SUBVERSION_LENGTH) 
-    {
-      return(std::string("Subversion string is too long")); 
+        if (value.size() > MAX_SUBVERSION_LENGTH)
+        {
+            return(std::string("Subversion string is too long"));
+        }
     }
-  }
-  return std::string();
+    return std::string();
 }
 
 
@@ -111,262 +111,262 @@ void UnlimitedPushTxns(CNode* dest);
 int32_t UnlimitedComputeBlockVersion(const CBlockIndex* pindexPrev, const Consensus::Params& params,uint32_t nTime)
 {
     if (blockVersion != 0)  // BU: allow override of block version
-      {
+    {
         return blockVersion;
-      }
-    
+    }
+
     int32_t nVersion = ComputeBlockVersion(pindexPrev, params);
 
-    // turn BIP109 off by default by commenting this out: 
+    // turn BIP109 off by default by commenting this out:
     // if (nTime <= params.SizeForkExpiration())
-    //	  nVersion |= FORK_BIT_2MB;
- 
+    //    nVersion |= FORK_BIT_2MB;
+
     return nVersion;
 }
 
 
 void UpdateSendStats(CNode* pfrom, const char* strCommand, int msgSize, int64_t nTime)
 {
-  sendAmt += msgSize;
-  std::string name("net/send/msg/");
-  name.append(strCommand);
-  CStatMap::iterator obj = statistics.find(name);
-  CStatMap::iterator end = statistics.end();
-  if (obj != end)
+    sendAmt += msgSize;
+    std::string name("net/send/msg/");
+    name.append(strCommand);
+    CStatMap::iterator obj = statistics.find(name);
+    CStatMap::iterator end = statistics.end();
+    if (obj != end)
     {
-      CStatBase* base = obj->second;
-      if (base)
-	{
-	  CStatHistory<uint64_t>* stat = dynamic_cast<CStatHistory<uint64_t>*> (base);
-          if (stat)
-            *stat << msgSize;
-	}
+        CStatBase* base = obj->second;
+        if (base)
+        {
+            CStatHistory<uint64_t>* stat = dynamic_cast<CStatHistory<uint64_t>*> (base);
+            if (stat)
+                *stat << msgSize;
+        }
     }
 }
 
 void UpdateRecvStats(CNode* pfrom, const std::string& strCommand, int msgSize, int64_t nTimeReceived)
 {
-  recvAmt += msgSize;
-  std::string name = "net/recv/msg/" + strCommand;
-  CStatMap::iterator obj = statistics.find(name);
-  CStatMap::iterator end = statistics.end();
-  if (obj != end)
+    recvAmt += msgSize;
+    std::string name = "net/recv/msg/" + strCommand;
+    CStatMap::iterator obj = statistics.find(name);
+    CStatMap::iterator end = statistics.end();
+    if (obj != end)
     {
-      CStatBase* base = obj->second;
-      if (base)
-	{
-	  CStatHistory<uint64_t>* stat = dynamic_cast<CStatHistory<uint64_t>*> (base);
-          if (stat)
-            *stat << msgSize;
-	}
+        CStatBase* base = obj->second;
+        if (base)
+        {
+            CStatHistory<uint64_t>* stat = dynamic_cast<CStatHistory<uint64_t>*> (base);
+            if (stat)
+                *stat << msgSize;
+        }
     }
 }
 
 void HandleExpeditedRequest(CDataStream& vRecv,CNode* pfrom)
 {
-  // TODO locks
-  uint64_t options;
-  vRecv >> options;
-  bool stop = ((options & EXPEDITED_STOP) != 0);  // Are we starting or stopping expedited service?
-  if (options & EXPEDITED_BLOCKS)
+    // TODO locks
+    uint64_t options;
+    vRecv >> options;
+    bool stop = ((options & EXPEDITED_STOP) != 0);  // Are we starting or stopping expedited service?
+    if (options & EXPEDITED_BLOCKS)
     {
-      if (stop)  // If stopping, find the array element and clear it.
-	{
-          LogPrint("blk", "Stopping expedited blocks to peer %s (%d).\n", pfrom->addrName.c_str(),pfrom->id);
-	  std::vector<CNode*>::iterator it = std::find(xpeditedBlk.begin(), xpeditedBlk.end(),pfrom);  
-          if (it != xpeditedBlk.end())
-	    {
-            *it = NULL;
-	    pfrom->Release();
-	    }
-	}
-      else  // Otherwise, add the new node to the end
-	{
-	  std::vector<CNode*>::iterator it1 = std::find(xpeditedBlk.begin(), xpeditedBlk.end(),pfrom); 
-          if (it1 == xpeditedBlk.end())  // don't add it twice
-	    {
-            unsigned int maxExpedited = GetArg("-maxexpeditedblockrecipients", 32);
-            if (xpeditedBlk.size() < maxExpedited )
-	      {
-		LogPrint("blk", "Starting expedited blocks to peer %s (%d).\n", pfrom->addrName.c_str(),pfrom->id);
-		std::vector<CNode*>::iterator it = std::find(xpeditedBlk.begin(), xpeditedBlk.end(),((CNode*)NULL));
-		if (it != xpeditedBlk.end())
-		  *it = pfrom;
-		else
-		  xpeditedBlk.push_back(pfrom);
-		pfrom->AddRef();
-	      }
-            else
-	      {
-		LogPrint("blk", "Expedited blocks requested from peer %s (%d), but I am full.\n", pfrom->addrName.c_str(),pfrom->id);
-	      }
-	    }
-	}
+        if (stop)  // If stopping, find the array element and clear it.
+        {
+            LogPrint("blk", "Stopping expedited blocks to peer %s (%d).\n", pfrom->addrName.c_str(),pfrom->id);
+            std::vector<CNode*>::iterator it = std::find(xpeditedBlk.begin(), xpeditedBlk.end(),pfrom);
+            if (it != xpeditedBlk.end())
+            {
+                *it = NULL;
+                pfrom->Release();
+            }
+        }
+        else  // Otherwise, add the new node to the end
+        {
+            std::vector<CNode*>::iterator it1 = std::find(xpeditedBlk.begin(), xpeditedBlk.end(),pfrom);
+            if (it1 == xpeditedBlk.end())  // don't add it twice
+            {
+                unsigned int maxExpedited = GetArg("-maxexpeditedblockrecipients", 32);
+                if (xpeditedBlk.size() < maxExpedited )
+                {
+                    LogPrint("blk", "Starting expedited blocks to peer %s (%d).\n", pfrom->addrName.c_str(),pfrom->id);
+                    std::vector<CNode*>::iterator it = std::find(xpeditedBlk.begin(), xpeditedBlk.end(),((CNode*)NULL));
+                    if (it != xpeditedBlk.end())
+                        *it = pfrom;
+                    else
+                        xpeditedBlk.push_back(pfrom);
+                    pfrom->AddRef();
+                }
+                else
+                {
+                    LogPrint("blk", "Expedited blocks requested from peer %s (%d), but I am full.\n", pfrom->addrName.c_str(),pfrom->id);
+                }
+            }
+        }
     }
-  if (options & EXPEDITED_TXNS)
+    if (options & EXPEDITED_TXNS)
     {
-      if (stop) // If stopping, find the array element and clear it.
-	{
-          LogPrint("blk", "Stopping expedited transactions to peer %s (%d).\n", pfrom->addrName.c_str(),pfrom->id);
-	  std::vector<CNode*>::iterator it = std::find(xpeditedTxn.begin(), xpeditedTxn.end(),pfrom);
-          if (it != xpeditedTxn.end())
-	    {
-            *it = NULL;
-	    pfrom->Release();
-	    }
-	}
-      else // Otherwise, add the new node to the end
-	{
-	  std::vector<CNode*>::iterator it1 = std::find(xpeditedTxn.begin(), xpeditedTxn.end(),pfrom);
-          if (it1 == xpeditedTxn.end())  // don't add it twice
-	    {
-            unsigned int maxExpedited = GetArg("-maxexpeditedtxrecipients", 32);
-            if (xpeditedTxn.size() < maxExpedited )
-	      {
-              LogPrint("blk", "Starting expedited transactions to peer %s (%d).\n", pfrom->addrName.c_str(),pfrom->id);
-	      std::vector<CNode*>::iterator it = std::find(xpeditedTxn.begin(), xpeditedTxn.end(),((CNode*)NULL));
-	      if (it != xpeditedTxn.end())
-		*it = pfrom;
-	      else
-		xpeditedTxn.push_back(pfrom);
-              pfrom->AddRef();
-	      }
-            else
-	      {
-		LogPrint("blk", "Expedited transactions requested from peer %s (%d), but I am full.\n", pfrom->addrName.c_str(),pfrom->id);
-	      }
-	    }
-	}
+        if (stop) // If stopping, find the array element and clear it.
+        {
+            LogPrint("blk", "Stopping expedited transactions to peer %s (%d).\n", pfrom->addrName.c_str(),pfrom->id);
+            std::vector<CNode*>::iterator it = std::find(xpeditedTxn.begin(), xpeditedTxn.end(),pfrom);
+            if (it != xpeditedTxn.end())
+            {
+                *it = NULL;
+                pfrom->Release();
+            }
+        }
+        else // Otherwise, add the new node to the end
+        {
+            std::vector<CNode*>::iterator it1 = std::find(xpeditedTxn.begin(), xpeditedTxn.end(),pfrom);
+            if (it1 == xpeditedTxn.end())  // don't add it twice
+            {
+                unsigned int maxExpedited = GetArg("-maxexpeditedtxrecipients", 32);
+                if (xpeditedTxn.size() < maxExpedited )
+                {
+                    LogPrint("blk", "Starting expedited transactions to peer %s (%d).\n", pfrom->addrName.c_str(),pfrom->id);
+                    std::vector<CNode*>::iterator it = std::find(xpeditedTxn.begin(), xpeditedTxn.end(),((CNode*)NULL));
+                    if (it != xpeditedTxn.end())
+                        *it = pfrom;
+                    else
+                        xpeditedTxn.push_back(pfrom);
+                    pfrom->AddRef();
+                }
+                else
+                {
+                    LogPrint("blk", "Expedited transactions requested from peer %s (%d), but I am full.\n", pfrom->addrName.c_str(),pfrom->id);
+                }
+            }
+        }
     }
 }
 
 bool IsRecentlyExpeditedAndStore(const uint256& hash)
 {
-  for (int i=0;i<NUM_XPEDITED_STORE;i++)
-    if (xpeditedBlkSent[i]==hash) return true;
-  xpeditedBlkSent[xpeditedBlkSendPos] = hash;
-  xpeditedBlkSendPos++;
-  if (xpeditedBlkSendPos >=NUM_XPEDITED_STORE)  xpeditedBlkSendPos = 0;
-  return false;
+    for (int i=0;i<NUM_XPEDITED_STORE;i++)
+        if (xpeditedBlkSent[i]==hash) return true;
+    xpeditedBlkSent[xpeditedBlkSendPos] = hash;
+    xpeditedBlkSendPos++;
+    if (xpeditedBlkSendPos >=NUM_XPEDITED_STORE)  xpeditedBlkSendPos = 0;
+    return false;
 }
 
 void HandleExpeditedBlock(CDataStream& vRecv,CNode* pfrom)
 {
-  unsigned char hops;
-  unsigned char msgType;
-  vRecv >> msgType >> hops;
+    unsigned char hops;
+    unsigned char msgType;
+    vRecv >> msgType >> hops;
 
-  if (msgType == EXPEDITED_MSG_XTHIN)
+    if (msgType == EXPEDITED_MSG_XTHIN)
     {
-      CXThinBlock thinBlock;
-      vRecv >> thinBlock;
+        CXThinBlock thinBlock;
+        vRecv >> thinBlock;
 
-      CInv inv(MSG_BLOCK, thinBlock.header.GetHash());
+        CInv inv(MSG_BLOCK, thinBlock.header.GetHash());
 
-      BlockMap::iterator mapEntry = mapBlockIndex.find(thinBlock.header.GetHash());
-      CBlockIndex *blkidx = NULL;
-      unsigned int status = 0;
-      if (mapEntry != mapBlockIndex.end())
-	{
-	  blkidx = mapEntry->second;
-	  status = blkidx->nStatus;
-	}
-      bool newBlock = ((blkidx == NULL) || (!(blkidx->nStatus & BLOCK_HAVE_DATA)));  // If I have never seen the block or just seen an INV, treat the block as new
-      int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);  // TODO replace with size of vRecv for efficiency
-      LogPrint("thin", "Received %s expedited thinblock %s from peer %s (%d). Hop %d. Size %d bytes. (status %d,0x%x)\n", newBlock ? "new":"repeated", inv.hash.ToString(), pfrom->addrName.c_str(),pfrom->id, hops, nSizeThinBlock,status,status);
+        BlockMap::iterator mapEntry = mapBlockIndex.find(thinBlock.header.GetHash());
+        CBlockIndex *blkidx = NULL;
+        unsigned int status = 0;
+        if (mapEntry != mapBlockIndex.end())
+        {
+            blkidx = mapEntry->second;
+            status = blkidx->nStatus;
+        }
+        bool newBlock = ((blkidx == NULL) || (!(blkidx->nStatus & BLOCK_HAVE_DATA)));  // If I have never seen the block or just seen an INV, treat the block as new
+        int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);  // TODO replace with size of vRecv for efficiency
+        LogPrint("thin", "Received %s expedited thinblock %s from peer %s (%d). Hop %d. Size %d bytes. (status %d,0x%x)\n", newBlock ? "new":"repeated", inv.hash.ToString(), pfrom->addrName.c_str(),pfrom->id, hops, nSizeThinBlock,status,status);
 
-      // Skip if we've already seen this block
-      // TODO move thes above the print, once we ensure no unexpected dups.
-      if (IsRecentlyExpeditedAndStore(thinBlock.header.GetHash())) return;
-      if (!newBlock) 
-	{
-	  // TODO determine if we have the block or just have an INV to it.
-	  return;
-	}
+        // Skip if we've already seen this block
+        // TODO move thes above the print, once we ensure no unexpected dups.
+        if (IsRecentlyExpeditedAndStore(thinBlock.header.GetHash())) return;
+        if (!newBlock)
+        {
+            // TODO determine if we have the block or just have an INV to it.
+            return;
+        }
 
-      CValidationState state;
-      if (!CheckBlockHeader(thinBlock.header, state, true))  // block header is bad
-	{
-	  // demerit the sender
-	  return;
-	}
-      // TODO:  Start headers-only mining now
+        CValidationState state;
+        if (!CheckBlockHeader(thinBlock.header, state, true))  // block header is bad
+        {
+            // demerit the sender
+            return;
+        }
+        // TODO:  Start headers-only mining now
 
-      SendExpeditedBlock(thinBlock,hops+1, pfrom); // I should push the vRecv rather than reserialize
-      thinBlock.process(pfrom, nSizeThinBlock, NetMsgType::XPEDITEDBLK);
+        SendExpeditedBlock(thinBlock,hops+1, pfrom); // I should push the vRecv rather than reserialize
+        thinBlock.process(pfrom, nSizeThinBlock, NetMsgType::XPEDITEDBLK);
     }
-  else
+    else
     {
-      LogPrint("thin", "Received unknown (0x%x) expedited message from peer %s (%d). Hop %d.\n", msgType, pfrom->addrName.c_str(),pfrom->id, hops);
+        LogPrint("thin", "Received unknown (0x%x) expedited message from peer %s (%d). Hop %d.\n", msgType, pfrom->addrName.c_str(),pfrom->id, hops);
     }
 }
 
 void SendExpeditedBlock(CXThinBlock& thinBlock,unsigned char hops,const CNode* skip)
-  {
+{
     //bool cameFromUpstream = false;
-  std::vector<CNode*>::iterator end = xpeditedBlk.end();
-  for (std::vector<CNode*>::iterator it = xpeditedBlk.begin(); it != end; it++)
+    std::vector<CNode*>::iterator end = xpeditedBlk.end();
+    for (std::vector<CNode*>::iterator it = xpeditedBlk.begin(); it != end; it++)
     {
-      CNode* n = *it;
-      //if (n == skip) cameFromUpstream = true;
-      if ((n != skip)&&(n != NULL)) // Don't send it back in case there is a forwarding loop
-	{
-          if (n->fDisconnect)
-	    {
-	      *it = NULL;
-              n->Release();
-	    }
-	  else
-	    {
-	      LogPrint("thin", "Sending expedited block %s to %s.\n", thinBlock.header.GetHash().ToString(),n->addrName.c_str());
-              n->PushMessage(NetMsgType::XPEDITEDBLK, (unsigned char) EXPEDITED_MSG_XTHIN, hops, thinBlock);  // I should push the vRecv rather than reserialize
-              n->blocksSent += 1;
-	    }
-	}
+        CNode* n = *it;
+        //if (n == skip) cameFromUpstream = true;
+        if ((n != skip)&&(n != NULL)) // Don't send it back in case there is a forwarding loop
+        {
+            if (n->fDisconnect)
+            {
+                *it = NULL;
+                n->Release();
+            }
+            else
+            {
+                LogPrint("thin", "Sending expedited block %s to %s.\n", thinBlock.header.GetHash().ToString(),n->addrName.c_str());
+                n->PushMessage(NetMsgType::XPEDITEDBLK, (unsigned char) EXPEDITED_MSG_XTHIN, hops, thinBlock);  // I should push the vRecv rather than reserialize
+                n->blocksSent += 1;
+            }
+        }
     }
 
 #if 0  // Probably better to have the upstream explicitly request blocks from the downstream.
-  // Upstream
-  if (!cameFromUpstream)  // TODO, if it came from an upstream block I really want to delay for a short period and then check if we got it and then send.  But this solves some of the issue
+    // Upstream
+    if (!cameFromUpstream)  // TODO, if it came from an upstream block I really want to delay for a short period and then check if we got it and then send.  But this solves some of the issue
     {
-      std::vector<CNode*>::iterator end = xpeditedBlkUp.end();
-      for (std::vector<CNode*>::iterator it = xpeditedBlkUp.begin(); it != end; it++)
-	{
-	  CNode* n = *it;
-	  if ((n != skip)&&(n != NULL)) // Don't send it back to the sender in case there is a forwarding loop
-	    {
-	      if (n->fDisconnect)
-		{
-		  *it = NULL;
-		  n->Release();
-		}
-	      else
-		{
-		  LogPrint("thin", "Sending expedited block %s upstream to %s.\n", thinBlock.header.GetHash().ToString(),n->addrName.c_str());
-		  n->PushMessage(NetMsgType::XPEDITEDBLK, (unsigned char) EXPEDITED_MSG_XTHIN, hops, thinBlock);  // I should push the vRecv rather than reserialize
-                  n->blocksSent += 1;
-		}
-	    }
-	}
+        std::vector<CNode*>::iterator end = xpeditedBlkUp.end();
+        for (std::vector<CNode*>::iterator it = xpeditedBlkUp.begin(); it != end; it++)
+        {
+            CNode* n = *it;
+            if ((n != skip)&&(n != NULL)) // Don't send it back to the sender in case there is a forwarding loop
+            {
+                if (n->fDisconnect)
+                {
+                    *it = NULL;
+                    n->Release();
+                }
+                else
+                {
+                    LogPrint("thin", "Sending expedited block %s upstream to %s.\n", thinBlock.header.GetHash().ToString(),n->addrName.c_str());
+                    n->PushMessage(NetMsgType::XPEDITEDBLK, (unsigned char) EXPEDITED_MSG_XTHIN, hops, thinBlock);  // I should push the vRecv rather than reserialize
+                    n->blocksSent += 1;
+                }
+            }
+        }
     }
 #endif
-  }
+}
 
 void SendExpeditedBlock(const CBlock& block,const CNode* skip)
 {
-  // If we've already put the block in our hash table, we've already sent it out
-  //BlockMap::iterator it = mapBlockIndex.find(block.GetHash());
-  //if (it != mapBlockIndex.end()) return;
+    // If we've already put the block in our hash table, we've already sent it out
+    //BlockMap::iterator it = mapBlockIndex.find(block.GetHash());
+    //if (it != mapBlockIndex.end()) return;
 
-  
-  if (!IsRecentlyExpeditedAndStore(block.GetHash()))
+
+    if (!IsRecentlyExpeditedAndStore(block.GetHash()))
     {
-    CXThinBlock thinBlock(block);
-    SendExpeditedBlock(thinBlock,0, skip);
+        CXThinBlock thinBlock(block);
+        SendExpeditedBlock(thinBlock,0, skip);
     }
-  else
+    else
     {
-      // LogPrint("thin", "No need to send expedited block %s\n", block.GetHash().ToString());
+        // LogPrint("thin", "No need to send expedited block %s\n", block.GetHash().ToString());
     }
 }
 
@@ -385,7 +385,7 @@ std::string UnlimitedCmdLineHelp()
     strUsage += HelpMessageOpt("-connect-thinblock=<ip:port>", _("Connect to a thinblock node(s). Blocks will only be downloaded from a thinblock peer.  If no connections are possible then regular blocks will then be downloaded form any other connected peers."));
     strUsage += HelpMessageOpt("-minlimitertxfee=<amt>", strprintf(_("Fees (in satoshi/byte) smaller than this are considered zero fee and subject to -limitfreerelay (default: %s)"), DEFAULT_MINLIMITERTXFEE));
     strUsage += HelpMessageOpt("-maxlimitertxfee=<amt>", strprintf(_("Fees (in satoshi/byte) larger than this are always relayed (default: %s)"), DEFAULT_MAXLIMITERTXFEE));
-    strUsage += HelpMessageOpt("-bitnodes", _("Query for peer addresses via Bitnodes API, if low on addresses (default: 1 unless -connect)"));    
+    strUsage += HelpMessageOpt("-bitnodes", _("Query for peer addresses via Bitnodes API, if low on addresses (default: 1 unless -connect)"));
     strUsage += HelpMessageOpt("-forcebitnodes", strprintf(_("Always query for peer addresses via Bitnodes API (default: %u)"), DEFAULT_FORCEBITNODES));
     strUsage += HelpMessageOpt("-usednsseed=<host>", _("Add a custom DNS seed to use.  If at least one custom DNS seed is set, the default DNS seeds will be ignored."));
     strUsage += HelpMessageOpt("-expeditedblock=<host>", _("Request expedited blocks from this host whenever we are connected to it"));
@@ -414,7 +414,7 @@ CNode* FindLikelyNode(const std::string& addrName)
 {
     LOCK(cs_vNodes);
     BOOST_FOREACH (CNode* pnode, vNodes)
-      if (pnode->addrName.find(addrName) != std::string::npos)
+        if (pnode->addrName.find(addrName) != std::string::npos)
             return (pnode);
     return NULL;
 }
@@ -424,14 +424,14 @@ UniValue expedited(const UniValue& params, bool fHelp)
     string strCommand;
     if (fHelp || params.size() < 2)
         throw runtime_error(
-            "expedited block|tx \"node IP addr\" on|off\n"
-            "\nRequest expedited forwarding of blocks and/or transactions from a node.\nExpedited forwarding sends blocks or transactions to a node before the node requests them.  This reduces latency, potentially at the expense of bandwidth.\n"
-            "\nArguments:\n"
-            "1. \"block | tx\"        (string, required) choose block to send expedited blocks, tx to send expedited transactions\n"
-            "2. \"node ip addr\"     (string, required) The node's IP address or IP and port (see getpeerinfo for nodes)\n"
-            "3. \"on | off\"     (string, required) Turn expedited service on or off\n"
-            "\nExamples:\n" +
-            HelpExampleCli("expedited", "block \"192.168.0.6:8333\" on") + HelpExampleRpc("expedited", "\"block\", \"192.168.0.6:8333\", \"on\""));
+                "expedited block|tx \"node IP addr\" on|off\n"
+                "\nRequest expedited forwarding of blocks and/or transactions from a node.\nExpedited forwarding sends blocks or transactions to a node before the node requests them.  This reduces latency, potentially at the expense of bandwidth.\n"
+                "\nArguments:\n"
+                "1. \"block | tx\"        (string, required) choose block to send expedited blocks, tx to send expedited transactions\n"
+                "2. \"node ip addr\"     (string, required) The node's IP address or IP and port (see getpeerinfo for nodes)\n"
+                "3. \"on | off\"     (string, required) Turn expedited service on or off\n"
+                "\nExamples:\n" +
+                HelpExampleCli("expedited", "block \"192.168.0.6:8333\" on") + HelpExampleRpc("expedited", "\"block\", \"192.168.0.6:8333\", \"on\""));
 
     string obj = params[0].get_str();
     string strNode = params[1].get_str();
@@ -447,32 +447,32 @@ UniValue expedited(const UniValue& params, bool fHelp)
     if (obj.find("tx")!= std::string::npos) flags |= EXPEDITED_TXNS;
     if (obj.find("transaction")!= std::string::npos) flags |= EXPEDITED_TXNS;
     if ((flags & (EXPEDITED_BLOCKS|EXPEDITED_TXNS))==0)
-      {
+    {
         throw runtime_error("Unknown object, give 'block' or 'transaction'");
-      }
+    }
 
     if (params.size() >= 3)
-      {
-      string onoff = params[2].get_str();    
-      if (onoff == "off") flags |= EXPEDITED_STOP;
-      if (onoff == "OFF") flags |= EXPEDITED_STOP;
-      }
+    {
+        string onoff = params[2].get_str();
+        if (onoff == "off") flags |= EXPEDITED_STOP;
+        if (onoff == "OFF") flags |= EXPEDITED_STOP;
+    }
 
     // TODO: validate that the node can handle expedited blocks
 
     // Add or remove this node to our list of upstream nodes
-    std::vector<CNode*>::iterator elem = std::find(xpeditedBlkUp.begin(), xpeditedBlkUp.end(),node); 
+    std::vector<CNode*>::iterator elem = std::find(xpeditedBlkUp.begin(), xpeditedBlkUp.end(),node);
     if ((flags & EXPEDITED_BLOCKS)&&(flags & EXPEDITED_STOP))
-      {
-	if (elem == xpeditedBlkUp.end()) xpeditedBlkUp.erase(elem);
-      }
+    {
+        if (elem == xpeditedBlkUp.end()) xpeditedBlkUp.erase(elem);
+    }
     else if (flags & EXPEDITED_BLOCKS)
-      {
-      if (elem == xpeditedBlkUp.end())  // don't add it twice
+    {
+        if (elem == xpeditedBlkUp.end())  // don't add it twice
         {
-        xpeditedBlkUp.push_back(node);
+            xpeditedBlkUp.push_back(node);
         }
-      }
+    }
 
     // Push the expedited message even if its a repeat to allow the operator to reissue the CLI command to trigger another message.
     node->PushMessage(NetMsgType::XPEDITEDREQUEST,flags);
@@ -484,12 +484,12 @@ UniValue pushtx(const UniValue& params, bool fHelp)
     string strCommand;
     if (fHelp || params.size() != 1)
         throw runtime_error(
-            "pushtx \"node\"\n"
-            "\nPush uncommitted transactions to a node.\n"
-            "\nArguments:\n"
-            "1. \"node\"     (string, required) The node (see getpeerinfo for nodes)\n"
-            "\nExamples:\n" +
-            HelpExampleCli("pushtx", "\"192.168.0.6:8333\" ") + HelpExampleRpc("pushtx", "\"192.168.0.6:8333\", "));
+                "pushtx \"node\"\n"
+                "\nPush uncommitted transactions to a node.\n"
+                "\nArguments:\n"
+                "1. \"node\"     (string, required) The node (see getpeerinfo for nodes)\n"
+                "\nExamples:\n" +
+                HelpExampleCli("pushtx", "\"192.168.0.6:8333\" ") + HelpExampleRpc("pushtx", "\"192.168.0.6:8333\", "));
 
     string strNode = params[0].get_str();
 
@@ -501,11 +501,11 @@ UniValue pushtx(const UniValue& params, bool fHelp)
 
         if (!node) {
 #if 0
-        if (strCommand == "onetry") {
-            CAddress addr;
-            OpenNetworkConnection(addr, NULL, strNode.c_str());
-            return NullUniValue;
-        }
+            if (strCommand == "onetry") {
+                CAddress addr;
+                OpenNetworkConnection(addr, NULL, strNode.c_str());
+                return NullUniValue;
+            }
 #endif
             throw runtime_error("Unknown node");
         }
@@ -514,7 +514,7 @@ UniValue pushtx(const UniValue& params, bool fHelp)
         //    This allows us to release the lock on cs_vNodes earlier while still protecting node from deletion
         node->AddRef();
     }
-    
+
     UnlimitedPushTxns(node);
 
     //BU: Remember to release the reference we took on node to protect from use-after-free
@@ -537,7 +537,7 @@ void UnlimitedPushTxns(CNode* dest)
         if (!fInMemPool)
             continue; // another thread removed since queryHashes, maybe...
         if ((dest->pfilter && dest->pfilter->IsRelevantAndUpdate(tx)) ||
-            (!dest->pfilter))
+                (!dest->pfilter))
             vInv.push_back(inv);
         if (vInv.size() == MAX_INV_SZ) {
             dest->PushMessage("inv", vInv);
@@ -599,25 +599,25 @@ void UnlimitedSetup(void)
     recvAmt.init("net/recv/total");
     recvAmt.init("net/send/total");
     std::vector<std::string> msgTypes = getAllNetMessageTypes();
-    
-    for (std::vector<std::string>::const_iterator i=msgTypes.begin(); i!=msgTypes.end();++i)
-      {
-	new CStatHistory<uint64_t >("net/recv/msg/" +  *i);  // This "leaks" in the sense that it is never freed, but is intended to last the duration of the program.
-	new CStatHistory<uint64_t >("net/send/msg/" +  *i);  // This "leaks" in the sense that it is never freed, but is intended to last the duration of the program.
-      }
 
-    xpeditedBlk.reserve(256); 
+    for (std::vector<std::string>::const_iterator i=msgTypes.begin(); i!=msgTypes.end();++i)
+    {
+        new CStatHistory<uint64_t >("net/recv/msg/" +  *i);  // This "leaks" in the sense that it is never freed, but is intended to last the duration of the program.
+        new CStatHistory<uint64_t >("net/send/msg/" +  *i);  // This "leaks" in the sense that it is never freed, but is intended to last the duration of the program.
+    }
+
+    xpeditedBlk.reserve(256);
     xpeditedBlkUp.reserve(256);
-    xpeditedTxn.reserve(256);  
+    xpeditedTxn.reserve(256);
 
     // make outbound conns modifiable by the user
     int nUserMaxOutConnections = GetArg("-maxoutconnections", DEFAULT_MAX_OUTBOUND_CONNECTIONS);
     nMaxOutConnections = std::max(nUserMaxOutConnections,0);
 
     if (nMaxConnections < nMaxOutConnections) {
-      // uiInterface.ThreadSafeMessageBox((strprintf(_("Reducing -maxoutconnections from %d to %d, because this value is higher than max available connections."), nUserMaxOutConnections, nMaxConnections)),"", CClientUIInterface::MSG_WARNING);
-      LogPrintf("Reducing -maxoutconnections from %d to %d, because this value is higher than max available connections.\n", nUserMaxOutConnections, nMaxConnections);
-      nMaxOutConnections = nMaxConnections;
+        // uiInterface.ThreadSafeMessageBox((strprintf(_("Reducing -maxoutconnections from %d to %d, because this value is higher than max available connections."), nUserMaxOutConnections, nMaxConnections)),"", CClientUIInterface::MSG_WARNING);
+        LogPrintf("Reducing -maxoutconnections from %d to %d, because this value is higher than max available connections.\n", nUserMaxOutConnections, nMaxConnections);
+        nMaxOutConnections = nMaxConnections;
     }
 
 }
@@ -636,22 +636,22 @@ extern void UnlimitedLogBlock(const CBlock& block, const std::string& hash, uint
         fprintf(blockReceiptLog, "%" PRIu64 ",%" PRIu64 ",%ld,%ld,%s\n", receiptTime, (uint64_t)bh.nTime, byteLen, block.vtx.size(), hash.c_str());
         fflush(blockReceiptLog);
     }
-#endif    
+#endif
 }
 
 
 std::string LicenseInfo()
 {
     return FormatParagraph(strprintf(_("Copyright (C) 2015-%i The Bitcoin Unlimited Developers"), COPYRIGHT_YEAR)) + "\n\n" +
-           FormatParagraph(strprintf(_("Portions Copyright (C) 2009-%i The Bitcoin Core Developers"), COPYRIGHT_YEAR)) + "\n\n" +
-           FormatParagraph(strprintf(_("Portions Copyright (C) 2014-%i The Bitcoin XT Developers"), COPYRIGHT_YEAR)) + "\n\n" +
-           "\n" +
-           FormatParagraph(_("This is experimental software.")) + "\n" +
-           "\n" +
-           FormatParagraph(_("Distributed under the MIT software license, see the accompanying file COPYING or <http://www.opensource.org/licenses/mit-license.php>.")) + "\n" +
-           "\n" +
-           FormatParagraph(_("This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit <https://www.openssl.org/> and cryptographic software written by Eric Young and UPnP software written by Thomas Bernard.")) +
-           "\n";
+        FormatParagraph(strprintf(_("Portions Copyright (C) 2009-%i The Bitcoin Core Developers"), COPYRIGHT_YEAR)) + "\n\n" +
+        FormatParagraph(strprintf(_("Portions Copyright (C) 2014-%i The Bitcoin XT Developers"), COPYRIGHT_YEAR)) + "\n\n" +
+        "\n" +
+        FormatParagraph(_("This is experimental software.")) + "\n" +
+        "\n" +
+        FormatParagraph(_("Distributed under the MIT software license, see the accompanying file COPYING or <http://www.opensource.org/licenses/mit-license.php>.")) + "\n" +
+        "\n" +
+        FormatParagraph(_("This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit <https://www.openssl.org/> and cryptographic software written by Eric Young and UPnP software written by Thomas Bernard.")) +
+        "\n";
 }
 
 
@@ -659,12 +659,12 @@ int chainContainsExcessive(const CBlockIndex* blk, unsigned int goBack)
 {
     if (goBack == 0)
         goBack = excessiveAcceptDepth+EXCESSIVE_BLOCK_CHAIN_RESET;
-    for (unsigned int i = 0; i < goBack; i++, blk = blk->pprev) 
+    for (unsigned int i = 0; i < goBack; i++, blk = blk->pprev)
     {
         if (!blk)
-	  break; // we hit the beginning
+            break; // we hit the beginning
         if (blk->nStatus & BLOCK_EXCESSIVE)
-	  return true;
+            return true;
     }
     return false;
 }
@@ -677,18 +677,18 @@ int isChainExcessive(const CBlockIndex* blk, unsigned int goBack)
     bool oldExcessive = false;
     for (unsigned int i = 0; i < goBack; i++, blk = blk->pprev) {
         if (!blk)
-	  break; // we hit the beginning
+            break; // we hit the beginning
         if (blk->nStatus & BLOCK_EXCESSIVE)
-	  recentExcessive = true;
+            recentExcessive = true;
     }
- 
+
     // Once an excessive block is built upon the chain is not excessive even if more large blocks appear.
     // So look back to make sure that this is the "first" excessive block for a while
     for (unsigned int i = 0; i < EXCESSIVE_BLOCK_CHAIN_RESET; i++, blk = blk->pprev) {
         if (!blk)
-	  break; // we hit the beginning
+            break; // we hit the beginning
         if (blk->nStatus & BLOCK_EXCESSIVE)
-	  oldExcessive = true;
+            oldExcessive = true;
     }
 
     return (recentExcessive && !oldExcessive);
@@ -707,42 +707,42 @@ bool CheckExcessive(const CBlock& block, uint64_t blockSize, uint64_t nSigOps, u
 
 extern UniValue getminercomment(const UniValue& params, bool fHelp)
 {
-  if (fHelp || params.size() != 0)
+    if (fHelp || params.size() != 0)
         throw runtime_error(
-            "getminercomment\n"
-            "\nReturn the comment that will be put into each mined block's coinbase\n transaction after the Bitcoin Unlimited parameters."
-            "\nResult\n"
-            "  minerComment (string) miner comment\n"
-            "\nExamples:\n" +
-            HelpExampleCli("getminercomment", "") + HelpExampleRpc("getminercomment", ""));
-  
-  return minerComment;
+                "getminercomment\n"
+                "\nReturn the comment that will be put into each mined block's coinbase\n transaction after the Bitcoin Unlimited parameters."
+                "\nResult\n"
+                "  minerComment (string) miner comment\n"
+                "\nExamples:\n" +
+                HelpExampleCli("getminercomment", "") + HelpExampleRpc("getminercomment", ""));
+
+    return minerComment;
 }
 
 extern UniValue setminercomment(const UniValue& params, bool fHelp)
 {
-  if (fHelp || params.size() != 1)
+    if (fHelp || params.size() != 1)
         throw runtime_error(
-            "setminercomment\n"
-            "\nSet the comment that will be put into each mined block's coinbase\n transaction after the Bitcoin Unlimited parameters.\n Comments that are too long will be truncated."
-            "\nExamples:\n" +
-            HelpExampleCli("setminercomment", "\"bitcoin is fundamentally emergent consensus\"") + HelpExampleRpc("setminercomment", "\"bitcoin is fundamentally emergent consensus\""));
+                "setminercomment\n"
+                "\nSet the comment that will be put into each mined block's coinbase\n transaction after the Bitcoin Unlimited parameters.\n Comments that are too long will be truncated."
+                "\nExamples:\n" +
+                HelpExampleCli("setminercomment", "\"bitcoin is fundamentally emergent consensus\"") + HelpExampleRpc("setminercomment", "\"bitcoin is fundamentally emergent consensus\""));
 
-  minerComment = params[0].getValStr();
-  return NullUniValue;
+    minerComment = params[0].getValStr();
+    return NullUniValue;
 }
 
 UniValue getexcessiveblock(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
-            "getexcessiveblock\n"
-            "\nReturn the excessive block size and accept depth."
-            "\nResult\n"
-            "  excessiveBlockSize (integer) block size in bytes\n"
-            "  excessiveAcceptDepth (integer) if the chain gets this much deeper than the excessive block, then accept the chain as active (if it has the most work)\n"
-            "\nExamples:\n" +
-            HelpExampleCli("getexcessiveblock", "") + HelpExampleRpc("getexcessiveblock", ""));
+                "getexcessiveblock\n"
+                "\nReturn the excessive block size and accept depth."
+                "\nResult\n"
+                "  excessiveBlockSize (integer) block size in bytes\n"
+                "  excessiveAcceptDepth (integer) if the chain gets this much deeper than the excessive block, then accept the chain as active (if it has the most work)\n"
+                "\nExamples:\n" +
+                HelpExampleCli("getexcessiveblock", "") + HelpExampleRpc("getexcessiveblock", ""));
 
     UniValue ret(UniValue::VOBJ);
     ret.push_back(Pair("excessiveBlockSize", (uint64_t)excessiveBlockSize));
@@ -754,13 +754,13 @@ UniValue setexcessiveblock(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() >= 3)
         throw runtime_error(
-            "setexcessiveblock blockSize acceptDepth\n"
-            "\nSet the excessive block size and accept depth.  Excessive blocks will not be used in the active chain or relayed until they are several blocks deep in the blockchain.  This discourages the propagation of blocks that you consider excessively large.  However, if the mining majority of the network builds upon the block then you will eventually accept it, maintaining consensus."
-            "\nResult\n"
-            "  blockSize (integer) excessive block size in bytes\n"
-            "  acceptDepth (integer) if the chain gets this much deeper than the excessive block, then accept the chain as active (if it has the most work)\n"
-            "\nExamples:\n" +
-            HelpExampleCli("getexcessiveblock", "") + HelpExampleRpc("getexcessiveblock", ""));
+                "setexcessiveblock blockSize acceptDepth\n"
+                "\nSet the excessive block size and accept depth.  Excessive blocks will not be used in the active chain or relayed until they are several blocks deep in the blockchain.  This discourages the propagation of blocks that you consider excessively large.  However, if the mining majority of the network builds upon the block then you will eventually accept it, maintaining consensus."
+                "\nResult\n"
+                "  blockSize (integer) excessive block size in bytes\n"
+                "  acceptDepth (integer) if the chain gets this much deeper than the excessive block, then accept the chain as active (if it has the most work)\n"
+                "\nExamples:\n" +
+                HelpExampleCli("getexcessiveblock", "") + HelpExampleRpc("getexcessiveblock", ""));
 
     unsigned int ebs=0;
     if (params[0].isNum())
@@ -771,12 +771,12 @@ UniValue setexcessiveblock(const UniValue& params, bool fHelp)
         ebs = boost::lexical_cast<unsigned int>(temp);
     }
 
-    if (ebs < maxGeneratedBlock) 
-      {
-      std::ostringstream ret;
-      ret << "Sorry, your maximum mined block (" << maxGeneratedBlock << ") is larger than your proposed excessive size (" << ebs << ").  This would cause you to orphan your own blocks.";    
-      throw runtime_error(ret.str());
-      }
+    if (ebs < maxGeneratedBlock)
+    {
+        std::ostringstream ret;
+        ret << "Sorry, your maximum mined block (" << maxGeneratedBlock << ") is larger than your proposed excessive size (" << ebs << ").  This would cause you to orphan your own blocks.";
+        throw runtime_error(ret.str());
+    }
     excessiveBlockSize = ebs;
 
     if (params[1].isNum())
@@ -789,7 +789,7 @@ UniValue setexcessiveblock(const UniValue& params, bool fHelp)
 
     settingsToUserAgentString();
     std::ostringstream ret;
-    ret << "Excessive Block set to " << excessiveBlockSize << " bytes.  Accept Depth set to " << excessiveAcceptDepth << " blocks.";    
+    ret << "Excessive Block set to " << excessiveBlockSize << " bytes.  Accept Depth set to " << excessiveAcceptDepth << " blocks.";
     return UniValue(ret.str());
 }
 
@@ -798,12 +798,12 @@ UniValue getminingmaxblock(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
-            "getminingmaxblock\n"
-            "\nReturn the max generated (mined) block size"
-            "\nResult\n"
-            "      (integer) maximum generated block size in bytes\n"
-            "\nExamples:\n" +
-            HelpExampleCli("getminingmaxblock", "") + HelpExampleRpc("getminingmaxblock", ""));
+                "getminingmaxblock\n"
+                "\nReturn the max generated (mined) block size"
+                "\nResult\n"
+                "      (integer) maximum generated block size in bytes\n"
+                "\nExamples:\n" +
+                HelpExampleCli("getminingmaxblock", "") + HelpExampleRpc("getminingmaxblock", ""));
 
     return maxGeneratedBlock;
 }
@@ -813,14 +813,14 @@ UniValue setminingmaxblock(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
         throw runtime_error(
-            "setminingmaxblock blocksize\n"
-            "\nSet the maximum number of bytes to include in a generated (mined) block.  This command does not turn generation on/off.\n"
-            "\nArguments:\n"
-            "1. blocksize         (integer, required) the maximum number of bytes to include in a block.\n"
-            "\nExamples:\n"
-            "\nSet the generated block size limit to 8 MB\n" +
-            HelpExampleCli("setminingmaxblock", "8000000") +
-            "\nCheck the setting\n" + HelpExampleCli("getminingmaxblock", ""));
+                "setminingmaxblock blocksize\n"
+                "\nSet the maximum number of bytes to include in a generated (mined) block.  This command does not turn generation on/off.\n"
+                "\nArguments:\n"
+                "1. blocksize         (integer, required) the maximum number of bytes to include in a block.\n"
+                "\nExamples:\n"
+                "\nSet the generated block size limit to 8 MB\n" +
+                HelpExampleCli("setminingmaxblock", "8000000") +
+                "\nCheck the setting\n" + HelpExampleCli("getminingmaxblock", ""));
 
     uint64_t arg = 0;
     if (params[0].isNum())
@@ -843,58 +843,58 @@ UniValue setminingmaxblock(const UniValue& params, bool fHelp)
 
 UniValue getblockversion(const UniValue& params, bool fHelp)
 {
-  if (fHelp || params.size() != 0)
+    if (fHelp || params.size() != 0)
         throw runtime_error(
-            "getblockversion\n"
-            "\nReturn the block version used when mining."
-            "\nResult\n"
-            "      (integer) block version number\n"
-            "\nExamples:\n" +
-            HelpExampleCli("getblockversion", "") + HelpExampleRpc("getblockversion", ""));
-  const CBlockIndex* pindex = chainActive.Tip();
-  return UnlimitedComputeBlockVersion(pindex, Params().GetConsensus(),pindex->nTime);
-      
+                "getblockversion\n"
+                "\nReturn the block version used when mining."
+                "\nResult\n"
+                "      (integer) block version number\n"
+                "\nExamples:\n" +
+                HelpExampleCli("getblockversion", "") + HelpExampleRpc("getblockversion", ""));
+    const CBlockIndex* pindex = chainActive.Tip();
+    return UnlimitedComputeBlockVersion(pindex, Params().GetConsensus(),pindex->nTime);
+
 }
 
 UniValue setblockversion(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error(
-            "setblockversion blockVersionNumber\n"
-            "\nSet the block version number.\n"
-            "\nArguments:\n"
-            "1. blockVersionNumber         (integer, hex integer, 'BIP109', 'BASE' or 'default'.  Required) The block version number.\n"
-            "\nExamples:\n"
-            "\nVote for 2MB blocks\n" +
-            HelpExampleCli("setblockversion", "BIP109") +
-            "\nCheck the setting\n" + HelpExampleCli("getblockversion", ""));
+                "setblockversion blockVersionNumber\n"
+                "\nSet the block version number.\n"
+                "\nArguments:\n"
+                "1. blockVersionNumber         (integer, hex integer, 'BIP109', 'BASE' or 'default'.  Required) The block version number.\n"
+                "\nExamples:\n"
+                "\nVote for 2MB blocks\n" +
+                HelpExampleCli("setblockversion", "BIP109") +
+                "\nCheck the setting\n" + HelpExampleCli("getblockversion", ""));
 
     uint32_t arg = 0;
 
     string temp = params[0].get_str();
     if (temp == "default")
-      {
+    {
         arg = 0;
-      }
+    }
     else if (temp == "BIP109")
-      {
+    {
         arg = BASE_VERSION | FORK_BIT_2MB;
-      }
+    }
     else if (temp == "BASE")
-      {
+    {
         arg = BASE_VERSION;
-      }
+    }
     else if ((temp[0] == '0') && (temp[1] == 'x'))
-      {
+    {
         std::stringstream ss;
         ss << std::hex << (temp.c_str()+2);
         ss >> arg;
-      }
+    }
     else
-      {
-      arg = boost::lexical_cast<unsigned int>(temp);
-      }
-   
+    {
+        arg = boost::lexical_cast<unsigned int>(temp);
+    }
+
     blockVersion = arg;
 
     return NullUniValue;
@@ -924,19 +924,19 @@ UniValue gettrafficshaping(const UniValue& params, bool fHelp)
 
     if (fHelp || (params.size() != 0))
         throw runtime_error(
-            "gettrafficshaping"
-            "\nReturns the current settings for the network send and receive bandwidth and burst in kilobytes per second.\n"
-            "\nArguments: None\n"
-            "\nResult:\n"
-            "  {\n"
-            "    \"sendBurst\" : 40,   (string) The maximum send bandwidth in Kbytes/sec\n"
-            "    \"sendAve\" : 30,   (string) The average send bandwidth in Kbytes/sec\n"
-            "    \"recvBurst\" : 20,   (string) The maximum receive bandwidth in Kbytes/sec\n"
-            "    \"recvAve\" : 10,   (string) The average receive bandwidth in Kbytes/sec\n"
-            "  }\n"
-            "\n NOTE: if the send and/or recv parameters do not exist, shaping in that direction is disabled.\n"
-            "\nExamples:\n" +
-            HelpExampleCli("gettrafficshaping", "") + HelpExampleRpc("gettrafficshaping", ""));
+                "gettrafficshaping"
+                "\nReturns the current settings for the network send and receive bandwidth and burst in kilobytes per second.\n"
+                "\nArguments: None\n"
+                "\nResult:\n"
+                "  {\n"
+                "    \"sendBurst\" : 40,   (string) The maximum send bandwidth in Kbytes/sec\n"
+                "    \"sendAve\" : 30,   (string) The average send bandwidth in Kbytes/sec\n"
+                "    \"recvBurst\" : 20,   (string) The maximum receive bandwidth in Kbytes/sec\n"
+                "    \"recvAve\" : 10,   (string) The average receive bandwidth in Kbytes/sec\n"
+                "  }\n"
+                "\n NOTE: if the send and/or recv parameters do not exist, shaping in that direction is disabled.\n"
+                "\nExamples:\n" +
+                HelpExampleCli("gettrafficshaping", "") + HelpExampleRpc("gettrafficshaping", ""));
 
     UniValue ret(UniValue::VOBJ);
     int64_t max, avg;
@@ -978,14 +978,14 @@ UniValue settrafficshaping(const UniValue& params, bool fHelp)
 
     if (fHelp || badArg || bucket == NULL)
         throw runtime_error(
-            "settrafficshaping \"send|receive\" \"burstKB\" \"averageKB\""
-            "\nSets the network send or receive bandwidth and burst in kilobytes per second.\n"
-            "\nArguments:\n"
-            "1. \"send|receive\"     (string, required) Are you setting the transmit or receive bandwidth\n"
-            "2. \"burst\"  (integer, required) Specify the maximum burst size in Kbytes/sec (actual max will be 1 packet larger than this number)\n"
-            "2. \"average\"  (integer, required) Specify the average throughput in Kbytes/sec\n"
-            "\nExamples:\n" +
-            HelpExampleCli("settrafficshaping", "\"receive\" 10000 1024") + HelpExampleCli("settrafficshaping", "\"receive\" disable") + HelpExampleRpc("settrafficshaping", "\"receive\" 10000 1024"));
+                "settrafficshaping \"send|receive\" \"burstKB\" \"averageKB\""
+                "\nSets the network send or receive bandwidth and burst in kilobytes per second.\n"
+                "\nArguments:\n"
+                "1. \"send|receive\"     (string, required) Are you setting the transmit or receive bandwidth\n"
+                "2. \"burst\"  (integer, required) Specify the maximum burst size in Kbytes/sec (actual max will be 1 packet larger than this number)\n"
+                "2. \"average\"  (integer, required) Specify the average throughput in Kbytes/sec\n"
+                "\nExamples:\n" +
+                HelpExampleCli("settrafficshaping", "\"receive\" 10000 1024") + HelpExampleCli("settrafficshaping", "\"receive\" disable") + HelpExampleRpc("settrafficshaping", "\"receive\" 10000 1024"));
 
     if (disable) {
         if (bucket)
@@ -1007,7 +1007,7 @@ UniValue settrafficshaping(const UniValue& params, bool fHelp)
         }
         if (burst < ave) {
             throw runtime_error("Burst rate must be greater than the average rate"
-                                "\nsettrafficshaping \"send|receive\" \"burst\" \"average\"");
+                    "\nsettrafficshaping \"send|receive\" \"burst\" \"average\"");
         }
 
         bucket->set(burst * 1024, ave * 1024);
@@ -1018,7 +1018,7 @@ UniValue settrafficshaping(const UniValue& params, bool fHelp)
 
 
 /**
- *  BUIP010 Xtreme Thinblocks Section 
+ *  BUIP010 Xtreme Thinblocks Section
  */
 bool HaveConnectThinblockNodes()
 {
@@ -1027,22 +1027,22 @@ bool HaveConnectThinblockNodes()
     {
         LOCK(cs_vNodes);
         BOOST_FOREACH (CNode* pnode, vNodes) {
-           int pos = pnode->addrName.rfind(":");
-           if (pos <= 0 )
-               vNodesIP.push_back(pnode->addrName);
-           else
-               vNodesIP.push_back(pnode->addrName.substr(0, pos));
+            int pos = pnode->addrName.rfind(":");
+            if (pos <= 0 )
+                vNodesIP.push_back(pnode->addrName);
+            else
+                vNodesIP.push_back(pnode->addrName.substr(0, pos));
         }
     }
 
     // Create a set used to check for cross connected nodes.
     // A cross connected node is one where we have a connect-thinblock connection to
     // but we also have another inbound connection which is also using
-    // connect-thinblock. In those cases we have created a dead-lock where no blocks 
-    // can be downloaded unless we also have at least one additional connect-thinblock 
+    // connect-thinblock. In those cases we have created a dead-lock where no blocks
+    // can be downloaded unless we also have at least one additional connect-thinblock
     // connection to a different node.
     std::set<std::string> nNotCrossConnected;
- 
+
     int nConnectionsOpen = 0;
     BOOST_FOREACH(const std::string& strAddrNode, mapMultiArgs["-connect-thinblock"]) {
         std::string strThinblockNode;
@@ -1066,7 +1066,7 @@ bool HaveConnectThinblockNodes()
     else if (nConnectionsOpen > 0)
         LogPrint("thin", "You have a cross connected thinblock node - we may download regular blocks until you resolve the issue\n");
     return false; // Connections are either not open or they are cross connected.
-} 
+}
 
 
 bool HaveThinblockNodes()
@@ -1107,7 +1107,7 @@ void ClearThinBlockTimer(uint256 hash)
     }
 }
 
-bool IsThinBlocksEnabled() 
+bool IsThinBlocksEnabled()
 {
     return GetBoolArg("-use-thinblocks", true);
 }
@@ -1121,7 +1121,7 @@ bool CanThinBlockBeDownloaded(CNode* pto)
 
         // When -connect-thinblock-force is true we will only download thinblocks from a peer or peers that
         // are using -connect-thinblock=<ip>.  This is an undocumented setting used for setting up performance testing
-        // of thinblocks, such as, going over the GFC and needing to have thinblocks always come from the same peer or 
+        // of thinblocks, such as, going over the GFC and needing to have thinblocks always come from the same peer or
         // group of peers.  Also, this is a one way street.  Thinblocks will flow ONLY from the remote peer to the peer
         // that has invoked -connect-thinblock.
 
@@ -1135,17 +1135,17 @@ bool CanThinBlockBeDownloaded(CNode* pto)
 
 // fIsChainNearlySyncd is updated only during startup and whenever we receive a header.
 // This way we avoid having to lock cs_main so often which tends to be a bottleneck.
-void IsChainNearlySyncdInit() 
+void IsChainNearlySyncdInit()
 {
     LOCK2(cs_main, cs_ischainnearlysyncd);
     if (!pindexBestHeader) fIsChainNearlySyncd = false;  // Not nearly synced if we don't have any blocks!
     else
-      {
-      if(chainActive.Height() < pindexBestHeader->nHeight - 2)
-        fIsChainNearlySyncd = false;
-      else
-        fIsChainNearlySyncd = true;
-      }
+    {
+        if(chainActive.Height() < pindexBestHeader->nHeight - 2)
+            fIsChainNearlySyncd = false;
+        else
+            fIsChainNearlySyncd = true;
+    }
 }
 
 bool IsChainNearlySyncd()
@@ -1185,8 +1185,8 @@ void BuildSeededBloomFilter(CBloomFilter& filterMemPool, std::vector<uint256>& v
     // Logically this should be the same size as the DEFAULT_BLOCK_PRIORITY_SIZE however,
     // we can't be sure that a miner won't decide to mine more high priority txs and therefore
     // by including a full blocks worth of high priority tx's we cover every scenario.  And when we
-    // go on to add the high fee tx's there will be an intersection between the two which then makes 
-    // the total number of tx's that go into the bloom filter smaller than just the sum of the two.  
+    // go on to add the high fee tx's there will be an intersection between the two which then makes
+    // the total number of tx's that go into the bloom filter smaller than just the sum of the two.
     uint64_t nBlockPrioritySize = LargestBlockSeen() * 1.5;
 
     // Largest projected block size used to add the high fee transactions.  We multiply it by an
@@ -1198,22 +1198,22 @@ void BuildSeededBloomFilter(CBloomFilter& filterMemPool, std::vector<uint256>& v
     TxCoinAgePriorityCompare pricomparer;
     {
         LOCK2(cs_main, mempool.cs);
-        if (mempool.mapTx.size() > 0) 
+        if (mempool.mapTx.size() > 0)
         {
             CBlockIndex* pindexPrev = chainActive.Tip();
             const int nHeight = pindexPrev->nHeight + 1;
             const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
 
             int64_t nLockTimeCutoff = (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST)
-                                    ? nMedianTimePast
-                                    : GetAdjustedTime();
+                ? nMedianTimePast
+                : GetAdjustedTime();
 
             // Create a sorted list of transactions and their updated priorities.  This will be used to fill
             // the mempoolhashes with the expected priority area of the next block.  We will multiply this by
             // a factor of ? to account for any differences between the "Miners".
             vPriority.reserve(mempool.mapTx.size());
             for (CTxMemPool::indexed_transaction_set::iterator mi = mempool.mapTx.begin();
-                 mi != mempool.mapTx.end(); mi++)
+                    mi != mempool.mapTx.end(); mi++)
             {
                 double dPriority = mi->GetPriority(nHeight);
                 CAmount dummy;
@@ -1239,11 +1239,11 @@ void BuildSeededBloomFilter(CBloomFilter& filterMemPool, std::vector<uint256>& v
                     if (!setPriorityMemPoolHashes.count(childHash)) {
                         setPriorityMemPoolHashes.insert(childHash);
                         nPrioritySize += child->GetTxSize();
-                        LogPrint("bloom", "add priority child %s with fee %d modified fee %d size %d clearatentry %d priority %f\n", 
-                                       child->GetTx().GetHash().ToString(), child->GetFee(), child->GetModifiedFee(), 
-                                       child->GetTxSize(), child->WasClearAtEntry(), child->GetPriority(nHeight));
+                        LogPrint("bloom", "add priority child %s with fee %d modified fee %d size %d clearatentry %d priority %f\n",
+                                child->GetTx().GetHash().ToString(), child->GetFee(), child->GetModifiedFee(),
+                                child->GetTxSize(), child->WasClearAtEntry(), child->GetPriority(nHeight));
                     }
-                }            
+                }
             }
 
             // Create a list of high score transactions. We will multiply this by
@@ -1266,9 +1266,9 @@ void BuildSeededBloomFilter(CBloomFilter& filterMemPool, std::vector<uint256>& v
                 iter = mempool.mapTx.project<0>(mi);
                 if (!setHighScoreMemPoolHashes.count(tx.GetHash()))
                 {
-                    LogPrint("bloom", "next tx is %s blocksize %d fee %d modified fee %d size %d clearatentry %d priority %f\n", 
-                                   mi->GetTx().GetHash().ToString(), nBlockSize, mi->GetFee(), mi->GetModifiedFee(), mi->GetTxSize(), 
-                                   mi->WasClearAtEntry(), mi->GetPriority(nHeight));
+                    LogPrint("bloom", "next tx is %s blocksize %d fee %d modified fee %d size %d clearatentry %d priority %f\n",
+                            mi->GetTx().GetHash().ToString(), nBlockSize, mi->GetFee(), mi->GetModifiedFee(), mi->GetTxSize(),
+                            mi->WasClearAtEntry(), mi->GetPriority(nHeight));
 
                     // add tx to the set: we don't know if this is a parent or child yet.
                     setHighScoreMemPoolHashes.insert(tx.GetHash());
@@ -1281,9 +1281,9 @@ void BuildSeededBloomFilter(CBloomFilter& filterMemPool, std::vector<uint256>& v
                         uint256 parentHash = parent->GetTx().GetHash();
                         if (!setHighScoreMemPoolHashes.count(parentHash)) {
                             setHighScoreMemPoolHashes.insert(parentHash);
-                            LogPrint("bloom", "add high score parent %s with blocksize %d fee %d modified fee %d size %d clearatentry %d priority %f\n", 
-                                           parent->GetTx().GetHash().ToString(), nBlockSize, parent->GetFee(), parent->GetModifiedFee(), 
-                                           parent->GetTxSize(), parent->WasClearAtEntry(), parent->GetPriority(nHeight));
+                            LogPrint("bloom", "add high score parent %s with blocksize %d fee %d modified fee %d size %d clearatentry %d priority %f\n",
+                                    parent->GetTx().GetHash().ToString(), nBlockSize, parent->GetFee(), parent->GetModifiedFee(),
+                                    parent->GetTxSize(), parent->WasClearAtEntry(), parent->GetPriority(nHeight));
                         }
                     }
 
@@ -1295,13 +1295,13 @@ void BuildSeededBloomFilter(CBloomFilter& filterMemPool, std::vector<uint256>& v
                         uint256 childHash = child->GetTx().GetHash();
                         if (!setHighScoreMemPoolHashes.count(childHash)) {
                             setHighScoreMemPoolHashes.insert(childHash);
-                            LogPrint("bloom", "add high score child %s with blocksize %d fee %d modified fee %d size %d clearatentry %d priority %f\n", 
-                                           child->GetTx().GetHash().ToString(), nBlockSize, child->GetFee(), child->GetModifiedFee(), 
-                                           child->GetTxSize(), child->WasClearAtEntry(), child->GetPriority(nHeight));
+                            LogPrint("bloom", "add high score child %s with blocksize %d fee %d modified fee %d size %d clearatentry %d priority %f\n",
+                                    child->GetTx().GetHash().ToString(), nBlockSize, child->GetFee(), child->GetModifiedFee(),
+                                    child->GetTxSize(), child->WasClearAtEntry(), child->GetPriority(nHeight));
                         }
                     }
 
-                    // If a tx with no parents and no children, then we increment this block size.  
+                    // If a tx with no parents and no children, then we increment this block size.
                     // We don't want to add parents and children to the size because for tx's with many children, miners may not mine them
                     // as they are not as profitable but we still have to add their hash to the bloom filter in case they do.
                     if (!fChild && !fHasChildren)
@@ -1329,7 +1329,7 @@ void BuildSeededBloomFilter(CBloomFilter& filterMemPool, std::vector<uint256>& v
     //static double nGrowthCoefficient = 0.8831; // use for nMinFalsePositive = 0.0001 and nMaxFalsePositive = 0.02 for 6 hour growth period
     //static double nGrowthCoefficient = 0.1921; // use for nMinFalsePositive = 0.0001 and nMaxFalsePositive = 0.01 for 24 hour growth period
     static double nGrowthCoefficient = 0.0544; // use for nMinFalsePositive = 0.0001 and nMaxFalsePositive = 0.005 for 72 hour growth period
-    static double nMinFalsePositive = 0.0001; // starting value for false positive 
+    static double nMinFalsePositive = 0.0001; // starting value for false positive
     static double nMaxFalsePositive = 0.005; // maximum false positive rate at end of decay
     // TODO: automatically calculate the nGrowthCoefficient from nHoursToGrow, nMinFalsePositve and nMaxFalsePositive
 
@@ -1341,7 +1341,7 @@ void BuildSeededBloomFilter(CBloomFilter& filterMemPool, std::vector<uint256>& v
     unsigned int nSelectedTxHashes = setHighScoreMemPoolHashes.size() + vOrphanHashes.size() + setPriorityMemPoolHashes.size();
     unsigned int nElements = std::max(nSelectedTxHashes, (unsigned int)1); // Must make sure nElements is greater than zero or will assert
 
-    // Calculate the new False Positive rate.  
+    // Calculate the new False Positive rate.
     // We increase the false positive rate as time increases, starting at nMinFalsePositive and with growth governed by nGrowthCoefficient,
     // using the simple exponential growth function as follows:
     // y = (starting or minimum fprate: nMinFalsePositive) * e ^ (time in hours from start * nGrowthCoefficient)
@@ -1351,9 +1351,9 @@ void BuildSeededBloomFilter(CBloomFilter& filterMemPool, std::vector<uint256>& v
         nFPRate = nMaxFalsePositive;
 
     filterMemPool = CBloomFilter(nElements, nFPRate, insecure_rand(), BLOOM_UPDATE_ALL);
-    LogPrint("thin", "FPrate: %f Num elements in bloom filter:%d high priority txs:%d high fee txs:%d orphans:%d total txs in mempool:%d\n", 
-              nFPRate, nElements, setPriorityMemPoolHashes.size(), 
-              setHighScoreMemPoolHashes.size(), vOrphanHashes.size(), mempool.mapTx.size());
+    LogPrint("thin", "FPrate: %f Num elements in bloom filter:%d high priority txs:%d high fee txs:%d orphans:%d total txs in mempool:%d\n",
+            nFPRate, nElements, setPriorityMemPoolHashes.size(),
+            setHighScoreMemPoolHashes.size(), vOrphanHashes.size(), mempool.mapTx.size());
 
     // Add the selected tx hashes to the bloom filter
     BOOST_FOREACH(uint256 txHash, setPriorityMemPoolHashes)
@@ -1402,14 +1402,14 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, CBlock &block, c
     if (state.IsInvalid(nDoS)) {
         LogPrintf("Invalid block due to %s\n", state.GetRejectReason().c_str());
         if (!strCommand.empty())
-	  {
-          pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
-                           state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
-          if (nDoS > 0) {
-            LOCK(cs_main);
-            Misbehaving(pfrom->GetId(), nDoS);
-          }
-	}
+        {
+            pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
+                    state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
+            if (nDoS > 0) {
+                LOCK(cs_main);
+                Misbehaving(pfrom->GetId(), nDoS);
+            }
+        }
     }
     else {
         LargestBlockSeen(nSizeBlock); // update largest block seen
@@ -1424,7 +1424,7 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, CBlock &block, c
     }
 
     // When we request a thinblock we may get back a regular block if it is smaller than a thinblock
-    // Therefore we have to remove the thinblock in flight if it exists and we also need to check that 
+    // Therefore we have to remove the thinblock in flight if it exists and we also need to check that
     // the block didn't arrive from some other peer.  This code ALSO cleans up the thin block that
     // was passed to us (&block), so do not use it after this.
     {
@@ -1433,7 +1433,7 @@ void HandleBlockMessage(CNode *pfrom, const string &strCommand, CBlock &block, c
             LOCK(cs_vNodes);
             BOOST_FOREACH(CNode* pnode, vNodes) {
                 if (pnode->mapThinBlocksInFlight.count(inv.hash)) {
-                    pnode->mapThinBlocksInFlight.erase(inv.hash); 
+                    pnode->mapThinBlocksInFlight.erase(inv.hash);
                     pnode->thinBlockWaitingForTxns = -1;
                     pnode->thinBlock.SetNull();
                 }
@@ -1473,51 +1473,51 @@ void ConnectToThinBlockNodes()
 
 bool CheckAndRequestExpeditedBlocks(CNode* pfrom)
 {
-  if (pfrom->nVersion >= EXPEDITED_VERSION)
+    if (pfrom->nVersion >= EXPEDITED_VERSION)
     {
-      BOOST_FOREACH(string& strAddr, mapMultiArgs["-expeditedblock"]) 
+        BOOST_FOREACH(string& strAddr, mapMultiArgs["-expeditedblock"])
         {
-          // Add the peer's listening port if it is empty
-          int pos1 = strAddr.rfind(":");
-          int pos2 = strAddr.rfind("]:");
-          if (pos1 <= 0 && pos2 <= 0)
-              strAddr += ':' + boost::lexical_cast<std::string>(pfrom->addrFromPort);
+            // Add the peer's listening port if it is empty
+            int pos1 = strAddr.rfind(":");
+            int pos2 = strAddr.rfind("]:");
+            if (pos1 <= 0 && pos2 <= 0)
+                strAddr += ':' + boost::lexical_cast<std::string>(pfrom->addrFromPort);
 
-          string strListeningPeerIP;
-          string strPeerIP = pfrom->addr.ToString();
-          pos1 = strPeerIP.rfind(":");
-          pos2 = strPeerIP.rfind("]:");
-          // Handle both ipv4 and ipv6 cases
-          if (pos1 <= 0 && pos2 <= 0) 
-              strListeningPeerIP = strPeerIP + ':' + boost::lexical_cast<std::string>(pfrom->addrFromPort);
-          else if (pos1 > 0)
-              strListeningPeerIP = strPeerIP.substr(0, pos1) + ':' + boost::lexical_cast<std::string>(pfrom->addrFromPort);
-          else
-              strListeningPeerIP = strPeerIP.substr(0, pos2) + ':' + boost::lexical_cast<std::string>(pfrom->addrFromPort);
+            string strListeningPeerIP;
+            string strPeerIP = pfrom->addr.ToString();
+            pos1 = strPeerIP.rfind(":");
+            pos2 = strPeerIP.rfind("]:");
+            // Handle both ipv4 and ipv6 cases
+            if (pos1 <= 0 && pos2 <= 0)
+                strListeningPeerIP = strPeerIP + ':' + boost::lexical_cast<std::string>(pfrom->addrFromPort);
+            else if (pos1 > 0)
+                strListeningPeerIP = strPeerIP.substr(0, pos1) + ':' + boost::lexical_cast<std::string>(pfrom->addrFromPort);
+            else
+                strListeningPeerIP = strPeerIP.substr(0, pos2) + ':' + boost::lexical_cast<std::string>(pfrom->addrFromPort);
 
-	  if(strAddr == strListeningPeerIP)
+            if(strAddr == strListeningPeerIP)
             {
-              if (!IsThinBlocksEnabled())
+                if (!IsThinBlocksEnabled())
                 {
-                  LogPrintf("You do not have Thinblocks enabled.  You can not request expedited blocks from peer %s (%d).\n", strListeningPeerIP, pfrom->id);
-                  return false;
+                    LogPrintf("You do not have Thinblocks enabled.  You can not request expedited blocks from peer %s (%d).\n", strListeningPeerIP, pfrom->id);
+                    return false;
                 }
-              else if (!pfrom->ThinBlockCapable())
+                else if (!pfrom->ThinBlockCapable())
                 {
-                  LogPrintf("Thinblocks is not enabled on remote peer.  You can not request expedited blocks from peer %s (%d).\n", strListeningPeerIP, pfrom->id);
-                  return false;
+                    LogPrintf("Thinblocks is not enabled on remote peer.  You can not request expedited blocks from peer %s (%d).\n", strListeningPeerIP, pfrom->id);
+                    return false;
                 }
-              else
+                else
                 {
-                  LogPrintf("Requesting expedited blocks from peer %s (%d).\n", strListeningPeerIP, pfrom->id);
-                  pfrom->PushMessage(NetMsgType::XPEDITEDREQUEST, ((uint64_t) EXPEDITED_BLOCKS));
-                  xpeditedBlkUp.push_back(pfrom);
-                  return true;
+                    LogPrintf("Requesting expedited blocks from peer %s (%d).\n", strListeningPeerIP, pfrom->id);
+                    pfrom->PushMessage(NetMsgType::XPEDITEDREQUEST, ((uint64_t) EXPEDITED_BLOCKS));
+                    xpeditedBlkUp.push_back(pfrom);
+                    return true;
                 }
             }
         }
     }
-  return false;
+    return false;
 }
 
 void CheckNodeSupportForThinBlocks()
@@ -1529,8 +1529,8 @@ void CheckNodeSupportForThinBlocks()
         BOOST_FOREACH(string& strAddr, mapMultiArgs["-connect-thinblock"]) {
             if(CNode* pnode = FindNode(strAddr)) {
                 if(!pnode->ThinBlockCapable()) {
-                    LogPrintf("ERROR: You are trying to use connect-thinblocks but to a node that does not support it - Protocol Version: %d peer=%d\n", 
-                               pnode->nVersion, pnode->id);
+                    LogPrintf("ERROR: You are trying to use connect-thinblocks but to a node that does not support it - Protocol Version: %d peer=%d\n",
+                            pnode->nVersion, pnode->id);
                 }
             }
         }
@@ -1588,9 +1588,9 @@ void SendXThinBlock(CBlock &block, CNode* pfrom, const CInv &inv)
         }
     }
     else
-      {
-	assert(0);  // inv type is not correct 
-      }
+    {
+        assert(0);  // inv type is not correct
+    }
     pfrom->blocksSent += 1;
 }
 
@@ -1625,36 +1625,36 @@ bool TestConservativeBlockValidity(CValidationState& state, const CChainParams& 
 
 CStatBase* FindStatistic(const char* name)
 {
-  CStatMap::iterator item = statistics.find(name);
-  if (item != statistics.end())
-    return item->second;
-  return NULL;
+    CStatMap::iterator item = statistics.find(name);
+    if (item != statistics.end())
+        return item->second;
+    return NULL;
 }
 
 UniValue getstatlist(const UniValue& params, bool fHelp)
 {
-  if (fHelp || (params.size() != 0))
+    if (fHelp || (params.size() != 0))
         throw runtime_error(
-            "getstatlist"
-            "\nReturns a list of all statistics available on this node.\n"
-            "\nArguments: None\n"
-            "\nResult:\n"
-            "  {\n"
-            "    \"name\" : (string) name of the statistic\n"
-            "    ...\n"
-            "  }\n"
-            "\nExamples:\n" +
-            HelpExampleCli("getstatlist", "") + HelpExampleRpc("getstatlist", ""));
+                "getstatlist"
+                "\nReturns a list of all statistics available on this node.\n"
+                "\nArguments: None\n"
+                "\nResult:\n"
+                "  {\n"
+                "    \"name\" : (string) name of the statistic\n"
+                "    ...\n"
+                "  }\n"
+                "\nExamples:\n" +
+                HelpExampleCli("getstatlist", "") + HelpExampleRpc("getstatlist", ""));
 
-  CStatMap::iterator it;
+    CStatMap::iterator it;
 
-  UniValue ret(UniValue::VARR);
-  for (it = statistics.begin(); it != statistics.end(); ++it)
+    UniValue ret(UniValue::VARR);
+    for (it = statistics.begin(); it != statistics.end(); ++it)
     {
-    ret.push_back(it->first);
+        ret.push_back(it->first);
     }
 
-  return ret;
+    return ret;
 }
 
 UniValue getstat(const UniValue& params, bool fHelp)
@@ -1664,79 +1664,79 @@ UniValue getstat(const UniValue& params, bool fHelp)
     int count = 0;
     if (params.size() < 3) count = 1;  // if a count is not specified, give the latest sample
     else
-      {
-	if (!params[2].isNum()) 
-	  {
-          try
-	    {
-	      count =  boost::lexical_cast<int>(params[2].get_str());
-	    }
-          catch (const boost::bad_lexical_cast &)
-	    {
-            fHelp=true;
-            specificIssue = "Invalid argument 3 \"count\" -- not a number";
-  	    }
-	  }
+    {
+        if (!params[2].isNum())
+        {
+            try
+            {
+                count =  boost::lexical_cast<int>(params[2].get_str());
+            }
+            catch (const boost::bad_lexical_cast &)
+            {
+                fHelp=true;
+                specificIssue = "Invalid argument 3 \"count\" -- not a number";
+            }
+        }
         else
-	  {
-	    count = params[2].get_int();
-	  }
-      }
+        {
+            count = params[2].get_int();
+        }
+    }
     if (fHelp || (params.size() < 1))
         throw runtime_error(
-            "getstat"
-            "\nReturns the current settings for the network send and receive bandwidth and burst in kilobytes per second.\n"
-            "\nArguments: \n"
-            "1. \"statistic\"     (string, required) Specify what statistic you want\n"
-            "2. \"series\"  (string, optional) Specify what data series you want.  Options are \"total\", \"now\",\"all\", \"sec10\", \"min5\", \"hourly\", \"daily\",\"monthly\".  Default is all.\n"
-            "3. \"count\"  (string, optional) Specify the number of samples you want.\n"
+                "getstat"
+                "\nReturns the current settings for the network send and receive bandwidth and burst in kilobytes per second.\n"
+                "\nArguments: \n"
+                "1. \"statistic\"     (string, required) Specify what statistic you want\n"
+                "2. \"series\"  (string, optional) Specify what data series you want.  Options are \"total\", \"now\",\"all\", \"sec10\", \"min5\", \"hourly\", \"daily\",\"monthly\".  Default is all.\n"
+                "3. \"count\"  (string, optional) Specify the number of samples you want.\n"
 
-            "\nResult:\n"
-            "  {\n"
-            "    \"<statistic name>\"\n"
-            "    {\n"
-            "    \"<series name>\"\n"
-            "      [\n"
-            "      <data>, (any type) The data points in the series\n"
-            "      ],\n"
-            "    ...\n"
-            "    },\n"
-            "  ...\n"            
-            "  }\n"
-            "\nExamples:\n" +
-            HelpExampleCli("getstat", "") + HelpExampleRpc("getstat", "")
-            + "\n" + specificIssue);
+                "\nResult:\n"
+                "  {\n"
+                "    \"<statistic name>\"\n"
+                "    {\n"
+                "    \"<series name>\"\n"
+                "      [\n"
+                "      <data>, (any type) The data points in the series\n"
+                "      ],\n"
+                "    ...\n"
+                "    },\n"
+                "  ...\n"
+                "  }\n"
+                "\nExamples:\n" +
+                HelpExampleCli("getstat", "") + HelpExampleRpc("getstat", "")
+                + "\n" + specificIssue);
 
     UniValue ret(UniValue::VARR);
 
     string seriesStr;
     if (params.size() < 2)
-      seriesStr = "total";
+        seriesStr = "total";
     else seriesStr = params[1].get_str();
-    //uint_t series = 0; 
+    //uint_t series = 0;
     //if (series == "now") series |= 1;
     //if (series == "all") series = 0xfffffff;
 
     CStatBase* base = FindStatistic(params[0].get_str().c_str());
     if (base)
-      {
+    {
         UniValue ustat(UniValue::VOBJ);
         if (seriesStr == "now")
-          {
-	    ustat.push_back(Pair("now", base->GetNow()));
-	  }
+        {
+            ustat.push_back(Pair("now", base->GetNow()));
+        }
         else if (seriesStr == "total")
-          {
-	    ustat.push_back(Pair("total", base->GetTotal()));
-	  }
+        {
+            ustat.push_back(Pair("total", base->GetTotal()));
+        }
         else
-	  {
+        {
             UniValue series = base->GetSeries(seriesStr,count);
-	    ustat.push_back(Pair(seriesStr,series));
-	  }
+            ustat.push_back(Pair(seriesStr,series));
+        }
 
-        ret.push_back(ustat);  
-      }
+        ret.push_back(ustat);
+    }
 
     return ret;
 }
