@@ -2204,9 +2204,9 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                     int64_t nFreezeLockTime = 0;
                     if (isFreezeCLTV(*this, coin.first->vout[coin.second].scriptPubKey, nFreezeLockTime))
                     {
-						if (nFreezeLockTime > LOCKTIME_THRESHOLD)
-							txNew.nLockTime = chainActive.Tip()->GetMedianTimePast();
-                	}
+                        if (nFreezeLockTime > LOCKTIME_THRESHOLD)
+                            txNew.nLockTime = chainActive.Tip()->GetMedianTimePast();
+                    }
                 }
 
                 // Sign
