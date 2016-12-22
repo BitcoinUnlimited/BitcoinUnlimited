@@ -135,7 +135,8 @@ static const char *FEE_ESTIMATES_FILENAME = "fee_estimates.dat";
 // shutdown thing.
 //
 
-volatile bool fRequestShutdown = false;
+std::atomic<bool> fRequestShutdown{false};
+std::atomic<bool> fDumpMempoolLater{false};
 
 void StartShutdown() { fRequestShutdown = true; }
 bool ShutdownRequested() { return fRequestShutdown; }
@@ -222,7 +223,8 @@ void Shutdown()
     StopNode();
     StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
-    DumpMempool();
+    if (fDumpMempoolLater)
+        DumpMempool();
 
     if (fFeeEstimatesInitialized)
     {
@@ -466,6 +468,7 @@ void ThreadImport(std::vector<fs::path> vImportFiles)
     }
 
     LoadMempool();
+    fDumpMempoolLater = !fRequestShutdown;
 }
 
 /** Sanity checks

@@ -1147,7 +1147,6 @@ CTransactionRef CTxMemPool::get(const uint256 &hash) const
 
 static TxMempoolInfo GetInfo(CTxMemPool::indexed_transaction_set::const_iterator it)
 {
-    AssertLockHeld(cs);
     return TxMempoolInfo{
         it->GetSharedTx(), it->GetTime(), CFeeRate(it->GetFee(), it->GetTxSize()), it->GetModifiedFee() - it->GetFee()};
 }
