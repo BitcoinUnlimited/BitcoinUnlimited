@@ -255,10 +255,8 @@ bool CXThinBlock::process(CNode* pfrom, int nSizeThinBlock, std::string strComma
         std::string ss = CThinBlockStats::ToString();
         LogPrint("thin", "thin block stats: %s\n", ss.c_str());
         requester.Received(GetInv(), pfrom, pfrom->nSizeThinBlock);
-        HandleBlockMessage(pfrom, strCommand, pfrom->thinBlock,  GetInv());  // clears the thin block
-        LOCK(cs_orphancache);
-        BOOST_FOREACH(uint64_t &cheapHash, vTxHashes)
-            EraseOrphanTx(mapPartialTxHash[cheapHash]);
+
+        HandleBlockMessage(pfrom, strCommand, pfrom->thinBlock,  GetInv());
     }
     else if (pfrom->thinBlockWaitingForTxns > 0) {
         // This marks the end of the transactions we've received. If we get this and we have NOT been able to

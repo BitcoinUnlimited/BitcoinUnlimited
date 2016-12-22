@@ -11,11 +11,16 @@
 #include "net.h"
 #include "stat.h"
 #include "thinblock.h"
+#include "chain.h"
+#include "coins.h"
 #include "consensus/validation.h"
 #include "consensus/params.h"
 #include "requestManager.h"
+#include "script/script_error.h"
+#include "checkqueue.h"
 #include <univalue.h>
 #include <vector>
+#include <boost/thread.hpp>
 
 enum {
     DEFAULT_MAX_GENERATED_BLOCK_SIZE = 1000000,
@@ -151,6 +156,7 @@ extern CCriticalSection cs_xval;
 // Xpress Validation: end
 
 extern bool fIsChainNearlySyncd;
+extern uint64_t LargestBlockSeen(uint64_t nBlockSize = 0);
 extern CCriticalSection cs_ischainnearlysyncd;
 
 extern bool HaveConnectThinblockNodes();
@@ -160,11 +166,10 @@ extern bool IsThinBlocksEnabled();
 extern bool CanThinBlockBeDownloaded(CNode* pto);
 extern bool IsChainNearlySyncd();
 extern void IsChainNearlySyncdInit();
-extern bool fIsChainNearlySyncd;
-extern uint64_t LargestBlockSeen(uint64_t nBlockSize = 0);
 extern void BuildSeededBloomFilter(CBloomFilter& memPoolFilter, std::vector<uint256>& vOrphanHashes, uint256 hash);
 extern void LoadFilter(CNode *pfrom, CBloomFilter *filter);
-extern void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, CBlock &block, const CInv &inv);
+extern void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, const CBlock &block, const CInv &inv);
+extern void HandleBlockMessageThread(CNode *pfrom, const std::string &strCommand, const CBlock &block, const CInv &inv);
 extern void ConnectToThinBlockNodes();
 extern void CheckNodeSupportForThinBlocks();
 extern void SendXThinBlock(CBlock &block, CNode* pfrom, const CInv &inv);

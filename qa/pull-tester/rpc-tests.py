@@ -139,6 +139,7 @@ if EXEEXT == ".exe" and not option_passed('win'):
 #Tests
 testScripts = [ RpcTest(t) for t in [
     'bip68-112-113-p2p',
+    'parallel',
     'wallet',
     'excessive',
     'listtransactions',

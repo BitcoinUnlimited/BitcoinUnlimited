@@ -20,6 +20,7 @@
 #include "net.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
+#include "parallel.h"
 #include "rpcserver.h"
 #include "thinblock.h"
 #include "timedata.h"
@@ -99,6 +100,9 @@ CCriticalSection cs_nLastNodeId;
 CCriticalSection cs_mapInboundConnectionTracker;
 CCriticalSection cs_vOneShots;
 
+// from unlimited.cpp
+CCriticalSection cs_blocksemaphore;
+
 deque<string> vOneShots;
 std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
 vector<std::string> vUseDNSSeeds;
@@ -146,6 +150,8 @@ CSemaphore*  semOutboundAddNode = NULL; // BU: separate semaphore for -addnodes
 CNodeSignals g_signals;
 CAddrMan addrman;
 
+CSemaphore *semPV; // semaphore for parallel validation threads
+
 // BU: change locking of orphan map from using cs_main to cs_orphancache.  There is too much dependance on cs_main locks which
 //     are generally too broad in scope.
 CCriticalSection cs_orphancache;
@@ -162,6 +168,11 @@ CTweakRef<unsigned int> briTweak("net.blockRetryInterval","How long to wait in m
 CTweakRef<std::string> subverOverrideTweak("net.subversionOverride","If set, this field will override the normal subversion field.  This is useful if you need to hide your node.",&subverOverride,&SubverValidator);
 
 CRequestManager requester;  // after the maps nodes and tweaks
+
+// Parallel Validation Variables
+CCriticalSection cs_blockvalidationthread;
+CParallelValidation PV;  // Singleton class
+CAllScriptCheckQueues allScriptCheckQueues; // Singleton class
 
 CStatHistory<unsigned int, MinValMax<unsigned int> > txAdded; //"memPool/txAdded");
 CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize; // "memPool/size",STAT_OP_AVE);
@@ -192,3 +203,5 @@ std::vector<CNode*> xpeditedTxn; // (256,(CNode*)NULL);
 
 // BUIP010 Xtreme Thinblocks Variables
 std::map<uint256, uint64_t> mapThinBlockTimer;
+
+
