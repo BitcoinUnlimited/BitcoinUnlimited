@@ -654,44 +654,21 @@ std::string LicenseInfo()
            "\n";
 }
 
-
-int chainContainsExcessive(const CBlockIndex* blk, unsigned int goBack)
+bool isChainExcessive(const CBlockIndex* blk, unsigned int goBack)
 {
-    if (goBack == 0)
-        goBack = excessiveAcceptDepth+EXCESSIVE_BLOCK_CHAIN_RESET;
-    for (unsigned int i = 0; i < goBack; i++, blk = blk->pprev) 
-    {
-        if (!blk)
-	  break; // we hit the beginning
-        if (blk->nStatus & BLOCK_EXCESSIVE)
-	  return true;
-    }
-    return false;
-}
+    // Headers don't count towards acceptDepth
+    while (blk && !(blk->nStatus & BLOCK_VALID_TRANSACTIONS))
+        blk = blk->pprev;
 
-int isChainExcessive(const CBlockIndex* blk, unsigned int goBack)
-{
     if (goBack == 0)
         goBack = excessiveAcceptDepth;
-    bool recentExcessive = false;
-    bool oldExcessive = false;
     for (unsigned int i = 0; i < goBack; i++, blk = blk->pprev) {
         if (!blk)
-	  break; // we hit the beginning
-        if (blk->nStatus & BLOCK_EXCESSIVE)
-	  recentExcessive = true;
+            return false; // Not excessive if we hit the beginning
+        if (blk->nExcessiveStatus & BLOCK_EXCESSIVE)
+            return true;
     }
- 
-    // Once an excessive block is built upon the chain is not excessive even if more large blocks appear.
-    // So look back to make sure that this is the "first" excessive block for a while
-    for (unsigned int i = 0; i < EXCESSIVE_BLOCK_CHAIN_RESET; i++, blk = blk->pprev) {
-        if (!blk)
-	  break; // we hit the beginning
-        if (blk->nStatus & BLOCK_EXCESSIVE)
-	  oldExcessive = true;
-    }
-
-    return (recentExcessive && !oldExcessive);
+    return false;
 }
 
 bool CheckExcessive(const CBlock& block, uint64_t blockSize, uint64_t nSigOps, uint64_t nTx)

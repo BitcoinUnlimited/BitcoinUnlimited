@@ -29,7 +29,7 @@ class ExcessiveBlockTest (BitcoinTestFramework):
             n.generate(1)
             self.sync_all()
           self.nodes[0].generate(100)
-	  self.sync_all()
+          self.sync_all()
         
  	# Set the accept depth at 1, 2, and 3 and watch each nodes resist the chain for that long
         self.nodes[1].setminingmaxblock(1000)
@@ -46,77 +46,67 @@ class ExcessiveBlockTest (BitcoinTestFramework):
         self.nodes[0].generate(1)
         time.sleep(2) #give blocks a chance to fully propagate
         counts = [ x.getblockcount() for x in self.nodes ]
-        assert_equal(counts, [201,200,200,200])  
+        assert_equal(counts, [201,200,200,200])
 
         self.nodes[0].generate(1)
         time.sleep(2) #give blocks a chance to fully propagate
         sync_blocks(self.nodes[0:2])
         counts = [ x.getblockcount() for x in self.nodes ]
-        assert_equal(counts, [202,202,200,200])  
+        assert_equal(counts, [202,202,200,200])
 
         self.nodes[0].generate(1)
         time.sleep(2) #give blocks a chance to fully propagate
         sync_blocks(self.nodes[0:3])
         counts = [ x.getblockcount() for x in self.nodes ]
-        assert_equal(counts, [203,203,203,200])  
+        assert_equal(counts, [203,203,203,200])
 
         self.nodes[0].generate(1)
         time.sleep(2) #give blocks a chance to fully propagate
         self.sync_all()
         counts = [ x.getblockcount() for x in self.nodes ]
-        assert_equal(counts, [204,204,204,204])  
+        assert_equal(counts, [204,204,204,204])
 
-        # Now generate another excessive block, but all nodes should snap right to it because they have an older excessive block
+        # Mine 4 excessive blocks back-to-back.
         for i in range(0,20):
           self.nodes[0].sendtoaddress(addr, 1.0)
         self.nodes[0].generate(1)
-        self.sync_all()
-        counts = [ x.getblockcount() for x in self.nodes ]
-        assert_equal(counts, [205,205,205,205])  
-      
-        self.nodes[0].generate(6*24)  # Now generate a day's worth of small blocks which should re-enable the node's reluctance to accept a large block
-        self.sync_all()
+        for i in range(0,20):
+          self.nodes[0].sendtoaddress(addr, 1.0)
+        self.nodes[0].generate(1)
+        for i in range(0,20):
+          self.nodes[0].sendtoaddress(addr, 1.0)
+        self.nodes[0].generate(1)
         for i in range(0,20):
           self.nodes[0].sendtoaddress(addr, 1.0)
         self.nodes[0].generate(1)
         time.sleep(2) #give blocks a chance to fully propagate
         counts = [ x.getblockcount() for x in self.nodes ]
-        assert_equal(counts, [350,349,349,349])  
+        assert_equal(counts, [208,204,204,204])
 
-        for i in range(0,20):
-          self.nodes[0].sendtoaddress(addr, 1.0)
+        # Mine empty blocks and watch nodes begin to accept the chain
         self.nodes[0].generate(1)
         time.sleep(2) #give blocks a chance to fully propagate
         sync_blocks(self.nodes[0:2])
         counts = [ x.getblockcount() for x in self.nodes ]
-        assert_equal(counts, [351,351,350,350])  
+        assert_equal(counts, [209,209,204,204])
 
-        for i in range(0,20):
-          self.nodes[0].sendtoaddress(addr, 1.0)
         self.nodes[0].generate(1)
         time.sleep(2) #give blocks a chance to fully propagate
         sync_blocks(self.nodes[0:3])
         counts = [ x.getblockcount() for x in self.nodes ]
-        assert_equal(counts, [352,352,352,351])  
+        assert_equal(counts, [210,210,210,204])
 
+        # Another EB. Node 3 is still on block 204.
         for i in range(0,20):
           self.nodes[0].sendtoaddress(addr, 1.0)
         self.nodes[0].generate(1)
-        self.sync_all()
+        time.sleep(2) #give blocks a chance to fully propagate
         counts = [ x.getblockcount() for x in self.nodes ]
-        assert_equal(counts, [353,353,353,353])  
+        assert_equal(counts, [211,210,210,204])
 
-        for i in range(0,20):
-          self.nodes[0].sendtoaddress(addr, 1.0)
-        self.nodes[0].generate(1)
-        self.sync_all()
-        counts = [ x.getblockcount() for x in self.nodes ]
-        assert_equal(counts, [354,354,354,354])  
-
-        self.nodes[0].generate(6*24 + 10)  # Now generate a day's worth of small blocks which should re-enable the node's reluctance to accept a large block + 10 because we have to get beyond all the node's accept depths
+        self.nodes[0].generate(4)  # Reset AD windows
         self.sync_all()
 
-        counts = [ x.getblockcount() for x in self.nodes ]
         self.nodes[1].setminingmaxblock(100000)  # not sure how big the txns will be but smaller than this 
         self.nodes[1].setexcessiveblock(100000, 1)  # not sure how big the txns will be but smaller than this 
         for i in range(0,40):
@@ -126,13 +116,14 @@ class ExcessiveBlockTest (BitcoinTestFramework):
         time.sleep(2) #give blocks a chance to fully propagate
         sync_blocks(self.nodes[0:2])
         counts = [ x.getblockcount() for x in self.nodes ]
-        assert_equal(counts, [509,509,508,508])  
-      
+        assert_equal(counts, [216,216,215,215])
 
         print "Random test"
         # random seed is initialized and printed by test framework
         for i in range(0,2):
           print "round ", i,
+          self.nodes[0].generate(11)  # Reset AD windows
+          self.sync_all()
           for n in self.nodes:
             size = random.randint(1,1000)*1000
             n.setminingmaxblock(size)
