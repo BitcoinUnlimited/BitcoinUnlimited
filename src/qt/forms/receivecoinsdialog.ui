@@ -193,7 +193,7 @@
            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Coin freezing locks coins to make them temporarily unspendable. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
           </property>
           <property name="text">
-           <string>Coin Freeze</string>
+           <string>Coin &amp;Freeze</string>
           </property>
          </widget>
         </item>
@@ -330,12 +330,13 @@
   <tabstop>reqLabel</tabstop>
   <tabstop>reqAmount</tabstop>
   <tabstop>reqMessage</tabstop>
+  <tabstop>freezeCheck</tabstop>
   <tabstop>reuseAddress</tabstop>
   <tabstop>receiveButton</tabstop>
   <tabstop>clearButton</tabstop>
+  <tabstop>recentRequestsView</tabstop>
   <tabstop>showRequestButton</tabstop>
   <tabstop>removeRequestButton</tabstop>
-  <tabstop>recentRequestsView</tabstop>
  </tabstops>
  <resources/>
  <connections/>
