@@ -110,7 +110,7 @@ void ReceiveCoinsDialog::clear()
     ui->reqMessage->setText("");
     ui->reuseAddress->setChecked(false);
     ui->freezeCheck->setChecked(false);
-    ui->freezeCheck->setText("Coin Freeze");
+    ui->freezeCheck->setText("Coin &Freeze");
     nFreezeLockTime = CScriptNum(0);
     freezeDialog = NULL;
     updateDisplayUnit();
