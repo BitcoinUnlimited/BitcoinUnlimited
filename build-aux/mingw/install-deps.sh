@@ -112,8 +112,8 @@ make
 
 # Qt (Download, unpack, and rename - build requires Windows CMD)
 cd $PATH_DEPS
-wget --no-check-certificate http://download.qt-project.org/official_releases/qt/5.3/5.3.2/submodules/qtbase-opensource-src-5.3.2.7z
-wget --no-check-certificate http://download.qt-project.org/official_releases/qt/5.3/5.3.2/submodules/qttools-opensource-src-5.3.2.7z
+wget --no-check-certificate http://download.qt-project.org/archive/qt/5.3/5.3.2/submodules/qtbase-opensource-src-5.3.2.7z
+wget --no-check-certificate http://download.qt-project.org/archive/qt/5.3/5.3.2/submodules/qttools-opensource-src-5.3.2.7z
 "$CMD_7ZIP" x qtbase-opensource-src-5.3.2.7z -aoa -o$PATH_DEPS/Qt
 "$CMD_7ZIP" x qttools-opensource-src-5.3.2.7z -aoa -o$PATH_DEPS/Qt
 cd Qt
