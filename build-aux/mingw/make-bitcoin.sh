@@ -26,6 +26,10 @@ case $i in
     STRIP=YES
     shift # past argument=value
     ;;
+    --check)
+    CHECK=YES
+    shift # past argument=value
+    ;;
     --no-autogen)
     SKIP_AUTOGEN=YES
     shift # past argument=value
@@ -55,7 +59,19 @@ fi
 
 BOOST_ROOT=$PATH_DEPS/boost_1_61_0
 
+# NOTE: If you want to run tests (make check and rpc-tests) you must
+#       1. Have built boost with the --with-tests flag (in config-mingw.bat)
+#       2. Have built a Hexdump equivalent for mingw (included by default in install-deps.sh)
 if [ -z "$SKIP_CONFIGURE" ]; then
+	# By default build without tests
+	DISABLE_TESTS="--disable-tests"
+	# However, if the --check argument was specified, we will run "make check"
+	# which means we need to configure for build with tests enabled
+	if [ -n "$CHECK" ]; then
+		echo 'Enabling tests in ./configure command'
+		DISABLE_TESTS=
+	fi
+
 	CPPFLAGS="-I$PATH_DEPS/db-4.8.30.NC/build_unix \
 	-I$PATH_DEPS/openssl-1.0.1k/include \
 	-I$PATH_DEPS/libevent-2.0.22/include \
@@ -73,7 +89,7 @@ if [ -z "$SKIP_CONFIGURE" ]; then
 	BOOST_ROOT=$PATH_DEPS/boost_1_61_0 \
 	./configure \
 	--disable-upnp-default \
-	--disable-tests \
+	$DISABLE_TESTS \
 	--with-qt-incdir=$PATH_DEPS/Qt/5.3.2/include \
 	--with-qt-libdir=$PATH_DEPS/Qt/5.3.2/lib \
 	--with-qt-plugindir=$PATH_DEPS/Qt/5.3.2/plugins \
@@ -82,6 +98,14 @@ if [ -z "$SKIP_CONFIGURE" ]; then
 fi
 
 make -j4
+
+# Optinally run make check tests (REVISIT: currently not working due to issues with python)
+# NOTE: This will only function if you have built BOOST with tests enabled
+#       and have the correct version of python installed and in the Windows PATH
+#if [ -n "$CHECK" ]; then
+#	echo 'Running make check tests'
+#	make check
+#fi
 
 # Strip symbol tables
 if [ -n "$STRIP" ]; then

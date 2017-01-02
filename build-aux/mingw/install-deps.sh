@@ -38,6 +38,15 @@ PATH=$TOOLCHAIN_BIN:$MSYS_BIN:$MINGW_BIN:$PATH
 mkdir -p $PATH_DEPS
 cd $PATH_DEPS
 
+# Hexdump (Download, unpack, and build into the toolchain path)
+# NOTE: Hexdump is only needed if you intend to build with unit tests enabled.
+cd $PATH_DEPS
+wget --no-check-certificate https://github.com/wahern/hexdump/archive/master.zip -O hexdump.zip
+"$CMD_7ZIP" x hexdump.zip -aoa -o$PATH_DEPS
+cd hexdump-master
+gcc -std=gnu99 -g -O2 -Wall -Wextra -Werror -Wno-unused-variable -Wno-unused-parameter hexdump.c -DHEXDUMP_MAIN -o $MSYS_BIN/hexdump.exe
+
+
 # Open SSL (Download, unpack, and build)
 cd $PATH_DEPS
 wget --no-check-certificate https://www.openssl.org/source/openssl-1.0.1k.tar.gz

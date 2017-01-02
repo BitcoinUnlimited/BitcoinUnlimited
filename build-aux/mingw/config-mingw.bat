@@ -1,8 +1,13 @@
 @echo off
+REM Default Boost build to exclude tests
+set BOOST_ENABLE_TESTS=""
 
 REM ##################################################################################################
 REM These paths need to be customized to match your system
 REM ##################################################################################################
+
+REM If you want to run tests ("make check" and "rpc-tests" you must uncomment below line).
+REM set BOOST_ENABLE_TESTS="--with-test"
 
 REM All paths defined below must be absolute paths.  Relative paths will break the scripts.
 
@@ -38,6 +43,9 @@ set MINGW_BIN_NIX=%MINGW_ROOT_NIX%/bin
 set MSYS_BIN_NIX=%MINGW_ROOT_NIX%/msys/1.0/bin
 set TOOLCHAIN_BIN_WIN=%TOOLCHAIN_ROOT_WIN%\bin
 set TOOLCHAIN_BIN_NIX=%TOOLCHAIN_ROOT_NIX%/bin
+set INCLUDE_TESTS=""
+if %BOOST_ENABLE_TESTS% NEQ "" set INCLUDE_TESTS="--check"
+
 
 REM Capture timing metrics
 set START_TIME=%TIME%
@@ -62,7 +70,7 @@ REM Boost (NOTE: Due to bootstrap.bat giving an error exit code, build it last)
 echo Building Boost
 cd %DEPS_ROOT_WIN%\boost_1_61_0
 call bootstrap.bat gcc
-b2 --build-type=complete --with-chrono --with-filesystem --with-program_options --with-system --with-thread toolset=gcc variant=release link=static threading=multi runtime-link=static stage
+b2 --build-type=complete --with-chrono --with-filesystem --with-program_options --with-system --with-thread %BOOST_ENABLE_TESTS% toolset=gcc variant=release link=static threading=multi runtime-link=static stage
 
 REM Miniunpuc
 echo Building Miniunpuc...
@@ -89,7 +97,7 @@ REM ############################################################################
 REM Time to build Bitcoin
 REM ##################################################################################################
 echo Building bitcoin
-%MSYS_SH_WIN% %INST_DIR%\make-bitcoin.sh --path-bitcoin=%BITCOIN_GIT_ROOT_NIX% --path-deps=%DEPS_ROOT_NIX% --path-msys=%MSYS_BIN_NIX% --path-toolchain=%TOOLCHAIN_BIN_NIX% --path-mingw=%MINGW_BIN_NIX%
+%MSYS_SH_WIN% %INST_DIR%\make-bitcoin.sh --path-bitcoin=%BITCOIN_GIT_ROOT_NIX% --path-deps=%DEPS_ROOT_NIX% --path-msys=%MSYS_BIN_NIX% --path-toolchain=%TOOLCHAIN_BIN_NIX% --path-mingw=%MINGW_BIN_NIX% %INCLUDE_TESTS%
 
 REM ##################################################################################################
 REM Get end time so we can output execution duration metrics
