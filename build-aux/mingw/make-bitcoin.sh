@@ -52,12 +52,12 @@ done
 PATH=$TOOLCHAIN_BIN:$MSYS_BIN:$MINGW_BIN:$PATH
 
 # Build BitcoinUnlimited
-cd $PATH_BITCOIN
+cd "$PATH_BITCOIN"
 if [ -z "$SKIP_AUTOGEN" ]; then
 	./autogen.sh
 fi
 
-BOOST_ROOT=$PATH_DEPS/boost_1_61_0
+BOOST_ROOT="$PATH_DEPS/boost_1_61_0"
 
 # NOTE: If you want to run tests (make check and rpc-tests) you must
 #       1. Have built boost with the --with-tests flag (in config-mingw.bat)
@@ -86,15 +86,15 @@ if [ -z "$SKIP_CONFIGURE" ]; then
 	-L$PATH_DEPS/protobuf-2.6.1/src/.libs \
 	-L$PATH_DEPS/libpng-1.6.16/.libs \
 	-L$PATH_DEPS/qrencode-3.4.4/.libs" \
-	BOOST_ROOT=$PATH_DEPS/boost_1_61_0 \
+	BOOST_ROOT="$PATH_DEPS/boost_1_61_0" \
 	./configure \
 	--disable-upnp-default \
 	$DISABLE_TESTS \
-	--with-qt-incdir=$PATH_DEPS/Qt/5.3.2/include \
-	--with-qt-libdir=$PATH_DEPS/Qt/5.3.2/lib \
-	--with-qt-plugindir=$PATH_DEPS/Qt/5.3.2/plugins \
-	--with-qt-bindir=$PATH_DEPS/Qt/5.3.2/bin \
-	--with-protoc-bindir=$PATH_DEPS/protobuf-2.6.1/src
+	--with-qt-incdir="$PATH_DEPS/Qt/5.3.2/include" \
+	--with-qt-libdir="$PATH_DEPS/Qt/5.3.2/lib" \
+	--with-qt-plugindir="$PATH_DEPS/Qt/5.3.2/plugins" \
+	--with-qt-bindir="$PATH_DEPS/Qt/5.3.2/bin" \
+	--with-protoc-bindir="$PATH_DEPS/protobuf-2.6.1/src"
 fi
 
 make -j4

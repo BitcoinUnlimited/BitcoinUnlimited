@@ -32,7 +32,7 @@ case $i in
 esac
 done
 
-PATH=$TOOLCHAIN_BIN:$MSYS_BIN:$MINGW_BIN:$PATH
+PATH="$MSYS_BIN:$MINGW_BIN:$PATH"
 
 # Install required msys shell packages
 mingw-get install msys-autoconf-bin
@@ -41,8 +41,8 @@ mingw-get install msys-libtool-bin
 mingw-get install msys-wget-bin
 
 # Ensure dependency directory exists
-mkdir -p $PATH_DEPS
-cd $PATH_DEPS
+mkdir -p "$PATH_DEPS"
+cd "$PATH_DEPS"
 
 # Strip the /bin sub directory
 TOOLCHAIN_ROOT=${TOOLCHAIN_BIN%/*}
@@ -53,12 +53,12 @@ TOOLCHAIN_ROOT=${TOOLCHAIN_ROOT%/*}
 # don't download if already downloaded
 if [ ! -e toolchain.7z ]
 then
-	wget --no-check-certificate http://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win32/Personal%20Builds/mingw-builds/4.9.2/threads-posix/dwarf/i686-4.9.2-release-posix-dwarf-rt_v3-rev1.7z/download --output-document=$PATH_DEPS/toolchain.7z
+	wget --no-check-certificate http://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win32/Personal%20Builds/mingw-builds/4.9.2/threads-posix/dwarf/i686-4.9.2-release-posix-dwarf-rt_v3-rev1.7z/download --output-document="$PATH_DEPS/toolchain.7z"
 fi
 # don't extract if already extracted
-cd $TOOLCHAIN_ROOT
+cd "$TOOLCHAIN_ROOT"
 if [ ! -d mingw32 ]
 then
-	cd $PATH_DEPS
-	"$CMD_7ZIP" x toolchain.7z -aoa -o$TOOLCHAIN_ROOT
+	cd "$PATH_DEPS"
+	"$CMD_7ZIP" x toolchain.7z -aoa -o"$TOOLCHAIN_ROOT"
 fi
