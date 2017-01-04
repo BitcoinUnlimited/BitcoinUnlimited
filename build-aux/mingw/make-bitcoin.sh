@@ -30,6 +30,10 @@ case $i in
     CHECK=YES
     shift # past argument=value
     ;;
+    --clean)
+    CLEAN=YES
+    shift # past argument=value
+    ;;
     --no-autogen)
     SKIP_AUTOGEN=YES
     shift # past argument=value
@@ -49,10 +53,18 @@ case $i in
 esac
 done
 
-PATH=$TOOLCHAIN_BIN:$MSYS_BIN:$MINGW_BIN:$PATH
+PATH="$TOOLCHAIN_BIN:$MSYS_BIN:$MINGW_BIN:$PATH"
 
 # Build BitcoinUnlimited
 cd "$PATH_BITCOIN"
+
+#if the clean parameter was passed call clean prior to make
+if [ -n "$CLEAN" ]; then
+	make clean
+	make distclean
+fi
+
+#skip autogen (improve build speed if this step isn't necessary)
 if [ -z "$SKIP_AUTOGEN" ]; then
 	./autogen.sh
 fi
