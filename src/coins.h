@@ -74,6 +74,7 @@
 class CCoins
 {
 public:
+
     //! whether transaction is a coinbase
     bool fCoinBase;
 
@@ -316,6 +317,8 @@ struct CCoinsStats
 class CCoinsView
 {
 public:
+
+
     //! Retrieve the CCoins (unspent transaction outputs) for a given txid
     virtual bool GetCoins(const uint256 &txid, CCoins &coins) const;
 
@@ -381,6 +384,7 @@ public:
 class CCoinsViewCache : public CCoinsViewBacked
 {
 protected:
+
     /* Whether this cache has an active modifier. */
     bool hasModifier;
 
@@ -396,6 +400,7 @@ protected:
     mutable size_t cachedCoinsUsage;
 
 public:
+
     CCoinsViewCache(CCoinsView *baseIn);
     ~CCoinsViewCache();
 

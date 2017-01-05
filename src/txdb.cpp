@@ -15,8 +15,6 @@
 
 #include <stdint.h>
 
-#include <boost/thread.hpp>
-
 using namespace std;
 
 static const char DB_COINS = 'c';
@@ -35,14 +33,17 @@ CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe) : db(Get
 }
 
 bool CCoinsViewDB::GetCoins(const uint256 &txid, CCoins &coins) const {
+    boost::shared_lock<boost::shared_mutex> lock(utxo);
     return db.Read(make_pair(DB_COINS, txid), coins);
 }
 
 bool CCoinsViewDB::HaveCoins(const uint256 &txid) const {
+    boost::shared_lock<boost::shared_mutex> lock(utxo);
     return db.Exists(make_pair(DB_COINS, txid));
 }
 
 uint256 CCoinsViewDB::GetBestBlock() const {
+    boost::shared_lock<boost::shared_mutex> lock(utxo);
     uint256 hashBestChain;
     if (!db.Read(DB_BEST_BLOCK, hashBestChain))
         return uint256();
@@ -50,6 +51,7 @@ uint256 CCoinsViewDB::GetBestBlock() const {
 }
 
 bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
+    boost::unique_lock<boost::shared_mutex> lock(utxo);
     CDBBatch batch(&db.GetObfuscateKey());
     size_t count = 0;
     size_t changed = 0;
@@ -96,6 +98,7 @@ bool CBlockTreeDB::ReadLastBlockFile(int &nFile) {
 }
 
 bool CCoinsViewDB::GetStats(CCoinsStats &stats) const {
+    boost::shared_lock<boost::shared_mutex> lock(utxo);
     /* It seems that there are no "const iterators" for LevelDB.  Since we
        only need read operations on it, use a const-cast to get around
        that restriction.  */
