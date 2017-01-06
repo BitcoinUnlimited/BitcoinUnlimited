@@ -355,6 +355,10 @@ AC_DEFUN([_BITCOIN_QT_FIND_STATIC_PLUGINS],[
        elif test x$TARGET_OS = xdarwin; then
          PKG_CHECK_MODULES([QTPRINT], [Qt5PrintSupport], [QT_LIBS="$QTPRINT_LIBS $QT_LIBS"])
        fi
+     else
+       if ${PKG_CONFIG} --exists "Qt5Core >= 5.6" 2>/dev/null; then
+         QT_LIBS="-lQt5PlatformSupport $QT_LIBS"
+       fi
      fi
      ])
   else
@@ -397,7 +401,7 @@ AC_DEFUN([_BITCOIN_QT_FIND_LIBS_WITH_PKGCONFIG],[
 
       dnl qt version is set to 'auto' and the preferred version wasn't found. Now try the other.
       if test x$have_qt = xno && test x$bitcoin_qt_want_version = xauto; then
-        if test x$auto_priority_version = x$qt5; then
+        if test x$auto_priority_version = xqt5; then
           PKG_CHECK_MODULES([QT], [$qt4_modules], [QT_INCLUDES="$QT_CFLAGS"; have_qt=yes; QT_LIB_PREFIX=Qt; bitcoin_qt_got_major_vers=4], [have_qt=no])
         else
           PKG_CHECK_MODULES([QT], [$qt5_modules], [QT_INCLUDES="$QT_CFLAGS"; have_qt=yes; QT_LIB_PREFIX=Qt5; bitcoin_qt_got_major_vers=5], [have_qt=no])
