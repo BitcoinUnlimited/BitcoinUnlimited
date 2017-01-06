@@ -14,7 +14,7 @@
 #include "net.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
-#include "rpcserver.h"
+#include "rpc/server.h"
 #include "thinblock.h"
 #include "timedata.h"
 #include "tinyformat.h"
@@ -581,16 +581,16 @@ void UnlimitedSetup(void)
     //  Init network shapers
     int64_t rb = GetArg("-receiveburst", DEFAULT_MAX_RECV_BURST);
     // parameter is in KBytes/sec, leaky bucket is in bytes/sec.  But if it is "off" then don't multiply
-    if (rb != LONG_LONG_MAX)
+    if (rb != std::numeric_limits<long long>::max())
         rb *= 1024;
-    int64_t ra = GetArg("-receiveavg", DEFAULT_MAX_RECV_BURST);
-    if (ra != LONG_LONG_MAX)
+    int64_t ra = GetArg("-receiveavg", DEFAULT_AVE_RECV);
+    if (ra != std::numeric_limits<long long>::max())
         ra *= 1024;
-    int64_t sb = GetArg("-sendburst", DEFAULT_MAX_RECV_BURST);
-    if (sb != LONG_LONG_MAX)
+    int64_t sb = GetArg("-sendburst", DEFAULT_MAX_SEND_BURST);
+    if (sb != std::numeric_limits<long long>::max())
         sb *= 1024;
-    int64_t sa = GetArg("-sendavg", DEFAULT_MAX_RECV_BURST);
-    if (sa != LONG_LONG_MAX)
+    int64_t sa = GetArg("-sendavg", DEFAULT_AVE_SEND);
+    if (sa != std::numeric_limits<long long>::max())
         sa *= 1024;
 
     receiveShaper.set(rb, ra);
@@ -937,11 +937,11 @@ bool IsTrafficShapingEnabled()
     int64_t max, avg;
 
     sendShaper.get(&max, &avg);
-    if (avg != LONG_LONG_MAX || max != LONG_LONG_MAX)
+    if (avg != std::numeric_limits<long long>::max() || max != std::numeric_limits<long long>::max())
         return true;
 
     receiveShaper.get(&max, &avg);
-    if (avg != LONG_LONG_MAX || max != LONG_LONG_MAX)
+    if (avg != std::numeric_limits<long long>::max() || max != std::numeric_limits<long long>::max())
         return true;
 
     return false;
@@ -973,12 +973,12 @@ UniValue gettrafficshaping(const UniValue& params, bool fHelp)
     UniValue ret(UniValue::VOBJ);
     int64_t max, avg;
     sendShaper.get(&max, &avg);
-    if (avg != LONG_LONG_MAX || max != LONG_LONG_MAX) {
+    if (avg != std::numeric_limits<long long>::max() || max != std::numeric_limits<long long>::max()) {
         ret.push_back(Pair("sendBurst", max / 1024));
         ret.push_back(Pair("sendAve", avg / 1024));
     }
     receiveShaper.get(&max, &avg);
-    if (avg != LONG_LONG_MAX || max != LONG_LONG_MAX) {
+    if (avg != std::numeric_limits<long long>::max() || max != std::numeric_limits<long long>::max()) {
         ret.push_back(Pair("recvBurst", max / 1024));
         ret.push_back(Pair("recvAve", avg / 1024));
     }

@@ -20,7 +20,7 @@
 #include "net.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
-#include "rpcserver.h"
+#include "rpc/server.h"
 #include "thinblock.h"
 #include "timedata.h"
 #include "tinyformat.h"
@@ -119,6 +119,14 @@ std::vector<std::string> BUComments = std::vector<std::string>();
 std::string minerComment;
 
 // Variables for traffic shaping
+/** Default value for the maximum amount of data that can be received in a burst */
+const int64_t DEFAULT_MAX_RECV_BURST = std::numeric_limits<long long>::max();
+/** Default value for the maximum amount of data that can be sent in a burst */
+const int64_t DEFAULT_MAX_SEND_BURST = std::numeric_limits<long long>::max();
+/** Default value for the average amount of data received per second */
+const int64_t DEFAULT_AVE_RECV = std::numeric_limits<long long>::max();
+/** Default value for the average amount of data sent per second */
+const int64_t DEFAULT_AVE_SEND = std::numeric_limits<long long>::max();
 CLeakyBucket receiveShaper(DEFAULT_MAX_RECV_BURST, DEFAULT_AVE_RECV);
 CLeakyBucket sendShaper(DEFAULT_MAX_SEND_BURST, DEFAULT_AVE_SEND);
 boost::chrono::steady_clock CLeakyBucket::clock;
@@ -139,7 +147,7 @@ CTweakMap tweaks;
 map<CInv, CDataStream> mapRelay;
 deque<pair<int64_t, CInv> > vRelayExpiration;
 CCriticalSection cs_mapRelay;
-limitedmap<CInv, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
+limitedmap<uint256, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
 
 vector<CNode*> vNodes;
 list<CNode*> vNodesDisconnected;
