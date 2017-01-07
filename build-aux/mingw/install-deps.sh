@@ -1,38 +1,10 @@
 #!/bin/sh
-for i in "$@"
-do
-case $i in
-    --path-7zip=*)
-    CMD_7ZIP="${i#*=}"
-    shift # past argument=value
-    ;;
-    --path-deps=*)
-    PATH_DEPS="${i#*=}"
-    shift # past argument=value
-    ;;
-    --path-msys=*)
-    MSYS_BIN="${i#*=}"
-    shift # past argument=value
-    ;;
-    --path-mingw=*)
-    MINGW_BIN="${i#*=}"
-    shift # past argument=value
-    ;;
-    --path-toolchain=*)
-    TOOLCHAIN_BIN="${i#*=}"
-    shift # past argument=value
-    ;;
-    --default)
-    DEFAULT=YES
-    shift # past argument with no value
-    ;;
-    *)
-            # unknown option
-    ;;
-esac
-done
 
-PATH="$TOOLCHAIN_BIN:$MSYS_BIN:$MINGW_BIN:$PATH"
+#Convert paths from Windows style to POSIX style
+MSYS_BIN=$(echo "/$MSYS_BIN" | sed -e 's/\\/\//g' -e 's/://' -e 's/\"//g')
+PATH_DEPS=$(echo "/$PATH_DEPS" | sed -e 's/\\/\//g' -e 's/://' -e 's/\"//g')
+CMD_7ZIP=$(echo "/$CMD_7ZIP" | sed -e 's/\\/\//g' -e 's/://' -e 's/\"//g')
+TOOLCHAIN_BIN=$(echo "/$TOOLCHAIN_BIN" | sed -e 's/\\/\//g' -e 's/://' -e 's/\"//g')
 
 # Strip the /bin sub directory
 TOOLCHAIN_ROOT=${TOOLCHAIN_BIN%/*}

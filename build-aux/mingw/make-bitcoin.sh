@@ -1,80 +1,39 @@
 #!/bin/sh
-for i in "$@"
-do
-case $i in
-    --path-deps=*)
-    PATH_DEPS="${i#*=}"
-    shift # past argument=value
-    ;;
-    --path-bitcoin=*)
-    PATH_BITCOIN="${i#*=}"
-    shift # past argument=value
-    ;;
-    --path-msys=*)
-    MSYS_BIN="${i#*=}"
-    shift # past argument=value
-    ;;
-    --path-mingw=*)
-    MINGW_BIN="${i#*=}"
-    shift # past argument=value
-    ;;
-    --path-toolchain=*)
-    TOOLCHAIN_BIN="${i#*=}"
-    shift # past argument=value
-    ;;
-    --strip)
-    STRIP=YES
-    shift # past argument=value
-    ;;
-    --check)
-    CHECK=YES
-    shift # past argument=value
-    ;;
-    --clean)
-    CLEAN=YES
-    shift # past argument=value
-    ;;
-    --no-autogen)
-    SKIP_AUTOGEN=YES
-    shift # past argument=value
-    ;;
-    --no-configure)
-	SKIP_AUTOGEN=YES # if configure is off, then we cannot run autogen
-    SKIP_CONFIGURE=YES
-    shift # past argument=value
-    ;;
-    --default)
-    DEFAULT=YES
-    shift # past argument with no value
-    ;;
-    *)
-            # unknown option
-    ;;
-esac
-done
 
-PATH="$TOOLCHAIN_BIN:$MSYS_BIN:$MINGW_BIN:$PATH"
+#Convert paths from Windows style to POSIX style
+PATH_DEPS=$(echo "/$PATH_DEPS" | sed -e 's/\\/\//g' -e 's/://' -e 's/\"//g')
+BITCOIN_GIT_ROOT=$(echo "/$BITCOIN_GIT_ROOT" | sed -e 's/\\/\//g' -e 's/://' -e 's/\"//g')
+
+#If skip configure is set, then skip autogen MUST be set
+if [ -n "$SKIP_CONFIGURE" ]; then
+	SKIP_AUTOGEN=YES
+fi
 
 # Build BitcoinUnlimited
-cd "$PATH_BITCOIN"
+cd "$BITCOIN_GIT_ROOT"
+
+#define and export BOOST_ROOT prior to any calls that require
+#executing ./configure (this may include `make clean`) depending on current system state
+export BOOST_ROOT="$PATH_DEPS/boost_1_61_0"
 
 #if the clean parameter was passed call clean prior to make
-if [ -n "$CLEAN" ]; then
+if [ -n "$CLEAN_BUILD" ]; then
+	echo 'Cleaning build...'
 	make clean
 	make distclean
 fi
 
 #skip autogen (improve build speed if this step isn't necessary)
 if [ -z "$SKIP_AUTOGEN" ]; then
+	echo 'Running autogen...'
 	./autogen.sh
 fi
-
-BOOST_ROOT="$PATH_DEPS/boost_1_61_0"
 
 # NOTE: If you want to run tests (make check and rpc-tests) you must
 #       1. Have built boost with the --with-tests flag (in config-mingw.bat)
 #       2. Have built a Hexdump equivalent for mingw (included by default in install-deps.sh)
 if [ -z "$SKIP_CONFIGURE" ]; then
+	echo 'Running configure...'
 	# By default build without tests
 	DISABLE_TESTS="--disable-tests"
 	# However, if the --check argument was specified, we will run "make check"
