@@ -16,6 +16,9 @@
 
 #include <vector>
 
+static const int BIP100_DBI_VERSION = 0x08000000;
+static const int DISK_BLOCK_INDEX_VERSION = BIP100_DBI_VERSION;
+
 struct CDiskBlockPos
 {
     int nFile;
@@ -69,8 +72,8 @@ enum BlockStatus: uint32_t {
 
     /**
      * Only first tx is coinbase, 2 <= coinbase input script length <= 100, transactions valid, no duplicate txids,
-     * sigops, size, merkle root. Implies all parents are at least TREE but not necessarily TRANSACTIONS. When all
-     * parent blocks also have TRANSACTIONS, CBlockIndex::nChainTx will be set.
+     * merkle root. Implies all parents are at least TREE but not necessarily TRANSACTIONS. When all
+     * parent blocks also have TRANSACTIONS, CBlockIndex::nChainTx and maxblocksize will be set.
      */
     BLOCK_VALID_TRANSACTIONS =    3,
 
@@ -149,6 +152,15 @@ public:
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
 
+    //! Index entry serial format version
+    int nSerialVersion;
+
+    //! Maximum serialized block size at nHeight
+    uint64_t nMaxBlockSize;
+
+    //! This block's vote for future maximum serialized block size
+    uint64_t nMaxBlockSizeVote;
+
     void SetNull()
     {
         phashBlock = NULL;
@@ -163,6 +175,9 @@ public:
         nChainTx = 0;
         nStatus = 0;
         nSequenceId = 0;
+        nSerialVersion = 0;
+        nMaxBlockSize = 0;
+        nMaxBlockSizeVote = 0;
 
         nVersion       = 0;
         hashMerkleRoot = uint256();
@@ -295,6 +310,7 @@ public:
 
     explicit CDiskBlockIndex(const CBlockIndex* pindex) : CBlockIndex(*pindex) {
         hashPrev = (pprev ? pprev->GetBlockHash() : uint256());
+        nSerialVersion = DISK_BLOCK_INDEX_VERSION;
     }
 
     ADD_SERIALIZE_METHODS;
@@ -302,7 +318,7 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
         if (!(nType & SER_GETHASH))
-            READWRITE(VARINT(nVersion));
+            READWRITE(VARINT(nSerialVersion));
 
         READWRITE(VARINT(nHeight));
         READWRITE(VARINT(nStatus));
@@ -321,6 +337,11 @@ public:
         READWRITE(nTime);
         READWRITE(nBits);
         READWRITE(nNonce);
+
+        if (nSerialVersion >= BIP100_DBI_VERSION) {
+            READWRITE(VARINT(nMaxBlockSize));
+            READWRITE(VARINT(nMaxBlockSizeVote));
+        }
     }
 
     uint256 GetBlockHash() const

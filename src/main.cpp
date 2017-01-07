@@ -18,6 +18,7 @@
 #include "expedited.h"
 #include "hash.h"
 #include "init.h"
+#include "maxblocksize.h"
 #include "merkleblock.h"
 #include "net.h"
 #include "parallel.h"
@@ -3046,6 +3047,17 @@ void static UpdateTip(CBlockIndex *pindexNew)
     const CChainParams &chainParams = Params();
     chainActive.SetTip(pindexNew);
 
+    if (GetArg("-bip100", 0))
+    {
+        uint64_t nMaxBlockSize = GetNextMaxBlockSize(pindexNew, chainParams.GetConsensus());
+        if (nMaxBlockSize != excessiveBlockSize)
+        {
+            excessiveBlockSize = nMaxBlockSize;
+            maxGeneratedBlock = (maxGeneratedBlock > excessiveBlockSize ? excessiveBlockSize : maxGeneratedBlock);
+            settingsToUserAgentString();
+        }
+    }
+
     // New best block
     nTimeBestReceived = GetTime();
     mempool.AddTransactionsUpdated(1);
@@ -3846,6 +3858,7 @@ bool ReceivedBlockTransactions(const CBlock &block,
     pindexNew->nFile = pos.nFile;
     pindexNew->nDataPos = pos.nPos;
     pindexNew->nUndoPos = 0;
+    pindexNew->nMaxBlockSizeVote = GetMaxBlockSizeVote(block.vtx[0].vin[0].scriptSig, pindexNew->nHeight);
     pindexNew->nStatus |= BLOCK_HAVE_DATA;
     if (block.fExcessive)
         pindexNew->nStatus |= BLOCK_EXCESSIVE;
@@ -3868,6 +3881,7 @@ bool ReceivedBlockTransactions(const CBlock &block,
                 LOCK(cs_nBlockSequenceId);
                 pindex->nSequenceId = nBlockSequenceId++;
             }
+            pindex->nMaxBlockSize = GetNextMaxBlockSize(pindex->pprev, Params().GetConsensus());
             if (chainActive.Tip() == NULL || !setBlockIndexCandidates.value_comp()(pindex, chainActive.Tip()))
             {
                 setBlockIndexCandidates.insert(pindex);
@@ -4666,7 +4680,7 @@ CBlockIndex *InsertBlockIndex(uint256 hash)
     return pindexNew;
 }
 
-bool static LoadBlockIndexDB()
+bool static LoadBlockIndexDB(bool *fRebuildRequired)
 {
     const CChainParams &chainparams = Params();
     if (!pblocktree->LoadBlockIndexGuts())
@@ -4683,8 +4697,11 @@ bool static LoadBlockIndexDB()
         vSortedByHeight.push_back(std::make_pair(pindex->nHeight, pindex));
     }
     std::sort(vSortedByHeight.begin(), vSortedByHeight.end());
-    BOOST_FOREACH (const PAIRTYPE(int, CBlockIndex *) & item, vSortedByHeight)
+    std::vector<std::pair<int, CBlockIndex *> >::iterator firstBIP100Entry = vSortedByHeight.end();
+    for (std::vector<std::pair<int, CBlockIndex *> >::iterator iter = vSortedByHeight.begin();
+         iter != vSortedByHeight.end(); iter++)
     {
+        const PAIRTYPE(int, CBlockIndex *) &item = *iter;
         CBlockIndex *pindex = item.second;
         pindex->nChainWork = (pindex->pprev ? pindex->pprev->nChainWork : 0) + GetBlockProof(*pindex);
         // We can link the chain of blocks for which we've received transactions at some point.
@@ -4718,6 +4735,14 @@ bool static LoadBlockIndexDB()
         if (pindex->IsValid(BLOCK_VALID_TREE) &&
             (pindexBestHeader == NULL || CBlockIndexWorkComparator()(pindexBestHeader, pindex)))
             pindexBestHeader = pindex;
+        if (item.first < chainparams.GetConsensus().bip100ActivationHeight)
+        {
+            pindex->nMaxBlockSize = BLOCKSTREAM_CORE_MAX_BLOCK_SIZE;
+        }
+        else if (firstBIP100Entry == vSortedByHeight.end())
+        {
+            firstBIP100Entry = iter;
+        }
     }
 
     // Load block file info
@@ -4772,6 +4797,43 @@ bool static LoadBlockIndexDB()
     pblocktree->ReadReindexing(fReindexing);
     fReindex |= fReindexing;
 
+    // Set max block size variables in any remaining pre-BIP100 index entries
+    bool fUpdatedEntries = false;
+    for (std::vector<std::pair<int, CBlockIndex *> >::iterator iter = firstBIP100Entry; iter != vSortedByHeight.end();
+         iter++)
+    {
+        const PAIRTYPE(int, CBlockIndex *) &item = *iter;
+        CBlockIndex *pindex = item.second;
+        if (pindex->nSerialVersion < BIP100_DBI_VERSION)
+        {
+            if (!fUpdatedEntries)
+            {
+                uiInterface.InitMessage(_("Updating block index for BIP100..."));
+                fUpdatedEntries = true;
+            }
+            pindex->nSerialVersion = DISK_BLOCK_INDEX_VERSION;
+            if (pindex->nChainTx)
+            {
+                CBlock block;
+                if (ReadBlockFromDisk(block, pindex, chainparams.GetConsensus()))
+                {
+                    pindex->nMaxBlockSizeVote = GetMaxBlockSizeVote(block.vtx[0].vin[0].scriptSig, pindex->nHeight);
+                    pindex->nMaxBlockSize = GetNextMaxBlockSize(pindex->pprev, chainparams.GetConsensus());
+                }
+                else
+                {
+                    // Error: Can't reconstruct vote. Rebuild required.
+                    // This can happen if the blocks were pruned after BIP100
+                    // activation with pre-BIP100 software.
+                    *fRebuildRequired = true;
+                    return false;
+                }
+            }
+            LogPrint("reindex", "%s: Updating block index entry at height %d for BIP100\n", __func__, pindex->nHeight);
+            setDirtyBlockIndex.insert(pindex);
+        }
+    }
+
     // Check whether we have a transaction index
     pblocktree->ReadFlag("txindex", fTxIndex);
     LogPrintf("%s: transaction index %s\n", __func__, fTxIndex ? "enabled" : "disabled");
@@ -4781,6 +4843,17 @@ bool static LoadBlockIndexDB()
     if (it == mapBlockIndex.end())
         return true;
     chainActive.SetTip(it->second);
+
+    if (GetArg("-bip100", 0))
+    {
+        uint64_t nMaxBlockSize = GetNextMaxBlockSize(it->second, chainparams.GetConsensus());
+        if (nMaxBlockSize != excessiveBlockSize)
+        {
+            excessiveBlockSize = nMaxBlockSize;
+            maxGeneratedBlock = (maxGeneratedBlock > excessiveBlockSize ? excessiveBlockSize : maxGeneratedBlock);
+            settingsToUserAgentString();
+        }
+    }
 
     PruneBlockIndexCandidates();
 
@@ -4939,10 +5012,11 @@ void UnloadBlockIndex()
     fHavePruned = false;
 }
 
-bool LoadBlockIndex()
+bool LoadBlockIndex(bool *fRebuildRequired)
 {
+    assert(fRebuildRequired != NULL);
     // Load block index from databases
-    if (!fReindex && !LoadBlockIndexDB())
+    if (!fReindex && !LoadBlockIndexDB(fRebuildRequired))
         return false;
     return true;
 }

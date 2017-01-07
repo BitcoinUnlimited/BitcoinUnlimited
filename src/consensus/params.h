@@ -54,6 +54,13 @@ struct Params {
     uint32_t nRuleChangeActivationThreshold;
     uint32_t nMinerConfirmationWindow;
     BIP9Deployment vDeployments[MAX_VERSION_BITS_DEPLOYMENTS];
+    /**
+     * BIP100: One-based position from beginning (end) of the ascending sorted list of max block size
+     * votes in a retarget interval, at which the possible new lower (higher) max block size is read.
+     * 1512 = 75th percentile of 2016
+     */
+    int bip100ActivationHeight;
+    uint32_t nMaxBlockSizeChangePosition;
     /** Proof of work parameters */
     uint256 powLimit;
     bool fPowAllowMinDifficultyBlocks;

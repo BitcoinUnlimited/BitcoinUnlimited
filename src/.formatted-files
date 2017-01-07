@@ -4,6 +4,8 @@ tweak.h
 thinblock.cpp
 thinblock.h
 leakybucket.h
+maxblocksize.cpp
+maxblocksize.h
 parallel.cpp
 parallel.h
 unlimited.cpp
