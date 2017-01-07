@@ -2743,6 +2743,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         PV.SetLocks(); // cs_main is re-aquired here before any final checks and updates
         if (PV.QuitReceived(this_id))
             return false;
+        // We must kill any competing threads here before updating the UTXO.
+        PV.QuitCompetingThreads(block); 
     }
     AssertLockHeld(cs_main);
 
@@ -2824,11 +2826,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     int64_t nTime6 = GetTimeMicros(); nTimeCallbacks += nTime6 - nTime5;
     LogPrint("bench", "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nTime6 - nTime5), nTimeCallbacks * 0.000001);
 
-
-    // After successful commit to UTXO, perform cleanup for Parallel Validation threads.
-    // This section must be peformed whether we are in fParallel or not because if we are validating a block we just
-    // mined we also have to check if there are any other threads we are running against which need to be terminated
-    // and also whether the nSequenceId needs to be updated.
     PV.Cleanup(block, pindex); // NOTE: this must be run whether in fParallel or not!
 
     // Delete hashes from unverified and preverified sets that will no longer be needed after the block is accepted.
@@ -3349,8 +3346,14 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
             } else {
                 pindexNewTip = pindexConnect;
 
+                // Update the UI after each block is processed if the most work index is less than 
+                // our target height.  This means we are close to finishing IBD and we want the user
+                // to see each block in the UI that gets processed.
+                if (pindexMostWork->nHeight < nHeight)
+                    uiInterface.NotifyBlockTip(true, pindexNewTip);
+
                 // Notify external zmq listeners about the new tip.
-                if (!IsInitialBlockDownload()) 
+                if (!IsInitialBlockDownload())
                     GetMainSignals().UpdatedBlockTip(pindexConnect);
 
                 PruneBlockIndexCandidates();
@@ -3363,13 +3366,18 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
                     break;
                     */
                 }
+
+                // Update the syncd status after each block is handled
+                IsChainNearlySyncdInit();
             }
         }
-        if (fContinue) pindexMostWork = FindMostWorkChain();
-        fBlock = false; //read next blocks from disk
 
         // Notify the UI with the new block tip information.
-        uiInterface.NotifyBlockTip(true, pindexNewTip);
+        if (pindexMostWork->nHeight >= nHeight && pindexNewTip != NULL)
+            uiInterface.NotifyBlockTip(true, pindexNewTip);
+
+        if (fContinue) pindexMostWork = FindMostWorkChain();
+        fBlock = false; //read next blocks from disk
 
         // Update the syncd status after each block is handled
         IsChainNearlySyncdInit();
@@ -3426,8 +3434,12 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
             }
 
             // Whether we have anything to do at all.
-            if (pindexMostWork == NULL || pindexMostWork == chainActive.Tip())
+            if (pindexMostWork == NULL)
                 return true;
+            else if (chainActive.Tip() != NULL) {
+               if (pindexMostWork->nChainWork <= chainActive.Tip()->nChainWork)
+                   return true;
+            }
 
             //** PARALLEL BLOCK VALIDATION
             // Find the CBlockIndex of this block if this blocks previous hash matches the old chaintip.  In the

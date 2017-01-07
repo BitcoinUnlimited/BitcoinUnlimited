@@ -66,7 +66,7 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
         return false;
     }
 
-
+    {
     LOCK(cs_blockvalidationthread);
     CHandleBlockMsgThreads * pValidationThread = &mapBlockValidationThreads[this_id];
     pValidationThread->hash = pindex->GetBlockHash();
@@ -83,7 +83,8 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
     // while a previous blocks is still validating or just finishing it's validation and grabs the next block to validate.
     map<boost::thread::id, CParallelValidation::CHandleBlockMsgThreads>::iterator iter = mapBlockValidationThreads.begin();
     while (iter != mapBlockValidationThreads.end()) {
-        if ((*iter).second.hash == pindex->GetBlockHash() && (*iter).first != this_id) {
+        if ((*iter).second.hash == pindex->GetBlockHash() && (*iter).second.IsValidating && (*iter).first != this_id) {
+            LogPrint("parallel", "Returning because another thread is already validating this block\n");
             return false;
         }
         iter++;
@@ -93,16 +94,16 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
     if (pindex->nSequenceId > 0)
         pValidationThread->nSequenceId = pindex->nSequenceId;
     
+    pValidationThread->IsValidating = true;
+    }
+
     return true;
 }
 
 void CParallelValidation::Cleanup(const CBlock& block, CBlockIndex* pindex)
 {
-    // First swap the block index sequence id's such that the winning block has the lowest id and all other id's
+    // Swap the block index sequence id's such that the winning block has the lowest id and all other id's
     // are still in their same order relative to each other.
-    // Then terminate all other threads that match our previous blockhash, and cleanup map before updating the tip.  
-    // This is in the case where we're doing IBD and we receive two of the same blocks, one a re-request.  
-    // Also, this handles an attack vector where someone blasts us with many of the same block.
     LOCK(cs_blockvalidationthread);
     {
         boost::thread::id this_id(boost::this_thread::get_id()); // get this thread's id
@@ -139,6 +140,16 @@ void CParallelValidation::Cleanup(const CBlock& block, CBlockIndex* pindex)
             }
             riter++;
         }
+
+    }
+}
+
+void CParallelValidation::QuitCompetingThreads(const CBlock& block)
+{
+    // Kill other competing threads but not this one.
+    LOCK(cs_blockvalidationthread);
+    {
+        boost::thread::id this_id(boost::this_thread::get_id()); // get this thread's id
 
         map<boost::thread::id, CHandleBlockMsgThreads>::iterator iter = mapBlockValidationThreads.begin();
         while (iter != mapBlockValidationThreads.end())
@@ -369,6 +380,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
         pValidationThread->nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
         pValidationThread->fQuit = false;
         pValidationThread->nodeid = pfrom->id;
+        pValidationThread->IsValidating = false;
         LogPrint("parallel", "Launching validation for %s with number of block validation threads running: %d\n", 
                               block.GetHash().ToString(), mapBlockValidationThreads.size());
 
