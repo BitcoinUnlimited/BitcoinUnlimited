@@ -24,7 +24,7 @@ REM This should be where you installed mingw-get-setup.exe
 REM IMPORTANT: DO NOT USE PATHS WITH SPACES for the MinGW root!  If you do, you WILL run into build errors
 set "MINGW_ROOT=C:\MinGW"
 
-REM Set 7-Zip installation path (Linux path format)
+REM Set 7-Zip installation path
 REM This should be where you installed 7-Zip
 set CMD_7ZIP="C:\Program Files\7-Zip\7z.exe"
 
@@ -43,7 +43,7 @@ REM
 REM The default configuration is:
 REM    1. 32-bit disabled
 REM    2. 64-bit enabled
-REM    3. Build cores = "-j4"
+REM    3. Build cores disabled (means make without the -jN parameter)
 REM    4. Tests disabled
 REM    5. Clean disabled
 REM    6. Strip enabled
@@ -68,15 +68,15 @@ REM Following will set the number of cores used to build the binaries
 REM NOTE: Rule of thumb is to set the number of cores to the number of CPU cores available.
 REM       If you run into issues with a higher -jN try reducing the number or eliminating
 REM       the parameter altogether.
-SET NUM_BUILD_CORES=-j4
+REM SET "MAKE_CORES=-j4"
 
 REM If you want to run tests ("make check" and "rpc-tests" you must uncomment below line).
 REM NOTE: Many of the RPC tests will not run on Windows due to a depencency not available in Windows
 REM SET BOOST_ENABLE_TESTS=--with-test
 
 REM If you want to remove any previous build outputs and configurations uncomment the line below.
-REM NOTE: If you are switching between the 32-bit and 64-bit tool chains, it is recommended you
-REM       performa clean build with this switch
+REM NOTE: If you are switching between the 32-bit and 64-bit tool chains, you should clean old
+REM       build outputs with this switch, otherwise you may run into linker issues.
 REM SET CLEAN_BUILD=YES
 
 REM Following will strip debug symbols from the generated bitcoin executables, greatly reducing file size.

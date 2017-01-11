@@ -68,7 +68,7 @@ if [ -z "$SKIP_CONFIGURE" ]; then
 	--with-protoc-bindir="$PATH_DEPS/protobuf-2.6.1/src"
 fi
 
-make -j4
+make $MAKE_CORES
 
 # Optinally run make check tests (REVISIT: currently not working due to issues with python)
 # NOTE: This will only function if you have built BOOST with tests enabled

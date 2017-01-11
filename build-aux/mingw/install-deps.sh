@@ -55,7 +55,9 @@ then
 fi
 cd "$PATH_DEPS/openssl-1.0.1k"
 ./Configure no-zlib no-shared no-dso no-krb5 no-camellia no-capieng no-cast no-cms no-dtls1 no-gost no-gmp no-heartbeats no-idea no-jpake no-md2 no-mdc2 no-rc5 no-rdrand no-rfc3779 no-rsax no-sctp no-seed no-sha0 no-static_engine no-whirlpool no-rc2 no-rc4 no-ssl2 no-ssl3 $LIB_SSL_MINGW
-make
+make $MAKE_CORES
+#pause for debugging purposes
+#read -rsp $'Press any key to continue...\n' -n 1 key
 
 
 # Berkeley DB (Download, unpack, and build)
@@ -72,7 +74,9 @@ then
 fi
 cd "$PATH_DEPS/db-4.8.30.NC/build_unix"
 ../dist/configure --enable-mingw --enable-cxx --disable-shared --disable-replication
-make
+make $MAKE_CORES
+#pause for debugging purposes
+#read -rsp $'Press any key to continue...\n' -n 1 key
 
 
 # Boost (Download and unpack - build requires Windows CMD)
@@ -104,7 +108,9 @@ then
 fi
 cd "$PATH_DEPS/libevent-2.0.22"
 ./configure --disable-shared
-make
+make $MAKE_CORES
+#pause for debugging purposes
+#read -rsp $'Press any key to continue...\n' -n 1 key
 
 
 # Miniunpuc (Download, unpack, and rename - build requires Windows CMD)
@@ -136,7 +142,9 @@ then
 fi
 cd "$PATH_DEPS/protobuf-2.6.1"
 ./configure --disable-shared
-make
+make $MAKE_CORES
+#pause for debugging purposes
+#read -rsp $'Press any key to continue...\n' -n 1 key
 
 
 # Libpng (Download, unpack, build, and rename-copy)
@@ -153,8 +161,10 @@ then
 fi
 cd "$PATH_DEPS/libpng-1.6.16"
 ./configure --disable-shared
-make
+make $MAKE_CORES
 cp .libs/libpng16.a .libs/libpng.a
+#pause for debugging purposes
+#read -rsp $'Press any key to continue...\n' -n 1 key
 
 
 # Qrencode (Download, unpack, and build)
@@ -174,7 +184,9 @@ LIBS="../libpng-1.6.16/.libs/libpng.a $LIBZ_STATIC_LIB" \
 png_CFLAGS="-I../libpng-1.6.16" \
 png_LIBS="-L../libpng-1.6.16/.libs" \
 ./configure --enable-static --disable-shared --without-tools
-make
+make $MAKE_CORES
+#pause for debugging purposes
+#read -rsp $'Press any key to continue...\n' -n 1 key
 
 
 # Qt (Download, unpack, and rename - build requires Windows CMD)

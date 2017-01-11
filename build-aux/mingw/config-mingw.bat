@@ -111,14 +111,16 @@ cd "%PATH_DEPS%\Qt\5.3.2"
 set "INCLUDE=%PATH_DEPS%\libpng-1.6.16;%PATH_DEPS%\openssl-1.0.1k\include"
 set "LIB=%PATH_DEPS%\libpng-1.6.16\.libs;%PATH_DEPS%\openssl-1.0.1k"
 call configure.bat -release -opensource -confirm-license -static -make libs -no-sql-sqlite -no-opengl -system-zlib -qt-pcre -no-icu -no-gif -system-libpng -no-libjpeg -no-freetype -no-angle -no-vcproj -openssl -no-dbus -no-audio-backend -no-wmf-backend -no-qml-debug
-mingw32-make -j4
+mingw32-make %MAKE_CORES%
+pause
 
 echo Building Qt Tools...
 set "PATH=%PATH%;%PATH_DEPS%\Qt\5.3.2\bin"
 set "PATH=%PATH%;%PATH_DEPS%\Qt\qttools-opensource-src-5.3.2"
 cd "%PATH_DEPS%\Qt\qttools-opensource-src-5.3.2"
 qmake qttools.pro
-mingw32-make -j4
+mingw32-make %MAKE_CORES%
+pause
 
 REM ##################################################################################################
 REM Time to build Bitcoin
