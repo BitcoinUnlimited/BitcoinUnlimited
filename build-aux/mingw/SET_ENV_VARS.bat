@@ -19,7 +19,7 @@ REM               called by these scripts may not be.  This is a confirmed issue
 REM               of MinGW, MSYS, the toolchains, and several of the dependency libraries.
 REM ##################################################################################################
 
-REM Set MinGW root installation path (CMD path format)
+REM Set MinGW root installation path
 REM This should be where you installed mingw-get-setup.exe
 REM IMPORTANT: DO NOT USE PATHS WITH SPACES for the MinGW root!  If you do, you WILL run into build errors
 set "MINGW_ROOT=C:\MinGW"
@@ -72,7 +72,7 @@ REM SET "MAKE_CORES=-j4"
 
 REM If you want to run tests ("make check" and "rpc-tests" you must uncomment below line).
 REM NOTE: Many of the RPC tests will not run on Windows due to a depencency not available in Windows
-REM SET BOOST_ENABLE_TESTS=--with-test
+REM SET ENABLE_TESTS=YES
 
 REM If you want to remove any previous build outputs and configurations uncomment the line below.
 REM NOTE: If you are switching between the 32-bit and 64-bit tool chains, you should clean old

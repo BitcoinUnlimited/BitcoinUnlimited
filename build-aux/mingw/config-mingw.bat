@@ -37,8 +37,8 @@ set "MSYS_BIN=%MINGW_ROOT%\msys\1.0\bin\"
 set MSYS_SH="%MSYS_BIN%\sh.exe"
 set "TOOL_CHAIN_ROOT=%MINGW_ROOT%"
 
-REM If including tests, set up the flag to pass to make-bitcoin.sh
-if "%BOOST_ENABLE_TESTS%" NEQ "" set INCLUDE_TESTS=--check
+REM If including tests, set up the configure flag used by Boost to enabled tests
+if "%ENABLE_TESTS%" NEQ "" set BOOST_ENABLE_TESTS=--with-test
 
 REM Install required msys base package (provide access to msys sh shell)
 echo Updating base MinGW
@@ -112,7 +112,6 @@ set "INCLUDE=%PATH_DEPS%\libpng-1.6.16;%PATH_DEPS%\openssl-1.0.1k\include"
 set "LIB=%PATH_DEPS%\libpng-1.6.16\.libs;%PATH_DEPS%\openssl-1.0.1k"
 call configure.bat -release -opensource -confirm-license -static -make libs -no-sql-sqlite -no-opengl -system-zlib -qt-pcre -no-icu -no-gif -system-libpng -no-libjpeg -no-freetype -no-angle -no-vcproj -openssl -no-dbus -no-audio-backend -no-wmf-backend -no-qml-debug
 mingw32-make %MAKE_CORES%
-pause
 
 echo Building Qt Tools...
 set "PATH=%PATH%;%PATH_DEPS%\Qt\5.3.2\bin"
@@ -120,7 +119,6 @@ set "PATH=%PATH%;%PATH_DEPS%\Qt\qttools-opensource-src-5.3.2"
 cd "%PATH_DEPS%\Qt\qttools-opensource-src-5.3.2"
 qmake qttools.pro
 mingw32-make %MAKE_CORES%
-pause
 
 REM ##################################################################################################
 REM Time to build Bitcoin

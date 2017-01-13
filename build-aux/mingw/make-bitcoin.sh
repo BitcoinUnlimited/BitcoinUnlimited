@@ -38,7 +38,7 @@ if [ -z "$SKIP_CONFIGURE" ]; then
 	DISABLE_TESTS="--disable-tests"
 	# However, if the --check argument was specified, we will run "make check"
 	# which means we need to configure for build with tests enabled
-	if [ -n "$CHECK" ]; then
+	if [ -n "$ENABLE_TESTS" ]; then
 		echo 'Enabling tests in ./configure command'
 		DISABLE_TESTS=
 	fi
@@ -70,12 +70,16 @@ fi
 
 make $MAKE_CORES
 
-# Optinally run make check tests (REVISIT: currently not working due to issues with python)
+# Optinally run make check tests (REVISIT: currently not working due to issues with python3 scripts)
 # NOTE: This will only function if you have built BOOST with tests enabled
 #       and have the correct version of python installed and in the Windows PATH
-#if [ -n "$CHECK" ]; then
-#	echo 'Running make check tests'
-#	make check
+#if [ -n "$ENABLE_TESTS" ]; then
+#	# Skip make check for now since it doesn't work on Windows
+#	#echo 'Running make check tests'
+#	#make check
+#	
+#	#echo 'Running qa tests'
+#	#./qa/pull-tester/rpc-tests.py --win
 #fi
 
 # Strip symbol tables

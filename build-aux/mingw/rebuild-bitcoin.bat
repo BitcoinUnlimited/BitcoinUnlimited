@@ -39,9 +39,6 @@ set "MSYS_BIN=%MINGW_ROOT%\msys\1.0\bin\"
 set MSYS_SH="%MSYS_BIN%\sh.exe"
 set "TOOL_CHAIN_ROOT=%MINGW_ROOT%"
 
-REM If including tests, set up the flag to pass to make-bitcoin.sh
-if "%BOOST_ENABLE_TESTS%" NEQ "" set INCLUDE_TESTS=--check
-
 REM Add MSYS and MinGW bin directories to the start of path so commands are available
 set "PATH=%MSYS_BIN%;%MINGW_BIN%;%PATH%"
 REM Remember the path without the toolchain prepended so we can easily switch toolchains
