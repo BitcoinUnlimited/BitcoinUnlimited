@@ -15,6 +15,7 @@
 #include "main.h"
 #include "miner.h"
 #include "net.h"
+#include "parallel.h"
 #include "pow.h"
 #include "rpc/server.h"
 #include "txmempool.h"
@@ -748,6 +749,16 @@ UniValue submitblock(const UniValue& params, bool fHelp)
     submitblock_StateCatcher sc(block.GetHash());
     LogPrint("rpc", "Received block %s via RPC.\n", block.GetHash().ToString());
     RegisterValidationInterface(&sc);
+
+    // We take a cs_main lock here even though it will also be aquired in ProcessNewBlock.  We want
+    // to make sure we give priority to our own blocks.  This is in order to prevent any other Parallel 
+    // Blocks to validate when we've just mined one of our own blocks.
+    LOCK(cs_main);
+
+    // In we are mining our own block or not running in parallel for any reason 
+    // we must terminate any block validation threads that are currently running.
+    PV.StopAllValidationThreads();
+
     bool fAccepted = ProcessNewBlock(state, Params(), NULL, &block, true, NULL, false);
     UnregisterValidationInterface(&sc);
     if (fBlockPresent)

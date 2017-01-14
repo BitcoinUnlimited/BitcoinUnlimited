@@ -121,7 +121,7 @@ public:
 
 
     /* Initialize a PV thread */
-    bool Initialize(const boost::thread::id this_id, const CBlockIndex* pindex);
+    bool Initialize(const boost::thread::id this_id, const CBlockIndex* pindex, const bool fParallel);
 
     /* Cleanup PV threads after one has finished and won the validation race */
     void Cleanup(const CBlock& block, CBlockIndex* pindex);
@@ -150,7 +150,7 @@ public:
     bool ChainWorkHasChanged(const arith_uint256& nStartingChainWork);
 
     /* Set the correct locks and locking order before returning from a PV session */
-    void SetLocks();
+    void SetLocks(const bool fParallel);
 
     /* Process a block message */
     void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, const CBlock &block, const CInv &inv);

@@ -16,10 +16,10 @@ class ParallelTest (BitcoinTestFramework):
 
     def setup_network(self, split=False):
         self.nodes = []
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-rpcservertimeout=0", "-debug", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-rpcservertimeout=0", "-debug", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-rpcservertimeout=0", "-debug", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-rpcservertimeout=0", "-debug", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-parallel=0", "-rpcservertimeout=0", "-debug", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-parallel=0", "-rpcservertimeout=0", "-debug", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-parallel=0", "-rpcservertimeout=0", "-debug", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-parallel=0", "-rpcservertimeout=0", "-debug", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
         connect_nodes(self.nodes[0],1)
         connect_nodes(self.nodes[0],2)
         connect_nodes(self.nodes[0],3)
@@ -27,7 +27,7 @@ class ParallelTest (BitcoinTestFramework):
         self.sync_all()
 
     def run_test (self):
-        print ("Mining blocks...")
+        print ("Mining blocks with PV off...")
 
         # Mine some blocks on node2 which we will need at the end to generate a few transactions from that node
         # in order to create the small block with just a few transactions in it.
@@ -255,10 +255,10 @@ class ParallelTest (BitcoinTestFramework):
         self.nodes.append(start_node(4, self.options.tmpdir, ["-par=1", "-rpcservertimeout=0","-debug", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
         self.nodes.append(start_node(5, self.options.tmpdir, ["-par=1", "-rpcservertimeout=0","-debug", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
         connect_nodes(self.nodes[0],1)
-        connect_nodes(self.nodes[0],2)
-        connect_nodes(self.nodes[0],3)
-        connect_nodes(self.nodes[0],4)
-        connect_nodes(self.nodes[0],5)
+        connect_nodes(self.nodes[1],2)
+        connect_nodes(self.nodes[1],3)
+        connect_nodes(self.nodes[1],4)
+        connect_nodes(self.nodes[1],5)
         sync_blocks(self.nodes)
 
         # Mine blocks on each node and then mine 100 to age them such that they are spendable.
@@ -274,7 +274,6 @@ class ParallelTest (BitcoinTestFramework):
         self.nodes[5].generate(5)
         sync_blocks(self.nodes)
         self.nodes[1].generate(100)
-        sync_blocks(self.nodes)
         sync_blocks(self.nodes)
 
         #stop nodes
@@ -310,7 +309,6 @@ class ParallelTest (BitcoinTestFramework):
         self.nodes[3].generate(1)
         self.nodes[4].generate(1)
         self.nodes[5].generate(1)
-        sync_blocks(self.nodes[2:4])
         counts = [ x.getblockcount() for x in self.nodes ]
         assert_equal(counts, [331,330,331,331,331,331])  
 
@@ -324,8 +322,7 @@ class ParallelTest (BitcoinTestFramework):
         sync_blocks(self.nodes)
 
 
-        # Mine a block which will cause a reorg because previous to this node2 won the validation race but now node0
-        # will be going ahead by one block which will trigger the reorg on node1.
+        # Mine a block which will cause a reorg.
         print ("Mine another block...")
         self.nodes[0].generate(1)
         sync_blocks(self.nodes)

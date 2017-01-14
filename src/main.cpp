@@ -2602,15 +2602,15 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     // scoped lock to ensure the scriptqueue is free and available.
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && nScriptCheckThreads ? pScriptQueue : NULL);
 
-    if (fParallel) {
-        // Initialize a PV thread session.
-        if (!PV.Initialize(this_id, pindex)) {
-            return false;
-        }
-        cs_main.unlock(); // unlock cs_main, we may be waiting here for a while before aquiring the scoped lock below
-    }
+    // Initialize a PV session.
+    if (!PV.Initialize(this_id, pindex, fParallel))
+        return false;
 
- 
+    /********************************************************************************************
+          Unlock cs_main here so we have no contention when we're checking inputs and scripts
+     ********************************************************************************************/
+    cs_main.unlock();
+
     // Start checking Inputs
     bool inOrphanCache;
     bool inVerifiedCache;
@@ -2634,13 +2634,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 // ** In the event of a big block DDOS attack, by checking the Chain Work here, we ensure that the thread 
                 //    that is validating the block will immediately exit and finish up (while still keeping the block on 
                 //    disk if needed or a reorg) as soon as the first block makes it through and wins the validation race.
-                if (fParallel) {
-                    if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id)) {
-                        PV.SetLocks();
-                        return false;
-                    }
+                PV.SetLocks(fParallel);
+                if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id)) {
+                    return false;
                 }
-
                 return state.DoS(100, error("ConnectBlock(): inputs missing/spent"),
                                  REJECT_INVALID, "bad-txns-inputs-missingorspent");
             }
@@ -2654,7 +2651,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             }
 
             if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex)) {
-                if (fParallel) PV.SetLocks();
+                PV.SetLocks(fParallel);
                 return state.DoS(100, error("%s: contains a non-BIP68-final transaction", __func__),
                                  REJECT_INVALID, "bad-txns-nonfinal");
             }
@@ -2691,9 +2688,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                     std::vector<CScriptCheck> vChecks;
                     bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks (still consult the cache, though) */
                     if (!CheckInputs(tx, state, viewTempCache, fScriptChecks, flags, fCacheResults, &resourceTracker, nScriptCheckThreads ? &vChecks : NULL)) {
-                        if (fParallel) {
-                            PV.SetLocks();
-                        }
+                        PV.SetLocks(fParallel);
                         return error("ConnectBlock(): CheckInputs on %s failed with %s", 
                                               tx.GetHash().ToString(), FormatStateMessage(state));
                     }
@@ -2714,8 +2709,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         vPos.push_back(std::make_pair(tx.GetHash(), pos));
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
 
-        if (fParallel && PV.QuitReceived(this_id)) {
-            PV.SetLocks();
+        if (PV.QuitReceived(this_id)) {
+            PV.SetLocks(fParallel);
             return false;
         }
     }
@@ -2726,9 +2721,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     LogPrint("parallel", "Waiting for script threads to finish\n");
     if (!control.Wait()) {
         // if we end up here then the signature verification failed and we must re-lock cs_main before returning.
-        if (fParallel) {
-            PV.SetLocks();
-        }
+        PV.SetLocks(fParallel);
         return state.DoS(100, false);
     }
 
@@ -2736,17 +2729,15 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     /*****************************************************************************************************************
      *                         Start update of UTXO, if this block wins the validation race                          *
      *****************************************************************************************************************/
-
     // If in PV mode and we win the race then we lock everyone out before updating the UTXO and terminating any
     // competing threads.
-    if (fParallel) {
-        PV.SetLocks(); // cs_main is re-aquired here before any final checks and updates
-        if (PV.QuitReceived(this_id))
-            return false;
-        // We must kill any competing threads here before updating the UTXO.
-        PV.QuitCompetingThreads(block); 
+    if (PV.QuitReceived(this_id)) {
+        PV.SetLocks(fParallel); // cs_main is re-aquired here before any final checks and updates as well as before killing other threads         
+        return false;
     }
-    AssertLockHeld(cs_main);
+    // We must kill any competing threads here before updating the UTXO.
+    cs_main.lock();
+    PV.QuitCompetingThreads(block); 
 
 
     CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
@@ -2760,11 +2751,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         return true;
 
  
-    if (fParallel) {
-        // Last check for chain work just in case the thread manages to get here before being terminated.
-        if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id))
-            return false; // no need to lock cs_main before returing as it should already be locked.
-    }
+    // Last check for chain work just in case the thread manages to get here before being terminated.
+    if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id))
+        return false; // no need to lock cs_main before returing as it should already be locked.
  
     //BU: parallel validation - Flush the temporary UTXO view to the base view.
     int64_t nUpdateCoinsTimeBegin = GetTimeMicros();
@@ -3277,10 +3266,8 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
         // point just after the chaintip had already been advanced.  If that were to happen then it could initiate a
         // re-org when in fact a Quit had already been called on this thread.  So we do a check if Quit was previously
         // called and return if true.
-        if (fParallel) {
-            if (PV.QuitReceived(this_id))
-                return false;
-        }
+        if (PV.QuitReceived(this_id))
+            return false;
 
         // Disconnect active blocks which are no longer in the best chain.
         if (!DisconnectTip(state, chainparams.GetConsensus()))
@@ -3290,7 +3277,7 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
         // currently running PV threads that are validating.  They will likley have self terminated
         // at this point anyway because the chain tip and UTXO base view will have changed but just
         // to be sure we are not waiting on script threads to finish we can issue the termination here.
-        if (fParallel && !fBlocksDisconnected) {
+        if (!fBlocksDisconnected) {
             PV.StopAllValidationThreads(this_id);
         }
         fBlocksDisconnected = true;
@@ -3416,7 +3403,6 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
         const CBlockIndex *pindexFork;
         bool fInitialDownload;
         {
-            //LOCK(cs_main);  // BU: set lock further up
             CBlockIndex *pindexOldTip = chainActive.Tip();
             pindexMostWork = FindMostWorkChain();
 
@@ -4071,19 +4057,17 @@ bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, c
     int64_t start = GetTimeMicros();
     LogPrint("thin", "Processing new block %s from peer %s (%d).\n", pblock->GetHash().ToString(), pfrom ? pfrom->addrName.c_str():"myself",pfrom ? pfrom->id: 0);
     // Preliminary checks
-    if (!CheckBlockHeader(*pblock, state, true))  // block header is bad
-	{
+    if (!CheckBlockHeader(*pblock, state, true)) { // block header is bad
 	  // demerit the sender
 	  return error("%s: CheckBlockHeader FAILED", __func__);
-	}
+    }
     if (IsChainNearlySyncd()) SendExpeditedBlock(*pblock,pfrom);
 
     bool checked = CheckBlock(*pblock, state);
-    if (!checked)
-      {
+    if (!checked) {
         int byteLen = ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION);
         LogPrintf("Invalid block: ver:%x time:%d Tx size:%d len:%d\n", pblock->nVersion, pblock->nTime, pblock->vtx.size(),byteLen);
-      }
+    }
 
     {
         LOCK(cs_main);
@@ -4100,11 +4084,10 @@ bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, c
             mapBlockSource[pindex->GetBlockHash()] = pfrom->GetId();
         }
         CheckBlockIndex(chainparams.GetConsensus());
-        if (!ret)
-	  {
+        if (!ret) {
             // BU TODO: if block comes out of order (before its parent) this will happen.  We should cache the block until the parents arrive.
             return error("%s: AcceptBlock FAILED", __func__);
-	  }
+	}
     }
 
     if (!ActivateBestChain(state, chainparams, pblock, fParallel)) {

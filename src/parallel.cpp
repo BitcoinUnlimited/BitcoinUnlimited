@@ -57,44 +57,45 @@ CParallelValidation::CParallelValidation()
     mapBlockValidationThreads.clear();
 }
 
-bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlockIndex* pindex)
+bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlockIndex* pindex, const bool fParallel)
 {
     AssertLockHeld(cs_main);
 
-    if (chainActive.Tip()->nChainWork > pindex->nChainWork) {
-        LogPrintf("returning because chainactive tip is now ahead of chainwork for this block\n");
-        return false;
-    }
-
+    if (fParallel)
     {
-    LOCK(cs_blockvalidationthread);
-    CHandleBlockMsgThreads * pValidationThread = &mapBlockValidationThreads[this_id];
-    pValidationThread->hash = pindex->GetBlockHash();
-
-    // We need to place a Quit here because we do not want to assign a script queue to a thread of activity
-    // if another thread has just won the race and has sent an fQuit.
-    if (pValidationThread->fQuit) {
-        LogPrint("parallel", "fQuit 0 called - Stopping validation of %s and returning\n", 
-                              pValidationThread->hash.ToString());
-        return false;
-    }
-
-    // Check whether a thread is aleady validating this very same block.  It can happen at times when a block arrives
-    // while a previous blocks is still validating or just finishing it's validation and grabs the next block to validate.
-    map<boost::thread::id, CParallelValidation::CHandleBlockMsgThreads>::iterator iter = mapBlockValidationThreads.begin();
-    while (iter != mapBlockValidationThreads.end()) {
-        if ((*iter).second.hash == pindex->GetBlockHash() && (*iter).second.IsValidating && (*iter).first != this_id) {
-            LogPrint("parallel", "Returning because another thread is already validating this block\n");
+        if (chainActive.Tip()->nChainWork > pindex->nChainWork) {
+            LogPrintf("returning because chainactive tip is now ahead of chainwork for this block\n");
             return false;
         }
-        iter++;
-    }
+ 
+        LOCK(cs_blockvalidationthread);
+        CHandleBlockMsgThreads * pValidationThread = &mapBlockValidationThreads[this_id];
+        pValidationThread->hash = pindex->GetBlockHash();
 
-    // Assign the nSequenceId for the block being validated in this thread. cs_main must be locked for lookup on pindex.
-    if (pindex->nSequenceId > 0)
-        pValidationThread->nSequenceId = pindex->nSequenceId;
+        // We need to place a Quit here because we do not want to assign a script queue to a thread of activity
+        // if another thread has just won the race and has sent an fQuit.
+        if (pValidationThread->fQuit) {
+            LogPrint("parallel", "fQuit 0 called - Stopping validation of %s and returning\n", 
+                                  pValidationThread->hash.ToString());
+            return false;
+        }
+
+        // Check whether a thread is aleady validating this very same block.  It can happen at times when a block arrives
+        // while a previous blocks is still validating or just finishing it's validation and grabs the next block to validate.
+        map<boost::thread::id, CParallelValidation::CHandleBlockMsgThreads>::iterator iter = mapBlockValidationThreads.begin();
+        while (iter != mapBlockValidationThreads.end()) {
+            if ((*iter).second.hash == pindex->GetBlockHash() && (*iter).second.IsValidating && (*iter).first != this_id) {
+                LogPrint("parallel", "Returning because another thread is already validating this block\n");
+                return false;
+            }
+            iter++;
+        }
+
+        // Assign the nSequenceId for the block being validated in this thread. cs_main must be locked for lookup on pindex.
+        if (pindex->nSequenceId > 0)
+            pValidationThread->nSequenceId = pindex->nSequenceId;
     
-    pValidationThread->IsValidating = true;
+        pValidationThread->IsValidating = true;
     }
 
     return true;
@@ -258,16 +259,18 @@ void CParallelValidation::Erase()
 bool CParallelValidation::QuitReceived(const boost::thread::id this_id)
 {
     LOCK(cs_blockvalidationthread);
-    if (mapBlockValidationThreads[this_id].fQuit) {
-        LogPrint("parallel", "fQuit called - Stopping validation of this block and returning\n");
-        return true;
+    if (mapBlockValidationThreads.count(this_id)) {
+        if (mapBlockValidationThreads[this_id].fQuit) {
+            LogPrint("parallel", "fQuit called - Stopping validation of this block and returning\n");
+            return true;
+        }
     }
     return false;
 }
 
 bool CParallelValidation::ChainWorkHasChanged(const arith_uint256& nStartingChainWork) // requires cs_main
 {
-    LOCK(cs_main);
+    AssertLockHeld(cs_main);
     if (chainActive.Tip()->nChainWork != nStartingChainWork)
     {
         LogPrint("parallel", "Quitting - Chain Work %s is not the same as the starting Chain Work %s\n",
@@ -277,22 +280,17 @@ bool CParallelValidation::ChainWorkHasChanged(const arith_uint256& nStartingChai
     return false;
 }
 
-void CParallelValidation::SetLocks()
+void CParallelValidation::SetLocks(const bool fParallel)
 {
-    // We must maintain locking order with cs_main, therefore we must make sure the scoped
-    // scriptcheck lock is unlocked prior to locking cs_main.  That is because in the case
-    // where we are not running in parallel the cs_main lock is aquired before the scoped
-    // lock and we do not want to then do the reverse here and aquire cs_main "after" the scoped
-    // lock is held, thereby reversing the locking order and creating a possible deadlock.
-    // Therefore to remedy the situation we simply unlock the scriptlock and do not enter into
-    // any reversal of the locking order.
+    // cs_main must be re-locked before returning from ConnectBlock()
     cs_main.lock();
 
-    boost::thread::id this_id(boost::this_thread::get_id()); 
-    LOCK(cs_blockvalidationthread);
+    if (fParallel)
     {
-         if (mapBlockValidationThreads.count(this_id))
-             mapBlockValidationThreads[this_id].pScriptQueue = NULL;
+        boost::thread::id this_id(boost::this_thread::get_id()); 
+        LOCK(cs_blockvalidationthread);
+        if (mapBlockValidationThreads.count(this_id))
+            mapBlockValidationThreads[this_id].pScriptQueue = NULL;
     }
 }
 
@@ -401,7 +399,14 @@ void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlo
     bool forceProcessing = pfrom->fWhitelisted && !IsInitialBlockDownload();
     const CChainParams& chainparams = Params();
     pfrom->firstBlock += 1;
-    ProcessNewBlock(state, chainparams, pfrom, &block, forceProcessing, NULL, PV.Enabled());
+    if (PV.Enabled()) {
+        ProcessNewBlock(state, chainparams, pfrom, &block, forceProcessing, NULL, true);
+    }
+    else {
+        LOCK(cs_main); // locking cs_main here prevents any other thread from beginning starting a block validation.
+        ProcessNewBlock(state, chainparams, pfrom, &block, forceProcessing, NULL, false);
+    }
+
     int nDoS;
     if (state.IsInvalid(nDoS)) {
         LogPrintf("Invalid block due to %s\n", state.GetRejectReason().c_str());
