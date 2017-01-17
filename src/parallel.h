@@ -104,12 +104,14 @@ public:
         CCheckQueue<CScriptCheck>* pScriptQueue;
         uint256 hash;
         uint256 hashPrevBlock;
+        uint32_t nChainWork;
         uint32_t nSequenceId;
         int64_t nStartTime;
         uint64_t nBlockSize;
         bool fQuit;
         NodeId nodeid;
-        bool IsValidating; // is the block currently in connectblock() and validating inputs
+        bool fIsValidating; // is the block currently in connectblock() and validating inputs
+        bool fIsReorgInProgress; // has a re-org to another chain been triggered.
     };
     CCriticalSection cs_blockvalidationthread;
     map<boost::thread::id, CHandleBlockMsgThreads> mapBlockValidationThreads GUARDED_BY(cs_blockvalidationthread);
@@ -135,6 +137,7 @@ public:
     /* Terminate All currently running Block Validation threads */
     void StopAllValidationThreads();
     void StopAllValidationThreads(const boost::thread::id this_id);
+    void StopAllValidationThreads(const uint32_t nChainWork);
     void WaitForAllValidationThreadsToStop();
 
     /* Has parallel block validation been turned on via the config settings */
@@ -144,7 +147,7 @@ public:
     void Erase();
 
     /* Was the fQuit flag set to true which causes the PV thread to exit */
-    bool QuitReceived(const boost::thread::id this_id);
+    bool QuitReceived(const boost::thread::id this_id, const bool fParallel);
 
     /* Used to determine if another thread has already updated the utxo and advance the chain tip */
     bool ChainWorkHasChanged(const arith_uint256& nStartingChainWork);
@@ -152,8 +155,13 @@ public:
     /* Set the correct locks and locking order before returning from a PV session */
     void SetLocks(const bool fParallel);
 
+    /* Is there a re-org in progress */
+    void IsReorgInProgress(const boost::thread::id this_id, const bool fReorg, const bool fParallel);
+    bool IsReorgInProgress();
+
     /* Process a block message */
     void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, const CBlock &block, const CInv &inv);
+
 };
 extern CParallelValidation PV;  // Singleton class
 

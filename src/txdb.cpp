@@ -98,6 +98,9 @@ bool CBlockTreeDB::ReadLastBlockFile(int &nFile) {
 }
 
 bool CCoinsViewDB::GetStats(CCoinsStats &stats) const {
+    CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
+    CAmount nTotalAmount = 0;
+    {
     boost::shared_lock<boost::shared_mutex> lock(utxo);
     /* It seems that there are no "const iterators" for LevelDB.  Since we
        only need read operations on it, use a const-cast to get around
@@ -105,10 +108,8 @@ bool CCoinsViewDB::GetStats(CCoinsStats &stats) const {
     boost::scoped_ptr<CDBIterator> pcursor(const_cast<CDBWrapper*>(&db)->NewIterator());
     pcursor->Seek(DB_COINS);
 
-    CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
     stats.hashBlock = GetBestBlock();
     ss << stats.hashBlock;
-    CAmount nTotalAmount = 0;
     while (pcursor->Valid()) {
         boost::this_thread::interruption_point();
         std::pair<char, uint256> key;
@@ -134,6 +135,7 @@ bool CCoinsViewDB::GetStats(CCoinsStats &stats) const {
             break;
         }
         pcursor->Next();
+    }
     }
     {
         LOCK(cs_main);

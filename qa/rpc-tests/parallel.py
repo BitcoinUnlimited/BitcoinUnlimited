@@ -234,14 +234,16 @@ class ParallelTest (BitcoinTestFramework):
 
 
         # Send some transactions and Mine a block on node 2.  
-        # This should cause node0 to re-org and all chains should now match.
+        # This should cause node0 and node3 to re-org and all chains should now match.
         for i in range(5):
             self.nodes[2].sendtoaddress(self.nodes[2].getnewaddress(), .01)
-        print ("Mine another block which causes a reorg...")
+        print ("Mine another block on node2 which causes a reorg on node0 and node3...")
         self.nodes[2].generate(1)
         sync_blocks(self.nodes)
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[2].getbestblockhash())
         assert_equal(self.nodes[0].getbestblockhash(), self.nodes[1].getbestblockhash())
+        counts = [ x.getblockcount() for x in self.nodes ]
+        assert_equal(counts, [205,205,205,205])  
 
         #stop nodes
         stop_nodes(self.nodes)

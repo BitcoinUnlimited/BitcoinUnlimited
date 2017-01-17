@@ -2339,16 +2339,6 @@ void static FlushBlockFile(bool fFinalize = false)
 bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigned int nAddSize);
 
 
-
-// BU: moved to parallel.h
-//static CCheckQueue<CScriptCheck> scriptcheckqueue(128);
-
-//void ThreadScriptCheck() {
-//    RenameThread("bitcoin-scriptch");
-//    scriptcheckqueue.Thread();
-//}
-
-
 //
 // Called periodically asynchronously; alerts if it smells like
 // we're being fed a bad chain (blocks being generated much
@@ -2635,7 +2625,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 //    that is validating the block will immediately exit and finish up (while still keeping the block on 
                 //    disk if needed or a reorg) as soon as the first block makes it through and wins the validation race.
                 PV.SetLocks(fParallel);
-                if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id)) {
+                if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id, fParallel)) {
                     return false;
                 }
                 return state.DoS(100, error("ConnectBlock(): inputs missing/spent"),
@@ -2700,7 +2690,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 }
             }
         }
-      
+
         CTxUndo undoDummy;
         if (i > 0) {
             blockundo.vtxundo.push_back(CTxUndo());
@@ -2709,7 +2699,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         vPos.push_back(std::make_pair(tx.GetHash(), pos));
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
 
-        if (PV.QuitReceived(this_id)) {
+        if (PV.QuitReceived(this_id, fParallel)) {
             PV.SetLocks(fParallel);
             return false;
         }
@@ -2731,12 +2721,16 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
      *****************************************************************************************************************/
     // If in PV mode and we win the race then we lock everyone out before updating the UTXO and terminating any
     // competing threads.
-    if (PV.QuitReceived(this_id)) {
+    if (PV.QuitReceived(this_id, fParallel)) {
         PV.SetLocks(fParallel); // cs_main is re-aquired here before any final checks and updates as well as before killing other threads         
         return false;
     }
-    // We must kill any competing threads here before updating the UTXO.
     cs_main.lock();
+    // Last check for chain work just in case the thread manages to get here before being terminated.
+    if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id, fParallel)) {
+        return false; // no need to lock cs_main before returing as it should already be locked.
+    }
+    // We must kill any competing threads here before updating the UTXO.
     PV.QuitCompetingThreads(block); 
 
 
@@ -2751,9 +2745,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         return true;
 
  
-    // Last check for chain work just in case the thread manages to get here before being terminated.
-    if (PV.ChainWorkHasChanged(nStartingChainWork) || PV.QuitReceived(this_id))
-        return false; // no need to lock cs_main before returing as it should already be locked.
  
     //BU: parallel validation - Flush the temporary UTXO view to the base view.
     int64_t nUpdateCoinsTimeBegin = GetTimeMicros();
@@ -3172,14 +3163,13 @@ static CBlockIndex* FindMostWorkChain() {
             if (depth < excessiveAcceptDepth)
 	      {
 		fRecentExcessive |= ((pindexTest->nStatus & BLOCK_EXCESSIVE) != 0);  // Unlimited: deny this candidate chain if there's a recent excessive block
-if ((pindexTest->nStatus & BLOCK_EXCESSIVE) != 0) LogPrintf("recent excessive block\n");
 	      }
             else
 	      {
 		fOldExcessive |= ((pindexTest->nStatus & BLOCK_EXCESSIVE) != 0);  // Unlimited: unless there is an even older excessive block
 	      }
 
-            if (fFailedChain | fMissingData | fRecentExcessive) { LogPrintf("breaking ######\n");break;}
+            if (fFailedChain | fMissingData | fRecentExcessive) break;
             pindexTest = pindexTest->pprev;
             depth++;
         }
@@ -3266,8 +3256,10 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
         // point just after the chaintip had already been advanced.  If that were to happen then it could initiate a
         // re-org when in fact a Quit had already been called on this thread.  So we do a check if Quit was previously
         // called and return if true.
-        if (PV.QuitReceived(this_id))
+        if (PV.QuitReceived(this_id, fParallel))
             return false;
+
+        PV.IsReorgInProgress(this_id, true, fParallel); // indicate that this thread has now initiated a re-org
 
         // Disconnect active blocks which are no longer in the best chain.
         if (!DisconnectTip(state, chainparams.GetConsensus()))
@@ -3277,11 +3269,10 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
         // currently running PV threads that are validating.  They will likley have self terminated
         // at this point anyway because the chain tip and UTXO base view will have changed but just
         // to be sure we are not waiting on script threads to finish we can issue the termination here.
-        if (!fBlocksDisconnected) {
+        if (fParallel && !fBlocksDisconnected) {
             PV.StopAllValidationThreads(this_id);
         }
         fBlocksDisconnected = true;
-
     }
 
     // Build list of new blocks to connect.
@@ -3306,7 +3297,6 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
         // a few blocks along the way.
         int nTargetHeight = std::min(nHeight + (int)BLOCK_DOWNLOAD_WINDOW, pindexMostWork->nHeight);
         vpindexToConnect.clear();
-        //vpindexToConnect.reserve(nTargetHeight - nHeight);
         CBlockIndex *pindexIter = pindexMostWork->GetAncestor(nTargetHeight);
         while (pindexIter && pindexIter->nHeight != nHeight) {
             vpindexToConnect.push_back(pindexIter);
@@ -4817,8 +4807,11 @@ void static CheckBlockIndex(const Consensus::Params& consensusParams)
                 // is valid and we have all data for its parents, it must be in
                 // setBlockIndexCandidates.  chainActive.Tip() must also be there
                 // even if some data has been pruned.
-           //     if ((!chainContainsExcessive(pindex)) && (pindexFirstMissing == NULL || pindex == chainActive.Tip()) )  // BU: if the chain is excessive it won't be on the list of active chain candidates
-           //         assert(setBlockIndexCandidates.count(pindex));
+
+                // PV:  this is no longer true under certain condition for PV - leaving it in here for further review
+                //if ((!chainContainsExcessive(pindex)) && (pindexFirstMissing == NULL || pindex == chainActive.Tip()) )  // BU: if the chain is excessive it won't be on the list of active chain candidates
+                //    assert(setBlockIndexCandidates.count(pindex));
+
                     // If some parent is missing, then it could be that this block was in
                     // setBlockIndexCandidates but had to be removed because of the missing data.
                     // In this case it must be in mapBlocksUnlinked -- see test below.
@@ -5236,7 +5229,6 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         CAddress addrMe;
         CAddress addrFrom;
         uint64_t nNonce = 1;
-
         vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
 
         CheckNodeSupportForThinBlocks(); // BUIP010 Xtreme Thinblocks
@@ -5374,9 +5366,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             // nodes)
 
             // BUIP010 Extreme Thinblocks: We only do inv/getdata for xthinblocks and so we must have headersfirst turned off
-            // BU: Parallel Block Validation.  We must have all headers first announcements turned off.
-            //if (!IsThinBlocksEnabled())
-            //    pfrom->PushMessage(NetMsgType::SENDHEADERS);
+            if (!IsThinBlocksEnabled())
+                pfrom->PushMessage(NetMsgType::SENDHEADERS);
         }
 
         // BU expedited procecessing requires the exchange of the listening port id but we have to send it in a separate version
@@ -6795,8 +6786,7 @@ bool SendMessages(CNode* pto)
             // add all to the inv queue.
             LOCK(pto->cs_inventory);
             vector<CBlock> vHeaders;
-            //bool fRevertToInv = (!state.fPreferHeaders || pto->vBlockHashesToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
-            bool fRevertToInv = true; // BU: this must always be false or it breaks a few things for parallel validation
+            bool fRevertToInv = (!state.fPreferHeaders || pto->vBlockHashesToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
             CBlockIndex *pBestIndex = NULL; // last header queued for delivery
             ProcessBlockAvailability(pto->id); // ensure pindexBestKnownBlock is up-to-date
 

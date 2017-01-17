@@ -907,7 +907,7 @@ private:
     CNode *_pnode;
 };
 
-#if 0 // BU: Not currenly used
+#if 0 // Not currenly used
 static bool ReverseCompareNodeMinPingTime(const CNodeRef &a, const CNodeRef &b)
 {
     return a->nMinPingUsecTime > b->nMinPingUsecTime;

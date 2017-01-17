@@ -70,6 +70,7 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
  
         LOCK(cs_blockvalidationthread);
         CHandleBlockMsgThreads * pValidationThread = &mapBlockValidationThreads[this_id];
+        assert(pValidationThread != NULL);
         pValidationThread->hash = pindex->GetBlockHash();
 
         // We need to place a Quit here because we do not want to assign a script queue to a thread of activity
@@ -84,7 +85,9 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
         // while a previous blocks is still validating or just finishing it's validation and grabs the next block to validate.
         map<boost::thread::id, CParallelValidation::CHandleBlockMsgThreads>::iterator iter = mapBlockValidationThreads.begin();
         while (iter != mapBlockValidationThreads.end()) {
-            if ((*iter).second.hash == pindex->GetBlockHash() && (*iter).second.IsValidating && (*iter).first != this_id) {
+            if ((*iter).second.hash == pindex->GetBlockHash() && (*iter).second.fIsValidating 
+                && !(*iter).second.fQuit && (*iter).first != this_id)
+            {
                 LogPrint("parallel", "Returning because another thread is already validating this block\n");
                 return false;
             }
@@ -95,7 +98,7 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
         if (pindex->nSequenceId > 0)
             pValidationThread->nSequenceId = pindex->nSequenceId;
     
-        pValidationThread->IsValidating = true;
+        pValidationThread->fIsValidating = true;
     }
 
     return true;
@@ -205,7 +208,7 @@ void CParallelValidation::StopAllValidationThreads()
     while (mi != mapBlockValidationThreads.end())
     {
         if ((*mi).second.pScriptQueue != NULL) {
-            (*mi).second.pScriptQueue->Quit(); // interrupt any running script threads
+            (*mi).second.pScriptQueue->Quit(); // quit any active script queue threads
         }
         (*mi).second.fQuit = true; // quit the PV thread
         mi++;
@@ -219,6 +222,27 @@ void CParallelValidation::StopAllValidationThreads(const boost::thread::id this_
     while (mi != mapBlockValidationThreads.end())
     {
         if ((*mi).first != this_id) // we don't want to kill our own thread
+        { 
+            if ((*mi).second.pScriptQueue != NULL)
+                (*mi).second.pScriptQueue->Quit(); // quit any active script queue threads
+            (*mi).second.fQuit = true; // quit the PV thread
+        }
+        mi++;
+    }
+}
+
+void CParallelValidation::StopAllValidationThreads(const uint32_t nChainWork)
+{
+    boost::thread::id this_id(boost::this_thread::get_id()); 
+
+    LOCK(cs_blockvalidationthread);
+    map<boost::thread::id, CHandleBlockMsgThreads>::iterator mi = mapBlockValidationThreads.begin();
+    while (mi != mapBlockValidationThreads.end())
+    {
+        // Kill any threads that have less than or equal to our own chain work we are working on.  We use
+        // this method when we're mining our own block.  In that event we want to give priority to our own
+        // block rather than any competing block or chain.
+        if (((*mi).first != this_id) && (*mi).second.nChainWork <= nChainWork)
         { 
             if ((*mi).second.pScriptQueue != NULL)
                 (*mi).second.pScriptQueue->Quit(); // quit any active script queue threads
@@ -256,13 +280,15 @@ void CParallelValidation::Erase()
         mapBlockValidationThreads.erase(this_id);
 }
 
-bool CParallelValidation::QuitReceived(const boost::thread::id this_id)
+bool CParallelValidation::QuitReceived(const boost::thread::id this_id, const bool fParallel)
 {
-    LOCK(cs_blockvalidationthread);
-    if (mapBlockValidationThreads.count(this_id)) {
-        if (mapBlockValidationThreads[this_id].fQuit) {
-            LogPrint("parallel", "fQuit called - Stopping validation of this block and returning\n");
-            return true;
+    if (fParallel) {
+        LOCK(cs_blockvalidationthread);
+        if (mapBlockValidationThreads.count(this_id)) {
+            if (mapBlockValidationThreads[this_id].fQuit) {
+                LogPrint("parallel", "fQuit called - Stopping validation of this block and returning\n");
+                return true;
+            }
         }
     }
     return false;
@@ -270,7 +296,6 @@ bool CParallelValidation::QuitReceived(const boost::thread::id this_id)
 
 bool CParallelValidation::ChainWorkHasChanged(const arith_uint256& nStartingChainWork) // requires cs_main
 {
-    AssertLockHeld(cs_main);
     if (chainActive.Tip()->nChainWork != nStartingChainWork)
     {
         LogPrint("parallel", "Quitting - Chain Work %s is not the same as the starting Chain Work %s\n",
@@ -292,6 +317,30 @@ void CParallelValidation::SetLocks(const bool fParallel)
         if (mapBlockValidationThreads.count(this_id))
             mapBlockValidationThreads[this_id].pScriptQueue = NULL;
     }
+}
+
+void CParallelValidation::IsReorgInProgress(const boost::thread::id this_id, const bool fReorg, const bool fParallel)
+{
+    if (fParallel)
+    {
+        LOCK(cs_blockvalidationthread);
+        if (mapBlockValidationThreads.count(this_id))
+            mapBlockValidationThreads[this_id].fIsReorgInProgress = fReorg;
+    }
+
+}
+
+bool CParallelValidation::IsReorgInProgress()
+{
+    LOCK(cs_blockvalidationthread);
+    map<boost::thread::id, CHandleBlockMsgThreads>::iterator mi = mapBlockValidationThreads.begin();
+    while (mi != mapBlockValidationThreads.end())
+    {
+        if ((*mi).second.fIsReorgInProgress)
+            return true;
+        mi++;
+    }
+    return false;
 }
 
 //  HandleBlockMessage launches a HandleBlockMessageThread.  And HandleBlockMessageThread processes each block and updates 
@@ -373,12 +422,14 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
         pValidationThread->pScriptQueue = NULL;
         pValidationThread->hash = inv.hash;
         pValidationThread->hashPrevBlock = block.GetBlockHeader().hashPrevBlock;
+        pValidationThread->nChainWork = block.GetBlockHeader().nBits;       
         pValidationThread->nSequenceId = INT_MAX;
         pValidationThread->nStartTime = GetTimeMillis();
         pValidationThread->nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
         pValidationThread->fQuit = false;
         pValidationThread->nodeid = pfrom->id;
-        pValidationThread->IsValidating = false;
+        pValidationThread->fIsValidating = false;
+        pValidationThread->fIsReorgInProgress = false;
         LogPrint("parallel", "Launching validation for %s with number of block validation threads running: %d\n", 
                               block.GetHash().ToString(), mapBlockValidationThreads.size());
 

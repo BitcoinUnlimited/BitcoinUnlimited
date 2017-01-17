@@ -90,7 +90,6 @@ class VersionBitsWarningTest(BitcoinTestFramework):
             block_time += 1
             height += 1
             tip = block.sha256
-            #tip = block.hash
         peer.sync_with_ping()
 
     def test_versionbits_in_alert_file(self):
@@ -118,7 +117,6 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         # 2. Now build one period of blocks on the tip, with < VB_THRESHOLD
         # blocks signaling some unknown bit.
         nVersion = VB_TOP_BITS | (1<<VB_UNKNOWN_BIT)
-        #self.send_blocks_with_version(test_node, VB_THRESHOLD-1, nVersion)
         for i in range(VB_THRESHOLD-1):
             self.send_blocks_with_version(test_node, 1, nVersion)
             test_node.sync_with_ping()
@@ -133,7 +131,6 @@ class VersionBitsWarningTest(BitcoinTestFramework):
  
         # 3. Now build one period of blocks with >= VB_THRESHOLD blocks signaling
         # some unknown bit
-        #self.send_blocks_with_version(test_node, VB_THRESHOLD, nVersion)
         for i in range(VB_THRESHOLD):
             self.send_blocks_with_version(test_node, 1, nVersion)
             test_node.sync_with_ping()
