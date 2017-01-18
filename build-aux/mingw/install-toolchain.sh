@@ -1,10 +1,16 @@
 #!/bin/sh
 
 #Convert paths from Windows style to POSIX style
+MINGW_BIN=$(echo "/$MINGW_BIN" | sed -e 's/\\/\//g' -e 's/://' -e 's/\"//g')
+MSYS_BIN=$(echo "/$MSYS_BIN" | sed -e 's/\\/\//g' -e 's/://' -e 's/\"//g')
 DEPS_ROOT=$(echo "/$DEPS_ROOT" | sed -e 's/\\/\//g' -e 's/://' -e 's/\"//g')
 CMD_7ZIP=$(echo "/$CMD_7ZIP" | sed -e 's/\\/\//g' -e 's/://' -e 's/\"//g')
 #Just put the toolchains in the MinGW root to keep everything in one place
 TOOLCHAIN_ROOT=$(echo "/$MINGW_ROOT" | sed -e 's/\\/\//g' -e 's/://' -e 's/\"//g')
+
+# Set PATH using POSIX style paths
+PATH="$MSYS_BIN:$MINGW_BIN:$PATH"
+
 
 # Install required msys shell packages
 mingw-get install msys-autoconf-bin

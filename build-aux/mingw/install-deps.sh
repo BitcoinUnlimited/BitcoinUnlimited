@@ -6,6 +6,9 @@ PATH_DEPS=$(echo "/$PATH_DEPS" | sed -e 's/\\/\//g' -e 's/://' -e 's/\"//g')
 CMD_7ZIP=$(echo "/$CMD_7ZIP" | sed -e 's/\\/\//g' -e 's/://' -e 's/\"//g')
 TOOLCHAIN_BIN=$(echo "/$TOOLCHAIN_BIN" | sed -e 's/\\/\//g' -e 's/://' -e 's/\"//g')
 
+# Set PATH using POSIX style paths
+PATH="$TOOLCHAIN_BIN:$MSYS_BIN:$PATH"
+
 # Strip the /bin sub directory
 TOOLCHAIN_ROOT=${TOOLCHAIN_BIN%/*}
 # Detect if this is 32 or 64 target build

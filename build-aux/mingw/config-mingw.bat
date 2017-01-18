@@ -7,6 +7,9 @@ REM ############################################################################
 REM Ensure any variable changes don't exceed the life of this batch file.
 setlocal
 
+REM Remember the path without anything prepended so we can easily switch toolchains
+set "OLD_PATH=%PATH%"
+
 REM Capture timing metrics
 set START_TIME=%TIME%
 
@@ -22,7 +25,6 @@ REM ############################################################################
 set CLEAN_BUILD=YES
 set SKIP_AUTOGEN=
 set SKIP_CONFIGURE=
-
 
 REM TODO: add checking to ensure environment variables are set correctly
 REM 1. Required variables set
@@ -45,10 +47,8 @@ echo Updating base MinGW
 %MINGW_GET% update
 %MINGW_GET% install msys-base-bin
 
-REM Add MSYS and MinGW bin directories to the start of path so commands are available
-set "PATH=%MSYS_BIN%;%MINGW_BIN%;%PATH%"
-REM Remember the path without the toolchain prepended so we can easily switch toolchains
-set "OLD_PATH=%PATH%"
+REM Add MSYS bin directory to the start of path so commands are available
+set "PATH=%MSYS_BIN%;%PATH%"
 
 REM Install toolchain components for the specified architecture(s) (download and unpack)
 echo Installing toolchain...
@@ -86,13 +86,15 @@ if "%BUILD_64_BIT%" NEQ "" (
 ) else ( GOTO BUILD_END )
 
 :BUILD_START
-REM Set the path variable to contain the toolchain as well as MSYS bin directories
-set "PATH=%TOOLCHAIN_BIN%;%OLD_PATH%"
-
 REM Install dependencies (and build this arch)
 %MSYS_SH% "%INST_DIR%\install-deps.sh"
 
+REM ##################################################################################################
 REM Perform build steps that require Windows CMD
+REM ##################################################################################################
+setlocal
+REM Set PATH with toolchain, but not msys, as this causes compile issues for 64-bit Qt
+set "PATH=%TOOLCHAIN_BIN%;%OLD_PATH%"
 
 REM Boost
 echo Building Boost...
@@ -120,6 +122,7 @@ cd "%PATH_DEPS%\Qt\qttools-opensource-src-5.3.2"
 qmake qttools.pro
 mingw32-make %MAKE_CORES%
 
+endlocal
 REM ##################################################################################################
 REM Time to build Bitcoin
 REM ##################################################################################################
