@@ -184,7 +184,8 @@ def initialize_datadir(dirname, n,bitcoinConfDict=None,wallet=None):
         os.makedirs(datadir)
     
     defaults = {"server":1, "discover":0, "regtest":1,"rpcuser":"rt","rpcpassword":"rt",
-                "port":p2p_port(n),"rpcport":str(rpc_port(n)),"listenonion":0,"maxlimitertxfee":0}
+                "port":p2p_port(n),"rpcport":str(rpc_port(n)),"listenonion":0,"maxlimitertxfee":0, "debug":"net",
+                "debug":"parallel", "debug":"thin", "debug":"blk", "debug":"req", "debug":"mempool"}
     if bitcoinConfDict: defaults.update(bitcoinConfDict)
 
     with open(os.path.join(datadir, "bitcoin.conf"), 'w') as f:
@@ -602,6 +603,10 @@ def split_transaction(node, prevouts, toAddrs, txfeePer=DEFAULT_TX_FEE_PER_BYTE,
               return (txn,inp,outp,txid)
     finally:
       decimal.getcontext().prec = decContext
+
+def assert_not_equal(thing1, thing2):
+    if thing1 == thing2:
+        raise AssertionError("%s != %s"%(str(thing1),str(thing2)))
 
 def assert_equal(thing1, thing2):
     if thing1 != thing2:
