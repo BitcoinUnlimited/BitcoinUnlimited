@@ -736,7 +736,8 @@ bool AddOrphanTx(const CTransaction& tx, NodeId peer) EXCLUSIVE_LOCKS_REQUIRED(c
     // at most 500 megabytes of orphans:
 
     // BU - Xtreme Thinblocks - begin section
-    // BU - we do not limit the size of orphans.  There is no danger to having memory overrun since the
+    // BU - we limit the size of orphans to MAX_STANDARD_TX_SIZE.
+    //      There is no danger to having memory overrun since the
     //      orphan cache is limited to only 5000 entries by default. Only 500MB of memory could be consumed
     //      if there were some kind of orphan memory exhaustion attack.
     //      Dropping any tx means they need to be included in the thin block when it it mined, which is inefficient.
