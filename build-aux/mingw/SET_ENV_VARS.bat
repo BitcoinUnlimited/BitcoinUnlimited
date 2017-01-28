@@ -28,6 +28,32 @@ REM Set 7-Zip installation path
 REM This should be where you installed 7-Zip
 set CMD_7ZIP="C:\Program Files\7-Zip\7z.exe"
 
+REM Set git installation path (optional)
+REM If git has been installed and this path is provided, a wrapper script will be "installed"
+REM To grant access to git commands in MinGW.
+REM If you have installed the GitHub Desktop app this includes a copy of git.exe in your AppData folder
+REM 
+REM   example git install path from GitHub Desktop:
+REM C:\Users\username\AppData\Local\GitHub\PortableGit_d7effa1a4a322478cd29c826b52a0c118ad3db11\mingw32\bin\git.exe
+REM set GIT_EXE="C:\Users\Justaphf\AppData\Local\GitHub\PortableGit_d7effa1a4a322478cd29c826b52a0c118ad3db11\mingw32\bin\git.exe"
+
+REM Set Python installation path(s) (optional)
+REM If python has been installed and this path is provided, a wrapper script will be "installed" for
+REM python, python2, and python3.
+REM 
+REM NOTE: If you want to run regression tests (once they are working on Windows), you need to have python installed.
+REM The latest versions of the bitcoin client uses Python3, while previous versions use Python2
+REM It is recommended that you at least install Python3.x as it will include the python version selector "py.exe"
+REM This will automatically detect and start the correct installed version of python based on the desired version
+REM
+REM Typically the py.exe is installed in C:\Windows\py.exe.
+REM set PY_EXE="C:\Windows\py.exe"
+REM
+REM Alternately you may directly specify the specific instance installations
+REM i.e. C:\Python27\python.exe or C:\Users\username\AppData\Local\Programs\Python\Python36\python.exe
+REM set PYTHON2_EXE="C:\Python27\python.exe"
+REM set PYTHON3_EXE="C:\Users\username\AppData\Local\Programs\Python\Python36\python.exe"
+
 REM Set the dependency path.  This is where all of the Bitcoin dependencies will be downloaded and built
 REM IMPORTANT: DO NOT USE PATHS WITH SPACES for the dependencies root!  If you do, you WILL run into build errors
 set "DEPS_ROOT=C:\deps"

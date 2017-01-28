@@ -54,6 +54,10 @@ REM Install toolchain components for the specified architecture(s) (download and
 echo Installing toolchain...
 %MSYS_SH% "%INST_DIR%\install-toolchain.sh"
 
+REM "Installs" utilities (creates wrapper scripts to alias installed python and git)
+echo Installing utilities...
+%MSYS_SH% "%INST_DIR%\install-utils.sh"
+
 
 REM Since the build procedure is the same for x86 and x64 except for the toolchain and deps path
 REM Just set the variable for these paths here based on build mode
