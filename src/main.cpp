@@ -5225,10 +5225,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     {
         LOCK(cs_main);
         // BUIP010 Xtreme Thinblocks: We only do inv/getdata for xthinblocks and so we must have headersfirst turned off
-        if (IsThinBlocksEnabled())
-            State(pfrom->GetId())->fPreferHeaders = false;
-        else
-            State(pfrom->GetId())->fPreferHeaders = true;
+        // However, because nodes never send SENDHEADERS messages when they want xthinblocks, we can safely set fPreferHeaders.
+        State(pfrom->GetId())->fPreferHeaders = true;
     }
 
 
