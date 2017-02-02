@@ -437,10 +437,17 @@ struct TxoIterLess // : binary_function <T,T,bool>
     typedef SpendableTxos::iterator T;
     bool operator() (const T& x, const T& y) const {return x->first < y->first;}
   };
+<<<<<<< HEAD
 
 typedef std::set<SpendableTxos::iterator,TxoIterLess> TxoItVec;
 typedef std::pair<CAmount, TxoItVec > TxoGroup;  // A set of coins and how much they sum to.
 
+=======
+
+typedef std::set<SpendableTxos::iterator,TxoIterLess> TxoItVec;
+typedef std::pair<CAmount, TxoItVec > TxoGroup;  // A set of coins and how much they sum to.
+
+>>>>>>> 7b5c141b30a9d2157598304fc0119a4264e127f7
 extern TxoGroup CoinSelection(/* const */ SpendableTxos& available, const CAmount targetValue);
 
 
