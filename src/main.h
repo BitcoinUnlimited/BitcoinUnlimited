@@ -110,6 +110,7 @@ static const int64_t BLOCK_DOWNLOAD_TIMEOUT_BASE = 1000000;
 static const int64_t BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 500000;
 
 static const unsigned int DEFAULT_LIMITFREERELAY = 15;
+/** -relaypriority is TO BE DEPRECATED in the future */
 static const bool DEFAULT_RELAYPRIORITY = false;
 
 /** Default for -permitbaremultisig */
