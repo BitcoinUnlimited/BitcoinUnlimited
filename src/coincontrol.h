@@ -36,7 +36,8 @@ public:
 
     bool HasSelected() const
     {
-        return (setSelected.size() > 0);
+      // return (setSelected.size() > 0);  // BU empty() can be faster than getting the full size
+      return !setSelected.empty();
     }
 
     bool IsSelected(const uint256& hash, unsigned int n) const

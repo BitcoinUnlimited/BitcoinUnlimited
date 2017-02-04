@@ -1893,7 +1893,7 @@ bool CWallet::IsTxSpendable(const CWalletTx* pcoin)
   return true;
 }
 
-void CWallet::FillAvailableCoins()
+void CWallet::FillAvailableCoins(const CCoinControl *coinControl)
 {
   available.clear();
  
@@ -1912,12 +1912,16 @@ void CWallet::FillAvailableCoins()
 	{
 	  isminetype mine =  _IsMine(*this,pcoin->vout[i].scriptPubKey); // BU optimize
 
+          bool alreadySelected = (coinControl && coinControl->HasSelected() && coinControl->IsSelected(wtxid,i));
+  
 	  if (!(IsSpent(wtxid, i)) && // If its not spent
 	      mine != ISMINE_NO &&    // and its mine
+              !alreadySelected  &&    // and coin control hasn't already chosen it
 	      !IsLockedCoin((*it).first, i) && 
 	      (pcoin->vout[i].nValue > 0))
 	    {
 	      bool spendable = ((mine & ISMINE_SPENDABLE) != ISMINE_NO);
+              
 	      available.insert(SpendableTxos::value_type(pcoin->vout[i].nValue, COutput(pcoin, i, nDepth,spendable)));
 	    }
 	}
@@ -1929,44 +1933,54 @@ bool CWallet::SelectCoinsBU(const CAmount& nTargetValue, std::set<std::pair<cons
 {
   setCoinsRet.clear();
   assert(nValueRet == 0);
-
+  CAmount tgtValue = nTargetValue;
+  bool filled = false;
+  
   // coin control -> return all selected outputs (we want all selected to go into the transaction)
   if (coinControl)
     {
       if (coinControl->HasSelected())  // Some coins were selected, let's find out which ones and add them to the set
         {
-	  /*
-	    BOOST_FOREACH(const COutput& out, vCoins)
+          std::vector<COutPoint> selectedCoins;
+          coinControl->ListSelected(selectedCoins);
+          
+	  BOOST_FOREACH(const COutPoint& outpt, selectedCoins) // for every selected coin
 	    {
-	    if (!out.fSpendable)
-	    continue;
-	    nValueRet += out.tx->vout[out.i].nValue;
-	    setCoinsRet.insert(make_pair(out.tx, out.i));
-	    }
-	  */
+              std::map<uint256, CWalletTx>::iterator txfound = mapWallet.find(outpt.hash); // get its transaction
+              if (txfound != mapWallet.end())
+                {
+                  // const uint256 hash = txfound->first;
+                  CWalletTx& tx= txfound->second;
+                  
+                  //? if (!out.fSpendable) continue;
+                  nValueRet += tx.vout[outpt.n].nValue;
+                  tgtValue -= tx.vout[outpt.n].nValue;  // decrease the value we will auto-find by what the user hand-selected.
+                  setCoinsRet.insert(make_pair(&tx, outpt.n));
+                }
+            }
 	}
 
       if (!coinControl->fAllowOtherInputs)  // No other inputs allowed so stop here.
 	return (nValueRet >= nTargetValue);
+
+      FillAvailableCoins(coinControl); // If the user is manually selecting outputs (only way is via the GUI) this is not performance sensitive anyway (and we need to make sure coincontrol coins are not in the list)
+      filled=true;
+    }
+  else if (available.size() < 100)  // If there are very few TXOs, then regenerate them.  If the wallet HAS few TXOs then regenerate every time -- its fast for few.
+    {
+      FillAvailableCoins(coinControl);
+      filled=true;
     }
 
   TxoGroup g;
-  if (available.size() < 100)  // If there are very few TXOs, then regenerate them.  If the wallet HAS few TXOs then regenerate every time -- its fast for few.
-    {
-      FillAvailableCoins();
-      g =  CoinSelection(available, nTargetValue);
-      if (g.first == 0 ) return false;
+  g =  CoinSelection(available, tgtValue);
+  if ((!filled)&&(g.first == 0)) // Ok no solution was found.  So let's regenerate the TXOs and try again.
+    {  
+      FillAvailableCoins(coinControl);
+      g =  CoinSelection(available, tgtValue);
     }
-  else  // Lots of available TXOs, do NOT regenerate
-    {
-    g =  CoinSelection(available, nTargetValue);
-    if (g.first == 0)  // Ok no solution was found.  So let's regenerate the TXOs and try again.
-      {  
-      FillAvailableCoins();
-      g =  CoinSelection(available, nTargetValue);
-      }
-    }
-  if (g.first == 0 ) return false;
+  if (g.first == 0 ) return false;  // no solution found
+  
   nValueRet = 0;
   for (TxoItVec::iterator i = g.second.begin(); i != g.second.end();)
     {

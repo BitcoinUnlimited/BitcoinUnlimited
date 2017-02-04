@@ -670,7 +670,7 @@ public:
     const CWalletTx* GetWalletTx(const uint256& hash) const;
 
     bool IsTxSpendable(const CWalletTx*);
-    void FillAvailableCoins(); // populate available COutputs.
+    void FillAvailableCoins(const CCoinControl *coinControl); // populate available COutputs.
     bool SelectCoinsBU(const CAmount& nTargetValue, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, const CCoinControl *coinControl = NULL);
 
     //! check whether we are allowed to upgrade (or already support) to the named feature
