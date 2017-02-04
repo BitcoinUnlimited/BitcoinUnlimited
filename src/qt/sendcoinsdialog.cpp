@@ -825,12 +825,14 @@ void SendCoinsDialog::coinControlUpdateLabels()
         // actual coin control calculation
         CoinControlDialog::updateLabels(model, this);
 
+        CoinControlDialog::coinControl->fAllowOtherInputs = false;  // Other outputs are selected so do not allow automatic selection.
         // show coin control stats
         ui->labelCoinControlAutomaticallySelected->hide();
         ui->widgetCoinControl->show();
     }
     else
     {
+        CoinControlDialog::coinControl->fAllowOtherInputs = true;  // No outputs are selected so we need to allow automatic selection.
         // hide coin control stats
         ui->labelCoinControlAutomaticallySelected->show();
         ui->widgetCoinControl->hide();
