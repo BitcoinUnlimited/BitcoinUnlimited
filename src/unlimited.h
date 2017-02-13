@@ -25,6 +25,7 @@ enum {
     DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER = 16,    // Allowed messages lengths will be this * the excessive block size
     MAX_COINBASE_SCRIPTSIG_SIZE = 100,
     EXCESSIVE_BLOCK_CHAIN_RESET = 6*24,  // After 1 day of non-excessive blocks, reset the checker
+    DEFAULT_CHECKPOINT_DAYS = 30,  // Default for the number of days in the past we check scripts during initial block download
 };
 
 class CBlock;
@@ -56,6 +57,9 @@ static const unsigned int MAX_BLOCK_SIZE_MULTIPLIER = 3;
 /** The minimum value possible for -limitfreerelay when rate limiting */
 static const unsigned int DEFAULT_MIN_LIMITFREERELAY = 1;
 // BU - Xtreme Thinblocks Auto Mempool Limiter - end section
+
+// The number of days in the past we check scripts during initial block download
+extern CTweak<uint64_t> checkScriptDays;
 
 // print out a configuration warning during initialization
 // bool InitWarning(const std::string &str);
