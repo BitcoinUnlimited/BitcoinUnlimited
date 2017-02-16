@@ -1,4 +1,4 @@
-<TS language="hr" version="2.0">
+<TS language="hr" version="2.1">
 <context>
     <name>AddressBookPage</name>
     <message>
@@ -217,6 +217,9 @@
     </message>
 </context>
 <context>
+    <name>BanTableModel</name>
+    </context>
+<context>
     <name>BitcoinGUI</name>
     <message>
         <source>Sign &amp;message...</source>
@@ -291,8 +294,8 @@
         <translation>Otvori &amp;URI...</translation>
     </message>
     <message>
-        <source>Bitcoin Core client</source>
-        <translation>Bitcoin Core klijent</translation>
+        <source>Bitcoin Unlimited client</source>
+        <translation>Bitcoin Unlimited klijent</translation>
     </message>
     <message>
         <source>Importing blocks from disk...</source>
@@ -343,8 +346,8 @@
         <translation>Pri&amp;mi</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Core</source>
-        <translation>Prikaži informacije o programu Bitcoin Core</translation>
+        <source>Show information about Bitcoin Unlimited</source>
+        <translation>Prikaži informacije o programu Bitcoin Unlimited</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -383,19 +386,19 @@
         <translation>Traka kartica</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin Unlimited</source>
+        <translation>Bitcoin Unlimited</translation>
     </message>
     <message>
         <source>Request payments (generates QR codes and bitcoin: URIs)</source>
         <translation>Zatraži uplatu (stvara QR kod i bitcoin: URI adresu)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
-        <translation>&amp;O programu Bitcoin Core</translation>
+        <source>&amp;About Bitcoin Unlimited</source>
+        <translation>&amp;O programu Bitcoin Unlimited</translation>
     </message>
     <message>
-        <source>Modify configuration options for Bitcoin Core</source>
+        <source>Modify configuration options for Bitcoin Unlimited</source>
         <translation>Promijeni postavke programa</translation>
     </message>
     <message>
@@ -415,7 +418,7 @@
         <translation>Opcije &amp;naredbene linije</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
+        <source>Show the Bitcoin Unlimited help message to get a list with possible Bitcoin command-line options</source>
         <translation>Ispis svih opcija naredbene linije programa sa kratkim opisom</translation>
     </message>
     <message numerus="yes">
@@ -744,8 +747,8 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin Unlimited</source>
+        <translation>Bitcoin Unlimited</translation>
     </message>
     <message>
         <source>version</source>
@@ -756,8 +759,8 @@
         <translation>(%1-bit)</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
-        <translation>O programu Bitcoin Core</translation>
+        <source>About Bitcoin Unlimited</source>
+        <translation>O programu Bitcoin Unlimited</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -771,7 +774,7 @@
         <source>command-line options</source>
         <translation>opcije programa u naredbenoj liniji</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>Intro</name>
     <message>
@@ -779,12 +782,12 @@
         <translation>Dobrodošli</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
-        <translation>Dobrodošli u programu Bitcoin Core.</translation>
+        <source>Welcome to Bitcoin Unlimited.</source>
+        <translation>Dobrodošli u programu Bitcoin Unlimited.</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin Unlimited</source>
+        <translation>Bitcoin Unlimited</translation>
     </message>
     <message>
         <source>Error</source>
@@ -861,11 +864,11 @@
         <translation>&amp;Mreža</translation>
     </message>
     <message>
-        <source>Automatically start Bitcoin Core after logging in to the system.</source>
+        <source>Automatically start Bitcoin Unlimited after logging in to the system.</source>
         <translation>Program se automatski pokrene po prijavi u sustav.</translation>
     </message>
     <message>
-        <source>&amp;Start Bitcoin Core on system login</source>
+        <source>&amp;Start Bitcoin Unlimited on system login</source>
         <translation>&amp;Pokreni program kod prijave u sustav</translation>
     </message>
     <message>
@@ -1011,6 +1014,10 @@
         <translation>&amp;Informacije</translation>
     </message>
     <message>
+        <source>Debug window</source>
+        <translation>Konzola za dijagnostiku</translation>
+    </message>
+    <message>
         <source>Using OpenSSL version</source>
         <translation>OpenSSL verzija u upotrebi</translation>
     </message>
@@ -1055,14 +1062,6 @@
         <translation>Trajanje veze</translation>
     </message>
     <message>
-        <source>Bytes Sent</source>
-        <translation>Bajtova poslano</translation>
-    </message>
-    <message>
-        <source>Bytes Received</source>
-        <translation>Bajtova primljeno</translation>
-    </message>
-    <message>
         <source>Last block time</source>
         <translation>Posljednje vrijeme bloka</translation>
     </message>
@@ -1087,7 +1086,7 @@
         <translation>Očisti konzolu</translation>
     </message>
     <message>
-        <source>Welcome to the Bitcoin Core RPC console.</source>
+        <source>Welcome to the Bitcoin Unlimited RPC console.</source>
         <translation>Dobrodošli u Bitcoin RPC konzolu.</translation>
     </message>
     <message>
@@ -1098,7 +1097,7 @@
         <source>Unknown</source>
         <translation>Nepoznato</translation>
     </message>
-    </context>
+</context>
 <context>
     <name>ReceiveCoinsDialog</name>
     <message>
@@ -1219,6 +1218,10 @@
         <translation>Slanje novca</translation>
     </message>
     <message>
+        <source>Insufficient funds!</source>
+        <translation>Nedovoljna sredstva</translation>
+    </message>
+    <message>
         <source>Quantity:</source>
         <translation>Količina:</translation>
     </message>
@@ -1241,6 +1244,10 @@
     <message>
         <source>Change:</source>
         <translation>Vraćeno:</translation>
+    </message>
+    <message>
+        <source>Transaction Fee:</source>
+        <translation>Naknada za transakciju:</translation>
     </message>
     <message>
         <source>Send to multiple recipients at once</source>
@@ -1372,11 +1379,19 @@
         <translation>Potpis</translation>
     </message>
     <message>
+        <source>Sign &amp;Message</source>
+        <translation>&amp;Potpišite poruku</translation>
+    </message>
+    <message>
         <source>Clear &amp;All</source>
         <translation>Obriši &amp;sve</translation>
     </message>
     <message>
         <source>&amp;Verify Message</source>
+        <translation>&amp;Potvrdite poruku</translation>
+    </message>
+    <message>
+        <source>Verify &amp;Message</source>
         <translation>&amp;Potvrdite poruku</translation>
     </message>
     <message>
@@ -1391,8 +1406,8 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin Unlimited</source>
+        <translation>Bitcoin Unlimited</translation>
     </message>
     <message>
         <source>[testnet]</source>
@@ -1769,14 +1784,6 @@
         <translation>Izvršavaj u pozadini kao uslužnik i prihvaćaj komande</translation>
     </message>
     <message>
-        <source>Use the test network</source>
-        <translation>Koristi test mrežu</translation>
-    </message>
-    <message>
-        <source>Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction.</source>
-        <translation>Upozorenje: -paytxfee je podešen na preveliki iznos.  To je iznos koji ćete platiti za obradu transakcije.</translation>
-    </message>
-    <message>
         <source>Block creation options:</source>
         <translation>Opcije za kreiranje bloka:</translation>
     </message>
@@ -1789,24 +1796,24 @@
         <translation>Pogreška: Nema dovoljno prostora na disku!</translation>
     </message>
     <message>
-        <source>Imports blocks from external blk000??.dat file</source>
-        <translation>Uvozi blokove sa vanjske blk000??.dat datoteke</translation>
-    </message>
-    <message>
         <source>Information</source>
         <translation>Informacija</translation>
     </message>
     <message>
+        <source>Invalid amount for -maxtxfee=&lt;amount&gt;: '%s'</source>
+        <translation>Nevaljali iznos za opciju -maxtxfee=&lt;iznos&gt;: '%s'</translation>
+    </message>
+    <message>
+        <source>Invalid amount for -minrelaytxfee=&lt;amount&gt;: '%s'</source>
+        <translation>Nevaljali iznos za opciju -minrelaytxfee=&lt;iznos&gt;: '%s'</translation>
+    </message>
+    <message>
+        <source>Invalid amount for -mintxfee=&lt;amount&gt;: '%s'</source>
+        <translation>Nevaljali iznos za opciju -mintxfee=&lt;iznos&gt;: '%s'</translation>
+    </message>
+    <message>
         <source>Send trace/debug info to console instead of debug.log file</source>
         <translation>Šalji trace/debug informacije na konzolu umjesto u debug.log datoteku</translation>
-    </message>
-    <message>
-        <source>Start minimized</source>
-        <translation>Pokreni minimiziran</translation>
-    </message>
-    <message>
-        <source>Use UPnP to map the listening port (default: 1 when listening)</source>
-        <translation>Pokušaj koristiti UPnP da otvoriš port za uslugu (default: 1 when listening)</translation>
     </message>
     <message>
         <source>Username for JSON-RPC connections</source>
@@ -1823,18 +1830,6 @@
     <message>
         <source>Execute command when the best block changes (%s in cmd is replaced by block hash)</source>
         <translation>Izvršite naredbu kada se najbolji blok promjeni (%s u cmd je zamjenjen sa block hash)</translation>
-    </message>
-    <message>
-        <source>Upgrade wallet to latest format</source>
-        <translation>Nadogradite novčanik u posljednji format.</translation>
-    </message>
-    <message>
-        <source>Rescan the block chain for missing wallet transactions</source>
-        <translation>Ponovno pretraži lanac blokova za transakcije koje nedostaju</translation>
-    </message>
-    <message>
-        <source>Use OpenSSL (https) for JSON-RPC connections</source>
-        <translation>Koristi OpenSSL (https) za JSON-RPC povezivanje</translation>
     </message>
     <message>
         <source>This help message</source>

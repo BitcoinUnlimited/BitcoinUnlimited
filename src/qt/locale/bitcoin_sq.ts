@@ -169,6 +169,9 @@
     </message>
     </context>
 <context>
+    <name>BanTableModel</name>
+    </context>
+<context>
     <name>BitcoinGUI</name>
     <message>
         <source>Synchronizing with network...</source>
@@ -197,6 +200,10 @@
     <message>
         <source>&amp;Options...</source>
         <translation>&amp;Opsione</translation>
+    </message>
+    <message>
+        <source>&amp;Receiving addresses...</source>
+        <translation>Duke marr adresen</translation>
     </message>
     <message>
         <source>Change the passphrase used for wallet encryption</source>
@@ -239,11 +246,11 @@
         <translation>Shiriti i mjeteve</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin Unlimited</source>
         <translation>Berthama Bitcoin</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
+        <source>&amp;About Bitcoin Unlimited</source>
         <translation>Rreth Berthames Bitkoin</translation>
     </message>
     <message>
@@ -378,7 +385,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin Unlimited</source>
         <translation>Berthama Bitcoin</translation>
     </message>
     <message>
@@ -386,7 +393,7 @@
         <translation>versioni</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
+        <source>About Bitcoin Unlimited</source>
         <translation>Rreth Berthames Bitkoin</translation>
     </message>
     </context>
@@ -397,11 +404,11 @@
         <translation>Miresevini</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
+        <source>Welcome to Bitcoin Unlimited.</source>
         <translation>Miresevini ne Berthamen Bitcoin</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin Unlimited</source>
         <translation>Berthama Bitcoin</translation>
     </message>
     <message>
@@ -417,6 +424,10 @@
     <message>
         <source>Options</source>
         <translation>Opsionet</translation>
+    </message>
+    <message>
+        <source>W&amp;allet</source>
+        <translation>Portofol</translation>
     </message>
     </context>
 <context>
@@ -445,6 +456,10 @@
 <context>
     <name>RPCConsole</name>
     <message>
+        <source>&amp;Information</source>
+        <translation>Informacion</translation>
+    </message>
+    <message>
         <source>&amp;Open</source>
         <translation>&amp;Hap</translation>
     </message>
@@ -460,16 +475,28 @@
         <source>Unknown</source>
         <translation>i/e panjohur</translation>
     </message>
-    </context>
+</context>
 <context>
     <name>ReceiveCoinsDialog</name>
+    <message>
+        <source>&amp;Amount:</source>
+        <translation>Shuma:</translation>
+    </message>
     <message>
         <source>&amp;Label:</source>
         <translation>&amp;Etiketë:</translation>
     </message>
+    <message>
+        <source>Clear</source>
+        <translation>Pastro</translation>
+    </message>
     </context>
 <context>
     <name>ReceiveRequestDialog</name>
+    <message>
+        <source>Copy &amp;Address</source>
+        <translation>&amp;Kopjo adresen</translation>
+    </message>
     <message>
         <source>Address</source>
         <translation>Adresë</translation>
@@ -507,6 +534,10 @@
     <message>
         <source>Send Coins</source>
         <translation>Dërgo Monedha</translation>
+    </message>
+    <message>
+        <source>Insufficient funds!</source>
+        <translation>Fonde te pamjaftueshme</translation>
     </message>
     <message>
         <source>Amount:</source>
@@ -567,6 +598,10 @@
         <source>Alt+P</source>
         <translation>Alt+P</translation>
     </message>
+    <message>
+        <source>Pay To:</source>
+        <translation>Paguaj drejt:</translation>
+    </message>
     </context>
 <context>
     <name>ShutdownWindow</name>
@@ -589,7 +624,7 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin Unlimited</source>
         <translation>Berthama Bitcoin</translation>
     </message>
     <message>
@@ -617,6 +652,10 @@
     <message>
         <source>Date</source>
         <translation>Data</translation>
+    </message>
+    <message>
+        <source>Transaction</source>
+        <translation>transaksionit</translation>
     </message>
     <message>
         <source>Amount</source>
@@ -754,6 +793,10 @@
     </context>
 <context>
     <name>bitcoin-core</name>
+    <message>
+        <source>Options:</source>
+        <translation>Opsionet:</translation>
+    </message>
     <message>
         <source>Information</source>
         <translation>Informacion</translation>

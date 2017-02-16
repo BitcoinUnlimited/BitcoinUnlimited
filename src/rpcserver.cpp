@@ -1,5 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
-// Copyright (c) 2009-2014 The Bitcoin Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,6 +13,11 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
+
+#ifdef ENABLE_WALLET
+#include "wallet/wallet.h"
+#endif
+#include "unlimited.h"
 
 #include <univalue.h>
 
@@ -31,7 +37,7 @@ using namespace std;
 static bool fRPCRunning = false;
 static bool fRPCInWarmup = true;
 static std::string rpcWarmupStatus("RPC server started");
-static CCriticalSection cs_rpcWarmup;
+extern CCriticalSection cs_rpcWarmup;
 /* Timer-creating functions */
 static std::vector<RPCTimerInterface*> timerInterfaces;
 /* Map of name to timer.
@@ -272,6 +278,12 @@ static const CRPCCommand vRPCCommands[] =
     { "network",            "setban",                 &setban,                 true  },
     { "network",            "listbanned",             &listbanned,             true  },
     { "network",            "clearbanned",            &clearbanned,            true  },
+    { "network",            "settrafficshaping",      &settrafficshaping,      true  },  // BU
+    { "network",            "gettrafficshaping",      &gettrafficshaping,      true  },  // BU
+    { "network",            "pushtx",                 &pushtx,                 true  },  // BU
+    { "network",            "getexcessiveblock",      &getexcessiveblock,      true  },  // BU
+    { "network",            "setexcessiveblock",      &setexcessiveblock,      true  },  // BU
+    { "network",            "expedited",              &expedited,              true  },  // BU
 
     /* Block chain and UTXO */
     { "blockchain",         "getblockchaininfo",      &getblockchaininfo,      true  },
@@ -296,6 +308,12 @@ static const CRPCCommand vRPCCommands[] =
     { "mining",             "getnetworkhashps",       &getnetworkhashps,       true  },
     { "mining",             "prioritisetransaction",  &prioritisetransaction,  true  },
     { "mining",             "submitblock",            &submitblock,            true  },
+    { "mining",             "getminingmaxblock",      &getminingmaxblock,      true  },  // BU
+    { "mining",             "setminingmaxblock",      &setminingmaxblock,      true  },  // BU
+    { "mining",             "getminercomment",        &getminercomment,        true  },  // BU
+    { "mining",             "setminercomment",        &setminercomment,        true  },  // BU
+    { "mining",             "getblockversion",        &getblockversion,        true  },  // BU
+    { "mining",             "setblockversion",        &setblockversion,        true  },  // BU
 
     /* Coin generation */
     { "generating",         "getgenerate",            &getgenerate,            true  },
@@ -319,6 +337,12 @@ static const CRPCCommand vRPCCommands[] =
     { "util",               "verifymessage",          &verifymessage,          true  },
     { "util",               "estimatefee",            &estimatefee,            true  },
     { "util",               "estimatepriority",       &estimatepriority,       true  },
+    { "util",               "estimatesmartfee",       &estimatesmartfee,       true  },
+    { "util",               "estimatesmartpriority",  &estimatesmartpriority,  true  },
+    { "util",               "getstatlist",            &getstatlist,            true  },  // BU
+    { "util",               "getstat",                &getstat,                true  },  // BU
+    { "util",               "get",                    &gettweak,               true  },  // BU
+    { "util",               "set",                    &settweak,               true  },  // BU
 
     /* Not shown in help */
     { "hidden",             "invalidateblock",        &invalidateblock,        true  },
@@ -344,6 +368,7 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "getreceivedbyaccount",   &getreceivedbyaccount,   false },
     { "wallet",             "getreceivedbyaddress",   &getreceivedbyaddress,   false },
     { "wallet",             "gettransaction",         &gettransaction,         false },
+    { "wallet",             "abandontransaction",     &abandontransaction,     false },
     { "wallet",             "getunconfirmedbalance",  &getunconfirmedbalance,  false },
     { "wallet",             "getwalletinfo",          &getwalletinfo,          false },
     { "wallet",             "importprivkey",          &importprivkey,          true  },
@@ -561,9 +586,9 @@ void RPCRunLater(const std::string& name, boost::function<void(void)> func, int6
     if (timerInterfaces.empty())
         throw JSONRPCError(RPC_INTERNAL_ERROR, "No timer handler registered for RPC");
     deadlineTimers.erase(name);
-    RPCTimerInterface* timerInterface = timerInterfaces[0];
+    RPCTimerInterface* timerInterface = timerInterfaces.back();
     LogPrint("rpc", "queue run of timer %s in %i seconds (using %s)\n", name, nSeconds, timerInterface->Name());
-    deadlineTimers.insert(std::make_pair(name, timerInterface->NewTimer(func, nSeconds*1000)));
+    deadlineTimers.insert(std::make_pair(name, boost::shared_ptr<RPCTimerBase>(timerInterface->NewTimer(func, nSeconds*1000))));
 }
 
 const CRPCTable tableRPC;

@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2013 The Bitcoin Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -8,6 +9,7 @@
 
 #include "crypto/ripemd160.h"
 #include "crypto/sha256.h"
+#include "prevector.h"
 #include "serialize.h"
 #include "uint256.h"
 #include "version.h"
@@ -38,6 +40,9 @@ public:
         sha.Reset();
         return *this;
     }
+
+    /** Return the total number of bytes hashed since the last Reset() (or object construction) */
+    size_t GetNumBytesHashed() const { return sha.GetNumBytesHashed(); }
 };
 
 /** A hasher class for Bitcoin's 160-bit hash (SHA-256 + RIPEMD-160). */
@@ -118,6 +123,13 @@ inline uint160 Hash160(const std::vector<unsigned char>& vch)
     return Hash160(vch.begin(), vch.end());
 }
 
+/** Compute the 160-bit hash of a vector. */
+template<unsigned int N>
+inline uint160 Hash160(const prevector<N, unsigned char>& vch)
+{
+    return Hash160(vch.begin(), vch.end());
+}
+
 /** A writer stream (for serialization) that computes a 256-bit hash. */
 class CHashWriter
 {
@@ -140,6 +152,11 @@ public:
         uint256 result;
         ctx.Finalize((unsigned char*)&result);
         return result;
+    }
+
+    /** Return the total number of bytes hashed by this object */
+    size_t GetNumBytesHashed() const {
+        return ctx.GetNumBytesHashed();
     }
 
     template<typename T>

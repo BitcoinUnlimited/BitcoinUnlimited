@@ -1,34 +1,31 @@
-Bitcoin Core 0.11.99
-=====================
+Bitcoin Unlimited 0.12.1b
+=========================
 
 Setup
 ---------------------
-[Bitcoin Core](http://bitcoin.org/en/download) is the original Bitcoin client and it builds the backbone of the network. However, it downloads and stores the entire history of Bitcoin transactions (which is currently several GBs); depending on the speed of your computer and network connection, the synchronization process can take anywhere from a few hours to a day or more.
+[Bitcoin Unlimited](http://www.bitcoinunlimited.info) is a fork of the original Bitcoin client and it builds the backbone of the network.  It downloads and stores the entire history of Bitcoin transactions (which is currently several GBs); depending on the speed of your computer and network connection, the synchronization process can take anywhere from a few hours to a day or more.
+
+- [Getting the most out of Xtreme thinblocks](bu-xthin.md)
+- [Setting up an Xpedited Relay Network](bu-xpedited-forwarding.md)
 
 Running
 ---------------------
-The following are some helpful notes on how to run Bitcoin on your native platform. 
+The following are some helpful notes on how to run Bitcoin on your native platform.
 
 ### Unix
 
-You need the Qt4 run-time libraries to run Bitcoin-Qt. On Debian or Ubuntu:
-
-	sudo apt-get install libqtgui4
-
 Unpack the files into a directory and run:
 
-- bin/32/bitcoin-qt (GUI, 32-bit) or bin/32/bitcoind (headless, 32-bit)
-- bin/64/bitcoin-qt (GUI, 64-bit) or bin/64/bitcoind (headless, 64-bit)
-
-
+- `bin/bitcoin-qt` (GUI) or
+- `bin/bitcoind` (headless)
 
 ### Windows
 
 Unpack the files into a directory, and then run bitcoin-qt.exe.
 
-### OSX
+### OS X
 
-Drag Bitcoin-Qt to your applications folder, and then run Bitcoin-Qt.
+Drag Bitcoin-Unlimited to your applications folder, and then run Bitcoin-Unlimited.
 
 ### Need Help?
 
@@ -41,13 +38,15 @@ Building
 ---------------------
 The following are developer notes on how to build Bitcoin on your native platform. They are not complete guides, but include notes on the necessary libraries, compile flags, etc.
 
-- [OSX Build Notes](build-osx.md)
+- [OS X Build Notes](build-osx.md)
 - [Unix Build Notes](build-unix.md)
+- [Windows Build Notes](build-windows.md)
+- [OpenBSD Build Notes](build-openbsd.md)
 - [Gitian Building Guide](gitian-building.md)
 
 Development
 ---------------------
-The Bitcoin repo's [root README](https://github.com/bitcoin/bitcoin/blob/master/README.md) contains relevant information on the development process and automated testing.
+The Bitcoin repo's [root README](/README.md) contains relevant information on the development process and automated testing.
 
 - [Developer Notes](developer-notes.md)
 - [Multiwallet Qt Development](multiwallet-qt.md)

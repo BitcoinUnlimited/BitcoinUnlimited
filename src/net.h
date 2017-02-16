@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2014 The Bitcoin Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,8 +10,8 @@
 #include "bloom.h"
 #include "compat.h"
 #include "limitedmap.h"
-#include "mruset.h"
 #include "netbase.h"
+#include "primitives/block.h"
 #include "protocol.h"
 #include "random.h"
 #include "streams.h"
@@ -28,6 +29,9 @@
 #include <boost/foreach.hpp>
 #include <boost/signals2/signal.hpp>
 
+#include "unlimited.h"
+#include "stat.h"
+
 class CAddrMan;
 class CScheduler;
 class CNode;
@@ -44,8 +48,10 @@ static const int TIMEOUT_INTERVAL = 20 * 60;
 static const unsigned int MAX_INV_SZ = 50000;
 /** The maximum number of new addresses to accumulate before announcing. */
 static const unsigned int MAX_ADDR_TO_SEND = 1000;
+/** The maximum # of bytes to receive at once */
+static const int64_t MAX_RECV_CHUNK = 256 * 1024;
 /** Maximum length of incoming protocol messages (no message over 2 MiB is currently acceptable). */
-static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 2 * 1024 * 1024;
+//static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 2 * 1024 * 1024;  // BU: currently allowing 10*excessiveBlockSize as the max message
 /** Maximum length of strSubVer in `version` message */
 static const unsigned int MAX_SUBVERSION_LENGTH = 256;
 /** -listen default */
@@ -58,8 +64,28 @@ static const bool DEFAULT_UPNP = false;
 #endif
 /** The maximum number of entries in mapAskFor */
 static const size_t MAPASKFOR_MAX_SZ = MAX_INV_SZ;
+/** The maximum number of entries in setAskFor (larger due to getdata latency)*/
+static const size_t SETASKFOR_MAX_SZ = 2 * MAX_INV_SZ;
 /** The maximum number of peer connections to maintain. */
 static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
+/** BU: The maximum numer of outbound peer connections */
+static const unsigned int DEFAULT_MAX_OUTBOUND_CONNECTIONS = 8;
+/** The default for -maxuploadtarget. 0 = Unlimited */
+static const uint64_t DEFAULT_MAX_UPLOAD_TARGET = 0;
+/** Default for blocks only*/
+static const bool DEFAULT_BLOCKSONLY = false;
+
+// BITCOINUNLIMITED START
+static const bool DEFAULT_FORCEBITNODES = false;
+// BITCOINUNLIMITED END
+
+static const bool DEFAULT_FORCEDNSSEED = false;
+static const size_t DEFAULT_MAXRECEIVEBUFFER = 5 * 1000;
+static const size_t DEFAULT_MAXSENDBUFFER    = 1 * 1000;
+
+// NOTE: When adjusting this, update rpcnet:setban's help ("24h")
+static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;  // Default 24-hour ban
+
 
 unsigned int ReceiveFloodSize();
 unsigned int SendBufferSize();
@@ -70,14 +96,15 @@ CNode* FindNode(const CNetAddr& ip);
 CNode* FindNode(const CSubNet& subNet);
 CNode* FindNode(const std::string& addrName);
 CNode* FindNode(const CService& ip);
-CNode* ConnectNode(CAddress addrConnect, const char *pszDest = NULL);
-bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false);
+int DisconnectSubNetNodes(const CSubNet& subNet);
+CNode* ConnectNode(CAddress addrConnect, const char* pszDest = NULL);
+bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant* grantOutbound = NULL, const char* strDest = NULL, bool fOneShot = false);
 void MapPort(bool fUseUPnP);
 unsigned short GetListenPort();
-bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
+bool BindListenPort(const CService& bindAddr, std::string& strError, bool fWhitelisted = false);
 void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler);
 bool StopNode();
-void SocketSendData(CNode *pnode);
+int SocketSendData(CNode* pnode);
 
 typedef int NodeId;
 
@@ -85,11 +112,12 @@ struct CombinerAll
 {
     typedef bool result_type;
 
-    template<typename I>
+    template <typename I>
     bool operator()(I first, I last) const
     {
         while (first != last) {
-            if (!(*first)) return false;
+            if (!(*first))
+                return false;
             ++first;
         }
         return true;
@@ -101,7 +129,7 @@ struct CNodeSignals
 {
     boost::signals2::signal<int ()> GetHeight;
     boost::signals2::signal<bool (CNode*), CombinerAll> ProcessMessages;
-    boost::signals2::signal<bool (CNode*, bool), CombinerAll> SendMessages;
+    boost::signals2::signal<bool (CNode*), CombinerAll> SendMessages;
     boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
     boost::signals2::signal<void (NodeId)> FinalizeNode;
 };
@@ -122,18 +150,18 @@ enum
 };
 
 bool IsPeerAddrLocalGood(CNode *pnode);
-void AdvertizeLocal(CNode *pnode);
+void AdvertiseLocal(CNode *pnode);
 void SetLimited(enum Network net, bool fLimited = true);
 bool IsLimited(enum Network net);
 bool IsLimited(const CNetAddr& addr);
 bool AddLocal(const CService& addr, int nScore = LOCAL_NONE);
 bool AddLocal(const CNetAddr& addr, int nScore = LOCAL_NONE);
+bool RemoveLocal(const CService& addr);
 bool SeenLocal(const CService& addr);
 bool IsLocal(const CService& addr);
-bool GetLocal(CService &addr, const CNetAddr *paddrPeer = NULL);
+bool GetLocal(CService& addr, const CNetAddr* paddrPeer = NULL);
 bool IsReachable(enum Network net);
 bool IsReachable(const CNetAddr &addr);
-void SetReachable(enum Network net, bool fFlag = true);
 CAddress GetLocalAddress(const CNetAddr *paddrPeer = NULL);
 
 
@@ -151,7 +179,7 @@ extern CCriticalSection cs_vNodes;
 extern std::map<CInv, CDataStream> mapRelay;
 extern std::deque<std::pair<int64_t, CInv> > vRelayExpiration;
 extern CCriticalSection cs_mapRelay;
-extern limitedmap<CInv, int64_t> mapAlreadyAskedFor;
+extern limitedmap<uint256, int64_t> mapAlreadyAskedFor;
 
 extern std::vector<std::string> vAddedNodes;
 extern CCriticalSection cs_vAddedNodes;
@@ -175,6 +203,7 @@ class CNodeStats
 public:
     NodeId nodeid;
     uint64_t nServices;
+    bool fRelayTxes;
     int64_t nLastSend;
     int64_t nLastRecv;
     int64_t nTimeConnected;
@@ -194,22 +223,22 @@ public:
 };
 
 
-
-
-class CNetMessage {
+class CNetMessage
+{
 public:
-    bool in_data;                   // parsing header (false) or data (true)
+    bool in_data; // parsing header (false) or data (true)
 
-    CDataStream hdrbuf;             // partially received header
-    CMessageHeader hdr;             // complete header
+    CDataStream hdrbuf; // partially received header
+    CMessageHeader hdr; // complete header
     unsigned int nHdrPos;
 
-    CDataStream vRecv;              // received message data
+    CDataStream vRecv; // received message data
     unsigned int nDataPos;
 
-    int64_t nTime;                  // time (in microseconds) of message receipt.
+    int64_t nTime; // time (in microseconds) of message receipt.
 
-    CNetMessage(const CMessageHeader::MessageStartChars& pchMessageStartIn, int nTypeIn, int nVersionIn) : hdrbuf(nTypeIn, nVersionIn), hdr(pchMessageStartIn), vRecv(nTypeIn, nVersionIn) {
+    CNetMessage(const CMessageHeader::MessageStartChars& pchMessageStartIn, int nTypeIn, int nVersionIn) : hdrbuf(nTypeIn, nVersionIn), hdr(pchMessageStartIn), vRecv(nTypeIn, nVersionIn)
+    {
         hdrbuf.resize(24);
         in_data = false;
         nHdrPos = 0;
@@ -285,7 +314,7 @@ public:
     {
         switch (banReason) {
         case BanReasonNodeMisbehaving:
-            return "node misbehabing";
+            return "node misbehaving";
         case BanReasonManuallyAdded:
             return "manually added";
         default:
@@ -296,6 +325,15 @@ public:
 
 typedef std::map<CSubNet, CBanEntry> banmap_t;
 
+#if 0  // BU cleaning up nodes as a global destructor creates many global destruction dependencies.  Instead use a function call.
+class CNetCleanup
+{
+public:
+  CNetCleanup() {}
+  ~CNetCleanup();
+};
+#endif
+
 /** Information about a peer */
 class CNode
 {
@@ -304,7 +342,7 @@ public:
     uint64_t nServices;
     SOCKET hSocket;
     CDataStream ssSend;
-    size_t nSendSize; // total size of all vSendMsg entries
+    size_t nSendSize;   // total size of all vSendMsg entries
     size_t nSendOffset; // offset inside the first vSendMsg already sent
     uint64_t nSendBytes;
     std::deque<CSerializeData> vSendMsg;
@@ -316,12 +354,17 @@ public:
     uint64_t nRecvBytes;
     int nRecvVersion;
 
+    // BU connection de-prioritization
+    // Total bytes sent and received
+    uint64_t nActivityBytes;
+
     int64_t nLastSend;
     int64_t nLastRecv;
     int64_t nTimeConnected;
     int64_t nTimeOffset;
     CAddress addr;
     std::string addrName;
+    const char* currentCommand;  // if in the middle of the send, this is the command type
     CService addrLocal;
     int nVersion;
     // strSubVer is whatever byte array we read from the wire. However, this field is intended
@@ -339,15 +382,31 @@ public:
     // We use fRelayTxes for two purposes -
     // a) it allows us to not relay tx invs before receiving the peer's version message
     // b) the peer may tell us in its version message that we should not relay tx invs
-    //    until it has initialized its bloom filter.
+    //    unless it loads a bloom filter.
     bool fRelayTxes;
     CSemaphoreGrant grantOutbound;
     CCriticalSection cs_filter;
     CBloomFilter* pfilter;
+    CBloomFilter* pThinBlockFilter; // BU - Xtreme Thinblocks: a bloom filter which is separate from the one used by SPV wallets
     int nRefCount;
     NodeId id;
-protected:
 
+    // BUIP010 Xtreme Thinblocks: begin section
+    CBlock thinBlock;
+    std::vector<uint256> thinBlockHashes;
+    std::vector<uint64_t> xThinBlockHashes;
+    int nSizeThinBlock;   // Original on-wire size of the block. Just used for reporting
+    int thinBlockWaitingForTxns;   // if -1 then not currently waiting
+    std::map<uint256, uint64_t> mapThinBlocksInFlight; // map of the hashes of thin blocks in flight with the time they were requested.
+    double nGetXBlockTxCount; // Count how many get_xblocktx requests are made
+    uint64_t nGetXBlockTxLastTime;  // The last time a get_xblocktx request was made
+    double nGetXthinCount; // Count how many get_xthin requests are made
+    uint64_t nGetXthinLastTime;  // The last time a get_xthin request was made
+    // BUIP010 Xtreme Thinblocks: end section
+
+    unsigned short addrFromPort;
+
+protected:
     // Denial-of-service detection/prevention
     // Key is IP address, value is banned-until-time
     static banmap_t setBanned;
@@ -371,12 +430,19 @@ public:
     CRollingBloomFilter addrKnown;
     bool fGetAddr;
     std::set<uint256> setKnown;
+    int64_t nNextAddrSend;
+    int64_t nNextLocalAddrSend;
 
     // inventory based relay
-    mruset<CInv> setInventoryKnown;
+    CRollingBloomFilter filterInventoryKnown;
     std::vector<CInv> vInventoryToSend;
     CCriticalSection cs_inventory;
+    std::set<uint256> setAskFor;
     std::multimap<int64_t, CInv> mapAskFor;
+    int64_t nNextInvSend;
+    // Used for headers announcements - unfiltered blocks to relay
+    // Also protected by cs_inventory
+    std::vector<uint256> vBlockHashesToAnnounce;
 
     // Ping time measurement:
     // The pong reply we're expecting, or 0 if no pong expected.
@@ -390,6 +456,27 @@ public:
     // Whether a ping is requested.
     bool fPingQueued;
 
+    // BU instrumentation
+    // track the number of bytes sent to this node
+    CStatHistory<unsigned int > bytesSent;
+    // track the number of bytes received from this node
+    CStatHistory<unsigned int > bytesReceived;
+    // track the average round trip latency for transaction requests to this node
+    CStatHistory<unsigned int > txReqLatency;
+    // track the # of times this node is the first to send us a transaction INV
+    CStatHistory<unsigned int> firstTx;
+    // track the # of times this node is the first to send us a block INV
+    CStatHistory<unsigned int> firstBlock;
+    // track the # of times we sent this node a block
+    CStatHistory<unsigned int> blocksSent;
+    // track the # of times we sent this node a transaction
+    CStatHistory<unsigned int> txsSent;
+    // track the # of times we sent this node a transaction
+    CStatHistory<unsigned int> sendGap;
+    // track the # of times we sent this node a transaction
+    CStatHistory<unsigned int> recvGap;
+
+
     CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
     ~CNode();
 
@@ -400,13 +487,18 @@ private:
     static uint64_t nTotalBytesRecv;
     static uint64_t nTotalBytesSent;
 
+    // outbound limit & stats
+    static uint64_t nMaxOutboundTotalBytesSentInCycle;
+    static uint64_t nMaxOutboundCycleStartTime;
+    static uint64_t nMaxOutboundLimit;
+    static uint64_t nMaxOutboundTimeframe;
+
     CNode(const CNode&);
     void operator=(const CNode&);
 
 public:
-
     NodeId GetId() const {
-      return id;
+        return id;
     }
 
     int GetRefCount()
@@ -419,19 +511,19 @@ public:
     unsigned int GetTotalRecvSize()
     {
         unsigned int total = 0;
-        BOOST_FOREACH(const CNetMessage &msg, vRecvMsg)
+        BOOST_FOREACH(const CNetMessage& msg, vRecvMsg)
             total += msg.vRecv.size() + 24;
         return total;
     }
 
     // requires LOCK(cs_vRecvMsg)
-    bool ReceiveMsgBytes(const char *pch, unsigned int nBytes);
+    bool ReceiveMsgBytes(const char* pch, unsigned int nBytes);
 
     // requires LOCK(cs_vRecvMsg)
     void SetRecvVersion(int nVersionIn)
     {
         nRecvVersion = nVersionIn;
-        BOOST_FOREACH(CNetMessage &msg, vRecvMsg)
+        BOOST_FOREACH(CNetMessage& msg, vRecvMsg)
             msg.SetVersion(nVersionIn);
     }
 
@@ -446,7 +538,12 @@ public:
         nRefCount--;
     }
 
-
+    // BUIP010:
+    bool ThinBlockCapable()
+    {
+        if (nServices & NODE_XTHIN) return true;
+        return false;
+    }
 
     void AddAddressKnown(const CAddress& addr)
     {
@@ -472,7 +569,7 @@ public:
     {
         {
             LOCK(cs_inventory);
-            setInventoryKnown.insert(inv);
+            filterInventoryKnown.insert(inv.hash);
         }
     }
 
@@ -480,9 +577,16 @@ public:
     {
         {
             LOCK(cs_inventory);
-            if (!setInventoryKnown.count(inv))
-                vInventoryToSend.push_back(inv);
+            if (inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash))
+                return;
+            vInventoryToSend.push_back(inv);
         }
+    }
+
+    void PushBlockHash(const uint256 &hash)
+    {
+        LOCK(cs_inventory);
+        vBlockHashesToAnnounce.push_back(hash);
     }
 
     void AskFor(const CInv& inv);
@@ -513,39 +617,33 @@ public:
         }
     }
 
-    template<typename T1>
+    template <typename T1>
     void PushMessage(const char* pszCommand, const T1& a1)
     {
-        try
-        {
+        try {
             BeginMessage(pszCommand);
             ssSend << a1;
             EndMessage();
-        }
-        catch (...)
-        {
+        } catch (...) {
             AbortMessage();
             throw;
         }
     }
 
-    template<typename T1, typename T2>
+    template <typename T1, typename T2>
     void PushMessage(const char* pszCommand, const T1& a1, const T2& a2)
     {
-        try
-        {
+        try {
             BeginMessage(pszCommand);
             ssSend << a1 << a2;
             EndMessage();
-        }
-        catch (...)
-        {
+        } catch (...) {
             AbortMessage();
             throw;
         }
     }
 
-    template<typename T1, typename T2, typename T3>
+    template <typename T1, typename T2, typename T3>
     void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3)
     {
         try
@@ -561,23 +659,20 @@ public:
         }
     }
 
-    template<typename T1, typename T2, typename T3, typename T4>
+    template <typename T1, typename T2, typename T3, typename T4>
     void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4)
     {
-        try
-        {
+        try {
             BeginMessage(pszCommand);
             ssSend << a1 << a2 << a3 << a4;
             EndMessage();
-        }
-        catch (...)
-        {
+        } catch (...) {
             AbortMessage();
             throw;
         }
     }
 
-    template<typename T1, typename T2, typename T3, typename T4, typename T5>
+    template <typename T1, typename T2, typename T3, typename T4, typename T5>
     void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5)
     {
         try
@@ -593,7 +688,7 @@ public:
         }
     }
 
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
+    template <typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
     void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6)
     {
         try
@@ -609,7 +704,7 @@ public:
         }
     }
 
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7>
+    template <typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7>
     void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7)
     {
         try
@@ -625,23 +720,20 @@ public:
         }
     }
 
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8>
+    template <typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8>
     void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8)
     {
-        try
-        {
+        try {
             BeginMessage(pszCommand);
             ssSend << a1 << a2 << a3 << a4 << a5 << a6 << a7 << a8;
             EndMessage();
-        }
-        catch (...)
-        {
+        } catch (...) {
             AbortMessage();
             throw;
         }
     }
 
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8, typename T9>
+    template <typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8, typename T9>
     void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8, const T9& a9)
     {
         try
@@ -701,8 +793,28 @@ public:
 
     static uint64_t GetTotalBytesRecv();
     static uint64_t GetTotalBytesSent();
-};
 
+    //!set the max outbound target in bytes
+    static void SetMaxOutboundTarget(uint64_t limit);
+    static uint64_t GetMaxOutboundTarget();
+
+    //!set the timeframe for the max outbound target
+    static void SetMaxOutboundTimeframe(uint64_t timeframe);
+    static uint64_t GetMaxOutboundTimeframe();
+
+    //!check if the outbound target is reached
+    // if param historicalBlockServingLimit is set true, the function will
+    // response true if the limit for serving historical blocks has been reached
+    static bool OutboundTargetReached(bool historicalBlockServingLimit);
+
+    //!response the bytes left in the current max outbound cycle
+    // in case of no limit, it will always response 0
+    static uint64_t GetOutboundTargetBytesLeft();
+
+    //!response the time in second left in the current max outbound cycle
+    // in case of no limit, it will always response 0
+    static uint64_t GetMaxOutboundTimeLeftInCycle();
+};
 
 
 class CTransaction;
@@ -714,6 +826,7 @@ class CAddrDB
 {
 private:
     boost::filesystem::path pathAddr;
+
 public:
     CAddrDB();
     bool Write(const CAddrMan& addr);
@@ -732,5 +845,8 @@ public:
 };
 
 void DumpBanlist();
+
+/** Return a timestamp in the future (in microseconds) for exponentially distributed events. */
+int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds);
 
 #endif // BITCOIN_NET_H

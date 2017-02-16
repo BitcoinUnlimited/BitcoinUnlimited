@@ -1,4 +1,5 @@
 // Copyright (c) 2015 The Bitcoin Core developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -28,7 +29,7 @@ bool InitHTTPServer();
  * This is separate from InitHTTPServer to give users race-condition-free time
  * to register their handlers between InitHTTPServer and StartHTTPServer.
  */
-bool StartHTTPServer(boost::thread_group& threadGroup);
+bool StartHTTPServer();
 /** Interrupt HTTP server threads */
 void InterruptHTTPServer();
 /** Stop HTTP server */

@@ -1,82 +1,69 @@
-Bitcoin Core integration/staging tree
-=====================================
+[Website](https://www.bitcoinunlimited.info)  | [Download](https://www.bitcoinunlimited.info/download) | [Setup](doc/README.md)  |  [Xthin](doc/bu-xthin.md)  |  [Xpedited](doc/bu-xpedited-forwarding.md)  |   [Miner](doc/miner.md)
 
-[![Build Status](https://travis-ci.org/bitcoin/bitcoin.svg?branch=master)](https://travis-ci.org/bitcoin/bitcoin)
-
-https://www.bitcoin.org
+[![Build Status](https://travis-ci.org/BitcoinUnlimited/BitcoinUnlimited.svg?branch=release)](https://travis-ci.org/BitcoinUnlimited/BitcoinUnlimited)
 
 What is Bitcoin?
-----------------
+=====================================
 
 Bitcoin is an experimental new digital currency that enables instant payments to
 anyone, anywhere in the world. Bitcoin uses peer-to-peer technology to operate
 with no central authority: managing transactions and issuing money are carried
-out collectively by the network. Bitcoin Core is the name of open source
+out collectively by the network. Bitcoin Unlimited is the name of open source
 software which enables the use of this currency.
 
 For more information, as well as an immediately useable, binary version of
-the Bitcoin Core software, see https://www.bitcoin.org/en/download.
+the Bitcoin Unlimited software, see https://www.bitcoinunlimited.info/download, or read the
+[original whitepaper](https://www.bitcoinunlimited.info/resources/bitcoin.pdf).
 
 License
 -------
 
-Bitcoin Core is released under the terms of the MIT license. See [COPYING](COPYING) for more
-information or see http://opensource.org/licenses/MIT.
+Bitcoin Unlimited is released under the terms of the MIT license. See [COPYING](COPYING) for more
+information or see https://opensource.org/licenses/MIT.
 
-Development Process
--------------------
+What is Bitcoin Unlimited?
+=====================================
 
-The `master` branch is regularly built and tested, but is not guaranteed to be
-completely stable. [Tags](https://github.com/bitcoin/bitcoin/tags) are created
-regularly to indicate new official, stable release versions of Bitcoin Core.
+Bitcoin Unlimited is an implementation of the Bitcoin client software that is based on Bitcoin Core.
+However, Bitcoin Unlimited has a very different philosophy than Core.
 
-The contribution workflow is described in [CONTRIBUTING.md](CONTRIBUTING.md).
+It follows a philosophy and is administered by a formal process described in the [Articles of Federation](http://www.bitcoinunlimited.info/resources/BUarticles.pdf).
+In short, we believe in market-driven decision making, emergent consensus, and giving our users choices.
 
-The developer [mailing list](https://lists.linuxfoundation.org/mailman/listinfo/bitcoin-dev)
-should be used to discuss complicated or controversial changes before working
-on a patch set.
+Quick installation Instructions
+====================================
 
-Developer IRC can be found on Freenode at #bitcoin-core-dev.
+If you're running an Ubuntu system:
 
-Testing
--------
+```sh
+sudo apt-get install software-properties-common
+sudo add-apt-repository ppa:bitcoin-unlimited/bu-ppa
+sudo apt-get update
+sudo apt-get install bitcoind bitcoin-qt
+```
+If you're compiling from source:
 
-Testing and code review is the bottleneck for development; we get more pull
-requests than we can review and test on short notice. Please be patient and help out by testing
-other people's pull requests, and remember this is a security-critical project where any mistake might cost people
-lots of money.
+```sh
+sudo apt-get install git build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils libboost-all-dev
+## optional: only needed if you want bitcoin-qt
+sudo apt-get install libqt4-dev libprotobuf-dev protobuf-compiler libqrencode-dev
+## optional: only needed if your wallet use the old format
+sudo apt-get install software-properties-common
 
-### Automated Testing
+## this not needed if your wallet will use the new
+## format, ot if you're not going to use a wallet at all
+sudo add-apt-repository ppa:bitcoin-unlimited/bu-ppa
+sudo apt-get update
+sudo apt-get install libdb4.8-dev libdb4.8++-dev
 
-Developers are strongly encouraged to write unit tests for new code, and to
-submit new unit tests for old code. Unit tests can be compiled and run (assuming they weren't disabled in configure) with: `make check`
+mkdir -p ~/src
+cd ~/src
+git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git bu-src
+cd bu-src
+./autogen.sh
+./configure
+make
+sudo make install
+```
 
-There are also regression and integration tests of the RPC interface, written
-in Python, that are run automatically on the build server.
-These tests can be run with: `qa/pull-tester/rpc-tests.py`
-
-Every pull request is built for both Windows and Linux on a dedicated server,
-and unit and sanity tests are automatically run. The binaries produced may be
-used for manual QA testing — a link to them will appear in a comment on the
-pull request posted by [BitcoinPullTester](https://github.com/BitcoinPullTester). See https://github.com/TheBlueMatt/test-scripts
-for the build/test scripts.
-
-### Manual Quality Assurance (QA) Testing
-
-Large changes should have a test plan, and should be tested by somebody other
-than the developer who wrote the code.
-See https://github.com/bitcoin/QA/ for how to create a test plan.
-
-Translations
-------------
-
-Changes to translations as well as new translations can be submitted to
-[Bitcoin Core's Transifex page](https://www.transifex.com/projects/p/bitcoin/).
-
-Translations are periodically pulled from Transifex and merged into the git repository. See the
-[translation process](doc/translation_process.md) for details on how this works.
-
-**Important**: We do not accept translation changes as GitHub pull requests because the next
-pull from Transifex would automatically overwrite them again.
-
-Translators should also subscribe to the [mailing list](https://groups.google.com/forum/#!forum/bitcoin-translators).
+For more detailed explanations on how compile from source just look at doc/build-*.md files (e.g. [here](doc/quick-install.md))

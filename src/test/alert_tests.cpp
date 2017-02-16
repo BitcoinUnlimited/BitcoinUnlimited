@@ -1,4 +1,5 @@
-// Copyright (c) 2013 The Bitcoin Core developers
+// Copyright (c) 2013-2015 The Bitcoin Core developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -113,7 +114,7 @@ struct ReadAlerts : public TestingSetup
     std::vector<CAlert> alerts;
 };
 
-BOOST_FIXTURE_TEST_SUITE(Alert_tests, ReadAlerts)
+BOOST_FIXTURE_TEST_SUITE(alert_tests, ReadAlerts)  // BU harmonize suite name with filename
 
 
 BOOST_AUTO_TEST_CASE(AlertApplies)
@@ -217,10 +218,12 @@ BOOST_AUTO_TEST_CASE(PartitionAlert)
         // use them
     }
 
+    strMiscWarning = "";
+
     // Test 1: chain with blocks every nPowTargetSpacing seconds,
     // as normal, no worries:
     PartitionCheck(falseFunc, csDummy, &indexDummy[99], nPowTargetSpacing);
-    BOOST_CHECK(strMiscWarning.empty());
+    BOOST_CHECK_MESSAGE(strMiscWarning.empty(), strMiscWarning);
 
     // Test 2: go 3.5 hours without a block, expect a warning:
     now += 3*60*60+30*60;

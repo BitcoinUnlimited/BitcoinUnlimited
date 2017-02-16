@@ -1,4 +1,5 @@
-// Copyright (c) 2011-2012 The Bitcoin Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -32,8 +33,9 @@ void PrintLockContention(const char* pszName, const char* pszFile, int nLine)
 // Complain if any thread tries to lock in a different order.
 //
 
-struct CLockLocation {
-    CLockLocation(const char* pszName, const char* pszFile, int nLine, bool fTryIn)
+// BU move to sync.h because I need to create these in globals.cpp
+//struct CLockLocation {
+CLockLocation::CLockLocation(const char* pszName, const char* pszFile, int nLine, bool fTryIn)
     {
         mutexName = pszName;
         sourceFile = pszFile;
@@ -41,25 +43,28 @@ struct CLockLocation {
         fTry = fTryIn;
     }
 
-    std::string ToString() const
+std::string CLockLocation::ToString() const
     {
         return mutexName + "  " + sourceFile + ":" + itostr(sourceLine) + (fTry ? " (TRY)" : "");
     }
 
-    std::string MutexName() const { return mutexName; }
+std::string CLockLocation::MutexName() const { return mutexName; }
 
+#if 0
     bool fTry;
 private:
     std::string mutexName;
     std::string sourceFile;
     int sourceLine;
 };
+#endif
 
-typedef std::vector<std::pair<void*, CLockLocation> > LockStack;
+// BU move to .h: typedef std::vector<std::pair<void*, CLockLocation> > LockStack;
 
-static boost::mutex dd_mutex;
-static std::map<std::pair<void*, void*>, LockStack> lockorders;
-static boost::thread_specific_ptr<LockStack> lockstack;
+// BU control the ctor/dtor ordering
+extern boost::mutex dd_mutex;
+extern LockStackMap lockorders;
+extern boost::thread_specific_ptr<LockStack> lockstack;
 
 
 static void potential_deadlock_detected(const std::pair<void*, void*>& mismatch, const LockStack& s1, const LockStack& s2)
@@ -120,20 +125,20 @@ static void push_lock(void* c, const CLockLocation& locklocation, bool fTry)
     dd_mutex.lock();
 
     (*lockstack).push_back(std::make_pair(c, locklocation));
-
+    // If this is a blocking lock operation, we want to make sure that the locking order between 2 mutexes is consistent across the program
     if (!fTry) {
         BOOST_FOREACH (const PAIRTYPE(void*, CLockLocation) & i, (*lockstack)) {
             if (i.first == c)
                 break;
 
             std::pair<void*, void*> p1 = std::make_pair(i.first, c);
-            if (lockorders.count(p1))
+            if (lockorders.count(p1))  // If this order has already been placed into the order map, we've already tested it
                 continue;
             lockorders[p1] = (*lockstack);
-
+            // check to see if the opposite order has ever occurred, if so flag a possible deadlock
             std::pair<void*, void*> p2 = std::make_pair(c, i.first);
             if (lockorders.count(p2))
-                potential_deadlock_detected(p1, lockorders[p2], lockorders[p1]);
+                potential_deadlock_detected(p1, lockorders[p1], lockorders[p2]);
         }
     }
     dd_mutex.unlock();
@@ -156,6 +161,23 @@ void LeaveCritical()
     pop_lock();
 }
 
+void DeleteCritical(const void* cs)
+{
+    dd_mutex.lock();
+    LockStackMap::iterator prev = lockorders.end();
+    for (LockStackMap::iterator i=lockorders.begin();i != lockorders.end(); ++i)
+      {
+        // if prev is valid and one of its locks is the one we are deleting, then erase the entry
+        if ((prev != lockorders.end()) && ((prev->first.first == cs) || (prev->first.second == cs)))
+          {
+            lockorders.erase(prev);
+          }
+        prev = i;
+      }
+    dd_mutex.unlock();  
+}
+
+
 std::string LocksHeld()
 {
     std::string result;
@@ -172,5 +194,25 @@ void AssertLockHeldInternal(const char* pszName, const char* pszFile, int nLine,
     fprintf(stderr, "Assertion failed: lock %s not held in %s:%i; locks held:\n%s", pszName, pszFile, nLine, LocksHeld().c_str());
     abort();
 }
+
+#ifdef DEBUG_LOCKORDER // BU normally CCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical section from the lockorder map
+CCriticalSection::CCriticalSection():name(NULL)
+{
+}
+
+CCriticalSection::CCriticalSection(const char* n):name(n)
+{
+}
+
+CCriticalSection::~CCriticalSection()
+{
+  if (name) 
+    { 
+      printf("Destructing %s\n", name);
+      fflush(stdout);
+    }
+  DeleteCritical((void*) this);
+}
+#endif 
 
 #endif /* DEBUG_LOCKORDER */

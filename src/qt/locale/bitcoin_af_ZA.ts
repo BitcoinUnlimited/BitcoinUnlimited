@@ -32,16 +32,20 @@
 <context>
     <name>AskPassphraseDialog</name>
     <message>
+        <source>Passphrase Dialog</source>
+        <translation>Wagfrase Dialoog</translation>
+    </message>
+    <message>
         <source>Enter passphrase</source>
-        <translation>Tik Wagwoord in</translation>
+        <translation>Tik wagfrase in</translation>
     </message>
     <message>
         <source>New passphrase</source>
-        <translation>Nuwe wagwoord</translation>
+        <translation>Nuwe wagfrase</translation>
     </message>
     <message>
         <source>Repeat new passphrase</source>
-        <translation>Herhaal nuwe wagwoord</translation>
+        <translation>Herhaal nuwe wagfrase</translation>
     </message>
     <message>
         <source>Encrypt wallet</source>
@@ -65,7 +69,7 @@
     </message>
     <message>
         <source>Change passphrase</source>
-        <translation>Verander wagwoord</translation>
+        <translation>Verander wagfrase</translation>
     </message>
     <message>
         <source>Confirm wallet encryption</source>
@@ -74,6 +78,10 @@
     <message>
         <source>Wallet encrypted</source>
         <translation>Die beursie is nou bewaak</translation>
+    </message>
+    <message>
+        <source>Enter the old passphrase and new passphrase to the wallet.</source>
+        <translation>Tik in die ou wagfrase en die nuwe wagfrase vir die beursie.</translation>
     </message>
     <message>
         <source>Wallet encryption failed</source>
@@ -85,7 +93,7 @@
     </message>
     <message>
         <source>The supplied passphrases do not match.</source>
-        <translation>Die wagwoord stem nie ooreen nie</translation>
+        <translation>Die wagfrase stem nie ooreen nie</translation>
     </message>
     <message>
         <source>Wallet unlock failed</source>
@@ -93,12 +101,19 @@
     </message>
     <message>
         <source>The passphrase entered for the wallet decryption was incorrect.</source>
-        <translation>Die wagwoord wat ingetik was om die beursie oop te sluit, was verkeerd.</translation>
+        <translation>Die wagfrase wat ingetik was om die beursie oop te sluit, was verkeerd.</translation>
     </message>
     <message>
         <source>Wallet decryption failed</source>
         <translation>Beursie dekripsie het misluk</translation>
     </message>
+    <message>
+        <source>Wallet passphrase was successfully changed.</source>
+        <translation>Die beursie se wagfrase verandering was suksesvol.</translation>
+    </message>
+</context>
+<context>
+    <name>BanTableModel</name>
     </context>
 <context>
     <name>BitcoinGUI</name>
@@ -212,6 +227,14 @@
 <context>
     <name>EditAddressDialog</name>
     <message>
+        <source>&amp;Label</source>
+        <translation>&amp;Etiket</translation>
+    </message>
+    <message>
+        <source>&amp;Address</source>
+        <translation>&amp;Adres</translation>
+    </message>
+    <message>
         <source>New receiving address</source>
         <translation>Nuwe ontvangende adres</translation>
     </message>
@@ -258,6 +281,10 @@
         <source>Options</source>
         <translation>Opsies</translation>
     </message>
+    <message>
+        <source>W&amp;allet</source>
+        <translation>&amp;Beursie</translation>
+    </message>
     </context>
 <context>
     <name>OverviewPage</name>
@@ -291,6 +318,14 @@
     </context>
 <context>
     <name>ReceiveCoinsDialog</name>
+    <message>
+        <source>&amp;Amount:</source>
+        <translation>&amp;Bedrag:</translation>
+    </message>
+    <message>
+        <source>&amp;Message:</source>
+        <translation>&amp;Boodskap:</translation>
+    </message>
     <message>
         <source>Copy amount</source>
         <translation>Kopieer bedrag</translation>
@@ -345,8 +380,16 @@
         <translation>Stuur Munstukke</translation>
     </message>
     <message>
+        <source>Insufficient funds!</source>
+        <translation>Onvoldoende fondse</translation>
+    </message>
+    <message>
         <source>Amount:</source>
         <translation>Bedrag:</translation>
+    </message>
+    <message>
+        <source>Transaction Fee:</source>
+        <translation>Transaksie fooi:</translation>
     </message>
     <message>
         <source>Send to multiple recipients at once</source>
@@ -371,6 +414,10 @@
     </context>
 <context>
     <name>SendCoinsEntry</name>
+    <message>
+        <source>A&amp;mount:</source>
+        <translation>&amp;Bedrag:</translation>
+    </message>
     <message>
         <source>Message:</source>
         <translation>Boodskap:</translation>
@@ -449,6 +496,10 @@
     <message>
         <source>Transaction ID</source>
         <translation>Transaksie ID</translation>
+    </message>
+    <message>
+        <source>Transaction</source>
+        <translation>Transaksie</translation>
     </message>
     <message>
         <source>Amount</source>
@@ -629,10 +680,6 @@
     <message>
         <source>Options:</source>
         <translation>Opsies:</translation>
-    </message>
-    <message>
-        <source>Use the test network</source>
-        <translation>Gebruik die toets netwerk</translation>
     </message>
     <message>
         <source>Error: Disk space is low!</source>

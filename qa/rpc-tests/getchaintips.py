@@ -1,5 +1,6 @@
-#!/usr/bin/env python2
-# Copyright (c) 2014 The Bitcoin Core developers
+#!/usr/bin/env python3
+# Copyright (c) 2014-2015 The Bitcoin Core developers
+# Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,8 +24,8 @@ class GetChainTipsTest (BitcoinTestFramework):
 
         # Split the network and build two chains of different lengths.
         self.split_network ()
-        self.nodes[0].generate(10);
-        self.nodes[2].generate(20);
+        self.nodes[0].generate(10)
+        self.nodes[2].generate(20)
         self.sync_all ()
 
         tips = self.nodes[1].getchaintips ()

@@ -1,6 +1,10 @@
-<TS language="he" version="2.0">
+<TS language="he" version="2.1">
 <context>
     <name>AddressBookPage</name>
+    <message>
+        <source>Right-click to edit address or label</source>
+        <translation>לחץ משק ימני כדי לערוך כתובת או חברה</translation>
+    </message>
     <message>
         <source>Create a new address</source>
         <translation>יצירת כתובת חדשה</translation>
@@ -164,6 +168,10 @@
         <translation>האם אכן להצפין את הארנק?</translation>
     </message>
     <message>
+        <source>Bitcoin Unlimited will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
+        <translation>ליבת ביטקוין תיסגר עכשיו כדי לסיים את תליך ההצפנה. זכור כי הצפנה אינה יכולה להגן עלייך באופן מלא מגניבה שמקורה בתוכנות זדוניות המצויות במחשב שלך.</translation>
+    </message>
+    <message>
         <source>IMPORTANT: Any previous backups you have made of your wallet file should be replaced with the newly generated, encrypted wallet file. For security reasons, previous backups of the unencrypted wallet file will become useless as soon as you start using the new, encrypted wallet.</source>
         <translation>לתשומת לבך: כל גיבוי קודם שביצעת לארנק שלך יש להחליף בקובץ הארנק המוצפן שזה עתה נוצר. מטעמי אבטחה, גיבויים קודמים של קובץ הארנק הבלתי-מוצפן יהפכו לחסרי תועלת עם התחלת השימוש בארנק החדש המוצפן.</translation>
     </message>
@@ -178,6 +186,10 @@
     <message>
         <source>Enter the new passphrase to the wallet.&lt;br/&gt;Please use a passphrase of &lt;b&gt;ten or more random characters&lt;/b&gt;, or &lt;b&gt;eight or more words&lt;/b&gt;.</source>
         <translation>נא להזין את מילת הצופן החדשה לארנק.&lt;br/&gt;כדאי להשתמש במילת צופן המורכבת מ&lt;b&gt;עשרה תווים אקראיים ומעלה&lt;/b&gt;, או &lt;b&gt;שמונה מילים ומעלה&lt;/b&gt;.</translation>
+    </message>
+    <message>
+        <source>Enter the old passphrase and new passphrase to the wallet.</source>
+        <translation>הכנס את מילת הצופן הישנה ומילת צופן חדשה לארנק שלך.</translation>
     </message>
     <message>
         <source>Wallet encryption failed</source>
@@ -208,6 +220,9 @@
         <translation>מילת הצופן של הארנק שונתה בהצלחה.</translation>
     </message>
 </context>
+<context>
+    <name>BanTableModel</name>
+    </context>
 <context>
     <name>BitcoinGUI</name>
     <message>
@@ -283,7 +298,7 @@
         <translation>פתיחת &amp;כתובת משאב…</translation>
     </message>
     <message>
-        <source>Bitcoin Core client</source>
+        <source>Bitcoin Unlimited client</source>
         <translation>לקוח ליבה של ביטקוין</translation>
     </message>
     <message>
@@ -335,7 +350,7 @@
         <translation>&amp;קבלה</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Core</source>
+        <source>Show information about Bitcoin Unlimited</source>
         <translation>הצגת מידע על ליבת ביטקוין</translation>
     </message>
     <message>
@@ -375,7 +390,7 @@
         <translation>סרגל כלים לשוניות</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin Unlimited</source>
         <translation>ליבת ביטקוין</translation>
     </message>
     <message>
@@ -383,7 +398,7 @@
         <translation>בקשת תשלומים (יצירה של קודים מסוג QR וסכימות כתובות משאב של :bitcoin)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
+        <source>&amp;About Bitcoin Unlimited</source>
         <translation>על &amp;אודות ליבת ביטקוין</translation>
     </message>
     <message>
@@ -403,7 +418,7 @@
         <translation>אפשרויות &amp;שורת הפקודה</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
+        <source>Show the Bitcoin Unlimited help message to get a list with possible Bitcoin command-line options</source>
         <translation>הצגת הודעות העזרה של ליבת ביטקוין כדי לקבל רשימה עם אפשרויות שורת הפקודה האפשריות של ביטקוין</translation>
     </message>
     <message>
@@ -413,6 +428,10 @@
     <message>
         <source>%1 and %2</source>
         <translation>%1 ו%2</translation>
+    </message>
+    <message>
+        <source>%1 behind</source>
+        <translation>%1 מאחור</translation>
     </message>
     <message>
         <source>Last received block was generated %1 ago.</source>
@@ -621,6 +640,10 @@
         <translation>הנמוך ביותר</translation>
     </message>
     <message>
+        <source>(%1 locked)</source>
+        <translation>(%1 נעול)</translation>
+    </message>
+    <message>
         <source>none</source>
         <translation>ללא</translation>
     </message>
@@ -742,7 +765,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin Unlimited</source>
         <translation>ליבת ביטקוין</translation>
     </message>
     <message>
@@ -754,7 +777,7 @@
         <translation>(%1-סיביות)</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
+        <source>About Bitcoin Unlimited</source>
         <translation>על אודות ליבת ביטקוין</translation>
     </message>
     <message>
@@ -769,7 +792,7 @@
         <source>command-line options</source>
         <translation>אפשרויות שורת פקודה</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>Intro</name>
     <message>
@@ -777,15 +800,15 @@
         <translation>ברוך בואך</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
+        <source>Welcome to Bitcoin Unlimited.</source>
         <translation>ברוך בואך לליבת ביטקוין</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Core will store its data.</source>
+        <source>As this is the first time the program is launched, you can choose where Bitcoin Unlimited will store its data.</source>
         <translation>מכיוון שזאת הפעם הראשונה שהתכנית פועלת ניתן לבחור איפה ליבת ביטקוין תאחסן את הנתונים שלה.</translation>
     </message>
     <message>
-        <source>Bitcoin Core will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <source>Bitcoin Unlimited will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
         <translation>לקוח ביטקוין יוריד וישמור העתק של שרשרת המקטעים של ביטקוין. לפחות %1 ג״ב מהנתונים יאוחסנו בתיקייה זו, והיא תגדל עם הזמן. הארנק גם יאוחסן בתיקייה הזו.</translation>
     </message>
     <message>
@@ -797,7 +820,7 @@
         <translation>שימוש בתיקיית נתונים מותאמת אישית:</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin Unlimited</source>
         <translation>ליבת ביטקוין</translation>
     </message>
     <message>
@@ -1313,14 +1336,6 @@
         <translation>שירותים</translation>
     </message>
     <message>
-        <source>Starting Height</source>
-        <translation>גובה התחלתי</translation>
-    </message>
-    <message>
-        <source>Sync Height</source>
-        <translation>גובה הסנכרון</translation>
-    </message>
-    <message>
         <source>Ban Score</source>
         <translation>דירוג חסימה</translation>
     </message>
@@ -1335,14 +1350,6 @@
     <message>
         <source>Last Receive</source>
         <translation>קבלה אחרונה</translation>
-    </message>
-    <message>
-        <source>Bytes Sent</source>
-        <translation>בתים שנשלחו</translation>
-    </message>
-    <message>
-        <source>Bytes Received</source>
-        <translation>בתים שהתקבלו</translation>
     </message>
     <message>
         <source>Ping Time</source>
@@ -1433,12 +1440,16 @@
         <translation>תעבורה יוצאת</translation>
     </message>
     <message>
-        <source>Unknown</source>
-        <translation>לא ידוע</translation>
+        <source>Yes</source>
+        <translation>כן</translation>
     </message>
     <message>
-        <source>Fetching...</source>
-        <translation>מתקבל…</translation>
+        <source>No</source>
+        <translation>לא</translation>
+    </message>
+    <message>
+        <source>Unknown</source>
+        <translation>לא ידוע</translation>
     </message>
 </context>
 <context>
@@ -1669,6 +1680,10 @@
         <translation>כתובת לעודף מותאמת אישית</translation>
     </message>
     <message>
+        <source>Transaction Fee:</source>
+        <translation>עמלת העברה:</translation>
+    </message>
+    <message>
         <source>Send to multiple recipients at once</source>
         <translation>שליחה למספר מוטבים בו־זמנית</translation>
     </message>
@@ -1735,10 +1750,6 @@
     <message>
         <source>Copy change</source>
         <translation>העתקת עודף</translation>
-    </message>
-    <message>
-        <source>Total Amount %1 (= %2)</source>
-        <translation>הסכום הכולל %1 (= %2)</translation>
     </message>
     <message>
         <source>or</source>
@@ -1859,7 +1870,7 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
+        <source>Bitcoin Unlimited is shutting down...</source>
         <translation>ליבת ביטקוין נסגרת…</translation>
     </message>
     <message>
@@ -2001,11 +2012,11 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin Unlimited</source>
         <translation>ליבת ביטקוין</translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
+        <source>The Bitcoin Unlimited developers</source>
         <translation>מתכנתי ליבת ביטקוין</translation>
     </message>
     <message>
@@ -2495,10 +2506,6 @@
         <translation>ריצה כסוכן ברקע וקבלת פקודות</translation>
     </message>
     <message>
-        <source>Use the test network</source>
-        <translation>שימוש ברשת הבדיקה</translation>
-    </message>
-    <message>
         <source>Accept connections from outside (default: 1 if no -proxy or -connect)</source>
         <translation>קבלת חיבורים מבחוץ (בררת מחדל: 1 ללא ‎-proxy או ‎-connect)</translation>
     </message>
@@ -2519,12 +2526,8 @@
         <translation>זוהי בניית ניסיון טרום-שחרור - השימוש בה על אחריותך - אין להשתמש לצורך כריה או יישומי מסחר</translation>
     </message>
     <message>
-        <source>Unable to bind to %s on this computer. Bitcoin Core is probably already running.</source>
+        <source>Unable to bind to %s on this computer. Bitcoin Unlimited is probably already running.</source>
         <translation>לא ניתן להתאגד אל %s במחשב זה. כנראה שליבת ביטקוין כבר פועלת.</translation>
-    </message>
-    <message>
-        <source>Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction.</source>
-        <translation>אזהרה: ‎-paytxfee נקבע לערך מאד גבוה! זוהי עמלת הפעולה שתשולם בעת העברת שליחה.</translation>
     </message>
     <message>
         <source>Warning: The network does not appear to fully agree! Some miners appear to be experiencing issues.</source>
@@ -2535,24 +2538,12 @@
         <translation>אזהרה: נראה שישנה אי־הסכמה בינינו לבין שאר העמיתים שלנו! יתכן שעדיף לשדרג או שכל שאר העמיתים צריכים לשדרג.</translation>
     </message>
     <message>
-        <source>Warning: error reading wallet.dat! All keys read correctly, but transaction data or address book entries might be missing or incorrect.</source>
-        <translation>אזהרה: שגיאה בקריאת wallet.dat! כל המפתחות נקראו באופן תקין, אך נתוני ההעברות או ספר הכתובות עלולים להיות חסרים או שגויים.</translation>
-    </message>
-    <message>
         <source>Warning: wallet.dat corrupt, data salvaged! Original wallet.dat saved as wallet.{timestamp}.bak in %s; if your balance or transactions are incorrect you should restore from a backup.</source>
         <translation>אזהרה: הקובץ wallet.dat הושחת, המידע חולץ! קובץ ה־wallet.dat המקורי נשמר בשם wallet.{timestamp}.bak במיקום %s; אם המאזן או ההעברות שגויים עליך לשחזר גיבוי.</translation>
     </message>
     <message>
-        <source>(default: 1)</source>
-        <translation>(בררת מחדל: 1)</translation>
-    </message>
-    <message>
         <source>&lt;category&gt; can be:</source>
         <translation>&lt;קטגוריה&gt; יכולה להיות:</translation>
-    </message>
-    <message>
-        <source>Attempt to recover private keys from a corrupt wallet.dat</source>
-        <translation>נסה לשחזר מפתחות פרטיים מקובץ wallet.dat מושחת.</translation>
     </message>
     <message>
         <source>Block creation options:</source>
@@ -2607,10 +2598,6 @@
         <translation>האזנה נכשלה בכל פורט. השתמש ב- -listen=0 אם ברצונך בכך.</translation>
     </message>
     <message>
-        <source>If &lt;category&gt; is not supplied, output all debugging information.</source>
-        <translation>אם לא סופקה &lt;קטגוריה&gt; יש לייצא את כל פרטי הניפוי.</translation>
-    </message>
-    <message>
         <source>Importing...</source>
         <translation>מתבצע יבוא…</translation>
     </message>
@@ -2663,56 +2650,36 @@
         <translation>עליך לבנות מחדש את מסד הנתונים תוך שימוש ב־‎-reindex על מנת לשנות את ‎-txindex</translation>
     </message>
     <message>
-        <source>Imports blocks from external blk000??.dat file</source>
-        <translation>מיובאים מקטעים מקובצי blk000??.dat חיצוניים</translation>
-    </message>
-    <message>
         <source>Execute command when a relevant alert is received or we see a really long fork (%s in cmd is replaced by message)</source>
         <translation>הרץ פקודה כאשר ההתראה הרלוונטית מתקבלת או כשאנחנו עדים לפיצול ארוך מאוד (%s בשורת הפקודה יוחלף ע"י ההודעה)</translation>
-    </message>
-    <message>
-        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin Core will not work properly.</source>
-        <translation>אזהרה: נא לבדוק שהתאריך והשעה של המחשב שלך נכונים! אם השעון שלך שגוי ליבת ביטקוין לא תעבוד כראוי.</translation>
     </message>
     <message>
         <source>Cannot resolve -whitebind address: '%s'</source>
         <translation>לא ניתן לפתור את הכתובת ‎-whitebind:‏ '%s'</translation>
     </message>
     <message>
-        <source>Choose data directory on startup (default: 0)</source>
-        <translation>בחירת תיקיית נתונים עם ההפעלה (בררת מחדל: 0)</translation>
-    </message>
-    <message>
         <source>Connect through SOCKS5 proxy</source>
         <translation>התחברות דרך מתווך SOCKS5</translation>
     </message>
     <message>
-        <source>Copyright (C) 2009-%i The Bitcoin Core Developers</source>
+        <source>Copyright (C) 2009-%i The Bitcoin Unlimited Developers</source>
         <translation>כל הזכויות שמורות (C)‏ 2009‏-%i מתכנתי ליבת ביטקוין</translation>
     </message>
     <message>
-        <source>Could not parse -rpcbind value %s as network address</source>
-        <translation>לא ניתן לנתח את הערך של ‎-rpcbind שצוין בתור %s ככתובת רשת</translation>
-    </message>
-    <message>
-        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Core</source>
+        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Unlimited</source>
         <translation>אירעה שגיאה בטעינת wallet.dat: הארנק דורש גרסה חדשה יותר של ליבת ביטקוין</translation>
-    </message>
-    <message>
-        <source>Error: Unsupported argument -tor found, use -onion.</source>
-        <translation>שגיאה: נמצא ארגומנט בלתי נתמך ‎-tor, יש להשתמש ב־‎-onion.</translation>
-    </message>
-    <message>
-        <source>Fee (in BTC/kB) to add to transactions you send (default: %s)</source>
-        <translation>עמלה (ב־BTC/ק״ב) להוספה להעברות שנשלחות ממך (בררת מחדל: %s)</translation>
     </message>
     <message>
         <source>Information</source>
         <translation>מידע</translation>
     </message>
     <message>
-        <source>Initialization sanity check failed. Bitcoin Core is shutting down.</source>
+        <source>Initialization sanity check failed. Bitcoin Unlimited is shutting down.</source>
         <translation>בדיקת התקינות ההתחלתית נכשלה. ליבת ביטקוין תיסגר כעת.</translation>
+    </message>
+    <message>
+        <source>Invalid amount for -maxtxfee=&lt;amount&gt;: '%s'</source>
+        <translation>כמות לא תקינה עבור -maxtxfee=&lt;amount&gt;: '%s'</translation>
     </message>
     <message>
         <source>Invalid amount for -minrelaytxfee=&lt;amount&gt;: '%s'</source>
@@ -2739,10 +2706,6 @@
         <translation>אפשרויות ממסר מפרק:</translation>
     </message>
     <message>
-        <source>RPC SSL options: (see the Bitcoin Wiki for SSL setup instructions)</source>
-        <translation>אפשרויות RPC SSL: (נא לעיין בוויקי של ביטקוין לקבלת הנחיות על הגדרת SSL)</translation>
-    </message>
-    <message>
         <source>RPC server options:</source>
         <translation>הגדרות שרת RPC</translation>
     </message>
@@ -2751,20 +2714,8 @@
         <translation>שלח מידע דיבאג ועקבה לקונסולה במקום לקובץ debug.log</translation>
     </message>
     <message>
-        <source>Set SSL root certificates for payment request (default: -system-)</source>
-        <translation>הגדרות אישורי בסיס של SSL לבקשות תשלום (בררת המחדל: -מערכת-)</translation>
-    </message>
-    <message>
-        <source>Set language, for example "de_DE" (default: system locale)</source>
-        <translation>הגדרת שפה, למשל „he_il“ (בררת מחדל: שפת המערכת)</translation>
-    </message>
-    <message>
         <source>Show all debugging options (usage: --help -help-debug)</source>
         <translation>הצגת כל אפשרויות הניפוי (שימוש: ‎--help -help-debug)</translation>
-    </message>
-    <message>
-        <source>Show splash screen on startup (default: 1)</source>
-        <translation>הצגת מסך פתיחה בעת הפעלה (בררת מחדל: 1)</translation>
     </message>
     <message>
         <source>Shrink debug.log file on client startup (default: 1 when no -debug)</source>
@@ -2773,10 +2724,6 @@
     <message>
         <source>Signing transaction failed</source>
         <translation>החתימה על ההעברה נכשלה</translation>
-    </message>
-    <message>
-        <source>Start minimized</source>
-        <translation>התחלה במצב ממוזער</translation>
     </message>
     <message>
         <source>This is experimental software.</source>
@@ -2799,32 +2746,16 @@
         <translation>לא ניתן להתאגד עם הפתחה %s במחשב זה (פעולת האיגוד החזירה את השגיאה %s)</translation>
     </message>
     <message>
-        <source>Use UPnP to map the listening port (default: 1 when listening)</source>
-        <translation>יש להשתמש ב־UPnP כדי למפות את הפתחה להאזנה (בררת מחדל: 1 בעת האזנה)</translation>
-    </message>
-    <message>
         <source>Username for JSON-RPC connections</source>
         <translation>שם משתמש לחיבורי JSON-RPC</translation>
     </message>
     <message>
-        <source>Wallet needed to be rewritten: restart Bitcoin Core to complete</source>
+        <source>Wallet needed to be rewritten: restart Bitcoin Unlimited to complete</source>
         <translation>יש לכתוב את הארנק מחדש: נא להפעיל את ליבת ביטקוין מחדש כדי להשלים את הפעולה</translation>
     </message>
     <message>
         <source>Warning</source>
         <translation>אזהרה</translation>
-    </message>
-    <message>
-        <source>Warning: Unsupported argument -benchmark ignored, use -debug=bench.</source>
-        <translation>אזהרה: הארגומנט שאינו נתמך עוד ‎-benchmark לא הופעל, נא להשתמש ב־‎-debug=bench.</translation>
-    </message>
-    <message>
-        <source>Warning: Unsupported argument -debugnet ignored, use -debug=net.</source>
-        <translation>אזהרה: הארגומנט שאינו נתמך עוד ‎-debugnet לא הופעל, נא להשתמש ב־‎-debug=net.</translation>
-    </message>
-    <message>
-        <source>on startup</source>
-        <translation>עם ההפעלה</translation>
     </message>
     <message>
         <source>wallet.dat corrupt, salvage failed</source>
@@ -2837,18 +2768,6 @@
     <message>
         <source>Execute command when the best block changes (%s in cmd is replaced by block hash)</source>
         <translation>יש לבצע פקודה זו כשהמקטע הטוב ביותר משתנה (%s בפקודה יוחלף בגיבוב המקטע)</translation>
-    </message>
-    <message>
-        <source>Upgrade wallet to latest format</source>
-        <translation>שדרוג הארנק למבנה העדכני</translation>
-    </message>
-    <message>
-        <source>Rescan the block chain for missing wallet transactions</source>
-        <translation>יש לסרוק מחדש את שרשרת המקטעים למציאת העברות חסרות בארנק</translation>
-    </message>
-    <message>
-        <source>Use OpenSSL (https) for JSON-RPC connections</source>
-        <translation>שימוש ב־OpenSSL (https)‎ עבור חיבורי JSON-RPC</translation>
     </message>
     <message>
         <source>This help message</source>

@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2013 The Bitcoin Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core, Unlimited, and XT developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,13 +15,15 @@
 
 #include "main.h" // for DEFAULT_SCRIPTCHECK_THREADS and MAX_SCRIPTCHECK_THREADS
 #include "netbase.h"
+#include "net.h"  // for access to the network traffic shapers
 #include "txdb.h" // for -dbcache defaults
 
 #ifdef ENABLE_WALLET
-#include "wallet/wallet.h" // for CWallet::minTxFee
+#include "wallet/wallet.h" // for CWallet::GetRequiredFee()
 #endif
 
 #include <boost/thread.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <QDataWidgetMapper>
 #include <QDir>
@@ -33,12 +35,12 @@
 OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     QDialog(parent),
     ui(new Ui::OptionsDialog),
+    portValidator(1, 65536, this),  // BU fix memory leaks
+    proxyPortValidator(1, 65536, this),
     model(0),
-    mapper(0),
-    fProxyIpsValid(true)
+    mapper(0)
 {
     ui->setupUi(this);
-
     /* Main elements init */
     ui->databaseCache->setMinimum(nMinDbCache);
     ui->databaseCache->setMaximum(nMaxDbCache);
@@ -52,20 +54,19 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
 
     ui->proxyIp->setEnabled(false);
     ui->proxyPort->setEnabled(false);
-    ui->proxyPort->setValidator(new QIntValidator(1, 65535, this));
+    ui->proxyPort->setValidator(&portValidator); //new QIntValidator(1, 65535, this));
 
     ui->proxyIpTor->setEnabled(false);
     ui->proxyPortTor->setEnabled(false);
-    ui->proxyPortTor->setValidator(new QIntValidator(1, 65535, this));
+    ui->proxyPortTor->setValidator(&proxyPortValidator);
 
     connect(ui->connectSocks, SIGNAL(toggled(bool)), ui->proxyIp, SLOT(setEnabled(bool)));
     connect(ui->connectSocks, SIGNAL(toggled(bool)), ui->proxyPort, SLOT(setEnabled(bool)));
+    connect(ui->connectSocks, SIGNAL(toggled(bool)), this, SLOT(updateProxyValidationState()));
 
     connect(ui->connectSocksTor, SIGNAL(toggled(bool)), ui->proxyIpTor, SLOT(setEnabled(bool)));
     connect(ui->connectSocksTor, SIGNAL(toggled(bool)), ui->proxyPortTor, SLOT(setEnabled(bool)));
-
-    ui->proxyIp->installEventFilter(this);
-    ui->proxyIpTor->installEventFilter(this);
+    connect(ui->connectSocksTor, SIGNAL(toggled(bool)), this, SLOT(updateProxyValidationState()));
 
     /* Window elements init */
 #ifdef Q_OS_MAC
@@ -95,9 +96,7 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
             /** display language strings as "language - country (locale name)", e.g. "German - Germany (de)" */
             ui->lang->addItem(QLocale::languageToString(locale.language()) + QString(" - ") + QLocale::countryToString(locale.country()) + QString(" (") + langStr + QString(")"), QVariant(langStr));
 #endif
-        }
-        else
-        {
+        } else {
 #if QT_VERSION >= 0x040800
             /** display language strings as "native language (locale name)", e.g. "Deutsch (de)" */
             ui->lang->addItem(locale.nativeLanguageName() + QString(" (") + langStr + QString(")"), QVariant(langStr));
@@ -119,7 +118,12 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     mapper->setOrientation(Qt::Vertical);
 
     /* setup/change UI elements when proxy IPs are invalid/valid */
-    connect(this, SIGNAL(proxyIpChecks(QValidatedLineEdit *, int)), this, SLOT(doProxyIpChecks(QValidatedLineEdit *, int)));
+    ui->proxyIp->setCheckValidator(new ProxyAddressValidator(parent));
+    ui->proxyIpTor->setCheckValidator(new ProxyAddressValidator(parent));
+    connect(ui->proxyIp, SIGNAL(validationDidChange(QValidatedLineEdit *)), this, SLOT(updateProxyValidationState()));
+    connect(ui->proxyIpTor, SIGNAL(validationDidChange(QValidatedLineEdit *)), this, SLOT(updateProxyValidationState()));
+    connect(ui->proxyPort, SIGNAL(textChanged(const QString&)), this, SLOT(updateProxyValidationState()));
+    connect(ui->proxyPortTor, SIGNAL(textChanged(const QString&)), this, SLOT(updateProxyValidationState()));
 }
 
 OptionsDialog::~OptionsDialog()
@@ -127,12 +131,13 @@ OptionsDialog::~OptionsDialog()
     delete ui;
 }
 
-void OptionsDialog::setModel(OptionsModel *model)
+
+
+void OptionsDialog::setModel(OptionsModel* model)
 {
     this->model = model;
 
-    if(model)
-    {
+    if (model) {
         /* check if client restart is needed and show persistent message */
         if (model->isRestartRequired())
             showRestartWarning(true);
@@ -162,7 +167,7 @@ void OptionsDialog::setModel(OptionsModel *model)
     connect(ui->connectSocksTor, SIGNAL(clicked(bool)), this, SLOT(showRestartWarning()));
     /* Display */
     connect(ui->lang, SIGNAL(valueChanged()), this, SLOT(showRestartWarning()));
-    connect(ui->thirdPartyTxUrls, SIGNAL(textChanged(const QString &)), this, SLOT(showRestartWarning()));
+    connect(ui->thirdPartyTxUrls, SIGNAL(textChanged(const QString&)), this, SLOT(showRestartWarning()));
 }
 
 void OptionsDialog::setMapper()
@@ -189,6 +194,7 @@ void OptionsDialog::setMapper()
     mapper->addMapping(ui->proxyPortTor, OptionsModel::ProxyPortTor);
 
     /* Window */
+
 #ifndef Q_OS_MAC
     mapper->addMapping(ui->minimizeToTray, OptionsModel::MinimizeToTray);
     mapper->addMapping(ui->minimizeOnClose, OptionsModel::MinimizeOnClose);
@@ -200,18 +206,6 @@ void OptionsDialog::setMapper()
     mapper->addMapping(ui->thirdPartyTxUrls, OptionsModel::ThirdPartyTxUrls);
 }
 
-void OptionsDialog::enableOkButton()
-{
-    /* prevent enabling of the OK button when data modified, if there is an invalid proxy address present */
-    if(fProxyIpsValid)
-        setOkButtonState(true);
-}
-
-void OptionsDialog::disableOkButton()
-{
-    setOkButtonState(false);
-}
-
 void OptionsDialog::setOkButtonState(bool fState)
 {
     ui->okButton->setEnabled(fState);
@@ -219,14 +213,11 @@ void OptionsDialog::setOkButtonState(bool fState)
 
 void OptionsDialog::on_resetButton_clicked()
 {
-    if(model)
-    {
+    if (model) {
         // confirmation dialog
-        QMessageBox::StandardButton btnRetVal = QMessageBox::question(this, tr("Confirm options reset"),
-            tr("Client restart required to activate changes.") + "<br><br>" + tr("Client will be shut down. Do you want to proceed?"),
-            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+        QMessageBox::StandardButton btnRetVal = QMessageBox::question(this, tr("Confirm options reset"), tr("Client restart required to activate changes.") + "<br><br>" + tr("Client will be shut down. Do you want to proceed?"), QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
 
-        if(btnRetVal == QMessageBox::Cancel)
+        if (btnRetVal == QMessageBox::Cancel)
             return;
 
         /* reset all options and close GUI */
@@ -251,12 +242,9 @@ void OptionsDialog::showRestartWarning(bool fPersistent)
 {
     ui->statusLabel->setStyleSheet("QLabel { color: red; }");
 
-    if(fPersistent)
-    {
+    if (fPersistent) {
         ui->statusLabel->setText(tr("Client restart required to activate changes."));
-    }
-    else
-    {
+    } else {
         ui->statusLabel->setText(tr("This change would require a client restart."));
         // clear non-persistent status label after 10 seconds
         // Todo: should perhaps be a class attribute, if we extend the use of statusLabel
@@ -269,24 +257,20 @@ void OptionsDialog::clearStatusLabel()
     ui->statusLabel->clear();
 }
 
-void OptionsDialog::doProxyIpChecks(QValidatedLineEdit *pUiProxyIp, int nProxyPort)
+void OptionsDialog::updateProxyValidationState()
 {
-    Q_UNUSED(nProxyPort);
-
-    CService addrProxy;
-
-    /* Check for a valid IPv4 / IPv6 address */
-    if (!(fProxyIpsValid = LookupNumeric(pUiProxyIp->text().toStdString().c_str(), addrProxy)))
+    QValidatedLineEdit *pUiProxyIp = ui->proxyIp;
+    QValidatedLineEdit *otherProxyWidget = (pUiProxyIp == ui->proxyIpTor) ? ui->proxyIp : ui->proxyIpTor;
+    if (pUiProxyIp->isValid() && (!ui->proxyPort->isEnabled() || ui->proxyPort->text().toInt() > 0) && (!ui->proxyPortTor->isEnabled() || ui->proxyPortTor->text().toInt() > 0))
     {
-        disableOkButton();
-        pUiProxyIp->setValid(false);
-        ui->statusLabel->setStyleSheet("QLabel { color: red; }");
-        ui->statusLabel->setText(tr("The supplied proxy address is invalid."));
+        setOkButtonState(otherProxyWidget->isValid()); //only enable ok button if both proxys are valid
+        ui->statusLabel->clear();
     }
     else
     {
-        enableOkButton();
-        ui->statusLabel->clear();
+        setOkButtonState(false);
+        ui->statusLabel->setStyleSheet("QLabel { color: red; }");
+        ui->statusLabel->setText(tr("The supplied proxy address is invalid."));
     }
 }
 
@@ -312,18 +296,18 @@ void OptionsDialog::updateDefaultProxyNets()
     (strProxy == strDefaultProxyGUI.toStdString()) ? ui->proxyReachTor->setChecked(true) : ui->proxyReachTor->setChecked(false);
 }
 
-bool OptionsDialog::eventFilter(QObject *object, QEvent *event)
+ProxyAddressValidator::ProxyAddressValidator(QObject *parent) :
+QValidator(parent)
 {
-    if(event->type() == QEvent::FocusOut)
-    {
-        if(object == ui->proxyIp)
-        {
-            Q_EMIT proxyIpChecks(ui->proxyIp, ui->proxyPort->text().toInt());
-        }
-        else if(object == ui->proxyIpTor)
-        {
-            Q_EMIT proxyIpChecks(ui->proxyIpTor, ui->proxyPortTor->text().toInt());
-        }
-    }
-    return QDialog::eventFilter(object, event);
+}
+
+QValidator::State ProxyAddressValidator::validate(QString &input, int &pos) const
+{
+    Q_UNUSED(pos);
+    // Validate the proxy
+    proxyType addrProxy = proxyType(CService(input.toStdString(), 9050), true);
+    if (addrProxy.IsValid())
+        return QValidator::Acceptable;
+
+    return QValidator::Invalid;
 }

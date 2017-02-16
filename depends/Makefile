@@ -73,13 +73,18 @@ include builders/$(build_os).mk
 include builders/default.mk
 include packages/packages.mk
 
-qt_packages_$(NO_QT) = $(qt_packages) $(qt_$(host_os)_packages)
-qt_native_packages_$(NO_QT) = $(qt_native_packages)
+qt_packages_$(NO_QT) = $(qt_packages) $(qt_$(host_os)_packages) $(qt_$(host_arch)_$(host_os)_packages)
+
 wallet_packages_$(NO_WALLET) = $(wallet_packages)
 upnp_packages_$(NO_UPNP) = $(upnp_packages)
 
 packages += $($(host_arch)_$(host_os)_packages) $($(host_os)_packages) $(qt_packages_) $(wallet_packages_) $(upnp_packages_)
-native_packages += $($(host_arch)_$(host_os)_native_packages) $($(host_os)_native_packages) $(qt_native_packages_)
+native_packages += $($(host_arch)_$(host_os)_native_packages) $($(host_os)_native_packages)
+
+ifneq ($(qt_packages_),)
+native_packages += $(qt_native_packages)
+endif
+
 all_packages = $(packages) $(native_packages)
 
 meta_depends = Makefile funcs.mk builders/default.mk hosts/default.mk hosts/$(host_os).mk builders/$(build_os).mk
@@ -131,9 +136,9 @@ endef
 
 define check_or_remove_sources
   mkdir -p $($(package)_source_dir); cd $($(package)_source_dir); \
-  $(build_SHA256SUM) -c $($(package)_fetched) >/dev/null 2>/dev/null || \
-    ( if test -f $($(package)_all_sources); then echo "Checksum missing or mismatched for $(package) source. Forcing re-download."; fi; \
-      rm -f $($(package)_all_sources) $($(1)_fetched))
+  test -f $($(package)_fetched) && ( $(build_SHA256SUM) -c $($(package)_fetched) >/dev/null 2>/dev/null || \
+    ( echo "Checksum missing or mismatched for $(package) source. Forcing re-download."; \
+      rm -f $($(package)_all_sources) $($(1)_fetched))) || true
 endef
 
 check-packages:

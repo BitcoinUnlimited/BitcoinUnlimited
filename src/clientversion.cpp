@@ -1,10 +1,13 @@
 // Copyright (c) 2012-2014 The Bitcoin Core developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "clientversion.h"
 
 #include "tinyformat.h"
+#include "tweak.h"
+#include "unlimited.h"
 
 #include <string>
 
@@ -13,7 +16,21 @@
  * for both bitcoind and bitcoin-core, to make it harder for attackers to
  * target servers or GUI users specifically.
  */
-const std::string CLIENT_NAME("Satoshi");
+const std::string CLIENT_NAME("BitcoinUnlimited");
+
+// BU added
+/**
+ * Override the standard sub-version field with this information.
+ * this can be used to hide 
+ */
+std::string subverOverride("");
+
+// BU move instantiation to a single file
+const int CLIENT_VERSION =
+                           1000000 * CLIENT_VERSION_MAJOR
+                         +   10000 * CLIENT_VERSION_MINOR
+                         +     100 * CLIENT_VERSION_REVISION
+                         +       1 * CLIENT_VERSION_BUILD;
 
 /**
  * Client version number
@@ -96,6 +113,8 @@ std::string FormatFullVersion()
  */
 std::string FormatSubVersion(const std::string& name, int nClientVersion, const std::vector<std::string>& comments)
 {
+    if (!subverOverride.empty()) return subverOverride;
+
     std::ostringstream ss;
     ss << "/";
     ss << name << ":" << FormatVersion(nClientVersion);

@@ -1,4 +1,5 @@
-// Copyright (c) 2012-2013 The Bitcoin Core developers
+// Copyright (c) 2012-2015 The Bitcoin Core developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -20,7 +21,7 @@ using namespace std;
 static std::vector<unsigned char>
 Serialize(const CScript& s)
 {
-    std::vector<unsigned char> sSerialized(s);
+    std::vector<unsigned char> sSerialized(s.begin(), s.end());
     return sSerialized;
 }
 

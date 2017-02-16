@@ -1,4 +1,5 @@
-// Copyright (c) 2011-2014 The Bitcoin Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,7 +16,7 @@
 
 #include <boost/test/unit_test.hpp>
 
-BOOST_AUTO_TEST_SUITE(tx_validationcache_tests)
+BOOST_AUTO_TEST_SUITE(txvalidationcache_tests)  // BU harmonize suite name with filename
 
 static bool
 ToMemPool(CMutableTransaction& tx)
@@ -23,7 +24,7 @@ ToMemPool(CMutableTransaction& tx)
     LOCK(cs_main);
 
     CValidationState state;
-    return AcceptToMemoryPool(mempool, state, tx, false, NULL, false);
+    return AcceptToMemoryPool(mempool, state, tx, false, NULL, true, false);
 }
 
 BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup)

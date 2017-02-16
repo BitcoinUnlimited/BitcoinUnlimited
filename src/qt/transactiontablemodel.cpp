@@ -1,4 +1,5 @@
-// Copyright (c) 2011-2014 The Bitcoin Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -13,6 +14,7 @@
 #include "transactionrecord.h"
 #include "walletmodel.h"
 
+#include "core_io.h"
 #include "main.h"
 #include "sync.h"
 #include "uint256.h"
@@ -217,6 +219,18 @@ public:
             {
                 return TransactionDesc::toHTML(wallet, mi->second, rec, unit);
             }
+        }
+        return QString();
+    }
+
+    QString getTxHex(TransactionRecord *rec)
+    {
+        LOCK2(cs_main, wallet->cs_wallet);
+        std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(rec->hash);
+        if(mi != wallet->mapWallet.end())
+        {
+            std::string strHex = EncodeHexTx(static_cast<CTransaction>(mi->second));
+            return QString::fromStdString(strHex);
         }
         return QString();
     }
@@ -594,6 +608,8 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
         return rec->getTxID();
     case TxHashRole:
         return QString::fromStdString(rec->hash.ToString());
+    case TxHexRole:
+        return priv->getTxHex(rec);
     case ConfirmedRole:
         return rec->status.countsForBalance;
     case FormattedAmountRole:

@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2014 The Bitcoin Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,13 +13,97 @@
 # include <arpa/inet.h>
 #endif
 
+namespace NetMsgType {
+const char *VERSION="version";
+const char *VERACK="verack";
+const char *ADDR="addr";
+const char *INV="inv";
+const char *GETDATA="getdata";
+const char *MERKLEBLOCK="merkleblock";
+const char *GETBLOCKS="getblocks";
+const char *GETHEADERS="getheaders";
+const char *TX="tx";
+const char *HEADERS="headers";
+const char *BLOCK="block";
+const char *GETADDR="getaddr";
+const char *MEMPOOL="mempool";
+const char *PING="ping";
+const char *PONG="pong";
+const char *ALERT="alert";
+const char *NOTFOUND="notfound";
+const char *FILTERLOAD="filterload";
+const char *FILTERADD="filteradd";
+const char *FILTERCLEAR="filterclear";
+const char *REJECT="reject";
+const char *SENDHEADERS="sendheaders";
+// BUIP010 Xtreme Thinblocks - begin section
+const char *THINBLOCK="thinblock";
+const char *XTHINBLOCK="xthinblock";
+const char *XBLOCKTX="xblocktx";
+const char *GET_XBLOCKTX="get_xblocktx";
+const char *GET_XTHIN="get_xthin";
+// BUIP010 Xtreme Thinblocks - end section
+const char *XPEDITEDREQUEST="req_xpedited";
+const char *XPEDITEDBLK="Xb";
+const char *XPEDITEDTxn="Xt";
+const char *BUVERSION="buversion";
+const char *BUVERACK="buverack";
+};
+
 static const char* ppszTypeName[] =
 {
-    "ERROR",
-    "tx",
-    "block",
-    "filtered block"
+    "ERROR", // Should never occur
+    NetMsgType::TX,
+    NetMsgType::BLOCK,
+    "filtered block", // Should never occur
+    // BUIP010 Xtreme Thinblocks - begin section
+    NetMsgType::THINBLOCK,
+    NetMsgType::XTHINBLOCK,
+    NetMsgType::XBLOCKTX,
+    NetMsgType::GET_XBLOCKTX,
+    // BUIP010 Xtreme Thinblocks - end section
 };
+
+/** All known message types. Keep this in the same order as the list of
+ * messages above and in protocol.h.
+ */
+const static std::string allNetMessageTypes[] = {
+    NetMsgType::VERSION,
+    NetMsgType::VERACK,
+    NetMsgType::ADDR,
+    NetMsgType::INV,
+    NetMsgType::GETDATA,
+    NetMsgType::MERKLEBLOCK,
+    NetMsgType::GETBLOCKS,
+    NetMsgType::GETHEADERS,
+    NetMsgType::TX,
+    NetMsgType::HEADERS,
+    NetMsgType::BLOCK,
+    NetMsgType::GETADDR,
+    NetMsgType::MEMPOOL,
+    NetMsgType::PING,
+    NetMsgType::PONG,
+    NetMsgType::ALERT,
+    NetMsgType::NOTFOUND,
+    NetMsgType::FILTERLOAD,
+    NetMsgType::FILTERADD,
+    NetMsgType::FILTERCLEAR,
+    NetMsgType::REJECT,
+    NetMsgType::SENDHEADERS,
+    // BUIP010 Xtreme Thinbocks - begin section
+    NetMsgType::THINBLOCK,
+    NetMsgType::XTHINBLOCK,
+    NetMsgType::XBLOCKTX,
+    NetMsgType::GET_XBLOCKTX,
+    NetMsgType::GET_XTHIN,
+    // BUIP010 Xtreme Thinbocks - end section
+    NetMsgType::XPEDITEDREQUEST,
+    NetMsgType::XPEDITEDBLK,
+    NetMsgType::XPEDITEDTxn,
+    NetMsgType::BUVERSION,
+    NetMsgType::BUVERACK,
+};
+const static std::vector<std::string> allNetMessageTypesVec(allNetMessageTypes, allNetMessageTypes+ARRAYLEN(allNetMessageTypes));
 
 CMessageHeader::CMessageHeader(const MessageStartChars& pchMessageStartIn)
 {
@@ -139,4 +224,9 @@ const char* CInv::GetCommand() const
 std::string CInv::ToString() const
 {
     return strprintf("%s %s", GetCommand(), hash.ToString());
+}
+
+const std::vector<std::string> &getAllNetMessageTypes()
+{
+    return allNetMessageTypesVec;
 }

@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2013 The Bitcoin Core developers
+// Copyright (c) 2009-2015 The Bitcoin Core developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,6 +8,8 @@
 #define BITCOIN_SYNC_H
 
 #include "threadsafety.h"
+#include "utiltime.h"
+#include "util.h"
 
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
@@ -75,7 +78,18 @@ public:
  * Wrapped boost mutex: supports recursive locking, but no waiting
  * TODO: We should move away from using the recursive lock by default.
  */
+#ifndef DEBUG_LOCKORDER
 typedef AnnotatedMixin<boost::recursive_mutex> CCriticalSection;
+#else  // BU we need to remove the critical section from the lockorder map when destructed
+class CCriticalSection:public AnnotatedMixin<boost::recursive_mutex>
+{
+public:
+  const char* name;
+  CCriticalSection(const char* name);
+  CCriticalSection();
+  ~CCriticalSection();
+};
+#endif
 
 /** Wrapped boost mutex: supports waiting but not recursive locking */
 typedef AnnotatedMixin<boost::mutex> CWaitableCriticalSection;
@@ -86,6 +100,7 @@ typedef boost::condition_variable CConditionVariable;
 #ifdef DEBUG_LOCKORDER
 void EnterCritical(const char* pszName, const char* pszFile, int nLine, void* cs, bool fTry = false);
 void LeaveCritical();
+void DeleteCritical(const void* cs); // BU if a CCriticalSection is allocated on the heap we need to clean it from the lockorder map upon destruction because another CCriticalSection could be created on top of it.
 std::string LocksHeld();
 void AssertLockHeldInternal(const char* pszName, const char* pszFile, int nLine, void* cs);
 #else
@@ -105,9 +120,17 @@ class SCOPED_LOCKABLE CMutexLock
 {
 private:
     boost::unique_lock<Mutex> lock;
+    int64_t lockedTime;
+    const char* name;
+    const char* file;
+    int line;
 
     void Enter(const char* pszName, const char* pszFile, int nLine)
     {
+        int64_t startWait = GetTimeMillis();
+        name = pszName;
+        file = pszFile;
+        line = nLine;
         EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()));
 #ifdef DEBUG_LOCKCONTENTION
         if (!lock.try_lock()) {
@@ -117,14 +140,26 @@ private:
 #ifdef DEBUG_LOCKCONTENTION
         }
 #endif
+        lockedTime = GetTimeMillis();
+        if (lockedTime - startWait > 500)
+	  {
+            LogPrint("lck", "Lock %s at %s:%d waited for %d ms\n", pszName, pszFile, nLine,(lockedTime - startWait));
+	  }
     }
 
     bool TryEnter(const char* pszName, const char* pszFile, int nLine)
     {
+        name = pszName;
+        file = pszFile;
+        line = nLine;
         EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()), true);
         lock.try_lock();
         if (!lock.owns_lock())
+	  {
+            lockedTime = 0;
             LeaveCritical();
+	  }
+        else lockedTime = GetTimeMillis();
         return lock.owns_lock();
     }
 
@@ -151,7 +186,14 @@ public:
     ~CMutexLock() UNLOCK_FUNCTION()
     {
         if (lock.owns_lock())
+	  {
             LeaveCritical();
+            int64_t doneTime = GetTimeMillis();
+            if (doneTime - lockedTime > 500)
+	      {
+		LogPrint("lck", "Lock %s at %s:%d remained locked for %d ms\n", name, file, line,doneTime - lockedTime);
+	      }            
+	  }
     }
 
     operator bool()
@@ -277,4 +319,20 @@ public:
     }
 };
 
+// BU move from sync.c because I need to create these in globals.cpp
+struct CLockLocation 
+{
+    CLockLocation(const char* pszName, const char* pszFile, int nLine, bool fTryIn);
+    std::string ToString() const;
+    std::string MutexName() const;
+
+    bool fTry;
+private:
+    std::string mutexName;
+    std::string sourceFile;
+    int sourceLine;
+};
+
+typedef std::vector<std::pair<void*, CLockLocation> > LockStack;
+typedef std::map<std::pair<void*, void*>, LockStack> LockStackMap;
 #endif // BITCOIN_SYNC_H

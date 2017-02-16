@@ -1,4 +1,6 @@
+Language:        Cpp
 AccessModifierOffset: -4
+AlignAfterOpenBracket: false
 AlignEscapedNewlinesLeft: true
 AlignTrailingComments: true
 AllowAllParametersOfDeclarationOnNextLine: false
@@ -10,7 +12,7 @@ AlwaysBreakBeforeMultilineStrings: false
 AlwaysBreakTemplateDeclarations: true
 BinPackParameters: false
 BreakBeforeBinaryOperators: false
-BreakBeforeBraces: Linux
+BreakBeforeBraces: Allman
 BreakBeforeTernaryOperators: false
 BreakConstructorInitializersBeforeComma: false
 ColumnLimit:     0
@@ -26,7 +28,6 @@ IndentCaseLabels: false
 IndentFunctionDeclarationAfterType: false
 IndentWidth:     4
 KeepEmptyLinesAtTheStartOfBlocks: false
-Language:        Cpp
 MaxEmptyLinesToKeep: 2
 NamespaceIndentation: None
 ObjCSpaceAfterProperty: false

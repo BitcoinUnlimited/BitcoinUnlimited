@@ -46,6 +46,22 @@
         <translation>&amp;Borrar</translation>
     </message>
     <message>
+        <source>Choose the address to send coins to</source>
+        <translation>Selecciona la direccion para enviar coins</translation>
+    </message>
+    <message>
+        <source>Choose the address to receive coins with</source>
+        <translation>Selecciona la dirección para recibir coins</translation>
+    </message>
+    <message>
+        <source>Sending addresses</source>
+        <translation>Dirección de envio</translation>
+    </message>
+    <message>
+        <source>Receiving addresses</source>
+        <translation>Dirección para recibir</translation>
+    </message>
+    <message>
         <source>Copy &amp;Label</source>
         <translation>Copia &amp;etiqueta</translation>
     </message>
@@ -54,8 +70,16 @@
         <translation>&amp;Editar</translation>
     </message>
     <message>
+        <source>Export Address List</source>
+        <translation>Exportar lista de direcciones</translation>
+    </message>
+    <message>
         <source>Comma separated file (*.csv)</source>
         <translation>Archivos separados por coma (*.csv)</translation>
+    </message>
+    <message>
+        <source>Exporting Failed</source>
+        <translation>Exportado fallo</translation>
     </message>
     </context>
 <context>
@@ -165,6 +189,9 @@
     </message>
 </context>
 <context>
+    <name>BanTableModel</name>
+    </context>
+<context>
     <name>BitcoinGUI</name>
     <message>
         <source>Sign &amp;message...</source>
@@ -223,11 +250,19 @@
         <translation>&amp;Cambiar la contraseña...</translation>
     </message>
     <message>
+        <source>&amp;Sending addresses...</source>
+        <translation>Mandando direcciones</translation>
+    </message>
+    <message>
+        <source>&amp;Receiving addresses...</source>
+        <translation>Recibiendo direcciones</translation>
+    </message>
+    <message>
         <source>Open &amp;URI...</source>
         <translation>Abrir y url...</translation>
     </message>
     <message>
-        <source>Bitcoin Core client</source>
+        <source>Bitcoin Unlimited client</source>
         <translation>cliente bitcoin core</translation>
     </message>
     <message>
@@ -255,6 +290,10 @@
         <translation>Abre consola de depuración y diagnóstico</translation>
     </message>
     <message>
+        <source>&amp;Verify message...</source>
+        <translation>Verificar mensaje....</translation>
+    </message>
+    <message>
         <source>Bitcoin</source>
         <translation>Bitcoin</translation>
     </message>
@@ -269,6 +308,10 @@
     <message>
         <source>&amp;Receive</source>
         <translation>y recibir</translation>
+    </message>
+    <message>
+        <source>Show information about Bitcoin Unlimited</source>
+        <translation>Mostrar informacion sobre Bitcoin Unlimited</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -295,8 +338,24 @@
         <translation>Barra de pestañas</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin Unlimited</source>
         <translation>bitcoin core</translation>
+    </message>
+    <message>
+        <source>Request payments (generates QR codes and bitcoin: URIs)</source>
+        <translation>Pide pagos (genera codigos QR and bitcoin: URls)</translation>
+    </message>
+    <message>
+        <source>&amp;About Bitcoin Unlimited</source>
+        <translation>&amp;Sobre Bitcoin Unlimited</translation>
+    </message>
+    <message>
+        <source>Modify configuration options for Bitcoin Unlimited</source>
+        <translation>Modifica las opciones para BitCoin Core</translation>
+    </message>
+    <message>
+        <source>%1 and %2</source>
+        <translation>%1 y %2</translation>
     </message>
     <message>
         <source>Error</source>
@@ -349,12 +408,25 @@
         <translation>Cantidad:</translation>
     </message>
     <message>
+        <source>Priority:</source>
+        <translation>prioridad:</translation>
+    </message>
+    <message>
+        <source>Fee:</source>
+        <translation>comisión:
+</translation>
+    </message>
+    <message>
         <source>Amount</source>
         <translation>Cantidad</translation>
     </message>
     <message>
         <source>Date</source>
         <translation>Fecha</translation>
+    </message>
+    <message>
+        <source>Confirmations</source>
+        <translation>Confirmaciones</translation>
     </message>
     <message>
         <source>Confirmed</source>
@@ -377,8 +449,24 @@
         <translation>Copiar Cantidad</translation>
     </message>
     <message>
+        <source>Copy quantity</source>
+        <translation>copiar cantidad</translation>
+    </message>
+    <message>
+        <source>Copy fee</source>
+        <translation>copiar comision</translation>
+    </message>
+    <message>
+        <source>Copy bytes</source>
+        <translation>copiar bytes</translation>
+    </message>
+    <message>
         <source>medium</source>
         <translation>medio</translation>
+    </message>
+    <message>
+        <source>low</source>
+        <translation>bajo</translation>
     </message>
     <message>
         <source>yes</source>
@@ -450,12 +538,16 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin Unlimited</source>
         <translation>bitcoin core</translation>
     </message>
     <message>
         <source>version</source>
         <translation>versión</translation>
+    </message>
+    <message>
+        <source>Command-line options</source>
+        <translation>opciones de linea de comando</translation>
     </message>
     <message>
         <source>Usage:</source>
@@ -469,7 +561,7 @@
         <translation>bienvenido</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin Unlimited</source>
         <translation>bitcoin core</translation>
     </message>
     <message>
@@ -501,6 +593,10 @@
     <message>
         <source>&amp;Network</source>
         <translation>&amp;Red</translation>
+    </message>
+    <message>
+        <source>W&amp;allet</source>
+        <translation>Cartera</translation>
     </message>
     <message>
         <source>Expert</source>
@@ -634,6 +730,10 @@
         <translation>&amp;Información</translation>
     </message>
     <message>
+        <source>Debug window</source>
+        <translation>Ventana Debug</translation>
+    </message>
+    <message>
         <source>General</source>
         <translation>General</translation>
     </message>
@@ -681,6 +781,10 @@
     </context>
 <context>
     <name>ReceiveCoinsDialog</name>
+    <message>
+        <source>&amp;Amount:</source>
+        <translation>Cantidad:</translation>
+    </message>
     <message>
         <source>&amp;Label:</source>
         <translation>&amp;Etiqueta:</translation>
@@ -759,8 +863,33 @@
         <translation>Enviar monedas</translation>
     </message>
     <message>
+        <source>Insufficient funds!</source>
+        <translation>Fondos insuficientes</translation>
+    </message>
+    <message>
         <source>Amount:</source>
         <translation>Cantidad:</translation>
+    </message>
+    <message>
+        <source>Priority:</source>
+        <translation>prioridad:</translation>
+    </message>
+    <message>
+        <source>Fee:</source>
+        <translation>comisión:
+</translation>
+    </message>
+    <message>
+        <source>Transaction Fee:</source>
+        <translation>Comisión transacción:</translation>
+    </message>
+    <message>
+        <source>normal</source>
+        <translation>normal</translation>
+    </message>
+    <message>
+        <source>fast</source>
+        <translation>rapido</translation>
     </message>
     <message>
         <source>Send to multiple recipients at once</source>
@@ -791,8 +920,20 @@
         <translation>Confirmar el envio de monedas</translation>
     </message>
     <message>
+        <source>Copy quantity</source>
+        <translation>copiar cantidad</translation>
+    </message>
+    <message>
         <source>Copy amount</source>
         <translation>Copiar Cantidad</translation>
+    </message>
+    <message>
+        <source>Copy fee</source>
+        <translation>copiar comision</translation>
+    </message>
+    <message>
+        <source>Copy bytes</source>
+        <translation>copiar bytes</translation>
     </message>
     <message>
         <source>The amount to pay must be larger than 0.</source>
@@ -844,6 +985,10 @@
     <message>
         <source>Message:</source>
         <translation>Mensaje:</translation>
+    </message>
+    <message>
+        <source>Pay To:</source>
+        <translation>Pagar a:</translation>
     </message>
     </context>
 <context>
@@ -900,6 +1045,10 @@
         <translation>Click en "Firmar Mensage" para conseguir firma</translation>
     </message>
     <message>
+        <source>The entered address is invalid.</source>
+        <translation>La dirección introducida no es una valida.</translation>
+    </message>
+    <message>
         <source>Please check the address and try again.</source>
         <translation>Por favor, revise la dirección Bitcoin e inténtelo denuevo</translation>
     </message>
@@ -923,7 +1072,7 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin Unlimited</source>
         <translation>bitcoin core</translation>
     </message>
     <message>
@@ -1071,8 +1220,16 @@
         <translation>Generado pero no acceptado</translation>
     </message>
     <message>
+        <source>Offline</source>
+        <translation>fuera de linea</translation>
+    </message>
+    <message>
         <source>Label</source>
         <translation>Etiqueta</translation>
+    </message>
+    <message>
+        <source>Unconfirmed</source>
+        <translation>no confirmado</translation>
     </message>
     <message>
         <source>Received with</source>
@@ -1194,6 +1351,10 @@
         <translation>Mostrar detalles de la transacción</translation>
     </message>
     <message>
+        <source>Exporting Failed</source>
+        <translation>Exportado fallo</translation>
+    </message>
+    <message>
         <source>Comma separated file (*.csv)</source>
         <translation>Archivos separados por coma (*.csv)</translation>
     </message>
@@ -1289,15 +1450,6 @@
 </translation>
     </message>
     <message>
-        <source>Use the test network</source>
-        <translation>Usa la red de pruebas
-</translation>
-    </message>
-    <message>
-        <source>Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction.</source>
-        <translation>Precaución: -paytxfee es muy alta. Esta es la comisión que pagarás si envias una transacción.</translation>
-    </message>
-    <message>
         <source>Connect only to the specified node(s)</source>
         <translation>Conecta solo al nodo especificado
 </translation>
@@ -1311,25 +1463,24 @@
         <translation>Atención: Poco espacio en el disco duro</translation>
     </message>
     <message>
-        <source>Imports blocks from external blk000??.dat file</source>
-        <translation>Importar bloques desde el archivo externo blk000??.dat </translation>
-    </message>
-    <message>
         <source>Information</source>
         <translation>Información</translation>
     </message>
     <message>
+        <source>Invalid amount for -maxtxfee=&lt;amount&gt;: '%s'</source>
+        <translation>Cantidad inválida para -maxtxfee=&lt;amount&gt;: '%s'</translation>
+    </message>
+    <message>
+        <source>Invalid amount for -minrelaytxfee=&lt;amount&gt;: '%s'</source>
+        <translation>Cantidad inválida para -minrelaytxfee=&lt;amount&gt;: '%s'</translation>
+    </message>
+    <message>
+        <source>Invalid amount for -mintxfee=&lt;amount&gt;: '%s'</source>
+        <translation>Cantidad inválida para -mintxfee=&lt;amount&gt;: '%s'</translation>
+    </message>
+    <message>
         <source>Send trace/debug info to console instead of debug.log file</source>
         <translation>Enviar informacion de seguimiento a la consola en vez del archivo debug.log</translation>
-    </message>
-    <message>
-        <source>Start minimized</source>
-        <translation>Arranca minimizado
-</translation>
-    </message>
-    <message>
-        <source>Use UPnP to map the listening port (default: 1 when listening)</source>
-        <translation>Intenta usar UPnP para mapear el puerto de escucha (default: 1 when listening)</translation>
     </message>
     <message>
         <source>Username for JSON-RPC connections</source>
@@ -1347,20 +1498,6 @@
     <message>
         <source>Password for JSON-RPC connections</source>
         <translation>Contraseña para las conexiones JSON-RPC
-</translation>
-    </message>
-    <message>
-        <source>Upgrade wallet to latest format</source>
-        <translation>Actualizar billetera al formato actual</translation>
-    </message>
-    <message>
-        <source>Rescan the block chain for missing wallet transactions</source>
-        <translation>Rescanea la cadena de bloques para transacciones perdidas de la cartera
-</translation>
-    </message>
-    <message>
-        <source>Use OpenSSL (https) for JSON-RPC connections</source>
-        <translation>Usa OpenSSL (https) para las conexiones JSON-RPC
 </translation>
     </message>
     <message>
@@ -1390,6 +1527,14 @@
         <translation>Dirección -proxy invalida: '%s'</translation>
     </message>
     <message>
+        <source>Cannot resolve -bind address: '%s'</source>
+        <translation>No se pudo resolver la dirección fija: '%s'</translation>
+    </message>
+    <message>
+        <source>Cannot resolve -externalip address: '%s'</source>
+        <translation>No se pudo resolver la dirección ip: '%s'</translation>
+    </message>
+    <message>
         <source>Invalid amount for -paytxfee=&lt;amount&gt;: '%s'</source>
         <translation>Cantidad inválida para -paytxfee=&lt;amount&gt;: '%s'</translation>
     </message>
@@ -1408,6 +1553,14 @@
     <message>
         <source>Loading wallet...</source>
         <translation>Cargando cartera...</translation>
+    </message>
+    <message>
+        <source>Cannot downgrade wallet</source>
+        <translation>No es posible desactualizar la billetera</translation>
+    </message>
+    <message>
+        <source>Cannot write default address</source>
+        <translation>No se pudo escribir la dirección por defecto</translation>
     </message>
     <message>
         <source>Rescanning...</source>
