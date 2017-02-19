@@ -27,17 +27,57 @@ if "%BUILD_32_BIT%" NEQ "" (
   )
 )
 
-REM TODO: add checking to ensure environment variables are set correctly
-REM 1. Required variables set
-REM 2. Any set variables are correct
-REM 3. All configured paths that are expected to pre-exist, do exist
-
 REM Build necessary paths based on this information
 set "INST_DIR=%CD%"
 set "MINGW_BIN=%MINGW_ROOT%\bin\"
 set "MSYS_BIN=%MINGW_ROOT%\msys\1.0\bin\"
 set MSYS_SH="%MSYS_BIN%\sh.exe"
 set "TOOL_CHAIN_ROOT=%MINGW_ROOT%"
+
+REM Verify that the user specified to build at least one of 32 or 64 bit
+set BUILD_ARCH=
+if "%BUILD_32_BIT%" NEQ "" set BUILD_ARCH=T
+if "%BUILD_64_BIT%" NEQ "" set BUILD_ARCH=T
+if "%BUILD_ARCH%" NEQ "T" (
+	echo You must specify building at least one of 32-bit or 64-bit version
+	echo of the Bitcoin client in SET_ENV_VARS.bat.
+	echo Aborting initial configuration...
+	pause
+	exit /b -1
+)
+
+REM Verify that base MinGW was installed and correctly specified in SET_ENV_VARS.bat
+if not exist "%MINGW_ROOT%" (
+	echo MinGW base does not appear to be installed.  Please ensure that you have
+	echo executed mingw-setup.exe, updated SET_ENV_VARS.bat to list the install
+	echo location you chose in the variable MINGW_ROOT, and run config-mingw.bat.
+	echo Current MINGW_ROOT = %MINGW_ROOT%
+	echo Aborting build of Bitcoin client...
+	pause
+	exit /b -1
+)
+
+REM Verify that MSYS was correctly installed and updated by previous steps
+if not exist "%MSYS_SH%" (
+	echo MSYS does not appear to have installed correctly.  Build of Bitcoin client
+	echo cannot continue without MSYS being properly installed and config-mingw.bat
+	echo having been successfully executed at least once.
+	echo Current MSYS_SH = %MSYS_SH%
+	echo Aborting build of Bitcoin client...
+	pause
+	exit /b -1
+)
+
+REM Verify that DEPS_ROOT is specified and exists
+if not exist "%DEPS_ROOT%" (
+	echo The DEPS_ROOT directory could not be created.  Initial configuration
+	echo cannot continue without a valid path to download and build dependencies.
+	echo Current DEPS_ROOT = %DEPS_ROOT%
+	echo Aborting initial configuration...
+	pause
+	exit /b -1
+)
+
 
 REM Add MSYS and MinGW bin directories to the start of path so commands are available
 set "PATH=%MSYS_BIN%;%MINGW_BIN%;%PATH%"
@@ -68,17 +108,35 @@ if "%BUILD_64_BIT%" NEQ "" (
 	set "TOOLCHAIN_BIN=%TOOL_CHAIN_ROOT%\mingw64\bin"
 	set "PATH_DEPS=%DEPS_ROOT%\x64"
 	set "BUILD_OUTPUT=%BITCOIN_GIT_ROOT%\build-output\x64"
-	
+
 	set HAS_BUILT_64_BIT=TRUE
 	
 	GOTO BUILD_START
 ) else ( GOTO BUILD_END )
 
 :BUILD_START
+REM Verify that the current build toolchain exists (by checking for gcc.exe)
+if not exist "%TOOLCHAIN_BIN%\gcc.exe" (
+	echo The build toolchain does not exist.  Initial configuration cannot
+	echo continue without a valid build toolchain.  This may indicate that
+	echo you have not run config-mingw.bat for the current architecture yet.
+	echo Current TOOLCHAIN_BIN = %TOOLCHAIN_BIN%
+	echo Aborting initial configuration...
+	pause
+	exit /b -1
+)
+
 REM Set the path variable to contain the toolchain as well as MSYS bin directories
 set "PATH=%TOOLCHAIN_BIN%;%OLD_PATH%"
 
 %MSYS_SH% "%INST_DIR%\make-bitcoin.sh"
+REM Check to see if make-bitcoin.sh failed (possibly due to missing dependencies)
+if %errorlevel% neq 0 (
+	REM Assume that whatever caused the error also wrote an output so we
+	REM don't need to write an output here
+	pause
+	exit /b %errorlevel%
+)
 
 echo Saving bitcoin executables to %BUILD_OUTPUT%
 REM Make sure output directory exists

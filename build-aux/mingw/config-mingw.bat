@@ -26,11 +26,6 @@ set CLEAN_BUILD=YES
 set SKIP_AUTOGEN=
 set SKIP_CONFIGURE=
 
-REM TODO: add checking to ensure environment variables are set correctly
-REM 1. Required variables set
-REM 2. Any set variables are correct
-REM 3. All configured paths that are expected to pre-exist, do exist
-
 REM Build necessary paths based on this information
 set "INST_DIR=%CD%"
 set "MINGW_BIN=%MINGW_ROOT%\bin\"
@@ -39,6 +34,58 @@ set "MSYS_BIN=%MINGW_ROOT%\msys\1.0\bin\"
 set MSYS_SH="%MSYS_BIN%\sh.exe"
 set "TOOL_CHAIN_ROOT=%MINGW_ROOT%"
 
+REM Verify that the user specified to build at least one of 32 or 64 bit
+set BUILD_ARCH=
+if "%BUILD_32_BIT%" NEQ "" set BUILD_ARCH=T
+if "%BUILD_64_BIT%" NEQ "" set BUILD_ARCH=T
+if "%BUILD_ARCH%" NEQ "T" (
+	echo You must specify building at least one of 32-bit or 64-bit version
+	echo of the Bitcoin client in SET_ENV_VARS.bat.
+	echo Aborting initial configuration...
+	pause
+	exit /b -1
+)
+
+REM Verify that base MinGW was installed and correctly specified in SET_ENV_VARS.bat
+if not exist "%MINGW_GET%" (
+	echo MinGW base does not appear to be installed.  Please ensure that you have
+	echo executed mingw-setup.exe and updated SET_ENV_VARS.bat to list the install
+	echo location you chose in the variable MINGW_ROOT.
+	echo Current MINGW_ROOT = %MINGW_ROOT%
+	echo Aborting initial configuration...
+	pause
+	exit /b -1
+)
+
+REM Verify that 7-Zip is installed and correctly referenced in SET_ENV_VARS.bat
+if not exist %CMD_7ZIP% (
+	echo 7-Zip does not appear to have been installed.  Initial configuration
+	echo cannot continue without 7-zip being properly installed.
+	echo Current CMD_7ZIP = %CMD_7ZIP%
+	echo Aborting initial configuration...
+	pause
+	exit /b -1
+)
+
+REM Verify that DEPS_ROOT is specified and exists
+if "%DEPS_ROOT%" EQU "" (
+	echo You must specify a valid path to install Bitcoin client dependencies in
+	echo the SET_ENV_VARS.bat file.
+	echo Current DEPS_ROOT = %DEPS_ROOT%
+	echo Aborting initial configuration...
+	pause
+	exit /b -1
+)
+mkdir "%DEPS_ROOT%"
+if not exist "%DEPS_ROOT%" (
+	echo The DEPS_ROOT directory could not be created.  Initial configuration
+	echo cannot continue without a valid path to download and build dependencies.
+	echo Current DEPS_ROOT = %DEPS_ROOT%
+	echo Aborting initial configuration...
+	pause
+	exit /b -1
+)
+
 REM If including tests, set up the configure flag used by Boost to enabled tests
 if "%ENABLE_TESTS%" NEQ "" set BOOST_ENABLE_TESTS=--with-test
 
@@ -46,6 +93,16 @@ REM Install required msys base package (provide access to msys sh shell)
 echo Updating base MinGW
 %MINGW_GET% update
 %MINGW_GET% install msys-base-bin
+
+REM Verify that MSYS was correctly installed and updated by previous steps
+if not exist "%MSYS_SH%" (
+	echo MSYS does not appear to have installed correctly.  Initial configuration
+	echo cannot continue without MSYS being properly installed.
+	echo Current MSYS_SH = %MSYS_SH%
+	echo Aborting initial configuration...
+	pause
+	exit /b -1
+)
 
 REM Add MSYS bin directory to the start of path so commands are available
 set "PATH=%MSYS_BIN%;%PATH%"
@@ -90,8 +147,25 @@ if "%BUILD_64_BIT%" NEQ "" (
 ) else ( GOTO BUILD_END )
 
 :BUILD_START
+REM Verify that the current build toolchain exists (by checking for gcc.exe)
+if not exist "%TOOLCHAIN_BIN%\gcc.exe" (
+	echo The build toolchain does not exist.  Initial configuration cannot
+	echo continue without a valid build toolchain.
+	echo Current TOOLCHAIN_BIN = %TOOLCHAIN_BIN%
+	echo Aborting initial configuration...
+	pause
+	exit /b -1
+)
+
 REM Install dependencies (and build this arch)
 %MSYS_SH% "%INST_DIR%\install-deps.sh"
+REM Check to see if make-bitcoin.sh failed (possibly due to missing dependencies)
+if %errorlevel% neq 0 (
+	REM Assume that whatever caused the error also wrote an output so we
+	REM don't need to write an output here
+	pause
+	exit /b %errorlevel%
+)
 
 REM ##################################################################################################
 REM Perform build steps that require Windows CMD
@@ -104,12 +178,31 @@ REM Boost
 echo Building Boost...
 cd "%PATH_DEPS%\boost_1_61_0"
 call bootstrap.bat gcc
+REM Check to see if bootstrap.bat failed
+if %errorlevel% neq 0 (
+	echo ERROR: Bootstrapping Boost failed!
+	pause
+	exit /b %errorlevel%
+)
 b2 --build-type=complete --with-chrono --with-filesystem --with-program_options --with-system --with-thread %BOOST_ENABLE_TESTS% toolset=gcc variant=release link=static threading=multi runtime-link=static stage
+REM Check to see if b2 failed
+if %errorlevel% neq 0 (
+	echo ERROR: Building Boost failed!
+	pause
+	exit /b %errorlevel%
+)
 
 REM Miniunpuc
 echo Building Miniunpuc...
 cd "%PATH_DEPS%\miniupnpc"
 mingw32-make -f Makefile.mingw init upnpc-static
+REM Check to see if mingw32-make failed
+if %errorlevel% neq 0 (
+	echo ERROR: Building Miniunpuc failed!
+	pause
+	exit /b %errorlevel%
+)
+
 
 REM Qt 5
 echo Building Qt 5.3.2...
@@ -117,14 +210,38 @@ cd "%PATH_DEPS%\Qt\5.3.2"
 set "INCLUDE=%PATH_DEPS%\libpng-1.6.16;%PATH_DEPS%\openssl-1.0.1k\include"
 set "LIB=%PATH_DEPS%\libpng-1.6.16\.libs;%PATH_DEPS%\openssl-1.0.1k"
 call configure.bat -release -opensource -confirm-license -static -make libs -no-sql-sqlite -no-opengl -system-zlib -qt-pcre -no-icu -no-gif -system-libpng -no-libjpeg -no-freetype -no-angle -no-vcproj -openssl -no-dbus -no-audio-backend -no-wmf-backend -no-qml-debug
+REM Check to see if configure.bat failed
+if %errorlevel% neq 0 (
+	echo ERROR: Configuring Qt failed!
+	pause
+	exit /b %errorlevel%
+)
 mingw32-make %MAKE_CORES%
+REM Check to see if bootstrap.bat failed
+if %errorlevel% neq 0 (
+	echo ERROR: Building Qt failed!
+	pause
+	exit /b %errorlevel%
+)
 
 echo Building Qt Tools...
 set "PATH=%PATH%;%PATH_DEPS%\Qt\5.3.2\bin"
 set "PATH=%PATH%;%PATH_DEPS%\Qt\qttools-opensource-src-5.3.2"
 cd "%PATH_DEPS%\Qt\qttools-opensource-src-5.3.2"
 qmake qttools.pro
+REM Check to see if qmake failed
+if %errorlevel% neq 0 (
+	echo ERROR: Running qmake for Qt Tools failed!
+	pause
+	exit /b %errorlevel%
+)
 mingw32-make %MAKE_CORES%
+REM Check to see if bootstrap.bat failed
+if %errorlevel% neq 0 (
+	echo ERROR: Building Qt Tools failed!
+	pause
+	exit /b %errorlevel%
+)
 
 endlocal
 REM ##################################################################################################
@@ -132,6 +249,13 @@ REM Time to build Bitcoin
 REM ##################################################################################################
 echo Building bitcoin...
 %MSYS_SH% "%INST_DIR%\make-bitcoin.sh"
+REM Check to see if make-bitcoin.sh failed (possibly due to missing dependencies)
+if %errorlevel% neq 0 (
+	REM Assume that whatever caused the error also wrote an output so we
+	REM don't need to write an output here
+	pause
+	exit /b %errorlevel%
+)
 
 echo Saving bitcoin executables to %BUILD_OUTPUT%
 REM Make sure output directory exists

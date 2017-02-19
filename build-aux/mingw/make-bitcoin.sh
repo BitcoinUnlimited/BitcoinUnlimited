@@ -9,6 +9,56 @@ BITCOIN_GIT_ROOT=$(echo "/$BITCOIN_GIT_ROOT" | sed -e 's/\\/\//g' -e 's/://' -e 
 # Set PATH using POSIX style paths
 PATH="$TOOLCHAIN_BIN:$MSYS_BIN:$PATH"
 
+# Verify that required dependencies have been built
+CHECK_PATH="$PATH_DEPS/openssl-1.0.1k/libssl.a"
+if [ ! -e "$CHECK_PATH" ]
+then
+	echo OpenSSL dependency is missing.  Please run config-mingw.bat.
+	exit -1
+fi
+CHECK_PATH="$PATH_DEPS/libevent-2.0.22/.libs/libevent.a"
+if [ ! -e "$CHECK_PATH" ]
+then
+	echo LibEvent dependency is missing.  Please run config-mingw.bat.
+	exit -1
+fi
+CHECK_PATH="$PATH_DEPS/miniupnpc/libminiupnpc.a"
+if [ ! -e "$CHECK_PATH" ]
+then
+	echo MiniUPNPC dependency is missing.  Please run config-mingw.bat.
+	exit -1
+fi
+CHECK_PATH="$PATH_DEPS/protobuf-2.6.1/src/.libs/libprotobuf.a"
+if [ ! -e "$CHECK_PATH" ]
+then
+	echo Protobuf dependency is missing.  Please run config-mingw.bat.
+	exit -1
+fi
+CHECK_PATH="$PATH_DEPS/libpng-1.6.16/.libs/libpng.a"
+if [ ! -e "$CHECK_PATH" ]
+then
+	echo LibPNG dependency is missing.  Please run config-mingw.bat.
+	exit -1
+fi
+CHECK_PATH="$PATH_DEPS/qrencode-3.4.4/.libs/libqrencode.a"
+if [ ! -e "$CHECK_PATH" ]
+then
+	echo LibQREncode dependency is missing.  Please run config-mingw.bat.
+	exit -1
+fi
+CHECK_PATH="$PATH_DEPS/boost_1_61_0/bin.v2/libs/chrono/build/gcc-mingw-4.9.2/release/link-static/runtime-link-static/threading-multi/libboost_chrono-mgw49-mt-s-1_61.a"
+if [ ! -e "$CHECK_PATH" ]
+then
+	echo Boost dependency is missing.  Please run config-mingw.bat.
+	exit -1
+fi
+CHECK_PATH="$PATH_DEPS/Qt/5.3.2/lib/libQt5Core.a"
+if [ ! -e "$CHECK_PATH" ]
+then
+	echo Qt dependency is missing.  Please run config-mingw.bat.
+	exit -1
+fi
+
 #If skip configure is set, then skip autogen MUST be set
 if [ -n "$SKIP_CONFIGURE" ]; then
 	SKIP_AUTOGEN=YES
