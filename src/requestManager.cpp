@@ -71,6 +71,8 @@ CRequestManager::CRequestManager()
 
 void CRequestManager::cleanup(OdMap::iterator &itemIt)
 {
+    LOCK2(cs_objDownloader, cs_vNodes);
+
     CUnknownObj &item = itemIt->second;
     // Because we'll ignore anything deleted from the map, reduce the # of requests in flight by every request we made
     // for this object
@@ -107,9 +109,7 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
         if (iter != vBlockRequestOrder.end())
         {
             sendBlkIter = vBlockRequestOrder.erase(iter);
-            LogPrintf("erased from vblockrequestorder size %d %s\n", vBlockRequestOrder.size(), hash.ToString());
             mapBlkInfo.erase(itemIt);
-            LogPrintf("erased from mapblkinfo size %d %s\n", mapBlkInfo.size(), hash.ToString());
         }
     }
 }
@@ -397,6 +397,8 @@ void RequestBlock(CNode *pfrom, CInv obj)
                     MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
                     LogPrint("thin", "Requesting Thinblock %s from peer %s (%d)\n", inv2.hash.ToString(),
                         pfrom->addrName.c_str(), pfrom->id);
+
+                    return true;
                 }
             }
             else
@@ -431,7 +433,8 @@ void RequestBlock(CNode *pfrom, CInv obj)
                     pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
                 }
                 MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
-            }
+                return true;
+           }
         }
         else
         {
@@ -442,7 +445,10 @@ void RequestBlock(CNode *pfrom, CInv obj)
             MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
             LogPrint("thin", "Requesting Regular Block %s from peer %s (%d)\n", inv2.hash.ToString(),
                 pfrom->addrName.c_str(), pfrom->id);
+            return true;
         }
+        return false; // no block requested
+
         // BUIP010 Xtreme Thinblocks: end section
     }
 }
@@ -459,7 +465,7 @@ void CRequestManager::SendRequests()
     // those blocks and txns can take much longer to download.
     unsigned int blkReqRetryInterval = MIN_BLK_REQUEST_RETRY_INTERVAL;
     unsigned int txReqRetryInterval = MIN_TX_REQUEST_RETRY_INTERVAL;
-    if ((!IsChainNearlySyncd() && Params().NetworkIDString() != "regtest") || IsTrafficShapingEnabled()) 
+    if (!IsChainNearlySyncd() || IsTrafficShapingEnabled()) 
     {
         blkReqRetryInterval *= 6;
         // we want to optimise block DL during IBD (and give lots of time for shaped nodes) so push the TX retry up to 2
@@ -472,6 +478,8 @@ void CRequestManager::SendRequests()
     {
         now = GetTimeMicros();
         OdMap::iterator itemIter = mapBlkInfo.find((*sendBlkIter));
+        if (itemIter == mapBlkInfo.end())
+            break;
         CUnknownObj& item = itemIter->second;
 
         if (now-item.lastRequestTime > blkReqRetryInterval)  // if never requested then lastRequestTime==0 so this will always be true
@@ -517,9 +525,10 @@ void CRequestManager::SendRequests()
                     CInv obj = item.obj;
                     LEAVE_CRITICAL_SECTION(cs_objDownloader);
 
-                    RequestBlock(next.node, obj);
-                    item.outstandingReqs++;
-                    item.lastRequestTime = now;
+                    if (RequestBlock(next.node, obj)) {
+                        item.outstandingReqs++;
+                        item.lastRequestTime = now;
+                    }
 
                     ENTER_CRITICAL_SECTION(cs_objDownloader);
 
