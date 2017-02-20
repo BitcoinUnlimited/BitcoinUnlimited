@@ -734,7 +734,7 @@ static const uint64_t MEMPOOL_DUMP_VERSION = 1541030400;
 bool LoadMempool(void)
 {
     int64_t nExpiryTimeout = GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
-    FILE *filestr = fopen((GetDataDir() / "mempool.dat").string().c_str(), "r");
+    FILE *filestr = fopen((GetDataDir() / "mempool.dat").string().c_str(), "rb");
     CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
     if (file.IsNull())
     {
@@ -827,7 +827,7 @@ void DumpMempool(void)
 
     try
     {
-        FILE *filestr = fopen((GetDataDir() / "mempool.dat.new").string().c_str(), "w");
+        FILE *filestr = fopen((GetDataDir() / "mempool.dat.new").string().c_str(), "wb");
         if (!filestr)
         {
             return;
