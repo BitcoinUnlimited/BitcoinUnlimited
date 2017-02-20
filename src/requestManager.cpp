@@ -65,7 +65,7 @@ CRequestManager::CRequestManager()
     // maxInFlight = 256;
 
     sendIter = mapTxnInfo.end();
-    sendBlkIter = mapBlkInfo.end();
+    sendBlkIter = vBlockRequestOrder.end();
 }
 
 
@@ -102,9 +102,15 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
     }
     else
     {
-        if (sendBlkIter == itemIt)
-            ++sendBlkIter;
-        mapBlkInfo.erase(itemIt);
+        uint256 hash = itemIt->second.obj.hash;
+        vector<uint256>::iterator iter = std::find(vBlockRequestOrder.begin(), vBlockRequestOrder.end(), hash);
+        if (iter != vBlockRequestOrder.end())
+        {
+            sendBlkIter = vBlockRequestOrder.erase(iter);
+            LogPrintf("erased from vblockrequestorder size %d %s\n", vBlockRequestOrder.size(), hash.ToString());
+            mapBlkInfo.erase(itemIt);
+            LogPrintf("erased from mapblkinfo size %d %s\n", mapBlkInfo.size(), hash.ToString());
+        }
     }
 }
 
@@ -128,8 +134,8 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, int priority)
             // all other fields are zeroed on creation
         }
         // else the txn already existed so nothing to do
-
         data.priority = max(priority, data.priority);
+
         // Got the data, now add the node as a source
         data.AddSource(from);
     }
@@ -137,7 +143,12 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, int priority)
     {
         uint256 temp = obj.hash;
         OdMap::value_type v(temp, CUnknownObj());
-        std::pair<OdMap::iterator, bool> result = mapBlkInfo.insert(v);
+
+        // for blocks we must add to both mapBlkInfo and vBlockRequestOrder
+        std::pair<OdMap::iterator,bool> result = mapBlkInfo.insert(v);
+        if (std::find(vBlockRequestOrder.begin(), vBlockRequestOrder.end(), hash) == vBlockRequestOrder.end())
+            vBlockRequestOrder.push_back(hash);
+
         OdMap::iterator &item = result.first;
         CUnknownObj &data = item->second;
         data.obj = obj;
@@ -175,7 +186,10 @@ void CRequestManager::Received(const CInv &obj, CNode *from, int bytes)
         if (item == mapTxnInfo.end())
             return; // item has already been removed
         LogPrint("req", "ReqMgr: TX received for %s.\n", item->second.obj.ToString().c_str());
-        from->txReqLatency << (now - item->second.lastRequestTime); // keep track of response latency of this node
+        {
+            LOCK(cs_vNodes);
+            from->txReqLatency << (now - item->second.lastRequestTime);  // keep track of response latency of this node
+        }
         // will be decremented in the item cleanup: if (inFlight) inFlight--;
         cleanup(item); // remove the item
         receivedTxns += 1;
@@ -290,6 +304,7 @@ CNodeRequestData::CNodeRequestData(CNode *n)
     // Calculate how much we like this node:
 
     // Prefer thin block nodes over low latency ones when the chain is syncd
+    LOCK(cs_vNodes);
     if (node->ThinBlockCapable() && IsChainNearlySyncd())
     {
         desirability += MaxLatency;
@@ -438,15 +453,13 @@ void CRequestManager::SendRequests()
     int64_t now = 0;
 
     // TODO: if a node goes offline, rerequest txns from someone else and cleanup references right away
-    cs_objDownloader.lock();
-    if (sendBlkIter == mapBlkInfo.end())
-        sendBlkIter = mapBlkInfo.begin();
+    LOCK(cs_objDownloader);
 
-    // Modify retry interval. If we're doing IBD or if Traffic Shaping is ON we want to have a longer interval because
+    // Modify retry interval. If we're doing IBD or if Traffic Shaping is ON we want to have a longer interval because 
     // those blocks and txns can take much longer to download.
     unsigned int blkReqRetryInterval = MIN_BLK_REQUEST_RETRY_INTERVAL;
     unsigned int txReqRetryInterval = MIN_TX_REQUEST_RETRY_INTERVAL;
-    if ((!IsChainNearlySyncd() && Params().NetworkIDString() != "regtest") || IsTrafficShapingEnabled())
+    if ((!IsChainNearlySyncd() && Params().NetworkIDString() != "regtest") || IsTrafficShapingEnabled()) 
     {
         blkReqRetryInterval *= 6;
         // we want to optimise block DL during IBD (and give lots of time for shaped nodes) so push the TX retry up to 2
@@ -454,19 +467,14 @@ void CRequestManager::SendRequests()
         txReqRetryInterval *= (12 * 2);
     }
 
-    // Get Blocks if we are not in the middle of a re-org
-    while (sendBlkIter != mapBlkInfo.end() && !PV.IsReorgInProgress())
+    // Get Blocks
+    for (vector<uint256>::iterator sendBlkIter = vBlockRequestOrder.begin(); sendBlkIter != vBlockRequestOrder.end(); sendBlkIter++)
     {
         now = GetTimeMicros();
-        OdMap::iterator itemIter = sendBlkIter;
-        CUnknownObj &item = itemIter->second;
+        OdMap::iterator itemIter = mapBlkInfo.find((*sendBlkIter));
+        CUnknownObj& item = itemIter->second;
 
-        ++sendBlkIter; // move it forward up here in case we need to erase the item we are working with.
-        if (itemIter == mapBlkInfo.end())
-            break;
-
-        // if never requested then lastRequestTime==0 so this will always be true
-        if (now - item.lastRequestTime > blkReqRetryInterval)
+        if (now-item.lastRequestTime > blkReqRetryInterval)  // if never requested then lastRequestTime==0 so this will always be true
         {
             if (!item.availableFrom.empty())
             {
@@ -507,13 +515,13 @@ void CRequestManager::SendRequests()
                     }
 
                     CInv obj = item.obj;
-                    cs_objDownloader.unlock();
+                    LEAVE_CRITICAL_SECTION(cs_objDownloader);
 
                     RequestBlock(next.node, obj);
                     item.outstandingReqs++;
                     item.lastRequestTime = now;
 
-                    cs_objDownloader.lock();
+                    ENTER_CRITICAL_SECTION(cs_objDownloader);
 
                     // If you wanted to remember that this node has this data, you could push it back onto the end of
                     // the availableFrom list like this:
@@ -605,7 +613,7 @@ void CRequestManager::SendRequests()
                     {
                         if (1)
                         {
-                            cs_objDownloader.unlock();
+                            LEAVE_CRITICAL_SECTION(cs_objDownloader);
                             LOCK(next.node->cs_vSend);
                             // from->AskFor(item.obj); basically just shoves the req into mapAskFor
                             // This commented code does skips requesting TX if the node is not synced.  But the req mgr
@@ -617,7 +625,7 @@ void CRequestManager::SendRequests()
                                 item.outstandingReqs++;
                                 item.lastRequestTime = now;
                             }
-                            cs_objDownloader.lock();
+                            ENTER_CRITICAL_SECTION(cs_objDownloader);
                         }
                         {
                             LOCK(cs_vNodes);
@@ -633,8 +641,6 @@ void CRequestManager::SendRequests()
             }
         }
     }
-
-    cs_objDownloader.unlock();
 }
 
 bool CRequestManager::IsNodePingAcceptable(CNode *pfrom)
