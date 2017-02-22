@@ -63,6 +63,7 @@ std::string getLabelPublic(const CScript& scriptPubKey)
     return "";
 }
 
+
 bool isFreezeCLTV(const CKeyStore &keystore, const CScript& scriptPubKey, CScriptNum& nFreezeLockTime)
 {
 	vector<valtype> vSolutions;

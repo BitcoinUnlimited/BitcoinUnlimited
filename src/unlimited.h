@@ -160,6 +160,9 @@ extern void SendExpeditedBlock(const CBlock& block,const CNode* skip=NULL);
 extern void HandleExpeditedRequest(CDataStream& vRecv,CNode* pfrom);
 extern bool IsRecentlyExpeditedAndStore(const uint256& hash);
 
+// Returns the block height of the current active chain tip.
+extern int GetBlockchainHeight();
+
 
 extern CSemaphore*  semOutboundAddNode;
 extern std::vector<CNode*> xpeditedBlk; // Who requested expedited blocks from us
