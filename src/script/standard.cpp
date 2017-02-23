@@ -62,6 +62,7 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
 
         // LabelPublc OP_RETURN data size format small
         mTemplates.insert(make_pair(TX_LABELPUBLIC, CScript() << OP_RETURN << OP_BIGINTEGER << OP_DATA));
+
     }
 
     vSolutionsRet.clear();
@@ -150,7 +151,7 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
                 else
                     break;
             }
-            else if (opcode2 == OP_BIGINTEGER)
+            else if (opcode2 == OP_BIGINTEGER )
             {
             	try {
             		CScriptNum n(vch1, true, 5);
