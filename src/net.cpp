@@ -473,9 +473,21 @@ void CNode::CloseSocketDisconnect()
     }
 
     // in case this fails, we'll empty the recv buffer when the CNode is deleted
-    TRY_LOCK(cs_vRecvMsg, lockRecv);
-    if (lockRecv)
-        vRecvMsg.clear();
+    // in case this fails, we'll empty the recv buffer when the CNode is deleted
+    {
+        TRY_LOCK(cs_vRecvMsg, lock);
+        if (lock) {
+            vRecvMsg.clear();
+            vRecvGetData.clear();
+        }
+    }
+
+    {
+        TRY_LOCK(cs_vSend, lock);
+        if (lock) {
+            vSendMsg.clear();
+        }
+    }
 }
 
 void CNode::PushVersion()
