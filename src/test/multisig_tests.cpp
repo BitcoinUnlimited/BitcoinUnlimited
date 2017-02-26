@@ -323,6 +323,8 @@ BOOST_AUTO_TEST_CASE(multisig_Sign)
         BOOST_CHECK_MESSAGE(SignSignature(keystore, txFrom, txTo[i], 0), strprintf("SignSignature %d", i));
     }
 }
+
+#ifdef ENABLE_WALLET
 BOOST_AUTO_TEST_CASE(cltv_freeze)
 {
 
@@ -397,14 +399,12 @@ BOOST_AUTO_TEST_CASE(opreturn_send)
     string inMsg = "hello world", outMsg = "";
     CScript s = GetScriptLabelPublic(inMsg);
 
-#ifdef ENABLE_WALLET
     outMsg = getLabelPublic(s);
     BOOST_CHECK(inMsg == outMsg);
-#endif
     BOOST_CHECK(Solver(s, whichType, solutions));
     BOOST_CHECK(whichType == TX_LABELPUBLIC);
 
 
 }
-
+#endif
 BOOST_AUTO_TEST_SUITE_END()
