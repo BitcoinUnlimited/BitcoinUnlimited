@@ -378,6 +378,7 @@ BOOST_AUTO_TEST_CASE(cltv_freeze)
 
 
 }
+
 BOOST_AUTO_TEST_CASE(opreturn_send)
 {
 
@@ -396,10 +397,10 @@ BOOST_AUTO_TEST_CASE(opreturn_send)
     string inMsg = "hello world", outMsg = "";
     CScript s = GetScriptLabelPublic(inMsg);
 
+#ifdef ENABLE_WALLET
     outMsg = getLabelPublic(s);
-
     BOOST_CHECK(inMsg == outMsg);
-
+#endif
     BOOST_CHECK(Solver(s, whichType, solutions));
     BOOST_CHECK(whichType == TX_LABELPUBLIC);
 
