@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2016 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -8,10 +8,13 @@
 
 #include "base58.h"
 #include "netbase.h"
+#include "net.h"
+#include "unlimited.h"
 
 #include "test/test_bitcoin.h"
 
 #include <boost/algorithm/string.hpp>
+#include <boost/assign/list_of.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include <univalue.h>
@@ -37,7 +40,7 @@ UniValue CallRPC(string args)
     string strMethod = vArgs[0];
     vArgs.erase(vArgs.begin());
     UniValue params = RPCConvertValues(strMethod, vArgs);
-
+    BOOST_CHECK(tableRPC[strMethod]);
     rpcfn_type method = tableRPC[strMethod]->actor;
     try {
         UniValue result = (*method)(params, false);
@@ -307,6 +310,54 @@ BOOST_AUTO_TEST_CASE(rpc_ban)
     o1 = ar[0].get_obj();
     adr = find_value(o1, "address");
     BOOST_CHECK_EQUAL(adr.get_str(), "2001:4d48:ac57:400:cacf:e9ff:fe1d:9c63/128");
+}
+
+BOOST_AUTO_TEST_CASE(findlikelynode)
+{
+  CAddress addr1(CService("169.254.1.2"));
+  CNode n1(INVALID_SOCKET, addr1, "", true);
+  CAddress addr2(CService("169.254.2.3"));
+  CNode n2(INVALID_SOCKET, addr2, "", true);
+  assert(vNodes.size() == 0);
+  vNodes.push_back(&n1);
+  vNodes.push_back(&n2);
+
+  // Test prefix matching
+  BOOST_CHECK(FindLikelyNode("169.254.1.2") == &n1);
+  BOOST_CHECK(FindLikelyNode("169.254.1.2:1234") == NULL);
+  BOOST_CHECK(FindLikelyNode("169.254.1") == &n1);
+
+  // Test wildcard matching
+  BOOST_CHECK(FindLikelyNode("169.254.1*") == &n1);
+  BOOST_CHECK(FindLikelyNode("169.254.2*") == &n2);
+  BOOST_CHECK(FindLikelyNode("169.254.2.3*") == &n2);
+  BOOST_CHECK(FindLikelyNode("169.254.2.?:?") == &n2);
+  BOOST_CHECK(FindLikelyNode("169.254.1.?:*") == &n1);
+
+  vNodes.clear();
+}
+
+BOOST_AUTO_TEST_CASE(rpc_convert_values_generatetoaddress)
+{
+    UniValue result;
+
+    BOOST_CHECK_NO_THROW(result = RPCConvertValues("generatetoaddress", boost::assign::list_of("101")("mkESjLZW66TmHhiFX8MCaBjrhZ543PPh9a")));
+    BOOST_CHECK_EQUAL(result[0].get_int(), 101);
+    BOOST_CHECK_EQUAL(result[1].get_str(), "mkESjLZW66TmHhiFX8MCaBjrhZ543PPh9a");
+
+    BOOST_CHECK_NO_THROW(result = RPCConvertValues("generatetoaddress", boost::assign::list_of("101")("mhMbmE2tE9xzJYCV9aNC8jKWN31vtGrguU")));
+    BOOST_CHECK_EQUAL(result[0].get_int(), 101);
+    BOOST_CHECK_EQUAL(result[1].get_str(), "mhMbmE2tE9xzJYCV9aNC8jKWN31vtGrguU");
+
+    BOOST_CHECK_NO_THROW(result = RPCConvertValues("generatetoaddress", boost::assign::list_of("1")("mkESjLZW66TmHhiFX8MCaBjrhZ543PPh9a")("9")));
+    BOOST_CHECK_EQUAL(result[0].get_int(), 1);
+    BOOST_CHECK_EQUAL(result[1].get_str(), "mkESjLZW66TmHhiFX8MCaBjrhZ543PPh9a");
+    BOOST_CHECK_EQUAL(result[2].get_int(), 9);
+
+    BOOST_CHECK_NO_THROW(result = RPCConvertValues("generatetoaddress", boost::assign::list_of("1")("mhMbmE2tE9xzJYCV9aNC8jKWN31vtGrguU")("9")));
+    BOOST_CHECK_EQUAL(result[0].get_int(), 1);
+    BOOST_CHECK_EQUAL(result[1].get_str(), "mhMbmE2tE9xzJYCV9aNC8jKWN31vtGrguU");
+    BOOST_CHECK_EQUAL(result[2].get_int(), 9);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2015 The Bitcoin Core developers
-# Copyright (c) 2015-2016 The Bitcoin Unlimited developers
+# Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -365,9 +365,9 @@ class ExcessiveBlockTest (BitcoinTestFramework):
           self.nodes[0].set("net.excessiveBlock=2000000")
 
           wallet.sort(key=lambda x: x["amount"],reverse=True)
-          (tx, vin, vout, txid) = split_transaction(self.nodes[0],wallet[0:2000],[addrs[0]],txfeePer=60)
+          (tx, vin, vout, txid) = split_transaction(self.nodes[0],wallet[0:2500],[addrs[0]],txfeePer=60)
           logging.debug("Transaction Length is: ", len(binascii.unhexlify(tx)))
-          assert(binascii.unhexlify(tx) > 100000) # txn has to be big for the test to work
+          assert(len(binascii.unhexlify(tx)) > 100000) # txn has to be big for the test to work
 
           origCounts = [ x.getblockcount() for x in self.nodes ]
           base = origCounts[0]

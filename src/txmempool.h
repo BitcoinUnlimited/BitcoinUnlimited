@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2016 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -18,6 +18,8 @@
 #undef foreach
 #include "boost/multi_index_container.hpp"
 #include "boost/multi_index/ordered_index.hpp"
+#include <boost/thread/locks.hpp>
+#include <boost/thread/mutex.hpp>
 
 class CAutoFile;
 class CBlockIndex;
@@ -376,6 +378,7 @@ private:
 
     void trackPackageRemoved(const CFeeRate& rate);
 
+    boost::mutex cs_txPerSec;
     double nTxPerSec; //BU: tx's per second accepted into the mempool
 
 public:
@@ -556,7 +559,7 @@ public:
     // BU: begin
     double TransactionsPerSecond()
     {
-        LOCK(cs);
+        boost::mutex::scoped_lock lock(cs_txPerSec);
         return nTxPerSec;
     }
     // BU: end

@@ -88,9 +88,6 @@ uint64_t CNode::nTotalBytesSent = 0;
 CCriticalSection CNode::cs_totalBytesRecv;
 CCriticalSection CNode::cs_totalBytesSent;
 
-bool fIsChainNearlySyncd;
-CCriticalSection cs_ischainnearlysyncd;
-
 // critical sections from net.cpp
 CCriticalSection cs_setservAddNodeAddresses;
 CCriticalSection cs_vAddedNodes;
@@ -165,6 +162,9 @@ map<uint256, set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs_orphancach
 CTweakRef<unsigned int> ebTweak("net.excessiveBlock","Excessive block size in bytes", &excessiveBlockSize,&ExcessiveBlockValidator);
 CTweak<uint64_t> blockSigopsPerMb("net.excessiveSigopsPerMb","Excessive effort per block, denoted in cost (# inputs * txsize) per MB",BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
 CTweak<uint64_t> blockMiningSigopsPerMb("mining.excessiveSigopsPerMb","Excessive effort per block, denoted in cost (# inputs * txsize) per MB",BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
+CTweak<uint64_t> coinbaseReserve("mining.coinbaseReserve","How much space to reserve for the coinbase transaction, in bytes",DEFAULT_COINBASE_RESERVE_SIZE);
+CTweakRef<std::string> miningCommentTweak("mining.comment","Include text in a block's coinbase.",&minerComment);
+CTweakRef<uint64_t> miningBlockSize("mining.blockSize","Maximum block size in bytes.  The maximum block size returned from 'getblocktemplate' will be this value minus mining.coinbaseReserve.",&maxGeneratedBlock,&MiningBlockSizeValidator);
 
 CTweak<unsigned int> maxTxSize("net.excessiveTx","Largest transaction size in bytes", DEFAULT_LARGEST_TRANSACTION);
 CTweakRef<unsigned int> eadTweak("net.excessiveAcceptDepth","Excessive block chain acceptance depth in blocks", &excessiveAcceptDepth);
@@ -202,7 +202,7 @@ CTweak<uint64_t> checkScriptDays("blockchain.checkScriptDays","The number of day
 
 CRequestManager requester;  // after the maps nodes and tweaks
 
-CStatHistory<unsigned int, MinValMax<unsigned int> > txAdded; //"memPool/txAdded");
+CStatHistory<unsigned int> txAdded; //"memPool/txAdded");
 CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize; // "memPool/size",STAT_OP_AVE);
 CStatHistory<uint64_t > recvAmt; 
 CStatHistory<uint64_t > sendAmt; 

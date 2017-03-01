@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2016 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -1024,6 +1024,8 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<uint256>* pvNoSpendsRe
 // BU: begin
 void CTxMemPool::UpdateTransactionsPerSecond()
 {
+    boost::mutex::scoped_lock lock(cs_txPerSec);
+
     static int64_t nLastTime = GetTime();
     double nSecondsToAverage = 60; // Length of time in seconds to smooth the tx rate over
     int64_t nNow = GetTime();

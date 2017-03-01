@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2015 The Bitcoin Core developers
-# Copyright (c) 2015-2016 The Bitcoin Unlimited developers
+# Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -29,6 +29,20 @@ class DisableWalletTest (BitcoinTestFramework):
         assert(x['isvalid'] == False)
         x = self.nodes[0].validateaddress('mneYUmWYsuk7kySiURxCi3AGxrAqZxLgPZ')
         assert(x['isvalid'] == True)
+
+        # Checking mining to an address without a wallet
+        try:
+            self.nodes[0].generatetoaddress(1, 'mneYUmWYsuk7kySiURxCi3AGxrAqZxLgPZ')
+        except JSONRPCException as e:
+            assert("Invalid address" not in e.error['message'])
+            assert("ProcessNewBlock, block not accepted" not in e.error['message'])
+            assert("Couldn't create new block" not in e.error['message'])
+
+        try:
+            self.nodes[0].generatetoaddress(1, '3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy')
+            raise AssertionError("Must not mine to invalid address!")
+        except JSONRPCException as e:
+            assert("Invalid address" in e.error['message'])
 
 if __name__ == '__main__':
     DisableWalletTest ().main ()

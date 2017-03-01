@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2015 The Bitcoin Core developers
-# Copyright (c) 2015-2016 The Bitcoin Unlimited developers
+# Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -298,6 +298,18 @@ class WalletTest (BitcoinTestFramework):
         assert_array_result(self.nodes[1].listunspent(),
                            {"address": address_to_import},
                            {"spendable": True})
+
+        # Mine a block from node0 to an address from node1
+        cbAddr = self.nodes[1].getnewaddress()
+        blkHash = self.nodes[0].generatetoaddress(1, cbAddr)[0]
+        cbTxId = self.nodes[0].getblock(blkHash)['tx'][0]
+        self.sync_all()
+
+        # Check that the txid and balance is found by node1
+        try:
+            self.nodes[1].gettransaction(cbTxId)
+        except JSONRPCException as e:
+            assert("Invalid or non-wallet transaction id" not in e.error['message'])
 
         #check if wallet or blochchain maintenance changes the balance
         self.sync_all()

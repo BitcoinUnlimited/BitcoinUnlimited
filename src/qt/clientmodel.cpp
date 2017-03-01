@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2016 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -34,13 +34,19 @@ ClientModel::ClientModel(OptionsModel *optionsModel, UnlimitedModel* ul, QObject
     optionsModel(optionsModel),
     peerTableModel(0),
     banTableModel(0),
-    pollTimer(0)
+    pollTimer1(0),
+    pollTimer2(0)
 {
     peerTableModel = new PeerTableModel(this);
     banTableModel = new BanTableModel(this);
-    pollTimer = new QTimer(this);
-    connect(pollTimer, SIGNAL(timeout()), this, SLOT(updateTimer()));
-    pollTimer->start(MODEL_UPDATE_DELAY);
+
+    pollTimer1 = new QTimer(this);
+    connect(pollTimer1, SIGNAL(timeout()), this, SLOT(updateTimer1()));
+    pollTimer1->start(MODEL_UPDATE_DELAY1);
+
+    pollTimer2 = new QTimer(this);
+    connect(pollTimer2, SIGNAL(timeout()), this, SLOT(updateTimer2()));
+    pollTimer2->start(MODEL_UPDATE_DELAY2);
 
     subscribeToCoreSignals();
 }
@@ -95,6 +101,12 @@ long ClientModel::getMempoolSize() const
     return mempool.size();
 }
 
+long ClientModel::getOrphanPoolSize() const
+{
+    LOCK(cs_orphancache);
+    return mapOrphanTransactions.size();
+}
+
 size_t ClientModel::getMempoolDynamicUsage() const
 {
     return mempool.DynamicMemoryUsage();
@@ -118,13 +130,22 @@ double ClientModel::getVerificationProgress(const CBlockIndex *tipIn) const
     return Checkpoints::GuessVerificationProgress(Params().Checkpoints(), tip);
 }
 
-void ClientModel::updateTimer()
+void ClientModel::updateTimer1()
 {
     // no locking required at this point
     // the following calls will aquire the required lock
     Q_EMIT mempoolSizeChanged(getMempoolSize(), getMempoolDynamicUsage());
+    Q_EMIT transactionsPerSecondChanged(getTransactionsPerSecond());
+}
+
+void ClientModel::updateTimer2()
+{
+    // no locking required at this point
+    // the following calls will aquire the required lock
+    Q_EMIT orphanPoolSizeChanged(getOrphanPoolSize());
     Q_EMIT bytesChanged(getTotalBytesRecv(), getTotalBytesSent());
-    Q_EMIT transactionsPerSecondChanged(getTransactionsPerSecond()); // BU:
+
+    uiInterface.BannedListChanged();
 }
 
 void ClientModel::updateNumConnections(int numConnections)
@@ -213,7 +234,8 @@ QString ClientModel::clientName() const
 
 QString ClientModel::formatClientStartupTime() const
 {
-    return QDateTime::fromTime_t(nClientStartupTime).toString();
+    QString time_format = "MMM  d yyyy, HH:mm:ss";
+    return QDateTime::fromTime_t(nClientStartupTime).toString(time_format);
 }
 
 void ClientModel::updateBanlist()
@@ -255,13 +277,13 @@ static void BlockTipChanged(ClientModel *clientmodel, bool initialSync, const CB
 {
     // lock free async UI updates in case we have a new block tip
     // during initial sync, only update the UI if the last update
-    // was > 250ms (MODEL_UPDATE_DELAY) ago
+    // was > 250ms (MODEL_UPDATE_DELAY1) ago
     int64_t now = 0;
     if (initialSync)
         now = GetTimeMillis();
 
     // if we are in-sync, update the UI regardless of last update time
-    if (!initialSync || now - nLastBlockTipUpdateNotification > MODEL_UPDATE_DELAY) {
+    if (!initialSync || now - nLastBlockTipUpdateNotification > MODEL_UPDATE_DELAY1) {
         //pass a async signal to the UI thread
         QMetaObject::invokeMethod(clientmodel, "numBlocksChanged", Qt::QueuedConnection,
                                   Q_ARG(int, pIndex->nHeight),

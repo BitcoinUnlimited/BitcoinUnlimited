@@ -1,5 +1,5 @@
 // Copyright (c) 2015 G. Andrew Stone
-// Copyright (c) 2016 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #pragma once
@@ -20,9 +20,10 @@
 enum {
     TYPICAL_BLOCK_SIZE = 200000,   // used for initial buffer size
     DEFAULT_MAX_GENERATED_BLOCK_SIZE = 1000000,  // default for the maximum size of mined blocks
-    DEFAULT_EXCESSIVE_ACCEPT_DEPTH = 4,
+    DEFAULT_EXCESSIVE_ACCEPT_DEPTH = 12,  // Default is 12 to make it very expensive for a minority hash power to get lucky, and potentially drive a block that the rest of the network sees as "excessive" onto the blockchain.
     DEFAULT_EXCESSIVE_BLOCK_SIZE = 16000000,
     DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER = 16,    // Allowed messages lengths will be this * the excessive block size
+    DEFAULT_COINBASE_RESERVE_SIZE = 1000,
     MAX_COINBASE_SCRIPTSIG_SIZE = 100,
     EXCESSIVE_BLOCK_CHAIN_RESET = 6*24,  // After 1 day of non-excessive blocks, reset the checker
     DEFAULT_CHECKPOINT_DAYS = 30,  // Default for the number of days in the past we check scripts during initial block download
@@ -68,8 +69,10 @@ extern CTweak<uint64_t> checkScriptDays;
 int32_t UnlimitedComputeBlockVersion(const CBlockIndex* pindexPrev, const Consensus::Params& params,uint32_t nTime);
 
 // This API finds a near match to the specified IP address, for example you can
-// leave the port off and it will find the first match to that IP.  This is
-// useful for the RPC calls.
+// leave the port off and it will find the first match to the IP.
+// The function also allows * or ? wildcards.
+// This is useful for the RPC calls.
+// Returns the first node that matches.
 CNode* FindLikelyNode(const std::string& addrName);
 
 // process incoming unsolicited block
@@ -100,6 +103,18 @@ extern int isChainExcessive(const CBlockIndex* blk, unsigned int checkDepth = ex
 
 // Check whether any block N back in this chain is an excessive block
 extern int chainContainsExcessive(const CBlockIndex* blk, unsigned int goBack=0);
+
+//// Internal CPU miner
+
+static const bool DEFAULT_GENERATE = false;
+static const int DEFAULT_GENERATE_THREADS = 1;
+
+// Run the miner threads
+extern void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams& chainparams);
+
+// Internal CPU miner RPC calls
+extern UniValue getgenerate(const UniValue& params, bool fHelp);
+extern UniValue setgenerate(const UniValue& params, bool fHelp);
 
 // RPC calls
 
@@ -141,12 +156,13 @@ extern CLeakyBucket sendShaper;
 // Test to determine if traffic shaping is enabled
 extern bool IsTrafficShapingEnabled();
 
-extern bool fIsChainNearlySyncd;
-extern CCriticalSection cs_ischainnearlysyncd;
+// Check whether we are doing an initial block download (synchronizing from disk or network)
+extern bool IsInitialBlockDownload();
+extern void IsInitialBlockDownloadInit();
 
+// Check whether we are nearly sync'd.  Used primarily to determine whether an xthin can be retrieved.
 extern bool IsChainNearlySyncd();
 extern void IsChainNearlySyncdInit();
-extern bool fIsChainNearlySyncd;
 extern uint64_t LargestBlockSeen(uint64_t nBlockSize = 0);
 extern void LoadFilter(CNode *pfrom, CBloomFilter *filter);
 extern void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, CBlock &block, const CInv &inv);
@@ -185,16 +201,18 @@ void UpdateSendStats(CNode* pfrom, const char* strCommand, int msgSize, int64_t 
 
 void UpdateRecvStats(CNode* pfrom, const std::string& strCommand, int msgSize, int64_t nTimeReceived);
 // txn mempool statistics
-extern CStatHistory<unsigned int, MinValMax<unsigned int> > txAdded;
+extern CStatHistory<unsigned int> txAdded;
 extern CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize;
 
 // Configuration variable validators
 std::string ExcessiveBlockValidator(const unsigned int& value,unsigned int* item,bool validate);
 std::string OutboundConnectionValidator(const int& value,int* item,bool validate);
 std::string SubverValidator(const std::string& value,std::string* item,bool validate);
+std::string MiningBlockSizeValidator(const uint64_t& value,uint64_t* item,bool validate);
 
 extern CTweak<unsigned int> maxTxSize;
 extern CTweak<uint64_t> blockSigopsPerMb;
+extern CTweak<uint64_t> coinbaseReserve;
 extern CTweak<uint64_t> blockMiningSigopsPerMb;
 
 // Protocol changes:
