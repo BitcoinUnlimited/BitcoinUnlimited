@@ -10,6 +10,7 @@
 #include "script/script_error.h"
 #include "script/interpreter.h"
 #include "script/sign.h"
+#include "script/ismine.h"
 #include "uint256.h"
 #include "test/test_bitcoin.h"
 #include "chain.h" // Freeze CBlockIndex
@@ -17,7 +18,6 @@
 
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"  // Freeze wallet test
-#include "wallet/wallet_ismine.h"
 #endif
 
 #include <boost/foreach.hpp>

@@ -1819,23 +1819,6 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
     return nSubsidy;
 }
 
-bool IsInitialBlockDownload()
-{
-    const CChainParams& chainParams = Params();
-    LOCK(cs_main);
-    if (fImporting || fReindex)
-        return true;
-    if (fCheckpointsEnabled && chainActive.Height() < Checkpoints::GetTotalBlocksEstimate(chainParams.Checkpoints()))
-        return true;
-    static bool lockIBDState = false;
-    if (lockIBDState)
-        return false;
-    bool state = (chainActive.Height() < pindexBestHeader->nHeight - 24 * 6 ||
-            pindexBestHeader->GetBlockTime() < GetTime() - chainParams.MaxTipAge());
-    if (!state)
-        lockIBDState = true;
-    return state;
-}
 
 bool fLargeWorkForkFound = false;
 bool fLargeWorkInvalidChainFound = false;
@@ -3228,6 +3211,7 @@ bool ActivateBestChain(CValidationState &state, const CChainParams& chainparams,
 
             pindexNewTip = chainActive.Tip();
             pindexFork = chainActive.FindFork(pindexOldTip);
+            IsInitialBlockDownloadInit(); // update status after each block is processed.
             fInitialDownload = IsInitialBlockDownload();
         }
         // When we reach this point, we switched to a new tip (stored in pindexNewTip).
@@ -4244,6 +4228,11 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
         uiInterface.ShowProgress(_("Verifying blocks..."), std::max(1, std::min(99, (int)(((double)(chainActive.Height() - pindex->nHeight)) / (double)nCheckDepth * (nCheckLevel >= 4 ? 50 : 100)))));
         if (pindex->nHeight < chainActive.Height()-nCheckDepth)
             break;
+        if (fPruneMode && !(pindex->nStatus & BLOCK_HAVE_DATA)) {
+            // If pruning, only go back as far as we have data.
+            LogPrintf("VerifyDB(): block verification stopping at height %d (pruning, no data)\n", pindex->nHeight);
+            break;
+        }
         CBlock block;
         // check level 0: read from disk
         if (!ReadBlockFromDisk(block, pindex, chainparams.GetConsensus()))
@@ -5264,20 +5253,26 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
             if (inv.type == MSG_BLOCK) {
                 UpdateBlockAvailability(pfrom->GetId(), inv.hash);
-                if (!fAlreadyHave && !fImporting && !fReindex) {  // BU request manager keeps track of all sources so no need for: && !mapBlocksInFlight.count(inv.hash)) {
+                // RE !IsInitialBlockDownload(): We do not want to get the block if the system is executing the initial block download because
+                // blocks are stored in block files in the order of arrival.  So grabbing blocks "early" will cause new blocks to be sprinkled
+                // throughout older block files.  This will stop those files from being pruned.   !IsInitialBlockDownload() can be removed if
+                // a better block storage system is devised.
+                if ((!fAlreadyHave && !fImporting && !fReindex && !IsInitialBlockDownload()) ||
+                    (!fAlreadyHave && !fImporting && !fReindex && Params().NetworkIDString() == "regtest")) {  // BU request && !mapBlocksInFlight.count(inv.hash)) {
 		    requester.AskFor(inv, pfrom);
                 }
-                else
-		  {
+                else {
 		    LogPrint("net", "skipping request of block %s.  already have: %d  importing: %d  reindex: %d  isChainNearlySyncd: %d\n",inv.hash.ToString(),fAlreadyHave,fImporting,fReindex,IsChainNearlySyncd());
-		  }
+		}
             }
             else
             {
                 if (fBlocksOnly)
                     LogPrint("net", "transaction (%s) inv sent in violation of protocol peer=%d\n", inv.hash.ToString(), pfrom->id);
-                else if (!fAlreadyHave && !fImporting && !fReindex) // BU removed && !IsInitialBlockDownload())
-                  requester.AskFor(inv,pfrom); // BU manage outgoing requests.  was: pfrom->AskFor(inv);
+                // RE !IsInitialBlockDownload(): during IBD, its a waste of bandwidth to grab transactions, they will likely be included
+                // in blocks that we IBD download anyway.  This is especially important as transaction volumes increase.
+                else if (!fAlreadyHave && !fImporting && !fReindex && !IsInitialBlockDownload())
+                    requester.AskFor(inv,pfrom); // BU manage outgoing requests.  was: pfrom->AskFor(inv);
             }
 
             // Track requests for our stuff
@@ -5365,12 +5360,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         uint256 hashStop;
         vRecv >> locator >> hashStop;
 
-        LOCK(cs_main);
         if (IsInitialBlockDownload() && !pfrom->fWhitelisted) {
             LogPrint("net", "Ignoring getheaders from peer=%d because node is in initial block download\n", pfrom->id);
             return true;
         }
 
+        LOCK(cs_main);
         CNodeState *nodestate = State(pfrom->GetId());
         CBlockIndex* pindex = NULL;
         if (locator.IsNull())
@@ -5655,6 +5650,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         CheckBlockIndex(chainparams.GetConsensus());
 
         IsChainNearlySyncdInit(); // BUIP010 XTHIN
+        IsInitialBlockDownloadInit();
     }
 
     // BUIP010 Xtreme Thinblocks: begin section
@@ -6259,7 +6255,8 @@ bool ProcessMessages(CNode* pfrom)
 
         // Scan for message start
         if (memcmp(msg.hdr.pchMessageStart, chainparams.MessageStart(), MESSAGE_START_SIZE) != 0) {
-            LogPrintf("PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%d\n", SanitizeString(msg.hdr.GetCommand()), pfrom->id);
+            LogPrintf("PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%d ip=%s\n", SanitizeString(msg.hdr.GetCommand()), pfrom->id, pfrom->addrName.c_str());
+            CNode::Ban(pfrom->addr, BanReasonNodeMisbehaving, 4*60*60); // ban for 4 hours
             fOk = false;
             break;
         }

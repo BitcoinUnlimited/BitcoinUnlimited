@@ -508,6 +508,7 @@ void CNode::ClearBanned()
     LOCK(cs_setBanned);
     setBanned.clear();
     setBannedIsDirty = true;
+    uiInterface.BannedListChanged();
 }
 
 bool CNode::IsBanned(CNetAddr ip)
@@ -563,6 +564,7 @@ void CNode::Ban(const CSubNet& subNet, const BanReason &banReason, int64_t banti
         setBanned[subNet] = banEntry;
 
     setBannedIsDirty = true;
+    uiInterface.BannedListChanged();
 }
 
 bool CNode::Unban(const CNetAddr &addr) {
@@ -575,6 +577,9 @@ bool CNode::Unban(const CSubNet &subNet) {
     if (setBanned.erase(subNet))
     {
         setBannedIsDirty = true;
+
+        SweepBanned();
+        uiInterface.BannedListChanged();
         return true;
     }
     return false;
@@ -583,6 +588,7 @@ bool CNode::Unban(const CSubNet &subNet) {
 void CNode::GetBanned(banmap_t &banMap)
 {
     LOCK(cs_setBanned);
+    SweepBanned();
     banMap = setBanned; //create a thread safe copy
 }
 
@@ -820,7 +826,10 @@ int SocketSendData(CNode* pnode)
         int amt2Send = min((int64_t)(data.size() - pnode->nSendOffset), sendShaper.available(SEND_SHAPER_MIN_FRAG));
         if (amt2Send == 0)
             break;
-        int nBytes = send(pnode->hSocket, &data[pnode->nSendOffset], amt2Send, MSG_NOSIGNAL | MSG_DONTWAIT);
+        SOCKET hSocket = pnode->hSocket;  
+        if (hSocket == INVALID_SOCKET)
+            break;        
+        int nBytes = send(hSocket, &data[pnode->nSendOffset], amt2Send, MSG_NOSIGNAL | MSG_DONTWAIT);
         if (nBytes > 0) {
             progress++;  // BU
             pnode->bytesSent += nBytes;  // BU stats
@@ -846,8 +855,8 @@ int SocketSendData(CNode* pnode)
                 // error
                 int nErr = WSAGetLastError();
                 if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS) {
-		  LogPrintf("socket send error '%s' to %s (%d)\n", NetworkErrorString(nErr),pnode->addrName.c_str(),pnode->id);
-                    pnode->CloseSocketDisconnect();
+                    LogPrintf("socket send error '%s' to %s (%d)\n", NetworkErrorString(nErr), pnode->addrName.c_str(), pnode->id);
+                    pnode->fDisconnect = true;
                 }
             }
             // couldn't send anything at all
@@ -1421,7 +1430,7 @@ void ThreadSocketHandler()
                         if (nBytes > 0) {
                             receiveShaper.leak(nBytes);
                             if (!pnode->ReceiveMsgBytes(recvMsgBuf, nBytes))
-                                pnode->CloseSocketDisconnect();
+                                pnode->fDisconnect = true;
                             int64_t tmp = GetTime();
                             pnode->recvGap << (tmp - pnode->nLastRecv);
                             pnode->nLastRecv = tmp;
@@ -1431,15 +1440,15 @@ void ThreadSocketHandler()
                         } else if (nBytes == 0) {
                             // socket closed gracefully
                             if (!pnode->fDisconnect)
-			      LogPrint("net", "Node %s socket closed\n",pnode->addrName.c_str());
-                            pnode->CloseSocketDisconnect();
+                                LogPrint("net", "Node %s socket closed\n", pnode->addrName.c_str());
+                            pnode->fDisconnect = true;
                         } else if (nBytes < 0) {
                             // error
                             int nErr = WSAGetLastError();
                             if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS) {
                                 if (!pnode->fDisconnect)
-				  LogPrintf("Node %s socket recv error '%s'\n", pnode->addrName.c_str(), NetworkErrorString(nErr));
-                                pnode->CloseSocketDisconnect();
+                                    LogPrintf("Node %s socket recv error '%s'\n", pnode->addrName.c_str(), NetworkErrorString(nErr));
+                                pnode->fDisconnect = true;
                             }
                         }
                     }
@@ -1720,6 +1729,19 @@ void DumpAddresses()
     adb.Write(addrman);
 
     LogPrint("net", "Flushed %d addresses to peers.dat  %dms\n", addrman.size(), GetTimeMillis() - nStart);
+}
+
+void DumpBanlist()
+{
+    int64_t nStart = GetTimeMillis();
+
+    CBanDB bandb;
+    banmap_t banmap;
+    CNode::GetBanned(banmap);
+    bandb.Write(banmap);
+
+    LogPrint("net", "Flushed %d banned node ips/subnets to banlist.dat  %dms\n",
+             banmap.size(), GetTimeMillis() - nStart);
 }
 
 void DumpData()
@@ -2031,7 +2053,7 @@ void ThreadMessageHandler()
                 TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
                 if (lockRecv) {
                     if (!g_signals.ProcessMessages(pnode))
-                        pnode->CloseSocketDisconnect();
+                        pnode->fDisconnect = true;
 
                     if (pnode->nSendSize < SendBufferSize()) {
                         if (!pnode->vRecvGetData.empty() || (!pnode->vRecvMsg.empty() && pnode->vRecvMsg[0].complete())) {
@@ -2973,21 +2995,6 @@ bool CBanDB::Read(banmap_t& banSet)
     }
     
     return true;
-}
-
-void DumpBanlist()
-{
-    int64_t nStart = GetTimeMillis();
-
-    CNode::SweepBanned(); //clean unused entries (if bantime has expired)
-
-    CBanDB bandb;
-    banmap_t banmap;
-    CNode::GetBanned(banmap);
-    bandb.Write(banmap);
-
-    LogPrint("net", "Flushed %d banned node ips/subnets to banlist.dat  %dms\n",
-             banmap.size(), GetTimeMillis() - nStart);
 }
 
 int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds) {

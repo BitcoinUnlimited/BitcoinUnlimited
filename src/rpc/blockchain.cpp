@@ -636,7 +636,7 @@ UniValue getblockchaininfo(const UniValue& params, bool fHelp)
             "  \"verificationprogress\": xxxx, (numeric) estimate of verification progress [0..1]\n"
             "  \"chainwork\": \"xxxx\"     (string) total amount of work in active chain, in hexadecimal\n"
             "  \"pruned\": xx,             (boolean) if the blocks are subject to pruning\n"
-            "  \"pruneheight\": xxxxxx,    (numeric) heighest block available\n"
+            "  \"pruneheight\": xxxxxx,    (numeric) lowest-height complete block stored\n"
             "  \"softforks\": [            (array) status of softforks in progress\n"
             "     {\n"
             "        \"id\": \"xxxx\",        (string) name of softfork\n"
@@ -925,4 +925,32 @@ UniValue reconsiderblock(const UniValue& params, bool fHelp)
     }
 
     return NullUniValue;
+}
+
+static const CRPCCommand commands[] =
+{ //  category              name                      actor (function)         okSafeMode
+  //  --------------------- ------------------------  -----------------------  ----------
+    { "blockchain",         "getblockchaininfo",      &getblockchaininfo,      true  },
+    { "blockchain",         "getbestblockhash",       &getbestblockhash,       true  },
+    { "blockchain",         "getblockcount",          &getblockcount,          true  },
+    { "blockchain",         "getblock",               &getblock,               true  },
+    { "blockchain",         "getblockhash",           &getblockhash,           true  },
+    { "blockchain",         "getblockheader",         &getblockheader,         true  },
+    { "blockchain",         "getchaintips",           &getchaintips,           true  },
+    { "blockchain",         "getdifficulty",          &getdifficulty,          true  },
+    { "blockchain",         "getmempoolinfo",         &getmempoolinfo,         true  },
+    { "blockchain",         "getrawmempool",          &getrawmempool,          true  },
+    { "blockchain",         "gettxout",               &gettxout,               true  },
+    { "blockchain",         "gettxoutsetinfo",        &gettxoutsetinfo,        true  },
+    { "blockchain",         "verifychain",            &verifychain,            true  },
+
+    /* Not shown in help */
+    { "hidden",             "invalidateblock",        &invalidateblock,        true  },
+    { "hidden",             "reconsiderblock",        &reconsiderblock,        true  },
+};
+
+void RegisterBlockchainRPCCommands(CRPCTable &tableRPC)
+{
+    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
+        tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
 }

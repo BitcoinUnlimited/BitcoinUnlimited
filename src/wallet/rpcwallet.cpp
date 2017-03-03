@@ -2511,7 +2511,7 @@ extern UniValue importwallet(const UniValue& params, bool fHelp);
 extern UniValue importprunedfunds(const UniValue& params, bool fHelp);
 extern UniValue removeprunedfunds(const UniValue& params, bool fHelp);
 
-const CRPCCommand vWalletRPCCommands[] =
+static const CRPCCommand commands[] =
 { //  category              name                        actor (function)           okSafeMode
     //  --------------------- ------------------------    -----------------------    ----------
     { "rawtransactions",    "fundrawtransaction",       &fundrawtransaction,       false },
@@ -2561,14 +2561,8 @@ const CRPCCommand vWalletRPCCommands[] =
     { "wallet",             "removeprunedfunds",        &removeprunedfunds,        true  },
 };
 
-void walletRegisterRPCCommands()
+void RegisterWalletRPCCommands(CRPCTable &tableRPC)
 {
-    unsigned int vcidx;
-    for (vcidx = 0; vcidx < ARRAYLEN(vWalletRPCCommands); vcidx++)
-    {
-        const CRPCCommand *pcmd;
-
-        pcmd = &vWalletRPCCommands[vcidx];
-        tableRPC.appendCommand(pcmd->name, pcmd);
-    }
+    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
+        tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
 }

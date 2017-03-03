@@ -104,6 +104,18 @@ extern int isChainExcessive(const CBlockIndex* blk, unsigned int checkDepth = ex
 // Check whether any block N back in this chain is an excessive block
 extern int chainContainsExcessive(const CBlockIndex* blk, unsigned int goBack=0);
 
+//// Internal CPU miner
+
+static const bool DEFAULT_GENERATE = false;
+static const int DEFAULT_GENERATE_THREADS = 1;
+
+// Run the miner threads
+extern void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams& chainparams);
+
+// Internal CPU miner RPC calls
+extern UniValue getgenerate(const UniValue& params, bool fHelp);
+extern UniValue setgenerate(const UniValue& params, bool fHelp);
+
 // RPC calls
 
 // RPC Get a particular tweak
@@ -144,12 +156,13 @@ extern CLeakyBucket sendShaper;
 // Test to determine if traffic shaping is enabled
 extern bool IsTrafficShapingEnabled();
 
-extern bool fIsChainNearlySyncd;
-extern CCriticalSection cs_ischainnearlysyncd;
+// Check whether we are doing an initial block download (synchronizing from disk or network)
+extern bool IsInitialBlockDownload();
+extern void IsInitialBlockDownloadInit();
 
+// Check whether we are nearly sync'd.  Used primarily to determine whether an xthin can be retrieved.
 extern bool IsChainNearlySyncd();
 extern void IsChainNearlySyncdInit();
-extern bool fIsChainNearlySyncd;
 extern uint64_t LargestBlockSeen(uint64_t nBlockSize = 0);
 extern void LoadFilter(CNode *pfrom, CBloomFilter *filter);
 extern void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, CBlock &block, const CInv &inv);
@@ -188,7 +201,7 @@ void UpdateSendStats(CNode* pfrom, const char* strCommand, int msgSize, int64_t 
 
 void UpdateRecvStats(CNode* pfrom, const std::string& strCommand, int msgSize, int64_t nTimeReceived);
 // txn mempool statistics
-extern CStatHistory<unsigned int, MinValMax<unsigned int> > txAdded;
+extern CStatHistory<unsigned int> txAdded;
 extern CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize;
 
 // Configuration variable validators
