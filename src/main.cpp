@@ -3221,6 +3221,28 @@ static void PruneBlockIndexCandidates() {
     assert(!setBlockIndexCandidates.empty());
 }
 
+static void NotifyHeaderTip() {
+    bool fNotify = false;
+    bool fInitialBlockDownload = false;
+    static CBlockIndex* pindexHeaderOld = NULL;
+    CBlockIndex* pindexHeader = NULL;
+    {
+        LOCK(cs_main);
+        if (!setBlockIndexCandidates.empty()) {
+            pindexHeader = *setBlockIndexCandidates.rbegin();
+        }
+        if (pindexHeader != pindexHeaderOld) {
+            fNotify = true;
+            fInitialBlockDownload = IsInitialBlockDownload();
+            pindexHeaderOld = pindexHeader;
+        }
+    }
+    // Send block tip changed notifications without cs_main
+    if (fNotify) {
+        uiInterface.NotifyHeaderTip(fInitialBlockDownload, pindexHeader);
+    }
+}
+
 /**
  * Try to make some progress towards making pindexMostWork the active block.
  * pblock is either NULL or a pointer to a CBlock corresponding to pindexMostWork.
@@ -3360,28 +3382,6 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
         CheckForkWarningConditions();
 
     return true;
-}
-
-static void NotifyHeaderTip() {
-    bool fNotify = false;
-    bool fInitialBlockDownload = false;
-    static CBlockIndex* pindexHeaderOld = NULL;
-    CBlockIndex* pindexHeader = NULL;
-    {
-        LOCK(cs_main);
-        if (!setBlockIndexCandidates.empty()) {
-            pindexHeader = *setBlockIndexCandidates.rbegin();
-        }
-        if (pindexHeader != pindexHeaderOld) {
-            fNotify = true;
-            fInitialBlockDownload = IsInitialBlockDownload();
-            pindexHeaderOld = pindexHeader;
-        }
-    }
-    // Send block tip changed notifications without cs_main
-    if (fNotify) {
-        uiInterface.NotifyHeaderTip(fInitialBlockDownload, pindexHeader);
-    }
 }
 
 /**
@@ -4066,8 +4066,8 @@ bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, c
     LogPrint("thin", "Processing new block %s from peer %s (%d).\n", pblock->GetHash().ToString(), pfrom ? pfrom->addrName.c_str():"myself",pfrom ? pfrom->id: 0);
     // Preliminary checks
     if (!CheckBlockHeader(*pblock, state, true)) { // block header is bad
-	  // demerit the sender
-	  return error("%s: CheckBlockHeader FAILED", __func__);
+        // demerit the sender
+        return error("%s: CheckBlockHeader FAILED", __func__);
     }
     if (IsChainNearlySyncd()) SendExpeditedBlock(*pblock,pfrom);
 
@@ -4097,8 +4097,6 @@ bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, c
             return error("%s: AcceptBlock FAILED", __func__);
         }
     }
-
-    NotifyHeaderTip();
 
     if (!ActivateBestChain(state, chainparams, pblock, fParallel)) {
         if (state.IsInvalid() || state.IsError())
@@ -4651,7 +4649,7 @@ bool LoadExternalBlockFile(const CChainParams& chainparams, FILE* fileIn, CDiskB
             blkdat.SetPos(nRewind);
             nRewind++; // start one byte further next time, in case of failure
             blkdat.SetLimit(); // remove former limit
-            unsigned int nSize = 0;  
+            unsigned int nSize = 0;
             try {
                 // locate a header
                 unsigned char buf[MESSAGE_START_SIZE];
@@ -4663,14 +4661,14 @@ bool LoadExternalBlockFile(const CChainParams& chainparams, FILE* fileIn, CDiskB
                 // read size
                 blkdat >> nSize; // BU NOTE: if we ever get to 4GB blocks the block size data structure will overflow since this is defined as unsigned int (32 bits)
                 if (nSize < 80) // BU allow variable block size || nSize > BU_MAX_BLOCK_SIZE)
-		  {
+                {
                     LogPrint("reindex","Reindex error: Short block: %d\n", nSize);
                     continue;
-		  }
+                }
                 if (nSize > 256*1024*1024)
-		  {
-                  LogPrint("reindex","Reindex warning: Gigantic block: %d\n", nSize);
-		  }
+                {
+                    LogPrint("reindex","Reindex warning: Gigantic block: %d\n", nSize);
+                }
                 blkdat.GrowTo(2*(nSize+MESSAGE_START_SIZE+sizeof(unsigned int)));
             } catch (const std::exception&) {
                 // no valid block header found; don't complain
