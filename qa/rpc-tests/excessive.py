@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
-# Copyright (c) 2014-2015 The Bitcoin Core developers
 # Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
-# Exercise the getchaintips API.  We introduce a network split, work
-# on chains of different lengths, and join the network together again.
-# This gives us two tips, verify that it works.
-#from signal import signal, SIGPIPE, SIG_DFL
-#signal(SIGPIPE,SIG_DFL)
 
 import time
 import random

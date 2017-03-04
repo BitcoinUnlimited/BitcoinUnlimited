@@ -1973,11 +1973,11 @@ bool CWallet::SelectCoinsBU(const CAmount& nTargetValue, std::set<std::pair<cons
     }
 
   TxoGroup g;
-  g =  CoinSelection(available, tgtValue);
+  g =  CoinSelection(available, tgtValue,::minRelayTxFee.GetFee(100));  // 100 is about half of a normal transaction, so overpay the fee by about half to avoid change
   if ((!filled)&&(g.first == 0)) // Ok no solution was found.  So let's regenerate the TXOs and try again.
     {  
       FillAvailableCoins(coinControl);
-      g =  CoinSelection(available, tgtValue);
+      g =  CoinSelection(available, tgtValue,::minRelayTxFee.GetFee(100));
     }
   if (g.first == 0 ) return false;  // no solution found
   

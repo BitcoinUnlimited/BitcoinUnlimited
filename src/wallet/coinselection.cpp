@@ -100,7 +100,7 @@ bool validate(const TxoGroup& grp,const CAmount targetValue)
 }
 
 // Select coins.
-TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetValue)
+TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetValue,const CAmount &dust)
 {
   SpendableTxos::iterator aEnd = available.end();
   TxoGroupMap solutions;
@@ -110,7 +110,11 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
   SpendableTxos::iterator large;
   large = available.lower_bound(targetValue);         // Find the elem nearest the target but greater or =
   if (large == aEnd) // The amount is bigger than our biggest output.  We'll create a simple solution from a set of our biggest outputs.
-    { 
+    {
+      if (large == available.begin())  // beginning == ending, there is nothing
+        {
+          return TxoGroup(0,TxoItVec());
+        }
       --large;
       SpendableTxos::iterator i = large;
       CAmount total = large->first;
@@ -195,8 +199,33 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
 
   // Let's see what solutions we found.
   TxoGroupMap::iterator i = solutions.begin();
-  while ((i != solutions.end()) && !validate(i->second,targetValue)) ++i;  // some bad solutions can occur (repeated elements), it is more efficient to eliminate them here than inside the loops
+  done=false;
+  TxoGroupMap::iterator end = solutions.end();
+  TxoGroupMap::iterator singleIn = end;
+  TxoGroupMap::iterator noChange = end;
+  int noChangeCount = 0;
+  TxoGroupMap::iterator multiIn = end;
+  int multiInCount = 0;
+  for(i=solutions.begin(); (i != end) && !done; ++i)
+    {
+      if (!validate(i->second,targetValue)) continue;  // some bad solutions can occur (repeated elements), it is more efficient to eliminate them here than inside the loops
+      int ntxo = i->second.second.size();
+      if (ntxo == 1) singleIn = i; // ok this solution works but does not reduce the utxo set
+      if ((i->first - targetValue <= dust)&&(ntxo > noChangeCount)) // look for a solution that won't need to pay change.
+        {
+          noChange = i;
+          noChangeCount = ntxo;
+          LogPrint("wallet","CoinSelection found a nochange solution\n");
+        }
+      if ((ntxo > 1)&&(ntxo > multiInCount)) { multiIn = i; multiInCount = ntxo; }
+    }
+
+  if (noChange != end) i = noChange;  // prefer the best no change solution
+  else if (multiIn != end) i = multiIn;    // or pick one the reduces the UTXO
+  else i = singleIn;  // ok take whatever I can get
+
   LogPrint("wallet","CoinSelection returns %d choices. Target: %d, found: %d, txos: %d\n", solutions.size(), targetValue, i->first, i->second.second.size());
+  
   if (i == solutions.end())
     {
       return TxoGroup(0,TxoItVec());

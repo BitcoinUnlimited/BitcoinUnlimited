@@ -9,6 +9,7 @@
 # Add python-bitcoinrpc to module search path:
 import os
 import sys
+import pdb        # BU added
 import time       # BU added
 import random     # BU added
 import shutil
@@ -87,6 +88,14 @@ class BitcoinTestFramework(object):
         wait_bitcoinds()
         self.setup_network(True)
 
+    def sync_mempools(self):
+        """synchronizes all unconfirmed transactions"""
+        if self.is_network_split:
+            sync_mempools(self.nodes[:2])
+            sync_mempools(self.nodes[2:])
+        else:
+            sync_mempools(self.nodes)
+            
     def sync_all(self):
         """Synchronizes blocks and mempools"""
         if self.is_network_split:
@@ -194,7 +203,7 @@ class BitcoinTestFramework(object):
         except Exception as e:
             print("Unexpected exception caught during testing: " + repr(e))
             traceback.print_tb(sys.exc_info()[2])
-
+            pdb.pm()
         if not self.options.noshutdown:
             print("Stopping nodes")
             stop_nodes(self.nodes)

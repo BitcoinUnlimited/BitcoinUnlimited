@@ -441,7 +441,9 @@ struct TxoIterLess // : binary_function <T,T,bool>
 typedef std::set<SpendableTxos::iterator,TxoIterLess> TxoItVec;
 typedef std::pair<CAmount, TxoItVec > TxoGroup;  // A set of coins and how much they sum to.
 
-extern TxoGroup CoinSelection(/* const */ SpendableTxos& available, const CAmount targetValue);
+// Select a group of UTXOs that sum up to above targetvalue.  The best choice is to be within dust of targetValue because
+// that will mean that I do not create any change.
+extern TxoGroup CoinSelection(/* const */ SpendableTxos& available, const CAmount targetValue,const CAmount &dust);
 
 
 /** Private key that includes an expiration date in case it never gets used. */
