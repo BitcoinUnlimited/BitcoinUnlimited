@@ -2348,7 +2348,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 
 		    // Remove scriptSigs if we used dummy signatures for fee calculation
 		    if (!sign) {
-		        BOOST_FOREACH (CTxIn& vin, txNew.vin)
+		      BOOST_FOREACH (CTxIn& vin, txNew.vin)
                         vin.scriptSig = CScript();
 		    }
 		    // Embed the constructed transaction data in wtxNew.

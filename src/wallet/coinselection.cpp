@@ -225,7 +225,6 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
   else i = singleIn;  // ok take whatever I can get
 
   LogPrint("wallet","CoinSelection returns %d choices. Target: %d, found: %d, txos: %d\n", solutions.size(), targetValue, i->first, i->second.second.size());
-  
   if (i == solutions.end())
     {
       return TxoGroup(0,TxoItVec());
