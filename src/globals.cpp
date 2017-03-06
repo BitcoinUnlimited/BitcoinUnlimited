@@ -188,6 +188,9 @@ CTweak<unsigned int> maxBlocksInTransitPerPeer("net.maxBlocksInTransitPerPeer","
  *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
 CTweak<unsigned int> blockDownloadWindow("net.blockDownloadWindow","How far ahead of our current height do we fetch? 0 means use algorithm.",0);
 
+CTweak<unsigned int> txDust("wallet.txFeeOverpay","If transactions overpay by less than this amount in Satoshis, the extra will be put in the fee rather than a change address.  Zero means calculate this dynamically as a fraction of the current transaction fee (recommended).", 0);
+
+
 /** This is the initial size of CFileBuffer's RAM buffer during reindex.  A 
 larger size will result in a tiny bit better performance if blocks are that 
 size.

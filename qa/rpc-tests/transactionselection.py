@@ -76,13 +76,15 @@ class TransactionSelectionTest (BitcoinTestFramework):
         self.nodes[0].generate(1)
         self.sync_all()
 
-    def randomUseTest(self):
+    def randomUseTest(self, count=10):
         self.nodes[0].generate(20)
         self.sync_all()
         self.nodes[1].generate(120)
         self.sync_all()
         print("random use test")
-        for j in range(1,1000):
+        self.nodes[1].set("wallet.txFeeOverpay=20000")
+        self.nodes[0].set("wallet.txFeeOverpay=1000")
+        for j in range(1,count):
             a = [x.getnewaddress() for x in self.nodes ]
             for i in range(0,20):
                for n in self.nodes:
@@ -104,8 +106,11 @@ class TransactionSelectionTest (BitcoinTestFramework):
         
         
     def run_test(self):
+        if repTest:
+           self.randomUseTest(10000)
+           return
+        
         self.nodes[0].generate(101)  # mine enough BTC to get 1 spendable block
-        self.randomUseTest()
         a0 = self.nodes[0].getnewaddress()
         a1 = self.nodes[1].getnewaddress()
         print ("Node 0 BTC address", a0)
@@ -159,6 +164,8 @@ class TransactionSelectionTest (BitcoinTestFramework):
 
         wallet2 = self.nodes[1].listunspent()
 
+        self.randomUseTest()
+
         pdb.set_trace()
         print("done")
         
@@ -168,6 +175,13 @@ bitcoinConf = {
     }
     
 if __name__ == '__main__':  
+    if "--rep" in sys.argv:
+      repTest=True
+      sys.argv.remove("--rep")
+      logging.info("Running repetitive tests")
+    else:
+      repTest=False
+
     if "--extended" in sys.argv:
       longTest=True
       sys.argv.remove("--extended")

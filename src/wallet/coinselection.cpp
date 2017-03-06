@@ -24,7 +24,7 @@ typedef std::multimap<CAmount, TxoGroup> TxoGroupMap;
 // How close do we want to get to targetValue (at first).  The longer it takes the more we add to this value.
 CAmount reasonableExcess(CAmount targetValue)
 {
-  return targetValue/128;
+  return targetValue/1024;
 }
 
 // Create a group of Txos from a Txo index and another group.
@@ -55,34 +55,41 @@ bool extend(const CAmount targetValue, /*const*/ SpendableTxos& available, TxoGr
   SpendableTxos::iterator aBeg = available.begin();
   bool ret = false;
   SpendableTxos::iterator small;
-  small = available.lower_bound(targetValue - grp.first);
+  small = available.lower_bound(targetValue - grp.first);  // Find a value at or above what we need
   if (1)
     {
       SpendableTxos::iterator i = small;
       // while not at the end and there's too little value or we already used this output then keep going.
       //while((i != aEnd) && ((i->first + grp.first < targetValue) || (grp.second.find(i) != grp.second.end()))  )  allow dups and eliminate later for performance
-      while((i != aEnd) && (i->first + grp.first < targetValue))
+      while((i != aEnd) && (i->first + grp.first < targetValue))  // iterate to make sure it is actually big enough.
         {
         ++i;
 	}
 
-      if (i!=aEnd)
+      if (i!=aEnd)  // Ok we have a solution so add it.
 	{
  	  TxoGroup g = makeGroup(i,grp);
   	  solutions.insert(TxoGroupMap::value_type(g.first,g));
+          LogPrint("wallet","CoinSelection solution found: excess %ld, txos: %d\n", g.first - targetValue, g.second.size());
           ret = true;
 	}
     }
-  --small; // lower_bound returns and element >= the passed value, so get one that is smaller
-  if ((small != aEnd)&&(small!=aBeg)&&(solutions.empty() || (depth < MAX_ELECTIVE_TXOS))) // keep looking if there are no solutions or if the depth is low
+  for (int i=0; i<5; i++) // check 5 more close values
     {
-      // Its better performance to accidentally add a double than to check every time
-      //while ((small != aBeg) && (grp.second.find(small) != grp.second.end())) --small;  // go to the prev if this one is already in the group.
-      //if (small != aBeg)
-	{
-	  TxoGroup newGrp = makeGroup(small, grp);
-	  ret |= extend(targetValue, available, newGrp, solutions, depth+1);
-	}
+      if (small == aBeg) break;
+      while ((small!=aBeg)&&(small->first + grp.first > targetValue)) --small; // lower_bound returns an element >= the passed value, so get one that is smaller
+      if (small == aEnd) break;
+      if ((solutions.empty() || (depth < MAX_ELECTIVE_TXOS))) // keep looking if there are no solutions or if the depth is low
+        {
+          // Its better performance to accidentally add a double than to check every time
+          //while ((small != aBeg) && (grp.second.find(small) != grp.second.end())) --small;  // go to the prev if this one is already in the group.
+          //if (small != aBeg)
+          {
+            TxoGroup newGrp = makeGroup(small, grp);
+            LogPrint("wallet","CoinSelection recursive extend: need %ld, txos: %d\n", targetValue - newGrp.first, newGrp.second.size());
+            ret |= extend(targetValue, available, newGrp, solutions, depth+1);
+          }
+        }
     }
   return ret;
 }
@@ -152,6 +159,7 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
     }
 
   // Now iterate looking for better solutions.
+  while ((large->first > targetValue)&&(large!=available.begin())) --large; // get something <= our target value 
   bool done = (large == available.begin());
   long int loop = 0;
   long int excessModifier = 0;
@@ -169,6 +177,7 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
       TxoGroupMap::iterator i = solutions.begin();
       if ((i->first - targetValue < reasonableExcess(targetValue)+excessModifier)||(solutions.size()>MAX_SOLUTIONS))  // Did we find any good solutions?  
 	{
+          LogPrint("wallet","CoinSelection done 1\n");
 	  done = true;  // If yes then quit.
 	}
       else  // No good solutions, so decrement large
@@ -177,6 +186,7 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
           do { --large; } while ((large != available.begin())&&(large->first != a));  // Skip all Txos whose value is the exact same as the Txo I just looked at.
 
           done = (large == available.begin()); // We are done if we get to the beginning.
+          if (done) LogPrint("wallet","CoinSelection done 2\n");
 	}
 
       if (!done)  // Now grab a random Txo and search for a solution near it
@@ -224,7 +234,7 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
   else if (multiIn != end) i = multiIn;    // or pick one the reduces the UTXO
   else i = singleIn;  // ok take whatever I can get
 
-  LogPrint("wallet","CoinSelection returns %d choices. Target: %d, found: %d, txos: %d\n", solutions.size(), targetValue, i->first, i->second.second.size());
+  LogPrint("wallet","CoinSelection returns %d choices. Dust: %d, Target: %d, found: %d, txos: %d\n", solutions.size(), dust, targetValue, i->first, i->second.second.size());
   if (i == solutions.end())
     {
       return TxoGroup(0,TxoItVec());

@@ -34,8 +34,9 @@
 
 using namespace std;
 
+extern CTweak<unsigned int> txDust;
 CWallet* pwalletMain = NULL;
-const int MAX_FEE_PERCENT_OF_VALUE = 5;
+const int MAX_FEE_PERCENT_OF_VALUE = 25;
 /** Transaction fee set by the user */
 CFeeRate payTxFee(DEFAULT_TRANSACTION_FEE);
 CAmount maxTxFee = DEFAULT_TRANSACTION_MAXFEE;
@@ -1973,11 +1974,13 @@ bool CWallet::SelectCoinsBU(const CAmount& nTargetValue, std::set<std::pair<cons
     }
 
   TxoGroup g;
-  g =  CoinSelection(available, tgtValue,::minRelayTxFee.GetFee(100));  // 100 is about half of a normal transaction, so overpay the fee by about half to avoid change
+  unsigned int dust = txDust.value;
+  if (dust == 0) dust = ::minRelayTxFee.GetFee(100);
+  g =  CoinSelection(available, tgtValue,dust);  // 100 is about half of a normal transaction, so overpay the fee by about half to avoid change
   if ((!filled)&&(g.first == 0)) // Ok no solution was found.  So let's regenerate the TXOs and try again.
     {  
       FillAvailableCoins(coinControl);
-      g =  CoinSelection(available, tgtValue,::minRelayTxFee.GetFee(100));
+      g =  CoinSelection(available, tgtValue, dust);
     }
   if (g.first == 0 ) return false;  // no solution found
   

@@ -203,7 +203,7 @@ class BitcoinTestFramework(object):
         except Exception as e:
             print("Unexpected exception caught during testing: " + repr(e))
             traceback.print_tb(sys.exc_info()[2])
-            pdb.pm()
+
         if not self.options.noshutdown:
             print("Stopping nodes")
             stop_nodes(self.nodes)
