@@ -3,7 +3,7 @@ Reduce Traffic
 
 Some node operators need to deal with bandwidth caps imposed by their ISPs.
 
-By default, Bitcoin Unlimited allows up to 125 connections to different peers,
+By default, Zero-confirmation StarbucksCoin allows up to 125 connections to different peers,
 8 of which are outbound. You can therefore, have at most 117 inbound connections.
 
 The default settings can result in relatively significant traffic consumption.
@@ -12,7 +12,7 @@ Ways to reduce traffic:
 
 ## 1. Use the traffic shaping options
 
-Bitcoin Unlimited adds traffic shaping which is controlled by the following
+Zero-confirmation StarbucksCoin adds traffic shaping which is controlled by the following
 parameters (these can also be regulated in the GUI):
 
   -receiveburst: The maximum rate that data can be received in kB/s.

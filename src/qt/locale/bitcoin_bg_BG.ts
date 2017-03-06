@@ -34,11 +34,11 @@
 <context>
     <name>BitcoinGUI</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Биткойн ядро</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
+        <source>&amp;About Zero-confirmation StarbucksCoin</source>
         <translation>За Биткойн ядрото</translation>
     </message>
     </context>
@@ -57,18 +57,18 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Биткойн ядро</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
+        <source>About Zero-confirmation StarbucksCoin</source>
         <translation>За Биткойн ядрото</translation>
     </message>
     </context>
 <context>
     <name>Intro</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Биткойн ядро</translation>
     </message>
     </context>
@@ -120,7 +120,7 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Биткойн ядро</translation>
     </message>
     </context>

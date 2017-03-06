@@ -1,7 +1,7 @@
-Release Notes for Bitcoin Unlimited v1.0.0
+Release Notes for Zero-confirmation StarbucksCoin v1.0.0
 ==========================================
 
-Bitcoin Unlimited version 1.0.0 is now available from:
+Zero-confirmation StarbucksCoin version 1.0.0 is now available from:
 
   <https://bitcoinunlimited.info/download>
 
@@ -18,11 +18,11 @@ The most important feature of BU's first general release is functionality to
 restore market dynamics at the discretion of the full-node network. Activation
 will result in eliminating the full-blocks handicap, restoring a healthy
 fee-market, allow reliable confirmation times, fair user fees, and re-igniting
-stalled network effect growth, based on Bitcoin Unlimited's Emergent Consensus
+stalled network effect growth, based on Zero-confirmation StarbucksCoin's Emergent Consensus
 model to let the ecosystem decide the best values of parameters like the maximum
 block size.
 
-Bitcoin Unlimited open-source version 1.0.0 contains a large number of changes,
+Zero-confirmation StarbucksCoin open-source version 1.0.0 contains a large number of changes,
 updates and improvements. Some optimize the Emergent Consensus logic (EC),
 others improve the system in a more general way, and a number of updates are
 imported from the open source work of the Bitcoin Core developers who deserve
@@ -62,7 +62,7 @@ Depth is increased to 12. This value is the result of analysis and simulation.
 Note that due to variation in node settings only a subset of nodes will be in
 an SG situation at any one time.
 
-Bitcoin Unlimited recommends miners and commercial node users set their
+Zero-confirmation StarbucksCoin recommends miners and commercial node users set their
 Accepted Depth parameter to the value of 12.
 
 Further information:
@@ -120,11 +120,11 @@ Wide-spectrum Anti-DoS improvements
 
 Network traffic represents a grey-scale of useful activity. Some helps the
 network to synchronize, while some is for surveillance and deliberate wastage.
-Bitcoin Unlimited differentiates useful and less useful data between nodes.
+Zero-confirmation StarbucksCoin differentiates useful and less useful data between nodes.
 
 Useful data is primarily valid transactions and blocks, invitations for required
 data, and handshake messages.  Not useful data are typically from from spam or
-spy nodes, From version 1.0.0, Bitcoin Unlimited Nodes track if peers supply
+spy nodes, From version 1.0.0, Zero-confirmation StarbucksCoin Nodes track if peers supply
 useful data.
 
 1) All traffic is tracked by byte count, per connection, so the "usefulness" of
@@ -153,7 +153,7 @@ Further information:
 Request Manager extensions
 --------------------------
 
-Bitcoin Unlimited uses a Request Manager that tracks source nodes for blocks and
+Zero-confirmation StarbucksCoin uses a Request Manager that tracks source nodes for blocks and
 transactions. If a request is filled slowly, it reissues the same request to a
 different source instead of just waiting and eventually timing out. The Request
 Manager was introduced to stabilize Xthin block propagation, but is generally
@@ -178,7 +178,7 @@ Further information:
 Xthin block propagation optimizations
 -------------------------------------
 
-Based on many months of live traffic observation, Bitcoin Unlimited implemented
+Based on many months of live traffic observation, Zero-confirmation StarbucksCoin implemented
 several general optimizations of the block propagation with Xthin. As tests have
 shown, this enables some nodes to operate with zero missing transactions in a
 24-hour period and thus achieves extremely efficient use of bandwidth resources
@@ -226,7 +226,7 @@ Command Tweaks
 --------------
 
 To allow a better organization of parameters in the command line or the
-bitcoin.conf, Bitcoin Unlimited introduces a new format using the dot notation.
+bitcoin.conf, Zero-confirmation StarbucksCoin introduces a new format using the dot notation.
 For example, to manage connections users can now specify "net.maxConnections" or
 "net.maxOutboundConnections".
 
@@ -245,13 +245,13 @@ DNS-Seed
 Whenever a new node starts, it needs to find its peers. Usually this is done by
 a DNS seed, which crawls the networks and builds a random list of other nodes to
 which the new node can connect to. Currently there are DNS seeds from bluematt,
-luke-jr, sipa, 21 and others. Bitcoin Unlimited aims to create its own DNS seed
+luke-jr, sipa, 21 and others. Zero-confirmation StarbucksCoin aims to create its own DNS seed
 capable of special requirements such as supporting the service bit of XTHIN. By
-adopting and adjusting Sipa's code for a DNS seed Bitcoin Unlimited fixed a
+adopting and adjusting Sipa's code for a DNS seed Zero-confirmation StarbucksCoin fixed a
 minor bug.
 
-The DNS Seed of Bitcoin Unlimited is currently activated on the NOL (No Limit)
-Net, the testnet for Bitcoin Unlimited's Emergent Consensus. It is expected to
+The DNS Seed of Zero-confirmation StarbucksCoin is currently activated on the NOL (No Limit)
+Net, the testnet for Zero-confirmation StarbucksCoin's Emergent Consensus. It is expected to
 go live on the mainnet soon.
 
 Further information:
@@ -271,7 +271,7 @@ Sometimes the program wants to free memory which was used for global variables,
 while the memory is already free. This can result in the so called SegFault, a
 common bug of several C written programs. The cause for this bug is a
 mis-organisation of the destruction order used during the shutdown. By
-reorganizing global variables in a single file Bitcoin Unlimited fixed the
+reorganizing global variables in a single file Zero-confirmation StarbucksCoin fixed the
 destruction order and eliminates this bug. This is especially helpful for
 running bitcoind test suite.
 
@@ -295,7 +295,7 @@ ARM architecture
 Version 1.0.0 has gitian support of deterministic builds for the ARM
 architecture. This supplements Windows, iOS and Linux x86, which were previously
 offered. This was backported from the Bitcoin Core project and adjusted for the
-Bitcoin Unlimited environment.
+Zero-confirmation StarbucksCoin environment.
 
 
 Imported Commits
@@ -311,7 +311,7 @@ and Core might disagree on some concepts and this disagreement sometimes
 dominates the public debates, both teams share the goal of an ongoing
 improvement of the codebase.
 
-Bitcoin Unlimited has therefore cherry-picked a number of Bitcoin Core 0.13.x
+Zero-confirmation StarbucksCoin has therefore cherry-picked a number of Bitcoin Core 0.13.x
 updates and upgrades which align with BU's onchain-scaling and wider goals to
 advance Bitcoin. We would like to thank developers Cory Fields, Jonas
 Schnelli, Marco Falke, Michael Ford, Patrick Strateman, Pieter Wuille, Russel

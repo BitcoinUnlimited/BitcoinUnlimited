@@ -326,11 +326,11 @@
         <translation>Vahelehe tööriistariba</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Bitcoini tuumik</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
+        <source>&amp;About Zero-confirmation StarbucksCoin</source>
         <translation>Kirjeldus Bitcoini Tuumast</translation>
     </message>
     <message>
@@ -591,7 +591,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Bitcoini tuumik</translation>
     </message>
     <message>
@@ -599,7 +599,7 @@
         <translation>versioon</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
+        <source>About Zero-confirmation StarbucksCoin</source>
         <translation>Kirjeldus Bitcoini Tuumast</translation>
     </message>
     <message>
@@ -622,7 +622,7 @@
         <translation>Teretulemast</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Bitcoini tuumik</translation>
     </message>
     <message>
@@ -1290,11 +1290,11 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Bitcoini tuumik</translation>
     </message>
     <message>
-        <source>The Bitcoin Unlimited developers</source>
+        <source>The Zero-confirmation StarbucksCoin developers</source>
         <translation>Bitcoini Tuuma arendajad</translation>
     </message>
     <message>

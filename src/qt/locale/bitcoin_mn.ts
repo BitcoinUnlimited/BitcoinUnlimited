@@ -750,7 +750,7 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Unlimited is shutting down...</source>
+        <source>Zero-confirmation StarbucksCoin is shutting down...</source>
         <translation>Биткойны цѳм хаагдаж байна...</translation>
     </message>
     <message>

@@ -286,8 +286,8 @@
         <translation>Atidaryti &amp;URI...</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited client</source>
-        <translation>Bitcoin Unlimited klientas</translation>
+        <source>Zero-confirmation StarbucksCoin client</source>
+        <translation>Zero-confirmation StarbucksCoin klientas</translation>
     </message>
     <message>
         <source>Importing blocks from disk...</source>
@@ -338,8 +338,8 @@
         <translation>&amp;Gauti</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Unlimited</source>
-        <translation>Rodyti informaciją apie Bitcoin Unlimited</translation>
+        <source>Show information about Zero-confirmation StarbucksCoin</source>
+        <translation>Rodyti informaciją apie Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -370,12 +370,12 @@
         <translation>Kortelių įrankinė</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Bitcoin branduolys</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
-        <translation>&amp;Apie Bitcoin Unlimited</translation>
+        <source>&amp;About Zero-confirmation StarbucksCoin</source>
+        <translation>&amp;Apie Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>
@@ -637,7 +637,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Bitcoin branduolys</translation>
     </message>
     <message>
@@ -645,8 +645,8 @@
         <translation>versija</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
-        <translation>Apie Bitcoin Unlimited</translation>
+        <source>About Zero-confirmation StarbucksCoin</source>
+        <translation>Apie Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -668,11 +668,11 @@
         <translation>Sveiki</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Unlimited.</source>
-        <translation>Sveiki atvykę į Bitcoin Unlimited.</translation>
+        <source>Welcome to Zero-confirmation StarbucksCoin.</source>
+        <translation>Sveiki atvykę į Zero-confirmation StarbucksCoin.</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Bitcoin branduolys</translation>
     </message>
     <message>
@@ -1360,7 +1360,7 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Bitcoin branduolys</translation>
     </message>
     <message>

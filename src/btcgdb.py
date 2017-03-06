@@ -67,4 +67,4 @@ sd = BuDumpCBlockIndex()
 
 SpHelp([sd])
 
-gdb.write("Loaded Bitcoin Unlimited GDB extensions %s.\nRun 'btc-help' for command help\n" % VERSION)
+gdb.write("Loaded Zero-confirmation StarbucksCoin GDB extensions %s.\nRun 'btc-help' for command help\n" % VERSION)

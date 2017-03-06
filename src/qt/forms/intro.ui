@@ -20,7 +20,7 @@
       <string notr="true">QLabel { font-style:italic; }</string>
      </property>
      <property name="text">
-      <string>Welcome to Bitcoin Unlimited.</string>
+      <string>Welcome to Zero-confirmation StarbucksCoin.</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>

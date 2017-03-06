@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2017 The Zero-confirmation StarbucksCoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -118,7 +118,7 @@ BitcoinGUI::BitcoinGUI(const PlatformStyle *platformStyle, const NetworkStyle *n
 {
     GUIUtil::restoreWindowGeometry("nWindow", QSize(850, 550), this);
 
-    QString windowTitle = tr("Bitcoin Unlimited") + " - ";
+    QString windowTitle = tr("Zero-confirmation StarbucksCoin") + " - ";
 #ifdef ENABLE_WALLET
     /* if compiled with wallet support, -disablewallet can still disable the wallet */
     enableWallet = !GetBoolArg("-disablewallet", false);
@@ -316,8 +316,8 @@ void BitcoinGUI::createActions()
     quitAction->setStatusTip(tr("Quit application"));
     quitAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_Q));
     quitAction->setMenuRole(QAction::QuitRole);
-    aboutAction = new QAction(platformStyle->TextColorIcon(":/icons/about"), tr("&About Bitcoin Unlimited"), this);
-    aboutAction->setStatusTip(tr("Show information about Bitcoin Unlimited"));
+    aboutAction = new QAction(platformStyle->TextColorIcon(":/icons/about"), tr("&About Zero-confirmation StarbucksCoin"), this);
+    aboutAction->setStatusTip(tr("Show information about Zero-confirmation StarbucksCoin"));
     aboutAction->setMenuRole(QAction::AboutRole);
     aboutAction->setEnabled(false);
     aboutQtAction = new QAction(platformStyle->TextColorIcon(":/icons/about_qt"), tr("About &Qt"), this);
@@ -332,7 +332,7 @@ void BitcoinGUI::createActions()
 
     // BU
     unlimitedAction = new QAction(platformStyle->TextColorIcon(":/icons/options"), tr("&Unlimited..."), this);
-    unlimitedAction->setStatusTip(tr("Modify Bitcoin Unlimited Options"));
+    unlimitedAction->setStatusTip(tr("Modify Zero-confirmation StarbucksCoin Options"));
     unlimitedAction->setMenuRole(QAction::PreferencesRole);
 
     encryptWalletAction = new QAction(platformStyle->TextColorIcon(":/icons/lock_closed"), tr("&Encrypt Wallet..."), this);
@@ -542,7 +542,7 @@ void BitcoinGUI::createTrayIcon(const NetworkStyle *networkStyle)
 {
 #ifndef Q_OS_MAC
     trayIcon = new QSystemTrayIcon(this);
-    QString toolTip = tr("Bitcoin Unlimited client") + " " + networkStyle->getTitleAddText();
+    QString toolTip = tr("Zero-confirmation StarbucksCoin client") + " " + networkStyle->getTitleAddText();
     trayIcon->setToolTip(toolTip);
     trayIcon->setIcon(networkStyle->getTrayAndWindowIcon());
 

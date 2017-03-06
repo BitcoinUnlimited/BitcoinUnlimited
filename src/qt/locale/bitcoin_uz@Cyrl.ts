@@ -290,7 +290,7 @@
         <translation>Интернет манзилни очиш</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited client</source>
+        <source>Zero-confirmation StarbucksCoin client</source>
         <translation>Bitcoin асос мижози</translation>
     </message>
     <message>
@@ -342,8 +342,8 @@
         <translation>&amp;Қабул қилиш</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited ҳақидаги маълумотларни кўрсатиш</translation>
+        <source>Show information about Zero-confirmation StarbucksCoin</source>
+        <translation>Zero-confirmation StarbucksCoin ҳақидаги маълумотларни кўрсатиш</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -382,16 +382,16 @@
         <translation>Ички ойналар асбоблар панели</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>Zero-confirmation StarbucksCoin</source>
+        <translation>Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <source>Request payments (generates QR codes and bitcoin: URIs)</source>
         <translation>Тўловлар (QR кодлари ва bitcoin ёрдамида яратишлар: URI’лар) сўраш</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited &amp;ҳақида</translation>
+        <source>&amp;About Zero-confirmation StarbucksCoin</source>
+        <translation>Zero-confirmation StarbucksCoin &amp;ҳақида</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -410,8 +410,8 @@
         <translation>&amp;Буйруқлар сатри мосламалари</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Unlimited help message to get a list with possible Bitcoin command-line options</source>
-        <translation>Мавжуд Bitcoin буйруқлар матни мосламалари билан  Bitcoin Unlimited ёрдам хабарларини олиш рўйхатини кўрсатиш</translation>
+        <source>Show the Zero-confirmation StarbucksCoin help message to get a list with possible Bitcoin command-line options</source>
+        <translation>Мавжуд Bitcoin буйруқлар матни мосламалари билан  Zero-confirmation StarbucksCoin ёрдам хабарларини олиш рўйхатини кўрсатиш</translation>
     </message>
     <message numerus="yes">
         <source>%n active connection(s) to Bitcoin network</source>
@@ -777,8 +777,8 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>Zero-confirmation StarbucksCoin</source>
+        <translation>Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <source>version</source>
@@ -789,8 +789,8 @@
         <translation>(%1-bit)</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited ҳақида</translation>
+        <source>About Zero-confirmation StarbucksCoin</source>
+        <translation>Zero-confirmation StarbucksCoin ҳақида</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -812,16 +812,16 @@
         <translation>Хуш келибсиз</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Unlimited.</source>
-        <translation>"Bitcoin Unlimited"га хуш келибсиз.</translation>
+        <source>Welcome to Zero-confirmation StarbucksCoin.</source>
+        <translation>"Zero-confirmation StarbucksCoin"га хуш келибсиз.</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Unlimited will store its data.</source>
-        <translation>Биринчи марта дастур ишга тушгани каби сиз Bitcoin Unlimited маълумотларини жойлаштирадиган жойни танлашингиз мумкин.</translation>
+        <source>As this is the first time the program is launched, you can choose where Zero-confirmation StarbucksCoin will store its data.</source>
+        <translation>Биринчи марта дастур ишга тушгани каби сиз Zero-confirmation StarbucksCoin маълумотларини жойлаштирадиган жойни танлашингиз мумкин.</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
-        <translation>Bitcoin Unlimited юклаб олинади ва Bitcoin блок занжири нусхаси жойлаштирилади. Камида %1GB  маълумот ушбу директорияга жойлаштирилади ва вақт давомида ўсиб боради. Ҳамён ҳам ушбу директорияда жойлашади.</translation>
+        <source>Zero-confirmation StarbucksCoin will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <translation>Zero-confirmation StarbucksCoin юклаб олинади ва Bitcoin блок занжири нусхаси жойлаштирилади. Камида %1GB  маълумот ушбу директорияга жойлаштирилади ва вақт давомида ўсиб боради. Ҳамён ҳам ушбу директорияда жойлашади.</translation>
     </message>
     <message>
         <source>Use the default data directory</source>
@@ -832,8 +832,8 @@
         <translation>Бошқа маълумотлар директориясида фойдаланинг:</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>Zero-confirmation StarbucksCoin</source>
+        <translation>Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <source>Error: Specified data directory "%1" cannot be created.</source>
@@ -1740,12 +1740,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>Zero-confirmation StarbucksCoin</source>
+        <translation>Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
-        <source>The Bitcoin Unlimited developers</source>
-        <translation>Bitcoin Unlimited дастурчилари</translation>
+        <source>The Zero-confirmation StarbucksCoin developers</source>
+        <translation>Zero-confirmation StarbucksCoin дастурчилари</translation>
     </message>
     <message>
         <source>[testnet]</source>
