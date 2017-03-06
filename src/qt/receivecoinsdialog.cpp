@@ -152,6 +152,7 @@ void ReceiveCoinsDialog::on_freezeDialog_hide()
 
         QString freezeLabel;
         if (nFreezeLockTime.getint64() < LOCKTIME_THRESHOLD)
+
           {
             uint64_t height = GetBlockchainHeight();
             uint64_t freezeHeight = nFreezeLockTime.getint();
@@ -167,6 +168,7 @@ void ReceiveCoinsDialog::on_freezeDialog_hide()
 
 void ReceiveCoinsDialog::on_freezeCheck_clicked()
 {
+
   if (ui->freezeCheck->isChecked())  // If the user clicked on coin freeze, bring up the freeze dialog box
     {
       if (!freezeDialog)
@@ -210,6 +212,7 @@ void ReceiveCoinsDialog::on_receiveButton_clicked()
     } else {
         /* Generate new receiving address and add to the address table */
         address = model->getAddressTableModel()->addRow(AddressTableModel::Receive, label, "", CScriptNum(0));
+
         // only use coin freeze if the freeze value is valid and the check box is still set
         if ((nFreezeLockTime > 0)&&(ui->freezeCheck)&&(ui->freezeCheck->isChecked()))
           {
@@ -220,7 +223,7 @@ void ReceiveCoinsDialog::on_receiveButton_clicked()
         }
     }
     SendCoinsRecipient info(address, label,
-        ui->reqAmount->value(), ui->reqMessage->text(), sFreezeLockTime);
+        ui->reqAmount->value(), ui->reqMessage->text(), sFreezeLockTime, "");
     ReceiveRequestDialog *dialog = new ReceiveRequestDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setModel(model->getOptionsModel());

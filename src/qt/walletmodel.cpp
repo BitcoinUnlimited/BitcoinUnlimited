@@ -36,7 +36,7 @@ WalletModel::WalletModel(const PlatformStyle *platformStyle, CWallet *wallet, Op
     cachedEncryptionStatus(Unencrypted),
     cachedNumBlocks(0)
 {
-    fHaveWatchOnly = wallet->HaveWatchOnly();
+    fHaveWatchOnly = wallet->HaveWatchOnly() || getWatchBalance() > 0;
     fForceCheckBalanceChanged = false;
 
     addressTableModel = new AddressTableModel(wallet, this);
@@ -238,14 +238,21 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
             {
                 return InvalidAddress;
             }
-            if(rcp.amount <= 0)
+            if(rcp.amount <= 0 && rcp.labelPublic == "")
             {
                 return InvalidAmount;
             }
             setAddress.insert(rcp.address);
             ++nAddresses;
 
-            CScript scriptPubKey = GetScriptForDestination(CBitcoinAddress(rcp.address.toStdString()).Get());
+            CScript scriptPubKey;
+            if (rcp.labelPublic == "")
+                scriptPubKey = GetScriptForDestination(CBitcoinAddress(rcp.address.toStdString()).Get());
+            else {
+                scriptPubKey = GetScriptLabelPublic(rcp.labelPublic.toStdString());
+                --nAddresses; // remove duplicate address as rcp.adddress was copied in SendCoinsDialog::on_sendButton_clicked()
+            }
+
             CRecipient recipient = {scriptPubKey, rcp.amount, rcp.fSubtractFeeFromAmount};
             vecSend.push_back(recipient);
 

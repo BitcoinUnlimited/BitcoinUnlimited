@@ -47,7 +47,6 @@ void ReceiveFreezeDialog::on_freezeBlock_editingFinished()
 {
     if (ui->freezeBlock->value() > 0)
       ui->freezeDateTime->clear();
-    //  ui->freezeDateTime->setDateTime(QDateTime::fromMSecsSinceEpoch(0));
 
     /* limit check */
     std::string freezeText = ui->freezeBlock->text().toStdString();
