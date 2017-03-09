@@ -223,8 +223,9 @@ void Shutdown()
     StopNode();
     StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
-    if (fDumpMempoolLater)
+    if (fDumpMempoolLater && GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
         DumpMempool();
+    }
 
     if (fFeeEstimatesInitialized)
     {
@@ -467,8 +468,11 @@ void ThreadImport(std::vector<fs::path> vImportFiles)
         StartShutdown();
     }
 
-    LoadMempool();
-    fDumpMempoolLater = !fRequestShutdown;
+    if (GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
+    {
+        LoadMempool();
+        fDumpMempoolLater = !fRequestShutdown;
+    }
 }
 
 /** Sanity checks

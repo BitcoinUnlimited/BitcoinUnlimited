@@ -142,6 +142,9 @@ static const bool DEFAULT_PERMIT_BAREMULTISIG = true;
 static const unsigned int DEFAULT_BYTES_PER_SIGOP = 20;
 static const bool DEFAULT_CHECKPOINTS_ENABLED = true;
 
+/** Default -persistmempool */
+static const bool DEFAULT_PERSIST_MEMPOOL = true;
+
 static const bool DEFAULT_TESTSAFEMODE = false;
 
 /** Maximum number of headers to announce when relaying blocks with headers message.*/
