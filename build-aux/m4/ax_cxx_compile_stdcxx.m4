@@ -9,9 +9,9 @@
 # DESCRIPTION
 #
 #   Check for baseline language coverage in the compiler for the specified
-#   version of the C++ standard.  If necessary, add switches to CXX and
-#   CXXCPP to enable support.  VERSION may be '11' (for the C++11 standard)
-#   or '14' (for the C++14 standard).
+#   version of the C++ standard.  If necessary, add switches to CXXFLAGS to
+#   enable support.  VERSION may be '11' (for the C++11 standard) or '14'
+#   (for the C++14 standard).
 #
 #   The second argument, if specified, indicates whether you insist on an
 #   extended mode (e.g. -std=gnu++11) or a strict conformance mode (e.g.
@@ -39,7 +39,7 @@
 #   and this notice are preserved.  This file is offered as-is, without any
 #   warranty.
 
-#serial 4
+#serial 1
 
 dnl  This macro is based on the code from the AX_CXX_COMPILE_STDCXX_11 macro
 dnl  (serial version number 13).
@@ -74,17 +74,14 @@ AC_DEFUN([AX_CXX_COMPILE_STDCXX], [dnl
       cachevar=AS_TR_SH([ax_cv_cxx_compile_cxx$1_$switch])
       AC_CACHE_CHECK(whether $CXX supports C++$1 features with $switch,
                      $cachevar,
-        [ac_save_CXX="$CXX"
-         CXX="$CXX $switch"
+        [ac_save_CXXFLAGS="$CXXFLAGS"
+         CXXFLAGS="$CXXFLAGS $switch"
          AC_COMPILE_IFELSE([AC_LANG_SOURCE([_AX_CXX_COMPILE_STDCXX_testbody_$1])],
           [eval $cachevar=yes],
           [eval $cachevar=no])
-         CXX="$ac_save_CXX"])
+         CXXFLAGS="$ac_save_CXXFLAGS"])
       if eval test x\$$cachevar = xyes; then
-        CXX="$CXX $switch"
-        if test -n "$CXXCPP" ; then
-          CXXCPP="$CXXCPP $switch"
-        fi
+        CXXFLAGS="$CXXFLAGS $switch"
         ac_success=yes
         break
       fi
@@ -100,17 +97,14 @@ AC_DEFUN([AX_CXX_COMPILE_STDCXX], [dnl
       cachevar=AS_TR_SH([ax_cv_cxx_compile_cxx$1_$switch])
       AC_CACHE_CHECK(whether $CXX supports C++$1 features with $switch,
                      $cachevar,
-        [ac_save_CXX="$CXX"
-         CXX="$CXX $switch"
+        [ac_save_CXXFLAGS="$CXXFLAGS"
+         CXXFLAGS="$CXXFLAGS $switch"
          AC_COMPILE_IFELSE([AC_LANG_SOURCE([_AX_CXX_COMPILE_STDCXX_testbody_$1])],
           [eval $cachevar=yes],
           [eval $cachevar=no])
-         CXX="$ac_save_CXX"])
+         CXXFLAGS="$ac_save_CXXFLAGS"])
       if eval test x\$$cachevar = xyes; then
-        CXX="$CXX $switch"
-        if test -n "$CXXCPP" ; then
-          CXXCPP="$CXXCPP $switch"
-        fi
+        CXXFLAGS="$CXXFLAGS $switch"
         ac_success=yes
         break
       fi
@@ -121,16 +115,18 @@ AC_DEFUN([AX_CXX_COMPILE_STDCXX], [dnl
     if test x$ac_success = xno; then
       AC_MSG_ERROR([*** A compiler with support for C++$1 language features is required.])
     fi
-  fi
-  if test x$ac_success = xno; then
-    HAVE_CXX$1=0
-    AC_MSG_NOTICE([No compiler with C++$1 support was found])
   else
-    HAVE_CXX$1=1
-    AC_DEFINE(HAVE_CXX$1,1,
-              [define if the compiler supports basic C++$1 syntax])
+    if test x$ac_success = xno; then
+      HAVE_CXX$1=0
+      AC_MSG_NOTICE([No compiler with C++$1 support was found])
+    else
+      HAVE_CXX$1=1
+      AC_DEFINE(HAVE_CXX$1,1,
+                [define if the compiler supports basic C++$1 syntax])
+    fi
+
+    AC_SUBST(HAVE_CXX$1)
   fi
-  AC_SUBST(HAVE_CXX$1)
 ])
 
 
