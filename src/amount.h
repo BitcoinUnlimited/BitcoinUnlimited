@@ -19,6 +19,11 @@ static const CAmount CENT = 1000000;
 
 extern const std::string CURRENCY_UNIT;
 
+enum
+  {
+    TYPICAL_UTXO_SIZE = 148 + 34, // minimum # of bytes to generate and spend a UTXO.  34 for the output, 148 for the input.  Used in dust calculation
+  };
+
 /** No amount larger than this (in satoshi) is valid.
  *
  * Note that this constant is *not* the total money supply, which in Bitcoin
@@ -45,6 +50,7 @@ public:
     CFeeRate(const CFeeRate& other) { nSatoshisPerK = other.nSatoshisPerK; }
 
     CAmount GetFee(size_t size) const; // unit returned is satoshis
+    CAmount GetDust() const;  // Dust is too small to be spendable.  It is either set via the txDust tweak or proportional to the cost to spend an output.
     CAmount GetFeePerK() const { return GetFee(1000); } // satoshis-per-1000-bytes
 
     friend bool operator<(const CFeeRate& a, const CFeeRate& b) { return a.nSatoshisPerK < b.nSatoshisPerK; }
@@ -62,5 +68,7 @@ public:
         READWRITE(nSatoshisPerK);
     }
 };
+
+extern CFeeRate minRelayTxFee;
 
 #endif //  BITCOIN_AMOUNT_H

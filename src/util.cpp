@@ -813,4 +813,17 @@ int GetNumCores()
 #endif
 }
 
+CSemaphore DbgPauseSem(0);
+
+extern "C" int DbgResume()
+{
+  DbgPauseSem.post();
+  return 0;
+}
+
+void DbgPause()
+{
+  LogPrintf("\n****DEBUG PAUSE HIT****\n\n");
+  DbgPauseSem.wait();
+}
 

@@ -417,9 +417,9 @@ public:
 class COutput
 {
 public:
-    const CWalletTx *tx;
-    int i;
-    int nDepth;
+    const CWalletTx *tx;  // transaction
+    int i;       // index of this output in transaction's vout
+    int nDepth;  // output of GetDepthInMainChain().  That is, how many blocks from the tip did this output get created in.  0 means not in blockchain (unconfirmed)
     bool fSpendable;
 
     COutput(const CWalletTx *txIn, int iIn, int nDepthIn, bool fSpendableIn)
@@ -443,7 +443,7 @@ typedef std::pair<CAmount, TxoItVec > TxoGroup;  // A set of coins and how much 
 
 // Select a group of UTXOs that sum up to above targetvalue.  The best choice is to be within dust of targetValue because
 // that will mean that I do not create any change.
-extern TxoGroup CoinSelection(/* const */ SpendableTxos& available, const CAmount targetValue,const CAmount &dust);
+extern TxoGroup CoinSelection(/* const */ SpendableTxos& available, const CAmount targetValue,const CAmount &dust,CFeeRate fee, unsigned int changeLen);
 
 
 /** Private key that includes an expiration date in case it never gets used. */
@@ -673,7 +673,7 @@ public:
 
     bool IsTxSpendable(const CWalletTx*);
     void FillAvailableCoins(const CCoinControl *coinControl); // populate available COutputs.
-    bool SelectCoinsBU(const CAmount& nTargetValue, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, const CCoinControl *coinControl = NULL);
+    bool SelectCoinsBU(const CAmount& nTargetValue, CFeeRate fee, unsigned int changeLen, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, const CCoinControl *coinControl = NULL);
 
     //! check whether we are allowed to upgrade (or already support) to the named feature
     bool CanSupportFeature(enum WalletFeature wf) { AssertLockHeld(cs_wallet); return nWalletMaxVersion >= wf; }

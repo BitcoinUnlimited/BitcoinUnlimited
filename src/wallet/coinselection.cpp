@@ -1,6 +1,19 @@
 #include "wallet.h"
 #include "random.h"
+#include "../tweak.h"
 
+// needed for tx validation
+#include "../main.h"  
+#include "../txmempool.h"
+#include "../script/sign.h"
+const int MAX_SOLUTIONS = 10000;   // The approximate maximum number of solutions we will find before giving up.
+const int MAX_ELECTIVE_TXOS = 5;  // What's the maximum number of TXOs we should use as inputs to a transaction (if we have a choice).
+const int MAX_TXOS = 100;         // What's the maximum number of TXOs to put in a transaction 
+// (now its a simple exponential) const long int LOOP_COST = 500;   // how many satoshi's the coin selection is willing to be off by per iteration through the loop.  Makes it progressively easier to find a solution
+const int P2PKH_INPUT_SIZE = 72;    // <Sig> <PubKey> OP_DUP OP_HASH160 <PubkeyHash> OP_EQUALVERIFY OP_CHECKSIG
+
+extern CTweak<unsigned int> maxCoinSelSearchTime;
+extern CTweak<unsigned int> preferredNumUTXO;
 
 #if 0 // for reference. Defined in wallet.h
 typedef std::multimap<CAmount, COutput> SpendableTxos;
@@ -41,11 +54,6 @@ TxoGroup makeGroup(SpendableTxos::iterator i, const TxoGroup& prev = *(TxoGroup*
   return ret;
 }
 
-const int MAX_SOLUTIONS = 5000;   // The approximate maximum number of solutions we will find before giving up.
-const int MAX_ELECTIVE_TXOS = 5;  // What's the maximum number of TXOs we should use as inputs to a transaction (if we have a choice).
-const int MAX_TXOS = 100;         // What's the maximum number of TXOs to put in a transaction 
-// (now its a simple exponential) const long int LOOP_COST = 500;   // how many satoshi's the coin selection is willing to be off by per iteration through the loop.  Makes it progressively easier to find a solution
-
 // Take a group that is not a solution and find a bunch of solutions by appending additional TXOs onto it.
 // This is a recursive function that is limited by MAX_TXOs and MAX_ELECTIVE_TXOS
 bool extend(const CAmount targetValue, /*const*/ SpendableTxos& available, TxoGroup grp, TxoGroupMap& solutions, int depth)
@@ -70,7 +78,7 @@ bool extend(const CAmount targetValue, /*const*/ SpendableTxos& available, TxoGr
 	{
  	  TxoGroup g = makeGroup(i,grp);
   	  solutions.insert(TxoGroupMap::value_type(g.first,g));
-          LogPrint("wallet","CoinSelection solution found: excess %ld, txos: %d\n", g.first - targetValue, g.second.size());
+          //LogPrint("wallet","CoinSelection solution found: excess %ld, txos: %d\n", g.first - targetValue, g.second.size());
           ret = true;
 	}
     }
@@ -86,7 +94,7 @@ bool extend(const CAmount targetValue, /*const*/ SpendableTxos& available, TxoGr
           //if (small != aBeg)
           {
             TxoGroup newGrp = makeGroup(small, grp);
-            LogPrint("wallet","CoinSelection recursive extend: need %ld, txos: %d\n", targetValue - newGrp.first, newGrp.second.size());
+            //LogPrint("wallet","CoinSelection recursive extend: need %ld, txos: %d\n", targetValue - newGrp.first, newGrp.second.size());
             ret |= extend(targetValue, available, newGrp, solutions, depth+1);
           }
         }
@@ -96,19 +104,45 @@ bool extend(const CAmount targetValue, /*const*/ SpendableTxos& available, TxoGr
 
 // Make sure that the group sums to >= the target value.
 // Since the TxoGroup is a set, identical Txos are eliminated meaning that this may not sum, and that the TxoGroup->first may be inaccurate.
+// There may be identical Txos because the search algorithm does not eliminate used txos from the search set for efficiency.
+// Also check various other aspects that would block the transaction from being accepted into the mempool.
 bool validate(const TxoGroup& grp,const CAmount targetValue)
 {
   CAmount acc = 0;
+  int nTx = grp.second.size();
   for (TxoItVec::iterator i = grp.second.begin(); i != grp.second.end(); ++i)
     {
       acc += (*i)->first;
     }
-  return (acc >= targetValue);
+  if (acc < targetValue) return false;
+
+  std::vector<CTxIn> txIn(nTx);
+  int count=0;
+  for (TxoItVec::iterator i = grp.second.begin(); i != grp.second.end(); ++i,++count)
+    {
+      COutput& tmp = (*i)->second;
+      txIn[count] = CTxIn(tmp.tx->GetHash(),tmp.i);
+    }
+
+  size_t limitAncestorCount = GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
+  size_t limitAncestorSize = GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT)*1000;
+  size_t limitDescendantsCount = GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT);
+  size_t limitDescendantSize = GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT)*1000;
+  std::string errString;
+  
+  LOCK(mempool.cs);
+  bool ret = mempool.ValidateMemPoolAncestors(txIn, limitAncestorCount, limitAncestorSize, limitDescendantsCount, limitDescendantSize, errString);
+  if (!ret)
+    {
+      LogPrint("wallet","CoinSelection eliminated a solution, error: %s\n", errString.c_str());
+    }
+  return ret;
 }
 
 // Select coins.
-TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetValue,const CAmount &dust)
+TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetValue,const CAmount &dust,CFeeRate feeRate, unsigned int changeLen)
 {
+  uint utxosInWallet = available.size();
   SpendableTxos::iterator aEnd = available.end();
   TxoGroupMap solutions;
   TxoGroupMap candidates;
@@ -164,22 +198,50 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
   long int loop = 0;
   long int excessModifier = 0;
   long int loopCost = 1;
+  uint64_t startTime = GetTimeMillis();
   while(!done)
     {
       loopCost++;  // for every loop, make it exponentially easier to find an acceptable solutions
       excessModifier += loopCost;
 
+      // Calculate the size of this new input
+      large->second.i;
+      const CScript& scriptPubKey = large->second.tx->vout[large->second.i].scriptPubKey;
+      CScript scriptSigRes; // = txNew.vin[nIn].scriptSig;
+      CWallet dummyWallet;
+      bool signSuccess = ProduceSignature(DummySignatureCreator(&dummyWallet), scriptPubKey, scriptSigRes);
+      int inputLen = signSuccess ? scriptSigRes.size(): P2PKH_INPUT_SIZE;
+      CAmount fee = feeRate.GetFee(inputLen);
       // We will take the "large" txo and decrement it each time through this loop.
       // If large ever hits the beginning, we have checked everything and can quit.
       TxoGroup grp = makeGroup(large);                    // Make a group out of our current txo
-      extend(targetValue, available, grp, solutions, 0);  // And attempt to extend it into solutions (automatically added to the "solutions" object)
+      extend(targetValue+fee, available, grp, solutions, 0);  // And attempt to extend it into solutions (automatically added to the "solutions" object)
 
       TxoGroupMap::iterator i = solutions.begin();
+#if 0 
       if ((i->first - targetValue < reasonableExcess(targetValue)+excessModifier)||(solutions.size()>MAX_SOLUTIONS))  // Did we find any good solutions?  
 	{
           LogPrint("wallet","CoinSelection done 1\n");
 	  done = true;  // If yes then quit.
 	}
+#endif
+
+      uint nSolutions = solutions.size();
+      if ((GetTimeMillis() - startTime > maxCoinSelSearchTime.value)&&(nSolutions >= 1)) // Have we looked for a long time
+        {
+          LogPrint("wallet","CoinSelection searched for the alloted time and found %d solutions\n",nSolutions);
+	  done = true;  // If yes then quit.          
+        }
+      else if (i->first - targetValue <= dust/2)  // Did we find any good solutions?  
+	{
+          LogPrint("wallet","CoinSelection found a close solution\n");
+	  done = true;  // If yes then quit.
+	}              
+      else if (solutions.size()>MAX_SOLUTIONS)  // Did we find lots of solutions?  
+	{
+          LogPrint("wallet","CoinSelection found many solutions\n");
+	  done = true;  // If yes then quit.
+	}      
       else  // No good solutions, so decrement large
 	{
           CAmount a = large->first;
@@ -231,8 +293,19 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
     }
 
   if (noChange != end) i = noChange;  // prefer the best no change solution
-  else if (multiIn != end) i = multiIn;    // or pick one the reduces the UTXO
-  else i = singleIn;  // ok take whatever I can get
+  else
+    {
+      if (utxosInWallet <= preferredNumUTXO.value)  // Find the cheapest (shortest) solution
+        {
+          if (singleIn != end) i = singleIn;
+          else i = multiIn;
+        }
+      else  // Reduce UTXO
+        {
+        if (multiIn != end) i = multiIn;    // or pick one the reduces the UTXO
+        else i = singleIn;  // ok take whatever I can get          
+        }
+    }
 
   LogPrint("wallet","CoinSelection returns %d choices. Dust: %d, Target: %d, found: %d, txos: %d\n", solutions.size(), dust, targetValue, i->first, i->second.second.size());
   if (i == solutions.end())

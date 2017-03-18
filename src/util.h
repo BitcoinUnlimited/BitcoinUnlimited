@@ -211,7 +211,7 @@ int GetNumCores();
 
 void SetThreadPriority(int nPriority);
 void RenameThread(const char* name);
-
+void DbgPause();
 /**
  * .. and a wrapper that just calls func once
  */

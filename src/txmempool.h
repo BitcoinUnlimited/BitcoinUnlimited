@@ -513,6 +513,9 @@ public:
      */
     bool CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntries &setAncestors, uint64_t limitAncestorCount, uint64_t limitAncestorSize, uint64_t limitDescendantCount, uint64_t limitDescendantSize, std::string &errString, bool fSearchForParents = true);
 
+    /** Similar to CalculateMemPoolAncestors, except only requires the inputs and just returns true/false depending on whether the input set conforms to the passed limits */
+    bool ValidateMemPoolAncestors(const std::vector<CTxIn>& txIn, uint64_t limitAncestorCount, uint64_t limitAncestorSize, uint64_t limitDescendantCount, uint64_t limitDescendantSize, std::string &errString);
+
     /** Populate setDescendants with all in-mempool descendants of hash.
      *  Assumes that setDescendants includes all in-mempool descendants of anything
      *  already in it.  */

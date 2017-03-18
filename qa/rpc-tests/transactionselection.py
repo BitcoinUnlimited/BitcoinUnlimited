@@ -23,6 +23,9 @@ import logging
 logging.basicConfig(format='%(asctime)s.%(levelname)s: %(message)s', level=logging.INFO)
 import traceback
 
+repTest = False
+feeTest = False
+
 def info(type, value, tb):
    if hasattr(sys, 'ps1') or not sys.stderr.isatty():
       # we are in interactive mode or we don't have a tty-like
@@ -61,12 +64,13 @@ class TransactionSelectionTest (BitcoinTestFramework):
 
     def setup_chain(self,bitcoinConfDict=None,wallets=None):
         print("Initializing test directory " + self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir,2,bitcoinConfDict,wallets)
+        initialize_chain_clean(self.options.tmpdir,3,bitcoinConfDict,wallets)
 
     def setup_network(self, split=False):
         self.nodes = []
         self.nodes.append(start_node(0,self.options.tmpdir, ["-rpcservertimeout=0"], timewait=60*10))
         self.nodes.append(start_node(1,self.options.tmpdir, ["-rpcservertimeout=0"], timewait=60*10))
+        self.nodes.append(start_node(2,self.options.tmpdir, ["-rpcservertimeout=0"], timewait=60*10))
         interconnect_nodes(self.nodes)
         self.is_network_split=False
         self.sync_all()
@@ -77,23 +81,33 @@ class TransactionSelectionTest (BitcoinTestFramework):
         self.sync_all()
 
     def randomUseTest(self, count=10):
-        self.nodes[0].generate(20)
+        self.nodes[0].generate(80)
         self.sync_all()
-        self.nodes[1].generate(120)
+        self.nodes[1].generate(180)
         self.sync_all()
         print("random use test")
+        
+        self.nodes[1].set("wallet.coinSelSearchTime=10000")
+        self.nodes[1].set("wallet.preferredNumUTXO=10000")
         self.nodes[1].set("wallet.txFeeOverpay=20000")
+        
+        self.nodes[0].set("wallet.coinSelSearchTime=100")
+        self.nodes[0].set("wallet.preferredNumUTXO=50")
         self.nodes[0].set("wallet.txFeeOverpay=1000")
         for j in range(1,count):
             a = [x.getnewaddress() for x in self.nodes ]
-            for i in range(0,20):
+            for i in range(0,80):
                for n in self.nodes:
                   amt = Decimal(random.uniform(.01,20.0))
                   amt = amt.quantize(Decimal(10) ** -8)
                   amt = amt.normalize()
                   to = a[random.randint(0,len(a)-1)]
                   print ("pay %s to %s" % (str(amt),to))
-                  n.sendtoaddress(to,amt)
+                  try:
+                      n.sendtoaddress(to,amt)
+                  except JSONRPCException as e:
+                      if not "Insufficient funds" in e.error['message']:
+                          raise
 
             self.commitTx()
             for n in self.nodes:      
@@ -103,13 +117,115 @@ class TransactionSelectionTest (BitcoinTestFramework):
                 amts = [ w["amount"] for w in wallet]
                 print([ format(w, "02.8f") for w in amts])
                 # print(wallet)
+
+    def feeTest(self, count=10):
+        self.nodes[0].generate(100)  # Start with 100 outputs
+        self.sync_all()
+        self.nodes[1].generate(100)  # on each node
+        self.sync_all()
+        self.nodes[2].generate(100)  # this node will just mine
+        self.sync_all()
+        print("fee test")
+        for n in self.nodes:
+                n.minedBalance = n.getbalance()
+                print (n.getbalance())
+                wallet = n.listunspent()
+                wallet.sort(key=lambda x: x["amount"],reverse=True)
+                print("%s unspent: %d" % (n.url, len(wallet)))
+                amts = [ w["amount"] for w in wallet]
+                print([ format(w, "02.8f") for w in amts])
+                
+        self.nodes[2].minedBalance = Decimal(25*99) + Decimal(12.5*1) # Have to set this manually because the last 100 blocks haven't matured
+      
+        self.nodes[1].set("wallet.coinSelSearchTime=10000")
+        self.nodes[1].set("wallet.preferredNumUTXO=10000")
+        self.nodes[1].set("wallet.txFeeOverpay=0")
         
+        self.nodes[0].set("wallet.coinSelSearchTime=100")
+        self.nodes[0].set("wallet.preferredNumUTXO=50")
+        self.nodes[0].set("wallet.txFeeOverpay=0")
+        for n in self.nodes[0:2]:
+            n.received = Decimal(0)
+            n.sent = Decimal(0)
+            n.txCount = 0
+
+        for j in range(0,count):
+            print("LOOP ", j)
+            for n in self.nodes[0:2]:
+                n.payAddr = n.getnewaddress()
+
+            for k in range(0,2):
+              if k == 0:
+                n = self.nodes[0]
+                t = self.nodes[1]                
+              elif k == 1:
+                n = self.nodes[1]
+                t = self.nodes[0]
+              else:
+                assert(0)
+
+              # to get the coinbase reward, do GBT before any txn with fees have been paid
+              self.nodes[2].minedBalance += Decimal(self.nodes[2].getblocktemplate()["coinbasevalue"])/Decimal(100000000)
+                
+              for i in range(0,50):
+                amt = Decimal(random.uniform(.01,50.0))
+                amt = amt.quantize(Decimal(10) ** -8)
+                amt = amt.normalize()
+                to = t.payAddr
+                # print ("pay %s to %s" % (str(amt),to))
+                try:
+                    n.sendtoaddress(to,amt)
+                    n.sent += amt
+                    n.txCount += 1
+                    t.received += amt                    
+                except JSONRPCException as e:
+                      if not "Insufficient funds" in e.error['message']:
+                          raise
+
+            self.sync_mempools()
+            self.nodes[2].generate(1)
+            self.sync_all()
+
+            if j&3==0:
+              for n in self.nodes:      
+                wallet = n.listunspent()
+                wallet.sort(key=lambda x: x["amount"],reverse=True)
+                print("%s unspent: %d" % (n.url, len(wallet)))
+                amts = [ w["amount"] for w in wallet]
+                print([ format(w, "02.8f") for w in amts])
+                # print(wallet)
+
+            if (j&7==0) or j==count-1:
+                print("FEE SUMMARY")
+                for n in self.nodes[0:2]:
+                    wallet = n.listunspent()
+                    bal = n.getbalance()
+                    tot = n.received + n.minedBalance - n.sent
+                    print("Tx Sent Count: %s Sent: %s Received: %s Net: %s  Balance: %s  Fees paid: %s" % (n.txCount, str(n.sent), str(n.received), str(tot), str(bal), str(tot-bal)))
+
+        self.sync_mempools()
+        self.nodes[2].generate(101)
+        self.sync_all()
+        bal = Decimal(self.nodes[2].getbalance())
+        mined = self.nodes[2].minedBalance 
+        print("mined Total: %s  Balance: %s  Fees paid: %s" % (str(mined), str(bal), str(bal-mined)))
+
+        if 1:
+                        n = self.nodes[2]
+                        wallet = n.listunspent()
+                        wallet.sort(key=lambda x: x["amount"],reverse=True)
+                        print("%s unspent: %d" % (n.url, len(wallet)))
+                        amts = [ w["amount"] for w in wallet]
+                        print([ format(w, "02.8f") for w in amts])
+
         
     def run_test(self):
         if repTest:
            self.randomUseTest(10000)
            return
-        
+        if feeTest:
+           self.feeTest(1000) 
+           return
         self.nodes[0].generate(101)  # mine enough BTC to get 1 spendable block
         a0 = self.nodes[0].getnewaddress()
         a1 = self.nodes[1].getnewaddress()
@@ -181,6 +297,12 @@ if __name__ == '__main__':
       logging.info("Running repetitive tests")
     else:
       repTest=False
+    if "--fee" in sys.argv:
+      feeTest=True
+      sys.argv.remove("--fee")
+      logging.info("Running fee tests")
+    else:
+      feeTest=False
 
     if "--extended" in sys.argv:
       longTest=True

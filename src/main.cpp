@@ -1215,7 +1215,9 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
     // is it already in the memory pool?
     uint256 hash = tx.GetHash();
     if (pool.exists(hash))
+      {
         return state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
+      }
 
     // Check for conflicts with in-memory transactions
     set<uint256> setConflicts;

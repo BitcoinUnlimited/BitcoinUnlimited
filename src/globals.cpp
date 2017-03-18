@@ -180,6 +180,9 @@ CTweakRef<unsigned int> briTweak("net.blockRetryInterval","How long to wait in m
 
 CTweakRef<std::string> subverOverrideTweak("net.subversionOverride","If set, this field will override the normal subversion field.  This is useful if you need to hide your node.",&subverOverride,&SubverValidator);
 
+CTweak<unsigned int> maxCoinSelSearchTime("wallet.coinSelSearchTime", "When sending, how long should this wallet search for a no-change payment solution in milliseconds.  A no-change solution reduces transaction fees.", 2000);
+CTweak<unsigned int> preferredNumUTXO("wallet.preferredNumUTXO", "How many UTXOs should be maintained in this wallet (on average).  If the number of UTXOs exceeds this value, transactions will be found that tend to have more inputs.  This will consolidate UTXOs.",5000);
+
 /** Number of blocks that can be requested at any given time from a single peer. */
 CTweak<unsigned int> maxBlocksInTransitPerPeer("net.maxBlocksInTransitPerPeer","Number of blocks that can be requested at any given time from a single peer. 0 means use algorithm.",0);
 /** Size of the "block download window": how far ahead of our current height do we fetch?

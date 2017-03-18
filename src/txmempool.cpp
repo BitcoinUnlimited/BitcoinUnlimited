@@ -252,6 +252,69 @@ bool CTxMemPool::CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntr
     return true;
 }
 
+bool CTxMemPool::ValidateMemPoolAncestors(const std::vector<CTxIn>& txIn, uint64_t limitAncestorCount, uint64_t limitAncestorSize, uint64_t limitDescendantCount, uint64_t limitDescendantSize, std::string &errString)
+{
+    setEntries parentHashes;
+    setEntries setAncestors;
+    int mySizeEstimate = 0;  // we don't know our own tx size yet: entry.GetTxSize();
+
+    // Get parents of this transaction that are in the mempool
+    // GetMemPoolParents() is only valid for entries in the mempool, so we
+    // iterate mapTx to find parents.
+    for (unsigned int i = 0; i < txIn.size(); i++)
+      {
+        txiter piter = mapTx.find(txIn[i].prevout.hash);
+        if (piter != mapTx.end())
+          {
+          parentHashes.insert(piter);
+          if (parentHashes.size() + 1 > limitAncestorCount)  // If we found it in the mempool, its unconfirmed
+            {
+            errString = strprintf("too many unconfirmed parents: %u [limit: %u]", parentHashes.size(), limitAncestorCount);
+            return false;
+            }
+          }
+      }
+       
+
+    size_t totalSizeWithAncestors = mySizeEstimate;  
+
+    while (!parentHashes.empty()) {
+        txiter stageit = *parentHashes.begin();
+
+        setAncestors.insert(stageit);
+        totalSizeWithAncestors += stageit->GetTxSize();
+
+        if (stageit->GetSizeWithDescendants() + mySizeEstimate > limitDescendantSize) {
+            errString = strprintf("exceeds descendant size limit for tx %s [limit: %u]", stageit->GetTx().GetHash().ToString(), limitDescendantSize);
+            return false;
+        } else if (stageit->GetCountWithDescendants() + 1 > limitDescendantCount) {
+            errString = strprintf("too many descendants for tx %s [limit: %u]", stageit->GetTx().GetHash().ToString(), limitDescendantCount);
+            return false;
+        } else if (totalSizeWithAncestors > limitAncestorSize) {
+  	    errString = strprintf(" %u exceeds ancestor size limit [limit: %u]", totalSizeWithAncestors, limitAncestorSize);
+            return false;
+        }
+
+        const setEntries & setMemPoolParents = GetMemPoolParents(stageit);
+        BOOST_FOREACH(const txiter &phash, setMemPoolParents) {
+            // If this is a new ancestor, add it.
+            if (setAncestors.count(phash) == 0) {
+                parentHashes.insert(phash);
+            }
+            if (parentHashes.size() + setAncestors.size() > limitAncestorCount) {
+                errString = strprintf("too many unconfirmed ancestors (%u+%u) [limit: %u]", parentHashes.size(), setAncestors.size(), limitAncestorCount);
+                return false;
+            }
+        }
+
+        parentHashes.erase(stageit);  // BU: Fix use after free bug by moving this last
+    }
+
+    return true;
+}
+
+
+
 void CTxMemPool::UpdateAncestorsOf(bool add, txiter it, setEntries &setAncestors)
 {
     setEntries parentIters = GetMemPoolParents(it);

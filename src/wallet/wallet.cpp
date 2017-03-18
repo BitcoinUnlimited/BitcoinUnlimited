@@ -34,7 +34,6 @@
 
 using namespace std;
 
-extern CTweak<unsigned int> txDust;
 CWallet* pwalletMain = NULL;
 const int MAX_FEE_PERCENT_OF_VALUE = 25;
 /** Transaction fee set by the user */
@@ -43,6 +42,9 @@ CAmount maxTxFee = DEFAULT_TRANSACTION_MAXFEE;
 unsigned int nTxConfirmTarget = DEFAULT_TX_CONFIRM_TARGET;
 bool bSpendZeroConfChange = DEFAULT_SPEND_ZEROCONF_CHANGE;
 bool fSendFreeTransactions = DEFAULT_SEND_FREE_TRANSACTIONS;
+
+const unsigned int P2PKH_LEN = 34;
+const unsigned int TX_HEADER_LEN = 4;
 
 const char * DEFAULT_WALLET_DAT = "wallet.dat";
 
@@ -1930,7 +1932,7 @@ void CWallet::FillAvailableCoins(const CCoinControl *coinControl)
 }
 
 
-bool CWallet::SelectCoinsBU(const CAmount& nTargetValue, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, const CCoinControl* coinControl)
+bool CWallet::SelectCoinsBU(const CAmount& nTargetValue, CFeeRate fee, unsigned int changeLen, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, const CCoinControl* coinControl)
 {
   setCoinsRet.clear();
   assert(nValueRet == 0);
@@ -1974,13 +1976,12 @@ bool CWallet::SelectCoinsBU(const CAmount& nTargetValue, std::set<std::pair<cons
     }
 
   TxoGroup g;
-  unsigned int dust = txDust.value;
-  if (dust == 0) dust = ::minRelayTxFee.GetFee(100);
-  g =  CoinSelection(available, tgtValue,dust);  // 100 is about half of a normal transaction, so overpay the fee by about half to avoid change
+  CAmount dust = minRelayTxFee.GetDust();
+  g =  CoinSelection(available, tgtValue,dust,fee,changeLen);  // 100 is about half of a normal transaction, so overpay the fee by about half to avoid change
   if ((!filled)&&(g.first == 0)) // Ok no solution was found.  So let's regenerate the TXOs and try again.
     {  
       FillAvailableCoins(coinControl);
-      g =  CoinSelection(available, tgtValue, dust);
+      g =  CoinSelection(available, tgtValue, dust,fee,changeLen);
     }
   if (g.first == 0 ) return false;  // no solution found
   
@@ -2183,23 +2184,64 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 		  nValueToSelect += nFeeRet;
                 double dPriority = 0;
 
+                int voutSize = 0;
+                txNew.vout.clear();
+                // Figure out how big the output part of the transaction is going to be
+                BOOST_FOREACH (const CRecipient& recipient, vecSend)
+                  {
+                    CTxOut txout(recipient.nAmount, recipient.scriptPubKey);
+
+                    if (recipient.fSubtractFeeFromAmount)
+                      {
+                        txout.nValue -= nFeeRet / nSubtractFeeFromAmount; // Subtract fee equally from each selected recipient
+
+                        if (fFirst) // first receiver pays the remainder not divisible by output count
+                          {
+                            fFirst = false;
+                            txout.nValue -= nFeeRet % nSubtractFeeFromAmount;
+                          }
+                      }
+
+                    if (txout.IsDust(::minRelayTxFee))
+                      {
+                        if (recipient.fSubtractFeeFromAmount && nFeeRet > 0)
+                          {
+                            if (txout.nValue < 0)
+                              strFailReason = _("The transaction amount is too small to pay the fee");
+                            else
+                              strFailReason = _("The transaction amount is too small to send after the fee has been deducted");
+                          }
+                        else
+                          strFailReason = _("Transaction amount too small");
+                        return false;
+                      }
+                    txNew.vout.push_back(txout);
+                    voutSize += txout.GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION);
+                  }
+                LogPrint("wallet","txout len %d\n", voutSize);
+
+                    
                 // Choose coins to use
                 set<pair<const CWalletTx*,unsigned int> > setCoins;
                 CAmount nValueIn = 0;
-                if (!SelectCoinsBU(nValueToSelect, setCoins, nValueIn, coinControl))
+                // TODO fixup nValueIn based on TX_HEADER_LEN+voutSize
+                CAmount feeperbyte = GetMinimumFee(1, nTxConfirmTarget, mempool);
+
+                if (!SelectCoinsBU(nValueToSelect, CFeeRate(feeperbyte), P2PKH_LEN, setCoins, nValueIn, coinControl))
 		  {
-                    strFailReason = _("Insufficient funds");
+                    strFailReason = _("Insufficient funds or funds not confirmed");
                     return false;
 		  }
 
                 do  // BU if the fee does not match, there might be extra in the selected coins to increase the fee so loop
 		  {
                     txNew.vin.clear();
-                    txNew.vout.clear();
                     wtxNew.fFromMe = true;
                     nChangePosRet = -1;
 
+                    // If I can remove the added change output from the prior loop, I can get rid of clearing and recalculating this
 		    // vouts to the payees
+                    txNew.vout.clear();
 		    BOOST_FOREACH (const CRecipient& recipient, vecSend)
 		      {
 			CTxOut txout(recipient.nAmount, recipient.scriptPubKey);
@@ -2283,7 +2325,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 			// So instead we raise the change and deduct from the recipient.
 			if (nSubtractFeeFromAmount > 0 && newTxOut.IsDust(::minRelayTxFee))
 			  {
-			    CAmount nDust = newTxOut.GetDustThreshold(::minRelayTxFee) - newTxOut.nValue;
+                            CAmount nDust = newTxOut.GetDustThreshold(::minRelayTxFee) - newTxOut.nValue;
 			    newTxOut.nValue += nDust; // raise change until no more dust
 			    for (unsigned int i = 0; i < vecSend.size(); i++) // subtract from first recipient
 			      {
@@ -2300,12 +2342,12 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 			      }
 			  }
 
-			// Never create dust outputs; if we would, just
-			// add the dust to the fee.
+			// Never create dust outputs; if we would, just add the dust to the fee.
 			if (newTxOut.IsDust(::minRelayTxFee))
 			  {
 			    nFeeRet += nChange;
 			    reservekey.ReturnKey();
+                            LogPrint("wallet","No change transaction!  Dust %d is folded into the fee\n", nChange);
 			  }
 			else
 			  {
