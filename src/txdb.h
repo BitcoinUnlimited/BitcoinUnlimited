@@ -9,17 +9,20 @@
 
 #include "coins.h"
 #include "dbwrapper.h"
+#include "chain.h"
 
 #include <map>
 #include <string>
 #include <utility>
 #include <vector>
 
+//#include <boost/function.hpp>
 
 class CBlockFileInfo;
 class CBlockIndex;
 struct CDiskTxPos;
 class uint256;
+struct CExtDiskTxPos;
 
 //! -dbcache default (MiB)
 static const int64_t nDefaultDbCache = 300; // BU Xtreme Thinblocks bump to support a larger ophan cache
@@ -27,6 +30,76 @@ static const int64_t nDefaultDbCache = 300; // BU Xtreme Thinblocks bump to supp
 static const int64_t nMaxDbCache = sizeof(void*) > 4 ? 16384 : 1024;
 //! min. -dbcache in (MiB)
 static const int64_t nMinDbCache = 4;
+
+struct CDiskTxPos : public CDiskBlockPos
+{
+    unsigned int nTxOffset; // after header
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+        READWRITE(*(CDiskBlockPos*)this);
+        READWRITE(VARINT(nTxOffset));
+    }
+
+    CDiskTxPos(const CDiskBlockPos &blockIn, unsigned int nTxOffsetIn) : CDiskBlockPos(blockIn.nFile, blockIn.nPos), nTxOffset(nTxOffsetIn) {
+    }
+
+    CDiskTxPos() {
+        SetNull();
+    }
+
+    void SetNull() {
+        CDiskBlockPos::SetNull();
+        nTxOffset = 0;
+    }
+
+    friend bool operator<(const CDiskTxPos &a, const CDiskTxPos &b) {
+        return (a.nFile < b.nFile || (
+               (a.nFile == b.nFile) && (a.nPos < b.nPos || (
+               (a.nPos == b.nPos) && (a.nTxOffset < b.nTxOffset)))));
+    }
+};
+
+struct CExtDiskTxPos : public CDiskTxPos
+{
+    unsigned int nHeight;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+            READWRITE(*(CDiskTxPos*)this);
+            READWRITE(VARINT(nHeight));
+    }
+
+    CExtDiskTxPos(const CDiskTxPos &pos, int nHeightIn) : CDiskTxPos(pos), nHeight(nHeightIn) {
+    }
+
+    CExtDiskTxPos() {
+        SetNull();
+    }
+
+    void SetNull() {
+        CDiskTxPos::SetNull();
+        nHeight = 0;
+    }
+
+    friend bool operator==(const CExtDiskTxPos &a, const CExtDiskTxPos &b) {
+        return (a.nHeight == b.nHeight && a.nFile == b.nFile && a.nPos == b.nPos && a.nTxOffset == b.nTxOffset);
+    }
+
+    friend bool operator!=(const CExtDiskTxPos &a, const CExtDiskTxPos &b) {
+        return !(a == b);
+    }
+
+    friend bool operator<(const CExtDiskTxPos &a, const CExtDiskTxPos &b) {
+        if (a.nHeight < b.nHeight) return true;
+        if (a.nHeight > b.nHeight) return false;
+        return ((const CDiskTxPos)a < (const CDiskTxPos)b);
+    }
+};
 
 /** CCoinsView backed by the coin database (chainstate/) */
 class CCoinsViewDB : public CCoinsView
@@ -51,6 +124,7 @@ class CBlockTreeDB : public CDBWrapper
 public:
     CBlockTreeDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
 private:
+    uint256 salt;
     CBlockTreeDB(const CBlockTreeDB&);
     void operator=(const CBlockTreeDB&);
 public:
@@ -61,6 +135,8 @@ public:
     bool ReadReindexing(bool &fReindex);
     bool ReadTxIndex(const uint256 &txid, CDiskTxPos &pos);
     bool WriteTxIndex(const std::vector<std::pair<uint256, CDiskTxPos> > &list);
+    bool ReadAddrIndex(uint160 addrid, std::vector<CExtDiskTxPos> &list);
+    bool AddAddrIndex(const std::vector<std::pair<uint160, CExtDiskTxPos> > &list);
     bool WriteFlag(const std::string &name, bool fValue);
     bool ReadFlag(const std::string &name, bool &fValue);
     bool LoadBlockIndexGuts();
