@@ -2782,6 +2782,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                     CCoins coins;
                     if(!view.GetCoins(txin.prevout.hash, coins)) {
                         LogPrintf("error: no coins found for: %s\n", txin.prevout.hash.ToString());
+                        LogPrintf("for block: %d, vtx.size=%d\n", pindex->nHeight, block.vtx.size());
                     	continue;
                     }
                     BuildAddrIndex(coins.vout[txin.prevout.n].scriptPubKey, pos, vPosAddrid);
