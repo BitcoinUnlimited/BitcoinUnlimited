@@ -2778,9 +2778,12 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             vPosTxid.push_back(std::make_pair(tx.GetHash(), pos));
         if (fAddrIndex) {
             if (!tx.IsCoinBase()) {
-                BOOST_FOREACH(const CTxIn &txin, tx.vin) {
+            	for (const auto& txin : tx.vin) {
                     CCoins coins;
-                    view.GetCoins(txin.prevout.hash, coins);
+                    if(!view.GetCoins(txin.prevout.hash, coins)) {
+                        LogPrintf("error: no coins found for: %s\n", txin.prevout.hash.ToString());
+                    	continue;
+                    }
                     BuildAddrIndex(coins.vout[txin.prevout.n].scriptPubKey, pos, vPosAddrid);
                 }
             }
