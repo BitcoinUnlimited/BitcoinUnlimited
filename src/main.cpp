@@ -2778,18 +2778,20 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             vPosTxid.push_back(std::make_pair(tx.GetHash(), pos));
         if (fAddrIndex) {
             if (!tx.IsCoinBase()) {
-            	for (const auto& txin : tx.vin) {
+                for (const auto& txin : tx.vin) {
                     CCoins coins;
-                    if(!view.GetCoins(txin.prevout.hash, coins)) {
-                        LogPrintf("error: no coins found for: %s\n", txin.prevout.hash.ToString());
-                        LogPrintf("for block: %d, vtx.size=%d\n", pindex->nHeight, block.vtx.size());
-                    	continue;
+                    if (!viewTempCache.GetCoins(txin.prevout.hash, coins)) {
+                        LogPrintf(
+                                "error: no coins found for: %s\n\tfor block: %d, vtx.size=%d\n",
+                                txin.prevout.hash.ToString(), pindex->nHeight, block.vtx.size());
+                        return AbortNode(state, "Failed to write AddrIndex");
                     }
                     BuildAddrIndex(coins.vout[txin.prevout.n].scriptPubKey, pos, vPosAddrid);
                 }
             }
-            BOOST_FOREACH(const CTxOut &txout, tx.vout)
-            BuildAddrIndex(txout.scriptPubKey, pos, vPosAddrid);
+            for (const CTxOut &txout : tx.vout) {
+                BuildAddrIndex(txout.scriptPubKey, pos, vPosAddrid);
+            }
         }
 
         CTxUndo undoDummy;
