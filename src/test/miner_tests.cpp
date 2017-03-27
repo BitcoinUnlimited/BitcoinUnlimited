@@ -91,19 +91,19 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     fCheckpointsEnabled = false;
 
     // Simple block creation, nothing special yet:
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(chainparams, scriptPubKey));
+    BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
 
     // Simple block creation, with coinbase message
     settingsToUserAgentString();
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(chainparams, scriptPubKey));
+    BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
 
     // Simple block creation, with coinbase message and miner message
     settingsToUserAgentString();
     minerComment = "I am a meat popsicle.";
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(chainparams, scriptPubKey));
+    BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
 
     minerComment = "flying is throwing yourself against the ground and missing.  This comment is WAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY too long.";
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(chainparams, scriptPubKey));
+    BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
 
     // We can't make transactions until we have inputs
     // Therefore, load 100 blocks :)
@@ -135,7 +135,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     delete pblocktemplate;
 
     // Just to make sure we can still make simple blocks
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(chainparams, scriptPubKey));
+    BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
     delete pblocktemplate;
 
     // block sigops > limit: 1000 CHECKMULTISIG + 1
@@ -155,7 +155,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).SpendsCoinbase(spendsCoinbase).FromTx(tx));
         tx.vin[0].prevout.hash = hash;
     }
-    BOOST_CHECK_THROW(CreateNewBlock(chainparams, scriptPubKey), std::runtime_error);
+    BOOST_CHECK_THROW(BlockAssembler(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error);
     mempool.clear();
 
     tx.vin[0].prevout.hash = txFirst[0]->GetHash();
@@ -169,8 +169,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).SpendsCoinbase(spendsCoinbase).SigOps(20).FromTx(tx));
         tx.vin[0].prevout.hash = hash;
     }
-    pblocktemplate = CreateNewBlock(chainparams, scriptPubKey);
-    BOOST_CHECK(pblocktemplate);
+    BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
     delete pblocktemplate;
 
     // Now generate lots of full size blocks and verify that none exceed the maxGeneratedBlock value, the mempool has 65k bytes of tx in it so this code will test both saturated and unsaturated blocks.
@@ -178,7 +177,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     {
       maxGeneratedBlock = i;
 
-      pblocktemplate = CreateNewBlock(chainparams, scriptPubKey);
+      pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey);
       BOOST_CHECK(pblocktemplate);
       BOOST_CHECK(pblocktemplate->block.fExcessive == false);
       BOOST_CHECK(pblocktemplate->block.nBlockSize <= maxGeneratedBlock);
@@ -187,23 +186,33 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
       //printf("%lu %lu <= %lu\n", (long unsigned int) blockSize, (long unsigned int) pblocktemplate->block.nBlockSize, (long unsigned int) maxGeneratedBlock);
       delete pblocktemplate;
     }
+
+    BOOST_CHECK(chainActive.Tip().nHeight() == 110);
+    bool hadMaximal = false;
 
     coinbaseReserve.value=0;  // Test no reserve
      // Now generate lots of full size blocks and verify that none exceed the maxGeneratedBlock value
-    for (unsigned int i = 2000; i <= 20000; i+=773)
+    for (unsigned int i = 2000; i <= 30000; i+=97)
     {
       maxGeneratedBlock = i;
 
-      pblocktemplate = CreateNewBlock(chainparams, scriptPubKey);
+      pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey);
       BOOST_CHECK(pblocktemplate);
       BOOST_CHECK(pblocktemplate->block.fExcessive == false);
       BOOST_CHECK(pblocktemplate->block.nBlockSize <= maxGeneratedBlock);
       unsigned int blockSize = pblocktemplate->block.GetSerializeSize(SER_NETWORK, CTransaction::CURRENT_VERSION);
-      BOOST_CHECK(blockSize <= maxGeneratedBlock);
+      // Why -2?  Height of 110 serializes in CScript as 2 bytes.  miner.cpp reserves 4 bytes.
+      BOOST_CHECK(blockSize <= maxGeneratedBlock - 2);
+      if (blockSize == maxGeneratedBlock - 2)
+        hadMaximal = true;
       //printf("%lu %lu <= %lu\n", (long unsigned int) blockSize, (long unsigned int) pblocktemplate->block.nBlockSize, (long unsigned int) maxGeneratedBlock);
       delete pblocktemplate;
     }
 
+    // Assert we went right up to the limit
+    BOOST_CHECK(hadMaximal);
+
+    hadMaximal = false
     std::string testMinerComment("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM__________");
      // Now generate lots of full size blocks and verify that none exceed the maxGeneratedBlock value
     //printf("test mining with different sized miner comments");
@@ -213,16 +222,22 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
       if ((i%100) > 0) minerComment = testMinerComment.substr(0,i%100);
       else minerComment = "";
       //minerComment = testMinerComment.substr(0,i%100);
-      pblocktemplate = CreateNewBlock(chainparams, scriptPubKey);
+      pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey);
       BOOST_CHECK(pblocktemplate);
       BOOST_CHECK(pblocktemplate->block.fExcessive == false);
       BOOST_CHECK(pblocktemplate->block.nBlockSize <= maxGeneratedBlock);
       unsigned int blockSize = pblocktemplate->block.GetSerializeSize(SER_NETWORK, CTransaction::CURRENT_VERSION);
-      BOOST_CHECK(blockSize <= maxGeneratedBlock);
+      // Why -2?  Height of 110 serializes in CScript as 2 bytes.  miner.cpp reserves 4 bytes.
+      BOOST_CHECK(blockSize <= maxGeneratedBlock - 2);
+      if (blockSize == maxGeneratedBlock - 2)
+        hadMaximal = true;
       //printf("%lu %lu (miner comment is %d) <= %lu\n", (long unsigned int) blockSize, (long unsigned int) pblocktemplate->block.nBlockSize, i%100, (long unsigned int) maxGeneratedBlock);
       delete pblocktemplate;
     }
-    
+
+    // Assert we went right up to the limit
+    BOOST_CHECK(hadMaximal);
+
     mempool.clear();
 
     // block size > limit
@@ -242,14 +257,14 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).SpendsCoinbase(spendsCoinbase).FromTx(tx));
         tx.vin[0].prevout.hash = hash;
     }
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(chainparams, scriptPubKey));
+    BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
     delete pblocktemplate;
     mempool.clear();
 
     // orphan in mempool, template creation fails
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).FromTx(tx));
-    BOOST_CHECK_THROW(CreateNewBlock(chainparams, scriptPubKey), std::runtime_error);
+    BOOST_CHECK_THROW(BlockAssembler(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error);
     mempool.clear();
 
     // child with higher priority than parent
@@ -266,7 +281,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.vout[0].nValue = 5900000000LL;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(400000000LL).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(chainparams, scriptPubKey));
+    BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
     delete pblocktemplate;
     mempool.clear();
 
@@ -278,7 +293,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     hash = tx.GetHash();
     // give it a fee so it'll get mined
     mempool.addUnchecked(hash, entry.Fee(100000).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
-    BOOST_CHECK_THROW(CreateNewBlock(chainparams, scriptPubKey), std::runtime_error);
+    BOOST_CHECK_THROW(BlockAssembler(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error);
     mempool.clear();
 
     // invalid (pre-p2sh) txn in mempool, template creation fails
@@ -295,7 +310,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.vout[0].nValue -= 1000000;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
-    BOOST_CHECK_THROW(CreateNewBlock(chainparams, scriptPubKey), std::runtime_error);
+    BOOST_CHECK_THROW(BlockAssembler(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error);
     mempool.clear();
 
     // double spend txn pair in mempool, template creation fails
@@ -308,7 +323,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.vout[0].scriptPubKey = CScript() << OP_2;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(100000000L).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
-    BOOST_CHECK_THROW(CreateNewBlock(chainparams, scriptPubKey), std::runtime_error);
+    BOOST_CHECK_THROW(BlockAssembler(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error);
     mempool.clear();
 
     // subsidy changing
@@ -324,7 +339,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         next->BuildSkip();
         chainActive.SetTip(next);
     }
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(chainparams, scriptPubKey));
+    BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
     delete pblocktemplate;
     // Extend to a 210000-long block chain.
     while (chainActive.Tip()->nHeight < 210000) {
@@ -337,7 +352,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         next->BuildSkip();
         chainActive.SetTip(next);
     }
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(chainparams, scriptPubKey));
+    BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
     delete pblocktemplate;
     // Delete the dummy blocks again.
     while (chainActive.Tip()->nHeight > nHeight) {
@@ -424,7 +439,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.vin[0].nSequence = CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG | 1;
     BOOST_CHECK(!TestSequenceLocks(tx, flags)); // Sequence locks fail
 
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(chainparams, scriptPubKey));
+    BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
 
     // None of the of the absolute height/time locked tx should have made
     // it into the template because we still check IsFinalTx in CreateNewBlock,
@@ -438,7 +453,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     chainActive.Tip()->nHeight++;
     SetMockTime(chainActive.Tip()->GetMedianTimePast() + 1);
 
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(chainparams, scriptPubKey));
+    BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
     BOOST_CHECK_EQUAL(pblocktemplate->block.vtx.size(), 5);
     delete pblocktemplate;
 
