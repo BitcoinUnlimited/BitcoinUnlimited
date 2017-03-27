@@ -474,13 +474,15 @@ void CRequestManager::SendRequests()
     }
 
     // Get Blocks
-    for (vector<uint256>::iterator sendBlkIter = vBlockRequestOrder.begin(); sendBlkIter != vBlockRequestOrder.end(); sendBlkIter++)
+    sendBlkIter = vBlockRequestOrder.begin();
+    while (sendBlkIter != vBlockRequestOrder.end())
     {
         now = GetTimeMicros();
         OdMap::iterator itemIter = mapBlkInfo.find((*sendBlkIter));
         if (itemIter == mapBlkInfo.end())
             break;
         CUnknownObj& item = itemIter->second;
+        sendBlkIter++;
 
         if (now-item.lastRequestTime > blkReqRetryInterval)  // if never requested then lastRequestTime==0 so this will always be true
         {
