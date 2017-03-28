@@ -291,6 +291,11 @@ struct CNodeState {
     int64_t fSyncStartTime;
     //! Were the first headers requested in a sync received
     bool fFirstHeadersReceived;
+    //! Whether the sync was completed for this node
+    bool fSyncCompleted;
+    //! Last time headers were received for this node
+    int64_t nLastHeadersReceived;
+
     //! Since when we're stalling block download progress (in microseconds), or 0.
     int64_t nStallingSince;
     list<QueuedBlock> vBlocksInFlight;
@@ -312,6 +317,8 @@ struct CNodeState {
         pindexLastCommonBlock = NULL;
         pindexBestHeaderSent = NULL;
         fSyncStarted = false;
+        fSyncCompleted = false;
+        fFirstHeadersReceived = false;
         nStallingSince = 0;
         nDownloadingSince = 0;
         nBlocksInFlight = 0;
@@ -5866,8 +5873,19 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             }
         }
 
-        if (pindexLast)
+        if (pindexLast) {
             UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
+
+            // During initial sync the node providing the headers should be giving us large batches of them
+            // and not just trickling them down to us, which is a possible DOS vector.  An attack node would
+            // want to connect and then trickle us the headers which would prevent a timely sync.
+            if ((nCount < MAX_HEADERS_RESULTS) &&
+                (pindexLast->nHeight <= pfrom->nStartingHeight - (int)MAX_HEADERS_RESULTS))
+            { 
+                Misbehaving(pfrom->GetId(), 20);
+                return error("Node not providing enough headers  = %u  peer=%d", nCount, pfrom->id);
+            }
+        }
 
         if (nCount == MAX_HEADERS_RESULTS && pindexLast) {
             // Headers message had its maximum size; the peer may have more headers.
@@ -5879,7 +5897,20 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         bool fCanDirectFetch = CanDirectFetch(chainparams.GetConsensus());
         CNodeState *nodestate = State(pfrom->GetId());
-        nodestate->fFirstHeadersReceived = true;
+        // Do the the checks for if the node has completed it's download of initial headers
+        if (!nodestate->fSyncCompleted)
+        {
+            nodestate->fFirstHeadersReceived = true;
+            nodestate->nLastHeadersReceived = GetTime();
+            LogPrint("net", "Received first headers for node %d\n", pfrom->id);
+
+            if (pindexLast->nHeight >= pfrom->nStartingHeight)
+            {
+                nodestate->fSyncCompleted = true;
+                LogPrint("net", "Received last headers. Sync successful for node %d\n", pfrom->id);
+            }
+        }
+
         // If this set of headers is valid and ends in a block with at least as
         // much work as our tip, download as much as possible.
         if (fCanDirectFetch && pindexLast && pindexLast->IsValid(BLOCK_VALID_TREE) && chainActive.Tip()->nChainWork <= pindexLast->nChainWork) {
@@ -6712,13 +6743,28 @@ bool SendMessages(CNode* pto)
             pto->PushMessage(NetMsgType::REJECT, (string)NetMsgType::BLOCK, reject.chRejectCode, reject.strRejectReason, reject.hashBlock);
         state.rejects.clear();
 
-        // If a sync has been started check whether we received the first batch of headers requested within the timeout period.
-        // If not then disconnect and ban the node and a new node will automatically be selected to start the headers download.
-        if ((state.fSyncStarted) && (state.fSyncStartTime < GetTime() - INITIAL_HEADERS_TIMEOUT) && (!state.fFirstHeadersReceived)) {
+        // If a sync has been started check whether we received the first batch of headers requested within the timeout
+        // period. If not then disconnect and ban the node and a new node will automatically be selected to start the
+        // headers download.
+        if ((state.fSyncStarted) && (state.fSyncStartTime < GetTime() - INITIAL_HEADERS_TIMEOUT) &&
+            (!state.fFirstHeadersReceived) && !pto->fWhitelisted)
+        {
             pto->fDisconnect = true;
             CNode::Ban(pto->addr, BanReasonNodeMisbehaving, 4*60*60); // ban for 4 hours
-            LogPrintf("Banning %s because initial headers were either not received or not received before the timeout\n", pto->addr.ToString());
+            return error("Banning %s because initial headers were either not received or not received before the "
+                         "timeout", pto->addr.ToString());
         }
+        else if (state.fSyncStarted && !state.fSyncCompleted && state.fFirstHeadersReceived && !pto->fWhitelisted)
+        {
+            if (state.nLastHeadersReceived < GetTime() - HEADERS_DOWNLOAD_TIMEOUT)
+            {
+                pto->fDisconnect = true;
+                CNode::Ban(pto->addr, BanReasonNodeMisbehaving, 4*60*60); // ban for 4 hours
+                return error("Banning %s because headers were either not received or not received before the "
+                             "timeout", pto->addr.ToString());
+            }
+        }
+
 
         // Start block sync
         if (pindexBestHeader == NULL)
