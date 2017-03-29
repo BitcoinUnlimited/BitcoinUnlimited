@@ -84,7 +84,6 @@ size_t nCoinCacheUsage = 5000 * 300;
 uint64_t nPruneTarget = 0;
 bool fEnableReplacement = DEFAULT_ENABLE_REPLACEMENT;
 
-/** Fees smaller than this (in satoshi) are considered zero fee (for relaying, mining and transaction creation) */
 CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
 
 // BU: Move global objects to a single file
@@ -108,7 +107,7 @@ static unsigned int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 1;
  *  Larger windows tolerate larger download speed differences between peer, but increase the potential
  *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
  *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
-static unsigned int BLOCK_DOWNLOAD_WINDOW = 8;
+static unsigned int BLOCK_DOWNLOAD_WINDOW = 256;
 
 extern CTweak<unsigned int> maxBlocksInTransitPerPeer;  // override the above
 extern CTweak<unsigned int> blockDownloadWindow;
@@ -129,6 +128,8 @@ const string strMessageMagic = "Bitcoin Signed Message:\n";
 
 extern CStatHistory<uint64_t> nTxValidationTime;
 extern CStatHistory<uint64_t> nBlockValidationTime;
+extern CCriticalSection cs_blockvalidationtime;
+
 extern CCriticalSection cs_LastBlockFile;
 extern CCriticalSection cs_nBlockSequenceId;
 
@@ -401,27 +402,21 @@ bool MarkBlockAsReceived(const uint256& hash) {
         avgResponseTime += nResponseTime / blockRange;
         if (avgResponseTime < 0.2) {
             MAX_BLOCKS_IN_TRANSIT_PER_PEER = 32;
-            BLOCK_DOWNLOAD_WINDOW = 256;
         }
         else if (avgResponseTime < 0.5) {
             MAX_BLOCKS_IN_TRANSIT_PER_PEER = 16;
-            BLOCK_DOWNLOAD_WINDOW = 128;
         }
         else if (avgResponseTime < 0.9) {
             MAX_BLOCKS_IN_TRANSIT_PER_PEER = 8;
-            BLOCK_DOWNLOAD_WINDOW = 64;
         }
         else if (avgResponseTime < 1.4) {
             MAX_BLOCKS_IN_TRANSIT_PER_PEER = 4;
-            BLOCK_DOWNLOAD_WINDOW = 32;
         }
         else if (avgResponseTime < 2.0) {
             MAX_BLOCKS_IN_TRANSIT_PER_PEER = 2;
-            BLOCK_DOWNLOAD_WINDOW = 16;
         }
         else  {
             MAX_BLOCKS_IN_TRANSIT_PER_PEER = 1;
-            BLOCK_DOWNLOAD_WINDOW = 8;
         }
 
         LogPrint("thin", "Received block %s in %.2f seconds\n", hash.ToString(), nResponseTime);
@@ -572,10 +567,11 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
 
     std::vector<CBlockIndex*> vToFetch;
     CBlockIndex *pindexWalk = state->pindexLastCommonBlock;
-    // Never fetch further than the best block we know the peer has, or more than BLOCK_DOWNLOAD_WINDOW + 1 beyond the last
-    // linked block we have in common with this peer. The +1 is so we can detect stalling, namely if we would be able to
-    // download that next block if the window were 1 larger.
-    int nWindowEnd = state->pindexLastCommonBlock->nHeight + BLOCK_DOWNLOAD_WINDOW;
+    // Never fetch further than the current chain tip + the block download window.  We need to ensure
+    // the if running in pruning mode we don't download too many blocks ahead and as a result use to
+    // much disk space to store unconnected blocks.
+    int nWindowEnd = chainActive.Height() + BLOCK_DOWNLOAD_WINDOW;
+
     int nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
     NodeId waitingfor = -1;
     while (pindexWalk->nHeight < nMaxHeight) {
@@ -1447,10 +1443,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
         // BU: we calculate the recommended fee by looking at what's in the mempool.  This starts at 0 though for an
         // empty mempool.  So set the minimum "absurd" fee to 10000 satoshies per byte.  If for some reason fees rise
         // above that, you can specify up to 100x what other txns are paying in the mempool
-        if (fRejectAbsurdFee && nFees > std::max((int64_t)100L*nSize,(int64_t)::minRelayTxFee.GetFee(nSize)) * 100 )
+        if (fRejectAbsurdFee && nFees > std::max((int64_t)100L*nSize, maxTxFee.value) * 100 )
             return state.Invalid(false,
                 REJECT_HIGHFEE, "absurdly-high-fee",
-				 strprintf("%d > %d", nFees, std::max((int64_t)1L,(int64_t)::minRelayTxFee.GetFee(nSize)) * 10000));
+				 strprintf("%d > %d", nFees, std::max((int64_t)1L, maxTxFee.value) * 10000));
 
         // Calculate in-mempool ancestors, up to a limit.
         CTxMemPool::setEntries setAncestors;
@@ -4093,6 +4089,11 @@ bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, c
         LogPrintf("Invalid block: ver:%x time:%d Tx size:%d len:%d\n", pblock->nVersion, pblock->nTime, pblock->vtx.size(),byteLen);
     }
 
+    // WARNING: cs_main is not locked here throughout but is released and then re-locked during ActivateBestChain
+    //          If you lock cs_main throughout ProcessNewBlock then you will in effect prevent PV from happening.
+    //          TODO: in order to lock cs_main all the way through we must remove the locking from ActivateBestChain
+    //                but it will require great care because ActivateBestChain requires cs_main however it is also
+    //                called from other places.  Currently it seems best to leave cs_main here as is.
     {
         LOCK(cs_main);
         bool fRequested = MarkBlockAsReceived(pblock->GetHash());
@@ -4154,7 +4155,9 @@ bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, c
     LogPrint("bench", "tx: %s, vin: %llu, vout: %llu, len: %d\n", txIn.GetHash().ToString(), txIn.vin.size(), txIn.vout.size(), ::GetSerializeSize(txIn,SER_NETWORK, PROTOCOL_VERSION));
     LogPrint("bench", "tx: %s, vin: %llu, vout: %llu, len: %d\n", txOut.GetHash().ToString(), txOut.vin.size(), txOut.vout.size(), ::GetSerializeSize(txOut,SER_NETWORK, PROTOCOL_VERSION));
     LogPrint("bench", "tx: %s, vin: %llu, vout: %llu, len: %d\n", txLen.GetHash().ToString(), txLen.vin.size(), txLen.vout.size(), ::GetSerializeSize(txLen,SER_NETWORK, PROTOCOL_VERSION));
-    nBlockValidationTime << (end-start);
+
+    LOCK(cs_blockvalidationtime);
+    nBlockValidationTime << (end - start);
     return true;
 }
 
