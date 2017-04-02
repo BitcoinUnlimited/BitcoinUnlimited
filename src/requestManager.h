@@ -79,7 +79,7 @@ protected:
     CCriticalSection cs_objDownloader; // protects mapTxnInfo and mapBlkInfo
 
     OdMap::iterator sendIter;
-    OdMap::iterator sendBlkIter;
+    std::vector<uint256>::iterator sendBlkIter;
 
     int inFlight;
     // int maxInFlight;

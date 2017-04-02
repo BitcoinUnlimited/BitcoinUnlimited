@@ -80,9 +80,7 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
     droppedTxns -= (item.outstandingReqs - 1);
     pendingTxns -= 1;
 
-    LOCK(cs_vNodes);
-
-    // remove all the source nodes
+     // remove all the source nodes
     for (CUnknownObj::ObjectSourceList::iterator i = item.availableFrom.begin(); i != item.availableFrom.end(); ++i)
     {
         CNode *node = i->node;
@@ -141,8 +139,8 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, int priority)
     }
     else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_THINBLOCK) || (obj.type == MSG_XTHINBLOCK))
     {
-        uint256 temp = obj.hash;
-        OdMap::value_type v(temp, CUnknownObj());
+        uint256 hash = obj.hash;
+        OdMap::value_type v(hash, CUnknownObj());
 
         // for blocks we must add to both mapBlkInfo and vBlockRequestOrder
         std::pair<OdMap::iterator,bool> result = mapBlkInfo.insert(v);
@@ -348,7 +346,7 @@ void CUnknownObj::AddSource(CNode *from)
     }
 }
 
-void RequestBlock(CNode *pfrom, CInv obj)
+bool RequestBlock(CNode *pfrom, CInv obj)
 {
     const CChainParams &chainParams = Params();
 
@@ -481,7 +479,7 @@ void CRequestManager::SendRequests()
         OdMap::iterator itemIter = mapBlkInfo.find((*sendBlkIter));
         if (itemIter == mapBlkInfo.end())
             break;
-        CUnknownObj& item = itemIter->second;
+        CUnknownObj &item = itemIter->second;
         sendBlkIter++;
 
         if (now-item.lastRequestTime > blkReqRetryInterval)  // if never requested then lastRequestTime==0 so this will always be true
