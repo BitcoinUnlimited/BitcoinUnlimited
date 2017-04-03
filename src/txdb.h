@@ -22,7 +22,8 @@ struct CDiskTxPos;
 class uint256;
 
 //! -dbcache default (MiB)
-static const int64_t nDefaultDbCache = 300; // BU Xtreme Thinblocks bump to support a larger ophan cache
+// BU Xtreme Thinblocks bump to support a larger ophan cache
+static const int64_t nDefaultDbCache = 300; 
 //! max. -dbcache in (MiB)
 static const int64_t nMaxDbCache = sizeof(void*) > 4 ? 16384 : 1024;
 //! min. -dbcache in (MiB)
@@ -66,4 +67,5 @@ public:
     bool LoadBlockIndexGuts();
 };
 
-#endif // BITCOIN_TXDB_H
+// BITCOIN_TXDB_H
+#endif 

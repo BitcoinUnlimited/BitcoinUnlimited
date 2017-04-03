@@ -26,8 +26,10 @@
 /** Used by SanitizeString() */
 enum SafeChars
 {
-    SAFE_CHARS_DEFAULT, //!< The full set of allowed chars
-    SAFE_CHARS_UA_COMMENT //!< BIP-0014 subset
+    //!< The full set of allowed chars
+    SAFE_CHARS_DEFAULT, 
+    //!< BIP-0014 subset
+    SAFE_CHARS_UA_COMMENT 
 };
 
 /**
@@ -131,4 +133,5 @@ bool TimingResistantEqual(const T& a, const T& b)
  */
 bool ParseFixedPoint(const std::string &val, int decimals, int64_t *amount_out);
 
-#endif // BITCOIN_UTILSTRENCODINGS_H
+// BITCOIN_UTILSTRENCODINGS_H
+#endif 

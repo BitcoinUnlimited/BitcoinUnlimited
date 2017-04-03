@@ -140,12 +140,14 @@ void TorControlConnection::readcb(struct bufferevent *bev, void *ctx)
     {
         std::string s(line, n_read_out);
         free(line);
-        if (s.size() < 4) // Short line
+        // Short line
+        if (s.size() < 4) 
             continue;
         // <status>(-|+| )<data><CRLF>
         self->message.code = atoi(s.substr(0,3));
         self->message.lines.push_back(s.substr(4));
-        char ch = s[3]; // '-','+' or ' '
+        // '-','+' or ' '
+        char ch = s[3]; 
         if (ch == ' ') {
             // Final line, dispatch reply and clean up
             if (self->message.code >= 600) {
@@ -254,7 +256,8 @@ static std::pair<std::string,std::string> SplitTorReplyLine(const std::string &s
         ++ptr;
     }
     if (ptr < s.size())
-        ++ptr; // skip ' '
+        // skip ' '
+        ++ptr; 
     return make_pair(type, s.substr(ptr));
 }
 
@@ -270,32 +273,40 @@ static std::map<std::string,std::string> ParseTorReplyMapping(const std::string 
             key.push_back(s[ptr]);
             ++ptr;
         }
-        if (ptr == s.size()) // unexpected end of line
+        // unexpected end of line
+        if (ptr == s.size()) 
             return std::map<std::string,std::string>();
-        ++ptr; // skip '='
-        if (ptr < s.size() && s[ptr] == '"') { // Quoted string
-            ++ptr; // skip '='
+        // skip '='
+        ++ptr; 
+        // Quoted string
+        if (ptr < s.size() && s[ptr] == '"') { 
+            // skip '='
+            ++ptr; 
             bool escape_next = false;
             while (ptr < s.size() && (!escape_next && s[ptr] != '"')) {
                 escape_next = (s[ptr] == '\\');
                 value.push_back(s[ptr]);
                 ++ptr;
             }
-            if (ptr == s.size()) // unexpected end of line
+            // unexpected end of line
+            if (ptr == s.size()) 
                 return std::map<std::string,std::string>();
-            ++ptr; // skip closing '"'
+            // skip closing '"'
+            ++ptr; 
             /* TODO: unescape value - according to the spec this depends on the
              * context, some strings use C-LogPrintf style escape codes, some
              * don't. So may be better handled at the call site.
              */
-        } else { // Unquoted value. Note that values can contain '=' at will, just no spaces
+        // Unquoted value. Note that values can contain '=' at will, just no spaces
+        } else { 
             while (ptr < s.size() && s[ptr] != ' ') {
                 value.push_back(s[ptr]);
                 ++ptr;
             }
         }
         if (ptr < s.size() && s[ptr] == ' ')
-            ++ptr; // skip ' ' after key=value
+            // skip ' ' after key=value
+            ++ptr; 
         mapping[key] = value;
     }
     return mapping;
@@ -443,7 +454,8 @@ void TorController::add_onion_cb(TorControlConnection& conn, const TorControlRep
         }
         AddLocal(service, LOCAL_MANUAL);
         // ... onion requested - keep connection open
-    } else if (reply.code == 510) { // 510 Unrecognized command
+    // 510 Unrecognized command
+    } else if (reply.code == 510) { 
         LogPrintf("tor: Add onion failed with unrecognized command (You probably need to upgrade Tor)\n");
     } else {
         LogPrintf("tor: Add onion failed; error code %d\n", reply.code);
@@ -464,8 +476,10 @@ void TorController::auth_cb(TorControlConnection& conn, const TorControlReply& r
         }
 
         // Finally - now create the service
-        if (private_key.empty()) // No private key, generate one
-            private_key = "NEW:RSA1024"; // Explicitly request RSA1024 - see issue #9214
+        // No private key, generate one
+        if (private_key.empty()) 
+            // Explicitly request RSA1024 - see issue #9214
+            private_key = "NEW:RSA1024"; 
         // Request hidden service, redirect port.
         // Note that the 'virtual' port doesn't have to be the same as our internal port, but this is just a convenient
         // choice.  TODO; refactor the shutdown sequence some day.

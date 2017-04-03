@@ -68,7 +68,8 @@ bool ParseMoney(const char* pszIn, CAmount& nRet)
     for (; *p; p++)
         if (!isspace(*p))
             return false;
-    if (strWhole.size() > 10) // guard against 63 bit overflow
+    // guard against 63 bit overflow
+    if (strWhole.size() > 10) 
         return false;
     if (nUnits < 0 || nUnits > COIN)
         return false;
