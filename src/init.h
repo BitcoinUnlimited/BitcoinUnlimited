@@ -15,7 +15,8 @@ class CWallet;
 namespace boost
 {
 class thread_group;
-} // namespace boost
+// namespace boost
+} 
 
 void StartShutdown();
 bool ShutdownRequested();
@@ -42,4 +43,5 @@ std::string HelpMessage(HelpMessageMode mode);
 /** Returns licensing information (for -version) */
 std::string LicenseInfo();
 
-#endif // BITCOIN_INIT_H
+// BITCOIN_INIT_H
+#endif 

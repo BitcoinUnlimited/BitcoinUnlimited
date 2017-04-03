@@ -32,7 +32,8 @@ static leveldb::Options GetOptions(size_t nCacheSize)
 {
     leveldb::Options options;
     options.block_cache = leveldb::NewLRUCache(nCacheSize / 2);
-    options.write_buffer_size = nCacheSize / 4; // up to two write buffers may be held in memory simultaneously
+    // up to two write buffers may be held in memory simultaneously
+    options.write_buffer_size = nCacheSize / 4; 
     options.filter_policy = leveldb::NewBloomFilterPolicy(10);
     options.compression = leveldb::kNoCompression;
     options.max_open_files = 64;

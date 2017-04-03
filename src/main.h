@@ -59,7 +59,8 @@ static const CAmount HIGH_TX_FEE_PER_KB = 0.01 * COIN;
 //! -maxtxfee will warn if called with a higher fee than this amount (in satoshis)
 static const CAmount HIGH_MAX_TX_FEE = 100 * HIGH_TX_FEE_PER_KB;
 /** Default for -maxorphantx, maximum number of orphan transactions kept in memory */
-static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 5000;  // BU Xtreme Thinblocks change to 5000 or 25MB (5000 x 5000KB max orphan size)
+// BU Xtreme Thinblocks change to 5000 or 25MB (5000 x 5000KB max orphan size)
+static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 5000;  
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
 static const unsigned int DEFAULT_ANCESTOR_LIMIT = 25;
 /** Default for -limitancestorsize, maximum kilobytes of tx + all in-mempool ancestors */
@@ -73,11 +74,14 @@ static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 72;
 /** Default for -orphanpoolexpiry, expiration time for orphan pool transactions in hours */
 static const unsigned int DEFAULT_ORPHANPOOL_EXPIRY = 4;
 /** The maximum size of a blk?????.dat file (since 0.8) */
-static const unsigned int MAX_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
+// 128 MiB
+static const unsigned int MAX_BLOCKFILE_SIZE = 0x8000000; 
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
-static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
+// 16 MiB
+static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; 
 /** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
-static const unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
+// 1 MiB
+static const unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; 
 
 /** Maximum number of script-checking threads allowed */
 static const int MAX_SCRIPTCHECK_THREADS = 16;
@@ -87,7 +91,8 @@ static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
 //static const int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 16;
 /** Timeout in seconds during which a peer must stall block download progress before being disconnected. */
 //static const unsigned int BLOCK_STALLING_TIMEOUT = 2;
-static const unsigned int BLOCK_STALLING_TIMEOUT = 60; // BU: request manager handles block timeouts at 30 seconds
+// BU: request manager handles block timeouts at 30 seconds
+static const unsigned int BLOCK_STALLING_TIMEOUT = 60; 
 /** Number of headers sent in one getheaders result. We rely on the assumption that if a peer sends
  *  less than this number, we reached its tip. Changing this value is a protocol upgrade. */
 static const unsigned int MAX_HEADERS_RESULTS = 2000;
@@ -129,7 +134,8 @@ static const unsigned int DEFAULT_BANSCORE_THRESHOLD = 100;
 
 static const bool DEFAULT_TESTSAFEMODE = false;
 /** Default for -mempoolreplacement */
-static const bool DEFAULT_ENABLE_REPLACEMENT = false;  // BUIP004: Replace by fee is NOT allowed.
+// BUIP004: Replace by fee is NOT allowed.
+static const bool DEFAULT_ENABLE_REPLACEMENT = false;  
 
 /** Maximum number of headers to announce when relaying blocks with headers message.*/
 static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 8;
@@ -163,7 +169,8 @@ extern size_t nCoinCacheUsage;
 extern CFeeRate minRelayTxFee;
 /** Absolute maximum transaction fee (in satoshis) used by wallet and mempool (rejects high fee in sendrawtransaction) */
 extern CTweak<CAmount> maxTxFee;
-extern bool fEnableReplacement;  // BU TODO is this RBF flag?
+// BU TODO is this RBF flag?
+extern bool fEnableReplacement;  
 /** If the tip is older than this (in seconds), the node is considered to be in initial block download. */
 extern int64_t nMaxTipAge;
 
@@ -310,7 +317,8 @@ struct CNodeStateStats {
 
 struct CDiskTxPos : public CDiskBlockPos
 {
-    unsigned int nTxOffset; // after header
+    // after header
+    unsigned int nTxOffset; 
 
     ADD_SERIALIZE_METHODS;
 
@@ -457,7 +465,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
 /** Context-independent validity checks */
 bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool fCheckPOW = true);
-bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW = true, bool fCheckMerkleRoot = true, bool conservative = false); // BU: returns the blocksize if block is valid.  Otherwise 0
+// BU: returns the blocksize if block is valid.  Otherwise 0
+bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW = true, bool fCheckMerkleRoot = true, bool conservative = false); 
 
 /** Context-dependent validity checks */
 bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex *pindexPrev);
@@ -477,13 +486,20 @@ bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state, CBloc
 class CBlockFileInfo
 {
 public:
-    unsigned int nBlocks;      //! number of blocks stored in file
-    unsigned int nSize;        //! number of used bytes of block file
-    unsigned int nUndoSize;    //! number of used bytes in the undo file
-    unsigned int nHeightFirst; //! lowest height of block in file
-    unsigned int nHeightLast;  //! highest height of block in file
-    uint64_t nTimeFirst;         //! earliest time of block in file
-    uint64_t nTimeLast;          //! latest time of block in file
+    //! number of blocks stored in file
+    unsigned int nBlocks;      
+    //! number of used bytes of block file
+    unsigned int nSize;        
+    //! number of used bytes in the undo file
+    unsigned int nUndoSize;    
+    //! lowest height of block in file
+    unsigned int nHeightFirst; 
+    //! highest height of block in file
+    unsigned int nHeightLast;  
+    //! earliest time of block in file
+    uint64_t nTimeFirst;         
+    //! latest time of block in file
+    uint64_t nTimeLast;          
 
     ADD_SERIALIZE_METHODS;
 
@@ -583,7 +599,8 @@ static const unsigned int REJECT_CONFLICT = 0x102;
 struct COrphanTx {
     CTransaction tx;
     NodeId fromPeer;
-    int64_t nEntryTime; // BU - Xtreme Thinblocks: used for aging orphans out of the cache
+    // BU - Xtreme Thinblocks: used for aging orphans out of the cache
+    int64_t nEntryTime; 
 };
 // BU: begin creating separate critical section for orphan cache and untangling from cs_main.
 extern CCriticalSection cs_orphancache;
@@ -593,7 +610,8 @@ extern std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED
 void EraseOrphanTx(uint256 hash) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache);
 // BU: end
 
-#if 0 // BU cleaning up at destuction time creates many global variable dependencies.  Instead clean up in a function called in main()
+// BU cleaning up at destuction time creates many global variable dependencies.  Instead clean up in a function called in main()
+#if 0 
 class CMainCleanup
 {
 public:
@@ -603,4 +621,5 @@ public:
 #endif
 
 
-#endif // BITCOIN_MAIN_H
+// BITCOIN_MAIN_H
+#endif 

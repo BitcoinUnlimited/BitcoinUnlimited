@@ -155,4 +155,5 @@ public:
     }
 };
 
-#endif // BITCOIN_MERKLEBLOCK_H
+// BITCOIN_MERKLEBLOCK_H
+#endif 

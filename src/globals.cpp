@@ -111,7 +111,8 @@ unsigned int excessiveAcceptDepth = DEFAULT_EXCESSIVE_ACCEPT_DEPTH;
 unsigned int maxMessageSizeMultiplier = DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER;
 int nMaxOutConnections = DEFAULT_MAX_OUTBOUND_CONNECTIONS;
 
-uint32_t blockVersion = 0;  // Overrides the mined block version if non-zero
+// Overrides the mined block version if non-zero
+uint32_t blockVersion = 0;  
 
 std::vector<std::string> BUComments = std::vector<std::string>();
 std::string minerComment;
@@ -150,7 +151,8 @@ limitedmap<uint256, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
 vector<CNode*> vNodes;
 list<CNode*> vNodesDisconnected;
 CSemaphore*  semOutbound = NULL;
-CSemaphore*  semOutboundAddNode = NULL; // BU: separate semaphore for -addnodes
+// BU: separate semaphore for -addnodes
+CSemaphore*  semOutboundAddNode = NULL; 
 CNodeSignals g_signals;
 CAddrMan addrman;
 
@@ -171,8 +173,10 @@ CTweak<unsigned int> maxTxSize("net.excessiveTx","Largest transaction size in by
 CTweakRef<unsigned int> eadTweak("net.excessiveAcceptDepth","Excessive block chain acceptance depth in blocks", &excessiveAcceptDepth);
 CTweakRef<int> maxOutConnectionsTweak("net.maxOutboundConnections","Maximum number of outbound connections", &nMaxOutConnections,&OutboundConnectionValidator);
 CTweakRef<int> maxConnectionsTweak("net.maxConnections","Maximum number of connections connections",&nMaxConnections);
-CTweakRef<unsigned int> triTweak("net.txRetryInterval","How long to wait in microseconds before requesting a transaction from another source", &MIN_TX_REQUEST_RETRY_INTERVAL);  // When should I request a tx from someone else (in microseconds). cmdline/bitcoin.conf: -txretryinterval
-CTweakRef<unsigned int> briTweak("net.blockRetryInterval","How long to wait in microseconds before requesting a block from another source", &MIN_BLK_REQUEST_RETRY_INTERVAL); // When should I request a block from someone else (in microseconds). cmdline/bitcoin.conf: -blkretryinterval
+// When should I request a tx from someone else (in microseconds). cmdline/bitcoin.conf: -txretryinterval
+CTweakRef<unsigned int> triTweak("net.txRetryInterval","How long to wait in microseconds before requesting a transaction from another source", &MIN_TX_REQUEST_RETRY_INTERVAL);  
+// When should I request a block from someone else (in microseconds). cmdline/bitcoin.conf: -blkretryinterval
+CTweakRef<unsigned int> briTweak("net.blockRetryInterval","How long to wait in microseconds before requesting a block from another source", &MIN_BLK_REQUEST_RETRY_INTERVAL); 
 
 CTweakRef<std::string> subverOverrideTweak("net.subversionOverride","If set, this field will override the normal subversion field.  This is useful if you need to hide your node.",&subverOverride,&SubverValidator);
 
@@ -203,25 +207,34 @@ during reindexing by allowing the size to be set to low and random values.
 CTweak<uint64_t> checkScriptDays("blockchain.checkScriptDays","The number of days in the past we check scripts during initial block download.",DEFAULT_CHECKPOINT_DAYS);
 
 
-CRequestManager requester;  // after the maps nodes and tweaks
+// after the maps nodes and tweaks
+CRequestManager requester;  
 
 // Parallel Validation Variables
-CParallelValidation PV;  // Singleton class
-CAllScriptCheckQueues allScriptCheckQueues; // Singleton class
+// Singleton class
+CParallelValidation PV;  
+// Singleton class
+CAllScriptCheckQueues allScriptCheckQueues; 
 
-CStatHistory<unsigned int> txAdded; //"memPool/txAdded");
-CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize; // "memPool/size",STAT_OP_AVE);
+//"memPool/txAdded");
+CStatHistory<unsigned int> txAdded; 
+// "memPool/size",STAT_OP_AVE);
+CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize; 
 CStatHistory<uint64_t > recvAmt; 
 CStatHistory<uint64_t > sendAmt; 
 CStatHistory<uint64_t> nTxValidationTime("txValidationTime", STAT_OP_MAX | STAT_INDIVIDUAL);
 CStatHistory<uint64_t> nBlockValidationTime("blockValidationTime", STAT_OP_MAX | STAT_INDIVIDUAL);
 CCriticalSection cs_blockvalidationtime;
 
-CThinBlockData thindata; // Singleton class
+// Singleton class
+CThinBlockData thindata; 
 
 // Expedited blocks
-std::vector<CNode*> xpeditedBlk; // (256,(CNode*)NULL);    // Who requested expedited blocks from us
-std::vector<CNode*> xpeditedBlkUp; //(256,(CNode*)NULL);  // Who we requested expedited blocks from
-std::vector<CNode*> xpeditedTxn; // (256,(CNode*)NULL);  
+// (256,(CNode*)NULL);    // Who requested expedited blocks from us
+std::vector<CNode*> xpeditedBlk; 
+//(256,(CNode*)NULL);  // Who we requested expedited blocks from
+std::vector<CNode*> xpeditedBlkUp; 
+// (256,(CNode*)NULL);  
+std::vector<CNode*> xpeditedTxn; 
 
 
