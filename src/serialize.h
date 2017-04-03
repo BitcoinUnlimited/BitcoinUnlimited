@@ -23,7 +23,8 @@
 
 #include "prevector.h"
 
-static const unsigned int MAX_SIZE = 0x02000000*8;  // BU Allow 256MB JSON encodings
+// BU Allow 256MB JSON encodings
+static const unsigned int MAX_SIZE = 0x02000000*8;  
 
 /**
  * Used to bypass the rule against non-const reference to temporary
@@ -199,7 +200,8 @@ inline unsigned int GetSerializeSize(uint64_t a,  int, int=0) { return 8; }
 inline unsigned int GetSerializeSize(float a,     int, int=0) { return 4; }
 inline unsigned int GetSerializeSize(double a,    int, int=0) { return 8; }
 
-template<typename Stream> inline void Serialize(Stream& s, char a,         int, int=0) { ser_writedata8(s, a); } // TODO Get rid of bare char
+// TODO Get rid of bare char
+template<typename Stream> inline void Serialize(Stream& s, char a,         int, int=0) { ser_writedata8(s, a); } 
 template<typename Stream> inline void Serialize(Stream& s, int8_t a,       int, int=0) { ser_writedata8(s, a); }
 template<typename Stream> inline void Serialize(Stream& s, uint8_t a,      int, int=0) { ser_writedata8(s, a); }
 template<typename Stream> inline void Serialize(Stream& s, int16_t a,      int, int=0) { ser_writedata16(s, a); }
@@ -211,7 +213,8 @@ template<typename Stream> inline void Serialize(Stream& s, uint64_t a,     int, 
 template<typename Stream> inline void Serialize(Stream& s, float a,        int, int=0) { ser_writedata32(s, ser_float_to_uint32(a)); }
 template<typename Stream> inline void Serialize(Stream& s, double a,       int, int=0) { ser_writedata64(s, ser_double_to_uint64(a)); }
 
-template<typename Stream> inline void Unserialize(Stream& s, char& a,      int, int=0) { a = ser_readdata8(s); } // TODO Get rid of bare char
+// TODO Get rid of bare char
+template<typename Stream> inline void Unserialize(Stream& s, char& a,      int, int=0) { a = ser_readdata8(s); } 
 template<typename Stream> inline void Unserialize(Stream& s, int8_t& a,    int, int=0) { a = ser_readdata8(s); }
 template<typename Stream> inline void Unserialize(Stream& s, uint8_t& a,   int, int=0) { a = ser_readdata8(s); }
 template<typename Stream> inline void Unserialize(Stream& s, int16_t& a,   int, int=0) { a = ser_readdata16(s); }
@@ -941,4 +944,5 @@ public:
     }
 };
 
-#endif // BITCOIN_SERIALIZE_H
+// BITCOIN_SERIALIZE_H
+#endif 

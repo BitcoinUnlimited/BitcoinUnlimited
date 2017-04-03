@@ -8,11 +8,15 @@
 
 #include "support/cleanse.h"
 #ifdef WIN32
-#include "compat.h" // for Windows API
+// for Windows API
+#include "compat.h" 
 #endif
-#include "serialize.h"        // for begin_ptr(vec)
-#include "util.h"             // for LogPrint()
-#include "utilstrencodings.h" // for GetTime()
+// for begin_ptr(vec)
+#include "serialize.h"        
+// for LogPrint()
+#include "util.h"             
+// for GetTime()
+#include "utilstrencodings.h" 
 
 #include <limits>
 
@@ -61,13 +65,15 @@ void RandAddSeedPerfmon()
     std::vector<unsigned char> vData(250000, 0);
     long ret = 0;
     unsigned long nSize = 0;
-    const size_t nMaxSize = 10000000; // Bail out at more than 10MB of performance data
+    // Bail out at more than 10MB of performance data
+    const size_t nMaxSize = 10000000; 
     while (true) {
         nSize = vData.size();
         ret = RegQueryValueExA(HKEY_PERFORMANCE_DATA, "Global", NULL, NULL, begin_ptr(vData), &nSize);
         if (ret != ERROR_MORE_DATA || vData.size() >= nMaxSize)
             break;
-        vData.resize(std::max((vData.size() * 3) / 2, nMaxSize)); // Grow size of buffer exponentially
+        // Grow size of buffer exponentially
+        vData.resize(std::max((vData.size() * 3) / 2, nMaxSize)); 
     }
     RegCloseKey(HKEY_PERFORMANCE_DATA);
     if (ret == ERROR_SUCCESS) {
@@ -75,7 +81,8 @@ void RandAddSeedPerfmon()
         memory_cleanse(begin_ptr(vData), nSize);
         LogPrint("rand", "%s: %lu bytes\n", __func__, nSize);
     } else {
-        static bool warned = false; // Warn only once
+        // Warn only once
+        static bool warned = false; 
         if (!warned) {
             LogPrintf("%s: Warning: RegQueryValueExA(HKEY_PERFORMANCE_DATA) failed with code %i\n", __func__, ret);
             warned = true;

@@ -33,4 +33,5 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 void IncrementExtraNonce(CBlock* pblock, unsigned int& nExtraNonce);
 int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev);
 
-#endif // BITCOIN_MINER_H
+// BITCOIN_MINER_H
+#endif 

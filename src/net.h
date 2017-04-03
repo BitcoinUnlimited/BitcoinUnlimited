@@ -38,7 +38,8 @@ class CNode;
 
 namespace boost {
     class thread_group;
-} // namespace boost
+// namespace boost
+} 
 
 /** Time between pings automatically sent out for latency probing and keepalive (in seconds). */
 static const int PING_INTERVAL = 2 * 60;
@@ -84,7 +85,8 @@ static const size_t DEFAULT_MAXRECEIVEBUFFER = 5 * 1000;
 static const size_t DEFAULT_MAXSENDBUFFER    = 1 * 1000;
 
 // NOTE: When adjusting this, update rpcnet:setban's help ("24h")
-static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;  // Default 24-hour ban
+// Default 24-hour ban
+static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;  
 
 
 unsigned int ReceiveFloodSize();
@@ -140,11 +142,16 @@ CNodeSignals& GetNodeSignals();
 
 enum
 {
-    LOCAL_NONE,   // unknown
-    LOCAL_IF,     // address a local interface listens on
-    LOCAL_BIND,   // address explicit bound to
-    LOCAL_UPNP,   // address reported by UPnP
-    LOCAL_MANUAL, // address explicitly specified (-externalip=)
+    // unknown
+    LOCAL_NONE,   
+    // address a local interface listens on
+    LOCAL_IF,     
+    // address explicit bound to
+    LOCAL_BIND,   
+    // address reported by UPnP
+    LOCAL_UPNP,   
+    // address explicitly specified (-externalip=)
+    LOCAL_MANUAL, 
 
     LOCAL_MAX
 };
@@ -226,16 +233,21 @@ public:
 class CNetMessage
 {
 public:
-    bool in_data; // parsing header (false) or data (true)
+    // parsing header (false) or data (true)
+    bool in_data; 
 
-    CDataStream hdrbuf; // partially received header
-    CMessageHeader hdr; // complete header
+    // partially received header
+    CDataStream hdrbuf; 
+    // complete header
+    CMessageHeader hdr; 
     unsigned int nHdrPos;
 
-    CDataStream vRecv; // received message data
+    // received message data
+    CDataStream vRecv; 
     unsigned int nDataPos;
 
-    int64_t nTime; // time (in microseconds) of message receipt.
+    // time (in microseconds) of message receipt.
+    int64_t nTime; 
 
     CNetMessage(const CMessageHeader::MessageStartChars& pchMessageStartIn, int nTypeIn, int nVersionIn) : hdrbuf(nTypeIn, nVersionIn), hdr(pchMessageStartIn), vRecv(nTypeIn, nVersionIn)
     {
@@ -325,7 +337,8 @@ public:
 
 typedef std::map<CSubNet, CBanEntry> banmap_t;
 
-#if 0  // BU cleaning up nodes as a global destructor creates many global destruction dependencies.  Instead use a function call.
+// BU cleaning up nodes as a global destructor creates many global destruction dependencies.  Instead use a function call.
+#if 0  
 class CNetCleanup
 {
 public:
@@ -342,8 +355,10 @@ public:
     uint64_t nServices;
     SOCKET hSocket;
     CDataStream ssSend;
-    size_t nSendSize;   // total size of all vSendMsg entries
-    size_t nSendOffset; // offset inside the first vSendMsg already sent
+    // total size of all vSendMsg entries
+    size_t nSendSize;   
+    // offset inside the first vSendMsg already sent
+    size_t nSendOffset; 
     uint64_t nSendBytes;
     std::deque<CSerializeData> vSendMsg;
     CCriticalSection cs_vSend;
@@ -364,7 +379,8 @@ public:
     int64_t nTimeOffset;
     CAddress addr;
     std::string addrName;
-    const char* currentCommand;  // if in the middle of the send, this is the command type
+    // if in the middle of the send, this is the command type
+    const char* currentCommand;  
     CService addrLocal;
     int nVersion;
     // strSubVer is whatever byte array we read from the wire. However, this field is intended
@@ -372,7 +388,8 @@ public:
     // store the sanitized version in cleanSubVer. The original should be used when dealing with
     // the network or wire types and the cleaned string used when displayed or logged.
     std::string strSubVer, cleanSubVer;
-    bool fWhitelisted; // This peer can bypass DoS banning.
+    // This peer can bypass DoS banning.
+    bool fWhitelisted; 
     bool fOneShot;
     bool fClient;
     bool fInbound;
@@ -387,7 +404,8 @@ public:
     CSemaphoreGrant grantOutbound;
     CCriticalSection cs_filter;
     CBloomFilter* pfilter;
-    CBloomFilter* pThinBlockFilter; // BU - Xtreme Thinblocks: a bloom filter which is separate from the one used by SPV wallets
+    // BU - Xtreme Thinblocks: a bloom filter which is separate from the one used by SPV wallets
+    CBloomFilter* pThinBlockFilter; 
     int nRefCount;
     NodeId id;
 
@@ -395,13 +413,20 @@ public:
     CBlock thinBlock;
     std::vector<uint256> thinBlockHashes;
     std::vector<uint64_t> xThinBlockHashes;
-    int nSizeThinBlock;   // Original on-wire size of the block. Just used for reporting
-    int thinBlockWaitingForTxns;   // if -1 then not currently waiting
-    std::map<uint256, uint64_t> mapThinBlocksInFlight; // map of the hashes of thin blocks in flight with the time they were requested.
-    double nGetXBlockTxCount; // Count how many get_xblocktx requests are made
-    uint64_t nGetXBlockTxLastTime;  // The last time a get_xblocktx request was made
-    double nGetXthinCount; // Count how many get_xthin requests are made
-    uint64_t nGetXthinLastTime;  // The last time a get_xthin request was made
+    // Original on-wire size of the block. Just used for reporting
+    int nSizeThinBlock;   
+    // if -1 then not currently waiting
+    int thinBlockWaitingForTxns;   
+    // map of the hashes of thin blocks in flight with the time they were requested.
+    std::map<uint256, uint64_t> mapThinBlocksInFlight; 
+    // Count how many get_xblocktx requests are made
+    double nGetXBlockTxCount; 
+    // The last time a get_xblocktx request was made
+    uint64_t nGetXBlockTxLastTime;  
+    // Count how many get_xthin requests are made
+    double nGetXthinCount; 
+    // The last time a get_xthin request was made
+    uint64_t nGetXthinLastTime;  
     // BUIP010 Xtreme Thinblocks: end section
 
     unsigned short addrFromPort;
@@ -419,7 +444,8 @@ protected:
     static CCriticalSection cs_vWhitelistedRange;
 
     // Basic fuzz-testing
-    void Fuzz(int nChance); // modifies ssSend
+    // modifies ssSend
+    void Fuzz(int nChance); 
 
 public:
     uint256 hashContinue;
@@ -765,7 +791,8 @@ public:
     // dangerous, because it can cause a network split
     // between nodes running old code and nodes running
     // new code.
-    static void ClearBanned(); // needed for unit testing
+    // needed for unit testing
+    static void ClearBanned(); 
     static bool IsBanned(CNetAddr ip);
     static bool IsBanned(CSubNet subnet);
     static void Ban(const CNetAddr &ip, const BanReason &banReason, int64_t bantimeoffset = 0, bool sinceUnixEpoch = false);
@@ -848,4 +875,5 @@ public:
 /** Return a timestamp in the future (in microseconds) for exponentially distributed events. */
 int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds);
 
-#endif // BITCOIN_NET_H
+// BITCOIN_NET_H
+#endif 

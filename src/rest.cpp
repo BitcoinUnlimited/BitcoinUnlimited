@@ -24,7 +24,8 @@
 
 using namespace std;
 
-static const size_t MAX_GETUTXOS_OUTPOINTS = 15; //allow a max of 15 outpoints to be queried at once
+//allow a max of 15 outpoints to be queried at once
+static const size_t MAX_GETUTXOS_OUTPOINTS = 15; 
 
 enum RetFormat {
     RF_UNDEF,
@@ -44,7 +45,8 @@ static const struct {
 };
 
 struct CCoin {
-    uint32_t nTxVer; // Don't call this nVersion, that name has a special meaning inside IMPLEMENT_SERIALIZE
+    // Don't call this nVersion, that name has a special meaning inside IMPLEMENT_SERIALIZE
+    uint32_t nTxVer; 
     uint32_t nHeight;
     CTxOut out;
 
@@ -198,7 +200,8 @@ static bool rest_headers(HTTPRequest* req,
     }
 
     // not reached
-    return true; // continue to process further HTTP reqs on this cxn
+    // continue to process further HTTP reqs on this cxn
+    return true; 
 }
 
 static bool rest_block(HTTPRequest* req,
@@ -261,7 +264,8 @@ static bool rest_block(HTTPRequest* req,
     }
 
     // not reached
-    return true; // continue to process further HTTP reqs on this cxn
+    // continue to process further HTTP reqs on this cxn
+    return true; 
 }
 
 static bool rest_block_extended(HTTPRequest* req, const std::string& strURIPart)
@@ -299,7 +303,8 @@ static bool rest_chaininfo(HTTPRequest* req, const std::string& strURIPart)
     }
 
     // not reached
-    return true; // continue to process further HTTP reqs on this cxn
+    // continue to process further HTTP reqs on this cxn
+    return true; 
 }
 
 static bool rest_mempool_info(HTTPRequest* req, const std::string& strURIPart)
@@ -324,7 +329,8 @@ static bool rest_mempool_info(HTTPRequest* req, const std::string& strURIPart)
     }
 
     // not reached
-    return true; // continue to process further HTTP reqs on this cxn
+    // continue to process further HTTP reqs on this cxn
+    return true; 
 }
 
 static bool rest_mempool_contents(HTTPRequest* req, const std::string& strURIPart)
@@ -349,7 +355,8 @@ static bool rest_mempool_contents(HTTPRequest* req, const std::string& strURIPar
     }
 
     // not reached
-    return true; // continue to process further HTTP reqs on this cxn
+    // continue to process further HTTP reqs on this cxn
+    return true; 
 }
 
 static bool rest_tx(HTTPRequest* req, const std::string& strURIPart)
@@ -401,7 +408,8 @@ static bool rest_tx(HTTPRequest* req, const std::string& strURIPart)
     }
 
     // not reached
-    return true; // continue to process further HTTP reqs on this cxn
+    // continue to process further HTTP reqs on this cxn
+    return true; 
 }
 
 static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
@@ -469,7 +477,8 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
             //deserialize only if user sent a request
             if (strRequestMutable.size() > 0)
             {
-                if (fInputParsed) //don't allow sending input over URI and HTTP RAW DATA
+                //don't allow sending input over URI and HTTP RAW DATA
+                if (fInputParsed) 
                     return RESTERR(req, HTTP_INTERNAL_SERVER_ERROR, "Combination of URI scheme inputs and raw post data is not allowed");
 
                 CDataStream oss(SER_NETWORK, PROTOCOL_VERSION);
@@ -513,7 +522,8 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
         CCoinsViewMemPool viewMempool(&viewChain, mempool);
 
         if (fCheckMemPool)
-            view.SetBackend(viewMempool); // switch cache backend to db+mempool in case user likes to query mempool
+            // switch cache backend to db+mempool in case user likes to query mempool
+            view.SetBackend(viewMempool); 
 
         for (size_t i = 0; i < vOutPoints.size(); i++) {
             CCoins coins;
@@ -533,7 +543,8 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
                 }
             }
 
-            bitmapStringRepresentation.append(hits[i] ? "1" : "0"); // form a binary string representation (human-readable for json output)
+            // form a binary string representation (human-readable for json output)
+            bitmapStringRepresentation.append(hits[i] ? "1" : "0"); 
         }
     }
     boost::to_block_range(hits, std::back_inserter(bitmap));
@@ -597,7 +608,8 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
     }
 
     // not reached
-    return true; // continue to process further HTTP reqs on this cxn
+    // continue to process further HTTP reqs on this cxn
+    return true; 
 }
 
 static const struct {

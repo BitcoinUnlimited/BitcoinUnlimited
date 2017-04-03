@@ -51,10 +51,12 @@ const char *BUVERACK="buverack";
 
 static const char* ppszTypeName[] =
 {
-    "ERROR", // Should never occur
+    // Should never occur
+    "ERROR", 
     NetMsgType::TX,
     NetMsgType::BLOCK,
-    "filtered block", // Should never occur
+    // Should never occur
+    "filtered block", 
     // BUIP010 Xtreme Thinblocks - begin section
     NetMsgType::THINBLOCK,
     NetMsgType::XTHINBLOCK,

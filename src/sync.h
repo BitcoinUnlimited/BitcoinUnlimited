@@ -37,10 +37,12 @@ LOCK2(mutex1, mutex2);
 TRY_LOCK(mutex, name);
     boost::unique_lock<boost::recursive_mutex> name(mutex, boost::try_to_lock_t);
 
-ENTER_CRITICAL_SECTION(mutex); // no RAII
+// no RAII
+ENTER_CRITICAL_SECTION(mutex); 
     mutex.lock();
 
-LEAVE_CRITICAL_SECTION(mutex); // no RAII
+// no RAII
+LEAVE_CRITICAL_SECTION(mutex); 
     mutex.unlock();
  */
 
@@ -80,7 +82,8 @@ public:
  */
 #ifndef DEBUG_LOCKORDER
 typedef AnnotatedMixin<boost::recursive_mutex> CCriticalSection;
-#else  // BU we need to remove the critical section from the lockorder map when destructed
+// BU we need to remove the critical section from the lockorder map when destructed
+#else  
 class CCriticalSection:public AnnotatedMixin<boost::recursive_mutex>
 {
 public:
@@ -100,7 +103,8 @@ typedef boost::condition_variable CConditionVariable;
 #ifdef DEBUG_LOCKORDER
 void EnterCritical(const char* pszName, const char* pszFile, int nLine, void* cs, bool fTry = false);
 void LeaveCritical();
-void DeleteCritical(const void* cs); // BU if a CCriticalSection is allocated on the heap we need to clean it from the lockorder map upon destruction because another CCriticalSection could be created on top of it.
+// BU if a CCriticalSection is allocated on the heap we need to clean it from the lockorder map upon destruction because another CCriticalSection could be created on top of it.
+void DeleteCritical(const void* cs); 
 std::string LocksHeld();
 void AssertLockHeldInternal(const char* pszName, const char* pszFile, int nLine, void* cs);
 #else
@@ -335,4 +339,5 @@ private:
 
 typedef std::vector<std::pair<void*, CLockLocation> > LockStack;
 typedef std::map<std::pair<void*, void*>, LockStack> LockStackMap;
-#endif // BITCOIN_SYNC_H
+// BITCOIN_SYNC_H
+#endif 

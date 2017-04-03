@@ -32,4 +32,5 @@ private:
     Lock templock;
 };
 
-#endif // BITCOIN_REVERSELOCK_H
+// BITCOIN_REVERSELOCK_H
+#endif 

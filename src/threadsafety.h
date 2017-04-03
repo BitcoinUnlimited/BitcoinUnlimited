@@ -50,6 +50,8 @@
 #define EXCLUSIVE_LOCKS_REQUIRED(...)
 #define SHARED_LOCKS_REQUIRED(...)
 #define NO_THREAD_SAFETY_ANALYSIS
-#endif // __GNUC__
+// __GNUC__
+#endif 
 
-#endif // BITCOIN_THREADSAFETY_H
+// BITCOIN_THREADSAFETY_H
+#endif 
