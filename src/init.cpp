@@ -97,7 +97,8 @@ enum BindFlags {
 };
 
 static const char* FEE_ESTIMATES_FILENAME="fee_estimates.dat";
-CClientUIInterface uiInterface; // Declared but not defined in ui_interface.h
+// Declared but not defined in ui_interface.h
+CClientUIInterface uiInterface; 
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -430,7 +431,8 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-limitdescendantcount=<n>", strprintf("Do not accept transactions if any ancestor would have <n> or more in-mempool descendants (default: %u)", DEFAULT_DESCENDANT_LIMIT));
         strUsage += HelpMessageOpt("-limitdescendantsize=<n>", strprintf("Do not accept transactions if any ancestor would have more than <n> kilobytes of in-mempool descendants (default: %u).", DEFAULT_DESCENDANT_SIZE_LIMIT));
     }
-    string debugCategories = "addrman, alert, bench, coindb, db, lock, rand, rpc, selectcoins, mempool, mempoolrej, net, proxy, prune, http, libevent, tor, zmq, thin"; // Don't translate these and qt below
+    // Don't translate these and qt below
+    string debugCategories = "addrman, alert, bench, coindb, db, lock, rand, rpc, selectcoins, mempool, mempoolrej, net, proxy, prune, http, libevent, tor, zmq, thin"; 
     if (mode == HMM_BITCOIN_QT)
         debugCategories += ", qt";
     strUsage += HelpMessageOpt("-debug=<category>", strprintf(_("Output debugging information (default: %u, supplying <category> is optional)"), 0) + ". " +
@@ -534,7 +536,8 @@ static void BlockNotifyCallback(bool initialSync, const CBlockIndex *pBlockIndex
     std::string strCmd = GetArg("-blocknotify", "");
 
     boost::replace_all(strCmd, "%s", pBlockIndex->GetBlockHash().GetHex());
-    boost::thread t(runCommand, strCmd); // thread runs free
+    // thread runs free
+    boost::thread t(runCommand, strCmd); 
 }
 
 struct CImportingNow
@@ -604,10 +607,12 @@ void ThreadImport(std::vector<boost::filesystem::path> vImportFiles)
         while (true) {
             CDiskBlockPos pos(nFile, 0);
             if (!boost::filesystem::exists(GetBlockPosFilename(pos, "blk")))
-                break; // No block files left to reindex
+                // No block files left to reindex
+                break; 
             FILE *file = OpenBlockFile(pos, true);
             if (!file)
-                break; // This error is logged in OpenBlockFile
+                // This error is logged in OpenBlockFile
+                break; 
             LogPrintf("Reindexing block file blk%05u.dat...\n", (unsigned int)nFile);
             LoadExternalBlockFile(chainparams, file, &pos);
             nFile++;
@@ -965,14 +970,16 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 #ifdef ENABLE_WALLET
     if (!CWallet::ParameterInteraction())
         return false;
-#endif // ENABLE_WALLET
+// ENABLE_WALLET
+#endif 
 
     fIsBareMultisigStd = GetBoolArg("-permitbaremultisig", DEFAULT_PERMIT_BAREMULTISIG);
     fAcceptDatacarrier = GetBoolArg("-datacarrier", DEFAULT_ACCEPT_DATACARRIER);
     nMaxDatacarrierBytes = GetArg("-datacarriersize", nMaxDatacarrierBytes);
 
     // Option to startup with mocktime set (used for regression testing):
-    SetMockTime(GetArg("-mocktime", 0)); // SetMockTime(0) is a no-op
+    // SetMockTime(0) is a no-op
+    SetMockTime(GetArg("-mocktime", 0)); 
 
     if (GetBoolArg("-peerbloomfilters", true))
         nLocalServices |= NODE_BLOOM;
@@ -982,11 +989,13 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         nLocalServices |= NODE_XTHIN;
     // BUIP010 Xtreme Thinblocks: begin section
 
-#if 0 // BUIP004: mempool replacement is not allowed
+// BUIP004: mempool replacement is not allowed
+#if 0 
     fEnableReplacement = GetBoolArg("-mempoolreplacement", DEFAULT_ENABLE_REPLACEMENT);
     if ((!fEnableReplacement) && mapArgs.count("-mempoolreplacement")) {
         // Minimal effort at forwards compatibility
-        std::string strReplacementModeList = GetArg("-mempoolreplacement", "");  // default is impossible
+        // default is impossible
+        std::string strReplacementModeList = GetArg("-mempoolreplacement", "");  
         std::vector<std::string> vstrReplacementModes;
         boost::split(vstrReplacementModes, strReplacementModeList, boost::is_any_of(","));
         fEnableReplacement = (std::find(vstrReplacementModes.begin(), vstrReplacementModes.end(), "fee") != vstrReplacementModes.end());
@@ -1008,7 +1017,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Make sure only a single Bitcoin process is using the data directory.
     boost::filesystem::path pathLockFile = GetDataDir() / ".lock";
-    FILE* file = fopen(pathLockFile.string().c_str(), "a"); // empty lock file; created if it doesn't exist.
+    // empty lock file; created if it doesn't exist.
+    FILE* file = fopen(pathLockFile.string().c_str(), "a"); 
     if (file) fclose(file);
 
     try {
@@ -1041,7 +1051,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     LogPrintf("Using %u threads for script verification\n", nScriptCheckThreads);
     // BU: parallel block validation - begin
-    AddAllScriptCheckQueuesAndThreads(nScriptCheckThreads, &threadGroup); // This initializes and creates 4 separate script thread queues and thread pools.
+    // This initializes and creates 4 separate script thread queues and thread pools.
+    AddAllScriptCheckQueuesAndThreads(nScriptCheckThreads, &threadGroup); 
     // BU: parallel block validation - end
 
     // Start the lightweight task scheduler thread
@@ -1067,8 +1078,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (!fDisableWallet) {
         if (!CWallet::Verify())
             return false;
-    } // (!fDisableWallet)
-#endif // ENABLE_WALLET
+    // (!fDisableWallet)
+    } 
+// ENABLE_WALLET
+#endif 
     // ********************************************************* Step 6: load block chain
 
     fReindex = GetBoolArg("-reindex", false);
@@ -1102,15 +1115,20 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // cache size calculations
     int64_t nTotalCache = (GetArg("-dbcache", nDefaultDbCache) << 20);
-    nTotalCache = std::max(nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache
-    nTotalCache = std::min(nTotalCache, nMaxDbCache << 20); // total cache cannot be greated than nMaxDbcache
+    // total cache cannot be less than nMinDbCache
+    nTotalCache = std::max(nTotalCache, nMinDbCache << 20); 
+    // total cache cannot be greated than nMaxDbcache
+    nTotalCache = std::min(nTotalCache, nMaxDbCache << 20); 
     int64_t nBlockTreeDBCache = nTotalCache / 8;
     if (nBlockTreeDBCache > (1 << 21) && !GetBoolArg("-txindex", DEFAULT_TXINDEX))
-        nBlockTreeDBCache = (1 << 21); // block tree db cache shouldn't be larger than 2 MiB
+        // block tree db cache shouldn't be larger than 2 MiB
+        nBlockTreeDBCache = (1 << 21); 
     nTotalCache -= nBlockTreeDBCache;
-    int64_t nCoinDBCache = std::min(nTotalCache / 2, (nTotalCache / 4) + (1 << 23)); // use 25%-50% of the remainder for disk cache
+    // use 25%-50% of the remainder for disk cache
+    int64_t nCoinDBCache = std::min(nTotalCache / 2, (nTotalCache / 4) + (1 << 23)); 
     nTotalCache -= nCoinDBCache;
-    nCoinCacheUsage = nTotalCache; // the rest goes to in-memory cache
+    // the rest goes to in-memory cache
+    nCoinCacheUsage = nTotalCache; 
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n", nBlockTreeDBCache * (1.0 / 1024 / 1024));
     LogPrintf("* Using %.1fMiB for chain state database\n", nCoinDBCache * (1.0 / 1024 / 1024));
@@ -1250,9 +1268,11 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         if (!pwalletMain)
             return false;
     }
-#else // ENABLE_WALLET
+// ENABLE_WALLET
+#else 
     LogPrintf("No wallet support compiled in!\n");
-#endif // !ENABLE_WALLET
+// !ENABLE_WALLET
+#endif 
 
     // ********************************************************* Step 8: data directory maintenance
 
@@ -1277,7 +1297,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     CValidationState state;
     if (!ActivateBestChain(state, chainparams))
         strErrors << "Failed to connect best block";
-    IsChainNearlySyncdInit(); // BUIP010 XTHIN: initialize fIsChainNearlySyncd
+    // BUIP010 XTHIN: initialize fIsChainNearlySyncd
+    IsChainNearlySyncdInit(); 
     IsInitialBlockDownloadInit();
 
     std::vector<boost::filesystem::path> vImportFiles;
@@ -1349,7 +1370,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         SetProxy(NET_IPV6, addrProxy);
         SetProxy(NET_TOR, addrProxy);
         SetNameProxy(addrProxy);
-        SetLimited(NET_TOR, false); // by default, -proxy sets onion as reachable, unless -noonion later
+        // by default, -proxy sets onion as reachable, unless -noonion later
+        SetLimited(NET_TOR, false); 
     }
 
     // -onion can be used to set only a proxy for .onion, or override normal proxy for .onion addresses
@@ -1357,8 +1379,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // An empty string is used to not override the onion proxy (in which case it defaults to -proxy set above, or none)
     std::string onionArg = GetArg("-onion", "");
     if (onionArg != "") {
-        if (onionArg == "0") { // Handle -noonion/-onion=0
-            SetLimited(NET_TOR); // set onions as unreachable
+        // Handle -noonion/-onion=0
+        if (onionArg == "0") { 
+            // set onions as unreachable
+            SetLimited(NET_TOR); 
         } else {
             proxyType addrOnion = proxyType(CService(onionArg, 9050), proxyRandomize);
             if (!addrOnion.IsValid())

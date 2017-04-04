@@ -41,7 +41,8 @@ bool CScriptCompressor::IsToPubKey(CPubKey &pubkey) const
     if (script.size() == 67 && script[0] == 65 && script[66] == OP_CHECKSIG
                             && script[1] == 0x04) {
         pubkey.Set(&script[1], &script[66]);
-        return pubkey.IsFullyValid(); // if not fully valid, a case that would not be compressible
+        // if not fully valid, a case that would not be compressible
+        return pubkey.IsFullyValid(); 
     }
     return false;
 }

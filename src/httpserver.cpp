@@ -9,7 +9,8 @@
 #include "compat.h"
 #include "util.h"
 #include "netbase.h"
-#include "rpc/protocol.h" // For HTTP status codes
+// For HTTP status codes
+#include "rpc/protocol.h" 
 #include "sync.h"
 #include "ui_interface.h"
 
@@ -35,7 +36,8 @@
 #endif
 #endif
 
-#include <boost/algorithm/string/case_conv.hpp> // for to_lower()
+// for to_lower()
+#include <boost/algorithm/string/case_conv.hpp> 
 #include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
 
@@ -207,8 +209,10 @@ static bool ClientAllowed(const CNetAddr& netaddr)
 static bool InitHTTPAllowList()
 {
     rpc_allow_subnets.clear();
-    rpc_allow_subnets.push_back(CSubNet("127.0.0.0/8")); // always allow IPv4 local subnet
-    rpc_allow_subnets.push_back(CSubNet("::1"));         // always allow IPv6 localhost
+    // always allow IPv4 local subnet
+    rpc_allow_subnets.push_back(CSubNet("127.0.0.0/8")); 
+    // always allow IPv6 localhost
+    rpc_allow_subnets.push_back(CSubNet("::1"));         
     if (mapMultiArgs.count("-rpcallowip")) {
         const std::vector<std::string>& vAllow = mapMultiArgs["-rpcallowip"];
         BOOST_FOREACH (std::string strAllow, vAllow) {
@@ -324,13 +328,15 @@ static bool HTTPBindAddresses(struct evhttp* http)
     std::vector<std::pair<std::string, uint16_t> > endpoints;
 
     // Determine what addresses to bind to
-    if (!mapArgs.count("-rpcallowip")) { // Default to loopback if not allowing external IPs
+    // Default to loopback if not allowing external IPs
+    if (!mapArgs.count("-rpcallowip")) { 
         endpoints.push_back(std::make_pair("::1", defaultPort));
         endpoints.push_back(std::make_pair("127.0.0.1", defaultPort));
         if (mapArgs.count("-rpcbind")) {
             LogPrintf("WARNING: option -rpcbind was ignored because -rpcallowip was not specified, refusing to allow everyone to connect\n");
         }
-    } else if (mapArgs.count("-rpcbind")) { // Specific bind address
+    // Specific bind address
+    } else if (mapArgs.count("-rpcbind")) { 
         const std::vector<std::string>& vbind = mapMultiArgs["-rpcbind"];
         for (std::vector<std::string>::const_iterator i = vbind.begin(); i != vbind.end(); ++i) {
             int port = defaultPort;
@@ -338,7 +344,8 @@ static bool HTTPBindAddresses(struct evhttp* http)
             SplitHostPort(*i, port, host);
             endpoints.push_back(std::make_pair(host, port));
         }
-    } else { // No specific bind address specified, bind to any
+    // No specific bind address specified, bind to any
+    } else { 
         endpoints.push_back(std::make_pair("::", defaultPort));
         endpoints.push_back(std::make_pair("0.0.0.0", defaultPort));
     }
@@ -370,7 +377,8 @@ static void libevent_log_cb(int severity, const char *msg)
 // EVENT_LOG_WARN was added in 2.0.19; but before then _EVENT_LOG_WARN existed.
 # define EVENT_LOG_WARN _EVENT_LOG_WARN
 #endif
-    if (severity >= EVENT_LOG_WARN) // Log warn messages and higher without debug category
+    // Log warn messages and higher without debug category
+    if (severity >= EVENT_LOG_WARN) 
         LogPrintf("libevent: %s\n", msg);
     else
         LogPrint("libevent", "libevent: %s\n", msg);
@@ -407,14 +415,16 @@ bool InitHTTPServer()
     evthread_use_pthreads();
 #endif
 
-    base = event_base_new(); // XXX RAII
+    // XXX RAII
+    base = event_base_new(); 
     if (!base) {
         LogPrintf("Couldn't create an event_base: exiting\n");
         return false;
     }
 
     /* Create a new evhttp object to handle requests. */
-    http = evhttp_new(base); // XXX RAII
+    // XXX RAII
+    http = evhttp_new(base); 
     if (!http) {
         LogPrintf("couldn't create evhttp. Exiting.\n");
         event_base_free(base);
@@ -536,9 +546,11 @@ HTTPEvent::~HTTPEvent()
 void HTTPEvent::trigger(struct timeval* tv)
 {
     if (tv == NULL)
-        event_active(ev, 0, 0); // immediately trigger event in main thread
+        // immediately trigger event in main thread
+        event_active(ev, 0, 0); 
     else
-        evtimer_add(ev, tv); // trigger after timeval passed
+        // trigger after timeval passed
+        evtimer_add(ev, tv); 
 }
 HTTPRequest::HTTPRequest(struct evhttp_request* req) : req(req),
                                                        replySent(false)
@@ -578,7 +590,8 @@ std::string HTTPRequest::ReadBody()
      * abstraction to consume the evbuffer on the fly in the parsing algorithm.
      */
     const char* data = (const char*)evbuffer_pullup(buf, size);
-    if (!data) // returns NULL in case of empty buffer
+    // returns NULL in case of empty buffer
+    if (!data) 
         return "";
     std::string rv(data, size);
     evbuffer_drain(buf, size);
@@ -608,7 +621,8 @@ void HTTPRequest::WriteReply(int nStatus, const std::string& strReply)
         boost::bind(evhttp_send_reply, req, nStatus, (const char*)NULL, (struct evbuffer *)NULL));
     ev->trigger(0);
     replySent = true;
-    req = 0; // transferred back to main thread
+    // transferred back to main thread
+    req = 0; 
 }
 
 CService HTTPRequest::GetPeer()

@@ -113,7 +113,8 @@ err:
     return ret;
 }
 
-} // anon namespace
+// anon namespace
+} 
 
 CECKey::CECKey() {
     pkey = EC_KEY_new();
@@ -193,15 +194,18 @@ bool CECKey::TweakPublic(const unsigned char vchTweak[32]) {
     BIGNUM *bnOrder = BN_CTX_get(ctx);
     BIGNUM *bnOne = BN_CTX_get(ctx);
     const EC_GROUP *group = EC_KEY_get0_group(pkey);
-    EC_GROUP_get_order(group, bnOrder, ctx); // what a grossly inefficient way to get the (constant) group order...
+    // what a grossly inefficient way to get the (constant) group order...
+    EC_GROUP_get_order(group, bnOrder, ctx); 
     BN_bin2bn(vchTweak, 32, bnTweak);
     if (BN_cmp(bnTweak, bnOrder) >= 0)
-        ret = false; // extremely unlikely
+        // extremely unlikely
+        ret = false; 
     EC_POINT *point = EC_POINT_dup(EC_KEY_get0_public_key(pkey), group);
     BN_one(bnOne);
     EC_POINT_mul(group, point, bnTweak, point, bnOne, ctx);
     if (EC_POINT_is_at_infinity(group, point))
-        ret = false; // ridiculously unlikely
+        // ridiculously unlikely
+        ret = false; 
     EC_KEY_set_public_key(pkey, point);
     EC_POINT_free(point);
     BN_CTX_end(ctx);

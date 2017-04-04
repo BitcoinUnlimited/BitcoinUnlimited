@@ -102,7 +102,8 @@ string ScriptToAsmStr(const CScript& script, const bool fAttemptSighashDecode)
                         const unsigned char chSigHashType = vch.back();
                         if (mapSigHashTypes.count(chSigHashType)) {
                             strSigHashDecode = "[" + mapSigHashTypes.find(chSigHashType)->second + "]";
-                            vch.pop_back(); // remove the sighash type byte. it will be replaced by the decode.
+                            // remove the sighash type byte. it will be replaced by the decode.
+                            vch.pop_back(); 
                         }
                     }
                     str += HexStr(vch) + strSigHashDecode;
@@ -193,5 +194,6 @@ void TxToUniv(const CTransaction& tx, const uint256& hashBlock, UniValue& entry)
     if (!hashBlock.IsNull())
         entry.pushKV("blockhash", hashBlock.GetHex());
 
-    entry.pushKV("hex", EncodeHexTx(tx)); // the hex-encoded transaction. used the name "hex" to be consistent with the verbose output of "getrawtransaction".
+    // the hex-encoded transaction. used the name "hex" to be consistent with the verbose output of "getrawtransaction".
+    entry.pushKV("hex", EncodeHexTx(tx)); 
 }

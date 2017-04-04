@@ -130,12 +130,14 @@ uint256 ParseHashUV(const UniValue& v, const string& strName)
     string strHex;
     if (v.isStr())
         strHex = v.getValStr();
-    return ParseHashStr(strHex, strName);  // Note: ParseHashStr("") throws a runtime_error
+    // Note: ParseHashStr("") throws a runtime_error
+    return ParseHashStr(strHex, strName);  
 }
 
 uint256 ParseHashStr(const std::string& strHex, const std::string& strName)
 {
-    if (!IsHex(strHex)) // Note: IsHex("") is false
+    // Note: IsHex("") is false
+    if (!IsHex(strHex)) 
         throw runtime_error(strName+" must be hexadecimal string (not '"+strHex+"')");
 
     uint256 result;

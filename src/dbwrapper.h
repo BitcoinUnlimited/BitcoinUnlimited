@@ -277,5 +277,6 @@ public:
 
 };
 
-#endif // BITCOIN_DBWRAPPER_H
+// BITCOIN_DBWRAPPER_H
+#endif 
 

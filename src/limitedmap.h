@@ -95,4 +95,5 @@ public:
     }
 };
 
-#endif // BITCOIN_LIMITEDMAP_H
+// BITCOIN_LIMITEDMAP_H
+#endif 

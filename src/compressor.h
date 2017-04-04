@@ -121,4 +121,5 @@ public:
     }
 };
 
-#endif // BITCOIN_COMPRESSOR_H
+// BITCOIN_COMPRESSOR_H
+#endif 

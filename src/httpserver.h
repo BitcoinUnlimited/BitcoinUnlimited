@@ -147,4 +147,5 @@ private:
     struct event* ev;
 };
 
-#endif // BITCOIN_HTTPSERVER_H
+// BITCOIN_HTTPSERVER_H
+#endif 

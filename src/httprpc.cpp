@@ -14,8 +14,10 @@
 #include <stdio.h>
 #include "utilstrencodings.h"
 
-#include <boost/algorithm/string.hpp> // boost::trim
-#include <boost/foreach.hpp> //BOOST_FOREACH
+// boost::trim
+#include <boost/algorithm/string.hpp> 
+//BOOST_FOREACH
+#include <boost/foreach.hpp> 
 
 /** WWW-Authenticate to present with 401 Unauthorized response */
 static const char* WWW_AUTH_HEADER_DATA = "Basic realm=\"jsonrpc\"";
@@ -125,7 +127,8 @@ static bool multiUserAuthorized(std::string strUserPass)
 
 static bool RPCAuthorized(const std::string& strAuth)
 {
-    if (strRPCUserColonPass.empty()) // Belt-and-suspenders measure if InitRPCAuthentication was not called
+    // Belt-and-suspenders measure if InitRPCAuthentication was not called
+    if (strRPCUserColonPass.empty()) 
         return false;
     if (strAuth.substr(0, 6) != "Basic ")
         return false;
@@ -210,7 +213,8 @@ static bool InitRPCAuthentication()
         LogPrintf("No rpcpassword set - using random cookie authentication\n");
         if (!GenerateAuthCookie(&strRPCUserColonPass)) {
             uiInterface.ThreadSafeMessageBox(
-                _("Error: A fatal internal error occurred, see debug.log for details"), // Same message as AbortNode
+                // Same message as AbortNode
+                _("Error: A fatal internal error occurred, see debug.log for details"), 
                 "", CClientUIInterface::MSG_ERROR);
             return false;
         }
