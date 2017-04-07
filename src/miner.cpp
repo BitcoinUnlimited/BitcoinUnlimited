@@ -55,7 +55,8 @@ public:
 
     bool operator()(const CTxMemPool::txiter a, const CTxMemPool::txiter b)
     {
-        return CompareTxMemPoolEntryByScore()(*b,*a); // Convert to less than
+        // Convert to less than
+        return CompareTxMemPoolEntryByScore()(*b,*a); 
     }
 };
 
@@ -82,7 +83,8 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
   if (maxGeneratedBlock >  BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
     tmpl = CreateNewBlock(chainparams, scriptPubKeyIn, false);
   
-  if ((!tmpl) || (tmpl->block.nBlockSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))  // If the block is too small we need to drop back to the 1MB ruleset
+  // If the block is too small we need to drop back to the 1MB ruleset
+  if ((!tmpl) || (tmpl->block.nBlockSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))  
     {
       tmpl = CreateNewBlock(chainparams, scriptPubKeyIn, true);
     }
@@ -96,7 +98,8 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
     if(!pblocktemplate.get())
         return NULL;
-    CBlock *pblock = &pblocktemplate->block; // pointer for convenience
+    // pointer for convenience
+    CBlock *pblock = &pblocktemplate->block; 
 
     // Create coinbase tx
     CMutableTransaction txNew;
@@ -107,13 +110,16 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
     // Add dummy coinbase tx as first transaction
     pblock->vtx.push_back(CTransaction());
-    pblocktemplate->vTxFees.push_back(-1); // updated at end
-    pblocktemplate->vTxSigOps.push_back(-1); // updated at end
+    // updated at end
+    pblocktemplate->vTxFees.push_back(-1); 
+    // updated at end
+    pblocktemplate->vTxSigOps.push_back(-1); 
 
     // Largest block you're willing to create:
     //unsigned int nBlockMaxSize = GetArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE);
     // Limit to betweeen 1K and MAX_BLOCK_SIZE-1K for sanity:
-    uint64_t nBlockMaxSize = maxGeneratedBlock; // std::max((unsigned int)1000, std::min((unsigned int)(maxGeneratedBlock-1000), nBlockMaxSize));
+    // std::max((unsigned int)1000, std::min((unsigned int)(maxGeneratedBlock-1000), nBlockMaxSize));
+    uint64_t nBlockMaxSize = maxGeneratedBlock; 
 
     // How much of the block should be dedicated to high-priority transactions,
     // included regardless of the fees they pay
@@ -138,19 +144,23 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
     std::priority_queue<CTxMemPool::txiter, std::vector<CTxMemPool::txiter>, ScoreCompare> clearedTxs;
     bool fPrintPriority = GetBoolArg("-printpriority", DEFAULT_PRINTPRIORITY);
-    uint64_t nBlockSize = 0;  // BU add the proper block size quantity to the actual size
+    // BU add the proper block size quantity to the actual size
+    uint64_t nBlockSize = 0;  
     {
       CBlockHeader h;
       nBlockSize += h.GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION);
     }
-    assert(nBlockSize == 80);  // BU block header is always 80 bytes
+    // BU block header is always 80 bytes
+    assert(nBlockSize == 80);  
 
 
     unsigned int nCoinbaseSize=0;
     // Compute coinbase transaction WITHOUT FEES just to get its size.  We will recompute this at the end when we know the fees.
     {
-      txNew.vout[0].nValue = 0;  // Will be fixed below, but we need to adjust the size for a possible 9 byte varint
-      txNew.vin[0].scriptSig = CScript() << ((int) 0) << CScriptNum(0);  // block height will be fixed below, but we need to adjust the size for a possible 9 byte varint
+      // Will be fixed below, but we need to adjust the size for a possible 9 byte varint
+      txNew.vout[0].nValue = 0;  
+      // block height will be fixed below, but we need to adjust the size for a possible 9 byte varint
+      txNew.vin[0].scriptSig = CScript() << ((int) 0) << CScriptNum(0);  
 
       // BU005 add block size settings to the coinbase
       std::string cbmsg = FormatCoinbaseMessage(BUComments, minerComment);
@@ -164,14 +174,17 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
           COINBASE_FLAGS.resize(MAX_COINBASE_SCRIPTSIG_SIZE - txNew.vin[0].scriptSig.size());
         }
       txNew.vin[0].scriptSig = txNew.vin[0].scriptSig + COINBASE_FLAGS;
-      nCoinbaseSize = txNew.GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION) + 16;  // This code serialized the transaction but the 2 zeros above (nValue and block height) got encoded into 2 bytes, yet these are varints so there is a possible 16 more bytes 
+      // This code serialized the transaction but the 2 zeros above (nValue and block height) got encoded into 2 bytes, yet these are varints so there is a possible 16 more bytes 
+      nCoinbaseSize = txNew.GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION) + 16;  
       // BU005 END
     }
     
-    nBlockSize += std::max(nCoinbaseSize,(unsigned int) coinbaseReserve.value);  // BU Miners take the block we give them, wipe away our coinbase and add their own.  So if their reserve choice is bigger then our coinbase then use that.
+    // BU Miners take the block we give them, wipe away our coinbase and add their own.  So if their reserve choice is bigger then our coinbase then use that.
+    nBlockSize += std::max(nCoinbaseSize,(unsigned int) coinbaseReserve.value);  
     
     uint64_t nBlockTx = 0;
-    unsigned int nBlockSigOps = 100;  // Reserve 100 sigops for miners to use in their coinbase transaction
+    // Reserve 100 sigops for miners to use in their coinbase transaction
+    unsigned int nBlockSigOps = 100;  
     int lastFewTxs = 0;
     CAmount nFees = 0;
 
@@ -215,24 +228,28 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         while (mi != mempool.mapTx.get<3>().end() || !clearedTxs.empty())
         {
             bool priorityTx = false;
-            if (fPriorityBlock && !vecPriority.empty()) { // add a tx from priority queue to fill the blockprioritysize
+            // add a tx from priority queue to fill the blockprioritysize
+            if (fPriorityBlock && !vecPriority.empty()) { 
                 priorityTx = true;
                 iter = vecPriority.front().second;
                 actualPriority = vecPriority.front().first;
                 std::pop_heap(vecPriority.begin(), vecPriority.end(), pricomparer);
                 vecPriority.pop_back();
             }
-            else if (clearedTxs.empty()) { // add tx with next highest score
+            // add tx with next highest score
+            else if (clearedTxs.empty()) { 
                 iter = mempool.mapTx.project<0>(mi);
                 mi++;
             }
-            else {  // try to add a previously postponed child tx
+            // try to add a previously postponed child tx
+            else {  
                 iter = clearedTxs.top();
                 clearedTxs.pop();
             }
 
             if (inBlock.count(iter))
-                continue; // could have been added to the priorityBlock
+                // could have been added to the priorityBlock
+                continue; 
 
             const CTransaction& tx = iter->GetTx();
 
@@ -278,10 +295,13 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                 continue;
 
             unsigned int nTxSigOps = iter->GetSigOpCount();
-            if (nBlockSize + nTxSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE) // Enforce the "old" sigops for <= 1MB blocks
+            // Enforce the "old" sigops for <= 1MB blocks
+            if (nBlockSize + nTxSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE) 
               {      
-                if (nBlockSigOps + nTxSigOps >= BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS) {  // BU: be conservative about what is generated
-                  if (nBlockSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS - 2) {  // BU: so a block that is near the sigops limit might be shorter than it could be if the high sigops tx was backed out and other tx added.
+                // BU: be conservative about what is generated
+                if (nBlockSigOps + nTxSigOps >= BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS) {  
+                  // BU: so a block that is near the sigops limit might be shorter than it could be if the high sigops tx was backed out and other tx added.
+                  if (nBlockSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS - 2) {  
                       break;
                   }
                   continue;
@@ -294,9 +314,11 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                   {
                   if (nBlockSigOps >  blockMiningSigopsPerMb.value*blockMbSize - 2)
                     {
-                    break;  // very close to the limit, so the block is finished.  So a block that is near the sigops limit might be shorter than it could be if the high sigops tx was backed out and other tx added.
+                    // very close to the limit, so the block is finished.  So a block that is near the sigops limit might be shorter than it could be if the high sigops tx was backed out and other tx added.
+                    break;  
                     }
-                  continue;  // find another TX
+                  // find another TX
+                  continue;  
                   }
               }
 
@@ -401,7 +423,8 @@ void IncrementExtraNonce(CBlock* pblock, unsigned int& nExtraNonce)
         hashPrevBlock = pblock->hashPrevBlock;
     }
     ++nExtraNonce;
-    unsigned int nHeight = pblock->GetHeight(); // Height first in coinbase required for block.version=2
+    // Height first in coinbase required for block.version=2
+    unsigned int nHeight = pblock->GetHeight(); 
     CMutableTransaction txCoinbase(pblock->vtx[0]);
  
     CScript script = (CScript() << nHeight << CScriptNum(nExtraNonce));

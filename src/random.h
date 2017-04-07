@@ -47,4 +47,5 @@ static inline uint32_t insecure_rand(void)
     return (insecure_rand_Rw << 16) + insecure_rand_Rz;
 }
 
-#endif // BITCOIN_RANDOM_H
+//BITCOIN_RANDOM_H
+#endif 

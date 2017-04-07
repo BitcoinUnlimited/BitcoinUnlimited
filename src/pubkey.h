@@ -222,4 +222,5 @@ public:
     ~ECCVerifyHandle();
 };
 
-#endif // BITCOIN_PUBKEY_H
+// BITCOIN_PUBKEY_H
+#endif 

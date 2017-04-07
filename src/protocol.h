@@ -381,4 +381,5 @@ enum {
     MSG_XTHINBLOCK,
 };
 
-#endif // BITCOIN_PROTOCOL_H
+//BITCOIN_PROTOCOL_H
+#endif 

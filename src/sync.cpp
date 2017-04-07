@@ -132,7 +132,8 @@ static void push_lock(void* c, const CLockLocation& locklocation, bool fTry)
                 break;
 
             std::pair<void*, void*> p1 = std::make_pair(i.first, c);
-            if (lockorders.count(p1))  // If this order has already been placed into the order map, we've already tested it
+            // If this order has already been placed into the order map, we've already tested it
+            if (lockorders.count(p1))  
                 continue;
             lockorders[p1] = (*lockstack);
             // check to see if the opposite order has ever occurred, if so flag a possible deadlock
@@ -195,7 +196,8 @@ void AssertLockHeldInternal(const char* pszName, const char* pszFile, int nLine,
     abort();
 }
 
-#ifdef DEBUG_LOCKORDER // BU normally CCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical section from the lockorder map
+// BU normally CCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical section from the lockorder map
+#ifdef DEBUG_LOCKORDER 
 CCriticalSection::CCriticalSection():name(NULL)
 {
 }

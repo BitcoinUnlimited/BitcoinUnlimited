@@ -31,7 +31,8 @@ static bool noui_ThreadSafeMessageBox(const std::string& message, const std::str
         strCaption += _("Information");
         break;
     default:
-        strCaption += caption; // Use supplied caption (can be empty)
+        // Use supplied caption (can be empty)
+        strCaption += caption; 
     }
 
     if (!fSecure)

@@ -116,11 +116,13 @@ NodeId nLastNodeId = 0;
 extern CCriticalSection cs_nLastNodeId;
 
 extern CSemaphore *semOutbound;
-extern CSemaphore *semOutboundAddNode; // BU: separate semaphore for -addnodes
+// BU: separate semaphore for -addnodes
+extern CSemaphore *semOutboundAddNode; 
 boost::condition_variable messageHandlerCondition;
 
 // BU Parallel validation
-extern CSemaphore *semPV; // semaphore for parallel validation threads
+// semaphore for parallel validation threads
+extern CSemaphore *semPV; 
 
 // BU  Connection Slot mitigation - used to determine how many connection attempts over time
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
@@ -347,7 +349,8 @@ void AddressCurrentlyConnected(const CService& addr)
 
 uint64_t CNode::nMaxOutboundLimit = 0;
 uint64_t CNode::nMaxOutboundTotalBytesSentInCycle = 0;
-uint64_t CNode::nMaxOutboundTimeframe = 60*60*24; //1 day
+//1 day
+uint64_t CNode::nMaxOutboundTimeframe = 60*60*24; 
 uint64_t CNode::nMaxOutboundCycleStartTime = 0;
 
 CNode* FindNode(const CNetAddr& ip)
@@ -592,7 +595,8 @@ void CNode::GetBanned(banmap_t &banMap)
 {
     LOCK(cs_setBanned);
     SweepBanned();
-    banMap = setBanned; //create a thread safe copy
+    //create a thread safe copy
+    banMap = setBanned; 
 }
 
 void CNode::SetBanned(const banmap_t &banMap)
@@ -629,7 +633,8 @@ bool CNode::BannedSetIsDirty()
 
 void CNode::SetBannedSetDirty(bool dirty)
 {
-    LOCK(cs_setBanned); //reuse setBanned lock for the isDirty flag
+    //reuse setBanned lock for the isDirty flag
+    LOCK(cs_setBanned); 
     setBannedIsDirty = dirty;
 }
 
@@ -814,7 +819,8 @@ int CNetMessage::readData(const char* pch, unsigned int nBytes)
 // requires LOCK(cs_vSend), BU: returns > 0 if any data was sent, 0 if nothing accomplished.
 int SocketSendData(CNode* pnode)
 {
-    int progress=0; // BU This variable is incremented if something happens.  If it is zero at the bottom of the loop, we delay.  This solves spin loop issues where the select does not block but no bytes can be transferred (traffic shaping limited, for example).
+    // BU This variable is incremented if something happens.  If it is zero at the bottom of the loop, we delay.  This solves spin loop issues where the select does not block but no bytes can be transferred (traffic shaping limited, for example).
+    int progress=0; 
     std::deque<CSerializeData>::iterator it = pnode->vSendMsg.begin();
 
     while (it != pnode->vSendMsg.end()) {
@@ -834,8 +840,10 @@ int SocketSendData(CNode* pnode)
             break;        
         int nBytes = send(hSocket, &data[pnode->nSendOffset], amt2Send, MSG_NOSIGNAL | MSG_DONTWAIT);
         if (nBytes > 0) {
-            progress++;  // BU
-            pnode->bytesSent += nBytes;  // BU stats
+            // BU
+            progress++;  
+            // BU stats
+            pnode->bytesSent += nBytes;  
             int64_t tmp = GetTime();
             pnode->sendGap << (tmp - pnode->nLastSend);
             pnode->nLastSend = tmp;
@@ -852,7 +860,8 @@ int SocketSendData(CNode* pnode)
                 break;
             }
             if (empty)
-                break; // Exceeded our send budget, stop sending more
+                // Exceeded our send budget, stop sending more
+                break; 
         } else {
             if (nBytes < 0) {
                 // error
@@ -916,7 +925,8 @@ private:
     CNode *_pnode;
 };
 
-#if 0 // Not currenly used
+// Not currenly used
+#if 0 
 static bool ReverseCompareNodeMinPingTime(const CNodeRef &a, const CNodeRef &b)
 {
     return a->nMinPingUsecTime > b->nMinPingUsecTime;
@@ -978,7 +988,8 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection) {
             // Decay the activity bytes for each node over a period of 2 hours.  This gradually de-prioritizes a connection 
             // that was once active but has gone stale for some reason and allows lower priority active nodes to climb the ladder.
             int64_t nNow = GetTime();
-            node->nActivityBytes *= pow(1.0 - 1.0/7200, (double)(nNow - nLastTime)); // exponential 2 hour decay
+            // exponential 2 hour decay
+            node->nActivityBytes *= pow(1.0 - 1.0/7200, (double)(nNow - nLastTime)); 
 
             if (node->fWhitelisted)
                 continue;
@@ -1231,17 +1242,20 @@ static void AcceptConnection(const ListenSocket& hListenSocket) {
     }
 }
 
-char recvMsgBuf[MAX_RECV_CHUNK];  // Messages are first pulled into this buffer
+// Messages are first pulled into this buffer
+char recvMsgBuf[MAX_RECV_CHUNK];  
 
 void ThreadSocketHandler()
 {
     unsigned int nPrevNodeCount = 0;
-    int progress; // This variable is incremented if something happens.  If it is zero at the bottom of the loop, we delay.  This solves spin loop issues where the select does not block but no bytes can be transferred (traffic shaping limited, for example).
+    // This variable is incremented if something happens.  If it is zero at the bottom of the loop, we delay.  This solves spin loop issues where the select does not block but no bytes can be transferred (traffic shaping limited, for example).
+    int progress; 
     bool fAquiredAllRecvLocks;
     while (true) {
         progress = 0;
         fAquiredAllRecvLocks = true;
-        stat_io_service.poll(); // BU instrumentation
+        // BU instrumentation
+        stat_io_service.poll(); 
         //
         // Disconnect nodes
         //
@@ -1305,7 +1319,8 @@ void ThreadSocketHandler()
         //
         struct timeval timeout;
         timeout.tv_sec = 0;
-        timeout.tv_usec = 50000; // frequency to poll pnode->vSend
+        // frequency to poll pnode->vSend
+        timeout.tv_usec = 50000; 
 
         fd_set fdsetRecv;
         fd_set fdsetSend;
@@ -1411,7 +1426,8 @@ void ThreadSocketHandler()
             //
             // Receive
             //
-  	    SOCKET hSocket = pnode->hSocket; // temporary used to make sure that pnode->hSocket isn't closed by another thread during processing here.
+  	    // temporary used to make sure that pnode->hSocket isn't closed by another thread during processing here.
+  	    SOCKET hSocket = pnode->hSocket; 
             if (hSocket == INVALID_SOCKET)
                 continue;
             if (FD_ISSET(hSocket, &fdsetRecv) || FD_ISSET(hSocket, &fdsetError)) {
@@ -1423,7 +1439,8 @@ void ThreadSocketHandler()
                 else if (amt2Recv > 0) {
                     {
                         progress++;
-                        hSocket = pnode->hSocket; // get it again inside the lock
+                        // get it again inside the lock
+                        hSocket = pnode->hSocket; 
                         if (hSocket == INVALID_SOCKET)
                           continue;
                         // max of min makes sure amt is in a range reasonable for buffer allocation
@@ -1437,7 +1454,8 @@ void ThreadSocketHandler()
                             pnode->recvGap << (tmp - pnode->nLastRecv);
                             pnode->nLastRecv = tmp;
                             pnode->nRecvBytes += nBytes;
-                            pnode->bytesReceived += nBytes;  // BU stats
+                            // BU stats
+                            pnode->bytesReceived += nBytes;  
                             pnode->RecordBytesRecv(nBytes);
                         } else if (nBytes == 0) {
                             // socket closed gracefully
@@ -1496,7 +1514,8 @@ void ThreadSocketHandler()
                 pnode->Release();
         }
 
-        if (progress == 0 && fAquiredAllRecvLocks) // BU: Nothing happened even though select did not block.  So slow us down. 
+        // BU: Nothing happened even though select did not block.  So slow us down. 
+        if (progress == 0 && fAquiredAllRecvLocks) 
             MilliSleep(5);
     }
 }
@@ -1567,7 +1586,8 @@ void ThreadMapPort()
                     LogPrintf("UPnP Port Mapping successful.\n");
                 ;
 
-                MilliSleep(20 * 60 * 1000); // Refresh every 20 minutes
+                // Refresh every 20 minutes
+                MilliSleep(20 * 60 * 1000); 
             }
         } catch (const boost::thread_interrupted&) {
             r = UPNP_DeletePortMapping(urls.controlURL, data.first.servicetype, port.c_str(), "TCP", 0);
@@ -1710,7 +1730,8 @@ void ThreadDNSAddressSeed()
                 {
                     int nOneDay = 24*3600;
                     CAddress addr = CAddress(CService(ip, Params().GetDefaultPort()), requiredServiceBits);
-                    addr.nTime = GetTime() - 3*nOneDay - GetRand(4*nOneDay); // use a random age between 3 and 7 days old
+                    // use a random age between 3 and 7 days old
+                    addr.nTime = GetTime() - 3*nOneDay - GetRand(4*nOneDay); 
                     vAdd.push_back(addr);
                     found++;
                 }
@@ -1782,7 +1803,8 @@ void ThreadOpenConnections()
 {
     // Connect to specific addresses
     if ((mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0) ||
-        (mapArgs.count("-connect-thinblock") && mapMultiArgs["-connect-thinblock"].size() > 0)) // BUIP010 Xtreme Thinblocks
+        // BUIP010 Xtreme Thinblocks
+        (mapArgs.count("-connect-thinblock") && mapMultiArgs["-connect-thinblock"].size() > 0)) 
     {
         for (int64_t nLoop = 0;; nLoop++)
         {
@@ -2023,7 +2045,8 @@ void ThreadMessageHandler()
 
     // SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
     while (true) {
-        requester.SendRequests();  // BU send out any requests for tx or blks that I don't know about yet        
+        // BU send out any requests for tx or blks that I don't know about yet        
+        requester.SendRequests();  
 
         vector<CNode*> vNodesCopy;
         {
@@ -2245,9 +2268,12 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (!bandb.Read(banmap))
         LogPrintf("Invalid or missing banlist.dat; recreating\n");
 
-    CNode::SetBanned(banmap); //thread save setter
-    CNode::SetBannedSetDirty(false); //no need to write down just read or nonexistent data
-    CNode::SweepBanned(); //sweap out unused entries
+    //thread save setter
+    CNode::SetBanned(banmap); 
+    //no need to write down just read or nonexistent data
+    CNode::SetBannedSetDirty(false); 
+    //sweap out unused entries
+    CNode::SweepBanned(); 
 
     LogPrintf("Loaded %i addresses from peers.dat  %dms\n",
               addrman.size(),
@@ -2526,9 +2552,11 @@ uint64_t CNode::GetTotalBytesSent()
 void CNode::Fuzz(int nChance)
 {
     if (!fSuccessfullyConnected)
-        return; // Don't fuzz initial handshake
+        // Don't fuzz initial handshake
+        return; 
     if (GetRand(nChance) != 0)
-        return; // Fuzz 1 of every nChance messages
+        // Fuzz 1 of every nChance messages
+        return; 
 
     switch (GetRand(3)) {
     case 0:
@@ -2673,7 +2701,8 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     nLastRecv = 0;
     nSendBytes = 0;
     nRecvBytes = 0;
-    nActivityBytes = 0; // BU connection slot exhaustion mitigation
+    // BU connection slot exhaustion mitigation
+    nActivityBytes = 0; 
     nTimeConnected = GetTime();
     nTimeOffset = 0;
     addr = addrIn;
@@ -2682,7 +2711,8 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     strSubVer = "";
     fWhitelisted = false;
     fOneShot = false;
-    fClient = false; // set by version message
+    // set by version message
+    fClient = false; 
     fInbound = fInboundIn;
     fNetworkNode = false;
     fSuccessfullyConnected = false;
@@ -2699,14 +2729,17 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     nNextInvSend = 0;
     fRelayTxes = false;
     pfilter = new CBloomFilter();
-    pThinBlockFilter = new CBloomFilter(); // BUIP010 - Xtreme Thinblocks
+    // BUIP010 - Xtreme Thinblocks
+    pThinBlockFilter = new CBloomFilter(); 
     nPingNonceSent = 0;
     nPingUsecStart = 0;
     nPingUsecTime = 0;
     fPingQueued = false;
     nMinPingUsecTime = std::numeric_limits<int64_t>::max();
-    thinBlockWaitingForTxns = -1; // BUIP010 Xtreme Thinblocks
-    addrFromPort = 0; // BU
+    // BUIP010 Xtreme Thinblocks
+    thinBlockWaitingForTxns = -1; 
+    // BU
+    addrFromPort = 0; 
 
     // BU instrumentation
     std::string xmledName;
@@ -2750,7 +2783,8 @@ CNode::~CNode()
     if (pfilter)
       {
         delete pfilter;
-	pfilter = NULL;  // BU
+	// BU
+	pfilter = NULL;  
       }
 
 

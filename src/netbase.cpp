@@ -28,8 +28,10 @@
 #include <fcntl.h>
 #endif
 
-#include <boost/algorithm/string/case_conv.hpp> // for to_lower()
-#include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
+// for to_lower()
+#include <boost/algorithm/string/case_conv.hpp> 
+// for startswith() and endswith()
+#include <boost/algorithm/string/predicate.hpp> 
 #include <boost/thread.hpp>
 
 #if !defined(HAVE_MSG_NOSIGNAL) && !defined(MSG_NOSIGNAL)
@@ -71,7 +73,8 @@ void SplitHostPort(std::string in, int &portOut, std::string &hostOut) {
     size_t colon = in.find_last_of(':');
     // if a : is found, and it either follows a [...], or no other : is in the string, treat it as port separator
     bool fHaveColon = colon != in.npos;
-    bool fBracketed = fHaveColon && (in[0]=='[' && in[colon-1]==']'); // if there is a colon, and in[0]=='[', colon is not 0, so in[colon-1] is safe
+    // if there is a colon, and in[0]=='[', colon is not 0, so in[colon-1] is safe
+    bool fBracketed = fHaveColon && (in[0]=='[' && in[colon-1]==']'); 
     bool fMultiColon = fHaveColon && (in.find_last_of(':',colon-1) != in.npos);
     if (fHaveColon && (colon==0 || fBracketed || !fMultiColon)) {
         int32_t n;
@@ -256,13 +259,16 @@ bool static InterruptibleRecv(char* data, size_t len, int timeout, SOCKET& hSock
     // to break off in case of an interruption.
     const int64_t maxWait = 1000;
     while (len > 0 && curTime < endTime) {
-        ssize_t ret = recv(hSocket, data, len, 0); // Optimistically try the recv first
+        // Optimistically try the recv first
+        ssize_t ret = recv(hSocket, data, len, 0); 
         if (ret > 0) {
             len -= ret;
             data += ret;
-        } else if (ret == 0) { // Unexpected disconnection
+        // Unexpected disconnection
+        } else if (ret == 0) { 
             return false;
-        } else { // Other error or blocking
+        // Other error or blocking
+        } else { 
             int nErr = WSAGetLastError();
             if (nErr == WSAEINPROGRESS || nErr == WSAEWOULDBLOCK || nErr == WSAEINVAL) {
                 if (!IsSelectableSocket(hSocket)) {
@@ -304,12 +310,17 @@ static bool Socks5(const std::string& strDest, int port, const ProxyCredentials 
     std::vector<uint8_t> vSocks5Init;
     vSocks5Init.push_back(0x05);
     if (auth) {
-        vSocks5Init.push_back(0x02); // # METHODS
-        vSocks5Init.push_back(0x00); // X'00' NO AUTHENTICATION REQUIRED
-        vSocks5Init.push_back(0x02); // X'02' USERNAME/PASSWORD (RFC1929)
+        // # METHODS
+        vSocks5Init.push_back(0x02); 
+        // X'00' NO AUTHENTICATION REQUIRED
+        vSocks5Init.push_back(0x00); 
+        // X'02' USERNAME/PASSWORD (RFC1929)
+        vSocks5Init.push_back(0x02); 
     } else {
-        vSocks5Init.push_back(0x01); // # METHODS
-        vSocks5Init.push_back(0x00); // X'00' NO AUTHENTICATION REQUIRED
+        // # METHODS
+        vSocks5Init.push_back(0x01); 
+        // X'00' NO AUTHENTICATION REQUIRED
+        vSocks5Init.push_back(0x00); 
     }
     ssize_t ret = send(hSocket, (const char*)begin_ptr(vSocks5Init), vSocks5Init.size(), MSG_NOSIGNAL);
     if (ret != (ssize_t)vSocks5Init.size()) {
@@ -357,11 +368,16 @@ static bool Socks5(const std::string& strDest, int port, const ProxyCredentials 
         return error("Proxy requested wrong authentication method %02x", pchRet1[1]);
     }
     std::vector<uint8_t> vSocks5;
-    vSocks5.push_back(0x05); // VER protocol version
-    vSocks5.push_back(0x01); // CMD CONNECT
-    vSocks5.push_back(0x00); // RSV Reserved
-    vSocks5.push_back(0x03); // ATYP DOMAINNAME
-    vSocks5.push_back(strDest.size()); // Length<=255 is checked at beginning of function
+    // VER protocol version
+    vSocks5.push_back(0x05); 
+    // CMD CONNECT
+    vSocks5.push_back(0x01); 
+    // RSV Reserved
+    vSocks5.push_back(0x00); 
+    // ATYP DOMAINNAME
+    vSocks5.push_back(0x03); 
+    // Length<=255 is checked at beginning of function
+    vSocks5.push_back(strDest.size()); 
     vSocks5.insert(vSocks5.end(), strDest.begin(), strDest.end());
     vSocks5.push_back((port >> 8) & 0xFF);
     vSocks5.push_back((port >> 0) & 0xFF);
@@ -598,7 +614,8 @@ bool ConnectSocket(const CService &addrDest, SOCKET& hSocketRet, int nTimeout, b
 
     if (GetProxy(addrDest.GetNetwork(), proxy))
         return ConnectThroughProxy(proxy, addrDest.ToStringIP(), addrDest.GetPort(), hSocketRet, nTimeout, outProxyConnectionFailed);
-    else // no proxy needed (none set for target network)
+    // no proxy needed (none set for target network)
+    else 
         return ConnectSocketDirectly(addrDest, hSocketRet, nTimeout);
 }
 
@@ -1046,12 +1063,14 @@ int CNetAddr::GetReachabilityFrom(const CNetAddr *paddrPartner) const
         default:         return REACH_DEFAULT;
         case NET_TEREDO: return REACH_TEREDO;
         case NET_IPV4:   return REACH_IPV4;
-        case NET_IPV6:   return fTunnel ? REACH_IPV6_WEAK : REACH_IPV6_STRONG; // only prefer giving our IPv6 address if it's not tunnelled
+        // only prefer giving our IPv6 address if it's not tunnelled
+        case NET_IPV6:   return fTunnel ? REACH_IPV6_WEAK : REACH_IPV6_STRONG; 
         }
     case NET_TOR:
         switch(ourNet) {
         default:         return REACH_DEFAULT;
-        case NET_IPV4:   return REACH_IPV4; // Tor users can connect to IPv4 as well
+        // Tor users can connect to IPv4 as well
+        case NET_IPV4:   return REACH_IPV4; 
         case NET_TOR:    return REACH_PRIVATE;
         }
     case NET_TEREDO:
@@ -1069,7 +1088,8 @@ int CNetAddr::GetReachabilityFrom(const CNetAddr *paddrPartner) const
         case NET_TEREDO:  return REACH_TEREDO;
         case NET_IPV6:    return REACH_IPV6_WEAK;
         case NET_IPV4:    return REACH_IPV4;
-        case NET_TOR:     return REACH_PRIVATE; // either from Tor, or don't care about our address
+        // either from Tor, or don't care about our address
+        case NET_TOR:     return REACH_PRIVATE; 
         }
     }
 }
@@ -1260,9 +1280,11 @@ CSubNet::CSubNet(const std::string &strSubnet, bool fAllowLookup)
             int32_t n;
             // IPv4 addresses start at offset 12, and first 12 bytes must match, so just offset n
             const int astartofs = network.IsIPv4() ? 12 : 0;
-            if (ParseInt32(strNetmask, &n)) // If valid number, assume /24 symtex
+            // If valid number, assume /24 symtex
+            if (ParseInt32(strNetmask, &n)) 
             {
-                if(n >= 0 && n <= (128 - astartofs*8)) // Only valid if in range of bits of address
+                // Only valid if in range of bits of address
+                if(n >= 0 && n <= (128 - astartofs*8)) 
                 {
                     n += astartofs*8;
                     // Clear bits [n..127]
@@ -1274,9 +1296,11 @@ CSubNet::CSubNet(const std::string &strSubnet, bool fAllowLookup)
                     valid = false;
                 }
             }
-            else // If not a valid number, try full netmask syntax
+            // If not a valid number, try full netmask syntax
+            else 
             {
-                if (LookupHost(strNetmask.c_str(), vIP, 1, false)) // Never allow lookup for netmask
+                // Never allow lookup for netmask
+                if (LookupHost(strNetmask.c_str(), vIP, 1, false)) 
                 {
                     // Copy only the *last* four bytes in case of IPv4, the rest of the mask should stay 1's as
                     // we don't want pchIPv4 to be part of the mask.
