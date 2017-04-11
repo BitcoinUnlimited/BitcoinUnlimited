@@ -399,11 +399,11 @@ bool CheckInputs(const CTransaction &tx,
     const CCoinsViewCache &view,
     bool fScriptChecks,
     unsigned int flags,
-    bool cacheStore,
+    bool cacheSigStore,
+    bool cacheFullScriptStore,
     ValidationResourceTracker *resourceTracker,
-    std::vector<CScriptCheck> *pvChecks = NULL,
-    unsigned char *sighashType = NULL);
-
+    std::vector<CScriptCheck> *pvChecks = nullptr,
+    unsigned char *sighashType = nullptr);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
 void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache &inputs, int nHeight);
@@ -609,6 +609,63 @@ public:
     ~CMainCleanup();
 };
 #endif
+
+/**
+ * Closure representing one script verification
+ * Note that this stores references to the spending transaction
+ */
+class CScriptCheck
+{
+protected:
+    ValidationResourceTracker *resourceTracker;
+    CScript scriptPubKey;
+    CAmount amount;
+    const CTransaction *ptxTo;
+    unsigned int nIn;
+    unsigned int nFlags;
+    bool cacheStore;
+    ScriptError error;
+
+public:
+    unsigned char sighashType;
+    CScriptCheck()
+        : resourceTracker(nullptr), amount(0), ptxTo(0), nIn(0), nFlags(0), cacheStore(false),
+          error(SCRIPT_ERR_UNKNOWN_ERROR), sighashType(0)
+    {
+    }
+
+    CScriptCheck(ValidationResourceTracker *resourceTrackerIn,
+        const CScript &scriptPubKeyIn,
+        const CAmount amountIn,
+        const CTransaction &txToIn,
+        unsigned int nInIn,
+        unsigned int nFlagsIn,
+        bool cacheIn)
+        : resourceTracker(resourceTrackerIn), scriptPubKey(scriptPubKeyIn), amount(amountIn), ptxTo(&txToIn),
+          nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn), error(SCRIPT_ERR_UNKNOWN_ERROR), sighashType(0)
+    {
+    }
+
+    bool operator()();
+
+    void swap(CScriptCheck &check)
+    {
+        std::swap(resourceTracker, check.resourceTracker);
+        scriptPubKey.swap(check.scriptPubKey);
+        std::swap(ptxTo, check.ptxTo);
+        std::swap(amount, check.amount);
+        std::swap(nIn, check.nIn);
+        std::swap(nFlags, check.nFlags);
+        std::swap(cacheStore, check.cacheStore);
+        std::swap(error, check.error);
+        std::swap(sighashType, check.sighashType);
+    }
+
+    ScriptError GetScriptError() const { return error; }
+};
+
+/** Initializes the script-execution cache */
+void InitScriptExecutionCache();
 
 
 #endif // BITCOIN_MAIN_H

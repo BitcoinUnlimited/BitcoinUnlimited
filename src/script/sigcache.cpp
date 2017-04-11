@@ -29,11 +29,11 @@ class SignatureCacheHasher
 {
 public:
     template <uint8_t hash_select>
-    uint32_t operator()(const uint256& key) const
+    uint32_t operator()(const uint256 &key) const
     {
-        static_assert(hash_select <8, "SignatureCacheHasher only has 8 hashes available.");
+        static_assert(hash_select < 8, "SignatureCacheHasher only has 8 hashes available.");
         uint32_t u;
-        std::memcpy(&u, key.begin()+4*hash_select, 4);
+        std::memcpy(&u, key.begin() + 4 * hash_select, 4);
         return u;
     }
 };
@@ -67,22 +67,18 @@ public:
             .Finalize(entry.begin());
     }
 
-    bool
-    Get(const uint256& entry, const bool erase)
+    bool Get(const uint256 &entry, const bool erase)
     {
         boost::shared_lock<boost::shared_mutex> lock(cs_sigcache);
         return setValid.contains(entry, erase);
     }
 
-    void Set(uint256& entry)
+    void Set(uint256 &entry)
     {
         boost::unique_lock<boost::shared_mutex> lock(cs_sigcache);
         setValid.insert(entry);
     }
-    uint32_t setup_bytes(size_t n)
-    {
-        return setValid.setup_bytes(n);
-    }
+    uint32_t setup_bytes(size_t n) { return setValid.setup_bytes(n); }
 };
 
 /* In previous versions of this code, signatureCache was a local static variable
@@ -97,14 +93,19 @@ static CSignatureCache signatureCache;
 // To be called once in AppInit2/TestingSetup to initialize the signatureCache
 void InitSignatureCache()
 {
-    size_t nMaxCacheSize = GetArg("-maxsigcachesize", DEFAULT_MAX_SIG_CACHE_SIZE) * ((size_t) 1 << 20);
-    if (nMaxCacheSize <= 0) return;
+    // nMaxCacheSize is unsigned. If -maxsigcachesize is set to zero,
+    // setup_bytes creates the minimum possible cache (2 elements).
+    size_t nMaxCacheSize = std::min(std::max((int64_t)0, GetArg("-maxsigcachesize", DEFAULT_MAX_SIG_CACHE_SIZE) / 2),
+                               (int64_t)MAX_MAX_SIG_CACHE_SIZE) *
+                           ((size_t)1 << 20);
     size_t nElems = signatureCache.setup_bytes(nMaxCacheSize);
     LOGA("Using %zu MiB out of %zu requested for signature cache, able to store %zu elements\n",
-            (nElems*sizeof(uint256)) >>20, nMaxCacheSize>>20, nElems);
+        (nElems * sizeof(uint256)) >> 20, nMaxCacheSize >> 20, nElems);
 }
 
-bool CachingTransactionSignatureChecker::VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& pubkey, const uint256& sighash) const
+bool CachingTransactionSignatureChecker::VerifySignature(const std::vector<unsigned char> &vchSig,
+    const CPubKey &pubkey,
+    const uint256 &sighash) const
 {
     uint256 entry;
     signatureCache.ComputeEntry(entry, sighash, vchSig, pubkey);

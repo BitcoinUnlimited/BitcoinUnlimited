@@ -18,6 +18,7 @@
 #include "consensus/merkle.h"
 #include "consensus/tx_verify.h"
 #include "consensus/validation.h"
+#include "cuckoocache.h"
 #include "dosman.h"
 #include "expedited.h"
 #include "hash.h"
@@ -126,7 +127,7 @@ extern CCriticalSection cs_mapInboundConnectionTracker;
 /** A cache to store headers that have arrived but can not yet be connected **/
 std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders;
 
-static void CheckBlockIndex(const Consensus::Params& consensusParams);
+static void CheckBlockIndex(const Consensus::Params &consensusParams);
 
 /** Constant stuff for coinbase transactions we create: */
 CScript COINBASE_FLAGS;
@@ -927,7 +928,7 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints *lp, bool 
 }
 
 // Returns the script flags which should be checked for a given block
-static unsigned int GetBlockScriptFlags(const CBlockIndex* pindex, const Consensus::Params& chainparams);
+static unsigned int GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &chainparams);
 
 void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
 {
@@ -1270,26 +1271,32 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         unsigned char sighashType = 0;
-        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true, &resourceTracker,
-                NULL, &sighashType))
+        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true, false,
+                &resourceTracker, nullptr, &sighashType))
         {
             LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", tx.GetHash().ToString().c_str());
             return false;
         }
         entry.UpdateRuntimeSigOps(resourceTracker.GetSigOps(), resourceTracker.GetSighashBytes());
 
-        // Check again against just the consensus-critical mandatory script
-        // verification flags, in case of bugs in the standard flags that cause
+        // Check again against just the current blocks tips script verification
+        // flags to cache our script execution flags. This is of course, useless
+        // if the next block has different script flags from the previous one, but
+        // because the cache track script flags for us it will auto-invalidate and
+        // we'll just have a few blocks of extra misses on soft fork activation.
+        //
+        // This is also useful in the case of bugs in the standard flags that casue
         // transactions to pass as valid when they're actually invalid. For
         // instance the STRICTENC flag was incorrectly allowing certain
         // CHECKSIG NOT scripts to pass, even though they were invalid.
         //
         // There is a similar check in CreateNewBlock() to prevent creating
-        // invalid blocks, however allowing such transactions into the mempool
+        // invalid blocks (using TestBlockValidity), however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true, NULL, NULL,
-                &sighashType2))
+        uint32_t fCurrentBlockVerifyScriptFlags = GetBlockScriptFlags(chainActive.Tip(), Params().GetConsensus());
+        if (!CheckInputs(tx, state, view, true, fCurrentBlockVerifyScriptFlags | forkVerifyFlags, true, true, nullptr,
+                nullptr, &sighashType2))
         {
             return error(
                 "%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
@@ -1704,19 +1711,35 @@ int GetSpendHeight(const CCoinsViewCache &inputs)
     throw std::runtime_error("GetSpendHeight(): best block does not exist");
 }
 
+static CuckooCache::cache<uint256, SignatureCacheHasher> scriptExecutionCache;
+static uint256 scriptExecutionCacheNonce(GetRandHash());
+
+void InitScriptExecutionCache()
+{
+    // nMaxCacheSize is unsigned. If -maxsigcachesize is set to zero,
+    // setup_bytes creates the minimum possible cache (2 elements).
+    size_t nMaxCacheSize = std::min(std::max((int64_t)0, GetArg("-maxsigcachesize", DEFAULT_MAX_SIG_CACHE_SIZE) / 2),
+                               (int64_t)MAX_MAX_SIG_CACHE_SIZE) *
+                           ((size_t)1 << 20);
+    size_t nElems = scriptExecutionCache.setup_bytes(nMaxCacheSize);
+    LOGA("Using %zu MiB out of %zu requested for script execution cache, able to store %zu elements\n",
+        (nElems * sizeof(uint256)) >> 20, nMaxCacheSize >> 20, nElems);
+}
+
 bool CheckInputs(const CTransaction &tx,
     CValidationState &state,
-    const CCoinsViewCache &inputs,
+    const CCoinsViewCache &view,
     bool fScriptChecks,
     unsigned int flags,
-    bool cacheStore,
+    bool cacheSigStore,
+    bool cacheFullScriptStore,
     ValidationResourceTracker *resourceTracker,
     std::vector<CScriptCheck> *pvChecks,
     unsigned char *sighashType)
 {
     if (!tx.IsCoinBase())
     {
-        if (!Consensus::CheckTxInputs(tx, state, inputs))
+        if (!Consensus::CheckTxInputs(tx, state, view))
             return false;
         if (pvChecks)
             pvChecks->reserve(tx.vin.size());
@@ -1733,10 +1756,32 @@ bool CheckInputs(const CTransaction &tx,
         // this optimisation would allow an invalid chain to be accepted.
         if (fScriptChecks)
         {
+            // First check if script executions have been cached with the same
+            // flags. Note that this assumes that the inputs provided are
+            // correct (ie that the transaction hash which is in tx's prevouts
+            // properly commits to the scriptPubKey in the inputs view of that
+            // transaction).
+            uint256 hashCacheEntry;
+            // We only use the first 19 bytes of nonce to avoid a second SHA
+            // round - giving us 19 + 32 + 4 = 55 bytes (+ 8 + 1 = 64)
+            static_assert(
+                55 - sizeof(flags) - 32 >= 128 / 8, "Want at least 128 bits of nonce for script execution cache");
+            CSHA256()
+                .Write(scriptExecutionCacheNonce.begin(), 55 - sizeof(flags) - 32)
+                .Write(tx.GetHash().begin(), 32)
+                .Write((unsigned char *)&flags, sizeof(flags))
+                .Finalize(hashCacheEntry.begin());
+
+            AssertLockHeld(cs_main); // TODO: Remove this requirement by making CuckooCache not require external locks
+            if (scriptExecutionCache.contains(hashCacheEntry, !cacheFullScriptStore))
+            {
+                return true;
+            }
+
             for (unsigned int i = 0; i < tx.vin.size(); i++)
             {
                 const COutPoint &prevout = tx.vin[i].prevout;
-                const Coin &coin = inputs.AccessCoin(prevout);
+                const Coin &coin = view.AccessCoin(prevout);
                 if (coin.IsSpent())
                     LOGA("ASSERTION: no inputs available\n");
                 assert(!coin.IsSpent());
@@ -1750,7 +1795,7 @@ bool CheckInputs(const CTransaction &tx,
                 const CAmount amount = coin.out.nValue;
 
                 // Verify signature
-                CScriptCheck check(resourceTracker, scriptPubKey, amount, tx, i, flags, cacheStore);
+                CScriptCheck check(resourceTracker, scriptPubKey, amount, tx, i, flags, cacheSigStore);
                 if (pvChecks)
                 {
                     pvChecks->push_back(CScriptCheck());
@@ -1767,7 +1812,7 @@ bool CheckInputs(const CTransaction &tx,
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
                         CScriptCheck check2(NULL, scriptPubKey, amount, tx, i,
-                            flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheStore);
+                            flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheSigStore);
                         if (check2())
                             return state.Invalid(
                                 false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
@@ -1785,6 +1830,13 @@ bool CheckInputs(const CTransaction &tx,
                 }
                 if (sighashType)
                     *sighashType = check.sighashType;
+            }
+
+            if (cacheFullScriptStore && !pvChecks)
+            {
+                // We executed all of the provided scripts, and were told to
+                // cache the result. Do so now.
+                scriptExecutionCache.insert(hashCacheEntry);
             }
         }
     }
@@ -2133,7 +2185,7 @@ public:
 // Protected by cs_main
 static ThresholdConditionCache warningcache[VERSIONBITS_NUM_BITS];
 
-static uint32_t GetBlockScriptFlags(const CBlockIndex* pindex, const Consensus::Params &consensusparams)
+static uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &consensusparams)
 {
     AssertLockHeld(cs_main);
 
@@ -2306,7 +2358,7 @@ bool ConnectBlock(const CBlock &block,
     }
 
     // Get the script flags for this block
-    uint32_t  flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus());
+    uint32_t flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus());
     bool fStrictPayToScriptHash = flags & SCRIPT_VERIFY_P2SH;
 
 
@@ -2442,8 +2494,8 @@ bool ConnectBlock(const CBlock &block,
                         std::vector<CScriptCheck> vChecks;
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
-                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, fCacheResults, &resourceTracker,
-                                PV->ThreadCount() ? &vChecks : NULL))
+                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, fCacheResults, fCacheResults,
+                                &resourceTracker, PV->ThreadCount() ? &vChecks : nullptr))
                         {
                             return error("ConnectBlock(): CheckInputs on %s failed with %s", tx.GetHash().ToString(),
                                 FormatStateMessage(state));
@@ -3900,11 +3952,12 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
 
     // Reject outdated version blocks when 95% (75% on testnet) of the network has upgraded:
     // check for version 2, 3 and 4 upgrades
-    if((block.nVersion < 2 && nHeight >= consensusParams.BIP34Height) ||
-       (block.nVersion < 3 && nHeight >= consensusParams.BIP66Height) ||
-       (block.nVersion < 4 && nHeight >= consensusParams.BIP65Height))
+    if ((block.nVersion < 2 && nHeight >= consensusParams.BIP34Height) ||
+        (block.nVersion < 3 && nHeight >= consensusParams.BIP66Height) ||
+        (block.nVersion < 4 && nHeight >= consensusParams.BIP65Height))
     {
-        return state.Invalid(error("%s: rejected nVersion=0x%08x block", __func__, block.nVersion), REJECT_OBSOLETE, "bad-version");
+        return state.Invalid(
+            error("%s: rejected nVersion=0x%08x block", __func__, block.nVersion), REJECT_OBSOLETE, "bad-version");
     }
 
     return true;
