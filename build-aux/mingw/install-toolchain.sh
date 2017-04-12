@@ -16,10 +16,32 @@ PATH="$MSYS_BIN:$MINGW_BIN:$PATH"
 mingw-get install msys-autoconf-bin
 mingw-get install msys-automake-bin
 mingw-get install msys-libtool-bin
+# NOTE: This is a very old version of wget (v1.12) and does not support TLSv1.2
+#       so we will only use this version to download the latest version v1.19.2
 mingw-get install msys-wget-bin
+
 
 # Ensure dependency directory exists
 mkdir -p "$DEPS_ROOT"
+cd "$DEPS_ROOT"
+
+# Use the v1.12 wget client to download & install the v1.19 version
+# don't download if already downloaded
+if [ ! -e wget-1.19.1-win32.zip ]
+then
+	wget --no-check-certificate https://eternallybored.org/misc/wget/releases/wget-1.19.1-win32.zip -O "$DEPS_ROOT/wget-1.19.1-win32.zip"
+fi
+# don't extract if already extracted
+if [ ! -d wget-1.19.1-win32 ]
+then
+	"$CMD_7ZIP" x wget-1.19.1-win32.zip -aoa -o"$DEPS_ROOT/wget-1.19.1-win32"
+	cd "$DEPS_ROOT/wget-1.19.1-win32"
+	cp wget.exe "$MSYS_BIN/wget.exe"
+fi
+#pause for debugging purposes
+#read -rsp $'Press any key to continue...\n' -n 1 key
+
+
 
 # Only install 32-bit tool chain if install path is provided
 if [ -n "$BUILD_32_BIT" ]
@@ -40,6 +62,7 @@ then
 	fi
 fi
 
+cd "$DEPS_ROOT"
 # Only install 64-bit tool chain if specified for inclusion by user
 if [ -n "$BUILD_64_BIT" ]
 then
