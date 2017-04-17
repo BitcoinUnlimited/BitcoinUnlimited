@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
-// Copyright (c) 2016 Bitcoin Unlimited Developers
+// Copyright (c) 2015-2017 The Zero-confirmation StarbucksCoin developers
+// Copyright (c) 2016 Zero-confirmation StarbucksCoin Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 

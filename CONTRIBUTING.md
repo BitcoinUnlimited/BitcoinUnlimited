@@ -1,9 +1,9 @@
 Contributing to Bitcoin
 =======================
 
-The Bitcoin Unlimited project operates an open contributor model where anyone is welcome to contribute towards development in the form of peer review, testing and patches. This document explains the practical process and guidelines for contributing.
+The Zero-confirmation StarbucksCoin project operates an open contributor model where anyone is welcome to contribute towards development in the form of peer review, testing and patches. This document explains the practical process and guidelines for contributing.
 
-Small features and patches can be contributed simply by issuing a pull request (PR) to this repository and working with the Bitcoin Unlimited Developer if any questions arise during the merge process.  Larger features should be proposed (and may be proposed before implemention) to the Bitcoin Unlimited members by writing a BUIP and submitting it to the bitcoin unlimited forum at: https://bitco.in/forum/forums/bitcoin-unlimited.15/.  If a proposal is accepted, then a contributor may issue a PR which will be merged.
+Small features and patches can be contributed simply by issuing a pull request (PR) to this repository and working with the Zero-confirmation StarbucksCoin Developer if any questions arise during the merge process.  Larger features should be proposed (and may be proposed before implemention) to the Zero-confirmation StarbucksCoin members by writing a BUIP and submitting it to the Zero-confirmation StarbucksCoin forum at: https://bitco.in/forum/forums/bitcoin-unlimited.15/.  If a proposal is accepted, then a contributor may issue a PR which will be merged.
 
 
 Contributor Workflow
@@ -67,9 +67,9 @@ Project maintainers aim for a quick turnaround on refactoring pull requests, so 
 "Decision Making" Process
 -------------------------
 
-The following applies to code changes to the Bitcoin Unlimited project (and related projects such as libsecp256k1), and is not to be confused with overall Bitcoin Network Protocol consensus changes.
+The following applies to code changes to the Zero-confirmation StarbucksCoin project (and related projects such as libsecp256k1), and is not to be confused with overall Bitcoin Network Protocol consensus changes.
 
-Whether a pull request is merged into Bitcoin Unlimited rests with the project merge maintainers and ultimately the project lead. 
+Whether a pull request is merged into Zero-confirmation StarbucksCoin rests with the project merge maintainers and ultimately the project lead. 
 
 Maintainers will take into consideration if a patch is in line with the general principles of the project; meets the minimum standards for inclusion; and will judge the general consensus of contributors.
 
@@ -107,4 +107,4 @@ Where a patch set proposes to change the Bitcoin consensus, it must have been di
 Release Policy
 --------------
 
-The project leader is the release manager for each Bitcoin Unlimited release.
+The project leader is the release manager for each Zero-confirmation StarbucksCoin release.

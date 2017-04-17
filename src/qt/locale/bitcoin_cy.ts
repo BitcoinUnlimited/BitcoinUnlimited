@@ -230,7 +230,7 @@
         <translation>&amp;Derbyn</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Unlimited</source>
+        <source>Show information about Zero-confirmation StarbucksCoin</source>
         <translation>Dangos gwybodaeth am Graidd Bitcoin</translation>
     </message>
     <message>
@@ -254,11 +254,11 @@
         <translation>Bar offer tabiau</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Craidd Bitcoin</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
+        <source>&amp;About Zero-confirmation StarbucksCoin</source>
         <translation>&amp;Ynghylch Craidd Bitcoin</translation>
     </message>
     <message numerus="yes">
@@ -425,11 +425,11 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Craidd Bitcoin</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
+        <source>About Zero-confirmation StarbucksCoin</source>
         <translation>Ynghylch Craidd Bitcoin</translation>
     </message>
     <message>
@@ -444,11 +444,11 @@
         <translation>Croeso</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Unlimited.</source>
+        <source>Welcome to Zero-confirmation StarbucksCoin.</source>
         <translation>Croeso i Graidd Bitcoin</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Craidd Bitcoin</translation>
     </message>
     <message>
@@ -664,11 +664,11 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>Zero-confirmation StarbucksCoin</source>
         <translation>Craidd Bitcoin</translation>
     </message>
     <message>
-        <source>The Bitcoin Unlimited developers</source>
+        <source>The Zero-confirmation StarbucksCoin developers</source>
         <translation>Datblygwyr Graidd Bitcoin</translation>
     </message>
     <message>

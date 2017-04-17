@@ -1,4 +1,4 @@
-Bitcoin Unlimited version 0.12.1 is now available from:
+Zero-confirmation StarbucksCoin version 0.12.1 is now available from:
 
   <https://bitcoinunlimited.info/download>
 

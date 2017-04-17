@@ -6,7 +6,7 @@ SetCompressor /SOLID lzma
 # General Symbol Definitions
 !define REGKEY "SOFTWARE\$(^Name)"
 !define VERSION @CLIENT_VERSION_MAJOR@.@CLIENT_VERSION_MINOR@.@CLIENT_VERSION_REVISION@
-!define COMPANY "Bitcoin Unlimited project"
+!define COMPANY "Zero-confirmation StarbucksCoin project"
 !define URL https://bitcoinunlimited.info/
 
 # MUI Symbol Definitions
@@ -59,7 +59,7 @@ XPStyle on
 BrandingText " "
 ShowInstDetails show
 VIProductVersion ${VERSION}.@CLIENT_VERSION_BUILD@
-VIAddVersionKey ProductName "Bitcoin Unlimited"
+VIAddVersionKey ProductName "Zero-confirmation StarbucksCoin"
 VIAddVersionKey ProductVersion "${VERSION}"
 VIAddVersionKey CompanyName "${COMPANY}"
 VIAddVersionKey CompanyWebsite "${URL}"

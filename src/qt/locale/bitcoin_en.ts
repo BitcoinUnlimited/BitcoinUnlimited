@@ -455,7 +455,7 @@
     </message>
     <message>
         <location line="+40"/>
-        <source>Show information about Bitcoin Unlimited</source>
+        <source>Show information about Zero-confirmation StarbucksCoin</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -505,8 +505,8 @@
     </message>
     <message>
         <location line="-314"/>
-        <source>Bitcoin Unlimited</source>
-        <translation type="unfinished">Bitcoin Unlimited</translation>
+        <source>Zero-confirmation StarbucksCoin</source>
+        <translation type="unfinished">Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <location line="+160"/>
@@ -515,7 +515,7 @@
     </message>
     <message>
         <location line="+38"/>
-        <source>&amp;About Bitcoin Unlimited</source>
+        <source>&amp;About Zero-confirmation StarbucksCoin</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1087,8 +1087,8 @@
     <name>HelpMessageDialog</name>
     <message>
         <location filename="../utilitydialog.cpp" line="+36"/>
-        <source>Bitcoin Unlimited</source>
-        <translation type="unfinished">Bitcoin Unlimited</translation>
+        <source>Zero-confirmation StarbucksCoin</source>
+        <translation type="unfinished">Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <location line="+0"/>
@@ -1103,7 +1103,7 @@
     </message>
     <message>
         <location line="+5"/>
-        <source>About Bitcoin Unlimited</source>
+        <source>About Zero-confirmation StarbucksCoin</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1166,7 +1166,7 @@
     </message>
     <message>
         <location line="+9"/>
-        <source>Welcome to Bitcoin Unlimited.</source>
+        <source>Welcome to Zero-confirmation StarbucksCoin.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1191,8 +1191,8 @@
     </message>
     <message>
         <location filename="../intro.cpp" line="+86"/>
-        <source>Bitcoin Unlimited</source>
-        <translation type="unfinished">Bitcoin Unlimited</translation>
+        <source>Zero-confirmation StarbucksCoin</source>
+        <translation type="unfinished">Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -1299,7 +1299,7 @@
     </message>
     <message>
         <location line="+45"/>
-        <source>The user interface language can be set here. This setting will take effect after restarting Bitcoin Unlimited.</source>
+        <source>The user interface language can be set here. This setting will take effect after restarting Zero-confirmation StarbucksCoin.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -3113,8 +3113,8 @@
     <name>SplashScreen</name>
     <message>
         <location filename="../splashscreen.cpp" line="+41"/>
-        <source>Bitcoin Unlimited</source>
-        <translation type="unfinished">Bitcoin Unlimited</translation>
+        <source>Zero-confirmation StarbucksCoin</source>
+        <translation type="unfinished">Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -4315,7 +4315,7 @@
     </message>
     <message>
         <location line="+16"/>
-        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Unlimited</source>
+        <source>Error loading wallet.dat: Wallet requires newer version of Zero-confirmation StarbucksCoin</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

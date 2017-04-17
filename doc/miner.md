@@ -1,11 +1,11 @@
 [Website](www.bitcoinunlimited.info)  | [Download](www.bitcoinunlimited.info/download) | [Setup](doc/README.md)  |  [Xthin](bu-xthin.md)  |  [Xpedited](bu-xpedited-forwarding.md)  |   [Miner](miner.md)
 
-Using Bitcoin Unlimited for Mining
+Using Zero-confirmation StarbucksCoin for Mining
 ==================================
 
-Bitcoin Unlimited is based on the Satoshi codebase, so it is a drop in replacement for your mining pool software.  Simply configure your pool to point to the Bitcoin Unlimited daemon, in the exact same manner you would for the Bitcoin Core daemon.
+Zero-confirmation StarbucksCoin is based on the Satoshi codebase, so it is a drop in replacement for your mining pool software.  Simply configure your pool to point to the Zero-confirmation StarbucksCoin daemon, in the exact same manner you would for the Bitcoin Core daemon.
 
-But Bitcoin Unlimited has specific features to facilitate mining.
+But Zero-confirmation StarbucksCoin has specific features to facilitate mining.
 
 
 Setting your excessive block size and accept depth
@@ -13,7 +13,7 @@ Setting your excessive block size and accept depth
 
 Blocks larger than the excessive block size will be ignored until "accept depth" (see next section) blocks are  built upon them.  This allows miners to discourage blocks that they feel are excessively large, but to ultimately accept them if it looks like the majority of the network is accepting this size.  You can learn more about these parameters [here](https://medium.com/@peter_r/the-excessive-block-gate-how-a-bitcoin-unlimited-node-deals-with-large-blocks-22a4a5c322d4#.bhkz538kw), and a miner's opinion on how they should be set [here](https://medium.com/@ViaBTC/miner-guide-how-to-safely-hard-fork-to-bitcoin-unlimited-8ac1570dc1a8#.zdklfb67p).
 
-To change the largest block that Bitcoin Unlimited will generate, run:
+To change the largest block that Zero-confirmation StarbucksCoin will generate, run:
 ```sh
 bitcoin-cli setexcessiveblock blockSize acceptDepth
 ```
@@ -50,7 +50,7 @@ $ bitcoin-cli getexcessiveblock
 Setting your subversion string (spoofing the user agent)
 --------------------------------------------------------
 
-To hide that this is a Bitcoin Unlimited node, set the "net.subversionOverride" to a string of your choice, in the bitcoin.conf file or using ./bitcoin-cli:
+To hide that this is a Zero-confirmation StarbucksCoin node, set the "net.subversionOverride" to a string of your choice, in the bitcoin.conf file or using ./bitcoin-cli:
 
 ```sh
  bitcoin-cli set net.subversionOverride="Your Choice Here"
@@ -70,10 +70,10 @@ To change this field in bitcoin.conf or on the command line, use:
 Setting your maximum mined block
 --------------------------------
 
-By default, the maximum block that Bitcoin Unlimited will mine is 1MB (compatible with Bitcoin Core).
+By default, the maximum block that Zero-confirmation StarbucksCoin will mine is 1MB (compatible with Bitcoin Core).
 You may want to increase this block size if the bitcoin network as a whole is willing to mine larger blocks, or you may want to decrease this size if you feel that the demands on the network is exceeding capacity.
 
-To change the largest block that Bitcoin Unlimited will generate, run:
+To change the largest block that Zero-confirmation StarbucksCoin will generate, run:
 ```sh
 bitcoin-cli setminingmaxblock blocksize
 ```
@@ -133,7 +133,7 @@ Here is an easy conversion in Linux: python -c "print '%d' % 0x30000000"
 Setting your block retry intervals
 ----------------------------------
 
-Bitcoin Unlimited tracks multiple sources for data an can rapidly request blocks or transactions from other sources if one source does not deliver the requested data.
+Zero-confirmation StarbucksCoin tracks multiple sources for data an can rapidly request blocks or transactions from other sources if one source does not deliver the requested data.
 To change the retry rate, set it in microseconds in your bitcoin.conf:
 
 Transaction retry interval:
@@ -167,13 +167,13 @@ To show the current string:
 bitcoin-cli getminercomment
 ```
 
- - WARNING: some mining software and pools also add to the coinbase string and do not validate the total string length (it must be < 100 bytes).  This can cause the mining pool to generate invalid blocks.  Please ensure that your mining pool software validates total string length, or keep the string you add to Bitcoin Unlimited short.
+ - WARNING: some mining software and pools also add to the coinbase string and do not validate the total string length (it must be < 100 bytes).  This can cause the mining pool to generate invalid blocks.  Please ensure that your mining pool software validates total string length, or keep the string you add to Zero-confirmation StarbucksCoin short.
 
 
 Filling a new node's transaction memory pool
 ---------------------------------------------
 
-When you restart bitcoind, the memory pool starts empty.  If a block is found quickly, this could result in an block with few transactions.  It is possible to "prime" a new instance of bitcoind with the memory pool of a different Bitcoin Unlimited node.  To do so, go to the CLI on the node that has a full mempool, connect to your new node, and push the transactions to it.
+When you restart bitcoind, the memory pool starts empty.  If a block is found quickly, this could result in an block with few transactions.  It is possible to "prime" a new instance of bitcoind with the memory pool of a different Zero-confirmation StarbucksCoin node.  To do so, go to the CLI on the node that has a full mempool, connect to your new node, and push the transactions to it.
 
 ```sh
 `bitcoin-cli addnode <new node's IP:port> onetry`

@@ -168,7 +168,7 @@
         <translation>Вы уверены, что хотите зашифровать ваш бумажник?</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
+        <source>Zero-confirmation StarbucksCoin will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
         <translation>Сейчас программа закроется для завершения процесса шифрования. Помните, что шифрование вашего бумажника не может полностью защитить ваши биткоины от кражи с помощью инфицирования вашего компьютера вредоносным ПО.</translation>
     </message>
     <message>
@@ -306,8 +306,8 @@
         <translation>Открыть &amp;URI...</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited client</source>
-        <translation>Bitcoin Unlimited клиент</translation>
+        <source>Zero-confirmation StarbucksCoin client</source>
+        <translation>Zero-confirmation StarbucksCoin клиент</translation>
     </message>
     <message>
         <source>Importing blocks from disk...</source>
@@ -358,8 +358,8 @@
         <translation>&amp;Получить</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Unlimited</source>
-        <translation>Показать информацию о Bitcoin Unlimited</translation>
+        <source>Show information about Zero-confirmation StarbucksCoin</source>
+        <translation>Показать информацию о Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -398,20 +398,20 @@
         <translation>Панель вкладок</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>Zero-confirmation StarbucksCoin</source>
+        <translation>Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <source>Request payments (generates QR codes and bitcoin: URIs)</source>
         <translation>Запросить платежи (создаёт QR-коды и bitcoin: ссылки)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
-        <translation>&amp;О Bitcoin Unlimited</translation>
+        <source>&amp;About Zero-confirmation StarbucksCoin</source>
+        <translation>&amp;О Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
-        <source>Modify configuration options for Bitcoin Unlimited</source>
-        <translation>Изменить опции конфигурации Bitcoin Unlimited</translation>
+        <source>Modify configuration options for Zero-confirmation StarbucksCoin</source>
+        <translation>Изменить опции конфигурации Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -430,8 +430,8 @@
         <translation>&amp;Параметры командной строки</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Unlimited help message to get a list with possible Bitcoin command-line options</source>
-        <translation>Показать помощь по Bitcoin Unlimited и получить список доступных параметров командной строки.</translation>
+        <source>Show the Zero-confirmation StarbucksCoin help message to get a list with possible Bitcoin command-line options</source>
+        <translation>Показать помощь по Zero-confirmation StarbucksCoin и получить список доступных параметров командной строки.</translation>
     </message>
     <message numerus="yes">
         <source>%n active connection(s) to Bitcoin network</source>
@@ -855,8 +855,8 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>Zero-confirmation StarbucksCoin</source>
+        <translation>Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <source>version</source>
@@ -867,8 +867,8 @@
         <translation>(%1-бит)</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
-        <translation>О Bitcoin Unlimited</translation>
+        <source>About Zero-confirmation StarbucksCoin</source>
+        <translation>О Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -918,16 +918,16 @@
         <translation>Добро пожаловать</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Unlimited.</source>
-        <translation>Добро пожаловать в Bitcoin Unlimited.</translation>
+        <source>Welcome to Zero-confirmation StarbucksCoin.</source>
+        <translation>Добро пожаловать в Zero-confirmation StarbucksCoin.</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Unlimited will store its data.</source>
-        <translation>Так как вы впервые запустили программу, вы можете выбрать, где Bitcoin Unlimited будет хранить данные.</translation>
+        <source>As this is the first time the program is launched, you can choose where Zero-confirmation StarbucksCoin will store its data.</source>
+        <translation>Так как вы впервые запустили программу, вы можете выбрать, где Zero-confirmation StarbucksCoin будет хранить данные.</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
-        <translation>Bitcoin Unlimited скачает и сохранит копию цепи блоков. Как минимум, %1ГБ данных будет храниться в этом каталоге, и со временем он будет расти. Бумажник будет также сохранён в этом каталоге.</translation>
+        <source>Zero-confirmation StarbucksCoin will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <translation>Zero-confirmation StarbucksCoin скачает и сохранит копию цепи блоков. Как минимум, %1ГБ данных будет храниться в этом каталоге, и со временем он будет расти. Бумажник будет также сохранён в этом каталоге.</translation>
     </message>
     <message>
         <source>Use the default data directory</source>
@@ -938,8 +938,8 @@
         <translation>Использовать другой каталог данных:</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>Zero-confirmation StarbucksCoin</source>
+        <translation>Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <source>Error: Specified data directory "%1" cannot be created.</source>
@@ -1020,8 +1020,8 @@
         <translation>Сворачивать вместо закрытия. Если данная опция будет выбрана — приложение закроется только после выбора соответствующего пункта в меню.</translation>
     </message>
     <message>
-        <source>The user interface language can be set here. This setting will take effect after restarting Bitcoin Unlimited.</source>
-        <translation>Здесь можно выбрать язык интерфейса. Настройки вступят в силу после перезапуска Bitcoin Unlimited.</translation>
+        <source>The user interface language can be set here. This setting will take effect after restarting Zero-confirmation StarbucksCoin.</source>
+        <translation>Здесь можно выбрать язык интерфейса. Настройки вступят в силу после перезапуска Zero-confirmation StarbucksCoin.</translation>
     </message>
     <message>
         <source>Third party URLs (e.g. a block explorer) that appear in the transactions tab as context menu items. %s in the URL is replaced by transaction hash. Multiple URLs are separated by vertical bar |.</source>
@@ -1048,12 +1048,12 @@
         <translation>&amp;Сеть</translation>
     </message>
     <message>
-        <source>Automatically start Bitcoin Unlimited after logging in to the system.</source>
-        <translation>Автоматически запускать Bitcoin Unlimited после входа в систему</translation>
+        <source>Automatically start Zero-confirmation StarbucksCoin after logging in to the system.</source>
+        <translation>Автоматически запускать Zero-confirmation StarbucksCoin после входа в систему</translation>
     </message>
     <message>
-        <source>&amp;Start Bitcoin Unlimited on system login</source>
-        <translation>&amp;Запускать Bitcoin Unlimited при входе в систему</translation>
+        <source>&amp;Start Zero-confirmation StarbucksCoin on system login</source>
+        <translation>&amp;Запускать Zero-confirmation StarbucksCoin при входе в систему</translation>
     </message>
     <message>
         <source>(0 = auto, &lt;0 = leave that many cores free)</source>
@@ -1518,8 +1518,8 @@
         <translation>Использование памяти</translation>
     </message>
     <message>
-        <source>Open the Bitcoin Unlimited debug log file from the current data directory. This can take a few seconds for large log files.</source>
-        <translation>Открыть отладочный лог-файл Bitcoin Unlimited из текущего каталога данных. Это может занять несколько секунд для больших лог-файлов.</translation>
+        <source>Open the Zero-confirmation StarbucksCoin debug log file from the current data directory. This can take a few seconds for large log files.</source>
+        <translation>Открыть отладочный лог-файл Zero-confirmation StarbucksCoin из текущего каталога данных. Это может занять несколько секунд для больших лог-файлов.</translation>
     </message>
     <message>
         <source>Received</source>
@@ -1678,8 +1678,8 @@
         <translation>&amp;Разблокировать узел</translation>
     </message>
     <message>
-        <source>Welcome to the Bitcoin Unlimited RPC console.</source>
-        <translation>Добро пожаловать в RPC-консоль Bitcoin Unlimited.</translation>
+        <source>Welcome to the Zero-confirmation StarbucksCoin RPC console.</source>
+        <translation>Добро пожаловать в RPC-консоль Zero-confirmation StarbucksCoin.</translation>
     </message>
     <message>
         <source>Use up and down arrows to navigate history, and &lt;b&gt;Ctrl-L&lt;/b&gt; to clear screen.</source>
@@ -2264,8 +2264,8 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Unlimited is shutting down...</source>
-        <translation>Bitcoin Unlimited выключается...</translation>
+        <source>Zero-confirmation StarbucksCoin is shutting down...</source>
+        <translation>Zero-confirmation StarbucksCoin выключается...</translation>
     </message>
     <message>
         <source>Do not shut down the computer until this window disappears.</source>
@@ -2414,12 +2414,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>Zero-confirmation StarbucksCoin</source>
+        <translation>Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
-        <source>The Bitcoin Unlimited developers</source>
-        <translation>Разработчики Bitcoin Unlimited</translation>
+        <source>The Zero-confirmation StarbucksCoin developers</source>
+        <translation>Разработчики Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <source>[testnet]</source>
@@ -2936,8 +2936,8 @@
         <translation>Максимальная сумма комиссий (%s) для одной транзакции в бумажнике; слишком низкое значение может вызвать прерывание больших транзакций (по умолчанию: %s)</translation>
     </message>
     <message>
-        <source>Please check that your computer's date and time are correct! If your clock is wrong Bitcoin Unlimited will not work properly.</source>
-        <translation>Внимание: убедитесь, что дата и время на Вашем компьютере выставлены верно! Если Ваши часы идут неправильно, Bitcoin Unlimited будет работать некорректно.</translation>
+        <source>Please check that your computer's date and time are correct! If your clock is wrong Zero-confirmation StarbucksCoin will not work properly.</source>
+        <translation>Внимание: убедитесь, что дата и время на Вашем компьютере выставлены верно! Если Ваши часы идут неправильно, Zero-confirmation StarbucksCoin будет работать некорректно.</translation>
     </message>
     <message>
         <source>Prune configured below the minimum of %d MiB.  Please use a higher number.</source>
@@ -3008,8 +3008,8 @@
         <translation>Это пре-релизная тестовая сборка - используйте на свой страх и риск - не используйте для добычи или торговых приложений</translation>
     </message>
     <message>
-        <source>Unable to bind to %s on this computer. Bitcoin Unlimited is probably already running.</source>
-        <translation>Не удалось забиндиться на %s на этом компьютере. Возможно, Bitcoin Unlimited уже запущен.</translation>
+        <source>Unable to bind to %s on this computer. Zero-confirmation StarbucksCoin is probably already running.</source>
+        <translation>Не удалось забиндиться на %s на этом компьютере. Возможно, Zero-confirmation StarbucksCoin уже запущен.</translation>
     </message>
     <message>
         <source>Use UPnP to map the listening port (default: 1 when listening and no -proxy)</source>
@@ -3216,8 +3216,8 @@
         <translation>Привязаться к указанному адресу для прослушивания JSON-RPC подключений. Используйте запись [хост]:порт для IPv6. Эту опцию можно использовать многократно (по умолчанию: привязываться ко всем интерфейсам)</translation>
     </message>
     <message>
-        <source>Cannot obtain a lock on data directory %s. Bitcoin Unlimited is probably already running.</source>
-        <translation>Не удалось установить блокировку на каталог данных %s. Возможно, Bitcoin Unlimited уже запущен.</translation>
+        <source>Cannot obtain a lock on data directory %s. Zero-confirmation StarbucksCoin is probably already running.</source>
+        <translation>Не удалось установить блокировку на каталог данных %s. Возможно, Zero-confirmation StarbucksCoin уже запущен.</translation>
     </message>
     <message>
         <source>Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)</source>
@@ -3316,12 +3316,12 @@
         <translation>Подключаться через SOCKS5 прокси</translation>
     </message>
     <message>
-        <source>Copyright (C) 2009-%i The Bitcoin Unlimited Developers</source>
-        <translation>Все права защищены © 2009-%i Разработчики Bitcoin Unlimited</translation>
+        <source>Copyright (C) 2009-%i The Zero-confirmation StarbucksCoin Developers</source>
+        <translation>Все права защищены © 2009-%i Разработчики Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
-        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Unlimited</source>
-        <translation>Ошибка загрузки wallet.dat: бумажник требует более новую версию Bitcoin Unlimited</translation>
+        <source>Error loading wallet.dat: Wallet requires newer version of Zero-confirmation StarbucksCoin</source>
+        <translation>Ошибка загрузки wallet.dat: бумажник требует более новую версию Zero-confirmation StarbucksCoin</translation>
     </message>
     <message>
         <source>Error reading from database, shutting down.</source>
@@ -3336,8 +3336,8 @@
         <translation>Информация</translation>
     </message>
     <message>
-        <source>Initialization sanity check failed. Bitcoin Unlimited is shutting down.</source>
-        <translation>Не удалось проверить чистоту. Bitcoin Unlimited выключается.</translation>
+        <source>Initialization sanity check failed. Zero-confirmation StarbucksCoin is shutting down.</source>
+        <translation>Не удалось проверить чистоту. Zero-confirmation StarbucksCoin выключается.</translation>
     </message>
     <message>
         <source>Invalid amount for -maxtxfee=&lt;amount&gt;: '%s'</source>
@@ -3456,8 +3456,8 @@
         <translation>Имя для подключений JSON-RPC</translation>
     </message>
     <message>
-        <source>Wallet needed to be rewritten: restart Bitcoin Unlimited to complete</source>
-        <translation>Необходимо перезаписать бумажник, перезапустите Bitcoin Unlimited для завершения операции.</translation>
+        <source>Wallet needed to be rewritten: restart Zero-confirmation StarbucksCoin to complete</source>
+        <translation>Необходимо перезаписать бумажник, перезапустите Zero-confirmation StarbucksCoin для завершения операции.</translation>
     </message>
     <message>
         <source>Warning</source>
