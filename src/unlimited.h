@@ -117,9 +117,6 @@ extern bool TestConservativeBlockValidity(CValidationState &state,
 // Check whether this block is bigger in some metric than we really want to accept
 extern bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, uint64_t nTx, uint64_t largestTx);
 
-// Check whether this chain qualifies as excessive.
-extern int isChainExcessive(const CBlockIndex *blk, unsigned int checkDepth = excessiveAcceptDepth);
-
 // Check whether any block N back in this chain is an excessive block
 extern int chainContainsExcessive(const CBlockIndex *blk, unsigned int goBack = 0);
 

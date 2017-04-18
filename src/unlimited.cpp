@@ -1095,33 +1095,6 @@ int chainContainsExcessive(const CBlockIndex *blk, unsigned int goBack)
     return false;
 }
 
-int isChainExcessive(const CBlockIndex *blk, unsigned int goBack)
-{
-    if (goBack == 0)
-        goBack = excessiveAcceptDepth;
-    bool recentExcessive = false;
-    bool oldExcessive = false;
-    for (unsigned int i = 0; i < goBack; i++, blk = blk->pprev)
-    {
-        if (!blk)
-            break; // we hit the beginning
-        if (blk->nStatus & BLOCK_EXCESSIVE)
-            recentExcessive = true;
-    }
-
-    // Once an excessive block is built upon the chain is not excessive even if more large blocks appear.
-    // So look back to make sure that this is the "first" excessive block for a while
-    for (unsigned int i = 0; i < EXCESSIVE_BLOCK_CHAIN_RESET; i++, blk = blk->pprev)
-    {
-        if (!blk)
-            break; // we hit the beginning
-        if (blk->nStatus & BLOCK_EXCESSIVE)
-            oldExcessive = true;
-    }
-
-    return (recentExcessive && !oldExcessive);
-}
-
 bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, uint64_t nTx, uint64_t largestTx)
 {
     if (blockSize > excessiveBlockSize)
