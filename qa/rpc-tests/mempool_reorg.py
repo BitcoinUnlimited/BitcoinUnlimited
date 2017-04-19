@@ -82,6 +82,7 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
 
         for node in self.nodes:
             node.invalidateblock(last_block[0])
+        self.sync_all()
         assert_equal(set(self.nodes[0].getrawmempool()), {spend_101_id, spend_102_1_id, spend_103_1_id})
 
         # Use invalidateblock to re-org back and make all those coinbase spends

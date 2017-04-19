@@ -115,6 +115,8 @@ static const int64_t BLOCK_DOWNLOAD_TIMEOUT_BASE = 1000000;
 static const int64_t BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 500000;
 /** Timeout in secs for the initial sync. If we don't receive the first batch of headers */
 static const uint8_t INITIAL_HEADERS_TIMEOUT = 30;
+/** Timeout in secs for the secondary download of headers after the first headers are received */
+static const uint8_t HEADERS_DOWNLOAD_TIMEOUT = 5;
 
 static const unsigned int DEFAULT_LIMITFREERELAY = 15;
 static const bool DEFAULT_RELAYPRIORITY = true;
