@@ -74,8 +74,9 @@ BITCOIN_TESTS =\
   test/core_io_tests.cpp \
   test/crypto_tests.cpp \
   test/DoS_tests.cpp \
-  test/exploit_tests.cpp \
   test/dstencode_tests.cpp \
+  test/exploit_tests.cpp \
+  test/forkscsv_tests.cpp \
   test/getarg_tests.cpp \
   test/hash_tests.cpp \
   test/key_tests.cpp \
@@ -112,6 +113,7 @@ BITCOIN_TESTS =\
   test/transaction_tests.cpp \
   test/txvalidationcache_tests.cpp \
   test/versionbits_tests.cpp \
+  test/genversionbits_tests.cpp \
   test/uint256_tests.cpp \
   test/univalue_tests.cpp \
   test/util_tests.cpp
