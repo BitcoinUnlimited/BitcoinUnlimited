@@ -218,6 +218,8 @@ static void addConfigurationLocationOptions(AllowedArgs &allowedArgs)
     allowedArgs.addHeader(_("Configuration location options:"))
         .addArg(
             "conf=<file>", requiredStr, strprintf(_("Specify configuration file (default: %s)"), BITCOIN_CONF_FILENAME))
+        .addArg(
+            "forks=<file>", requiredStr, strprintf(_("Specify fork deployment file (default: %s)"), FORKS_CSV_FILENAME))
         .addArg("datadir=<dir>", requiredStr, _("Specify data directory"));
 }
 
@@ -234,7 +236,9 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
             strprintf(_("How many blocks to check at startup (default: %u, 0 = all)"), DEFAULT_CHECKBLOCKS))
         .addArg("checklevel=<n>", requiredInt,
             strprintf(_("How thorough the block verification of -checkblocks is (0-4, default: %u)"),
-                    DEFAULT_CHECKLEVEL));
+                    DEFAULT_CHECKLEVEL))
+        .addDebugArg("dumpforks", optionalBool,
+            strprintf(_("Dump built-in fork deployment data in CSV format and exit")));
 
 #ifndef WIN32
     if (mode == HMM_BITCOIND)

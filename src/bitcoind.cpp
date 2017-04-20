@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin developers
+// Copyright (c) 2009-2017 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -20,6 +20,8 @@
 #include "unlimited.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "unlimited.h"
+#include "versionbits.h"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/thread.hpp>
@@ -112,6 +114,19 @@ bool AppInit(int argc, char *argv[])
         fprintf(stdout, "%s", strUsage.c_str());
         return true;
     }
+
+    // bip-genvbvoting begin
+    // dump default deployment info and exit, if requested
+    if (mapArgs.count("-dumpforks")) {
+        std::string strVersion = "# " + strprintf(_("%s Daemon"), _(PACKAGE_NAME)) + " " + _("version") + " " + FormatFullVersion();
+        fprintf(stdout, "%s\n%s", strVersion.c_str(), FORKS_CSV_FILE_HEADER);
+        fprintf(stdout, NetworkDeploymentInfoCSV(CBaseChainParams::MAIN).c_str());
+        fprintf(stdout, NetworkDeploymentInfoCSV(CBaseChainParams::UNL).c_str());
+        fprintf(stdout, NetworkDeploymentInfoCSV(CBaseChainParams::TESTNET).c_str());
+        fprintf(stdout, NetworkDeploymentInfoCSV(CBaseChainParams::REGTEST).c_str());
+        return true;
+    }
+    // bip-genvbvoting end
 
     try
     {
