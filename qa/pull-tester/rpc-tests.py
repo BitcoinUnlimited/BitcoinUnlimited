@@ -237,6 +237,7 @@ testScriptsExt = [ RpcTest(t) for t in [
     'bip68-sequence',
     'bipdersig-p2p',
     'bipdersig',
+    'bipgenvbvoting-forks',
     'getblocktemplate_longpoll',
     'getblocktemplate_proposals',
     'txn_doublespend',
