@@ -743,6 +743,29 @@ static UniValue BIP9SoftForkDesc(const Consensus::Params &consensusParams, Conse
     return rv;
 }
 
+// bip-genvbvoting begin
+static UniValue BIPGenVBForkDesc(const Consensus::Params &consensusParams, Consensus::DeploymentPos id)
+{
+    UniValue rv(UniValue::VOBJ);
+    rv.push_back(Pair("bit", (int)id));
+    const ThresholdState thresholdState = VersionBitsTipState(consensusParams, id);
+    switch (thresholdState) {
+    case THRESHOLD_DEFINED: rv.push_back(Pair("status", "defined")); break;
+    case THRESHOLD_STARTED: rv.push_back(Pair("status", "started")); break;
+    case THRESHOLD_LOCKED_IN: rv.push_back(Pair("status", "locked_in")); break;
+    case THRESHOLD_ACTIVE: rv.push_back(Pair("status", "active")); break;
+    case THRESHOLD_FAILED: rv.push_back(Pair("status", "failed")); break;
+    }
+    rv.push_back(Pair("startTime", consensusParams.vDeployments[id].nStartTime));
+    rv.push_back(Pair("timeout", consensusParams.vDeployments[id].nTimeout));
+    rv.push_back(Pair("windowsize", consensusParams.vDeployments[id].windowsize));
+    rv.push_back(Pair("threshold", consensusParams.vDeployments[id].threshold));
+    rv.push_back(Pair("minlockedblocks", consensusParams.vDeployments[id].minlockedblocks));
+    rv.push_back(Pair("minlockedtime", consensusParams.vDeployments[id].minlockedtime));
+    return rv;
+}
+// bip-genvbvoting end
+
 UniValue getblockchaininfo(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -804,12 +827,28 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     CBlockIndex *tip = chainActive.Tip();
     UniValue softforks(UniValue::VARR);
     UniValue bip9_softforks(UniValue::VOBJ);
+    UniValue bipgenvb_forks(UniValue::VOBJ);  // bip-genvbvoting added
     softforks.push_back(SoftForkDesc("bip34", 2, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip66", 3, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip65", 4, tip, consensusParams));
-    bip9_softforks.push_back(Pair("csv", BIP9SoftForkDesc(consensusParams, Consensus::DEPLOYMENT_CSV)));
+    // bip-genvbvoting begin : add all the configured forks
+    const Consensus::BIP9Deployment *vdeployments = consensusParams.vDeployments;
+    assert (Consensus::MAX_VERSION_BITS_DEPLOYMENTS <= VERSIONBITS_NUM_BITS);
+    for (int i = 0; i < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++)
+    {
+        Consensus::DeploymentPos bit = static_cast<Consensus::DeploymentPos>(i);
+        const struct BIP9DeploymentInfo& vbinfo = VersionBitsDeploymentInfo[bit];
+        if (isConfiguredDeployment(consensusParams, bit)) {
+            bip9_softforks.push_back(Pair(vbinfo.name, BIP9SoftForkDesc(consensusParams, bit)));
+            bipgenvb_forks.push_back(Pair(vbinfo.name, BIPGenVBForkDesc(consensusParams, bit)));
+        }
+    }
+
     obj.push_back(Pair("softforks", softforks));
     obj.push_back(Pair("bip9_softforks", bip9_softforks));
+    // to maintain backward compat initially, we introduce a new list for the full genvbvoting data
+    obj.push_back(Pair("bipgenvb_forks", bipgenvb_forks));
+    // bip-genvbvoting end
 
     if (fPruneMode)
     {
