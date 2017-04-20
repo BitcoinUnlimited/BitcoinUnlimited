@@ -1,4 +1,5 @@
 // Copyright (c) 2016 The Bitcoin Core developers
+// Copyright (c) 2017 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -16,14 +17,27 @@ static const int32_t VERSIONBITS_TOP_BITS = 0x20000000UL;
 static const int32_t VERSIONBITS_TOP_MASK = 0xE0000000UL;
 /** Total bits available for versionbits */
 static const int32_t VERSIONBITS_NUM_BITS = 29;
+/** Size of window to use for assessing warning of unknown bits */
+static const int BIT_WARNING_WINDOW = 100;
+/** Threshold to use for assessing warning of unknown bits */
+static const int BIT_WARNING_THRESHOLD = 50;
+// bip-genvbvoting begin
+/** File header for -dumpforks output */
+static const char *FORKS_CSV_FILE_HEADER = \
+    "# forks.csv - Fork deployment configuration (from built-in defaults)\n" \
+    "# This file defines the known consensus changes tracked by the software\n" \
+    "# MODIFY AT OWN RISK - EXERCISE EXTREME CARE\n" \
+    "# Line format:\n" \
+    "# network,bit,name,starttime,timeout,windowsize,threshold,minlockedblocks,minlockedtime,gbtforce\n";
+// bip-genvbvoting end
 
-enum ThresholdState
-{
-    THRESHOLD_DEFINED,
-    THRESHOLD_STARTED,
-    THRESHOLD_LOCKED_IN,
-    THRESHOLD_ACTIVE,
-    THRESHOLD_FAILED,
+// bip-genvbvoting: assigned numbers to these enum values
+enum ThresholdState {
+    THRESHOLD_DEFINED = 0,
+    THRESHOLD_STARTED = 1,
+    THRESHOLD_LOCKED_IN = 2,
+    THRESHOLD_ACTIVE = 3,
+    THRESHOLD_FAILED = 4,
 };
 
 // A map that gives the state for blocks whose height is a multiple of Period().
@@ -34,12 +48,12 @@ typedef std::map<const CBlockIndex *, ThresholdState> ThresholdConditionCache;
 struct BIP9DeploymentInfo
 {
     /** Deployment name */
-    const char *name;
+    char *name;   // bip-genvbvoting: removed const to allow update from CSV
     /** Whether GBT clients can safely ignore this rule in simplified usage */
     bool gbt_force;
 };
 
-extern const struct BIP9DeploymentInfo VersionBitsDeploymentInfo[];
+extern struct BIP9DeploymentInfo VersionBitsDeploymentInfo[];
 
 /**
  * Abstract class that implements BIP9-style threshold logic, and caches results.
@@ -52,6 +66,10 @@ protected:
     virtual int64_t EndTime(const Consensus::Params &params) const = 0;
     virtual int Period(const Consensus::Params &params) const = 0;
     virtual int Threshold(const Consensus::Params &params) const = 0;
+    // bip-genvbvoting begin
+    virtual int MinLockedBlocks(const Consensus::Params &params) const = 0;
+    virtual int64_t MinLockedTime(const Consensus::Params &params) const = 0;
+    // bip-genvbvoting end
 
 public:
     // Note that the function below takes a pindexPrev as input: they compute information for block B based on its
