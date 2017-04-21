@@ -21,15 +21,6 @@ static const int32_t VERSIONBITS_NUM_BITS = 29;
 static const int BIT_WARNING_WINDOW = 100;
 /** Threshold to use for assessing warning of unknown bits */
 static const int BIT_WARNING_THRESHOLD = 50;
-// bip-genvbvoting begin
-/** File header for -dumpforks output */
-static const char *FORKS_CSV_FILE_HEADER = \
-    "# forks.csv - Fork deployment configuration (from built-in defaults)\n" \
-    "# This file defines the known consensus changes tracked by the software\n" \
-    "# MODIFY AT OWN RISK - EXERCISE EXTREME CARE\n" \
-    "# Line format:\n" \
-    "# network,bit,name,starttime,timeout,windowsize,threshold,minlockedblocks,minlockedtime,gbtforce\n";
-// bip-genvbvoting end
 
 // bip-genvbvoting: assigned numbers to these enum values
 enum ThresholdState {

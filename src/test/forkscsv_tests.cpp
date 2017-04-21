@@ -111,7 +111,9 @@ BOOST_AUTO_TEST_CASE(forkscsv_validation_test)
     BOOST_CHECK(ValidateWindowSize(100));
     BOOST_CHECK(ValidateWindowSize(10000));
     BOOST_CHECK(ValidateWindowSize(std::numeric_limits<int>::max()));
+#pragma GCC diagnostic ignored "-Woverflow"
     BOOST_CHECK(!ValidateWindowSize(1 + std::numeric_limits<int>::max()));
+#pragma GCC diagnostic pop
 
     // threshold size (2nd param is window)
     BOOST_CHECK(!ValidateThreshold(1,1));   // 1 is not valid window size
@@ -147,7 +149,9 @@ BOOST_AUTO_TEST_CASE(forkscsv_validation_test)
     BOOST_CHECK(ValidateMinLockedBlocks(100));
     BOOST_CHECK(!ValidateMinLockedBlocks(-1));
     BOOST_CHECK(ValidateMinLockedBlocks(std::numeric_limits<int>::max()));
+#pragma GCC diagnostic ignored "-Woverflow"
     BOOST_CHECK(!ValidateMinLockedBlocks(1 + std::numeric_limits<int>::max()));
+#pragma GCC diagnostic pop
 
     // minlockedtime
     BOOST_CHECK(ValidateMinLockedTime(0));   // zero is ok
@@ -155,7 +159,9 @@ BOOST_AUTO_TEST_CASE(forkscsv_validation_test)
     BOOST_CHECK(ValidateMinLockedTime(100));
     BOOST_CHECK(!ValidateMinLockedTime(-1));
     BOOST_CHECK(ValidateMinLockedTime(std::numeric_limits<int64_t>::max()));
+#pragma GCC diagnostic ignored "-Woverflow"
     BOOST_CHECK(!ValidateMinLockedTime(1 + std::numeric_limits<int64_t>::max()));
+#pragma GCC diagnostic pop
 }
 
 BOOST_AUTO_TEST_SUITE_END()
