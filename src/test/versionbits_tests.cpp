@@ -274,9 +274,6 @@ BOOST_AUTO_TEST_CASE(versionbits_test)
     for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++)
     {
         uint32_t bitmask = VersionBitsMask(mainnetParams, (Consensus::DeploymentPos)i);
-        // bip-genvbvoting begin needed by updated disjointness check below
-        const Consensus::BIP9Deployment *vdeployments = mainnetParams.vDeployments;
-        // bip-genvbvoting end
         // Make sure that no deployment tries to set an invalid bit.
         BOOST_CHECK_EQUAL(bitmask & ~(uint32_t)VERSIONBITS_TOP_MASK, bitmask);
 

@@ -143,7 +143,6 @@ ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex 
     int64_t nMinLockedTime = MinLockedTime(params);
     int64_t nActualLockinTime = 0;
     int nActualLockinBlock = 0;
-    const CBlockIndex *start_pindexPrev = pindexPrev;
 
     if (nPeriod == 0)
     {
