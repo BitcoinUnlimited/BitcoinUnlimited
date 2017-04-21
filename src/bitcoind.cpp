@@ -21,7 +21,8 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "unlimited.h"
-#include "versionbits.h"
+//#include "versionbits.h"
+#include "forks_csv.h"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/thread.hpp>
@@ -120,10 +121,10 @@ bool AppInit(int argc, char *argv[])
     if (mapArgs.count("-dumpforks")) {
         std::string strVersion = "# " + strprintf(_("%s Daemon"), _(PACKAGE_NAME)) + " " + _("version") + " " + FormatFullVersion();
         fprintf(stdout, "%s\n%s", strVersion.c_str(), FORKS_CSV_FILE_HEADER);
-        fprintf(stdout, NetworkDeploymentInfoCSV(CBaseChainParams::MAIN).c_str());
-        fprintf(stdout, NetworkDeploymentInfoCSV(CBaseChainParams::UNL).c_str());
-        fprintf(stdout, NetworkDeploymentInfoCSV(CBaseChainParams::TESTNET).c_str());
-        fprintf(stdout, NetworkDeploymentInfoCSV(CBaseChainParams::REGTEST).c_str());
+        fprintf(stdout, "%s", NetworkDeploymentInfoCSV(CBaseChainParams::MAIN).c_str());
+        fprintf(stdout, "%s", NetworkDeploymentInfoCSV(CBaseChainParams::UNL).c_str());
+        fprintf(stdout, "%s", NetworkDeploymentInfoCSV(CBaseChainParams::TESTNET).c_str());
+        fprintf(stdout, "%s", NetworkDeploymentInfoCSV(CBaseChainParams::REGTEST).c_str());
         return true;
     }
     // bip-genvbvoting end

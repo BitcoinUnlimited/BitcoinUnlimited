@@ -15,6 +15,16 @@
 using namespace std;
 using namespace io;
 
+// bip-genvbvoting begin
+/** File header for -dumpforks output */
+const char *FORKS_CSV_FILE_HEADER = \
+    "# forks.csv - Fork deployment configuration (from built-in defaults)\n" \
+    "# This file defines the known consensus changes tracked by the software\n" \
+    "# MODIFY AT OWN RISK - EXERCISE EXTREME CARE\n" \
+    "# Line format:\n" \
+    "# network,bit,name,starttime,timeout,windowsize,threshold,minlockedblocks,minlockedtime,gbtforce\n";
+// bip-genvbvoting end
+
 /**
  * Read deployment CSV file and update consensus parameters
  */
@@ -145,7 +155,7 @@ bool ReadForksCsv(string activeNetworkID, istream& csvInput, Consensus::Params& 
 }
 
 
-const bool ValidateNetwork(const string& networkname)
+bool ValidateNetwork(const string& networkname)
 {
     // check that network is one we know about
     if (networkname == CBaseChainParams::MAIN)
@@ -161,13 +171,13 @@ const bool ValidateNetwork(const string& networkname)
 }
 
 
-const bool ValidateForkName(const string& forkname)
+bool ValidateForkName(const string& forkname)
 {
     return (forkname.length() > 0);
 }
 
 
-const bool ValidateGBTForce(const string& gbtforce)
+bool ValidateGBTForce(const string& gbtforce)
 {
     string gbtforceLower(gbtforce);
     boost::algorithm::to_lower(gbtforceLower);
@@ -178,43 +188,43 @@ const bool ValidateGBTForce(const string& gbtforce)
 }
 
 
-const bool ValidateBit(int bit)
+bool ValidateBit(int bit)
 {
     return (bit >= 0 && bit < VERSIONBITS_NUM_BITS);
 }
 
 
-const bool ValidateWindowSize(int windowsize)
+bool ValidateWindowSize(int windowsize)
 {
     return (windowsize > 1);
 }
 
 
-const bool ValidateThreshold(int threshold, int window)
+bool ValidateThreshold(int threshold, int window)
 {
     return (ValidateWindowSize(window) && threshold > 0 && threshold <= window);
 }
 
 
-const bool ValidateTimes(int64_t starttime, int64_t timeout)
+bool ValidateTimes(int64_t starttime, int64_t timeout)
 {
     return (starttime >= 0 && starttime < timeout);
 }
 
 
-const bool ValidateMinLockedBlocks(int minlockedblocks)
+bool ValidateMinLockedBlocks(int minlockedblocks)
 {
     return (minlockedblocks >= 0);
 }
 
 
-const bool ValidateMinLockedTime(int64_t minlockedtime)
+bool ValidateMinLockedTime(int64_t minlockedtime)
 {
     return (minlockedtime >= 0);
 }
 
 
-const bool ValidateOverallParams(const string& checkNetworkID)
+bool ValidateOverallParams(const string& checkNetworkID)
 {
     // Stubbed function which should cross-check all parameters for the
     // given network and return true only if they are correct and consistent.
