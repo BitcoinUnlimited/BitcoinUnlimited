@@ -1601,8 +1601,11 @@ uint64_t LargestBlockSeen(uint64_t nBlockSize)
 void LoadFilter(CNode *pfrom, CBloomFilter *filter)
 {
     if (!filter->IsWithinSizeConstraints())
+    {
+        LOCK(cs_main);
         // There is no excuse for sending a too-large filter
         Misbehaving(pfrom->GetId(), 100);
+    }
     else
     {
         LOCK(pfrom->cs_filter);
