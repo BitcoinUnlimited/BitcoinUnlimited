@@ -432,9 +432,8 @@ bool SoftSetArg(const std::string &strArg, const std::string &strValue);
 bool SoftSetBoolArg(const std::string &strArg, bool fValue);
 
 /**
- * Return the number of physical cores available on the current system.
- * @note This does not count virtual cores, such as those provided by HyperThreading
- * when boost is newer than 1.56.
+ * Return the number of cores available on the current system.
+ * @note This does count virtual cores, such as those provided by HyperThreading.
  */
 int GetNumCores();
 
