@@ -19,6 +19,7 @@
 #include "net.h"
 #include "script/script_error.h"
 #include "sync.h"
+#include "txdb.h"
 #include "versionbits.h"
 
 #include <algorithm>
@@ -46,6 +47,9 @@ class CValidationState;
 
 struct CNodeStateStats;
 struct LockPoints;
+
+/** Global variable that points to the coins database */
+extern CCoinsViewDB *pcoinsdbview;
 
 enum FlushStateMode
 {
