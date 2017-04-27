@@ -382,8 +382,8 @@ bool CXThinBlock::process(CNode *pfrom,
     if (!fMerkleRootCorrect)
     {
         vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_THINBLOCK, header.GetHash())); 
-        pfrom->PushMessage("getdata", vGetData); 
+        vGetData.push_back(CInv(MSG_THINBLOCK, header.GetHash()));
+        pfrom->PushMessage("getdata", vGetData);
         LogPrintf("xthinblock merkelroot does not match computed merkleroot - requesting full thinblock, peer=%d",
             pfrom->GetId());
         return true;
