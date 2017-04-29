@@ -15,6 +15,7 @@
 #include "uint256.h"
 #include <vector>
 
+class CDataStream;
 class CNode;
 
 class CThinBlock
@@ -157,6 +158,12 @@ public:
 };
 extern CThinBlockData thindata; // Singleton class
 
+// Protocol message handlers
+bool HandleThinBlock(CDataStream &, CNode *);
+bool HandleXThinBlock(CDataStream &, CNode *);
+bool HandleGetXThin(CDataStream &, CNode *);
+bool HandleGetXBlockTx(CDataStream &, CNode *);
+bool HandleXBlockTx(CDataStream &, CNode *);
 
 bool HaveConnectThinblockNodes();
 bool HaveThinblockNodes();
@@ -165,7 +172,6 @@ bool CanThinBlockBeDownloaded(CNode *pto);
 void ConnectToThinBlockNodes();
 void CheckNodeSupportForThinBlocks();
 void SendXThinBlock(CBlock &block, CNode *pfrom, const CInv &inv);
-bool IsThinBlockValid(const CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header);
 void BuildSeededBloomFilter(CBloomFilter &memPoolFilter,
     std::vector<uint256> &vOrphanHashes,
     uint256 hash,
