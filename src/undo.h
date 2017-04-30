@@ -20,10 +20,14 @@
 class CTxInUndo
 {
 public:
-    CTxOut txout;         // the txout data before being spent
-    bool fCoinBase;       // if the outpoint was the last unspent: whether it belonged to a coinbase
-    unsigned int nHeight; // if the outpoint was the last unspent: its height
-    int nVersion;         // if the outpoint was the last unspent: its version
+    // the txout data before being spent
+    CTxOut txout;         
+    // if the outpoint was the last unspent: whether it belonged to a coinbase
+    bool fCoinBase;       
+    // if the outpoint was the last unspent: its height
+    unsigned int nHeight; 
+    // if the outpoint was the last unspent: its version
+    int nVersion;         
 
     CTxInUndo() : txout(), fCoinBase(false), nHeight(0), nVersion(0) {}
     CTxInUndo(const CTxOut &txoutIn, bool fCoinBaseIn = false, unsigned int nHeightIn = 0, int nVersionIn = 0) : txout(txoutIn), fCoinBase(fCoinBaseIn), nHeight(nHeightIn), nVersion(nVersionIn) { }
@@ -73,7 +77,8 @@ public:
 class CBlockUndo
 {
 public:
-    std::vector<CTxUndo> vtxundo; // for all but the coinbase
+    // for all but the coinbase
+    std::vector<CTxUndo> vtxundo; 
 
     ADD_SERIALIZE_METHODS;
 
@@ -83,4 +88,5 @@ public:
     }
 };
 
-#endif // BITCOIN_UNDO_H
+// BITCOIN_UNDO_H
+#endif 

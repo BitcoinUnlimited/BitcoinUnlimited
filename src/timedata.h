@@ -49,10 +49,12 @@ public:
     {
         int size = vSorted.size();
         assert(size > 0);
-        if (size & 1) // Odd number of elements
+        // Odd number of elements
+        if (size & 1) 
         {
             return vSorted[size / 2];
-        } else // Even number of elements
+        // Even number of elements
+        } else 
         {
             return (vSorted[size / 2 - 1] + vSorted[size / 2]) / 2;
         }
@@ -74,4 +76,5 @@ int64_t GetTimeOffset();
 int64_t GetAdjustedTime();
 void AddTimeData(const CNetAddr& ip, int64_t nTime);
 
-#endif // BITCOIN_TIMEDATA_H
+// BITCOIN_TIMEDATA_H
+#endif 

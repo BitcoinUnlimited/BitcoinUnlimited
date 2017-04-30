@@ -19,8 +19,10 @@ static const string CHARS_ALPHA_NUM = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO
 
 static const string SAFE_CHARS[] =
 {
-    CHARS_ALPHA_NUM + " .,;-_/:?@()", // SAFE_CHARS_DEFAULT
-    CHARS_ALPHA_NUM + " .,;-_?@" // SAFE_CHARS_UA_COMMENT
+    // SAFE_CHARS_DEFAULT
+    CHARS_ALPHA_NUM + " .,;-_/:?@()", 
+    // SAFE_CHARS_UA_COMMENT
+    CHARS_ALPHA_NUM + " .,;-_?@" 
 };
 
 string SanitizeString(const string& str, int rule)
@@ -108,19 +110,22 @@ string EncodeBase64(const unsigned char* pch, size_t len)
         int enc = *(pch++);
         switch (mode)
         {
-            case 0: // we have no bits
+            // we have no bits
+            case 0: 
                 strRet += pbase64[enc >> 2];
                 left = (enc & 3) << 4;
                 mode = 1;
                 break;
 
-            case 1: // we have two bits
+            // we have two bits
+            case 1: 
                 strRet += pbase64[left | (enc >> 4)];
                 left = (enc & 15) << 2;
                 mode = 2;
                 break;
 
-            case 2: // we have four bits
+            // we have four bits
+            case 2: 
                 strRet += pbase64[left | (enc >> 6)];
                 strRet += pbase64[enc & 63];
                 mode = 0;
@@ -179,24 +184,28 @@ vector<unsigned char> DecodeBase64(const char* p, bool* pfInvalid)
          p++;
          switch (mode)
          {
-             case 0: // we have no bits and get 6
+             // we have no bits and get 6
+             case 0: 
                  left = dec;
                  mode = 1;
                  break;
 
-              case 1: // we have 6 bits and keep 4
+              // we have 6 bits and keep 4
+              case 1: 
                   vchRet.push_back((left<<2) | (dec>>4));
                   left = dec & 15;
                   mode = 2;
                   break;
 
-             case 2: // we have 4 bits and get 6, we keep 2
+             // we have 4 bits and get 6, we keep 2
+             case 2: 
                  vchRet.push_back((left<<4) | (dec>>2));
                  left = dec & 3;
                  mode = 3;
                  break;
 
-             case 3: // we have 2 bits and get 6
+             // we have 2 bits and get 6
+             case 3: 
                  vchRet.push_back((left<<6) | dec);
                  mode = 0;
                  break;
@@ -206,19 +215,23 @@ vector<unsigned char> DecodeBase64(const char* p, bool* pfInvalid)
     if (pfInvalid)
         switch (mode)
         {
-            case 0: // 4n base64 characters processed: ok
+            // 4n base64 characters processed: ok
+            case 0: 
                 break;
 
-            case 1: // 4n+1 base64 character processed: impossible
+            // 4n+1 base64 character processed: impossible
+            case 1: 
                 *pfInvalid = true;
                 break;
 
-            case 2: // 4n+2 base64 characters processed: require '=='
+            // 4n+2 base64 characters processed: require '=='
+            case 2: 
                 if (left || p[0] != '=' || p[1] != '=' || decode64_table[(unsigned char)p[2]] != -1)
                     *pfInvalid = true;
                 break;
 
-            case 3: // 4n+3 base64 characters processed: require '='
+            // 4n+3 base64 characters processed: require '='
+            case 3: 
                 if (left || p[0] != '=' || decode64_table[(unsigned char)p[1]] != -1)
                     *pfInvalid = true;
                 break;
@@ -248,33 +261,38 @@ string EncodeBase32(const unsigned char* pch, size_t len)
         int enc = *(pch++);
         switch (mode)
         {
-            case 0: // we have no bits
+            // we have no bits
+            case 0: 
                 strRet += pbase32[enc >> 3];
                 left = (enc & 7) << 2;
                 mode = 1;
                 break;
 
-            case 1: // we have three bits
+            // we have three bits
+            case 1: 
                 strRet += pbase32[left | (enc >> 6)];
                 strRet += pbase32[(enc >> 1) & 31];
                 left = (enc & 1) << 4;
                 mode = 2;
                 break;
 
-            case 2: // we have one bit
+            // we have one bit
+            case 2: 
                 strRet += pbase32[left | (enc >> 4)];
                 left = (enc & 15) << 1;
                 mode = 3;
                 break;
 
-            case 3: // we have four bits
+            // we have four bits
+            case 3: 
                 strRet += pbase32[left | (enc >> 7)];
                 strRet += pbase32[(enc >> 2) & 31];
                 left = (enc & 3) << 3;
                 mode = 4;
                 break;
 
-            case 4: // we have two bits
+            // we have two bits
+            case 4: 
                 strRet += pbase32[left | (enc >> 5)];
                 strRet += pbase32[enc & 31];
                 mode = 0;
@@ -332,46 +350,54 @@ vector<unsigned char> DecodeBase32(const char* p, bool* pfInvalid)
          p++;
          switch (mode)
          {
-             case 0: // we have no bits and get 5
+             // we have no bits and get 5
+             case 0: 
                  left = dec;
                  mode = 1;
                  break;
 
-              case 1: // we have 5 bits and keep 2
+              // we have 5 bits and keep 2
+              case 1: 
                   vchRet.push_back((left<<3) | (dec>>2));
                   left = dec & 3;
                   mode = 2;
                   break;
 
-             case 2: // we have 2 bits and keep 7
+             // we have 2 bits and keep 7
+             case 2: 
                  left = left << 5 | dec;
                  mode = 3;
                  break;
 
-             case 3: // we have 7 bits and keep 4
+             // we have 7 bits and keep 4
+             case 3: 
                  vchRet.push_back((left<<1) | (dec>>4));
                  left = dec & 15;
                  mode = 4;
                  break;
 
-             case 4: // we have 4 bits, and keep 1
+             // we have 4 bits, and keep 1
+             case 4: 
                  vchRet.push_back((left<<4) | (dec>>1));
                  left = dec & 1;
                  mode = 5;
                  break;
 
-             case 5: // we have 1 bit, and keep 6
+             // we have 1 bit, and keep 6
+             case 5: 
                  left = left << 5 | dec;
                  mode = 6;
                  break;
 
-             case 6: // we have 6 bits, and keep 3
+             // we have 6 bits, and keep 3
+             case 6: 
                  vchRet.push_back((left<<2) | (dec>>3));
                  left = dec & 7;
                  mode = 7;
                  break;
 
-             case 7: // we have 3 bits, and keep 0
+             // we have 3 bits, and keep 0
+             case 7: 
                  vchRet.push_back((left<<5) | dec);
                  mode = 0;
                  break;
@@ -381,31 +407,39 @@ vector<unsigned char> DecodeBase32(const char* p, bool* pfInvalid)
     if (pfInvalid)
         switch (mode)
         {
-            case 0: // 8n base32 characters processed: ok
+            // 8n base32 characters processed: ok
+            case 0: 
                 break;
 
-            case 1: // 8n+1 base32 characters processed: impossible
-            case 3: //   +3
-            case 6: //   +6
+            // 8n+1 base32 characters processed: impossible
+            case 1: 
+            //   +3
+            case 3: 
+            //   +6
+            case 6: 
                 *pfInvalid = true;
                 break;
 
-            case 2: // 8n+2 base32 characters processed: require '======'
+            // 8n+2 base32 characters processed: require '======'
+            case 2: 
                 if (left || p[0] != '=' || p[1] != '=' || p[2] != '=' || p[3] != '=' || p[4] != '=' || p[5] != '=' || decode32_table[(unsigned char)p[6]] != -1)
                     *pfInvalid = true;
                 break;
 
-            case 4: // 8n+4 base32 characters processed: require '===='
+            // 8n+4 base32 characters processed: require '===='
+            case 4: 
                 if (left || p[0] != '=' || p[1] != '=' || p[2] != '=' || p[3] != '=' || decode32_table[(unsigned char)p[4]] != -1)
                     *pfInvalid = true;
                 break;
 
-            case 5: // 8n+5 base32 characters processed: require '==='
+            // 8n+5 base32 characters processed: require '==='
+            case 5: 
                 if (left || p[0] != '=' || p[1] != '=' || p[2] != '=' || decode32_table[(unsigned char)p[3]] != -1)
                     *pfInvalid = true;
                 break;
 
-            case 7: // 8n+7 base32 characters processed: require '='
+            // 8n+7 base32 characters processed: require '='
+            case 7: 
                 if (left || p[0] != '=' || decode32_table[(unsigned char)p[1]] != -1)
                     *pfInvalid = true;
                 break;
@@ -422,11 +456,14 @@ string DecodeBase32(const string& str)
 
 static bool ParsePrechecks(const std::string& str)
 {
-    if (str.empty()) // No empty string allowed
+    // No empty string allowed
+    if (str.empty()) 
         return false;
-    if (str.size() >= 1 && (isspace(str[0]) || isspace(str[str.size()-1]))) // No padding allowed
+    // No padding allowed
+    if (str.size() >= 1 && (isspace(str[0]) || isspace(str[str.size()-1]))) 
         return false;
-    if (str.size() != strlen(str.c_str())) // No embedded NUL characters allowed
+    // No embedded NUL characters allowed
+    if (str.size() != strlen(str.c_str())) 
         return false;
     return true;
 }
@@ -436,7 +473,8 @@ bool ParseInt32(const std::string& str, int32_t *out)
     if (!ParsePrechecks(str))
         return false;
     char *endp = NULL;
-    errno = 0; // strtol will not set errno if valid
+    // strtol will not set errno if valid
+    errno = 0; 
     long int n = strtol(str.c_str(), &endp, 10);
     if(out) *out = (int32_t)n;
     // Note that strtol returns a *long int*, so even if strtol doesn't report a over/underflow
@@ -452,7 +490,8 @@ bool ParseInt64(const std::string& str, int64_t *out)
     if (!ParsePrechecks(str))
         return false;
     char *endp = NULL;
-    errno = 0; // strtoll will not set errno if valid
+    // strtoll will not set errno if valid
+    errno = 0; 
     long long int n = strtoll(str.c_str(), &endp, 10);
     if(out) *out = (int64_t)n;
     // Note that strtoll returns a *long long int*, so even if strtol doesn't report a over/underflow
@@ -466,7 +505,8 @@ bool ParseDouble(const std::string& str, double *out)
 {
     if (!ParsePrechecks(str))
         return false;
-    if (str.size() >= 2 && str[0] == '0' && str[1] == 'x') // No hexadecimal floats allowed
+    // No hexadecimal floats allowed
+    if (str.size() >= 2 && str[0] == '0' && str[1] == 'x') 
         return false;
     std::istringstream text(str);
     text.imbue(std::locale::classic());

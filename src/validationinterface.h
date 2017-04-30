@@ -69,4 +69,5 @@ struct CMainSignals {
 
 CMainSignals& GetMainSignals();
 
-#endif // BITCOIN_VALIDATIONINTERFACE_H
+// BITCOIN_VALIDATIONINTERFACE_H
+#endif 

@@ -154,4 +154,5 @@ inline uint256 uint256S(const std::string& str)
     return rv;
 }
 
-#endif // BITCOIN_UINT256_H
+// BITCOIN_UINT256_H
+#endif 

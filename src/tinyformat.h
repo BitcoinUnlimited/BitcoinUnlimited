@@ -226,7 +226,8 @@ struct formatZeroIntegerWorkaround<T,true>
         return false;
     }
 };
-#endif // TINYFORMAT_OLD_LIBSTDCPLUSPLUS_WORKAROUND
+// TINYFORMAT_OLD_LIBSTDCPLUSPLUS_WORKAROUND
+#endif 
 
 // Convert an arbitrary type to integer.  The version with convertible=false
 // throws an error.
@@ -247,7 +248,8 @@ struct convertToInt<T,true>
     static int invoke(const T& value) { return static_cast<int>(value); }
 };
 
-} // namespace detail
+// namespace detail
+} 
 
 
 //------------------------------------------------------------------------------
@@ -272,7 +274,8 @@ inline void formatValue(std::ostream& out, const char* /*fmtBegin*/,
     // Since we don't support printing of wchar_t using "%ls", make it fail at
     // compile time in preference to printing as a void* at runtime.
     typedef typename detail::is_wchar<T>::tinyformat_wchar_is_not_supported DummyType;
-    (void) DummyType(); // avoid unused type warning with gcc-4.8
+    // avoid unused type warning with gcc-4.8
+    (void) DummyType(); 
 #endif
     // The mess here is to support the %c and %p conversions: if these
     // conversions are active we try to convert the type to a char or const
@@ -444,10 +447,14 @@ class FormatIterator
         enum ExtraFormatFlags
         {
             Flag_None                = 0,
-            Flag_TruncateToPrecision = 1<<0, // truncate length to stream precision()
-            Flag_SpacePadPositive    = 1<<1, // pad positive values with spaces
-            Flag_VariableWidth       = 1<<2, // variable field width in arg list
-            Flag_VariablePrecision   = 1<<3  // variable field precision in arg list
+            // truncate length to stream precision()
+            Flag_TruncateToPrecision = 1<<0, 
+            // pad positive values with spaces
+            Flag_SpacePadPositive    = 1<<1, 
+            // variable field width in arg list
+            Flag_VariableWidth       = 1<<2, 
+            // variable field precision in arg list
+            Flag_VariablePrecision   = 1<<3  
         };
 
         // out is the output stream, fmt is the full format string
@@ -581,7 +588,8 @@ class FormatIterator
 
 // Accept a value for formatting into the internal stream.
 template<typename T>
-TINYFORMAT_NOINLINE  // < greatly reduces bloat in optimized builds
+// < greatly reduces bloat in optimized builds
+TINYFORMAT_NOINLINE  
 void FormatIterator::accept(const T& value)
 {
     // Parse the format string
@@ -639,7 +647,8 @@ void FormatIterator::accept(const T& value)
             // Not a truncated c-string; just format normally.
             formatValue(tmpStream, m_fmt, fmtEnd, value);
         }
-        std::string result = tmpStream.str(); // allocates... yuck.
+        // allocates... yuck.
+        std::string result = tmpStream.str(); 
         if(m_extraFlags & Flag_SpacePadPositive)
         {
             for(size_t i = 0, iend = result.size(); i < iend; ++i)
@@ -757,7 +766,8 @@ inline const char* FormatIterator::streamStateFromFormat(std::ostream& out,
         {
             if(*c >= '0' && *c <= '9')
                 precision = parseIntAndAdvance(c);
-            else if(*c == '-') // negative precisions ignored, treated as zero.
+            // negative precisions ignored, treated as zero.
+            else if(*c == '-') 
                 parseIntAndAdvance(++c);
         }
         out.precision(precision);
@@ -884,9 +894,11 @@ void format(detail::FormatIterator& fmtIter, TINYFORMAT_VARARGS(n))       \
 TINYFORMAT_FOREACH_ARGNUM(TINYFORMAT_MAKE_FORMAT_DETAIL)
 #undef TINYFORMAT_MAKE_FORMAT_DETAIL
 
-#endif // End C++98 variadic template emulation for format()
+// End C++98 variadic template emulation for format()
+#endif 
 
-} // namespace detail
+// namespace detail
+} 
 
 
 //------------------------------------------------------------------------------
@@ -1006,8 +1018,10 @@ TINYFORMAT_WRAP_FORMAT_N(15, returnType, funcName, funcDeclSuffix, bodyPrefix, s
 TINYFORMAT_WRAP_FORMAT_N(16, returnType, funcName, funcDeclSuffix, bodyPrefix, streamName, bodySuffix) \
 
 
-} // namespace tinyformat
+// namespace tinyformat
+} 
 
 #define strprintf tfm::format
 
-#endif // TINYFORMAT_H_INCLUDED
+// TINYFORMAT_H_INCLUDED
+#endif 

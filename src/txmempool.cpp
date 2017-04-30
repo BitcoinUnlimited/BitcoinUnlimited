@@ -52,7 +52,8 @@ CTxMemPoolEntry::GetPriority(unsigned int currentHeight) const
 {
     double deltaPriority = ((double)(currentHeight-entryHeight)*inChainInputValue)/nModSize;
     double dResult = entryPriority + deltaPriority;
-    if (dResult < 0) // This should only happen if it was called with a height below entry height
+    // This should only happen if it was called with a height below entry height
+    if (dResult < 0) 
         dResult = 0;
     return dResult;
 }
@@ -93,7 +94,8 @@ bool CTxMemPool::UpdateForDescendants(txiter updateIt, int maxDescendantsToVisit
             return false;
         }
         setAllDescendants.insert(cit);
-        stageEntries.erase(cit);  // BU its ok to erase here because GetMemPoolChildren does not dereference cit
+        // BU its ok to erase here because GetMemPoolChildren does not dereference cit
+        stageEntries.erase(cit);  
         const setEntries &setChildren = GetMemPoolChildren(cit);
         BOOST_FOREACH(const txiter childEntry, setChildren) {
             cacheMap::iterator cacheIt = cachedDescendants.find(childEntry);
@@ -246,7 +248,8 @@ bool CTxMemPool::CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntr
             }
         }
 
-        parentHashes.erase(stageit);  // BU: Fix use after free bug by moving this last
+        // BU: Fix use after free bug by moving this last
+        parentHashes.erase(stageit);  
     }
 
     return true;
@@ -338,7 +341,8 @@ void CTxMemPoolEntry::UpdateState(int64_t modifySize, CAmount modifyFee, int64_t
 CTxMemPool::CTxMemPool(const CFeeRate& _minReasonableRelayFee) :
     nTransactionsUpdated(0)
 {
-    _clear(); //lock free clear
+    //lock free clear
+    _clear(); 
 
     // Sanity checks off by default for performance, because otherwise
     // accepting transactions becomes O(N^2) where N is the number
@@ -362,7 +366,8 @@ void CTxMemPool::pruneSpent(const uint256 &hashTx, CCoins &coins)
 
     // iterate over all COutPoints in mapNextTx whose hash equals the provided hashTx
     while (it != mapNextTx.end() && it->first.hash == hashTx) {
-        coins.Spend(it->first.n); // and remove those outputs from coins
+        // and remove those outputs from coins
+        coins.Spend(it->first.n); 
         it++;
     }
 }
@@ -428,8 +433,10 @@ bool CTxMemPool::addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry,
 
     nTransactionsUpdated++;
     totalTxSize += entry.GetTxSize();
-    txAdded +=1;  // BU
-    poolSize() = totalTxSize; // BU
+    // BU
+    txAdded +=1;  
+    // BU
+    poolSize() = totalTxSize; 
     minerPolicyEstimator->processTransaction(entry, fCurrentEstimate);
 
     return true;
@@ -468,7 +475,8 @@ void CTxMemPool::CalculateDescendants(txiter entryit, setEntries &setDescendants
     while (!stage.empty()) {
         txiter it = *stage.begin();
         setDescendants.insert(it);
-        stage.erase(it);  // BU its ok to erase here because GetMemPoolChildren does not dereference it
+        // BU its ok to erase here because GetMemPoolChildren does not dereference it
+        stage.erase(it);  
 
         const setEntries &setChildren = GetMemPoolChildren(it);
         BOOST_FOREACH(const txiter &childiter, setChildren) {
@@ -674,7 +682,8 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         CAmount childModFee = 0;
         for (; iter != mapNextTx.end() && iter->first.hash == it->GetTx().GetHash(); ++iter) {
             txiter childit = mapTx.find(iter->second.ptx->GetHash());
-            assert(childit != mapTx.end()); // mapNextTx points to in-mempool transactions
+            // mapNextTx points to in-mempool transactions
+            assert(childit != mapTx.end()); 
             if (setChildrenCheck.insert(childit).second) {
                 childSizes += childit->GetTxSize();
                 childModFee += childit->GetModifiedFee();
@@ -772,8 +781,10 @@ CTxMemPool::WriteFeeEstimates(CAutoFile& fileout) const
 {
     try {
         LOCK(cs);
-        fileout << 109900; // version required to read: 0.10.99 or later
-        fileout << CLIENT_VERSION; // version that wrote the file
+        // version required to read: 0.10.99 or later
+        fileout << 109900; 
+        // version that wrote the file
+        fileout << CLIENT_VERSION; 
         minerPolicyEstimator->Write(fileout);
     }
     catch (const std::exception&) {
@@ -1027,7 +1038,8 @@ void CTxMemPool::UpdateTransactionsPerSecond()
     boost::mutex::scoped_lock lock(cs_txPerSec);
 
     static int64_t nLastTime = GetTime();
-    double nSecondsToAverage = 60; // Length of time in seconds to smooth the tx rate over
+    // Length of time in seconds to smooth the tx rate over
+    double nSecondsToAverage = 60; 
     int64_t nNow = GetTime();
 
     // Decay the previous tx rate.  
@@ -1038,7 +1050,8 @@ void CTxMemPool::UpdateTransactionsPerSecond()
     }
 
     // Add the new tx to the rate
-    nTxPerSec += 1/nSecondsToAverage; // The amount that the new tx will add to the tx rate
+    // The amount that the new tx will add to the tx rate
+    nTxPerSec += 1/nSecondsToAverage; 
     if (nTxPerSec < 0) nTxPerSec = 0;
 }
 // BU: end

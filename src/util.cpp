@@ -34,7 +34,8 @@
 
 #define _POSIX_C_SOURCE 200112L
 
-#endif // __linux__
+// __linux__
+#endif 
 
 #include <algorithm>
 #include <fcntl.h>
@@ -73,9 +74,11 @@
 #include <sys/prctl.h>
 #endif
 
-#include <boost/algorithm/string/case_conv.hpp> // for to_lower()
+// for to_lower()
+#include <boost/algorithm/string/case_conv.hpp> 
 #include <boost/algorithm/string/join.hpp>
-#include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
+// for startswith() and endswith()
+#include <boost/algorithm/string/predicate.hpp> 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/foreach.hpp>
@@ -96,7 +99,8 @@ namespace boost {
         std::string to_internal(const std::string&);
     }
 
-} // namespace boost
+// namespace boost
+} 
 
 using namespace std;
 
@@ -215,7 +219,8 @@ void OpenDebugLog()
     assert(vMsgsBeforeOpenLog);
     boost::filesystem::path pathDebug = GetDataDir() / "debug.log";
     fileout = fopen(pathDebug.string().c_str(), "a");
-    if (fileout) setbuf(fileout, NULL); // unbuffered
+    // unbuffered
+    if (fileout) setbuf(fileout, NULL); 
 
     // dump buffered messages from before we opened the log
     while (!vMsgsBeforeOpenLog->empty()) {
@@ -287,7 +292,8 @@ static std::string LogTimestampStr(const std::string &str, bool *fStartedNewLine
 
 int LogPrintStr(const std::string &str)
 {
-    int ret = 0; // Returns total number of characters written
+    // Returns total number of characters written
+    int ret = 0; 
     static bool fStartedNewLine = true;
 
     string strTimestamped = LogTimestampStr(str, &fStartedNewLine);
@@ -316,7 +322,8 @@ int LogPrintStr(const std::string &str)
                 fReopenDebugLog = false;
                 boost::filesystem::path pathDebug = GetDataDir() / "debug.log";
                 if (freopen(pathDebug.string().c_str(),"a",fileout) != NULL)
-                    setbuf(fileout, NULL); // unbuffered
+                    // unbuffered
+                    setbuf(fileout, NULL); 
             }
 
             ret = FileWriteStr(strTimestamped, fileout);
@@ -538,7 +545,8 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
 {
     boost::filesystem::ifstream streamConfig(GetConfigFile());
     if (!streamConfig.good())
-        return; // No bitcoin.conf file is OK
+        // No bitcoin.conf file is OK
+        return; 
 
     set<string> setOptions;
     setOptions.insert("*");
@@ -608,7 +616,8 @@ bool TryCreateDirectory(const boost::filesystem::path& p)
 
 void FileCommit(FILE *fileout)
 {
-    fflush(fileout); // harmless if redundantly called
+    // harmless if redundantly called
+    fflush(fileout); 
 #ifdef WIN32
     HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(fileout));
     FlushFileBuffers(hFile);
@@ -650,7 +659,8 @@ int RaiseFileDescriptorLimit(int nMinFD) {
         }
         return limitFD.rlim_cur;
     }
-    return nMinFD; // getrlimit failed, assume it's fine
+    // getrlimit failed, assume it's fine
+    return nMinFD; 
 #endif
 }
 
@@ -694,7 +704,8 @@ void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length) {
         unsigned int now = 65536;
         if (length < now)
             now = length;
-        fwrite(buf, 1, now, file); // allowed to fail; this function is advisory anyway
+        // allowed to fail; this function is advisory anyway
+        fwrite(buf, 1, now, file); 
         length -= now;
     }
 #endif
@@ -770,7 +781,8 @@ void SetupEnvironment()
     // may be invalid, in which case the "C" locale is used as fallback.
 #if !defined(WIN32) && !defined(MAC_OSX) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
     try {
-        std::locale(""); // Raises a runtime error if current locale is invalid
+        // Raises a runtime error if current locale is invalid
+        std::locale(""); 
     } catch (const std::runtime_error&) {
         setenv("LC_ALL", "C", 1);
     }
@@ -799,20 +811,25 @@ void SetThreadPriority(int nPriority)
 {
 #ifdef WIN32
     SetThreadPriority(GetCurrentThread(), nPriority);
-#else // WIN32
+// WIN32
+#else 
 #ifdef PRIO_THREAD
     setpriority(PRIO_THREAD, 0, nPriority);
-#else // PRIO_THREAD
+// PRIO_THREAD
+#else 
     setpriority(PRIO_PROCESS, 0, nPriority);
-#endif // PRIO_THREAD
-#endif // WIN32
+// PRIO_THREAD
+#endif 
+// WIN32
+#endif 
 }
 
 int GetNumCores()
 {
 #if BOOST_VERSION >= 105600
     return boost::thread::physical_concurrency();
-#else // Must fall back to hardware_concurrency, which unfortunately counts virtual cores
+// Must fall back to hardware_concurrency, which unfortunately counts virtual cores
+#else 
     return boost::thread::hardware_concurrency();
 #endif
 }

@@ -43,18 +43,30 @@ public:
         ICON_MASK = (ICON_INFORMATION | ICON_WARNING | ICON_ERROR),
 
         /** These values are taken from qmessagebox.h "enum StandardButton" to be directly usable */
-        BTN_OK      = 0x00000400U, // QMessageBox::Ok
-        BTN_YES     = 0x00004000U, // QMessageBox::Yes
-        BTN_NO      = 0x00010000U, // QMessageBox::No
-        BTN_ABORT   = 0x00040000U, // QMessageBox::Abort
-        BTN_RETRY   = 0x00080000U, // QMessageBox::Retry
-        BTN_IGNORE  = 0x00100000U, // QMessageBox::Ignore
-        BTN_CLOSE   = 0x00200000U, // QMessageBox::Close
-        BTN_CANCEL  = 0x00400000U, // QMessageBox::Cancel
-        BTN_DISCARD = 0x00800000U, // QMessageBox::Discard
-        BTN_HELP    = 0x01000000U, // QMessageBox::Help
-        BTN_APPLY   = 0x02000000U, // QMessageBox::Apply
-        BTN_RESET   = 0x04000000U, // QMessageBox::Reset
+        // QMessageBox::Ok
+        BTN_OK      = 0x00000400U, 
+        // QMessageBox::Yes
+        BTN_YES     = 0x00004000U, 
+        // QMessageBox::No
+        BTN_NO      = 0x00010000U, 
+        // QMessageBox::Abort
+        BTN_ABORT   = 0x00040000U, 
+        // QMessageBox::Retry
+        BTN_RETRY   = 0x00080000U, 
+        // QMessageBox::Ignore
+        BTN_IGNORE  = 0x00100000U, 
+        // QMessageBox::Close
+        BTN_CLOSE   = 0x00200000U, 
+        // QMessageBox::Cancel
+        BTN_CANCEL  = 0x00400000U, 
+        // QMessageBox::Discard
+        BTN_DISCARD = 0x00800000U, 
+        // QMessageBox::Help
+        BTN_HELP    = 0x01000000U, 
+        // QMessageBox::Apply
+        BTN_APPLY   = 0x02000000U, 
+        // QMessageBox::Reset
+        BTN_RESET   = 0x04000000U, 
         /**
          * Mask of all available buttons in CClientUIInterface::MessageBoxFlags
          * This needs to be updated, when buttons are changed there!
@@ -103,4 +115,5 @@ public:
 
 extern CClientUIInterface uiInterface;
 
-#endif // BITCOIN_UI_INTERFACE_H
+// BITCOIN_UI_INTERFACE_H
+#endif 

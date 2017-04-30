@@ -77,30 +77,48 @@ class CTxMemPoolEntry
 {
 private:
     CTransaction tx;
-    CAmount nFee; //! Cached to avoid expensive parent-transaction lookups
-    size_t nTxSize; //! ... and avoid recomputing tx size
-    size_t nModSize; //! ... and modified size for priority
-    size_t nUsageSize; //! ... and total memory usage
-    int64_t nTime; //! Local time when entering the mempool
-    double entryPriority; //! Priority when entering the mempool
-    unsigned int entryHeight; //! Chain height when entering the mempool
-    bool hadNoDependencies; //! Not dependent on any other txs when it entered the mempool
-    CAmount inChainInputValue; //! Sum of all txin values that are already in blockchain
-    bool spendsCoinbase; //! keep track of transactions that spend a coinbase
-    unsigned int sigOpCount; //! Legacy sig ops plus P2SH sig op count
-    uint64_t runtimeSigOpCount; //! Runtime signature operation count
-    uint64_t runtimeSighashBytes; //! Runtime bytes hashed for signature operations
-    int64_t feeDelta; //! Used for determining the priority of the transaction for mining in a block
-    LockPoints lockPoints; //! Track the height and time at which tx was final
+    //! Cached to avoid expensive parent-transaction lookups
+    CAmount nFee; 
+    //! ... and avoid recomputing tx size
+    size_t nTxSize; 
+    //! ... and modified size for priority
+    size_t nModSize; 
+    //! ... and total memory usage
+    size_t nUsageSize; 
+    //! Local time when entering the mempool
+    int64_t nTime; 
+    //! Priority when entering the mempool
+    double entryPriority; 
+    //! Chain height when entering the mempool
+    unsigned int entryHeight; 
+    //! Not dependent on any other txs when it entered the mempool
+    bool hadNoDependencies; 
+    //! Sum of all txin values that are already in blockchain
+    CAmount inChainInputValue; 
+    //! keep track of transactions that spend a coinbase
+    bool spendsCoinbase; 
+    //! Legacy sig ops plus P2SH sig op count
+    unsigned int sigOpCount; 
+    //! Runtime signature operation count
+    uint64_t runtimeSigOpCount; 
+    //! Runtime bytes hashed for signature operations
+    uint64_t runtimeSighashBytes; 
+    //! Used for determining the priority of the transaction for mining in a block
+    int64_t feeDelta; 
+    //! Track the height and time at which tx was final
+    LockPoints lockPoints; 
 
     // Information about descendants of this transaction that are in the
     // mempool; if we remove this transaction we must remove all of these
     // descendants as well.  if nCountWithDescendants is 0, treat this entry as
     // dirty, and nSizeWithDescendants and nModFeesWithDescendants will not be
     // correct.
-    uint64_t nCountWithDescendants; //! number of descendant transactions
-    uint64_t nSizeWithDescendants;  //! ... and size
-    CAmount nModFeesWithDescendants;  //! ... and total fees (all including us)
+    //! number of descendant transactions
+    uint64_t nCountWithDescendants; 
+    //! ... and size
+    uint64_t nSizeWithDescendants;  
+    //! ... and total fees (all including us)
+    CAmount nModFeesWithDescendants;  
 
 public:
     CTxMemPoolEntry(const CTransaction& _tx, const CAmount& _nFee,
@@ -368,27 +386,33 @@ public:
 class CTxMemPool
 {
 private:
-    uint32_t nCheckFrequency; //! Value n means that n times in 2^32 we check.
+    //! Value n means that n times in 2^32 we check.
+    uint32_t nCheckFrequency; 
     unsigned int nTransactionsUpdated;
     CBlockPolicyEstimator* minerPolicyEstimator;
 
-    uint64_t totalTxSize; //! sum of all mempool tx' byte sizes
-    uint64_t cachedInnerUsage; //! sum of dynamic memory usage of all the map elements (NOT the maps themselves)
+    //! sum of all mempool tx' byte sizes
+    uint64_t totalTxSize; 
+    //! sum of dynamic memory usage of all the map elements (NOT the maps themselves)
+    uint64_t cachedInnerUsage; 
 
     CFeeRate minReasonableRelayFee;
 
     mutable int64_t lastRollingFeeUpdate;
     mutable bool blockSinceLastRollingFeeBump;
-    mutable double rollingMinimumFeeRate; //! minimum fee to get into the pool, decreases exponentially
+    //! minimum fee to get into the pool, decreases exponentially
+    mutable double rollingMinimumFeeRate; 
 
     void trackPackageRemoved(const CFeeRate& rate);
 
     boost::mutex cs_txPerSec;
-    double nTxPerSec; //BU: tx's per second accepted into the mempool
+    //BU: tx's per second accepted into the mempool
+    double nTxPerSec; 
 
 public:
 
-    static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12; // public only for testing
+    // public only for testing
+    static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12; 
 
     typedef boost::multi_index_container<
         CTxMemPoolEntry,
@@ -476,7 +500,8 @@ public:
     void removeForBlock(const std::vector<CTransaction>& vtx, unsigned int nBlockHeight,
                         std::list<CTransaction>& conflicts, bool fCurrentEstimate = true);
     void clear();
-    void _clear(); //lock free
+    //lock free
+    void _clear(); 
     void queryHashes(std::vector<uint256>& vtxid);
     void pruneSpent(const uint256& hash, CCoins &coins);
     unsigned int GetTransactionsUpdated() const;
@@ -660,9 +685,11 @@ struct TxCoinAgePriorityCompare
     bool operator()(const TxCoinAgePriority& a, const TxCoinAgePriority& b)
     {
         if (a.first == b.first)
-            return CompareTxMemPoolEntryByScore()(*(b.second), *(a.second)); //Reverse order to make sort less than
+            //Reverse order to make sort less than
+            return CompareTxMemPoolEntryByScore()(*(b.second), *(a.second)); 
         return a.first < b.first;
     }
 };
 
-#endif // BITCOIN_TXMEMPOOL_H
+// BITCOIN_TXMEMPOOL_H
+#endif 
