@@ -603,6 +603,10 @@ def split_transaction(node, prevouts, toAddrs, txfeePer=DEFAULT_TX_FEE_PER_BYTE,
     finally:
       decimal.getcontext().prec = decContext
 
+def assert_not_equal(thing1, thing2):
+    if thing1 == thing2:
+        raise AssertionError("%s != %s"%(str(thing1),str(thing2)))
+
 def assert_equal(thing1, thing2):
     if thing1 != thing2:
         raise AssertionError("%s != %s"%(str(thing1),str(thing2)))
@@ -750,7 +754,4 @@ def create_lots_of_big_transactions(node, txouts, utxos, fee):
 
 def get_bip9_status(node, key):
     info = node.getblockchaininfo()
-    for row in info['bip9_softforks']:
-        if row['id'] == key:
-            return row
-    raise IndexError ('key:"%s" not found' % key)
+    return info['bip9_softforks'][key]

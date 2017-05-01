@@ -28,7 +28,7 @@ JSON_TEST_FILES = \
   test/data/tx_valid.json \
   test/data/sighash.json
 
-RAW_TEST_FILES = test/data/alertTests.raw
+RAW_TEST_FILES =
 
 GENERATED_TEST_FILES = $(JSON_TEST_FILES:.json=.json.h) $(RAW_TEST_FILES:.raw=.raw.h)
 
@@ -47,10 +47,12 @@ BITCOIN_TESTS =\
   test/bloom_tests.cpp \
   test/checkblock_tests.cpp \
   test/Checkpoints_tests.cpp \
+  test/bswap_tests.cpp \
   test/coins_tests.cpp \
   test/compress_tests.cpp \
   test/crypto_tests.cpp \
   test/DoS_tests.cpp \
+  test/exploit_tests.cpp \
   test/getarg_tests.cpp \
   test/hash_tests.cpp \
   test/key_tests.cpp \
@@ -61,6 +63,7 @@ BITCOIN_TESTS =\
   test/merkle_tests.cpp \
   test/miner_tests.cpp \
   test/multisig_tests.cpp \
+  test/net_tests.cpp \
   test/netbase_tests.cpp \
   test/pmt_tests.cpp \
   test/policyestimator_tests.cpp \
@@ -81,6 +84,8 @@ BITCOIN_TESTS =\
   test/test_bitcoin.cpp \
   test/test_bitcoin.h \
   test/thinblock_tests.cpp \
+  test/testutil.cpp \
+  test/testutil.h \
   test/timedata_tests.cpp \
   test/transaction_tests.cpp \
   test/txvalidationcache_tests.cpp \

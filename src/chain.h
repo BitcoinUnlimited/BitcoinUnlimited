@@ -12,6 +12,7 @@
 #include "pow.h"
 #include "tinyformat.h"
 #include "uint256.h"
+#include "util.h"
 
 #include <vector>
 
@@ -87,7 +88,7 @@ enum BlockStatus: uint32_t {
     BLOCK_HAVE_DATA          =    8, //! full block available in blk*.dat
     BLOCK_HAVE_UNDO          =   16, //! undo data available in rev*.dat
     BLOCK_HAVE_MASK          =   BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO,
- 
+
     BLOCK_EXCESSIVE          =   32, // BU: This block is bigger than what we really want to accept.
 
     BLOCK_FAILED_VALID       =   64, //! stage after last reached validness failed
@@ -378,6 +379,8 @@ public:
 
     /** Efficiently check whether a block is present in this chain. */
     bool Contains(const CBlockIndex *pindex) const {
+        /* null pointer isn't in this chain but caller should not send in the first place */
+        DbgAssert(pindex, return false);
         return (*this)[pindex->nHeight] == pindex;
     }
 

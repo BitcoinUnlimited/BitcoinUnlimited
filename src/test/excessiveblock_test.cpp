@@ -32,11 +32,14 @@ BOOST_AUTO_TEST_CASE(rpc_excessive)
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock 1000 0 0"), runtime_error);
 
     BOOST_CHECK_THROW(CallRPC("setminingmaxblock"), runtime_error);
-    BOOST_CHECK_NO_THROW(CallRPC("setminingmaxblock 100000"));
+    BOOST_CHECK_THROW(CallRPC("setminingmaxblock 100000"), runtime_error);
     BOOST_CHECK_THROW(CallRPC("setminingmaxblock not_uint"),  boost::bad_lexical_cast);
     BOOST_CHECK_THROW(CallRPC("setminingmaxblock -1"),  boost::bad_lexical_cast);
     BOOST_CHECK_THROW(CallRPC("setminingmaxblock 0"), runtime_error);
     BOOST_CHECK_THROW(CallRPC("setminingmaxblock 0 0"), runtime_error);
+    BOOST_CHECK_NO_THROW(CallRPC("setminingmaxblock 1000"));
+    BOOST_CHECK_NO_THROW(CallRPC("setminingmaxblock 101"));
+    
 }
 
 BOOST_AUTO_TEST_CASE(buip005)
@@ -123,6 +126,121 @@ BOOST_AUTO_TEST_CASE(excessiveChecks)
   BOOST_CHECK_MESSAGE(true == CheckExcessive(block,BLOCKSTREAM_CORE_MAX_BLOCK_SIZE+1,1,1,maxTxSize.value+1), "improper max tx");
 
 
+}
+
+BOOST_AUTO_TEST_CASE(check_validator_rule)
+{
+    BOOST_CHECK( MiningAndExcessiveBlockValidatorRule(1000000, 1000000));
+    BOOST_CHECK( MiningAndExcessiveBlockValidatorRule(16000000, 1000000));
+    BOOST_CHECK( MiningAndExcessiveBlockValidatorRule(1000001, 1000000));
+
+    BOOST_CHECK( ! MiningAndExcessiveBlockValidatorRule(1000000, 1000001));
+    BOOST_CHECK( ! MiningAndExcessiveBlockValidatorRule(1000000, 16000000));
+
+    BOOST_CHECK( MiningAndExcessiveBlockValidatorRule(1357, 1357));
+    BOOST_CHECK( MiningAndExcessiveBlockValidatorRule(161616, 2222));
+    BOOST_CHECK( MiningAndExcessiveBlockValidatorRule(88889, 88888));
+
+    BOOST_CHECK( ! MiningAndExcessiveBlockValidatorRule(929292, 929293));
+    BOOST_CHECK( ! MiningAndExcessiveBlockValidatorRule(4, 234245));
+}
+
+BOOST_AUTO_TEST_CASE(check_excessive_validator)
+{
+    unsigned int c_mgb = maxGeneratedBlock;
+    unsigned int c_ebs = excessiveBlockSize;
+
+    // fudge global variables....
+    maxGeneratedBlock = 1000000;
+    excessiveBlockSize = 888;
+
+    unsigned int tmpExcessive = 1000000;
+    std::string str;
+
+    str = ExcessiveBlockValidator(tmpExcessive, NULL, true);
+    BOOST_CHECK(str.empty());
+
+    excessiveBlockSize = 888;
+    str = ExcessiveBlockValidator(tmpExcessive, NULL, false);
+    BOOST_CHECK(str.empty());
+
+    str = ExcessiveBlockValidator(tmpExcessive, (unsigned int *) 42, true);
+    BOOST_CHECK(str.empty());
+
+    tmpExcessive = maxGeneratedBlock + 1;
+
+    str = ExcessiveBlockValidator(tmpExcessive, NULL, true);
+    BOOST_CHECK(str.empty());
+
+    excessiveBlockSize = 888;
+    str = ExcessiveBlockValidator(tmpExcessive, NULL, false);
+    BOOST_CHECK(str.empty());
+
+    str = ExcessiveBlockValidator(tmpExcessive, (unsigned int *) 42, true);
+    BOOST_CHECK(str.empty());
+
+    tmpExcessive = maxGeneratedBlock - 1;
+
+    str = ExcessiveBlockValidator(tmpExcessive, NULL, true);
+    BOOST_CHECK(! str.empty());
+
+    str = ExcessiveBlockValidator(tmpExcessive, NULL, false);
+    BOOST_CHECK(str.empty());
+
+    str = ExcessiveBlockValidator(tmpExcessive, (unsigned int *) 42, true);
+    BOOST_CHECK(! str.empty());
+
+    maxGeneratedBlock = c_mgb;
+    excessiveBlockSize = c_ebs;
+}
+
+BOOST_AUTO_TEST_CASE(check_generated_block_validator)
+{
+    unsigned int c_mgb = maxGeneratedBlock;
+    unsigned int c_ebs = excessiveBlockSize;
+
+    // fudge global variables....
+    maxGeneratedBlock = 888;
+    excessiveBlockSize = 1000000;
+
+    uint64_t tmpMGB = 1000000;
+    std::string str;
+
+    str = MiningBlockSizeValidator(tmpMGB, NULL, true);
+    BOOST_CHECK(str.empty());
+
+    maxGeneratedBlock = 8888881;
+    str = MiningBlockSizeValidator(tmpMGB, NULL, false);
+    BOOST_CHECK(str.empty());
+
+    str = MiningBlockSizeValidator(tmpMGB, (uint64_t *) 42, true);
+    BOOST_CHECK(str.empty());
+
+    tmpMGB = excessiveBlockSize - 1;
+
+    str = MiningBlockSizeValidator(tmpMGB, NULL, true);
+    BOOST_CHECK(str.empty());
+
+    maxGeneratedBlock = 8888881;
+    str = MiningBlockSizeValidator(tmpMGB, NULL, false);
+    BOOST_CHECK(str.empty());
+
+    str = MiningBlockSizeValidator(tmpMGB, (uint64_t *) 42, true);
+    BOOST_CHECK(str.empty());
+
+    tmpMGB = excessiveBlockSize + 1;
+
+    str = MiningBlockSizeValidator(tmpMGB, NULL, true);
+    BOOST_CHECK(! str.empty());
+
+    str = MiningBlockSizeValidator(tmpMGB, NULL, false);
+    BOOST_CHECK(str.empty());
+
+    str = MiningBlockSizeValidator(tmpMGB, (uint64_t *) 42, true);
+    BOOST_CHECK(! str.empty());
+
+    maxGeneratedBlock = c_mgb;
+    excessiveBlockSize = c_ebs;
 }
 
 

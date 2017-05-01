@@ -23,6 +23,7 @@
 
 #include <boost/thread.hpp>
 #include <boost/lexical_cast.hpp>
+#include <limits>
 
 #include <QDataWidgetMapper>
 #include <QDir>
@@ -54,7 +55,7 @@ UnlimitedDialog::UnlimitedDialog(QWidget* parent,UnlimitedModel* mdl):
 
     int64_t max, ave;
     sendShaper.get(&max, &ave);
-    int64_t longMax = std::numeric_limits<long long>::max();
+    auto longMax = std::numeric_limits<int64_t>::max();
     bool enabled = (ave != longMax);
     ui.sendShapingEnable->setChecked(enabled);
     ui.sendBurstSlider->setRange(0, 1000); // The slider is just for convenience so setting their ranges to what is commonly chosen
@@ -91,7 +92,7 @@ UnlimitedDialog::UnlimitedDialog(QWidget* parent,UnlimitedModel* mdl):
     }
 
     receiveShaper.get(&max, &ave);
-    enabled = (ave != std::numeric_limits<long long>::max());
+    enabled = (ave != std::numeric_limits<int64_t>::max());
     ui.recvShapingEnable->setChecked(enabled);
     if (enabled) {
         ui.recvBurstEdit->setText(QString(boost::lexical_cast<std::string>(max / 1024).c_str()));
@@ -103,7 +104,12 @@ UnlimitedDialog::UnlimitedDialog(QWidget* parent,UnlimitedModel* mdl):
         ui.recvAveEdit->setText("");
     }
     shapingEnableChanged(false);
-}  
+
+    // Block Size text field validators
+    ui.miningMaxBlock->setValidator(new QIntValidator(0, INT_MAX, this));
+    ui.excessiveBlockSize->setValidator(new QIntValidator(0, INT_MAX, this));
+    ui.excessiveAcceptDepth->setValidator(new QIntValidator(0, INT_MAX, this));
+}
 
 
 
@@ -124,17 +130,50 @@ void UnlimitedDialog::setMapper()
     mapper.addMapping(ui.recvBurstEdit, UnlimitedModel::ReceiveBurst);
     mapper.addMapping(ui.recvAveEdit, UnlimitedModel::ReceiveAve);
 
+    /* blocksize */
     mapper.addMapping(ui.miningMaxBlock,UnlimitedModel::MaxGeneratedBlock);
     mapper.addMapping(ui.excessiveBlockSize,UnlimitedModel::ExcessiveBlockSize);
     mapper.addMapping(ui.excessiveAcceptDepth,UnlimitedModel::ExcessiveAcceptDepth);
+    connect(ui.miningMaxBlock, SIGNAL(textChanged(const QString &)), this, SLOT(validateBlockSize()));
+    connect(ui.excessiveBlockSize, SIGNAL(textChanged(const QString &)), this, SLOT(validateBlockSize()));
+    connect(ui.excessiveAcceptDepth, SIGNAL(textChanged(const QString &)), this, SLOT(validateBlockSize()));
+
     mapper.toFirst();
 }
-    
+
+void UnlimitedDialog::setOkButtonState(bool fState)
+{
+    ui.okButton->setEnabled(fState);
+}
+
+void UnlimitedDialog::on_resetButton_clicked()
+{
+  if (model)
+    {
+      // confirmation dialog
+      QMessageBox::StandardButton btnRetVal
+         = QMessageBox::question(this,
+            tr("Confirm options reset"),
+            tr("This is a global reset of all settings!") +
+            "<br>" +
+            tr("Client restart required to activate changes.") +
+            "<br><br>" +
+            tr("Client will be shut down. Do you want to proceed?"),
+            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+
+      if (btnRetVal == QMessageBox::Cancel)
+        return;
+
+      /* reset all options and close GUI */
+      model->Reset();
+      QApplication::quit();
+    }
+}
 
 void UnlimitedDialog::on_okButton_clicked()
 {
   if (!mapper.submit())
-    {    
+    {
       assert(0);
     }
 
@@ -145,6 +184,29 @@ void UnlimitedDialog::on_cancelButton_clicked()
 {
   mapper.revert();
   reject();
+}
+
+void UnlimitedDialog::validateBlockSize()
+{
+    ui.statusLabel->setStyleSheet("QLabel { color: red; }");
+
+    int mmb = ui.miningMaxBlock->text().toInt();
+    int ebs = ui.excessiveBlockSize->text().toInt();
+
+    if ( ! MiningAndExcessiveBlockValidatorRule(ebs, mmb))
+    {
+       ui.statusLabel->setText(tr("Mined block size cannot be larger then excessive block size!"));
+       ui.miningMaxBlock->setStyleSheet("QLineEdit {  background-color: red; }");
+       ui.excessiveBlockSize->setStyleSheet("QLineEdit { background-color: red; }");
+       ui.okButton->setEnabled(false);
+    }
+    else
+    {
+       ui.statusLabel->clear();
+       ui.excessiveBlockSize->setStyleSheet("");
+       ui.miningMaxBlock->setStyleSheet("");
+       ui.okButton->setEnabled(true);
+   }
 }
 
 void UnlimitedDialog::shapingAveEditFinished(void)

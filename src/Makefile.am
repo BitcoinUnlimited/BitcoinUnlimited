@@ -63,11 +63,10 @@ if BUILD_BITCOIN_UTILS
   bin_PROGRAMS += bitcoin-cli bitcoin-tx
 endif
 
-.PHONY: FORCE check-symbols check-security
+.PHONY: FORCE check-symbols check-security check-formatting
 # bitcoin core #
 BITCOIN_CORE_H = \
   addrman.h \
-  alert.h \
   base58.h \
   bitnodes.h \
   bloom.h \
@@ -88,6 +87,7 @@ BITCOIN_CORE_H = \
   consensus/consensus.h \
   core_io.h \
   core_memusage.h \
+  expedited.h \
   httprpc.h \
   httpserver.h \
   init.h \
@@ -103,6 +103,7 @@ BITCOIN_CORE_H = \
   leakybucket.h \
   netbase.h \
   noui.h \
+  parallel.h \
   policy/fees.h \
   policy/policy.h \
   policy/rbf.h \
@@ -165,11 +166,11 @@ libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
   globals.cpp \
   addrman.cpp \
-  alert.cpp \
   bitnodes.cpp \
   bloom.cpp \
   chain.cpp \
   checkpoints.cpp \
+  expedited.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
@@ -179,6 +180,7 @@ libbitcoin_server_a_SOURCES = \
   miner.cpp \
   net.cpp \
   noui.cpp \
+  parallel.cpp \
   policy/fees.cpp \
   policy/policy.cpp \
   pow.cpp \
@@ -452,7 +454,8 @@ clean-local:
 
 .rc.o:
 	@test -f $(WINDRES)
-	$(AM_V_GEN) $(WINDRES) -DWINDRES_PREPROC -i $< -o $@
+	## FIXME: How to get the appropriate modulename_CPPFLAGS in here?
+	$(AM_V_GEN) $(WINDRES) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(CPPFLAGS) -DWINDRES_PREPROC -i $< -o $@
 
 .mm.o:
 	$(AM_V_CXX) $(OBJCXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
@@ -469,6 +472,10 @@ if HARDEN
 	@echo "Checking binary security..."
 	$(AM_V_at) READELF=$(READELF) OBJDUMP=$(OBJDUMP) $(top_srcdir)/contrib/devtools/security-check.py < $(bin_PROGRAMS)
 endif
+
+check-formatting:
+	@echo "Checking source formatting style..."
+	(cd $(top_srcdir)/src; ../contrib/devtools/clang-format.py check clang-format-3.8 `cat ./.formatted-files`)
 
 %.pb.cc %.pb.h: %.proto
 	@test -f $(PROTOC)

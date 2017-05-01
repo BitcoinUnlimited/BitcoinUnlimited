@@ -47,6 +47,9 @@
 // Dump addresses to peers.dat every 15 minutes (900s)
 #define DUMP_ADDRESSES_INTERVAL 900
 
+// We add a random period time (0 to 1 seconds) to feeler connections to prevent synchronization.
+#define FEELER_SLEEP_WINDOW 1
+
 #if !defined(HAVE_MSG_NOSIGNAL) && !defined(MSG_NOSIGNAL)
 #define MSG_NOSIGNAL 0
 #endif
@@ -64,8 +67,10 @@
 
 using namespace std;
 
-namespace {
-    // BU replaced this with a configuration option const int MAX_OUTBOUND_CONNECTIONS = 8;
+namespace
+{
+    // BU replaced this with a configuration option: const int MAX_OUTBOUND_CONNECTIONS = 8;
+    const int MAX_FEELER_CONNECTIONS = 1;
 
     struct ListenSocket {
         SOCKET socket;
@@ -88,6 +93,8 @@ uint64_t nLocalHostNonce = 0;
 static std::vector<ListenSocket> vhListenSocket;
 extern CAddrMan addrman;
 int nMaxConnections = DEFAULT_MAX_PEER_CONNECTIONS;
+int nMinXthinNodes = MIN_XTHIN_NODES;
+
 bool fAddressesInitialized = false;
 std::string strSubVersion;
 
@@ -118,6 +125,9 @@ extern CCriticalSection cs_nLastNodeId;
 extern CSemaphore *semOutbound;
 extern CSemaphore *semOutboundAddNode; // BU: separate semaphore for -addnodes
 boost::condition_variable messageHandlerCondition;
+
+// BU Parallel validation
+extern CSemaphore *semPV; // semaphore for parallel validation threads
 
 // BU  Connection Slot mitigation - used to determine how many connection attempts over time
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
@@ -405,8 +415,7 @@ int DisconnectSubNetNodes(const CSubNet& subNet)
     return nDisconnected;
 }
 
-
-CNode* ConnectNode(CAddress addrConnect, const char* pszDest)
+CNode* ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure)
 {
     if (pszDest == NULL) {
         if (IsLocal(addrConnect))
@@ -441,7 +450,7 @@ CNode* ConnectNode(CAddress addrConnect, const char* pszDest)
             return NULL;
         }
 
-        addrman.Attempt(addrConnect);
+        addrman.Attempt(addrConnect, fCountFailure);
 
         // Add node
         CNode* pnode = new CNode(hSocket, addrConnect, pszDest ? pszDest : "", false);
@@ -458,7 +467,7 @@ CNode* ConnectNode(CAddress addrConnect, const char* pszDest)
     } else if (!proxyConnectionFailed) {
         // If connecting to the node failed, and failure is not caused by a problem connecting to
         // the proxy, mark this as an attempt.
-        addrman.Attempt(addrConnect);
+        addrman.Attempt(addrConnect, fCountFailure);
     }
 
     return NULL;
@@ -495,6 +504,7 @@ void CNode::PushVersion()
     PushMessage(NetMsgType::VERSION, PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
                 nLocalHostNonce, FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, BUComments),
                 nBestHeight, !GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY));
+    tVersionSent = GetTime();
 }
 
 
@@ -750,7 +760,7 @@ bool CNode::ReceiveMsgBytes(const char* pch, unsigned int nBytes)
                     vRecvMsg.pop_back();
                     LogPrint("thin", "Receive Queue: pushed %s to the front of the queue\n", strCommand);
                 }
-            }
+           }
             // BU: end
             msg.nTime = GetTimeMicros();
             messageHandlerCondition.notify_one();
@@ -913,14 +923,12 @@ private:
     CNode *_pnode;
 };
 
-#if 0  // Not currently used
+#if 0 // Not currenly used
 static bool ReverseCompareNodeMinPingTime(const CNodeRef &a, const CNodeRef &b)
 {
     return a->nMinPingUsecTime > b->nMinPingUsecTime;
 }
-#endif
 
-#if 0 // BU: Not currenly used
 static bool ReverseCompareNodeTimeConnected(const CNodeRef &a, const CNodeRef &b)
 {
     return a->nTimeConnected > b->nTimeConnected;
@@ -1001,69 +1009,6 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection) {
 
     if (vEvictionCandidates.empty()) return false;
 
-    // Protect connections with certain characteristics
-
-    // Deterministically select 4 peers to protect by netgroup.
-    // An attacker cannot predict which netgroups will be protected.
-// BU:  this is not effective and not needed
-//    static CompareNetGroupKeyed comparerNetGroupKeyed;
-//    std::sort(vEvictionCandidates.begin(), vEvictionCandidates.end(), comparerNetGroupKeyed);
-//    vEvictionCandidates.erase(vEvictionCandidates.end() - std::min(4, static_cast<int>(vEvictionCandidates.size())), vEvictionCandidates.end());
-
-//    if (vEvictionCandidates.empty()) return false;
-
-// BU: slot attack - using ping time is not affective against a slot attack since the attackers generally have the best ping time.
-// BU: also, ping time does not necessarily mean a node is closer.  Nodes that are busy can have long ping times but be near in location.
-// BU: this is not effective and actually gives the attackers a better chance since attacker ping time is usually very good because ping time
-// has a great deal to do with node activity and attackers typically do not have much activity. Remember, this is not the same ping time as a network
-// ping, this is a node ping/pong message which has to not only traverse the network but also be processed by the node and sent back.
-    // Protect the 8 nodes with the best ping times.
-    // An attacker cannot manipulate this metric without physically moving nodes closer to the target.
-//    std::sort(vEvictionCandidates.begin(), vEvictionCandidates.end(), ReverseCompareNodeMinPingTime);
-//    vEvictionCandidates.erase(vEvictionCandidates.end() - std::min(8, static_cast<int>(vEvictionCandidates.size())), vEvictionCandidates.end());
-
-//    if (vEvictionCandidates.empty()) return false;
-
-// BU: this also makes no sense since attackers can be the first to connect and also regular nodes often connect and disconnect causing them
-// to go down in the rank while the attackers increase in rank.
-    // Protect the half of the remaining nodes which have been connected the longest.
-    // This replicates the existing implicit behavior.
-//    std::sort(vEvictionCandidates.begin(), vEvictionCandidates.end(), ReverseCompareNodeTimeConnected);
-//    vEvictionCandidates.erase(vEvictionCandidates.end() - static_cast<int>(vEvictionCandidates.size() / 2), vEvictionCandidates.end());
-
-//    if (vEvictionCandidates.empty()) return false;
-
-// *** BU - we do not need to deprioritize based on netgroup and it can have unwanted repercussions for xpedited network setup
-//          as well as testing setups.
-    // Identify the network group with the most connections and youngest member.
-    // (vEvictionCandidates is sorted by reverse connect time)
-//    std::sort(vEvictionCandidates.begin(), vEvictionCandidates.end(), ReverseCompareNodeTimeConnected);
-//    std::vector<unsigned char> naMostConnections;
-//    unsigned int nMostConnections = 0;
-//    int64_t nMostConnectionsTime = 0;
-//    std::map<std::vector<unsigned char>, std::vector<CNodeRef> > mapAddrCounts;
-//    BOOST_FOREACH(const CNodeRef &node, vEvictionCandidates) {
-//        mapAddrCounts[node->addr.GetGroup()].push_back(node);
-//        int64_t grouptime = mapAddrCounts[node->addr.GetGroup()][0]->nTimeConnected;
-//        size_t groupsize = mapAddrCounts[node->addr.GetGroup()].size();
-
-//        if (groupsize > nMostConnections || (groupsize == nMostConnections && grouptime > nMostConnectionsTime)) {
-//            nMostConnections = groupsize;
-//            nMostConnectionsTime = grouptime;
-//            naMostConnections = node->addr.GetGroup();
-//        }
-//    }
-
-    // Reduce to the network group with the most connections
-//    vEvictionCandidates = mapAddrCounts[naMostConnections];
-
-    // Do not disconnect peers if there is only one unprotected connection from their network group.
-//    if (vEvictionCandidates.size() > 1) {
-//        // Disconnect from the network group with the most connections
-//        vEvictionCandidates[0]->fDisconnect = true;
-//        return true;
-//    }
-// *** BU end section
 
     // If we get here then we prioritize connections based on activity.  The least active incoming peer is
     // de-prioritized based on bytes in and bytes out.  A whitelisted peer will always get a connection and there is
@@ -1160,7 +1105,8 @@ static void AcceptConnection(const ListenSocket& hListenSocket) {
         LOCK(cs_vAddedNodes);
         nMaxAddNodeOutbound = std::min((int)vAddedNodes.size(), nMaxOutConnections);
     }
-    int nMaxInbound = nMaxConnections - nMaxOutConnections - nMaxAddNodeOutbound;
+    int nMaxInbound = nMaxConnections - (nMaxOutConnections + MAX_FEELER_CONNECTIONS) - nMaxAddNodeOutbound;
+
     //REVISIT: a. This doesn't take into account RPC "addnode <node> onetry" outbound connections as those aren't tracked
     //         b. This also doesn't take into account whether or not the tracked vAddedNodes are valid or connected
     //         c. There is also an edge case where if less than nMaxOutConnections entries exist in vAddedNodes
@@ -1287,7 +1233,8 @@ void ThreadSocketHandler()
                     }
                     if (fDelete) {
                         vNodesDisconnected.remove(pnode);
-                        assert(std::find(vNodes.begin(),vNodes.end(), pnode) == vNodes.end());  // make sure it has been removed
+                        // no need to remove from vNodes. we know pnode has already been removed from vNodes since that
+                        // occurred prior to insertion into vNodesDisconnected
                         delete pnode;
                     }
                 }
@@ -1771,7 +1718,7 @@ void static ProcessOneShot()
     //Uses try-wait methodology because if a grant is given, there are outbound
     //slots to fill, and if the grant isn't given, there's no seeding to do.
     if (grant) {
-        if (!OpenNetworkConnection(addr, &grant, strDest.c_str(), true))
+        if (!OpenNetworkConnection(addr, false, &grant, strDest.c_str(), true))
             AddOneShot(strDest);
     }
 }
@@ -1790,7 +1737,7 @@ void ThreadOpenConnections()
                 CAddress addr;
                 //NOTE: Because the only nodes we are connecting to here are the ones the user put in their
                 //      bitcoin.conf/commandline args as "-connect", we don't use the semaphore to limit outbound connections
-                OpenNetworkConnection(addr, NULL, strAddr.c_str());
+                OpenNetworkConnection(addr, false, NULL, strAddr.c_str());
                 for (int i = 0; i < 10 && i < nLoop; i++)
                 {
                     MilliSleep(500);
@@ -1809,12 +1756,84 @@ void ThreadOpenConnections()
 
     // Initiate network connections
     int64_t nStart = GetTime();
-    while (true) {
+    unsigned int nDisconnects = 0;
+    // Minimum time before next feeler connection (in microseconds).
+    int64_t nNextFeeler = PoissonNextSend(nStart*1000*1000, FEELER_INTERVAL);
+
+    while (true)
+    {
         ProcessOneShot();
 
         MilliSleep(500);
 
-        CSemaphoreGrant grant(*semOutbound);
+        // Only connect out to one peer per network group (/16 for IPv4).
+        // Do this here so we don't have to critsect vNodes inside mapAddresses critsect.
+        // And also must do this before the semaphore grant so that we don't have to block
+        // if the grants are all taken and we want to disconnect a node in the event that
+        // we don't have enough connections to XTHIN capable nodes yet.
+        int nOutbound = 0;
+        int nThinBlockCapable = 0;
+        set<vector<unsigned char> > setConnected;
+        CNode* ptemp = nullptr;
+        bool fDisconnected = false;
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH (CNode* pnode, vNodes)
+            {
+                if (pnode->fAutoOutbound) // only count outgoing connections.
+                {
+                    setConnected.insert(pnode->addr.GetGroup());
+                    nOutbound++;
+
+                    if (pnode->ThinBlockCapable())
+                        nThinBlockCapable++;
+                    else
+                        ptemp = pnode;
+                }
+            }
+            // Disconnect a node that is not XTHIN capable if all outbound slots are full and we
+            // have not yet connected to enough XTHIN nodes.
+            nMinXthinNodes = GetArg("-min-xthin-nodes", MIN_XTHIN_NODES);
+            if (nOutbound >= nMaxOutConnections &&
+                nThinBlockCapable <= min(nMinXthinNodes, nMaxOutConnections) &&
+                nDisconnects < MAX_DISCONNECTS && IsThinBlocksEnabled() && IsChainNearlySyncd())
+            {
+                if (ptemp != nullptr)
+                {
+                    ptemp->fDisconnect = true;
+                    fDisconnected = true;
+                    nDisconnects++;
+                }
+            }
+        }
+
+        // If disconnected then wait for disconnection completion
+        if (fDisconnected)
+        {
+            while (true)
+            {
+                MilliSleep(500);
+                {
+                    LOCK(cs_vNodes);
+                    if (find(vNodes.begin(), vNodes.end(), ptemp) == vNodes.end())
+                        break;
+                }
+            }
+        }
+
+        // During IBD we do not actively disconnect and search for XTHIN capable nodes therefore
+        // we need to check occasionally whether IBD is complete, meaning IsChainNearlySynd() returns true.
+        // Therefore we do a try_wait() rather than wait() when aquiring the semaphore. A try_wait() is
+        // indicated by passing "true" to CSemaphore grant().
+        CSemaphoreGrant grant(*semOutbound, true);
+        if (!grant)
+        {
+            // If the try_wait() fails, meaning all grants are currently in use, then we wait for one minute
+            // to check again whether we should disconnect any nodes.  We don't have to check this too often
+            // as this is most relevant during IBD.
+            MilliSleep(60000);
+            continue;
+        }
         boost::this_thread::interruption_point();
 
         // Add seed nodes if DNS seeds are all down (an infrastructure attack?).
@@ -1832,25 +1851,37 @@ void ThreadOpenConnections()
         //
         CAddress addrConnect;
 
-        // Only connect out to one peer per network group (/16 for IPv4).
-        // Do this here so we don't have to critsect vNodes inside mapAddresses critsect.
-        int nOutbound = 0;
-        set<vector<unsigned char> > setConnected;
+        // Feeler Connections
+        //
+        // Design goals:
+        //  * Increase the number of connectable addresses in the tried table.
+        //
+        // Method:
+        //  * Choose a random address from new and attempt to connect to it if we can connect
+        //    successfully it is added to tried.
+        //  * Start attempting feeler connections only after node finishes making outbound
+        //    connections.
+        //  * Only make a feeler connection once every few minutes.
+        //
+        bool fFeeler = false;
+        if (nOutbound >= nMaxOutConnections)
         {
-            LOCK(cs_vNodes);
-            BOOST_FOREACH (CNode* pnode, vNodes) {
-                if (!pnode->fInbound) {
-                    setConnected.insert(pnode->addr.GetGroup());
-                    nOutbound++;
-                }
+            int64_t nTime = GetTimeMicros(); // The current time right now (in microseconds).
+            if (nTime > nNextFeeler)
+            {
+                nNextFeeler = PoissonNextSend(nTime, FEELER_INTERVAL);
+                fFeeler = true;
+            } else
+            {
+                continue;
             }
         }
 
         int64_t nANow = GetAdjustedTime();
-
         int nTries = 0;
-        while (true) {
-            CAddrInfo addr = addrman.Select();
+        while (true)
+        {
+            CAddrInfo addr = addrman.Select(fFeeler);
 
             // if we selected an invalid address, restart
             if (!addr.IsValid() || setConnected.count(addr.GetGroup()) || IsLocal(addr))
@@ -1879,8 +1910,26 @@ void ThreadOpenConnections()
         }
 
         if (addrConnect.IsValid())
+        {
+            if (fFeeler)
+            {
+                // Add small amount of random noise before connection to avoid synchronization.
+                int randsleep = GetRandInt(FEELER_SLEEP_WINDOW * 1000);
+                MilliSleep(randsleep);
+                LogPrint("net", "Making feeler connection to %s\n", addrConnect.ToString());
+            }
+
             //Seeded outbound connections track against the original semaphore
-            OpenNetworkConnection(addrConnect, &grant);
+            if (OpenNetworkConnection(addrConnect, (int)setConnected.size() >= std::min(nMaxConnections - 1, 2), &grant, NULL, false, fFeeler))
+            {
+                LOCK(cs_vNodes);
+                CNode* pnode = FindNode((CService)addrConnect);
+                // We need to use a separate outbound flag so as not to differentiate these outbound
+                // nodes with ones that were added using -addnode -connect-thinblock or -connect.
+                if (pnode)
+                    pnode->fAutoOutbound = true;
+            }
+        }
     }
 }
 
@@ -1911,13 +1960,14 @@ void ThreadOpenAddedConnections()
                 BOOST_FOREACH(const std::string& strAddNode, vAddedNodes)
                     lAddresses.push_back(strAddNode);
             }
-            BOOST_FOREACH(const std::string& strAddNode, lAddresses) {
-  	            CAddress addr;
+            BOOST_FOREACH(const std::string& strAddNode, lAddresses)
+            {
+                CAddress addr;
                 // BU: always allow us to add a node manually. Whenever we use -addnode the maximum InBound connections are reduced by
-                //     the same number.  Here we use our own semaphore to ensure we have the outbound slots we need and can reconnect to 
+                //     the same number.  Here we use our own semaphore to ensure we have the outbound slots we need and can reconnect to
                 //     nodes that have restarted.
                 CSemaphoreGrant grant(*semOutboundAddNode);
-                OpenNetworkConnection(addr, &grant, strAddNode.c_str());
+                OpenNetworkConnection(addr, false, &grant, strAddNode.c_str());
                 MilliSleep(500);
             }
             // Retry every 15 seconds.  It is important to check often to make sure the Xpedited Relay network 
@@ -1966,10 +2016,10 @@ void ThreadOpenAddedConnections()
         BOOST_FOREACH(vector<CService>& vserv, lservAddressesToAdd)
         {
             // BU: always allow us to add a node manually. Whenever we use -addnode the maximum InBound connections are reduced by
-            //     the same number.  Here we use our own semaphore to ensure we have the outbound slots we need and can reconnect to 
+            //     the same number.  Here we use our own semaphore to ensure we have the outbound slots we need and can reconnect to
             //     nodes that have restarted.
             CSemaphoreGrant grant(*semOutboundAddNode);
-            OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant);
+            OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), false, &grant);
             MilliSleep(500);
         }
         // Retry every 15 seconds.  It is important to check often to make sure the Xpedited Relay network 
@@ -1979,9 +2029,8 @@ void ThreadOpenAddedConnections()
 }
 
 // if successful, this moves the passed grant to the constructed node
-bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant* grantOutbound, const char* pszDest, bool fOneShot)
+bool OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot, bool fFeeler)
 {
-
     //
     // Initiate outbound network connection
     //
@@ -1999,7 +2048,7 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant* grantOu
             return false;
     }
 
-    CNode* pnode = ConnectNode(addrConnect, pszDest);
+    CNode* pnode = ConnectNode(addrConnect, pszDest, fCountFailure);
     boost::this_thread::interruption_point();
 
     if (!pnode)
@@ -2009,6 +2058,8 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant* grantOu
     pnode->fNetworkNode = true;
     if (fOneShot)
         pnode->fOneShot = true;
+    if (fFeeler)
+        pnode->fFeeler = true;
 
     return true;
 }
@@ -2154,7 +2205,7 @@ bool BindListenPort(const CService& addrBind, string& strError, bool fWhiteliste
     if (::bind(hListenSocket, (struct sockaddr*)&sockaddr, len) == SOCKET_ERROR) {
         int nErr = WSAGetLastError();
         if (nErr == WSAEADDRINUSE)
-            strError = strprintf(_("Unable to bind to %s on this computer. Bitcoin is probably already running."), addrBind.ToString());
+            strError = strprintf(_("Unable to bind to %s on this computer. %s is probably already running."), addrBind.ToString(), _(PACKAGE_NAME));
         else
             strError = strprintf(_("Unable to bind to %s on this computer (bind returned error %s)"), addrBind.ToString(), NetworkErrorString(nErr));
         LogPrintf("%s\n", strError);
@@ -2233,8 +2284,16 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     int64_t nStart = GetTimeMillis();
     {
         CAddrDB adb;
-        if (!adb.Read(addrman))
+        if (adb.Read(addrman))
+        {
+            LogPrintf("Loaded %i addresses from peers.dat  %dms\n", addrman.size(), GetTimeMillis() - nStart);
+        }
+        else
+        {
+            // Addrman can be in an inconsistent state after failure, reset it
+            addrman.Clear();
             LogPrintf("Invalid or missing peers.dat; recreating\n");
+        }
     }
 
     //try to read stored banlist
@@ -2254,7 +2313,7 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     if (semOutbound == NULL) {
         // initialize semaphore
-        int nMaxOutbound = min(nMaxOutConnections, nMaxConnections);
+        int nMaxOutbound = min((nMaxOutConnections + MAX_FEELER_CONNECTIONS), nMaxConnections);
         semOutbound = new CSemaphore(nMaxOutbound);
     }
 
@@ -2313,7 +2372,7 @@ bool StopNode()
     LogPrintf("StopNode()\n");
     MapPort(false);
     if (semOutbound)
-        for (int i=0; i<nMaxOutConnections; i++)
+        for (int i=0; i<(nMaxOutConnections + MAX_FEELER_CONNECTIONS); i++)
             semOutbound->post();
 
     if (fAddressesInitialized)
@@ -2353,6 +2412,10 @@ void NetCleanup()
         semOutboundAddNode = NULL;
         if (pnodeLocalHost) delete pnodeLocalHost;
         pnodeLocalHost = NULL;
+
+        //BU: clean up the parallel validation semaphore
+        if (semPV) delete semPV;
+        semPV = NULL;
 
 #ifdef WIN32
         // Shutdown Windows Sockets
@@ -2633,6 +2696,11 @@ bool CAddrDB::Read(CAddrMan& addr)
     if (hashIn != hashTmp)
         return error("%s: Checksum mismatch, data corrupted", __func__);
 
+    return Read(addr, ssPeers);
+}
+
+bool CAddrDB::Read(CAddrMan& addr, CDataStream& ssPeers)
+{
     unsigned char pchMsgTmp[4];
     try {
         // de-serialize file header (network specific magic number) and ..
@@ -2646,6 +2714,8 @@ bool CAddrDB::Read(CAddrMan& addr)
         ssPeers >> addr;
     }
     catch (const std::exception& e) {
+        // de-serialization has failed, ensure addrman is left in a clean state
+        addr.Clear();
         return error("%s: Deserialize or I/O error - %s", __func__, e.what());
     }
 
@@ -2677,8 +2747,13 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     fWhitelisted = false;
     fOneShot = false;
     fClient = false; // set by version message
+    fFeeler = false;
     fInbound = fInboundIn;
+    fAutoOutbound = false;
     fNetworkNode = false;
+    tVersionSent = -1;
+    fVerackSent = false;
+    fBUVersionSent = false;
     fSuccessfullyConnected = false;
     fDisconnect = false;
     nRefCount = 0;
@@ -2761,6 +2836,7 @@ CNode::~CNode()
     // We must set this to false on disconnect otherwise we will have trouble reconnecting -addnode nodes
     // if the remote peer restarts.
     fSuccessfullyConnected = false;
+    fAutoOutbound = false;
 
     // BUIP010 - Xtreme Thinblocks - end section
 
