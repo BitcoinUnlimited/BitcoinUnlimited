@@ -1501,20 +1501,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
                 // Save these to avoid repeated lookups
                 setIterConflicting.insert(mi);
 
-                // If this entry is "dirty", then we don't have descendant
-                // state for this transaction, which means we probably have
-                // lots of in-mempool descendants.
-                // Don't allow replacements of dirty transactions, to ensure
-                // that we don't spend too much time walking descendants.
-                // This should be rare.
-                if (mi->IsDirty()) {
-                    return state.DoS(0,
-                            error("AcceptToMemoryPool: rejecting replacement %s; cannot replace tx %s with untracked descendants",
-                                hash.ToString(),
-                                mi->GetTx().GetHash().ToString()),
-                            REJECT_NONSTANDARD, "too many potential replacements");
-                }
-
                 // Don't allow the replacement to reduce the feerate of the
                 // mempool.
                 //
@@ -1643,7 +1629,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
                     FormatMoney(nModifiedFees - nConflictingFees),
                     (int)nSize - (int)nConflictingSize);
         }
-        pool.RemoveStaged(allConflicting);
+        pool.RemoveStaged(allConflicting, false);
 
         // Store transaction in memory
         pool.addUnchecked(hash, entry, setAncestors, !IsInitialBlockDownload());
@@ -3044,7 +3030,7 @@ bool static DisconnectTip(CValidationState& state, const Consensus::Params& cons
         std::list<CTransaction> removed;
         CValidationState stateDummy;
         if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, NULL, true)) {
-            mempool.remove(tx, removed, true);
+            mempool.removeRecursive(tx, removed);
         } else if (mempool.exists(tx.GetHash())) {
             vHashUpdate.push_back(tx.GetHash());
         }
@@ -5557,6 +5543,7 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, in
             Misbehaving(pfrom->GetId(), 20);
             return error("message inv size() = %u", vInv.size());
         }
+
         for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
         {
             const CInv &inv = vInv[nInv];
@@ -5567,7 +5554,7 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, in
                 return error("message inv invalid type = %u or is null hash %s", inv.type, inv.hash.ToString());
             }
         }
-        
+
         bool fBlocksOnly = GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY);
 
         // Allow whitelisted peers to send data other than blocks in blocks only mode if whitelistrelay is true
@@ -5639,11 +5626,11 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, in
             if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK) || (inv.type == MSG_FILTERED_BLOCK) || (inv.type == MSG_THINBLOCK) || (inv.type == MSG_XTHINBLOCK)))
             {
                 Misbehaving(pfrom->GetId(), 20);
-                return error("message inv invalid type = %u", inv.type);                
+                return error("message inv invalid type = %u", inv.type);
             }
             // inv.hash does not need validation, since SHA2556 hash can be any value
         }
-        
+
 
         if (fDebug || (vInv.size() != 1))
             LogPrint("net", "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
@@ -6026,7 +6013,7 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, in
                 {
                     LOCK(cs_main);
                     Misbehaving(pfrom->GetId(), 100);  // If they exceed the limit then disconnect them
-                    return error("requesting too many get_xthin");                
+                    return error("requesting too many get_xthin");
                 }
             }
         }
@@ -6040,9 +6027,9 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, in
         {
             LOCK(cs_main);
             Misbehaving(pfrom->GetId(), 100);
-            return error("invalid get_xthin type=%u hash=%s", inv.type, inv.hash.ToString());                
+            return error("invalid get_xthin type=%u hash=%s", inv.type, inv.hash.ToString());
         }
-        
+
 
         // Validates that the filter is reasonably sized.
         LoadFilter(pfrom, &filterMemPool);
@@ -6079,11 +6066,11 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, in
         // ignore the expedited message unless we are at the chain tip...
         if (!fImporting && !fReindex && IsChainNearlySyncd())
         {
-	          if (!HandleExpeditedBlock(vRecv, pfrom))
+            if (!HandleExpeditedBlock(vRecv, pfrom))
             {
                 LOCK(cs_main);
                 Misbehaving(pfrom->GetId(), 5);
-                return false;            
+                return false;
             }
         }
     }
@@ -6323,7 +6310,7 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, in
             {
                 LOCK(cs_main);
                 Misbehaving(pfrom->GetId(), 20);
-                return error("Requested block is not available");          
+                return error("Requested block is not available");
             }
             else
             {
@@ -6459,7 +6446,7 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, in
         LogPrint("blk", "received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
         UnlimitedLogBlock(block, inv.hash.ToString(), receiptTime);
 
-        // If block was never requested then ban the peer. We should never received 
+        // If block was never requested then ban the peer. We should never received
         // unrequested blocks unless we are doing testing in regtest.
         {
             LOCK(cs_main);
@@ -6480,7 +6467,7 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, in
         // block is invalid we don't want to remove it from the request manager yet.
         requester.Received(inv, pfrom, msgSize);
 
-         
+
         // Message consistency checking
         // NOTE: consistency checking is handled by checkblock() which is called during
         //       ProcessNewBlock() during HandleBlockMessage.
@@ -6730,7 +6717,7 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, in
 
 bool ProcessMessages(CNode* pfrom)
 {
-    AssertLockHeld(pfrom->cs_vRecvMsg);  
+    AssertLockHeld(pfrom->cs_vRecvMsg);
     const CChainParams& chainparams = Params();
     //if (fDebug)
     //    LogPrintf("%s(%u messages)\n", __func__, pfrom->vRecvMsg.size());
