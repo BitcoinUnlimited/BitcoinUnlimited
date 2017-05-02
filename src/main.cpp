@@ -6263,17 +6263,6 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, in
         LogPrint("blk", "received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
         UnlimitedLogBlock(block, inv.hash.ToString(), receiptTime);
 
-        // If block was never requested then ban the peer. We should never received 
-        // unrequested blocks unless we are doing testing in regtest.
-        {
-            LOCK(cs_main);
-            if (mapBlocksInFlight.find(inv.hash) == mapBlocksInFlight.end() && !pfrom->fWhitelisted)
-            {
-                Misbehaving(pfrom->GetId(), 100);
-                return error("Block %s was never requested, banning peer=%d", inv.hash.ToString(), pfrom->GetId());
-            }
-        }
-
         if (IsChainNearlySyncd()) // BU send the received block out expedited channels quickly
         {
             CValidationState state;
