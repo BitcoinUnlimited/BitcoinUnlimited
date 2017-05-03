@@ -6,6 +6,7 @@
 #define REQUEST_MANAGER_H
 #include "net.h"
 #include "stat.h"
+
 // When should I request a tx from someone else (in microseconds). cmdline/bitcoin.conf: -txretryinterval
 extern unsigned int MIN_TX_REQUEST_RETRY_INTERVAL;
 // When should I request a block from someone else (in microseconds). cmdline/bitcoin.conf: -blkretryinterval
@@ -65,6 +66,12 @@ public:
 class CRequestManager
 {
 protected:
+
+    // keeps track of the order of block requests so we can iterate through
+    // the mapBlkInfo in the order that block INV or HEADERS were received.
+    // This keeps blocks from returning out of order.
+    std::vector<uint256> vBlockRequestOrder;
+
     // map of transactions
     typedef std::map<uint256, CUnknownObj> OdMap;
     OdMap mapTxnInfo;
@@ -72,7 +79,7 @@ protected:
     CCriticalSection cs_objDownloader; // protects mapTxnInfo and mapBlkInfo
 
     OdMap::iterator sendIter;
-    OdMap::iterator sendBlkIter;
+    std::vector<uint256>::iterator sendBlkIter;
 
     int inFlight;
     // int maxInFlight;
