@@ -230,6 +230,9 @@ testScriptsExt = [ RpcTest(t) for t in [
     Disabled('replace-by-fee', "disabled while Replace By Fee is disabled in code")
 ] ]
 
+
+sys.exit(0)
+
 #Enable ZMQ tests
 if ENABLE_ZMQ == 1:
     testScripts.append(RpcTest('zmq_test'))
