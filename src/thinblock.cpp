@@ -5,6 +5,7 @@
 #include "thinblock.h"
 #include "chainparams.h"
 #include "consensus/merkle.h"
+#include "expedited.h"
 #include "main.h"
 #include "net.h"
 #include "parallel.h"
@@ -247,6 +248,110 @@ bool CXThinBlock::CheckBlockHeader(const CBlockHeader &block, CValidationState &
     return true;
 }
 
+/**
+ * Handle an incoming Xthin or Xpedited block
+ * Once the block is validated apart from the Merkle root, forward the Xpedited block with a hop count of nHops.
+ */
+bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, string strCommand, unsigned nHops)
+{
+    if (!pfrom->ThinBlockCapable())
+    {
+        LOCK(cs_main);
+        Misbehaving(pfrom->GetId(), 100);
+        return error("%s message received from a non thinblock node, peer=%d", strCommand, pfrom->GetId());
+    }
+
+    int nSizeThinBlock = vRecv.size();
+    CXThinBlock thinBlock;
+    vRecv >> thinBlock;
+
+    // Message consistency checking
+    if (!IsThinBlockValid(pfrom, thinBlock.vMissingTx, thinBlock.header))
+    {
+        LOCK(cs_main);
+        Misbehaving(pfrom->GetId(), 100);
+        return error("Invalid %s received", strCommand);
+    }
+
+    // Is there a previous block or header to connect with?
+    {
+        LOCK(cs_main);
+        uint256 prevHash = thinBlock.header.hashPrevBlock;
+        BlockMap::iterator mi = mapBlockIndex.find(prevHash);
+        if (mi == mapBlockIndex.end())
+        {
+            Misbehaving(pfrom->GetId(), 10);
+            return error("%s from peer %s (%d) will not connect, unknown previous block %s",
+                strCommand, pfrom->addrName.c_str(), pfrom->id, prevHash.ToString());
+        }
+        CBlockIndex *pprev = mi->second;
+        CValidationState state;
+        if (!ContextualCheckBlockHeader(thinBlock.header, state, pprev))
+        {
+            // Thin block does not fit within our blockchain
+            Misbehaving(pfrom->GetId(), 100);
+            return error("%s from peer %s (%d) contextual error: %s", strCommand, pfrom->addrName.c_str(),
+                pfrom->id, state.GetRejectReason().c_str());
+        }
+    }
+
+    CInv inv(MSG_BLOCK, thinBlock.header.GetHash());
+    bool fAlreadyHave = false;
+
+    if (nHops > 0)
+    {
+        bool newBlock = false;
+        unsigned int status = 0;
+
+        LOCK(cs_main);
+        BlockMap::iterator mapEntry = mapBlockIndex.find(inv.hash);
+        CBlockIndex *blkidx = NULL;
+        if (mapEntry != mapBlockIndex.end())
+        {
+            blkidx = mapEntry->second;
+            if (blkidx)
+                status = blkidx->nStatus;
+        }
+
+        // If we do not have the block on disk or do not have the header yet then treat the block as new.
+        newBlock = blkidx == NULL || !(blkidx->nStatus & BLOCK_HAVE_DATA);
+
+        LogPrint("thin",
+            "Received %s expedited thinblock %s from peer %s (%d). Hop %d. Size %d bytes. (status %d,0x%x)\n",
+            newBlock ? "new" : "repeated", inv.hash.ToString(), pfrom->addrName.c_str(), pfrom->id, nHops,
+            nSizeThinBlock, status, status);
+
+        if (!newBlock)
+            return true;
+    }
+    else
+    {
+        LogPrint("thin", "Received %s %s from peer %s (%d). Size %d bytes.\n", strCommand, inv.hash.ToString(),
+            pfrom->addrName.c_str(), pfrom->id, nSizeThinBlock);
+
+        // An expedited block or re-requested xthin can arrive and beat the original thin block request/response
+        if (!pfrom->mapThinBlocksInFlight.count(inv.hash))
+        {
+            LogPrint("thin", "%s %s from peer %s (%d) received but we may already have processed it\n",
+                strCommand, inv.hash.ToString(), pfrom->addrName.c_str(), pfrom->id);
+            LOCK(cs_main);
+            fAlreadyHave = AlreadyHave(inv); // I'll still continue processing if we don't have an accepted block yet
+            if (fAlreadyHave)
+                // record the bytes received from the thinblock even though we had it already
+                requester.Received(inv, pfrom, nSizeThinBlock);
+        }
+    }
+
+    // Send expedited block without checking merkle root.
+    if (!IsRecentlyExpeditedAndStore(inv.hash))
+        SendExpeditedBlock(thinBlock, nHops, pfrom);
+
+    if (fAlreadyHave)
+        return true;
+
+    return thinBlock.process(pfrom, nSizeThinBlock, strCommand);
+}
+
 bool CXThinBlock::process(CNode *pfrom,
     int nSizeThinBlock,
     string strCommand) // TODO: request from the "best" txn source not necessarily from the block source
@@ -385,30 +490,23 @@ bool CXThinBlock::process(CNode *pfrom,
     pfrom->xThinBlockHashes.clear();
     mapPartialTxHash.clear();
 
-    // This must be done outside of the above section or a deadlock may occur.
-    if (!fMerkleRootCorrect)
-    {
-        vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_THINBLOCK, header.GetHash()));
-        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-        LogPrintf("xthinblock merkelroot does not match computed merkleroot - requesting full thinblock, peer=%d",
-            pfrom->GetId());
-        return true;
-    }
-
+    // These must be checked outside the above section or a deadlock may occur
+    // Expedited blocks are sent before checking the merkle root, so a mismatch should not attract a penalty
     // There is a remote possiblity of a Tx hash collision therefore if it occurs we re-request a normal
     // thinblock which has the full Tx hash data rather than just the truncated hash.
-    if (collision)
+    if (collision || !fMerkleRootCorrect)
     {
         vector<CInv> vGetData;
         vGetData.push_back(CInv(MSG_THINBLOCK, header.GetHash()));
         // This must be done outside of the mempool.cs lock or the deadlock
         pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
         // detection with pfrom->cs_vSend will be triggered.
-        LogPrintf("TX HASH COLLISION for xthinblock: re-requesting a thinblock\n");
+        if (!fMerkleRootCorrect)
+            LogPrintf("mismatched merkle root on xthinblock: re-requesting a thinblock\n");
+        else
+            LogPrintf("TX HASH COLLISION for xthinblock: re-requesting a thinblock\n");
         return true;
     }
-
 
     pfrom->thinBlockWaitingForTxns = missingCount;
     LogPrint("thin", "thinblock waiting for: %d, unnecessary: %d, txs: %d full: %d\n", pfrom->thinBlockWaitingForTxns,
