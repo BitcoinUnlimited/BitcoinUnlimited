@@ -5936,7 +5936,7 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, in
     else if (strCommand == NetMsgType::XPEDITEDBLK)
     {
         // ignore the expedited message unless we are at the chain tip...
-        if (!fImporting && !fReindex && !IsInitialBlockDownload() && IsThinBlocksEnabled())
+        if (!fImporting && !fReindex && !IsInitialBlockDownload())
         {
             if (!HandleExpeditedBlock(vRecv, pfrom))
             {

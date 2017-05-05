@@ -257,7 +257,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, string strComm
     if (!pfrom->ThinBlockCapable())
     {
         LOCK(cs_main);
-        Misbehaving(pfrom->GetId(), 100);
+        Misbehaving(pfrom->GetId(), 5);
         return error("%s message received from a non thinblock node, peer %s", strCommand, pfrom->GetLogName());
     }
 
