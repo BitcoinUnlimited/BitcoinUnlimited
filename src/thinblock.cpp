@@ -258,7 +258,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, string strComm
     {
         LOCK(cs_main);
         Misbehaving(pfrom->GetId(), 100);
-        return error("%s message received from a non thinblock node, peer=%d", strCommand, pfrom->GetId());
+        return error("%s message received from a non thinblock node, peer %s", strCommand, pfrom->GetLogName());
     }
 
     int nSizeThinBlock = vRecv.size();
@@ -281,8 +281,8 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, string strComm
         if (mi == mapBlockIndex.end())
         {
             Misbehaving(pfrom->GetId(), 10);
-            return error("%s from peer %s (%d) will not connect, unknown previous block %s",
-                strCommand, pfrom->addrName.c_str(), pfrom->id, prevHash.ToString());
+            return error("%s from peer %s will not connect, unknown previous block %s", strCommand, pfrom->GetLogName(),
+                prevHash.ToString());
         }
         CBlockIndex *pprev = mi->second;
         CValidationState state;
@@ -290,8 +290,8 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, string strComm
         {
             // Thin block does not fit within our blockchain
             Misbehaving(pfrom->GetId(), 100);
-            return error("%s from peer %s (%d) contextual error: %s", strCommand, pfrom->addrName.c_str(),
-                pfrom->id, state.GetRejectReason().c_str());
+            return error("%s from peer %s contextual error: %s", strCommand, pfrom->GetLogName(),
+                state.GetRejectReason().c_str());
         }
     }
 
@@ -316,24 +316,23 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, string strComm
         // If we do not have the block on disk or do not have the header yet then treat the block as new.
         newBlock = blkidx == NULL || !(blkidx->nStatus & BLOCK_HAVE_DATA);
 
-        LogPrint("thin",
-            "Received %s expedited thinblock %s from peer %s (%d). Hop %d. Size %d bytes. (status %d,0x%x)\n",
-            newBlock ? "new" : "repeated", inv.hash.ToString(), pfrom->addrName.c_str(), pfrom->id, nHops,
-            nSizeThinBlock, status, status);
+        LogPrint("thin", "Received %s expedited thinblock %s from peer %s. Hop %d. Size %d bytes. (status %d,0x%x)\n",
+            newBlock ? "new" : "repeated", inv.hash.ToString(), pfrom->GetLogName(), nHops, nSizeThinBlock, status,
+            status);
 
         if (!newBlock)
             return true;
     }
     else
     {
-        LogPrint("thin", "Received %s %s from peer %s (%d). Size %d bytes.\n", strCommand, inv.hash.ToString(),
-            pfrom->addrName.c_str(), pfrom->id, nSizeThinBlock);
+        LogPrint("thin", "Received %s %s from peer %s. Size %d bytes.\n", strCommand, inv.hash.ToString(),
+            pfrom->GetLogName(), nSizeThinBlock);
 
         // An expedited block or re-requested xthin can arrive and beat the original thin block request/response
         if (!pfrom->mapThinBlocksInFlight.count(inv.hash))
         {
-            LogPrint("thin", "%s %s from peer %s (%d) received but we may already have processed it\n",
-                strCommand, inv.hash.ToString(), pfrom->addrName.c_str(), pfrom->id);
+            LogPrint("thin", "%s %s from peer %s received but we may already have processed it\n", strCommand,
+                inv.hash.ToString(), pfrom->GetLogName());
             LOCK(cs_main);
             fAlreadyHave = AlreadyHave(inv); // I'll still continue processing if we don't have an accepted block yet
             if (fAlreadyHave)
