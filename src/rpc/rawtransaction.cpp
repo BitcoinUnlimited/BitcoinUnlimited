@@ -198,8 +198,10 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
     uint256 hash = ParseHashV(params[0], "parameter 1");
 
     bool fVerbose = false;
-    if (params.size() > 1)
-        fVerbose = (params[1].get_int() != 0);
+    if (!params[1].isNull())
+    {
+        fVerbose = params[1].isNum() ? (params[1].get_int() != 0) : params[1].get_bool();
+    }
 
     CTransactionRef tx;
     uint256 hashBlock;
