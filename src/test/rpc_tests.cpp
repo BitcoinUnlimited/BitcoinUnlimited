@@ -314,9 +314,9 @@ BOOST_AUTO_TEST_CASE(rpc_ban)
 
 BOOST_AUTO_TEST_CASE(findlikelynode)
 {
-  CAddress addr1(CService("169.254.1.2"));
+  CAddress addr1(CService("169.254.1.2"), NODE_NETWORK);
   CNode n1(INVALID_SOCKET, addr1, "", true);
-  CAddress addr2(CService("169.254.2.3"));
+  CAddress addr2(CService("169.254.2.3"), NODE_NETWORK);
   CNode n2(INVALID_SOCKET, addr2, "", true);
   assert(vNodes.size() == 0);
   vNodes.push_back(&n1);

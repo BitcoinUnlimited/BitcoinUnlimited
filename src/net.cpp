@@ -1602,7 +1602,7 @@ void ThreadBitnodesAddressSeed()
         {
             SplitHostPort(seed, portOut, hostOut);
             CNetAddr ip(hostOut);
-            CAddress addr = CAddress(CService(ip, portOut));
+            CAddress addr = CAddress(CService(ip, portOut), NODE_NETWORK);
             addr.nTime = GetTime();
             vAdd.push_back(addr);
         }
@@ -1616,7 +1616,7 @@ void ThreadBitnodesAddressSeed()
 // BITCOINUNLIMITED END
 
 
-static std::string GetDNSHost(const CDNSSeedData& data, uint64_t requiredServiceBits)
+static std::string GetDNSHost(const CDNSSeedData& data, ServiceFlags requiredServiceBits)
 {
     //use default host for non-filter-capable seeds or if we use the default service bits (NODE_NETWORK)
     if (!data.supportsServiceBitsFiltering || requiredServiceBits == NODE_NETWORK) {

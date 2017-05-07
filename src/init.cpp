@@ -998,7 +998,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     //BUIP010 Xtreme Thinblocks: begin section Initialize XTHIN service
     if (GetBoolArg("-use-thinblocks", true))
-        nLocalServices |= NODE_XTHIN;
+        nLocalServices = ServiceFlags(nLocalServices | NODE_XTHIN);
     // BUIP010 Xtreme Thinblocks: end section
 
     nMaxTipAge = GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
