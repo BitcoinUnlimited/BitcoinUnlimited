@@ -276,13 +276,14 @@ bool GetTransaction(const uint256 &hash,
     const Consensus::Params &consensusParams,
     uint256 &hashBlock,
     bool fAllowSlow,
-    const CBlockIndex* blockIndex)
+    const CBlockIndex *blockIndex)
 {
     const CBlockIndex *pindexSlow = blockIndex;
 
     LOCK(cs_main);
 
-    if (blockIndex == nullptr) {
+    if (blockIndex == nullptr)
+    {
         CTransactionRef ptx = mempool.get(hash);
         if (ptx)
         {
