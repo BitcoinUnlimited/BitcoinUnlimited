@@ -5901,7 +5901,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         CheckAndRequestExpeditedBlocks(pfrom);
     }
 
-    else if (strCommand == NetMsgType::XTHINBLOCK && !fImporting && !fReindex && IsThinBlocksEnabled())
+    else if (strCommand == NetMsgType::XTHINBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload()
+    	     && IsThinBlocksEnabled())
     {
     	CXThinBlock::HandleMessage(vRecv, pfrom, strCommand, 0);
     }
