@@ -15,7 +15,6 @@
 #include "consensus/consensus.h"
 #include "consensus/merkle.h"
 #include "consensus/validation.h"
-#include "expedited.h"
 #include "hash.h"
 #include "init.h"
 #include "merkleblock.h"
