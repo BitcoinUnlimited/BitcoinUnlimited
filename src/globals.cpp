@@ -99,7 +99,7 @@ CCriticalSection cs_vOneShots;
 
 CCriticalSection cs_statMap;
 
-// critical sections from expedited.cpp
+// critical sections from thinblock.cpp
 CCriticalSection cs_xpedited;
 
 // semaphore for parallel validation threads

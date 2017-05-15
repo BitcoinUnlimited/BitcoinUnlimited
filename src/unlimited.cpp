@@ -11,7 +11,6 @@
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "core_io.h"
-#include "expedited.h"
 #include "hash.h"
 #include "leakybucket.h"
 #include "main.h"
