@@ -755,3 +755,15 @@ def create_lots_of_big_transactions(node, txouts, utxos, fee):
 def get_bip9_status(node, key):
     info = node.getblockchaininfo()
     return info['bip9_softforks'][key]
+
+def disconnect_nodes(from_connection, node_num):
+    for peer_id in [peer['id'] for peer in from_connection.getpeerinfo() if "testnode%d" % node_num in peer['subver']]:
+        from_connection.disconnectnode(nodeid=peer_id)
+
+    for _ in range(50):
+        if [peer['id'] for peer in from_connection.getpeerinfo() if "testnode%d" % node_num in peer['subver']] == []:
+            break
+        time.sleep(0.1)
+    else:
+        raise AssertionError("timed out waiting for disconnect")
+
