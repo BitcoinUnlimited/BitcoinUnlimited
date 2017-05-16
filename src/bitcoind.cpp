@@ -116,7 +116,7 @@ bool AppInit(int argc, char *argv[])
         return true;
     }
 
-    // bip-genvbvoting begin
+    // bip135 begin
     // dump default deployment info and exit, if requested
     if (mapArgs.count("-dumpforks")) {
         std::string strVersion = "# " + strprintf(_("%s Daemon"), _(PACKAGE_NAME)) + " " + _("version") + " " + FormatFullVersion();
@@ -127,7 +127,7 @@ bool AppInit(int argc, char *argv[])
         fprintf(stdout, "%s", NetworkDeploymentInfoCSV(CBaseChainParams::REGTEST).c_str());
         return true;
     }
-    // bip-genvbvoting end
+    // bip135 end
 
     try
     {

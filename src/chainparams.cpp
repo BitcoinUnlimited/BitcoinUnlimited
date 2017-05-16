@@ -6,7 +6,7 @@
 
 #include "chainparams.h"
 #include "consensus/merkle.h"
-#include "versionbits.h"  // bip-genvbvoting added
+#include "versionbits.h"  // bip135 added
 
 #include "tinyformat.h"
 #include "util.h"
@@ -497,7 +497,7 @@ void SelectParams(const std::string &network)
     pCurrentParams = &Params(network);
 }
 
-// bip-genvbvoting begin
+// bip135 begin
 /**
  * Return true if a deployment is considered to be configured for the network.
  * Deployments with a zero-length name, or a windowsize or threshold equal to
@@ -561,4 +561,4 @@ CChainParams &ModifiableParams() {
     assert(pCurrentParams);
     return *pCurrentParams;
 }
-// bip-genvbvoting end
+// bip135 end

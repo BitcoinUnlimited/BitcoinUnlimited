@@ -878,12 +878,11 @@ def get_bip9_status(node, key):
     info = node.getblockchaininfo()
     return info['bip9_softforks'][key]
 
-# bip-genvbvoting begin
+# bip135 begin
 # To maintain backward compat initially, the old bip9_softforks is left as-is,
-# and we introduce a new interface ('bipgenvb_forks') for more fork data.
-# The name 'bipgenvb_forks' is a temporary placeholder until a BIP number has
-# been assigned. The old 'bip9_softforks' can be deprecated later.
-def get_bipgenvbvoting_status(node, key):
+# and we introduce a new interface ('bip135_forks') for more fork data.
+# The old 'bip9_softforks' can be deprecated later.
+def get_bip135_status(node, key):
     info = node.getblockchaininfo()
-    return info['bipgenvb_forks'][key]
-# bip-genvbvoting end
+    return info['bip135_forks'][key]
+# bip135 end

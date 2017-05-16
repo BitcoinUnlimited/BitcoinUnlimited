@@ -670,10 +670,10 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 #endif
 
     // ********************************************************* Step 2: parameter interactions
-    // bip-genvbvoting begin
+    // bip135 begin
     // changed from const to modifiable so that deployment params can be updated
     CChainParams &chainparams = ModifiableParams();
-    // bip-genvbvoting end
+    // bip135 end
 
     // also see: InitParameterInteraction()
 
@@ -905,7 +905,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     LOGA("Using at most %i connections (%i file descriptors available)\n", nMaxConnections, nFD);
     std::ostringstream strErrors;
 
-    // bip-genvbvoting begin
+    // bip135 begin
     // check for fork deployment CSV file, read it
     string ForksCsvFile = GetForksCsvFile().string();
 
@@ -941,7 +941,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         // be noisy, but don't fail if file is absent - use built-in defaults
         LogPrintf("No deployment configuration found at '%s' - using defaults\n", ForksCsvFile);
     }
-    // bip-genvbvoting end
+    // bip135 end
 
     // -par=0 means autodetect, but passing 0 to the CParallelValidation constructor means no concurrency
     int nPVThreads = GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);

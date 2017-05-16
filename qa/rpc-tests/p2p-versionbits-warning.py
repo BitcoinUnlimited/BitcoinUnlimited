@@ -17,11 +17,11 @@ Generate chains with block versions that appear to be signalling unknown
 forks, and test that warning alerts are generated.
 '''
 
-# bip-genvbvoting begin
+# bip135 begin
 # modified from 108/144 to 50/100 for new unknown versions algo
 VB_PERIOD = 100 # unknown versionbits period length
 VB_THRESHOLD = 50 # unknown versionbits warning level
-# bip-genvbvoting end
+# bip135 end
 VB_TOP_BITS = 0x20000000
 VB_UNKNOWN_BIT = 27 # Choose a bit unassigned to any deployment
 
@@ -76,10 +76,10 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         self.nodes.append(start_node(0, self.options.tmpdir, self.node_options))
 
         import re
-        # bip-genvbvoting begin
+        # bip135 begin
         # with new unknown version algo, warning has changed.
         self.vb_pattern = re.compile("^Warning: Unknown block versions being mined Its possible unknown rules are in effect")
-        # bip-genvbvoting end
+        # bip135 end
 
     # Send numblocks blocks via peer with nVersionToUse set.
     def send_blocks_with_version(self, peer, numblocks, nVersionToUse):
@@ -155,7 +155,7 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         # Mine a period worth of expected blocks so the generic block-version warning
         # is cleared, and restart the node.
         # OBSOLETE: This should no longer move the versionbit state to ACTIVE.
-        # State transitions are NOT tracked for unconfigured bits in bip-genvbvoting,
+        # State transitions are NOT tracked for unconfigured bits in bip135,
         # since we do not have sufficient information to assess those reliably.
         self.nodes[0].generate(VB_PERIOD)
         stop_node(self.nodes[0], 0)
