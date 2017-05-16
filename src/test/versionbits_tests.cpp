@@ -29,10 +29,10 @@ public:
     int64_t EndTime(const Consensus::Params &params) const { return TestTime(20000); }
     int Period(const Consensus::Params &params) const { return 1000; }
     int Threshold(const Consensus::Params &params) const { return 900; }
-    // bip-genvbvoting begin
-    int MinLockedBlocks(const Consensus::Params &params) const { return 0; }
-    int64_t MinLockedTime(const Consensus::Params &params) const { return 0; }
-    // bip-genvbvoting end
+    // bip135 begin
+    int MinLockedBlocks(const Consensus::Params& params) const { return 0; }
+    int64_t MinLockedTime(const Consensus::Params& params) const { return 0; }
+    // bip135 end
     bool Condition(const CBlockIndex *pindex, const Consensus::Params &params) const
     {
         return (pindex->nVersion & 0x100);
@@ -284,7 +284,7 @@ BOOST_AUTO_TEST_CASE(versionbits_test)
         // end time of that soft fork.  (Alternatively, the end time of that
         // activated soft fork could be later changed to be earlier to avoid
         // overlap.)
-        // bip-genvbvoting begin fix disjointness check
+        // bip135 begin fix disjointness check
         if (isConfiguredDeployment(mainnetParams, i)) {
             BOOST_CHECK(mainnetParams.vDeployments[i].nStartTime <= mainnetParams.vDeployments[i].nTimeout);
             for (int j=0; j<(int) Consensus::MAX_VERSION_BITS_DEPLOYMENTS; j++) {
@@ -298,7 +298,7 @@ BOOST_AUTO_TEST_CASE(versionbits_test)
                 }
             }
         }
-        // bip-genvbvoting end
+        // bip135 end
     }
 }
 

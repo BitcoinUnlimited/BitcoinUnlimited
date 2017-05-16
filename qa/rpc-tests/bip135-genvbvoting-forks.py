@@ -31,12 +31,12 @@ The node is occasionally reset between tests.
 '''
 
 
-class BIPGenVBVotingForksTest(ComparisonTestFramework):
+class BIP135ForksTest(ComparisonTestFramework):
 
     def __init__(self):
         self.num_nodes = 1
 
-        self.defined_forks = [ "genvbtest%d" % i for i in range(0,22) ]
+        self.defined_forks = [ "bip135test%d" % i for i in range(0,22) ]
 
     def setup_network(self):
         '''
@@ -60,75 +60,75 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
             ########## THRESHOLD TESTING BITS (1-6) ############
 
             # bit 0: test 'csv' fork renaming/reparameterization
-            "regtest,0,genvbtest0,%d,999999999999,144,108,0,0,true\n" % (self.fork_starttime) +
+            "regtest,0,bip135test0,%d,999999999999,144,108,0,0,true\n" % (self.fork_starttime) +
 
             # bit 1: test minimum threshold
-            "regtest,1,genvbtest1,%d,999999999999,100,1,0,0,true\n" % (self.fork_starttime) +
+            "regtest,1,bip135test1,%d,999999999999,100,1,0,0,true\n" % (self.fork_starttime) +
 
             # bit 2: small threshold
-            "regtest,2,genvbtest2,%d,999999999999,100,10,0,0,true\n" % (self.fork_starttime) +
+            "regtest,2,bip135test2,%d,999999999999,100,10,0,0,true\n" % (self.fork_starttime) +
 
             # bit 3: supermajority threshold
-            "regtest,3,genvbtest3,%d,999999999999,100,75,0,0,true\n" % (self.fork_starttime) +
+            "regtest,3,bip135test3,%d,999999999999,100,75,0,0,true\n" % (self.fork_starttime) +
 
             # bit 4: high threshold
-            "regtest,4,genvbtest4,%d,999999999999,100,95,0,0,true\n" % (self.fork_starttime) +
+            "regtest,4,bip135test4,%d,999999999999,100,95,0,0,true\n" % (self.fork_starttime) +
 
             # bit 5: max-but-one threshold
-            "regtest,5,genvbtest5,%d,999999999999,100,99,0,0,true\n" % (self.fork_starttime) +
+            "regtest,5,bip135test5,%d,999999999999,100,99,0,0,true\n" % (self.fork_starttime) +
 
             # bit 6: max threshold
-            "regtest,6,genvbtest6,%d,999999999999,100,100,0,0,true\n" % (self.fork_starttime) +
+            "regtest,6,bip135test6,%d,999999999999,100,100,0,0,true\n" % (self.fork_starttime) +
 
             ########## GRACE PERIOD TESTING BITS (7-21) ############
 
             # bit 7: one minlockedblock
-            "regtest,7,genvbtest7,%d,999999999999,10,9,1,0,true\n" % (self.fork_starttime) +
+            "regtest,7,bip135test7,%d,999999999999,10,9,1,0,true\n" % (self.fork_starttime) +
 
             # bit 8: half a window of minlockedblocks
-            "regtest,8,genvbtest8,%d,999999999999,10,9,5,0,true\n" % (self.fork_starttime) +
+            "regtest,8,bip135test8,%d,999999999999,10,9,5,0,true\n" % (self.fork_starttime) +
 
             # bit 9: full window of minlockedblocks
-            "regtest,9,genvbtest9,%d,999999999999,10,9,10,0,true\n" % (self.fork_starttime) +
+            "regtest,9,bip135test9,%d,999999999999,10,9,10,0,true\n" % (self.fork_starttime) +
 
             # bit 10: just over full window of minlockedblocks
-            "regtest,10,genvbtest10,%d,999999999999,10,9,11,0,true\n" % (self.fork_starttime) +
+            "regtest,10,bip135test10,%d,999999999999,10,9,11,0,true\n" % (self.fork_starttime) +
 
             # bit 11: one second minlockedtime
-            "regtest,11,genvbtest11,%d,999999999999,10,9,0,1,true\n" % (self.fork_starttime) +
+            "regtest,11,bip135test11,%d,999999999999,10,9,0,1,true\n" % (self.fork_starttime) +
 
             # bit 12: half window of minlockedtime
-            "regtest,12,genvbtest12,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 5) +
+            "regtest,12,bip135test12,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 5) +
 
             # bit 13: just under one full window of minlockedtime
-            "regtest,13,genvbtest13,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 9) +
+            "regtest,13,bip135test13,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 9) +
 
             # bit 14: exactly one window of minlockedtime
-            "regtest,14,genvbtest14,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 10) +
+            "regtest,14,bip135test14,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 10) +
 
             # bit 15: just over one window of minlockedtime
-            "regtest,15,genvbtest15,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 11) +
+            "regtest,15,bip135test15,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 11) +
 
             # bit 16: one and a half window of minlockedtime
-            "regtest,16,genvbtest16,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 15) +
+            "regtest,16,bip135test16,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 15) +
 
             # bit 17: one window of minblockedblocks plus one window of minlockedtime
-            "regtest,17,genvbtest17,%d,999999999999,10,9,10,%d,true\n" % (self.fork_starttime, 10) +
+            "regtest,17,bip135test17,%d,999999999999,10,9,10,%d,true\n" % (self.fork_starttime, 10) +
 
             # bit 18: one window of minblockedblocks plus just under two windows of minlockedtime
-            "regtest,18,genvbtest18,%d,999999999999,10,9,10,%d,true\n" % (self.fork_starttime, 19) +
+            "regtest,18,bip135test18,%d,999999999999,10,9,10,%d,true\n" % (self.fork_starttime, 19) +
 
             # bit 19: one window of minblockedblocks plus two windows of minlockedtime
-            "regtest,19,genvbtest19,%d,999999999999,10,9,10,%d,true\n" % (self.fork_starttime, 20) +
+            "regtest,19,bip135test19,%d,999999999999,10,9,10,%d,true\n" % (self.fork_starttime, 20) +
 
             # bit 20: two windows of minblockedblocks plus two windows of minlockedtime
-            "regtest,20,genvbtest20,%d,999999999999,10,9,20,%d,true\n" % (self.fork_starttime, 21) +
+            "regtest,20,bip135test20,%d,999999999999,10,9,20,%d,true\n" % (self.fork_starttime, 21) +
 
             # bit 21: just over two windows of minblockedblocks plus two windows of minlockedtime
-            "regtest,21,genvbtest21,%d,999999999999,10,9,21,%d,true\n" % (self.fork_starttime, 20) +
+            "regtest,21,bip135test21,%d,999999999999,10,9,21,%d,true\n" % (self.fork_starttime, 20) +
 
             ########## NOT USED SO FAR ############
-            "regtest,22,genvbtest22,%d,999999999999,100,9,0,0,true\n" % (self.fork_starttime)
+            "regtest,22,bip135test22,%d,999999999999,100,9,0,0,true\n" % (self.fork_starttime)
             )
 
         self.nodes = start_nodes(1, self.options.tmpdir,
@@ -173,14 +173,14 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
             self.height += 1
         return test_blocks
 
-    def get_bipgenvbvoting_status(self, key):
+    def get_bip135_status(self, key):
         info = self.nodes[0].getblockchaininfo()
-        return info['bipgenvb_forks'][key]
+        return info['bip135_forks'][key]
 
     def print_rpc_status(self):
         for f in self.defined_forks:
             info = self.nodes[0].getblockchaininfo()
-            print(info['bipgenvb_forks'][f])
+            print(info['bip135_forks'][f])
 
     def test_BIP9_CSV(self, bipName, activated_version, invalidate, invalidatePostSignature, bitno):
         # generate some coins for later
@@ -191,7 +191,7 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         self.nodeaddress = self.nodes[0].getnewaddress()
         self.last_block_time = int(time.time())
 
-        assert_equal(self.get_bipgenvbvoting_status(bipName)['status'], 'defined')
+        assert_equal(self.get_bip135_status(bipName)['status'], 'defined')
         tmpl = self.nodes[0].getblocktemplate({})
         assert(bipName not in tmpl['rules'])
         assert(bipName not in tmpl['vbavailable'])
@@ -203,7 +203,7 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         test_blocks = self.generate_blocks(141, 4)
         yield TestInstance(test_blocks, sync_every_block=False)
 
-        assert_equal(self.get_bipgenvbvoting_status(bipName)['status'], 'started')
+        assert_equal(self.get_bip135_status(bipName)['status'], 'started')
         tmpl = self.nodes[0].getblocktemplate({})
         assert(bipName not in tmpl['rules'])
         assert_equal(tmpl['vbavailable'][bipName], bitno)
@@ -219,7 +219,7 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         test_blocks = self.generate_blocks(24, 4, test_blocks) # 0x20010000 (signalling not)
         yield TestInstance(test_blocks, sync_every_block=False)
 
-        assert_equal(self.get_bipgenvbvoting_status(bipName)['status'], 'started')
+        assert_equal(self.get_bip135_status(bipName)['status'], 'started')
         tmpl = self.nodes[0].getblocktemplate({})
         assert(bipName not in tmpl['rules'])
         assert_equal(tmpl['vbavailable'][bipName], bitno)
@@ -235,7 +235,7 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         test_blocks = self.generate_blocks(10, 4, test_blocks) # 0x20010000 (signalling not)
         yield TestInstance(test_blocks, sync_every_block=False)
 
-        assert_equal(self.get_bipgenvbvoting_status(bipName)['status'], 'locked_in')
+        assert_equal(self.get_bip135_status(bipName)['status'], 'locked_in')
         tmpl = self.nodes[0].getblocktemplate({})
         assert(bipName not in tmpl['rules'])
 
@@ -244,7 +244,7 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         test_blocks = self.generate_blocks(143, 4)
         yield TestInstance(test_blocks, sync_every_block=False)
 
-        assert_equal(self.get_bipgenvbvoting_status(bipName)['status'], 'locked_in')
+        assert_equal(self.get_bip135_status(bipName)['status'], 'locked_in')
         tmpl = self.nodes[0].getblocktemplate({})
         assert(bipName not in tmpl['rules'])
 
@@ -269,7 +269,7 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         self.height += 1
         yield TestInstance([[block, True]])
 
-        assert_equal(self.get_bipgenvbvoting_status(bipName)['status'], 'active')
+        assert_equal(self.get_bip135_status(bipName)['status'], 'active')
         tmpl = self.nodes[0].getblocktemplate({})
         assert(bipName in tmpl['rules'])
         assert(bipName not in tmpl['vbavailable'])
@@ -304,12 +304,12 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         self.test.add_all_connections(self.nodes)
         NetworkThread().start() # Start up network handling in another thread
 
-    def test_BIPGenVBGraceConditions(self):
+    def test_BIP135GraceConditions(self):
 
         # the fork bits used to check grace period conditions
         gracebits = self.defined_forks[7:22]
 
-        print("begin test_BIPGenVBGraceConditions test")
+        print("begin test_BIP135GraceConditions test")
         node = self.nodes[0]
         self.tip = int("0x" + node.getbestblockhash(), 0)
         header = node.getblockheader("0x%x" % self.tip)
@@ -327,8 +327,8 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         bcinfo = self.nodes[0].getblockchaininfo()
         # check bits 7-15 , they should be in DEFINED
         for f in gracebits:
-            assert_equal(bcinfo['bipgenvb_forks'][f]['bit'], int(f[9:]))
-            assert_equal(bcinfo['bipgenvb_forks'][f]['status'], 'defined')
+            assert_equal(bcinfo['bip135_forks'][f]['bit'], int(f[10:]))
+            assert_equal(bcinfo['bip135_forks'][f]['status'], 'defined')
 
         # move to starttime
         moved_to_started = False
@@ -344,9 +344,9 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
                     time.sleep(3)  # need to actually give daemon a little time to change the state
 
                 if moved_to_started:
-                    assert_equal(bcinfo['bipgenvb_forks'][f]['status'], 'started')
+                    assert_equal(bcinfo['bip135_forks'][f]['status'], 'started')
                 else:
-                    assert_equal(bcinfo['bipgenvb_forks'][f]['status'], 'defined')
+                    assert_equal(bcinfo['bip135_forks'][f]['status'], 'defined')
 
         # lock all of them them in by producing 9 signaling blocks out of 10
         test_blocks = self.generate_blocks(9, 0x203fff80)
@@ -357,7 +357,7 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         bcinfo = self.nodes[0].getblockchaininfo()
         print("checking all grace period forks are locked in")
         for f in gracebits:
-            assert_equal(bcinfo['bipgenvb_forks'][f]['status'], 'locked_in')
+            assert_equal(bcinfo['bip135_forks'][f]['status'], 'locked_in')
 
         # now we just check that they turn ACTIVE only when their configured
         # conditions are all met. Reminder: window size is 10 blocks, inter-
@@ -386,7 +386,7 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         test_blocks = self.generate_blocks(10, 0x20000000)
         yield TestInstance(test_blocks, sync_every_block=False)
         bcinfo = self.nodes[0].getblockchaininfo()
-        activation_states = [ bcinfo['bipgenvb_forks'][f]['status'] for f in gracebits ]
+        activation_states = [ bcinfo['bip135_forks'][f]['status'] for f in gracebits ]
         assert_equal(activation_states, ['active',
                                          'active',
                                          'active',
@@ -408,7 +408,7 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         test_blocks = self.generate_blocks(10, 0x20000000)
         yield TestInstance(test_blocks, sync_every_block=False)
         bcinfo = self.nodes[0].getblockchaininfo()
-        activation_states = [ bcinfo['bipgenvb_forks'][f]['status'] for f in gracebits ]
+        activation_states = [ bcinfo['bip135_forks'][f]['status'] for f in gracebits ]
         assert_equal(activation_states, ['active',
                                          'active',
                                          'active',
@@ -430,7 +430,7 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         test_blocks = self.generate_blocks(10, 0x20000000)
         yield TestInstance(test_blocks, sync_every_block=False)
         bcinfo = self.nodes[0].getblockchaininfo()
-        activation_states = [ bcinfo['bipgenvb_forks'][f]['status'] for f in gracebits ]
+        activation_states = [ bcinfo['bip135_forks'][f]['status'] for f in gracebits ]
         assert_equal(activation_states, ['active',
                                          'active',
                                          'active',
@@ -452,7 +452,7 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         test_blocks = self.generate_blocks(10, 0x20000000)
         yield TestInstance(test_blocks, sync_every_block=False)
         bcinfo = self.nodes[0].getblockchaininfo()
-        activation_states = [ bcinfo['bipgenvb_forks'][f]['status'] for f in gracebits ]
+        activation_states = [ bcinfo['bip135_forks'][f]['status'] for f in gracebits ]
         assert_equal(activation_states, ['active',
                                          'active',
                                          'active',
@@ -483,9 +483,9 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         self.test.add_all_connections(self.nodes)
         NetworkThread().start() # Start up network handling in another thread
 
-    def test_BIPGenVBThresholds(self):
+    def test_BIP135Thresholds(self):
 
-        print("test_BIPGenVBThresholds: begin")
+        print("test_BIP135Thresholds: begin")
         node = self.nodes[0]
         self.tip = int("0x" + node.getbestblockhash(), 0)
         header = node.getblockheader("0x%x" % self.tip)
@@ -513,8 +513,8 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         while self.last_block_time < self.fork_starttime or self.height < 100:
             test_blocks = self.generate_blocks(1, 0x20000001, test_blocks)
             for f in self.defined_forks:
-                assert_equal(self.get_bipgenvbvoting_status(f)['bit'], int(f[9:]))
-                assert_equal(self.get_bipgenvbvoting_status(f)['status'], 'defined')
+                assert_equal(self.get_bip135_status(f)['bit'], int(f[10:]))
+                assert_equal(self.get_bip135_status(f)['status'], 'defined')
                 assert(f not in tmpl['rules'])
                 assert(f not in tmpl['vbavailable'])
 
@@ -525,12 +525,12 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         print("begin test 3")
         test_blocks = self.generate_blocks(1, 0x20000001)  # do not set bit 0 yet
         for f in self.defined_forks:
-            if int(f[9:]) > 0:
-                assert_equal(self.get_bipgenvbvoting_status(f)['status'], 'started')
+            if int(f[10:]) > 0:
+                assert_equal(self.get_bip135_status(f)['status'], 'started')
                 assert(f not in tmpl['rules'])
                 assert(f not in tmpl['vbavailable'])
             else: # bit 0 only becomes started at height 144
-                assert_equal(self.get_bipgenvbvoting_status(f)['status'], 'defined')
+                assert_equal(self.get_bip135_status(f)['status'], 'defined')
 
         yield TestInstance(test_blocks, sync_every_block=False)
 
@@ -542,33 +542,31 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
 
         for f in self.defined_forks:
             info = node.getblockchaininfo()
-            print(info['bipgenvb_forks'][f])
+            print(info['bip135_forks'][f])
 
         # Test 5..?
         # Advance from DEFINED to STARTED
         print("begin test 5 .. x - move to height 144 for bit 0 start")
         # we are not yet at height 144, so bit 0 is still defined
-        assert_equal(self.get_bipgenvbvoting_status(self.defined_forks[0])['status'], 'defined')
+        assert_equal(self.get_bip135_status(self.defined_forks[0])['status'], 'defined')
         # move up until it starts
         while self.height < 144:
             print("last block time has not reached fork_starttime, difference: %d" % (self.fork_starttime - self.last_block_time))
-            #self.nodes[0].generate(1)
             test_blocks = self.generate_blocks(1, 0x20000001)
             yield TestInstance(test_blocks, sync_every_block=False)
-            if int(f[9:]) > 0:
-                assert_equal(self.get_bipgenvbvoting_status(f)['status'], 'started')
+            if int(f[10:]) > 0:
+                assert_equal(self.get_bip135_status(f)['status'], 'started')
                 assert(f not in tmpl['rules'])
                 assert(f not in tmpl['vbavailable'])
             else: # bit 0 only becomes started at height 144
-                assert_equal(self.get_bipgenvbvoting_status(f)['status'], 'defined')
+                assert_equal(self.get_bip135_status(f)['status'], 'defined')
 
         # generate block 144
-        #test_blocks = self.generate_blocks(1, 0x20000001, test_blocks)
         test_blocks = []
         # now it should be started
 
         yield TestInstance(test_blocks, sync_every_block=False)
-        assert_equal(self.get_bipgenvbvoting_status(self.defined_forks[0])['status'], 'started')
+        assert_equal(self.get_bip135_status(self.defined_forks[0])['status'], 'started')
 
         tmpl = self.nodes[0].getblocktemplate({})
         assert(self.defined_forks[0] not in tmpl['rules'])
@@ -590,27 +588,27 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         test_blocks = self.generate_blocks(1, 0x2000007F)
         yield TestInstance(test_blocks, sync_every_block=False)
         # check still STARTED until we get to multiple of window size
-        assert_equal(self.get_bipgenvbvoting_status(self.defined_forks[1])['status'], 'started')
+        assert_equal(self.get_bip135_status(self.defined_forks[1])['status'], 'started')
 
         # 10 blocks total for bit 2
         test_blocks = self.generate_blocks(9, 0x2000007D)
         yield TestInstance(test_blocks, sync_every_block=False)
-        assert_equal(self.get_bipgenvbvoting_status(self.defined_forks[2])['status'], 'started')
+        assert_equal(self.get_bip135_status(self.defined_forks[2])['status'], 'started')
 
         # 75 blocks total for bit 3
         test_blocks = self.generate_blocks(65, 0x20000079)
         yield TestInstance(test_blocks, sync_every_block=False)
-        assert_equal(self.get_bipgenvbvoting_status(self.defined_forks[3])['status'], 'started')
+        assert_equal(self.get_bip135_status(self.defined_forks[3])['status'], 'started')
 
         # 95 blocks total for bit 4
         test_blocks = self.generate_blocks(20, 0x20000071)
         yield TestInstance(test_blocks, sync_every_block=False)
-        assert_equal(self.get_bipgenvbvoting_status(self.defined_forks[4])['status'], 'started')
+        assert_equal(self.get_bip135_status(self.defined_forks[4])['status'], 'started')
 
         # 99 blocks total for bit 5
         test_blocks = self.generate_blocks(4, 0x20000061)
         yield TestInstance(test_blocks, sync_every_block=False)
-        assert_equal(self.get_bipgenvbvoting_status(self.defined_forks[5])['status'], 'started')
+        assert_equal(self.get_bip135_status(self.defined_forks[5])['status'], 'started')
 
         # 100 blocks total for bit 6
         test_blocks = self.generate_blocks(1, 0x20000041)
@@ -620,11 +618,11 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         # debug trace
         for f in self.defined_forks[1:7]:
             info = node.getblockchaininfo()
-            print(info['bipgenvb_forks'][f])
-            assert_equal(self.get_bipgenvbvoting_status(f)['status'], 'locked_in')
+            print(info['bip135_forks'][f])
+            assert_equal(self.get_bip135_status(f)['status'], 'locked_in')
 
 
-        assert_equal(self.get_bipgenvbvoting_status(self.defined_forks[0])['status'], 'started')
+        assert_equal(self.get_bip135_status(self.defined_forks[0])['status'], 'started')
         # move until it bit 0 locks in
         one_hundreds_active = False  # to count the 100-block bits 1-6 going active after 100 more
         while self.height % 144 != 0:
@@ -634,22 +632,22 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
             bcinfo = self.nodes[0].getblockchaininfo()
             # check bit 0 - it is locked in after this loop exits
             if self.height % 144:
-                assert_equal(bcinfo['bipgenvb_forks'][self.defined_forks[0]]['status'], 'started')
+                assert_equal(bcinfo['bip135_forks'][self.defined_forks[0]]['status'], 'started')
             else:
-                assert_equal(bcinfo['bipgenvb_forks'][self.defined_forks[0]]['status'], 'locked_in')
+                assert_equal(bcinfo['bip135_forks'][self.defined_forks[0]]['status'], 'locked_in')
             # bits 1-6 should remain LOCKED_IN
             for f in self.defined_forks[1:7]:
                 if self.height % 100:
                     if not one_hundreds_active:
-                        assert_equal(bcinfo['bipgenvb_forks'][f]['status'], 'locked_in')
+                        assert_equal(bcinfo['bip135_forks'][f]['status'], 'locked_in')
                     else:
-                        assert_equal(bcinfo['bipgenvb_forks'][f]['status'], 'active')
+                        assert_equal(bcinfo['bip135_forks'][f]['status'], 'active')
                 else:
                     # mark them expected active henceforth
                     one_hundreds_active = True
-                    assert_equal(bcinfo['bipgenvb_forks'][f]['status'], 'active')
+                    assert_equal(bcinfo['bip135_forks'][f]['status'], 'active')
 
-        assert_equal(self.get_bipgenvbvoting_status(self.defined_forks[0])['status'], 'locked_in')
+        assert_equal(self.get_bip135_status(self.defined_forks[0])['status'], 'locked_in')
 
         # Restart all
         stop_nodes(self.nodes)
@@ -671,41 +669,12 @@ class BIPGenVBVotingForksTest(ComparisonTestFramework):
         '''
         # CSV (bit 0) for backward compatibility with BIP9
         for test in itertools.chain(
-                self.test_BIPGenVBGraceConditions(), # test grace periods
-                self.test_BIPGenVBThresholds(),  # test thresholds on other bits
+                self.test_BIP135GraceConditions(), # test grace periods
+                self.test_BIP135Thresholds(),  # test thresholds on other bits
         ):
             yield test
 
-    def donothing(self, tx):
-        ''' used by CSV tests '''
-        return
-
-    def csv_invalidate(self, tx):
-        '''
-        Used by CSV tests:
-        Modifies the signature in vin 0 of the tx to fail CSV
-        Prepends -1 CSV DROP in the scriptSig itself.
-        '''
-        tx.vin[0].scriptSig = CScript([OP_1NEGATE, OP_CHECKSEQUENCEVERIFY, OP_DROP] +
-                                      list(CScript(tx.vin[0].scriptSig)))
-
-    def sequence_lock_invalidate(self, tx):
-        '''
-        Used by CSV tests:
-        Modify the nSequence to make it fails once sequence lock rule is activated (high timespan)
-        '''
-        tx.vin[0].nSequence = 0x00FFFFFF
-        tx.nLockTime = 0
-
-    def mtp_invalidate(self, tx):
-        '''
-        Used by CSV tests:
-        Modify the nLockTime to make it fails once MTP rule is activated
-        '''
-        # Disable Sequence lock, Activate nLockTime
-        tx.vin[0].nSequence = 0x90FFFFFF
-        tx.nLockTime = self.last_block_time
 
 
 if __name__ == '__main__':
-    BIPGenVBVotingForksTest().main()
+    BIP135ForksTest().main()

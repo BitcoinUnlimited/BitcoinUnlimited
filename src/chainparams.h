@@ -70,7 +70,7 @@ public:
     };
 
     const Consensus::Params &GetConsensus() const { return consensus; }
-    /** Modifiable consensus parameters added by bip-genvbvoting */
+    /** Modifiable consensus parameters added by bip135 */
     Consensus::Params &GetModifiableConsensus() { return consensus; }
     const CMessageHeader::MessageStartChars &MessageStart() const { return pchMessageStart; }
     const CMessageHeader::MessageStartChars &CashMessageStart() const { return pchCashMessageStart; }
@@ -141,7 +141,7 @@ CBlock CreateGenesisBlock(CScript prefix,
     int32_t nVersion,
     const CAmount &genesisReward);
 
-// bip-genvbvoting begin
+// bip135 begin
 /**
  * Return the currently selected parameters. Can be changed by reading in
  * some additional config files (e.g. CSV deployment data)
@@ -159,6 +159,6 @@ bool isConfiguredDeployment(const Consensus::Params& consensusParams, const int 
  * @throws std::runtime_error when the chain is not supported.
  */
 const std::string NetworkDeploymentInfoCSV(const std::string& chain);
-// bip-genvbvoting end
+// bip135 end
 
 #endif // BITCOIN_CHAINPARAMS_H

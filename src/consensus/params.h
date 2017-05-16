@@ -17,7 +17,7 @@ namespace Consensus
 {
 enum DeploymentPos
 {
-    // bip-genvbvoting begin
+    // bip135 begin
     // List of deployment bits. Known allocated bits should be described by a
     // name, even if their deployment logic is not implemented by the client.
     // (their info is nevertheless useful for awareness and event logging)
@@ -54,7 +54,7 @@ enum DeploymentPos
     DEPLOYMENT_UNASSIGNED_BIT_26,
     DEPLOYMENT_UNASSIGNED_BIT_27,
     DEPLOYMENT_TESTDUMMY,  // bit 28 - used for deployment testing purposes
-    // bip-genvbvoting end
+    // bip135 end
     MAX_VERSION_BITS_DEPLOYMENTS
 };
 
@@ -69,7 +69,7 @@ struct BIP9Deployment
     int64_t nStartTime;
     /** Timeout/expiry MedianTime for the deployment attempt. */
     int64_t nTimeout;
-    // bip-genvbvoting begin added parameters
+    // bip135 begin added parameters
     /** Window size (in blocks) for generalized versionbits signal tallying */
     int windowsize;
     /** Threshold (in blocks / window) for generalized versionbits lock-in */
@@ -78,7 +78,7 @@ struct BIP9Deployment
     int minlockedblocks;
     /** Minimum duration (in seconds based on MTP) to remain in locked-in state */
     int64_t minlockedtime;
-    // bip-genvbvoting end added parameters
+    // bip135 end added parameters
 };
 
 /**
@@ -103,9 +103,9 @@ struct Params
      * Examples: 1916 for 95%, 1512 for testchains.
      */
     /**
-     * Deployment parameters for the 29 bits (0..28) defined by bip-genvbvoting
+     * Deployment parameters for the 29 bits (0..28) defined by bip135
      */
-    // bip-genvbvoting begin
+    // bip135 begin
     // fully initialize array
     BIP9Deployment vDeployments[MAX_VERSION_BITS_DEPLOYMENTS] = {
             { 0, 0LL, 0LL, 0, 0, 0, 0LL },  // deployment on bit 0
@@ -138,7 +138,7 @@ struct Params
             { 27, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 27
             { 28, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 28
     };
-    // bip-genvbvoting end
+    // bip135 end
     /** Proof of work parameters */
     uint256 powLimit;
     bool fPowAllowMinDifficultyBlocks;

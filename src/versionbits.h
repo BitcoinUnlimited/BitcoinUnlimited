@@ -22,7 +22,7 @@ static const int BIT_WARNING_WINDOW = 100;
 /** Threshold to use for assessing warning of unknown bits */
 static const int BIT_WARNING_THRESHOLD = 50;
 
-// bip-genvbvoting: assigned numbers to these enum values
+// bip135: assigned numbers to these enum values
 enum ThresholdState {
     THRESHOLD_DEFINED = 0,
     THRESHOLD_STARTED = 1,
@@ -39,7 +39,7 @@ typedef std::map<const CBlockIndex *, ThresholdState> ThresholdConditionCache;
 struct BIP9DeploymentInfo
 {
     /** Deployment name */
-    char *name;   // bip-genvbvoting: removed const to allow update from CSV
+    char *name;   // bip135: removed const to allow update from CSV
     /** Whether GBT clients can safely ignore this rule in simplified usage */
     bool gbt_force;
 };
@@ -57,10 +57,10 @@ protected:
     virtual int64_t EndTime(const Consensus::Params &params) const = 0;
     virtual int Period(const Consensus::Params &params) const = 0;
     virtual int Threshold(const Consensus::Params &params) const = 0;
-    // bip-genvbvoting begin
+    // bip135 begin
     virtual int MinLockedBlocks(const Consensus::Params &params) const = 0;
     virtual int64_t MinLockedTime(const Consensus::Params &params) const = 0;
-    // bip-genvbvoting end
+    // bip135 end
 
 public:
     // Note that the function below takes a pindexPrev as input: they compute information for block B based on its
