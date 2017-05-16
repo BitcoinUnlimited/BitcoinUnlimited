@@ -332,7 +332,7 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
     if binary is None:
         binary = os.getenv("BITCOIND", "bitcoind")
     # RPC tests still depend on free transactions
-    args = [ binary, "-datadir="+datadir, "-rest", "-mocktime="+str(get_mocktime()) ] # // BU removed, "-keypool=1","-blockprioritysize=50000" ]
+    args = [binary, "-datadir=" + datadir, "-server", "-keypool=1", "-discover=0", "-rest", "-logtimemicros", "-debug", "-mocktime=" + str(get_mocktime()), "-uacomment=testnode%d" % i]
     if extra_args is not None: args.extend(extra_args)
     bitcoind_processes[i] = subprocess.Popen(args)
     if os.getenv("PYTHON_DEBUG", ""):
@@ -354,6 +354,8 @@ def start_nodes(num_nodes, dirname, extra_args=None, rpchost=None, binary=None,t
     """
     if extra_args is None: extra_args = [ None for i in range(num_nodes) ]
     if binary is None: binary = [ None for i in range(num_nodes) ]
+    assert_equal(len(extra_args), num_nodes)
+    assert_equal(len(binary), num_nodes)
     rpcs = []
     try:
         for i in range(num_nodes):
