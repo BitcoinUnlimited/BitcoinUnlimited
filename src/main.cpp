@@ -1732,7 +1732,7 @@ int32_t ComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Para
     int32_t nVersion = VERSIONBITS_TOP_BITS;
 
     for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++) {
-        // bip-genvbvoting begin
+        // bip135 begin
         // guard this because not all deployments have window/threshold
         if (isConfiguredDeployment(params, i))
         {
@@ -1742,13 +1742,13 @@ int32_t ComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Para
                 nVersion |= VersionBitsMask(params, (Consensus::DeploymentPos)i);
             }
         }
-        // bip-genvbvoting end
+        // bip135 end
     }
 
     return nVersion;
 }
 
-// bip-genvbvoting : removed WarningBitsConditionChecker - no longer needed
+// bip135 : removed WarningBitsConditionChecker - no longer needed
 
 // Protected by cs_main
 static ThresholdConditionCache warningcache[VERSIONBITS_NUM_BITS];
@@ -1811,7 +1811,7 @@ static uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::
     return flags;
 }
 
-// bip-genvbvoting begin
+// bip135 begin
 // keep track of count over last 100
 struct UnknownForkData {
     int UnknownForkSignalStrength {0};
@@ -1825,7 +1825,7 @@ struct UnknownForkData {
 };
 
 static UnknownForkData unknownFork[VERSIONBITS_NUM_BITS];
-// bip-genvbvoting end
+// bip135 end
 
 static int64_t nTimeCheck = 0;
 static int64_t nTimeForks = 0;
@@ -2454,9 +2454,9 @@ void static UpdateTip(CBlockIndex *pindexNew)
     if (!IsInitialBlockDownload())
     {
         int nUpgraded = 0;
-        bool upgradedEval = false;  // bip-genvbvoting added
+        bool upgradedEval = false;  // bip135 added
         const CBlockIndex* pindex = chainActive.Tip();
-        // bip-genvbvoting begin
+        // bip135 begin
         int32_t anUnexpectedVersion = 0;
         // start unexpected version / new fork signal checks only after BIT_WARNING_WINDOW block height
         if (pindex->nHeight >= BIT_WARNING_WINDOW) {
@@ -2559,7 +2559,7 @@ void static UpdateTip(CBlockIndex *pindexNew)
                 fWarned = true;
             }
         }
-        // bip-genvbvoting end
+        // bip135 end
     }
 }
 

@@ -15,7 +15,7 @@
 using namespace std;
 using namespace io;
 
-// bip-genvbvoting begin
+// bip135 begin
 /** File header for -dumpforks output */
 const char *FORKS_CSV_FILE_HEADER = \
     "# forks.csv - Fork deployment configuration (from built-in defaults)\n" \
@@ -23,7 +23,7 @@ const char *FORKS_CSV_FILE_HEADER = \
     "# MODIFY AT OWN RISK - EXERCISE EXTREME CARE\n" \
     "# Line format:\n" \
     "# network,bit,name,starttime,timeout,windowsize,threshold,minlockedblocks,minlockedtime,gbtforce\n";
-// bip-genvbvoting end
+// bip135 end
 
 /**
  * Read deployment CSV file and update consensus parameters

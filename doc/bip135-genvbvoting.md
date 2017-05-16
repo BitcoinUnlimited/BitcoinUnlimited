@@ -1,24 +1,23 @@
-Generalized version bits voting (bip-genvbvoting)
-====================================================
+Generalized version bits voting (BIP135)
+================================================
 
 1. What is this?
 ------------------------
 
-bip-genvbvoting is a reworked version of BIP9 versionbits which allows each
+BIP135 is a reworked version of BIP9 versionbits which allows each
 versionbit to be configured with its own threshold etc.
 
 
 2. Requirements
 ------------------------
 
-The draft specification (under development as is the implementation)
-can be found at:
+The draft specification can be found at:
 
-https://github.com/sanch0panza/bips/blob/bip-genvbvoting/bip-genvbvoting.mediawiki
+https://github.com/bitcoin/bips/blob/master/bip-0135.mediawiki
 
 Some formal requirements have been extracted into the file
 
-doc/bip-genvbvoting-condensed-requirements.txt
+doc/bip135-genvbvoting-condensed-requirements.txt
 
 These are intended to be integrated back into an updated version of the BIP.
 
@@ -134,7 +133,7 @@ but no warnings / RPC error messages, to keep this reference
 implementation small.
 
 A new RPC output section has been added to the `getblockchaininfo`
-call. It is called 'bipgenvb_forks', and complements the existing
+call. It is called 'bip135_forks', and complements the existing
 section 'bip9_softforks', which has been retained for compatibility
 but can be made obsolete at a later stage.
 The new section lists all parameter values and the bit number for
@@ -142,7 +141,7 @@ each 'configured' deployment - which means those which have a name
 and valid settings (i.e. nonzero window size etc).
 
 This RPC interface is also used by the new regression test
-for this BIP, which is bipgenvbvoting-forks.py .
+for this BIP, which is bip135-genvbvoting-forks.py .
 The old bip9-softforks.py is retained to prove backward compatibility.
 The same method has been followed for unit tests:
 The old versionbits_tests.cpp has been retained mostly unchanged -
@@ -166,7 +165,7 @@ machine, reading and validating contents of the forks.csv file).
 4.2 Regression tests
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The bipgenvbvoting-forks.py test exercises a variety of settings on bits 1-21.
+The bip135-genvbvoting-forks.py test exercises a variety of settings on bits 1-21.
 
 The existing regression tests sufficiently test the timeout transitions of
 BIP9 which remain compatible.

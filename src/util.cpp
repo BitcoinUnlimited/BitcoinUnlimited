@@ -176,7 +176,7 @@ void LogInit()
 
 const char *const BITCOIN_CONF_FILENAME = "bitcoin.conf";
 const char *const BITCOIN_PID_FILENAME = "bitcoind.pid";
-const char * const FORKS_CSV_FILENAME = "forks.csv";  // bip-genvbvoting added
+const char *const FORKS_CSV_FILENAME = "forks.csv";  // bip135 added
 
 map<string, string> mapArgs;
 map<string, vector<string> > mapMultiArgs;
@@ -603,7 +603,7 @@ fs::path GetConfigFile(const std::string &confPath)
     return pathConfigFile;
 }
 
-// bip-genvbvoting added
+// bip135 added
 /**
  * Function to return expected path of FORKS_CSV_FILENAME
  */

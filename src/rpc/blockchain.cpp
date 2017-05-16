@@ -743,8 +743,8 @@ static UniValue BIP9SoftForkDesc(const Consensus::Params &consensusParams, Conse
     return rv;
 }
 
-// bip-genvbvoting begin
-static UniValue BIPGenVBForkDesc(const Consensus::Params &consensusParams, Consensus::DeploymentPos id)
+// bip135 begin
+static UniValue BIP135ForkDesc(const Consensus::Params &consensusParams, Consensus::DeploymentPos id)
 {
     UniValue rv(UniValue::VOBJ);
     rv.push_back(Pair("bit", (int)id));
@@ -764,7 +764,7 @@ static UniValue BIPGenVBForkDesc(const Consensus::Params &consensusParams, Conse
     rv.push_back(Pair("minlockedtime", consensusParams.vDeployments[id].minlockedtime));
     return rv;
 }
-// bip-genvbvoting end
+// bip135 end
 
 UniValue getblockchaininfo(const UniValue &params, bool fHelp)
 {
@@ -827,11 +827,11 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     CBlockIndex *tip = chainActive.Tip();
     UniValue softforks(UniValue::VARR);
     UniValue bip9_softforks(UniValue::VOBJ);
-    UniValue bipgenvb_forks(UniValue::VOBJ);  // bip-genvbvoting added
+    UniValue bip135_forks(UniValue::VOBJ);  // bip135 added
     softforks.push_back(SoftForkDesc("bip34", 2, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip66", 3, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip65", 4, tip, consensusParams));
-    // bip-genvbvoting begin : add all the configured forks
+    // bip135 begin : add all the configured forks
     assert (Consensus::MAX_VERSION_BITS_DEPLOYMENTS <= VERSIONBITS_NUM_BITS);
     for (int i = 0; i < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++)
     {
@@ -839,15 +839,15 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
         const struct BIP9DeploymentInfo& vbinfo = VersionBitsDeploymentInfo[bit];
         if (isConfiguredDeployment(consensusParams, bit)) {
             bip9_softforks.push_back(Pair(vbinfo.name, BIP9SoftForkDesc(consensusParams, bit)));
-            bipgenvb_forks.push_back(Pair(vbinfo.name, BIPGenVBForkDesc(consensusParams, bit)));
+            bip135_forks.push_back(Pair(vbinfo.name, BIP135ForkDesc(consensusParams, bit)));
         }
     }
 
     obj.push_back(Pair("softforks", softforks));
     obj.push_back(Pair("bip9_softforks", bip9_softforks));
-    // to maintain backward compat initially, we introduce a new list for the full genvbvoting data
-    obj.push_back(Pair("bipgenvb_forks", bipgenvb_forks));
-    // bip-genvbvoting end
+    // to maintain backward compat initially, we introduce a new list for the full BIP135 data
+    obj.push_back(Pair("bip135_forks", bip135_forks));
+    // bip135 end
 
     if (fPruneMode)
     {
