@@ -38,7 +38,8 @@ protected:
         boost::chrono::time_point<CClock> now = clock.now();
         CClock::duration elapsed(now - lastFill);
         int64_t msElapsed = boost::chrono::duration_cast<boost::chrono::milliseconds>(elapsed).count();
-        if (msElapsed > 100) // note in practice msElapsed can be < 0, something to do with hyperthreading so reduce don't eliminate this conditional
+        // note in practice msElapsed can be < 0, something to do with hyperthreading so reduce don't eliminate this conditional
+        if (msElapsed > 100)
         {
             lastFill = now;
             level += (fill * msElapsed) / 1000;
@@ -100,7 +101,8 @@ public:
             return true; // leaky bucket is turned off.
         assert(amt >= 0);
         fillIt();
-        if (level >= amt) {
+        if (level >= amt)
+        {
             level -= amt;
             return true;
         }
