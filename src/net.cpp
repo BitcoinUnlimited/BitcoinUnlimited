@@ -80,12 +80,15 @@ namespace
     };
 }
 
+/** Services this node implementation cares about */
+static const ServiceFlags nRelevantServices = NODE_NETWORK;
+
 //
 // Global state variables
 //
 bool fDiscover = true;
 bool fListen = true;
-uint64_t nLocalServices = NODE_NETWORK;
+ServiceFlags nLocalServices = NODE_NETWORK;
 // BU moved to globals.cpp: CCriticalSection cs_mapLocalHost;
 // BU moved to globals.cpp: map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfLimited[NET_MAX] = {};
@@ -188,7 +191,7 @@ static std::vector<CAddress> convertSeed6(const std::vector<SeedSpec6> &vSeedsIn
     {
         struct in6_addr ip;
         memcpy(&ip, i->addr, sizeof(ip));
-        CAddress addr(CService(ip, i->port));
+        CAddress addr(CService(ip, i->port), NODE_NETWORK);
         addr.nTime = GetTime() - GetRand(nOneWeek) - nOneWeek;
         vSeedsOut.push_back(addr);
     }
@@ -201,13 +204,12 @@ static std::vector<CAddress> convertSeed6(const std::vector<SeedSpec6> &vSeedsIn
 // one by discovery.
 CAddress GetLocalAddress(const CNetAddr *paddrPeer)
 {
-    CAddress ret(CService("0.0.0.0", GetListenPort()), 0);
+    CAddress ret(CService("0.0.0.0", GetListenPort()), NODE_NONE);
     CService addr;
     if (GetLocal(addr, paddrPeer))
     {
-        ret = CAddress(addr);
+        ret = CAddress(addr, nLocalServices);
     }
-    ret.nServices = nLocalServices;
     ret.nTime = GetAdjustedTime();
     return ret;
 }
@@ -462,6 +464,7 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure
             vNodes.push_back(pnode);
         }
 
+        pnode->nServicesExpected = ServiceFlags(addrConnect.nServices & nRelevantServices);
         pnode->nTimeConnected = GetTime();
 
         return pnode;
@@ -494,7 +497,7 @@ void CNode::PushVersion()
     int nBestHeight = g_signals.GetHeight().get_value_or(0);
 
     int64_t nTime = (fInbound ? GetAdjustedTime() : GetTime());
-    CAddress addrYou = (addr.IsRoutable() && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0", 0)));
+    CAddress addrYou = (addr.IsRoutable() && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0", NODE_NONE), addr.nServices));
     CAddress addrMe = GetLocalAddress(&addr);
     GetRandBytes((unsigned char*)&nLocalHostNonce, sizeof(nLocalHostNonce));
     if (fLogIPs)
@@ -503,7 +506,7 @@ void CNode::PushVersion()
         LogPrint("net", "send version message: version %d, blocks=%d, us=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), id);
 
     // BUIP005 add our special subversion string
-    PushMessage(NetMsgType::VERSION, PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
+    PushMessage(NetMsgType::VERSION, PROTOCOL_VERSION, (uint64_t)nLocalServices, nTime, addrYou, addrMe,
                 nLocalHostNonce, FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, BUComments),
                 nBestHeight, !GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY));
     tVersionSent = GetTime();
@@ -1599,7 +1602,7 @@ void ThreadBitnodesAddressSeed()
         {
             SplitHostPort(seed, portOut, hostOut);
             CNetAddr ip(hostOut);
-            CAddress addr = CAddress(CService(ip, portOut));
+            CAddress addr = CAddress(CService(ip, portOut), NODE_NETWORK);
             addr.nTime = GetTime();
             vAdd.push_back(addr);
         }
@@ -1613,7 +1616,7 @@ void ThreadBitnodesAddressSeed()
 // BITCOINUNLIMITED END
 
 
-static std::string GetDNSHost(const CDNSSeedData& data, uint64_t requiredServiceBits)
+static std::string GetDNSHost(const CDNSSeedData& data, ServiceFlags requiredServiceBits)
 {
     //use default host for non-filter-capable seeds or if we use the default service bits (NODE_NETWORK)
     if (!data.supportsServiceBitsFiltering || requiredServiceBits == NODE_NETWORK) {
@@ -1665,9 +1668,9 @@ void ThreadDNSAddressSeed()
         if (HaveNameProxy()) {
             AddOneShot(seed.host);
         } else {
-            vector<CNetAddr> vIPs;
-            vector<CAddress> vAdd;
-            uint64_t requiredServiceBits = NODE_NETWORK;
+            std::vector<CNetAddr> vIPs;
+            std::vector<CAddress> vAdd;
+            ServiceFlags requiredServiceBits = nRelevantServices;
             if (LookupHost(GetDNSHost(seed, requiredServiceBits).c_str(), vIPs, 0, true))
             {
                 BOOST_FOREACH(const CNetAddr& ip, vIPs)
@@ -1761,7 +1764,7 @@ void ThreadOpenConnections()
             ProcessOneShot();
             BOOST_FOREACH(const std::string& strAddr, mapMultiArgs["-connect"])
             {
-                CAddress addr;
+                CAddress addr(CService(), NODE_NONE);
                 //NOTE: Because the only nodes we are connecting to here are the ones the user put in their
                 //      bitcoin.conf/commandline args as "-connect", we don't use the semaphore to limit outbound connections
                 OpenNetworkConnection(addr, false, NULL, strAddr.c_str());
@@ -1932,6 +1935,10 @@ void ThreadOpenConnections()
             if (IsLimited(addr))
                 continue;
 
+            // only connect to full nodes
+            if ((addr.nServices & REQUIRED_SERVICES) != REQUIRED_SERVICES)
+                continue;
+
             // only consider very recently tried nodes after 30 failed attempts
             if (nANow - addr.nLastTry < 600 && nTries < 30)
                 continue;
@@ -2054,7 +2061,7 @@ void ThreadOpenAddedConnections()
             //     the same number.  Here we use our own semaphore to ensure we have the outbound slots we need and can reconnect to
             //     nodes that have restarted.
             CSemaphoreGrant grant(*semOutboundAddNode);
-            OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), false, &grant);
+            OpenNetworkConnection(CAddress(vserv[i % vserv.size()], NODE_NONE), false, &grant);
             MilliSleep(500);
         }
         // Retry every 15 seconds.  It is important to check often to make sure the Xpedited Relay network
@@ -2772,7 +2779,8 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     addrKnown(5000, 0.001),
     filterInventoryKnown(50000, 0.000001)
 {
-    nServices = 0;
+    nServices = NODE_NONE;
+    nServicesExpected = NODE_NONE;
     hSocket = hSocketIn;
     nRecvVersion = INIT_PROTO_VERSION;
     nLastSend = 0;
