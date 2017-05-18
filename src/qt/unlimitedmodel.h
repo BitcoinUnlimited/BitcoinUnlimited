@@ -24,7 +24,7 @@ class UnlimitedModel : public QAbstractListModel
     Q_OBJECT
 
 public:
-    explicit UnlimitedModel(QObject* parent = 0);
+    explicit UnlimitedModel(QObject *parent = 0);
 
     enum UOptionID
     {
@@ -32,33 +32,28 @@ public:
         ExcessiveBlockSize,
         ExcessiveAcceptDepth,
         UseReceiveShaping, // bool
-        UseSendShaping,    // bool
-        ReceiveBurst,      // int
-        ReceiveAve,        // int
-        SendBurst,         // int
-        SendAve,           // int
+        UseSendShaping, // bool
+        ReceiveBurst, // int
+        ReceiveAve, // int
+        SendBurst, // int
+        SendAve, // int
         UOptIDRowCount,
     };
 
     void Init();
     void Reset();
 
-    int rowCount(const QModelIndex& parent = QModelIndex()) const;
-    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
-    bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole);
+    int rowCount(const QModelIndex &parent = QModelIndex()) const;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
+    bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole);
 
     /* Options setters */
-    void setMaxGeneratedBlock(const QVariant& value);
+    void setMaxGeneratedBlock(const QVariant &value);
 
 
     /* Explicit getters */
-    uint64_t getMaxGeneratedBlock()
-    {
-        return ::maxGeneratedBlock;
-    }
-
-
-    const QString& getOverriddenByCommandLine() { return strOverriddenByCommandLine; }
+    uint64_t getMaxGeneratedBlock() { return ::maxGeneratedBlock; }
+    const QString &getOverriddenByCommandLine() { return strOverriddenByCommandLine; }
     /* Restart flag helper */
     void setRestartRequired(bool fRequired);
     bool isRestartRequired();
@@ -68,7 +63,7 @@ private:
     QString strOverriddenByCommandLine;
 
     /// Add option to list of GUI options overridden through command line/config file
-    void addOverriddenOption(const std::string& option);
+    void addOverriddenOption(const std::string &option);
 
 Q_SIGNALS:
 };

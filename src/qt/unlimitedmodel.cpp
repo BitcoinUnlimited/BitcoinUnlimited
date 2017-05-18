@@ -32,12 +32,8 @@
 extern CTweakRef<uint64_t> miningBlockSize;
 extern CTweakRef<unsigned int> ebTweak;
 
-UnlimitedModel::UnlimitedModel(QObject* parent) : QAbstractListModel(parent)
-{
-    Init();
-}
-
-void UnlimitedModel::addOverriddenOption(const std::string& option)
+UnlimitedModel::UnlimitedModel(QObject *parent) : QAbstractListModel(parent) { Init(); }
+void UnlimitedModel::addOverriddenOption(const std::string &option)
 {
     strOverriddenByCommandLine += QString::fromStdString(option) + "=" + QString::fromStdString(mapArgs[option]) + " ";
 }
@@ -71,7 +67,9 @@ void UnlimitedModel::Init()
     if (!MiningAndExcessiveBlockValidatorRule(tmpExcessiveBlockSize, tmpMaxGeneratedBlock))
     {
         std::ostringstream emsg;
-        emsg << "Sorry, your configured maximum mined block (" << tmpMaxGeneratedBlock << ") is larger than your configured excessive size (" << tmpExcessiveBlockSize << ").  This would cause you to orphan your own blocks.";
+        emsg << "Sorry, your configured maximum mined block (" << tmpMaxGeneratedBlock
+             << ") is larger than your configured excessive size (" << tmpExcessiveBlockSize
+             << ").  This would cause you to orphan your own blocks.";
         LogPrintf(emsg.str().c_str());
     }
     else
@@ -122,13 +120,9 @@ void UnlimitedModel::Reset()
         GUIUtil::SetStartOnSystemStartup(false);
 }
 
-int UnlimitedModel::rowCount(const QModelIndex& parent) const
-{
-    return UOptIDRowCount;
-}
-
+int UnlimitedModel::rowCount(const QModelIndex &parent) const { return UOptIDRowCount; }
 // read QSettings values and return them
-QVariant UnlimitedModel::data(const QModelIndex& index, int role) const
+QVariant UnlimitedModel::data(const QModelIndex &index, int role) const
 {
     if (role == Qt::EditRole)
     {
@@ -161,7 +155,7 @@ QVariant UnlimitedModel::data(const QModelIndex& index, int role) const
 }
 
 // write QSettings values
-bool UnlimitedModel::setData(const QModelIndex& index, const QVariant& value, int role)
+bool UnlimitedModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
     bool successful = true; /* set to false on parse error */
     bool changeSendShaper = false;
@@ -278,14 +272,13 @@ bool UnlimitedModel::setData(const QModelIndex& index, const QVariant& value, in
     return successful;
 }
 
-void UnlimitedModel::setMaxGeneratedBlock(const QVariant& value)
+void UnlimitedModel::setMaxGeneratedBlock(const QVariant &value)
 {
     if (!value.isNull())
     {
         QSettings settings;
         maxGeneratedBlock = value.toInt();
-        settings.setValue("maxGeneratedBlock",
-            static_cast<qlonglong>(maxGeneratedBlock));
+        settings.setValue("maxGeneratedBlock", static_cast<qlonglong>(maxGeneratedBlock));
         // Q_EMIT your signal if you need one
     }
 }

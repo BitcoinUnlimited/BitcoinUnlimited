@@ -13,7 +13,7 @@
 #include "guiutil.h"
 
 #include "main.h" // for DEFAULT_SCRIPTCHECK_THREADS and MAX_SCRIPTCHECK_THREADS
-#include "net.h"  // for access to the network traffic shapers
+#include "net.h" // for access to the network traffic shapers
 #include "netbase.h"
 #include "txdb.h" // for -dbcache defaults
 
@@ -33,16 +33,14 @@
 
 inline int64_t bwEdit2Slider(int64_t x) { return sqrt(x * 100); }
 inline int64_t bwSlider2Edit(int64_t x) { return x * x / 100; }
-UnlimitedDialog::UnlimitedDialog(QWidget* parent, UnlimitedModel* mdl) : QDialog(parent),
-                                                                         model(mdl),
-                                                                         burstValidator(0, 100000000, this),
-                                                                         sendAveValidator(0, 100000000, this),
-                                                                         recvAveValidator(0, 100000000, this)
+UnlimitedDialog::UnlimitedDialog(QWidget *parent, UnlimitedModel *mdl)
+    : QDialog(parent), model(mdl), burstValidator(0, 100000000, this), sendAveValidator(0, 100000000, this),
+      recvAveValidator(0, 100000000, this)
 {
     ui.setupUi(this);
     sendAveValidator.initialize(ui.sendBurstEdit, ui.errorText);
     recvAveValidator.initialize(ui.recvBurstEdit, ui.errorText);
-    //ui.maxMinedBlock->setRange(0, 0xffffffffUL);
+    // ui.maxMinedBlock->setRange(0, 0xffffffffUL);
     mapper.setSubmitPolicy(QDataWidgetMapper::ManualSubmit);
     mapper.setOrientation(Qt::Vertical);
     setMapper();
@@ -115,11 +113,7 @@ UnlimitedDialog::UnlimitedDialog(QWidget* parent, UnlimitedModel* mdl) : QDialog
 }
 
 
-UnlimitedDialog::~UnlimitedDialog()
-{
-}
-
-
+UnlimitedDialog::~UnlimitedDialog() {}
 void UnlimitedDialog::setMapper()
 {
     mapper.setModel(model);
@@ -136,29 +130,22 @@ void UnlimitedDialog::setMapper()
     mapper.addMapping(ui.miningMaxBlock, UnlimitedModel::MaxGeneratedBlock);
     mapper.addMapping(ui.excessiveBlockSize, UnlimitedModel::ExcessiveBlockSize);
     mapper.addMapping(ui.excessiveAcceptDepth, UnlimitedModel::ExcessiveAcceptDepth);
-    connect(ui.miningMaxBlock, SIGNAL(textChanged(const QString&)), this, SLOT(validateBlockSize()));
-    connect(ui.excessiveBlockSize, SIGNAL(textChanged(const QString&)), this, SLOT(validateBlockSize()));
-    connect(ui.excessiveAcceptDepth, SIGNAL(textChanged(const QString&)), this, SLOT(validateBlockSize()));
+    connect(ui.miningMaxBlock, SIGNAL(textChanged(const QString &)), this, SLOT(validateBlockSize()));
+    connect(ui.excessiveBlockSize, SIGNAL(textChanged(const QString &)), this, SLOT(validateBlockSize()));
+    connect(ui.excessiveAcceptDepth, SIGNAL(textChanged(const QString &)), this, SLOT(validateBlockSize()));
 
     mapper.toFirst();
 }
 
-void UnlimitedDialog::setOkButtonState(bool fState)
-{
-    ui.okButton->setEnabled(fState);
-}
-
+void UnlimitedDialog::setOkButtonState(bool fState) { ui.okButton->setEnabled(fState); }
 void UnlimitedDialog::on_resetButton_clicked()
 {
     if (model)
     {
         // confirmation dialog
-        QMessageBox::StandardButton btnRetVal = QMessageBox::question(this,
-            tr("Confirm options reset"),
-            tr("This is a global reset of all settings!") +
-                "<br>" +
-                tr("Client restart required to activate changes.") +
-                "<br><br>" +
+        QMessageBox::StandardButton btnRetVal = QMessageBox::question(this, tr("Confirm options reset"),
+            tr("This is a global reset of all settings!") + "<br>" +
+                tr("Client restart required to activate changes.") + "<br><br>" +
                 tr("Client will be shut down. Do you want to proceed?"),
             QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
 
@@ -259,7 +246,8 @@ void UnlimitedDialog::shapingMaxEditFinished(void)
         if (ok && ok2)
         {
             ui.sendBurstSlider->setValue(bwEdit2Slider(maxVal)); // Move the slider based on the edit box change
-            // If the max was changed to be lower than the average, bump the average down to the maximum, because having an ave > the max makes no sense.
+            // If the max was changed to be lower than the average, bump the average down to the maximum, because having
+            // an ave > the max makes no sense.
             if (maxVal < aveVal)
             {
                 // I use the string text here just so I don't have to convert back from int to string
@@ -305,7 +293,8 @@ void UnlimitedDialog::shapingEnableChanged(bool val)
 
 void UnlimitedDialog::shapingSliderChanged(void)
 {
-    // When the sliders change, I want to update the edit box.  Rather then have the pain of making a separate function for every slider, I just set them all whenever one changes.
+    // When the sliders change, I want to update the edit box.  Rather then have the pain of making a separate function
+    // for every slider, I just set them all whenever one changes.
     int64_t sval;
     int64_t val;
     int64_t cur;
@@ -316,7 +305,8 @@ void UnlimitedDialog::shapingSliderChanged(void)
         val = bwSlider2Edit(sval); // Transform the slider linear position into a bandwidth in Kb
         cur = ui.sendBurstEdit->text().toLongLong();
 
-        // The slider is imprecise compared to the edit box.  So we only want to change the edit box if the slider's change is larger than its imprecision.
+        // The slider is imprecise compared to the edit box.  So we only want to change the edit box if the slider's
+        // change is larger than its imprecision.
         if (bwEdit2Slider(cur) != sval)
         {
             ui.sendBurstEdit->setText(QString::number(val));
@@ -376,7 +366,7 @@ void UnlimitedDialog::shapingSliderChanged(void)
 }
 
 
-QValidator::State LessThanValidator::validate(QString& input, int& pos) const
+QValidator::State LessThanValidator::validate(QString &input, int &pos) const
 {
     QValidator::State ret = QIntValidator::validate(input, pos);
     bool clearError = true;
@@ -393,7 +383,8 @@ QValidator::State LessThanValidator::validate(QString& input, int& pos) const
                 {
                     clearError = false;
                     if (errorDisplay)
-                        errorDisplay->setText("<span style=\"color:#aa0000;\">Average must be less than or equal Maximum</span>");
+                        errorDisplay->setText(
+                            "<span style=\"color:#aa0000;\">Average must be less than or equal Maximum</span>");
                 }
             }
         }

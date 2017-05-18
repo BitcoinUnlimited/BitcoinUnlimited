@@ -20,11 +20,11 @@ static uint256 xpeditedBlkSent[NUM_XPEDITED_STORE];
 // zeros on construction)
 static int xpeditedBlkSendPos = 0;
 
-bool CheckAndRequestExpeditedBlocks(CNode* pfrom)
+bool CheckAndRequestExpeditedBlocks(CNode *pfrom)
 {
     if (pfrom->nVersion >= EXPEDITED_VERSION)
     {
-        BOOST_FOREACH (std::string& strAddr, mapMultiArgs["-expeditedblock"])
+        BOOST_FOREACH (std::string &strAddr, mapMultiArgs["-expeditedblock"])
         {
             std::string strListeningPeerIP;
             std::string strPeerIP = pfrom->addr.ToString();
@@ -84,7 +84,7 @@ bool CheckAndRequestExpeditedBlocks(CNode* pfrom)
     return false;
 }
 
-void HandleExpeditedRequest(CDataStream& vRecv, CNode* pfrom)
+void HandleExpeditedRequest(CDataStream &vRecv, CNode *pfrom)
 {
     uint64_t options;
     vRecv >> options;
@@ -104,7 +104,7 @@ void HandleExpeditedRequest(CDataStream& vRecv, CNode* pfrom)
         if (stop) // If stopping, find the array element and clear it.
         {
             LogPrint("blk", "Stopping expedited blocks to peer %s (%d).\n", pfrom->addrName.c_str(), pfrom->id);
-            std::vector<CNode*>::iterator it = std::find(xpeditedBlk.begin(), xpeditedBlk.end(), pfrom);
+            std::vector<CNode *>::iterator it = std::find(xpeditedBlk.begin(), xpeditedBlk.end(), pfrom);
             if (it != xpeditedBlk.end())
             {
                 *it = NULL;
@@ -113,7 +113,7 @@ void HandleExpeditedRequest(CDataStream& vRecv, CNode* pfrom)
         }
         else // Otherwise, add the new node to the end
         {
-            std::vector<CNode*>::iterator it1 = std::find(xpeditedBlk.begin(), xpeditedBlk.end(), pfrom);
+            std::vector<CNode *>::iterator it1 = std::find(xpeditedBlk.begin(), xpeditedBlk.end(), pfrom);
             if (it1 == xpeditedBlk.end()) // don't add it twice
             {
                 unsigned int maxExpedited = GetArg("-maxexpeditedblockrecipients", 32);
@@ -122,8 +122,8 @@ void HandleExpeditedRequest(CDataStream& vRecv, CNode* pfrom)
                     LogPrint("blk", "Starting expedited blocks to peer %s (%d).\n", pfrom->addrName.c_str(), pfrom->id);
 
                     // find an empty array location
-                    std::vector<CNode*>::iterator it =
-                        std::find(xpeditedBlk.begin(), xpeditedBlk.end(), ((CNode*)NULL));
+                    std::vector<CNode *>::iterator it =
+                        std::find(xpeditedBlk.begin(), xpeditedBlk.end(), ((CNode *)NULL));
                     if (it != xpeditedBlk.end())
                         *it = pfrom;
                     else
@@ -145,7 +145,7 @@ void HandleExpeditedRequest(CDataStream& vRecv, CNode* pfrom)
         if (stop) // If stopping, find the array element and clear it.
         {
             LogPrint("blk", "Stopping expedited transactions to peer %s (%d).\n", pfrom->addrName.c_str(), pfrom->id);
-            std::vector<CNode*>::iterator it = std::find(xpeditedTxn.begin(), xpeditedTxn.end(), pfrom);
+            std::vector<CNode *>::iterator it = std::find(xpeditedTxn.begin(), xpeditedTxn.end(), pfrom);
             if (it != xpeditedTxn.end())
             {
                 *it = NULL;
@@ -154,7 +154,7 @@ void HandleExpeditedRequest(CDataStream& vRecv, CNode* pfrom)
         }
         else // Otherwise, add the new node to the end
         {
-            std::vector<CNode*>::iterator it1 = std::find(xpeditedTxn.begin(), xpeditedTxn.end(), pfrom);
+            std::vector<CNode *>::iterator it1 = std::find(xpeditedTxn.begin(), xpeditedTxn.end(), pfrom);
             if (it1 == xpeditedTxn.end()) // don't add it twice
             {
                 unsigned int maxExpedited = GetArg("-maxexpeditedtxrecipients", 32);
@@ -163,8 +163,8 @@ void HandleExpeditedRequest(CDataStream& vRecv, CNode* pfrom)
                     LogPrint("blk", "Starting expedited transactions to peer %s (%d).\n", pfrom->addrName.c_str(),
                         pfrom->id);
 
-                    std::vector<CNode*>::iterator it =
-                        std::find(xpeditedTxn.begin(), xpeditedTxn.end(), ((CNode*)NULL));
+                    std::vector<CNode *>::iterator it =
+                        std::find(xpeditedTxn.begin(), xpeditedTxn.end(), ((CNode *)NULL));
                     if (it != xpeditedTxn.end())
                         *it = pfrom;
                     else
@@ -181,7 +181,7 @@ void HandleExpeditedRequest(CDataStream& vRecv, CNode* pfrom)
     }
 }
 
-bool IsRecentlyExpeditedAndStore(const uint256& hash)
+bool IsRecentlyExpeditedAndStore(const uint256 &hash)
 {
     for (int i = 0; i < NUM_XPEDITED_STORE; i++)
         if (xpeditedBlkSent[i] == hash)
@@ -195,7 +195,7 @@ bool IsRecentlyExpeditedAndStore(const uint256& hash)
     return false;
 }
 
-bool HandleExpeditedBlock(CDataStream& vRecv, CNode* pfrom)
+bool HandleExpeditedBlock(CDataStream &vRecv, CNode *pfrom)
 {
     unsigned char hops;
     unsigned char msgType;
@@ -217,13 +217,13 @@ bool HandleExpeditedBlock(CDataStream& vRecv, CNode* pfrom)
     }
 }
 
-void SendExpeditedBlock(CXThinBlock& thinBlock, unsigned char hops, const CNode* skip)
+void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *skip)
 {
     LOCK(cs_xpedited);
-    std::vector<CNode*>::iterator end = xpeditedBlk.end();
-    for (std::vector<CNode*>::iterator it = xpeditedBlk.begin(); it != end; it++)
+    std::vector<CNode *>::iterator end = xpeditedBlk.end();
+    for (std::vector<CNode *>::iterator it = xpeditedBlk.begin(); it != end; it++)
     {
-        CNode* n = *it;
+        CNode *n = *it;
         if ((n != skip) && (n != NULL)) // Don't send it back in case there is a forwarding loop
         {
             if (n->fDisconnect)
@@ -243,7 +243,7 @@ void SendExpeditedBlock(CXThinBlock& thinBlock, unsigned char hops, const CNode*
     }
 }
 
-void SendExpeditedBlock(const CBlock& block, const CNode* skip)
+void SendExpeditedBlock(const CBlock &block, const CNode *skip)
 {
     if (!IsRecentlyExpeditedAndStore(block.GetHash()))
     {
@@ -253,7 +253,7 @@ void SendExpeditedBlock(const CBlock& block, const CNode* skip)
     // else, nothing to do
 }
 
-bool IsExpeditedNode(const CNode* pfrom)
+bool IsExpeditedNode(const CNode *pfrom)
 {
     // xpeditedBlkUp keeps track of the nodes that we have requested expedited blocks from.  If the node
     // is not in this list then it is not expedited node.

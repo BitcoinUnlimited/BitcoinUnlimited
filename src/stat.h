@@ -23,37 +23,37 @@ enum StatOperation
     STAT_OP_AVE = 2,
     STAT_OP_MAX = 4,
     STAT_OP_MIN = 8,
-    STAT_KEEP = 0x10,       // Do not clear the value when it it moved into history
+    STAT_KEEP = 0x10, // Do not clear the value when it it moved into history
     STAT_KEEP_COUNT = 0x20, // do not reset the sample count when it it moved into history
     STAT_INDIVIDUAL = 0x40, // Every sample is a data point, do not aggregate by time
 };
 
-//typedef boost::reference_wrapper<std::string> CStatKey;
+// typedef boost::reference_wrapper<std::string> CStatKey;
 typedef std::string CStatKey;
-typedef std::map<CStatKey, CStatBase*> CStatMap;
+typedef std::map<CStatKey, CStatBase *> CStatMap;
 
 extern CStatMap statistics;
 extern boost::asio::io_service stat_io_service;
 extern boost::posix_time::milliseconds statMinInterval;
 
 template <typename NUM>
-void statAverage(NUM& tally, const NUM& cur, unsigned int sampleCounts)
+void statAverage(NUM &tally, const NUM &cur, unsigned int sampleCounts)
 {
     tally = ((tally * ((NUM)sampleCounts - 1)) + cur) / sampleCounts;
 }
 
-template void statAverage<uint16_t>(uint16_t& tally, const uint16_t& cur, unsigned int sampleCounts);
-template void statAverage<unsigned int>(unsigned int& tally, const unsigned int& cur, unsigned int sampleCounts);
-template void statAverage<uint64_t>(uint64_t& tally, const uint64_t& cur, unsigned int sampleCounts);
-template void statAverage<int16_t>(int16_t& tally, const int16_t& cur, unsigned int sampleCounts);
-template void statAverage<int>(int& tally, const int& cur, unsigned int sampleCounts);
-template void statAverage<int64_t>(int64_t& tally, const int64_t& cur, unsigned int sampleCounts);
-template void statAverage<float>(float& tally, const float& cur, unsigned int sampleCounts);
-template void statAverage<double>(double& tally, const double& cur, unsigned int sampleCounts);
+template void statAverage<uint16_t>(uint16_t &tally, const uint16_t &cur, unsigned int sampleCounts);
+template void statAverage<unsigned int>(unsigned int &tally, const unsigned int &cur, unsigned int sampleCounts);
+template void statAverage<uint64_t>(uint64_t &tally, const uint64_t &cur, unsigned int sampleCounts);
+template void statAverage<int16_t>(int16_t &tally, const int16_t &cur, unsigned int sampleCounts);
+template void statAverage<int>(int &tally, const int &cur, unsigned int sampleCounts);
+template void statAverage<int64_t>(int64_t &tally, const int64_t &cur, unsigned int sampleCounts);
+template void statAverage<float>(float &tally, const float &cur, unsigned int sampleCounts);
+template void statAverage<double>(double &tally, const double &cur, unsigned int sampleCounts);
 // template void statAverage<ZZ>(ZZ& tally,const ZZ& cur,unsigned int sampleCounts);
 
 template <typename NUM>
-void statReset(NUM& tally, uint64_t flags)
+void statReset(NUM &tally, uint64_t flags)
 {
     if (!(flags & STAT_KEEP))
         tally = NUM();
@@ -68,7 +68,7 @@ public:
     virtual UniValue GetNow() = 0; // Returns the current value of this statistic
     // Returns the cumulative value of this statistic
     virtual UniValue GetTotal() = 0;
-    virtual UniValue GetSeries(const std::string& name, int count) = 0; // Returns the historical or series data
+    virtual UniValue GetSeries(const std::string &name, int count) = 0; // Returns the historical or series data
 };
 
 template <class DataType, class RecordType = DataType>
@@ -81,20 +81,20 @@ protected:
 
 public:
     CStat() {}
-    CStat(const char* namep) : name(namep)
+    CStat(const char *namep) : name(namep)
     {
         LOCK(cs_statMap);
         value = RecordType(); // = 0;
         statistics[CStatKey(name)] = this;
     }
-    CStat(const std::string& namep) : name(namep)
+    CStat(const std::string &namep) : name(namep)
     {
         LOCK(cs_statMap);
         value = RecordType(); // = 0;
         statistics[CStatKey(name)] = this;
     }
 
-    void init(const char* namep)
+    void init(const char *namep)
     {
         LOCK(cs_statMap);
         name = namep;
@@ -102,7 +102,7 @@ public:
         statistics[CStatKey(name)] = this;
     }
 
-    void init(const std::string& namep)
+    void init(const std::string &namep)
     {
         LOCK(cs_statMap);
         name = namep;
@@ -117,35 +117,27 @@ public:
         name.clear();
     }
 
-    CStat& operator=(const DataType& arg)
+    CStat &operator=(const DataType &arg)
     {
         value = arg;
         return *this;
     }
 
-    CStat& operator+=(const DataType& rhs)
+    CStat &operator+=(const DataType &rhs)
     {
         value += rhs;
         return *this;
     }
-    CStat& operator-=(const DataType& rhs)
+    CStat &operator-=(const DataType &rhs)
     {
         value -= rhs;
         return *this;
     }
 
-    RecordType& operator()() { return value; }
-    virtual UniValue GetNow()
-    {
-        return UniValue(value);
-    }
-
-    virtual UniValue GetTotal()
-    {
-        return NullUniValue;
-    }
-
-    virtual UniValue GetSeries(const std::string& name, int count)
+    RecordType &operator()() { return value; }
+    virtual UniValue GetNow() { return UniValue(value); }
+    virtual UniValue GetTotal() { return NullUniValue; }
+    virtual UniValue GetSeries(const std::string &name, int count)
     {
         return NullUniValue; // Has no series data
     }
@@ -162,12 +154,12 @@ public:
 };
 
 
-extern const char* sampleNames[];
+extern const char *sampleNames[];
 // Even though there may be 1000 samples, it takes this many samples to produce an element in the next series.
 extern int operateSampleCount[];
 extern int interruptIntervals[]; // When to calculate the next series, in multiples of the interrupt time.
 
-//accumulate(accumulator,datapt);
+// accumulate(accumulator,datapt);
 
 
 enum
@@ -191,28 +183,27 @@ protected:
     RecordType total;
 
 public:
-    CStatHistory() : CStat<DataType, RecordType>(), timer(stat_io_service)
-    {
-    }
-
-    CStatHistory(const char* name, unsigned int operation = STAT_OP_SUM) : CStat<DataType, RecordType>(name), op(operation), timer(stat_io_service)
+    CStatHistory() : CStat<DataType, RecordType>(), timer(stat_io_service) {}
+    CStatHistory(const char *name, unsigned int operation = STAT_OP_SUM)
+        : CStat<DataType, RecordType>(name), op(operation), timer(stat_io_service)
     {
         Clear();
     }
 
-    CStatHistory(const std::string& name, unsigned int operation = STAT_OP_SUM) : CStat<DataType, RecordType>(name), op(operation), timer(stat_io_service)
+    CStatHistory(const std::string &name, unsigned int operation = STAT_OP_SUM)
+        : CStat<DataType, RecordType>(name), op(operation), timer(stat_io_service)
     {
         Clear();
     }
 
-    void init(const char* name, unsigned int operation = STAT_OP_SUM)
+    void init(const char *name, unsigned int operation = STAT_OP_SUM)
     {
         CStat<DataType, RecordType>::init(name);
         op = operation;
         Clear();
     }
 
-    void init(const std::string& name, unsigned int operation = STAT_OP_SUM)
+    void init(const std::string &name, unsigned int operation = STAT_OP_SUM)
     {
         CStat<DataType, RecordType>::init(name);
         op = operation;
@@ -236,11 +227,8 @@ public:
         Start();
     }
 
-    virtual ~CStatHistory()
-    {
-    }
-
-    CStatHistory& operator<<(const DataType& rhs)
+    virtual ~CStatHistory() {}
+    CStatHistory &operator<<(const DataType &rhs)
     {
         // If each call is an individual datapoint, simulate a timeout every time data arrives to advance.
         if (op & STAT_INDIVIDUAL)
@@ -248,7 +236,7 @@ public:
         if (op & STAT_OP_SUM)
         {
             this->value += rhs;
-            //this->total += rhs;  // Updating total when timer fires
+            // this->total += rhs;  // Updating total when timer fires
         }
         else if (op & STAT_OP_AVE)
         {
@@ -257,19 +245,19 @@ public:
                 tmp = 1;
             statAverage(this->value, rhs, tmp);
             //++totalSamples;
-            //statAverage(this->total,rhs,totalSamples);
+            // statAverage(this->total,rhs,totalSamples);
         }
         else if (op & STAT_OP_MAX)
         {
             if (this->value < rhs)
                 this->value = rhs;
-            //if (this->total < rhs) this->total = rhs;
+            // if (this->total < rhs) this->total = rhs;
         }
         else if (op & STAT_OP_MIN)
         {
             if (this->value > rhs)
                 this->value = rhs;
-            //if (this->total > rhs) this->total = rhs;
+            // if (this->total > rhs) this->total = rhs;
         }
         return *this;
     }
@@ -286,7 +274,7 @@ public:
             timer.cancel();
     }
 
-    int Series(int series, DataType* array, int len)
+    int Series(int series, DataType *array, int len)
     {
         assert(series < STATISTICS_NUM_RANGES);
         if (len > STATISTICS_SAMPLES)
@@ -313,7 +301,7 @@ public:
         return UniValue(total);
     }
 
-    virtual UniValue GetSeries(const std::string& name, int count)
+    virtual UniValue GetSeries(const std::string &name, int count)
     {
         for (int series = 0; series < STATISTICS_NUM_RANGES; series++)
         {
@@ -326,7 +314,7 @@ public:
                     count = len[series];
                 for (int i = -1 * (count - 1); i <= 0; i++)
                 {
-                    const RecordType& sample = History(series, i);
+                    const RecordType &sample = History(series, i);
                     ret.push_back((UniValue)sample);
                 }
                 return ret;
@@ -336,7 +324,7 @@ public:
     }
 
     // 0 is latest, then pass a negative number for prior
-    const RecordType& History(int series, int ago)
+    const RecordType &History(int series, int ago)
     {
         assert(ago <= 0);
         assert(series < STATISTICS_NUM_RANGES);
@@ -347,13 +335,14 @@ public:
         return history[series][pos];
     }
 
-    void timeout(const boost::system::error_code& e)
+    void timeout(const boost::system::error_code &e)
     {
         if (e)
             return;
 
-        // To avoid taking a mutex, I sample and compare.  This sort of thing isn't perfect but acceptable for statistics calc.
-        volatile RecordType* sampler = &this->value;
+        // To avoid taking a mutex, I sample and compare.  This sort of thing isn't perfect but acceptable for
+        // statistics calc.
+        volatile RecordType *sampler = &this->value;
         RecordType samples[2];
         do
         {
@@ -422,7 +411,8 @@ public:
                             accumulator = datapt;
                     }
                 }
-                // All done accumulating.  Now store the data in the proper history field -- its going in the next series.
+                // All done accumulating.  Now store the data in the proper history field -- its going in the next
+                // series.
                 if (op & STAT_OP_AVE)
                     accumulator /= ((DataType)operateSampleCount[i]);
                 history[i + 1][loc[i + 1]] = accumulator;
@@ -455,11 +445,8 @@ public:
     NUM val;
     NUM max;
     int samples;
-    MinValMax() : min(std::numeric_limits<NUM>::max()), val(0), max(std::numeric_limits<NUM>::min()), samples(0)
-    {
-    }
-
-    MinValMax& operator=(const MinValMax& rhs)
+    MinValMax() : min(std::numeric_limits<NUM>::max()), val(0), max(std::numeric_limits<NUM>::min()), samples(0) {}
+    MinValMax &operator=(const MinValMax &rhs)
     {
         min = rhs.min;
         val = rhs.val;
@@ -468,7 +455,7 @@ public:
         return *this;
     }
 
-    MinValMax& operator=(const volatile MinValMax& rhs)
+    MinValMax &operator=(const volatile MinValMax &rhs)
     {
         min = rhs.min;
         val = rhs.val;
@@ -477,12 +464,8 @@ public:
         return *this;
     }
 
-    bool operator!=(const MinValMax& rhs) const
-    {
-        return !(*this == rhs);
-    }
-
-    bool operator==(const MinValMax& rhs) const
+    bool operator!=(const MinValMax &rhs) const { return !(*this == rhs); }
+    bool operator==(const MinValMax &rhs) const
     {
         if (min != rhs.min)
             return false;
@@ -495,7 +478,7 @@ public:
         return true;
     }
 
-    MinValMax& operator=(const NUM& rhs)
+    MinValMax &operator=(const NUM &rhs)
     {
         if (max < rhs)
             max = rhs;
@@ -508,27 +491,13 @@ public:
 
 
     // Probably not meaningful just here to meet the template req
-    bool operator>(const MinValMax& rhs) const
-    {
-        return (max > rhs.max);
-    }
+    bool operator>(const MinValMax &rhs) const { return (max > rhs.max); }
     // Probably not meaningful just here to meet the template req
-    bool operator<(const MinValMax& rhs) const
-    {
-        return (min > rhs.min);
-    }
-
-    bool operator>(const NUM& rhs) const
-    {
-        return (val > rhs);
-    }
-    bool operator<(const NUM& rhs) const
-    {
-        return (val < rhs);
-    }
-
+    bool operator<(const MinValMax &rhs) const { return (min > rhs.min); }
+    bool operator>(const NUM &rhs) const { return (val > rhs); }
+    bool operator<(const NUM &rhs) const { return (val < rhs); }
     // happens when users adds a stat to the system
-    MinValMax& operator+=(const NUM& rhs)
+    MinValMax &operator+=(const NUM &rhs)
     {
         val += rhs;
         if (max < val)
@@ -539,7 +508,7 @@ public:
         return *this;
     }
     // happens when users adds a stat to the system
-    MinValMax& operator-=(const NUM& rhs)
+    MinValMax &operator-=(const NUM &rhs)
     {
         val -= rhs;
         if (max < rhs)
@@ -551,10 +520,10 @@ public:
     }
 
     // happens when results are moved from a faster series to a slower one.
-    MinValMax& operator+=(const MinValMax& rhs)
+    MinValMax &operator+=(const MinValMax &rhs)
     {
-        //if (rhs.max > max) max=rhs.max;
-        //if (rhs.min < min) min=rhs.min;
+        // if (rhs.max > max) max=rhs.max;
+        // if (rhs.min < min) min=rhs.min;
         max += rhs.max;
         min += rhs.min;
         val += rhs.val;
@@ -562,13 +531,9 @@ public:
         return *this;
     }
 
-    NUM operator/(const NUM& rhs)
-    {
-        return val / rhs;
-    }
-
+    NUM operator/(const NUM &rhs) { return val / rhs; }
     // used in the averaging
-    MinValMax& operator/=(const NUM& rhs)
+    MinValMax &operator/=(const NUM &rhs)
     {
         val /= rhs;
         min /= rhs;
@@ -587,7 +552,7 @@ public:
 };
 
 template <typename NUM>
-void statAverage(MinValMax<NUM>& tally, const NUM& cur, unsigned int sampleCounts)
+void statAverage(MinValMax<NUM> &tally, const NUM &cur, unsigned int sampleCounts)
 {
     statAverage(tally.val, cur, sampleCounts);
     if (cur > tally.max)
@@ -597,7 +562,7 @@ void statAverage(MinValMax<NUM>& tally, const NUM& cur, unsigned int sampleCount
 }
 
 template <typename NUM>
-void statReset(MinValMax<NUM>& tally, uint64_t flags)
+void statReset(MinValMax<NUM> &tally, uint64_t flags)
 {
     if (flags & STAT_KEEP)
     {
@@ -620,14 +585,12 @@ protected:
     T end;
 
 public:
-    LinearHistogram(T pstart, T pend) : buckets(0), start(pstart), end(pend)
-    {
-    }
+    LinearHistogram(T pstart, T pend) : buckets(0), start(pstart), end(pend) {}
 };
 
 
 // Get the named statistic.  Returns NULL if it does not exist
-CStatBase* GetStat(char* name);
+CStatBase *GetStat(char *name);
 
 
 #endif

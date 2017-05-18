@@ -21,23 +21,24 @@ class UnlimitedModel;
 /** Ensures that one edit box is always less than another */
 class LessThanValidator : public QIntValidator
 {
-    QLineEdit* other;
-    QLabel* errorDisplay;
+    QLineEdit *other;
+    QLabel *errorDisplay;
 
 public:
-    LessThanValidator(int minimum, int maximum, QObject* parent = 0) : QIntValidator(minimum, maximum, parent), other(NULL), errorDisplay(NULL)
+    LessThanValidator(int minimum, int maximum, QObject *parent = 0)
+        : QIntValidator(minimum, maximum, parent), other(NULL), errorDisplay(NULL)
     {
     }
 
     // This cannot be part of the constructor because these widgets may not be created at construction time.
-    void initialize(QLineEdit* otherp, QLabel* errorDisplayp)
+    void initialize(QLineEdit *otherp, QLabel *errorDisplayp)
     {
         other = otherp;
         errorDisplay = errorDisplayp;
     }
 
 
-    virtual State validate(QString& input, int& pos) const;
+    virtual State validate(QString &input, int &pos) const;
 };
 
 // Unlimited dialog
@@ -46,7 +47,7 @@ class UnlimitedDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit UnlimitedDialog(QWidget* parent, UnlimitedModel* model);
+    explicit UnlimitedDialog(QWidget *parent, UnlimitedModel *model);
     virtual ~UnlimitedDialog();
     void setMapper();
 
@@ -68,7 +69,7 @@ Q_SIGNALS:
 private:
     Ui_UnlimitedDialog ui;
     QDataWidgetMapper mapper;
-    UnlimitedModel* model;
+    UnlimitedModel *model;
 
     QIntValidator burstValidator;
     LessThanValidator sendAveValidator;

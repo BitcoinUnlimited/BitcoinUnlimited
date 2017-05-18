@@ -57,7 +57,7 @@ public:
     }
 };
 
-int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev)
+int64_t UpdateTime(CBlockHeader *pblock, const Consensus::Params &consensusParams, const CBlockIndex *pindexPrev)
 {
     int64_t nOldTime = pblock->nTime;
     int64_t nNewTime = std::max(pindexPrev->GetMedianTimePast() + 1, GetAdjustedTime());
@@ -72,11 +72,13 @@ int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParam
     return nNewTime - nOldTime;
 }
 
-CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, bool blockstreamCoreCompatible);
+CBlockTemplate *CreateNewBlock(const CChainParams &chainparams,
+    const CScript &scriptPubKeyIn,
+    bool blockstreamCoreCompatible);
 
-CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn)
+CBlockTemplate *CreateNewBlock(const CChainParams &chainparams, const CScript &scriptPubKeyIn)
 {
-    CBlockTemplate* tmpl = NULL;
+    CBlockTemplate *tmpl = NULL;
     if (maxGeneratedBlock > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
         tmpl = CreateNewBlock(chainparams, scriptPubKeyIn, false);
 
@@ -89,13 +91,15 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
     return tmpl;
 }
 
-CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, bool blockstreamCoreCompatible)
+CBlockTemplate *CreateNewBlock(const CChainParams &chainparams,
+    const CScript &scriptPubKeyIn,
+    bool blockstreamCoreCompatible)
 {
     // Create new block
     auto_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
     if (!pblocktemplate.get())
         return NULL;
-    CBlock* pblock = &pblocktemplate->block; // pointer for convenience
+    CBlock *pblock = &pblocktemplate->block; // pointer for convenience
 
     // Create coinbase tx
     CMutableTransaction txNew;
@@ -106,11 +110,11 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
     // Add dummy coinbase tx as first transaction
     pblock->vtx.push_back(CTransaction());
-    pblocktemplate->vTxFees.push_back(-1);   // updated at end
+    pblocktemplate->vTxFees.push_back(-1); // updated at end
     pblocktemplate->vTxSigOps.push_back(-1); // updated at end
 
     // Largest block you're willing to create:
-    //unsigned int nBlockMaxSize = GetArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE);
+    // unsigned int nBlockMaxSize = GetArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE);
     // Limit to betweeen 1K and MAX_BLOCK_SIZE-1K for sanity:
     // std::max((unsigned int)1000, std::min((unsigned int)(maxGeneratedBlock-1000), nBlockMaxSize));
     uint64_t nBlockMaxSize = maxGeneratedBlock;
@@ -147,7 +151,8 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
 
     unsigned int nCoinbaseSize = 0;
-    // Compute coinbase transaction WITHOUT FEES just to get its size.  We will recompute this at the end when we know the fees.
+    // Compute coinbase transaction WITHOUT FEES just to get its size.  We will recompute this at the end when we know
+    // the fees.
     {
         txNew.vout[0].nValue = 0; // Will be fixed below, but we need to adjust the size for a possible 9 byte varint
         // block height will be fixed below, but we need to adjust the size for a possible 9 byte varint
@@ -155,7 +160,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
         // BU005 add block size settings to the coinbase
         std::string cbmsg = FormatCoinbaseMessage(BUComments, minerComment);
-        const char* cbcstr = cbmsg.c_str();
+        const char *cbcstr = cbmsg.c_str();
         vector<unsigned char> vec(cbcstr, cbcstr + cbmsg.size());
         COINBASE_FLAGS = CScript() << vec;
         // Chop off any extra data in the COINBASE_FLAGS so the sig does not exceed the max.
@@ -165,12 +170,14 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             COINBASE_FLAGS.resize(MAX_COINBASE_SCRIPTSIG_SIZE - txNew.vin[0].scriptSig.size());
         }
         txNew.vin[0].scriptSig = txNew.vin[0].scriptSig + COINBASE_FLAGS;
-        // This code serialized the transaction but the 2 zeros above (nValue and block height) got encoded into 2 bytes, yet these are varints so there is a possible 16 more bytes
+        // This code serialized the transaction but the 2 zeros above (nValue and block height) got encoded into 2
+        // bytes, yet these are varints so there is a possible 16 more bytes
         nCoinbaseSize = txNew.GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION) + 16;
         // BU005 END
     }
 
-    // BU Miners take the block we give them, wipe away our coinbase and add their own.  So if their reserve choice is bigger then our coinbase then use that.
+    // BU Miners take the block we give them, wipe away our coinbase and add their own.  So if their reserve choice is
+    // bigger then our coinbase then use that.
     nBlockSize += std::max(nCoinbaseSize, (unsigned int)coinbaseReserve.value);
 
     uint64_t nBlockTx = 0;
@@ -180,7 +187,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
     {
         LOCK2(cs_main, mempool.cs);
-        CBlockIndex* pindexPrev = chainActive.Tip();
+        CBlockIndex *pindexPrev = chainActive.Tip();
         const int nHeight = pindexPrev->nHeight + 1;
         pblock->nTime = GetAdjustedTime();
         const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
@@ -191,14 +198,15 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         if (chainparams.MineBlocksOnDemand())
             pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
 
-        int64_t nLockTimeCutoff = (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
+        int64_t nLockTimeCutoff =
+            (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
 
         bool fPriorityBlock = nBlockPrioritySize > 0;
         if (fPriorityBlock)
         {
             vecPriority.reserve(mempool.mapTx.size());
-            for (CTxMemPool::indexed_transaction_set::iterator mi = mempool.mapTx.begin();
-                 mi != mempool.mapTx.end(); ++mi)
+            for (CTxMemPool::indexed_transaction_set::iterator mi = mempool.mapTx.begin(); mi != mempool.mapTx.end();
+                 ++mi)
             {
                 double dPriority = mi->GetPriority(nHeight);
                 CAmount dummy;
@@ -236,7 +244,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             if (inBlock.count(iter))
                 continue; // could have been added to the priorityBlock
 
-            const CTransaction& tx = iter->GetTx();
+            const CTransaction &tx = iter->GetTx();
 
             bool fOrphan = false;
             BOOST_FOREACH (CTxMemPool::txiter parent, mempool.GetMemPoolParents(iter))
@@ -257,8 +265,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             }
 
             unsigned int nTxSize = iter->GetTxSize();
-            if (fPriorityBlock &&
-                (nBlockSize + nTxSize >= nBlockPrioritySize || !AllowFree(actualPriority)))
+            if (fPriorityBlock && (nBlockSize + nTxSize >= nBlockPrioritySize || !AllowFree(actualPriority)))
             {
                 fPriorityBlock = false;
                 waitPriMap.clear();
@@ -292,7 +299,8 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                 // BU: be conservative about what is generated
                 if (nBlockSigOps + nTxSigOps >= BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS)
                 {
-                    // BU: so a block that is near the sigops limit might be shorter than it could be if the high sigops tx was backed out and other tx added.
+                    // BU: so a block that is near the sigops limit might be shorter than it could be if the high sigops
+                    // tx was backed out and other tx added.
                     if (nBlockSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS - 2)
                     {
                         break;
@@ -307,7 +315,8 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                 {
                     if (nBlockSigOps > blockMiningSigopsPerMb.value * blockMbSize - 2)
                     {
-                        // very close to the limit, so the block is finished.  So a block that is near the sigops limit might be shorter than it could be if the high sigops tx was backed out and other tx added.
+                        // very close to the limit, so the block is finished.  So a block that is near the sigops limit
+                        // might be shorter than it could be if the high sigops tx was backed out and other tx added.
                         break;
                     }
                     continue; // find another TX
@@ -329,8 +338,8 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                 double dPriority = iter->GetPriority(nHeight);
                 CAmount dummy;
                 mempool.ApplyDeltas(tx.GetHash(), dPriority, dummy);
-                LogPrintf("priority %.1f fee %s txid %s\n",
-                    dPriority, CFeeRate(iter->GetModifiedFee(), nTxSize).ToString(), tx.GetHash().ToString());
+                LogPrintf("priority %.1f fee %s txid %s\n", dPriority,
+                    CFeeRate(iter->GetModifiedFee(), nTxSize).ToString(), tx.GetHash().ToString());
             }
 
             inBlock.insert(iter);
@@ -360,7 +369,8 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         }
         nLastBlockTx = nBlockTx;
         nLastBlockSize = nBlockSize;
-        LogPrintf("CreateNewBlock(): total size %u txs: %u fees: %ld sigops %d\n", nBlockSize, nBlockTx, nFees, nBlockSigOps);
+        LogPrintf(
+            "CreateNewBlock(): total size %u txs: %u fees: %ld sigops %d\n", nBlockSize, nBlockTx, nFees, nBlockSigOps);
 
         // Compute final coinbase transaction.
         txNew.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
@@ -368,7 +378,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
         // BU005 add block size settings to the coinbase
         std::string cbmsg = FormatCoinbaseMessage(BUComments, minerComment);
-        const char* cbcstr = cbmsg.c_str();
+        const char *cbcstr = cbmsg.c_str();
         vector<unsigned char> vec(cbcstr, cbcstr + cbmsg.size());
         COINBASE_FLAGS = CScript() << vec;
         // Chop off any extra data in the COINBASE_FLAGS so the sig does not exceed the max.
@@ -395,26 +405,29 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         {
             if (!TestConservativeBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
             {
-                throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s", __func__, FormatStateMessage(state)));
+                throw std::runtime_error(
+                    strprintf("%s: TestBlockValidity failed: %s", __func__, FormatStateMessage(state)));
             }
         }
         else
         {
             if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
             {
-                throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s", __func__, FormatStateMessage(state)));
+                throw std::runtime_error(
+                    strprintf("%s: TestBlockValidity failed: %s", __func__, FormatStateMessage(state)));
             }
         }
         if (pblock->fExcessive)
         {
-            throw std::runtime_error(strprintf("%s: Excessive block generated: %s", __func__, FormatStateMessage(state)));
+            throw std::runtime_error(
+                strprintf("%s: Excessive block generated: %s", __func__, FormatStateMessage(state)));
         }
     }
 
     return pblocktemplate.release();
 }
 
-void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned int& nExtraNonce)
+void IncrementExtraNonce(CBlock *pblock, const CBlockIndex *pindexPrev, unsigned int &nExtraNonce)
 {
     // Update nExtraNonce
     static uint256 hashPrevBlock;
@@ -450,14 +463,14 @@ void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned
 // nonce is 0xffff0000 or above, the block is rebuilt and nNonce starts over at
 // zero.
 //
-bool static ScanHash(const CBlockHeader* pblock, uint32_t& nNonce, uint256* phash)
+bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phash)
 {
     // Write the first 76 bytes of the block header to a double-SHA256 state.
     CHash256 hasher;
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     ss << *pblock;
     assert(ss.size() == 80);
-    hasher.Write((unsigned char*)&ss[0], 76);
+    hasher.Write((unsigned char *)&ss[0], 76);
 
     while (true)
     {
@@ -465,11 +478,11 @@ bool static ScanHash(const CBlockHeader* pblock, uint32_t& nNonce, uint256* phas
 
         // Write the last 4 bytes of the block header (the nonce) to a copy of
         // the double-SHA256 state, and compute the result.
-        CHash256(hasher).Write((unsigned char*)&nNonce, 4).Finalize((unsigned char*)phash);
+        CHash256(hasher).Write((unsigned char *)&nNonce, 4).Finalize((unsigned char *)phash);
 
         // Return the nonce if the hash has at least some zero bits,
         // caller will check if it has enough to reach the target
-        if (((uint16_t*)phash)[15] == 0)
+        if (((uint16_t *)phash)[15] == 0)
             return true;
 
         // If nothing found after trying for a while, return -1
@@ -478,7 +491,7 @@ bool static ScanHash(const CBlockHeader* pblock, uint32_t& nNonce, uint256* phas
     }
 }
 
-static bool ProcessBlockFound(const CBlock* pblock, const CChainParams& chainparams)
+static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainparams)
 {
     LogPrintf("%s\n", pblock->ToString());
     LogPrintf("generated %s\n", FormatMoney(pblock->vtx[0].vout[0].nValue));
@@ -501,7 +514,7 @@ static bool ProcessBlockFound(const CBlock* pblock, const CChainParams& chainpar
     return true;
 }
 
-void static BitcoinMiner(const CChainParams& chainparams)
+void static BitcoinMiner(const CChainParams &chainparams)
 {
     LogPrintf("BitcoinMiner started\n");
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
@@ -543,15 +556,16 @@ void static BitcoinMiner(const CChainParams& chainparams)
             // Create new block
             //
             unsigned int nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
-            CBlockIndex* pindexPrev = chainActive.Tip();
+            CBlockIndex *pindexPrev = chainActive.Tip();
 
             auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(chainparams, coinbaseScript->reserveScript));
             if (!pblocktemplate.get())
             {
-                LogPrintf("Error in BitcoinMiner: Keypool ran out, please call keypoolrefill before restarting the mining thread\n");
+                LogPrintf("Error in BitcoinMiner: Keypool ran out, please call keypoolrefill before restarting the "
+                          "mining thread\n");
                 return;
             }
-            CBlock* pblock = &pblocktemplate->block;
+            CBlock *pblock = &pblocktemplate->block;
             IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
 
             LogPrintf("Running BitcoinMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
@@ -577,7 +591,8 @@ void static BitcoinMiner(const CChainParams& chainparams)
 
                         SetThreadPriority(THREAD_PRIORITY_NORMAL);
                         LogPrintf("BitcoinMiner:\n");
-                        LogPrintf("proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(), hashTarget.GetHex());
+                        LogPrintf(
+                            "proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(), hashTarget.GetHex());
                         ProcessBlockFound(pblock, chainparams);
                         SetThreadPriority(THREAD_PRIORITY_LOWEST);
                         coinbaseScript->KeepScript();
@@ -605,7 +620,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
                 // Update nTime every few seconds
                 if (UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev) < 0)
                     break; // Recreate the block if the clock has run backwards,
-                           // so that we can use the correct time.
+                // so that we can use the correct time.
                 if (chainparams.GetConsensus().fPowAllowMinDifficultyBlocks)
                 {
                     // Changing pblock->nTime can change work required on testnet:
@@ -614,21 +629,21 @@ void static BitcoinMiner(const CChainParams& chainparams)
             }
         }
     }
-    catch (const boost::thread_interrupted&)
+    catch (const boost::thread_interrupted &)
     {
         LogPrintf("BitcoinMiner terminated\n");
         throw;
     }
-    catch (const std::runtime_error& e)
+    catch (const std::runtime_error &e)
     {
         LogPrintf("BitcoinMiner runtime error: %s\n", e.what());
         return;
     }
 }
 
-void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams& chainparams)
+void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams &chainparams)
 {
-    static boost::thread_group* minerThreads = NULL;
+    static boost::thread_group *minerThreads = NULL;
 
     if (nThreads < 0)
         nThreads = GetNumCores();

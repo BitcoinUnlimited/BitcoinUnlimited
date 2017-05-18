@@ -20,9 +20,10 @@
 
 enum
 {
-    TYPICAL_BLOCK_SIZE = 200000,                // used for initial buffer size
+    TYPICAL_BLOCK_SIZE = 200000, // used for initial buffer size
     DEFAULT_MAX_GENERATED_BLOCK_SIZE = 1000000, // default for the maximum size of mined blocks
-    // Default is 12 to make it very expensive for a minority hash power to get lucky, and potentially drive a block that the rest of the network sees as "excessive" onto the blockchain.
+    // Default is 12 to make it very expensive for a minority hash power to get lucky, and potentially drive a block
+    // that the rest of the network sees as "excessive" onto the blockchain.
     DEFAULT_EXCESSIVE_ACCEPT_DEPTH = 12,
     DEFAULT_EXCESSIVE_BLOCK_SIZE = 16000000,
     DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER = 16, // Allowed messages lengths will be this * the excessive block size
@@ -66,77 +67,86 @@ static const unsigned int DEFAULT_MIN_LIMITFREERELAY = 1;
 // bool InitWarning(const std::string &str);
 
 // Replace Core's ComputeBlockVersion
-int32_t UnlimitedComputeBlockVersion(const CBlockIndex* pindexPrev, const Consensus::Params& params, uint32_t nTime);
+int32_t UnlimitedComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Params &params, uint32_t nTime);
 
 // This API finds a near match to the specified IP address, for example you can
 // leave the port off and it will find the first match to the IP.
 // The function also allows * or ? wildcards.
 // This is useful for the RPC calls.
 // Returns the first node that matches.
-extern CNode* FindLikelyNode(const std::string& addrName);
+extern CNode *FindLikelyNode(const std::string &addrName);
 
 // Convert the BUComments to the string client's "subversion" string
 extern void settingsToUserAgentString();
-// Convert a list of client comments (typically BUcomments) and a custom comment into a string appropriate for the coinbase txn
+// Convert a list of client comments (typically BUcomments) and a custom comment into a string appropriate for the
+// coinbase txn
 // The coinbase size restriction is NOT enforced
-extern std::string FormatCoinbaseMessage(const std::vector<std::string>& comments, const std::string& customComment);
+extern std::string FormatCoinbaseMessage(const std::vector<std::string> &comments, const std::string &customComment);
 
 extern void UnlimitedSetup(void);
 extern void UnlimitedCleanup(void);
 extern std::string UnlimitedCmdLineHelp();
 
 // Called whenever a new block is accepted
-extern void UnlimitedAcceptBlock(const CBlock& block, CValidationState& state, CBlockIndex* ppindex, CDiskBlockPos* dbp);
+extern void UnlimitedAcceptBlock(const CBlock &block,
+    CValidationState &state,
+    CBlockIndex *ppindex,
+    CDiskBlockPos *dbp);
 
-extern void UnlimitedLogBlock(const CBlock& block, const std::string& hash, uint64_t receiptTime);
+extern void UnlimitedLogBlock(const CBlock &block, const std::string &hash, uint64_t receiptTime);
 
 // used during mining
-extern bool TestConservativeBlockValidity(CValidationState& state, const CChainParams& chainparams, const CBlock& block, CBlockIndex* pindexPrev, bool fCheckPOW, bool fCheckMerkleRoot);
+extern bool TestConservativeBlockValidity(CValidationState &state,
+    const CChainParams &chainparams,
+    const CBlock &block,
+    CBlockIndex *pindexPrev,
+    bool fCheckPOW,
+    bool fCheckMerkleRoot);
 
 // Check whether this block is bigger in some metric than we really want to accept
-extern bool CheckExcessive(const CBlock& block, uint64_t blockSize, uint64_t nSigOps, uint64_t nTx, uint64_t largestTx);
+extern bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, uint64_t nTx, uint64_t largestTx);
 
 // Check whether this chain qualifies as excessive.
-extern int isChainExcessive(const CBlockIndex* blk, unsigned int checkDepth = excessiveAcceptDepth);
+extern int isChainExcessive(const CBlockIndex *blk, unsigned int checkDepth = excessiveAcceptDepth);
 
 // Check whether any block N back in this chain is an excessive block
-extern int chainContainsExcessive(const CBlockIndex* blk, unsigned int goBack = 0);
+extern int chainContainsExcessive(const CBlockIndex *blk, unsigned int goBack = 0);
 
 // RPC calls
 
 // RPC Get a particular tweak
-extern UniValue settweak(const UniValue& params, bool fHelp);
+extern UniValue settweak(const UniValue &params, bool fHelp);
 // RPC Set a particular tweak
-extern UniValue gettweak(const UniValue& params, bool fHelp);
+extern UniValue gettweak(const UniValue &params, bool fHelp);
 
-extern UniValue settrafficshaping(const UniValue& params, bool fHelp);
-extern UniValue gettrafficshaping(const UniValue& params, bool fHelp);
-extern UniValue pushtx(const UniValue& params, bool fHelp);
+extern UniValue settrafficshaping(const UniValue &params, bool fHelp);
+extern UniValue gettrafficshaping(const UniValue &params, bool fHelp);
+extern UniValue pushtx(const UniValue &params, bool fHelp);
 
-extern UniValue getminingmaxblock(const UniValue& params, bool fHelp);
-extern UniValue setminingmaxblock(const UniValue& params, bool fHelp);
+extern UniValue getminingmaxblock(const UniValue &params, bool fHelp);
+extern UniValue setminingmaxblock(const UniValue &params, bool fHelp);
 
-extern UniValue getexcessiveblock(const UniValue& params, bool fHelp);
-extern UniValue setexcessiveblock(const UniValue& params, bool fHelp);
+extern UniValue getexcessiveblock(const UniValue &params, bool fHelp);
+extern UniValue setexcessiveblock(const UniValue &params, bool fHelp);
 
 // Get and set the custom string that miners can place into the coinbase transaction
-extern UniValue getminercomment(const UniValue& params, bool fHelp);
-extern UniValue setminercomment(const UniValue& params, bool fHelp);
+extern UniValue getminercomment(const UniValue &params, bool fHelp);
+extern UniValue setminercomment(const UniValue &params, bool fHelp);
 
 // Get and set the generated (mined) block version.  USE CAREFULLY!
-extern UniValue getblockversion(const UniValue& params, bool fHelp);
-extern UniValue setblockversion(const UniValue& params, bool fHelp);
+extern UniValue getblockversion(const UniValue &params, bool fHelp);
+extern UniValue setblockversion(const UniValue &params, bool fHelp);
 
 // RPC Return a list of all available statistics
-extern UniValue getstatlist(const UniValue& params, bool fHelp);
+extern UniValue getstatlist(const UniValue &params, bool fHelp);
 // RPC Get a particular statistic
-extern UniValue getstat(const UniValue& params, bool fHelp);
+extern UniValue getstat(const UniValue &params, bool fHelp);
 
 // RPC debugging Get sizes of every data structure
-extern UniValue getstructuresizes(const UniValue& params, bool fHelp);
+extern UniValue getstructuresizes(const UniValue &params, bool fHelp);
 
 // RPC Set a node to receive expedited blocks from
-UniValue expedited(const UniValue& params, bool fHelp);
+UniValue expedited(const UniValue &params, bool fHelp);
 
 // These variables for traffic shaping need to be globally scoped so the GUI and CLI can adjust the parameters
 extern CLeakyBucket receiveShaper;
@@ -150,46 +160,47 @@ extern CCriticalSection cs_ischainnearlysyncd;
 extern bool IsChainNearlySyncd();
 extern void IsChainNearlySyncdInit();
 extern uint64_t LargestBlockSeen(uint64_t nBlockSize = 0);
-extern void LoadFilter(CNode* pfrom, CBloomFilter* filter);
-extern void HandleBlockMessage(CNode* pfrom, const std::string& strCommand, CBlock& block, const CInv& inv);
+extern void LoadFilter(CNode *pfrom, CBloomFilter *filter);
+extern void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, CBlock &block, const CInv &inv);
 
-extern CSemaphore* semOutboundAddNode;
+extern CSemaphore *semOutboundAddNode;
 extern CStatHistory<uint64_t> recvAmt;
 extern CStatHistory<uint64_t> sendAmt;
 
 // Connection Slot mitigation - used to track connection attempts and evictions
 struct ConnectionHistory
 {
-    double nConnections;         // number of connection attempts made within 1 minute
+    double nConnections; // number of connection attempts made within 1 minute
     int64_t nLastConnectionTime; // the time the last connection attempt was made
 
-    double nEvictions;         // number of times a connection was de-prioritized and disconnected in last 30 minutes
+    double nEvictions; // number of times a connection was de-prioritized and disconnected in last 30 minutes
     int64_t nLastEvictionTime; // the time the last eviction occurred.
 };
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
 extern CCriticalSection cs_mapInboundConnectionTracker;
 
 // statistics
-void UpdateSendStats(CNode* pfrom, const char* strCommand, int msgSize, int64_t nTime);
+void UpdateSendStats(CNode *pfrom, const char *strCommand, int msgSize, int64_t nTime);
 
-void UpdateRecvStats(CNode* pfrom, const std::string& strCommand, int msgSize, int64_t nTimeReceived);
+void UpdateRecvStats(CNode *pfrom, const std::string &strCommand, int msgSize, int64_t nTimeReceived);
 // txn mempool statistics
 extern CStatHistory<unsigned int, MinValMax<unsigned int> > txAdded;
 extern CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize;
 
 // Configuration variable validators
-bool MiningAndExcessiveBlockValidatorRule(const unsigned int newExcessiveBlockSize, const unsigned int newMiningBlockSize);
-std::string ExcessiveBlockValidator(const unsigned int& value, unsigned int* item, bool validate);
-std::string OutboundConnectionValidator(const int& value, int* item, bool validate);
-std::string SubverValidator(const std::string& value, std::string* item, bool validate);
-std::string MiningBlockSizeValidator(const uint64_t& value, uint64_t* item, bool validate);
+bool MiningAndExcessiveBlockValidatorRule(const unsigned int newExcessiveBlockSize,
+    const unsigned int newMiningBlockSize);
+std::string ExcessiveBlockValidator(const unsigned int &value, unsigned int *item, bool validate);
+std::string OutboundConnectionValidator(const int &value, int *item, bool validate);
+std::string SubverValidator(const std::string &value, std::string *item, bool validate);
+std::string MiningBlockSizeValidator(const uint64_t &value, uint64_t *item, bool validate);
 
 extern CTweak<unsigned int> maxTxSize;
 extern CTweak<uint64_t> blockSigopsPerMb;
 extern CTweak<uint64_t> coinbaseReserve;
 extern CTweak<uint64_t> blockMiningSigopsPerMb;
 
-extern std::list<CStatBase*> mallocedStats;
+extern std::list<CStatBase *> mallocedStats;
 
 
 #endif
