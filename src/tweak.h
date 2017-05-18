@@ -24,11 +24,14 @@ class CTweakBase
 {
 public:
     CTweakBase(){};
-    virtual std::string GetName() const = 0;                                     // Returns the name of this statistic
-    virtual std::string GetHelp() const = 0;                                     // Returns the help for this statistic
-    virtual UniValue Get() const = 0;                                            // Returns the current value of this statistic
-    virtual UniValue Set(const UniValue& val) = 0;                               // Returns NullUnivalue or an error string
-    virtual std::string Validate(const UniValue& val) { return std::string(); }; // Returns NullUnivalue or an error string
+    virtual std::string GetName() const = 0; // Returns the name of this statistic
+    virtual std::string GetHelp() const = 0; // Returns the help for this statistic
+    // Returns the current value of this statistic
+    virtual UniValue Get() const = 0;
+    // Returns NullUnivalue or an error string
+    virtual UniValue Set(const UniValue& val) = 0;
+    // Returns NullUnivalue or an error string
+    virtual std::string Validate(const UniValue& val) { return std::string(); };
 };
 
 
@@ -96,7 +99,7 @@ inline void fill(const UniValue& v, bool& output)
 
 // Checks if two given strings match. The first string may contain wildcard characters
 bool match(const char* first, const char* second);
-  
+
 /** A configuration parameter that is automatically hooked up to
  * bitcoin.conf, bitcoin-cli, and is available as a command line argument
  */

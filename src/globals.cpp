@@ -8,41 +8,41 @@
 // Independent global variables may be placed here for organizational
 // purposes.
 
+#include "addrman.h"
+#include "alert.h"
 #include "chain.h"
-#include "clientversion.h"
 #include "chainparams.h"
-#include "miner.h"
+#include "clientversion.h"
 #include "consensus/consensus.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "leakybucket.h"
 #include "main.h"
+#include "miner.h"
 #include "net.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
 #include "rpcserver.h"
+#include "stat.h"
 #include "thinblock.h"
 #include "timedata.h"
 #include "tinyformat.h"
-#include "txmempool.h"
-#include "unlimited.h"
-#include "utilstrencodings.h"
-#include "ui_interface.h"
-#include "util.h"
-#include "validationinterface.h"
-#include "alert.h"
-#include "version.h"
-#include "stat.h"
 #include "tweak.h"
-#include "addrman.h"
+#include "txmempool.h"
+#include "ui_interface.h"
+#include "unlimited.h"
+#include "util.h"
+#include "utilstrencodings.h"
+#include "validationinterface.h"
+#include "version.h"
 
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
-#include <iomanip>
 #include <boost/thread.hpp>
 #include <inttypes.h>
-#include <queue>
+#include <iomanip>
 #include <list>
+#include <queue>
 
 using namespace std;
 
@@ -51,7 +51,6 @@ boost::mutex dd_mutex;
 std::map<std::pair<void*, void*>, LockStack> lockorders;
 boost::thread_specific_ptr<LockStack> lockstack;
 #endif
-
 
 
 // main.cpp CriticalSections:
@@ -110,7 +109,7 @@ CCriticalSection cs_xpedited;
 
 // semaphore for parallel validation threads
 CCriticalSection cs_semPV;
-CSemaphore *semPV;
+CSemaphore* semPV;
 
 deque<string> vOneShots;
 std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
@@ -124,7 +123,7 @@ unsigned int excessiveAcceptDepth = DEFAULT_EXCESSIVE_ACCEPT_DEPTH;
 unsigned int maxMessageSizeMultiplier = DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER;
 int nMaxOutConnections = DEFAULT_MAX_OUTBOUND_CONNECTIONS;
 
-uint32_t blockVersion = 0;  // Overrides the mined block version if non-zero
+uint32_t blockVersion = 0; // Overrides the mined block version if non-zero
 
 std::vector<std::string> BUComments = std::vector<std::string>();
 std::string minerComment;
@@ -143,9 +142,9 @@ CLeakyBucket sendShaper(DEFAULT_MAX_SEND_BURST, DEFAULT_AVE_SEND);
 boost::chrono::steady_clock CLeakyBucket::clock;
 
 // Variables for statistics tracking, must be before the "requester" singleton instantiation
-const char* sampleNames[] = { "sec10", "min5", "hourly", "daily","monthly"};
-int operateSampleCount[] = { 30,       12,   24,  30 };
-int interruptIntervals[] = { 30,       30*12,   30*12*24,   30*12*24*30 };
+const char* sampleNames[] = {"sec10", "min5", "hourly", "daily", "monthly"};
+int operateSampleCount[] = {30, 12, 24, 30};
+int interruptIntervals[] = {30, 30 * 12, 30 * 12 * 24, 30 * 12 * 24 * 30};
 
 CTxMemPool mempool(::minRelayTxFee);
 
@@ -163,8 +162,8 @@ limitedmap<uint256, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
 
 vector<CNode*> vNodes;
 list<CNode*> vNodesDisconnected;
-CSemaphore*  semOutbound = NULL;
-CSemaphore*  semOutboundAddNode = NULL; // BU: separate semaphore for -addnodes
+CSemaphore* semOutbound = NULL;
+CSemaphore* semOutboundAddNode = NULL; // BU: separate semaphore for -addnodes
 CNodeSignals g_signals;
 CAddrMan addrman;
 
@@ -226,12 +225,12 @@ CTweak<CAmount> maxTxFee("wallet.maxTxFee",
     DEFAULT_TRANSACTION_MAXFEE);
 
 /** Number of blocks that can be requested at any given time from a single peer. */
-CTweak<unsigned int> maxBlocksInTransitPerPeer("net.maxBlocksInTransitPerPeer","Number of blocks that can be requested at any given time from a single peer. 0 means use algorithm.",0);
+CTweak<unsigned int> maxBlocksInTransitPerPeer("net.maxBlocksInTransitPerPeer", "Number of blocks that can be requested at any given time from a single peer. 0 means use algorithm.", 0);
 /** Size of the "block download window": how far ahead of our current height do we fetch?
  *  Larger windows tolerate larger download speed differences between peer, but increase the potential
  *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
  *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
-CTweak<unsigned int> blockDownloadWindow("net.blockDownloadWindow","How far ahead of our current height do we fetch? 0 means use algorithm.",0);
+CTweak<unsigned int> blockDownloadWindow("net.blockDownloadWindow", "How far ahead of our current height do we fetch? 0 means use algorithm.", 0);
 
 /** This is the initial size of CFileBuffer's RAM buffer during reindex.  A 
 larger size will result in a tiny bit better performance if blocks are that 
@@ -239,21 +238,21 @@ size.
 The real purpose of this parameter is to exhaustively test dynamic buffer resizes
 during reindexing by allowing the size to be set to low and random values.
 */
-CTweak<uint64_t> reindexTypicalBlockSize("reindex.typicalBlockSize","Set larger than the typical block size.  The block data file's RAM buffer will initally be 2x this size.",TYPICAL_BLOCK_SIZE);
+CTweak<uint64_t> reindexTypicalBlockSize("reindex.typicalBlockSize", "Set larger than the typical block size.  The block data file's RAM buffer will initally be 2x this size.", TYPICAL_BLOCK_SIZE);
 
 
-CRequestManager requester;  // after the maps nodes and tweaks
+CRequestManager requester; // after the maps nodes and tweaks
 
 CStatHistory<unsigned int, MinValMax<unsigned int> > txAdded; //"memPool/txAdded");
-CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize; // "memPool/size",STAT_OP_AVE);
-CStatHistory<uint64_t > recvAmt; 
-CStatHistory<uint64_t > sendAmt; 
+CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize;        // "memPool/size",STAT_OP_AVE);
+CStatHistory<uint64_t> recvAmt;
+CStatHistory<uint64_t> sendAmt;
 CStatHistory<uint64_t> nTxValidationTime("txValidationTime", STAT_OP_MAX | STAT_INDIVIDUAL);
 CStatHistory<uint64_t> nBlockValidationTime("blockValidationTime", STAT_OP_MAX | STAT_INDIVIDUAL);
 
 CThinBlockData thindata; // Singleton class
 
 // Expedited blocks
-std::vector<CNode*> xpeditedBlk; // (256,(CNode*)NULL);    // Who requested expedited blocks from us
+std::vector<CNode*> xpeditedBlk;   // (256,(CNode*)NULL);    // Who requested expedited blocks from us
 std::vector<CNode*> xpeditedBlkUp; //(256,(CNode*)NULL);  // Who we requested expedited blocks from
-std::vector<CNode*> xpeditedTxn; // (256,(CNode*)NULL);  
+std::vector<CNode*> xpeditedTxn;   // (256,(CNode*)NULL);
