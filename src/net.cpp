@@ -1707,7 +1707,7 @@ void ThreadBitnodesAddressSeed()
         {
             SplitHostPort(seed, portOut, hostOut);
             CNetAddr ip(hostOut);
-            CAddress addr = CAddress(CService(ip, portOut));
+            CAddress addr = CAddress(CService(ip, portOut), NODE_NETWORK);
             addr.nTime = GetTime();
             vAdd.push_back(addr);
         }
@@ -1780,10 +1780,12 @@ void ThreadDNSAddressSeed()
         if (HaveNameProxy())
         {
             AddOneShot(seed.host);
-        } else {
+        }
+        else
+        {
             std::vector<CNetAddr> vIPs;
             std::vector<CAddress> vAdd;
-            uint64_t requiredServiceBits(nRelevantServices);
+            uint64_t requiredServiceBits = nRelevantServices;
             if (LookupHost(GetDNSHost(seed, requiredServiceBits).c_str(), vIPs, 0, true))
             {
                 BOOST_FOREACH (const CNetAddr &ip, vIPs)
@@ -1882,7 +1884,7 @@ void ThreadOpenConnections()
             BOOST_FOREACH (const std::string &strAddr, mapMultiArgs["-connect"])
             {
                 CAddress addr(CService(), 0);
-                //NOTE: Because the only nodes we are connecting to here are the ones the user explicitly specified
+                // NOTE: Because the only nodes we are connecting to here are the ones the user explicitly specified
                 //      with "-connect", we don't use the semaphore to limit outbound connections
                 OpenNetworkConnection(addr, false, NULL, strAddr.c_str());
                 for (int i = 0; i < 10 && i < nLoop; i++)
