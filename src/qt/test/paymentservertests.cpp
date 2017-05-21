@@ -179,15 +179,17 @@ void PaymentServerTests::paymentServerTests()
     QCOMPARE(PaymentServer::verifyExpired(r.paymentRequest.getDetails()), true);
 
     // Test BIP70 DoS protection:
-    unsigned char randData[BIP70_MAX_PAYMENTREQUEST_SIZE + 1];
-    GetRandBytes(randData, sizeof(randData));
+    const qint64 bip70mps = BIP70_MAX_PAYMENTREQUEST_SIZE + 1;
+    unsigned char* randData = new unsigned char[bip70mps];
+    GetRandBytes(randData, sizeof(unsigned char) * bip70mps);
     // Write data to a temp file:
     QTemporaryFile tempFile;
     tempFile.open();
-    tempFile.write((const char*)randData, sizeof(randData));
+    tempFile.write((const char*)randData, sizeof(unsigned char) * bip70mps);
     tempFile.close();
     // compares 50001 <= BIP70_MAX_PAYMENTREQUEST_SIZE == false
     QCOMPARE(PaymentServer::verifySize(tempFile.size()), false);
+    delete [] randData;
 
     // Payment request with amount overflow (amount is set to 21000001 BTC):
     data = DecodeBase64(paymentrequest5_cert2_BASE64);
