@@ -61,7 +61,7 @@ enum DeploymentPos
 /**
  * Struct for each individual consensus rule change using BIP9.
  */
-struct BIP9Deployment
+struct ForkDeployment
 {
     /** Bit position to select the particular bit in nVersion. */
     int bit;
@@ -107,7 +107,7 @@ struct Params
      */
     // bip135 begin
     // fully initialize array
-    BIP9Deployment vDeployments[MAX_VERSION_BITS_DEPLOYMENTS] = {
+    ForkDeployment vDeployments[MAX_VERSION_BITS_DEPLOYMENTS] = {
             { 0, 0LL, 0LL, 0, 0, 0, 0LL },  // deployment on bit 0
             { 1, 0LL, 0LL, 0, 0, 0, 0LL },  // deployment on bit 1
             { 2, 0LL, 0LL, 0, 0, 0, 0LL },  // deployment on bit 2
