@@ -3,6 +3,7 @@
 # Copyright (c) 2016-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 import test_framework.loginit
 from test_framework.mininode import *
 from test_framework.test_framework import BitcoinTestFramework
