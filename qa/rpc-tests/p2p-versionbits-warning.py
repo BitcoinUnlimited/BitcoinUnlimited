@@ -3,24 +3,29 @@
 # Copyright (c) 2016-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
+"""Test version bits warning system.
+
+Generate chains with block versions that appear to be signalling unknown
+forks, and test that warning alerts are generated.
+"""
 
 from test_framework.mininode import *
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
+import re
 import time
 from test_framework.blocktools import create_block, create_coinbase
 
-'''
-Test version bits' warning system.
-
-Generate chains with block versions that appear to be signalling unknown
-forks, and test that warning alerts are generated.
-'''
-
 # bip135 begin
-# modified from 108/144 to 50/100 for new unknown versions algo
+# modified from 108/144 to 51/100 for new unknown versions algo
 VB_PERIOD = 100 # unknown versionbits period length
-VB_THRESHOLD = 50 # unknown versionbits warning level
+VB_THRESHOLD = 51 # unknown versionbits warning level
+WARN_UNKNOWN_RULES_MINED = "Unknown block versions being mined! It's possible unknown rules are in effect"
+# the warning echo'd by alertnotify is sanitized
+WARN_UNKNOWN_RULES_MINED_SANITIZED = re.compile("^Warning: Unknown block versions being mined Its possible unknown rules are in effect")
+# After BIP135, a client cannot know whether an unknown version bit has gone ACTIVE
+# since the activation threshold of unknown bits is ... unknown.
+VB_PATTERN = re.compile("^Warning.*versionbit")
 # bip135 end
 VB_TOP_BITS = 0x20000000
 VB_UNKNOWN_BIT = 27 # Choose a bit unassigned to any deployment
@@ -70,16 +75,11 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         self.nodes = []
         self.alert_filename = os.path.join(self.options.tmpdir, "alert.txt")
         # Open and close to create zero-length file
-        with open(self.alert_filename, 'w') as f:
+        with open(self.alert_filename, 'w', encoding='utf8') as _:
             pass
-        self.node_options = ["-debug", "-logtimemicros=1", "-whitelist=127.0.0.1", "-alertnotify=echo %s >> \"" + self.alert_filename + "\""]
+        self.node_options = ["-debug", "-logtimemicros=1", "-whitelist=127.0.0.1",
+                             "-alertnotify=echo %s >> \"" + self.alert_filename + "\""]
         self.nodes.append(start_node(0, self.options.tmpdir, self.node_options))
-
-        import re
-        # bip135 begin
-        # with new unknown version algo, warning has changed.
-        self.vb_pattern = re.compile("^Warning: Unknown block versions being mined Its possible unknown rules are in effect")
-        # bip135 end
 
     # Send numblocks blocks via peer with nVersionToUse set.
     def send_blocks_with_version(self, peer, numblocks, nVersionToUse):
@@ -99,9 +99,9 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         peer.sync_with_ping()
 
     def test_versionbits_in_alert_file(self):
-        with open(self.alert_filename, 'r') as f:
+        with open(self.alert_filename, 'r', encoding='utf8') as f:
             alert_text = f.read()
-        assert(self.vb_pattern.match(alert_text))
+        assert(WARN_UNKNOWN_RULES_MINED_SANITIZED.match(alert_text))
 
     def run_test(self):
         # Setup the p2p connection and start up the network thread.
@@ -123,7 +123,7 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         # 2. Now build one period of blocks on the tip, with < VB_THRESHOLD
         # blocks signaling some unknown bit.
         nVersion = VB_TOP_BITS | (1<<VB_UNKNOWN_BIT)
-        for i in range(VB_THRESHOLD-1):
+        for i in range(VB_THRESHOLD - 1):
             self.send_blocks_with_version(test_node, 1, nVersion)
             test_node.sync_with_ping()
         assert(self.nodes[0].getblockcount() ==  VB_PERIOD + VB_THRESHOLD - 1)
@@ -131,22 +131,26 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         # Fill rest of period with regular version blocks
         self.nodes[0].generate(VB_PERIOD - VB_THRESHOLD + 1)
         # Check that we're not getting any versionbit-related errors in
-        # getinfo()
-        assert(not self.vb_pattern.match(self.nodes[0].getinfo()["errors"]))
+        # get*info()
+        assert(not VB_PATTERN.match(self.nodes[0].getinfo()["errors"]))
+        assert(not VB_PATTERN.match(self.nodes[0].getmininginfo()["errors"]))
+        assert(not VB_PATTERN.match(self.nodes[0].getnetworkinfo()["warnings"]))
         assert(self.nodes[0].getblockcount() ==  VB_PERIOD * 2)
 
         # 3. Now build one period of blocks with > VB_THRESHOLD blocks signaling
         # some unknown bit
-        for i in range(VB_THRESHOLD + 1):
+        for i in range(VB_THRESHOLD):
             self.send_blocks_with_version(test_node, 1, nVersion)
             test_node.sync_with_ping()
-           # time.sleep(0.05)
-        assert(self.nodes[0].getblockcount() ==  VB_PERIOD * 2 + VB_THRESHOLD + 1)
-        self.nodes[0].generate(VB_PERIOD - VB_THRESHOLD - 1)
+        assert(self.nodes[0].getblockcount() ==  VB_PERIOD * 2 + VB_THRESHOLD)
+        self.nodes[0].generate(VB_PERIOD - VB_THRESHOLD)
         # Might not get a versionbits-related alert yet, as we should
         # have gotten a different alert due to more than 50/100 blocks
         # being of unexpected version.
-        # Check that getinfo() shows some kind of error.
+        # Check that get*info() shows some kind of error.
+        assert(WARN_UNKNOWN_RULES_MINED in self.nodes[0].getinfo()["errors"])
+        assert(WARN_UNKNOWN_RULES_MINED in self.nodes[0].getmininginfo()["errors"])
+        assert(WARN_UNKNOWN_RULES_MINED in self.nodes[0].getnetworkinfo()["warnings"])
         assert(len(self.nodes[0].getinfo()["errors"]) != 0)
         self.test_versionbits_in_alert_file()
 
@@ -161,9 +165,10 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         stop_node(self.nodes[0], 0)
         wait_bitcoinds()
         # Empty out the alert file
-        with open(self.alert_filename, 'w') as f:
+        with open(self.alert_filename, 'w', encoding='utf8') as f:
             pass
-        self.nodes[0] = start_node(0, self.options.tmpdir, ["-debug", "-logtimemicros=1", "-alertnotify=echo %s >> \"" + self.alert_filename + "\""])
+        self.nodes[0] = start_node(0, self.options.tmpdir, ["-debug", "-logtimemicros=1",
+                                   "-alertnotify=echo %s >> \"" + self.alert_filename + "\""])
 
         # Since there are no unknown versionbits exceeding threshold in last period,
         # no error will be generated.
@@ -174,7 +179,8 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         wait_bitcoinds()
 
         # Test framework expects the node to still be running...
-        self.nodes[0] = start_node(0, self.options.tmpdir, ["-debug", "-logtimemicros=1", "-alertnotify=echo %s >> \"" + self.alert_filename + "\""])
+        self.nodes[0] = start_node(0, self.options.tmpdir, ["-debug", "-logtimemicros=1",
+                                   "-alertnotify=echo %s >> \"" + self.alert_filename + "\""])
 
 
 if __name__ == '__main__':
