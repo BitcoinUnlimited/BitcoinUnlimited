@@ -118,7 +118,7 @@ bool AppInit(int argc, char *argv[])
 
     // bip135 begin
     // dump default deployment info and exit, if requested
-    if (mapArgs.count("-dumpforks")) {
+    if (GetBoolArg("-dumpforks", false)) {
         std::string strVersion = "# " + strprintf(_("%s Daemon"), _(PACKAGE_NAME)) + " " + _("version") + " " + FormatFullVersion();
         fprintf(stdout, "%s\n%s", strVersion.c_str(), FORKS_CSV_FILE_HEADER);
         fprintf(stdout, "%s", NetworkDeploymentInfoCSV(CBaseChainParams::MAIN).c_str());
