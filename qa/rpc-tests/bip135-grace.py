@@ -183,14 +183,12 @@ class BIP135ForksTest(ComparisonTestFramework):
         while tip_mediantime < self.fork_starttime or self.height % 10:
             test_blocks = self.generate_blocks(1, 0x20000000)
             yield TestInstance(test_blocks, sync_every_block=False)
-            time.sleep(3)  # need to actually give daemon a little time to change the state
             bcinfo = self.nodes[0].getblockchaininfo()
             tip_mediantime = int(bcinfo['mediantime'])
             for f in self.defined_forks:
                 # transition to STARTED must occur if this is true
                 if tip_mediantime >= self.fork_starttime and self.height % 10 == 0:
                     moved_to_started = True
-                    time.sleep(3)  # need to actually give daemon a little time to change the state
 
                 if moved_to_started:
                     assert_equal(bcinfo['bip135_forks'][f]['status'], 'started')
@@ -234,7 +232,6 @@ class BIP135ForksTest(ComparisonTestFramework):
 
         test_blocks = self.generate_blocks(10, 0x20000000)
         yield TestInstance(test_blocks, sync_every_block=False)
-        time.sleep(3)
         bcinfo = self.nodes[0].getblockchaininfo()
         activation_states = [ bcinfo['bip135_forks'][f]['status'] for f in self.defined_forks ]
         assert_equal(activation_states, ['active',
@@ -257,7 +254,6 @@ class BIP135ForksTest(ComparisonTestFramework):
         # check the ones supposed to activate at next+1 sync
         test_blocks = self.generate_blocks(10, 0x20000000)
         yield TestInstance(test_blocks, sync_every_block=False)
-        time.sleep(3)
         bcinfo = self.nodes[0].getblockchaininfo()
         activation_states = [ bcinfo['bip135_forks'][f]['status'] for f in self.defined_forks ]
         assert_equal(activation_states, ['active',
@@ -280,7 +276,6 @@ class BIP135ForksTest(ComparisonTestFramework):
         # check the ones supposed to activate at next+2 period
         test_blocks = self.generate_blocks(10, 0x20000000)
         yield TestInstance(test_blocks, sync_every_block=False)
-        time.sleep(3)
         bcinfo = self.nodes[0].getblockchaininfo()
         activation_states = [ bcinfo['bip135_forks'][f]['status'] for f in self.defined_forks ]
         assert_equal(activation_states, ['active',
@@ -303,7 +298,6 @@ class BIP135ForksTest(ComparisonTestFramework):
         # check the ones supposed to activate at next+2 period
         test_blocks = self.generate_blocks(10, 0x20000000)
         yield TestInstance(test_blocks, sync_every_block=False)
-        time.sleep(3)
         bcinfo = self.nodes[0].getblockchaininfo()
         activation_states = [ bcinfo['bip135_forks'][f]['status'] for f in self.defined_forks ]
         assert_equal(activation_states, ['active',
