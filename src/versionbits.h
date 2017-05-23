@@ -36,7 +36,7 @@ enum ThresholdState {
 // will either be NULL or a block with (height + 1) % Period() == 0.
 typedef std::map<const CBlockIndex *, ThresholdState> ThresholdConditionCache;
 
-struct BIP9DeploymentInfo
+struct ForkDeploymentInfo
 {
     /** Deployment name */
     char *name;   // bip135: removed const to allow update from CSV
@@ -44,7 +44,7 @@ struct BIP9DeploymentInfo
     bool gbt_force;
 };
 
-extern struct BIP9DeploymentInfo VersionBitsDeploymentInfo[];
+extern struct ForkDeploymentInfo VersionBitsDeploymentInfo[];
 
 /**
  * Abstract class that implements BIP9-style threshold logic, and caches results.

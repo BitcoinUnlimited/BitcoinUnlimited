@@ -506,8 +506,8 @@ void SelectParams(const std::string &network)
  */
 bool isConfiguredDeployment(const Consensus::Params& consensusParams, const int bit)
 {
-    const Consensus::BIP9Deployment *vdeployments = consensusParams.vDeployments;
-    const struct BIP9DeploymentInfo& vbinfo = VersionBitsDeploymentInfo[bit];
+    const Consensus::ForkDeployment *vdeployments = consensusParams.vDeployments;
+    const struct ForkDeploymentInfo& vbinfo = VersionBitsDeploymentInfo[bit];
 
     if (strlen(vbinfo.name) == 0)
         return false;
@@ -522,14 +522,14 @@ bool isConfiguredDeployment(const Consensus::Params& consensusParams, const int 
 const std::string NetworkDeploymentInfoCSV(const std::string& network)
 {
     const Consensus::Params& consensusParams = Params(network).GetConsensus();;
-    const Consensus::BIP9Deployment *vdeployments = consensusParams.vDeployments;
+    const Consensus::ForkDeployment *vdeployments = consensusParams.vDeployments;
 
     std::string networkInfoStr;
     networkInfoStr = "# deployment info for network '" + network + "':\n";
 
     for (int bit = 0; bit < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; bit++)
     {
-        const struct BIP9DeploymentInfo& vbinfo = VersionBitsDeploymentInfo[bit];
+        const struct ForkDeploymentInfo& vbinfo = VersionBitsDeploymentInfo[bit];
         if (isConfiguredDeployment(consensusParams, bit)) {
             networkInfoStr += network + ",";
             networkInfoStr += std::to_string(bit) + ",";
