@@ -21,7 +21,6 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "unlimited.h"
-//#include "versionbits.h"
 #include "forks_csv.h"
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -119,12 +118,14 @@ bool AppInit(int argc, char *argv[])
     // bip135 begin
     // dump default deployment info and exit, if requested
     if (GetBoolArg("-dumpforks", false)) {
-        std::string strVersion = "# " + strprintf(_("%s Daemon"), _(PACKAGE_NAME)) + " " + _("version") + " " + FormatFullVersion();
-        fprintf(stdout, "%s\n%s", strVersion.c_str(), FORKS_CSV_FILE_HEADER);
-        fprintf(stdout, "%s", NetworkDeploymentInfoCSV(CBaseChainParams::MAIN).c_str());
-        fprintf(stdout, "%s", NetworkDeploymentInfoCSV(CBaseChainParams::UNL).c_str());
-        fprintf(stdout, "%s", NetworkDeploymentInfoCSV(CBaseChainParams::TESTNET).c_str());
-        fprintf(stdout, "%s", NetworkDeploymentInfoCSV(CBaseChainParams::REGTEST).c_str());
+        std::stringstream ss;
+        ss << "# " << strprintf(_("%s Daemon"), _(PACKAGE_NAME)) << " " << _("version") << " " << FormatFullVersion();
+        ss << "\n" << FORKS_CSV_FILE_HEADER;
+        ss << NetworkDeploymentInfoCSV(CBaseChainParams::MAIN);
+        ss << NetworkDeploymentInfoCSV(CBaseChainParams::UNL);
+        ss << NetworkDeploymentInfoCSV(CBaseChainParams::TESTNET);
+        ss << NetworkDeploymentInfoCSV(CBaseChainParams::REGTEST);
+        std::cout << ss.str();
         return true;
     }
     // bip135 end
