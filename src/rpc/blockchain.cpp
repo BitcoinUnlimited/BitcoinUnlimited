@@ -794,7 +794,7 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
             "  ],\n"
             "  \"bip9_softforks\": {          (object) status of BIP9 softforks in progress\n"
             "     \"xxxx\" : {                (string) name of the softfork\n"
-            "        \"status\": \"xxxx\",    (string) one of \"defined\", \"started\", \"lockedin\", \"active\", "
+            "        \"status\": \"xxxx\",      (string) one of \"defined\", \"started\", \"lockedin\", \"active\", "
             "\"failed\"\n"
             "        \"bit\": xx,             (numeric) the bit, 0-28, in the block version field used to signal this "
             "soft fork\n"
@@ -804,6 +804,19 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
             "considered failed if not yet locked in\n"
             "     }\n"
             "  }\n"
+            // bip135 begin
+            "  \"bip135_forks\": {            (object) status of BIP135 forks in progress\n"
+            "     \"xxxx\" : {                (string) name of the fork\n"
+            "        \"status\": \"xxxx\",      (string) one of \"defined\", \"started\", \"locked_in\", \"active\", \"failed\"\n"
+            "        \"bit\": xx,             (numeric) the bit (0-28) in the block version field used to signal this fork (only for \"started\" status)\n"
+            "        \"startTime\": xx,       (numeric) the minimum median time past of a block at which the bit gains its meaning\n"
+            "        \"windowsize\": xx,      (numeric) the number of blocks over which the fork status is tallied\n"
+            "        \"threshold\": xx,       (numeric) the number of blocks in a window that must signal for fork to lock in\n"
+            "        \"minlockedblocks\": xx, (numeric) the minimum number of blocks to elapse after lock-in and before activation\n"
+            "        \"minlockedtime\": xx,   (numeric) the minimum number of seconds to elapse after median time past of lock-in until activation\n"
+            "     }\n"
+            "  }\n"
+            // bip135 end
             "}\n"
             "\nExamples:\n" +
             HelpExampleCli("getblockchaininfo", "") + HelpExampleRpc("getblockchaininfo", ""));
