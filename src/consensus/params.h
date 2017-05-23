@@ -59,7 +59,7 @@ enum DeploymentPos
 };
 
 /**
- * Struct for each individual consensus rule change using BIP9.
+ * Struct for each individual consensus rule change using BIP135.
  */
 struct ForkDeployment
 {
@@ -97,11 +97,6 @@ struct Params
     int BIP65Height;
     /** Block height at which BIP66 becomes active */
     int BIP66Height;
-    /**
-     * Minimum blocks including miner confirmation of the total of 2016 blocks in a retargetting period,
-     * (nPowTargetTimespan / nPowTargetSpacing) which is also used for BIP9 deployments.
-     * Examples: 1916 for 95%, 1512 for testchains.
-     */
     /**
      * Deployment parameters for the 29 bits (0..28) defined by bip135
      */

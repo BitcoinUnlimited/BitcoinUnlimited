@@ -658,8 +658,8 @@ UniValue mkblocktemplate(const UniValue &params, CBlock *pblockOut)
         // blocks
         // This is safe to do [otherwise-]unconditionally only because we are throwing an exception above if a non-force
         // deployment gets activated
-        // Note that this can probably also be removed entirely after the first BIP9 non-force deployment (ie, probably
-        // segwit) gets activated
+        // Note that this can probably also be removed entirely after the first BIP9/BIP135 non-force deployment
+        // (ie, segwit) gets activated
         aMutable.push_back("version/force");
     }
 
