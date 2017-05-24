@@ -130,6 +130,12 @@ struct ForkDeploymentInfo VersionBitsDeploymentInfo[Consensus::MAX_VERSION_BITS_
 
 
 // bip135 begin
+bool AbstractThresholdConditionChecker::backAtDefined(ThresholdConditionCache &cache, const CBlockIndex *pindex) const
+{
+    return (cache.count(pindex) && cache[pindex] == THRESHOLD_DEFINED);
+}
+
+
 // major adaptations to generalize and support new grace period parameters
 ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex *pindexPrev,
     const Consensus::Params &params,
@@ -159,8 +165,8 @@ ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex 
 
     // Walk backwards in steps of nPeriod to find a pindexPrev which was DEFINED
     std::vector<const CBlockIndex*> vToCompute;
-    bool backAtDefined = (cache.count(pindexPrev) && cache[pindexPrev] == THRESHOLD_DEFINED);
-    while (!backAtDefined) {
+
+    while (!backAtDefined(cache, (const CBlockIndex *) pindexPrev)) {
         if (pindexPrev == NULL) {
             // The genesis block is by definition defined.
             cache[pindexPrev] = THRESHOLD_DEFINED;
@@ -177,10 +183,6 @@ ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex 
         vToCompute.push_back(pindexPrev);
         // go back one more period
         pindexPrev = pindexPrev->GetAncestor(pindexPrev->nHeight - nPeriod);
-
-        if (cache.count(pindexPrev) > 0 && cache[pindexPrev] == THRESHOLD_DEFINED) {
-            backAtDefined = true;
-        }
     }
 
     // At this point, cache[pindexPrev] is known
