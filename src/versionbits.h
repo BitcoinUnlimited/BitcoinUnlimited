@@ -67,6 +67,9 @@ public:
     ThresholdState GetStateFor(const CBlockIndex *pindexPrev,
         const Consensus::Params &params,
         ThresholdConditionCache &cache) const;
+    // bip135 begin
+    bool backAtDefined(ThresholdConditionCache &cache, const CBlockIndex *pindex) const;
+    // bip135 end
 };
 
 struct VersionBitsCache
