@@ -1754,14 +1754,16 @@ int32_t ComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Para
     LOCK(cs_main);
     int32_t nVersion = VERSIONBITS_TOP_BITS;
 
-    for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++) {
+    for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++)
+    {
         // bip135 begin
         // guard this because not all deployments have window/threshold
         if (isConfiguredDeployment(params, i))
         {
             ThresholdState state = VersionBitsState(pindexPrev, params, (Consensus::DeploymentPos)i, versionbitscache);
             // activate the bits that are STARTED or LOCKED_IN according to their deployments
-            if (state == THRESHOLD_LOCKED_IN || state == THRESHOLD_STARTED) {
+            if (state == THRESHOLD_LOCKED_IN || state == THRESHOLD_STARTED)
+            {
                 nVersion |= VersionBitsMask(params, (Consensus::DeploymentPos)i);
             }
         }
@@ -1836,15 +1838,16 @@ static uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::
 
 // bip135 begin
 // keep track of count over last 100
-struct UnknownForkData {
-    int UnknownForkSignalStrength {0};
-    bool UnknownForkSignalFirstDetected {false};
-    bool UnknownForkSignalLost {false};
-    bool UnknownForkSignalAt25Percent {false};
-    bool UnknownForkSignalAt50Percent {false};
-    bool UnknownForkSignalAt70Percent {false};
-    bool UnknownForkSignalAt90Percent {false};
-    bool UnknownForkSignalAt95Percent {false};
+struct UnknownForkData
+{
+    int UnknownForkSignalStrength{0};
+    bool UnknownForkSignalFirstDetected{false};
+    bool UnknownForkSignalLost{false};
+    bool UnknownForkSignalAt25Percent{false};
+    bool UnknownForkSignalAt50Percent{false};
+    bool UnknownForkSignalAt70Percent{false};
+    bool UnknownForkSignalAt90Percent{false};
+    bool UnknownForkSignalAt95Percent{false};
 };
 
 static UnknownForkData unknownFork[VERSIONBITS_NUM_BITS];
@@ -2432,7 +2435,8 @@ void PruneAndFlush()
 
 // bip135 begin
 /** Check for conspicuous versionbit signal events in last 100 blocks and alert. */
-void static CheckAndAlertUnknownVersionbits(const CChainParams &chainParams, const CBlockIndex *chainTip) {
+void static CheckAndAlertUnknownVersionbits(const CChainParams &chainParams, const CBlockIndex *chainTip)
+{
     static bool fWarned = false;
     int nUpgraded = 0;
     bool upgradedEval = false;
@@ -2440,22 +2444,26 @@ void static CheckAndAlertUnknownVersionbits(const CChainParams &chainParams, con
     int32_t anUnexpectedVersion = 0;
 
     // start unexpected version / new fork signal checks only after BIT_WARNING_WINDOW block height
-    if (pindex->nHeight >= BIT_WARNING_WINDOW) {
+    if (pindex->nHeight >= BIT_WARNING_WINDOW)
+    {
         for (int bit = 0; bit < VERSIONBITS_NUM_BITS; bit++)
         {
-            if (!isConfiguredDeployment(chainParams.GetConsensus(), bit)) {
-                const CBlockIndex *iindex = pindex;  // iterating index, reset to chain tip
+            if (!isConfiguredDeployment(chainParams.GetConsensus(), bit))
+            {
+                const CBlockIndex *iindex = pindex; // iterating index, reset to chain tip
                 // set count for this bit to 0
                 unknownFork[bit].UnknownForkSignalStrength = 0;
                 for (int i = 0; i < BIT_WARNING_WINDOW && iindex != NULL; i++)
                 {
                     unknownFork[bit].UnknownForkSignalStrength += ((iindex->nVersion >> bit) & 0x1);
-                    if (!upgradedEval) {
+                    if (!upgradedEval)
+                    {
                         // do the old "unexpected block version" counting only during first bit walk
-                        int32_t nExpectedVersion = UnlimitedComputeBlockVersion(pindex->pprev, chainParams.GetConsensus(), pindex->nTime);
+                        int32_t nExpectedVersion =
+                            UnlimitedComputeBlockVersion(pindex->pprev, chainParams.GetConsensus(), pindex->nTime);
 
-                        if (iindex->nVersion > VERSIONBITS_LAST_OLD_BLOCK_VERSION
-                                                    && (iindex->nVersion & ~nExpectedVersion) != 0)
+                        if (iindex->nVersion > VERSIONBITS_LAST_OLD_BLOCK_VERSION &&
+                            (iindex->nVersion & ~nExpectedVersion) != 0)
                         {
                             anUnexpectedVersion = iindex->nVersion;
                             ++nUpgraded;
@@ -2463,72 +2471,79 @@ void static CheckAndAlertUnknownVersionbits(const CChainParams &chainParams, con
                     }
                     iindex = iindex->pprev;
                 }
-                upgradedEval = true;  // only do the unexpected version checks once during bit loop
-                if (unknownFork[bit].UnknownForkSignalFirstDetected && !unknownFork[bit].UnknownForkSignalLost
-                        && unknownFork[bit].UnknownForkSignalStrength == 0) {
+                upgradedEval = true; // only do the unexpected version checks once during bit loop
+                if (unknownFork[bit].UnknownForkSignalFirstDetected && !unknownFork[bit].UnknownForkSignalLost &&
+                    unknownFork[bit].UnknownForkSignalStrength == 0)
+                {
                     // report a lost signal
-                    LogPrintf("%s: signal lost for unknown fork (versionbit %i)\n",
-                            __func__, bit);
+                    LogPrintf("%s: signal lost for unknown fork (versionbit %i)\n", __func__, bit);
                     unknownFork[bit].UnknownForkSignalFirstDetected = true;
                     unknownFork[bit].UnknownForkSignalLost = true; // set it so that we don't report on it again
                 }
                 // report newly gained / regained signal
-                else if ((!unknownFork[bit].UnknownForkSignalFirstDetected || unknownFork[bit].UnknownForkSignalLost)
-                        && unknownFork[bit].UnknownForkSignalStrength > 0) {
+                else if ((!unknownFork[bit].UnknownForkSignalFirstDetected || unknownFork[bit].UnknownForkSignalLost) &&
+                         unknownFork[bit].UnknownForkSignalStrength > 0)
+                {
                     // report a newly detected signal
-                    LogPrintf("%s: new signal detected for unknown fork (versionbit %i) - strength %d/%d\n",
-                            __func__, bit, unknownFork[bit].UnknownForkSignalStrength, BIT_WARNING_WINDOW);
-                    unknownFork[bit].UnknownForkSignalFirstDetected = true; // set it so that we don't report on it again
+                    LogPrintf("%s: new signal detected for unknown fork (versionbit %i) - strength %d/%d\n", __func__,
+                        bit, unknownFork[bit].UnknownForkSignalStrength, BIT_WARNING_WINDOW);
+                    // set it so that we don't report on it again
+                    unknownFork[bit].UnknownForkSignalFirstDetected = true;
                     unknownFork[bit].UnknownForkSignalLost = false;
                 }
-                else if (unknownFork[bit].UnknownForkSignalStrength >= 95 && !unknownFork[bit].UnknownForkSignalAt95Percent)
+                else if (unknownFork[bit].UnknownForkSignalStrength >= 95 &&
+                         !unknownFork[bit].UnknownForkSignalAt95Percent)
                 {
-                    LogPrintf("%s: signal for unknown fork (versionbit %i) >= 95%% - strength %d/%d\n",
-                            __func__, bit, unknownFork[bit].UnknownForkSignalStrength, BIT_WARNING_WINDOW);
+                    LogPrintf("%s: signal for unknown fork (versionbit %i) >= 95%% - strength %d/%d\n", __func__, bit,
+                        unknownFork[bit].UnknownForkSignalStrength, BIT_WARNING_WINDOW);
                     unknownFork[bit].UnknownForkSignalAt95Percent = true;
                 }
-                else if (unknownFork[bit].UnknownForkSignalStrength >= 90 && !unknownFork[bit].UnknownForkSignalAt90Percent)
+                else if (unknownFork[bit].UnknownForkSignalStrength >= 90 &&
+                         !unknownFork[bit].UnknownForkSignalAt90Percent)
                 {
-                    LogPrintf("%s: signal for unknown fork (versionbit %i) >= 90%% - strength %d/%d\n",
-                            __func__, bit, unknownFork[bit].UnknownForkSignalStrength, BIT_WARNING_WINDOW);
+                    LogPrintf("%s: signal for unknown fork (versionbit %i) >= 90%% - strength %d/%d\n", __func__, bit,
+                        unknownFork[bit].UnknownForkSignalStrength, BIT_WARNING_WINDOW);
                     unknownFork[bit].UnknownForkSignalAt90Percent = true;
                     unknownFork[bit].UnknownForkSignalAt95Percent = false;
                 }
-                else if (unknownFork[bit].UnknownForkSignalStrength >= 70 && !unknownFork[bit].UnknownForkSignalAt70Percent)
+                else if (unknownFork[bit].UnknownForkSignalStrength >= 70 &&
+                         !unknownFork[bit].UnknownForkSignalAt70Percent)
                 {
-                    LogPrintf("%s: signal for unknown fork (versionbit %i) >= 70%% - strength %d/%d\n",
-                            __func__, bit, unknownFork[bit].UnknownForkSignalStrength, BIT_WARNING_WINDOW);
+                    LogPrintf("%s: signal for unknown fork (versionbit %i) >= 70%% - strength %d/%d\n", __func__, bit,
+                        unknownFork[bit].UnknownForkSignalStrength, BIT_WARNING_WINDOW);
                     unknownFork[bit].UnknownForkSignalAt70Percent = true;
                     unknownFork[bit].UnknownForkSignalAt90Percent = false;
                     unknownFork[bit].UnknownForkSignalAt95Percent = false;
                 }
-                else if (unknownFork[bit].UnknownForkSignalStrength >= 50 && !unknownFork[bit].UnknownForkSignalAt50Percent)
+                else if (unknownFork[bit].UnknownForkSignalStrength >= 50 &&
+                         !unknownFork[bit].UnknownForkSignalAt50Percent)
                 {
-                    LogPrintf("%s: signal for unknown fork (versionbit %i) >= 50%% - strength %d/%d\n",
-                            __func__, bit, unknownFork[bit].UnknownForkSignalStrength, BIT_WARNING_WINDOW);
+                    LogPrintf("%s: signal for unknown fork (versionbit %i) >= 50%% - strength %d/%d\n", __func__, bit,
+                        unknownFork[bit].UnknownForkSignalStrength, BIT_WARNING_WINDOW);
                     unknownFork[bit].UnknownForkSignalAt50Percent = true;
                     unknownFork[bit].UnknownForkSignalAt70Percent = false;
                     unknownFork[bit].UnknownForkSignalAt90Percent = false;
                     unknownFork[bit].UnknownForkSignalAt95Percent = false;
                 }
-                else if (unknownFork[bit].UnknownForkSignalStrength >= 25 && !unknownFork[bit].UnknownForkSignalAt25Percent)
+                else if (unknownFork[bit].UnknownForkSignalStrength >= 25 &&
+                         !unknownFork[bit].UnknownForkSignalAt25Percent)
                 {
-                    LogPrintf("%s: signal for unknown fork (versionbit %i) >= 25%% - strength %d/%d\n",
-                            __func__, bit, unknownFork[bit].UnknownForkSignalStrength, BIT_WARNING_WINDOW);
+                    LogPrintf("%s: signal for unknown fork (versionbit %i) >= 25%% - strength %d/%d\n", __func__, bit,
+                        unknownFork[bit].UnknownForkSignalStrength, BIT_WARNING_WINDOW);
                     unknownFork[bit].UnknownForkSignalAt25Percent = true;
                     unknownFork[bit].UnknownForkSignalAt50Percent = false;
                     unknownFork[bit].UnknownForkSignalAt70Percent = false;
                     unknownFork[bit].UnknownForkSignalAt90Percent = false;
                     unknownFork[bit].UnknownForkSignalAt95Percent = false;
-                    fWarned = false;  // turn off to repeat the warning when > 50% again
+                    fWarned = false; // turn off to repeat the warning when > 50% again
                 }
             }
         }
     }
 
     if (nUpgraded > 0)
-        LogPrintf("%s: %d of last 100 blocks have unexpected version. One example: 0x%x\n",
-                __func__, nUpgraded, anUnexpectedVersion);
+        LogPrintf("%s: %d of last 100 blocks have unexpected version. One example: 0x%x\n", __func__, nUpgraded,
+            anUnexpectedVersion);
     if (nUpgraded > BIT_WARNING_WINDOW / 2)
     {
         // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
@@ -2584,7 +2599,8 @@ void static UpdateTip(CBlockIndex *pindexNew)
 
     cvBlockChange.notify_all();
 
-    if (!IsInitialBlockDownload()) {
+    if (!IsInitialBlockDownload())
+    {
         // Check the version of the last 100 blocks,
         // alert if significant signaling changes.
         CheckAndAlertUnknownVersionbits(chainParams, chainActive.Tip());
