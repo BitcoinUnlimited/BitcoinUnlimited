@@ -383,7 +383,7 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
 std::string FormatStateMessage(const CValidationState &state);
 
 /** Get the BIP135 state for a given deployment at the current tip. */
-ThresholdState VersionBitsTipState(const Consensus::Params& params, Consensus::DeploymentPos pos);
+ThresholdState VersionBitsTipState(const Consensus::Params &params, Consensus::DeploymentPos pos);
 
 struct CNodeStateStats
 {
