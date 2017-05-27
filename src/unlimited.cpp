@@ -231,17 +231,13 @@ std::string FormatCoinbaseMessage(const std::vector<std::string> &comments, cons
 CNodeRef FindLikelyNode(const std::string &addrName)
 {
     LOCK(cs_vNodes);
-    bool wildcard = (addrName.find_first_of("*?") != std::string::npos);
-
+    // always match any beginning part of string to be
+    // compatible with old implementation of FindLikelyNode(..)
+    std::string match_str = (addrName[addrName.size() - 1] == '*') ? addrName : addrName + "*";
     for (CNode *pnode : vNodes)
     {
-        if (wildcard)
-        {
-            if (match(addrName.c_str(), pnode->addrName.c_str()))
-                return (pnode);
-        }
-        else if (pnode->addrName.find(addrName) != std::string::npos)
-            return (pnode);
+        if (wildmatch(match_str, pnode->addrName))
+            return pnode;
     }
     return nullptr;
 }

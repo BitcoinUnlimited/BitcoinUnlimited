@@ -90,9 +90,6 @@ inline void fill(const UniValue &v, bool &output)
         output = v.get_bool();
 }
 
-// Checks if two given strings match. The first string may contain wildcard characters
-bool match(const char *first, const char *second);
-
 /** A configuration parameter that is automatically hooked up to
  * bitcoin.conf, bitcoin-cli, and is available as a command line argument
  */

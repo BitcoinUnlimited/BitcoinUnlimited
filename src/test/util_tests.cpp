@@ -767,4 +767,26 @@ BOOST_AUTO_TEST_CASE(util_Logging)
     }
 }
 
+BOOST_AUTO_TEST_CASE(util_wildmatch)
+{
+    BOOST_CHECK(wildmatch("123", "123"));
+    BOOST_CHECK(wildmatch("", ""));
+    BOOST_CHECK(wildmatch("?", "?"));
+    BOOST_CHECK(wildmatch("?", "x"));
+    BOOST_CHECK(wildmatch("*", "123"));
+    BOOST_CHECK(!wildmatch("456", "123"));
+
+    // multi-star pattern is not allowed
+    BOOST_CHECK(!wildmatch("**", "123"));
+    BOOST_CHECK(!wildmatch("************************************", "123"));
+    BOOST_CHECK(!wildmatch("?*?*?*?*?*?*?*?*?*?*?*?*?*?*?*?*?*?", "123"));
+
+    BOOST_CHECK(wildmatch("????", "1234"));
+    BOOST_CHECK(wildmatch("????a?b?", "1234a5b6"));
+    BOOST_CHECK(!wildmatch("????a?b?", "1234a5c6"));
+    BOOST_CHECK(wildmatch("123*", "123456"));
+    BOOST_CHECK(wildmatch("123*456", "123acdef456"));
+    BOOST_CHECK(wildmatch("*123", "abcdef123"));
+}
+
 BOOST_AUTO_TEST_SUITE_END()

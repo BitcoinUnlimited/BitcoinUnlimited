@@ -6,6 +6,7 @@
 #include "main.h"
 #include "net.h"
 #include "rpc/server.h"
+#include "util.h"
 
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
@@ -13,34 +14,6 @@
 #include <iomanip>
 
 using namespace std;
-
-// http://www.geeksforgeeks.org/wildcard-character-matching/
-// This function checks if two given strings
-// match. The first string may contain wildcard characters
-bool match(const char *first, const char *second)
-{
-    // If we reach at the end of both strings, we are done
-    if (*first == '\0' && *second == '\0')
-        return true;
-
-    // Make sure that the characters after '*' are present
-    // in second string. This function assumes that the first
-    // string will not contain two consecutive '*'
-    if (*first == '*' && *(first + 1) != '\0' && *second == '\0')
-        return false;
-
-    // If the first string contains '?', or current characters
-    // of both strings match
-    if (*first == '?' || *first == *second)
-        return match(first + 1, second + 1);
-
-    // If there is *, then there are two possibilities
-    // a) We consider current character of second string
-    // b) We ignore current character of second string.
-    if (*first == '*')
-        return match(first + 1, second) || match(first, second + 1);
-    return false;
-}
 
 void LoadTweaks()
 {
@@ -89,26 +62,22 @@ UniValue gettweak(const UniValue &params, bool fHelp)
     {
         string name = params[i].get_str();
         if (name == "help")
+        {
             help = true;
-        CTweakMap::iterator item = tweaks.find(name);
-        if (item != tweaks.end())
-        {
-            if (help)
-                ret.push_back(Pair(item->second->GetName(), item->second->GetHelp()));
-            else
-                ret.push_back(Pair(item->second->GetName(), item->second->Get()));
+            continue;
         }
-        else
+        // always match any beginning part of string to be
+        // compatible with old implementation of gettweak(..)
+        std::string match_str = (name[name.size() - 1] == '*') ? name : name + "*";
+
+        for (CTweakMap::iterator item = tweaks.begin(); item != tweaks.end(); ++item)
         {
-            for (CTweakMap::iterator item = tweaks.begin(); item != tweaks.end(); ++item)
+            if (wildmatch(match_str, item->first))
             {
-                if (match(name.c_str(), item->first.c_str()))
-                {
-                    if (help)
-                        ret.push_back(Pair(item->second->GetName(), item->second->GetHelp()));
-                    else
-                        ret.push_back(Pair(item->second->GetName(), item->second->Get()));
-                }
+                if (help)
+                    ret.push_back(Pair(item->second->GetName(), item->second->GetHelp()));
+                else
+                    ret.push_back(Pair(item->second->GetName(), item->second->Get()));
             }
         }
     }

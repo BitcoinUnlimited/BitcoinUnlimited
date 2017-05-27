@@ -474,4 +474,10 @@ void TraceThread(const char *name, Callable func)
 
 std::string CopyrightHolders(const std::string &strPrefix);
 
+/** Wildcard matching of strings
+The first argument (the pattern) might contain '?' and '*' wildcards and
+the second argument will be matched to this pattern. Returns true iff the string
+matches pattern. */
+bool wildmatch(const std::string &pattern, const std::string &test);
+
 #endif // BITCOIN_UTIL_H
