@@ -82,6 +82,9 @@ struct ListenSocket
 };
 }
 
+/** Services this node implementation cares about */
+static const uint64_t nRelevantServices = NODE_NETWORK;
+
 //
 // Global state variables
 //
@@ -182,7 +185,7 @@ static std::vector<CAddress> convertSeed6(const std::vector<SeedSpec6> &vSeedsIn
     {
         struct in6_addr ip;
         memcpy(&ip, i->addr, sizeof(ip));
-        CAddress addr(CService(ip, i->port));
+        CAddress addr(CService(ip, i->port), NODE_NETWORK);
         addr.nTime = GetTime() - GetRand(nOneWeek) - nOneWeek;
         vSeedsOut.push_back(addr);
     }
@@ -199,9 +202,8 @@ CAddress GetLocalAddress(const CNetAddr *paddrPeer)
     CService addr;
     if (GetLocal(addr, paddrPeer))
     {
-        ret = CAddress(addr);
+        ret = CAddress(addr, nLocalServices);
     }
-    ret.nServices = nLocalServices;
     ret.nTime = GetAdjustedTime();
     return ret;
 }
@@ -450,6 +452,7 @@ CNode *ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure
             vNodes.push_back(pnode);
         }
 
+        pnode->nServicesExpected = addrConnect.nServices & nRelevantServices;
         pnode->nTimeConnected = GetTime();
 
         return pnode;
@@ -484,7 +487,7 @@ void CNode::PushVersion()
     int nBestHeight = g_signals.GetHeight().get_value_or(0);
 
     int64_t nTime = (fInbound ? GetAdjustedTime() : GetTime());
-    CAddress addrYou = (addr.IsRoutable() && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0", 0)));
+    CAddress addrYou = (addr.IsRoutable() && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0", 0), addr.nServices));
     CAddress addrMe = GetLocalAddress(&addr);
     GetRandBytes((unsigned char *)&nLocalHostNonce, sizeof(nLocalHostNonce));
     if (fLogIPs)
@@ -1704,7 +1707,7 @@ void ThreadBitnodesAddressSeed()
         {
             SplitHostPort(seed, portOut, hostOut);
             CNetAddr ip(hostOut);
-            CAddress addr = CAddress(CService(ip, portOut));
+            CAddress addr = CAddress(CService(ip, portOut), NODE_NETWORK);
             addr.nTime = GetTime();
             vAdd.push_back(addr);
         }
@@ -1780,9 +1783,9 @@ void ThreadDNSAddressSeed()
         }
         else
         {
-            vector<CNetAddr> vIPs;
-            vector<CAddress> vAdd;
-            uint64_t requiredServiceBits = NODE_NETWORK;
+            std::vector<CNetAddr> vIPs;
+            std::vector<CAddress> vAdd;
+            uint64_t requiredServiceBits = nRelevantServices;
             if (LookupHost(GetDNSHost(seed, requiredServiceBits).c_str(), vIPs, 0, true))
             {
                 BOOST_FOREACH (const CNetAddr &ip, vIPs)
@@ -1880,10 +1883,9 @@ void ThreadOpenConnections()
             ProcessOneShot();
             BOOST_FOREACH (const std::string &strAddr, mapMultiArgs["-connect"])
             {
-                CAddress addr;
-                // NOTE: Because the only nodes we are connecting to here are the ones the user put in their
-                //      bitcoin.conf/commandline args as "-connect", we don't use the semaphore to limit outbound
-                //      connections
+                CAddress addr(CService(), 0);
+                // NOTE: Because the only nodes we are connecting to here are the ones the user explicitly specified
+                //      with "-connect", we don't use the semaphore to limit outbound connections
                 OpenNetworkConnection(addr, false, NULL, strAddr.c_str());
                 for (int i = 0; i < 10 && i < nLoop; i++)
                 {
@@ -2054,6 +2056,10 @@ void ThreadOpenConnections()
             if (IsLimited(addr))
                 continue;
 
+            // only connect to full nodes
+            if (!(addr.nServices & NODE_NETWORK))
+                continue;
+
             // only consider very recently tried nodes after 30 failed attempts
             if (nANow - addr.nLastTry < 600 && nTries < 30)
                 continue;
@@ -2186,7 +2192,7 @@ void ThreadOpenAddedConnections()
             //     reconnect to
             //     nodes that have restarted.
             CSemaphoreGrant grant(*semOutboundAddNode);
-            OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), false, &grant);
+            OpenNetworkConnection(CAddress(vserv[i % vserv.size()], 0), false, &grant);
             MilliSleep(500);
         }
         // Retry every 15 seconds.  It is important to check often to make sure the Xpedited Relay network
@@ -2954,6 +2960,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
       filterInventoryKnown(50000, 0.000001)
 {
     nServices = 0;
+    nServicesExpected = 0;
     hSocket = hSocketIn;
     nRecvVersion = INIT_PROTO_VERSION;
     nLastSend = 0;
