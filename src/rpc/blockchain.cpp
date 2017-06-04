@@ -609,7 +609,29 @@ static bool is_param_trueish(const UniValue &param)
     return param.get_bool();
 }
 
-UniValue getblock(const UniValue &params, bool fHelp)
+static CBlock GetBlockChecked(const CBlockIndex *pblockindex)
+{
+    CBlock block;
+    {
+        READLOCK(cs_mapBlockIndex);
+        if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
+        {
+            throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
+        }
+    }
+    if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+    {
+        // Block not found on disk. This could be because we have the block
+        // header in our index but don't have the block (for example if a
+        // non-whitelisted node sends us an unrequested long chain of valid
+        // blocks, we add the headers to our index, but don't accept the
+        // block).
+        throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
+    }
+    return block;
+}
+
+static UniValue getblock(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 3)
         throw runtime_error(
@@ -684,16 +706,7 @@ UniValue getblock(const UniValue &params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
     }
 
-    CBlock block;
-
-    {
-        READLOCK(cs_mapBlockIndex);
-        if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not available (pruned data)");
-    }
-
-    if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+    const CBlock block = GetBlockChecked(pblockindex);
 
     if (!fVerbose)
     {
