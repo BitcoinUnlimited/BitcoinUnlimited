@@ -264,11 +264,18 @@ bool CheckSignatureEncoding(const vector<unsigned char> &vchSig, unsigned int fl
     return true;
 }
 
-bool static CheckPubKeyEncoding(const valtype &vchSig, unsigned int flags, ScriptError *serror)
+bool CheckPubKeyEncoding(const valtype &vchPubKey, unsigned int flags, ScriptError *serror)
 {
-    if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 && !IsCompressedOrUncompressedPubKey(vchSig))
+    if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 && !IsCompressedOrUncompressedPubKey(vchPubKey))
     {
         return set_error(serror, SCRIPT_ERR_PUBKEYTYPE);
+    }
+
+    // Only compressed keys are accepted when
+    // SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE is enabled.
+    if (flags & SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE && !IsCompressedPubKey(vchPubKey))
+    {
+        return set_error(serror, SCRIPT_ERR_NONCOMPRESSED_PUBKEY);
     }
     return true;
 }

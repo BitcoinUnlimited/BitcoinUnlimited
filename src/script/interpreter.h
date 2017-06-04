@@ -92,9 +92,14 @@ enum
     // Signature(s) must be empty vector if an CHECK(MULTI)SIG operation failed
     SCRIPT_VERIFY_NULLFAIL = (1U << 14),
 
+
     // Do we accept signature using SIGHASH_FORKID
     //
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
+
+    // Public keys in scripts must be compressed
+    //
+    SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE = (1U << 15),
 
     // Enable Replay protection.
     // This is just a placeholder, BU does not implement automatic reply protections
