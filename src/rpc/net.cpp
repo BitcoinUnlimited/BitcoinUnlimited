@@ -125,12 +125,12 @@ UniValue getpeerinfo(const UniValue& params, bool fHelp)
     CopyNodeStats(vstats);
 
     UniValue ret(UniValue::VARR);
-    CNode* node = NULL;
+    CNodeRef node;
     if (params.size() > 0)  // BU allow params to this RPC call
       {
 	string nodeName = params[0].get_str();
         node = FindLikelyNode(nodeName);
-        if (!node) throw runtime_error("Unknown node");        
+        if (!node) throw runtime_error("Unknown node");
       }
 
     BOOST_FOREACH(const CNodeStats& stats, vstats) {
@@ -204,7 +204,7 @@ UniValue addnode(const UniValue& params, bool fHelp)
         CAddress addr;
         //NOTE: Using RPC "addnode <node> onetry" ignores both the "maxconnections"
         //      and "maxoutconnections" limits and can cause both to be exceeded.
-        OpenNetworkConnection(addr, NULL, strNode.c_str());
+        OpenNetworkConnection(addr, false, NULL, strNode.c_str());
         return NullUniValue;
     }
 
@@ -240,13 +240,11 @@ UniValue disconnectnode(const UniValue& params, bool fHelp)
             + HelpExampleRpc("disconnectnode", "\"192.168.0.6:8333\"")
         );
 
-    //BU: Add lock on cs_vNodes as FindNode now requries it to prevent potential use-after-free errors
-    LOCK(cs_vNodes);
-    CNode* pNode = FindNode(params[0].get_str());
-    if (pNode == NULL)
+    CNodeRef node = FindNodeRef(params[0].get_str());
+    if (!node)
         throw JSONRPCError(RPC_CLIENT_NODE_NOT_CONNECTED, "Node not found in connected nodes");
 
-    pNode->fDisconnect = true;
+    node->fDisconnect = true;
 
     return NullUniValue;
 }
@@ -322,7 +320,7 @@ UniValue getaddednodeinfo(const UniValue& params, bool fHelp)
     list<pair<string, vector<CService> > > laddedAddreses(0);
     BOOST_FOREACH(const std::string& strAddNode, laddedNodes) {
         vector<CService> vservNode(0);
-        if(Lookup(strAddNode.c_str(), vservNode, Params().GetDefaultPort(), fNameLookup, 0))
+        if(Lookup(strAddNode.c_str(), vservNode, Params().GetDefaultPort(), 0, fNameLookup))
             laddedAddreses.push_back(make_pair(strAddNode, vservNode));
         else
         {
@@ -437,14 +435,14 @@ static UniValue GetThinBlockStats()
     obj.push_back(Pair("enabled", enabled));
     if (enabled) {
         obj.push_back(Pair("summary", thindata.ToString()));
-        obj.push_back(Pair("summary", thindata.MempoolLimiterBytesSavedToString()));
-        obj.push_back(Pair("summary", thindata.InBoundPercentToString()));
-        obj.push_back(Pair("summary", thindata.OutBoundPercentToString()));
-        obj.push_back(Pair("summary", thindata.ResponseTimeToString()));
-        obj.push_back(Pair("summary", thindata.ValidationTimeToString()));
-        obj.push_back(Pair("summary", thindata.OutBoundBloomFiltersToString()));
-        obj.push_back(Pair("summary", thindata.InBoundBloomFiltersToString()));
-        obj.push_back(Pair("summary", thindata.ReRequestedTxToString()));
+        obj.push_back(Pair("mempool_limiter", thindata.MempoolLimiterBytesSavedToString()));
+        obj.push_back(Pair("inbound_percent", thindata.InBoundPercentToString()));
+        obj.push_back(Pair("outbound_percent", thindata.OutBoundPercentToString()));
+        obj.push_back(Pair("response_time", thindata.ResponseTimeToString()));
+        obj.push_back(Pair("validation_time", thindata.ValidationTimeToString()));
+        obj.push_back(Pair("outbound_bloom_filters", thindata.OutBoundBloomFiltersToString()));
+        obj.push_back(Pair("inbound_bloom_filters", thindata.InBoundBloomFiltersToString()));
+        obj.push_back(Pair("rerequested", thindata.ReRequestedTxToString()));
     }
     return obj;
 }
@@ -483,7 +481,7 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
             "  ,...\n"
             "  ]\n"
             "  \"warnings\": \"...\"                    (string) any network warnings (such as alert messages) \n"
-            "  \"thinblockstats\": \"...\"              (string) thin block related statistics \n" 
+            "  \"thinblockstats\": \"...\"              (string) thin block related statistics \n"
             "}\n"
             "\nExamples:\n"
             + HelpExampleCli("getnetworkinfo", "")
@@ -574,9 +572,8 @@ UniValue setban(const UniValue& params, bool fHelp)
 
         //disconnect possible nodes
         if (!isSubnet) subNet = CSubNet(netAddr);
-        DisconnectSubNetNodes(subNet);//BU: Since we need to mark any nodes in subNet for disconnect, atomically mark all nodes at once
-        //while(CNode *bannedNode = (isSubnet ? FindNode(subNet) : FindNode(netAddr)))
-        //    bannedNode->fDisconnect = true;
+        // BU: Since we need to mark any nodes in subNet for disconnect, atomically mark all nodes at once
+        DisconnectSubNetNodes(subNet);
     }
     else if(strCommand == "remove")
     {

@@ -8,7 +8,6 @@
 #include "tweak.h"
 #include "tinyformat.h"
 extern CTweak<unsigned int> txDust;
-const std::string CURRENCY_UNIT = "BTC";
 
 CFeeRate::CFeeRate(const CAmount& nFeePaid, size_t nSize)
 {

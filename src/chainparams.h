@@ -30,8 +30,16 @@ typedef std::map<int, uint256> MapCheckpoints;
 struct CCheckpointData {
     MapCheckpoints mapCheckpoints;
     int64_t nTimeLastCheckpoint;
-    int64_t nTransactionsLastCheckpoint;
+    uint64_t nTransactionsLastCheckpoint;
     double fTransactionsPerDay;
+};
+
+enum
+{
+    DEFAULT_MAINNET_PORT = 8333,
+    DEFAULT_TESTNET_PORT = 18333,
+    DEFAULT_NOLNET_PORT = 9333,
+    DEFAULT_REGTESTNET_PORT = 18444
 };
 
 /**
@@ -56,7 +64,6 @@ public:
 
     const Consensus::Params& GetConsensus() const { return consensus; }
     const CMessageHeader::MessageStartChars& MessageStart() const { return pchMessageStart; }
-    const std::vector<unsigned char>& AlertKey() const { return vAlertPubKey; }
     int GetDefaultPort() const { return nDefaultPort; }
 
     const CBlock& GenesisBlock() const { return genesis; }
@@ -82,8 +89,6 @@ protected:
 
     Consensus::Params consensus;
     CMessageHeader::MessageStartChars pchMessageStart;
-    //! Raw pub key bytes for the broadcast alert signing key.
-    std::vector<unsigned char> vAlertPubKey;
     int nDefaultPort;
     uint64_t nPruneAfterHeight;
     std::vector<CDNSSeedData> vSeeds;
@@ -115,5 +120,9 @@ CChainParams& Params(const std::string& chain);
  * @throws std::runtime_error when the chain is not supported.
  */
 void SelectParams(const std::string& chain);
+
+CBlock CreateGenesisBlock(CScript prefix, const std::string &comment, const CScript& genesisOutputScript,
+                          uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion,
+                          const CAmount& genesisReward);
 
 #endif // BITCOIN_CHAINPARAMS_H

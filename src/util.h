@@ -15,6 +15,7 @@
 #include "config/bitcoin-config.h"
 #endif
 
+#include "allowed_args.h"
 #include "compat.h"
 #include "tinyformat.h"
 #include "utiltime.h"
@@ -29,9 +30,25 @@
 #include <boost/signals2/signal.hpp>
 #include <boost/thread/exceptions.hpp>
 
+#ifdef DEBUG_ASSERTION
+/// If DEBUG_ASSERTION is enabled this asserts when the predicate is false.
+//  If DEBUG_ASSERTION is disabled and the predicate is false, it executes the execInRelease statements.
+//  Typically, the programmer will error out -- return false, raise an exception, etc in the execInRelease code.
+//  DO NOT USE break or continue inside the DbgAssert!
+#define DbgAssert(pred, execInRelease) assert(pred)
+#else
+#define DbgStringify(x) #x
+#define DbgStringifyIntLiteral(x) DbgStringify(x)
+#define DbgAssert(pred, execInRelease) do { if (!(pred)) { LogPrintStr(std::string(__FILE__ "(" DbgStringifyIntLiteral(__LINE__) "): Debug Assertion failed: \"" #pred "\"\n")); execInRelease; }} while(0)
+#endif
+
 static const bool DEFAULT_LOGTIMEMICROS = false;
 static const bool DEFAULT_LOGIPS        = true;
 static const bool DEFAULT_LOGTIMESTAMPS = true;
+
+// For bitcoin-cli
+extern const char DEFAULT_RPCCONNECT[];
+static const int DEFAULT_HTTP_CLIENT_TIMEOUT = 900;
 
 /** Signals for translation. */
 class CTranslationInterface
@@ -107,8 +124,24 @@ static inline bool error(const char* s)
     return false;
 }
 
+/**
+ Format an amount of bytes with a unit symbol attached, such as MB, KB, GB.
+ Uses Kilobytes x1000, not Kibibytes x1024.
+
+ Output value has two digits after the dot. No space between unit symbol and
+ amount.
+
+ Also works for negative amounts. The maximum unit supported is 1 Exabyte (EB).
+ This formatting is used by the thinblock statistics functions, and this
+ is a factored-out utility function.
+
+ @param [value] The value to format
+ @return String with unit
+ */
+extern std::string formatInfoUnit(double value);
+
 void PrintExceptionContinue(const std::exception *pex, const char* pszThread);
-void ParseParameters(int argc, const char*const argv[]);
+void ParseParameters(int argc, const char*const argv[], const AllowedArgs::AllowedArgs& allowedArgs);
 void FileCommit(FILE *fileout);
 bool TruncateFile(FILE *file, unsigned int length);
 int RaiseFileDescriptorLimit(int nMinFD);
@@ -123,7 +156,9 @@ boost::filesystem::path GetConfigFile();
 boost::filesystem::path GetPidFile();
 void CreatePidFile(const boost::filesystem::path &path, pid_t pid);
 #endif
-void ReadConfigFile(std::map<std::string, std::string>& mapSettingsRet, std::map<std::string, std::vector<std::string> >& mapMultiSettingsRet);
+void ReadConfigFile(std::map<std::string, std::string>& mapSettingsRet,
+                    std::map<std::string, std::vector<std::string> >& mapMultiSettingsRet,
+                    CTweakMap *pTweaks);
 #ifdef WIN32
 boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
 #endif
@@ -186,23 +221,6 @@ bool SoftSetArg(const std::string& strArg, const std::string& strValue);
 bool SoftSetBoolArg(const std::string& strArg, bool fValue);
 
 /**
- * Format a string to be used as group of options in help messages
- *
- * @param message Group name (e.g. "RPC server options:")
- * @return the formatted string
- */
-std::string HelpMessageGroup(const std::string& message);
-
-/**
- * Format a string to be used as option description in help messages
- *
- * @param option Option message (e.g. "-rpcuser=<user>")
- * @param message Option description (e.g. "Username for JSON-RPC connections")
- * @return the formatted string
- */
-std::string HelpMessageOpt(const std::string& option, const std::string& message);
-
-/**
  * Return the number of physical cores available on the current system.
  * @note This does not count virtual cores, such as those provided by HyperThreading
  * when boost is newer than 1.56.
@@ -239,5 +257,7 @@ template <typename Callable> void TraceThread(const char* name,  Callable func)
         throw;
     }
 }
+
+std::string CopyrightHolders(const std::string& strPrefix);
 
 #endif // BITCOIN_UTIL_H
