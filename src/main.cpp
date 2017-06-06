@@ -9,6 +9,7 @@
 
 #include "addrman.h"
 #include "arith_uint256.h"
+#include "buip055fork.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "checkqueue.h"
@@ -1244,6 +1245,15 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     // Coinbase is only valid in a block, not as a loose transaction
     if (tx.IsCoinBase())
         return state.DoS(100, false, REJECT_INVALID, "coinbase");
+
+    // BUIP055: reject transactions that won't work on the fork.
+    // This code uses the system time to determine when to start rejecting which is inaccurate relative to the
+    // actual activation time (defined by times in the blocks).
+    // But its ok to reject these transactions from the mempool a little early (or late).
+    if (start/1000000 >= miningForkTime.value)
+    {
+        if (!ValidateBUIP055Tx(tx)) return state.DoS(100, false, REJECT_INVALID, "wrong fork");
+    }
 
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
     std::string reason;
@@ -4108,6 +4118,15 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
         IsSuperMajority(4, pindexPrev, consensusParams.nMajorityRejectBlockOutdated, consensusParams))
         return state.Invalid(error("%s : rejected nVersion=3 block", __func__), REJECT_OBSOLETE, "bad-version");
 
+#if 0    
+    // TODO BUIP055: check that the block is on the > 1MB fork
+    if (forkBlockHash)
+    {
+        if (block.GetAncestor(forkActivationHeight) != forkBlockHash)
+            return state.Invalid(error("%s : rejected wrong fork block", __func__), REJECT_OBSOLETE, "wrong-fork");
+    }
+#endif     
+ 
     return true;
 }
 
@@ -4156,8 +4175,30 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
         }
     }
 
+    // BUIP055 enforce that the fork block is > 1MB
+    // (note subsequent blocks can be <= 1MB...)
+    if (pindexPrev->forkAtNextBlock(miningForkTime.value))
+    {
+        DbgAssert(block.nBlockSize, );
+        if (block.nBlockSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
+        {
+            uint256 hash = block.GetHash();
+            return state.DoS(100,
+                error("%s: BUIP055 fork block (%s, height %d) must exceed %d, but this block is %d bytes", __func__,
+                                 hash.ToString(), nHeight, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, block.nBlockSize),
+                REJECT_INVALID, "bad-fork-block");
+        }
+    }
+    // BUIP055 check soft-fork items, such as tx targeted to the 1MB chain
+    if (pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value))
+    {
+        return ValidateBUIP055Block(block, state);
+    }
+
     return true;
 }
+
+
 
 bool AcceptBlockHeader(const CBlockHeader &block,
     CValidationState &state,

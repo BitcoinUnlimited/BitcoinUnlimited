@@ -78,6 +78,7 @@ BITCOIN_CORE_H = \
   base58.h \
   bitnodes.h \
   bloom.h \
+  buip055fork.cpp \
   chain.h \
   chainparams.h \
   chainparamsbase.h \

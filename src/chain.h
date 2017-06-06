@@ -139,6 +139,9 @@ public:
     //! Verification status of this block. See enum BlockStatus
     unsigned int nStatus;
 
+    //! true if buip055 hard fork rules are active in this block.
+    // TODO NEEDED? bool largeBlkForkActive;
+
     //! block header
     int nVersion;
     uint256 hashMerkleRoot;
@@ -169,6 +172,8 @@ public:
         nTime          = 0;
         nBits          = 0;
         nNonce         = 0;
+
+        //TODO: largeBlkForkActive = false;
     }
 
     CBlockIndex()
@@ -217,6 +222,18 @@ public:
         block.nNonce         = nNonce;
         return block;
     }
+
+    // was the fork activated on this or any prior block?
+    bool forkActivated(int time);
+
+    // Is THIS the fork block?
+    bool forkActivateNow(int time);
+
+    // Is the next block the fork block?
+    bool forkAtNextBlock(int time);
+
+    // Is the fork active on the next block?
+    bool IsforkActiveOnNextBlock(int time);
 
     uint256 GetBlockHash() const
     {

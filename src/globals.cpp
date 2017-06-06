@@ -178,6 +178,12 @@ CTweakRef<uint64_t> miningBlockSize("mining.blockSize",
     &maxGeneratedBlock,
     &MiningBlockSizeValidator);
 
+
+CTweak<uint64_t> miningForkTime("mining.forkTime",
+    "Time in seconds since the epoch to initiate a hard fork as per BUIP055.",
+    1501545600); // Tue 1 Aug 2017 00:00:00 UTC
+
+
 CTweak<unsigned int> maxTxSize("net.excessiveTx", "Largest transaction size in bytes", DEFAULT_LARGEST_TRANSACTION);
 CTweakRef<unsigned int> eadTweak("net.excessiveAcceptDepth",
     "Excessive block chain acceptance depth in blocks",
