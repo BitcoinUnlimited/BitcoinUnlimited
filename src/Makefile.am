@@ -76,6 +76,8 @@ BITCOIN_CORE_H = \
   addrman.h \
   allowed_args.h \
   base58.h \
+  bandb.h \
+  banentry.h \
   bitnodes.h \
   bloom.h \
   buip055fork.cpp \
@@ -97,6 +99,7 @@ BITCOIN_CORE_H = \
   consensus/consensus.h \
   core_io.h \
   core_memusage.h \
+  dosman.h \
   expedited.h \
   httprpc.h \
   httpserver.h \
@@ -110,6 +113,7 @@ BITCOIN_CORE_H = \
   merkleblock.h \
   miner.h \
   net.h \
+  nodestate.h \
   leakybucket.h \
   netbase.h \
   noui.h \
@@ -175,11 +179,14 @@ libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
   globals.cpp \
   addrman.cpp \
+  bandb.cpp \
+  banentry.cpp \
   bitnodes.cpp \
   bloom.cpp \
   chain.cpp \
   checkpoints.cpp \
   connmgr.cpp \
+  dosman.cpp \
   expedited.cpp \
   httprpc.cpp \
   httpserver.cpp \
@@ -189,6 +196,7 @@ libbitcoin_server_a_SOURCES = \
   merkleblock.cpp \
   miner.cpp \
   net.cpp \
+  nodestate.cpp \
   noui.cpp \
   parallel.cpp \
   policy/fees.cpp \

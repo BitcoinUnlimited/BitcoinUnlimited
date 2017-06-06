@@ -29,6 +29,7 @@
 #include <boost/foreach.hpp>
 #include <boost/signals2/signal.hpp>
 
+#include "banentry.h"
 #include "stat.h"
 #include "unlimited.h"
 
@@ -91,10 +92,6 @@ static const bool DEFAULT_FORCEBITNODES = false;
 static const bool DEFAULT_FORCEDNSSEED = false;
 static const size_t DEFAULT_MAXRECEIVEBUFFER = 5 * 1000;
 static const size_t DEFAULT_MAXSENDBUFFER = 1 * 1000;
-
-// NOTE: When adjusting this, update rpcnet:setban's help ("24h")
-static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24; // Default 24-hour ban
-
 
 unsigned int ReceiveFloodSize();
 unsigned int SendBufferSize();
@@ -277,60 +274,6 @@ public:
 };
 
 
-typedef enum BanReason { BanReasonUnknown = 0, BanReasonNodeMisbehaving = 1, BanReasonManuallyAdded = 2 } BanReason;
-
-class CBanEntry
-{
-public:
-    static const int CURRENT_VERSION = 1;
-    int nVersion;
-    int64_t nCreateTime;
-    int64_t nBanUntil;
-    uint8_t banReason;
-
-    CBanEntry() { SetNull(); }
-    CBanEntry(int64_t nCreateTimeIn)
-    {
-        SetNull();
-        nCreateTime = nCreateTimeIn;
-    }
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action, int nType, int nVersion)
-    {
-        READWRITE(this->nVersion);
-        nVersion = this->nVersion;
-        READWRITE(nCreateTime);
-        READWRITE(nBanUntil);
-        READWRITE(banReason);
-    }
-
-    void SetNull()
-    {
-        nVersion = CBanEntry::CURRENT_VERSION;
-        nCreateTime = 0;
-        nBanUntil = 0;
-        banReason = BanReasonUnknown;
-    }
-
-    std::string banReasonToString()
-    {
-        switch (banReason)
-        {
-        case BanReasonNodeMisbehaving:
-            return "node misbehaving";
-        case BanReasonManuallyAdded:
-            return "manually added";
-        default:
-            return "unknown";
-        }
-    }
-};
-
-typedef std::map<CSubNet, CBanEntry> banmap_t;
-
 // BU cleaning up nodes as a global destructor creates many global destruction dependencies.  Instead use a function
 // call.
 #if 0
@@ -422,6 +365,7 @@ public:
     CBlock thinBlock;
     std::vector<uint256> thinBlockHashes;
     std::vector<uint64_t> xThinBlockHashes;
+    std::map<uint64_t, CTransaction> mapMissingTx;
     uint64_t nLocalThinBlockBytes; // the bytes used in creating this thinblock, updated dynamically
     int nSizeThinBlock; // Original on-wire size of the block. Just used for reporting
     int thinBlockWaitingForTxns; // if -1 then not currently waiting
@@ -436,17 +380,6 @@ public:
     unsigned short addrFromPort;
 
 protected:
-    // Denial-of-service detection/prevention
-    // Key is IP address, value is banned-until-time
-    static banmap_t setBanned;
-    static CCriticalSection cs_setBanned;
-    static bool setBannedIsDirty;
-
-    // Whitelisted ranges. Any node connecting from these is automatically
-    // whitelisted (as well as those connecting to whitelisted binds).
-    static std::vector<CSubNet> vWhitelistedRange;
-    static CCriticalSection cs_vWhitelistedRange;
-
     // Basic fuzz-testing
     void Fuzz(int nChance); // modifies ssSend
 
@@ -837,47 +770,7 @@ public:
     }
 
 
-    // Denial-of-service detection/prevention
-    // The idea is to detect peers that are behaving
-    // badly and disconnect/ban them, but do it in a
-    // one-coding-mistake-won't-shatter-the-entire-network
-    // way.
-    // IMPORTANT:  There should be nothing I can give a
-    // node that it will forward on that will make that
-    // node's peers drop it. If there is, an attacker
-    // can isolate a node and/or try to split the network.
-    // Dropping a node for sending stuff that is invalid
-    // now but might be valid in a later version is also
-    // dangerous, because it can cause a network split
-    // between nodes running old code and nodes running
-    // new code.
-    static void ClearBanned(); // needed for unit testing
-    static bool IsBanned(CNetAddr ip);
-    static bool IsBanned(CSubNet subnet);
-    static void Ban(const CNetAddr &ip,
-        const BanReason &banReason,
-        int64_t bantimeoffset = 0,
-        bool sinceUnixEpoch = false);
-    static void Ban(const CSubNet &subNet,
-        const BanReason &banReason,
-        int64_t bantimeoffset = 0,
-        bool sinceUnixEpoch = false);
-    static bool Unban(const CNetAddr &ip);
-    static bool Unban(const CSubNet &ip);
-    static void GetBanned(banmap_t &banmap);
-    static void SetBanned(const banmap_t &banmap);
-
-    //! check is the banlist has unwritten changes
-    static bool BannedSetIsDirty();
-    //! set the "dirty" flag for the banlist
-    static void SetBannedSetDirty(bool dirty = true);
-    //! clean unused entries (if bantime has expired)
-    static void SweepBanned();
-
     void copyStats(CNodeStats &stats);
-
-    static bool IsWhitelistedRange(const CNetAddr &ip);
-    static void AddWhitelistedRange(const CSubNet &subnet);
 
     // Network stats
     static void RecordBytesRecv(uint64_t bytes);
@@ -969,19 +862,6 @@ public:
     bool Read(CAddrMan &addr);
     bool Read(CAddrMan &addr, CDataStream &ssPeers);
 };
-
-/** Access to the banlist database (banlist.dat) */
-class CBanDB
-{
-private:
-    boost::filesystem::path pathBanlist;
-
-public:
-    CBanDB();
-    bool Write(const banmap_t &banSet);
-    bool Read(banmap_t &banSet);
-};
-
 
 /** Return a timestamp in the future (in microseconds) for exponentially distributed events. */
 int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds);

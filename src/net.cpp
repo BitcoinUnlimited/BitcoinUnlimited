@@ -11,12 +11,13 @@
 #include "net.h"
 
 #include "addrman.h"
+#include "bandb.h"
 #include "chainparams.h"
 #include "clientversion.h"
 #include "connmgr.h"
 #include "consensus/consensus.h"
 #include "crypto/common.h"
-#include "crypto/common.h"
+#include "dosman.h"
 #include "hash.h"
 #include "primitives/transaction.h"
 #include "requestManager.h"
@@ -492,164 +493,6 @@ void CNode::PushVersion()
 }
 
 
-banmap_t CNode::setBanned;
-// CCriticalSection CNode::cs_setBanned;
-bool CNode::setBannedIsDirty;
-
-void CNode::ClearBanned()
-{
-    LOCK(cs_setBanned);
-    setBanned.clear();
-    setBannedIsDirty = true;
-    uiInterface.BannedListChanged();
-}
-
-bool CNode::IsBanned(CNetAddr ip)
-{
-    bool fResult = false;
-    {
-        LOCK(cs_setBanned);
-        for (banmap_t::iterator it = setBanned.begin(); it != setBanned.end(); it++)
-        {
-            CSubNet subNet = (*it).first;
-            CBanEntry banEntry = (*it).second;
-
-            if (subNet.Match(ip) && GetTime() < banEntry.nBanUntil)
-                fResult = true;
-        }
-    }
-    return fResult;
-}
-
-bool CNode::IsBanned(CSubNet subnet)
-{
-    bool fResult = false;
-    {
-        LOCK(cs_setBanned);
-        banmap_t::iterator i = setBanned.find(subnet);
-        if (i != setBanned.end())
-        {
-            CBanEntry banEntry = (*i).second;
-            if (GetTime() < banEntry.nBanUntil)
-                fResult = true;
-        }
-    }
-    return fResult;
-}
-
-void CNode::Ban(const CNetAddr &addr, const BanReason &banReason, int64_t bantimeoffset, bool sinceUnixEpoch)
-{
-    CSubNet subNet(addr);
-    Ban(subNet, banReason, bantimeoffset, sinceUnixEpoch);
-}
-
-void CNode::Ban(const CSubNet &subNet, const BanReason &banReason, int64_t bantimeoffset, bool sinceUnixEpoch)
-{
-    CBanEntry banEntry(GetTime());
-    banEntry.banReason = banReason;
-    if (bantimeoffset <= 0)
-    {
-        bantimeoffset = GetArg("-bantime", DEFAULT_MISBEHAVING_BANTIME);
-        sinceUnixEpoch = false;
-    }
-    banEntry.nBanUntil = (sinceUnixEpoch ? 0 : GetTime()) + bantimeoffset;
-
-    LOCK(cs_setBanned);
-    if (setBanned[subNet].nBanUntil < banEntry.nBanUntil)
-        setBanned[subNet] = banEntry;
-
-    setBannedIsDirty = true;
-    uiInterface.BannedListChanged();
-}
-
-bool CNode::Unban(const CNetAddr &addr)
-{
-    CSubNet subNet(addr);
-    return Unban(subNet);
-}
-
-bool CNode::Unban(const CSubNet &subNet)
-{
-    LOCK(cs_setBanned);
-    if (setBanned.erase(subNet))
-    {
-        setBannedIsDirty = true;
-
-        SweepBanned();
-        uiInterface.BannedListChanged();
-        return true;
-    }
-    return false;
-}
-
-void CNode::GetBanned(banmap_t &banMap)
-{
-    LOCK(cs_setBanned);
-    SweepBanned();
-    banMap = setBanned; // create a thread safe copy
-}
-
-void CNode::SetBanned(const banmap_t &banMap)
-{
-    LOCK(cs_setBanned);
-    setBanned = banMap;
-    setBannedIsDirty = true;
-}
-
-void CNode::SweepBanned()
-{
-    int64_t now = GetTime();
-
-    LOCK(cs_setBanned);
-    banmap_t::iterator it = setBanned.begin();
-    while (it != setBanned.end())
-    {
-        CSubNet subNet = (*it).first;
-        CBanEntry banEntry = (*it).second;
-        if (now > banEntry.nBanUntil)
-        {
-            setBanned.erase(it++);
-            setBannedIsDirty = true;
-            LogPrint("net", "%s: Removed banned node ip/subnet from banlist.dat: %s\n", __func__, subNet.ToString());
-        }
-        else
-            ++it;
-    }
-}
-
-bool CNode::BannedSetIsDirty()
-{
-    LOCK(cs_setBanned);
-    return setBannedIsDirty;
-}
-
-void CNode::SetBannedSetDirty(bool dirty)
-{
-    LOCK(cs_setBanned); // reuse setBanned lock for the isDirty flag
-    setBannedIsDirty = dirty;
-}
-
-
-// BU moved: std::vector<CSubNet> CNode::vWhitelistedRange;
-// BU moved: CCriticalSection CNode::cs_vWhitelistedRange;
-
-bool CNode::IsWhitelistedRange(const CNetAddr &addr)
-{
-    LOCK(cs_vWhitelistedRange);
-    BOOST_FOREACH (const CSubNet &subnet, vWhitelistedRange)
-    {
-        if (subnet.Match(addr))
-            return true;
-    }
-    return false;
-}
-
-void CNode::AddWhitelistedRange(const CSubNet &subnet)
-{
-    LOCK(cs_vWhitelistedRange);
-    vWhitelistedRange.push_back(subnet);
-}
-
 #undef X
 #define X(name) stats.name = name
 void CNode::copyStats(CNodeStats &stats)
@@ -1025,7 +868,7 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
         if (nEvictions > 15)
         {
             int nHoursToBan = 4;
-            CNode::Ban(ipAddress, BanReasonNodeMisbehaving, nHoursToBan * 60 * 60);
+            dosMan.Ban(ipAddress, BanReasonNodeMisbehaving, nHoursToBan * 60 * 60);
             LogPrintf("Banning %s for %d hours: Too many evictions - connection dropped\n",
                 vEvictionCandidatesByActivity[0]->addr.ToString(), nHoursToBan);
         }
@@ -1053,7 +896,7 @@ static void AcceptConnection(const ListenSocket &hListenSocket)
         if (!addr.SetSockAddr((const struct sockaddr *)&sockaddr))
             LogPrintf("Warning: Unknown socket family\n");
 
-    bool whitelisted = hListenSocket.whitelisted || CNode::IsWhitelistedRange(addr);
+    bool whitelisted = hListenSocket.whitelisted || dosMan.IsWhitelistedRange(addr);
     if (hSocket == INVALID_SOCKET)
     {
         int nErr = WSAGetLastError();
@@ -1078,7 +921,7 @@ static void AcceptConnection(const ListenSocket &hListenSocket)
     setsockopt(hSocket, IPPROTO_TCP, TCP_NODELAY, (void *)&set, sizeof(int));
 #endif
 
-    if (CNode::IsBanned(addr) && !whitelisted)
+    if (dosMan.IsBanned(addr) && !whitelisted)
     {
         LogPrint("net", "connection from %s dropped (banned)\n", addr.ToString());
         CloseSocket(hSocket);
@@ -1168,7 +1011,7 @@ static void AcceptConnection(const ListenSocket &hListenSocket)
         if (nConnections > 4 && !whitelisted)
         {
             int nHoursToBan = 4;
-            CNode::Ban((CNetAddr)addr, BanReasonNodeMisbehaving, nHoursToBan * 60 * 60);
+            dosMan.Ban((CNetAddr)addr, BanReasonNodeMisbehaving, nHoursToBan * 60 * 60);
             LogPrintf("Banning %s for %d hours: Too many connection attempts - connection dropped\n", addr.ToString(),
                 nHoursToBan);
             CloseSocket(hSocket);
@@ -1794,7 +1637,7 @@ void DumpBanlist()
 
     CBanDB bandb;
     banmap_t banmap;
-    CNode::GetBanned(banmap);
+    dosMan.GetBanned(banmap);
     bandb.Write(banmap);
 
     LogPrint(
@@ -1805,10 +1648,10 @@ void DumpData()
 {
     DumpAddresses();
 
-    if (CNode::BannedSetIsDirty())
+    if (dosMan.BannedSetIsDirty())
     {
         DumpBanlist();
-        CNode::SetBannedSetDirty(false);
+        dosMan.SetBannedSetDirty(false);
     }
 }
 
@@ -2178,7 +2021,7 @@ bool OpenNetworkConnection(const CAddress &addrConnect,
         LOCK(cs_vNodes);
         if (!pszDest)
         {
-            if (IsLocal(addrConnect) || FindNode((CNetAddr)addrConnect) || CNode::IsBanned(addrConnect) ||
+            if (IsLocal(addrConnect) || FindNode((CNetAddr)addrConnect) || dosMan.IsBanned(addrConnect) ||
                 FindNode(addrConnect.ToStringIPPort()))
                 return false;
         }
@@ -2470,9 +2313,9 @@ void StartNode(boost::thread_group &threadGroup, CScheduler &scheduler)
     banmap_t banmap;
     if (bandb.Read(banmap))
     {
-        CNode::SetBanned(banmap); // thread save setter
-        CNode::SetBannedSetDirty(false); // no need to write down, just read data
-        CNode::SweepBanned(); // sweep out unused entries
+        dosMan.SetBanned(banmap); // thread save setter
+        dosMan.SetBannedSetDirty(false); // no need to write down, just read data
+        dosMan.SweepBanned(); // sweep out unused entries
 
         LogPrint("net", "Loaded %d banned node ips/subnets from banlist.dat  %dms\n", banmap.size(),
             GetTimeMillis() - nStart);
@@ -3145,109 +2988,6 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
         SocketSendData(this);
 
     LEAVE_CRITICAL_SECTION(cs_vSend);
-}
-
-//
-// CBanDB
-//
-
-CBanDB::CBanDB() { pathBanlist = GetDataDir() / "banlist.dat"; }
-bool CBanDB::Write(const banmap_t &banSet)
-{
-    // Generate random temporary filename
-    unsigned short randv = 0;
-    GetRandBytes((unsigned char *)&randv, sizeof(randv));
-    std::string tmpfn = strprintf("banlist.dat.%04x", randv);
-
-    // serialize banlist, checksum data up to that point, then append csum
-    CDataStream ssBanlist(SER_DISK, CLIENT_VERSION);
-    ssBanlist << FLATDATA(Params().MessageStart());
-    ssBanlist << banSet;
-    uint256 hash = Hash(ssBanlist.begin(), ssBanlist.end());
-    ssBanlist << hash;
-
-    // open temp output file, and associate with CAutoFile
-    boost::filesystem::path pathTmp = GetDataDir() / tmpfn;
-    FILE *file = fopen(pathTmp.string().c_str(), "wb");
-    CAutoFile fileout(file, SER_DISK, CLIENT_VERSION);
-    if (fileout.IsNull())
-        return error("%s: Failed to open file %s", __func__, pathTmp.string());
-
-    // Write and commit header, data
-    try
-    {
-        fileout << ssBanlist;
-    }
-    catch (const std::exception &e)
-    {
-        return error("%s: Serialize or I/O error - %s", __func__, e.what());
-    }
-    FileCommit(fileout.Get());
-    fileout.fclose();
-
-    // replace existing banlist.dat, if any, with new banlist.dat.XXXX
-    if (!RenameOver(pathTmp, pathBanlist))
-        return error("%s: Rename-into-place failed", __func__);
-
-    return true;
-}
-
-bool CBanDB::Read(banmap_t &banSet)
-{
-    // open input file, and associate with CAutoFile
-    FILE *file = fopen(pathBanlist.string().c_str(), "rb");
-    CAutoFile filein(file, SER_DISK, CLIENT_VERSION);
-    if (filein.IsNull())
-        return error("%s: Failed to open file %s", __func__, pathBanlist.string());
-
-    // use file size to size memory buffer
-    uint64_t fileSize = boost::filesystem::file_size(pathBanlist);
-    uint64_t dataSize = 0;
-    // Don't try to resize to a negative number if file is small
-    if (fileSize >= sizeof(uint256))
-        dataSize = fileSize - sizeof(uint256);
-    vector<unsigned char> vchData;
-    vchData.resize(dataSize);
-    uint256 hashIn;
-
-    // read data and checksum from file
-    try
-    {
-        filein.read((char *)&vchData[0], dataSize);
-        filein >> hashIn;
-    }
-    catch (const std::exception &e)
-    {
-        return error("%s: Deserialize or I/O error - %s", __func__, e.what());
-    }
-    filein.fclose();
-
-    CDataStream ssBanlist(vchData, SER_DISK, CLIENT_VERSION);
-
-    // verify stored checksum matches input data
-    uint256 hashTmp = Hash(ssBanlist.begin(), ssBanlist.end());
-    if (hashIn != hashTmp)
-        return error("%s: Checksum mismatch, data corrupted", __func__);
-
-    unsigned char pchMsgTmp[4];
-    try
-    {
-        // de-serialize file header (network specific magic number) and ..
-        ssBanlist >> FLATDATA(pchMsgTmp);
-
-        // ... verify the network matches ours
-        if (memcmp(pchMsgTmp, Params().MessageStart(), sizeof(pchMsgTmp)))
-            return error("%s: Invalid network magic number", __func__);
-
-        // de-serialize address data into one CAddrMan object
-        ssBanlist >> banSet;
-    }
-    catch (const std::exception &e)
-    {
-        return error("%s: Deserialize or I/O error - %s", __func__, e.what());
-    }
-
-    return true;
 }
 
 int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds)

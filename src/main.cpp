@@ -16,11 +16,13 @@
 #include "consensus/consensus.h"
 #include "consensus/merkle.h"
 #include "consensus/validation.h"
+#include "dosman.h"
 #include "expedited.h"
 #include "hash.h"
 #include "init.h"
 #include "merkleblock.h"
 #include "net.h"
+#include "nodestate.h"
 #include "parallel.h"
 #include "policy/policy.h"
 #include "pow.h"
@@ -230,16 +232,6 @@ std::map<uint256, NodeId> mapBlockSource;
 boost::scoped_ptr<CRollingBloomFilter> recentRejects;
 uint256 hashRecentRejectsChainTip;
 
-/** Blocks that are in flight, and that are in the queue to be downloaded. Protected by cs_main. */
-struct QueuedBlock
-{
-    uint256 hash;
-    CBlockIndex *pindex; //!< Optional.
-    int64_t nTime; //! Time of "getdata" request in microseconds.
-    bool fValidatedHeaders; //!< Whether this block has validated headers at the time of request.
-};
-std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
-
 /** Number of preferable block download peers. */
 int nPreferredDownload = 0;
 
@@ -261,88 +253,6 @@ int nPeersWithValidatedDownloads = 0;
 
 namespace
 {
-struct CBlockReject
-{
-    unsigned char chRejectCode;
-    std::string strRejectReason;
-    uint256 hashBlock;
-};
-
-/**
- * Maintain validation-specific state about nodes, protected by cs_main, instead
- * by CNode's own locks. This simplifies asynchronous operation, where
- * processing of incoming data is done after the ProcessMessage call returns,
- * and we're no longer holding the node's locks.
- */
-struct CNodeState
-{
-    //! The peer's address
-    CService address;
-    //! Whether we have a fully established connection.
-    bool fCurrentlyConnected;
-    //! Accumulated misbehaviour score for this peer.
-    int nMisbehavior;
-    //! Whether this peer should be disconnected and banned (unless whitelisted).
-    bool fShouldBan;
-    //! String name of this peer (debugging/logging purposes).
-    std::string name;
-    //! List of asynchronously-determined block rejections to notify this peer about.
-    std::vector<CBlockReject> rejects;
-    //! The best known block we know this peer has announced.
-    CBlockIndex *pindexBestKnownBlock;
-    //! The hash of the last unknown block this peer has announced.
-    uint256 hashLastUnknownBlock;
-    //! The last full block we both have.
-    CBlockIndex *pindexLastCommonBlock;
-    //! The best header we have sent our peer.
-    CBlockIndex *pindexBestHeaderSent;
-    //! Whether we've started headers synchronization with this peer.
-    bool fSyncStarted;
-    //! The start time of the sync
-    int64_t fSyncStartTime;
-    //! Were the first headers requested in a sync received
-    bool fFirstHeadersReceived;
-
-    std::list<QueuedBlock> vBlocksInFlight;
-    //! When the first entry in vBlocksInFlight started downloading. Don't care when vBlocksInFlight is empty.
-    int64_t nDownloadingSince;
-    int nBlocksInFlight;
-    int nBlocksInFlightValidHeaders;
-    //! Whether we consider this a preferred download peer.
-    bool fPreferredDownload;
-    //! Whether this peer wants invs or headers (when possible) for block announcements.
-    bool fPreferHeaders;
-
-    CNodeState()
-    {
-        fCurrentlyConnected = false;
-        nMisbehavior = 0;
-        fShouldBan = false;
-        pindexBestKnownBlock = NULL;
-        hashLastUnknownBlock.SetNull();
-        pindexLastCommonBlock = NULL;
-        pindexBestHeaderSent = NULL;
-        fSyncStarted = false;
-        nDownloadingSince = 0;
-        nBlocksInFlight = 0;
-        nBlocksInFlightValidHeaders = 0;
-        fPreferredDownload = false;
-        fPreferHeaders = false;
-    }
-};
-
-/** Map maintaining per-node state. Requires cs_main. */
-std::map<NodeId, CNodeState> mapNodeState;
-
-// Requires cs_main.
-CNodeState *State(NodeId pnode)
-{
-    std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(pnode);
-    if (it == mapNodeState.end())
-        return NULL;
-    return &it->second;
-}
-
 int GetHeight()
 {
     LOCK(cs_main);
@@ -1852,28 +1762,6 @@ void CheckForkWarningConditionsOnNewFork(CBlockIndex *pindexNewForkTip)
     CheckForkWarningConditions();
 }
 
-// Requires cs_main.
-void Misbehaving(NodeId pnode, int howmuch)
-{
-    if (howmuch == 0)
-        return;
-
-    CNodeState *state = State(pnode);
-    if (state == NULL)
-        return;
-
-    state->nMisbehavior += howmuch;
-    int banscore = GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD);
-    if (state->nMisbehavior >= banscore && state->nMisbehavior - howmuch < banscore)
-    {
-        LogPrintf("%s: %s (%d -> %d) BAN THRESHOLD EXCEEDED\n", __func__, state->name, state->nMisbehavior - howmuch,
-            state->nMisbehavior);
-        state->fShouldBan = true;
-    }
-    else
-        LogPrintf("%s: %s (%d -> %d)\n", __func__, state->name, state->nMisbehavior - howmuch, state->nMisbehavior);
-}
-
 void static InvalidChainFound(CBlockIndex *pindexNew)
 {
     if (!pindexBestInvalid || pindexNew->nChainWork > pindexBestInvalid->nChainWork)
@@ -1904,7 +1792,7 @@ void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state
                 state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), pindex->GetBlockHash()};
             State(it->second)->rejects.push_back(reject);
             if (nDoS > 0)
-                Misbehaving(it->second, nDoS);
+                dosMan.Misbehaving(it->second, nDoS);
         }
     }
     if (!state.CorruptionPossible())
@@ -5748,7 +5636,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     {
         if (pfrom->nVersion >= NO_BLOOM_VERSION)
         {
-            Misbehaving(pfrom->GetId(), 100);
+            dosMan.Misbehaving(pfrom->GetId(), 100);
             return false;
         }
         else
@@ -5767,7 +5655,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             pfrom->PushMessage(
                 NetMsgType::REJECT, strCommand, REJECT_DUPLICATE, std::string("Duplicate version message"));
             LOCK(cs_main);
-            Misbehaving(pfrom->GetId(), 100);
+            dosMan.Misbehaving(pfrom->GetId(), 100);
             return error("Duplicate version message received - banning peer=%d version=%s ip=%s", pfrom->GetId(),
                 pfrom->cleanSubVer, pfrom->addrName.c_str());
         }
@@ -5786,7 +5674,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             pfrom->PushMessage(NetMsgType::REJECT, strCommand, REJECT_OBSOLETE,
                 strprintf("Protocol Version must be %d or greater", MIN_PEER_PROTO_VERSION));
             LOCK(cs_main);
-            Misbehaving(pfrom->GetId(), 100);
+            dosMan.Misbehaving(pfrom->GetId(), 100);
             return error("Using obsolete protocol version %i - banning peer=%d version=%s ip=%s", pfrom->nVersion,
                 pfrom->GetId(), pfrom->cleanSubVer, pfrom->addrName.c_str());
         }
@@ -5905,7 +5793,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         //        attacker sends us messages that do not require a response coupled with an nVersion of zero
         //        then they can continue unimpeded even though they have exceeded the misbehaving threshold.
         pfrom->fDisconnect = true;
-        CNode::Ban(pfrom->addr, BanReasonNodeMisbehaving);
+        dosMan.Ban(pfrom->addr, BanReasonNodeMisbehaving);
         return error("VERSION was not received before other messages - banning peer=%d ip=%s", pfrom->GetId(),
             pfrom->addrName.c_str());
     }
@@ -5917,14 +5805,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (pfrom->tVersionSent < 0)
         {
             LOCK(cs_main);
-            Misbehaving(pfrom->GetId(), 100);
+            dosMan.Misbehaving(pfrom->GetId(), 100);
             return error("VERACK received but we never sent a VERSION message - banning peer=%d version=%s ip=%s",
                 pfrom->GetId(), pfrom->cleanSubVer, pfrom->addrName.c_str());
         }
         if (pfrom->fSuccessfullyConnected)
         {
             LOCK(cs_main);
-            Misbehaving(pfrom->GetId(), 100);
+            dosMan.Misbehaving(pfrom->GetId(), 100);
             return error("duplicate VERACK received - banning peer=%d version=%s ip=%s", pfrom->GetId(),
                 pfrom->cleanSubVer, pfrom->addrName.c_str());
         }
@@ -5995,7 +5883,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             return true;
         if (vAddr.size() > 1000)
         {
-            Misbehaving(pfrom->GetId(), 20);
+            dosMan.Misbehaving(pfrom->GetId(), 20);
             return error("message addr size() = %u", vAddr.size());
         }
 
@@ -6071,7 +5959,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (vInv.size() > MAX_INV_SZ || vInv.empty())
         {
             LOCK(cs_main);
-            Misbehaving(pfrom->GetId(), 20);
+            dosMan.Misbehaving(pfrom->GetId(), 20);
             return error("message inv size() = %u", vInv.size());
         }
         for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
@@ -6080,7 +5968,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK)) || inv.hash.IsNull())
             {
                 LOCK(cs_main);
-                Misbehaving(pfrom->GetId(), 20);
+                dosMan.Misbehaving(pfrom->GetId(), 20);
                 return error("message inv invalid type = %u or is null hash %s", inv.type, inv.hash.ToString());
             }
         }
@@ -6143,7 +6031,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             if (pfrom->nSendSize > (SendBufferSize() * 2))
             {
-                Misbehaving(pfrom->GetId(), 50);
+                dosMan.Misbehaving(pfrom->GetId(), 50);
                 return error("send buffer size() = %u", pfrom->nSendSize);
             }
         }
@@ -6157,7 +6045,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // BU check size == 0 to be intolerant of an empty and useless request
         if ((vInv.size() > MAX_INV_SZ) || (vInv.size() == 0))
         {
-            Misbehaving(pfrom->GetId(), 20);
+            dosMan.Misbehaving(pfrom->GetId(), 20);
             return error("message getdata size() = %u", vInv.size());
         }
 
@@ -6168,7 +6056,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK) || (inv.type == MSG_FILTERED_BLOCK) ||
                     (inv.type == MSG_THINBLOCK) || (inv.type == MSG_XTHINBLOCK)))
             {
-                Misbehaving(pfrom->GetId(), 20);
+                dosMan.Misbehaving(pfrom->GetId(), 20);
                 return error("message inv invalid type = %u", inv.type);
             }
             // inv.hash does not need validation, since SHA2556 hash can be any value
@@ -6360,7 +6248,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                         if (stateDummy.IsInvalid(nDos) && nDos > 0)
                         {
                             // Punish peer that gave us an invalid orphan tx
-                            Misbehaving(fromPeer, nDos);
+                            dosMan.Misbehaving(fromPeer, nDos);
                             setMisbehaving.insert(fromPeer);
                             LogPrint("mempool", "   invalid orphan tx %s\n", orphanHash.ToString());
                         }
@@ -6431,7 +6319,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 pfrom->PushMessage(NetMsgType::REJECT, strCommand, (unsigned char)state.GetRejectCode(),
                     state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
             if (nDoS > 0)
-                Misbehaving(pfrom->GetId(), nDoS);
+                dosMan.Misbehaving(pfrom->GetId(), nDoS);
         }
         FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
     }
@@ -6445,7 +6333,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         unsigned int nCount = ReadCompactSize(vRecv);
         if (nCount > MAX_HEADERS_RESULTS)
         {
-            Misbehaving(pfrom->GetId(), 20);
+            dosMan.Misbehaving(pfrom->GetId(), 20);
             return error("headers message size = %u", nCount);
         }
         headers.resize(nCount);
@@ -6480,7 +6368,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             if (header.hashPrevBlock != hashLastBlock)
             {
-                Misbehaving(pfrom->GetId(), 20);
+                dosMan.Misbehaving(pfrom->GetId(), 20);
                 return error("non-continuous headers sequence");
             }
             hashLastBlock = header.GetHash();
@@ -6497,7 +6385,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 if (state.IsInvalid(nDoS))
                 {
                     if (nDoS > 0)
-                        Misbehaving(pfrom->GetId(), nDoS);
+                        dosMan.Misbehaving(pfrom->GetId(), nDoS);
                     return error("invalid header received");
                 }
             }
@@ -6580,7 +6468,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!pfrom->ThinBlockCapable())
         {
             LOCK(cs_main);
-            Misbehaving(pfrom->GetId(), 100);
+            dosMan.Misbehaving(pfrom->GetId(), 100);
             return error("Thinblock message received from a non thinblock node, peer=%d", pfrom->GetId());
         }
 
@@ -6600,7 +6488,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 if (pfrom->nGetXthinCount >= 20)
                 {
                     LOCK(cs_main);
-                    Misbehaving(pfrom->GetId(), 100); // If they exceed the limit then disconnect them
+                    dosMan.Misbehaving(pfrom->GetId(), 100); // If they exceed the limit then disconnect them
                     return error("requesting too many get_xthin");
                 }
             }
@@ -6614,7 +6502,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!((inv.type == MSG_XTHINBLOCK) || (inv.type == MSG_THINBLOCK)) || inv.hash.IsNull())
         {
             LOCK(cs_main);
-            Misbehaving(pfrom->GetId(), 100);
+            dosMan.Misbehaving(pfrom->GetId(), 100);
             return error("invalid get_xthin type=%u hash=%s", inv.type, inv.hash.ToString());
         }
 
@@ -6626,7 +6514,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
             if (mi == mapBlockIndex.end())
             {
-                Misbehaving(pfrom->GetId(), 100);
+                dosMan.Misbehaving(pfrom->GetId(), 100);
                 return error("Peer %s (%d) requested nonexistent block %s", pfrom->addrName.c_str(), pfrom->id,
                     inv.hash.ToString());
             }
@@ -6661,7 +6549,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (!HandleExpeditedBlock(vRecv, pfrom))
             {
                 LOCK(cs_main);
-                Misbehaving(pfrom->GetId(), 5);
+                dosMan.Misbehaving(pfrom->GetId(), 5);
                 return false;
             }
         }
@@ -6676,7 +6564,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!pfrom->fVerackSent)
         {
             LOCK(cs_main);
-            Misbehaving(pfrom->GetId(), 100);
+            dosMan.Misbehaving(pfrom->GetId(), 100);
             return error("BUVERSION received but we never sent a VERACK message - banning peer=%d version=%s ip=%s",
                 pfrom->GetId(), pfrom->cleanSubVer, pfrom->addrName.c_str());
         }
@@ -6686,7 +6574,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             pfrom->PushMessage(
                 NetMsgType::REJECT, strCommand, REJECT_DUPLICATE, std::string("Duplicate BU version message"));
             LOCK(cs_main);
-            Misbehaving(pfrom->GetId(), 100);
+            dosMan.Misbehaving(pfrom->GetId(), 100);
             return error("Duplicate BU version message received from peer=%d version=%s ip=%s", pfrom->GetId(),
                 pfrom->cleanSubVer, pfrom->addrName.c_str());
         }
@@ -6702,7 +6590,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!pfrom->fBUVersionSent)
         {
             LOCK(cs_main);
-            Misbehaving(pfrom->GetId(), 100);
+            dosMan.Misbehaving(pfrom->GetId(), 100);
             return error("BUVERACK received but we never sent a BUVERSION message - banning peer=%d version=%s ip=%s",
                 pfrom->GetId(), pfrom->cleanSubVer, pfrom->addrName.c_str());
         }
@@ -6929,7 +6817,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!filter.IsWithinSizeConstraints())
         {
             // There is no excuse for sending a too-large filter
-            Misbehaving(pfrom->GetId(), 100);
+            dosMan.Misbehaving(pfrom->GetId(), 100);
             return false;
         }
         else
@@ -6951,7 +6839,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // and thus, the maximum size any matched object can have) in a filteradd message
         if (vData.size() > MAX_SCRIPT_ELEMENT_SIZE)
         {
-            Misbehaving(pfrom->GetId(), 100);
+            dosMan.Misbehaving(pfrom->GetId(), 100);
         }
         else
         {
@@ -6959,7 +6847,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (pfrom->pfilter)
                 pfrom->pfilter->insert(vData);
             else
-                Misbehaving(pfrom->GetId(), 100);
+                dosMan.Misbehaving(pfrom->GetId(), 100);
         }
     }
 
@@ -7090,7 +6978,7 @@ bool ProcessMessages(CNode *pfrom)
                 pfrom->id, pfrom->addrName.c_str());
             if (!pfrom->fWhitelisted)
             {
-                CNode::Ban(pfrom->addr, BanReasonNodeMisbehaving, 4 * 60 * 60); // ban for 4 hours
+                dosMan.Ban(pfrom->addr, BanReasonNodeMisbehaving, 4 * 60 * 60); // ban for 4 hours
             }
             fOk = false;
             break;
@@ -7305,7 +7193,7 @@ bool SendMessages(CNode *pto)
                     LogPrintf("Warning: not banning local peer %s!\n", pto->addr.ToString());
                 else
                 {
-                    CNode::Ban(pto->addr, BanReasonNodeMisbehaving);
+                    dosMan.Ban(pto->addr, BanReasonNodeMisbehaving);
                 }
             }
             state.fShouldBan = false;
@@ -7324,7 +7212,7 @@ bool SendMessages(CNode *pto)
             (!state.fFirstHeadersReceived) && !pto->fWhitelisted)
         {
             pto->fDisconnect = true;
-            CNode::Ban(pto->addr, BanReasonNodeMisbehaving, 4 * 60 * 60); // ban for 4 hours
+            dosMan.Ban(pto->addr, BanReasonNodeMisbehaving, 4 * 60 * 60); // ban for 4 hours
             LogPrintf(
                 "Banning %s because initial headers were either not received or not received before the timeout\n",
                 pto->addr.ToString());

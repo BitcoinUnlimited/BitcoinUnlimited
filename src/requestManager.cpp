@@ -368,14 +368,12 @@ bool RequestBlock(CNode *pfrom, CInv obj)
         {
             if (HaveConnectThinblockNodes() || (HaveThinblockNodes() && thindata.CheckThinblockTimer(obj.hash)))
             {
-                // Must download a block from a ThinBlock peer
+                // Must download an xthinblock from a XTHIN peer.
+                // We can only request one xthinblock per peer at a time.
                 if (pfrom->mapThinBlocksInFlight.size() < 1 && CanThinBlockBeDownloaded(pfrom))
-                { // We can only send one thinblock per peer at a time
-                    {
-                        LOCK(pfrom->cs_mapthinblocksinflight);
-                        pfrom->mapThinBlocksInFlight.insert(
-                            std::pair<uint256, CNode::CThinBlockInFlight>(inv2.hash, CNode::CThinBlockInFlight()));
-                    }
+                {
+                    AddThinBlockInFlight(pfrom, inv2.hash);
+
                     inv2.type = MSG_XTHINBLOCK;
                     std::vector<uint256> vOrphanHashes;
                     {
@@ -389,23 +387,20 @@ bool RequestBlock(CNode *pfrom, CInv obj)
                     ss << filterMemPool;
                     MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
                     pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                    LogPrint("thin", "Requesting Thinblock %s from peer %s (%d)\n", inv2.hash.ToString(),
+                    LogPrint("thin", "Requesting xthinblock %s from peer %s (%d)\n", inv2.hash.ToString(),
                         pfrom->addrName.c_str(), pfrom->id);
                     return true;
                 }
             }
             else
             {
-                // Try to download a thinblock if possible otherwise just download a regular block
-                // We can only send one thinblock per peer at a time
+                // Try to download a thinblock if possible otherwise just download a regular block.
+                // We can only request one xthinblock per peer at a time.
                 MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
                 if (pfrom->mapThinBlocksInFlight.size() < 1 && CanThinBlockBeDownloaded(pfrom))
                 {
-                    {
-                        LOCK(pfrom->cs_mapthinblocksinflight);
-                        pfrom->mapThinBlocksInFlight.insert(
-                            std::pair<uint256, CNode::CThinBlockInFlight>(inv2.hash, CNode::CThinBlockInFlight()));
-                    }
+                    AddThinBlockInFlight(pfrom, inv2.hash);
+
                     inv2.type = MSG_XTHINBLOCK;
                     std::vector<uint256> vOrphanHashes;
                     {
@@ -418,7 +413,7 @@ bool RequestBlock(CNode *pfrom, CInv obj)
                     ss << inv2;
                     ss << filterMemPool;
                     pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                    LogPrint("thin", "Requesting Thinblock %s from peer %s (%d)\n", inv2.hash.ToString(),
+                    LogPrint("thin", "Requesting xthinblock %s from peer %s (%d)\n", inv2.hash.ToString(),
                         pfrom->addrName.c_str(), pfrom->id);
                 }
                 else
@@ -536,13 +531,25 @@ void CRequestManager::SendRequests()
                     }
 
                     CInv obj = item.obj;
-                    LEAVE_CRITICAL_SECTION(cs_objDownloader);
-                    if (RequestBlock(next.node, obj))
-                    {
-                        item.outstandingReqs++;
-                        item.lastRequestTime = now;
-                    }
+                    item.outstandingReqs++;
+                    int64_t then = item.lastRequestTime;
+                    item.lastRequestTime = now;
+                    LEAVE_CRITICAL_SECTION(cs_objDownloader);  // item and itemIter are now invalid
+                    bool reqblkResult = RequestBlock(next.node, obj);
                     ENTER_CRITICAL_SECTION(cs_objDownloader);
+                    if (!reqblkResult)
+                    {
+                        // having released cs_objDownloader, item and itemiter may be invalid.
+                        // So in the rare case that we could not request the block we need to
+                        // find the item again (if it exists) and set the tracking back to what it was
+                        itemIter =  mapBlkInfo.find(obj.hash);
+                        if (itemIter != mapBlkInfo.end())
+                        {
+                            item = itemIter->second;
+                            item.outstandingReqs--;
+                            item.lastRequestTime = then;
+                        }
+                    }
 
                     // If you wanted to remember that this node has this data, you could push it back onto the end of
                     // the availableFrom list like this:
@@ -553,7 +560,7 @@ void CRequestManager::SendRequests()
                     // Instead we'll forget about it -- the node is already popped of of the available list so now we'll
                     // release our reference.
                     LOCK(cs_vNodes);
-                    LogPrint("req", "ReqMgr: %s removed block ref to %d count %d\n", item.obj.ToString(),
+                    LogPrint("req", "ReqMgr: %s removed block ref to %d count %d\n", obj.ToString(),
                         next.node->GetId(), next.node->GetRefCount());
                     next.node->Release();
                     next.node = NULL;
@@ -632,26 +639,24 @@ void CRequestManager::SendRequests()
 
                     if (next.node != NULL)
                     {
+                        CInv obj = item.obj;
                         if (1)
                         {
-                            LEAVE_CRITICAL_SECTION(cs_objDownloader);
-                            LOCK(next.node->cs_vSend);
                             // from->AskFor(item.obj); basically just shoves the req into mapAskFor
                             // This commented code does skips requesting TX if the node is not synced.  But the req mgr
                             // should not make this decision, the caller should not give the TX to me...
-                            // !item.lastRequestTime || (item.lastRequestTime && IsChainNearlySyncd()))
-                            if (1)
-                            {
-                                next.node->mapAskFor.insert(std::make_pair(now, item.obj));
-                                item.outstandingReqs++;
-                                item.lastRequestTime = now;
-                            }
+                            // if (!item.lastRequestTime || (item.lastRequestTime && IsChainNearlySyncd()))
+
+                            item.outstandingReqs++;
+                            item.lastRequestTime = now;
+                            LEAVE_CRITICAL_SECTION(cs_objDownloader);  // do not use "item" after releasing this
+                            next.node->mapAskFor.insert(std::make_pair(now, obj));
                             ENTER_CRITICAL_SECTION(cs_objDownloader);
                         }
                         {
                             LOCK(cs_vNodes);
                             LogPrint("req", "ReqMgr: %s removed tx ref to %d count %d\n",
-                                item.obj.ToString(), next.node->GetId(), next.node->GetRefCount());
+                                obj.ToString(), next.node->GetId(), next.node->GetRefCount());
                             next.node->Release();
                             next.node = NULL;
                         }

@@ -23,3 +23,12 @@ qt/unlimiteddialog.cpp
 qt/unlimiteddialog.h
 qt/unlimitedmodel.cpp
 qt/unlimitedmodel.h
+nodestate.cpp
+nodestate.h
+banentry.cpp
+banentry.h
+bandb.cpp
+bandb.h
+test/bandb_tests.cpp
+dosman.cpp
+dosman.h
