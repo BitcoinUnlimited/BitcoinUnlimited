@@ -1712,6 +1712,18 @@ int GetSpendHeight(const CCoinsViewCache &inputs)
     throw std::runtime_error("GetSpendHeight(): best block does not exist");
 }
 
+/**
+ * Check whether all inputs of this transaction are valid (no double spends, scripts & sigs, amounts)
+ * This does not modify the UTXO set.
+ *
+ * If pvChecks is not NULL, script checks are pushed onto it instead of being performed inline. Any
+ * script checks which are not necessary (eg due to script execution cache hits) are, obviously,
+ * not pushed onto pvChecks/run.
+ *
+ * Setting cacheSigStore/cacheFullScriptStore to false will remove elements from the corresponding cache
+ * which are matched. This is useful for checking blocks where we will likely never need the cache
+ * entry again.
+ */
 bool CheckInputs(const CTransaction &tx,
     CValidationState &state,
     const CCoinsViewCache &view,
