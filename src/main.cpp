@@ -245,7 +245,6 @@ int nPeersWithValidatedDownloads = 0;
 } // anon namespace
 
 
-
 //////////////////////////////////////////////////////////////////////////////
 //
 // Registration of network node signals.
