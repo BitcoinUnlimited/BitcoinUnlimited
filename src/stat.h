@@ -64,6 +64,7 @@ class CStatBase
 {
 public:
     CStatBase(){};
+    virtual ~CStatBase(){};
     virtual UniValue GetNow() = 0; // Returns the current value of this statistic
     virtual UniValue GetTotal() = 0; // Returns the cumulative value of this statistic
     virtual UniValue GetSeries(const std::string &name, int count) = 0; // Returns the historical or series data
@@ -78,7 +79,10 @@ protected:
     std::string name;
 
 public:
-    CStat() {}
+    CStat()
+    {
+        value = RecordType(); // = 0;
+    }
     CStat(const char *namep) : name(namep)
     {
         LOCK(cs_statMap);
@@ -112,7 +116,7 @@ public:
     {
         LOCK(cs_statMap);
         statistics.erase(CStatKey(name));
-        name = "";
+        name.clear();
     }
 
     CStat &operator=(const DataType &arg)
@@ -140,11 +144,14 @@ public:
         return NullUniValue; // Has no series data
     }
 
-    ~CStat()
+    virtual ~CStat()
     {
         LOCK(cs_statMap);
         if (name.size())
+        {
             statistics.erase(CStatKey(name));
+            name.clear();
+        }
     }
 };
 
@@ -178,7 +185,10 @@ protected:
     RecordType total;
 
 public:
-    CStatHistory() : CStat<DataType, RecordType>(), timer(stat_io_service) {}
+    CStatHistory() : CStat<DataType, RecordType>(), op(STAT_OP_SUM | STAT_KEEP_COUNT), timer(stat_io_service)
+    {
+        Clear();
+    }
     CStatHistory(const char *name, unsigned int operation = STAT_OP_SUM)
         : CStat<DataType, RecordType>(name), op(operation), timer(stat_io_service)
     {
@@ -208,6 +218,7 @@ public:
     void Clear(void)
     {
         timerCount = 0;
+        sampleCount = 0;
         for (int i = 0; i < STATISTICS_NUM_RANGES; i++)
             loc[i] = 0;
         for (int i = 0; i < STATISTICS_NUM_RANGES; i++)
@@ -217,12 +228,12 @@ public:
             {
                 history[i][j] = RecordType();
             }
-        total = DataType();
+        total = RecordType();
         this->value = RecordType();
         Start();
     }
 
-    ~CStatHistory() {}
+    virtual ~CStatHistory() {}
     CStatHistory &operator<<(const DataType &rhs)
     {
         if (op & STAT_INDIVIDUAL)

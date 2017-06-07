@@ -4,7 +4,8 @@
 
 #include "parallel.h"
 #include "chainparams.h"
-#include "main.h"
+#include "dosman.h"
+#include "net.h"
 #include "pow.h"
 #include "timedata.h"
 #include "unlimited.h"
@@ -495,6 +496,16 @@ void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlo
     CValidationState state;
     uint64_t nSizeBlock = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
 
+    // Indicate that the thinblock was fully received. At this point we have either a block or a fully reconstructed
+    // thinblock but we still need to maintain a mapThinBlocksInFlight entry so that we don't re-request a full block
+    // from the same node while the block is processing.
+    {
+        LOCK(pfrom->cs_mapthinblocksinflight);
+        if (pfrom->mapThinBlocksInFlight.count(inv.hash))
+            pfrom->mapThinBlocksInFlight[inv.hash].fReceived = true;
+    }
+
+
     boost::thread::id this_id(boost::this_thread::get_id());
     PV.InitThread(this_id, pfrom, block, inv); // initialize the mapBlockValidationThread entries
 
@@ -525,7 +536,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlo
             if (nDoS > 0)
             {
                 LOCK(cs_main);
-                Misbehaving(pfrom->GetId(), nDoS);
+                dosMan.Misbehaving(pfrom->GetId(), nDoS);
             }
         }
     }
@@ -536,13 +547,14 @@ void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlo
         double nValidationTime = (double)(GetTimeMicros() - startTime) / 1000000.0;
         if (strCommand != NetMsgType::BLOCK)
         {
-            LogPrint("thin", "Processed ThinBlock %s in %.2f seconds\n", inv.hash.ToString(),
-                (double)(GetTimeMicros() - startTime) / 1000000.0);
+            LogPrint("thin", "Processed Block %s reconstructed from (%s) in %.2f seconds, peer=%s\n",
+                inv.hash.ToString(), strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0,
+                pfrom->GetLogName());
             thindata.UpdateValidationTime(nValidationTime);
         }
         else
-            LogPrint("thin", "Processed Regular Block %s in %.2f seconds\n", inv.hash.ToString(),
-                (double)(GetTimeMicros() - startTime) / 1000000.0);
+            LogPrint("thin", "Processed Regular Block %s in %.2f seconds, peer=%s\n", inv.hash.ToString(),
+                (double)(GetTimeMicros() - startTime) / 1000000.0, pfrom->GetLogName());
     }
 
     // When we request a thinblock we may get back a regular block if it is smaller than a thinblock
@@ -552,32 +564,35 @@ void HandleBlockMessageThread(CNode *pfrom, const string &strCommand, const CBlo
     {
         int nTotalThinBlocksInFlight = 0;
         {
-            LOCK(cs_vNodes);
+            LOCK2(cs_vNodes, pfrom->cs_mapthinblocksinflight);
+
+            // Erase this thinblock from the tracking map now that we're done with it.
+            if (pfrom->mapThinBlocksInFlight.count(inv.hash))
+            {
+                // Clear thinblock data and thinblock in flight
+                thindata.ClearThinBlockData(pfrom, inv.hash);
+            }
+
+            // Count up any other remaining nodes with thinblocks in flight.
             BOOST_FOREACH (CNode *pnode, vNodes)
             {
-                if (pnode->mapThinBlocksInFlight.erase(inv.hash))
-                {
-                    pnode->thinBlockWaitingForTxns = -1;
-                    pnode->thinBlock.SetNull();
-                }
                 if (pnode->mapThinBlocksInFlight.size() > 0)
                     nTotalThinBlocksInFlight++;
             }
             pfrom->firstBlock += 1; // update statistics, requires cs_vNodes
         }
 
-        // When we no longer have any thinblocks in flight then clear the set
+        // When we no longer have any thinblocks in flight then clear our any data
         // just to make sure we don't somehow get growth over time.
         if (nTotalThinBlocksInFlight == 0)
         {
+            thindata.ResetThinBlockBytes();
+
             LOCK(cs_xval);
             setPreVerifiedTxHash.clear();
             setUnVerifiedOrphanTxHash.clear();
         }
     }
-
-    // Clear the thinblock timer used for preferential download
-    thindata.ClearThinBlockTimer(inv.hash);
 
     // Erase any txns from the orphan cache that are no longer needed
     PV.ClearOrphanCache(block);

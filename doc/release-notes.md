@@ -42,6 +42,18 @@ Example item
 Example text.
 
 
+- Full UTF-8 support in the RPC API. Non-ASCII characters in, for example,
+  wallet labels have always been malformed because they weren't taken into account
+  properly in JSON RPC processing. This is no longer the case. This also affects
+  the GUI debug console.
+
+- Command line and config option checking improvements (ported from Classic; see
+  https://zander.github.io/posts/20170220-Whatsnew/).  Using non-existent options
+  is no longer ignored but produces a hard error; inputs are properly validated, and
+  yes/no, false/true, 0/1 all now work consistently.
+  Obsolete command line and config arguments 'rpcssl' ,'socks', 'debugnet', 'tor',
+  'benchmark' and 'whitelistalwaysrelay' now give a hard error about an unknown option.
+
 C++11
 -----
 
@@ -52,8 +64,12 @@ building. Effectively this means GCC 4.7 or higher, or Clang 3.3 or higher.
 When cross-compiling for a target that doesn't have C++11 libraries, configure with
 `./configure --enable-glibc-back-compat ... LDFLAGS=-static-libstdc++`.
 
-0.12.1 Change log
-=================
+RPC low-level changes
+----------------------
+
+- `gettxoutsetinfo` UTXO hash (`hash_serialized`) has changed. There was a divergence between
+  32-bit and 64-bit platforms, and the txids were missing in the hashed data. This has been
+  fixed, but this means that the output will be different than from previous versions.
 
 Detailed release notes follow. This overview includes changes that affect
 behavior, not code moves, refactors and string updates. For convenience in locating
@@ -65,10 +81,10 @@ git merge commit are mentioned.
 Asm script outputs replacements for OP_NOP2 and OP_NOP3
 -------------------------------------------------------
 
-OP_NOP2 has been renamed to OP_CHECKLOCKTIMEVERIFY by [BIP 
+OP_NOP2 has been renamed to OP_CHECKLOCKTIMEVERIFY by [BIP
 65](https://github.com/bitcoin/bips/blob/master/bip-0065.mediawiki)
 
-OP_NOP3 has been renamed to OP_CHECKSEQUENCEVERIFY by [BIP 
+OP_NOP3 has been renamed to OP_CHECKSEQUENCEVERIFY by [BIP
 112](https://github.com/bitcoin/bips/blob/master/bip-0112.mediawiki)
 
 The following outputs are affected by this change:

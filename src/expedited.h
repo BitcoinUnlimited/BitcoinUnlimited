@@ -37,11 +37,13 @@ extern bool CheckAndRequestExpeditedBlocks(CNode *pfrom);
 // be an expedited block source and if so, request them.
 extern void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *skip = NULL);
 extern void SendExpeditedBlock(const CBlock &block, const CNode *skip = NULL);
-extern void HandleExpeditedRequest(CDataStream &vRecv, CNode *pfrom);
+extern bool HandleExpeditedRequest(CDataStream &vRecv, CNode *pfrom);
 extern bool IsRecentlyExpeditedAndStore(const uint256 &hash);
 
 // process incoming unsolicited block
 extern bool HandleExpeditedBlock(CDataStream &vRecv, CNode *pfrom);
 
+// is this node an expedited node
+extern bool IsExpeditedNode(const CNode *pfrom);
 
 #endif
