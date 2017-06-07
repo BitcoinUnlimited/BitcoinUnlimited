@@ -186,12 +186,9 @@ extern void IsInitialBlockDownloadInit();
 extern bool IsChainNearlySyncd();
 extern void IsChainNearlySyncdInit();
 extern uint64_t LargestBlockSeen(uint64_t nBlockSize = 0);
-
-// BUIP010 Xtreme Thinblocks: begin
-
-// Returns the block height of the current active chain tip.
 extern int GetBlockchainHeight();
 
+// BUIP010 Xtreme Thinblocks: begin
 // Xpress Validation: begin
 // Transactions that have already been accepted into the memory pool do not need to be
 // re-verified and can avoid having to do a second and expensive CheckInputs() when

@@ -201,12 +201,6 @@ bool fCheckForPruning = false;
 /** Blocks loaded from disk are assigned id 0, so start the counter at 1. */
 uint32_t nBlockSequenceId = 1;
 
-int GetBlockchainHeight()
-{
-    LOCK(cs_main);
-    return chainActive.Height();
-}
-
 /**
  * Sources of received blocks, saved to be able to send them reject
  * messages or ban them when processing happens afterwards. Protected by
@@ -251,7 +245,21 @@ int nPeersWithValidatedDownloads = 0;
 } // anon namespace
 
 
-void UpdatePreferredDownload(CNode* node, CNodeState* state)
+
+//////////////////////////////////////////////////////////////////////////////
+//
+// Registration of network node signals.
+//
+
+namespace
+{
+int GetHeight()
+{
+    LOCK(cs_main);
+    return chainActive.Height();
+}
+
+void UpdatePreferredDownload(CNode *node, CNodeState *state)
 {
     nPreferredDownload -= state->fPreferredDownload;
 
@@ -630,7 +638,7 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)
 
 void RegisterNodeSignals(CNodeSignals &nodeSignals)
 {
-    nodeSignals.GetHeight.connect(&GetBlockchainHeight);
+    nodeSignals.GetHeight.connect(&GetHeight);
     nodeSignals.ProcessMessages.connect(&ProcessMessages);
     nodeSignals.SendMessages.connect(&SendMessages);
     nodeSignals.InitializeNode.connect(&InitializeNode);
@@ -639,7 +647,7 @@ void RegisterNodeSignals(CNodeSignals &nodeSignals)
 
 void UnregisterNodeSignals(CNodeSignals &nodeSignals)
 {
-    nodeSignals.GetHeight.disconnect(&GetBlockchainHeight);
+    nodeSignals.GetHeight.disconnect(&GetHeight);
     nodeSignals.ProcessMessages.disconnect(&ProcessMessages);
     nodeSignals.SendMessages.disconnect(&SendMessages);
     nodeSignals.InitializeNode.disconnect(&InitializeNode);
