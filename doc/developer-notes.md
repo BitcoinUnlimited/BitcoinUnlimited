@@ -313,6 +313,10 @@ General Bitcoin Unlimited
   - *Explanation*: If the test suite is to be updated for a change, this has to
     be done first 
 
+  - When implementing a PR, please enter provisional information (status: 'planned')
+    into doc/buips.md . When a release is cut, this document shall be updated
+    by whoever manages the release.
+
 Wallet
 -------
 
