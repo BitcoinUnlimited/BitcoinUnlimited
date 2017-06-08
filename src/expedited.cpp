@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "expedited.h"
+#include "dosman.h"
 #include "main.h"
 #include "rpc/server.h"
 #include "thinblock.h"
@@ -85,11 +86,18 @@ bool CheckAndRequestExpeditedBlocks(CNode *pfrom)
     return false;
 }
 
-void HandleExpeditedRequest(CDataStream &vRecv, CNode *pfrom)
+bool HandleExpeditedRequest(CDataStream &vRecv, CNode *pfrom)
 {
     uint64_t options;
     vRecv >> options;
     bool stop = ((options & EXPEDITED_STOP) != 0); // Indicates started or stopped expedited service
+
+    if (!pfrom->ThinBlockCapable() || !IsThinBlocksEnabled())
+    {
+        LOCK(cs_main);
+        dosMan.Misbehaving(pfrom->GetId(), 5);
+        return false;
+    }
 
     if (options & EXPEDITED_BLOCKS)
     {
@@ -97,7 +105,7 @@ void HandleExpeditedRequest(CDataStream &vRecv, CNode *pfrom)
 
         if (stop) // If stopping, find the array element and clear it.
         {
-            LogPrint("blk", "Stopping expedited blocks to peer %s (%d).\n", pfrom->addrName.c_str(), pfrom->id);
+            LogPrint("blk", "Stopping expedited blocks to peer %s\n", pfrom->GetLogName());
             std::vector<CNode *>::iterator it = std::find(xpeditedBlk.begin(), xpeditedBlk.end(), pfrom);
             if (it != xpeditedBlk.end())
             {
@@ -113,7 +121,7 @@ void HandleExpeditedRequest(CDataStream &vRecv, CNode *pfrom)
                 unsigned int maxExpedited = GetArg("-maxexpeditedblockrecipients", 32);
                 if (xpeditedBlk.size() < maxExpedited)
                 {
-                    LogPrint("blk", "Starting expedited blocks to peer %s (%d).\n", pfrom->addrName.c_str(), pfrom->id);
+                    LogPrint("blk", "Starting expedited blocks to peer %s\n", pfrom->GetLogName());
 
                     // find an empty array location
                     std::vector<CNode *>::iterator it =
@@ -126,8 +134,7 @@ void HandleExpeditedRequest(CDataStream &vRecv, CNode *pfrom)
                 }
                 else
                 {
-                    LogPrint("blk", "Expedited blocks requested from peer %s (%d), but I am full.\n",
-                        pfrom->addrName.c_str(), pfrom->id);
+                    LogPrint("blk", "Expedited blocks requested from peer %s but I am full\n", pfrom->GetLogName());
                 }
             }
         }
@@ -138,7 +145,7 @@ void HandleExpeditedRequest(CDataStream &vRecv, CNode *pfrom)
 
         if (stop) // If stopping, find the array element and clear it.
         {
-            LogPrint("blk", "Stopping expedited transactions to peer %s (%d).\n", pfrom->addrName.c_str(), pfrom->id);
+            LogPrint("blk", "Stopping expedited transactions to peer %s\n", pfrom->GetLogName());
             std::vector<CNode *>::iterator it = std::find(xpeditedTxn.begin(), xpeditedTxn.end(), pfrom);
             if (it != xpeditedTxn.end())
             {
@@ -154,8 +161,7 @@ void HandleExpeditedRequest(CDataStream &vRecv, CNode *pfrom)
                 unsigned int maxExpedited = GetArg("-maxexpeditedtxrecipients", 32);
                 if (xpeditedTxn.size() < maxExpedited)
                 {
-                    LogPrint("blk", "Starting expedited transactions to peer %s (%d).\n", pfrom->addrName.c_str(),
-                        pfrom->id);
+                    LogPrint("blk", "Starting expedited transactions to peer %s\n", pfrom->GetLogName());
 
                     std::vector<CNode *>::iterator it =
                         std::find(xpeditedTxn.begin(), xpeditedTxn.end(), ((CNode *)NULL));
@@ -167,12 +173,14 @@ void HandleExpeditedRequest(CDataStream &vRecv, CNode *pfrom)
                 }
                 else
                 {
-                    LogPrint("blk", "Expedited transactions requested from peer %s (%d), but I am full.\n",
-                        pfrom->addrName.c_str(), pfrom->id);
+                    LogPrint(
+                        "blk", "Expedited transactions requested from peer %s but I am full\n", pfrom->GetLogName());
                 }
             }
         }
     }
+
+    return true;
 }
 
 bool IsRecentlyExpeditedAndStore(const uint256 &hash)
@@ -195,60 +203,20 @@ bool HandleExpeditedBlock(CDataStream &vRecv, CNode *pfrom)
     unsigned char msgType;
     vRecv >> msgType >> hops;
 
+    if (!pfrom->ThinBlockCapable() || !IsThinBlocksEnabled() || !IsExpeditedNode(pfrom))
+    {
+        return false;
+    }
+
     if (msgType == EXPEDITED_MSG_XTHIN)
     {
-        CXThinBlock thinBlock;
-        vRecv >> thinBlock;
-        uint256 blkHash = thinBlock.header.GetHash();
-        CInv inv(MSG_BLOCK, blkHash);
-
-        bool newBlock = false;
-        unsigned int status = 0;
-        {
-            LOCK(cs_main);
-            BlockMap::iterator mapEntry = mapBlockIndex.find(blkHash);
-            CBlockIndex *blkidx = NULL;
-            if (mapEntry != mapBlockIndex.end())
-            {
-                blkidx = mapEntry->second;
-                if (blkidx)
-                    status = blkidx->nStatus;
-            }
-
-            // If we do not have the block on disk or do not have the header yet then treat the block as new.
-            newBlock = ((blkidx == NULL) || (!(blkidx->nStatus & BLOCK_HAVE_DATA)));
-        }
-
-        int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);
-        LogPrint("thin",
-            "Received %s expedited thinblock %s from peer %s (%d). Hop %d. Size %d bytes. (status %d,0x%x)\n",
-            newBlock ? "new" : "repeated", inv.hash.ToString(), pfrom->addrName.c_str(), pfrom->id, hops,
-            nSizeThinBlock, status, status);
-
-        // TODO: Move this section above the print once we ensure no unexpected dups.
-        // Skip if we've already seen this block
-        if (IsRecentlyExpeditedAndStore(blkHash))
-            return true;
-        if (!newBlock)
-            return true;
-
-        CValidationState state;
-        if (!CheckBlockHeader(thinBlock.header, state, true))
-            return false;
-
-        // TODO: Start headers-only mining now
-
-        SendExpeditedBlock(thinBlock, hops + 1, pfrom);
-
-        // Process the thinblock
-        thinBlock.process(pfrom, nSizeThinBlock, NetMsgType::XPEDITEDBLK);
+        return CXThinBlock::HandleMessage(vRecv, pfrom, NetMsgType::XPEDITEDBLK, hops + 1);
     }
     else
     {
         return error("Received unknown (0x%x) expedited message from peer %s (%d). Hop %d.\n", msgType,
             pfrom->addrName.c_str(), pfrom->id, hops);
     }
-    return true;
 }
 
 void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *skip)
@@ -285,4 +253,15 @@ void SendExpeditedBlock(const CBlock &block, const CNode *skip)
         SendExpeditedBlock(thinBlock, 0, skip);
     }
     // else, nothing to do
+}
+
+bool IsExpeditedNode(const CNode *pfrom)
+{
+    // xpeditedBlkUp keeps track of the nodes that we have requested expedited blocks from.  If the node
+    // is not in this list then it is not expedited node.
+    LOCK(cs_xpedited);
+    if (std::find(xpeditedBlkUp.begin(), xpeditedBlkUp.end(), pfrom) == xpeditedBlkUp.end())
+        return false;
+
+    return true;
 }

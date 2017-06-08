@@ -17,6 +17,13 @@ class CAddrManSerializationMock : public CAddrMan
 {
 public:
     virtual void Serialize(CDataStream& s, int nType, int nVersionDummy) const = 0;
+
+    //! Ensure that bucket placement is always the same for testing purposes.
+    void MakeDeterministic()
+    {
+        nKey.SetNull();
+        seed_insecure_rand(true);
+    }
 };
 
 class CAddrManUncorrupted : public CAddrManSerializationMock
@@ -65,6 +72,7 @@ BOOST_FIXTURE_TEST_SUITE(net_tests, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(caddrdb_read)
 {
     CAddrManUncorrupted addrmanUncorrupted;
+    addrmanUncorrupted.MakeDeterministic();
 
     CService addr1 = CService("250.7.1.1", 8333);
     CService addr2 = CService("250.7.2.2", 9999);
@@ -106,6 +114,7 @@ BOOST_AUTO_TEST_CASE(caddrdb_read)
 BOOST_AUTO_TEST_CASE(caddrdb_read_corrupted)
 {
     CAddrManCorrupted addrmanCorrupted;
+    addrmanCorrupted.MakeDeterministic();
 
     // Test that the de-serialization of corrupted addrman throws an exception.
     CDataStream ssPeers1 = AddrmanToStream(addrmanCorrupted);
@@ -119,7 +128,7 @@ BOOST_AUTO_TEST_CASE(caddrdb_read_corrupted)
     } catch (const std::exception& e) {
         exceptionThrown = true;
     }
-    // Even through de-serialization failed adddrman is not left in a clean state.
+    // Even through de-serialization failed addrman is not left in a clean state.
     BOOST_CHECK(addrman1.size() == 1);
     BOOST_CHECK(exceptionThrown);
 
@@ -139,20 +148,66 @@ BOOST_AUTO_TEST_CASE(cnode_simple_test)
 
     in_addr ipv4Addr;
     ipv4Addr.s_addr = 0xa0b0c001;
-    
+
     CAddress addr = CAddress(CService(ipv4Addr, 7777), NODE_NETWORK);
     std::string pszDest = "";
     bool fInboundIn = false;
 
     // Test that fFeeler is false by default.
-    CNode* pnode1 = new CNode(hSocket, addr, pszDest, fInboundIn);
+    std::unique_ptr<CNode> pnode1(new CNode(hSocket, addr, pszDest, fInboundIn));
     BOOST_CHECK(pnode1->fInbound == false);
     BOOST_CHECK(pnode1->fFeeler == false);
 
     fInboundIn = true;
-    CNode* pnode2 = new CNode(hSocket, addr, pszDest, fInboundIn);
+    std::unique_ptr<CNode> pnode2(new CNode(hSocket, addr, pszDest, fInboundIn));
     BOOST_CHECK(pnode2->fInbound == true);
     BOOST_CHECK(pnode2->fFeeler == false);
+
+    // NodeRef checks and refcount checks.
+    BOOST_CHECK_EQUAL(pnode1->nRefCount, 0);
+
+    // Check null pointers are good
+    {
+        CNodeRef ref;       // Default constructor
+        BOOST_CHECK(!ref);  // operator bool
+        ref = 0;
+        BOOST_CHECK(!ref);
+    }
+
+    // get()
+    {
+        CNodeRef ref1(pnode1.get());
+        CNodeRef ref2;
+        BOOST_CHECK(ref1.get() == pnode1.get());
+        BOOST_CHECK(ref2.get() == nullptr);
+    }
+
+    // Plain constructor and copy constructor
+    {
+        CNodeRef ref1(pnode1.get());
+        BOOST_CHECK_EQUAL(pnode1->nRefCount, 1);
+
+        {
+            CNodeRef ref2(ref1);
+            BOOST_CHECK_EQUAL(pnode1->nRefCount, 2);
+        }
+
+        BOOST_CHECK_EQUAL(pnode1->nRefCount, 1);
+    }
+    BOOST_CHECK_EQUAL(pnode1->nRefCount, 0);
+
+    // Assignment operator
+    {
+        CNodeRef ref1;
+
+        ref1 = pnode1.get();
+        BOOST_CHECK_EQUAL(pnode1->nRefCount, 1);
+        ref1 = ref1;
+        BOOST_CHECK_EQUAL(pnode1->nRefCount, 1);
+        ref1 = nullptr;
+        BOOST_CHECK_EQUAL(pnode1->nRefCount, 0);
+    }
+    BOOST_CHECK_EQUAL(pnode1->nRefCount, 0);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

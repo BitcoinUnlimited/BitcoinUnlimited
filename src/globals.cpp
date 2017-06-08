@@ -15,13 +15,16 @@
 #include "consensus/consensus.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
+#include "dosman.h"
 #include "leakybucket.h"
 #include "main.h"
 #include "miner.h"
 #include "net.h"
+#include "nodestate.h"
 #include "parallel.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
+#include "requestManager.h"
 #include "rpc/server.h"
 #include "stat.h"
 #include "thinblock.h"
@@ -30,7 +33,6 @@
 #include "tweak.h"
 #include "txmempool.h"
 #include "ui_interface.h"
-#include "unlimited.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validationinterface.h"
@@ -42,8 +44,8 @@
 #include <boost/thread.hpp>
 #include <inttypes.h>
 #include <iomanip>
+#include <list>
 #include <queue>
-
 
 using namespace std;
 
@@ -75,15 +77,16 @@ proxyType proxyInfo[NET_MAX];
 proxyType nameProxy;
 CCriticalSection cs_proxyInfos;
 
+// moved from main.cpp (now part of nodestate.h)
+std::map<uint256, pair<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
+std::map<NodeId, CNodeState> mapNodeState;
+
 set<uint256> setPreVerifiedTxHash;
 set<uint256> setUnVerifiedOrphanTxHash;
 CCriticalSection cs_xval;
 CCriticalSection cs_vNodes;
 CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
-std::vector<CSubNet> CNode::vWhitelistedRange;
-CCriticalSection CNode::cs_vWhitelistedRange;
-CCriticalSection CNode::cs_setBanned;
 uint64_t CNode::nTotalBytesRecv = 0;
 uint64_t CNode::nTotalBytesSent = 0;
 CCriticalSection CNode::cs_totalBytesRecv;
@@ -93,7 +96,6 @@ CCriticalSection CNode::cs_totalBytesSent;
 CCriticalSection cs_setservAddNodeAddresses;
 CCriticalSection cs_vAddedNodes;
 CCriticalSection cs_vUseDNSSeeds;
-CCriticalSection cs_nLastNodeId;
 CCriticalSection cs_mapInboundConnectionTracker;
 CCriticalSection cs_vOneShots;
 
@@ -123,15 +125,6 @@ uint32_t blockVersion = 0; // Overrides the mined block version if non-zero
 std::vector<std::string> BUComments = std::vector<std::string>();
 std::string minerComment;
 
-// Variables for traffic shaping
-/** Default value for the maximum amount of data that can be received in a burst */
-const int64_t DEFAULT_MAX_RECV_BURST = std::numeric_limits<long long>::max();
-/** Default value for the maximum amount of data that can be sent in a burst */
-const int64_t DEFAULT_MAX_SEND_BURST = std::numeric_limits<long long>::max();
-/** Default value for the average amount of data received per second */
-const int64_t DEFAULT_AVE_RECV = std::numeric_limits<long long>::max();
-/** Default value for the average amount of data sent per second */
-const int64_t DEFAULT_AVE_SEND = std::numeric_limits<long long>::max();
 CLeakyBucket receiveShaper(DEFAULT_MAX_RECV_BURST, DEFAULT_AVE_RECV);
 CLeakyBucket sendShaper(DEFAULT_MAX_SEND_BURST, DEFAULT_AVE_SEND);
 boost::chrono::steady_clock CLeakyBucket::clock;
@@ -146,6 +139,7 @@ CTxMemPool mempool(::minRelayTxFee);
 boost::posix_time::milliseconds statMinInterval(10000);
 boost::asio::io_service stat_io_service;
 
+std::list<CStatBase *> mallocedStats;
 CStatMap statistics;
 CTweakMap tweaks;
 
@@ -160,6 +154,7 @@ CSemaphore *semOutbound = NULL;
 CSemaphore *semOutboundAddNode = NULL; // BU: separate semaphore for -addnodes
 CNodeSignals g_signals;
 CAddrMan addrman;
+CDoSManager dosMan;
 
 // BU: change locking of orphan map from using cs_main to cs_orphancache.  There is too much dependance on cs_main locks
 // which are generally too broad in scope.
