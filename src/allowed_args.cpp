@@ -238,7 +238,7 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
             strprintf(_("How thorough the block verification of -checkblocks is (0-4, default: %u)"),
                     DEFAULT_CHECKLEVEL))
         .addDebugArg("dumpforks", optionalBool,
-            strprintf(_("Dump built-in fork deployment data in CSV format and exit")));
+            _("Dump built-in fork deployment data in CSV format and exit"));
 
 #ifndef WIN32
     if (mode == HMM_BITCOIND)
