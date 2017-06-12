@@ -144,7 +144,7 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
         block.rehash()
         hexblk = ToHex(block)
         expectException(lambda: self.nodes[0].validateblocktemplate(hexblk),
-                        JSONRPCException, "invalid block: bad-blk-length")
+                        JSONRPCException, "invalid block: bad-no-txs")
 
         logging.info("good block")
         block = create_block(tip, coinbase, cur_time + 600)
