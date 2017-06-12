@@ -5705,14 +5705,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 pfrom->PushMessage(NetMsgType::GETADDR);
                 pfrom->fGetAddr = true;
             }
-            addrman.Good(pfrom->addr);
         }
         else
         {
             if (((CNetAddr)pfrom->addr) == (CNetAddr)addrFrom)
             {
                 addrman.Add(addrFrom, addrFrom);
-                addrman.Good(addrFrom);
             }
         }
 
@@ -6369,6 +6367,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             {
                 nodestate->fFirstHeadersReceived = true;
                 LogPrint("net", "Initial headers received for peer=%s\n", pfrom->GetLogName());
+
+                // Peers are added to addrman when they first connect, but we only add peers to addrman's
+                // good (tried) list if we're confident this really is a good peer.
+                addrman.Good(pfrom->addr);
             }
 
             // Allow for very large reorgs (> 2000 blocks) on the nol test chain or other test net.
