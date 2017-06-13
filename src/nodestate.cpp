@@ -6,16 +6,21 @@
 
 #include "nodestate.h"
 
+extern CChain chainActive;
+
 /**
-* Default constructor initializing all local member variables to "null" values
+* Default constructor initializing all local member variables
 */
 CNodeState::CNodeState()
 {
-    pindexBestKnownBlock = NULL;
+    pindexBestKnownBlock = nullptr;
     hashLastUnknownBlock.SetNull();
-    pindexLastCommonBlock = NULL;
-    pindexBestHeaderSent = NULL;
+    pindexLastCommonBlock = nullptr;
+    pindexBestHeaderSent = nullptr;
     fSyncStarted = false;
+    nSyncStartTime = GetTime();
+    fFirstHeadersReceived = false;
+    nFirstHeadersExpectedHeight = chainActive.Height();
     nDownloadingSince = 0;
     nBlocksInFlight = 0;
     nBlocksInFlightValidHeaders = 0;
