@@ -5669,6 +5669,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             pfrom->PushVersion();
 
         pfrom->fClient = !(pfrom->nServices & NODE_NETWORK);
+        pfrom->fPrunedNode = (pfrom->fClient && pfrom->nServices > 0);
 
         // Potentially mark this peer as a preferred download peer.
         UpdatePreferredDownload(pfrom, State(pfrom->GetId()));
@@ -6342,14 +6343,21 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (pindexLast)
             UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
 
-        if (nCount == MAX_HEADERS_RESULTS && pindexLast)
+        if (nCount == MAX_HEADERS_RESULTS && pindexLast && !pfrom->fClient)
         {
-            // Headers message had its maximum size; the peer may have more headers.
+            // Headers message had its maximum size; the peer may have more headers but only ask if they
+            // are NODE_NETWORK (not an fClient)
             // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
             // from there instead.
             LogPrint("net", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id,
                 pfrom->nStartingHeight);
             pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexLast), uint256());
+        }
+        else if (nCount == MAX_HEADERS_RESULTS && pindexLast && pfrom->fClient)
+        {
+            pfrom->fDisconnect = true;
+            return error("You have asked for more headers from a peer that does not have them, disconnecting peer=%s",
+                pfrom->GetLogName());
         }
 
         bool fCanDirectFetch = CanDirectFetch(chainparams.GetConsensus());
@@ -7185,9 +7193,10 @@ bool SendMessages(CNode *pto)
             pindexBestHeader = chainActive.Tip();
         // Download if this is a nice peer, or we have no nice peers and this one might do.
         bool fFetch = state.fPreferredDownload || (nPreferredDownload == 0 && !pto->fClient && !pto->fOneShot);
-        if (!state.fSyncStarted && !pto->fClient && !fImporting && !fReindex)
+        if (!state.fSyncStarted && (!pto->fClient || pto->fPrunedNode) && !fImporting && !fReindex)
         {
-            // Only actively request headers from a single peer, unless we're close to today.
+            // Only actively request headers from a single peer, unless we're close to today. This way we can
+            // download the full set of headers from a NODE_NETWORK peer or just the initial headers from any peer.
             if ((nSyncStarted == 0 && fFetch) || pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60)
             {
                 const CBlockIndex *pindexStart = pindexBestHeader;
@@ -7200,14 +7209,15 @@ bool SendMessages(CNode *pto)
                    got back an empty response.  */
                 if (pindexStart->pprev)
                     pindexStart = pindexStart->pprev;
-                // BU Bug fix for Core:  Don't start downloading headers unless our chain is shorter
+                // Don't start downloading headers unless our chain is shorter
                 if (pindexStart->nHeight < pto->nStartingHeight)
                 {
                     state.fSyncStarted = true;
                     state.nSyncStartTime = GetTime();
                     state.fFirstHeadersReceived = false;
                     state.nFirstHeadersExpectedHeight = pindexBestHeader->nHeight;
-                    nSyncStarted++;
+                    if (!pto->fClient)
+                        nSyncStarted++;
 
                     LogPrint("net", "initial getheaders (%d) to peer=%d (startheight:%d)\n", pindexStart->nHeight,
                         pto->id, pto->nStartingHeight);
