@@ -76,6 +76,6 @@ struct CNodeState
 extern std::map<NodeId, CNodeState> mapNodeState;
 
 // Requires cs_main.
-extern CNodeState *State(NodeId pnode);
+extern CNodeState *State(NodeId id);
 
 #endif // BITCOIN_NODESTATE_H
