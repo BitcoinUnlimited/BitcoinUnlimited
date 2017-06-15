@@ -610,7 +610,8 @@ void MarkBlockAsInFlight(NodeId nodeid,
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
 {
-    return chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - consensusParams.nPowTargetSpacing * 20;
+    return chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - consensusParams.nPowTargetSpacing *
+        MAX_CAN_DIRECT_FETCH;
 }
 
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)
@@ -6395,10 +6396,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (fCanDirectFetch && pindexLast && pindexLast->IsValid(BLOCK_VALID_TREE) &&
             chainActive.Tip()->nChainWork <= pindexLast->nChainWork)
         {
-            // Set tweak value.  Mostly used in testing direct fetch.
-            if (maxBlocksInTransitPerPeer.value != 0)
-                MAX_BLOCKS_IN_TRANSIT_PER_PEER = maxBlocksInTransitPerPeer.value;
-
             std::vector<CBlockIndex *> vToFetch;
             CBlockIndex *pindexWalk = pindexLast;
             // Calculate all the blocks we'd need to switch to pindexLast.
@@ -6422,9 +6419,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     nAskFor++;
                 }
                 // We don't care about how many blocks are in flight.  We just need to make sure we don't
-                // ask for more than the maximum allowed per peer because the request manager will take care
-                // of any duplicate requests.
-                if (nAskFor >= MAX_BLOCKS_IN_TRANSIT_PER_PEER)
+                // ask for more than the maximum allowed for direct fetch because the request manager will
+                // take care of any duplicate requests.
+                if (nAskFor >= MAX_CAN_DIRECT_FETCH)
                 {
                     LogPrint("net", "Large reorg, could only direct fetch %d blocks\n", nAskFor);
                     break;

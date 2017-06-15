@@ -29,9 +29,10 @@ class IBDTest (BitcoinTestFramework):
                     
     def run_test (self):
         
-        # Mine a 500 blocks chain.
+        # Mine a 2001 blocks chain.  Mining more than 2000 blocks will test the request
+        # of a second GETHEADERS.
         print ("Mining blocks...")
-        self.nodes[0].generate(500)
+        self.nodes[0].generate(2001)
 
         # Stop nodes
         stop_nodes(self.nodes)
@@ -63,33 +64,27 @@ class IBDTest (BitcoinTestFramework):
         wait_bitcoinds()
 
 
-        ######################################################################
-        # Verify that NETWORK_NODE will not sync from pruned nodes
-        ######################################################################
+        ##############################################################################
+        # Verify that NETWORK_NODE will sync from pruned nodes that are close to today
+        ##############################################################################
 
-        # Mine blocks on node 0 and sync to the pruned node 2
+        # Mine blocks on node 0 and sync to the pruned node 1
         print ("Mining 10 more blocks...")
         self.nodes.append(start_node(0, self.options.tmpdir, ["-debug="]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug=", "-prune=1000"]))
-        connect_nodes(self.nodes[0],2)
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug=", "-prune=1000"]))
+        connect_nodes(self.nodes[0],1)
         self.nodes[0].generate(10)
 
-        # Connect node1 to pruned node 2 only.  They should not sync.
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug="]))
-        connect_nodes(self.nodes[1],2)
-        time.sleep(5);
-        counts = [ x.getblockcount() for x in self.nodes ]
-        assert_equal(counts, [520, 520, 510])  
-
-        # Now connect the two network nodes 0 and 1 together and they should sync
-        print ("Connecting network nodes...")
-        connect_nodes(self.nodes[0],1)
+        # Connect node2  only to pruned node 1.  They should sync.
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug="]))
+        connect_nodes(self.nodes[2],1)
         self.sync_all()
+        counts = [ x.getblockcount() for x in self.nodes ]
+        assert_equal(counts, [2021, 2021, 2021])  
          
         #stop nodes
         stop_nodes(self.nodes)
         wait_bitcoinds()
-
 
 
 if __name__ == '__main__':

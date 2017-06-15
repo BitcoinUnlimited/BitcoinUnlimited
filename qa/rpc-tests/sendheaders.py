@@ -534,7 +534,7 @@ class SendHeadersTest(BitcoinTestFramework):
 
         test_node.send_header_for_blocks(blocks)
         test_node.sync_with_ping()
-        test_node.wait_for_getdata([x.sha256 for x in blocks], timeout=5)
+        test_node.wait_for_getdata([x.sha256 for x in blocks], timeout=10)
 
         [ test_node.send_message(msg_block(x)) for x in blocks ]
 
@@ -546,7 +546,7 @@ class SendHeadersTest(BitcoinTestFramework):
         blocks = []
 
         # Create extra blocks for later
-        for b in range(20):
+        for b in range(24):
             blocks.append(create_block(tip, create_coinbase(height), block_time))
             blocks[-1].solve()
             tip = blocks[-1].sha256
@@ -565,22 +565,20 @@ class SendHeadersTest(BitcoinTestFramework):
         # both blocks (same work as tip)
         test_node.send_header_for_blocks(blocks[1:2])
         test_node.sync_with_ping()
-        test_node.wait_for_getdata([x.sha256 for x in blocks[0:2]], timeout=5)
+        test_node.wait_for_getdata([x.sha256 for x in blocks[0:2]], timeout=10)
 
-        # Announcing 16 more headers should trigger direct fetch for 14 more
+        # Announcing 20 more headers should trigger direct fetch for 18 more
         # blocks
-        self.nodes[0].set("net.maxBlocksInTransitPerPeer=16")
-        self.nodes[1].set("net.maxBlocksInTransitPerPeer=16")
-        test_node.send_header_for_blocks(blocks[2:18])
+        test_node.send_header_for_blocks(blocks[2:22])
         test_node.sync_with_ping()
-        test_node.wait_for_getdata([x.sha256 for x in blocks[2:16]], timeout=5)
+        test_node.wait_for_getdata([x.sha256 for x in blocks[2:20]], timeout=15)
         with mininode_lock:
             assert_equal(test_node.last_getdata, [])
 
         # Announcing 1 more header should not trigger any response because we
         # already have the maximumum blocks in flight
         test_node.last_getdata = []
-        test_node.send_header_for_blocks(blocks[18:19])
+        test_node.send_header_for_blocks(blocks[22:23])
         test_node.sync_with_ping()
         with mininode_lock:
             assert_equal(test_node.last_getdata, [])
