@@ -32,7 +32,14 @@ class IBDTest (BitcoinTestFramework):
         # Mine a 2001 blocks chain.  Mining more than 2000 blocks will test the request
         # of a second GETHEADERS.
         print ("Mining blocks...")
-        self.nodes[0].generate(2001)
+        self.nodes[0].generate(500)
+        print ("Mining blocks...")
+        self.nodes[0].generate(500)
+        print ("Mining blocks...")
+        self.nodes[0].generate(500)
+        print ("Mining blocks...")
+        self.nodes[0].generate(501)
+        print ("Finished mining iniital blocks...")
 
         # Stop nodes
         stop_nodes(self.nodes)
@@ -86,6 +93,58 @@ class IBDTest (BitcoinTestFramework):
         stop_nodes(self.nodes)
         wait_bitcoinds()
 
+
+        ######################################################################################
+        # Verify that NETWORK_NODE will NOT sync from pruned nodes that are not close to today
+        ######################################################################################
+
+        # Mine blocks on node 0 and sync to the pruned node 1
+        print ("Mining 10 more blocks...")
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug="]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug=", "-prune=1000"]))
+        connect_nodes(self.nodes[0],1)
+        self.nodes[0].generate(10)
+        self.sync_all()
+
+        # Advance the clock by one day and one second and then connect node2  only to pruned node 1.
+        # They should NOT sync because the best header on node 2 is too old.
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug="]))
+        cur_time = int(time.time()) * 60 * 60 * 24  + 1
+        self.nodes[2].setmocktime(cur_time)
+        connect_nodes(self.nodes[2],1)
+        time.sleep(5); #give sync a chance to happen
+        counts = [ x.getblockcount() for x in self.nodes ]
+        assert_equal(counts, [2031, 2031, 2021])  
+        print ("Success - did not sync with pruned node...")
+
+        #stop nodes
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+
+
+        ######################################################################################
+        # Verify that NETWORK_NODE will sync from a NETWORK_NODE that is not close to today
+        ######################################################################################
+
+        # Mine blocks on node 0 and sync to the pruned node 1
+        print ("Mining 1 more block...")
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug="]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug=", "-prune=1000"]))
+        connect_nodes(self.nodes[0],1)
+        self.nodes[0].generate(1)
+
+        # Advance the clock by one day and one second and then connect node2  only to network node 0.
+        # They should sync even though we are more than 24 hours behind.
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug="]))
+        cur_time = int(time.time()) * 60 * 60 * 24  + 1
+        self.nodes[2].setmocktime(cur_time)
+        connect_nodes(self.nodes[2],0)
+        self.sync_all()
+        print ("Success - sync with network node...")
+
+        #stop nodes
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
 
 if __name__ == '__main__':
     IBDTest ().main ()
