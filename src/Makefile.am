@@ -1,9 +1,15 @@
 DIST_SUBDIRS = secp256k1 univalue
 
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS) $(HARDENED_LDFLAGS)
+if ENABLE_GPERF
+AM_CXXFLAGS = -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free $(HARDENED_CXXFLAGS)
+AM_CPPFLAGS = -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free $(HARDENED_CPPFLAGS)
+else
 AM_CXXFLAGS = $(HARDENED_CXXFLAGS)
 AM_CPPFLAGS = $(HARDENED_CPPFLAGS)
+endif
 EXTRA_LIBRARIES =
+# libtcmalloc.a
 
 BITCOIN_CONFIG_INCLUDES=-I$(builddir)/config
 BITCOIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BDB_CPPFLAGS) $(BOOST_CPPFLAGS) $(LEVELDB_CPPFLAGS) $(CRYPTO_CFLAGS) $(SSL_CFLAGS)
@@ -52,6 +58,7 @@ EXTRA_LIBRARIES += \
 lib_LTLIBRARIES = $(LIBBITCOINCONSENSUS)
 
 bin_PROGRAMS =
+noinst_PROGRAMS =
 TESTS =
 BENCHMARKS =
 
@@ -63,11 +70,14 @@ if BUILD_BITCOIN_UTILS
   bin_PROGRAMS += bitcoin-cli bitcoin-tx
 endif
 
-.PHONY: FORCE check-symbols check-security
+.PHONY: FORCE check-symbols check-security check-formatting
 # bitcoin core #
 BITCOIN_CORE_H = \
   addrman.h \
+  allowed_args.h \
   base58.h \
+  bandb.h \
+  banentry.h \
   bitnodes.h \
   bloom.h \
   chain.h \
@@ -84,9 +94,12 @@ BITCOIN_CORE_H = \
   compat/endian.h \
   compat/sanity.h \
   compressor.h \
+  connmgr.h \
   consensus/consensus.h \
   core_io.h \
   core_memusage.h \
+  dosman.h \
+  expedited.h \
   httprpc.h \
   httpserver.h \
   init.h \
@@ -99,13 +112,14 @@ BITCOIN_CORE_H = \
   merkleblock.h \
   miner.h \
   net.h \
+  nodestate.h \
   leakybucket.h \
+  netaddress.h \
   netbase.h \
   noui.h \
   parallel.h \
   policy/fees.h \
   policy/policy.h \
-  policy/rbf.h \
   pow.h \
   protocol.h \
   random.h \
@@ -165,10 +179,15 @@ libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
   globals.cpp \
   addrman.cpp \
+  bandb.cpp \
+  banentry.cpp \
   bitnodes.cpp \
   bloom.cpp \
   chain.cpp \
   checkpoints.cpp \
+  connmgr.cpp \
+  dosman.cpp \
+  expedited.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
@@ -177,6 +196,7 @@ libbitcoin_server_a_SOURCES = \
   merkleblock.cpp \
   miner.cpp \
   net.cpp \
+  nodestate.cpp \
   noui.cpp \
   parallel.cpp \
   policy/fees.cpp \
@@ -224,7 +244,6 @@ libbitcoin_wallet_a_SOURCES = \
   wallet/rpcwallet.cpp \
   wallet/wallet.cpp \
   wallet/walletdb.cpp \
-  policy/rbf.cpp \
   $(BITCOIN_CORE_H)
 
 # crypto primitives library
@@ -295,6 +314,7 @@ libbitcoin_common_a_SOURCES = \
   core_write.cpp \
   key.cpp \
   keystore.cpp \
+  netaddress.cpp \
   netbase.cpp \
   protocol.cpp \
   scheduler.cpp \
@@ -309,6 +329,7 @@ libbitcoin_util_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_util_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_util_a_SOURCES = \
   support/pagelocker.cpp \
+  allowed_args.cpp \
   chainparamsbase.cpp \
   clientversion.cpp \
   compat/glibc_sanity.cpp \
@@ -470,6 +491,10 @@ if HARDEN
 	@echo "Checking binary security..."
 	$(AM_V_at) READELF=$(READELF) OBJDUMP=$(OBJDUMP) $(top_srcdir)/contrib/devtools/security-check.py < $(bin_PROGRAMS)
 endif
+
+check-formatting:
+	@echo "Checking source formatting style..."
+	(cd $(top_srcdir)/src; ../contrib/devtools/clang-format.py check clang-format-3.8 `cat ./.formatted-files`)
 
 %.pb.cc %.pb.h: %.proto
 	@test -f $(PROTOC)

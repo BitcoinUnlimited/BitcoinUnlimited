@@ -7,17 +7,21 @@
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "clientversion.h"
+#include "connmgr.h"
 #include "consensus/consensus.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
+#include "core_io.h"
+#include "dosman.h"
+#include "expedited.h"
 #include "hash.h"
 #include "leakybucket.h"
-#include "main.h"
 #include "miner.h"
 #include "net.h"
 #include "parallel.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
+#include "requestManager.h"
 #include "rpc/server.h"
 #include "stat.h"
 #include "thinblock.h"
@@ -38,6 +42,7 @@
 #include <boost/thread.hpp>
 #include <inttypes.h>
 #include <iomanip>
+#include <limits>
 #include <queue>
 
 using namespace std;
@@ -45,18 +50,27 @@ using namespace std;
 extern CTxMemPool mempool; // from main.cpp
 static atomic<uint64_t> nLargestBlockSeen{BLOCKSTREAM_CORE_MAX_BLOCK_SIZE}; // track the largest block we've seen
 static atomic<bool> fIsChainNearlySyncd{false};
-static atomic<bool> fIsInitialBlockDownload{false};
+extern atomic<bool> fIsInitialBlockDownload;
 extern CTweakRef<uint64_t> miningBlockSize;
+extern CTweakRef<unsigned int> ebTweak;
 
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
 
 bool IsTrafficShapingEnabled();
+UniValue validateblocktemplate(const UniValue &params, bool fHelp);
+
+bool MiningAndExcessiveBlockValidatorRule(const unsigned int newExcessiveBlockSize,
+    const unsigned int newMiningBlockSize)
+{
+    // The mined block size must be less then or equal too the excessive block size.
+    return (newMiningBlockSize <= newExcessiveBlockSize);
+}
 
 std::string ExcessiveBlockValidator(const unsigned int &value, unsigned int *item, bool validate)
 {
     if (validate)
     {
-        if (value < maxGeneratedBlock)
+        if (!MiningAndExcessiveBlockValidatorRule(value, maxGeneratedBlock))
         {
             std::ostringstream ret;
             ret << "Sorry, your maximum mined block (" << maxGeneratedBlock
@@ -76,7 +90,7 @@ std::string MiningBlockSizeValidator(const uint64_t &value, uint64_t *item, bool
 {
     if (validate)
     {
-        if (value > excessiveBlockSize)
+        if (!MiningAndExcessiveBlockValidatorRule(excessiveBlockSize, value))
         {
             std::ostringstream ret;
             ret << "Sorry, your excessive block size (" << excessiveBlockSize
@@ -130,11 +144,6 @@ std::string SubverValidator(const std::string &value, std::string *item, bool va
     return std::string();
 }
 
-#define NUM_XPEDITED_STORE 10
-// Just save the last few expedited sent blocks so we don't resend (uint256
-uint256 xpeditedBlkSent[NUM_XPEDITED_STORE];
-// zeros on construction)
-int xpeditedBlkSendPos = 0;
 
 // Push all transactions in the mempool to another node
 void UnlimitedPushTxns(CNode *dest);
@@ -195,296 +204,6 @@ void UpdateRecvStats(CNode *pfrom, const std::string &strCommand, int msgSize, i
     }
 }
 
-void HandleExpeditedRequest(CDataStream &vRecv, CNode *pfrom)
-{
-    uint64_t options;
-    vRecv >> options;
-    bool stop = ((options & EXPEDITED_STOP) != 0); // Are we starting or stopping expedited service?
-    if (options & EXPEDITED_BLOCKS)
-    {
-        if (stop) // If stopping, find the array element and clear it.
-        {
-            LogPrint("blk", "Stopping expedited blocks to peer %s (%d).\n", pfrom->addrName.c_str(), pfrom->id);
-            std::vector<CNode *>::iterator it = std::find(xpeditedBlk.begin(), xpeditedBlk.end(), pfrom);
-            if (it != xpeditedBlk.end())
-            {
-                *it = NULL;
-                pfrom->Release();
-            }
-        }
-        else // Otherwise, add the new node to the end
-        {
-            std::vector<CNode *>::iterator it1 = std::find(xpeditedBlk.begin(), xpeditedBlk.end(), pfrom);
-            if (it1 == xpeditedBlk.end()) // don't add it twice
-            {
-                unsigned int maxExpedited = GetArg("-maxexpeditedblockrecipients", 32);
-                if (xpeditedBlk.size() < maxExpedited)
-                {
-                    LogPrint("blk", "Starting expedited blocks to peer %s (%d).\n", pfrom->addrName.c_str(), pfrom->id);
-                    // find an empty array location
-                    std::vector<CNode *>::iterator it =
-                        std::find(xpeditedBlk.begin(), xpeditedBlk.end(), ((CNode *)NULL));
-                    if (it != xpeditedBlk.end())
-                        *it = pfrom;
-                    else
-                        xpeditedBlk.push_back(pfrom);
-                    pfrom->AddRef(); // add a reference because we have added this pointer into the expedited array
-                }
-                else
-                {
-                    LogPrint("blk", "Expedited blocks requested from peer %s (%d), but I am full.\n",
-                        pfrom->addrName.c_str(), pfrom->id);
-                }
-            }
-        }
-    }
-    if (options & EXPEDITED_TXNS)
-    {
-        if (stop) // If stopping, find the array element and clear it.
-        {
-            LogPrint("blk", "Stopping expedited transactions to peer %s (%d).\n", pfrom->addrName.c_str(), pfrom->id);
-            std::vector<CNode *>::iterator it = std::find(xpeditedTxn.begin(), xpeditedTxn.end(), pfrom);
-            if (it != xpeditedTxn.end())
-            {
-                *it = NULL;
-                pfrom->Release();
-            }
-        }
-        else // Otherwise, add the new node to the end
-        {
-            std::vector<CNode *>::iterator it1 = std::find(xpeditedTxn.begin(), xpeditedTxn.end(), pfrom);
-            if (it1 == xpeditedTxn.end()) // don't add it twice
-            {
-                unsigned int maxExpedited = GetArg("-maxexpeditedtxrecipients", 32);
-                if (xpeditedTxn.size() < maxExpedited)
-                {
-                    LogPrint("blk", "Starting expedited transactions to peer %s (%d).\n", pfrom->addrName.c_str(),
-                        pfrom->id);
-                    std::vector<CNode *>::iterator it =
-                        std::find(xpeditedTxn.begin(), xpeditedTxn.end(), ((CNode *)NULL));
-                    if (it != xpeditedTxn.end())
-                        *it = pfrom;
-                    else
-                        xpeditedTxn.push_back(pfrom);
-                    pfrom->AddRef();
-                }
-                else
-                {
-                    LogPrint("blk", "Expedited transactions requested from peer %s (%d), but I am full.\n",
-                        pfrom->addrName.c_str(), pfrom->id);
-                }
-            }
-        }
-    }
-}
-
-bool IsRecentlyExpeditedAndStore(const uint256 &hash)
-{
-    for (int i = 0; i < NUM_XPEDITED_STORE; i++)
-        if (xpeditedBlkSent[i] == hash)
-            return true;
-    xpeditedBlkSent[xpeditedBlkSendPos] = hash;
-    xpeditedBlkSendPos++;
-    if (xpeditedBlkSendPos >= NUM_XPEDITED_STORE)
-        xpeditedBlkSendPos = 0;
-    return false;
-}
-
-bool HandleExpeditedBlock(CDataStream &vRecv, CNode *pfrom)
-{
-    unsigned char hops;
-    unsigned char msgType;
-    vRecv >> msgType >> hops;
-
-    if (msgType == EXPEDITED_MSG_XTHIN)
-    {
-        CXThinBlock thinBlock;
-        vRecv >> thinBlock;
-        uint256 blkHash = thinBlock.header.GetHash();
-        CInv inv(MSG_BLOCK, blkHash);
-
-        BlockMap::iterator mapEntry = mapBlockIndex.find(blkHash);
-        CBlockIndex *blkidx = NULL;
-        unsigned int status = 0;
-        if (mapEntry != mapBlockIndex.end())
-        {
-            blkidx = mapEntry->second;
-            if (blkidx)
-                status = blkidx->nStatus;
-        }
-        bool newBlock =
-            ((blkidx == NULL) ||
-                (!(blkidx->nStatus &
-                    BLOCK_HAVE_DATA))); // If I have never seen the block or just seen an INV, treat the block as new
-        int nSizeThinBlock = ::GetSerializeSize(
-            thinBlock, SER_NETWORK, PROTOCOL_VERSION); // TODO replace with size of vRecv for efficiency
-        LogPrint("thin",
-            "Received %s expedited thinblock %s from peer %s (%d). Hop %d. Size %d bytes. (status %d,0x%x)\n",
-            newBlock ? "new" : "repeated", inv.hash.ToString(), pfrom->addrName.c_str(), pfrom->id, hops,
-            nSizeThinBlock, status, status);
-
-        // Skip if we've already seen this block
-        // TODO move this above the print, once we ensure no unexpected dups.
-        if (IsRecentlyExpeditedAndStore(blkHash))
-            return true;
-        if (!newBlock)
-        {
-            // TODO determine if we have the block or just have an INV to it.
-            return true;
-        }
-
-        CValidationState state;
-        if (!CheckBlockHeader(thinBlock.header, state, true)) // block header is bad
-        {
-            // demerit the sender, it should have checked the header before expedited relay
-            return false;
-        }
-        // TODO:  Start headers-only mining now
-
-        SendExpeditedBlock(thinBlock, hops + 1, pfrom); // I should push the vRecv rather than reserialize
-        thinBlock.process(pfrom, nSizeThinBlock, NetMsgType::XPEDITEDBLK);
-    }
-    else
-    {
-        LogPrint("thin", "Received unknown (0x%x) expedited message from peer %s (%d). Hop %d.\n", msgType,
-            pfrom->addrName.c_str(), pfrom->id, hops);
-        return false;
-    }
-    return true;
-}
-
-void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *skip)
-{
-    // bool cameFromUpstream = false;
-    std::vector<CNode *>::iterator end = xpeditedBlk.end();
-    for (std::vector<CNode *>::iterator it = xpeditedBlk.begin(); it != end; it++)
-    {
-        CNode *n = *it;
-        // if (n == skip) cameFromUpstream = true;
-        if ((n != skip) && (n != NULL)) // Don't send it back in case there is a forwarding loop
-        {
-            if (n->fDisconnect)
-            {
-                *it = NULL;
-                n->Release();
-            }
-            else
-            {
-                LogPrint("thin", "Sending expedited block %s to %s.\n", thinBlock.header.GetHash().ToString(),
-                    n->addrName.c_str());
-                n->PushMessage(NetMsgType::XPEDITEDBLK, (unsigned char)EXPEDITED_MSG_XTHIN, hops,
-                    thinBlock); // I should push the vRecv rather than reserialize
-                n->blocksSent += 1;
-            }
-        }
-    }
-
-#if 0 // Probably better to have the upstream explicitly request blocks from the downstream.
-  // Upstream
-  // TODO, if it came from an upstream block I really want to delay for a short period and then check if we got it and then send.  But this solves some of the issue
-  if (!cameFromUpstream)
-    {
-      std::vector<CNode*>::iterator end = xpeditedBlkUp.end();
-      for (std::vector<CNode*>::iterator it = xpeditedBlkUp.begin(); it != end; it++)
-        {
-          CNode* n = *it;
-          if ((n != skip)&&(n != NULL)) // Don't send it back to the sender in case there is a forwarding loop
-            {
-              if (n->fDisconnect)
-                {
-                  *it = NULL;
-                  n->Release();
-                }
-              else
-                {
-                  LogPrint("thin", "Sending expedited block %s upstream to %s.\n", thinBlock.header.GetHash().ToString(),n->addrName.c_str());
-                  // I should push the vRecv rather than reserialize
-                  n->PushMessage(NetMsgType::XPEDITEDBLK, (unsigned char) EXPEDITED_MSG_XTHIN, hops, thinBlock);
-                  n->blocksSent += 1;
-                }
-            }
-        }
-    }
-#endif
-}
-
-void SendExpeditedBlock(const CBlock &block, const CNode *skip)
-{
-    // If we've already put the block in our hash table, we've already sent it out
-    // BlockMap::iterator it = mapBlockIndex.find(block.GetHash());
-    // if (it != mapBlockIndex.end()) return;
-
-
-    if (!IsRecentlyExpeditedAndStore(block.GetHash()))
-    {
-        CXThinBlock thinBlock(block);
-        SendExpeditedBlock(thinBlock, 0, skip);
-    }
-    else
-    {
-        // LogPrint("thin", "No need to send expedited block %s\n", block.GetHash().ToString());
-    }
-}
-
-std::string UnlimitedCmdLineHelp()
-{
-    std::string strUsage;
-    strUsage += HelpMessageGroup(_("Bitcoin Unlimited Options:"));
-    strUsage += HelpMessageOpt("-blockversion=<n>", _("Generated block version number.  Value must be an integer"));
-    strUsage +=
-        HelpMessageOpt("-excessiveblocksize=<n>", _("Blocks above this size in bytes are considered excessive"));
-    strUsage += HelpMessageOpt("-excessiveacceptdepth=<n>",
-        _("Excessive blocks are accepted anyway if this many blocks are mined on top of them"));
-    strUsage += HelpMessageOpt(
-        "-receiveburst", _("The maximum rate that data can be received in kB/s.  If there has been a period of lower "
-                           "than average data rates, the client may receive extra data to bring the average back to "
-                           "'-receiveavg' but the data rate will not exceed this parameter."));
-    strUsage += HelpMessageOpt(
-        "-sendburst", _("The maximum rate that data can be sent in kB/s.  If there has been a period of lower than "
-                        "average data rates, the client may send extra data to bring the average back to '-receiveavg' "
-                        "but the data rate will not exceed this parameter."));
-    strUsage += HelpMessageOpt("-receiveavg", _("The average rate that data can be received in kB/s"));
-    strUsage += HelpMessageOpt("-sendavg", _("The maximum rate that data can be sent in kB/s"));
-    strUsage += HelpMessageOpt(
-        "-use-thinblocks=<n>", strprintf(_("Turn Thinblocks on or off (off: 0, on: 1, default: %d)"), 1));
-    strUsage += HelpMessageOpt("-connect-thinblock=<ip:port>",
-        _("Connect to a thinblock node(s). Blocks will only be downloaded from a thinblock peer.  If no connections "
-          "are possible then regular blocks will then be downloaded form any other connected peers."));
-    strUsage +=
-        HelpMessageOpt("-minlimitertxfee=<amt>", strprintf(_("Fees (in satoshi/byte) smaller than this are considered "
-                                                             "zero fee and subject to -limitfreerelay (default: %s)"),
-                                                     DEFAULT_MINLIMITERTXFEE));
-    strUsage += HelpMessageOpt("-maxlimitertxfee=<amt>",
-        strprintf(_("Fees (in satoshi/byte) larger than this are always relayed (default: %s)"),
-                                   DEFAULT_MAXLIMITERTXFEE));
-    strUsage += HelpMessageOpt(
-        "-bitnodes", _("Query for peer addresses via Bitnodes API, if low on addresses (default: 1 unless -connect)"));
-    strUsage += HelpMessageOpt("-forcebitnodes",
-        strprintf(_("Always query for peer addresses via Bitnodes API (default: %u)"), DEFAULT_FORCEBITNODES));
-    strUsage += HelpMessageOpt("-usednsseed=<host>", _("Add a custom DNS seed to use.  If at least one custom DNS seed "
-                                                       "is set, the default DNS seeds will be ignored."));
-    strUsage += HelpMessageOpt(
-        "-expeditedblock=<host>", _("Request expedited blocks from this host whenever we are connected to it"));
-    strUsage += HelpMessageOpt("-maxexpeditedblockrecipients=<n>",
-        _("The maximum number of nodes this node will forward expedited blocks to"));
-    strUsage += HelpMessageOpt("-maxexpeditedtxrecipients=<n>",
-        _("The maximum number of nodes this node will forward expedited transactions to"));
-    strUsage += HelpMessageOpt("-maxoutconnections=<n>",
-        strprintf(_("Initiate at most <n> connections to peers (default: %u).  If this number is higher than "
-                    "--maxconnections, it will be reduced to --maxconnections."),
-                                   DEFAULT_MAX_OUTBOUND_CONNECTIONS));
-    strUsage += HelpMessageOpt(
-        "-parallel=<n>", strprintf(_("Turn Parallel Block Validation on or off (off: 0, on: 1, default: %d)"), 1));
-    strUsage += HelpMessageOpt("-gen", strprintf(_("Generate coins (default: %u)"), DEFAULT_GENERATE));
-    strUsage += HelpMessageOpt("-genproclimit=<n>",
-        strprintf(_("Set the number of threads for coin generation if enabled (-1 = all cores, default: %d)"),
-                                   DEFAULT_GENERATE_THREADS));
-    strUsage += HelpMessageOpt("-ophanpoolexpiry=<n>",
-        strprintf(_("Do not keep transactions in the orphanpool longer than <n> hours (default: %u)"),
-                                   DEFAULT_ORPHANPOOL_EXPIRY));
-    strUsage += TweakCmdLineHelp();
-    return strUsage;
-}
 
 std::string FormatCoinbaseMessage(const std::vector<std::string> &comments, const std::string &customComment)
 {
@@ -501,7 +220,7 @@ std::string FormatCoinbaseMessage(const std::vector<std::string> &comments, cons
     return ret;
 }
 
-CNode *FindLikelyNode(const std::string &addrName)
+CNodeRef FindLikelyNode(const std::string &addrName)
 {
     LOCK(cs_vNodes);
     bool wildcard = (addrName.find_first_of("*?") != std::string::npos);
@@ -521,7 +240,7 @@ CNode *FindLikelyNode(const std::string &addrName)
 
 UniValue expedited(const UniValue &params, bool fHelp)
 {
-    string strCommand;
+    std::string strCommand;
     if (fHelp || params.size() < 2)
         throw runtime_error("expedited block|tx \"node IP addr\" on|off\n"
                             "\nRequest expedited forwarding of blocks and/or transactions from a node.\nExpedited "
@@ -537,10 +256,10 @@ UniValue expedited(const UniValue &params, bool fHelp)
                             HelpExampleCli("expedited", "block \"192.168.0.6:8333\" on") +
                             HelpExampleRpc("expedited", "\"block\", \"192.168.0.6:8333\", \"on\""));
 
-    string obj = params[0].get_str();
-    string strNode = params[1].get_str();
+    std::string obj = params[0].get_str();
+    std::string strNode = params[1].get_str();
 
-    CNode *node = FindLikelyNode(strNode);
+    CNodeRef node(FindLikelyNode(strNode));
     if (!node)
     {
         throw runtime_error("Unknown node");
@@ -562,33 +281,15 @@ UniValue expedited(const UniValue &params, bool fHelp)
 
     if (params.size() >= 3)
     {
-        string onoff = params[2].get_str();
+        std::string onoff = params[2].get_str();
         if (onoff == "off")
             flags |= EXPEDITED_STOP;
         if (onoff == "OFF")
             flags |= EXPEDITED_STOP;
     }
 
-    // TODO: validate that the node can handle expedited blocks
+    connmgr->PushExpeditedRequest(node.get(), flags);
 
-    // Add or remove this node to our list of upstream nodes
-    std::vector<CNode *>::iterator elem = std::find(xpeditedBlkUp.begin(), xpeditedBlkUp.end(), node);
-    if ((flags & EXPEDITED_BLOCKS) && (flags & EXPEDITED_STOP))
-    {
-        if (elem != xpeditedBlkUp.end())
-            xpeditedBlkUp.erase(elem);
-    }
-    else if (flags & EXPEDITED_BLOCKS)
-    {
-        if (elem == xpeditedBlkUp.end()) // don't add it twice
-        {
-            xpeditedBlkUp.push_back(node);
-        }
-    }
-
-    // Push the expedited message even if its a repeat to allow the operator to reissue the CLI command to trigger
-    // another message.
-    node->PushMessage(NetMsgType::XPEDITEDREQUEST, flags);
     return NullUniValue;
 }
 
@@ -606,26 +307,11 @@ UniValue pushtx(const UniValue &params, bool fHelp)
 
     string strNode = params[0].get_str();
 
-    // BU: Add lock on cs_vNodes as FindNode now requries it to prevent potential use-after-free errors
-    CNode *node = NULL;
-    {
-        LOCK(cs_vNodes);
-        node = FindLikelyNode(strNode);
+    CNodeRef node(FindLikelyNode(strNode));
+    if (!node)
+        throw runtime_error("Unknown node");
 
-        if (!node)
-        {
-            throw runtime_error("Unknown node");
-        }
-
-        // BU: Since we are passing node to another function, add a ref to prevent use-after-free
-        //    This allows us to release the lock on cs_vNodes earlier while still protecting node from deletion
-        node->AddRef();
-    }
-
-    UnlimitedPushTxns(node);
-
-    // BU: Remember to release the reference we took on node to protect from use-after-free
-    node->Release();
+    UnlimitedPushTxns(node.get());
 
     return NullUniValue;
 }
@@ -675,8 +361,8 @@ void settingsToUserAgentString()
 
 void UnlimitedSetup(void)
 {
-    MIN_TX_REQUEST_RETRY_INTERVAL = GetArg("-txretryinterval", MIN_TX_REQUEST_RETRY_INTERVAL);
-    MIN_BLK_REQUEST_RETRY_INTERVAL = GetArg("-blkretryinterval", MIN_BLK_REQUEST_RETRY_INTERVAL);
+    MIN_TX_REQUEST_RETRY_INTERVAL = GetArg("-txretryinterval", DEFAULT_MIN_TX_REQUEST_RETRY_INTERVAL);
+    MIN_BLK_REQUEST_RETRY_INTERVAL = GetArg("-blkretryinterval", DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL);
     maxGeneratedBlock = GetArg("-blockmaxsize", maxGeneratedBlock);
     blockVersion = GetArg("-blockversion", blockVersion);
     excessiveBlockSize = GetArg("-excessiveblocksize", excessiveBlockSize);
@@ -718,15 +404,9 @@ void UnlimitedSetup(void)
 
     for (std::vector<std::string>::const_iterator i = msgTypes.begin(); i != msgTypes.end(); ++i)
     {
-        new CStatHistory<uint64_t>("net/recv/msg/" + *i); // This "leaks" in the sense that it is never freed, but is
-        // intended to last the duration of the program.
-        new CStatHistory<uint64_t>("net/send/msg/" + *i); // This "leaks" in the sense that it is never freed, but is
-        // intended to last the duration of the program.
+        mallocedStats.push_front(new CStatHistory<uint64_t>("net/recv/msg/" + *i));
+        mallocedStats.push_front(new CStatHistory<uint64_t>("net/send/msg/" + *i));
     }
-
-    xpeditedBlk.reserve(256);
-    xpeditedBlkUp.reserve(256);
-    xpeditedTxn.reserve(256);
 
     // make outbound conns modifiable by the user
     int nUserMaxOutConnections = GetArg("-maxoutconnections", DEFAULT_MAX_OUTBOUND_CONNECTIONS);
@@ -749,6 +429,17 @@ void UnlimitedSetup(void)
 }
 
 FILE *blockReceiptLog = NULL;
+
+void UnlimitedCleanup()
+{
+    CStatBase *obj = NULL;
+    while (!mallocedStats.empty())
+    {
+        obj = mallocedStats.front();
+        delete obj;
+        mallocedStats.pop_front();
+    }
+}
 
 extern void UnlimitedLogBlock(const CBlock &block, const std::string &hash, uint64_t receiptTime)
 {
@@ -844,7 +535,7 @@ static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainpar
         // we must terminate any block validation threads that are currently running,
         // Unless they have more work than our own block.
         // TODO: we need a better way to determine if a reorg is in progress.
-        PV.StopAllValidationThreads(pblock->GetBlockHeader().nBits);
+        PV->StopAllValidationThreads(pblock->GetBlockHeader().nBits);
 
         // Process this block the same as if we had received it from another node
         CValidationState state;
@@ -904,7 +595,8 @@ void static BitcoinMiner(const CChainParams &chainparams)
                 pindexPrev = chainActive.Tip();
             }
 
-            unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(chainparams, coinbaseScript->reserveScript));
+            unique_ptr<CBlockTemplate> pblocktemplate(
+                BlockAssembler(chainparams).CreateNewBlock(coinbaseScript->reserveScript));
             if (!pblocktemplate.get())
             {
                 LogPrintf("Error in BitcoinMiner: Keypool ran out, please call keypoolrefill before restarting the "
@@ -1239,15 +931,10 @@ UniValue setexcessiveblock(const UniValue &params, bool fHelp)
         ebs = boost::lexical_cast<unsigned int>(temp);
     }
 
-    if (ebs < maxGeneratedBlock)
-    {
-        std::ostringstream ret;
-        ret << "Sorry, your maximum mined block (" << maxGeneratedBlock
-            << ") is larger than your proposed excessive size (" << ebs
-            << ").  This would cause you to orphan your own blocks.";
-        throw runtime_error(ret.str());
-    }
-    excessiveBlockSize = ebs;
+    std::string estr = ebTweak.Validate(ebs);
+    if (!estr.empty())
+        throw runtime_error(estr);
+    ebTweak.Set(ebs);
 
     if (params[1].isNum())
         excessiveAcceptDepth = params[1].get_int64();
@@ -1592,77 +1279,16 @@ void LoadFilter(CNode *pfrom, CBloomFilter *filter)
 {
     if (!filter->IsWithinSizeConstraints())
         // There is no excuse for sending a too-large filter
-        Misbehaving(pfrom->GetId(), 100);
+        dosMan.Misbehaving(pfrom, 100);
     else
     {
         LOCK(pfrom->cs_filter);
         delete pfrom->pThinBlockFilter;
         pfrom->pThinBlockFilter = new CBloomFilter(*filter);
-        pfrom->pThinBlockFilter->UpdateEmptyFull();
     }
     uint64_t nSizeFilter = ::GetSerializeSize(*pfrom->pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION);
     LogPrint("thin", "Thinblock Bloom filter size: %d\n", nSizeFilter);
     thindata.UpdateInBoundBloomFilter(nSizeFilter);
-}
-
-bool CheckAndRequestExpeditedBlocks(CNode *pfrom)
-{
-    if (pfrom->nVersion >= EXPEDITED_VERSION)
-    {
-        BOOST_FOREACH (string &strAddr, mapMultiArgs["-expeditedblock"])
-        {
-            string strListeningPeerIP;
-            string strPeerIP = pfrom->addr.ToString();
-            // Add the peer's listening port if it was provided (only misbehaving clients do not provide it)
-            if (pfrom->addrFromPort != 0)
-            {
-                int pos1 = strAddr.rfind(":");
-                int pos2 = strAddr.rfind("]:");
-                if (pos1 <= 0 && pos2 <= 0)
-                    strAddr += ':' + boost::lexical_cast<std::string>(pfrom->addrFromPort);
-
-                pos1 = strPeerIP.rfind(":");
-                pos2 = strPeerIP.rfind("]:");
-                // Handle both ipv4 and ipv6 cases
-                if (pos1 <= 0 && pos2 <= 0)
-                    strListeningPeerIP = strPeerIP + ':' + boost::lexical_cast<std::string>(pfrom->addrFromPort);
-                else if (pos1 > 0)
-                    strListeningPeerIP =
-                        strPeerIP.substr(0, pos1) + ':' + boost::lexical_cast<std::string>(pfrom->addrFromPort);
-                else
-                    strListeningPeerIP =
-                        strPeerIP.substr(0, pos2) + ':' + boost::lexical_cast<std::string>(pfrom->addrFromPort);
-            }
-            else
-                strListeningPeerIP = strPeerIP;
-
-            if (strAddr == strListeningPeerIP)
-            {
-                if (!IsThinBlocksEnabled())
-                {
-                    LogPrintf("You do not have Thinblocks enabled.  You can not request expedited blocks from peer %s "
-                              "(%d).\n",
-                        strListeningPeerIP, pfrom->id);
-                    return false;
-                }
-                else if (!pfrom->ThinBlockCapable())
-                {
-                    LogPrintf("Thinblocks is not enabled on remote peer.  You can not request expedited blocks from "
-                              "peer %s (%d).\n",
-                        strListeningPeerIP, pfrom->id);
-                    return false;
-                }
-                else
-                {
-                    LogPrintf("Requesting expedited blocks from peer %s (%d).\n", strListeningPeerIP, pfrom->id);
-                    pfrom->PushMessage(NetMsgType::XPEDITEDREQUEST, ((uint64_t)EXPEDITED_BLOCKS));
-                    xpeditedBlkUp.push_back(pfrom);
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
 }
 
 // Similar to TestBlockValidity but is very conservative in parameters (used in mining)
@@ -1818,35 +1444,233 @@ UniValue getstat(const UniValue &params, bool fHelp)
 
         ret.push_back(ustat);
     }
-
     return ret;
 }
 
-static const CRPCCommand commands[] = {
-    //  category              name                      actor (function)         okSafeMode
-    //  --------------------- ------------------------  -----------------------  ----------
+/* clang-format off */
+static const CRPCCommand commands[] =
+{ //  category              name                      actor (function)         okSafeMode
+  //  --------------------- ------------------------  -----------------------  ----------
     /* P2P networking */
-    {"network", "settrafficshaping", &settrafficshaping, true},
-    {"network", "gettrafficshaping", &gettrafficshaping, true}, {"network", "pushtx", &pushtx, true},
-    {"network", "getexcessiveblock", &getexcessiveblock, true},
-    {"network", "setexcessiveblock", &setexcessiveblock, true}, {"network", "expedited", &expedited, true},
+    { "network",            "settrafficshaping",      &settrafficshaping,      true  },
+    { "network",            "gettrafficshaping",      &gettrafficshaping,      true  },
+    { "network",            "pushtx",                 &pushtx,                 true  },
+    { "network",            "getexcessiveblock",      &getexcessiveblock,      true  },
+    { "network",            "setexcessiveblock",      &setexcessiveblock,      true  },
+    { "network",            "expedited",              &expedited,              true  },
 
     /* Mining */
-    {"mining", "getminingmaxblock", &getminingmaxblock, true},
-    {"mining", "setminingmaxblock", &setminingmaxblock, true}, {"mining", "getminercomment", &getminercomment, true},
-    {"mining", "setminercomment", &setminercomment, true}, {"mining", "getblockversion", &getblockversion, true},
-    {"mining", "setblockversion", &setblockversion, true},
+    { "mining",             "getminingmaxblock",      &getminingmaxblock,      true  },
+    { "mining",             "setminingmaxblock",      &setminingmaxblock,      true  },
+    { "mining",             "getminercomment",        &getminercomment,        true  },
+    { "mining",             "setminercomment",        &setminercomment,        true  },
+    { "mining",             "getblockversion",        &getblockversion,        true  },
+    { "mining",             "setblockversion",        &setblockversion,        true  },
+    { "mining",             "validateblocktemplate",  &validateblocktemplate,  true  },
 
     /* Utility functions */
-    {"util", "getstatlist", &getstatlist, true}, {"util", "getstat", &getstat, true}, {"util", "get", &gettweak, true},
-    {"util", "set", &settweak, true},
+    { "util",               "getstatlist",            &getstatlist,            true  },
+    { "util",               "getstat",                &getstat,                true  },
+    { "util",               "get",                    &gettweak,               true  },
+    { "util",               "set",                    &settweak,               true  },
+#ifdef DEBUG
+    { "util",               "getstructuresizes",      &getstructuresizes,      true  },  // BU
+#endif
 
     /* Coin generation */
-    {"generating", "getgenerate", &getgenerate, true}, {"generating", "setgenerate", &setgenerate, true},
+    { "generating",         "getgenerate",            &getgenerate,            true  },
+    { "generating",         "setgenerate",            &setgenerate,            true  },
 };
+/* clang-format on */
 
 void RegisterUnlimitedRPCCommands(CRPCTable &tableRPC)
 {
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
         tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
 }
+
+
+UniValue validateblocktemplate(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 1)
+        throw runtime_error(
+            "validateblocktemplate \"hexdata\"\n"
+            "\nReturns whether this block template will be accepted if a hash solution is found.\n"
+            "The 'jsonparametersobject' parameter is currently ignored.\n"
+            "See https://en.bitcoin.it/wiki/BIP_0022 for full specification.\n"
+
+            "\nArguments\n"
+            "1. \"hexdata\"    (string, required) the hex-encoded block to validate (same format as submitblock)\n"
+            "\nResult:\n"
+            "true (boolean) submitted block template is valid\n"
+            "JSONRPCException if submitted block template is invalid\n"
+            "\nExamples:\n" +
+            HelpExampleCli("validateblocktemplate", "\"mydata\"") +
+            HelpExampleRpc("validateblocktemplate", "\"mydata\""));
+
+    UniValue ret(UniValue::VARR);
+    CBlock block;
+    if (!DecodeHexBlk(block, params[0].get_str()))
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
+
+    if (block.nBlockSize == 0)
+        block.nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+
+    CBlockIndex *pindexPrev = NULL;
+    {
+        LOCK(cs_main);
+
+        BlockMap::iterator i = mapBlockIndex.find(block.hashPrevBlock);
+        if (i == mapBlockIndex.end())
+        {
+            throw runtime_error("invalid block: unknown parent");
+        }
+
+        pindexPrev = i->second;
+
+        if (pindexPrev != chainActive.Tip())
+        {
+            throw runtime_error("invalid block: does not build on chain tip");
+        }
+
+        DbgAssert(pindexPrev, throw runtime_error("invalid block: unknown parent"));
+
+        const CChainParams &chainparams = Params();
+        CValidationState state;
+        if (block.nBlockSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
+        {
+            if (!TestConservativeBlockValidity(state, chainparams, block, pindexPrev, false, true))
+            {
+                throw runtime_error(std::string("invalid block: ") + state.GetRejectReason());
+            }
+        }
+        else
+        {
+            if (!TestBlockValidity(state, chainparams, block, pindexPrev, false, true))
+            {
+                throw runtime_error(std::string("invalid block: ") + state.GetRejectReason());
+            }
+        }
+
+        if (block.fExcessive)
+        {
+            throw runtime_error("invalid block: excessive");
+        }
+    }
+
+    return UniValue(true);
+}
+
+#ifdef DEBUG
+#ifdef DEBUG_LOCKORDER
+extern std::map<std::pair<void *, void *>, LockStack> lockorders;
+#endif
+
+extern std::vector<std::string> vUseDNSSeeds;
+extern std::list<CNode *> vNodesDisconnected;
+extern std::set<CNetAddr> setservAddNodeAddresses;
+extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
+{
+    UniValue ret(UniValue::VOBJ);
+    ret.push_back(Pair("time", GetTime()));
+    ret.push_back(Pair("requester.mapTxnInfo", requester.mapTxnInfo.size()));
+    ret.push_back(Pair("requester.mapBlkInfo", requester.mapBlkInfo.size()));
+    unsigned long int max = 0;
+    unsigned long int size = 0;
+    for (CRequestManager::OdMap::iterator i = requester.mapTxnInfo.begin(); i != requester.mapTxnInfo.end(); i++)
+    {
+        unsigned long int temp = i->second.availableFrom.size();
+        size += temp;
+        if (max < temp)
+            max = temp;
+    }
+    ret.push_back(Pair("requester.mapTxnInfo.maxobj", max));
+    ret.push_back(Pair("requester.mapTxnInfo.totobj", size));
+
+    max = 0;
+    size = 0;
+    for (CRequestManager::OdMap::iterator i = requester.mapBlkInfo.begin(); i != requester.mapBlkInfo.end(); i++)
+    {
+        unsigned long int temp = i->second.availableFrom.size();
+        size += temp;
+        if (max < temp)
+            max = temp;
+    }
+    ret.push_back(Pair("requester.mapBlkInfo.maxobj", max));
+    ret.push_back(Pair("requester.mapBlkInfo.totobj", size));
+
+    ret.push_back(Pair("mapBlockIndex", mapBlockIndex.size()));
+    // CChain
+    {
+        LOCK(cs_xval);
+        ret.push_back(Pair("setPreVerifiedTxHash", setPreVerifiedTxHash.size()));
+        ret.push_back(Pair("setUnVerifiedOrphanTxHash", setUnVerifiedOrphanTxHash.size()));
+    }
+    ret.push_back(Pair("mapLocalHost", mapLocalHost.size()));
+    ret.push_back(Pair("CDoSManager::vWhitelistedRange", dosMan.vWhitelistedRange.size()));
+    ret.push_back(Pair("mapInboundConnectionTracker", mapInboundConnectionTracker.size()));
+    ret.push_back(Pair("vUseDNSSeeds", vUseDNSSeeds.size()));
+    ret.push_back(Pair("vAddedNodes", vAddedNodes.size()));
+    ret.push_back(Pair("setservAddNodeAddresses", setservAddNodeAddresses.size()));
+    ret.push_back(Pair("statistics", statistics.size()));
+    ret.push_back(Pair("tweaks", tweaks.size()));
+    ret.push_back(Pair("mapRelay", mapRelay.size()));
+    ret.push_back(Pair("vRelayExpiration", vRelayExpiration.size()));
+    ret.push_back(Pair("vNodes", vNodes.size()));
+    ret.push_back(Pair("vNodesDisconnected", vNodesDisconnected.size()));
+    // CAddrMan
+    ret.push_back(Pair("mapOrphanTransactions", mapOrphanTransactions.size()));
+    ret.push_back(Pair("mapOrphanTransactionsByPrev", mapOrphanTransactionsByPrev.size()));
+
+    uint32_t nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream;
+    connmgr->ExpeditedNodeCounts(nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream);
+    ret.push_back(Pair("xpeditedBlk", nExpeditedBlocks));
+    ret.push_back(Pair("xpeditedBlkUp", nExpeditedUpstream));
+    ret.push_back(Pair("xpeditedTxn", nExpeditedTxs));
+
+#ifdef DEBUG_LOCKORDER
+    ret.push_back(Pair("lockorders", lockorders.size()));
+#endif
+
+    LOCK(cs_vNodes);
+    std::vector<CNode *>::iterator n;
+    uint64_t totalThinBlockSize = 0;
+    int disconnected = 0; // watch # of disconnected nodes to ensure they are being cleaned up
+    for (std::vector<CNode *>::iterator it = vNodes.begin(); it != vNodes.end(); ++it)
+    {
+        if (*it == NULL)
+            continue;
+        CNode &n = **it;
+        UniValue node(UniValue::VOBJ);
+        disconnected += (n.fDisconnect) ? 1 : 0;
+
+        node.push_back(Pair("vSendMsg", n.vSendMsg.size()));
+        node.push_back(Pair("vRecvGetData", n.vRecvGetData.size()));
+        node.push_back(Pair("vRecvMsg", n.vRecvMsg.size()));
+        if (n.pfilter)
+        {
+            node.push_back(Pair("pfilter", n.pfilter->GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION)));
+        }
+        if (n.pThinBlockFilter)
+        {
+            node.push_back(
+                Pair("pThinBlockFilter", n.pThinBlockFilter->GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION)));
+        }
+        node.push_back(Pair("thinblock.vtx", n.thinBlock.vtx.size()));
+        uint64_t thinBlockSize = ::GetSerializeSize(n.thinBlock, SER_NETWORK, PROTOCOL_VERSION);
+        totalThinBlockSize += thinBlockSize;
+        node.push_back(Pair("thinblock.size", thinBlockSize));
+        node.push_back(Pair("thinBlockHashes", n.thinBlockHashes.size()));
+        node.push_back(Pair("xThinBlockHashes", n.xThinBlockHashes.size()));
+        node.push_back(Pair("vAddrToSend", n.vAddrToSend.size()));
+        node.push_back(Pair("vInventoryToSend", n.vInventoryToSend.size()));
+        node.push_back(Pair("setAskFor", n.setAskFor.size()));
+        node.push_back(Pair("mapAskFor", n.mapAskFor.size()));
+        ret.push_back(Pair(n.addrName, node));
+    }
+    ret.push_back(Pair("totalThinBlockSize", totalThinBlockSize));
+    ret.push_back(Pair("disconnectedNodes", disconnected));
+
+    return ret;
+}
+#endif

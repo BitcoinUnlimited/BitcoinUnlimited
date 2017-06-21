@@ -6,6 +6,7 @@
 #include "uint256.h"
 #include "random.h"
 #include "bloom.h"
+#include "chainparams.h"
 #include "streams.h"
 #include "version.h"
 #include "serialize.h"
@@ -15,12 +16,14 @@
 #include "thinblock.h"
 #include "txmempool.h"
 #include "main.h"
+
+#include "test/test_bitcoin.h"
+
 #include <boost/test/unit_test.hpp>
 #include <sstream>
 #include <string.h>
 
 extern void BuildSeededBloomFilter(CBloomFilter& memPoolFilter, std::vector<uint256>& vOrphanHashes, uint256 hash);
-
 
 CBlock TestBlock() { //Thanks dagurval :)
     // Block taken from bloom_tests.cpp merkle_block_1
@@ -32,7 +35,8 @@ CBlock TestBlock() { //Thanks dagurval :)
     return block;
 };
 
-BOOST_AUTO_TEST_SUITE(thinblock_tests);
+
+BOOST_FIXTURE_TEST_SUITE(thinblock_tests, TestingSetup)
 
 BOOST_AUTO_TEST_CASE(thinblock_test) {
 
@@ -115,7 +119,6 @@ BOOST_AUTO_TEST_CASE(thinblock_test) {
     filter1.clear();
     CXThinBlock xthinblock7(block, &filter1);
     BOOST_CHECK(xthinblock7.collision);
-
 }
 
 BOOST_AUTO_TEST_SUITE_END()

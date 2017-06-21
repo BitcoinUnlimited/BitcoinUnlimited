@@ -41,10 +41,13 @@ extern CCriticalSection cs_orphancache; // from main.h
 // Request management
 extern CRequestManager requester;
 
+// Any ping < 25 ms is good
+unsigned int ACCEPTABLE_PING_USEC = 25*1000;
+
 // When should I request an object from someone else (in microseconds)
-unsigned int MIN_TX_REQUEST_RETRY_INTERVAL = 5 * 1000 * 1000;
+unsigned int MIN_TX_REQUEST_RETRY_INTERVAL = DEFAULT_MIN_TX_REQUEST_RETRY_INTERVAL;
 // When should I request a block from someone else (in microseconds)
-unsigned int MIN_BLK_REQUEST_RETRY_INTERVAL = 5 * 1000 * 1000;
+unsigned int MIN_BLK_REQUEST_RETRY_INTERVAL = DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL;
 
 // defined in main.cpp.  should be moved into a utilities file but want to make rebasing easier
 extern bool CanDirectFetch(const Consensus::Params &consensusParams);
@@ -87,7 +90,7 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
         if (node)
         {
             i->clear();
-            LogPrint("req", "ReqMgr: %s removed ref to %d count %d.\n", item.obj.ToString(), node->GetId(),
+            LogPrint("req", "ReqMgr: %s cleanup - removed ref to %d count %d.\n", item.obj.ToString(), node->GetId(),
                 node->GetRefCount());
             node->Release();
         }
@@ -109,7 +112,7 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
 }
 
 // Get this object from somewhere, asynchronously.
-void CRequestManager::AskFor(const CInv &obj, CNode *from, int priority)
+void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority)
 {
     // LogPrint("req", "ReqMgr: Ask for %s.\n", obj.ToString().c_str());
 
@@ -144,8 +147,10 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, int priority)
         // if (result.second)  // means this was inserted rather than already existed
         // { } nothing to do
         data.priority = max(priority, data.priority);
-        data.AddSource(from);
-        LogPrint("blk", "%s available at %s\n", obj.ToString().c_str(), from->addrName.c_str());
+        if (data.AddSource(from))
+        {
+            LogPrint("blk", "%s available at %s\n", obj.ToString().c_str(), from->addrName.c_str());
+        }
     }
     else
     {
@@ -154,7 +159,7 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, int priority)
 }
 
 // Get these objects from somewhere, asynchronously.
-void CRequestManager::AskFor(const std::vector<CInv> &objArray, CNode *from, int priority)
+void CRequestManager::AskFor(const std::vector<CInv> &objArray, CNode *from, unsigned int priority)
 {
     unsigned int sz = objArray.size();
     for (unsigned int nInv = 0; nInv < sz; nInv++)
@@ -308,14 +313,13 @@ CNodeRequestData::CNodeRequestData(CNode *n)
     desirability -= latency;
 }
 
-void CUnknownObj::AddSource(CNode *from)
+bool CUnknownObj::AddSource(CNode *from)
 {
     // node is not in the request list
-    if (std::find_if(availableFrom.begin(), availableFrom.end(), IsCNodeRequestDataThisNode(from)) ==
-        availableFrom.end())
+    if (std::find_if(availableFrom.begin(), availableFrom.end(), MatchCNodeRequestData(from)) == availableFrom.end())
     {
-        LogPrint(
-            "req", "%s added ref to node %d.  Current count %d.\n", obj.ToString(), from->GetId(), from->GetRefCount());
+        LogPrint("req", "%s added ref to node %d.  Current count %d.\n",
+                 obj.ToString(), from->GetId(), from->GetRefCount());
         {
             LOCK(cs_vNodes); // This lock is needed to ensure that AddRef happens atomically
             from->AddRef();
@@ -326,14 +330,15 @@ void CUnknownObj::AddSource(CNode *from)
             if (i->desirability < req.desirability)
             {
                 availableFrom.insert(i, req);
-                return;
+                return true;
             }
         }
         availableFrom.push_back(req);
     }
+  return false;
 }
 
-void RequestBlock(CNode *pfrom, CInv obj)
+bool RequestBlock(CNode *pfrom, CInv obj)
 {
     const CChainParams &chainParams = Params();
 
@@ -363,10 +368,12 @@ void RequestBlock(CNode *pfrom, CInv obj)
         {
             if (HaveConnectThinblockNodes() || (HaveThinblockNodes() && thindata.CheckThinblockTimer(obj.hash)))
             {
-                // Must download a block from a ThinBlock peer
+                // Must download an xthinblock from a XTHIN peer.
+                // We can only request one xthinblock per peer at a time.
                 if (pfrom->mapThinBlocksInFlight.size() < 1 && CanThinBlockBeDownloaded(pfrom))
-                { // We can only send one thinblock per peer at a time
-                    pfrom->mapThinBlocksInFlight[inv2.hash] = GetTime();
+                {
+                    AddThinBlockInFlight(pfrom, inv2.hash);
+
                     inv2.type = MSG_XTHINBLOCK;
                     std::vector<uint256> vOrphanHashes;
                     {
@@ -378,19 +385,22 @@ void RequestBlock(CNode *pfrom, CInv obj)
                     BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash);
                     ss << inv2;
                     ss << filterMemPool;
-                    pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
                     MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
-                    LogPrint("thin", "Requesting Thinblock %s from peer %s (%d)\n", inv2.hash.ToString(),
+                    pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
+                    LogPrint("thin", "Requesting xthinblock %s from peer %s (%d)\n", inv2.hash.ToString(),
                         pfrom->addrName.c_str(), pfrom->id);
+                    return true;
                 }
             }
             else
             {
-                // Try to download a thinblock if possible otherwise just download a regular block
-                // We can only send one thinblock per peer at a time
+                // Try to download a thinblock if possible otherwise just download a regular block.
+                // We can only request one xthinblock per peer at a time.
+                MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
                 if (pfrom->mapThinBlocksInFlight.size() < 1 && CanThinBlockBeDownloaded(pfrom))
                 {
-                    pfrom->mapThinBlocksInFlight[inv2.hash] = GetTime();
+                    AddThinBlockInFlight(pfrom, inv2.hash);
+
                     inv2.type = MSG_XTHINBLOCK;
                     std::vector<uint256> vOrphanHashes;
                     {
@@ -403,7 +413,7 @@ void RequestBlock(CNode *pfrom, CInv obj)
                     ss << inv2;
                     ss << filterMemPool;
                     pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                    LogPrint("thin", "Requesting Thinblock %s from peer %s (%d)\n", inv2.hash.ToString(),
+                    LogPrint("thin", "Requesting xthinblock %s from peer %s (%d)\n", inv2.hash.ToString(),
                         pfrom->addrName.c_str(), pfrom->id);
                 }
                 else
@@ -415,7 +425,7 @@ void RequestBlock(CNode *pfrom, CInv obj)
                     vToFetch.push_back(inv2);
                     pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
                 }
-                MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
+                return true;
             }
         }
         else
@@ -423,11 +433,13 @@ void RequestBlock(CNode *pfrom, CInv obj)
             std::vector<CInv> vToFetch;
             inv2.type = MSG_BLOCK;
             vToFetch.push_back(inv2);
-            pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
             MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
+            pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
             LogPrint("thin", "Requesting Regular Block %s from peer %s (%d)\n", inv2.hash.ToString(),
                 pfrom->addrName.c_str(), pfrom->id);
+            return true;
         }
+        return false; // no block was requested
         // BUIP010 Xtreme Thinblocks: end section
     }
 }
@@ -438,7 +450,7 @@ void CRequestManager::SendRequests()
     int64_t now = 0;
 
     // TODO: if a node goes offline, rerequest txns from someone else and cleanup references right away
-    cs_objDownloader.lock();
+    LOCK(cs_objDownloader);
     if (sendBlkIter == mapBlkInfo.end())
         sendBlkIter = mapBlkInfo.begin();
 
@@ -455,7 +467,7 @@ void CRequestManager::SendRequests()
     }
 
     // Get Blocks if we are not in the middle of a re-org
-    while (sendBlkIter != mapBlkInfo.end() && !PV.IsReorgInProgress())
+    while (sendBlkIter != mapBlkInfo.end() && !PV->IsReorgInProgress())
     {
         now = GetTimeMicros();
         OdMap::iterator itemIter = sendBlkIter;
@@ -487,11 +499,23 @@ void CRequestManager::SendRequests()
                         //   TODO: Eventually when we move away from vNodes or have a different mechanism for tracking
                         //   ping times we can include
                         //   this filtering in all our requests for blocks and transactions.
-                        if (next.node->fDisconnect || (!IsChainNearlySyncd() && !IsNodePingAcceptable(next.node)))
+                        bool release = false;
+                        std::string reason;
+                        if (next.node->fDisconnect)
+                        {
+                            reason = "on disconnect";
+                            release = true;
+                        }
+                        else if (!IsChainNearlySyncd() && !IsNodePingAcceptable(next.node))
+                        {
+                            reason = "bad ping time";
+                            release = true;
+                        }
+                        if (release)
                         {
                             LOCK(cs_vNodes);
-                            LogPrint("req", "ReqMgr: %s removed ref to %d count %d (disconnect).\n",
-                                item.obj.ToString(), next.node->GetId(), next.node->GetRefCount());
+                            LogPrint("req", "ReqMgr: %s removed block ref to %s count %d (%s).\n", item.obj.ToString(),
+                                next.node->GetLogName(), next.node->GetRefCount(), reason);
                             next.node->Release();
                             next.node = NULL; // force the loop to get another node
                         }
@@ -507,13 +531,25 @@ void CRequestManager::SendRequests()
                     }
 
                     CInv obj = item.obj;
-                    cs_objDownloader.unlock();
-
-                    RequestBlock(next.node, obj);
                     item.outstandingReqs++;
+                    int64_t then = item.lastRequestTime;
                     item.lastRequestTime = now;
-
-                    cs_objDownloader.lock();
+                    LEAVE_CRITICAL_SECTION(cs_objDownloader);  // item and itemIter are now invalid
+                    bool reqblkResult = RequestBlock(next.node, obj);
+                    ENTER_CRITICAL_SECTION(cs_objDownloader);
+                    if (!reqblkResult)
+                    {
+                        // having released cs_objDownloader, item and itemiter may be invalid.
+                        // So in the rare case that we could not request the block we need to
+                        // find the item again (if it exists) and set the tracking back to what it was
+                        itemIter =  mapBlkInfo.find(obj.hash);
+                        if (itemIter != mapBlkInfo.end())
+                        {
+                            item = itemIter->second;
+                            item.outstandingReqs--;
+                            item.lastRequestTime = then;
+                        }
+                    }
 
                     // If you wanted to remember that this node has this data, you could push it back onto the end of
                     // the availableFrom list like this:
@@ -524,7 +560,7 @@ void CRequestManager::SendRequests()
                     // Instead we'll forget about it -- the node is already popped of of the available list so now we'll
                     // release our reference.
                     LOCK(cs_vNodes);
-                    LogPrint("req", "ReqMgr: %s removed ref to %d count %d (disconnect).\n", item.obj.ToString(),
+                    LogPrint("req", "ReqMgr: %s removed block ref to %d count %d\n", obj.ToString(),
                         next.node->GetId(), next.node->GetRefCount());
                     next.node->Release();
                     next.node = NULL;
@@ -540,7 +576,7 @@ void CRequestManager::SendRequests()
                 // There can be no block sources because a node dropped out.  In this case, nothing can be done so
                 // remove the item.
                 LogPrint("req", "Block %s has no available sources. Removing\n", item.obj.ToString());
-                cleanup(itemIter); // node should never be null... but if it is then there's nothing to do.
+                cleanup(itemIter);
             }
         }
     }
@@ -593,7 +629,7 @@ void CRequestManager::SendRequests()
                             if (next.node->fDisconnect) // Node was disconnected so we can't request from it
                             {
                                 LOCK(cs_vNodes);
-                                LogPrint("req", "ReqMgr: %s removed ref to %d count %d (disconnect).\n",
+                                LogPrint("req", "ReqMgr: %s removed tx ref to %d count %d (on disconnect).\n",
                                     item.obj.ToString(), next.node->GetId(), next.node->GetRefCount());
                                 next.node->Release();
                                 next.node = NULL; // force the loop to get another node
@@ -603,26 +639,24 @@ void CRequestManager::SendRequests()
 
                     if (next.node != NULL)
                     {
+                        CInv obj = item.obj;
                         if (1)
                         {
-                            cs_objDownloader.unlock();
-                            LOCK(next.node->cs_vSend);
                             // from->AskFor(item.obj); basically just shoves the req into mapAskFor
                             // This commented code does skips requesting TX if the node is not synced.  But the req mgr
                             // should not make this decision, the caller should not give the TX to me...
-                            // !item.lastRequestTime || (item.lastRequestTime && IsChainNearlySyncd()))
-                            if (1)
-                            {
-                                next.node->mapAskFor.insert(std::make_pair(now, item.obj));
-                                item.outstandingReqs++;
-                                item.lastRequestTime = now;
-                            }
-                            cs_objDownloader.lock();
+                            // if (!item.lastRequestTime || (item.lastRequestTime && IsChainNearlySyncd()))
+
+                            item.outstandingReqs++;
+                            item.lastRequestTime = now;
+                            LEAVE_CRITICAL_SECTION(cs_objDownloader);  // do not use "item" after releasing this
+                            next.node->mapAskFor.insert(std::make_pair(now, obj));
+                            ENTER_CRITICAL_SECTION(cs_objDownloader);
                         }
                         {
                             LOCK(cs_vNodes);
-                            LogPrint("req", "ReqMgr: %s removed ref to %d count %d (disconnect).\n",
-                                item.obj.ToString(), next.node->GetId(), next.node->GetRefCount());
+                            LogPrint("req", "ReqMgr: %s removed tx ref to %d count %d\n",
+                                obj.ToString(), next.node->GetId(), next.node->GetRefCount());
                             next.node->Release();
                             next.node = NULL;
                         }
@@ -633,12 +667,13 @@ void CRequestManager::SendRequests()
             }
         }
     }
-
-    cs_objDownloader.unlock();
 }
 
 bool CRequestManager::IsNodePingAcceptable(CNode *pfrom)
 {
+    if (pfrom->nPingUsecTime < ACCEPTABLE_PING_USEC)
+        return true;
+
     // Calculate average ping time of all nodes
     uint16_t nValidNodes = 0;
     std::vector<uint64_t> vPingTimes;
@@ -651,7 +686,7 @@ bool CRequestManager::IsNodePingAcceptable(CNode *pfrom)
             vPingTimes.push_back(pnode->nPingUsecTime);
         }
     }
-    if (nValidNodes == 1)
+    if (nValidNodes < 10)  // Take anything if we are poorly connected
         return true;
 
     // Calculate Standard Deviation and Mean of Ping Time

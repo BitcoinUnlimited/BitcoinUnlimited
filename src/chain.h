@@ -88,7 +88,7 @@ enum BlockStatus: uint32_t {
     BLOCK_HAVE_DATA          =    8, //! full block available in blk*.dat
     BLOCK_HAVE_UNDO          =   16, //! undo data available in rev*.dat
     BLOCK_HAVE_MASK          =   BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO,
- 
+
     BLOCK_EXCESSIVE          =   32, // BU: This block is bigger than what we really want to accept.
 
     BLOCK_FAILED_VALID       =   64, //! stage after last reached validness failed
@@ -134,8 +134,7 @@ public:
 
     //! (memory only) Number of transactions in the chain up to and including this block.
     //! This value will be non-zero only if and only if transactions for this block and all its parents are available.
-    //! Change to 64-bit type when necessary; won't happen before 2030
-    unsigned int nChainTx;
+    uint64_t nChainTx;
 
     //! Verification status of this block. See enum BlockStatus
     unsigned int nStatus;

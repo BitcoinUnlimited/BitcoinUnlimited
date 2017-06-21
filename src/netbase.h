@@ -45,12 +45,13 @@ class CNetAddr
 {
     protected:
         unsigned char ip[16]; // in network byte order
+        uint32_t scopeId; // for scoped/link-local ipv6 addresses
 
     public:
         CNetAddr();
         CNetAddr(const struct in_addr& ipv4Addr);
-        explicit CNetAddr(const char *pszIp, bool fAllowLookup = false);
-        explicit CNetAddr(const std::string &strIp, bool fAllowLookup = false);
+        explicit CNetAddr(const char *pszIp);
+        explicit CNetAddr(const std::string &strIp);
         void Init();
         void SetIP(const CNetAddr& ip);
 
@@ -90,7 +91,7 @@ class CNetAddr
         std::vector<unsigned char> GetGroup() const;
         int GetReachabilityFrom(const CNetAddr *paddrPartner = NULL) const;
 
-        CNetAddr(const struct in6_addr& pipv6Addr);
+        CNetAddr(const struct in6_addr& pipv6Addr, const uint32_t scope = IPV6_ADDR_SCOPE_RESERVED);
         bool GetIn6Addr(struct in6_addr* pipv6Addr) const;
 
         friend bool operator==(const CNetAddr& a, const CNetAddr& b);
@@ -107,42 +108,6 @@ class CNetAddr
         friend class CSubNet;
 };
 
-class CSubNet
-{
-    protected:
-        /// Network (base) address
-        CNetAddr network;
-        /// Netmask, in network byte order
-        uint8_t netmask[16];
-        /// Is this value valid? (only used to signal parse errors)
-        bool valid;
-
-    public:
-        CSubNet();
-        explicit CSubNet(const std::string &strSubnet, bool fAllowLookup = false);
-
-        //constructor for single ip subnet (<ipv4>/32 or <ipv6>/128)
-        explicit CSubNet(const CNetAddr &addr);
-
-        bool Match(const CNetAddr &addr) const;
-
-        std::string ToString() const;
-        bool IsValid() const;
-
-        friend bool operator==(const CSubNet& a, const CSubNet& b);
-        friend bool operator!=(const CSubNet& a, const CSubNet& b);
-        friend bool operator<(const CSubNet& a, const CSubNet& b);
-
-        ADD_SERIALIZE_METHODS;
-
-        template <typename Stream, typename Operation>
-        inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-            READWRITE(network);
-            READWRITE(FLATDATA(netmask));
-            READWRITE(FLATDATA(valid));
-        }
-};
-
 /** A combination of a network address (CNetAddr) and a (TCP) port */
 class CService : public CNetAddr
 {
@@ -154,10 +119,10 @@ class CService : public CNetAddr
         CService(const CNetAddr& ip, unsigned short port);
         CService(const struct in_addr& ipv4Addr, unsigned short port);
         CService(const struct sockaddr_in& addr);
-        explicit CService(const char *pszIpPort, int portDefault, bool fAllowLookup = false);
-        explicit CService(const char *pszIpPort, bool fAllowLookup = false);
-        explicit CService(const std::string& strIpPort, int portDefault, bool fAllowLookup = false);
-        explicit CService(const std::string& strIpPort, bool fAllowLookup = false);
+        explicit CService(const char *pszIpPort, int portDefault);
+        explicit CService(const char *pszIpPort);
+        explicit CService(const std::string& strIpPort, int portDefault);
+        explicit CService(const std::string& strIpPort);
         void Init();
         void SetPort(unsigned short portIn);
         unsigned short GetPort() const;
@@ -206,10 +171,49 @@ bool GetProxy(enum Network net, proxyType &proxyInfoOut);
 bool IsProxy(const CNetAddr &addr);
 bool SetNameProxy(const proxyType &addrProxy);
 bool HaveNameProxy();
-bool LookupHost(const char *pszName, std::vector<CNetAddr>& vIP, unsigned int nMaxSolutions = 0, bool fAllowLookup = true);
-bool Lookup(const char *pszName, CService& addr, int portDefault = 0, bool fAllowLookup = true);
-bool Lookup(const char *pszName, std::vector<CService>& vAddr, int portDefault = 0, bool fAllowLookup = true, unsigned int nMaxSolutions = 0);
+
+/**
+ * Resolve a string hostname into an array of possible IP addresses.
+ * @param[in]  pszName             The host name or dotted IP
+ * @param[out] vIP                 The host's IP addresses
+ * @param[in]  nMaxSolutions       Don't find more than this number of solutions
+ * @param[in]  fAllowDnsResolution If true, pszName may be a dotted-name address, and an attempt will be made to
+                                   resolve.  This can be very time consuming depending on your machine's DNS lookup time
+ * @return True if resolution succeeded
+ */
+bool LookupHost(const char *pszName, std::vector<CNetAddr>& vIP, unsigned int nMaxSolutions, bool fAllowDnsResolution);
+
+/**
+ * Resolve a string hostname into an IP address:port "service".
+ * @param[in]  pszName             The host name or dotted IP
+ * @param[out] addr                The resolved IP address:port
+ * @param[in]  portDefault         If a port is not specified in pszName, use this one.
+ * @param[in]  fAllowDnsResolution If true, pszName may be a dotted-name address, and an attempt will be made to
+                                   resolve.  This can be very time consuming depending on your machine's DNS lookup time
+ * @return True if resolution succeeded
+ */
+bool Lookup(const char *pszName, CService& addr, int portDefault, bool fAllowDnsResolution);
+
+/**
+ * Resolve a string hostname into an array of possible IP address/port "services".
+ * @param[in]  pszName             The host name or dotted IP
+ * @param[out] vAddr               All resolved IP address:ports
+ * @param[in]  nMaxSolutions       Don't find more than this number of solutions
+ * @param[in]  fAllowDnsResolution If true, pszName may be a dotted-name address, and an attempt will be made to
+                                   resolve.  This can be very time consuming depending on your machine's DNS lookup time
+ * @return True if resolution succeeded
+ */
+bool Lookup(const char *pszName, std::vector<CService>& vAddr, int portDefault, unsigned int nMaxSolutions, bool fAllowDnsResolution);
+
+/**
+ * Resolve a string numeric hostname into an IP address:port "service".
+ * @param[in]  pszName             The host name or dotted IP
+ * @param[out] addr                The resolved IP address:port
+ * @param[in]  portDefault         If a port is not specified in pszName, use this one.
+ * @return True if resolution succeeded
+ */
 bool LookupNumeric(const char *pszName, CService& addr, int portDefault = 0);
+
 bool ConnectSocket(const CService &addr, SOCKET& hSocketRet, int nTimeout, bool *outProxyConnectionFailed = 0);
 bool ConnectSocketByName(CService &addr, SOCKET& hSocketRet, const char *pszDest, int portDefault, int nTimeout, bool *outProxyConnectionFailed = 0);
 /** Return readable error string for a network error code */

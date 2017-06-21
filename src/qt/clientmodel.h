@@ -62,7 +62,7 @@ public:
 
     //! Return the dynamic memory usage of the mempool
     size_t getMempoolDynamicUsage() const;
-    
+
     //! BU: Return the transactions per second that are accepted into the mempool
     double getTransactionsPerSecond() const;
 
@@ -81,10 +81,10 @@ public:
 
     QString formatFullVersion() const;
     QString formatSubVersion() const;
-    QString formatBuildDate() const;
     bool isReleaseVersion() const;
     QString clientName() const;
     QString formatClientStartupTime() const;
+    QString dataDir() const;
     UnlimitedModel *unlimitedModel;
 
 private:

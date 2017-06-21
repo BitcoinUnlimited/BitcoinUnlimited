@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#pragma once
+
 #ifndef TWEAK_H
 #define TWEAK_H
 
@@ -16,9 +16,6 @@ class CTweakBase;
 typedef std::string CTweakKey;
 typedef std::map<CTweakKey, CTweakBase *> CTweakMap;
 extern CTweakMap tweaks;
-
-// Create a help string for all the ctweaks entries, as they would be used as command line options
-std::string TweakCmdLineHelp();
 
 class CTweakBase
 {

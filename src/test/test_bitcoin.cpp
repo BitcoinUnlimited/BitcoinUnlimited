@@ -64,8 +64,7 @@ TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(cha
         pcoinsTip = new CCoinsViewCache(pcoinsdbview);
         InitBlockIndex(chainparams);
 
-        nScriptCheckThreads = 3;
-        AddAllScriptCheckQueuesAndThreads(nScriptCheckThreads, &threadGroup);
+        PV.reset(new CParallelValidation(3, &threadGroup));
         RegisterNodeSignals(GetNodeSignals());
 }
 
@@ -102,7 +101,7 @@ CBlock
 TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransaction>& txns, const CScript& scriptPubKey)
 {
     const CChainParams& chainparams = Params();
-    CBlockTemplate *pblocktemplate = CreateNewBlock(chainparams, scriptPubKey);
+    CBlockTemplate *pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey);
     CBlock& block = pblocktemplate->block;
 
     // Replace mempool-selected txns with just coinbase plus passed-in txns:

@@ -196,6 +196,9 @@ void CAddrMan::MakeTried(CAddrInfo& info, int nId)
 void CAddrMan::Good_(const CService& addr, int64_t nTime)
 {
     int nId;
+
+    nLastGood = nTime;
+
     CAddrInfo* pinfo = Find(addr, &nId);
 
     // if not found, bail out
@@ -310,7 +313,7 @@ bool CAddrMan::Add_(const CAddress& addr, const CNetAddr& source, int64_t nTimeP
     return fNew;
 }
 
-void CAddrMan::Attempt_(const CService& addr, int64_t nTime)
+void CAddrMan::Attempt_(const CService& addr, bool fCountFailure, int64_t nTime)
 {
     CAddrInfo* pinfo = Find(addr);
 
@@ -326,7 +329,10 @@ void CAddrMan::Attempt_(const CService& addr, int64_t nTime)
 
     // update info
     info.nLastTry = nTime;
-    info.nAttempts++;
+    if (fCountFailure && info.nLastCountAttempt < nLastGood) {
+        info.nLastCountAttempt = nTime;
+        info.nAttempts++;
+    }
 }
 
 CAddrInfo CAddrMan::Select_(bool newOnly)
@@ -338,16 +344,16 @@ CAddrInfo CAddrMan::Select_(bool newOnly)
         return CAddrInfo();
 
     // BU: select is stuck never finding an address in vvNew, if network connectivity drops.  It is interesting because dumping
-    // vvNew shows there there are one or two valid entries.  However, breakpoints set outside of the 
-    // loop are never hit.  Could there be an issue with pseudo-random # generation?  
+    // vvNew shows there there are one or two valid entries.  However, breakpoints set outside of the
+    // loop are never hit.  Could there be an issue with pseudo-random # generation?
     // The chosen approach (aborting after a time) is a compromise between
     // quality and changing the code as little as possible.  Higher layer code does handle invalid addreses with a
     // delay loop.
-    int nTries=0;  
+    int nTries=0;
 
     // Use a 50% chance for choosing between tried and new table entries.
     if (!newOnly &&
-       (nTried > 0 && (nNew == 0 || RandomInt(2) == 0))) { 
+       (nTried > 0 && (nNew == 0 || RandomInt(2) == 0))) {
         // use a tried node
         double fChanceFactor = 1.0;
         while (1) {
