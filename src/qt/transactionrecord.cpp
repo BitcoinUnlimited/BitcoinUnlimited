@@ -41,7 +41,6 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
     CAmount nDebit = wtx.GetDebit(ISMINE_ALL);
     CAmount nNet = nCredit - nDebit;
     uint256 hash = wtx.GetHash();
-    std::map<std::string, std::string> mapValue = wtx.mapValue;
     AddressList listAllAddresses;
 
     // load all tx addresses for user display/filter
@@ -81,7 +80,6 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             if(mine & ISMINE_WATCH_ONLY) involvesWatchAddress = true;
             if(fAllToMe > mine) fAllToMe = mine;
         }
-
     }
 
     if (nNet > 0 || wtx.IsCoinBase())
@@ -123,7 +121,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
 
                 parts.append(sub);
             }
-        }
+        } // BOOST_FOREACH(const CTxOut& txout, wtx.vout)
     }
     else
     {
@@ -157,7 +155,6 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             for (unsigned int nOut = 0; nOut < wtx.vout.size(); nOut++)
             {
                 const CTxOut& txout = wtx.vout[nOut];
-
                 if(wallet->IsMine(txout))
                 {
                     // Ignore parts sent to self, as this is usually the change
@@ -197,15 +194,40 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 sub.debit = -nValue;
 
                 parts.append(sub);
-            }
-        }
+            } // for
+        } // else if (fAllFromMe)
         else
         {
-            //
-            // Mixed debit transaction, can't break down payees
-            //
-            parts.append(TransactionRecord(hash, nTime, TransactionRecord::Other, listAllAddresses, nNet, 0));
-            parts.last().involvesWatchAddress = involvesWatchAddress;
+            // Check if at least one of the inputs/outputs are mine
+            bool atLeastOneMine = false;
+            BOOST_FOREACH(const CTxIn& txin, wtx.vin)
+            {
+                isminetype mine = wallet->IsMine(txin);
+                if(mine)
+                {
+                    atLeastOneMine = true;
+                    break;
+                }
+            }
+            if (!atLeastOneMine)
+                BOOST_FOREACH(const CTxOut& txout, wtx.vout)
+                {
+                    isminetype mine = wallet->IsMine(txout);
+                    if(mine)
+                    {
+                        atLeastOneMine = true;
+                        break;
+                    }
+                }
+
+            if (atLeastOneMine)
+            {
+                //
+                // Mixed debit transaction, can't break down payees
+                //
+                parts.append(TransactionRecord(hash, nTime, TransactionRecord::Other, listAllAddresses, nNet, 0));
+                parts.last().involvesWatchAddress = involvesWatchAddress;
+            }
         }
     }
 

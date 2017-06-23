@@ -457,21 +457,36 @@ QWidget *SendCoinsDialog::setupTabChain(QWidget *prev)
 void SendCoinsDialog::setAddress(const QString &address)
 {
     SendCoinsEntry *entry = 0;
-    // Replace the first entry if it is still unused
-    if(ui->entries->count() == 1)
+    // Replace the first unused entry
+    for (int i = 0; ui->entries->count(); i++)
     {
-        SendCoinsEntry *first = qobject_cast<SendCoinsEntry*>(ui->entries->itemAt(0)->widget());
+        SendCoinsEntry *first = qobject_cast<SendCoinsEntry*>(ui->entries->itemAt(i)->widget());
         if(first->isClear())
         {
             entry = first;
+            break;
         }
     }
-    if(!entry)
+    if(!entry && address != "")
     {
         entry = addEntry();
     }
 
-    entry->setAddress(address);
+    if (address != "") entry->setAddress(address);
+}
+
+void SendCoinsDialog::setPublicLabel(const QString labelPublic)
+{
+    // Replace the first empty public label
+    for (int i = 0; ui->entries->count(); i++)
+    {
+        SendCoinsEntry *entry = qobject_cast<SendCoinsEntry*>(ui->entries->itemAt(i)->widget());
+        if (entry->isClearPublicLabel())
+        {
+            entry->setPublicLabel(labelPublic);
+            break;
+        }
+    }
 }
 
 void SendCoinsDialog::pasteEntry(const SendCoinsRecipient &rv)

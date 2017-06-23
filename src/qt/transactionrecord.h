@@ -132,6 +132,9 @@ public:
     /** Whether the transaction was sent/received with a watch-only address */
     bool involvesWatchAddress;
 
+    /** Whether the transaction involves a public label */
+    bool involvesPublicLabel;
+
     /** Return the unique identifier for this transaction (part) */
     QString getTxID() const;
 

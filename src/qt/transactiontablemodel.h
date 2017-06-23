@@ -112,6 +112,10 @@ private:
     QVariant txWatchonlyDecoration(const TransactionRecord *wtx) const;
     QVariant txAddressDecoration(const TransactionRecord *wtx) const;
 
+    mutable QMap<std::string, CAmount> publicLabelTotals;
+    CAmount unspentPublicLabelAmount(const TransactionRecord *tr) const;
+    CAmount unspentPublicLabelTotal(std::string publicLabel) const;
+
 public Q_SLOTS:
     /* New transaction, or transaction changed status */
     void updateTransaction(const QString &hash, int status, bool showTransaction);

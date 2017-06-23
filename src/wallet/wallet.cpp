@@ -664,6 +664,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFromLoadWallet, CWalletD
     if (fFromLoadWallet)
     {
         mapWallet[hash] = wtxIn;
+        if (UnspentPublicLabelAmount(wtxIn, "").first > 0) mapWalletPublicLabels[hash] = wtxIn;
         CWalletTx& wtx = mapWallet[hash];
         wtx.BindWallet(this);
         wtxOrdered.insert(make_pair(wtx.nOrderPos, TxPair(&wtx, (CAccountingEntry*)0)));
@@ -817,7 +818,8 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pbl
 
         bool fExisted = mapWallet.count(tx.GetHash()) != 0;
         if (fExisted && !fUpdate) return false;
-        if (fExisted || IsMine(tx) || IsFromMe(tx))
+        CAmount unspentPublicLabelAmount = UnspentPublicLabelAmount(tx, "").first;
+        if (fExisted || IsMine(tx) || IsFromMe(tx) || unspentPublicLabelAmount > 0)
         {
             CWalletTx wtx(this,tx);
 
@@ -828,6 +830,13 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pbl
             // Do not flush the wallet here for performance reasons
             // this is safe, as in case of a crash, we rescan the necessary blocks on startup through our SetBestChain-mechanism
             CWalletDB walletdb(strWalletFile, "r+", false);
+
+            // Keep map of txs involving public label
+            if (unspentPublicLabelAmount > 0)
+            {
+
+                mapWalletPublicLabels[wtx.GetHash()] = wtx;
+            }
 
             return AddToWallet(wtx, false, &walletdb);
         }
@@ -1018,6 +1027,50 @@ bool CWallet::IsMine(const CTransaction& tx) const
             return true;
 	}
     return false;
+}
+
+std::pair<CAmount, int> CWallet::UnspentPublicLabelAmount(const CTransaction& tx, const std::string comparePublicLabel) const
+{ // Returns unspent output amount associated with public label
+
+    // A public label exists BEFORE its txout buddy
+    bool nextIsPublicLabelBuddy = false;
+    int i = 0;
+    BOOST_FOREACH(const CTxOut& txout, tx.vout)
+    {
+        // Speeds up the search but doesn't effect the result
+        if ((!nextIsPublicLabelBuddy && txout.nValue == 0) || (nextIsPublicLabelBuddy && txout.nValue > 0))
+        {
+
+            std::string txPublicLabel = getLabelPublic(txout.scriptPubKey);
+
+            if (nextIsPublicLabelBuddy)
+            {
+                // Skip in case there are many public labels on the same target txout.nValue
+                if (txPublicLabel != "")
+                {
+                    i++;
+                    continue;
+                }
+
+                // This is the target txout.nValue
+                CAmount nValue = IsSpent(tx.GetHash(), i) ? 0 : txout.nValue;
+                if (nValue > 0)
+                {
+                    // found unspent outputs related to public label
+                    return make_pair(nValue, i);
+                }
+
+            }
+            else if ((comparePublicLabel != "" && txPublicLabel == comparePublicLabel)  // matches the specified public label
+                     || (comparePublicLabel == "" && txPublicLabel != ""))              // matches for any public label
+            {
+                // if the public label exists the next txout.nValue is the target
+                nextIsPublicLabelBuddy = true;
+            }
+        }
+        i++;
+    }
+    return make_pair(0, NULL);
 }
 
 CAmount CWallet::GetCredit(const CTxOut& txout, const isminefilter& filter) const
@@ -1254,10 +1307,11 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
     {
         LOCK2(cs_main, cs_wallet);
 
+        // commented below out so that public labels with unspent utxos from any date/time may be tracked
         // no need to read and scan block, if block was created before
         // our wallet birthday (as adjusted for block time variability)
-        while (pindex && nTimeFirstKey && (pindex->GetBlockTime() < (nTimeFirstKey - 7200)))
-            pindex = chainActive.Next(pindex);
+        //while (pindex && nTimeFirstKey && (pindex->GetBlockTime() < (nTimeFirstKey - 7200)))
+        //    pindex = chainActive.Next(pindex);
 
         ShowProgress(_("Rescanning..."), 0); // show rescan progress in GUI as dialog or on splashscreen, if -rescan on startup
         double dProgressStart = Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), pindex, false);
@@ -2216,10 +2270,10 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                     {
                         if (!involvesPublicLabel)
                         {
-                        // Insert change txn at random position:
-                        nChangePosRet = GetRandInt(txNew.vout.size()+1);
-                        vector<CTxOut>::iterator position = txNew.vout.begin()+nChangePosRet;
-                        txNew.vout.insert(position, newTxOut);
+                            // Insert change txn at random position:
+                            nChangePosRet = GetRandInt(txNew.vout.size()+1);
+                            vector<CTxOut>::iterator position = txNew.vout.begin()+nChangePosRet;
+                            txNew.vout.insert(position, newTxOut);
                         }
                         else
                             // Insert change at end position because original txout order is critical for public label
@@ -2406,6 +2460,34 @@ bool CWallet::AddAccountingEntry(const CAccountingEntry& acentry, CWalletDB & pw
     return true;
 }
 
+std::vector<std::pair<CWalletTx, int>> CWallet::GetPublicLabelTxs(std::string& comparePublicLabel) const
+{
+    // Make a list of all public label txs with unspent outputs that match the specified public label
+    std::vector<std::pair<CWalletTx, int>> listPublicLabelTxs;
+    BOOST_FOREACH(PAIRTYPE(uint256, CWalletTx) item, mapWalletPublicLabels)
+    {
+        const uint256& wtxid = item.first;
+        CWalletTx& wtx = item.second;
+        assert(wtx.GetHash() == wtxid);
+
+        for (unsigned int i = 0; i < wtx.vout.size(); i++)
+        {
+            CTxOut txout = wtx.vout[i];
+            std::string txPublicLabel = getLabelPublic(txout.scriptPubKey);
+
+            if (txPublicLabel == comparePublicLabel)
+            {
+                std::pair<CAmount, int> utxoPublicLabel = UnspentPublicLabelAmount(wtx, txPublicLabel);
+                txout.nValue = utxoPublicLabel.first;
+                // Add to list if the public label's buddy is unspent
+                if (txout.nValue > 0) listPublicLabelTxs.push_back(make_pair(wtx, utxoPublicLabel.second));
+            }
+
+        }
+    }
+    return listPublicLabelTxs;
+}
+
 CAmount CWallet::GetRequiredFee(unsigned int nTxBytes)
 {
     return std::max(minTxFee.GetFee(nTxBytes), ::minRelayTxFee.GetFee(nTxBytes));
@@ -2508,6 +2590,34 @@ DBErrors CWallet::ZapWalletTx(std::vector<CWalletTx>& vWtx)
         return nZapWalletTxRet;
 
     return DB_LOAD_OK;
+}
+
+void CWallet::ZapOldPublicLabels()
+{
+    // Delete/remove all public label txs with zero unspent outputs
+    std::vector<CWalletTx> vWtx;
+    BOOST_FOREACH(PAIRTYPE(uint256, CWalletTx) item, mapWalletPublicLabels)
+    {
+        const uint256& wtxid = item.first;
+        CWalletTx wtx = item.second;
+        assert(wtx.GetHash() == wtxid);
+        CAmount totalUnspent = 0;
+
+        // scan outputs for public labels
+        for (unsigned int i = 0; i < wtx.vout.size(); i++)
+        {
+            CTxOut txout = wtx.vout[i];
+            std::string txPublicLabel = getLabelPublic(txout.scriptPubKey);
+
+            if (txPublicLabel != "")
+                    totalUnspent += UnspentPublicLabelAmount(wtx, txPublicLabel).first;
+
+        }
+
+        if (totalUnspent == 0) vWtx.push_back(wtx);
+    }
+
+    if (!vWtx.empty()) ZapWalletTx(vWtx);
 }
 
 
@@ -3210,6 +3320,9 @@ bool CWallet::InitLoadWallet()
         LogPrintf(" rescan      %15dms\n", GetTimeMillis() - nStart);
         walletInstance->SetBestChain(chainActive.GetLocator());
         nWalletDBUpdated++;
+
+        // Clear spent public labels
+        walletInstance->ZapOldPublicLabels();
 
         // Restore wallet transaction metadata after -zapwallettxes=1
         if (GetBoolArg("-zapwallettxes", false) && GetArg("-zapwallettxes", "1") != "2")

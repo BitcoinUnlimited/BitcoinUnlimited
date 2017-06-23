@@ -18,6 +18,7 @@
 #include "signverifymessagedialog.h"
 #include "transactiontablemodel.h"
 #include "transactionview.h"
+#include "publiclabelview.h"
 #include "walletmodel.h"
 
 #include "ui_interface.h"
@@ -54,6 +55,14 @@ WalletView::WalletView(const PlatformStyle *platformStyle, QWidget *parent):
     vbox->addLayout(hbox_buttons);
     transactionsPage->setLayout(vbox);
 
+
+    publicLabelPage = new QWidget(this);
+    QVBoxLayout *vbox2 = new QVBoxLayout();
+    publicLabelView = new PublicLabelView(platformStyle, this);
+    vbox2->addWidget(publicLabelView);
+    publicLabelPage->setLayout(vbox2);
+
+
     receiveCoinsPage = new ReceiveCoinsDialog(platformStyle);
     sendCoinsPage = new SendCoinsDialog(platformStyle);
 
@@ -62,14 +71,16 @@ WalletView::WalletView(const PlatformStyle *platformStyle, QWidget *parent):
 
     addWidget(overviewPage);
     addWidget(transactionsPage);
+    addWidget(publicLabelPage);
     addWidget(receiveCoinsPage);
     addWidget(sendCoinsPage);
 
     // Clicking on a transaction on the overview pre-selects the transaction on the transaction history page
     connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), transactionView, SLOT(focusTransaction(QModelIndex)));
 
-    // Double-clicking on a transaction on the transaction history page shows details
+    // Double-clicking on a transaction on the transaction history or public label list page shows details
     connect(transactionView, SIGNAL(doubleClicked(QModelIndex)), transactionView, SLOT(showDetails()));
+    connect(publicLabelView, SIGNAL(doubleClicked(QModelIndex)), publicLabelView, SLOT(showDetails()));
 
     // Clicking on "Export" allows to export the transaction list
     connect(exportButton, SIGNAL(clicked()), transactionView, SLOT(exportClicked()));
@@ -78,6 +89,8 @@ WalletView::WalletView(const PlatformStyle *platformStyle, QWidget *parent):
     connect(sendCoinsPage, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
     // Pass through messages from transactionView
     connect(transactionView, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
+    // Pass through messages from publicLabelView
+    connect(publicLabelView, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
 }
 
 WalletView::~WalletView()
@@ -90,6 +103,9 @@ void WalletView::setBitcoinGUI(BitcoinGUI *gui)
     {
         // Clicking on a transaction on the overview page simply sends you to transaction history page
         connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), gui, SLOT(gotoHistoryPage()));
+
+        // Menu action Send public label on the public labe page sends you to the send tx page with the public label pre-filled
+        connect(publicLabelView, SIGNAL(menuActionSendPublicLabel(QString, QString)), gui, SLOT(gotoSendCoinsPage(QString, QString)));
 
         // Receive and report messages
         connect(this, SIGNAL(message(QString,QString,unsigned int)), gui, SLOT(message(QString,QString,unsigned int)));
@@ -116,6 +132,7 @@ void WalletView::setWalletModel(WalletModel *walletModel)
 
     // Put transaction list in tabs
     transactionView->setModel(walletModel);
+    publicLabelView->setModel(walletModel);
     overviewPage->setWalletModel(walletModel);
     receiveCoinsPage->setModel(walletModel);
     sendCoinsPage->setModel(walletModel);
@@ -173,17 +190,34 @@ void WalletView::gotoHistoryPage()
     setCurrentWidget(transactionsPage);
 }
 
+void WalletView::gotoPublicLabelPage()
+{
+    setCurrentWidget(publicLabelPage);
+}
+
 void WalletView::gotoReceiveCoinsPage()
 {
     setCurrentWidget(receiveCoinsPage);
 }
 
-void WalletView::gotoSendCoinsPage(QString addr)
+void WalletView::gotoSendCoinsPage(QString addr, QString labelPublic)
 {
     setCurrentWidget(sendCoinsPage);
 
-    if (!addr.isEmpty())
-        sendCoinsPage->setAddress(addr);
+    // Add self address for public labels
+    if (addr.isEmpty() and !labelPublic.isEmpty())
+    {
+        CPubKey pubkey;
+        pubkey = walletModel->getNewPubKey();
+
+        if (pubkey.IsValid()) addr = QString::fromStdString(CBitcoinAddress(pubkey.GetID()).ToString());
+    }
+
+    sendCoinsPage->setAddress(addr);
+
+    if (!labelPublic.isEmpty())
+        sendCoinsPage->setPublicLabel(labelPublic);
+
 }
 
 void WalletView::gotoSignMessageTab(QString addr)

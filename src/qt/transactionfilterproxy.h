@@ -66,6 +66,7 @@ private:
     CAmount minAmount;
     int limitRows;
     bool showInactive;
+
 };
 
 #endif // BITCOIN_QT_TRANSACTIONFILTERPROXY_H
