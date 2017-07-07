@@ -53,8 +53,6 @@ if [ -n "$1" ]; then
    else
       BASEDIR="$BASEDIR$VERSION/"
    fi
-
-   SIGNATUREFILE="$BASEDIR$SIGNATUREFILENAME"
 else
    BASEDIR="${SIGNATUREFILE%/*}/"
 fi
