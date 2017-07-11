@@ -340,7 +340,8 @@ UniValue createrawtransaction(const UniValue& params, bool fHelp)
             "     ]\n"
             "2. \"outputs\"             (string, required) a json object with outputs\n"
             "    {\n"
-            "      \"address\": x.xxx   (numeric or string, required) The key is the bitcoin address, the numeric value (can be string) is the " + CURRENCY_UNIT + " amount\n"
+            "      \"address or script\": x.xxx   (numeric or string, required) The key is the bitcoin address or\n"
+            "                hex-formatted output script, the numeric value (can be string) is the " + CURRENCY_UNIT + " amount\n"
             "      \"data\": \"hex\",     (string, required) The key is \"data\", the value is hex encoded data\n"
             "      ...\n"
             "    }\n"
@@ -395,21 +396,32 @@ UniValue createrawtransaction(const UniValue& params, bool fHelp)
     vector<string> addrList = sendTo.getKeys();
     BOOST_FOREACH(const string& name_, addrList) {
 
-        if (name_ == "data") {
+        if (name_ == "data")
+        {
             std::vector<unsigned char> data = ParseHexV(sendTo[name_].getValStr(),"Data");
 
             CTxOut out(0, CScript() << OP_RETURN << data);
             rawTx.vout.push_back(out);
-        } else {
+        }
+        else
+        {
             CBitcoinAddress address(name_);
-            if (!address.IsValid())
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid Bitcoin address: ")+name_);
+            CScript scriptPubKey;
+            if (address.IsValid())
+            {
+                scriptPubKey = GetScriptForDestination(address.Get());
 
-            if (setAddress.count(address))
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+name_);
-            setAddress.insert(address);
+                if (setAddress.count(address))
+                    throw JSONRPCError(
+                        RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ") + name_);
+                setAddress.insert(address);
+            }
+            else // its a script
+            {
+                vector<unsigned char> scriptData(ParseHexV(name_, "Output script"));
+                scriptPubKey = CScript(scriptData.begin(), scriptData.end());
+            }
 
-            CScript scriptPubKey = GetScriptForDestination(address.Get());
             CAmount nAmount = AmountFromValue(sendTo[name_]);
 
             CTxOut out(nAmount, scriptPubKey);

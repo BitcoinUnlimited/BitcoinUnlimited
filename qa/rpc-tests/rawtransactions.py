@@ -8,9 +8,12 @@
 # Test re-org scenarios with a mempool that contains transactions
 # that spend (directly or indirectly) coinbase transactions.
 #
+import pdb
+from collections import OrderedDict
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
+from test_framework.script import *
 
 # Create one-input, one-output, no-fee transaction:
 class RawTransactionsTest(BitcoinTestFramework):
@@ -34,6 +37,13 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         self.is_network_split=False
         self.sync_all()
+
+    def wastefulOutput(self, btcAddress):
+        data = b"""this is junk data."""
+        # for long data: ret = CScript([OP_PUSHDATA1, len(data), data, OP_DROP, OP_DUP, OP_HASH160, bitcoinAddress2bin(btcAddress), OP_EQUALVERIFY, OP_CHECKSIG])
+        ret = CScript([len(data), data, OP_DROP, OP_DUP, OP_HASH160, bitcoinAddress2bin(btcAddress), OP_EQUALVERIFY, OP_CHECKSIG])
+        # ret = CScript([OP_DUP, OP_HASH160, bitcoinAddress2bin(btcAddress), OP_EQUALVERIFY, OP_CHECKSIG])
+        return ret
 
     def run_test(self):
 
@@ -128,7 +138,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         rawTx = self.nodes[2].createrawtransaction(inputs, outputs)
         rawTxPartialSigned = self.nodes[1].signrawtransaction(rawTx, inputs)
         assert_equal(rawTxPartialSigned['complete'], False) #node1 only has one key, can't comp. sign the tx
-        
+
         rawTxSigned = self.nodes[2].signrawtransaction(rawTx, inputs)
         assert_equal(rawTxSigned['complete'], True) #node2 can sign the tx compl., own two of three keys
         self.nodes[2].sendrawtransaction(rawTxSigned['hex'])
@@ -138,5 +148,75 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.sync_all()
         assert_equal(self.nodes[0].getbalance(), bal+Decimal('50.00000000')+Decimal('2.19000000')) #block reward + tx
 
+        ###################################
+        # RAW TX, with custom output script
+        ###################################
+
+        # Start with a standard output script, so we can spend it
+        node = self.nodes[0]
+        newAddr = self.nodes[1].getnewaddress()
+        wallet = node.listunspent()
+        utxo = wallet.pop()
+        outp = OrderedDict()
+        outscript = CScript([OP_DUP, OP_HASH160, bitcoinAddress2bin(newAddr), OP_EQUALVERIFY, OP_CHECKSIG])
+        outscripthex = hexlify(outscript).decode("ascii")
+        amt = utxo["amount"]
+        outp[outscripthex] = amt
+        txn = node.createrawtransaction([utxo], outp)
+        txna = node.createrawtransaction([utxo], {newAddr:utxo["amount"]})
+        assert(txn==txna)  # verify that we made the same tx as bitcoind
+
+        # ok let's add an OP_RETURN
+        outscript = CScript([OP_RETURN, b"This is some random data"])
+        outscripthex = hexlify(outscript).decode("ascii")
+        outp[outscripthex] = 0
+        txn = node.createrawtransaction([utxo], outp)
+
+        signedtxn = node.signrawtransaction(txn)
+        txhash = node.sendrawtransaction(signedtxn["hex"])
+
+        priorbal = self.nodes[1].getbalance()
+        node.generate(1)
+        self.sync_all()
+        bal = self.nodes[1].getbalance()
+        assert (bal-priorbal == amt)
+
+        # Ok now make a weird tx output, spending the prior output
+        newAddr2 = self.nodes[1].getnewaddress()
+
+        outscript = self.wastefulOutput(newAddr2)
+        outscripthex = hexlify(outscript).decode("ascii")
+        txn2 = node.createrawtransaction([{"txid":txhash,"vout":0}], {outscripthex:amt})
+        signedtxn2 = self.nodes[1].signrawtransaction(txn2)
+        assert(signedtxn2["complete"])
+        txhash2 = node.sendrawtransaction(signedtxn2["hex"])
+        self.sync_all()
+        self.nodes[1].generate(1)
+        bal = self.nodes[1].getbalance()
+        assert(bal == 0)  # Even though I spent to myself, bitcoind is not smart enough to notice this balance
+
+        # bitcoind can't spend the weird output, because it can't understand the output script.
+        if 0:
+            newAddr3 = self.nodes[1].getnewaddress()
+            # txn3 = self.nodes[1].createrawtransaction([{"txid":txhash2,"vout":0,"scriptPubKey":"" }], {newAddr:amt})
+            txn3 = self.nodes[1].createrawtransaction([{"txid":txhash2,"vout":0,}], {newAddr:amt})
+            pdb.set_trace()
+            signedtxn3 = self.nodes[1].signrawtransaction(txn3)
+            # assert(signedtxn3["complete"])
+            txhash3 = self.nodes[1].sendrawtransaction(signedtxn3["hex"])
+            self.nodes[1].generate(1)
+            self.sync_all()
+            bal = self.nodes[1].getbalance()
+            assert(bal == amt)
+
 if __name__ == '__main__':
     RawTransactionsTest().main()
+
+
+def Test():
+  t = RawTransactionsTest()
+  bitcoinConf = {
+    "debug":["net","blk","thin","mempool","req","bench","evict"],
+    "blockprioritysize":2000000  # we don't want any transactions rejected due to insufficient fees...
+  }
+  t.main(["--tmpdir=/ramdisk/test", "--nocleanup","--noshutdown"],bitcoinConf,None)

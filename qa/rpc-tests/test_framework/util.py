@@ -755,3 +755,36 @@ def create_lots_of_big_transactions(node, txouts, utxos, fee):
 def get_bip9_status(node, key):
     info = node.getblockchaininfo()
     return info['bip9_softforks'][key]
+
+def bitcoinAddress2bin(btcAddress):
+    """convert a bitcoin address to binary data capable of being put in a CScript"""
+    # chop the version and checksum out of the bytes of the address
+    return decodeBase58(btcAddress)[1:-4]
+
+B58_DIGITS = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+def decodeBase58(s):
+    """Decode a base58-encoding string, returning bytes"""
+    if not s:
+        return b''
+
+    # Convert the string to an integer
+    n = 0
+    for c in s:
+        n *= 58
+        if c not in B58_DIGITS:
+            raise InvalidBase58Error('Character %r is not a valid base58 character' % c)
+        digit = B58_DIGITS.index(c)
+        n += digit
+
+    # Convert the integer to bytes
+    h = '%x' % n
+    if len(h) % 2:
+        h = '0' + h
+    res = binascii.unhexlify(h.encode('utf8'))
+
+    # Add padding back.
+    pad = 0
+    for c in s[:-1]:
+        if c == B58_DIGITS[0]: pad += 1
+        else: break
+    return b'\x00' * pad + res
