@@ -40,8 +40,7 @@ class RawTransactionsTest(BitcoinTestFramework):
 
     def wastefulOutput(self, btcAddress):
         data = b"""this is junk data."""
-        # for long data: ret = CScript([OP_PUSHDATA1, len(data), data, OP_DROP, OP_DUP, OP_HASH160, bitcoinAddress2bin(btcAddress), OP_EQUALVERIFY, OP_CHECKSIG])
-        ret = CScript([len(data), data, OP_DROP, OP_DUP, OP_HASH160, bitcoinAddress2bin(btcAddress), OP_EQUALVERIFY, OP_CHECKSIG])
+        ret = CScript([data, OP_NOP, OP_DROP, OP_DUP, OP_HASH160, bitcoinAddress2bin(btcAddress), OP_EQUALVERIFY, OP_CHECKSIG])
         # ret = CScript([OP_DUP, OP_HASH160, bitcoinAddress2bin(btcAddress), OP_EQUALVERIFY, OP_CHECKSIG])
         return ret
 
@@ -193,16 +192,18 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.sync_all()
         self.nodes[1].generate(1)
         bal = self.nodes[1].getbalance()
-        assert(bal == 0)  # Even though I spent to myself, bitcoind is not smart enough to notice this balance
+        #assert(bal == 0)  # Even though I spent to myself, bitcoind is not smart enough to notice this balance
+        assert(bal == amt) # unless the script is added to standard.cpp...
+        print ("balance: ", bal)
 
-        # bitcoind can't spend the weird output, because it can't understand the output script.
-        if 0:
+        # Unless the output script is added to standard.cpp bitcoind can't spend the weird output, because it can't
+        # understand the output script.
+        if 1:
             newAddr3 = self.nodes[1].getnewaddress()
             # txn3 = self.nodes[1].createrawtransaction([{"txid":txhash2,"vout":0,"scriptPubKey":"" }], {newAddr:amt})
             txn3 = self.nodes[1].createrawtransaction([{"txid":txhash2,"vout":0,}], {newAddr:amt})
-            pdb.set_trace()
             signedtxn3 = self.nodes[1].signrawtransaction(txn3)
-            # assert(signedtxn3["complete"])
+            assert(signedtxn3["complete"])
             txhash3 = self.nodes[1].sendrawtransaction(signedtxn3["hex"])
             self.nodes[1].generate(1)
             self.sync_all()

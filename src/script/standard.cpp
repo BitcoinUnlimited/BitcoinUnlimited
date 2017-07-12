@@ -53,6 +53,9 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
 
         // Sender provides N pubkeys, receivers provides M signatures
         mTemplates.insert(make_pair(TX_MULTISIG, CScript() << OP_SMALLINTEGER << OP_PUBKEYS << OP_SMALLINTEGER << OP_CHECKMULTISIG));
+
+        // Bitcoin address tx, sender provides hash of pubkey, receiver provides signature and pubkey with data
+        mTemplates.insert(make_pair(TX_PUBKEYHASH, CScript() << OP_DATA << OP_ANY_NOP << OP_DROP << OP_DUP << OP_HASH160 << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG));
     }
 
     vSolutionsRet.clear();
@@ -147,6 +150,17 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
                     vSolutionsRet.push_back(valtype(1, n));
                 }
                 else
+                    break;
+            }
+            else if (opcode2 == OP_DATA)  // If the template has data here
+            {
+                // Expect that there is some data in the script
+                if (vch1.size() == 0)
+                    break;
+            }
+            else if (opcode2 == OP_ANY_NOP)  // allow any unknown instruction here (presumably an extension)
+            {
+                if ((opcode1 != OP_NOP)&&((opcode1 < OP_NOP4) || (opcode1 > OP_NOP10)))
                     break;
             }
             else if (opcode1 != opcode2 || vch1 != vch2)
