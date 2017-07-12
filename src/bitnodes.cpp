@@ -160,6 +160,11 @@ class client
 
         void handle_read(const boost::system::error_code& error, size_t bytes_transferred)
         {
+            // If EOF / no bytes transferred, exit to avoid "short read" error
+            if (bytes_transferred==0) {
+                return;
+            }
+
             if (!error){
                 std::ostringstream ss ;
                 ss << &response_;
@@ -202,7 +207,7 @@ bool GetLeaderboardFromBitnodes(vector<string>& vIPs)
     string url_host = "bitnodes.21.co";
     string url_port = "443";
     string url_path = "/api/v1/nodes/leaderboard/?limit=100";
-    string cert_hostname = "dazzlepod.com";
+    string cert_hostname = "ssl472581.cloudflaressl.com"; // Previous CN was "dazzlepod.com"
     int timeout = 30;
 
     int count = 0;
