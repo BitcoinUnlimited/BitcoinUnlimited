@@ -43,7 +43,7 @@ struct CNodeState
     //! Whether we've started headers synchronization with this peer.
     bool fSyncStarted;
     //! The start time of the sync
-    int64_t fSyncStartTime;
+    int64_t nSyncStartTime;
     //! Were the first headers requested in a sync received
     bool fFirstHeadersReceived;
     //! Our current block height at the time we requested GETHEADERS
@@ -66,6 +66,6 @@ struct CNodeState
 extern std::map<NodeId, CNodeState> mapNodeState;
 
 // Requires cs_main.
-extern CNodeState *State(NodeId pnode);
+extern CNodeState *State(NodeId id);
 
 #endif // BITCOIN_NODESTATE_H

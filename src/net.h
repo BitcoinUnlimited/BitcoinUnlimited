@@ -340,6 +340,7 @@ public:
     bool fFeeler; // If true this node is being used as a short lived feeler.
     bool fOneShot;
     bool fClient;
+    bool fPrunedNode;
     bool fInbound;
     bool fAutoOutbound; // any outbound node not connected with -addnode, connect-thinblock or -connect
     bool fNetworkNode; // any outbound node

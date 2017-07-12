@@ -6,16 +6,21 @@
 
 #include "nodestate.h"
 
+extern CChain chainActive;
+
 /**
-* Default constructor initializing all local member variables to "null" values
+* Default constructor initializing all local member variables
 */
 CNodeState::CNodeState()
 {
-    pindexBestKnownBlock = NULL;
+    pindexBestKnownBlock = nullptr;
     hashLastUnknownBlock.SetNull();
-    pindexLastCommonBlock = NULL;
-    pindexBestHeaderSent = NULL;
+    pindexLastCommonBlock = nullptr;
+    pindexBestHeaderSent = nullptr;
     fSyncStarted = false;
+    nSyncStartTime = GetTime();
+    fFirstHeadersReceived = false;
+    nFirstHeadersExpectedHeight = chainActive.Height();
     nDownloadingSince = 0;
     nBlocksInFlight = 0;
     nBlocksInFlightValidHeaders = 0;
@@ -29,10 +34,10 @@ CNodeState::CNodeState()
 * @param[in] pnode  The NodeId to return CNodeState* for
 * @return CNodeState* matching the NodeId, or NULL if NodeId is not matched
 */
-CNodeState *State(NodeId pnode)
+CNodeState *State(NodeId id)
 {
-    std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(pnode);
+    std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(id);
     if (it == mapNodeState.end())
-        return NULL;
+        return nullptr;
     return &it->second;
 }
