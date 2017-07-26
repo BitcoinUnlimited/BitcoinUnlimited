@@ -65,8 +65,6 @@ CRequestManager::CRequestManager()
       blockPacer(64, 32) // Max and average # of block requests that can be made per second
 {
     inFlight = 0;
-    // maxInFlight = 256;
-
     sendIter = mapTxnInfo.end();
     sendBlkIter = mapBlkInfo.end();
 }
@@ -90,8 +88,8 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
         if (node)
         {
             i->clear();
-            LogPrint("req", "ReqMgr: %s cleanup - removed ref to %d count %d.\n", item.obj.ToString(), node->GetId(),
-                node->GetRefCount());
+            //LogPrint("req", "ReqMgr: %s cleanup - removed ref to %d count %d.\n", item.obj.ToString(), node->GetId(),
+            //    node->GetRefCount());
             node->Release();
         }
     }
@@ -149,7 +147,14 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
         data.priority = max(priority, data.priority);
         if (data.AddSource(from))
         {
-            LogPrint("blk", "%s available at %s\n", obj.ToString().c_str(), from->addrName.c_str());
+            //LogPrint("blk", "%s available at %s\n", obj.ToString().c_str(), from->addrName.c_str());
+            // If this is a new thin block source and we haven't requested from anywhere yet
+            // then request from here right away.
+            if (from->ThinBlockCapable() && !data.hasThinSource)
+            {
+                data.hasThinSource = true;
+                data.lastRequestTime = 0;
+            }
         }
     }
     else
@@ -318,8 +323,7 @@ bool CUnknownObj::AddSource(CNode *from)
     // node is not in the request list
     if (std::find_if(availableFrom.begin(), availableFrom.end(), MatchCNodeRequestData(from)) == availableFrom.end())
     {
-        LogPrint("req", "%s added ref to node %d.  Current count %d.\n",
-                 obj.ToString(), from->GetId(), from->GetRefCount());
+        LogPrint("req", "AddSource %s is available at %s.\n", obj.ToString(), from->GetLogName());
         {
             LOCK(cs_vNodes); // This lock is needed to ensure that AddRef happens atomically
             from->AddRef();
@@ -334,11 +338,12 @@ bool CUnknownObj::AddSource(CNode *from)
             }
         }
         availableFrom.push_back(req);
+        return true;
     }
   return false;
 }
 
-bool RequestBlock(CNode *pfrom, CInv obj)
+bool RequestBlock(CNode *pfrom, CInv obj, bool waitForThin)
 {
     const CChainParams &chainParams = Params();
 
@@ -355,8 +360,12 @@ bool RequestBlock(CNode *pfrom, CInv obj)
     //        here.
     if (IsChainNearlySyncd() || chainParams.NetworkIDString() == "regtest")
     {
-        LogPrint("net", "getheaders (%d) %s to peer=%d\n", pindexBestHeader->nHeight, obj.hash.ToString(), pfrom->id);
-        pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexBestHeader), obj.hash);
+        BlockMap::iterator idxIt = mapBlockIndex.find(obj.hash);
+        if (idxIt == mapBlockIndex.end())  // only request if we don't already have the header
+        {
+            LogPrint("net", "getheaders (%d) %s to peer=%d\n", pindexBestHeader->nHeight, obj.hash.ToString(), pfrom->id);
+            pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexBestHeader), obj.hash);
+        }
     }
 
     {
@@ -366,69 +375,36 @@ bool RequestBlock(CNode *pfrom, CInv obj)
         CBloomFilter filterMemPool;
         if (IsThinBlocksEnabled() && IsChainNearlySyncd())
         {
-            if (HaveConnectThinblockNodes() || (HaveThinblockNodes() && thindata.CheckThinblockTimer(obj.hash)))
+            // Try to download a thinblock if possible otherwise just download a regular block.
+            // We can only request one xthinblock per peer at a time.
+            MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
+            if (pfrom->mapThinBlocksInFlight.size() < 1 && CanThinBlockBeDownloaded(pfrom))
             {
-                // Must download an xthinblock from a XTHIN peer.
-                // We can only request one xthinblock per peer at a time.
-                if (pfrom->mapThinBlocksInFlight.size() < 1 && CanThinBlockBeDownloaded(pfrom))
-                {
-                    AddThinBlockInFlight(pfrom, inv2.hash);
+                AddThinBlockInFlight(pfrom, inv2.hash);
 
-                    inv2.type = MSG_XTHINBLOCK;
-                    std::vector<uint256> vOrphanHashes;
-                    {
-                        LOCK(cs_orphancache);
-                        for (map<uint256, COrphanTx>::iterator mi = mapOrphanTransactions.begin();
-                             mi != mapOrphanTransactions.end(); ++mi)
-                            vOrphanHashes.push_back((*mi).first);
-                    }
-                    BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash);
-                    ss << inv2;
-                    ss << filterMemPool;
-                    MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
-                    pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                    LogPrint("thin", "Requesting xthinblock %s from peer %s (%d)\n", inv2.hash.ToString(),
-                        pfrom->addrName.c_str(), pfrom->id);
-                    return true;
-                }
-            }
-            else
-            {
-                // Try to download a thinblock if possible otherwise just download a regular block.
-                // We can only request one xthinblock per peer at a time.
-                MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
-                if (pfrom->mapThinBlocksInFlight.size() < 1 && CanThinBlockBeDownloaded(pfrom))
+                inv2.type = MSG_XTHINBLOCK;
+                std::vector<uint256> vOrphanHashes;
                 {
-                    AddThinBlockInFlight(pfrom, inv2.hash);
-
-                    inv2.type = MSG_XTHINBLOCK;
-                    std::vector<uint256> vOrphanHashes;
-                    {
-                        LOCK(cs_orphancache);
-                        for (map<uint256, COrphanTx>::iterator mi = mapOrphanTransactions.begin();
-                             mi != mapOrphanTransactions.end(); ++mi)
-                            vOrphanHashes.push_back((*mi).first);
-                    }
-                    BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash);
-                    ss << inv2;
-                    ss << filterMemPool;
-                    pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                    LogPrint("thin", "Requesting xthinblock %s from peer %s (%d)\n", inv2.hash.ToString(),
-                        pfrom->addrName.c_str(), pfrom->id);
+                    LOCK(cs_orphancache);
+                    for (map<uint256, COrphanTx>::iterator mi = mapOrphanTransactions.begin();
+                         mi != mapOrphanTransactions.end(); ++mi)
+                        vOrphanHashes.push_back((*mi).first);
                 }
-                else
-                {
-                    LogPrint("thin", "Requesting Regular Block %s from peer %s (%d)\n", inv2.hash.ToString(),
-                        pfrom->addrName.c_str(), pfrom->id);
-                    std::vector<CInv> vToFetch;
-                    inv2.type = MSG_BLOCK;
-                    vToFetch.push_back(inv2);
-                    pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
-                }
+                BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash);
+                ss << inv2;
+                ss << filterMemPool;
+                pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
+                LogPrint("thin", "Requesting xthinblock %s from peer %s (%d)\n", inv2.hash.ToString(),
+                         pfrom->addrName.c_str(), pfrom->id);
                 return true;
             }
         }
         else
+        {
+            waitForThin = false;  // Override user's choice if we can't get a thin block
+        }
+
+        if (!waitForThin)  // Download the regular block we are unwilling to wait for a thin.
         {
             std::vector<CInv> vToFetch;
             inv2.type = MSG_BLOCK;
@@ -440,7 +416,6 @@ bool RequestBlock(CNode *pfrom, CInv obj)
             return true;
         }
         return false; // no block was requested
-        // BUIP010 Xtreme Thinblocks: end section
     }
 }
 
@@ -527,17 +502,23 @@ void CRequestManager::SendRequests()
                     // If item.lastRequestTime is true then we've requested at least once and we'll try a re-request
                     if (item.lastRequestTime)
                     {
-                        LogPrint("req", "Block request timeout for %s.  Retrying\n", item.obj.ToString().c_str());
+                        LogPrint("req", "Block request or thin source timeout for %s.  Retrying\n",
+                                 item.obj.ToString().c_str());
                     }
 
                     CInv obj = item.obj;
                     item.outstandingReqs++;
                     int64_t then = item.lastRequestTime;
-                    item.lastRequestTime = now;
+                    item.lastRequestTime = GetTimeMicros();
+                    LogPrint("req", "ReqMgr: %s removed block ref to %d count %d item %p lrt %llu\n", obj.ToString(),
+                             next.node->GetId(), next.node->GetRefCount(), &item, item.lastRequestTime);
+
                     LEAVE_CRITICAL_SECTION(cs_objDownloader);  // item and itemIter are now invalid
-                    bool reqblkResult = RequestBlock(next.node, obj);
+                    // first time thru wait for a thin source, subsequently get it from anywhere
+                    bool waitForThin = (then==0);
+                    bool reqblkResult = RequestBlock(next.node, obj, waitForThin);
                     ENTER_CRITICAL_SECTION(cs_objDownloader);
-                    if (!reqblkResult)
+                    if (!reqblkResult)  // I didn't actually send to this node
                     {
                         // having released cs_objDownloader, item and itemiter may be invalid.
                         // So in the rare case that we could not request the block we need to
@@ -548,6 +529,12 @@ void CRequestManager::SendRequests()
                             item = itemIter->second;
                             item.outstandingReqs--;
                             item.lastRequestTime = then;
+                            // rerequest in 1 second, not instantly
+                            if (item.lastRequestTime == 0) item.lastRequestTime = now-blkReqRetryInterval+1000000;
+                            // We need to put the node back on the available list so if we get a notification
+                            // from it again, we don't run thru this code again in an infinite loop
+                            // We also need it back on the list if its a full block node and no thin sources appear
+                            item.availableFrom.push_back(next);
                         }
                     }
 
@@ -559,11 +546,12 @@ void CRequestManager::SendRequests()
 
                     // Instead we'll forget about it -- the node is already popped of of the available list so now we'll
                     // release our reference.
-                    LOCK(cs_vNodes);
-                    LogPrint("req", "ReqMgr: %s removed block ref to %d count %d\n", obj.ToString(),
-                        next.node->GetId(), next.node->GetRefCount());
-                    next.node->Release();
-                    next.node = NULL;
+                    else
+                    {
+                        LOCK(cs_vNodes);
+                        next.node->Release();
+                        next.node = NULL;
+                    }
                 }
                 else
                 {
@@ -575,8 +563,15 @@ void CRequestManager::SendRequests()
             {
                 // There can be no block sources because a node dropped out.  In this case, nothing can be done so
                 // remove the item.
-                LogPrint("req", "Block %s has no available sources. Removing\n", item.obj.ToString());
-                cleanup(itemIter);
+                if (item.lastRequestTime)
+                {
+                    LogPrint("req", "Block %s has no available sources. Removing\n", item.obj.ToString());
+                    cleanup(itemIter);
+                }
+                else  // wait a bit to see if a block source appears
+                {
+                    item.lastRequestTime = now;
+                }
             }
         }
     }

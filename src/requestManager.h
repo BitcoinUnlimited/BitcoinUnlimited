@@ -73,11 +73,9 @@ public:
     bool rateLimited;
     int64_t lastRequestTime; // In microseconds, 0 means no request
     unsigned int outstandingReqs;
-    // unsigned int receivingFrom;
-    // char    requestCount[MAX_AVAIL_FROM];
-    // CNode* availableFrom[MAX_AVAIL_FROM];
     ObjectSourceList availableFrom;
     unsigned int priority;
+    bool hasThinSource;
 
     CUnknownObj()
     {
@@ -85,6 +83,7 @@ public:
         outstandingReqs = 0;
         lastRequestTime = 0;
         priority = 0;
+        hasThinSource = false;
     }
 
     bool AddSource(CNode *from); // returns true if the source did not already exist

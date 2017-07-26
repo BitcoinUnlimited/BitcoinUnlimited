@@ -52,7 +52,7 @@ bool IsTxBUIP055Only(const CTransaction& tx)
 {
     if (tx.sighashType & SIGHASH_FORKID)
     {
-        LogPrintf("txn is BUIP055-specific\n");
+        // LogPrintf("txn is BUIP055-specific\n");
         return true;
     }
     return false;

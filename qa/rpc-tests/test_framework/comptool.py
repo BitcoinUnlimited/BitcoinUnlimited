@@ -206,8 +206,9 @@ class TestManager(object):
                 for node in self.test_nodes
             )
         # --> error if not requested
-        if not wait_until(blocks_requested, attempts=20*num_blocks):
+        if not wait_until(blocks_requested, attempts=100*num_blocks):
             # print [ c.cb.block_request_map for c in self.connections ]
+            pdb.set_trace()
             raise AssertionError("Not all nodes requested block")
 
         # Send getheaders message
