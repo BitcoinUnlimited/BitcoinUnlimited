@@ -253,7 +253,17 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
     CScript::const_iterator pbegincodehash = script.begin();
     opcodetype opcode;
     valtype vchPushValue;
-    vector<bool> vfExec;
+
+    // Whether we are currently executing the opcodes.
+    bool fExec = true;
+    // Counts the number of active conditional scopes
+    int activeConditionalScopeCount = 0;
+    // Counts the number of ignored scopes (scopes that were
+    // started while fExec was false). Note that we can get away
+    // with two counts instead of a stack because a scope is only
+    //  active if its parents are active.
+    int ignoredConditionalScopeCount = 0;
+
     vector<valtype> altstack;
     if (sighashtype) *sighashtype=0;
 
@@ -266,8 +276,6 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
     {
         while (pc < pend)
         {
-            bool fExec = !count(vfExec.begin(), vfExec.end(), false);
-
             //
             // Read instruction
             //
@@ -432,34 +440,61 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                 case OP_NOTIF:
                 {
                     // <expression> if [statements] [else [statements]] endif
-                    bool fValue = false;
                     if (fExec)
                     {
                         if (stack.size() < 1)
                             return set_error(serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
                         valtype& vch = stacktop(-1);
-                        fValue = CastToBool(vch);
+                        bool fValue = CastToBool(vch);
                         if (opcode == OP_NOTIF)
                             fValue = !fValue;
                         popstack(stack);
+                        fExec = fValue;
+                        ++activeConditionalScopeCount;
                     }
-                    vfExec.push_back(fValue);
+                    else
+                    {
+                        // None of the code in this scope will execute,
+                        // not even after OP_ELSE.
+                        ++ignoredConditionalScopeCount;
+                    }
                 }
                 break;
 
                 case OP_ELSE:
                 {
-                    if (vfExec.empty())
-                        return set_error(serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
-                    vfExec.back() = !vfExec.back();
+                    // OP_ELSE only matters if the current scope is active.
+                    if (ignoredConditionalScopeCount == 0) {
+                        if (activeConditionalScopeCount > 0) {
+                            // We're currently inside a conditional scope,
+                            // toggle whether we're executing. Note that OP_ELSE
+                            // can happen repeatedly in a single scope, and
+                            // toggles fExec each time.
+                            fExec = !fExec;
+                        } else {
+                            // Invoked OP_ELSE while outside any conditional scope
+                            return set_error(serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
+                        }
+                    }
                 }
                 break;
 
                 case OP_ENDIF:
                 {
-                    if (vfExec.empty())
+                    if (ignoredConditionalScopeCount > 0) {
+                        --ignoredConditionalScopeCount;
+                        // We're exiting an ignored scope, which means the
+                        // parent was not executing when the inner scope started.
+                        assert(!fExec); // fExec should have been false all along.
+                    } else if (activeConditionalScopeCount > 0) {
+                        --activeConditionalScopeCount;
+                        // We're exiting an active scope, which means the
+                        // parent was executing when the inner scope started.
+                        fExec = true;
+                    } else {
+                        // There's no scope to exit.
                         return set_error(serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
-                    vfExec.pop_back();
+                    }
                 }
                 break;
 
@@ -1036,8 +1071,9 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
         return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
     }
 
-    if (!vfExec.empty())
+    if (ignoredConditionalScopeCount + activeConditionalScopeCount > 0) {
         return set_error(serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
+    }
 
     return set_success(serror);
 }
