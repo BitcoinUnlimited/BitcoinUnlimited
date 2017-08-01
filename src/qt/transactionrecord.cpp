@@ -42,7 +42,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
     CAmount nNet = nCredit - nDebit;
     uint256 hash = wtx.GetHash();
     std::map<std::string, std::string> mapValue = wtx.mapValue;
-    std::map<std::string, CScript> listAllAddresses;
+    AddressList listAllAddresses;
 
     // load all tx addresses for user display/filter
     isminetype fAllToMe = ISMINE_SPENDABLE;
@@ -50,19 +50,30 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
     CTxDestination address;
     BOOST_FOREACH(const CTxOut& txout, wtx.vout)
     {
-
-        if (ExtractDestination(txout.scriptPubKey, address))
-            // a standard address
-            listAllAddresses[CBitcoinAddress(address).ToString()] = txout.scriptPubKey;
-        else
+        // get public label if it exists
+        std::string labelPublic = getLabelPublic(txout.scriptPubKey);
+        if (labelPublic != "")
         {
-            std::string labelPublic = getLabelPublic(txout.scriptPubKey);
-            if (labelPublic != "")
-                listAllAddresses["<" + labelPublic + ">"] = txout.scriptPubKey;
-            else
-                // add the unknown scriptPubKey as n/a - TODO could also skip these if there is no need to display/filter??
-                listAllAddresses["n/a"] = txout.scriptPubKey;
+            // use public label instead of address
+            listAllAddresses.push_back(std::make_pair("<" + labelPublic + ">", txout.scriptPubKey));
+
+            // append public label
+            TransactionRecord sub(hash, nTime);
+            sub.idx = parts.size(); // sequence number
+            sub.credit = txout.nValue;
+            sub.type = TransactionRecord::PublicLabel;
+            sub.addresses.push_back(std::make_pair(labelPublic, txout.scriptPubKey));
+
+            parts.append(sub);
+
         }
+        else if (ExtractDestination(txout.scriptPubKey, address))
+            // a standard address
+            listAllAddresses.push_back(std::make_pair(CBitcoinAddress(address).ToString(), txout.scriptPubKey));
+
+        else
+            // add the unknown scriptPubKey as n/a - TODO could also skip these if there is no need to display/filter??
+            listAllAddresses.push_back(std::make_pair("n/a", txout.scriptPubKey));
 
         if (txout.nValue > 0)  // only checkout outputs which received bitcoin
         {
@@ -88,23 +99,26 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 sub.idx = parts.size(); // sequence number
                 sub.credit = txout.nValue;
                 sub.involvesWatchAddress = mine & ISMINE_WATCH_ONLY;
-                if (ExtractDestination(txout.scriptPubKey, address) && wallet->IsMine(address))
+                std::string labelPublic = getLabelPublic(txout.scriptPubKey);
+                if (labelPublic != "") continue;
+                else if (ExtractDestination(txout.scriptPubKey, address) && wallet->IsMine(address))
                 {
                     // Received by Bitcoin Address
                     sub.type = TransactionRecord::RecvWithAddress;
-                    //sub.addresses[CBitcoinAddress(address).ToString()] = txout.scriptPubKey;
+                    //listAllAddresses.push_back(std::make_pair(CBitcoinAddress(address).ToString(), txout.scriptPubKey));
+                }
+                else if (wtx.IsCoinBase())
+                {
+                    // Generated
+                    sub.type = TransactionRecord::Generated;
                 }
                 else
                 {
                     // Received by IP connection (deprecated features), or a multisignature or other non-simple transaction
                     sub.type = TransactionRecord::RecvFromOther;
-                    listAllAddresses[mapValue["from"]] = txout.scriptPubKey;
+                    //listAllAddresses.push_back(std::make_pair(mapValue["from "],txout.scriptPubKey));
                 }
-                if (wtx.IsCoinBase())
-                {
-                    // Generated
-                    sub.type = TransactionRecord::Generated;
-                }
+
                 sub.addresses = listAllAddresses;
 
                 parts.append(sub);
@@ -143,9 +157,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             for (unsigned int nOut = 0; nOut < wtx.vout.size(); nOut++)
             {
                 const CTxOut& txout = wtx.vout[nOut];
-                TransactionRecord sub(hash, nTime);
-                sub.idx = parts.size();
-                sub.involvesWatchAddress = involvesWatchAddress;
+
                 if(wallet->IsMine(txout))
                 {
                     // Ignore parts sent to self, as this is usually the change
@@ -153,19 +165,27 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     continue;
                 }
 
+                TransactionRecord sub(hash, nTime);
+                sub.idx = parts.size();
+                sub.involvesWatchAddress = involvesWatchAddress;
+
                 CTxDestination address;
-                if (ExtractDestination(txout.scriptPubKey, address))
+                std::string labelPublic = getLabelPublic(txout.scriptPubKey);
+                if (labelPublic != "") continue;
+                else if (ExtractDestination(txout.scriptPubKey, address))
                 {
                     // Sent to Bitcoin Address
                     sub.type = TransactionRecord::SendToAddress;
-                    sub.addresses[CBitcoinAddress(address).ToString()] = txout.scriptPubKey;
+                    //sub.addresses.push_back(std::make_pair(CBitcoinAddress(address).ToString(), txout.scriptPubKey));
                 }
                 else
                 {
                     // Sent to IP, or other non-address transaction like OP_EVAL
                     sub.type = TransactionRecord::SendToOther;
-                    sub.addresses[mapValue["to"]] = txout.scriptPubKey;
+                    //sub.addresses.push_back(std::make_pair(mapValue["to"], txout.scriptPubKey));
                 }
+
+                sub.addresses = listAllAddresses;
 
                 CAmount nValue = txout.nValue;
                 /* Add fee to first output */

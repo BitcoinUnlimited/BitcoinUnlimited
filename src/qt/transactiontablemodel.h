@@ -50,6 +50,8 @@ public:
         DateRole,
         /** Watch-only boolean */
         WatchonlyRole,
+        /** Public label boolean */
+        PublicLabelRole,
         /** Watch-only icon */
         WatchonlyDecorationRole,
         /** Long description (HTML format) */
@@ -102,7 +104,9 @@ private:
     QString formatTxToAddress(const TransactionRecord *wtx, bool tooltip) const;
     QString formatTxAmount(const TransactionRecord *wtx, bool showUnconfirmed=true, BitcoinUnits::SeparatorStyle separators=BitcoinUnits::separatorStandard) const;
     QString formatTooltip(const TransactionRecord *rec) const;
-    QString pickLabelWithAddress(std::map <std::string,CScript> listAddresses, std::string& address) const;
+#ifdef ENABLE_WALLET
+    QString pickLabelWithAddress(AddressList listAddresses, std::string& address) const;
+#endif
 
     QVariant txStatusDecoration(const TransactionRecord *wtx) const;
     QVariant txWatchonlyDecoration(const TransactionRecord *wtx) const;

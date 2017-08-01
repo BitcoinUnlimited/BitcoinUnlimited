@@ -378,6 +378,8 @@ QString TransactionTableModel::formatTxType(const TransactionRecord *wtx) const
         return tr("Payment to yourself");
     case TransactionRecord::Generated:
         return tr("Mined");
+    case TransactionRecord::PublicLabel:
+        return tr("Public label");
     default:
         return QString();
     }
@@ -414,10 +416,13 @@ QString TransactionTableModel::formatTxToAddress(const TransactionRecord *wtx, b
     QString label = pickLabelWithAddress(wtx->addresses, address);
 
     /* Get all the addresses so the user can filter for any of them */
-    std::string addressList;
+    std::string addressList = "";
     BOOST_FOREACH(const PAIRTYPE(std::string,CScript)& addr, wtx->addresses)
     {
-        addressList = addressList + " " + addr.first;
+        std::string nextAddress = boost::replace_all_copy(addr.first, "\n", " ");
+        // ensure list isn't prefixed by a space
+        if (addressList == "") addressList = nextAddress;
+            else addressList = addressList + " " + nextAddress;
     }
 
     if (label == "") return QString::fromStdString(addressList) + watchAddress;
@@ -515,7 +520,7 @@ QString TransactionTableModel::formatTooltip(const TransactionRecord *rec) const
     return tooltip;
 }
 
-QString TransactionTableModel::pickLabelWithAddress(std::map <std::string,CScript> listAddresses, std::string& address) const
+QString TransactionTableModel::pickLabelWithAddress(AddressList listAddresses, std::string& address) const
 {
     /* returns the first address wiith a label or the last address on the list */
     QString label = "";
@@ -613,6 +618,8 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
         return QDateTime::fromTime_t(static_cast<uint>(rec->time));
     case WatchonlyRole:
         return rec->involvesWatchAddress;
+    case PublicLabelRole:
+        return (rec->type == TransactionRecord::PublicLabel);
     case WatchonlyDecorationRole:
         return txWatchonlyDecoration(rec);
     case LongDescriptionRole:

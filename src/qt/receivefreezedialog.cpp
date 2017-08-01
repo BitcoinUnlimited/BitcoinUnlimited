@@ -8,6 +8,7 @@
 #include "guiconstants.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
+#include "main.h"
 
 ReceiveFreezeDialog::ReceiveFreezeDialog(QWidget *parent) :
     QDialog(parent),
@@ -20,6 +21,8 @@ ReceiveFreezeDialog::ReceiveFreezeDialog(QWidget *parent) :
     ui->freezeDateTime->setDisplayFormat("yyyy/MM/dd hh:mm");
     ui->freezeDateTime->setDateTime(QDateTime::currentDateTime());
   
+    ui->freezeBlock->setMinimum(chainActive.Height());
+
     on_resetButton_clicked();
 
     connect(this, SIGNAL(accepted()), parent, SLOT(on_freezeDialog_hide()));
@@ -39,14 +42,14 @@ void ReceiveFreezeDialog::setModel(OptionsModel *model)
 
 void ReceiveFreezeDialog::on_freezeDateTime_editingFinished()
 {
-    if (ui->freezeDateTime->dateTime() > QDateTime::fromMSecsSinceEpoch(0))
+    if (ui->freezeDateTime->dateTime() > ui->freezeDateTime->minimumDateTime())
         ui->freezeBlock->clear();
 }
 
 void ReceiveFreezeDialog::on_freezeBlock_editingFinished()
 {
     if (ui->freezeBlock->value() > 0)
-      ui->freezeDateTime->clear();
+      ui->freezeDateTime->setDateTime(ui->freezeDateTime->minimumDateTime());
 
     /* limit check */
     std::string freezeText = ui->freezeBlock->text().toStdString();
@@ -59,7 +62,7 @@ void ReceiveFreezeDialog::on_freezeBlock_editingFinished()
 void ReceiveFreezeDialog::on_resetButton_clicked()
 {
     ui->freezeBlock->clear();
-    ui->freezeDateTime->setDateTime(QDateTime::fromMSecsSinceEpoch(0));
+    ui->freezeDateTime->setDateTime(ui->freezeDateTime->minimumDateTime());
 }
 
 void ReceiveFreezeDialog::on_okButton_clicked()
@@ -70,7 +73,6 @@ void ReceiveFreezeDialog::on_okButton_clicked()
 void ReceiveFreezeDialog::on_ReceiveFreezeDialog_rejected()
 {
     // this signal is also called by the ESC key
-
     on_resetButton_clicked();
 }
 
@@ -80,10 +82,15 @@ void ReceiveFreezeDialog::getFreezeLockTime(CScriptNum &nFreezeLockTime)
 
     // try freezeBlock
     std::string freezeText = ui->freezeBlock->text().toStdString();
-    if (freezeText != "") nFreezeLockTime = CScriptNum(std::strtoul(freezeText.c_str(),0,10));
+    if (freezeText != "")
+        nFreezeLockTime = CScriptNum(std::strtoul(freezeText.c_str(),0,10));
 
-    // try freezeDateTime
-    if (nFreezeLockTime == 0) nFreezeLockTime = CScriptNum(ui->freezeDateTime->dateTime().toMSecsSinceEpoch() / 1000);
+    else
+    {
+        // try freezeDateTime
+        if (ui->freezeDateTime->dateTime() > ui->freezeDateTime->minimumDateTime())
+            nFreezeLockTime = CScriptNum(ui->freezeDateTime->dateTime().toMSecsSinceEpoch() / 1000);
+    }
 
 }
 
