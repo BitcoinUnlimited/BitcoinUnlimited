@@ -18,6 +18,7 @@
 #include "sync.h"
 #include "uint256.h"
 
+#include <atomic>
 #include <deque>
 #include <stdint.h>
 
@@ -35,6 +36,7 @@
 
 class CAddrMan;
 class CScheduler;
+class CSubNet;
 class CNode;
 class CNodeRef;
 
@@ -78,6 +80,8 @@ static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
 static const unsigned int DEFAULT_MAX_OUTBOUND_CONNECTIONS = 12;
 /** BU: The minimum number of xthin nodes to connect */
 static const uint8_t MIN_XTHIN_NODES = 8;
+/** BU: The minimum number of BitcoinCash nodes to connect */
+static const uint8_t MIN_BITCOIN_CASH_NODES = 4;
 /** BU: The daily maximum disconnects while searching for xthin nodes to connect */
 static const unsigned int MAX_DISCONNECTS = 200;
 /** The default for -maxuploadtarget. 0 = Unlimited */
@@ -97,7 +101,6 @@ unsigned int ReceiveFloodSize();
 unsigned int SendBufferSize();
 
 void AddOneShot(const std::string &strDest);
-void AddressCurrentlyConnected(const CService &addr);
 CNodeRef FindNodeRef(const std::string &addrName);
 int DisconnectSubNetNodes(const CSubNet &subNet);
 bool OpenNetworkConnection(const CAddress &addrConnect,
@@ -185,6 +188,8 @@ extern CAddrMan addrman;
 extern int nMaxConnections;
 /** The minimum number of xthin nodes to connect to */
 extern int nMinXthinNodes;
+/** The minimum number of BitcoinCash nodes to connect to */
+extern int nMinBitcoinCashNodes;
 extern std::vector<CNode *> vNodes;
 extern CCriticalSection cs_vNodes;
 extern std::map<CInv, CDataStream> mapRelay;
@@ -358,8 +363,15 @@ public:
     CBloomFilter *pfilter;
     // BU - Xtreme Thinblocks: a bloom filter which is separate from the one used by SPV wallets
     CBloomFilter *pThinBlockFilter;
-    int nRefCount;
+    std::atomic<int> nRefCount;
     NodeId id;
+
+    //! Accumulated misbehaviour score for this peer.
+    std::atomic<int> nMisbehavior;
+    //! Whether this peer should be disconnected and banned (unless whitelisted).
+    bool fShouldBan;
+    //! Whether we have a fully established connection.
+    bool fCurrentlyConnected;
 
     // BUIP010 Xtreme Thinblocks: begin section
     CBlock thinBlock;
@@ -500,6 +512,14 @@ public:
     bool ThinBlockCapable()
     {
         if (nServices & NODE_XTHIN)
+            return true;
+        return false;
+    }
+
+    // BUIP055:
+    bool BitcoinCashCapable()
+    {
+        if (nServices & NODE_BITCOIN_CASH)
             return true;
         return false;
     }
@@ -758,6 +778,11 @@ public:
         }
     }
 
+    /**
+     * Check if it is flagged for banning, and if so ban it and disconnect.
+     */
+    void DisconnectIfBanned();
+
     void CloseSocketDisconnect();
 
     //! returns the name of this node for logging.  Respects the user's choice to not log the node's IP
@@ -807,19 +832,17 @@ class CNodeRef
     void AddRef()
     {
         if (_pnode)
-        {
-            LOCK(cs_vNodes);
             _pnode->AddRef();
-        }
     }
 
     void Release()
     {
         if (_pnode)
         {
-            LOCK(cs_vNodes);
-            _pnode->Release();
+            // Make the noderef null before releasing, to ensure a user can't get freed memory from us
+            CNode *tmp = _pnode;
             _pnode = nullptr;
+            tmp->Release();
         }
     }
 
@@ -845,6 +868,8 @@ public:
 private:
     CNode *_pnode;
 };
+
+typedef std::vector<CNodeRef> VNodeRefs;
 
 class CTransaction;
 void RelayTransaction(const CTransaction &tx);

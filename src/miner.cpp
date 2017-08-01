@@ -75,7 +75,7 @@ int64_t UpdateTime(CBlockHeader *pblock, const Consensus::Params &consensusParam
 
 BlockAssembler::BlockAssembler(const CChainParams &_chainparams)
     : chainparams(_chainparams), nBlockSize(0), nBlockTx(0), nBlockSigOps(0), nFees(0), nHeight(0), nLockTimeCutoff(0),
-      lastFewTxs(0), blockFinished(false)
+      lastFewTxs(0), blockFinished(false), buip055ChainBlock(false)
 {
     // Largest block you're willing to create:
     nBlockMaxSize = maxGeneratedBlock;
@@ -184,6 +184,8 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
     LOCK2(cs_main, mempool.cs);
     CBlockIndex *pindexPrev = chainActive.Tip();
     nHeight = pindexPrev->nHeight + 1;
+
+    buip055ChainBlock = pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value);
 
     pblock->nTime = GetAdjustedTime();
     pblock->nVersion = UnlimitedComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), pblock->nTime);
@@ -372,6 +374,22 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
             continue;
         }
 
+        // If tx is not applicable to this (forked) chain, skip it
+        if (buip055ChainBlock && IsTxOpReturnInvalid(iter->GetTx()))
+        {
+            continue;
+        }
+        // Reject the tx if we are on the fork, but the tx is not fork-signed
+        if (buip055ChainBlock && onlyAcceptForkSig.value && !IsTxBUIP055Only(*iter))
+        {
+            continue;
+        }
+        // if tx is not applicable to this (unforked) chain, skip it
+        if (!buip055ChainBlock && IsTxBUIP055Only(*iter))
+        {
+            continue;
+        }
+
         // If tx is dependent on other mempool txs which haven't yet been included
         // then put it in the waitSet
         if (isStillDependent(iter))
@@ -455,6 +473,22 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
         if (isStillDependent(iter))
         {
             waitPriMap.insert(std::make_pair(iter, actualPriority));
+            continue;
+        }
+
+        // If tx is not applicable to this (forked) chain, skip it
+        if (buip055ChainBlock && IsTxOpReturnInvalid(iter->GetTx()))
+        {
+            continue;
+        }
+        // Reject the tx if we are on the fork, but the tx is not fork-signed
+        if (buip055ChainBlock && onlyAcceptForkSig.value && !IsTxBUIP055Only(*iter))
+        {
+            continue;
+        }
+        // if tx is not applicable to this (unforked) chain, skip it
+        if (!buip055ChainBlock && IsTxBUIP055Only(*iter))
+        {
             continue;
         }
 

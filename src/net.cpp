@@ -11,7 +11,6 @@
 #include "net.h"
 
 #include "addrman.h"
-#include "bandb.h"
 #include "chainparams.h"
 #include "clientversion.h"
 #include "connmgr.h"
@@ -98,6 +97,7 @@ static std::vector<ListenSocket> vhListenSocket;
 extern CAddrMan addrman;
 int nMaxConnections = DEFAULT_MAX_PEER_CONNECTIONS;
 int nMinXthinNodes = MIN_XTHIN_NODES;
+int nMinBitcoinCashNodes = MIN_BITCOIN_CASH_NODES;
 
 bool fAddressesInitialized = false;
 std::string strSubVersion;
@@ -126,9 +126,6 @@ extern CCriticalSection cs_vUseDNSSeeds;
 extern CSemaphore *semOutbound;
 extern CSemaphore *semOutboundAddNode; // BU: separate semaphore for -addnodes
 boost::condition_variable messageHandlerCondition;
-
-// BU Parallel validation
-extern CSemaphore *semPV; // semaphore for parallel validation threads
 
 // BU  Connection Slot mitigation - used to determine how many connection attempts over time
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
@@ -331,7 +328,6 @@ bool IsReachable(const CNetAddr &addr)
     return IsReachable(net);
 }
 
-void AddressCurrentlyConnected(const CService &addr) { addrman.Connected(addr); }
 // BU moved to globals.cpp
 // uint64_t CNode::nTotalBytesRecv = 0;
 // uint64_t CNode::nTotalBytesSent = 0;
@@ -1062,6 +1058,9 @@ void ThreadSocketHandler()
                     // remove from vNodes
                     vNodes.erase(remove(vNodes.begin(), vNodes.end(), pnode), vNodes.end());
 
+                    // inform connection manager
+                    connmgr->RemovedNode(pnode);
+
                     // release outbound grant (if any)
                     pnode->grantOutbound.Release();
 
@@ -1631,28 +1630,12 @@ void DumpAddresses()
     LogPrint("net", "Flushed %d addresses to peers.dat  %dms\n", addrman.size(), GetTimeMillis() - nStart);
 }
 
-void DumpBanlist()
-{
-    int64_t nStart = GetTimeMillis();
-
-    CBanDB bandb;
-    banmap_t banmap;
-    dosMan.GetBanned(banmap);
-    bandb.Write(banmap);
-
-    LogPrint(
-        "net", "Flushed %d banned node ips/subnets to banlist.dat  %dms\n", banmap.size(), GetTimeMillis() - nStart);
-}
-
 void DumpData()
 {
     DumpAddresses();
 
-    if (dosMan.BannedSetIsDirty())
-    {
-        DumpBanlist();
-        dosMan.SetBannedSetDirty(false);
-    }
+    // Request dos manager to write it's ban list to disk
+    dosMan.DumpBanlist();
 }
 
 void static ProcessOneShot()
@@ -1729,6 +1712,7 @@ void ThreadOpenConnections()
         // we don't have enough connections to XTHIN capable nodes yet.
         int nOutbound = 0;
         int nThinBlockCapable = 0;
+        int nBitcoinCash = 0;
         set<vector<unsigned char> > setConnected;
         CNode *ptemp = nullptr;
         bool fDisconnected = false;
@@ -1743,6 +1727,8 @@ void ThreadOpenConnections()
 
                     if (pnode->ThinBlockCapable())
                         nThinBlockCapable++;
+                    else if (pnode->BitcoinCashCapable())
+                        nBitcoinCash++;
                     else
                         ptemp = pnode;
                 }
@@ -1750,6 +1736,7 @@ void ThreadOpenConnections()
             // Disconnect a node that is not XTHIN capable if all outbound slots are full and we
             // have not yet connected to enough XTHIN nodes.
             nMinXthinNodes = GetArg("-min-xthin-nodes", MIN_XTHIN_NODES);
+            nMinBitcoinCashNodes = GetArg("-min-bitcoin-cash-nodes", MIN_BITCOIN_CASH_NODES);
             if (nOutbound >= nMaxOutConnections && nThinBlockCapable <= min(nMinXthinNodes, nMaxOutConnections) &&
                 nDisconnects < MAX_DISCONNECTS && IsThinBlocksEnabled() && IsChainNearlySyncd())
             {
@@ -1760,6 +1747,20 @@ void ThreadOpenConnections()
                     nDisconnects++;
                 }
             }
+#ifdef BITCOIN_CASH
+            // Disconnect a node that is not BitcoinCash capable if all outbound slots are full and we
+            // have not yet connected to enough BitcoinCash nodes.
+            else if (nOutbound >= nMaxOutConnections && nBitcoinCash <= min(nMinBitcoinCashNodes, nMaxOutConnections) &&
+                     nDisconnects < MAX_DISCONNECTS && IsChainNearlySyncd())
+            {
+                if (ptemp != nullptr)
+                {
+                    ptemp->fDisconnect = true;
+                    fDisconnected = true;
+                    nDisconnects++;
+                }
+            }
+#endif
 
             // In the event that outbound nodes restart or drop off the network over time we need to
             // replenish the number of disconnects allowed once per day.
@@ -1828,6 +1829,7 @@ void ThreadOpenConnections()
         //    connections.
         //  * Only make a feeler connection once every few minutes.
         //
+
         bool fFeeler = false;
         if (nOutbound >= nMaxOutConnections)
         {
@@ -2306,22 +2308,8 @@ void StartNode(boost::thread_group &threadGroup, CScheduler &scheduler)
         }
     }
 
-    uiInterface.InitMessage(_("Loading banlist..."));
-    // Load addresses from banlist.dat
-    nStart = GetTimeMillis();
-    CBanDB bandb;
-    banmap_t banmap;
-    if (bandb.Read(banmap))
-    {
-        dosMan.SetBanned(banmap); // thread save setter
-        dosMan.SetBannedSetDirty(false); // no need to write down, just read data
-        dosMan.SweepBanned(); // sweep out unused entries
-
-        LogPrint("net", "Loaded %d banned node ips/subnets from banlist.dat  %dms\n", banmap.size(),
-            GetTimeMillis() - nStart);
-    }
-    else
-        LogPrintf("Invalid or missing banlist.dat; recreating\n");
+    // ask dos manager to load banlist from disk (or recreate if missing/corrupt)
+    dosMan.LoadBanlist();
 
     fAddressesInitialized = true;
 
@@ -2421,11 +2409,6 @@ void NetCleanup()
     if (pnodeLocalHost)
         delete pnodeLocalHost;
     pnodeLocalHost = NULL;
-
-    // BU: clean up the parallel validation semaphore
-    if (semPV)
-        delete semPV;
-    semPV = NULL;
 
 #ifdef WIN32
     // Shutdown Windows Sockets
@@ -2749,7 +2732,7 @@ bool CAddrDB::Read(CAddrMan &addr, CDataStream &ssPeers)
 unsigned int ReceiveFloodSize() { return 1000 * GetArg("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER); }
 unsigned int SendBufferSize() { return 1000 * GetArg("-maxsendbuffer", DEFAULT_MAXSENDBUFFER); }
 CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn, bool fInboundIn)
-    : ssSend(SER_NETWORK, INIT_PROTO_VERSION), id(CConnMgr::nextNodeId()), addrKnown(5000, 0.001),
+    : ssSend(SER_NETWORK, INIT_PROTO_VERSION), id(connmgr->NextNodeId()), addrKnown(5000, 0.001),
       filterInventoryKnown(50000, 0.000001)
 {
     nServices = 0;
@@ -2800,6 +2783,10 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     thinBlockWaitingForTxns = -1; // BUIP010 Xtreme Thinblocks
     addrFromPort = 0; // BU
     nLocalThinBlockBytes = 0;
+
+    nMisbehavior = 0;
+    fShouldBan = false;
+    fCurrentlyConnected = false;
 
     // BU instrumentation
     std::string xmledName;
@@ -2861,6 +2848,10 @@ CNode::~CNode()
     // BUIP010 - Xtreme Thinblocks - end section
 
     addrFromPort = 0;
+
+    // Update addrman timestamp
+    if (nMisbehavior == 0 && fCurrentlyConnected)
+        addrman.Connected(addr);
 
     GetNodeSignals().FinalizeNode(GetId());
 }
@@ -2989,6 +2980,29 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
 
     LEAVE_CRITICAL_SECTION(cs_vSend);
 }
+
+/**
+ * Check if it is flagged for banning, and if so ban it and disconnect.
+ */
+void CNode::DisconnectIfBanned()
+{
+    if (fShouldBan)
+    {
+        fShouldBan = false;
+
+        if (fWhitelisted)
+            LogPrintf("Warning: not punishing whitelisted peer %s!\n", GetLogName());
+        else
+        {
+            fDisconnect = true;
+            if (addr.IsLocal())
+                LogPrintf("Warning: not banning local peer %s!\n", GetLogName());
+            else
+                dosMan.Ban(addr, BanReasonNodeMisbehaving);
+        }
+    }
+}
+
 
 int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds)
 {

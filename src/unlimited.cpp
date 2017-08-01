@@ -7,6 +7,7 @@
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "clientversion.h"
+#include "connmgr.h"
 #include "consensus/consensus.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
@@ -51,24 +52,22 @@ static atomic<uint64_t> nLargestBlockSeen{BLOCKSTREAM_CORE_MAX_BLOCK_SIZE}; // t
 static atomic<bool> fIsChainNearlySyncd{false};
 extern atomic<bool> fIsInitialBlockDownload;
 extern CTweakRef<uint64_t> miningBlockSize;
-extern CTweakRef<unsigned int> ebTweak;
-extern std::vector<CNode *> xpeditedBlk; // Who requested expedited blocks from us
-extern std::vector<CNode *> xpeditedBlkUp; // Who we requested expedited blocks from
-extern std::vector<CNode *> xpeditedTxn;
+extern CTweakRef<uint64_t> ebTweak;
 
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
 
 bool IsTrafficShapingEnabled();
 UniValue validateblocktemplate(const UniValue &params, bool fHelp);
+UniValue validatechainhistory(const UniValue &params, bool fHelp);
 
-bool MiningAndExcessiveBlockValidatorRule(const unsigned int newExcessiveBlockSize,
-    const unsigned int newMiningBlockSize)
+bool MiningAndExcessiveBlockValidatorRule(const uint64_t newExcessiveBlockSize, const uint64_t newMiningBlockSize)
 {
     // The mined block size must be less then or equal too the excessive block size.
+    LogPrintf("newMiningBlockSizei: %d - newExcessiveBlockSize: %d", newMiningBlockSize, newExcessiveBlockSize);
     return (newMiningBlockSize <= newExcessiveBlockSize);
 }
 
-std::string ExcessiveBlockValidator(const unsigned int &value, unsigned int *item, bool validate)
+std::string ExcessiveBlockValidator(const uint64_t &value, uint64_t *item, bool validate)
 {
     if (validate)
     {
@@ -290,27 +289,8 @@ UniValue expedited(const UniValue &params, bool fHelp)
             flags |= EXPEDITED_STOP;
     }
 
-    // TODO: validate that the node can handle expedited blocks
+    connmgr->PushExpeditedRequest(node.get(), flags);
 
-    // Add or remove this node to our list of upstream nodes
-    {
-        LOCK(cs_xpedited);
-        std::vector<CNode *>::iterator elem = std::find(xpeditedBlkUp.begin(), xpeditedBlkUp.end(), node.get());
-        if ((flags & EXPEDITED_BLOCKS) && (flags & EXPEDITED_STOP))
-        {
-            if (elem != xpeditedBlkUp.end())
-                xpeditedBlkUp.erase(elem);
-        }
-        else if (flags & EXPEDITED_BLOCKS)
-        {
-            if (elem == xpeditedBlkUp.end()) // don't add it twice
-                xpeditedBlkUp.push_back(node.get());
-        }
-    }
-
-    // Push the expedited message even if its a repeat to allow the operator to reissue the CLI command to trigger
-    // another message.
-    node->PushMessage(NetMsgType::XPEDITEDREQUEST, flags);
     return NullUniValue;
 }
 
@@ -367,13 +347,16 @@ void settingsToUserAgentString()
 {
     BUComments.clear();
 
-    double ebInMegaBytes = (double)excessiveBlockSize / 1000000;
     std::stringstream ebss;
-    ebss << std::fixed << std::setprecision(1) << ebInMegaBytes;
+    ebss << (excessiveBlockSize / 100000);
     std::string eb = ebss.str();
-    std::string eb_formatted;
-    eb_formatted = (eb.at(eb.size() - 1) == '0' ? eb.substr(0, eb.size() - 2) : eb); // strip zero decimal
-    BUComments.push_back("EB" + eb_formatted);
+    eb.insert(eb.size() - 1, ".", 1);
+    if (eb.substr(0, 1) == ".")
+        eb = "0" + eb;
+    if (eb.at(eb.size() - 1) == '0')
+        eb = eb.substr(0, eb.size() - 2);
+
+    BUComments.push_back("EB" + eb);
 
     int ad_formatted;
     ad_formatted = (excessiveAcceptDepth >= 9999999 ? 9999999 : excessiveAcceptDepth);
@@ -382,8 +365,8 @@ void settingsToUserAgentString()
 
 void UnlimitedSetup(void)
 {
-    MIN_TX_REQUEST_RETRY_INTERVAL = GetArg("-txretryinterval", MIN_TX_REQUEST_RETRY_INTERVAL);
-    MIN_BLK_REQUEST_RETRY_INTERVAL = GetArg("-blkretryinterval", MIN_BLK_REQUEST_RETRY_INTERVAL);
+    MIN_TX_REQUEST_RETRY_INTERVAL = GetArg("-txretryinterval", DEFAULT_MIN_TX_REQUEST_RETRY_INTERVAL);
+    MIN_BLK_REQUEST_RETRY_INTERVAL = GetArg("-blkretryinterval", DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL);
     maxGeneratedBlock = GetArg("-blockmaxsize", maxGeneratedBlock);
     blockVersion = GetArg("-blockversion", blockVersion);
     excessiveBlockSize = GetArg("-excessiveblocksize", excessiveBlockSize);
@@ -428,10 +411,6 @@ void UnlimitedSetup(void)
         mallocedStats.push_front(new CStatHistory<uint64_t>("net/recv/msg/" + *i));
         mallocedStats.push_front(new CStatHistory<uint64_t>("net/send/msg/" + *i));
     }
-
-    xpeditedBlk.reserve(256);
-    xpeditedBlkUp.reserve(256);
-    xpeditedTxn.reserve(256);
 
     // make outbound conns modifiable by the user
     int nUserMaxOutConnections = GetArg("-maxoutconnections", DEFAULT_MAX_OUTBOUND_CONNECTIONS);
@@ -558,9 +537,9 @@ static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainpar
 
         // In we are mining our own block or not running in parallel for any reason
         // we must terminate any block validation threads that are currently running,
-        // Unless they have more work than our own block.
-        // TODO: we need a better way to determine if a reorg is in progress.
-        PV.StopAllValidationThreads(pblock->GetBlockHeader().nBits);
+        // Unless they have more work than our own block or are processing a chain
+        // that has more work than our block.
+        PV->StopAllValidationThreads(pblock->GetBlockHeader().nBits);
 
         // Process this block the same as if we had received it from another node
         CValidationState state;
@@ -1311,7 +1290,7 @@ void LoadFilter(CNode *pfrom, CBloomFilter *filter)
 {
     if (!filter->IsWithinSizeConstraints())
         // There is no excuse for sending a too-large filter
-        dosMan.Misbehaving(pfrom->GetId(), 100);
+        dosMan.Misbehaving(pfrom, 100);
     else
     {
         LOCK(pfrom->cs_filter);
@@ -1505,6 +1484,7 @@ static const CRPCCommand commands[] =
     { "util",               "getstat",                &getstat,                true  },
     { "util",               "get",                    &gettweak,               true  },
     { "util",               "set",                    &settweak,               true  },
+    { "util",               "validatechainhistory",   &validatechainhistory,   true  },
 #ifdef DEBUG
     { "util",               "getstructuresizes",      &getstructuresizes,      true  },  // BU
 #endif
@@ -1519,6 +1499,67 @@ void RegisterUnlimitedRPCCommands(CRPCTable &tableRPC)
 {
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
         tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
+}
+
+
+UniValue validatechainhistory(const UniValue &params, bool fHelp)
+{
+    if (fHelp)
+        throw runtime_error("validatechainhistory [hash]\n"
+                            "\nUpdates a chain's valid/invalid status based on parent blocks.\n");
+
+    std::stack<CBlockIndex *> stk;
+    CBlockIndex *pos = pindexBestHeader;
+    bool failedChain = false;
+    UniValue ret = NullUniValue;
+
+    LOCK(cs_main);
+
+    if (params.size() >= 1)
+    {
+        std::string strHash = params[0].get_str();
+        uint256 hash(uint256S(strHash));
+
+        if (mapBlockIndex.count(hash) == 0)
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+
+        CBlock block;
+        pos = mapBlockIndex[hash];
+    }
+
+    LogPrintf("validatechainhistory starting at %d %s\n", pos->nHeight, pos->phashBlock->ToString());
+    while (pos && !failedChain)
+    {
+        // LogPrintf("validate %d %s\n", pos->nHeight, pos->phashBlock->ToString());
+        failedChain = pos->nStatus & BLOCK_FAILED_MASK;
+        if (!failedChain)
+        {
+            stk.push(pos);
+        }
+        pos = pos->pprev;
+    }
+    if (failedChain)
+    {
+        ret = UniValue("Chain has a bad ancestor");
+        while (!stk.empty())
+        {
+            pos = stk.top();
+            if (pos)
+            {
+                pos->nStatus |= BLOCK_FAILED_CHILD;
+            }
+            setDirtyBlockIndex.insert(pos);
+            stk.pop();
+        }
+        FlushStateToDisk();
+        pindexBestHeader = FindMostWorkChain();
+    }
+    else
+    {
+        ret = UniValue("Chain is ok");
+    }
+
+    return ret;
 }
 
 
@@ -1653,9 +1694,13 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     // CAddrMan
     ret.push_back(Pair("mapOrphanTransactions", mapOrphanTransactions.size()));
     ret.push_back(Pair("mapOrphanTransactionsByPrev", mapOrphanTransactionsByPrev.size()));
-    ret.push_back(Pair("xpeditedBlk", xpeditedBlk.size()));
-    ret.push_back(Pair("xpeditedBlkUp", xpeditedBlkUp.size()));
-    ret.push_back(Pair("xpeditedTxn", xpeditedTxn.size()));
+
+    uint32_t nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream;
+    connmgr->ExpeditedNodeCounts(nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream);
+    ret.push_back(Pair("xpeditedBlk", (uint64_t)nExpeditedBlocks));
+    ret.push_back(Pair("xpeditedBlkUp", (uint64_t)nExpeditedUpstream));
+    ret.push_back(Pair("xpeditedTxn", (uint64_t)nExpeditedTxs));
+
 #ifdef DEBUG_LOCKORDER
     ret.push_back(Pair("lockorders", lockorders.size()));
 #endif
@@ -1702,3 +1747,70 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     return ret;
 }
 #endif
+
+/** Comparison function for sorting the getchaintips heads.  */
+struct CompareBlocksByHeight
+{
+    bool operator()(const CBlockIndex *a, const CBlockIndex *b) const
+    {
+        /* Make sure that unequal blocks with the same height do not compare
+           equal. Use the pointers themselves to make a distinction. */
+
+        if (a->nHeight != b->nHeight)
+            return (a->nHeight > b->nHeight);
+
+        return a < b;
+    }
+};
+
+void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
+{
+    LOCK(cs_main);
+
+    bool dirty = false;
+    DbgAssert(invalidBlock->nStatus & BLOCK_FAILED_MASK, return );
+
+    // Find all the chain tips:
+    std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
+    std::set<CBlockIndex *> setOrphans;
+    std::set<CBlockIndex *> setPrevs;
+
+    BOOST_FOREACH (const PAIRTYPE(const uint256, CBlockIndex *) & item, mapBlockIndex)
+    {
+        if (!chainActive.Contains(item.second))
+        {
+            setOrphans.insert(item.second);
+            setPrevs.insert(item.second->pprev);
+        }
+    }
+
+    for (std::set<CBlockIndex *>::iterator it = setOrphans.begin(); it != setOrphans.end(); ++it)
+    {
+        if (setPrevs.erase(*it) == 0)
+        {
+            setTips.insert(*it);
+        }
+    }
+
+    // Always report the currently active tip.
+    setTips.insert(chainActive.Tip());
+
+    BOOST_FOREACH (CBlockIndex *tip, setTips)
+    {
+        if (tip->GetAncestor(invalidBlock->nHeight) == invalidBlock)
+        {
+            for (CBlockIndex *blk = tip; blk != invalidBlock; blk = blk->pprev)
+            {
+                if ((blk->nStatus & BLOCK_FAILED_CHILD) == 0)
+                {
+                    blk->nStatus |= BLOCK_FAILED_CHILD;
+                    setDirtyBlockIndex.insert(blk);
+                    dirty = true;
+                }
+            }
+        }
+    }
+
+    if (dirty)
+        FlushStateToDisk();
+}

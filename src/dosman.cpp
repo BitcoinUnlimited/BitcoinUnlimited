@@ -6,12 +6,16 @@
 
 #include "dosman.h"
 #include "bandb.h"
-#include "nodestate.h"
+#include "connmgr.h"
 #include "ui_interface.h"
 
 #include <boost/foreach.hpp>
 
-
+CDoSManager::CDoSManager() : setBannedIsDirty(false), nBanThreshold(DEFAULT_BANSCORE_THRESHOLD) {}
+/**
+ * Call once the command line is parsed so dosman configures itself appropriately.
+ */
+void CDoSManager::HandleCommandLine() { nBanThreshold = GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD); }
 /**
 * Checks if this CNetAddr is in the whitelist
 *
@@ -60,19 +64,19 @@ void CDoSManager::ClearBanned()
 */
 bool CDoSManager::IsBanned(CNetAddr ip)
 {
-    bool fResult = false;
+    LOCK(cs_setBanned);
+    for (banmap_t::iterator it = setBanned.begin(); it != setBanned.end(); it++)
     {
-        LOCK(cs_setBanned);
-        for (banmap_t::iterator it = setBanned.begin(); it != setBanned.end(); it++)
-        {
-            CSubNet subNet = (*it).first;
-            CBanEntry banEntry = (*it).second;
+        CSubNet subNet = (*it).first;
+        CBanEntry banEntry = (*it).second;
 
-            if (subNet.Match(ip) && GetTime() < banEntry.nBanUntil)
-                fResult = true;
-        }
+        // As soon as we find a matching ban that isn't expired return immediately
+        if (subNet.Match(ip) && GetTime() < banEntry.nBanUntil)
+            return true;
     }
-    return fResult;
+
+    // If we got here, we traversed the list and didn't find any non-expired bans for this IP
+    return false;
 }
 
 /**
@@ -83,18 +87,18 @@ bool CDoSManager::IsBanned(CNetAddr ip)
 */
 bool CDoSManager::IsBanned(CSubNet subnet)
 {
-    bool fResult = false;
+    LOCK(cs_setBanned);
+    banmap_t::iterator i = setBanned.find(subnet);
+    if (i != setBanned.end())
     {
-        LOCK(cs_setBanned);
-        banmap_t::iterator i = setBanned.find(subnet);
-        if (i != setBanned.end())
-        {
-            CBanEntry banEntry = (*i).second;
-            if (GetTime() < banEntry.nBanUntil)
-                fResult = true;
-        }
+        CBanEntry banEntry = (*i).second;
+        // As soon as we find a matching ban that isn't expired return immediately
+        if (GetTime() < banEntry.nBanUntil)
+            return true;
     }
-    return fResult;
+
+    // If we got here, we traversed the list and didn't find any non-expired bans for this exact subnet
+    return false;
 }
 
 /**
@@ -167,7 +171,7 @@ bool CDoSManager::Unban(const CSubNet &subNet)
     {
         setBannedIsDirty = true;
 
-        SweepBanned();
+        SweepBannedInternal();
         uiInterface.BannedListChanged();
         return true;
     }
@@ -183,21 +187,23 @@ bool CDoSManager::Unban(const CSubNet &subNet)
 void CDoSManager::GetBanned(banmap_t &banMap)
 {
     LOCK(cs_setBanned);
-    SweepBanned();
-    banMap = setBanned; // create a thread safe copy
+    SweepBannedInternal();
+    GetBannedInternal(banMap); // create a thread safe copy
 }
 
 /**
-* Overwrite the current in-memory banlist with the passed in banmap_t
-* Marks the in-memory banlist as dirty
+* Copies current in-memory banlist to the passed in banmap_t
+* Intended to allow read-only actions on the banlist without holding the lock
 *
-* @param[in] banMap  The new banlist to copy over in-memory banmap_t
+* @param[in,out] banMap  The banlist copy
 */
-void CDoSManager::SetBanned(const banmap_t &banMap)
+void CDoSManager::GetBannedInternal(banmap_t &banMap) EXCLUSIVE_LOCKS_REQUIRED(cs_setBanned)
 {
-    LOCK(cs_setBanned);
-    setBanned = banMap;
-    setBannedIsDirty = true;
+    // Ensure lock is held externally as it is required for this internal version of the method
+    AssertLockHeld(cs_setBanned);
+
+    SweepBannedInternal();
+    banMap = setBanned; // create a thread safe copy
 }
 
 /**
@@ -206,9 +212,23 @@ void CDoSManager::SetBanned(const banmap_t &banMap)
 */
 void CDoSManager::SweepBanned()
 {
-    int64_t now = GetTime();
-
     LOCK(cs_setBanned);
+    SweepBannedInternal();
+}
+
+/**
+* Iterates the in-memory banlist and removes any ban entries where the ban has expired
+* Marks the in-memory banlist as dirty if any entries were removed
+*
+* This is the internal version of the function which requres a lock is held externally
+* This helps avoid taking recursive locks internally
+*/
+void CDoSManager::SweepBannedInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_setBanned)
+{
+    // Ensure lock is held externally as it is required for this internal version of the method
+    AssertLockHeld(cs_setBanned);
+
+    int64_t now = GetTime();
     banmap_t::iterator it = setBanned.begin();
     while (it != setBanned.end())
     {
@@ -237,46 +257,96 @@ bool CDoSManager::BannedSetIsDirty()
 }
 
 /**
-* Set flag indicating the in-memory banlist has changes not written to disk
-*
-* @param[in] dirty  Flag indicating if in-memory banlist has changes not written to disk
-*/
-void CDoSManager::SetBannedSetDirty(bool dirty)
+ * Increment the misbehaving count score for this node.  If the ban threshold is reached, flag the node to be
+ * banned.  No locks are needed to call this function.
+ */
+void CDoSManager::Misbehaving(CNode *pNode, int howmuch)
 {
-    LOCK(cs_setBanned); // reuse setBanned lock for the isDirty flag
-    setBannedIsDirty = dirty;
+    if (howmuch == 0 || !pNode)
+        return;
+
+    int prior(pNode->nMisbehavior.fetch_add(howmuch));
+
+    if (prior + howmuch >= nBanThreshold && prior < nBanThreshold)
+    {
+        LogPrintf("%s: %s (%d -> %d) BAN THRESHOLD EXCEEDED\n", __func__, pNode->GetLogName(), prior, prior + howmuch);
+        pNode->fShouldBan = true;
+    }
+    else
+        LogPrintf("%s: %s (%d -> %d)\n", __func__, pNode->GetLogName(), prior, prior + howmuch);
 }
 
 /**
-* Set the ban score for this node and if the threshold is exceeded request the node be banned.
-* NOTE: This requires an externally taken lock on cs_main to protect the CNodeState returned by
-*       the internal call to State()
-*
-* REVISIT: There are numerous new calls to Misbehaving which have been recently added.
-*          A subsequent PR will be added to ensure the lock on cs_main is properly taken,
-*          adding unit tests for full coverage of all cases, and adding static analysis
-*          tags and an AsserLockHeld to help catch/prevent future developer mistakes.
-*
-* @param[in] pnode    Id of the node which is misbehaving, used to look up the CNodeState
-* @param[in] howmuch  Ban score for the latest infraction against this node
-*/
-void CDoSManager::Misbehaving(NodeId pnode, int howmuch)
+ * Increment the misbehaving count score for this node.  If the ban threshold is reached, flag the node to be
+ * banned.  No locks are needed to call this function.
+ */
+void CDoSManager::Misbehaving(NodeId nodeid, int howmuch)
 {
-    if (howmuch == 0)
-        return;
+    CNodeRef nodeRef(connmgr->FindNodeFromId(nodeid));
 
-    CNodeState *state = State(pnode);
-    if (state == NULL)
-        return;
+    Misbehaving(nodeRef.get(), howmuch);
+}
 
-    state->nMisbehavior += howmuch;
-    int banscore = GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD);
-    if (state->nMisbehavior >= banscore && state->nMisbehavior - howmuch < banscore)
+
+/**
+* Write in-memory banmap to disk
+*/
+void CDoSManager::DumpBanlist()
+{
+    int64_t nStart = GetTimeMillis();
+    banmap_t banmap;
     {
-        LogPrintf("%s: %s (%d -> %d) BAN THRESHOLD EXCEEDED\n", __func__, state->name, state->nMisbehavior - howmuch,
-            state->nMisbehavior);
-        state->fShouldBan = true;
+        LOCK(cs_setBanned);
+        // If setBanned is not dirty, don't waste time on disk i/o
+        if (!setBannedIsDirty)
+            return;
+
+        // Get thread-safe copy of the current banlist
+        GetBannedInternal(banmap);
+
+        // Set the dirty flag to false in anticipation of successful flush to disk
+        // In the event that the flush fails, we will set the flag back to true below
+        // This needs to be done before the current lock is released in case another thread
+        // dirties the banlist between now and completion of the write to disk
+        setBannedIsDirty = false;
+    }
+
+    // Don't hold the lock while performing disk I/O
+    CBanDB bandb;
+    if (!bandb.Write(banmap))
+    {
+        // If the write to disk failed we need to set the dirty flag to true
+        LOCK(cs_setBanned);
+        setBannedIsDirty = true;
     }
     else
-        LogPrintf("%s: %s (%d -> %d)\n", __func__, state->name, state->nMisbehavior - howmuch, state->nMisbehavior);
+        LogPrint("net", "Flushed %d banned node ips/subnets to banlist.dat  %dms\n", banmap.size(),
+            GetTimeMillis() - nStart);
+}
+
+/**
+* Read banmap from disk into memory
+*/
+void CDoSManager::LoadBanlist()
+{
+    uiInterface.InitMessage(_("Loading banlist..."));
+
+    // Load addresses from banlist.dat
+    int64_t nStart = GetTimeMillis();
+    CBanDB bandb;
+    banmap_t banmap;
+    if (bandb.Read(banmap))
+    {
+        LOCK(cs_setBanned);
+        setBanned = banmap;
+        // We just set the in memory banlist to the values from disk, so indicate banlist is not dirty
+        setBannedIsDirty = false;
+        // Remove any ban entries that were persisted to disk but have since expired
+        SweepBannedInternal();
+
+        LogPrint("net", "Loaded %d banned node ips/subnets from banlist.dat  %dms\n", banmap.size(),
+            GetTimeMillis() - nStart);
+    }
+    else
+        LogPrintf("Invalid or missing banlist.dat; recreating\n");
 }

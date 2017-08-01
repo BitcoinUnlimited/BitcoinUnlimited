@@ -20,14 +20,6 @@ struct QueuedBlock
 
 extern std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
 
-
-struct CBlockReject
-{
-    unsigned char chRejectCode;
-    std::string strRejectReason;
-    uint256 hashBlock;
-};
-
 /**
 * Maintain validation-specific state about nodes, protected by cs_main, instead
 * by CNode's own locks. This simplifies asynchronous operation, where
@@ -38,16 +30,8 @@ struct CNodeState
 {
     //! The peer's address
     CService address;
-    //! Whether we have a fully established connection.
-    bool fCurrentlyConnected;
-    //! Accumulated misbehaviour score for this peer.
-    int nMisbehavior;
-    //! Whether this peer should be disconnected and banned (unless whitelisted).
-    bool fShouldBan;
     //! String name of this peer (debugging/logging purposes).
     std::string name;
-    //! List of asynchronously-determined block rejections to notify this peer about.
-    std::vector<CBlockReject> rejects;
     //! The best known block we know this peer has announced.
     CBlockIndex *pindexBestKnownBlock;
     //! The hash of the last unknown block this peer has announced.
@@ -62,6 +46,8 @@ struct CNodeState
     int64_t fSyncStartTime;
     //! Were the first headers requested in a sync received
     bool fFirstHeadersReceived;
+    //! Our current block height at the time we requested GETHEADERS
+    int nFirstHeadersExpectedHeight;
 
     std::list<QueuedBlock> vBlocksInFlight;
     //! When the first entry in vBlocksInFlight started downloading. Don't care when vBlocksInFlight is empty.

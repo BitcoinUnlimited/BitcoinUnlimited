@@ -9,7 +9,6 @@
 
 #include "banentry.h" // for banmap_t
 #include "net.h" // for NodeId
-#include "netbase.h" // for CSubNet
 #include "sync.h" // for CCritalSection
 
 #ifdef DEBUG
@@ -19,7 +18,6 @@
 // NOTE: When adjusting this, update rpcnet:setban's help ("24h")
 static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24; // Default 24-hour ban
 static const unsigned int DEFAULT_BANSCORE_THRESHOLD = 100;
-
 
 class CDoSManager
 {
@@ -39,7 +37,35 @@ protected:
     mutable CCriticalSection cs_setBanned;
     bool setBannedIsDirty;
 
+    // If a node's misbehaving count reaches this value, it is flagged for banning.
+    int nBanThreshold;
+
 public:
+    CDoSManager();
+
+    /**
+     * Call once the command line is parsed so dosman configures itself appropriately.
+     */
+    void HandleCommandLine();
+
+    /**
+     * Increment the misbehaving score for this node.  If the ban threshold is reached, flag the node to be
+     * banned.  No locks are needed to call this function.
+     *
+     * @param[in] pNode    The node which is misbehaving.  No effect if nullptr.
+     * @param[in] howmuch  Incremental misbehaving score for the latest infraction by this node.
+     */
+    void Misbehaving(CNode *pNode, int howmuch);
+
+    /**
+     * Increment the misbehaving score for this node.  If the ban threshold is reached, flag the node to be
+     * banned.  No locks are needed to call this function.
+     *
+     * @param[in] nodeid   The ID of the misbehaving node.  No effect if the CNode is no longer present.
+     * @param[in] howmuch  Incremental misbehaving score for the latest infraction by this node.
+     */
+    void Misbehaving(NodeId nodeid, int howmuch);
+
     bool IsWhitelistedRange(const CNetAddr &ip);
     void AddWhitelistedRange(const CSubNet &subnet);
 
@@ -65,17 +91,20 @@ public:
     bool Unban(const CNetAddr &ip);
     bool Unban(const CSubNet &ip);
     void GetBanned(banmap_t &banmap);
-    void SetBanned(const banmap_t &banmap);
 
-    //! check is the banlist has unwritten changes
+    //! check if the banlist has unwritten changes
     bool BannedSetIsDirty();
-    //! set the "dirty" flag for the banlist
-    void SetBannedSetDirty(bool dirty = true);
     //! clean unused entries (if bantime has expired)
     void SweepBanned();
 
-    /** Increase a node's misbehavior score. */
-    void Misbehaving(NodeId nodeid, int howmuch);
+    //! save banlist to disk
+    void DumpBanlist();
+    //! load banlist from disk
+    void LoadBanlist();
+
+protected:
+    void SweepBannedInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_setBanned);
+    void GetBannedInternal(banmap_t &banmap) EXCLUSIVE_LOCKS_REQUIRED(cs_setBanned);
 };
 
 // actual definition should be in globals.cpp for ordered construction/destruction
