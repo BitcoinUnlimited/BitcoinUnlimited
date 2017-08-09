@@ -153,15 +153,6 @@ void DoTest(const CScript& scriptPubKey, const CScript& scriptSig, int flags, co
     CMutableTransaction txCredit = BuildCreditingTransaction(scriptPubKey, nValue);
     CMutableTransaction tx = BuildSpendingTransaction(scriptSig, txCredit);
     CMutableTransaction tx2 = tx;
-    if (1) //flags & SIGHASH_FORKID)
-    {
-        bool result = VerifyScript(scriptSig, scriptPubKey, flags, MutableTransactionSignatureChecker(&tx, 0, txCredit.vout[0].nValue, flags), &err);
-        if (result != expect)
-        {
-            printf("bug\n");
-        }
-        
-    }
     bool result = VerifyScript(scriptSig, scriptPubKey, flags, MutableTransactionSignatureChecker(&tx, 0, txCredit.vout[0].nValue, flags), &err);
     BOOST_CHECK_MESSAGE(result == expect, message);
     BOOST_CHECK_MESSAGE(err == scriptError, std::string(FormatScriptError(err)) + " where " + std::string(FormatScriptError((ScriptError_t)scriptError)) + " expected: " + message);
@@ -323,15 +314,7 @@ public:
 
     TestBuilder& PushSig(const CKey& key, int nHashType = SIGHASH_ALL, unsigned int lenR = 32, unsigned int lenS = 32, CAmount amount = 0)
     {
-        uint256 hash;
-        if (nHashType & SIGHASH_FORKID)
-        {
-            hash = SignatureHashBitcoinCash(script, spendTx, 0, nHashType, amount);
-        }
-        else
-        {
-            hash = SignatureHash(script, spendTx, 0, nHashType, amount);
-        }
+        uint256 hash = SignatureHash(script, spendTx, 0, nHashType, amount);
         std::vector<unsigned char> vchSig, r, s;
         uint32_t iter = 0;
         do {

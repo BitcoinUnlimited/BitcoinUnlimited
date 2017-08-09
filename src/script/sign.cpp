@@ -27,9 +27,7 @@ bool TransactionSignatureCreator::CreateSig(std::vector<unsigned char>& vchSig, 
     if (!keystore->GetKey(address, key))
         return false;
 
-    uint256 hash;
-    if (nHashType & SIGHASH_FORKID) hash = SignatureHashBitcoinCash(scriptCode, *txTo, nIn, nHashType, amount);
-    else hash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount);
+    uint256 hash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount);
     if (!key.Sign(hash, vchSig))
         return false;
     vchSig.push_back((unsigned char)nHashType);

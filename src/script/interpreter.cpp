@@ -1210,7 +1210,7 @@ uint256 SignatureHashBitcoinCash(const CScript &scriptCode, const CTransaction &
     return one;
 }
 
-uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsigned int nIn, uint32_t nHashType, const CAmount &amount, size_t* nHashedOut)
+uint256 SignatureHashLegacy(const CScript& scriptCode, const CTransaction& txTo, unsigned int nIn, uint32_t nHashType, const CAmount &amount, size_t* nHashedOut)
 {
     static const uint256 one(uint256S("0000000000000000000000000000000000000000000000000000000000000001"));
     if (nIn >= txTo.vin.size()) {
@@ -1235,6 +1235,15 @@ uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsig
     if (nHashedOut != NULL)
         *nHashedOut = ss.GetNumBytesHashed();
     return ss.GetHash();
+}
+
+uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsigned int nIn, uint32_t nHashType, const CAmount &amount, size_t* nHashedOut)
+{
+    if (nHashType & SIGHASH_FORKID)
+    {
+        return SignatureHashBitcoinCash(scriptCode, txTo, nIn, nHashType, amount, nHashedOut);
+    }
+    return SignatureHashLegacy(scriptCode, txTo, nIn, nHashType, amount, nHashedOut);
 }
 
 bool TransactionSignatureChecker::VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& pubkey, const uint256& sighash) const
@@ -1265,7 +1274,7 @@ bool TransactionSignatureChecker::CheckSig(const vector<unsigned char>& vchSigIn
     }
     else
     {
-        sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, &nHashed);
+        sighash = SignatureHashLegacy(scriptCode, *txTo, nIn, nHashType, amount, &nHashed);
     }
     nBytesHashed += nHashed;
     ++nSigops;
