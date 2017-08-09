@@ -54,7 +54,15 @@ BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup)
 
         // Sign:
         std::vector<unsigned char> vchSig;
-        uint256 hash = SignatureHash(scriptPubKey, spends[i], 0, sighashType, coinbaseTxns[0].vout[0].nValue, 0);
+        uint256 hash;
+        if (sighashType & SIGHASH_FORKID)
+        {
+        hash = SignatureHashBitcoinCash(scriptPubKey, spends[i], 0, sighashType, coinbaseTxns[0].vout[0].nValue, 0);
+        }
+        else
+        {
+        hash = SignatureHash(scriptPubKey, spends[i], 0, sighashType, coinbaseTxns[0].vout[0].nValue, 0);
+        }
         BOOST_CHECK(coinbaseKey.Sign(hash, vchSig));
         vchSig.push_back((unsigned char)sighashType);
         spends[i].vin[0].scriptSig << vchSig;

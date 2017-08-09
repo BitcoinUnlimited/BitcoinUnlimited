@@ -215,7 +215,10 @@ BOOST_AUTO_TEST_CASE(sighash_from_data)
           continue;
         }
 
-        sh = SignatureHash(scriptCode, tx, nIn, nHashType, 0, 0);
+        if (nHashType & SIGHASH_FORKID)
+            sh = SignatureHashBitcoinCash(scriptCode, tx, nIn, nHashType, 0, 0);
+        else
+            sh = SignatureHash(scriptCode, tx, nIn, nHashType, 0, 0);
         BOOST_CHECK_MESSAGE(sh.GetHex() == sigHashHex, strTest);
     }
 }

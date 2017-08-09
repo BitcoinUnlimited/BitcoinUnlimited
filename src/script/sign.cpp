@@ -19,7 +19,7 @@ using namespace std;
 
 typedef std::vector<unsigned char> valtype;
 
-TransactionSignatureCreator::TransactionSignatureCreator(const CKeyStore* keystoreIn, const CTransaction* txToIn, unsigned int nInIn, const CAmount &amountIn, uint32_t nHashTypeIn) : BaseSignatureCreator(keystoreIn), txTo(txToIn), nIn(nInIn), amount(amountIn), nHashType(nHashTypeIn), checker(txTo, nIn, amount) {}
+TransactionSignatureCreator::TransactionSignatureCreator(const CKeyStore* keystoreIn, const CTransaction* txToIn, unsigned int nInIn, const CAmount &amountIn, uint32_t nHashTypeIn) : BaseSignatureCreator(keystoreIn), txTo(txToIn), nIn(nInIn), amount(amountIn), nHashType(nHashTypeIn), checker(txTo, nIn, amount, (nHashTypeIn & SIGHASH_FORKID) ? SCRIPT_ENABLE_SIGHASH_FORKID:0) {}
 
 bool TransactionSignatureCreator::CreateSig(std::vector<unsigned char>& vchSig, const CKeyID& address, const CScript& scriptCode) const
 {
@@ -27,7 +27,9 @@ bool TransactionSignatureCreator::CreateSig(std::vector<unsigned char>& vchSig, 
     if (!keystore->GetKey(address, key))
         return false;
 
-    uint256 hash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount);
+    uint256 hash;
+    if (nHashType & SIGHASH_FORKID) hash = SignatureHashBitcoinCash(scriptCode, *txTo, nIn, nHashType, amount);
+    else hash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount);
     if (!key.Sign(hash, vchSig))
         return false;
     vchSig.push_back((unsigned char)nHashType);

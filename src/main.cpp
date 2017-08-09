@@ -1865,7 +1865,7 @@ void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCach
 bool CScriptCheck::operator()()
 {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
-    CachingTransactionSignatureChecker checker(ptxTo, nIn, amount, cacheStore);
+    CachingTransactionSignatureChecker checker(ptxTo, nIn, amount, nFlags, cacheStore);
     if (!VerifyScript(scriptSig, scriptPubKey, nFlags, checker, &error, &sighashType))
         return false;
     if (resourceTracker)
@@ -4321,8 +4321,9 @@ bool ProcessNewBlock(CValidationState &state,
     if (!checked)
     {
         int byteLen = ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION);
-        LogPrintf("Invalid block: ver:%x time:%d Tx size:%d len:%d\n", pblock->nVersion, pblock->nTime,
-            pblock->vtx.size(), byteLen);
+        LogPrintf("Invalid block: ver:%x time:%d Tx size:%d len:%d reject code: 0x%x reject reason: %s debug: %s \n",
+                  pblock->nVersion, pblock->nTime, pblock->vtx.size(), byteLen,
+                  state.GetRejectCode(), state.GetRejectReason(), state.GetDebugMessage());
     }
 
     // WARNING: cs_main is not locked here throughout but is released and then re-locked during ActivateBestChain
