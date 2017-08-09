@@ -4322,8 +4322,8 @@ bool ProcessNewBlock(CValidationState &state,
     {
         int byteLen = ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION);
         LogPrintf("Invalid block: ver:%x time:%d Tx size:%d len:%d reject code: 0x%x reject reason: %s debug: %s \n",
-                  pblock->nVersion, pblock->nTime, pblock->vtx.size(), byteLen,
-                  state.GetRejectCode(), state.GetRejectReason(), state.GetDebugMessage());
+            pblock->nVersion, pblock->nTime, pblock->vtx.size(), byteLen, state.GetRejectCode(),
+            state.GetRejectReason(), state.GetDebugMessage());
     }
 
     // WARNING: cs_main is not locked here throughout but is released and then re-locked during ActivateBestChain
