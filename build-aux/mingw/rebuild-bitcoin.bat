@@ -7,6 +7,9 @@ REM ############################################################################
 REM Ensure any variable changes don't exceed the life of this batch file.
 setlocal
 
+REM Remember the path without anything prepended so we can easily switch toolchains
+set "BASE_PATH=%SystemRoot%;%SystemRoot%\system32;"
+
 REM Capture timing metrics
 set START_TIME=%TIME%
 
@@ -80,7 +83,7 @@ if not exist "%DEPS_ROOT%" (
 
 
 REM Add MSYS and MinGW bin directories to the start of path so commands are available
-set "PATH=%MSYS_BIN%;%MINGW_BIN%;%PATH%"
+set "PATH=%MSYS_BIN%;%MINGW_BIN%;%BASE_PATH%"
 REM Remember the path without the toolchain prepended so we can easily switch toolchains
 set "OLD_PATH=%PATH%"
 

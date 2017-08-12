@@ -8,7 +8,7 @@ REM Ensure any variable changes don't exceed the life of this batch file.
 setlocal
 
 REM Remember the path without anything prepended so we can easily switch toolchains
-set "OLD_PATH=%PATH%"
+set "BASE_PATH=%SystemRoot%;%SystemRoot%\system32;"
 
 REM Capture timing metrics
 set START_TIME=%TIME%
@@ -105,7 +105,7 @@ if not exist "%MSYS_SH%" (
 )
 
 REM Add MSYS bin directory to the start of path so commands are available
-set "PATH=%MSYS_BIN%;%PATH%"
+set "PATH=%MSYS_BIN%;%BASE_PATH%"
 
 REM Install toolchain components for the specified architecture(s) (download and unpack)
 echo Installing toolchain...
@@ -172,7 +172,7 @@ REM Perform build steps that require Windows CMD
 REM ##################################################################################################
 setlocal
 REM Set PATH with toolchain, but not msys, as this causes compile issues for 64-bit Qt
-set "PATH=%TOOLCHAIN_BIN%;%OLD_PATH%"
+set "PATH=%TOOLCHAIN_BIN%;%BASE_PATH%"
 
 REM Boost
 echo Building Boost...
