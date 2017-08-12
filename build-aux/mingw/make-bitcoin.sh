@@ -97,6 +97,11 @@ if [ -z "$SKIP_CONFIGURE" ]; then
 		echo 'Enabling tests in ./configure command'
 		DISABLE_TESTS=
 	fi
+	
+	# Uncomment below to build release
+	ENABLE_DEBUG=
+	# Uncomment below to build debug
+	#ENABLE_DEBUG="--enable-debug"
 
 	CPPFLAGS="-I$PATH_DEPS/db-4.8.30.NC/build_unix \
 	-I$PATH_DEPS/openssl-1.0.1k/include \
@@ -114,6 +119,7 @@ if [ -z "$SKIP_CONFIGURE" ]; then
 	-L$PATH_DEPS/qrencode-3.4.4/.libs" \
 	BOOST_ROOT="$PATH_DEPS/boost_1_61_0" \
 	./configure \
+	$ENABLE_DEBUG \
 	--disable-upnp-default \
 	$DISABLE_TESTS \
 	--with-qt-incdir="$PATH_DEPS/Qt/5.3.2/include" \
