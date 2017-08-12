@@ -131,19 +131,22 @@ make $MAKE_CORES
 # Miniunpuc (Download, unpack, and rename - build requires Windows CMD)
 cd "$DEPS_ROOT"
 # don't download if already downloaded
-if [ ! -e miniupnpc-1.9.20151008.tar.gz ]
+# Updated version 2.0.20170509 for CVE-2017-8798
+if [ ! -e miniupnpc-2.0.20170509.tar.gz ]
 then
-	wget --no-check-certificate http://miniupnp.free.fr/files/download.php?file=miniupnpc-1.9.20151008.tar.gz -O "$DEPS_ROOT/miniupnpc-1.9.20151008.tar.gz"
+	wget --no-check-certificate http://miniupnp.free.fr/files/download.php?file=miniupnpc-2.0.20170509.tar.gz -O "$DEPS_ROOT/miniupnpc-2.0.20170509.tar.gz"
 fi
 # don't extract if already extracted
 cd "$PATH_DEPS"
 if [ ! -d miniupnpc ]
 then
 	cd "$DEPS_ROOT"
-	tar -xvf miniupnpc-1.9.20151008.tar.gz -C "$PATH_DEPS"
+	tar -xvf miniupnpc-2.0.20170509.tar.gz -C "$PATH_DEPS"
 	cd "$PATH_DEPS"
-	mv miniupnpc-1.9.20151008 miniupnpc
+	mv miniupnpc-2.0.20170509 miniupnpc
 fi
+#pause for debugging purposes
+#read -rsp $'Press any key to continue...\n' -n 1 key
 
 
 # Protobuf (Download, unpack, and build)

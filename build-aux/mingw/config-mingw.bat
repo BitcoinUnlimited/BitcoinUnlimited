@@ -195,14 +195,18 @@ if %errorlevel% neq 0 (
 REM Miniunpuc
 echo Building Miniunpuc...
 cd "%PATH_DEPS%\miniupnpc"
+REM The make file for Miniunpuc v2 uses "CC ?= gcc" which causes issues
+REM so we need to explicitly set CC prior to calling make
+set "OLD_CC=%CC%"
+set "CC=gcc"
 mingw32-make -f Makefile.mingw init upnpc-static
+set "CC=%OLD_CC%"
 REM Check to see if mingw32-make failed
 if %errorlevel% neq 0 (
 	echo ERROR: Building Miniunpuc failed!
 	pause
 	exit /b %errorlevel%
 )
-
 
 REM Qt 5
 echo Building Qt 5.3.2...
