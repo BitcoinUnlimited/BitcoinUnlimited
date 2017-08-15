@@ -35,6 +35,8 @@ QT_END_NAMESPACE
  */
 namespace GUIUtil
 {
+extern const QString URI_SCHEME;
+
 // Create human-readable string from date
 QString dateTimeStr(const QDateTime &datetime);
 QString dateTimeStr(qint64 nTime);
@@ -49,7 +51,8 @@ std::string DummyAddress(const CChainParams &params, const Config &cfg);
 void setupAddressWidget(QValidatedLineEdit *widget, QWidget *parent);
 void setupAmountWidget(QLineEdit *widget, QWidget *parent);
 
-// Parse "bitcoin:" URI into recipient object, return true on successful parsing
+// Parse "bitcoincash:" URI into recipient object, return true on successful
+// parsing
 bool parseBitcoinURI(const QUrl &uri, SendCoinsRecipient *out);
 bool parseBitcoinURI(QString uri, SendCoinsRecipient *out);
 QString formatBitcoinURI(const SendCoinsRecipient &info);

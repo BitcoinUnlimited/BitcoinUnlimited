@@ -79,8 +79,9 @@ extern double NSAppKitVersionNumber;
 #endif
 #endif
 
-namespace GUIUtil
-{
+namespace GUIUtil {
+const QString URI_SCHEME("bitcoincash");
+
 QString dateTimeStr(const QDateTime &date)
 {
     return date.date().toString(Qt::SystemLocaleShortDate) + QString(" ") + date.toString("hh:mm");
@@ -153,11 +154,9 @@ void setupAmountWidget(QLineEdit *widget, QWidget *parent)
     widget->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 }
 
-bool parseBitcoinURI(const QUrl &uri, SendCoinsRecipient *out)
-{
-    // return if URI is not valid or is no bitcoin: URI
-    if (!uri.isValid() || uri.scheme() != uriPrefix())
-        return false;
+bool parseBitcoinURI(const QUrl &uri, SendCoinsRecipient *out) {
+    // return if URI is not valid or is no bitcoincash: URI
+    if (!uri.isValid() || uri.scheme() != URI_SCHEME) return false;
 
     SendCoinsRecipient rv;
     rv.address = uri.path();
@@ -215,24 +214,21 @@ bool parseBitcoinURI(const QUrl &uri, SendCoinsRecipient *out)
     return true;
 }
 
-bool parseBitcoinURI(QString uri, SendCoinsRecipient *out)
-{
-    // Convert bitcoin:// to bitcoin:
+bool parseBitcoinURI(QString uri, SendCoinsRecipient *out) {
+    // Convert bitcoincash:// to bitcoincash:
     //
-    //    Cannot handle this later, because bitcoin:// will cause Qt to see the part after // as host,
+    //    Cannot handle this later, because bitcoincash://
+    //    will cause Qt to see the part after // as host,
     //    which will lower-case it (and thus invalidate the address).
-    const QString bigPrefix(uriPrefix() + "://");
-    if (uri.startsWith(bigPrefix, Qt::CaseInsensitive))
-    {
-        uri.replace(0, bigPrefix.length(), uriPrefix() + ':');
+    if (uri.startsWith(URI_SCHEME + "://", Qt::CaseInsensitive)) {
+        uri.replace(0, URI_SCHEME.length() + 3, URI_SCHEME + ":");
     }
     QUrl uriInstance(uri);
     return parseBitcoinURI(uriInstance, out);
 }
 
-QString formatBitcoinURI(const SendCoinsRecipient &info)
-{
-    QString ret = uriPrefix() + ':' + info.address;
+QString formatBitcoinURI(const SendCoinsRecipient &info) {
+    QString ret = (URI_SCHEME + ":%1").arg(info.address);
     int paramCount = 0;
 
     if (info.amount)

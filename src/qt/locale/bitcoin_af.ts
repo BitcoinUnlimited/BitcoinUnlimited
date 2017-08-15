@@ -326,6 +326,58 @@
         <translation>Bitcoin Kern</translation>
     </message>
     <message>
+        <source>Tabs toolbar</source>
+        <translation>Orebalk</translation>
+    </message>
+    <message>
+        <source>Request payments (generates QR codes and %1 URIs)</source>
+        <translation>Versoek betalings (genereer QR-kodes en %1 URI's)</translation>
+    </message>
+    <message>
+        <source>Show the list of used sending addresses and labels</source>
+        <translation>Vertoon die lys van gebruikte versendingsadresse en etikette</translation>
+    </message>
+    <message>
+        <source>Show the list of used receiving addresses and labels</source>
+        <translation>Vertoon die lys van gebruikte ontvangers-adresse en etikette</translation>
+    </message>
+    <message>
+        <source>Open a %1 URI or payment request</source>
+        <translation>Skep 'n %1 URI of betalingsversoek</translation>
+    </message>
+    <message>
+        <source>Indexing blocks on disk...</source>
+        <translation>Blokke op skyf word geïndekseer...</translation>
+    </message>
+    <message>
+        <source>Processing blocks on disk...</source>
+        <translation>Blokke op skyf word geprosesseer...</translation>
+    </message>
+    <message>
+        <source>%1 behind</source>
+        <translation>%1 agter</translation>
+    </message>
+    <message>
+        <source>Last received block was generated %1 ago.</source>
+        <translation>Laaste ontvange blok is %1 gelede gegenereer.</translation>
+    </message>
+    <message>
+        <source>Transactions after this will not yet be visible.</source>
+        <translation>Transaksies hierna sal nog nie sigbaar wees nie.</translation>
+    </message>
+    <message>
+        <source>Error</source>
+        <translation>Fout</translation>
+    </message>
+    <message>
+        <source>Warning</source>
+        <translation>Waarskuwing</translation>
+    </message>
+    <message>
+        <source>Information</source>
+        <translation>Inligting</translation>
+    </message>
+    <message>
         <source>Request payments (generates QR codes and %1: URIs)</source>
         <translation>Versoek betalings (genereer QR-kodes en %1: URI's)</translation>
     </message>

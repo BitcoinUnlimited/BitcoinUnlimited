@@ -14,7 +14,9 @@
 OpenURIDialog::OpenURIDialog(const Config *cfg, QWidget *parent) : QDialog(parent), ui(new Ui::OpenURIDialog), cfg(cfg)
 {
     ui->setupUi(this);
-    ui->uriEdit->setPlaceholderText(GUIUtil::uriPrefix() + ':');
+#if QT_VERSION >= 0x040700
+    ui->uriEdit->setPlaceholderText(GUIUtil::URI_SCHEME + ":");
+#endif
 }
 
 OpenURIDialog::~OpenURIDialog() { delete ui; }
@@ -39,5 +41,5 @@ void OpenURIDialog::on_selectFileButton_clicked()
     if (filename.isEmpty())
         return;
     QUrl fileUri = QUrl::fromLocalFile(filename);
-    ui->uriEdit->setText(GUIUtil::uriPrefix() + ":?r=" + QUrl::toPercentEncoding(fileUri.toString()));
+    ui->uriEdit->setText(GUIUtil::URI_SCHEME + ":?r=" + QUrl::toPercentEncoding(fileUri.toString()));
 }

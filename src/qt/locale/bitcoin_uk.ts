@@ -403,7 +403,7 @@
     </message>
     <message>
         <source>Request payments (generates QR codes and %1: URIs)</source>
-        <translation>Створити запит платежу (генерує QR-код та %1: URI)</translation>
+        <translation>Створити запит платежу (генерує QR-код та %1 URI)</translation>
     </message>
     <message>
         <source>&amp;About Bitcoin Unlimited</source>
@@ -422,8 +422,8 @@
         <translation>Показати список адрес і міток, що були використані для отримання</translation>
     </message>
     <message>
-        <source>Open a %1: URI or payment request</source>
-        <translation>Відкрити %1: URI чи запит платежу</translation>
+        <source>Open a %1 URI or payment request</source>
+        <translation>Відкрити %1 URI чи запит платежу</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>
@@ -2249,8 +2249,8 @@
         <translation>Введіть мітку для цієї адреси для додавання її в список використаних адрес</translation>
     </message>
     <message>
-        <source>A message that was attached to the bitcoin: URI which will be stored with the transaction for your reference. Note: This message will not be sent over the Bitcoin network.</source>
-        <translation>Повідомлення, що було додане до bitcoin:URI та буде збережено разом з транзакцією для довідки. Примітка: Це повідомлення не буде відправлено в мережу Bitcoin.</translation>
+        <source>A message that was attached to the %1 URI which will be stored with the transaction for your reference. Note: This message will not be sent over the Bitcoin network.</source>
+        <translation>Повідомлення, що було додане до %1URI та буде збережено разом з транзакцією для довідки. Примітка: Це повідомлення не буде відправлено в мережу Bitcoin.</translation>
     </message>
     <message>
         <source>Pay To:</source>

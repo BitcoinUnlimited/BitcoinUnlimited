@@ -398,12 +398,12 @@
         <translation>Baris tab</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+       <source>Bitcoin Unlimited</source>
         <translation>Bitcoin Unlimited</translation>
     </message>
     <message>
-        <source>Request payments (generates QR codes and %1: URIs)</source>
-        <translation>Permintaan pembayaran (membuat kode QR dan %1: URIs)</translation>
+        <source>Request payments (generates QR codes and %1 URIs)</source>
+        <translation>Permintaan pembayaran (membuat kode QR dan %1 URIs)</translation>
     </message>
     <message>
         <source>&amp;About Bitcoin Unlimited</source>
@@ -422,8 +422,8 @@
         <translation>Tampilkan daftar alamat dan label yang diterima</translation>
     </message>
     <message>
-        <source>Open a %1: URI or payment request</source>
-        <translation>Buka URI %1: atau permintaan pembayaran</translation>
+        <source>Open a %1 URI or payment request</source>
+        <translation>Buka URI %1 atau permintaan pembayaran</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>

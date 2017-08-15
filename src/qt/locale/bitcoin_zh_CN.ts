@@ -403,7 +403,7 @@
     </message>
     <message>
         <source>Request payments (generates QR codes and %1: URIs)</source>
-        <translation>请求支付（生成二维码和 %1: URI）</translation>
+        <translation>请求支付 (生成二维码和 %1 URI)</translation>
     </message>
     <message>
         <source>&amp;About Bitcoin Unlimited</source>
@@ -422,8 +422,8 @@
         <translation>显示用过的接收地址和标签的列表</translation>
     </message>
     <message>
-        <source>Open a %1: URI or payment request</source>
-        <translation>打开一%1：URI 或支付请求</translation>
+        <source>Open a %1 URI or payment request</source>
+        <translation>打开一个 %1 URI 或支付请求</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>
@@ -1292,6 +1292,10 @@
     <message>
         <source>Invalid payment address %1</source>
         <translation>无效的付款地址 %1</translation>
+    </message>
+    <message>
+        <source>Cannot start %1 click-to-pay handler</source>
+        <translation>无法启动 %1 协议的“一键支付”处理器</translation>
     </message>
     <message>
         <source>Payment request rejected</source>
@@ -2245,8 +2249,8 @@
         <translation>请为此地址输入一个标签以将它加入用过的地址列表</translation>
     </message>
     <message>
-        <source>A message that was attached to the bitcoin: URI which will be stored with the transaction for your reference. Note: This message will not be sent over the Bitcoin network.</source>
-        <translation>bitcoin:URI 附带的备注信息，将会和交易一起存储，备查。 注意：该消息不会通过比特币网络传输。</translation>
+        <source>A message that was attached to the %1 URI which will be stored with the transaction for your reference. Note: This message will not be sent over the Bitcoin network.</source>
+        <translation>%1URI 附带的备注信息，将会和交易一起存储，备查。 注意：该消息不会通过比特币网络传输。</translation>
     </message>
     <message>
         <source>Pay To:</source>

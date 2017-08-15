@@ -229,8 +229,15 @@
       <property name="alignment">
        <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
       </property>
-      <property name="margin">
-       <number>0</number>
+     </widget>
+    </item>
+    <item row="3" column="1">
+     <widget class="QLabel" name="messageTextLabel">
+      <property name="toolTip">
+       <string/>
+      </property>
+      <property name="textFormat">
+       <enum>Qt::PlainText</enum>
       </property>
       <property name="buddy">
        <cstring>lineEditPublic</cstring>
