@@ -429,6 +429,15 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout[0].scriptPubKey = CScript() << OP_RETURN;
     t.vout[1].scriptPubKey = CScript() << OP_RETURN;
     BOOST_CHECK(!IsStandardTx(t, reason));
+
+    // Replay-protected TX is non-std
+    std::string orig("RP=!>1x");
+    std::string origHex = HexStr(orig);
+    BOOST_CHECK_EQUAL(origHex, "52503d213e3178");
+
+    t.vout.resize(1);
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("52503d213e3178");
+    BOOST_CHECK(!IsStandardTx(t, reason));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

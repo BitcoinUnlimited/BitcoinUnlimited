@@ -284,6 +284,8 @@ public:
     }
 
     std::string ToString() const;
+
+    bool ReplayProtected() const;
 };
 
 /** A mutable version of CTransaction. */
