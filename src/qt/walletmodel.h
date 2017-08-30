@@ -215,7 +215,7 @@ public:
     UnlockContext requestUnlock();
 
     bool getPubKey(const CKeyID &address, CPubKey &vchPubKeyOut) const;
-    bool havePrivKey(const CKeyID &address) const;
+    bool IsSpendable(const CTxDestination &dest) const;
     void getOutputs(const std::vector<COutPoint> &vOutpoints, std::vector<COutput> &vOutputs);
     bool isSpent(const COutPoint &outpoint) const;
     void listCoins(std::map<QString, std::vector<COutput> > &mapCoins) const;

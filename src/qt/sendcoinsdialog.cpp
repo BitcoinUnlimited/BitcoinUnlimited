@@ -801,9 +801,7 @@ void SendCoinsDialog::coinControlChangeEdited(const QString &text)
         else
         {
             // Valid address
-            const CKeyID *keyID = boost::get<CKeyID>(&dest);
-            CKey key;
-            if (!model->havePrivKey(*keyID))
+            if (!model->IsSpendable(dest))
             {
                 ui->labelCoinControlChangeLabel->setText(tr("Warning: Unknown change address"));
 
