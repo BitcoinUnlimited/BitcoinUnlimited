@@ -20,6 +20,7 @@
 #include "random.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
+#include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "test/testutil.h"
 #include "txdb.h"

@@ -33,6 +33,7 @@
 #include "primitives/transaction.h"
 #include "requestManager.h"
 #include "script/script.h"
+#include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
 #include "thinblock.h"
@@ -1711,21 +1712,6 @@ int GetSpendHeight(const CCoinsViewCache &inputs)
     throw std::runtime_error("GetSpendHeight(): best block does not exist");
 }
 
-static CuckooCache::cache<uint256, SignatureCacheHasher> scriptExecutionCache;
-static uint256 scriptExecutionCacheNonce(GetRandHash());
-
-void InitScriptExecutionCache()
-{
-    // nMaxCacheSize is unsigned. If -maxsigcachesize is set to zero,
-    // setup_bytes creates the minimum possible cache (2 elements).
-    size_t nMaxCacheSize = std::min(std::max((int64_t)0, GetArg("-maxsigcachesize", DEFAULT_MAX_SIG_CACHE_SIZE) / 2),
-                               (int64_t)MAX_MAX_SIG_CACHE_SIZE) *
-                           ((size_t)1 << 20);
-    size_t nElems = scriptExecutionCache.setup_bytes(nMaxCacheSize);
-    LOGA("Using %zu MiB out of %zu requested for script execution cache, able to store %zu elements\n",
-        (nElems * sizeof(uint256)) >> 20, nMaxCacheSize >> 20, nElems);
-}
-
 bool CheckInputs(const CTransaction &tx,
     CValidationState &state,
     const CCoinsViewCache &view,
@@ -1761,19 +1747,8 @@ bool CheckInputs(const CTransaction &tx,
             // correct (ie that the transaction hash which is in tx's prevouts
             // properly commits to the scriptPubKey in the inputs view of that
             // transaction).
-            uint256 hashCacheEntry;
-            // We only use the first 19 bytes of nonce to avoid a second SHA
-            // round - giving us 19 + 32 + 4 = 55 bytes (+ 8 + 1 = 64)
-            static_assert(
-                55 - sizeof(flags) - 32 >= 128 / 8, "Want at least 128 bits of nonce for script execution cache");
-            CSHA256()
-                .Write(scriptExecutionCacheNonce.begin(), 55 - sizeof(flags) - 32)
-                .Write(tx.GetHash().begin(), 32)
-                .Write((unsigned char *)&flags, sizeof(flags))
-                .Finalize(hashCacheEntry.begin());
-
-            AssertLockHeld(cs_main); // TODO: Remove this requirement by making CuckooCache not require external locks
-            if (scriptExecutionCache.contains(hashCacheEntry, !cacheFullScriptStore))
+            uint256 hashCacheEntry = GetScriptCacheKey(tx, flags);
+            if (IsKeyInScriptCache(hashCacheEntry, !cacheFullScriptStore))
             {
                 return true;
             }
@@ -1836,7 +1811,7 @@ bool CheckInputs(const CTransaction &tx,
             {
                 // We executed all of the provided scripts, and were told to
                 // cache the result. Do so now.
-                scriptExecutionCache.insert(hashCacheEntry);
+                AddKeyInScriptCache(hashCacheEntry);
             }
         }
     }
