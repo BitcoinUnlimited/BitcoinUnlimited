@@ -4,8 +4,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "serialize.h"
-#include "streams.h"
 #include "hash.h"
+#include "streams.h"
 #include "test/test_bitcoin.h"
 
 #include <stdint.h>
@@ -92,20 +92,25 @@ Python code to generate the below hashes:
     def dsha256(x):
         return hashlib.sha256(hashlib.sha256(x).digest()).digest()
 
-    reversed_hex(dsha256(''.join(struct.pack('<f', x) for x in range(0,1000)))) == '8e8b4cf3e4df8b332057e3e23af42ebc663b61e0495d5e7e32d85099d7f3fe0c'
-    reversed_hex(dsha256(''.join(struct.pack('<d', x) for x in range(0,1000)))) == '43d0c82591953c4eafe114590d392676a01585d25b25d433557f0d7878b23f96'
+    reversed_hex(dsha256(''.join(struct.pack('<f', x) for x in range(0,1000)))) ==
+'8e8b4cf3e4df8b332057e3e23af42ebc663b61e0495d5e7e32d85099d7f3fe0c'
+    reversed_hex(dsha256(''.join(struct.pack('<d', x) for x in range(0,1000)))) ==
+'43d0c82591953c4eafe114590d392676a01585d25b25d433557f0d7878b23f96'
 */
 BOOST_AUTO_TEST_CASE(floats)
 {
     CDataStream ss(SER_DISK, 0);
     // encode
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 1000; i++)
+    {
         ss << float(i);
     }
-    BOOST_CHECK(Hash(ss.begin(), ss.end()) == uint256S("8e8b4cf3e4df8b332057e3e23af42ebc663b61e0495d5e7e32d85099d7f3fe0c"));
+    BOOST_CHECK(
+        Hash(ss.begin(), ss.end()) == uint256S("8e8b4cf3e4df8b332057e3e23af42ebc663b61e0495d5e7e32d85099d7f3fe0c"));
 
     // decode
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 1000; i++)
+    {
         float j;
         ss >> j;
         BOOST_CHECK_MESSAGE(i == j, "decoded:" << j << " expected:" << i);
@@ -116,13 +121,16 @@ BOOST_AUTO_TEST_CASE(doubles)
 {
     CDataStream ss(SER_DISK, 0);
     // encode
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 1000; i++)
+    {
         ss << double(i);
     }
-    BOOST_CHECK(Hash(ss.begin(), ss.end()) == uint256S("43d0c82591953c4eafe114590d392676a01585d25b25d433557f0d7878b23f96"));
+    BOOST_CHECK(
+        Hash(ss.begin(), ss.end()) == uint256S("43d0c82591953c4eafe114590d392676a01585d25b25d433557f0d7878b23f96"));
 
     // decode
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 1000; i++)
+    {
         double j;
         ss >> j;
         BOOST_CHECK_MESSAGE(i == j, "decoded:" << j << " expected:" << i);
@@ -135,26 +143,30 @@ BOOST_AUTO_TEST_CASE(varints)
 
     CDataStream ss(SER_DISK, 0);
     CDataStream::size_type size = 0;
-    for (int i = 0; i < 100000; i++) {
+    for (int i = 0; i < 100000; i++)
+    {
         ss << VARINT(i);
         size += ::GetSerializeSize(VARINT(i), 0, 0);
         BOOST_CHECK(size == ss.size());
     }
 
-    for (uint64_t i = 0;  i < 100000000000ULL; i += 999999937) {
+    for (uint64_t i = 0; i < 100000000000ULL; i += 999999937)
+    {
         ss << VARINT(i);
         size += ::GetSerializeSize(VARINT(i), 0, 0);
         BOOST_CHECK(size == ss.size());
     }
 
     // decode
-    for (int i = 0; i < 100000; i++) {
+    for (int i = 0; i < 100000; i++)
+    {
         int j = -1;
         ss >> VARINT(j);
         BOOST_CHECK_MESSAGE(i == j, "decoded:" << j << " expected:" << i);
     }
 
-    for (uint64_t i = 0;  i < 100000000000ULL; i += 999999937) {
+    for (uint64_t i = 0; i < 100000000000ULL; i += 999999937)
+    {
         uint64_t j = -1;
         ss >> VARINT(j);
         BOOST_CHECK_MESSAGE(i == j, "decoded:" << j << " expected:" << i);
@@ -168,26 +180,26 @@ BOOST_AUTO_TEST_CASE(compactsize)
 
     for (i = 1; i <= MAX_SIZE; i *= 2)
     {
-        WriteCompactSize(ss, i-1);
+        WriteCompactSize(ss, i - 1);
         WriteCompactSize(ss, i);
     }
     for (i = 1; i <= MAX_SIZE; i *= 2)
     {
         j = ReadCompactSize(ss);
-        BOOST_CHECK_MESSAGE((i-1) == j, "decoded:" << j << " expected:" << (i-1));
+        BOOST_CHECK_MESSAGE((i - 1) == j, "decoded:" << j << " expected:" << (i - 1));
         j = ReadCompactSize(ss);
         BOOST_CHECK_MESSAGE(i == j, "decoded:" << j << " expected:" << i);
     }
 }
 
-static bool isCanonicalException(const std::ios_base::failure& ex)
+static bool isCanonicalException(const std::ios_base::failure &ex)
 {
     std::ios_base::failure expectedException("non-canonical ReadCompactSize()");
 
     // The string returned by what() can be different for different platforms.
     // Instead of directly comparing the ex.what() with an expected string,
-    // create an instance of exception to see if ex.what() matches 
-    // the expected explanatory string returned by the exception instance. 
+    // create an instance of exception to see if ex.what() matches
+    // the expected explanatory string returned by the exception instance.
     return strcmp(expectedException.what(), ex.what()) == 0;
 }
 
@@ -251,7 +263,7 @@ BOOST_AUTO_TEST_CASE(insert_delete)
     BOOST_CHECK_EQUAL(ss[4], (char)0xff);
     BOOST_CHECK_EQUAL(ss[5], c);
 
-    ss.insert(ss.begin()+2, c);
+    ss.insert(ss.begin() + 2, c);
     BOOST_CHECK_EQUAL(ss.size(), 7);
     BOOST_CHECK_EQUAL(ss[2], c);
 
@@ -260,11 +272,11 @@ BOOST_AUTO_TEST_CASE(insert_delete)
     BOOST_CHECK_EQUAL(ss.size(), 6);
     BOOST_CHECK_EQUAL(ss[0], 0);
 
-    ss.erase(ss.begin()+ss.size()-1);
+    ss.erase(ss.begin() + ss.size() - 1);
     BOOST_CHECK_EQUAL(ss.size(), 5);
     BOOST_CHECK_EQUAL(ss[4], (char)0xff);
 
-    ss.erase(ss.begin()+1);
+    ss.erase(ss.begin() + 1);
     BOOST_CHECK_EQUAL(ss.size(), 4);
     BOOST_CHECK_EQUAL(ss[0], 0);
     BOOST_CHECK_EQUAL(ss[1], 1);

@@ -4,8 +4,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "hash.h"
-#include "utilstrencodings.h"
 #include "test/test_bitcoin.h"
+#include "utilstrencodings.h"
 
 #include <vector>
 
@@ -17,7 +17,6 @@ BOOST_FIXTURE_TEST_SUITE(hash_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(murmurhash3)
 {
-
 #define T(expected, seed, data) BOOST_CHECK_EQUAL(MurmurHash3(seed, ParseHex(data)), expected)
 
     // Test MurmurHash3 with various inputs. Of course this is retested in the
