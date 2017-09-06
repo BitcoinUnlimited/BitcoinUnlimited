@@ -154,6 +154,10 @@ CCriticalSection cs_orphancache;
 map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs_orphancache);
 map<uint256, set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs_orphancache);
 
+CTweak<uint32_t> netMagic("net.magic",
+    "network prefix override. If 0 use the default",
+    0);
+
 CTweakRef<uint64_t> ebTweak("net.excessiveBlock",
     "Excessive block size in bytes",
     &excessiveBlockSize,

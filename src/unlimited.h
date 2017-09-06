@@ -93,6 +93,8 @@ extern CTweak<uint64_t> checkScriptDays;
 // Allow getblocktemplate to succeed even if this node chain tip blocks are old or this node is not connected
 extern CTweak<bool> unsafeGetBlockTemplate;
 
+extern CTweak<uint32_t> netMagic;
+
 // print out a configuration warning during initialization
 // bool InitWarning(const std::string &str);
 
