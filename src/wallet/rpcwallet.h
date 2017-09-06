@@ -9,4 +9,4 @@ class CRPCTable;
 
 void RegisterWalletRPCCommands(CRPCTable &tableRPC);
 
-#endif //BITCOIN_WALLET_RPCWALLET_H
+#endif // BITCOIN_WALLET_RPCWALLET_H

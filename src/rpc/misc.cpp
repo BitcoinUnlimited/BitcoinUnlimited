@@ -40,7 +40,7 @@ using namespace std;
  *
  * Or alternatively, create a specific query method for the information.
  **/
-UniValue getinfo(const UniValue& params, bool fHelp)
+UniValue getinfo(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -58,18 +58,22 @@ UniValue getinfo(const UniValue& params, bool fHelp)
             "  \"proxy\": \"host:port\",     (string, optional) the proxy used by the server\n"
             "  \"difficulty\": xxxxxx,       (numeric) the current difficulty\n"
             "  \"testnet\": true|false,      (boolean) if the server is using testnet or not\n"
-            "  \"keypoololdest\": xxxxxx,    (numeric) the timestamp (seconds since GMT epoch) of the oldest pre-generated key in the key pool\n"
+            "  \"keypoololdest\": xxxxxx,    (numeric) the timestamp (seconds since GMT epoch) of the oldest "
+            "pre-generated key in the key pool\n"
             "  \"keypoolsize\": xxxx,        (numeric) how many new keys are pre-generated\n"
-            "  \"unlocked_until\": ttt,      (numeric) the timestamp in seconds since epoch (midnight Jan 1 1970 GMT) that the wallet is unlocked for transfers, or 0 if the wallet is locked\n"
-            "  \"paytxfee\": x.xxxx,         (numeric) the transaction fee set in " + CURRENCY_UNIT + "/kB\n"
-            "  \"relayfee\": x.xxxx,         (numeric) minimum relay fee for non-free transactions in " + CURRENCY_UNIT + "/kB\n"
-            "  \"fork\": \"...\"             (string) \"Bitcoin Cash\" or \"Bitcoin\".  Will display as Bitcoin pre-fork.\n"
-            "  \"errors\": \"...\"           (string) any error messages\n"
-            "}\n"
-            "\nExamples:\n"
-            + HelpExampleCli("getinfo", "")
-            + HelpExampleRpc("getinfo", "")
-        );
+            "  \"unlocked_until\": ttt,      (numeric) the timestamp in seconds since epoch (midnight Jan 1 1970 GMT) "
+            "that the wallet is unlocked for transfers, or 0 if the wallet is locked\n"
+            "  \"paytxfee\": x.xxxx,         (numeric) the transaction fee set in " +
+            CURRENCY_UNIT +
+            "/kB\n"
+            "  \"relayfee\": x.xxxx,         (numeric) minimum relay fee for non-free transactions in " +
+            CURRENCY_UNIT + "/kB\n"
+                            "  \"fork\": \"...\"             (string) \"Bitcoin Cash\" or \"Bitcoin\".  Will display "
+                            "as Bitcoin pre-fork.\n"
+                            "  \"errors\": \"...\"           (string) any error messages\n"
+                            "}\n"
+                            "\nExamples:\n" +
+            HelpExampleCli("getinfo", "") + HelpExampleRpc("getinfo", ""));
 
 #ifdef ENABLE_WALLET
     LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);
@@ -84,31 +88,34 @@ UniValue getinfo(const UniValue& params, bool fHelp)
     obj.push_back(Pair("version", CLIENT_VERSION));
     obj.push_back(Pair("protocolversion", PROTOCOL_VERSION));
 #ifdef ENABLE_WALLET
-    if (pwalletMain) {
+    if (pwalletMain)
+    {
         obj.push_back(Pair("walletversion", pwalletMain->GetVersion()));
-        obj.push_back(Pair("balance",       ValueFromAmount(pwalletMain->GetBalance())));
+        obj.push_back(Pair("balance", ValueFromAmount(pwalletMain->GetBalance())));
     }
 #endif
-    obj.push_back(Pair("blocks",        (int)chainActive.Height()));
-    obj.push_back(Pair("timeoffset",    GetTimeOffset()));
-    obj.push_back(Pair("connections",   (int)vNodes.size()));
-    obj.push_back(Pair("proxy",         (proxy.IsValid() ? proxy.proxy.ToStringIPPort() : string())));
-    obj.push_back(Pair("difficulty",    (double)GetDifficulty()));
-    obj.push_back(Pair("testnet",       Params().TestnetToBeDeprecatedFieldRPC()));
+    obj.push_back(Pair("blocks", (int)chainActive.Height()));
+    obj.push_back(Pair("timeoffset", GetTimeOffset()));
+    obj.push_back(Pair("connections", (int)vNodes.size()));
+    obj.push_back(Pair("proxy", (proxy.IsValid() ? proxy.proxy.ToStringIPPort() : string())));
+    obj.push_back(Pair("difficulty", (double)GetDifficulty()));
+    obj.push_back(Pair("testnet", Params().TestnetToBeDeprecatedFieldRPC()));
 #ifdef ENABLE_WALLET
-    if (pwalletMain) {
+    if (pwalletMain)
+    {
         obj.push_back(Pair("keypoololdest", pwalletMain->GetOldestKeyPoolTime()));
-        obj.push_back(Pair("keypoolsize",   (int)pwalletMain->GetKeyPoolSize()));
+        obj.push_back(Pair("keypoolsize", (int)pwalletMain->GetKeyPoolSize()));
     }
     if (pwalletMain && pwalletMain->IsCrypted())
         obj.push_back(Pair("unlocked_until", nWalletUnlockTime));
-    obj.push_back(Pair("paytxfee",      ValueFromAmount(payTxFee.GetFeePerK())));
+    obj.push_back(Pair("paytxfee", ValueFromAmount(payTxFee.GetFeePerK())));
 #endif
-    obj.push_back(Pair("relayfee",      ValueFromAmount(::minRelayTxFee.GetFeePerK())));
-    obj.push_back(Pair("errors",        GetWarnings("statusbar")));
+    obj.push_back(Pair("relayfee", ValueFromAmount(::minRelayTxFee.GetFeePerK())));
+    obj.push_back(Pair("errors", GetWarnings("statusbar")));
     CBlockIndex *cashFork = chainActive.Tip();
-    if (cashFork) cashFork = cashFork->GetAncestor(BITCOIN_CASH_FORK_HEIGHT);
-    std::string fork="Bitcoin";
+    if (cashFork)
+        cashFork = cashFork->GetAncestor(BITCOIN_CASH_FORK_HEIGHT);
+    std::string fork = "Bitcoin";
     if (cashFork && cashFork->phashBlock)
     {
         if (*cashFork->phashBlock == bitcoinCashForkBlockHash)
@@ -126,23 +133,26 @@ class DescribeAddressVisitor : public boost::static_visitor<UniValue>
 {
 public:
     UniValue operator()(const CNoDestination &dest) const { return UniValue(UniValue::VOBJ); }
-
-    UniValue operator()(const CKeyID &keyID) const {
+    UniValue operator()(const CKeyID &keyID) const
+    {
         UniValue obj(UniValue::VOBJ);
         CPubKey vchPubKey;
         obj.push_back(Pair("isscript", false));
-        if (pwalletMain && pwalletMain->GetPubKey(keyID, vchPubKey)) {
+        if (pwalletMain && pwalletMain->GetPubKey(keyID, vchPubKey))
+        {
             obj.push_back(Pair("pubkey", HexStr(vchPubKey)));
             obj.push_back(Pair("iscompressed", vchPubKey.IsCompressed()));
         }
         return obj;
     }
 
-    UniValue operator()(const CScriptID &scriptID) const {
+    UniValue operator()(const CScriptID &scriptID) const
+    {
         UniValue obj(UniValue::VOBJ);
         CScript subscript;
         obj.push_back(Pair("isscript", true));
-        if (pwalletMain && pwalletMain->GetCScript(scriptID, subscript)) {
+        if (pwalletMain && pwalletMain->GetCScript(scriptID, subscript))
+        {
             std::vector<CTxDestination> addresses;
             txnouttype whichType;
             int nRequired;
@@ -150,7 +160,7 @@ public:
             obj.push_back(Pair("script", GetTxnOutputType(whichType)));
             obj.push_back(Pair("hex", HexStr(subscript.begin(), subscript.end())));
             UniValue a(UniValue::VARR);
-            BOOST_FOREACH(const CTxDestination& addr, addresses)
+            BOOST_FOREACH (const CTxDestination &addr, addresses)
                 a.push_back(CBitcoinAddress(addr).ToString());
             obj.push_back(Pair("addresses", a));
             if (whichType == TX_MULTISIG)
@@ -161,7 +171,7 @@ public:
 };
 #endif
 
-UniValue validateaddress(const UniValue& params, bool fHelp)
+UniValue validateaddress(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
         throw runtime_error(
@@ -171,7 +181,8 @@ UniValue validateaddress(const UniValue& params, bool fHelp)
             "1. \"bitcoinaddress\"     (string, required) The bitcoin address to validate\n"
             "\nResult:\n"
             "{\n"
-            "  \"isvalid\" : true|false,       (boolean) If the address is valid or not. If not, this is the only property returned.\n"
+            "  \"isvalid\" : true|false,       (boolean) If the address is valid or not. If not, this is the only "
+            "property returned.\n"
             "  \"address\" : \"bitcoinaddress\", (string) The bitcoin address validated\n"
             "  \"scriptPubKey\" : \"hex\",       (string) The hex encoded scriptPubKey generated by the address\n"
             "  \"ismine\" : true|false,        (boolean) If the address is yours or not\n"
@@ -179,12 +190,12 @@ UniValue validateaddress(const UniValue& params, bool fHelp)
             "  \"isscript\" : true|false,      (boolean) If the key is a script\n"
             "  \"pubkey\" : \"publickeyhex\",    (string) The hex value of the raw public key\n"
             "  \"iscompressed\" : true|false,  (boolean) If the address is compressed\n"
-            "  \"account\" : \"account\"         (string) DEPRECATED. The account associated with the address, \"\" is the default account\n"
+            "  \"account\" : \"account\"         (string) DEPRECATED. The account associated with the address, \"\" is "
+            "the default account\n"
             "}\n"
-            "\nExamples:\n"
-            + HelpExampleCli("validateaddress", "\"1PSSGeFHDnKNxiEyFrD1wcEaHr9hrQDDWc\"")
-            + HelpExampleRpc("validateaddress", "\"1PSSGeFHDnKNxiEyFrD1wcEaHr9hrQDDWc\"")
-        );
+            "\nExamples:\n" +
+            HelpExampleCli("validateaddress", "\"1PSSGeFHDnKNxiEyFrD1wcEaHr9hrQDDWc\"") +
+            HelpExampleRpc("validateaddress", "\"1PSSGeFHDnKNxiEyFrD1wcEaHr9hrQDDWc\""));
 
 #ifdef ENABLE_WALLET
     LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);
@@ -209,7 +220,7 @@ UniValue validateaddress(const UniValue& params, bool fHelp)
 #ifdef ENABLE_WALLET
         isminetype mine = pwalletMain ? IsMine(*pwalletMain, dest, chainActive.Tip()) : ISMINE_NO;
         ret.push_back(Pair("ismine", (mine & ISMINE_SPENDABLE) ? true : false));
-        ret.push_back(Pair("iswatchonly", (mine & ISMINE_WATCH_ONLY) ? true: false));
+        ret.push_back(Pair("iswatchonly", (mine & ISMINE_WATCH_ONLY) ? true : false));
         UniValue detail = boost::apply_visitor(DescribeAddressVisitor(), dest);
         ret.pushKVs(detail);
         if (pwalletMain && pwalletMain->mapAddressBook.count(dest))
@@ -222,25 +233,26 @@ UniValue validateaddress(const UniValue& params, bool fHelp)
 /**
  * Used by addmultisigaddress / createmultisig:
  */
-CScript _createmultisig_redeemScript(const UniValue& params)
+CScript _createmultisig_redeemScript(const UniValue &params)
 {
     int nRequired = params[0].get_int();
-    const UniValue& keys = params[1].get_array();
+    const UniValue &keys = params[1].get_array();
 
     // Gather public keys
     if (nRequired < 1)
         throw runtime_error("a multisignature address must require at least one key to redeem");
     if ((int)keys.size() < nRequired)
-        throw runtime_error(
-            strprintf("not enough keys supplied "
-                      "(got %u keys, but need at least %d to redeem)", keys.size(), nRequired));
+        throw runtime_error(strprintf("not enough keys supplied "
+                                      "(got %u keys, but need at least %d to redeem)",
+            keys.size(), nRequired));
     if (keys.size() > 16)
-        throw runtime_error("Number of addresses involved in the multisignature address creation > 16\nReduce the number");
+        throw runtime_error(
+            "Number of addresses involved in the multisignature address creation > 16\nReduce the number");
     std::vector<CPubKey> pubkeys;
     pubkeys.resize(keys.size());
     for (unsigned int i = 0; i < keys.size(); i++)
     {
-        const std::string& ks = keys[i].get_str();
+        const std::string &ks = keys[i].get_str();
 #ifdef ENABLE_WALLET
         // Case 1: Bitcoin address and we have full public key:
         CBitcoinAddress address(ks);
@@ -248,52 +260,52 @@ CScript _createmultisig_redeemScript(const UniValue& params)
         {
             CKeyID keyID;
             if (!address.GetKeyID(keyID))
-                throw runtime_error(
-                    strprintf("%s does not refer to a key",ks));
+                throw runtime_error(strprintf("%s does not refer to a key", ks));
             CPubKey vchPubKey;
             if (!pwalletMain->GetPubKey(keyID, vchPubKey))
-                throw runtime_error(
-                    strprintf("no full public key for address %s",ks));
+                throw runtime_error(strprintf("no full public key for address %s", ks));
             if (!vchPubKey.IsFullyValid())
-                throw runtime_error(" Invalid public key: "+ks);
+                throw runtime_error(" Invalid public key: " + ks);
             pubkeys[i] = vchPubKey;
         }
 
         // Case 2: hex public key
         else
 #endif
-        if (IsHex(ks))
+            if (IsHex(ks))
         {
             CPubKey vchPubKey(ParseHex(ks));
             if (!vchPubKey.IsFullyValid())
-                throw runtime_error(" Invalid public key: "+ks);
+                throw runtime_error(" Invalid public key: " + ks);
             pubkeys[i] = vchPubKey;
         }
         else
         {
-            throw runtime_error(" Invalid public key: "+ks);
+            throw runtime_error(" Invalid public key: " + ks);
         }
     }
     CScript result = GetScriptForMultisig(nRequired, pubkeys);
 
     if (result.size() > MAX_SCRIPT_ELEMENT_SIZE)
         throw runtime_error(
-                strprintf("redeemScript exceeds size limit: %d > %d", result.size(), MAX_SCRIPT_ELEMENT_SIZE));
+            strprintf("redeemScript exceeds size limit: %d > %d", result.size(), MAX_SCRIPT_ELEMENT_SIZE));
 
     return result;
 }
 
-UniValue createmultisig(const UniValue& params, bool fHelp)
+UniValue createmultisig(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 2)
     {
-        string msg = "createmultisig nrequired [\"key\",...]\n"
+        string msg =
+            "createmultisig nrequired [\"key\",...]\n"
             "\nCreates a multi-signature address with n signature of m keys required.\n"
             "It returns a json object with the address and redeemScript.\n"
 
             "\nArguments:\n"
             "1. nrequired      (numeric, required) The number of required signatures out of the n keys or addresses.\n"
-            "2. \"keys\"       (string, required) A json array of keys which are bitcoin addresses or hex-encoded public keys\n"
+            "2. \"keys\"       (string, required) A json array of keys which are bitcoin addresses or hex-encoded "
+            "public keys\n"
             "     [\n"
             "       \"key\"    (string) bitcoin address or hex-encoded public key\n"
             "       ,...\n"
@@ -306,11 +318,12 @@ UniValue createmultisig(const UniValue& params, bool fHelp)
             "}\n"
 
             "\nExamples:\n"
-            "\nCreate a multisig address from 2 addresses\n"
-            + HelpExampleCli("createmultisig", "2 \"[\\\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\\\",\\\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\\\"]\"") +
-            "\nAs a json rpc call\n"
-            + HelpExampleRpc("createmultisig", "2, \"[\\\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\\\",\\\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\\\"]\"")
-        ;
+            "\nCreate a multisig address from 2 addresses\n" +
+            HelpExampleCli("createmultisig",
+                "2 \"[\\\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\\\",\\\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\\\"]\"") +
+            "\nAs a json rpc call\n" +
+            HelpExampleRpc("createmultisig",
+                "2, \"[\\\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\\\",\\\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\\\"]\"");
         throw runtime_error(msg);
     }
 
@@ -326,7 +339,7 @@ UniValue createmultisig(const UniValue& params, bool fHelp)
     return result;
 }
 
-UniValue verifymessage(const UniValue& params, bool fHelp)
+UniValue verifymessage(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 3)
         throw runtime_error(
@@ -334,26 +347,25 @@ UniValue verifymessage(const UniValue& params, bool fHelp)
             "\nVerify a signed message\n"
             "\nArguments:\n"
             "1. \"bitcoinaddress\"  (string, required) The bitcoin address to use for the signature.\n"
-            "2. \"signature\"       (string, required) The signature provided by the signer in base 64 encoding (see signmessage).\n"
+            "2. \"signature\"       (string, required) The signature provided by the signer in base 64 encoding (see "
+            "signmessage).\n"
             "3. \"message\"         (string, required) The message that was signed.\n"
             "\nResult:\n"
             "true|false   (boolean) If the signature is verified or not.\n"
             "\nExamples:\n"
-            "\nUnlock the wallet for 30 seconds\n"
-            + HelpExampleCli("walletpassphrase", "\"mypassphrase\" 30") +
-            "\nCreate the signature\n"
-            + HelpExampleCli("signmessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\" \"my message\"") +
-            "\nVerify the signature\n"
-            + HelpExampleCli("verifymessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\" \"signature\" \"my message\"") +
-            "\nAs json rpc\n"
-            + HelpExampleRpc("verifymessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\", \"signature\", \"my message\"")
-        );
+            "\nUnlock the wallet for 30 seconds\n" +
+            HelpExampleCli("walletpassphrase", "\"mypassphrase\" 30") + "\nCreate the signature\n" +
+            HelpExampleCli("signmessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\" \"my message\"") +
+            "\nVerify the signature\n" +
+            HelpExampleCli("verifymessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\" \"signature\" \"my message\"") +
+            "\nAs json rpc\n" +
+            HelpExampleRpc("verifymessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\", \"signature\", \"my message\""));
 
     LOCK(cs_main);
 
-    string strAddress  = params[0].get_str();
-    string strSign     = params[1].get_str();
-    string strMessage  = params[2].get_str();
+    string strAddress = params[0].get_str();
+    string strSign = params[1].get_str();
+    string strMessage = params[2].get_str();
 
     CBitcoinAddress addr(strAddress);
     if (!addr.IsValid())
@@ -380,16 +392,14 @@ UniValue verifymessage(const UniValue& params, bool fHelp)
     return (pubkey.GetID() == keyID);
 }
 
-UniValue setmocktime(const UniValue& params, bool fHelp)
+UniValue setmocktime(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
-        throw runtime_error(
-            "setmocktime timestamp\n"
-            "\nSet the local time to given timestamp (-regtest only)\n"
-            "\nArguments:\n"
-            "1. timestamp  (integer, required) Unix seconds-since-epoch timestamp\n"
-            "   Pass 0 to go back to using the system time."
-        );
+        throw runtime_error("setmocktime timestamp\n"
+                            "\nSet the local time to given timestamp (-regtest only)\n"
+                            "\nArguments:\n"
+                            "1. timestamp  (integer, required) Unix seconds-since-epoch timestamp\n"
+                            "   Pass 0 to go back to using the system time.");
 
     if (!Params().MineBlocksOnDemand())
         throw runtime_error("setmocktime for regression testing (-regtest mode) only");
@@ -404,23 +414,23 @@ UniValue setmocktime(const UniValue& params, bool fHelp)
     SetMockTime(params[0].get_int64());
 
     uint64_t t = GetTime();
-    BOOST_FOREACH(CNode* pnode, vNodes) {
+    BOOST_FOREACH (CNode *pnode, vNodes)
+    {
         pnode->nLastSend = pnode->nLastRecv = t;
     }
 
     return NullUniValue;
 }
 
-static const CRPCCommand commands[] =
-{ //  category              name                      actor (function)         okSafeMode
-  //  --------------------- ------------------------  -----------------------  ----------
-    { "control",            "getinfo",                &getinfo,                true  }, /* uses wallet if enabled */
-    { "util",               "validateaddress",        &validateaddress,        true  }, /* uses wallet if enabled */
-    { "util",               "createmultisig",         &createmultisig,         true  },
-    { "util",               "verifymessage",          &verifymessage,          true  },
+static const CRPCCommand commands[] = {
+    //  category              name                      actor (function)         okSafeMode
+    //  --------------------- ------------------------  -----------------------  ----------
+    {"control", "getinfo", &getinfo, true}, /* uses wallet if enabled */
+    {"util", "validateaddress", &validateaddress, true}, /* uses wallet if enabled */
+    {"util", "createmultisig", &createmultisig, true}, {"util", "verifymessage", &verifymessage, true},
 
     /* Not shown in help */
-    { "hidden",             "setmocktime",            &setmocktime,            true  },
+    {"hidden", "setmocktime", &setmocktime, true},
 };
 
 void RegisterMiscRPCCommands(CRPCTable &tableRPC)

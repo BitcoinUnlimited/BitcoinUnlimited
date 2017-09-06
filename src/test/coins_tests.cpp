@@ -4,14 +4,14 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "coins.h"
-#include "random.h"
-#include "uint256.h"
-#include "test/test_bitcoin.h"
-#include "main.h"
 #include "consensus/validation.h"
+#include "main.h"
+#include "random.h"
+#include "test/test_bitcoin.h"
+#include "uint256.h"
 
-#include <vector>
 #include <map>
+#include <vector>
 
 #include <boost/test/unit_test.hpp>
 
@@ -23,35 +23,39 @@ class CCoinsViewTest : public CCoinsView
     std::map<uint256, CCoins> map_;
 
 public:
-    bool GetCoins(const uint256& txid, CCoins& coins) const
+    bool GetCoins(const uint256 &txid, CCoins &coins) const
     {
         std::map<uint256, CCoins>::const_iterator it = map_.find(txid);
-        if (it == map_.end()) {
+        if (it == map_.end())
+        {
             return false;
         }
         coins = it->second;
-        if (coins.IsPruned() && insecure_rand() % 2 == 0) {
+        if (coins.IsPruned() && insecure_rand() % 2 == 0)
+        {
             // Randomly return false in case of an empty entry.
             return false;
         }
         return true;
     }
 
-    bool HaveCoins(const uint256& txid) const
+    bool HaveCoins(const uint256 &txid) const
     {
         CCoins coins;
         return GetCoins(txid, coins);
     }
 
     uint256 GetBestBlock() const { return hashBestBlock_; }
-
-    bool BatchWrite(CCoinsMap& mapCoins, const uint256& hashBlock, size_t &nChildCachedCoinsUsage)
+    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock, size_t &nChildCachedCoinsUsage)
     {
-        for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end(); ) {
-            if (it->second.flags & CCoinsCacheEntry::DIRTY) {
+        for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();)
+        {
+            if (it->second.flags & CCoinsCacheEntry::DIRTY)
+            {
                 // Same optimization used in CCoinsViewDB is to only write dirty entries.
                 map_[it->first] = it->second.coins;
-                if (it->second.coins.IsPruned() && insecure_rand() % 3 == 0) {
+                if (it->second.coins.IsPruned() && insecure_rand() % 3 == 0)
+                {
                     // Randomly delete empty entries on write.
                     map_.erase(it->first);
                 }
@@ -66,26 +70,24 @@ public:
         return true;
     }
 
-    bool GetStats(CCoinsStats& stats) const { return false; }
+    bool GetStats(CCoinsStats &stats) const { return false; }
 };
 
 class CCoinsViewCacheTest : public CCoinsViewCache
 {
 public:
-    CCoinsViewCacheTest(CCoinsView* base) : CCoinsViewCache(base) {}
-
+    CCoinsViewCacheTest(CCoinsView *base) : CCoinsViewCache(base) {}
     void SelfTest() const
     {
         // Manually recompute the dynamic usage of the whole data, and compare it.
         size_t ret = memusage::DynamicUsage(cacheCoins);
-        for (CCoinsMap::iterator it = cacheCoins.begin(); it != cacheCoins.end(); it++) {
+        for (CCoinsMap::iterator it = cacheCoins.begin(); it != cacheCoins.end(); it++)
+        {
             ret += it->second.coins.DynamicMemoryUsage();
         }
         BOOST_CHECK_EQUAL(DynamicMemoryUsage(), ret);
     }
-
 };
-
 }
 
 BOOST_FIXTURE_TEST_SUITE(coins_tests, BasicTestingSetup)
@@ -117,34 +119,42 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
 
     // The cache stack.
     CCoinsViewTest base; // A CCoinsViewTest at the bottom.
-    std::vector<CCoinsViewCacheTest*> stack; // A stack of CCoinsViewCaches on top.
+    std::vector<CCoinsViewCacheTest *> stack; // A stack of CCoinsViewCaches on top.
     stack.push_back(new CCoinsViewCacheTest(&base)); // Start with one cache.
 
     // Use a limited set of random transaction ids, so we do test overwriting entries.
     std::vector<uint256> txids;
     txids.resize(NUM_SIMULATION_ITERATIONS / 8);
-    for (unsigned int i = 0; i < txids.size(); i++) {
+    for (unsigned int i = 0; i < txids.size(); i++)
+    {
         txids[i] = GetRandHash();
     }
 
-    for (unsigned int i = 0; i < NUM_SIMULATION_ITERATIONS; i++) {
+    for (unsigned int i = 0; i < NUM_SIMULATION_ITERATIONS; i++)
+    {
         // Do a random modification.
         {
             uint256 txid = txids[insecure_rand() % txids.size()]; // txid we're going to modify in this iteration.
-            CCoins& coins = result[txid];
+            CCoins &coins = result[txid];
             CCoinsModifier entry = stack.back()->ModifyCoins(txid);
             BOOST_CHECK(coins == *entry);
-            if (insecure_rand() % 5 == 0 || coins.IsPruned()) {
-                if (coins.IsPruned()) {
+            if (insecure_rand() % 5 == 0 || coins.IsPruned())
+            {
+                if (coins.IsPruned())
+                {
                     added_an_entry = true;
-                } else {
+                }
+                else
+                {
                     updated_an_entry = true;
                 }
                 coins.nVersion = insecure_rand();
                 coins.vout.resize(1);
                 coins.vout[0].nValue = insecure_rand();
                 *entry = coins;
-            } else {
+            }
+            else
+            {
                 coins.Clear();
                 entry->Clear();
                 removed_an_entry = true;
@@ -152,43 +162,57 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
         }
 
         // Once every 1000 iterations and at the end, verify the full cache.
-        if (insecure_rand() % 1000 == 1 || i == NUM_SIMULATION_ITERATIONS - 1) {
-            for (std::map<uint256, CCoins>::iterator it = result.begin(); it != result.end(); it++) {
-                const CCoins* coins = stack.back()->AccessCoins(it->first);
-                if (coins) {
+        if (insecure_rand() % 1000 == 1 || i == NUM_SIMULATION_ITERATIONS - 1)
+        {
+            for (std::map<uint256, CCoins>::iterator it = result.begin(); it != result.end(); it++)
+            {
+                const CCoins *coins = stack.back()->AccessCoins(it->first);
+                if (coins)
+                {
                     BOOST_CHECK(*coins == it->second);
                     found_an_entry = true;
-                } else {
+                }
+                else
+                {
                     BOOST_CHECK(it->second.IsPruned());
                     missed_an_entry = true;
                 }
             }
-            BOOST_FOREACH(const CCoinsViewCacheTest *test, stack) {
+            BOOST_FOREACH (const CCoinsViewCacheTest *test, stack)
+            {
                 test->SelfTest();
             }
         }
 
-        if (insecure_rand() % 100 == 0) {
+        if (insecure_rand() % 100 == 0)
+        {
             // Every 100 iterations, flush an intermediate cache
-            if (stack.size() > 1 && insecure_rand() % 2 == 0) {
+            if (stack.size() > 1 && insecure_rand() % 2 == 0)
+            {
                 unsigned int flushIndex = insecure_rand() % (stack.size() - 1);
                 stack[flushIndex]->Flush();
             }
         }
-        if (insecure_rand() % 100 == 0) {
+        if (insecure_rand() % 100 == 0)
+        {
             // Every 100 iterations, change the cache stack.
-            if (stack.size() > 0 && insecure_rand() % 2 == 0) {
-                //Remove the top cache
+            if (stack.size() > 0 && insecure_rand() % 2 == 0)
+            {
+                // Remove the top cache
                 stack.back()->Flush();
                 delete stack.back();
                 stack.pop_back();
             }
-            if (stack.size() == 0 || (stack.size() < 4 && insecure_rand() % 2)) {
-                //Add a new cache
-                CCoinsView* tip = &base;
-                if (stack.size() > 0) {
+            if (stack.size() == 0 || (stack.size() < 4 && insecure_rand() % 2))
+            {
+                // Add a new cache
+                CCoinsView *tip = &base;
+                if (stack.size() > 0)
+                {
                     tip = stack.back();
-                } else {
+                }
+                else
+                {
                     removed_all_caches = true;
                 }
 
@@ -200,7 +224,8 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
     }
 
     // Clean up the stack.
-    while (stack.size() > 0) {
+    while (stack.size() > 0)
+    {
         delete stack.back();
         stack.pop_back();
     }
@@ -228,7 +253,7 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
 
     // The cache stack.
     CCoinsViewTest base; // A CCoinsViewTest at the bottom.
-    std::vector<CCoinsViewCacheTest*> stack; // A stack of CCoinsViewCaches on top.
+    std::vector<CCoinsViewCacheTest *> stack; // A stack of CCoinsViewCaches on top.
     stack.push_back(new CCoinsViewCacheTest(&base)); // Start with one cache.
 
     // Track the txids we've used and whether they have been spent or not
@@ -236,38 +261,45 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
     std::set<uint256> alltxids;
     std::set<uint256> duplicateids;
 
-    for (unsigned int i = 0; i < NUM_SIMULATION_ITERATIONS; i++) {
+    for (unsigned int i = 0; i < NUM_SIMULATION_ITERATIONS; i++)
+    {
         {
             CMutableTransaction tx;
             tx.vin.resize(1);
             tx.vout.resize(1);
-            tx.vout[0].nValue = i; //Keep txs unique unless intended to duplicate
+            tx.vout[0].nValue = i; // Keep txs unique unless intended to duplicate
             unsigned int height = insecure_rand();
 
             // 1/10 times create a coinbase
-            if (insecure_rand() % 10 == 0 || coinbaseids.size() < 10) {
+            if (insecure_rand() % 10 == 0 || coinbaseids.size() < 10)
+            {
                 // 1/100 times create a duplicate coinbase
-                if (insecure_rand() % 10 == 0 && coinbaseids.size()) {
+                if (insecure_rand() % 10 == 0 && coinbaseids.size())
+                {
                     std::map<uint256, CAmount>::iterator coinbaseIt = coinbaseids.lower_bound(GetRandHash());
-                    if (coinbaseIt == coinbaseids.end()) {
+                    if (coinbaseIt == coinbaseids.end())
+                    {
                         coinbaseIt = coinbaseids.begin();
                     }
-                    //Use same random value to have same hash and be a true duplicate
+                    // Use same random value to have same hash and be a true duplicate
                     tx.vout[0].nValue = coinbaseIt->second;
                     assert(tx.GetHash() == coinbaseIt->first);
                     duplicateids.insert(coinbaseIt->first);
                 }
-                else {
+                else
+                {
                     coinbaseids[tx.GetHash()] = tx.vout[0].nValue;
                 }
                 assert(CTransaction(tx).IsCoinBase());
             }
             // 9/10 times create a regular tx
-            else {
+            else
+            {
                 uint256 prevouthash;
                 // equally likely to spend coinbase or non coinbase
                 std::set<uint256>::iterator txIt = alltxids.lower_bound(GetRandHash());
-                if (txIt == alltxids.end()) {
+                if (txIt == alltxids.end())
+                {
                     txIt = alltxids.begin();
                 }
                 prevouthash = *txIt;
@@ -277,7 +309,7 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
                 tx.vin[0].prevout.n = 0;
 
                 // Update the expected result of prevouthash to know these coins are spent
-                CCoins& oldcoins = result[prevouthash];
+                CCoins &oldcoins = result[prevouthash];
                 oldcoins.Clear();
 
                 // It is of particular importance here that once we spend a coinbase tx hash
@@ -306,43 +338,55 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
         }
 
         // Once every 1000 iterations and at the end, verify the full cache.
-        if (insecure_rand() % 1000 == 1 || i == NUM_SIMULATION_ITERATIONS - 1) {
-            for (std::map<uint256, CCoins>::iterator it = result.begin(); it != result.end(); it++) {
-                const CCoins* coins = stack.back()->AccessCoins(it->first);
-                if (coins) {
+        if (insecure_rand() % 1000 == 1 || i == NUM_SIMULATION_ITERATIONS - 1)
+        {
+            for (std::map<uint256, CCoins>::iterator it = result.begin(); it != result.end(); it++)
+            {
+                const CCoins *coins = stack.back()->AccessCoins(it->first);
+                if (coins)
+                {
                     BOOST_CHECK(*coins == it->second);
-                } else {
+                }
+                else
+                {
                     BOOST_CHECK(it->second.IsPruned());
                 }
             }
         }
 
-        if (insecure_rand() % 100 == 0) {
+        if (insecure_rand() % 100 == 0)
+        {
             // Every 100 iterations, flush an intermediate cache
-            if (stack.size() > 1 && insecure_rand() % 2 == 0) {
+            if (stack.size() > 1 && insecure_rand() % 2 == 0)
+            {
                 unsigned int flushIndex = insecure_rand() % (stack.size() - 1);
                 stack[flushIndex]->Flush();
             }
         }
-        if (insecure_rand() % 100 == 0) {
+        if (insecure_rand() % 100 == 0)
+        {
             // Every 100 iterations, change the cache stack.
-            if (stack.size() > 0 && insecure_rand() % 2 == 0) {
+            if (stack.size() > 0 && insecure_rand() % 2 == 0)
+            {
                 stack.back()->Flush();
                 delete stack.back();
                 stack.pop_back();
             }
-            if (stack.size() == 0 || (stack.size() < 4 && insecure_rand() % 2)) {
-                CCoinsView* tip = &base;
-                if (stack.size() > 0) {
+            if (stack.size() == 0 || (stack.size() < 4 && insecure_rand() % 2))
+            {
+                CCoinsView *tip = &base;
+                if (stack.size() > 0)
+                {
                     tip = stack.back();
                 }
                 stack.push_back(new CCoinsViewCacheTest(tip));
-           }
+            }
         }
     }
 
     // Clean up the stack.
-    while (stack.size() > 0) {
+    while (stack.size() > 0)
+    {
         delete stack.back();
         stack.pop_back();
     }

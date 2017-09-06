@@ -10,7 +10,8 @@
 
 #include <boost/filesystem.hpp>
 
-boost::filesystem::path GetTempPath() {
+boost::filesystem::path GetTempPath()
+{
 #if BOOST_FILESYSTEM_VERSION == 3
     return boost::filesystem::temp_directory_path();
 #else
@@ -24,7 +25,8 @@ boost::filesystem::path GetTempPath() {
 #else
     path = boost::filesystem::path("/tmp");
 #endif
-    if (path.empty() || !boost::filesystem::is_directory(path)) {
+    if (path.empty() || !boost::filesystem::is_directory(path))
+    {
         LogPrintf("GetTempPath(): failed to find temp path\n");
         return boost::filesystem::path("");
     }

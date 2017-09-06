@@ -24,7 +24,7 @@ class uint256;
 //! -dbcache default (MiB)
 static const int64_t nDefaultDbCache = 500;
 //! max. -dbcache in (MiB)
-static const int64_t nMaxDbCache = sizeof(void*) > 4 ? 16384 : 2048;
+static const int64_t nMaxDbCache = sizeof(void *) > 4 ? 16384 : 2048;
 //! min. -dbcache in (MiB)
 static const int64_t nMinDbCache = 4;
 //! max increase in cache size since the last time we did a full flush
@@ -52,11 +52,15 @@ class CBlockTreeDB : public CDBWrapper
 {
 public:
     CBlockTreeDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
+
 private:
-    CBlockTreeDB(const CBlockTreeDB&);
-    void operator=(const CBlockTreeDB&);
+    CBlockTreeDB(const CBlockTreeDB &);
+    void operator=(const CBlockTreeDB &);
+
 public:
-    bool WriteBatchSync(const std::vector<std::pair<int, const CBlockFileInfo*> >& fileInfo, int nLastFile, const std::vector<const CBlockIndex*>& blockinfo);
+    bool WriteBatchSync(const std::vector<std::pair<int, const CBlockFileInfo *> > &fileInfo,
+        int nLastFile,
+        const std::vector<const CBlockIndex *> &blockinfo);
     bool ReadBlockFileInfo(int nFile, CBlockFileInfo &fileinfo);
     bool ReadLastBlockFile(int &nFile);
     bool WriteReindexing(bool fReindex);
