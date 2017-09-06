@@ -37,6 +37,8 @@
 #include "stat.h"
 #include "unlimited.h"
 
+extern CTweak<uint32_t> netMagic;
+static CMessageHeader::MessageStartChars netOverride;
 class CAddrMan;
 class CScheduler;
 class CSubNet;
@@ -572,6 +574,14 @@ public:
 
     const CMessageHeader::MessageStartChars &GetMagic(const CChainParams &params) const
     {
+        if (netMagic.Value() != 0)
+        {
+            netOverride[0] = netMagic.Value() & 255;
+            netOverride[1] = (netMagic.Value() >> 8) & 255;
+            netOverride[2] = (netMagic.Value() >> 16) & 255;
+            netOverride[3] = (netMagic.Value() >> 24) & 255;
+            return netOverride;
+        }
         return params.CashMessageStart();
     }
 
