@@ -39,12 +39,21 @@ class CBloomFilter;
 class CChainParams;
 class CInv;
 class CScriptCheck;
+class CScriptCheckAndAnalyze;
 class CTxMemPool;
 class CValidationInterface;
 class CValidationState;
 
 struct CNodeStateStats;
 struct LockPoints;
+
+enum FlushStateMode
+{
+    FLUSH_STATE_NONE,
+    FLUSH_STATE_IF_NEEDED,
+    FLUSH_STATE_PERIODIC,
+    FLUSH_STATE_ALWAYS
+};
 
 /** Default for DEFAULT_WHITELISTRELAY. */
 static const bool DEFAULT_WHITELISTRELAY = true;
@@ -113,7 +122,11 @@ static const int64_t BLOCK_DOWNLOAD_TIMEOUT_BASE = 1000000;
 /** Additional block download timeout per parallel downloading peer (i.e. 5 min) */
 static const int64_t BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 500000;
 /** Timeout in secs for the initial sync. If we don't receive the first batch of headers */
-static const uint32_t INITIAL_HEADERS_TIMEOUT = 30;
+static const uint32_t INITIAL_HEADERS_TIMEOUT = 120;
+/** The maximum number of headers in the mapUnconnectedHeaders cache **/
+static const uint32_t MAX_UNCONNECTED_HEADERS = 144;
+/** The maximum length of time, in seconds, we keep unconnected headers in the cache **/
+static const uint32_t UNCONNECTED_HEADERS_TIMEOUT = 120;
 
 static const unsigned int DEFAULT_LIMITFREERELAY = 15;
 static const bool DEFAULT_RELAYPRIORITY = true;
@@ -124,7 +137,6 @@ static const bool DEFAULT_PERMIT_BAREMULTISIG = true;
 static const unsigned int DEFAULT_BYTES_PER_SIGOP = 20;
 static const bool DEFAULT_CHECKPOINTS_ENABLED = true;
 static const bool DEFAULT_TXINDEX = false;
-static const unsigned int DEFAULT_BANSCORE_THRESHOLD = 100;
 
 static const bool DEFAULT_TESTSAFEMODE = false;
 
@@ -150,7 +162,6 @@ extern CWaitableCriticalSection csBestBlock;
 extern CConditionVariable cvBlockChange;
 extern bool fImporting;
 extern bool fReindex;
-extern int nScriptCheckThreads;
 extern bool fTxIndex;
 extern bool fIsBareMultisigStd;
 extern bool fRequireStandard;
@@ -316,10 +327,9 @@ void UnlinkPrunedFiles(std::set<int> &setFilesToPrune);
 CBlockIndex *InsertBlockIndex(uint256 hash);
 /** Get statistics from node state */
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats);
-/** Increase a node's misbehavior score. */
-void Misbehaving(NodeId nodeid, int howmuch);
 /** Flush all state, indexes and buffers to disk. */
 void FlushStateToDisk();
+bool FlushStateToDisk(CValidationState &state, FlushStateMode mode);
 /** Prune block files and flush state to disk. */
 void PruneAndFlush();
 
@@ -402,7 +412,9 @@ bool CheckInputs(const CTransaction &tx,
     unsigned int flags,
     bool cacheStore,
     ValidationResourceTracker *resourceTracker,
-    std::vector<CScriptCheck> *pvChecks = NULL);
+    std::vector<CScriptCheck> *pvChecks = NULL,
+    unsigned char *sighashType = NULL);
+
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
 void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache &inputs, int nHeight);
@@ -648,6 +660,8 @@ static const unsigned int REJECT_HIGHFEE = 0x100;
 static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 /** Transaction conflicts with a transaction already known */
 static const unsigned int REJECT_CONFLICT = 0x102;
+/** Transaction cannot be committed on my fork */
+static const unsigned int REJECT_WRONG_FORK = 0x103;
 
 struct COrphanTx
 {
@@ -663,6 +677,8 @@ extern std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED
 
 void EraseOrphanTx(uint256 hash) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache);
 // BU: end
+
+CBlockIndex *FindMostWorkChain();
 
 // BU cleaning up at destuction time creates many global variable dependencies.  Instead clean up in a function called
 // in main()

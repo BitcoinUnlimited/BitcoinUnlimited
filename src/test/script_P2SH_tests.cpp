@@ -43,7 +43,7 @@ Verify(const CScript& scriptSig, const CScript& scriptPubKey, bool fStrict, Scri
     txTo.vin[0].scriptSig = scriptSig;
     txTo.vout[0].nValue = 1;
 
-    return VerifyScript(scriptSig, scriptPubKey, fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE, MutableTransactionSignatureChecker(&txTo, 0), &err);
+    return VerifyScript(scriptSig, scriptPubKey, fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE, MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue), &err);
 }
 
 
@@ -99,7 +99,9 @@ BOOST_AUTO_TEST_CASE(sign)
         txTo[i].vin[0].prevout.n = i;
         txTo[i].vin[0].prevout.hash = txFrom.GetHash();
         txTo[i].vout[0].nValue = 1;
-        BOOST_CHECK_MESSAGE(IsMine(keystore, txFrom.vout[i].scriptPubKey), strprintf("IsMine %d", i));
+#ifdef ENABLE_WALLET
+        BOOST_CHECK_MESSAGE(IsMine(keystore, txFrom.vout[i].scriptPubKey, 0), strprintf("IsMine %d", i));
+#endif
     }
     for (int i = 0; i < 8; i++)
     {
@@ -112,7 +114,11 @@ BOOST_AUTO_TEST_CASE(sign)
         {
             CScript sigSave = txTo[i].vin[0].scriptSig;
             txTo[i].vin[0].scriptSig = txTo[j].vin[0].scriptSig;
+#ifdef BITCOIN_CASH
+            bool sigOK = CScriptCheck(NULL, CCoins(txFrom, 0), txTo[i], 0, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID, false)();
+#else
             bool sigOK = CScriptCheck(NULL, CCoins(txFrom, 0), txTo[i], 0, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC, false)();
+#endif
             if (i == j)
                 BOOST_CHECK_MESSAGE(sigOK, strprintf("VerifySignature %d %d", i, j));
             else
@@ -194,7 +200,9 @@ BOOST_AUTO_TEST_CASE(set)
         txTo[i].vin[0].prevout.hash = txFrom.GetHash();
         txTo[i].vout[0].nValue = 1*CENT;
         txTo[i].vout[0].scriptPubKey = inner[i];
-        BOOST_CHECK_MESSAGE(IsMine(keystore, txFrom.vout[i].scriptPubKey), strprintf("IsMine %d", i));
+#ifdef ENABLE_WALLET
+        BOOST_CHECK_MESSAGE(IsMine(keystore, txFrom.vout[i].scriptPubKey, 0), strprintf("IsMine %d", i));
+#endif
     }
     for (int i = 0; i < 4; i++)
     {

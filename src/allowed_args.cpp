@@ -7,13 +7,15 @@
 
 #include "allowed_args.h"
 #include "chainparams.h"
+#include "dosman.h"
 #include "httpserver.h"
 #include "init.h"
 #include "main.h"
 #include "miner.h"
-#include "net.h"
+#include "netbase.h"
 #include "policy/policy.h"
 #include "qt/guiconstants.h"
+#include "requestManager.h"
 #include "script/sigcache.h"
 #include "tinyformat.h"
 #include "torcontrol.h"
@@ -61,6 +63,7 @@ std::string HelpMessageOpt(const std::string &option, const std::string &message
            FormatParagraph(message, screenWidth - msgIndent, msgIndent) + std::string("\n\n");
 }
 
+AllowedArgs::AllowedArgs(bool permit_unrecognized) : m_permit_unrecognized(permit_unrecognized) {}
 AllowedArgs &AllowedArgs::addHeader(const std::string &strHeader, bool debug)
 {
     m_helpList.push_back(HelpComponent{strHeader + "\n\n", debug});
@@ -117,7 +120,11 @@ AllowedArgs &AllowedArgs::addArg(const std::string &strArgsDefinition,
 void AllowedArgs::checkArg(const std::string &strArg, const std::string &strValue) const
 {
     if (!m_args.count(strArg))
+    {
+        if (m_permit_unrecognized)
+            return;
         throw std::runtime_error(strprintf(_("unrecognized option '%s'"), strArg));
+    }
 
     if (!m_args.at(strArg)(strValue))
         throw std::runtime_error(strprintf(_("invalid value '%s' for option '%s'"), strValue, strArg));
@@ -247,7 +254,7 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addArg("mempoolexpiry=<n>", requiredInt,
             strprintf(_("Do not keep transactions in the mempool longer than <n> hours (default: %u)"),
                     DEFAULT_MEMPOOL_EXPIRY))
-        .addArg("ophanpoolexpiry=<n>", requiredInt,
+        .addArg("orphanpoolexpiry=<n>", requiredInt,
             strprintf(_("Do not keep transactions in the orphanpool longer than <n> hours (default: %u)"),
                     DEFAULT_ORPHANPOOL_EXPIRY))
         .addArg("par=<n>", requiredInt, strprintf(_("Set the number of script verification threads (%u to %d, 0 = "
@@ -282,6 +289,9 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
             _("Bind to given address and always listen on it. Use [host]:port notation for IPv6"))
         .addArg("bitnodes", optionalBool,
             _("Query for peer addresses via Bitnodes API, if low on addresses (default: 1 unless -connect)"))
+        .addArg("blkretryinterval", requiredInt,
+            strprintf(_("Time to wait before requesting a block from a different peer, in microseconds (default: %u)"),
+                    DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL))
         .addArg("connect=<ip>", optionalStr, _("Connect only to the specified node(s)"))
         .addArg("connect-thinblock=<ip:port>", requiredStr,
             _("Connect to a thinblock node(s). Blocks will only be downloaded from a thinblock peer.  If no "
@@ -341,6 +351,9 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
         .addArg("torcontrol=<ip>:<port>", requiredStr,
             strprintf(_("Tor control port to use if onion listening enabled (default: %s)"), DEFAULT_TOR_CONTROL))
         .addArg("torpassword=<pass>", requiredStr, _("Tor control port password (default: empty)"))
+        .addArg("txretryinterval", requiredInt,
+            strprintf(_("Time to wait before requesting a tx from a different peer, in microseconds (default: %u)"),
+                    DEFAULT_MIN_TX_REQUEST_RETRY_INTERVAL))
 #ifdef USE_UPNP
 #if USE_UPNP
         .addArg("upnp", optionalBool, _("Use UPnP to map the listening port (default: 1 when listening and no -proxy)"))
@@ -460,6 +473,7 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addDebugArg("testsafemode", optionalBool, strprintf("Force safe mode (default: %u)", DEFAULT_TESTSAFEMODE))
         .addDebugArg("dropmessagestest=<n>", requiredInt, "Randomly drop 1 of every <n> network messages")
         .addDebugArg("fuzzmessagestest=<n>", requiredInt, "Randomly fuzz 1 of every <n> network messages")
+        .addDebugArg("pvtest", optionalBool, strprintf("Slow down input checking to 1 every second (default: %u)", DEFAULT_PV_TESTMODE))
 #ifdef ENABLE_WALLET
         .addDebugArg("flushwallet", optionalBool,
             strprintf("Run a thread to flush wallet periodically (default: %u)", DEFAULT_FLUSHWALLET))
@@ -649,6 +663,10 @@ static void addTweaks(AllowedArgs &allowedArgs, CTweakMap *pTweaks)
 
         if (dynamic_cast<CTweak<CAmount> *>(tweak))
             allowedArgs.addArg(optName + "=<amt>", requiredAmount, tweak->GetHelp());
+        else if (dynamic_cast<CTweakRef<CAmount> *>(tweak))
+            allowedArgs.addArg(optName + "=<amt>", requiredAmount, tweak->GetHelp());
+        else if (dynamic_cast<CTweak<std::string> *>(tweak))
+            allowedArgs.addArg(optName + "=<str>", requiredStr, tweak->GetHelp());
         else if (dynamic_cast<CTweakRef<std::string> *>(tweak))
             allowedArgs.addArg(optName + "=<str>", requiredStr, tweak->GetHelp());
         else
@@ -675,7 +693,8 @@ static void addAllNodeOptions(AllowedArgs &allowedArgs, HelpMessageMode mode, CT
         addUiOptions(allowedArgs);
 }
 
-BitcoinCli::BitcoinCli()
+// bitcoin-cli does not know about tweaks so we have to silently ignore unknown options
+BitcoinCli::BitcoinCli() : AllowedArgs(true)
 {
     addHelpOptions(*this);
     addChainSelectionOptions(*this);
@@ -696,9 +715,9 @@ BitcoinCli::BitcoinCli()
                                          "(recommended for sensitive information such as passphrases)"));
 }
 
-Bitcoind::Bitcoind(CTweakMap *pTweaks) { addAllNodeOptions(*this, HMM_BITCOIND, pTweaks); }
-BitcoinQt::BitcoinQt(CTweakMap *pTweaks) { addAllNodeOptions(*this, HMM_BITCOIN_QT, pTweaks); }
-BitcoinTx::BitcoinTx()
+Bitcoind::Bitcoind(CTweakMap *pTweaks) : AllowedArgs(false) { addAllNodeOptions(*this, HMM_BITCOIND, pTweaks); }
+BitcoinQt::BitcoinQt(CTweakMap *pTweaks) : AllowedArgs(false) { addAllNodeOptions(*this, HMM_BITCOIN_QT, pTweaks); }
+BitcoinTx::BitcoinTx() : AllowedArgs(false)
 {
     addHelpOptions(*this);
     addChainSelectionOptions(*this);
@@ -710,7 +729,7 @@ BitcoinTx::BitcoinTx()
         .addDebugArg("", optionalBool, "Read hex-encoded bitcoin transaction from stdin.");
 }
 
-ConfigFile::ConfigFile(CTweakMap *pTweaks)
+ConfigFile::ConfigFile(CTweakMap *pTweaks) : AllowedArgs(false)
 {
     // Merges all allowed args from BitcoinCli, Bitcoind, and BitcoinQt.
     // Excludes args from BitcoinTx, because bitcoin-tx does not read

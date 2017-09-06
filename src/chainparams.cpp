@@ -108,6 +108,10 @@ public:
         pchMessageStart[1] = 0xbe;
         pchMessageStart[2] = 0xb4;
         pchMessageStart[3] = 0xd9;
+        pchCashMessageStart[0] = 0xe3;
+        pchCashMessageStart[1] = 0xe1;
+        pchCashMessageStart[2] = 0xf3;
+        pchCashMessageStart[3] = 0xe8;
         nDefaultPort = DEFAULT_MAINNET_PORT;
         nPruneAfterHeight = 100000;
 
@@ -116,7 +120,16 @@ public:
         assert(consensus.hashGenesisBlock == uint256S("0x000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"));
         assert(genesis.hashMerkleRoot == uint256S("0x4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"));
 
-        // BITCOINUNLIMITED START
+#ifdef BITCOIN_CASH
+        // List of Bitcoin Cash compatible seeders
+        vSeeds.push_back(CDNSSeedData("bitcoinunlimited.info", "btccash-seeder.bitcoinunlimited.info", true));
+        vSeeds.push_back(CDNSSeedData("bitcoinabc.org", "seed.bitcoinabc.org", true));
+        vSeeds.push_back(CDNSSeedData("bitcoinforks.org", "seed-abc.bitcoinforks.org", true));
+        vSeeds.push_back(CDNSSeedData("bitprim.org", "seed.bitprim.org", true)); // Bitprim
+        vSeeds.push_back(CDNSSeedData("deadalnix.me", "seed.deadalnix.me", true)); // Amaury SÉCHET
+
+#else
+        // List of BitcoinUnlimited seeders
         vSeeds.push_back(CDNSSeedData("bitcoinunlimited.info", "seed.bitcoinunlimited.info", true)); // BU seeder
         vSeeds.push_back(CDNSSeedData("bitnodes.io", "seed.bitnodes.io"));      // Bitnodes (Addy Yeow)
         vSeeds.push_back(CDNSSeedData("bitcoin.sipa.be", "seed.bitcoin.sipa.be", true)); // Pieter Wuille, only supports x1, x5, x9, and xd
@@ -124,7 +137,7 @@ public:
         vSeeds.push_back(CDNSSeedData("dashjr.org", "dnsseed.bitcoin.dashjr.org")); // Luke Dashjr
         vSeeds.push_back(CDNSSeedData("bitcoinstats.com", "seed.bitcoinstats.com", true)); // Christian Decker, supports x1 - xf
         vSeeds.push_back(CDNSSeedData("bitcoin.jonasschnelli.ch", "seed.bitcoin.jonasschnelli.ch", true)); // Jonas Schnelli, only supports x1, x5, x9, and xd
-        // BITCOINUNLIMITED END
+#endif
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,0);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);
@@ -269,6 +282,10 @@ public:
         pchMessageStart[1] = 0x11;
         pchMessageStart[2] = 0x09;
         pchMessageStart[3] = 0x07;
+        pchCashMessageStart[0] = 0xf4;
+        pchCashMessageStart[1] = 0xe5;
+        pchCashMessageStart[2] = 0xf3;
+        pchCashMessageStart[3] = 0xf4;
         nDefaultPort = DEFAULT_TESTNET_PORT;
         nPruneAfterHeight = 1000;
 
@@ -342,6 +359,10 @@ public:
         pchMessageStart[1] = 0xbf;
         pchMessageStart[2] = 0xb5;
         pchMessageStart[3] = 0xda;
+        pchCashMessageStart[0] = 0xda;
+        pchCashMessageStart[1] = 0xb5;
+        pchCashMessageStart[2] = 0xbf;
+        pchCashMessageStart[3] = 0xfa;
         nDefaultPort = DEFAULT_REGTESTNET_PORT;
         nPruneAfterHeight = 1000;
 

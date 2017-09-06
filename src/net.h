@@ -8,6 +8,7 @@
 #define BITCOIN_NET_H
 
 #include "bloom.h"
+#include "chainparams.h"
 #include "compat.h"
 #include "limitedmap.h"
 #include "netbase.h"
@@ -18,6 +19,7 @@
 #include "sync.h"
 #include "uint256.h"
 
+#include <atomic>
 #include <deque>
 #include <stdint.h>
 
@@ -29,11 +31,13 @@
 #include <boost/foreach.hpp>
 #include <boost/signals2/signal.hpp>
 
+#include "banentry.h"
 #include "stat.h"
 #include "unlimited.h"
 
 class CAddrMan;
 class CScheduler;
+class CSubNet;
 class CNode;
 class CNodeRef;
 
@@ -74,9 +78,11 @@ static const size_t SETASKFOR_MAX_SZ = 2 * MAX_INV_SZ;
 /** The maximum number of peer connections to maintain. */
 static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
 /** BU: The maximum numer of outbound peer connections */
-static const unsigned int DEFAULT_MAX_OUTBOUND_CONNECTIONS = 8;
+static const unsigned int DEFAULT_MAX_OUTBOUND_CONNECTIONS = 12;
 /** BU: The minimum number of xthin nodes to connect */
-static const uint8_t MIN_XTHIN_NODES = 4;
+static const uint8_t MIN_XTHIN_NODES = 8;
+/** BU: The minimum number of BitcoinCash nodes to connect */
+static const uint8_t MIN_BITCOIN_CASH_NODES = 4;
 /** BU: The daily maximum disconnects while searching for xthin nodes to connect */
 static const unsigned int MAX_DISCONNECTS = 200;
 /** The default for -maxuploadtarget. 0 = Unlimited */
@@ -92,15 +98,10 @@ static const bool DEFAULT_FORCEDNSSEED = false;
 static const size_t DEFAULT_MAXRECEIVEBUFFER = 5 * 1000;
 static const size_t DEFAULT_MAXSENDBUFFER = 1 * 1000;
 
-// NOTE: When adjusting this, update rpcnet:setban's help ("24h")
-static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24; // Default 24-hour ban
-
-
 unsigned int ReceiveFloodSize();
 unsigned int SendBufferSize();
 
 void AddOneShot(const std::string &strDest);
-void AddressCurrentlyConnected(const CService &addr);
 CNodeRef FindNodeRef(const std::string &addrName);
 int DisconnectSubNetNodes(const CSubNet &subNet);
 bool OpenNetworkConnection(const CAddress &addrConnect,
@@ -188,6 +189,8 @@ extern CAddrMan addrman;
 extern int nMaxConnections;
 /** The minimum number of xthin nodes to connect to */
 extern int nMinXthinNodes;
+/** The minimum number of BitcoinCash nodes to connect to */
+extern int nMinBitcoinCashNodes;
 extern std::vector<CNode *> vNodes;
 extern CCriticalSection cs_vNodes;
 extern std::map<CInv, CDataStream> mapRelay;
@@ -277,60 +280,6 @@ public:
 };
 
 
-typedef enum BanReason { BanReasonUnknown = 0, BanReasonNodeMisbehaving = 1, BanReasonManuallyAdded = 2 } BanReason;
-
-class CBanEntry
-{
-public:
-    static const int CURRENT_VERSION = 1;
-    int nVersion;
-    int64_t nCreateTime;
-    int64_t nBanUntil;
-    uint8_t banReason;
-
-    CBanEntry() { SetNull(); }
-    CBanEntry(int64_t nCreateTimeIn)
-    {
-        SetNull();
-        nCreateTime = nCreateTimeIn;
-    }
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action, int nType, int nVersion)
-    {
-        READWRITE(this->nVersion);
-        nVersion = this->nVersion;
-        READWRITE(nCreateTime);
-        READWRITE(nBanUntil);
-        READWRITE(banReason);
-    }
-
-    void SetNull()
-    {
-        nVersion = CBanEntry::CURRENT_VERSION;
-        nCreateTime = 0;
-        nBanUntil = 0;
-        banReason = BanReasonUnknown;
-    }
-
-    std::string banReasonToString()
-    {
-        switch (banReason)
-        {
-        case BanReasonNodeMisbehaving:
-            return "node misbehaving";
-        case BanReasonManuallyAdded:
-            return "manually added";
-        default:
-            return "unknown";
-        }
-    }
-};
-
-typedef std::map<CSubNet, CBanEntry> banmap_t;
-
 // BU cleaning up nodes as a global destructor creates many global destruction dependencies.  Instead use a function
 // call.
 #if 0
@@ -415,13 +364,21 @@ public:
     CBloomFilter *pfilter;
     // BU - Xtreme Thinblocks: a bloom filter which is separate from the one used by SPV wallets
     CBloomFilter *pThinBlockFilter;
-    int nRefCount;
+    std::atomic<int> nRefCount;
     NodeId id;
+
+    //! Accumulated misbehaviour score for this peer.
+    std::atomic<int> nMisbehavior;
+    //! Whether this peer should be disconnected and banned (unless whitelisted).
+    bool fShouldBan;
+    //! Whether we have a fully established connection.
+    bool fCurrentlyConnected;
 
     // BUIP010 Xtreme Thinblocks: begin section
     CBlock thinBlock;
     std::vector<uint256> thinBlockHashes;
     std::vector<uint64_t> xThinBlockHashes;
+    std::map<uint64_t, CTransaction> mapMissingTx;
     uint64_t nLocalThinBlockBytes; // the bytes used in creating this thinblock, updated dynamically
     int nSizeThinBlock; // Original on-wire size of the block. Just used for reporting
     int thinBlockWaitingForTxns; // if -1 then not currently waiting
@@ -436,17 +393,6 @@ public:
     unsigned short addrFromPort;
 
 protected:
-    // Denial-of-service detection/prevention
-    // Key is IP address, value is banned-until-time
-    static banmap_t setBanned;
-    static CCriticalSection cs_setBanned;
-    static bool setBannedIsDirty;
-
-    // Whitelisted ranges. Any node connecting from these is automatically
-    // whitelisted (as well as those connecting to whitelisted binds).
-    static std::vector<CSubNet> vWhitelistedRange;
-    static CCriticalSection cs_vWhitelistedRange;
-
     // Basic fuzz-testing
     void Fuzz(int nChance); // modifies ssSend
 
@@ -510,6 +456,8 @@ public:
 
 
     CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
+    // Whether the node uses the bitcoin cash magic to communicate.
+    std::atomic<bool> fUsesCashMagic;
     ~CNode();
 
 private:
@@ -556,6 +504,11 @@ public:
             msg.SetVersion(nVersionIn);
     }
 
+    const CMessageHeader::MessageStartChars &GetMagic(const CChainParams &params) const
+    {
+        return fUsesCashMagic ? params.CashMessageStart() : params.MessageStart();
+    }
+
     CNode *AddRef()
     {
         nRefCount++;
@@ -567,6 +520,14 @@ public:
     bool ThinBlockCapable()
     {
         if (nServices & NODE_XTHIN)
+            return true;
+        return false;
+    }
+
+    // BUIP055:
+    bool BitcoinCashCapable()
+    {
+        if (nServices & NODE_BITCOIN_CASH)
             return true;
         return false;
     }
@@ -825,6 +786,11 @@ public:
         }
     }
 
+    /**
+     * Check if it is flagged for banning, and if so ban it and disconnect.
+     */
+    void DisconnectIfBanned();
+
     void CloseSocketDisconnect();
 
     //! returns the name of this node for logging.  Respects the user's choice to not log the node's IP
@@ -837,47 +803,7 @@ public:
     }
 
 
-    // Denial-of-service detection/prevention
-    // The idea is to detect peers that are behaving
-    // badly and disconnect/ban them, but do it in a
-    // one-coding-mistake-won't-shatter-the-entire-network
-    // way.
-    // IMPORTANT:  There should be nothing I can give a
-    // node that it will forward on that will make that
-    // node's peers drop it. If there is, an attacker
-    // can isolate a node and/or try to split the network.
-    // Dropping a node for sending stuff that is invalid
-    // now but might be valid in a later version is also
-    // dangerous, because it can cause a network split
-    // between nodes running old code and nodes running
-    // new code.
-    static void ClearBanned(); // needed for unit testing
-    static bool IsBanned(CNetAddr ip);
-    static bool IsBanned(CSubNet subnet);
-    static void Ban(const CNetAddr &ip,
-        const BanReason &banReason,
-        int64_t bantimeoffset = 0,
-        bool sinceUnixEpoch = false);
-    static void Ban(const CSubNet &subNet,
-        const BanReason &banReason,
-        int64_t bantimeoffset = 0,
-        bool sinceUnixEpoch = false);
-    static bool Unban(const CNetAddr &ip);
-    static bool Unban(const CSubNet &ip);
-    static void GetBanned(banmap_t &banmap);
-    static void SetBanned(const banmap_t &banmap);
-
-    //! check is the banlist has unwritten changes
-    static bool BannedSetIsDirty();
-    //! set the "dirty" flag for the banlist
-    static void SetBannedSetDirty(bool dirty = true);
-    //! clean unused entries (if bantime has expired)
-    static void SweepBanned();
-
     void copyStats(CNodeStats &stats);
-
-    static bool IsWhitelistedRange(const CNetAddr &ip);
-    static void AddWhitelistedRange(const CSubNet &subnet);
 
     // Network stats
     static void RecordBytesRecv(uint64_t bytes);
@@ -914,19 +840,17 @@ class CNodeRef
     void AddRef()
     {
         if (_pnode)
-        {
-            LOCK(cs_vNodes);
             _pnode->AddRef();
-        }
     }
 
     void Release()
     {
         if (_pnode)
         {
-            LOCK(cs_vNodes);
-            _pnode->Release();
+            // Make the noderef null before releasing, to ensure a user can't get freed memory from us
+            CNode *tmp = _pnode;
             _pnode = nullptr;
+            tmp->Release();
         }
     }
 
@@ -953,6 +877,8 @@ private:
     CNode *_pnode;
 };
 
+typedef std::vector<CNodeRef> VNodeRefs;
+
 class CTransaction;
 void RelayTransaction(const CTransaction &tx);
 void RelayTransaction(const CTransaction &tx, const CDataStream &ss);
@@ -969,19 +895,6 @@ public:
     bool Read(CAddrMan &addr);
     bool Read(CAddrMan &addr, CDataStream &ssPeers);
 };
-
-/** Access to the banlist database (banlist.dat) */
-class CBanDB
-{
-private:
-    boost::filesystem::path pathBanlist;
-
-public:
-    CBanDB();
-    bool Write(const banmap_t &banSet);
-    bool Read(banmap_t &banSet);
-};
-
 
 /** Return a timestamp in the future (in microseconds) for exponentially distributed events. */
 int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds);

@@ -16,7 +16,7 @@
 #include "connmgr.h"
 #include "consensus/consensus.h"
 #include "crypto/common.h"
-#include "crypto/common.h"
+#include "dosman.h"
 #include "hash.h"
 #include "primitives/transaction.h"
 #include "requestManager.h"
@@ -97,6 +97,7 @@ static std::vector<ListenSocket> vhListenSocket;
 extern CAddrMan addrman;
 int nMaxConnections = DEFAULT_MAX_PEER_CONNECTIONS;
 int nMinXthinNodes = MIN_XTHIN_NODES;
+int nMinBitcoinCashNodes = MIN_BITCOIN_CASH_NODES;
 
 bool fAddressesInitialized = false;
 std::string strSubVersion;
@@ -125,9 +126,6 @@ extern CCriticalSection cs_vUseDNSSeeds;
 extern CSemaphore *semOutbound;
 extern CSemaphore *semOutboundAddNode; // BU: separate semaphore for -addnodes
 boost::condition_variable messageHandlerCondition;
-
-// BU Parallel validation
-extern CSemaphore *semPV; // semaphore for parallel validation threads
 
 // BU  Connection Slot mitigation - used to determine how many connection attempts over time
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
@@ -330,7 +328,6 @@ bool IsReachable(const CNetAddr &addr)
     return IsReachable(net);
 }
 
-void AddressCurrentlyConnected(const CService &addr) { addrman.Connected(addr); }
 // BU moved to globals.cpp
 // uint64_t CNode::nTotalBytesRecv = 0;
 // uint64_t CNode::nTotalBytesSent = 0;
@@ -492,164 +489,6 @@ void CNode::PushVersion()
 }
 
 
-banmap_t CNode::setBanned;
-// CCriticalSection CNode::cs_setBanned;
-bool CNode::setBannedIsDirty;
-
-void CNode::ClearBanned()
-{
-    LOCK(cs_setBanned);
-    setBanned.clear();
-    setBannedIsDirty = true;
-    uiInterface.BannedListChanged();
-}
-
-bool CNode::IsBanned(CNetAddr ip)
-{
-    bool fResult = false;
-    {
-        LOCK(cs_setBanned);
-        for (banmap_t::iterator it = setBanned.begin(); it != setBanned.end(); it++)
-        {
-            CSubNet subNet = (*it).first;
-            CBanEntry banEntry = (*it).second;
-
-            if (subNet.Match(ip) && GetTime() < banEntry.nBanUntil)
-                fResult = true;
-        }
-    }
-    return fResult;
-}
-
-bool CNode::IsBanned(CSubNet subnet)
-{
-    bool fResult = false;
-    {
-        LOCK(cs_setBanned);
-        banmap_t::iterator i = setBanned.find(subnet);
-        if (i != setBanned.end())
-        {
-            CBanEntry banEntry = (*i).second;
-            if (GetTime() < banEntry.nBanUntil)
-                fResult = true;
-        }
-    }
-    return fResult;
-}
-
-void CNode::Ban(const CNetAddr &addr, const BanReason &banReason, int64_t bantimeoffset, bool sinceUnixEpoch)
-{
-    CSubNet subNet(addr);
-    Ban(subNet, banReason, bantimeoffset, sinceUnixEpoch);
-}
-
-void CNode::Ban(const CSubNet &subNet, const BanReason &banReason, int64_t bantimeoffset, bool sinceUnixEpoch)
-{
-    CBanEntry banEntry(GetTime());
-    banEntry.banReason = banReason;
-    if (bantimeoffset <= 0)
-    {
-        bantimeoffset = GetArg("-bantime", DEFAULT_MISBEHAVING_BANTIME);
-        sinceUnixEpoch = false;
-    }
-    banEntry.nBanUntil = (sinceUnixEpoch ? 0 : GetTime()) + bantimeoffset;
-
-    LOCK(cs_setBanned);
-    if (setBanned[subNet].nBanUntil < banEntry.nBanUntil)
-        setBanned[subNet] = banEntry;
-
-    setBannedIsDirty = true;
-    uiInterface.BannedListChanged();
-}
-
-bool CNode::Unban(const CNetAddr &addr)
-{
-    CSubNet subNet(addr);
-    return Unban(subNet);
-}
-
-bool CNode::Unban(const CSubNet &subNet)
-{
-    LOCK(cs_setBanned);
-    if (setBanned.erase(subNet))
-    {
-        setBannedIsDirty = true;
-
-        SweepBanned();
-        uiInterface.BannedListChanged();
-        return true;
-    }
-    return false;
-}
-
-void CNode::GetBanned(banmap_t &banMap)
-{
-    LOCK(cs_setBanned);
-    SweepBanned();
-    banMap = setBanned; // create a thread safe copy
-}
-
-void CNode::SetBanned(const banmap_t &banMap)
-{
-    LOCK(cs_setBanned);
-    setBanned = banMap;
-    setBannedIsDirty = true;
-}
-
-void CNode::SweepBanned()
-{
-    int64_t now = GetTime();
-
-    LOCK(cs_setBanned);
-    banmap_t::iterator it = setBanned.begin();
-    while (it != setBanned.end())
-    {
-        CSubNet subNet = (*it).first;
-        CBanEntry banEntry = (*it).second;
-        if (now > banEntry.nBanUntil)
-        {
-            setBanned.erase(it++);
-            setBannedIsDirty = true;
-            LogPrint("net", "%s: Removed banned node ip/subnet from banlist.dat: %s\n", __func__, subNet.ToString());
-        }
-        else
-            ++it;
-    }
-}
-
-bool CNode::BannedSetIsDirty()
-{
-    LOCK(cs_setBanned);
-    return setBannedIsDirty;
-}
-
-void CNode::SetBannedSetDirty(bool dirty)
-{
-    LOCK(cs_setBanned); // reuse setBanned lock for the isDirty flag
-    setBannedIsDirty = dirty;
-}
-
-
-// BU moved: std::vector<CSubNet> CNode::vWhitelistedRange;
-// BU moved: CCriticalSection CNode::cs_vWhitelistedRange;
-
-bool CNode::IsWhitelistedRange(const CNetAddr &addr)
-{
-    LOCK(cs_vWhitelistedRange);
-    BOOST_FOREACH (const CSubNet &subnet, vWhitelistedRange)
-    {
-        if (subnet.Match(addr))
-            return true;
-    }
-    return false;
-}
-
-void CNode::AddWhitelistedRange(const CSubNet &subnet)
-{
-    LOCK(cs_vWhitelistedRange);
-    vWhitelistedRange.push_back(subnet);
-}
-
 #undef X
 #define X(name) stats.name = name
 void CNode::copyStats(CNodeStats &stats)
@@ -704,7 +543,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 
         CNetMessage &msg = vRecvMsg.back();
 
-        // absorb network data
+        // Absorb network data.
         int handled;
         if (!msg.in_data)
             handled = msg.readHeader(pch, nBytes);
@@ -1025,7 +864,7 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
         if (nEvictions > 15)
         {
             int nHoursToBan = 4;
-            CNode::Ban(ipAddress, BanReasonNodeMisbehaving, nHoursToBan * 60 * 60);
+            dosMan.Ban(ipAddress, BanReasonNodeMisbehaving, nHoursToBan * 60 * 60);
             LogPrintf("Banning %s for %d hours: Too many evictions - connection dropped\n",
                 vEvictionCandidatesByActivity[0]->addr.ToString(), nHoursToBan);
         }
@@ -1053,7 +892,7 @@ static void AcceptConnection(const ListenSocket &hListenSocket)
         if (!addr.SetSockAddr((const struct sockaddr *)&sockaddr))
             LogPrintf("Warning: Unknown socket family\n");
 
-    bool whitelisted = hListenSocket.whitelisted || CNode::IsWhitelistedRange(addr);
+    bool whitelisted = hListenSocket.whitelisted || dosMan.IsWhitelistedRange(addr);
     if (hSocket == INVALID_SOCKET)
     {
         int nErr = WSAGetLastError();
@@ -1078,7 +917,7 @@ static void AcceptConnection(const ListenSocket &hListenSocket)
     setsockopt(hSocket, IPPROTO_TCP, TCP_NODELAY, (void *)&set, sizeof(int));
 #endif
 
-    if (CNode::IsBanned(addr) && !whitelisted)
+    if (dosMan.IsBanned(addr) && !whitelisted)
     {
         LogPrint("net", "connection from %s dropped (banned)\n", addr.ToString());
         CloseSocket(hSocket);
@@ -1168,7 +1007,7 @@ static void AcceptConnection(const ListenSocket &hListenSocket)
         if (nConnections > 4 && !whitelisted)
         {
             int nHoursToBan = 4;
-            CNode::Ban((CNetAddr)addr, BanReasonNodeMisbehaving, nHoursToBan * 60 * 60);
+            dosMan.Ban((CNetAddr)addr, BanReasonNodeMisbehaving, nHoursToBan * 60 * 60);
             LogPrintf("Banning %s for %d hours: Too many connection attempts - connection dropped\n", addr.ToString(),
                 nHoursToBan);
             CloseSocket(hSocket);
@@ -1218,6 +1057,9 @@ void ThreadSocketHandler()
                 {
                     // remove from vNodes
                     vNodes.erase(remove(vNodes.begin(), vNodes.end(), pnode), vNodes.end());
+
+                    // inform connection manager
+                    connmgr->RemovedNode(pnode);
 
                     // release outbound grant (if any)
                     pnode->grantOutbound.Release();
@@ -1788,28 +1630,12 @@ void DumpAddresses()
     LogPrint("net", "Flushed %d addresses to peers.dat  %dms\n", addrman.size(), GetTimeMillis() - nStart);
 }
 
-void DumpBanlist()
-{
-    int64_t nStart = GetTimeMillis();
-
-    CBanDB bandb;
-    banmap_t banmap;
-    CNode::GetBanned(banmap);
-    bandb.Write(banmap);
-
-    LogPrint(
-        "net", "Flushed %d banned node ips/subnets to banlist.dat  %dms\n", banmap.size(), GetTimeMillis() - nStart);
-}
-
 void DumpData()
 {
     DumpAddresses();
 
-    if (CNode::BannedSetIsDirty())
-    {
-        DumpBanlist();
-        CNode::SetBannedSetDirty(false);
-    }
+    // Request dos manager to write it's ban list to disk
+    dosMan.DumpBanlist();
 }
 
 void static ProcessOneShot()
@@ -1886,6 +1712,7 @@ void ThreadOpenConnections()
         // we don't have enough connections to XTHIN capable nodes yet.
         int nOutbound = 0;
         int nThinBlockCapable = 0;
+        int nBitcoinCash = 0;
         set<vector<unsigned char> > setConnected;
         CNode *ptemp = nullptr;
         bool fDisconnected = false;
@@ -1900,6 +1727,8 @@ void ThreadOpenConnections()
 
                     if (pnode->ThinBlockCapable())
                         nThinBlockCapable++;
+                    else if (pnode->BitcoinCashCapable())
+                        nBitcoinCash++;
                     else
                         ptemp = pnode;
                 }
@@ -1907,6 +1736,7 @@ void ThreadOpenConnections()
             // Disconnect a node that is not XTHIN capable if all outbound slots are full and we
             // have not yet connected to enough XTHIN nodes.
             nMinXthinNodes = GetArg("-min-xthin-nodes", MIN_XTHIN_NODES);
+            nMinBitcoinCashNodes = GetArg("-min-bitcoin-cash-nodes", MIN_BITCOIN_CASH_NODES);
             if (nOutbound >= nMaxOutConnections && nThinBlockCapable <= min(nMinXthinNodes, nMaxOutConnections) &&
                 nDisconnects < MAX_DISCONNECTS && IsThinBlocksEnabled() && IsChainNearlySyncd())
             {
@@ -1917,6 +1747,20 @@ void ThreadOpenConnections()
                     nDisconnects++;
                 }
             }
+#ifdef BITCOIN_CASH
+            // Disconnect a node that is not BitcoinCash capable if all outbound slots are full and we
+            // have not yet connected to enough BitcoinCash nodes.
+            else if (nOutbound >= nMaxOutConnections && nBitcoinCash <= min(nMinBitcoinCashNodes, nMaxOutConnections) &&
+                     nDisconnects < MAX_DISCONNECTS && IsChainNearlySyncd())
+            {
+                if (ptemp != nullptr)
+                {
+                    ptemp->fDisconnect = true;
+                    fDisconnected = true;
+                    nDisconnects++;
+                }
+            }
+#endif
 
             // In the event that outbound nodes restart or drop off the network over time we need to
             // replenish the number of disconnects allowed once per day.
@@ -1985,6 +1829,7 @@ void ThreadOpenConnections()
         //    connections.
         //  * Only make a feeler connection once every few minutes.
         //
+
         bool fFeeler = false;
         if (nOutbound >= nMaxOutConnections)
         {
@@ -2178,7 +2023,7 @@ bool OpenNetworkConnection(const CAddress &addrConnect,
         LOCK(cs_vNodes);
         if (!pszDest)
         {
-            if (IsLocal(addrConnect) || FindNode((CNetAddr)addrConnect) || CNode::IsBanned(addrConnect) ||
+            if (IsLocal(addrConnect) || FindNode((CNetAddr)addrConnect) || dosMan.IsBanned(addrConnect) ||
                 FindNode(addrConnect.ToStringIPPort()))
                 return false;
         }
@@ -2463,22 +2308,8 @@ void StartNode(boost::thread_group &threadGroup, CScheduler &scheduler)
         }
     }
 
-    uiInterface.InitMessage(_("Loading banlist..."));
-    // Load addresses from banlist.dat
-    nStart = GetTimeMillis();
-    CBanDB bandb;
-    banmap_t banmap;
-    if (bandb.Read(banmap))
-    {
-        CNode::SetBanned(banmap); // thread save setter
-        CNode::SetBannedSetDirty(false); // no need to write down, just read data
-        CNode::SweepBanned(); // sweep out unused entries
-
-        LogPrint("net", "Loaded %d banned node ips/subnets from banlist.dat  %dms\n", banmap.size(),
-            GetTimeMillis() - nStart);
-    }
-    else
-        LogPrintf("Invalid or missing banlist.dat; recreating\n");
+    // ask dos manager to load banlist from disk (or recreate if missing/corrupt)
+    dosMan.LoadBanlist();
 
     fAddressesInitialized = true;
 
@@ -2578,11 +2409,6 @@ void NetCleanup()
     if (pnodeLocalHost)
         delete pnodeLocalHost;
     pnodeLocalHost = NULL;
-
-    // BU: clean up the parallel validation semaphore
-    if (semPV)
-        delete semPV;
-    semPV = NULL;
 
 #ifdef WIN32
     // Shutdown Windows Sockets
@@ -2906,7 +2732,7 @@ bool CAddrDB::Read(CAddrMan &addr, CDataStream &ssPeers)
 unsigned int ReceiveFloodSize() { return 1000 * GetArg("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER); }
 unsigned int SendBufferSize() { return 1000 * GetArg("-maxsendbuffer", DEFAULT_MAXSENDBUFFER); }
 CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn, bool fInboundIn)
-    : ssSend(SER_NETWORK, INIT_PROTO_VERSION), id(CConnMgr::nextNodeId()), addrKnown(5000, 0.001),
+    : ssSend(SER_NETWORK, INIT_PROTO_VERSION), id(connmgr->NextNodeId()), addrKnown(5000, 0.001),
       filterInventoryKnown(50000, 0.000001)
 {
     nServices = 0;
@@ -2953,10 +2779,16 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nPingUsecStart = 0;
     nPingUsecTime = 0;
     fPingQueued = false;
+    // set when etablishing connection
+    fUsesCashMagic = false;
     nMinPingUsecTime = std::numeric_limits<int64_t>::max();
     thinBlockWaitingForTxns = -1; // BUIP010 Xtreme Thinblocks
     addrFromPort = 0; // BU
     nLocalThinBlockBytes = 0;
+
+    nMisbehavior = 0;
+    fShouldBan = false;
+    fCurrentlyConnected = false;
 
     // BU instrumentation
     std::string xmledName;
@@ -3019,6 +2851,10 @@ CNode::~CNode()
 
     addrFromPort = 0;
 
+    // Update addrman timestamp
+    if (nMisbehavior == 0 && fCurrentlyConnected)
+        addrman.Connected(addr);
+
     GetNodeSignals().FinalizeNode(GetId());
 }
 
@@ -3069,9 +2905,7 @@ void CNode::BeginMessage(const char *pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSen
 void CNode::AbortMessage() UNLOCK_FUNCTION(cs_vSend)
 {
     ssSend.clear();
-
     LEAVE_CRITICAL_SECTION(cs_vSend);
-
     LogPrint("net", "(aborted)\n");
 }
 
@@ -3147,108 +2981,28 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
     LEAVE_CRITICAL_SECTION(cs_vSend);
 }
 
-//
-// CBanDB
-//
-
-CBanDB::CBanDB() { pathBanlist = GetDataDir() / "banlist.dat"; }
-bool CBanDB::Write(const banmap_t &banSet)
+/**
+ * Check if it is flagged for banning, and if so ban it and disconnect.
+ */
+void CNode::DisconnectIfBanned()
 {
-    // Generate random temporary filename
-    unsigned short randv = 0;
-    GetRandBytes((unsigned char *)&randv, sizeof(randv));
-    std::string tmpfn = strprintf("banlist.dat.%04x", randv);
-
-    // serialize banlist, checksum data up to that point, then append csum
-    CDataStream ssBanlist(SER_DISK, CLIENT_VERSION);
-    ssBanlist << FLATDATA(Params().MessageStart());
-    ssBanlist << banSet;
-    uint256 hash = Hash(ssBanlist.begin(), ssBanlist.end());
-    ssBanlist << hash;
-
-    // open temp output file, and associate with CAutoFile
-    boost::filesystem::path pathTmp = GetDataDir() / tmpfn;
-    FILE *file = fopen(pathTmp.string().c_str(), "wb");
-    CAutoFile fileout(file, SER_DISK, CLIENT_VERSION);
-    if (fileout.IsNull())
-        return error("%s: Failed to open file %s", __func__, pathTmp.string());
-
-    // Write and commit header, data
-    try
+    if (fShouldBan)
     {
-        fileout << ssBanlist;
-    }
-    catch (const std::exception &e)
-    {
-        return error("%s: Serialize or I/O error - %s", __func__, e.what());
-    }
-    FileCommit(fileout.Get());
-    fileout.fclose();
+        fShouldBan = false;
 
-    // replace existing banlist.dat, if any, with new banlist.dat.XXXX
-    if (!RenameOver(pathTmp, pathBanlist))
-        return error("%s: Rename-into-place failed", __func__);
-
-    return true;
+        if (fWhitelisted)
+            LogPrintf("Warning: not punishing whitelisted peer %s!\n", GetLogName());
+        else
+        {
+            fDisconnect = true;
+            if (addr.IsLocal())
+                LogPrintf("Warning: not banning local peer %s!\n", GetLogName());
+            else
+                dosMan.Ban(addr, BanReasonNodeMisbehaving);
+        }
+    }
 }
 
-bool CBanDB::Read(banmap_t &banSet)
-{
-    // open input file, and associate with CAutoFile
-    FILE *file = fopen(pathBanlist.string().c_str(), "rb");
-    CAutoFile filein(file, SER_DISK, CLIENT_VERSION);
-    if (filein.IsNull())
-        return error("%s: Failed to open file %s", __func__, pathBanlist.string());
-
-    // use file size to size memory buffer
-    uint64_t fileSize = boost::filesystem::file_size(pathBanlist);
-    uint64_t dataSize = 0;
-    // Don't try to resize to a negative number if file is small
-    if (fileSize >= sizeof(uint256))
-        dataSize = fileSize - sizeof(uint256);
-    vector<unsigned char> vchData;
-    vchData.resize(dataSize);
-    uint256 hashIn;
-
-    // read data and checksum from file
-    try
-    {
-        filein.read((char *)&vchData[0], dataSize);
-        filein >> hashIn;
-    }
-    catch (const std::exception &e)
-    {
-        return error("%s: Deserialize or I/O error - %s", __func__, e.what());
-    }
-    filein.fclose();
-
-    CDataStream ssBanlist(vchData, SER_DISK, CLIENT_VERSION);
-
-    // verify stored checksum matches input data
-    uint256 hashTmp = Hash(ssBanlist.begin(), ssBanlist.end());
-    if (hashIn != hashTmp)
-        return error("%s: Checksum mismatch, data corrupted", __func__);
-
-    unsigned char pchMsgTmp[4];
-    try
-    {
-        // de-serialize file header (network specific magic number) and ..
-        ssBanlist >> FLATDATA(pchMsgTmp);
-
-        // ... verify the network matches ours
-        if (memcmp(pchMsgTmp, Params().MessageStart(), sizeof(pchMsgTmp)))
-            return error("%s: Invalid network magic number", __func__);
-
-        // de-serialize address data into one CAddrMan object
-        ssBanlist >> banSet;
-    }
-    catch (const std::exception &e)
-    {
-        return error("%s: Deserialize or I/O error - %s", __func__, e.what());
-    }
-
-    return true;
-}
 
 int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds)
 {
