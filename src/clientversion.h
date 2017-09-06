@@ -6,6 +6,8 @@
 #ifndef BITCOIN_CLIENTVERSION_H
 #define BITCOIN_CLIENTVERSION_H
 
+#define BITCOIN_CASH
+
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
 #else
@@ -17,8 +19,8 @@
 //! These need to be macros, as clientversion.cpp's and bitcoin*-res.rc's voodoo requires it
 #define CLIENT_VERSION_MAJOR 1
 #define CLIENT_VERSION_MINOR 1
-#define CLIENT_VERSION_REVISION 0
-#define CLIENT_VERSION_BUILD 99  // BU set version 99 to indicate an unreleased version
+#define CLIENT_VERSION_REVISION 1
+#define CLIENT_VERSION_BUILD 1  // BU set version 99 to indicate an unreleased version
 
 //! Set to true for release, false for prerelease or test build
 #define CLIENT_VERSION_IS_RELEASE true
@@ -30,6 +32,8 @@
 #define COPYRIGHT_YEAR 2017
 
 #endif //HAVE_CONFIG_H
+
+/** Client flavor */
 
 /**
  * Converts the parameter X to a string after macro replacement on X has been performed.
