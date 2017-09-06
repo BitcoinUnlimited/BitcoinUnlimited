@@ -186,7 +186,6 @@ qt/optionsmodel.cpp
 qt/optionsmodel.h
 qt/overviewpage.cpp
 qt/overviewpage.h
-qt/paymentrequest.pb.h
 qt/paymentrequestplus.cpp
 qt/paymentrequestplus.h
 qt/paymentserver.cpp
