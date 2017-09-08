@@ -170,6 +170,7 @@ bool AppInit(int argc, char* argv[])
         // Set this early so that parameter interactions go to console
         InitLogging();
         InitParameterInteraction();
+        UnlimitedSetup();
         fRet = AppInit2(threadGroup, scheduler);
     }
     catch (const std::exception& e) {
@@ -177,8 +178,6 @@ bool AppInit(int argc, char* argv[])
     } catch (...) {
         PrintExceptionContinue(NULL, "AppInit()");
     }
-
-    UnlimitedSetup();
 
     if (!fRet)
     {
