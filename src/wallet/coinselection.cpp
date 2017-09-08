@@ -147,6 +147,8 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
   TxoGroupMap solutions;
   TxoGroupMap candidates;
 
+  LogPrint("wallet","num available txos: %d\n", available.size());
+
   // Find the smallest output > TargetValue & add it to solutions (if it exists).
   SpendableTxos::iterator large;
   large = available.lower_bound(targetValue);         // Find the elem nearest the target but greater or =
@@ -307,11 +309,11 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
         }
     }
 
-  LogPrint("wallet","CoinSelection returns %d choices. Dust: %d, Target: %d, found: %d, txos: %d\n", solutions.size(), dust, targetValue, i->first, i->second.second.size());
   if (i == solutions.end())
     {
       return TxoGroup(0,TxoItVec());
     }  
+  LogPrint("wallet","CoinSelection returns %d choices. Dust: %d, Target: %d, found: %d, txos: %d\n", solutions.size(), dust, targetValue, i->first, i->second.second.size());
   TxoGroup ret = i->second;
   return ret;
 }

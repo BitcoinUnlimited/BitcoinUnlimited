@@ -422,14 +422,41 @@ public:
     }
 
     std::string ToString() const;
+
+    inline int cmp(const COutput& rhs) const
+    {
+        if (tx->GetHash() == rhs.tx->GetHash())
+        {
+            if (i < rhs.i) return -1;
+            if (i > rhs.i) return 1;
+            return 0;
+        }
+        if (tx->GetHash() < rhs.tx->GetHash()) return -1;
+        return 1;
+    }
+
 };
+
+inline bool operator==(const COutput& lhs, const COutput& rhs){ return lhs.cmp(rhs) == 0; }
+inline bool operator!=(const COutput& lhs, const COutput& rhs){ return lhs.cmp(rhs) != 0; }
+inline bool operator< (const COutput& lhs, const COutput& rhs){ return lhs.cmp(rhs) <  0; }
+inline bool operator> (const COutput& lhs, const COutput& rhs){ return lhs.cmp(rhs) >  0; }
+inline bool operator<=(const COutput& lhs, const COutput& rhs){ return lhs.cmp(rhs) <= 0; }
+inline bool operator>=(const COutput& lhs, const COutput& rhs){ return lhs.cmp(rhs) >= 0; }
 
 typedef std::multimap<CAmount, COutput> SpendableTxos;
 
 struct TxoIterLess // : binary_function <T,T,bool> 
   {
     typedef SpendableTxos::iterator T;
-    bool operator() (const T& x, const T& y) const {return x->first < y->first;}
+    bool operator() (const T& x, const T& y) const
+      {
+          if (x->first == y->first)
+          {
+              return x->second < y->second;
+          }
+          return x->first < y->first;
+      }
   };
 
 typedef std::set<SpendableTxos::iterator,TxoIterLess> TxoItVec;
