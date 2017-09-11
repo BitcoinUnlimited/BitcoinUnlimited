@@ -2010,9 +2010,13 @@ bool CWallet::SelectCoinsBU(const CAmount &nTargetValue,
         if (!coinControl->fAllowOtherInputs) // No other inputs allowed so stop here.
             return (nValueRet >= nTargetValue);
 
-        FillAvailableCoins(coinControl); // If the user is manually selecting outputs (only way is via the GUI) this is
-                                         // not performance sensitive anyway (and we need to make sure coincontrol coins
-                                         // are not in the list)
+        // If the user is manually selecting outputs (only way is via the GUI) this is
+        // not performance sensitive anyway (and we need to make sure coincontrol coins
+        // are not in the list)
+        if ((coinControl->HasSelected() || available.size() < 100))
+        {  // this "if" statement skips case where coincontrol is only used to supply a change address
+            FillAvailableCoins(coinControl);
+        }
         filled = true;
     }
     else if (available.size() < 100) // If there are very few TXOs, then regenerate them.  If the wallet HAS few TXOs
@@ -2166,6 +2170,7 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount &nFeeRet, int& nC
 bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet,
                                 int& nChangePosRet, std::string& strFailReason, const CCoinControl* coinControl, bool sign)
 {
+    uint64_t start = GetLogTimeMicros();
     CAmount nValue = 0;
     unsigned int nSubtractFeeFromAmount = 0;
     bool involvesPublicLabel = false;
@@ -2231,12 +2236,12 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
         LOCK2(cs_main, cs_wallet);
         {
             CAmount nFeeNeeded = 0;
-            nFeeRet = GetMinimumFee(200, nTxConfirmTarget, mempool); // BU estimate base fee from an approx minimum size tx
+            nFeeRet = GetMinimumFee(250, nTxConfirmTarget, mempool); // BU estimate base fee from an approx minimum size tx
             // Loop until there is enough fee
             while (true)
 	      {
                 bool fFirst = true;
-
+                
                 CAmount nValueToSelect = nValue;
                 if (nSubtractFeeFromAmount == 0)
 		  nValueToSelect += nFeeRet;
@@ -2283,13 +2288,13 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                 CAmount nValueIn = 0;
                 // TODO fixup nValueIn based on TX_HEADER_LEN+voutSize
                 CAmount feeperbyte = GetMinimumFee(1, nTxConfirmTarget, mempool);
-
+                uint64_t preSelect = GetLogTimeMicros();
                 if (!SelectCoinsBU(nValueToSelect, CFeeRate(feeperbyte), P2PKH_LEN, setCoins, nValueIn, coinControl))
 		  {
                     strFailReason = _("Insufficient funds or funds not confirmed");
                     return false;
 		  }
-
+                uint64_t postSelect = GetLogTimeMicros();
                 do  // BU if the fee does not match, there might be extra in the selected coins to increase the fee so loop
 		  {
                     txNew.vin.clear();
@@ -2491,11 +2496,13 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 			return false;
 		      }
 
-		    if (nFeeNeeded*100/MAX_FEE_PERCENT_OF_VALUE > nValue)
+#if 0  // TODO remove check for gigablock testing                     
+		    if (nFeeNeeded > nValue*MAX_FEE_PERCENT_OF_VALUE/100)
 		      {
 			strFailReason = _("Fee is larger than configured percent of transaction value");
 			return false;
-		      }
+                      }
+#endif                    
 
                     // try with these inputs again if the fee we allocated is less than what is needed, BUT the inputs contain enough coins to cover the needed fees.
 		    if ((nFeeRet < nFeeNeeded)&&(nValueIn - nValue >= nFeeNeeded))
@@ -2505,7 +2512,8 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 		      }
                     else break;
 		    } while(1);
-
+                uint64_t signLoop = GetLogTimeMicros();
+                LogPrint("bench", "CreateTransaction: total: %llu, selection: %llu, signloop: %llu\n", signLoop-start, postSelect-preSelect, signLoop-postSelect);
                 if (nFeeRet >= nFeeNeeded)
                     break; // Done, enough fee included.
 

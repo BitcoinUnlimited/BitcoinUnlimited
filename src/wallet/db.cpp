@@ -72,6 +72,12 @@ void CDBEnv::Close()
     EnvShutdown();
 }
 
+enum
+{
+    WALLET_DB_CACHE_SIZE = 0x400000,
+    
+};
+
 bool CDBEnv::Open(const boost::filesystem::path& pathIn)
 {
     if (fDbEnvInit)
@@ -90,7 +96,7 @@ bool CDBEnv::Open(const boost::filesystem::path& pathIn)
         nEnvFlags |= DB_PRIVATE;
 
     dbenv->set_lg_dir(pathLogDir.string().c_str());
-    dbenv->set_cachesize(0, 0x100000, 1); // 1 MiB should be enough for just the wallet
+    dbenv->set_cachesize(0, WALLET_DB_CACHE_SIZE, 1); // 1 MiB should be enough for just the wallet
     dbenv->set_lg_bsize(0x10000);
     dbenv->set_lg_max(1048576);
     dbenv->set_lk_max_locks(40000);

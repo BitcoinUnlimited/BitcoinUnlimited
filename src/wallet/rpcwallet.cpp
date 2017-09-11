@@ -17,6 +17,7 @@
 #include "utilmoneystr.h"
 #include "wallet.h"
 #include "walletdb.h"
+#include "coincontrol.h"
 
 #include <stdint.h>
 
@@ -350,7 +351,7 @@ UniValue getaddressesbyaccount(const UniValue& params, bool fHelp)
     return ret;
 }
 
-static void SendMoney(const CTxDestination &address, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew)
+static void SendMoney(const CTxDestination &address, const CTxDestination *change, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew)
 {
     // Check amount
     if (nValue <= 0)
@@ -367,7 +368,14 @@ static void SendMoney(const CTxDestination &address, CAmount nValue, bool fSubtr
     int nChangePosRet = -1;
     CRecipient recipient = {scriptPubKey, nValue, fSubtractFeeFromAmount};
     vecSend.push_back(recipient);
-    if (!pwalletMain->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strError)) 
+    uint64_t start = GetLogTimeMicros();
+    CCoinControl cc;
+    cc.fAllowOtherInputs = true;
+    if (change)
+    {
+        cc.destChange = GetScriptForDestination(*change);
+    }
+    if (!pwalletMain->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strError, &cc)) 
       {
         CAmount curBalance = pwalletMain->GetBalance();
         if (nValue > curBalance)
@@ -377,8 +385,11 @@ static void SendMoney(const CTxDestination &address, CAmount nValue, bool fSubtr
             strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!", FormatMoney(nFeeRequired));
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
       }
+    uint64_t createtx = GetLogTimeMicros();
     if (!pwalletMain->CommitTransaction(wtxNew, reservekey))
         throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
+    uint64_t committx = GetLogTimeMicros();
+    LogPrint("bench", "CreateTransaction: %llu, CommitTransaction: %llu\n",createtx-start, committx-createtx);
 }
 
 UniValue sendtoaddress(const UniValue& params, bool fHelp)
@@ -386,9 +397,9 @@ UniValue sendtoaddress(const UniValue& params, bool fHelp)
     if (!EnsureWalletIsAvailable(fHelp))
         return NullUniValue;
 
-    if (fHelp || params.size() < 2 || params.size() > 5)
+    if (fHelp || params.size() < 2 || params.size() > 6)
         throw runtime_error(
-            "sendtoaddress \"bitcoinaddress\" amount ( \"comment\" \"comment-to\" subtractfeefromamount )\n"
+            "sendtoaddress \"bitcoinaddress\" amount ( \"comment\" \"comment-to\" subtractfeefromamount \"change-address\" )\n"
             "\nSend an amount to a given address.\n"
             + HelpRequiringPassphrase() +
             "\nArguments:\n"
@@ -401,6 +412,7 @@ UniValue sendtoaddress(const UniValue& params, bool fHelp)
             "                             transaction, just kept in your wallet.\n"
             "5. subtractfeefromamount  (boolean, optional, default=false) The fee will be deducted from the amount being sent.\n"
             "                             The recipient will receive less bitcoins than you enter in the amount field.\n"
+            "6. \"change address\" (string, optional) send any change to this address\n"
             "\nResult:\n"
             "\"transactionid\"  (string) The transaction id.\n"
             "\nExamples:\n"
@@ -410,7 +422,9 @@ UniValue sendtoaddress(const UniValue& params, bool fHelp)
             + HelpExampleRpc("sendtoaddress", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", 0.1, \"donation\", \"seans outpost\"")
         );
 
+    int64_t start = GetLogTimeMicros();
     LOCK2(cs_main, pwalletMain->cs_wallet);
+    int64_t lockTime = GetLogTimeMicros();
 
     CBitcoinAddress address(params[0].get_str());
     if (!address.IsValid())
@@ -432,10 +446,22 @@ UniValue sendtoaddress(const UniValue& params, bool fHelp)
     if (params.size() > 4)
         fSubtractFeeFromAmount = params[4].get_bool();
 
+    CTxDestination changeDestMem;
+    CTxDestination* changeDest = NULL;
+    if (params.size() > 5)
+    {
+        CBitcoinAddress changeAddr;
+        changeAddr = CBitcoinAddress(params[0].get_str());
+        changeDestMem = changeAddr.Get();
+        changeDest = &changeDestMem;
+    }
+
     EnsureWalletIsUnlocked();
+    
+    SendMoney(address.Get(), changeDest, nAmount, fSubtractFeeFromAmount, wtx);
+    int64_t endTime = GetLogTimeMicros();
 
-    SendMoney(address.Get(), nAmount, fSubtractFeeFromAmount, wtx);
-
+    LogPrint("bench", "sendtoaddress total: %llu, lockWait: %llu\n",endTime-start, lockTime-start);
     return wtx.GetHash().GetHex();
 }
 
@@ -917,7 +943,7 @@ UniValue sendfrom(const UniValue& params, bool fHelp)
     if (nAmount > nBalance)
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Account has insufficient funds");
 
-    SendMoney(address.Get(), nAmount, false, wtx);
+    SendMoney(address.Get(), NULL, nAmount, false, wtx);
 
     return wtx.GetHash().GetHex();
 }
@@ -986,14 +1012,14 @@ UniValue sendmany(const UniValue& params, bool fHelp)
 
     CAmount totalAmount = 0;
     vector<string> keys = sendTo.getKeys();
-    BOOST_FOREACH(const string& name_, keys)
+    BOOST_FOREACH (const string &name_, keys)
     {
         CBitcoinAddress address(name_);
         if (!address.IsValid())
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid Bitcoin address: ")+name_);
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid Bitcoin address: ") + name_);
 
         if (setAddress.count(address))
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+name_);
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ") + name_);
         setAddress.insert(address);
 
         CScript scriptPubKey = GetScriptForDestination(address.Get());
@@ -1003,8 +1029,9 @@ UniValue sendmany(const UniValue& params, bool fHelp)
         totalAmount += nAmount;
 
         bool fSubtractFeeFromAmount = false;
-        for (unsigned int idx = 0; idx < subtractFeeFromAmount.size(); idx++) {
-            const UniValue& addr = subtractFeeFromAmount[idx];
+        for (unsigned int idx = 0; idx < subtractFeeFromAmount.size(); idx++)
+        {
+            const UniValue &addr = subtractFeeFromAmount[idx];
             if (addr.get_str() == name_)
                 fSubtractFeeFromAmount = true;
         }
