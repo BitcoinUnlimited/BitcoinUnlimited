@@ -1296,7 +1296,7 @@ void LoadFilter(CNode *pfrom, CBloomFilter *filter)
 {
     if (!filter->IsWithinSizeConstraints())
         // There is no excuse for sending a too-large filter
-        dosMan.Misbehaving(pfrom, 100);
+        MISBEHAVING(pfrom, 100, "bloom filter too large");
     else
     {
         LOCK(pfrom->cs_filter);

@@ -1800,7 +1800,7 @@ void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state
                     (unsigned char)state.GetRejectCode(), state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH),
                     pindex->GetBlockHash());
                 if (nDoS > 0)
-                    dosMan.Misbehaving(node.get(), nDoS);
+                    MISBEHAVING(node.get(), nDoS, "Reject invalid block");
             }
         }
     }
