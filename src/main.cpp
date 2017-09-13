@@ -6690,7 +6690,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             {
                 if (pfrom->nGetXthinCount >= 20)
                 {
-                    dosMan.Misbehaving(pfrom, 100); // If they exceed the limit then disconnect them
+                    // If they exceed the limit then disconnect them
+                    MISBEHAVING(pfrom, 100, "requesting too many get_xthin");
                     return error("requesting too many get_xthin");
                 }
             }
@@ -6703,7 +6704,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // Message consistency checking
         if (!((inv.type == MSG_XTHINBLOCK) || (inv.type == MSG_THINBLOCK)) || inv.hash.IsNull())
         {
-            dosMan.Misbehaving(pfrom, 100);
+            MISBEHAVING(pfrom, 100, "invalid get_xthin type");
             return error("invalid get_xthin type=%u hash=%s", inv.type, inv.hash.ToString());
         }
 
@@ -6715,7 +6716,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
             if (mi == mapBlockIndex.end())
             {
-                dosMan.Misbehaving(pfrom, 100);
+                MISBEHAVING(pfrom, 10, "nonexistent block");
                 return error("Peer %s (%d) requested nonexistent block %s", pfrom->addrName.c_str(), pfrom->id,
                     inv.hash.ToString());
             }
