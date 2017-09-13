@@ -36,7 +36,7 @@ extern unsigned int MIN_BLK_REQUEST_RETRY_INTERVAL;
 static const unsigned int DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL = 5 * 1000 * 1000;
 
 // How long in seconds we wait for a xthin request to be fullfilled before disconnecting the node.
-static const unsigned int THINBLOCK_DOWNLOAD_TIMEOUT = 30;
+static const unsigned int THINBLOCK_DOWNLOAD_TIMEOUT = 5*60;
 
 class CNode;
 

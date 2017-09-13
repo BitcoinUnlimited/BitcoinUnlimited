@@ -1386,8 +1386,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
         }
 
-        // minRelayTxFee = CFeeRate(feeCutoff * 1000);
-        minRelayTxFee = CFeeRate(1); // TEMP for the gigatest network: relay everything
+        minRelayTxFee = CFeeRate(feeCutoff * 1000);
         LogPrint("mempool",
             "MempoolBytes:%d  LimitFreeRelay:%.5g  FeeCutOff:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d  TxFees:%d\n",
             poolBytes, nFreeLimit, ((double)::minRelayTxFee.GetFee(nSize)) / nSize, ((double)nFees) / nSize, nSize,
@@ -7341,7 +7340,7 @@ bool SendMessages(CNode *pto)
             std::map<uint256, CNode::CThinBlockInFlight>::iterator iter = pto->mapThinBlocksInFlight.begin();
             while (iter != pto->mapThinBlocksInFlight.end())
             {
-                if (!(*iter).second.fReceived && (GetTime() - (*iter).second.nRequestTime) > THINBLOCK_DOWNLOAD_TIMEOUT)
+                if (!(*iter).second.fReceived && (GetTime() - (*iter).second.nRequestTime) > thinBlockTimeout.value)
                 {
                     if (!pto->fWhitelisted && Params().NetworkIDString() != "regtest")
                     {

@@ -162,6 +162,9 @@ CTweakRef<uint64_t> ebTweak("net.excessiveBlock",
     "Excessive block size in bytes",
     &excessiveBlockSize,
     &ExcessiveBlockValidator);
+CTweak<uint32_t> thinBlockTimeout("net.thinBlockTimeout",
+    "Thin block download timeout in seconds",
+    THINBLOCK_DOWNLOAD_TIMEOUT);
 CTweak<uint64_t> blockSigopsPerMb("net.excessiveSigopsPerMb",
     "Excessive effort per block, denoted in cost (# inputs * txsize) per MB",
     BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);

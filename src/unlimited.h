@@ -94,6 +94,7 @@ extern CTweak<uint64_t> checkScriptDays;
 extern CTweak<bool> unsafeGetBlockTemplate;
 
 extern CTweak<uint32_t> netMagic;
+extern CTweak<uint32_t> thinBlockTimeout;
 
 // print out a configuration warning during initialization
 // bool InitWarning(const std::string &str);
