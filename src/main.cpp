@@ -4358,7 +4358,9 @@ bool ProcessNewBlock(CValidationState &state,
 
         // Store to disk
         CBlockIndex *pindex = NULL;
+        LogPrintf("AcceptBlock\n");
         bool ret = AcceptBlock(*pblock, state, chainparams, &pindex, fRequested, dbp);
+        LogPrintf("AcceptBlock done\n");
         if (pindex && pfrom)
         {
             mapBlockSource[pindex->GetBlockHash()] = pfrom->GetId();
@@ -4376,7 +4378,7 @@ bool ProcessNewBlock(CValidationState &state,
         CInv inv(MSG_BLOCK, hash);
         requester.Received(inv, pfrom);
     }
-
+    LogPrintf("ActivateBestChain\n");
     if (!ActivateBestChain(state, chainparams, pblock, fParallel))
     {
         if (state.IsInvalid() || state.IsError())
@@ -4384,6 +4386,7 @@ bool ProcessNewBlock(CValidationState &state,
         else
             return false;
     }
+    LogPrintf("ActivateBestChain OK\n");
 
     int64_t end = GetTimeMicros();
 

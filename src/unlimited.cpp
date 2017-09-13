@@ -515,7 +515,13 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phas
 
 static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainparams)
 {
-    LogPrintf("%s\n", pblock->ToString());
+    LogPrintf("CBlock(hash=%s, ver=%d, hashPrevBlock=%s, hashMerkleRoot=%s, nTime=%u, nBits=%08x, nNonce=%u, vtx=%u)\n",
+        pblock->GetHash().ToString(),
+        pblock->nVersion,
+        pblock->hashPrevBlock.ToString(),
+        pblock->hashMerkleRoot.ToString(),
+        pblock->nTime, pblock->nBits, pblock->nNonce,
+        pblock->vtx.size());
     LogPrintf("generated %s\n", FormatMoney(pblock->vtx[0].vout[0].nValue));
 
     // Found a solution
