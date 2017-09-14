@@ -4358,9 +4358,7 @@ bool ProcessNewBlock(CValidationState &state,
 
         // Store to disk
         CBlockIndex *pindex = NULL;
-        LogPrintf("AcceptBlock\n");
         bool ret = AcceptBlock(*pblock, state, chainparams, &pindex, fRequested, dbp);
-        LogPrintf("AcceptBlock done\n");
         if (pindex && pfrom)
         {
             mapBlockSource[pindex->GetBlockHash()] = pfrom->GetId();
@@ -4378,7 +4376,6 @@ bool ProcessNewBlock(CValidationState &state,
         CInv inv(MSG_BLOCK, hash);
         requester.Received(inv, pfrom);
     }
-    LogPrintf("ActivateBestChain\n");
     if (!ActivateBestChain(state, chainparams, pblock, fParallel))
     {
         if (state.IsInvalid() || state.IsError())
@@ -4386,7 +4383,6 @@ bool ProcessNewBlock(CValidationState &state,
         else
             return false;
     }
-    LogPrintf("ActivateBestChain OK\n");
 
     int64_t end = GetTimeMicros();
 
@@ -5566,7 +5562,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
                     {
                         // its possible that I know about it but haven't stored it yet
-                        LogPrint("thin", "unable to load block %s from disk\n",
+                        LogPrintf("Unable to load block %s from disk\n",
                             (*mi).second->phashBlock ? (*mi).second->phashBlock->ToString() : "");
                         // no response
                     }
@@ -6125,7 +6121,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // BU check size == 0 to be intolerant of an empty and useless request
         if ((vInv.size() > MAX_INV_SZ) || (vInv.size() == 0))
         {
-            dosMan.Misbehaving(pfrom, 20);
+            MISBEHAVING(pfrom, 20, "getdata inv size out of range");
             return error("message getdata size() = %u", vInv.size());
         }
 
@@ -7362,13 +7358,13 @@ bool SendMessages(CNode *pto)
         TRY_LOCK(cs_main, lockMain); // Acquire cs_main for IsInitialBlockDownload() and CNodeState()
         if (!lockMain)
         {
-            LogPrint("net", "skipping SendMessages to %s, cs_main is locked\n", pto->addr.ToString());
+            //LogPrint("net", "skipping SendMessages to %s, cs_main is locked\n", pto->addr.ToString());
             return true;
         }
         TRY_LOCK(pto->cs_vSend, lockSend);
         if (!lockSend)
         {
-            LogPrint("net", "skipping SendMessages to %s, pto->cs_vSend is locked\n", pto->addr.ToString());
+            //LogPrint("net", "skipping SendMessages to %s, pto->cs_vSend is locked\n", pto->addr.ToString());
             return true;
         }
 
