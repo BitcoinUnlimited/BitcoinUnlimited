@@ -7355,22 +7355,38 @@ bool SendMessages(CNode *pto)
             }
         }
 
-        TRY_LOCK(cs_main, lockMain); // Acquire cs_main for IsInitialBlockDownload() and CNodeState()
-        if (!lockMain)
+        bool isInitialBlockDownload = false;
+        CNodeState *statep = nullptr;
+        CBlockIndex *tip = nullptr;
+        if (1)
         {
-            //LogPrint("net", "skipping SendMessages to %s, cs_main is locked\n", pto->addr.ToString());
-            return true;
+            TRY_LOCK(cs_main, lockMain); // Acquire cs_main for IsInitialBlockDownload() and CNodeState()
+            if (!lockMain)
+            {
+                //LogPrint("net", "skipping SendMessages to %s, cs_main is locked\n", pto->addr.ToString());
+                return true;
+            }
+            isInitialBlockDownload = IsInitialBlockDownload();
+            // state won't be deleted unless this node is deleted but it can't because we have run addref()
+            statep = State(pto->GetId());
+
+            tip = chainActive.Tip();
+            if (pindexBestHeader == NULL)
+              pindexBestHeader = tip;
         }
+
+#if 0
         TRY_LOCK(pto->cs_vSend, lockSend);
         if (!lockSend)
         {
             //LogPrint("net", "skipping SendMessages to %s, pto->cs_vSend is locked\n", pto->addr.ToString());
             return true;
         }
+#endif
 
         // Address refresh broadcast
         int64_t nNow = GetTimeMicros();
-        if (!IsInitialBlockDownload() && pto->nNextLocalAddrSend < nNow)
+        if (isInitialBlockDownload && pto->nNextLocalAddrSend < nNow)
         {
             AdvertiseLocal(pto);
             pto->nNextLocalAddrSend = PoissonNextSend(nNow, AVG_LOCAL_ADDRESS_BROADCAST_INTERVAL);
@@ -7393,6 +7409,7 @@ bool SendMessages(CNode *pto)
                     // receiver rejects addr messages larger than 1000
                     if (vAddr.size() >= 1000)
                     {
+                        LOCK(pto->cs_vSend);
                         pto->PushMessage(NetMsgType::ADDR, vAddr);
                         vAddr.clear();
                     }
@@ -7403,7 +7420,7 @@ bool SendMessages(CNode *pto)
                 pto->PushMessage(NetMsgType::ADDR, vAddr);
         }
 
-        CNodeState &state = *State(pto->GetId());
+        CNodeState &state = *statep;
 
         // If a sync has been started check whether we received the first batch of headers requested within the timeout
         // period.
@@ -7419,17 +7436,15 @@ bool SendMessages(CNode *pto)
         }
 
         // Start block sync
-        if (pindexBestHeader == NULL)
-            pindexBestHeader = chainActive.Tip();
         // Download if this is a nice peer, or we have no nice peers and this one might do.
         bool fFetch = state.fPreferredDownload || (nPreferredDownload == 0 && !pto->fClient && !pto->fOneShot);
         if (!state.fSyncStarted && !pto->fClient && !fImporting && !fReindex)
         {
             // Only actively request headers from a single peer, unless we're close to today.
             if ((nSyncStarted < MAX_HEADER_REQS_DURING_IBD && fFetch) ||
-                chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - SINGLE_PEER_REQUEST_MODE_AGE)
+                tip->GetBlockTime() > GetAdjustedTime() - SINGLE_PEER_REQUEST_MODE_AGE)
             {
-                const CBlockIndex *pindexStart = chainActive.Tip();
+                const CBlockIndex *pindexStart = tip;
                 /* If possible, start at the block preceding the currently
                    best known header.  This ensures that we always get a
                    non-empty list of headers back as long as the peer
@@ -7450,6 +7465,7 @@ bool SendMessages(CNode *pto)
 
                     LogPrint("net", "initial getheaders (%d) to peer=%s (startheight:%d)\n", pindexStart->nHeight,
                         pto->GetLogName(), pto->nStartingHeight);
+                    LOCK(pto->cs_vSend);
                     pto->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexStart), uint256());
                 }
             }
@@ -7458,7 +7474,7 @@ bool SendMessages(CNode *pto)
         // Resend wallet transactions that haven't gotten in a block yet
         // Except during reindex, importing and IBD, when old wallet
         // transactions become unconfirmed and spams other nodes.
-        if (!fReindex && !fImporting && !IsInitialBlockDownload())
+        if (!fReindex && !fImporting && !isInitialBlockDownload)
         {
             GetMainSignals().Broadcast(nTimeBestReceived);
         }
@@ -7474,9 +7490,16 @@ bool SendMessages(CNode *pto)
             // If no header would connect, or if we have too many
             // blocks, or if the peer doesn't want headers, just
             // add all to the inv queue.
+            std::vector<uint256> blockHashesToAnnounce;
+            if (1)
+            {
             LOCK(pto->cs_inventory);
+            // make a copy so that we do not need to keep cs_inventory which cannot be taken before cs_main
+            blockHashesToAnnounce = pto->vBlockHashesToAnnounce;
+            }
+
             std::vector<CBlock> vHeaders;
-            bool fRevertToInv = (!state.fPreferHeaders || pto->vBlockHashesToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
+            bool fRevertToInv = (!state.fPreferHeaders || blockHashesToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
             CBlockIndex *pBestIndex = NULL; // last header queued for delivery
             ProcessBlockAvailability(pto->id); // ensure pindexBestKnownBlock is up-to-date
 
@@ -7486,18 +7509,23 @@ bool SendMessages(CNode *pto)
                 // Try to find first header that our peer doesn't have, and
                 // then send all headers past that one.  If we come across any
                 // headers that aren't on chainActive, give up.
-                BOOST_FOREACH (const uint256 &hash, pto->vBlockHashesToAnnounce)
+                BOOST_FOREACH (const uint256 &hash, blockHashesToAnnounce)
                 {
-                    BlockMap::iterator mi = mapBlockIndex.find(hash);
-                    // BU skip blocks that we don't know about.  was: assert(mi != mapBlockIndex.end());
-                    if (mi == mapBlockIndex.end())
-                        continue;
-                    CBlockIndex *pindex = mi->second;
-                    if (chainActive[pindex->nHeight] != pindex)
+                    CBlockIndex *pindex = NULL;
+                    if (1)
                     {
-                        // Bail out if we reorged away from this block
-                        fRevertToInv = true;
-                        break;
+                        LOCK(cs_main);
+                        BlockMap::iterator mi = mapBlockIndex.find(hash);
+                        // BU skip blocks that we don't know about.  was: assert(mi != mapBlockIndex.end());
+                        if (mi == mapBlockIndex.end())
+                            continue;
+                        pindex = mi->second;
+                        if (chainActive[pindex->nHeight] != pindex)
+                        {
+                            // Bail out if we reorged away from this block
+                            fRevertToInv = true;
+                            break;
+                        }
                     }
                     if (pBestIndex != NULL && pindex->pprev != pBestIndex)
                     {
@@ -7546,14 +7574,18 @@ bool SendMessages(CNode *pto)
                 // If falling back to using an inv, just try to inv the tip.
                 // The last entry in vBlockHashesToAnnounce was our tip at some point
                 // in the past.
-                if (!pto->vBlockHashesToAnnounce.empty())
+                if (!blockHashesToAnnounce.empty())
                 {
-                    BOOST_FOREACH (const uint256 &hashToAnnounce, pto->vBlockHashesToAnnounce)
+                    BOOST_FOREACH (const uint256 &hashToAnnounce, blockHashesToAnnounce)
                     {
-                        BlockMap::iterator mi = mapBlockIndex.find(hashToAnnounce);
-                        if (mi != mapBlockIndex.end())
+                        CBlockIndex *pindex = nullptr;
+                        if (1)
                         {
-                            CBlockIndex *pindex = mi->second;
+                            LOCK(cs_main);
+                            BlockMap::iterator mi = mapBlockIndex.find(hashToAnnounce);
+                            if (mi == mapBlockIndex.end())
+                                continue;
+                            pindex = mi->second;
 
                             // Warn if we're announcing a block that is not on the main chain.
                             // This should be very rare and could be optimized out.
@@ -7561,18 +7593,19 @@ bool SendMessages(CNode *pto)
                             if (chainActive[pindex->nHeight] != pindex)
                             {
                                 LogPrint("net", "Announcing block %s not on main chain (tip=%s)\n",
-                                    hashToAnnounce.ToString(), chainActive.Tip()->GetBlockHash().ToString());
+                                         hashToAnnounce.ToString(), chainActive.Tip()->GetBlockHash().ToString());
                             }
+                        }
 
-                            // If the peer announced this block to us, don't inv it back.
-                            // (Since block announcements may not be via inv's, we can't solely rely on
-                            // setInventoryKnown to track this.)
-                            if (!PeerHasHeader(&state, pindex))
-                            {
-                                pto->PushInventory(CInv(MSG_BLOCK, hashToAnnounce));
-                                LogPrint("net", "%s: sending inv peer=%d hash=%s\n", __func__, pto->id,
-                                    hashToAnnounce.ToString());
-                            }
+                        // If the peer announced this block to us, don't inv it back.
+                        // (Since block announcements may not be via inv's, we can't solely rely on
+                        // setInventoryKnown to track this.)
+                        if (!PeerHasHeader(&state, pindex))
+                        {
+                            LOCK(pto->cs_vSend);
+                            pto->PushInventory(CInv(MSG_BLOCK, hashToAnnounce));
+                            LogPrint("net", "%s: sending inv peer=%d hash=%s\n", __func__, pto->id,
+                                hashToAnnounce.ToString());
                         }
                     }
                 }
@@ -7589,10 +7622,15 @@ bool SendMessages(CNode *pto)
                     LogPrint("net", "%s: sending header %s to peer=%d\n", __func__,
                         vHeaders.front().GetHash().ToString(), pto->id);
                 }
+                LOCK(pto->cs_vSend);
                 pto->PushMessage(NetMsgType::HEADERS, vHeaders);
                 state.pindexBestHeaderSent = pBestIndex;
             }
-            pto->vBlockHashesToAnnounce.clear();
+            if (1)
+            {
+                LOCK(pto->cs_inventory);
+                pto->vBlockHashesToAnnounce.clear();
+            }
         }
 
         //
@@ -7654,6 +7692,7 @@ bool SendMessages(CNode *pto)
                 vInv.push_back(inv);
                 if (vInv.size() >= 1000)
                 {
+                    LOCK(pto->cs_vSend);
                     pto->PushMessage(NetMsgType::INV, vInv);
                     vInv.clear();
                 }
@@ -7661,7 +7700,10 @@ bool SendMessages(CNode *pto)
             pto->vInventoryToSend = vInvWait;
         }
         if (!vInv.empty())
+        {
+            LOCK(pto->cs_vSend);
             pto->PushMessage(NetMsgType::INV, vInv);
+        }
 
         // In case there is a block that has been in flight from this peer for 2 + 0.5 * N times the block interval
         // (with N the number of peers from which we're downloading validated blocks), disconnect due to timeout.
@@ -7693,6 +7735,7 @@ bool SendMessages(CNode *pto)
             std::vector<CBlockIndex *> vToDownload;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload);
             // LogPrint("req", "IBD AskFor %d blocks from peer=%s\n", vToDownload.size(), pto->GetLogName());
+            LOCK(cs_main); // AlreadyHave()
             BOOST_FOREACH (CBlockIndex *pindex, vToDownload)
             {
                 CInv inv(MSG_BLOCK, pindex->GetBlockHash());
@@ -7711,13 +7754,20 @@ bool SendMessages(CNode *pto)
         while (!pto->fDisconnect && !pto->mapAskFor.empty() && (*pto->mapAskFor.begin()).first <= nNow)
         {
             const CInv &inv = (*pto->mapAskFor.begin()).second;
-            if (!AlreadyHave(inv))
+            bool alreadyHave = false;
+            if (1)
+            {
+                LOCK(cs_main); // AlreadyHave()
+                alreadyHave = AlreadyHave(inv);
+            }
+            if (!alreadyHave)
             {
                 if (fDebug)
                     LogPrint("net", "Requesting %s peer=%d\n", inv.ToString(), pto->id);
                 vGetData.push_back(inv);
                 if (vGetData.size() >= 1000)
                 {
+                    LOCK(pto->cs_vSend);
                     pto->PushMessage(NetMsgType::GETDATA, vGetData);
                     vGetData.clear();
                 }
@@ -7731,7 +7781,10 @@ bool SendMessages(CNode *pto)
             pto->mapAskFor.erase(pto->mapAskFor.begin());
         }
         if (!vGetData.empty())
+        {
+            LOCK(pto->cs_vSend);
             pto->PushMessage(NetMsgType::GETDATA, vGetData);
+        }
     }
     return true;
 }

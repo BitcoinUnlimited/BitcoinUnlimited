@@ -8,6 +8,16 @@ else
 AM_CXXFLAGS = $(HARDENED_CXXFLAGS)
 AM_CPPFLAGS = $(HARDENED_CPPFLAGS)
 endif
+if ENABLE_GPERF
+AM_CXXFLAGS += -pg
+AM_CPPFLAGS += -pg
+AM_LDFLAGS  += -pg
+endif
+if ENABLE_MUTRACE
+AM_CXXFLAGS += -O0 -g -rdynamic
+AM_CPPFLAGS += -O0 -g -rdynamic
+AM_LDFLAGS  += -O0 -g -rdynamic
+endif
 EXTRA_LIBRARIES =
 # libtcmalloc.a
 
