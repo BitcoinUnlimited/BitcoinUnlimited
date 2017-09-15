@@ -1049,7 +1049,10 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
             return CFeeRate(0);
         }
     }
-    return std::max(CFeeRate(rollingMinimumFeeRate), minReasonableRelayFee);
+    static const double maxFeeCutoff =
+        boost::lexical_cast<double>(GetArg("-maxlimitertxfee", DEFAULT_MAXLIMITERTXFEE));
+    CFeeRate estimated_fee = std::max(CFeeRate(rollingMinimumFeeRate), minReasonableRelayFee);
+    return std::min(estimated_fee, CFeeRate(maxFeeCutoff));
 }
 
 void CTxMemPool::trackPackageRemoved(const CFeeRate& rate) {
