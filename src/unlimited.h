@@ -19,9 +19,11 @@
 #include "stat.h"
 #include "thinblock.h"
 #include "tweak.h"
+#include "txmempool.h"
 #include "univalue/include/univalue.h"
 #include <boost/thread.hpp>
 #include <list>
+#include <queue>
 #include <vector>
 
 enum
@@ -62,6 +64,31 @@ class CNodeRef;
 class CChainParams;
 
 extern uint256 bitcoinCashForkBlockHash;
+
+class CTxInputData
+{
+public:
+    CTransaction tx;
+    uint nodeId; // hold the id so I don't keep a ref to the node
+    bool whitelisted; 
+    std::string nodeName;
+};
+extern std::queue<CTxInputData> txInQ;
+extern CWaitableCriticalSection csTxInQ;
+extern CConditionVariable cvTxInQ;
+extern void ThreadTxHandler();
+
+class CTxCommitData
+{
+public:
+    CTxMemPoolEntry entry;
+    uint256 hash;
+    CTxMemPool::setEntries setAncestors;
+};
+extern std::queue<CTxCommitData> txCommitQ;
+extern CCriticalSection csTxCommitQ;
+extern void ThreadCommitToMempool();
+
 
 extern std::set<CBlockIndex *> setDirtyBlockIndex;
 extern uint32_t blockVersion; // Overrides the mined block version if non-zero
@@ -214,6 +241,7 @@ extern void IsChainNearlySyncdInit();
 extern uint64_t LargestBlockSeen(uint64_t nBlockSize = 0);
 extern int GetBlockchainHeight();
 
+extern bool AlreadyHaveOrphan(uint256 hash);
 // BUIP010 Xtreme Thinblocks: begin
 // Xpress Validation: begin
 // Transactions that have already been accepted into the memory pool do not need to be
@@ -224,6 +252,7 @@ extern std::set<uint256> setPreVerifiedTxHash;
 // Orphans that are added to the thinblock must be verifed since they have never been
 // accepted into the memory pool.  (Protected by cs_xval)
 extern std::set<uint256> setUnVerifiedOrphanTxHash;
+extern uint64_t nBytesOrphanPool;
 
 extern CCriticalSection cs_xval;
 // Xpress Validation: end
@@ -275,4 +304,30 @@ void InterruptBlockValidationThreads();
 
 extern CTweak<uint64_t> miningForkTime;
 extern CTweak<bool> onlyAcceptForkSig;
+
+/**
+ * Filter for transactions that were recently rejected by
+ * AcceptToMemoryPool. These are not rerequested until the chain tip
+ * changes, at which point the entire filter is reset. Protected by
+ * cs_main.
+ *
+ * Without this filter we'd be re-requesting txs from each of our peers,
+ * increasing bandwidth consumption considerably. For instance, with 100
+ * peers, half of which relay a tx we don't accept, that might be a 50x
+ * bandwidth increase. A flooding attacker attempting to roll-over the
+ * filter using minimum-sized, 60byte, transactions might manage to send
+ * 1000/sec if we have fast peers, so we pick 120,000 to give our peers a
+ * two minute window to send invs to us.
+ *
+ * Decreasing the false positive rate is fairly cheap, so we pick one in a
+ * million to make it highly unlikely for users to have issues with this
+ * filter.
+ *
+ * Memory used: 1.7MB
+ */
+extern boost::scoped_ptr<CRollingBloomFilter> recentRejects;
+extern CSharedCriticalSection csRecentRejects;
+
+extern bool TxAlreadyHave(const CInv &inv);
+
 #endif

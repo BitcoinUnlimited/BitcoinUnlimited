@@ -418,7 +418,7 @@ public:
         >
     > indexed_transaction_set;
 
-    mutable CCriticalSection cs;
+    mutable CSharedCriticalSection cs;
     indexed_transaction_set mapTx;
     typedef indexed_transaction_set::nth_index<0>::type::iterator txiter;
     struct CompareIteratorByHash {
@@ -479,7 +479,7 @@ public:
                         std::list<CTransaction>& conflicts, bool fCurrentEstimate = true);
     void clear();
     void _clear(); //lock free
-    void queryHashes(std::vector<uint256>& vtxid);
+    void queryHashes(std::vector<uint256>& vtxid) const;
     void pruneSpent(const uint256& hash, CCoins &coins);
     unsigned int GetTransactionsUpdated() const;
     void AddTransactionsUpdated(unsigned int n);
@@ -553,19 +553,19 @@ public:
 
     unsigned long size()
     {
-        LOCK(cs);
+        READLOCK(cs);
         return mapTx.size();
     }
 
     uint64_t GetTotalTxSize()
     {
-        LOCK(cs);
+        READLOCK(cs);
         return totalTxSize;
     }
 
     bool exists(uint256 hash) const
     {
-        LOCK(cs);
+        READLOCK(cs);
         return (mapTx.count(hash) != 0);
     }
 
@@ -603,6 +603,7 @@ public:
     bool ReadFeeEstimates(CAutoFile& filein);
 
     size_t DynamicMemoryUsage() const;
+    size_t _DynamicMemoryUsage() const;  // no locks taken
 
 private:
     /** UpdateForDescendants is used by UpdateTransactionsFromBlock to update

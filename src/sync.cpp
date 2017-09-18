@@ -202,17 +202,59 @@ CCriticalSection::CCriticalSection():name(NULL)
 
 CCriticalSection::CCriticalSection(const char* n):name(n)
 {
+// print the address of named critical sections so they can be found in the mutrace output
+#ifdef ENABLE_MUTRACE
+    if (name)
+    {
+        printf("CCriticalSection %s at %p\n", name, this);
+        fflush(stdout);
+    }
+#endif
 }
 
 CCriticalSection::~CCriticalSection()
 {
+#ifdef ENABLE_MUTRACE
   if (name)
     {
       printf("Destructing %s\n", name);
       fflush(stdout);
     }
+#endif
   DeleteCritical((void*) this);
 }
 #endif
+
+#ifdef DEBUG_LOCKORDER // BU normally CSharedCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical section from the lockorder map
+CSharedCriticalSection::CSharedCriticalSection():name(NULL)
+{
+}
+
+CSharedCriticalSection::CSharedCriticalSection(const char* n):name(n)
+{
+// print the address of named critical sections so they can be found in the mutrace output
+#ifdef ENABLE_MUTRACE
+    if (name)
+    {
+        printf("CSharedCriticalSection %s at %p\n", name, this);
+        fflush(stdout);
+    }
+#endif
+}
+
+CSharedCriticalSection::~CSharedCriticalSection()
+{
+#ifdef ENABLE_MUTRACE
+  if (name)
+    {
+      printf("Destructing CSharedCriticalSection %s\n", name);
+      fflush(stdout);
+    }
+#endif
+  DeleteCritical((void*) this);
+}
+#endif
+
+
 
 #endif /* DEBUG_LOCKORDER */

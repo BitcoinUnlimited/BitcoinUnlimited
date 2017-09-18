@@ -2355,7 +2355,15 @@ void StartNode(boost::thread_group &threadGroup, CScheduler &scheduler)
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "opencon", &ThreadOpenConnections));
 
     // Process messages
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msghand", &ThreadMessageHandler));
+    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msg1", &ThreadMessageHandler));
+    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msg2", &ThreadMessageHandler));
+    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msg3", &ThreadMessageHandler));
+
+    // Process transactions
+    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "tx1", &ThreadTxHandler));
+    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "tx2", &ThreadTxHandler));
+
+    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "txc", &ThreadCommitToMempool));
 
     // Dump network addresses
     scheduler.scheduleEvery(&DumpData, DUMP_ADDRESSES_INTERVAL);
@@ -2861,11 +2869,15 @@ CNode::~CNode()
 
 void CNode::AskFor(const CInv &inv)
 {
-    if (mapAskFor.size() > MAPASKFOR_MAX_SZ || setAskFor.size() > SETASKFOR_MAX_SZ)
-        return;
-    // a peer may not have multiple non-responded queue positions for a single inv item
-    if (!setAskFor.insert(inv.hash).second)
-        return;
+    if (1)
+    {
+        LOCK(csAskFor);
+        if (mapAskFor.size() > MAPASKFOR_MAX_SZ || setAskFor.size() > SETASKFOR_MAX_SZ)
+            return;
+        // a peer may not have multiple non-responded queue positions for a single inv item
+        if (!setAskFor.insert(inv.hash).second)
+            return;
+    }
 
     // We're using mapAskFor as a priority queue,
     // the key is the earliest time the request can be sent
@@ -2891,6 +2903,7 @@ void CNode::AskFor(const CInv &inv)
         mapAlreadyAskedFor.update(it, nRequestTime);
     else
         mapAlreadyAskedFor.insert(std::make_pair(inv.hash, nRequestTime));
+    LOCK(csAskFor);
     mapAskFor.insert(std::make_pair(nRequestTime, inv));
 }
 

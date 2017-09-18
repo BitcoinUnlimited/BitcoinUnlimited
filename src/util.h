@@ -42,6 +42,10 @@
 #define DbgAssert(pred, execInRelease) do { if (!(pred)) { LogPrintStr(std::string(__FILE__ "(" DbgStringifyIntLiteral(__LINE__) "): Debug Assertion failed: \"" #pred "\"\n")); execInRelease; }} while(0)
 #endif
 
+#define UNIQUE2(pfx,LINE) pfx##LINE
+#define UNIQUE1(pfx,LINE) UNIQUE2(pfx, LINE)
+#define UNIQUIFY(pfx) UNIQUE1(pfx,__LINE__)
+
 static const bool DEFAULT_LOGTIMEMICROS = false;
 static const bool DEFAULT_LOGIPS        = true;
 static const bool DEFAULT_LOGTIMESTAMPS = true;

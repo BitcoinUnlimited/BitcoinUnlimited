@@ -130,7 +130,7 @@ bool validate(const TxoGroup& grp,const CAmount targetValue)
   size_t limitDescendantSize = GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT)*1000;
   std::string errString;
   
-  LOCK(mempool.cs);
+  READLOCK(mempool.cs);
   bool ret = mempool.ValidateMemPoolAncestors(txIn, limitAncestorCount, limitAncestorSize, limitDescendantsCount, limitDescendantSize, errString);
   if (!ret)
     {

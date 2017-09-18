@@ -247,6 +247,11 @@ public:
         assert(WIDTH >= 2);
         return pn[0] | (uint64_t)pn[1] << 32;
     }
+    uint32_t slice32(uint8_t idx) const
+    {
+        if (idx >= WIDTH) return 0;
+        return pn[idx];
+    }
 };
 
 /** 256-bit unsigned big integer. */

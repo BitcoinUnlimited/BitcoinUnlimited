@@ -163,7 +163,8 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
 
     {
         LOCK(cs_orphancache);
-        LOCK2(mempool.cs, cs_xval);
+        READLOCK(mempool.cs);
+        LOCK(cs_xval);
         int missingCount = 0;
         int unnecessaryCount = 0;
 
@@ -383,7 +384,8 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // With xThinBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
     {
         LOCK(cs_orphancache);
-        LOCK2(mempool.cs, cs_xval);
+        READLOCK(mempool.cs);
+        LOCK(cs_xval);
         if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
             return false;
     }
@@ -712,7 +714,8 @@ bool CXThinBlock::process(CNode *pfrom,
 
         // We don't have to keep the lock on mempool.cs here to do mempool.queryHashes
         // but we take the lock anyway so we don't have to re-lock again later.
-        LOCK2(mempool.cs, cs_xval);
+        READLOCK(mempool.cs);
+        LOCK(cs_xval);
         mempool.queryHashes(memPoolHashes);
 
         for (uint64_t i = 0; i < memPoolHashes.size(); i++)
@@ -1644,7 +1647,8 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
     vector<TxCoinAgePriority> vPriority;
     TxCoinAgePriorityCompare pricomparer;
     {
-        LOCK2(cs_main, mempool.cs);
+        LOCK(cs_main);
+        READLOCK(mempool.cs);
         if (mempool.mapTx.size() > 0)
         {
             CBlockIndex *pindexPrev = chainActive.Tip();

@@ -41,6 +41,7 @@
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
+#include <boost/lockfree/queue.hpp>
 #include <inttypes.h>
 #include <iomanip>
 #include <list>
@@ -58,15 +59,15 @@ boost::thread_specific_ptr<LockStack> lockstack;
 std::atomic<bool> fIsInitialBlockDownload{false};
 
 // main.cpp CriticalSections:
-CCriticalSection cs_LastBlockFile;
-CCriticalSection cs_nBlockSequenceId;
+CRITSEC( cs_LastBlockFile);
+CRITSEC( cs_nBlockSequenceId);
 
-CCriticalSection cs_nTimeOffset;
+CRITSEC( cs_nTimeOffset);
 int64_t nTimeOffset = 0;
 
-CCriticalSection cs_rpcWarmup;
+CRITSEC( cs_rpcWarmup);
 
-CCriticalSection cs_main;
+CRITSEC( cs_main);
 BlockMap mapBlockIndex;
 CChain chainActive;
 CWaitableCriticalSection csBestBlock;
@@ -74,7 +75,7 @@ CConditionVariable cvBlockChange;
 
 proxyType proxyInfo[NET_MAX];
 proxyType nameProxy;
-CCriticalSection cs_proxyInfos;
+CRITSEC( cs_proxyInfos);
 
 // moved from main.cpp (now part of nodestate.h)
 std::map<uint256, pair<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
@@ -82,23 +83,23 @@ std::map<NodeId, CNodeState> mapNodeState;
 
 set<uint256> setPreVerifiedTxHash;
 set<uint256> setUnVerifiedOrphanTxHash;
-CCriticalSection cs_xval;
-CCriticalSection cs_vNodes;
-CCriticalSection cs_mapLocalHost;
+CRITSEC( cs_xval);
+CRITSEC( cs_vNodes);
+CRITSEC( cs_mapLocalHost);
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
 uint64_t CNode::nTotalBytesRecv = 0;
 uint64_t CNode::nTotalBytesSent = 0;
-CCriticalSection CNode::cs_totalBytesRecv;
-CCriticalSection CNode::cs_totalBytesSent;
+CRITSEC( CNode::cs_totalBytesRecv);
+CRITSEC( CNode::cs_totalBytesSent);
 
 // critical sections from net.cpp
-CCriticalSection cs_setservAddNodeAddresses;
-CCriticalSection cs_vAddedNodes;
-CCriticalSection cs_vUseDNSSeeds;
-CCriticalSection cs_mapInboundConnectionTracker;
-CCriticalSection cs_vOneShots;
+CRITSEC( cs_setservAddNodeAddresses);
+CRITSEC( cs_vAddedNodes);
+CRITSEC( cs_vUseDNSSeeds);
+CRITSEC( cs_mapInboundConnectionTracker);
+CRITSEC( cs_vOneShots);
 
-CCriticalSection cs_statMap;
+CRITSEC( cs_statMap);
 
 deque<string> vOneShots;
 std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
@@ -137,7 +138,7 @@ CTweakMap tweaks;
 
 map<CInv, CDataStream> mapRelay;
 deque<pair<int64_t, CInv> > vRelayExpiration;
-CCriticalSection cs_mapRelay;
+CRITSEC( cs_mapRelay);
 limitedmap<uint256, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
 
 vector<CNode *> vNodes;
@@ -148,9 +149,15 @@ CNodeSignals g_signals;
 CAddrMan addrman;
 CDoSManager dosMan;
 
+std::queue<CTxInputData> txInQ;
+CWaitableCriticalSection csTxInQ;
+CConditionVariable cvTxInQ;
+std::queue<CTxCommitData> txCommitQ;
+CCriticalSection csTxCommitQ;
+
 // BU: change locking of orphan map from using cs_main to cs_orphancache.  There is too much dependance on cs_main locks
 // which are generally too broad in scope.
-CCriticalSection cs_orphancache;
+CRITSEC( cs_orphancache);
 map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs_orphancache);
 map<uint256, set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs_orphancache);
 
@@ -295,8 +302,11 @@ CStatHistory<uint64_t> recvAmt;
 CStatHistory<uint64_t> sendAmt;
 CStatHistory<uint64_t> nTxValidationTime("txValidationTime", STAT_OP_MAX | STAT_INDIVIDUAL);
 CStatHistory<uint64_t> nBlockValidationTime("blockValidationTime", STAT_OP_MAX | STAT_INDIVIDUAL);
-CCriticalSection cs_blockvalidationtime;
+CRITSEC(cs_blockvalidationtime);
 
 CThinBlockData thindata; // Singleton class
 
 uint256 bitcoinCashForkBlockHash = uint256S("000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec");
+
+SCRITSEC(csRecentRejects);
+boost::scoped_ptr<CRollingBloomFilter> recentRejects;

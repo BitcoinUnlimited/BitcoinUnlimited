@@ -695,5 +695,11 @@ public:
 };
 #endif
 
+void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);
+extern CStatHistory<uint64_t> nTxValidationTime;;
+std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx,
+    int flags, std::vector<int> *prevHeights, const CBlockIndex &block);
+
+bool EvaluateSequenceLocks(const CBlockIndex &block, std::pair<int, int64_t> lockPair);
 
 #endif // BITCOIN_MAIN_H

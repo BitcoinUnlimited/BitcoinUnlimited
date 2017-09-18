@@ -181,7 +181,8 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
     pblocktemplate->vTxFees.push_back(-1); // updated at end
     pblocktemplate->vTxSigOps.push_back(-1); // updated at end
 
-    LOCK2(cs_main, mempool.cs);
+    LOCK(cs_main);
+    READLOCK(mempool.cs);
     CBlockIndex *pindexPrev = chainActive.Tip();
     nHeight = pindexPrev->nHeight + 1;
 

@@ -320,7 +320,7 @@ bool CUnknownObj::AddSource(CNode *from)
     {
         LogPrint("req", "AddSource %s is available at %s.\n", obj.ToString(), from->GetLogName());
         {
-            LOCK(cs_vNodes); // This lock is needed to ensure that AddRef happens atomically
+            // no longer needed (ref count is an atomic) LOCK(cs_vNodes); // This lock is needed to ensure that AddRef happens atomically
             from->AddRef();
         }
         CNodeRequestData req(from);
@@ -654,7 +654,11 @@ void CRequestManager::SendRequests()
                             item.outstandingReqs++;
                             item.lastRequestTime = now;
                             LEAVE_CRITICAL_SECTION(cs_objDownloader);  // do not use "item" after releasing this
-                            next.node->mapAskFor.insert(std::make_pair(now, obj));
+                            if (1)
+                            {
+                                LOCK(next.node->csAskFor);
+                                next.node->mapAskFor.insert(std::make_pair(now, obj));
+                            }
                             ENTER_CRITICAL_SECTION(cs_objDownloader);
                         }
                         {

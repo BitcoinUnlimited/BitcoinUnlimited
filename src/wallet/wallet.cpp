@@ -1316,7 +1316,7 @@ void CWallet::ReacceptWalletTransactions()
     {
         CWalletTx& wtx = *(item.second);
 
-        LOCK(mempool.cs);
+        WRITELOCK(mempool.cs);
         wtx.AcceptToMemoryPool(false);
         SyncWithWallets(wtx,NULL);
     }
@@ -1510,7 +1510,6 @@ CAmount CWalletTx::GetChange() const
 
 bool CWalletTx::InMempool() const
 {
-    LOCK(mempool.cs);
     if (mempool.exists(GetHash())) {
         return true;
     }

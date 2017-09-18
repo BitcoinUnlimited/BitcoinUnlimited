@@ -184,7 +184,7 @@ UniValue mempoolToJSON(bool fVerbose = false)
 {
     if (fVerbose)
     {
-        LOCK(mempool.cs);
+        READLOCK(mempool.cs);
         UniValue o(UniValue::VOBJ);
         BOOST_FOREACH(const CTxMemPoolEntry& e, mempool.mapTx)
         {
@@ -535,7 +535,7 @@ UniValue gettxout(const UniValue& params, bool fHelp)
 
     CCoins coins;
     if (fMempool) {
-        LOCK(mempool.cs);
+        WRITELOCK(mempool.cs);
         CCoinsViewMemPool view(pcoinsTip, mempool);
         if (!view.GetCoins(hash, coins))
             return NullUniValue;
