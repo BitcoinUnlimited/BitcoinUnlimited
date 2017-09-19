@@ -2533,27 +2533,36 @@ void ThreadCommitToMempool()
                 continue;
         }
 
-        LOCK2(cs_main, csTxCommitQ);
-        while (!txCommitQ.empty())
+        if (1)
         {
-            CTxCommitData &data = txCommitQ.front();
-            // Store transaction in memory
-            mempool.addUnchecked(data.hash, data.entry, data.setAncestors, !IsInitialBlockDownload());
-            if (mempool.exists(data.hash))
-                SyncWithWallets(data.entry.GetTx(), NULL);
-            vWorkQueue.push_back(data.hash);
+            LOCK2(cs_main, csTxCommitQ);
+            while (!txCommitQ.empty())
+            {
+                CTxCommitData &data = txCommitQ.front();
+                // Store transaction in memory
+                mempool.addUnchecked(data.hash, data.entry, data.setAncestors, !IsInitialBlockDownload());
+                if (mempool.exists(data.hash))
+                    SyncWithWallets(data.entry.GetTx(), NULL);
+                vWorkQueue.push_back(data.hash);
 
-            txCommitQ.pop();
+                txCommitQ.pop();
+            }
+
+            processOrphans(vWorkQueue);
+            mempool.check(pcoinsTip);
+            // BU - Xtreme Thinblocks - trim the orphan pool by entry time and do not allow it to be overidden.
+            LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
+                GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+
+            // BU: update tx per second when a tx is valid and accepted
+            mempool.UpdateTransactionsPerSecond();
         }
 
-        processOrphans(vWorkQueue);
-        mempool.check(pcoinsTip);
-        // BU - Xtreme Thinblocks - trim the orphan pool by entry time and do not allow it to be overidden.
-        LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
-            GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
-
-        // BU: update tx per second when a tx is valid and accepted
-        mempool.UpdateTransactionsPerSecond();
+        CValidationState state;
+        FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
+        // The flush to disk above is only periodic therefore we need to continuously trim any excess from the
+        // cache.
+        pcoinsTip->Trim(nCoinCacheUsage);
     }
 }
 
@@ -2627,7 +2636,6 @@ void ThreadTxHandler()
 
             if (ParallelAcceptToMemoryPool(ss, mempool, state, tx, true, &fMissingInputs, false, false, vHashTxToUncache))
             {
-                
                 mempool.check(pcoinsTip);
                 RelayTransaction(tx);
 
@@ -2682,11 +2690,6 @@ void ThreadTxHandler()
 #endif                    
                 }
             }
-            FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
-
-            // The flush to disk above is only periodic therefore we need to continuously trim any excess from the
-            // cache.
-            pcoinsTip->Trim(nCoinCacheUsage);
         }
     }
 }

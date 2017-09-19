@@ -140,6 +140,7 @@ map<CInv, CDataStream> mapRelay;
 deque<pair<int64_t, CInv> > vRelayExpiration;
 CRITSEC( cs_mapRelay);
 limitedmap<uint256, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
+CRITSEC( cs_mapAlreadyAskedFor);
 
 vector<CNode *> vNodes;
 list<CNode *> vNodesDisconnected;
@@ -153,7 +154,7 @@ std::queue<CTxInputData> txInQ;
 CWaitableCriticalSection csTxInQ;
 CConditionVariable cvTxInQ;
 std::queue<CTxCommitData> txCommitQ;
-CCriticalSection csTxCommitQ;
+CRITSEC(csTxCommitQ);
 
 // BU: change locking of orphan map from using cs_main to cs_orphancache.  There is too much dependance on cs_main locks
 // which are generally too broad in scope.
@@ -310,3 +311,19 @@ uint256 bitcoinCashForkBlockHash = uint256S("000000000000000000651ef99cb9fcbe0da
 
 SCRITSEC(csRecentRejects);
 boost::scoped_ptr<CRollingBloomFilter> recentRejects;
+
+#ifdef ENABLE_MUTRACE
+class PrintSomePointers
+{
+public:
+    PrintSomePointers()
+    {
+        printf("csBestBlock %p\n", &csBestBlock);
+        printf("cvBlockChange %p\n", &cvBlockChange);
+        printf("csTxInQ %p\n", &csTxInQ);
+        printf("cvTxInQ %p\n", &cvTxInQ);
+    }
+};
+
+static PrintSomePointers unused;
+#endif

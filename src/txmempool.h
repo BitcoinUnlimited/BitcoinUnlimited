@@ -473,8 +473,10 @@ public:
     bool addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry, setEntries &setAncestors, bool fCurrentEstimate = true);
 
     void remove(const CTransaction &tx, std::list<CTransaction>& removed, bool fRecursive = false);
+    void _remove(const CTransaction &tx, std::list<CTransaction>& removed, bool fRecursive = false);
     void removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags);
     void removeConflicts(const CTransaction &tx, std::list<CTransaction>& removed);
+    void _removeConflicts(const CTransaction &tx, std::list<CTransaction>& removed);
     void removeForBlock(const std::vector<CTransaction>& vtx, unsigned int nBlockHeight,
                         std::list<CTransaction>& conflicts, bool fCurrentEstimate = true);
     void clear();
@@ -493,6 +495,7 @@ public:
     void PrioritiseTransaction(const uint256 hash, const std::string strHash, double dPriorityDelta, const CAmount& nFeeDelta);
     void ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount &nFeeDelta) const;
     void ClearPrioritisation(const uint256 hash);
+    void _ClearPrioritisation(const uint256 hash);
 
 public:
     /** Remove a set of transactions from the mempool.
@@ -577,8 +580,9 @@ public:
     }
     // BU: end
 
-    bool lookup(uint256 hash, CTxMemPoolEntry& result) const;
-    bool lookup(uint256 hash, CTransaction& result) const;
+    bool lookup(const uint256& hash, CTxMemPoolEntry& result) const;
+    bool _lookup(const uint256& hash, CTxMemPoolEntry& result) const;
+    bool lookup(const uint256& hash, CTransaction& result) const;
 
     /** Estimate fee rate needed to get into the next nBlocks
      *  If no answer can be given at nBlocks, return an estimate

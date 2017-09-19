@@ -96,8 +96,8 @@ static const bool DEFAULT_FORCEBITNODES = false;
 // BITCOINUNLIMITED END
 
 static const bool DEFAULT_FORCEDNSSEED = false;
-static const size_t DEFAULT_MAXRECEIVEBUFFER = 5 * 1000;
-static const size_t DEFAULT_MAXSENDBUFFER = 1 * 1000;
+static const size_t DEFAULT_MAXRECEIVEBUFFER = 40 * 1000;
+static const size_t DEFAULT_MAXSENDBUFFER = 10 * 1000;
 
 unsigned int ReceiveFloodSize();
 unsigned int SendBufferSize();
@@ -198,6 +198,7 @@ extern std::map<CInv, CDataStream> mapRelay;
 extern std::deque<std::pair<int64_t, CInv> > vRelayExpiration;
 extern CCriticalSection cs_mapRelay;
 extern limitedmap<uint256, int64_t> mapAlreadyAskedFor;
+extern CCriticalSection cs_mapAlreadyAskedFor;
 
 extern std::vector<std::string> vAddedNodes;
 extern CCriticalSection cs_vAddedNodes;

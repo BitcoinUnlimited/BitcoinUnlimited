@@ -556,42 +556,54 @@ void CTxMemPool::CalculateDescendants(txiter entryit, setEntries &setDescendants
     }
 }
 
-void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransaction>& removed, bool fRecursive)
+void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransaction> &removed, bool fRecursive)
+{
+    WRITELOCK(cs);
+    _remove(origTx, removed, fRecursive);
+}
+
+void CTxMemPool::_remove(const CTransaction &origTx, std::list<CTransaction> &removed, bool fRecursive)
 {
     // Remove transaction from memory pool
+    setEntries txToRemove;
+    txiter origit = mapTx.find(origTx.GetHash());
+    if (origit != mapTx.end())
     {
-        WRITELOCK(cs);
-        setEntries txToRemove;
-        txiter origit = mapTx.find(origTx.GetHash());
-        if (origit != mapTx.end()) {
-            txToRemove.insert(origit);
-        } else if (fRecursive) {
-            // If recursively removing but origTx isn't in the mempool
-            // be sure to remove any children that are in the pool. This can
-            // happen during chain re-orgs if origTx isn't re-accepted into
-            // the mempool for any reason.
-            for (unsigned int i = 0; i < origTx.vout.size(); i++) {
-                std::map<COutPoint, CInPoint>::iterator it = mapNextTx.find(COutPoint(origTx.GetHash(), i));
-                if (it == mapNextTx.end())
-                    continue;
-                txiter nextit = mapTx.find(it->second.ptx->GetHash());
-                assert(nextit != mapTx.end());
-                txToRemove.insert(nextit);
-            }
-        }
-        setEntries setAllRemoves;
-        if (fRecursive) {
-            BOOST_FOREACH(txiter it, txToRemove) {
-                CalculateDescendants(it, setAllRemoves);
-            }
-        } else {
-            setAllRemoves.swap(txToRemove);
-        }
-        BOOST_FOREACH(txiter it, setAllRemoves) {
-            removed.push_back(it->GetTx());
-        }
-        RemoveStaged(setAllRemoves);
+        txToRemove.insert(origit);
     }
+    else if (fRecursive)
+    {
+        // If recursively removing but origTx isn't in the mempool
+        // be sure to remove any children that are in the pool. This can
+        // happen during chain re-orgs if origTx isn't re-accepted into
+        // the mempool for any reason.
+        for (unsigned int i = 0; i < origTx.vout.size(); i++)
+        {
+            std::map<COutPoint, CInPoint>::iterator it = mapNextTx.find(COutPoint(origTx.GetHash(), i));
+            if (it == mapNextTx.end())
+                continue;
+            txiter nextit = mapTx.find(it->second.ptx->GetHash());
+            assert(nextit != mapTx.end());
+            txToRemove.insert(nextit);
+        }
+    }
+    setEntries setAllRemoves;
+    if (fRecursive)
+    {
+        BOOST_FOREACH (txiter it, txToRemove)
+        {
+            CalculateDescendants(it, setAllRemoves);
+        }
+    }
+    else
+    {
+        setAllRemoves.swap(txToRemove);
+    }
+    BOOST_FOREACH (txiter it, setAllRemoves)
+    {
+        removed.push_back(it->GetTx());
+    }
+    RemoveStaged(setAllRemoves);
 }
 
 void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags)
@@ -626,23 +638,27 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
     }
     BOOST_FOREACH(const CTransaction& tx, transactionsToRemove) {
         list<CTransaction> removed;
-        remove(tx, removed, true);
+        _remove(tx, removed, true);
     }
 }
 
 void CTxMemPool::removeConflicts(const CTransaction &tx, std::list<CTransaction>& removed)
 {
-    // Remove transactions which depend on inputs of tx, recursively
-    list<CTransaction> result;
     WRITELOCK(cs);
+    _removeConflicts(tx, removed);
+}
+
+void CTxMemPool::_removeConflicts(const CTransaction &tx, std::list<CTransaction>& removed)
+{
+    // Remove transactions which depend on inputs of tx, recursively
     BOOST_FOREACH(const CTxIn &txin, tx.vin) {
         std::map<COutPoint, CInPoint>::iterator it = mapNextTx.find(txin.prevout);
         if (it != mapNextTx.end()) {
             const CTransaction &txConflict = *it->second.ptx;
             if (txConflict != tx)
             {
-                remove(txConflict, removed, true);
-                ClearPrioritisation(txConflict.GetHash());
+                _remove(txConflict, removed, true);
+                _ClearPrioritisation(txConflict.GetHash());
             }
         }
     }
@@ -667,9 +683,9 @@ void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtx, unsigned i
     BOOST_FOREACH(const CTransaction& tx, vtx)
     {
         std::list<CTransaction> dummy;
-        remove(tx, dummy, false);
-        removeConflicts(tx, conflicts);
-        ClearPrioritisation(tx.GetHash());
+        _remove(tx, dummy, false);
+        _removeConflicts(tx, conflicts);
+        _ClearPrioritisation(tx.GetHash());
     }
     // After the txs in the new block have been removed from the mempool, update policy estimates
     minerPolicyEstimator->processBlock(nBlockHeight, entries, fCurrentEstimate);
@@ -814,7 +830,13 @@ void CTxMemPool::queryHashes(vector<uint256>& vtxid) const
         vtxid.push_back(mi->GetTx().GetHash());
 }
 
-bool CTxMemPool::lookup(uint256 hash, CTxMemPoolEntry& result) const
+bool CTxMemPool::lookup(const uint256& hash, CTxMemPoolEntry& result) const
+{
+    READLOCK(cs);
+    _lookup(hash,result);
+}
+
+bool CTxMemPool::_lookup(const uint256& hash, CTxMemPoolEntry& result) const
 {
     AssertLockHeld(cs);
     indexed_transaction_set::const_iterator i = mapTx.find(hash);
@@ -823,7 +845,7 @@ bool CTxMemPool::lookup(uint256 hash, CTxMemPoolEntry& result) const
     return true;
 }
 
-bool CTxMemPool::lookup(uint256 hash, CTransaction& result) const
+bool CTxMemPool::lookup(const uint256& hash, CTransaction& result) const
 {
     AssertLockHeld(cs);
     indexed_transaction_set::const_iterator i = mapTx.find(hash);
@@ -913,7 +935,7 @@ void CTxMemPool::PrioritiseTransaction(const uint256 hash, const string strHash,
 
 void CTxMemPool::ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount &nFeeDelta) const
 {
-    WRITELOCK(cs);
+    READLOCK(cs);
     std::map<uint256, std::pair<double, CAmount> >::const_iterator pos = mapDeltas.find(hash);
     if (pos == mapDeltas.end())
         return;
@@ -925,6 +947,10 @@ void CTxMemPool::ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount
 void CTxMemPool::ClearPrioritisation(const uint256 hash)
 {
     WRITELOCK(cs);
+    mapDeltas.erase(hash);
+}
+void CTxMemPool::_ClearPrioritisation(const uint256 hash)
+{
     mapDeltas.erase(hash);
 }
 

@@ -1135,9 +1135,16 @@ void ThreadSocketHandler()
             have_fds = true;
         }
 
+        vector<CNode *> vNodesCopy;
         {
             LOCK(cs_vNodes);
-            BOOST_FOREACH (CNode *pnode, vNodes)
+            vNodesCopy = vNodes;
+            BOOST_FOREACH (CNode *pnode, vNodesCopy)
+                pnode->AddRef();
+        }
+
+        {
+            BOOST_FOREACH (CNode *pnode, vNodesCopy)
             {
                 // It is necessary to use a temporary variable to ensure that pnode->hSocket is not changed by another
                 // thread during execution.
@@ -1213,13 +1220,6 @@ void ThreadSocketHandler()
         //
         // Service each socket
         //
-        vector<CNode *> vNodesCopy;
-        {
-            LOCK(cs_vNodes);
-            vNodesCopy = vNodes;
-            BOOST_FOREACH (CNode *pnode, vNodesCopy)
-                pnode->AddRef();
-        }
         BOOST_FOREACH (CNode *pnode, vNodesCopy)
         {
             boost::this_thread::interruption_point();
@@ -1333,7 +1333,7 @@ void ThreadSocketHandler()
             }
         }
         {
-            LOCK(cs_vNodes);
+            // not needed, release is atomic: LOCK(cs_vNodes);
             BOOST_FOREACH (CNode *pnode, vNodesCopy)
                 pnode->Release();
         }
@@ -2117,7 +2117,7 @@ void ThreadMessageHandler()
         }
 
         {
-            LOCK(cs_vNodes);
+            // no need to lock here, because I am accessing the copy and pnode must exist until I release  LOCK(cs_vNodes);
             BOOST_FOREACH (CNode *pnode, vNodesCopy)
                 pnode->Release();
         }
@@ -2882,13 +2882,6 @@ void CNode::AskFor(const CInv &inv)
     // We're using mapAskFor as a priority queue,
     // the key is the earliest time the request can be sent
     int64_t nRequestTime;
-    limitedmap<uint256, int64_t>::const_iterator it = mapAlreadyAskedFor.find(inv.hash);
-    if (it != mapAlreadyAskedFor.end())
-        nRequestTime = it->second;
-    else
-        nRequestTime = 0;
-    LogPrint("net", "askfor %s  %d (%s) peer=%d\n", inv.ToString(), nRequestTime,
-        DateTimeStrFormat("%H:%M:%S", nRequestTime / 1000000), id);
 
     // Make sure not to reuse time indexes to keep things in the same order
     int64_t nNow = GetTimeMicros() - 1000000;
@@ -2897,12 +2890,26 @@ void CNode::AskFor(const CInv &inv)
     nNow = std::max(nNow, nLastTime);
     nLastTime = nNow;
 
-    // Each retry is 2 minutes after the last
-    nRequestTime = std::max(nRequestTime + 2 * 60 * 1000000, nNow);
-    if (it != mapAlreadyAskedFor.end())
-        mapAlreadyAskedFor.update(it, nRequestTime);
-    else
-        mapAlreadyAskedFor.insert(std::make_pair(inv.hash, nRequestTime));
+    if (1)
+    {
+        limitedmap<uint256, int64_t>::const_iterator it = mapAlreadyAskedFor.find(inv.hash);
+        if (it != mapAlreadyAskedFor.end())
+            nRequestTime = it->second;
+        else
+            nRequestTime = 0;
+
+        LogPrint("net", "askfor %s  %d (%s) peer=%d\n", inv.ToString(), nRequestTime,
+            DateTimeStrFormat("%H:%M:%S", nRequestTime / 1000000), id);
+
+        // Each retry is 2 minutes after the last
+        nRequestTime = std::max(nRequestTime + 2 * 60 * 1000000, nNow);
+
+        LOCK(cs_mapAlreadyAskedFor);
+        if (it != mapAlreadyAskedFor.end())
+            mapAlreadyAskedFor.update(it, nRequestTime);
+        else
+            mapAlreadyAskedFor.insert(std::make_pair(inv.hash, nRequestTime));
+    }
     LOCK(csAskFor);
     mapAskFor.insert(std::make_pair(nRequestTime, inv));
 }

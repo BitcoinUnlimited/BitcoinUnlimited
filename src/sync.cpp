@@ -195,7 +195,9 @@ void AssertLockHeldInternal(const char* pszName, const char* pszFile, int nLine,
     abort();
 }
 
-#ifdef DEBUG_LOCKORDER // BU normally CCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical section from the lockorder map
+// BU normally CCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical
+// section from the lockorder map
+#ifdef DEBUG_LOCKORDER
 CCriticalSection::CCriticalSection():name(NULL)
 {
 }
@@ -215,13 +217,13 @@ CCriticalSection::CCriticalSection(const char* n):name(n)
 CCriticalSection::~CCriticalSection()
 {
 #ifdef ENABLE_MUTRACE
-  if (name)
+    if (name)
     {
-      printf("Destructing %s\n", name);
-      fflush(stdout);
+        printf("Destructing %s\n", name);
+        fflush(stdout);
     }
 #endif
-  DeleteCritical((void*) this);
+    DeleteCritical((void *)this);
 }
 #endif
 
@@ -245,16 +247,15 @@ CSharedCriticalSection::CSharedCriticalSection(const char* n):name(n)
 CSharedCriticalSection::~CSharedCriticalSection()
 {
 #ifdef ENABLE_MUTRACE
-  if (name)
+    if (name)
     {
-      printf("Destructing CSharedCriticalSection %s\n", name);
-      fflush(stdout);
+        printf("Destructing CSharedCriticalSection %s\n", name);
+        fflush(stdout);
     }
 #endif
-  DeleteCritical((void*) this);
+    DeleteCritical((void *)this);
 }
 #endif
-
 
 
 #endif /* DEBUG_LOCKORDER */

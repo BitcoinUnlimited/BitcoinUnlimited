@@ -243,7 +243,7 @@ private:
         file = pszFile;
         line = nLine;
         EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()));
-        LogPrint("lck","try ReadLock %p %s by %d\n", this, name ? name : "", boost::this_thread::get_id());
+        LogPrint("lck","try ReadLock %p %s by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
 #ifdef DEBUG_LOCKCONTENTION
         if (!lock.try_lock()) {
             PrintLockContention(pszName, pszFile, nLine);
@@ -252,7 +252,7 @@ private:
 #ifdef DEBUG_LOCKCONTENTION
         }
 #endif
-        LogPrint("lck","ReadLock %p %s taken by %d\n", this, name ? name : "", boost::this_thread::get_id());
+        LogPrint("lck","ReadLock %p %s taken by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
         lockedTime = GetStopwatch();
         if (lockedTime - startWait > LOCK_WARN_TIME)
           {

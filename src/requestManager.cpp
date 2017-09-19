@@ -58,9 +58,10 @@ extern void MarkBlockAsInFlight(NodeId nodeid,
 // note mark block as in flight is redundant with the request manager now...
 
 CRequestManager::CRequestManager()
-    : inFlightTxns("reqMgr/inFlight", STAT_OP_MAX), receivedTxns("reqMgr/received"), rejectedTxns("reqMgr/rejected"),
+    : cs_objDownloader("reqmgr.cs_objDownloader"),
+      inFlightTxns("reqMgr/inFlight", STAT_OP_MAX), receivedTxns("reqMgr/received"), rejectedTxns("reqMgr/rejected"),
       droppedTxns("reqMgr/dropped", STAT_KEEP), pendingTxns("reqMgr/pending", STAT_KEEP),
-      requestPacer(512, 256) // Max and average # of requests that can be made per second
+      requestPacer(16384, 8192) // Max and average # of requests that can be made per second
       ,
       blockPacer(64, 32) // Max and average # of block requests that can be made per second
 {
@@ -81,7 +82,7 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
     droppedTxns -= (item.outstandingReqs - 1);
     pendingTxns -= 1;
 
-    LOCK(cs_vNodes);
+    // shouldn't need this because node's release is atomic: LOCK(cs_vNodes);
 
     // remove all the source nodes
     for (CUnknownObj::ObjectSourceList::iterator i = item.availableFrom.begin(); i != item.availableFrom.end(); ++i)
@@ -517,7 +518,7 @@ void CRequestManager::SendRequests()
                         }
                         if (release)
                         {
-                            LOCK(cs_vNodes);
+                            // LOCK(cs_vNodes);
                             LogPrint("req", "ReqMgr: %s removed block ref to %s count %d (%s).\n", item.obj.ToString(),
                                 next.node->GetLogName(), next.node->GetRefCount(), reason);
                             next.node->Release();
@@ -563,7 +564,7 @@ void CRequestManager::SendRequests()
 
                     // Instead we'll forget about it -- the node is already popped of of the available list so now we'll
                     // release our reference.
-                    LOCK(cs_vNodes);
+                    //LOCK(cs_vNodes);
                     //LogPrint("req", "ReqMgr: %s removed block ref to %d count %d\n", obj.ToString(),
                     //    next.node->GetId(), next.node->GetRefCount());
                     next.node->Release();
@@ -632,9 +633,9 @@ void CRequestManager::SendRequests()
                         {
                             if (next.node->fDisconnect) // Node was disconnected so we can't request from it
                             {
-                                LOCK(cs_vNodes);
-                                LogPrint("req", "ReqMgr: %s removed tx ref to %d count %d (on disconnect).\n",
-                                    item.obj.ToString(), next.node->GetId(), next.node->GetRefCount());
+                                //LOCK(cs_vNodes);
+                                //LogPrint("req", "ReqMgr: %s removed tx ref to %d count %d (on disconnect).\n",
+                                //    item.obj.ToString(), next.node->GetId(), next.node->GetRefCount());
                                 next.node->Release();
                                 next.node = NULL; // force the loop to get another node
                             }
@@ -662,9 +663,9 @@ void CRequestManager::SendRequests()
                             ENTER_CRITICAL_SECTION(cs_objDownloader);
                         }
                         {
-                            LOCK(cs_vNodes);
-                            LogPrint("req", "ReqMgr: %s removed tx ref to %d count %d\n",
-                                obj.ToString(), next.node->GetId(), next.node->GetRefCount());
+                            //LOCK(cs_vNodes);
+                            //LogPrint("req", "ReqMgr: %s removed tx ref to %d count %d\n",
+                            //    obj.ToString(), next.node->GetId(), next.node->GetRefCount());
                             next.node->Release();
                             next.node = NULL;
                         }

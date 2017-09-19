@@ -445,14 +445,15 @@ CBlockIndex *LastCommonAncestor(CBlockIndex *pa, CBlockIndex *pb)
 
 /** Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
  *  at most count entries. */
-static void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex *> &vBlocks)
+static unsigned int FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex *> &vBlocks)
 {
+    unsigned int amtFound=0;
     if (count == 0)
-        return;
+        return 0;
 
     vBlocks.reserve(vBlocks.size() + count);
     CNodeState *state = State(nodeid);
-    DbgAssert(state != NULL, return );
+    DbgAssert(state != NULL, return 0);
 
     // Make sure pindexBestKnownBlock is up to date, we'll need it.
     ProcessBlockAvailability(nodeid);
@@ -460,7 +461,7 @@ static void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vec
     if (state->pindexBestKnownBlock == NULL || state->pindexBestKnownBlock->nChainWork < chainActive.Tip()->nChainWork)
     {
         // This peer has nothing interesting.
-        return;
+        return 0;
     }
 
     if (state->pindexLastCommonBlock == NULL)
@@ -475,7 +476,7 @@ static void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vec
     // of its current tip anymore. Go back enough to fix that.
     state->pindexLastCommonBlock = LastCommonAncestor(state->pindexLastCommonBlock, state->pindexBestKnownBlock);
     if (state->pindexLastCommonBlock == state->pindexBestKnownBlock)
-        return;
+        return 0;
 
     std::vector<CBlockIndex *> vToFetch;
     CBlockIndex *pindexWalk = state->pindexLastCommonBlock;
@@ -508,7 +509,7 @@ static void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vec
             if (!pindex->IsValid(BLOCK_VALID_TREE))
             {
                 // We consider the chain that this peer is on invalid.
-                return;
+                return amtFound;
             }
             if (pindex->nStatus & BLOCK_HAVE_DATA || chainActive.Contains(pindex))
             {
@@ -520,18 +521,19 @@ static void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vec
                 // Return if we've reached the end of the download window.
                 if (pindex->nHeight > nWindowEnd)
                 {
-                    return;
+                    return amtFound;
                 }
 
                 // Return if we've reached the end of the number of blocks we can download for this peer.
                 vBlocks.push_back(pindex);
                 if (vBlocks.size() == count)
                 {
-                    return;
+                    return amtFound;
                 }
             }
         }
     }
+    return amtFound;
 }
 
 } // anon namespace
@@ -6193,8 +6195,11 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             pfrom->setAskFor.erase(inv.hash);
         }
 
-        LOCK(cs_main);
-        mapAlreadyAskedFor.erase(inv.hash);
+        if (1)
+        {
+            LOCK(cs_mapAlreadyAskedFor);
+            mapAlreadyAskedFor.erase(inv.hash);
+        }
     }
 
 
@@ -7406,8 +7411,9 @@ bool SendMessages(CNode *pto)
         //
         // Message: inventory
         //
-        std::vector<CInv> vInv;
+
         std::vector<CInv> vInvWait;
+        std::vector<CInv> vInvSend;
         {
             static  arith_uint256 hashSalt;
             if (hashSalt == 0)
@@ -7419,14 +7425,9 @@ bool SendMessages(CNode *pto)
                 fSendTrickle = true;
                 pto->nNextInvSend = PoissonNextSend(nNow, AVG_INVENTORY_BROADCAST_INTERVAL);
             }
-            LOCK(pto->cs_inventory);
-            vInv.reserve(std::min<size_t>(1000, pto->vInventoryToSend.size()));
-            vInvWait.reserve(pto->vInventoryToSend.size());
-            BOOST_FOREACH (const CInv &inv, pto->vInventoryToSend)
-            {
-                if (inv.type == MSG_TX && pto->filterInventoryKnown.contains(inv.hash))
-                    continue;
 
+            if (1)
+            {
                 // BU - here we only want to forward message inventory if our peer has actually been requesting useful
                 // data or
                 //      giving us useful data.  We give them 2 minutes to be useful but then choke off their inventory.
@@ -7436,52 +7437,47 @@ bool SendMessages(CNode *pto)
                 //      However we will still send them block inventory in the case they are a pruned node or wallet
                 //      waiting for block
                 //      announcements, therefore we have to check each inv in pto->vInventoryToSend.
-                if (inv.type == MSG_TX && pto->nActivityBytes == 0 && (GetTime() - pto->nTimeConnected) > 120)
-                {
-                    LogPrint("evict", "choking off tx inventory for %s time connected %d\n", pto->addr.ToString(),
-                        GetTime() - pto->nTimeConnected);
-                    continue;
-                }
+                bool chokeTxInv = (pto->nActivityBytes == 0 && (GetTime() - pto->nTimeConnected) > 120);
+                LOCK(pto->cs_inventory);
 
-                // trickle out tx inv to protect privacy
-                if (inv.type == MSG_TX && !fSendTrickle)
-                {
-                    // 1/4 of tx invs blast to all immediately
-                    // uint256 hashRand = ArithToUint256(UintToArith256(inv.hash) ^ UintToArith256(hashSalt));
-                    // Inefficient.  This is doing a SHA256 for each message.
-                    // Instead grab 2 random bits
-                    // hashRand = Hash(BEGIN(hashRand), END(hashRand));
-                    // bool fTrickleWait = ((UintToArith256(hashRand) & 3) != 0);
-                    arith_uint256 hashRand = UintToArith256(inv.hash) ^ hashSalt;
-                    uint32_t shift = insecure_rand()&255;
-                    uint32_t slice = hashRand.slice32(shift/32);
-                    shift &=31;
-                    slice = (slice << shift) | (slice >> (32-shift));  // rotate
-                    bool fTrickleWait = (slice&3) != 0;
+                vInvSend.reserve(pto->vInventoryToSend.size());
+                vInvWait.reserve(pto->vInventoryToSend.size()/3);
 
-                    if (fTrickleWait)
+                // Make copy of vInventoryToSend while cs_inventory is locked but also ignore some tx and defer others
+                BOOST_FOREACH (const CInv &inv, pto->vInventoryToSend)
+                {
+                    if (inv.type == MSG_TX)
                     {
-                        vInvWait.push_back(inv);
-                        continue;
+                        if (chokeTxInv) continue;
+                        // skip if we already know abt this one
+                        if (pto->filterInventoryKnown.contains(inv.hash)) continue;
+                        if (!fSendTrickle)
+                        {
+                            if ((insecure_rand()&3)==0)
+                            {
+                              vInvWait.push_back(inv);
+                              continue;
+                            }
+                        }
                     }
+                    vInvSend.push_back(inv);
+                    pto->filterInventoryKnown.insert(inv.hash);
                 }
+            }
 
-                pto->filterInventoryKnown.insert(inv.hash);
-
-                vInv.push_back(inv);
-                if (vInv.size() >= 1000)
+            const int MAX_INV_ELEMENTS=1000;
+            int sz = vInvSend.size();
+            if (sz)
+            {
+                LOCK(pto->cs_vSend);
+                for (int i = 0; i < sz; i += MAX_INV_ELEMENTS)
                 {
-                    LOCK(pto->cs_vSend);
-                    pto->PushMessage(NetMsgType::INV, vInv);
-                    vInv.clear();
+                    int last = std::min(i + MAX_INV_ELEMENTS, sz);
+                    std::vector<CInv> vInv(&vInvSend[i], &vInvSend[last]);
+                    pto->PushMessage(NetMsgType::INV, vInv); // TODO subvector PushMessage to avoid copy
                 }
             }
             pto->vInventoryToSend = vInvWait;
-        }
-        if (!vInv.empty())
-        {
-            LOCK(pto->cs_vSend);
-            pto->PushMessage(NetMsgType::INV, vInv);
         }
 
         // In case there is a block that has been in flight from this peer for 2 + 0.5 * N times the block interval
@@ -7512,17 +7508,17 @@ bool SendMessages(CNode *pto)
         if (!pto->fDisconnect && !pto->fClient && state.nBlocksInFlight < (int)MAX_BLOCKS_IN_TRANSIT_PER_PEER)
         {
             std::vector<CBlockIndex *> vToDownload;
-            FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload);
-            // LogPrint("req", "IBD AskFor %d blocks from peer=%s\n", vToDownload.size(), pto->GetLogName());
-            LOCK(cs_main); // AlreadyHave()
-            BOOST_FOREACH (CBlockIndex *pindex, vToDownload)
+            if (FindNextBlocksToDownload(
+                    pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload))
             {
-                CInv inv(MSG_BLOCK, pindex->GetBlockHash());
-                if (!AlreadyHave(inv))
+                // LogPrint("req", "IBD AskFor %d blocks from peer=%s\n", vToDownload.size(), pto->GetLogName());
+                BOOST_FOREACH (CBlockIndex *pindex, vToDownload)
                 {
-                    requester.AskFor(inv, pto);
-                    // LogPrint("req", "AskFor block %s (%d) peer=%s\n", pindex->GetBlockHash().ToString(),
-                    //  pindex->nHeight, pto->GetLogName());
+                    if (!(pindex->nStatus & BLOCK_HAVE_DATA))
+                    {
+                        CInv inv(MSG_BLOCK, pindex->GetBlockHash());
+                        requester.AskFor(inv, pto);
+                    }
                 }
             }
         }
@@ -7548,11 +7544,12 @@ bool SendMessages(CNode *pto)
             }
 
             bool alreadyHave = false;
-            if (1)
+            if (0)
             {
                 LOCK(cs_main); // AlreadyHave()
                 alreadyHave = AlreadyHave(inv);
             }
+            alreadyHave = TxAlreadyHave(inv);
             if (!alreadyHave)
             {
                 if (fDebug)
