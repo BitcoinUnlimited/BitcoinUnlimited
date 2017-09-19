@@ -56,7 +56,10 @@ extern void MarkBlockAsInFlight(NodeId nodeid,
 // note mark block as in flight is redundant with the request manager now...
 
 CRequestManager::CRequestManager()
-    : cs_objDownloader("reqmgr.cs_objDownloader"),
+    :
+#ifdef DEBUG_LOCKORDER
+      cs_objDownloader("reqmgr.cs_objDownloader"),
+#endif
       inFlightTxns("reqMgr/inFlight", STAT_OP_MAX), receivedTxns("reqMgr/received"), rejectedTxns("reqMgr/rejected"),
       droppedTxns("reqMgr/dropped", STAT_KEEP), pendingTxns("reqMgr/pending", STAT_KEEP),
       requestPacer(16384, 8192) // Max and average # of requests that can be made per second

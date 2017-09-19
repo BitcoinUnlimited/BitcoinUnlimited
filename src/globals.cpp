@@ -158,7 +158,7 @@ CRITSEC(csTxCommitQ);
 
 // BU: change locking of orphan map from using cs_main to cs_orphancache.  There is too much dependance on cs_main locks
 // which are generally too broad in scope.
-CSharedCriticalSection cs_orphancache("cs_orphancache");
+SCRITSEC(cs_orphancache);
 map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs_orphancache);
 map<uint256, set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs_orphancache);
 

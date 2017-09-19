@@ -97,7 +97,7 @@ public:
 
 #ifndef DEBUG_LOCKORDER
 typedef AnnotatedMixin<boost::shared_mutex> CSharedCriticalSection;
-#define CRITSEC(x) CCriticalSection x
+#define SCRITSEC(x) CSharedCriticalSection x
 #else  // BU we need to remove the critical section from the lockorder map when destructed
 class CSharedCriticalSection:public AnnotatedMixin<boost::shared_mutex>
 {
