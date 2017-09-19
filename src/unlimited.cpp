@@ -1831,7 +1831,7 @@ void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
 //
 bool AlreadyHaveOrphan(uint256 hash)
 {
-    LOCK(cs_orphancache);
+    READLOCK(cs_orphancache);
     if (mapOrphanTransactions.count(hash))
         return true;
     return false;
@@ -1951,15 +1951,32 @@ public:
     int64_t adjustedTime;
     CBlockIndex *tip;  // CBlockIndexes are never deleted once created (even if the tip changes) so we can use this ptr
     CCoinsViewCache *coins;
+    CCoinsViewMemPool* cvMempool;
 
     void Load(void)
     {
-        LOCK(cs_main);
-        tipHeight = chainActive.Height();
-        tip = chainActive.Tip();
-        tipMedianTimePast = tip->GetMedianTimePast();
-        adjustedTime =  GetAdjustedTime();
-        coins = pcoinsTip; // TODO pcoinsTip can change
+        if (1)
+        {
+            LOCK(cs_main);
+            tipHeight = chainActive.Height();
+            tip = chainActive.Tip();
+            tipMedianTimePast = tip->GetMedianTimePast();
+            adjustedTime = GetAdjustedTime();
+            coins = pcoinsTip; // TODO pcoinsTip can change
+        }
+        if (cvMempool) delete cvMempool;
+        if (1)
+        {
+            READLOCK(mempool.cs);
+            // ss.coins contains the UTXO set for the tip in ss
+            cvMempool = new CCoinsViewMemPool(coins, mempool);
+        }
+    }
+
+    Snapshot():coins(nullptr), cvMempool(nullptr) {}
+    ~Snapshot()
+    {
+        if (cvMempool) delete cvMempool;
     }
 };
 
@@ -1987,8 +2004,8 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints *lp, bool 
     }
     else
     {
-        // ss.coins contains the UTXO set for the tip in ss
-        CCoinsViewMemPool viewMemPool(ss.coins, mempool);
+         // CCoinsViewMemPool viewMemPool(ss.coins, mempool);
+        CCoinsViewMemPool& viewMemPool(*ss.cvMempool);
         std::vector<int> prevheights;
         prevheights.resize(tx.vin.size());
         for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++)
@@ -2162,7 +2179,7 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
         LockPoints lp;
         {
             READLOCK(pool.cs);
-            CCoinsViewMemPool viewMemPool(ss.coins, pool);
+            CCoinsViewMemPool& viewMemPool(*ss.cvMempool);
             view.SetBackend(viewMemPool);
 
             // do all inputs exist?
@@ -2450,73 +2467,63 @@ void processOrphans(std::vector<uint256>& vWorkQueue)
     std::vector<uint256> vEraseQueue;
 
     // Recursively process any orphan transactions that depended on this one
-    LOCK(cs_orphancache);
-    std::set<NodeId> setMisbehaving;
-    for (unsigned int i = 0; i < vWorkQueue.size(); i++)
+    if (1)
     {
-        std::map<uint256, std::set<uint256> >::iterator itByPrev = mapOrphanTransactionsByPrev.find(vWorkQueue[i]);
-        if (itByPrev == mapOrphanTransactionsByPrev.end())
-            continue;
-        for (std::set<uint256>::iterator mi = itByPrev->second.begin(); mi != itByPrev->second.end(); ++mi)
+        READLOCK(cs_orphancache);
+        std::set<NodeId> setMisbehaving;
+        for (unsigned int i = 0; i < vWorkQueue.size(); i++)
         {
-            const uint256 &orphanHash = *mi;
-
-            // Make sure we actually have an entry on the orphan cache. While this should never fail because
-            // we always erase orphans and any mapOrphanTransactionsByPrev at the same time, still we need
-            // to
-            // be sure.
-            bool fOk = true;
-            DbgAssert(mapOrphanTransactions.count(orphanHash), fOk = false);
-            if (!fOk)
+            std::map<uint256, std::set<uint256> >::iterator itByPrev = mapOrphanTransactionsByPrev.find(vWorkQueue[i]);
+            if (itByPrev == mapOrphanTransactionsByPrev.end())
                 continue;
-
-            const CTransaction &orphanTx = mapOrphanTransactions[orphanHash].tx;
-            NodeId fromPeer = mapOrphanTransactions[orphanHash].fromPeer;
-            bool fMissingInputs2 = false;
-            // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
-            // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get
-            // anyone relaying LegitTxX banned)
-            CValidationState stateDummy;
-
-
-            if (setMisbehaving.count(fromPeer))
-                continue;
-            if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2))
+            for (std::set<uint256>::iterator mi = itByPrev->second.begin(); mi != itByPrev->second.end(); ++mi)
             {
-                LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
-                RelayTransaction(orphanTx);
-                vWorkQueue.push_back(orphanHash);
-                vEraseQueue.push_back(orphanHash);
-            }
-            else if (!fMissingInputs2)
-            {
-                int nDos = 0;
-                if (stateDummy.IsInvalid(nDos) && nDos > 0)
-                {
-                    // Punish peer that gave us an invalid orphan tx
-                    dosMan.Misbehaving(fromPeer, nDos);
-                    setMisbehaving.insert(fromPeer);
-                    LogPrint("mempool", "   invalid orphan tx %s\n", orphanHash.ToString());
-                }
-                // Has inputs but not accepted to mempool
-                // Probably non-standard or insufficient fee/priority
-                LogPrint("mempool", "   removed orphan tx %s\n", orphanHash.ToString());
-                vEraseQueue.push_back(orphanHash);
+                const uint256 &orphanHash = *mi;
+
+                // Make sure we actually have an entry on the orphan cache. While this should never fail because
+                // we always erase orphans and any mapOrphanTransactionsByPrev at the same time, still we need
+                // to
+                // be sure.
+                bool fOk = true;
+                DbgAssert(mapOrphanTransactions.count(orphanHash), fOk = false);
+                if (!fOk)
+                    continue;
+
+                const CTransaction &orphanTx = mapOrphanTransactions[orphanHash].tx;
+                NodeId fromPeer = mapOrphanTransactions[orphanHash].fromPeer;
+                // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
+                // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get
+                // anyone relaying LegitTxX banned)
+                CValidationState stateDummy;
+
+
+                if (setMisbehaving.count(fromPeer))
+                    continue;
                 if (1)
                 {
-                    WRITELOCK(csRecentRejects);
-                    if (recentRejects)
-                        recentRejects->insert(orphanHash); // should always be true
+                    CTxInputData txd;
+                    txd.tx = orphanTx;
+                    txd.nodeId = fromPeer;
+                    txd.nodeName = "orphan";
+                    txd.whitelisted = false;
+                    boost::unique_lock<boost::mutex> lock(csTxInQ);
+                    txInQ.push(txd); // add this transaction onto the processing queue
+                    cvTxInQ.notify_one();
                 }
+                vEraseQueue.push_back(orphanHash);
             }
-            mempool.check(pcoinsTip);
         }
     }
-    BOOST_FOREACH (uint256 hash, vEraseQueue)
-        EraseOrphanTx(hash);
 
-    //  BU: Xtreme thinblocks - purge orphans that are too old
-    EraseOrphansByTime();
+    if (1)
+    {
+        WRITELOCK(cs_orphancache);
+        BOOST_FOREACH (uint256 hash, vEraseQueue)
+            EraseOrphanTx(hash);
+        //  BU: Xtreme thinblocks - purge orphans that are too old
+        EraseOrphansByTime();
+    }
+
 }
 
 void ThreadCommitToMempool()
@@ -2652,7 +2659,7 @@ void ThreadTxHandler()
                     // If we've forked and this is probably not a valid tx, then skip adding it to the orphan pool
                     if (!chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value) || IsTxProbablyNewSigHash(tx))
                     {
-                        LOCK(cs_orphancache);
+                        WRITELOCK(cs_orphancache);
                         AddOrphanTx(tx, txd.nodeId);
 
                         // DoS prevention: do not allow mapOrphanTransactions to grow unbounded

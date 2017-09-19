@@ -2362,6 +2362,8 @@ void StartNode(boost::thread_group &threadGroup, CScheduler &scheduler)
     // Process transactions
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "tx1", &ThreadTxHandler));
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "tx2", &ThreadTxHandler));
+    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "tx3", &ThreadTxHandler));
+    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "tx4", &ThreadTxHandler));
 
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "txc", &ThreadCommitToMempool));
 

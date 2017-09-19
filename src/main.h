@@ -674,8 +674,10 @@ struct COrphanTx
     int64_t nEntryTime; // BU - Xtreme Thinblocks: used for aging orphans out of the cache
     uint64_t nOrphanTxSize;
 };
-// BU: begin creating separate critical section for orphan cache and untangling from cs_main.
-extern CCriticalSection cs_orphancache;
+
+// BU: change locking of orphan map from using cs_main to cs_orphancache.
+// There is too much dependance on cs_main locks which are generally too broad in scope.
+extern CSharedCriticalSection cs_orphancache;
 extern std::map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs_orphancache);
 extern std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs_orphancache);
 

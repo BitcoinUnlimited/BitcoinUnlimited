@@ -36,8 +36,6 @@
 
 using namespace std;
 
-extern CCriticalSection cs_orphancache; // from main.h
-
 // Request management
 extern CRequestManager requester;
 
@@ -382,7 +380,7 @@ bool RequestBlock(CNode *pfrom, CInv obj)
                     inv2.type = MSG_XTHINBLOCK;
                     std::vector<uint256> vOrphanHashes;
                     {
-                        LOCK(cs_orphancache);
+                        READLOCK(cs_orphancache);
                         for (map<uint256, COrphanTx>::iterator mi = mapOrphanTransactions.begin();
                              mi != mapOrphanTransactions.end(); ++mi)
                             vOrphanHashes.push_back((*mi).first);
@@ -409,7 +407,7 @@ bool RequestBlock(CNode *pfrom, CInv obj)
                     inv2.type = MSG_XTHINBLOCK;
                     std::vector<uint256> vOrphanHashes;
                     {
-                        LOCK(cs_orphancache);
+                        READLOCK(cs_orphancache);
                         for (map<uint256, COrphanTx>::iterator mi = mapOrphanTransactions.begin();
                              mi != mapOrphanTransactions.end(); ++mi)
                             vOrphanHashes.push_back((*mi).first);

@@ -92,14 +92,6 @@ CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
 // BU: Move global objects to a single file
 extern CTxMemPool mempool;
 
-// BU: change locking of orphan map from using cs_main to cs_orphancache.
-// There is too much dependance on cs_main locks which are generally too
-// broad in scope.
-// Move globals to a single file
-extern CCriticalSection cs_orphancache;
-extern std::map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs_orphancache);
-extern std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs_orphancache);
-
 
 // BU: start block download at low numbers in case our peers are slow when we start
 /** Number of blocks that can be requested at any given time from a single peer. */
@@ -4759,7 +4751,7 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
 void UnloadBlockIndex()
 {
     {
-        LOCK(cs_orphancache);
+        WRITELOCK(cs_orphancache);
         mapOrphanTransactions.clear();
         mapOrphanTransactionsByPrev.clear();
         nBytesOrphanPool = 0;
@@ -7608,7 +7600,7 @@ void MainCleanup()
 
     if (1)
     {
-        LOCK(cs_orphancache); // BU apply the appropriate lock so no contention during destruction
+        WRITELOCK(cs_orphancache); // BU apply the appropriate lock so no contention during destruction
         // orphan transactions
         mapOrphanTransactions.clear();
         mapOrphanTransactionsByPrev.clear();

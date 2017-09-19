@@ -102,7 +102,7 @@ long ClientModel::getMempoolSize() const
 
 long ClientModel::getOrphanPoolSize() const
 {
-    LOCK(cs_orphancache);
+    READLOCK(cs_orphancache);
     return mapOrphanTransactions.size();
 }
 
