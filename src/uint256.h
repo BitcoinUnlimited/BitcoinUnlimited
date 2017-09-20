@@ -90,7 +90,7 @@ public:
                ((uint64_t)ptr[7]) << 56;
     }
 
-    unsigned int GetSerializeSize(int nType, int nVersion) const
+    unsigned int GetSerializeSize(int nType, int nVersion) const;
 
     template<typename Stream>
     void Serialize(Stream& s) const

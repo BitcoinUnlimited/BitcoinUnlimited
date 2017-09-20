@@ -47,6 +47,7 @@ bool CCoinsView::GetCoins(const uint256 &txid, CCoins &coins) const { return fal
 bool CCoinsView::HaveCoins(const uint256 &txid) const { return false; }
 uint256 CCoinsView::GetBestBlock() const { return uint256(); }
 bool CCoinsView::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock, size_t &nChildCachedCoinsUsage) { return false; }
+CCoinsViewCursor *CCoinsView::Cursor() const { return nullptr; }
 bool CCoinsView::GetStats(CCoinsStats &stats) const { return false; }
 
 
