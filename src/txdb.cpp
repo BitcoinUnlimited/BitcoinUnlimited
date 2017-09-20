@@ -144,6 +144,60 @@ bool CBlockTreeDB::ReadLastBlockFile(int &nFile) {
     return Read(DB_LAST_BLOCK, nFile);
 }
 
+CCoinsViewCursor *CCoinsViewDB::Cursor() const
+{
+    CCoinsViewDBCursor *i = new CCoinsViewDBCursor(const_cast<CDBWrapper&>(db).NewIterator(), GetBestBlock());
+    /* It seems that there are no "const iterators" for LevelDB.  Since we
+       only need read operations on it, use a const-cast to get around
+       that restriction.  */
+    i->pcursor->Seek(DB_COINS);
+    // Cache key of first record
+    if (i->pcursor->Valid()) {
+        CoinEntry entry(&i->keyTmp.second);
+        i->pcursor->GetKey(entry);
+        i->keyTmp.first = entry.key;
+    } else {
+        i->keyTmp.first = 0; // Make sure Valid() and GetKey() return false
+    }
+    return i;
+}
+
+bool CCoinsViewDBCursor::GetKey(COutPoint &key) const
+{
+    // Return cached key
+    if (keyTmp.first == DB_COINS) {
+        key = keyTmp.second;
+        return true;
+    }
+    return false;
+}
+
+bool CCoinsViewDBCursor::GetValue(Coin &coin) const
+{
+    return pcursor->GetValue(coin);
+}
+
+unsigned int CCoinsViewDBCursor::GetValueSize() const
+{
+    return pcursor->GetValueSize();
+}
+
+bool CCoinsViewDBCursor::Valid() const
+{
+    return keyTmp.first == DB_COINS;
+}
+
+void CCoinsViewDBCursor::Next()
+{
+    pcursor->Next();
+    CoinEntry entry(&keyTmp.second);
+    if (!pcursor->Valid() || !pcursor->GetKey(entry)) {
+        keyTmp.first = 0; // Invalidate cached key after last record so that Valid() and GetKey() return false
+    } else {
+        keyTmp.first = entry.key;
+    }
+}
+
 bool CBlockTreeDB::WriteBatchSync(const std::vector<std::pair<int, const CBlockFileInfo*> >& fileInfo, int nLastFile, const std::vector<const CBlockIndex*>& blockinfo) {
     CDBBatch batch(&GetObfuscateKey());
     for (std::vector<std::pair<int, const CBlockFileInfo*> >::const_iterator it=fileInfo.begin(); it != fileInfo.end(); it++) {
