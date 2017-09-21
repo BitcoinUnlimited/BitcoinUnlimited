@@ -1945,17 +1945,7 @@ void EraseOrphansByTime() EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
 }
 // BU - Xtreme Thinblocks: end
 
-class Snapshot
-{
-public:
-    uint64_t tipHeight;
-    uint64_t tipMedianTimePast;
-    int64_t adjustedTime;
-    CBlockIndex *tip;  // CBlockIndexes are never deleted once created (even if the tip changes) so we can use this ptr
-    CCoinsViewCache *coins;
-    CCoinsViewMemPool* cvMempool;
-
-    void Load(void)
+void Snapshot::Load(void)
     {
         if (1)
         {
@@ -1975,12 +1965,6 @@ public:
         }
     }
 
-    Snapshot():coins(nullptr), cvMempool(nullptr) {}
-    ~Snapshot()
-    {
-        if (cvMempool) delete cvMempool;
-    }
-};
 
 bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints *lp, bool useExistingLockPoints, const Snapshot& ss)
 {
@@ -2381,7 +2365,8 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
         size_t nLimitDescendants = GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT);
         size_t nLimitDescendantSize = GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
         std::string errString;
-        if (!pool.CalculateMemPoolAncestors(entry, eData.setAncestors, nLimitAncestors, nLimitAncestorSize, nLimitDescendants,
+        // note we could resolve ancestors to hashes and return those if that saves time in the txc thread
+        if (!pool.CalculateMemPoolAncestors(entry, nLimitAncestors, nLimitAncestorSize, nLimitDescendants,
                 nLimitDescendantSize, errString))
         {
             return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
@@ -2549,7 +2534,7 @@ void ThreadCommitToMempool()
             {
                 CTxCommitData &data = txCommitQ.front();
                 // Store transaction in memory
-                mempool.addUnchecked(data.hash, data.entry, data.setAncestors, !IsInitialBlockDownload());
+                mempool.addUnchecked(data.hash, data.entry, !IsInitialBlockDownload());
                 if (mempool.exists(data.hash))
                     SyncWithWallets(data.entry.GetTx(), NULL);
                 vWorkQueue.push_back(data.hash);
@@ -2559,21 +2544,24 @@ void ThreadCommitToMempool()
 
             processOrphans(vWorkQueue);
             mempool.check(pcoinsTip);
+            LogPrint("mempool", "MemoryPool sz %u txn, %u kB\n",
+                mempool.size(), mempool.DynamicMemoryUsage() / 1000);
             // BU - Xtreme Thinblocks - trim the orphan pool by entry time and do not allow it to be overidden.
             LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
                 GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
 
             // BU: update tx per second when a tx is valid and accepted
             mempool.UpdateTransactionsPerSecond();
+            CValidationState state;
+            FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
+            // The flush to disk above is only periodic therefore we need to continuously trim any excess from the
+            // cache.
+            pcoinsTip->Trim(nCoinCacheUsage);
+            vWorkQueue.clear();
         }
-
-        CValidationState state;
-        FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
-        // The flush to disk above is only periodic therefore we need to continuously trim any excess from the
-        // cache.
-        pcoinsTip->Trim(nCoinCacheUsage);
     }
 }
+
 
 void ThreadTxHandler()
 {
@@ -2646,11 +2634,10 @@ void ThreadTxHandler()
 
             if (ParallelAcceptToMemoryPool(ss, mempool, state, tx, true, &fMissingInputs, false, false, vHashTxToUncache))
             {
-                mempool.check(pcoinsTip);
                 RelayTransaction(tx);
 
-                LogPrint("mempool", "AcceptToMemoryPool: peer=%s: accepted %s (poolsz %u txn, %u kB)\n",
-                    txd.nodeName, tx.GetHash().ToString(), mempool.size(), mempool.DynamicMemoryUsage() / 1000);
+                LogPrint("mempool", "AcceptToMemoryPool: peer=%s: accepted %s onto Q\n",
+                    txd.nodeName, tx.GetHash().ToString());
 
             }
             else

@@ -1667,7 +1667,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
             {
                 double dPriority = mi->GetPriority(nHeight);
                 CAmount dummy;
-                mempool.ApplyDeltas(mi->GetTx().GetHash(), dPriority, dummy);
+                mempool._ApplyDeltas(mi->GetTx().GetHash(), dPriority, dummy);
                 vPriority.push_back(TxCoinAgePriority(dPriority, mi));
             }
             make_heap(vPriority.begin(), vPriority.end(), pricomparer);
@@ -1827,7 +1827,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
     LogPrint("thin", "FPrate: %f Num elements in bloom filter:%d high priority txs:%d high fee txs:%d orphans:%d total "
                      "txs in mempool:%d\n",
         nFPRate, nElements, setPriorityMemPoolHashes.size(), setHighScoreMemPoolHashes.size(), vOrphanHashes.size(),
-        mempool.mapTx.size());
+        mempool.size());
 
     // Add the selected tx hashes to the bloom filter
     BOOST_FOREACH (uint256 txHash, setPriorityMemPoolHashes)

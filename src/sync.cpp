@@ -12,7 +12,6 @@
 
 #include <boost/foreach.hpp>
 #include <boost/thread.hpp>
-
 #ifdef DEBUG_LOCKCONTENTION
 void PrintLockContention(const char* pszName, const char* pszFile, int nLine)
 {
@@ -193,6 +192,16 @@ void AssertLockHeldInternal(const char* pszName, const char* pszFile, int nLine,
             return;
     fprintf(stderr, "Assertion failed: lock %s not held in %s:%i; locks held:\n%s", pszName, pszFile, nLine, LocksHeld().c_str());
     abort();
+}
+
+void AssertWriteLockHeldInternal(const char* pszName, const char* pszFile, int nLine, CSharedCriticalSection* cs)
+{
+    if (cs->try_lock())  // It would be better to check that this thread has the lock
+    {
+        fprintf(stderr, "Assertion failed: lock %s not held in %s:%i; locks held:\n%s", pszName, pszFile, nLine, LocksHeld().c_str());
+        fflush(stderr);
+        abort();
+    }
 }
 
 // BU normally CCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical

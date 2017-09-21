@@ -996,364 +996,6 @@ std::string FormatStateMessage(const CValidationState &state)
         state.GetDebugMessage().empty() ? "" : ", " + state.GetDebugMessage(), state.GetRejectCode());
 }
 
-bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
-    CValidationState &state,
-    const CTransaction &consttx,
-    bool fLimitFree,
-    bool *pfMissingInputs,
-    bool fOverrideMempoolLimit,
-    bool fRejectAbsurdFee,
-    std::vector<uint256> &vHashTxnToUncache)
-{
-    unsigned int forkVerifyFlags = 0;
-    CTransaction tx = consttx;
-    unsigned int nSigOps = 0;
-    ValidationResourceTracker resourceTracker;
-    unsigned int nSize = 0;
-    uint64_t start = GetTimeMicros();
-    AssertLockHeld(cs_main);
-    if (pfMissingInputs)
-        *pfMissingInputs = false;
-
-    if (!CheckTransaction(tx, state))
-      {
-        return false;
-      }
-
-    // Coinbase is only valid in a block, not as a loose transaction
-    if (tx.IsCoinBase())
-        return state.DoS(100, false, REJECT_INVALID, "coinbase");
-
-    // BUIP055: reject transactions that won't work on the fork, starting 2 hours before the fork
-    // based on op_return.
-    // But accept both sighashtypes because we will need all the tx types during the transition.
-    // This code uses the system time to determine when to start rejecting which is inaccurate relative to the
-    // actual activation time (defined by times in the blocks).
-    // But its ok to reject these transactions from the mempool a little early (or late).
-    if ((miningForkTime.value != 0) && (start / 1000000 >= miningForkTime.value - (2 * 60 * 60)))
-    {
-        forkVerifyFlags = SCRIPT_ENABLE_SIGHASH_FORKID;
-        if (IsTxOpReturnInvalid(tx))
-            return state.DoS(0, false, REJECT_WRONG_FORK, "wrong-fork");
-    }
-
-    // Rather not work on nonstandard transactions (unless -testnet/-regtest)
-    std::string reason;
-    if (fRequireStandard && !IsStandardTx(tx, reason))
-        return state.DoS(0, false, REJECT_NONSTANDARD, reason);
-
-    // Don't relay version 2 transactions until CSV is active, and we can be
-    // sure that such transactions will be mined (unless we're on
-    // -testnet/-regtest).
-    const CChainParams &chainparams = Params();
-    if (fRequireStandard && tx.nVersion >= 2 &&
-        VersionBitsTipState(chainparams.GetConsensus(), Consensus::DEPLOYMENT_CSV) != THRESHOLD_ACTIVE)
-    {
-        return state.DoS(0, false, REJECT_NONSTANDARD, "premature-version2-tx");
-    }
-
-    // Only accept nLockTime-using transactions that can be mined in the next
-    // block; we don't want our mempool filled up with transactions that can't
-    // be mined yet.
-    if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS))
-        return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
-
-    // is it already in the memory pool?
-    uint256 hash = tx.GetHash();
-    if (pool.exists(hash))
-      {
-        return state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
-      }
-
-    // Check for conflicts with in-memory transactions
-    {
-        READLOCK(pool.cs); // protect pool.mapNextTx
-        BOOST_FOREACH (const CTxIn &txin, tx.vin)
-        {
-            auto itConflicting = pool.mapNextTx.find(txin.prevout);
-            if (itConflicting != pool.mapNextTx.end())
-            {
-                // Disable replacement feature for good
-                return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
-            }
-        }
-    }
-
-    {
-        CCoinsView dummy;
-        CCoinsViewCache view(&dummy);
-
-        CAmount nValueIn = 0;
-        LockPoints lp;
-        {
-            READLOCK(pool.cs);
-            CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
-            view.SetBackend(viewMemPool);
-
-            // do all inputs exist?
-            // Note that this does not check for the presence of actual outputs (see the next check for that),
-            // and only helps with filling in pfMissingInputs (to determine missing vs spent).
-            BOOST_FOREACH (const CTxIn txin, tx.vin)
-            {
-                if (!pcoinsTip->HaveCoinsInCache(txin.prevout.hash))
-                    vHashTxnToUncache.push_back(txin.prevout.hash);
-                if (!view.HaveCoins(txin.prevout.hash))
-                {
-                    if (pfMissingInputs)
-                        *pfMissingInputs = true;
-                    // fMissingInputs and !state.IsInvalid() is used to detect this condition, don't set state.Invalid()
-                    return false;
-                }
-            }
-
-            // are the actual inputs available?
-            if (!view.HaveInputs(tx))
-                return state.Invalid(false, REJECT_DUPLICATE, "bad-txns-inputs-spent");
-
-            // Bring the best block into scope
-            view.GetBestBlock();
-
-            nValueIn = view.GetValueIn(tx);
-
-            // we have all inputs cached now, so switch back to dummy, so we don't need to keep lock on mempool
-            view.SetBackend(dummy);
-
-            // Only accept BIP68 sequence locked transactions that can be mined in the next
-            // block; we don't want our mempool filled up with transactions that can't
-            // be mined yet.
-            // Must keep pool.cs for this unless we change CheckSequenceLocks to take a
-            // CoinsViewCache instead of create its own
-            if (!CheckSequenceLocks(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp))
-                return state.DoS(0, false, REJECT_NONSTANDARD, "non-BIP68-final");
-        }
-
-        // Check for non-standard pay-to-script-hash in inputs
-        if (fRequireStandard && !AreInputsStandard(tx, view))
-            return state.Invalid(false, REJECT_NONSTANDARD, "bad-txns-nonstandard-inputs");
-
-        nSigOps = GetLegacySigOpCount(tx);
-        nSigOps += GetP2SHSigOpCount(tx, view);
-
-        CAmount nValueOut = tx.GetValueOut();
-        CAmount nFees = nValueIn - nValueOut;
-        // nModifiedFees includes any fee deltas from PrioritiseTransaction
-        CAmount nModifiedFees = nFees;
-        double nPriorityDummy = 0;
-        pool.ApplyDeltas(hash, nPriorityDummy, nModifiedFees);
-
-        CAmount inChainInputValue;
-        double dPriority = view.GetPriority(tx, chainActive.Height(), inChainInputValue);
-
-        // Keep track of transactions that spend a coinbase, which we re-scan
-        // during reorgs to ensure COINBASE_MATURITY is still met.
-        bool fSpendsCoinbase = false;
-        BOOST_FOREACH (const CTxIn &txin, tx.vin)
-        {
-            const CCoins *coins = view.AccessCoins(txin.prevout.hash);
-            if (coins->IsCoinBase())
-            {
-                fSpendsCoinbase = true;
-                break;
-            }
-        }
-
-        CTxMemPoolEntry entry(tx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(tx),
-            inChainInputValue, fSpendsCoinbase, nSigOps, lp);
-        nSize = entry.GetTxSize();
-
-        // Check that the transaction doesn't have an excessive number of
-        // sigops, making it impossible to mine.
-        if (nSigOps > MAX_TX_SIGOPS)
-            return state.DoS(0, false, REJECT_NONSTANDARD, "bad-txns-too-many-sigops", false, strprintf("%d", nSigOps));
-
-        CAmount mempoolRejectFee =
-            pool.GetMinFee(GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000).GetFee(nSize);
-        if (mempoolRejectFee > 0 && nModifiedFees < mempoolRejectFee)
-        {
-            return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool min fee not met", false,
-                strprintf("%d < %d", nFees, mempoolRejectFee));
-        }
-        else if (GetBoolArg("-relaypriority", DEFAULT_RELAYPRIORITY) && nModifiedFees < ::minRelayTxFee.GetFee(nSize) &&
-                 !AllowFree(entry.GetPriority(chainActive.Height() + 1)))
-        {
-            // Require that free transactions have sufficient priority to be mined in the next block.
-	    LogPrint("mempool","Txn fee %lld (%d - %d), priority fee delta was %lld\n",nFees, nValueIn, nValueOut, nModifiedFees - nFees);
-            return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "insufficient priority");
-        }
-
-        // BU - Xtreme Thinblocks Auto Mempool Limiter - begin section
-        /* Continuously rate-limit free (really, very-low-fee) transactions
-         * This mitigates 'penny-flooding' -- sending thousands of free transactions just to
-         * be annoying or make others' transactions take longer to confirm. */
-        // maximum feeCutoff in satoshi per byte
-        static const double maxFeeCutoff =
-            boost::lexical_cast<double>(GetArg("-maxlimitertxfee", DEFAULT_MAXLIMITERTXFEE));
-        // starting value for feeCutoff in satoshi per byte
-        static const double initFeeCutoff =
-            boost::lexical_cast<double>(GetArg("-minlimitertxfee", DEFAULT_MINLIMITERTXFEE));
-        static const int nLimitFreeRelay = GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY);
-
-        // get current memory pool size
-        uint64_t poolBytes = pool.GetTotalTxSize();
-
-        // Calculate feeCutoff in satoshis per byte:
-        //   When the feeCutoff is larger than the satoshiPerByte of the
-        //   current transaction then spam blocking will be in effect. However
-        //   Some free transactions will still get through based on -limitfreerelay
-        static double feeCutoff;
-        static double nFreeLimit = nLimitFreeRelay;
-        static int64_t nLastTime;
-        int64_t nNow = GetTime();
-
-        // When the mempool starts falling use an exponentially decaying ~24 hour window:
-        // nFreeLimit = nFreeLimit + ((double)(DEFAULT_LIMIT_FREE_RELAY - nFreeLimit) / pow(1.0 - 1.0/86400,
-        // (double)(nNow - nLastTime)));
-        nFreeLimit /= std::pow(1.0 - 1.0 / 86400, (double)(nNow - nLastTime));
-
-        // When the mempool starts falling use an exponentially decaying ~24 hour window:
-        feeCutoff *= std::pow(1.0 - 1.0 / 86400, (double)(nNow - nLastTime));
-
-        uint64_t nLargestBlockSeen = LargestBlockSeen();
-
-        if (poolBytes < nLargestBlockSeen)
-        {
-            feeCutoff = std::max(feeCutoff, initFeeCutoff);
-            nFreeLimit = std::min(nFreeLimit, (double)nLimitFreeRelay);
-        }
-        else if (poolBytes < (nLargestBlockSeen * MAX_BLOCK_SIZE_MULTIPLIER))
-        {
-            // Gradually choke off what is considered a free transaction
-            feeCutoff =
-                std::max(feeCutoff, initFeeCutoff + ((maxFeeCutoff - initFeeCutoff) * (poolBytes - nLargestBlockSeen) /
-                                                        (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1))));
-
-            // Gradually choke off the nFreeLimit as well but leave at least DEFAULT_MIN_LIMITFREERELAY
-            // So that some free transactions can still get through
-            nFreeLimit = std::min(
-                nFreeLimit, ((double)nLimitFreeRelay - ((double)(nLimitFreeRelay - DEFAULT_MIN_LIMITFREERELAY) *
-                                                           (double)(poolBytes - nLargestBlockSeen) /
-                                                           (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1)))));
-            if (nFreeLimit < DEFAULT_MIN_LIMITFREERELAY)
-                nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
-        }
-        else
-        {
-            feeCutoff = maxFeeCutoff;
-            nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
-        }
-
-        minRelayTxFee = CFeeRate(feeCutoff * 1000);
-        LogPrint("mempool",
-            "MempoolBytes:%d  LimitFreeRelay:%.5g  FeeCutOff:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d  TxFees:%d\n",
-            poolBytes, nFreeLimit, ((double)::minRelayTxFee.GetFee(nSize)) / nSize, ((double)nFees) / nSize, nSize,
-            nFees);
-        if (fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize))
-        {
-            static double dFreeCount;
-
-            // Use an exponentially decaying ~10-minute window:
-            dFreeCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - nLastTime));
-            nLastTime = nNow;
-
-            // -limitfreerelay unit is thousand-bytes-per-minute
-            // At default rate it would take over a month to fill 1GB
-            LogPrint("mempool", "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount + nSize);
-            if ((dFreeCount + nSize) >= (nFreeLimit * 10 * 1000 * nLargestBlockSeen / BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
-            {
-                thindata.UpdateMempoolLimiterBytesSaved(nSize);
-                LogPrint(
-                    "mempool", "AcceptToMemoryPool : free transaction %s rejected by rate limiter\n", hash.ToString());
-                return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "rate limited free transaction");
-            }
-            dFreeCount += nSize;
-        }
-        nLastTime = nNow;
-        // BU - Xtreme Thinblocks Auto Mempool Limiter - end section
-
-        // BU: we calculate the recommended fee by looking at what's in the mempool.  This starts at 0 though for an
-        // empty mempool.  So set the minimum "absurd" fee to 10000 satoshies per byte.  If for some reason fees rise
-        // above that, you can specify up to 100x what other txns are paying in the mempool
-        if (fRejectAbsurdFee && nFees > std::max((int64_t)100L * nSize, maxTxFee.value) * 100)
-            return state.Invalid(false, REJECT_HIGHFEE, "absurdly-high-fee",
-                strprintf("%d > %d", nFees, std::max((int64_t)1L, maxTxFee.value) * 10000));
-
-        // Calculate in-mempool ancestors, up to a limit.
-        CTxMemPool::setEntries setAncestors;
-        size_t nLimitAncestors = GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
-        size_t nLimitAncestorSize = GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
-        size_t nLimitDescendants = GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT);
-        size_t nLimitDescendantSize = GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
-        std::string errString;
-        if (!pool.CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize, nLimitDescendants,
-                nLimitDescendantSize, errString))
-        {
-            return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
-        }
-
-        // Check against previous transactions
-        // This is done last to help prevent CPU exhaustion denial-of-service attacks.
-        unsigned char sighashType = 0;
-        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true, &resourceTracker,
-                NULL, &sighashType))
-        {
-            LogPrint("mempool", "txn CheckInputs failed");
-            return false;
-        }
-        entry.UpdateRuntimeSigOps(resourceTracker.GetSigOps(), resourceTracker.GetSighashBytes());
-
-        // Check again against just the consensus-critical mandatory script
-        // verification flags, in case of bugs in the standard flags that cause
-        // transactions to pass as valid when they're actually invalid. For
-        // instance the STRICTENC flag was incorrectly allowing certain
-        // CHECKSIG NOT scripts to pass, even though they were invalid.
-        //
-        // There is a similar check in CreateNewBlock() to prevent creating
-        // invalid blocks, however allowing such transactions into the mempool
-        // can be exploited as a DoS attack.
-        unsigned char sighashType2 = 0;
-        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true, NULL, NULL,
-                &sighashType2))
-        {
-            return error(
-                "%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
-                __func__, hash.ToString(), FormatStateMessage(state));
-        }
-
-        entry.sighashType = sighashType | sighashType2;
-        // This code denies old style tx from entering the mempool as soon as we fork
-        if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value) && !IsTxBUIP055Only(entry))
-        {
-            return state.Invalid(false, REJECT_WRONG_FORK, "txn-uses-old-sighash-algorithm");
-        }
-        // Store transaction in memory
-        pool.addUnchecked(hash, entry, setAncestors, !IsInitialBlockDownload());
-
-        // trim mempool and check if tx was trimmed
-        if (!fOverrideMempoolLimit)
-        {
-            LimitMempoolSize(pool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
-                GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
-            if (!pool.exists(hash))
-                return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool full");
-        }
-        // BU: update tx per second when a tx is valid and accepted
-        pool.UpdateTransactionsPerSecond();
-        // BU - Xtreme Thinblocks - trim the orphan pool by entry time and do not allow it to be overidden.
-    }
-
-    if (!fRejectAbsurdFee)
-        SyncWithWallets(tx, NULL);
-
-    int64_t end = GetTimeMicros();
-
-    LogPrint("bench", "ValidateTransaction, time: %d, tx: %s, len: %d, sigops: %llu (legacy: %u), sighash: %llu, Vin: "
-                      "%llu, Vout: %llu\n",
-        end - start, tx.GetHash().ToString(), nSize, resourceTracker.GetSigOps(), (unsigned int)nSigOps,
-        resourceTracker.GetSighashBytes(), tx.vin.size(), tx.vout.size());
-    nTxValidationTime << (end - start);
-
-    return true;
-}
 
 bool AcceptToMemoryPool(CTxMemPool &pool,
     CValidationState &state,
@@ -1364,16 +1006,17 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     bool fRejectAbsurdFee)
 {
     std::vector<uint256> vHashTxToUncache;
-    bool res = AcceptToMemoryPoolWorker(
-        pool, state, tx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit, fRejectAbsurdFee, vHashTxToUncache);
+    Snapshot ss;
+    ss.Load();
+    bool res = ParallelAcceptToMemoryPool(ss,pool,state,tx,fLimitFree,pfMissingInputs,fOverrideMempoolLimit, fRejectAbsurdFee, vHashTxToUncache);
     if (!res)
     {
         BOOST_FOREACH (const uint256 &hashTx, vHashTxToUncache)
             pcoinsTip->Uncache(hashTx);
     }
-
     return res;
 }
+
 
 /** Return transaction in tx, and if it was found inside a block, its hash is placed in hashBlock */
 bool GetTransaction(const uint256 &hash,
@@ -2922,6 +2565,7 @@ bool static DisconnectTip(CValidationState &state, const Consensus::Params &cons
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
     // Resurrect mempool transactions from the disconnected block.
+#if 0
     std::vector<uint256> vHashUpdate;
     BOOST_FOREACH (const CTransaction &tx, block.vtx)
     {
@@ -2944,6 +2588,26 @@ bool static DisconnectTip(CValidationState &state, const Consensus::Params &cons
     // block that were added back and cleans up the mempool state.
     mempool.UpdateTransactionsFromBlock(vHashUpdate);
     // Update chainActive and related variables.
+#endif
+    if (1)
+    {
+        boost::unique_lock<boost::mutex> lock(csTxInQ);
+        for (const CTransaction &tx : block.vtx)
+        {
+            if (!tx.IsCoinBase())
+            {
+                CTxInputData txd;
+                txd.tx = tx;
+                txd.nodeId = 0;
+                txd.nodeName = "unwind";
+                txd.whitelisted = false;
+                // TODO updatetransactionsfrom block
+                txInQ.push(txd); // add this transaction onto the processing queue
+                cvTxInQ.notify_one();
+            }
+        }
+    }
+
     UpdateTip(pindexDelete->pprev);
     // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:

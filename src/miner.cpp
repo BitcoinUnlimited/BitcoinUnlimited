@@ -246,6 +246,7 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
 
 bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter)
 {
+    READLOCK(mempool.cs);
     BOOST_FOREACH (CTxMemPool::txiter parent, mempool.GetMemPoolParents(iter))
     {
         if (!inBlock.count(parent))
@@ -338,7 +339,7 @@ void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, CTxMemPool::txit
     {
         double dPriority = iter->GetPriority(nHeight);
         CAmount dummy;
-        mempool.ApplyDeltas(iter->GetTx().GetHash(), dPriority, dummy);
+        mempool._ApplyDeltas(iter->GetTx().GetHash(), dPriority, dummy);
         LogPrintf("priority %.1f fee %s txid %s\n", dPriority,
             CFeeRate(iter->GetModifiedFee(), iter->GetTxSize()).ToString().c_str(),
             iter->GetTx().GetHash().ToString().c_str());
@@ -347,6 +348,7 @@ void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, CTxMemPool::txit
 
 void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
 {
+    READLOCK(mempool.cs);
     std::priority_queue<CTxMemPool::txiter, std::vector<CTxMemPool::txiter>, ScoreCompare> clearedTxs;
     CTxMemPool::setEntries waitSet;
     CTxMemPool::indexed_transaction_set::index<mining_score>::type::iterator mi =
@@ -443,13 +445,13 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
     std::map<CTxMemPool::txiter, double, CTxMemPool::CompareIteratorByHash> waitPriMap;
     typedef std::map<CTxMemPool::txiter, double, CTxMemPool::CompareIteratorByHash>::iterator waitPriIter;
     double actualPriority = -1;
-
+    READLOCK(mempool.cs);
     vecPriority.reserve(mempool.mapTx.size());
     for (CTxMemPool::indexed_transaction_set::iterator mi = mempool.mapTx.begin(); mi != mempool.mapTx.end(); ++mi)
     {
         double dPriority = mi->GetPriority(nHeight);
         CAmount dummy;
-        mempool.ApplyDeltas(mi->GetTx().GetHash(), dPriority, dummy);
+        mempool._ApplyDeltas(mi->GetTx().GetHash(), dPriority, dummy);
         vecPriority.push_back(TxCoinAgePriority(dPriority, mi));
     }
     std::make_heap(vecPriority.begin(), vecPriority.end(), pricomparer);

@@ -65,6 +65,34 @@ class CChainParams;
 
 extern uint256 bitcoinCashForkBlockHash;
 
+class Snapshot
+{
+public:
+    uint64_t tipHeight;
+    uint64_t tipMedianTimePast;
+    int64_t adjustedTime;
+    CBlockIndex *tip;  // CBlockIndexes are never deleted once created (even if the tip changes) so we can use this ptr
+    CCoinsViewCache *coins;
+    CCoinsViewMemPool* cvMempool;
+
+    void Load(void);
+
+    Snapshot():coins(nullptr), cvMempool(nullptr) {}
+    ~Snapshot()
+    {
+        if (cvMempool) delete cvMempool;
+    }
+};
+
+extern bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
+    CValidationState &state,
+    const CTransaction &consttx,
+    bool fLimitFree,
+    bool *pfMissingInputs,
+    bool fOverrideMempoolLimit,
+    bool fRejectAbsurdFee,
+                                std::vector<uint256> &vHashTxnToUncache);
+    
 class CTxInputData
 {
 public:
@@ -83,7 +111,6 @@ class CTxCommitData
 public:
     CTxMemPoolEntry entry;
     uint256 hash;
-    CTxMemPool::setEntries setAncestors;
 };
 extern std::queue<CTxCommitData> txCommitQ;
 extern CCriticalSection csTxCommitQ;

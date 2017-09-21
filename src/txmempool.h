@@ -441,8 +441,8 @@ private:
     typedef std::map<txiter, TxLinks, CompareIteratorByHash> txlinksMap;
     txlinksMap mapLinks;
 
-    void UpdateParent(txiter entry, txiter parent, bool add);
-    void UpdateChild(txiter entry, txiter child, bool add);
+    void _UpdateParent(txiter entry, txiter parent, bool add);
+    void _UpdateChild(txiter entry, txiter child, bool add);
 
 public:
     std::map<COutPoint, CInPoint> mapNextTx;
@@ -494,6 +494,7 @@ public:
     /** Affect CreateNewBlock prioritisation of transactions */
     void PrioritiseTransaction(const uint256 hash, const std::string strHash, double dPriorityDelta, const CAmount& nFeeDelta);
     void ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount &nFeeDelta) const;
+    void _ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount &nFeeDelta) const;
     void ClearPrioritisation(const uint256 hash);
     void _ClearPrioritisation(const uint256 hash);
 
@@ -501,7 +502,7 @@ public:
     /** Remove a set of transactions from the mempool.
      *  If a transaction is in this set, then all in-mempool descendants must
      *  also be in the set.*/
-    void RemoveStaged(setEntries &stage);
+    void _RemoveStaged(setEntries &stage);
 
     /** When adding transactions from a disconnected block back to the mempool,
      *  new mempool entries may have children in the mempool (which is generally
@@ -524,16 +525,12 @@ public:
      *  fSearchForParents = whether to search a tx's vin for in-mempool parents, or
      *    look up parents from mapLinks. Must be true for entries not in the mempool
      */
-    bool CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntries &setAncestors, uint64_t limitAncestorCount, uint64_t limitAncestorSize, uint64_t limitDescendantCount, uint64_t limitDescendantSize, std::string &errString, bool fSearchForParents = true);
+    bool CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, uint64_t limitAncestorCount, uint64_t limitAncestorSize, uint64_t limitDescendantCount, uint64_t limitDescendantSize, std::string &errString, bool fSearchForParents = true);
     bool _CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntries &setAncestors, uint64_t limitAncestorCount, uint64_t limitAncestorSize, uint64_t limitDescendantCount, uint64_t limitDescendantSize, std::string &errString, bool fSearchForParents = true);
 
     /** Similar to CalculateMemPoolAncestors, except only requires the inputs and just returns true/false depending on whether the input set conforms to the passed limits */
     bool ValidateMemPoolAncestors(const std::vector<CTxIn>& txIn, uint64_t limitAncestorCount, uint64_t limitAncestorSize, uint64_t limitDescendantCount, uint64_t limitDescendantSize, std::string &errString);
 
-    /** Populate setDescendants with all in-mempool descendants of hash.
-     *  Assumes that setDescendants includes all in-mempool descendants of anything
-     *  already in it.  */
-    void CalculateDescendants(txiter it, setEntries &setDescendants);
 
     /** The minimum fee to get into the mempool, which may itself not be enough
       *  for larger-sized transactions.
@@ -613,6 +610,11 @@ public:
 
     size_t DynamicMemoryUsage() const;
     size_t _DynamicMemoryUsage() const;  // no locks taken
+protected:
+        /** Populate setDescendants with all in-mempool descendants of hash.
+     *  Assumes that setDescendants includes all in-mempool descendants of anything
+     *  already in it.  */
+    void _CalculateDescendants(txiter it, setEntries &setDescendants);
 
 private:
     /** UpdateForDescendants is used by UpdateTransactionsFromBlock to update
@@ -636,9 +638,9 @@ private:
             cacheMap &cachedDescendants,
             const std::set<uint256> &setExclude);
     /** Update ancestors of hash to add/remove it as a descendant transaction. */
-    void UpdateAncestorsOf(bool add, txiter hash, setEntries &setAncestors);
+    void _UpdateAncestorsOf(bool add, txiter hash, setEntries &setAncestors);
     /** For each transaction being removed, update ancestors and any direct children. */
-    void UpdateForRemoveFromMempool(const setEntries &entriesToRemove);
+    void _UpdateForRemoveFromMempool(const setEntries &entriesToRemove);
     /** Sever link between specified transaction and direct children. */
     void UpdateChildrenForRemoval(txiter entry);
 

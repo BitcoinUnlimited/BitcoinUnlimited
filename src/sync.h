@@ -124,12 +124,15 @@ void LeaveCritical();
 void DeleteCritical(const void* cs); // BU if a CCriticalSection is allocated on the heap we need to clean it from the lockorder map upon destruction because another CCriticalSection could be created on top of it.
 std::string LocksHeld();
 void AssertLockHeldInternal(const char* pszName, const char* pszFile, int nLine, void* cs);
+void AssertWriteLockHeldInternal(const char* pszName, const char* pszFile, int nLine, CSharedCriticalSection *cs);
 #else
 void static inline EnterCritical(const char* pszName, const char* pszFile, int nLine, void* cs, bool fTry = false) {}
 void static inline LeaveCritical() {}
 void static inline AssertLockHeldInternal(const char* pszName, const char* pszFile, int nLine, void* cs) {}
+void static inline AssertWriteLockHeldInternal(const char* pszName, const char* pszFile, int nLine, CSharedCriticalSection *cs) {}
 #endif
 #define AssertLockHeld(cs) AssertLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
+#define AssertWriteLockHeld(cs) AssertWriteLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
 
 #ifdef DEBUG_LOCKCONTENTION
 void PrintLockContention(const char* pszName, const char* pszFile, int nLine);
