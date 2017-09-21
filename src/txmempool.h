@@ -572,8 +572,11 @@ public:
         READLOCK(cs);
         return (mapTx.count(hash) != 0);
     }
+    bool _exists(uint256 hash) const
+    {
+        return (mapTx.count(hash) != 0);
+    }
 
-    // BU: begin
     double TransactionsPerSecond()
     {
         boost::mutex::scoped_lock lock(cs_txPerSec);
