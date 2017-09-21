@@ -202,6 +202,12 @@ void CTxMemPool::UpdateTransactionsFromBlock(const std::vector<uint256> &vHashes
 bool CTxMemPool::CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntries &setAncestors, uint64_t limitAncestorCount, uint64_t limitAncestorSize, uint64_t limitDescendantCount, uint64_t limitDescendantSize, std::string &errString, bool fSearchForParents /* = true */)
 {
     READLOCK(cs);
+    return _CalculateMemPoolAncestors(entry, setAncestors, limitAncestorCount, limitAncestorSize, limitDescendantCount, limitDescendantSize, errString, fSearchForParents);
+}
+
+bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntries &setAncestors, uint64_t limitAncestorCount, uint64_t limitAncestorSize, uint64_t limitDescendantCount, uint64_t limitDescendantSize, std::string &errString, bool fSearchForParents /* = true */)
+{
+
     setEntries parentHashes;
     const CTransaction &tx = entry.GetTx();
 
@@ -378,7 +384,7 @@ void CTxMemPool::UpdateForRemoveFromMempool(const setEntries &entriesToRemove)
         // differ from the set of mempool parents we'd calculate by searching,
         // and it's important that we use the mapLinks[] notion of ancestor
         // transactions as the set of things to update for removal.
-        CalculateMemPoolAncestors(entry, setAncestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, false);
+        _CalculateMemPoolAncestors(entry, setAncestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, false);
         // Note that UpdateAncestorsOf severs the child links that point to
         // removeIt in the entries for the parents of removeIt.  This is
         // fine since we don't need to use the mempool children of any entries
@@ -833,7 +839,7 @@ void CTxMemPool::queryHashes(vector<uint256>& vtxid) const
 bool CTxMemPool::lookup(const uint256& hash, CTxMemPoolEntry& result) const
 {
     READLOCK(cs);
-    _lookup(hash,result);
+    return _lookup(hash,result);
 }
 
 bool CTxMemPool::_lookup(const uint256& hash, CTxMemPoolEntry& result) const
@@ -846,6 +852,12 @@ bool CTxMemPool::_lookup(const uint256& hash, CTxMemPoolEntry& result) const
 }
 
 bool CTxMemPool::lookup(const uint256& hash, CTransaction& result) const
+{
+    READLOCK(cs);
+    return _lookup(hash,result);
+}
+
+bool CTxMemPool::_lookup(const uint256& hash, CTransaction& result) const
 {
     AssertLockHeld(cs);
     indexed_transaction_set::const_iterator i = mapTx.find(hash);
@@ -924,7 +936,7 @@ void CTxMemPool::PrioritiseTransaction(const uint256 hash, const string strHash,
             setEntries setAncestors;
             uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
             std::string dummy;
-            CalculateMemPoolAncestors(*it, setAncestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, false);
+            _CalculateMemPoolAncestors(*it, setAncestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, false);
             BOOST_FOREACH(txiter ancestorIt, setAncestors) {
                 mapTx.modify(ancestorIt, update_descendant_state(0, nFeeDelta, 0));
             }
@@ -969,7 +981,7 @@ bool CCoinsViewMemPool::GetCoins(const uint256 &txid, CCoins &coins) const {
     // conflict with the underlying cache, and it cannot have pruned entries (as it contains full)
     // transactions. First checking the underlying cache risks returning a pruned entry instead.
     CTransaction tx;
-    if (mempool.lookup(txid, tx)) {
+    if (mempool._lookup(txid, tx)) {
         coins = CCoins(tx, MEMPOOL_HEIGHT);
         return true;
     }
@@ -1018,7 +1030,6 @@ int CTxMemPool::Expire(int64_t time) {
 
 bool CTxMemPool::addUnchecked(const uint256&hash, const CTxMemPoolEntry &entry, bool fCurrentEstimate)
 {
-    WRITELOCK(cs);
     setEntries setAncestors;
     uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
     std::string dummy;

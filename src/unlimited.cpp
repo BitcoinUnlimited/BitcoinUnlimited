@@ -322,11 +322,13 @@ UniValue pushtx(const UniValue &params, bool fHelp)
 
 void UnlimitedPushTxns(CNode *dest)
 {
-    // LOCK2(cs_main, pfrom->cs_filter);
-    LOCK(dest->cs_filter);
     std::vector<uint256> vtxid;
-    mempool.queryHashes(vtxid);
+    {
+        READLOCK(mempool.cs);
+        mempool.queryHashes(vtxid);
+    }
     vector<CInv> vInv;
+    LOCK(dest->cs_filter);
     BOOST_FOREACH (uint256 &hash, vtxid)
     {
         CInv inv(MSG_TX, hash);
@@ -2607,6 +2609,7 @@ void ThreadTxHandler()
                 bool have = TxAlreadyHave(inv);
                 if (have)
                 {
+                    LogPrint("mempool","already have\n");
                     if (1)
                     {
                         WRITELOCK(csRecentRejects);

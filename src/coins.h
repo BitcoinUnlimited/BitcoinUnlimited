@@ -320,7 +320,7 @@ class CCoinsView
 {
 public:
 
-    mutable CCriticalSection cs_utxo;
+    mutable CSharedCriticalSection cs_utxo;
 
     //! Retrieve the CCoins (unspent transaction outputs) for a given txid
     virtual bool GetCoins(const uint256 &txid, CCoins &coins) const;
@@ -397,6 +397,7 @@ protected:
      */
     mutable uint256 hashBlock;
     mutable CCoinsMap cacheCoins;
+    mutable CCriticalSection csCacheInsert;
 
     /* Cached dynamic memory usage for the inner CCoins objects. */
     mutable size_t cachedCoinsUsage;
@@ -425,6 +426,7 @@ public:
      * allowed while accessing the returned pointer.
      */
     const CCoins* AccessCoins(const uint256 &txid) const;
+    const CCoins* _AccessCoins(const uint256 &txid) const;
 
     /**
      * Return a modifiable reference to a CCoins. If no entry with the given
@@ -470,6 +472,7 @@ public:
 
     //! Calculate the size of the cache (in bytes)
     size_t DynamicMemoryUsage() const;
+    size_t _DynamicMemoryUsage() const;
 
     //! Recalculate and Reset the size of cachedCoinsUsage
     size_t ResetCachedCoinUsage() const;
@@ -495,11 +498,12 @@ public:
     double GetPriority(const CTransaction &tx, int nHeight, CAmount &inChainInputValue) const;
 
     const CTxOut &GetOutputFor(const CTxIn& input) const;
+    const CTxOut &_GetOutputFor(const CTxIn& input) const;
 
     friend class CCoinsModifier;
 
 private:
-    CCoinsMap::iterator FetchCoins(const uint256 &txid);
+    //CCoinsMap::iterator FetchCoins(const uint256 &txid);
     CCoinsMap::const_iterator FetchCoins(const uint256 &txid) const;
 
     /**

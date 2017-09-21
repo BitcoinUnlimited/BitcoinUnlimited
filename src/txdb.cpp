@@ -33,17 +33,17 @@ CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe) : db(Get
 }
 
 bool CCoinsViewDB::GetCoins(const uint256 &txid, CCoins &coins) const {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
     return db.Read(make_pair(DB_COINS, txid), coins);
 }
 
 bool CCoinsViewDB::HaveCoins(const uint256 &txid) const {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
     return db.Exists(make_pair(DB_COINS, txid));
 }
 
 uint256 CCoinsViewDB::GetBestBlock() const {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
     uint256 hashBestChain;
     if (!db.Read(DB_BEST_BLOCK, hashBestChain))
         return uint256();
@@ -52,7 +52,7 @@ uint256 CCoinsViewDB::GetBestBlock() const {
 
 bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock, size_t &nChildCachedCoinsUsage)
 {
-    LOCK(cs_utxo);
+    WRITELOCK(cs_utxo);
     CDBBatch batch(&db.GetObfuscateKey());
     size_t count = 0;
     size_t changed = 0;
@@ -159,7 +159,7 @@ bool CCoinsViewDB::GetStats(CCoinsStats &stats) const {
         throw;
     }
     {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
     LEAVE_CRITICAL_SECTION(cs_main);
     /* It seems that there are no "const iterators" for LevelDB.  Since we
        only need read operations on it, use a const-cast to get around

@@ -1962,7 +1962,6 @@ bool AbortNode(CValidationState &state, const std::string &strMessage, const std
 static bool ApplyTxInUndo(const CTxInUndo &undo, CCoinsViewCache &view, const COutPoint &out)
 {
     bool fClean = true;
-
     CCoinsModifier coins = view.ModifyCoins(out.hash);
     if (undo.nHeight != 0)
     {
@@ -5380,15 +5379,15 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
     return true;
 }
 
-void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParams)
+void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParams, std::vector<CInv>& vInv)
 {
-    std::deque<CInv>::iterator it = pfrom->vRecvGetData.begin();
+    std::vector<CInv>::iterator it = vInv.begin();
 
     std::vector<CInv> vNotFound;
 
     LOCK(cs_main);
 
-    while (it != pfrom->vRecvGetData.end())
+    while (it != vInv.end())
     {
         // Don't bother if send buffer is too full to respond anyway
         if (pfrom->nSendSize >= SendBufferSize())
@@ -5545,6 +5544,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     if (pushed)
                     {
                         pfrom->PushMessage(inv.GetCommand(), cd);
+                        pfrom->txsSent += 1;
                     }
                 }
                 if (!pushed && inv.type == MSG_TX)
@@ -5581,7 +5581,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
         }
     }
 
-    pfrom->vRecvGetData.erase(pfrom->vRecvGetData.begin(), it);
+    // pfrom->vRecvGetData.erase(pfrom->vRecvGetData.begin(), it);
 
     if (!vNotFound.empty())
     {
@@ -5955,7 +5955,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             fBlocksOnly = false;
 
         bool ibd = IsInitialBlockDownload();
-
+        // LogPrintf("got inv: length %s peer=%s\n", vInv.size(), pfrom->GetLogName());
         for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
         {
             const CInv &inv = vInv[nInv];
@@ -5963,8 +5963,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             boost::this_thread::interruption_point();
 
             bool fAlreadyHave = AlreadyHaveLocking(inv);
-            LogPrint("net", "got inv: %s  %s %s peer=%s\n", inv.ToString(), fAlreadyHave ? "have" : "new",
-                     ibd ? "ignoring" : "", pfrom->GetLogName());
+            //LogPrint("net", "got inv: %s  %s %s peer=%s\n", inv.ToString(), fAlreadyHave ? "have" : "new",
+            //         ibd ? "ignoring" : "", pfrom->GetLogName());
 
             if (inv.type == MSG_BLOCK)
             {
@@ -5984,7 +5984,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 }
                 else
                 {
-                    LogPrint("net", "skipping request of block %s.  already have: %d  importing: %d  reindex: %d  "
+                    LogPrint("reject", "skipping request of block %s.  already have: %d  importing: %d  reindex: %d  "
                                     "isChainNearlySyncd: %d\n",
                         inv.hash.ToString(), fAlreadyHave, fImporting, fReindex, IsChainNearlySyncd());
                 }
@@ -5993,7 +5993,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             {
                 pfrom->AddInventoryKnown(inv);
                 if (fBlocksOnly)
-                    LogPrint("net", "transaction (%s) inv sent in violation of protocol peer=%d\n", inv.hash.ToString(),
+                    LogPrint("reject", "transaction (%s) inv sent in violation of protocol peer=%d\n", inv.hash.ToString(),
                         pfrom->id);
                 // RE !IsInitialBlockDownload(): during IBD, its a waste of bandwidth to grab transactions, they will
                 // likely be included
@@ -6048,8 +6048,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
             LogPrint("net", "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
 
-        pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
-        ProcessGetData(pfrom, chainparams.GetConsensus());
+        //pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
+        ProcessGetData(pfrom, chainparams.GetConsensus(), vInv);
     }
 
 
@@ -6652,7 +6652,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         std::vector<uint256> vtxid;
         if (1) // Keep this lock for as short as possible, causing 2.6 second locks
         {
-            LOCK2(cs_main, pfrom->cs_filter);
+            READLOCK(mempool.cs);
             mempool.queryHashes(vtxid);
         }
         std::vector<CInv> vInv;
@@ -6919,8 +6919,8 @@ bool ProcessMessages(CNode *pfrom)
     //
     bool fOk = true;
 
-    if (!pfrom->vRecvGetData.empty())
-        ProcessGetData(pfrom, chainparams.GetConsensus());
+    //if (!pfrom->vRecvGetData.empty())
+    //    ProcessGetData(pfrom, chainparams.GetConsensus(),pfrom->vRecvGetData);
 
     // this maintains the order of responses
     if (!pfrom->vRecvGetData.empty())

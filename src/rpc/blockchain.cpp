@@ -222,7 +222,10 @@ UniValue mempoolToJSON(bool fVerbose = false)
     else
     {
         vector<uint256> vtxid;
-        mempool.queryHashes(vtxid);
+        {
+            READLOCK(mempool.cs);
+            mempool.queryHashes(vtxid);
+        }
 
         UniValue a(UniValue::VARR);
         BOOST_FOREACH(const uint256& hash, vtxid)

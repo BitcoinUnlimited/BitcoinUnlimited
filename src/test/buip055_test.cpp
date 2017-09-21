@@ -50,7 +50,6 @@ SetupDummyInputs(CBasicKeyStore& keystoreRet, CCoinsViewCache& coinsRet)
         key[i].MakeNewKey(i % 2);
         keystoreRet.AddKey(key[i]);
     }
-
     // Create some dummy input transactions
     dummyTransactions[0].vout.resize(2);
     dummyTransactions[0].vout[0].nValue = 11*CENT;

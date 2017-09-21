@@ -692,6 +692,7 @@ UniValue signrawtransaction(const UniValue& params, bool fHelp)
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
+                // WRITELOCK(view.cs_utxo);
                 CCoinsModifier coins = view.ModifyCoins(txid);
                 if (coins->IsAvailable(nOut) && coins->vout[nOut].scriptPubKey != scriptPubKey) {
                     string err("Previous output scriptPubKey mismatch:\n");

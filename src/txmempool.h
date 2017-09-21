@@ -525,6 +525,7 @@ public:
      *    look up parents from mapLinks. Must be true for entries not in the mempool
      */
     bool CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntries &setAncestors, uint64_t limitAncestorCount, uint64_t limitAncestorSize, uint64_t limitDescendantCount, uint64_t limitDescendantSize, std::string &errString, bool fSearchForParents = true);
+    bool _CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntries &setAncestors, uint64_t limitAncestorCount, uint64_t limitAncestorSize, uint64_t limitDescendantCount, uint64_t limitDescendantSize, std::string &errString, bool fSearchForParents = true);
 
     /** Similar to CalculateMemPoolAncestors, except only requires the inputs and just returns true/false depending on whether the input set conforms to the passed limits */
     bool ValidateMemPoolAncestors(const std::vector<CTxIn>& txIn, uint64_t limitAncestorCount, uint64_t limitAncestorSize, uint64_t limitDescendantCount, uint64_t limitDescendantSize, std::string &errString);
@@ -583,6 +584,7 @@ public:
     bool lookup(const uint256& hash, CTxMemPoolEntry& result) const;
     bool _lookup(const uint256& hash, CTxMemPoolEntry& result) const;
     bool lookup(const uint256& hash, CTransaction& result) const;
+    bool _lookup(const uint256& hash, CTransaction& result) const;
 
     /** Estimate fee rate needed to get into the next nBlocks
      *  If no answer can be given at nBlocks, return an estimate
