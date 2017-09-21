@@ -866,21 +866,6 @@ bool CTxMemPool::HasNoInputsOf(const CTransaction &tx) const
 
 CCoinsViewMemPool::CCoinsViewMemPool(CCoinsView *baseIn, const CTxMemPool &mempoolIn) : CCoinsViewBacked(baseIn), mempool(mempoolIn) { }
 
-bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const {
-    // If an entry in the mempool exists, always return that one, as it's guaranteed to never
-    // conflict with the underlying cache, and it cannot have pruned entries (as it contains full)
-    // transactions. First checking the underlying cache risks returning a pruned entry instead.
-    CTransactionRef ptx = mempool.get(outpoint.hash);
-    if (ptx) {
-        if (outpoint.n < ptx->vout.size()) {
-            coin = Coin(ptx->vout[outpoint.n], MEMPOOL_HEIGHT, false);
-            return true;
-        } else {
-            return false;
-        }
-    }
-    return (base->GetCoin(outpoint, coin) && !coin.IsSpent());
-}
 
 bool CCoinsViewMemPool::HaveCoin(const COutPoint &outpoint) const {
     return mempool.exists(outpoint) || base->HaveCoin(outpoint);
@@ -1057,6 +1042,18 @@ void CTxMemPool::UpdateTransactionsPerSecond()
     nTxPerSec += 1/nSecondsToAverage; // The amount that the new tx will add to the tx rate
     if (nTxPerSec < 0) nTxPerSec = 0;
 }
+
+/*
+CTransaction& CTxMemPool::get(const uint256 &hash) const
+{
+    LOCK(cs);
+    indexed_transaction_set::const_iterator i = mapTx.find(hash);
+    if (i == mapTx.end())
+        return nullptr;
+    //return &(i->GetTx());
+    return i;
+}
+*/
 
 SaltedTxidHasher::SaltedTxidHasher() : k0(GetRand(std::numeric_limits<uint64_t>::max())), k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
 
