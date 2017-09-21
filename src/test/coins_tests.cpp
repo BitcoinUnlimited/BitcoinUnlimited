@@ -255,6 +255,21 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
     BOOST_CHECK(missed_an_entry);
 }
 
+// Store of all necessary tx and undo data for next test
+typedef std::map<COutPoint, std::tuple<CTransaction,CTxUndo,Coin>> UtxoData;
+UtxoData utxoData;
+
+UtxoData::iterator FindRandomFrom(const std::set<COutPoint> &utxoSet) {
+    assert(utxoSet.size());
+    auto utxoSetIt = utxoSet.lower_bound(COutPoint(insecure_rand(), 0));
+    if (utxoSetIt == utxoSet.end()) {
+        utxoSetIt = utxoSet.begin();
+    }
+    auto utxoDataIt = utxoData.find(*utxoSetIt);
+    assert(utxoDataIt != utxoData.end());
+    return utxoDataIt;
+}
+
 // This test is similar to the previous test
 // except the emphasis is on testing the functionality of UpdateCoins
 // random txs are created and UpdateCoins is used to update the cache stack
@@ -275,14 +290,18 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
     std::map<uint256, CAmount> coinbaseids;
     std::set<uint256> alltxids;
     std::set<uint256> duplicateids;
+    std::set<COutPoint> disconnected_coins;
+    std::set<COutPoint> utxoset;
 
-    for (unsigned int i = 0; i < NUM_SIMULATION_ITERATIONS; i++) {
+    for (unsigned int i = 0; i < NUM_SIMULATION_ITERATIONS; i++)
+    {
+        uint32_t randiter = insecure_rand();
+        if (randiter % 20 < 19)
         {
             CMutableTransaction tx;
             tx.vin.resize(1);
             tx.vout.resize(1);
             tx.vout[0].nValue = i; //Keep txs unique unless intended to duplicate
-            unsigned int height = insecure_rand();
 
             // 1/10 times create a coinbase
             if (insecure_rand() % 10 == 0 || coinbaseids.size() < 10) {
@@ -337,15 +356,14 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
             }
 
 
-            // Track this tx and undo info to use later
-            alltxs.insert(std::make_pair(tx.GetHash(),std::make_tuple(tx,undo,oldcoins)));
         } else if (utxoset.size()) {
             //1/20 times undo a previous transaction
-            TxData &txd = FindRandomFrom(utxoset);
+            unsigned int height = insecure_rand();
+            auto utxod = FindRandomFrom(utxoset);
 
-            CTransaction &tx = std::get<0>(txd);
-            CTxUndo &undo = std::get<1>(txd);
-            CCoins &origcoins = std::get<2>(txd);
+            CTransaction &tx = std::get<0>(utxod->second);
+            CTxUndo &undo = std::get<1>(utxod->second);
+            CCoins &origcoins = std::get<2>(utxod->second);
 
             uint256 undohash = tx.GetHash();
 
@@ -370,7 +388,7 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
                 ApplyTxInUndo(std::move(coin), *(stack.back()), out);
             }
             // Store as a candidate for reconnection
-            disconnectedids.insert(undohash);
+            disconnected_coins.insert(utxod->first);
 
             CValidationState dummy;
             UpdateCoins(tx, dummy, *(stack.back()), height);
