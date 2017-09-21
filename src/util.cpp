@@ -597,7 +597,7 @@ bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest)
  * Specifically handles case where path p exists, but it wasn't possible for the user to
  * write to the parent directory.
  */
-bool TryCreateDirectory(const boost::filesystem::path& p)
+bool TryCreateDirectories(const boost::filesystem::path& p)
 {
     try
     {
@@ -610,6 +610,7 @@ bool TryCreateDirectory(const boost::filesystem::path& p)
     // create_directory didn't create the directory, it had to have existed already
     return false;
 }
+
 
 void FileCommit(FILE *fileout)
 {
