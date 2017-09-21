@@ -185,6 +185,18 @@ static void RegisterLoad(const string& strInput)
     RegisterSetJson(key, valStr);
 }
 
+static CAmount AmountFromValue(const UniValue& value)
+{
+    if (!value.isNum() && !value.isStr())
+        throw std::runtime_error("Amount is not a number or string");
+    CAmount amount;
+    if (!ParseFixedPoint(value.getValStr(), 8, &amount))
+        throw std::runtime_error("Invalid amount");
+    if (!MoneyRange(amount))
+        throw std::runtime_error("Amount out of range");
+    return amount;
+}
+
 static void MutateTxVersion(CMutableTransaction& tx, const string& cmdVal)
 {
     int64_t newVersion = atoi64(cmdVal);

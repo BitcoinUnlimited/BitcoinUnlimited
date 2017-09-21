@@ -321,6 +321,8 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
 
                 assert(!CTransaction(tx).IsCoinBase());
             }
+
+
             // Track this tx to possibly spend later
             alltxids.insert(tx.GetHash());
 
