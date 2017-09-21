@@ -591,7 +591,8 @@ void MarkBlockAsInFlight(NodeId nodeid,
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
 {
-    return chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - consensusParams.nPowTargetSpacing * 20;
+    return !IsInitialBlockDownload();
+        // chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - consensusParams.nPowTargetSpacing * 20;
 }
 
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)
