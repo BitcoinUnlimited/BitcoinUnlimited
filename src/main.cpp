@@ -2592,7 +2592,8 @@ bool static DisconnectTip(CValidationState &state, const Consensus::Params &cons
 #endif
     if (1)
     {
-        boost::unique_lock<boost::mutex> lock(csTxInQ);
+        // lock is already held
+        //boost::unique_lock<boost::mutex> lock(csTxInQ);
         for (const CTransaction &tx : block.vtx)
         {
             if (!tx.IsCoinBase())
@@ -3087,6 +3088,13 @@ static bool ActivateBestChainStep(CValidationState &state,
 bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams, const CBlock *pblock, bool fParallel)
 {
     CBlockIndex *pindexMostWork = NULL;
+
+    // Stop all transaction processing while we deal with the new block
+    // or transaction might be committed that conflict with it
+    boost::unique_lock<boost::mutex> lock(csTxInQ);
+    boost::unique_lock<boost::mutex> lock2(csCommitQ);
+    CommitToMempool();
+
     LOCK(cs_main);
 
     bool fOneDone = false;
@@ -3207,6 +3215,12 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
         setBlockIndexCandidates.erase(pindexWalk);
         // ActivateBestChain considers blocks already in chainActive
         // unconditionally valid already, so force disconnect away from it.
+
+        // Stop all mempool processing and input all pending tx into the mempool first
+        boost::unique_lock<boost::mutex> lock(csTxInQ);
+        boost::unique_lock<boost::mutex> lock2(csCommitQ);
+        CommitToMempool();
+
         if (!DisconnectTip(state, consensusParams))
         {
             mempool.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
@@ -3862,13 +3876,6 @@ bool ProcessNewBlock(CValidationState &state,
     bool fParallel)
 {
     int64_t start = GetTimeMicros();
-
-    // Stop all transaction processing while we deal with the new block
-    // or transaction might be committed that conflict with it
-    boost::unique_lock<boost::mutex> lock(csTxInQ);
-    txInQ = std::queue<CTxInputData>();  // clears.  TODO, process these first
-    boost::unique_lock<boost::mutex> lock2(csCommitQ);
-    CommitToMempool();
 
     LogPrint("thin", "Processing new block %s from peer %s (%d).\n", pblock->GetHash().ToString(),
         pfrom ? pfrom->addrName.c_str() : "myself", pfrom ? pfrom->id : 0);
