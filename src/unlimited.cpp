@@ -2517,17 +2517,21 @@ void CommitToMempool()
 {
     std::vector<uint256> vWorkQueue;
 
-    LOCK(cs_main);
-    while (!txCommitQ.empty())
+    LOCK(cs_main);  // cs_main must lock before csCommitQ
+    if (1)
     {
-        CTxCommitData &data = txCommitQ.front();
-        // Store transaction in memory
-        mempool.addUnchecked(data.hash, data.entry, !IsInitialBlockDownload());
-        if (mempool.exists(data.hash))
-            SyncWithWallets(data.entry.GetTx(), NULL);
-        vWorkQueue.push_back(data.hash);
+        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        while (!txCommitQ.empty())
+        {
+            CTxCommitData &data = txCommitQ.front();
+            // Store transaction in memory
+            mempool.addUnchecked(data.hash, data.entry, !IsInitialBlockDownload());
+            if (mempool.exists(data.hash))
+                SyncWithWallets(data.entry.GetTx(), NULL);
+            vWorkQueue.push_back(data.hash);
 
-        txCommitQ.pop();
+            txCommitQ.pop();
+        }
     }
 
     processOrphans(vWorkQueue);
@@ -2561,8 +2565,8 @@ void ThreadCommitToMempool()
             {
                 cvCommitQ.timed_wait(lock, boost::posix_time::milliseconds(5000));
             }
-            CommitToMempool();
         }
+        CommitToMempool();
     }
 }
 

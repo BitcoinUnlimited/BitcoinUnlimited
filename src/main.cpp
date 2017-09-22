@@ -1010,7 +1010,11 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     Snapshot ss;
     ss.Load();
     bool res = ParallelAcceptToMemoryPool(ss,pool,state,tx,fLimitFree,pfMissingInputs,fOverrideMempoolLimit, fRejectAbsurdFee, vHashTxToUncache);
-    if (!res)
+    if (res)
+    {
+        RelayTransaction(tx);
+    }
+    else
     {
         BOOST_FOREACH (const uint256 &hashTx, vHashTxToUncache)
             pcoinsTip->Uncache(hashTx);
@@ -3091,11 +3095,7 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
     // Stop all transaction processing while we deal with the new block
     // or transaction might be committed that conflict with it
     boost::unique_lock<boost::mutex> lock(csTxInQ);
-    if (1)
-    {
-        boost::unique_lock<boost::mutex> lock2(csCommitQ);
-        CommitToMempool();
-    }
+    CommitToMempool();
 
     LOCK(cs_main);
 

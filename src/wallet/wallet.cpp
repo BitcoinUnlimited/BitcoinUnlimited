@@ -2540,69 +2540,54 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 /**
  * Call after CreateTransaction unless you want to abort
  */
-bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey)
+bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey)
 {
+    if (fBroadcastTransactions)
     {
-        LOCK2(cs_main, cs_wallet);
-        LogPrint("wallet","CommitTransaction:\n%s", wtxNew.ToString());
-
-#if 1
-        if (fBroadcastTransactions)
+        // Broadcast
+        if (!wtxNew.AcceptToMemoryPool(false))
         {
-            // Broadcast
-            if (!wtxNew.AcceptToMemoryPool(false))
-            {
-                // This must not fail. The transaction has already been signed and recorded.
-                LogPrintf("CommitTransaction(): Error: Transaction not accepted into memory pool\n");
-                return false;
-            }
+            // This must not fail. The transaction has already been signed and recorded.
+            LogPrintf("CommitTransaction(): Error: Transaction not accepted into memory pool\n");
+            return false;
         }
-#endif
+    }
 
+    LOCK2(cs_main, cs_wallet);
+    LogPrint("wallet", "CommitTransaction:\n%s", wtxNew.ToString());
+
+    {
+        // This is only to keep the database open to defeat the auto-flush for the
+        // duration of this scope.  This is the only place where this optimization
+        // maybe makes sense; please don't do it anywhere else.
+        CWalletDB *pwalletdb = fFileBacked ? new CWalletDB(strWalletFile, "r+") : NULL;
+
+        // Take key pair from key pool so it won't be used again
+        reservekey.KeepKey();
+
+        // Add tx to wallet, because if it has change it's also ours,
+        // otherwise just for transaction history.
+        AddToWallet(wtxNew, false, pwalletdb);
+
+        // Notify that old coins are spent
+        set<CWalletTx *> setCoins;
+        BOOST_FOREACH (const CTxIn &txin, wtxNew.vin)
         {
-            // This is only to keep the database open to defeat the auto-flush for the
-            // duration of this scope.  This is the only place where this optimization
-            // maybe makes sense; please don't do it anywhere else.
-            CWalletDB* pwalletdb = fFileBacked ? new CWalletDB(strWalletFile,"r+") : NULL;
-
-            // Take key pair from key pool so it won't be used again
-            reservekey.KeepKey();
-
-            // Add tx to wallet, because if it has change it's also ours,
-            // otherwise just for transaction history.
-            AddToWallet(wtxNew, false, pwalletdb);
-
-            // Notify that old coins are spent
-            set<CWalletTx*> setCoins;
-            BOOST_FOREACH(const CTxIn& txin, wtxNew.vin)
-            {
-                CWalletTx &coin = mapWallet[txin.prevout.hash];
-                coin.BindWallet(this);
-                NotifyTransactionChanged(this, coin.GetHash(), CT_UPDATED);
-            }
-
-            if (fFileBacked)
-                delete pwalletdb;
+            CWalletTx &coin = mapWallet[txin.prevout.hash];
+            coin.BindWallet(this);
+            NotifyTransactionChanged(this, coin.GetHash(), CT_UPDATED);
         }
 
-        // Track how many getdata requests our transaction gets
-        mapRequestCount[wtxNew.GetHash()] = 0;
+        if (fFileBacked)
+            delete pwalletdb;
+    }
 
-        if (fBroadcastTransactions)
-        {
-#if 0
-            // Broadcast
-            if (!wtxNew.AcceptToMemoryPool(false))
-            {
-                // This must not fail. The transaction has already been signed and recorded.
-                LogPrintf("CommitTransaction(): Error: Transaction not valid\n");
-                return false;
-            }
-#else
-            SyncWithWallets(wtxNew,NULL);
-#endif
-            wtxNew.RelayWalletTransaction();
-        }
+    // Track how many getdata requests our transaction gets
+    mapRequestCount[wtxNew.GetHash()] = 0;
+
+    if (fBroadcastTransactions)
+    {
+        wtxNew.RelayWalletTransaction();
     }
     return true;
 }
