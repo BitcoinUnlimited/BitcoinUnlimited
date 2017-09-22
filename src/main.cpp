@@ -1373,7 +1373,6 @@ bool CScriptCheck::operator()()
 
 int GetSpendHeight(const CCoinsViewCache &inputs)
 {
-    LOCK(cs_main);
     BlockMap::iterator i = mapBlockIndex.find(inputs.GetBestBlock());
     if (i != mapBlockIndex.end())
     {
@@ -3092,8 +3091,11 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
     // Stop all transaction processing while we deal with the new block
     // or transaction might be committed that conflict with it
     boost::unique_lock<boost::mutex> lock(csTxInQ);
-    boost::unique_lock<boost::mutex> lock2(csCommitQ);
-    CommitToMempool();
+    if (1)
+    {
+        boost::unique_lock<boost::mutex> lock2(csCommitQ);
+        CommitToMempool();
+    }
 
     LOCK(cs_main);
 

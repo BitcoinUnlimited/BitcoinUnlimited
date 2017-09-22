@@ -1294,30 +1294,35 @@ void CWallet::ReacceptWalletTransactions()
     // If transactions aren't being broadcasted, don't let them into local mempool either
     if (!fBroadcastTransactions)
         return;
-    LOCK2(cs_main, cs_wallet);
-    std::map<int64_t, CWalletTx*> mapSorted;
 
-    // Sort pending wallet transactions based on their initial wallet insertion order
-    BOOST_FOREACH(PAIRTYPE(const uint256, CWalletTx)& item, mapWallet)
+    std::map<int64_t, CTransaction> mapSorted;
+
+    if (1)
     {
-        const uint256& wtxid = item.first;
-        CWalletTx& wtx = item.second;
-        assert(wtx.GetHash() == wtxid);
+        LOCK2(cs_main, cs_wallet);
+        // Sort pending wallet transactions based on their initial wallet insertion order
+        BOOST_FOREACH (PAIRTYPE(const uint256, CWalletTx) & item, mapWallet)
+        {
+            const uint256 &wtxid = item.first;
+            CWalletTx &wtx = item.second;
+            assert(wtx.GetHash() == wtxid);
 
-        int nDepth = wtx.GetDepthInMainChain();
+            int nDepth = wtx.GetDepthInMainChain();
 
-        if (!wtx.IsCoinBase() && (nDepth == 0 && !wtx.isAbandoned())) {
-            mapSorted.insert(std::make_pair(wtx.nOrderPos, &wtx));
+            if (!wtx.IsCoinBase() && (nDepth == 0 && !wtx.isAbandoned()))
+            {
+                mapSorted.insert(std::make_pair(wtx.nOrderPos, wtx));
+            }
         }
     }
 
     // Try to add wallet transactions to memory pool
-    BOOST_FOREACH(PAIRTYPE(const int64_t, CWalletTx*)& item, mapSorted)
+    BOOST_FOREACH(PAIRTYPE(const int64_t, CTransaction)& item, mapSorted)
     {
-        CWalletTx& wtx = *(item.second);
+        CTransaction& tx = item.second;
 
-        wtx.AcceptToMemoryPool(false);
-        SyncWithWallets(wtx,NULL);
+        CValidationState state;
+        AcceptToMemoryPool(mempool, state, tx, false, NULL, false, false);
     }
 }
 
