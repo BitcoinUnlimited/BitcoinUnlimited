@@ -2413,7 +2413,7 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
 
         if (1)
         {
-            LOCK(csTxCommitQ);
+            boost::unique_lock<boost::mutex> lock(csCommitQ);
             txCommitQ.push(eData);
         }
     }
@@ -2513,51 +2513,55 @@ void processOrphans(std::vector<uint256>& vWorkQueue)
 
 }
 
-void ThreadCommitToMempool()
+void CommitToMempool()
 {
     std::vector<uint256> vWorkQueue;
 
+    LOCK(cs_main);
+    while (!txCommitQ.empty())
+    {
+        CTxCommitData &data = txCommitQ.front();
+        // Store transaction in memory
+        mempool.addUnchecked(data.hash, data.entry, !IsInitialBlockDownload());
+        if (mempool.exists(data.hash))
+            SyncWithWallets(data.entry.GetTx(), NULL);
+        vWorkQueue.push_back(data.hash);
+
+        txCommitQ.pop();
+    }
+
+    processOrphans(vWorkQueue);
+    mempool.check(pcoinsTip);
+    LogPrint("mempool", "MemoryPool sz %u txn, %u kB\n", mempool.size(), mempool.DynamicMemoryUsage() / 1000);
+    // BU - Xtreme Thinblocks - trim the orphan pool by entry time and do not allow it to be overidden.
+    LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
+        GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+
+    // BU: update tx per second when a tx is valid and accepted
+    mempool.UpdateTransactionsPerSecond();
+    CValidationState state;
+    FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
+    // The flush to disk above is only periodic therefore we need to continuously trim any excess from the
+    // cache.
+    pcoinsTip->Trim(nCoinCacheUsage);
+
+    while (!blockCommitQ.empty())
+    {
+    }
+}
+
+void ThreadCommitToMempool()
+{
     while (1)
     {
-        MilliSleep(5000);
         if (1)
         {
-            LOCK(csTxCommitQ);
-            if (txCommitQ.empty())
-                continue;
-        }
-
-        if (1)
-        {
-            LOCK2(cs_main, csTxCommitQ);
-            while (!txCommitQ.empty())
+            boost::unique_lock<boost::mutex> lock(csCommitQ);
+            while (txCommitQ.empty() && blockCommitQ.empty())
             {
-                CTxCommitData &data = txCommitQ.front();
-                // Store transaction in memory
-                mempool.addUnchecked(data.hash, data.entry, !IsInitialBlockDownload());
-                if (mempool.exists(data.hash))
-                    SyncWithWallets(data.entry.GetTx(), NULL);
-                vWorkQueue.push_back(data.hash);
-
-                txCommitQ.pop();
+                cvCommitQ.timed_wait(lock, boost::posix_time::milliseconds(5000));
             }
-
-            processOrphans(vWorkQueue);
-            mempool.check(pcoinsTip);
-            LogPrint("mempool", "MemoryPool sz %u txn, %u kB\n",
-                mempool.size(), mempool.DynamicMemoryUsage() / 1000);
-            // BU - Xtreme Thinblocks - trim the orphan pool by entry time and do not allow it to be overidden.
-            LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
-                GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
-
-            // BU: update tx per second when a tx is valid and accepted
-            mempool.UpdateTransactionsPerSecond();
-            CValidationState state;
-            FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
-            // The flush to disk above is only periodic therefore we need to continuously trim any excess from the
-            // cache.
-            pcoinsTip->Trim(nCoinCacheUsage);
-            vWorkQueue.clear();
+            CommitToMempool();
         }
     }
 }

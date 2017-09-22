@@ -518,6 +518,7 @@ static unsigned int FindNextBlocksToDownload(NodeId nodeid, unsigned int count, 
 
                 // Return if we've reached the end of the number of blocks we can download for this peer.
                 vBlocks.push_back(pindex);
+                amtFound+=1;
                 if (vBlocks.size() == count)
                 {
                     return amtFound;
@@ -3861,6 +3862,14 @@ bool ProcessNewBlock(CValidationState &state,
     bool fParallel)
 {
     int64_t start = GetTimeMicros();
+
+    // Stop all transaction processing while we deal with the new block
+    // or transaction might be committed that conflict with it
+    boost::unique_lock<boost::mutex> lock(csTxInQ);
+    txInQ = std::queue<CTxInputData>();  // clears.  TODO, process these first
+    boost::unique_lock<boost::mutex> lock2(csCommitQ);
+    CommitToMempool();
+
     LogPrint("thin", "Processing new block %s from peer %s (%d).\n", pblock->GetHash().ToString(),
         pfrom ? pfrom->addrName.c_str() : "myself", pfrom ? pfrom->id : 0);
     // Preliminary checks

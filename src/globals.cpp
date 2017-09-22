@@ -154,7 +154,9 @@ std::queue<CTxInputData> txInQ;
 CWaitableCriticalSection csTxInQ;
 CConditionVariable cvTxInQ;
 std::queue<CTxCommitData> txCommitQ;
-CRITSEC(csTxCommitQ);
+CWaitableCriticalSection csCommitQ;
+CConditionVariable cvCommitQ;
+std::queue<CBlockCommitData> blockCommitQ;
 
 // BU: change locking of orphan map from using cs_main to cs_orphancache.  There is too much dependance on cs_main locks
 // which are generally too broad in scope.

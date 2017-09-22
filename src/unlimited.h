@@ -105,6 +105,7 @@ extern std::queue<CTxInputData> txInQ;
 extern CWaitableCriticalSection csTxInQ;
 extern CConditionVariable cvTxInQ;
 extern void ThreadTxHandler();
+extern void CommitToMempool();
 
 class CTxCommitData
 {
@@ -112,8 +113,17 @@ public:
     CTxMemPoolEntry entry;
     uint256 hash;
 };
+class CBlockCommitData
+{
+public:
+    CBlock* block;  // queue popper owns this
+    uint256 hash;
+};
+
 extern std::queue<CTxCommitData> txCommitQ;
-extern CCriticalSection csTxCommitQ;
+extern std::queue<CBlockCommitData> blockCommitQ;
+extern CWaitableCriticalSection csCommitQ;
+extern CConditionVariable cvCommitQ;
 extern void ThreadCommitToMempool();
 
 

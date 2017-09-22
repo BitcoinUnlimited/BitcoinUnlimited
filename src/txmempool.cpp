@@ -474,6 +474,11 @@ bool CTxMemPool::addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry,
     // Used by main.cpp AcceptToMemoryPool(), which DOES do
     // all the appropriate checks.
     AssertWriteLockHeld(cs);
+    if (mapTx.find(hash) != mapTx.end()) // already inserted
+    {
+        LogPrintf("WARNING: transaction already in mempool\n");
+        return true;
+    }
     indexed_transaction_set::iterator newit = mapTx.insert(entry).first;
     mapLinks.insert(make_pair(newit, TxLinks()));
 
@@ -578,6 +583,7 @@ void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransaction> &rem
 
 void CTxMemPool::_remove(const CTransaction &origTx, std::list<CTransaction> &removed, bool fRecursive)
 {
+    AssertWriteLockHeld(cs);
     // Remove transaction from memory pool
     setEntries txToRemove;
     txiter origit = mapTx.find(origTx.GetHash());
