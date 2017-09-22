@@ -1316,7 +1316,6 @@ void CWallet::ReacceptWalletTransactions()
     {
         CWalletTx& wtx = *(item.second);
 
-        WRITELOCK(mempool.cs);
         wtx.AcceptToMemoryPool(false);
         SyncWithWallets(wtx,NULL);
     }
