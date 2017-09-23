@@ -692,6 +692,7 @@ protected:
 
 public:
     CCoinsViewMemPool(CCoinsView *baseIn, const CTxMemPool &mempoolIn);
+    bool GetCoin(const COutPoint &outpoint, Coin &coin) const;
     bool HaveCoin(const COutPoint &outpoint) const;
 };
 
