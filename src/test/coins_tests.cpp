@@ -402,7 +402,7 @@ void WriteCoinsViewEntry(CCoinsView& view, CAmount value, char flags)
     InsertCoinsMapEntry(map, value, flags);
     uint256 hash;
     hash.SetNull();
-    uint64_t cacheusage = 0;
+    size_t cacheusage = 0;
     view.BatchWrite(map, hash, cacheusage);
 }
 
