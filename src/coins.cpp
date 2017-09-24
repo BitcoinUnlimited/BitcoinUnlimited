@@ -318,12 +318,11 @@ double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight, CAmount
     return tx.ComputePriority(dResult);
 }
 
-static const size_t MAX_OUTPUTS_PER_BLOCK = std::numeric_limits<long long>::max(); // TODO: merge with similar definition in undo.h.
-
+static const size_t nMaxOutputsPerBlock = DEFAULT_LARGEST_TRANSACTION / ::GetSerializeSize(CTxOut(), SER_NETWORK, PROTOCOL_VERSION);
 const Coin& AccessByTxid(const CCoinsViewCache& view, const uint256& txid)
 {
     COutPoint iter(txid, 0);
-    while (iter.n < MAX_OUTPUTS_PER_BLOCK) {
+    while (iter.n < nMaxOutputsPerBlock) {
         const Coin& alternate = view.AccessCoin(iter);
         if (!alternate.IsSpent()) return alternate;
         ++iter.n;
