@@ -67,7 +67,6 @@ public:
         std::swap(nFlags, check.nFlags);
         std::swap(cacheStore, check.cacheStore);
         std::swap(error, check.error);
-        std::swap(amount, check.amount);
         std::swap(sighashType, check.sighashType);
     }
 
