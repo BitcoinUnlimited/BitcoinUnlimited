@@ -131,9 +131,10 @@ BOOST_AUTO_TEST_CASE(intarg)
     ResetArgs("-maxconnections"); // -maxconnections is an optional int argument
     BOOST_CHECK_EQUAL(GetArg("-maxconnections", 11), 0);
 
-    ResetArgs("-maxconnections=11 -maxreceivebuffer=12");
+    ResetArgs("-maxconnections=11 -maxreceivebuffer=12 -maxsendbuffer=12");
     BOOST_CHECK_EQUAL(GetArg("-maxconnections", 0), 11);
     BOOST_CHECK_EQUAL(GetArg("-maxreceivebuffer", 11), 12);
+    BOOST_CHECK_EQUAL(GetArg("-maxsendbuffer", 11), 12);
 
     ResetArgs("-par=-1");
     BOOST_CHECK_EQUAL(GetArg("-par", 0), -1);
@@ -141,6 +142,10 @@ BOOST_AUTO_TEST_CASE(intarg)
     BOOST_CHECK_THROW(ResetArgs("-maxreceivebuffer"), std::runtime_error);
     BOOST_CHECK_THROW(ResetArgs("-maxreceivebuffer="), std::runtime_error);
     BOOST_CHECK_THROW(ResetArgs("-maxreceivebuffer=NaN"), std::runtime_error);
+
+    BOOST_CHECK_THROW(ResetArgs("-maxsendbuffer"), std::runtime_error);
+    BOOST_CHECK_THROW(ResetArgs("-maxsendbuffer="), std::runtime_error);
+    BOOST_CHECK_THROW(ResetArgs("-maxsendbuffer=NaN"), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(doubledash)
