@@ -378,26 +378,14 @@ public:
     template <class T, class TAl>
     explicit CFlatData(std::vector<T,TAl> &v,  bool coinlog = false)
     {
-          if (coinlog)
-             printf("serialize.h flatdata vector 1\n");
         pbegin = (char*)v.data();
-          if (coinlog)
-             printf("serialize.h flatdata vector 2\n");
         pend = (char*)(v.data() + v.size());
-          if (coinlog)
-             printf("serialize.h flatdata vector 3\n");
     }
     template <unsigned int N, typename T, typename S, typename D>
     explicit CFlatData(prevector<N, T, S, D> &v, bool coinlog = false)
     {
-          if (coinlog)
-             printf("serialize.h flatdata prevector 1\n");
         pbegin = (char*)v.data();
-          if (coinlog)
-             printf("serialize.h flatdata prevector 2\n");
         pend = (char*)(v.data() + v.size());
-          if (coinlog)
-             printf("serialize.h flatdata prevector 3\n");
     }
     char* begin() { return pbegin; }
     const char* begin() const { return pbegin; }
@@ -407,16 +395,12 @@ public:
     template<typename Stream>
     void Serialize(Stream& s) const
     {
-          if (coinlog)
-             printf("serialize.h flatdata Serialize 1\n");
         s.write(pbegin, pend - pbegin);
     }
 
     template<typename Stream>
     void Unserialize(Stream& s)
     {
-          if (coinlog)
-             printf("serialize.h flatdata unserialize 1\n");
         s.read(pbegin, pend - pbegin);
     }
 };
@@ -565,8 +549,6 @@ inline void Serialize(Stream& os, const T& a)
 template<typename Stream, typename T>
 inline void Unserialize(Stream& is, T& a)
 {
-     //    if (coinlog)
-      //      printf("serialize.h unserialize 1\n");
    a.Unserialize(is);
 }
 
