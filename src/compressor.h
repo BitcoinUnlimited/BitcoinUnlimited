@@ -59,24 +59,34 @@ public:
 
     template<typename Stream>
     void Serialize(Stream &s) const {
+       if (coinlog)
+             printf("Serialize stream compressor.h A\n");
         std::vector<unsigned char> compr;
         if (Compress(compr)) {
-            s << CFlatData(compr);
+       if (coinlog)
+             printf("Serialize stream compressor.h B\n");
+           s << CFlatData(compr);
+       if (coinlog)
+             printf("Serialize stream compressor.h C\n");
             return;
         }
         unsigned int nSize = script.size() + nSpecialScripts;
         s << VARINT(nSize);
+       if (coinlog)
+             printf("Serialize stream compressor.h D\n");
         s << CFlatData(script);
+       if (coinlog)
+             printf("Serialize stream compressor.h E\n");
     }
 
     template<typename Stream>
     void Unserialize(Stream &s) {
-        if (coinlog)
-             printf("unserialize compressor.h\n");
         unsigned int nSize = 0;
+        if (coinlog)
+             printf("unserialize compressor.h nsize is %d\n", nSize);
         s >> VARINT(nSize);
         if (coinlog)
-            printf("unserialize compressor.h 2\n");
+            printf("unserialize compressor.h 2 nsizeis %d\n", nSize);
         if (nSize < nSpecialScripts) {
             std::vector<unsigned char> vch(GetSpecialSize(nSize), 0x00);
         if (coinlog)
@@ -101,8 +111,8 @@ public:
                 printf("unserialize compressor.h 7\n");
             script.resize(nSize);
               if (coinlog)
-                printf("unserialize compressor.h 7a\n");
-            s >> REF(CFlatData(script));
+                printf("unserialize compressor.h 7a script size %d\n", script.size() );
+            s >> REF(CFlatData(script), coinlog);
               if (coinlog)
                  printf("unserialize compressor.h 8\n");
         }
