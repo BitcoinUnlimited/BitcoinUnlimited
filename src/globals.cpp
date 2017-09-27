@@ -31,7 +31,6 @@
 #include "tinyformat.h"
 #include "tweak.h"
 #include "txmempool.h"
-#include "serialize.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
