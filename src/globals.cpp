@@ -236,6 +236,8 @@ CTweakRef<int> maxOutConnectionsTweak("net.maxOutboundConnections",
     &nMaxOutConnections,
     &OutboundConnectionValidator);
 CTweakRef<int> maxConnectionsTweak("net.maxConnections", "Maximum number of connections", &nMaxConnections);
+CTweakRef<uint32_t> maxSendBuffer("maxsendbuffer", "Maximum per-connection send buffer, <n>*1000 bytes", &nMaxSendBuffer);
+CTweakRef<uint32_t> maxReceiveBuffer("maxreceivebuffer", "Maximum per-connection receive buffer, <n>*1000 bytes", &nMaxReceiveBuffer);
 CTweakRef<int> minXthinNodesTweak("net.minXthinNodes",
     "Minimum number of outbound xthin capable nodes to connect to",
     &nMinXthinNodes);
