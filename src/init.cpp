@@ -132,6 +132,7 @@ volatile bool fRequestShutdown = false;
 void StartShutdown()
 {
     fRequestShutdown = true;
+    StopTxProcessing();
 }
 bool ShutdownRequested()
 {
@@ -205,6 +206,7 @@ void Shutdown()
     GenerateBitcoins(false, 0, Params());
     StopNode();
     StopTorControl();
+    StopTxProcessing();
     UnregisterNodeSignals(GetNodeSignals());
 
     if (fFeeEstimatesInitialized)

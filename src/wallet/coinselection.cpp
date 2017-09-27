@@ -175,7 +175,8 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
 	}
       else // We added every transaction and it did not sum to totalValue, so no solution.
 	{
-        return TxoGroup(0,TxoItVec());
+            LogPrint("wallet","Every available UTXO does not add up to %llu\n", targetValue);
+            return TxoGroup(0,TxoItVec());
 	}
     }  
   else  // otherwise, the next one could be a solution
@@ -311,7 +312,8 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
 
   if (i == solutions.end())
     {
-      return TxoGroup(0,TxoItVec());
+        LogPrint("wallet", "%d solutions found, but none chosen\n", solutions.size());
+        return TxoGroup(0,TxoItVec());
     }  
   LogPrint("wallet","CoinSelection returns %d choices. Dust: %d, Target: %d, found: %d, txos: %d\n", solutions.size(), dust, targetValue, i->first, i->second.second.size());
   TxoGroup ret = i->second;

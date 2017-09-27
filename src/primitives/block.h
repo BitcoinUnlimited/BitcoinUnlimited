@@ -88,6 +88,7 @@ public:
     mutable bool fChecked;
     mutable bool fExcessive;  // BU: is the block "excessive" (bigger than this node prefers to accept)
     mutable uint64_t nBlockSize; // BU: length of this block in bytes
+    mutable std::map<uint256, int32_t> hashToIdx;  // BU: this map translates a tx hash to an vtx index for rapid lookup
 
     CBlock()
     {
@@ -100,6 +101,21 @@ public:
         *((CBlockHeader*)this) = header;
     }
 
+    // return the index of the transaction in this block.  Return -1 if tx is not in this block
+    int find(uint256 hash) const
+    {
+        // If the hash to idx map is empty, then fill it up
+        if (hashToIdx.empty()&& (!vtx.empty()))
+        {
+            for (int nIndex = 0; nIndex < (int)vtx.size(); nIndex++)
+                hashToIdx[vtx[nIndex].GetHash()] = nIndex;
+        }
+        // find the hash and return the idx
+        auto pos = hashToIdx.find(hash);
+        if (pos == hashToIdx.end()) return -1;
+        return pos->second;
+    }
+    
     static bool VersionKnown(int32_t nVersion, int32_t voteBits)
     {
         if (nVersion >= 1 && nVersion <= 4)

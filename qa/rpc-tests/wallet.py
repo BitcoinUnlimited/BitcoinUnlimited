@@ -242,7 +242,7 @@ class WalletTest (BitcoinTestFramework):
         connect_nodes_bi(self.nodes,1,2)
         connect_nodes_bi(self.nodes,0,2)
         sync_blocks(self.nodes)
-
+        time.sleep(7)  # give tx broadcast a chance to be processed
         self.nodes[0].generate(1)
         sync_blocks(self.nodes)
         node_2_bal += 2
@@ -368,8 +368,8 @@ if __name__ == '__main__':
 def Test():
     t = WalletTest()
     bitcoinConf = {
-        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],  # "lck"
+        "debug": ["wallet", "net", "blk", "thin", "mempool", "req", "bench", "evict"],  # "lck"
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
     # "--tmpdir=/ramdisk/test",
-    t.main(["--nocleanup", "--noshutdown"], bitcoinConf, None)
+    t.main(["--tmpdir=/ramdisk/test","--nocleanup", "--noshutdown"], bitcoinConf, None)

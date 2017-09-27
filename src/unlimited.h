@@ -84,28 +84,36 @@ public:
     }
 };
 
-extern bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
+extern bool ParallelAcceptToMemoryPool(Snapshot &ss,
+    CTxMemPool &pool,
     CValidationState &state,
     const CTransaction &consttx,
     bool fLimitFree,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
-                                std::vector<uint256> &vHashTxnToUncache);
-    
+    std::vector<uint256> &vHashTxnToUncache);
+
 class CTxInputData
 {
 public:
     CTransaction tx;
     uint nodeId; // hold the id so I don't keep a ref to the node
-    bool whitelisted; 
+    bool whitelisted;
     std::string nodeName;
 };
 extern std::queue<CTxInputData> txInQ;
-extern CWaitableCriticalSection csTxInQ;
-extern CConditionVariable cvTxInQ;
+extern CCriticalSection csTxInQ;
+extern CCond cvTxInQ;
 extern void ThreadTxHandler();
 extern void CommitToMempool();
+
+extern CThreadCorral txProcessingCorral;
+enum
+{
+    TX_PROCESSING=1,
+    BLOCK_PROCESSING=2
+};
 
 class CTxCommitData
 {
@@ -366,5 +374,6 @@ extern boost::scoped_ptr<CRollingBloomFilter> recentRejects;
 extern CSharedCriticalSection csRecentRejects;
 
 extern bool TxAlreadyHave(const CInv &inv);
+extern void StopTxProcessing();
 
 #endif

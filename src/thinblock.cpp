@@ -854,6 +854,7 @@ bool CXThinBlock::process(CNode *pfrom,
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount)
 {
     AssertLockHeld(cs_xval);
+    AssertLockHeld(mempool.cs);
     uint64_t maxAllowedSize = maxMessageSizeMultiplier * excessiveBlockSize;
 
     // We must have all the full tx hashes by this point.  We first check for any repeating
@@ -877,7 +878,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         CTransaction tx;
         if (!hash.IsNull())
         {
-            bool inMemPool = mempool.lookup(hash, tx);
+            bool inMemPool = mempool._lookup(hash, tx);
             bool inMissingTx = pfrom->mapMissingTx.count(hash.GetCheapHash()) > 0;
             bool inOrphanCache = mapOrphanTransactions.count(hash) > 0;
 

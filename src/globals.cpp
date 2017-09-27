@@ -101,6 +101,8 @@ CRITSEC( cs_vOneShots);
 
 CRITSEC( cs_statMap);
 
+CThreadCorral txProcessingCorral;
+
 deque<string> vOneShots;
 std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
 vector<std::string> vUseDNSSeeds;
@@ -151,8 +153,8 @@ CAddrMan addrman;
 CDoSManager dosMan;
 
 std::queue<CTxInputData> txInQ;
-CWaitableCriticalSection csTxInQ;
-CConditionVariable cvTxInQ;
+CCriticalSection csTxInQ;
+CCond cvTxInQ;
 std::queue<CTxCommitData> txCommitQ;
 CWaitableCriticalSection csCommitQ;
 CConditionVariable cvCommitQ;

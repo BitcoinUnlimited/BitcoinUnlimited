@@ -896,6 +896,8 @@ UniValue invalidateblock(const UniValue& params, bool fHelp)
     uint256 hash(uint256S(strHash));
     CValidationState state;
 
+    CORRAL(txProcessingCorral,BLOCK_PROCESSING);
+
     {
         LOCK(cs_main);
         if (mapBlockIndex.count(hash) == 0)

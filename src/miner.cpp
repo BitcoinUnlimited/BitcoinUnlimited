@@ -246,7 +246,7 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
 
 bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter)
 {
-    READLOCK(mempool.cs);
+    AssertLockHeld(mempool.cs);
     BOOST_FOREACH (CTxMemPool::txiter parent, mempool.GetMemPoolParents(iter))
     {
         if (!inBlock.count(parent))
@@ -348,7 +348,7 @@ void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, CTxMemPool::txit
 
 void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
 {
-    READLOCK(mempool.cs);
+    AssertLockHeld(mempool.cs);
     std::priority_queue<CTxMemPool::txiter, std::vector<CTxMemPool::txiter>, ScoreCompare> clearedTxs;
     CTxMemPool::setEntries waitSet;
     CTxMemPool::indexed_transaction_set::index<mining_score>::type::iterator mi =
@@ -445,7 +445,7 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
     std::map<CTxMemPool::txiter, double, CTxMemPool::CompareIteratorByHash> waitPriMap;
     typedef std::map<CTxMemPool::txiter, double, CTxMemPool::CompareIteratorByHash>::iterator waitPriIter;
     double actualPriority = -1;
-    READLOCK(mempool.cs);
+    AssertLockHeld(mempool.cs);
     vecPriority.reserve(mempool.mapTx.size());
     for (CTxMemPool::indexed_transaction_set::iterator mi = mempool.mapTx.begin(); mi != mempool.mapTx.end(); ++mi)
     {

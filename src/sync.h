@@ -17,7 +17,7 @@
 #include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/thread/thread.hpp>
-
+#include <condition_variable>
 
 ////////////////////////////////////////////////
 //                                            //
@@ -102,10 +102,29 @@ typedef AnnotatedMixin<boost::shared_mutex> CSharedCriticalSection;
 class CSharedCriticalSection:public AnnotatedMixin<boost::shared_mutex>
 {
 public:
+
+    class LockInfo
+    {
+    public:
+        const char* file;
+        unsigned int line;
+    LockInfo():file(""), line(0) {}
+    LockInfo(const char* f, unsigned int l): file(f), line(l) {}
+    };
+
+  boost::mutex setlock;
+  std::map<uint64_t, LockInfo> sharedowners;
   const char* name;
+  uint64_t exclusiveOwner;
   CSharedCriticalSection(const char* name);
   CSharedCriticalSection();
   ~CSharedCriticalSection();
+  void lock_shared();
+  bool try_lock_shared();
+  void unlock_shared();
+  void lock();
+  void unlock();
+  bool try_lock();
 };
 #define SCRITSEC(zzname) CSharedCriticalSection zzname(#zzname)
 #endif
@@ -117,6 +136,9 @@ typedef AnnotatedMixin<boost::mutex> CWaitableCriticalSection;
 
 /** Just a typedef for boost::condition_variable, can be wrapped later if desired */
 typedef boost::condition_variable CConditionVariable;
+
+/** Just a typedef for boost::condition_variable_any, can be wrapped later if desired */
+typedef std::condition_variable_any CCond;
 
 #ifdef DEBUG_LOCKORDER
 void EnterCritical(const char* pszName, const char* pszFile, int nLine, void* cs, bool fTry = false);
@@ -269,8 +291,7 @@ private:
         file = pszFile;
         line = nLine;
         EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()), true);
-        lock.try_lock();
-        if (!lock.owns_lock())
+        if (!lock.try_lock())
           {
             lockedTime = 0;
             LeaveCritical();
@@ -292,7 +313,7 @@ public:
     {
         if (!pmutexIn) return;
 
-        lock = boost::unique_lock<Mutex>(*pmutexIn, boost::defer_lock);
+        lock = boost::shared_lock<Mutex>(*pmutexIn, boost::defer_lock);
         if (fTry)
             TryEnter(pszName, pszFile, nLine);
         else
@@ -310,6 +331,7 @@ public:
                 LogPrint("lck", "Lock %s at %s:%d remained locked for %d ms\n", name, file, line,doneTime - lockedTime);
               }
           }
+        // When lock is destructed it will release
     }
 
     operator bool()
@@ -458,4 +480,70 @@ private:
 
 typedef std::vector<std::pair<void*, CLockLocation> > LockStack;
 typedef std::map<std::pair<void*, void*>, LockStack> LockStackMap;
+
+
+class CThreadCorral
+{
+protected:
+    int curRegion;
+    int curCount;
+    int maxRequestedRegion;
+    CCriticalSection mutex;
+    CCond cond;
+public:
+    CThreadCorral():curRegion(0),curCount(0),maxRequestedRegion(0) {}
+
+    void Enter(int region)
+    {
+        LOCK(mutex);
+        while (1)
+        {
+            // If no region is running and I'm the biggest requested region, then run my region
+            if ((curCount == 0)&&(region>=maxRequestedRegion))
+            {
+                curRegion = region;
+                maxRequestedRegion=0;
+                curCount = 1;
+                return;
+            }
+            // If the current region is mine, and no higher priority regions want to run, then I can run
+            else if ((curRegion == region)&&(region>=maxRequestedRegion))
+            {
+                curCount++;
+                return;
+            }
+            else  // I can't run now.
+            {
+                if (region > maxRequestedRegion) maxRequestedRegion = region;
+                cond.wait(mutex);
+            }
+        }
+    }
+
+    void Exit(int region)
+    {
+        LOCK(mutex);
+        assert(curRegion == region);
+        curCount--;
+        if (curCount==0)
+        {
+            cond.notify_all();
+        }
+    }
+
+};
+
+class CCorralLock
+{
+protected:
+    CThreadCorral &corral;
+    int region;
+
+public:
+    CCorralLock(CThreadCorral &corralp, int regionp) : corral(corralp), region(regionp) { corral.Enter(region); }
+    ~CCorralLock() { corral.Exit(region); }
+};
+
+#define CORRAL(cral, region) CCorralLock UNIQUIFY(corral)(cral,region);
+
 #endif // BITCOIN_SYNC_H

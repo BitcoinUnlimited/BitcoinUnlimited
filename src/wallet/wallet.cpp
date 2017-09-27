@@ -46,7 +46,7 @@ bool fSendFreeTransactions = DEFAULT_SEND_FREE_TRANSACTIONS;
 
 const unsigned int P2PKH_LEN = 34;
 const unsigned int TX_HEADER_LEN = 4;
-
+const unsigned int MIN_BYTES_IN_TX = 192;
 const char * DEFAULT_WALLET_DAT = "wallet.dat";
 
 /**
@@ -1564,7 +1564,7 @@ std::vector<uint256> CWallet::ResendWalletTransactionsBefore(int64_t nTime)
 {
     std::vector<uint256> result;
 
-    LOCK(cs_wallet);
+    LOCK2(cs_main, cs_wallet);
     // Sort them in chronological order
     multimap<unsigned int, CWalletTx*> mapSorted;
     BOOST_FOREACH(PAIRTYPE(const uint256, CWalletTx)& item, mapWallet)
@@ -2003,8 +2003,8 @@ bool CWallet::SelectCoinsBU(const CAmount &nTargetValue,
 
                     //? if (!out.fSpendable) continue;
                     nValueRet += tx.vout[outpt.n].nValue;
-                    tgtValue -=
-                        tx.vout[outpt.n].nValue; // decrease the value we will auto-find by what the user hand-selected.
+                    // decrease the value we will auto-find by what the user hand-selected.
+                    tgtValue -= tx.vout[outpt.n].nValue;
                     setCoinsRet.insert(make_pair(&tx, outpt.n));
                 }
             }
@@ -2018,6 +2018,8 @@ bool CWallet::SelectCoinsBU(const CAmount &nTargetValue,
         // are not in the list)
         if ((coinControl->HasSelected() || available.size() < 100))
         {  // this "if" statement skips case where coincontrol is only used to supply a change address
+            // flush the txns waiting to enter the mempool so we can respend them
+            CommitToMempool();
             FillAvailableCoins(coinControl);
         }
         filled = true;
@@ -2025,21 +2027,32 @@ bool CWallet::SelectCoinsBU(const CAmount &nTargetValue,
     else if (available.size() < 100) // If there are very few TXOs, then regenerate them.  If the wallet HAS few TXOs
                                      // then regenerate every time -- its fast for few.
     {
+        // flush the txns waiting to enter the mempool so we can respend them
+        CommitToMempool();
         FillAvailableCoins(coinControl);
         filled = true;
     }
+    // The selected coins are all we need
+    if (tgtValue <= 0) return true;
 
     TxoGroup g;
     CAmount dust = minRelayTxFee.GetDust();
-    g = CoinSelection(available, tgtValue, dust, fee,
-        changeLen); // 100 is about half of a normal transaction, so overpay the fee by about half to avoid change
+    // 100 is about half of a normal transaction, so overpay the fee by about half to avoid change
+    g = CoinSelection(available, tgtValue, dust, fee, changeLen);
     if ((!filled) && (g.first == 0)) // Ok no solution was found.  So let's regenerate the TXOs and try again.
     {
+        LogPrint("wallet","Flush all pending tx and reload available coins\n");
+        // flush the txns waiting to enter the mempool so we can respend them
+        CommitToMempool();
+        // now get all tx
         FillAvailableCoins(coinControl);
         g = CoinSelection(available, tgtValue, dust, fee, changeLen);
     }
     if (g.first == 0)
+    {
+        LogPrint("wallet","no solution found, %d utxos\n",available.size());
         return false; // no solution found
+    }
 
     nValueRet = 0;
     for (TxoItVec::iterator i = g.second.begin(); i != g.second.end();)
@@ -2239,7 +2252,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
         LOCK2(cs_main, cs_wallet);
         {
             CAmount nFeeNeeded = 0;
-            nFeeRet = GetMinimumFee(250, nTxConfirmTarget, mempool); // BU estimate base fee from an approx minimum size tx
+            nFeeRet = GetMinimumFee(MIN_BYTES_IN_TX, nTxConfirmTarget, mempool); // BU estimate base fee from an approx minimum size tx
             // Loop until there is enough fee
             while (true)
 	      {
@@ -2507,14 +2520,18 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                       }
 #endif                    
 
-                    // try with these inputs again if the fee we allocated is less than what is needed, BUT the inputs contain enough coins to cover the needed fees.
-		    if ((nFeeRet < nFeeNeeded)&&(nValueIn - nValue >= nFeeNeeded))
-		      {
-			nValueToSelect = nValue + nFeeNeeded;
-                        nFeeRet = nFeeNeeded;
-		      }
-                    else break;
-		    } while(1);
+                    // try with these inputs again if the fee we allocated is less than what is needed,
+                    // BUT the inputs contain enough coins to cover the needed fees.
+                      if ((nFeeRet < nFeeNeeded) && (nValueIn - nValue >= nFeeNeeded))
+                      {
+                          // if we are pulling fees from sending amounts, do not select greater amounts
+                          if (!nSubtractFeeFromAmount)
+                              nValueToSelect = nValue + nFeeNeeded;
+                          nFeeRet = nFeeNeeded;
+                      }
+                      else
+                          break;
+                    } while(1);
                 uint64_t signLoop = GetLogTimeMicros();
                 LogPrint("bench", "CreateTransaction: total: %llu, selection: %llu, signloop: %llu\n", signLoop-start, postSelect-preSelect, signLoop-postSelect);
                 if (nFeeRet >= nFeeNeeded)
@@ -2551,6 +2568,8 @@ bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey)
             LogPrintf("CommitTransaction(): Error: Transaction not accepted into memory pool\n");
             return false;
         }
+        CORRAL(txProcessingCorral, BLOCK_PROCESSING);
+        CommitToMempool();
     }
 
     LOCK2(cs_main, cs_wallet);
@@ -3532,12 +3551,9 @@ int CMerkleTx::SetMerkleBranch(const CBlock& block)
     hashBlock = block.GetHash();
 
     // Locate the transaction
-    for (nIndex = 0; nIndex < (int)block.vtx.size(); nIndex++)
-        if (block.vtx[nIndex] == *(CTransaction*)this)
-            break;
-    if (nIndex == (int)block.vtx.size())
+    nIndex = block.find(((CTransaction*)this)->GetHash());
+    if (nIndex == -1)
     {
-        nIndex = -1;
         LogPrintf("ERROR: SetMerkleBranch(): couldn't find tx in block\n");
         return 0;
     }

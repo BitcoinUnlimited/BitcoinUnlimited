@@ -35,6 +35,7 @@
 #include "utilstrencodings.h"
 #include "validationinterface.h"
 #include "version.h"
+#include "init.h"
 
 #include <atomic>
 #include <boost/foreach.hpp>
@@ -55,6 +56,8 @@ extern CTweakRef<uint64_t> miningBlockSize;
 extern CTweakRef<uint64_t> ebTweak;
 
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
+bool txProcessing = true;
+bool txCommitProcessing = true;
 
 bool IsTrafficShapingEnabled();
 UniValue validateblocktemplate(const UniValue &params, bool fHelp);
@@ -2493,7 +2496,7 @@ void processOrphans(std::vector<uint256>& vWorkQueue)
                     txd.nodeId = fromPeer;
                     txd.nodeName = "orphan";
                     txd.whitelisted = false;
-                    boost::unique_lock<boost::mutex> lock(csTxInQ);
+                    LOCK(csTxInQ);
                     txInQ.push(txd); // add this transaction onto the processing queue
                     cvTxInQ.notify_one();
                 }
@@ -2556,7 +2559,7 @@ void CommitToMempool()
 
 void ThreadCommitToMempool()
 {
-    while (1)
+    while (!ShutdownRequested())
     {
         if (1)
         {
@@ -2564,16 +2567,27 @@ void ThreadCommitToMempool()
             while (txCommitQ.empty() && blockCommitQ.empty())
             {
                 cvCommitQ.timed_wait(lock, boost::posix_time::milliseconds(5000));
+                boost::this_thread::interruption_point();
             }
         }
-        CommitToMempool();
+        if (1)
+        {
+            CORRAL(txProcessingCorral, BLOCK_PROCESSING);
+            boost::this_thread::interruption_point();
+            CommitToMempool();
+        }
     }
 }
 
+void StopTxProcessing()
+{
+    cvTxInQ.notify_all();
+    cvCommitQ.notify_all();
+}
 
 void ThreadTxHandler()
 {
-    while (1)
+    while (!ShutdownRequested())
     {
         boost::this_thread::interruption_point();
 
@@ -2583,17 +2597,21 @@ void ThreadTxHandler()
         CTxInputData txd;
         if (1)
         {
-            boost::unique_lock<boost::mutex> lock(csTxInQ);
-            while (txInQ.empty())
+            CCriticalBlock lock(csTxInQ,"csTxInQ",__FILE__,__LINE__);
+            while (txInQ.empty() && !ShutdownRequested())
             {
-                cvTxInQ.wait(lock);
+                cvTxInQ.wait(csTxInQ);
+                boost::this_thread::interruption_point();
             }
+            if (ShutdownRequested()) break;
             txd = txInQ.front(); // make copy so I can pop & release
             txInQ.pop();
         }
 
         if (1)
         {
+            CORRAL(txProcessingCorral, TX_PROCESSING);
+            boost::this_thread::interruption_point();
             CTransaction& tx = txd.tx;
             CInv inv(MSG_TX, tx.GetHash());
 

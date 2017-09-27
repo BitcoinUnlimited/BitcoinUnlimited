@@ -3094,10 +3094,9 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
 
     // Stop all transaction processing while we deal with the new block
     // or transaction might be committed that conflict with it
-    boost::unique_lock<boost::mutex> lock(csTxInQ);
-    CommitToMempool();
-
+    CORRAL(txProcessingCorral, BLOCK_PROCESSING);
     LOCK(cs_main);
+    CommitToMempool();
 
     bool fOneDone = false;
     do
@@ -3219,7 +3218,6 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
         // unconditionally valid already, so force disconnect away from it.
 
         // Stop all mempool processing and input all pending tx into the mempool first
-        boost::unique_lock<boost::mutex> lock(csTxInQ);
         boost::unique_lock<boost::mutex> lock2(csCommitQ);
         CommitToMempool();
 
@@ -5857,7 +5855,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         txd.whitelisted = pfrom->fWhitelisted;
         if (1)
         {
-            boost::unique_lock<boost::mutex> lock(csTxInQ);
+            LOCK(csTxInQ);
             txInQ.push(txd); // add this transaction onto the processing queue
             cvTxInQ.notify_one();
         }
