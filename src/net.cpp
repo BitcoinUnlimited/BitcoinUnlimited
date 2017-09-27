@@ -96,6 +96,8 @@ uint64_t nLocalHostNonce = 0;
 static std::vector<ListenSocket> vhListenSocket;
 extern CAddrMan addrman;
 int nMaxConnections = DEFAULT_MAX_PEER_CONNECTIONS;
+uint32_t nMaxReceiveBuffer = DEFAULT_MAXRECEIVEBUFFER;
+uint32_t nMaxSendBuffer = DEFAULT_MAXSENDBUFFER;
 int nMinXthinNodes = MIN_XTHIN_NODES;
 int nMinBitcoinCashNodes = MIN_BITCOIN_CASH_NODES;
 
@@ -2739,8 +2741,8 @@ bool CAddrDB::Read(CAddrMan &addr, CDataStream &ssPeers)
     return true;
 }
 
-unsigned int ReceiveFloodSize() { return 1000 * GetArg("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER); }
-unsigned int SendBufferSize() { return 1000 * GetArg("-maxsendbuffer", DEFAULT_MAXSENDBUFFER); }
+uint32_t ReceiveFloodSize() { return 1000 * nMaxReceiveBuffer; }
+uint32_t SendBufferSize() { return 1000 * nMaxSendBuffer; }
 CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn, bool fInboundIn)
     : ssSend(SER_NETWORK, INIT_PROTO_VERSION), id(connmgr->NextNodeId()), addrKnown(5000, 0.001),
       filterInventoryKnown(50000, 0.000001)

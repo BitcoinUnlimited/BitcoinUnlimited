@@ -188,6 +188,10 @@ extern CAddrMan addrman;
 
 /** Maximum number of connections to simultaneously allow (aka connection slots) */
 extern int nMaxConnections;
+/** Maximum per-connection receive buffer, <n>*1000 bytes */
+extern uint32_t nMaxReceiveBuffer;
+/** Maximum per-connection send buffer, <n>*1000 bytes */
+extern uint32_t nMaxSendBuffer;
 /** The minimum number of xthin nodes to connect to */
 extern int nMinXthinNodes;
 /** The minimum number of BitcoinCash nodes to connect to */
