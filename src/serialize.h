@@ -615,7 +615,7 @@ void Serialize_impl(Stream& os, const prevector<N, T>& v, const unsigned char&)
 {
     WriteCompactSize(os, v.size());
     if (!v.empty())
-        os.write((char*)&v[0], v.size() * sizeof(T));
+        os.write((char*)v.data(), v.size() * sizeof(T));
 }
 
 template<typename Stream, unsigned int N, typename T, typename V>
@@ -683,7 +683,7 @@ void Serialize_impl(Stream& os, const std::vector<T, A>& v, const unsigned char&
 {
     WriteCompactSize(os, v.size());
     if (!v.empty())
-        os.write((char*)&v[0], v.size() * sizeof(T));
+        os.write((char*)v.data(), v.size() * sizeof(T));
 }
 
 template<typename Stream, typename T, typename A, typename V>
