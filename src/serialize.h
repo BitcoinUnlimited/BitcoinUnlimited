@@ -471,7 +471,7 @@ public:
         }
         string.resize(size);
         if (size != 0)
-            s.read((char*)&string[0], size);
+            s.read((char*)string.data(), size);
     }
 
     template<typename Stream>
@@ -479,7 +479,7 @@ public:
     {
         WriteCompactSize(s, string.size());
         if (!string.empty())
-            s.write((char*)&string[0], string.size());
+            s.write((char*)string.data(), string.size());
     }
 };
 
@@ -569,7 +569,7 @@ void Serialize(Stream& os, const std::basic_string<C>& str)
 {
     WriteCompactSize(os, str.size());
     if (!str.empty())
-        os.write((char*)&str[0], str.size() * sizeof(str[0]));
+        os.write((char*)str.data(), str.size() * sizeof(C));
 }
 
 template<typename Stream, typename C>
@@ -578,7 +578,7 @@ void Unserialize(Stream& is, std::basic_string<C>& str)
     unsigned int nSize = ReadCompactSize(is);
     str.resize(nSize);
     if (nSize != 0)
-        is.read((char*)&str[0], nSize * sizeof(str[0]));
+        is.read((char*)str.data(), nSize * sizeof(C));
 }
 
 
