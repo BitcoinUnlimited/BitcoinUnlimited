@@ -5066,8 +5066,6 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
 
     std::vector<CInv> vNotFound;
 
-    LOCK(cs_main);
-
     while (it != vInv.end())
     {
         // Don't bother if send buffer is too full to respond anyway
@@ -5083,6 +5081,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK ||
                 inv.type == MSG_XTHINBLOCK)
             {
+                LOCK(cs_main);
                 bool send = false;
                 BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
                 if (mi != mapBlockIndex.end())
