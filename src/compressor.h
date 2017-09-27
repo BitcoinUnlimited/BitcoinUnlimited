@@ -141,8 +141,8 @@ public:
         } else {
         if (coinlog)
             printf("compresser step 1\n");
-
             uint64_t nVal = 0;
+
         if (coinlog)
             printf("compresser step 2\n");
             READWRITE(VARINT(nVal));
@@ -150,7 +150,7 @@ public:
             printf("compresser step 3\n");
             txout.nValue = DecompressAmount(nVal);
         if (coinlog)
-            printf("compresser step 4\n");
+            printf("compresser step 4 txout nvalue %d\n", (int)txout.nValue);
 
         }
         CScriptCompressor cscript(REF(txout.scriptPubKey, coinlog));
