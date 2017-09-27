@@ -375,21 +375,34 @@ static void SendMoney(const CTxDestination &address, const CTxDestination *chang
     {
         cc.destChange = GetScriptForDestination(*change);
     }
-    if (!pwalletMain->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strError, &cc)) 
-      {
-        CAmount curBalance = pwalletMain->GetBalance();
-        if (nValue > curBalance)
-          throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
+    uint64_t createtx=0;
+    if (1)
+    {
+        CORRAL(txProcessingCorral, BLOCK_PROCESSING);
+        LOCK2(cs_main, pwalletMain->cs_wallet);
+        
+        if (!pwalletMain->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strError, &cc))
+        {
+            CAmount curBalance = pwalletMain->GetBalance();
+            if (nValue > curBalance)
+                throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
 
-        if (!fSubtractFeeFromAmount && nValue + nFeeRequired > curBalance)
-            strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!", FormatMoney(nFeeRequired));
-        throw JSONRPCError(RPC_WALLET_ERROR, strError);
-      }
-    uint64_t createtx = GetLogTimeMicros();
-    if (!pwalletMain->CommitTransaction(wtxNew, reservekey))
-        throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
+            if (!fSubtractFeeFromAmount && nValue + nFeeRequired > curBalance)
+                strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its "
+                                     "amount, complexity, or use of recently received funds!",
+                    FormatMoney(nFeeRequired));
+            throw JSONRPCError(RPC_WALLET_ERROR, strError);
+        }
+        createtx = GetLogTimeMicros();
+        if (!pwalletMain->CommitTransaction(wtxNew, reservekey))
+            throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected! This might happen if some of "
+                                                 "the coins in your wallet were already spent, such as if you used a "
+                                                 "copy of wallet.dat and coins were spent in the copy but not marked "
+                                                 "as spent here.");
+    }
+
     uint64_t committx = GetLogTimeMicros();
-    LogPrint("bench", "CreateTransaction: %llu, CommitTransaction: %llu\n",createtx-start, committx-createtx);
+    LogPrint("bench", "CreateTransaction: %llu, CommitTransaction: %llu\n", createtx - start, committx - createtx);
 }
 
 UniValue sendtoaddress(const UniValue& params, bool fHelp)
@@ -423,8 +436,6 @@ UniValue sendtoaddress(const UniValue& params, bool fHelp)
         );
 
     int64_t start = GetLogTimeMicros();
-    LOCK2(cs_main, pwalletMain->cs_wallet);
-    int64_t lockTime = GetLogTimeMicros();
 
     CBitcoinAddress address(params[0].get_str());
     if (!address.IsValid())
@@ -457,11 +468,11 @@ UniValue sendtoaddress(const UniValue& params, bool fHelp)
     }
 
     EnsureWalletIsUnlocked();
-    
+
     SendMoney(address.Get(), changeDest, nAmount, fSubtractFeeFromAmount, wtx);
     int64_t endTime = GetLogTimeMicros();
 
-    LogPrint("bench", "sendtoaddress total: %llu, lockWait: %llu\n",endTime-start, lockTime-start);
+    LogPrint("bench", "sendtoaddress total: %llu\n",endTime-start);
     return wtx.GetHash().GetHex();
 }
 
@@ -915,8 +926,6 @@ UniValue sendfrom(const UniValue& params, bool fHelp)
             "\nAs a json rpc call\n"
             + HelpExampleRpc("sendfrom", "\"tabby\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", 0.01, 6, \"donation\", \"seans outpost\"")
         );
-
-    LOCK2(cs_main, pwalletMain->cs_wallet);
 
     string strAccount = AccountFromValue(params[0]);
     CBitcoinAddress address(params[1].get_str());
