@@ -71,30 +71,40 @@ public:
 
     template<typename Stream>
     void Unserialize(Stream &s) {
-printf("unserialize compressor.h\n");
+        if (coinlog)
+             printf("unserialize compressor.h\n");
         unsigned int nSize = 0;
         s >> VARINT(nSize);
-printf("unserialize compressor.h 2\n");
+        if (coinlog)
+            printf("unserialize compressor.h 2\n");
         if (nSize < nSpecialScripts) {
             std::vector<unsigned char> vch(GetSpecialSize(nSize), 0x00);
-printf("unserialize compressor.h 3\n");
+        if (coinlog)
+              printf("unserialize compressor.h 3\n");
             s >> REF(CFlatData(vch));
             Decompress(nSize, vch);
-printf("unserialize compressor.h 4\n");
+        if (coinlog)
+             printf("unserialize compressor.h 4\n");
             return;
         }
         nSize -= nSpecialScripts;
         if (nSize > MAX_SCRIPT_SIZE) {
-printf("unserialize compressor.h 5\n");
+          if (coinlog)
+             printf("unserialize compressor.h 5\n");
             // Overly long script, replace with a short invalid one
             script << OP_RETURN;
-printf("unserialize compressor.h 6\n");
+            if (coinlog)
+                printf("unserialize compressor.h 6\n");
             s.ignore(nSize);
         } else {
-printf("unserialize compressor.h 7\n");
+          if (coinlog)
+                printf("unserialize compressor.h 7\n");
             script.resize(nSize);
+              if (coinlog)
+                printf("unserialize compressor.h 7a\n");
             s >> REF(CFlatData(script));
-printf("unserialize compressor.h 8\n");
+              if (coinlog)
+                 printf("unserialize compressor.h 8\n");
         }
     }
 };
