@@ -578,6 +578,7 @@ inline void Unserialize(Stream& is, T& a)
 {
      //    if (coinlog)
       //      printf("serialize.h unserialize 1\n");
+printf("deserialize call member function\n");
    a.Unserialize(is);
 }
 
