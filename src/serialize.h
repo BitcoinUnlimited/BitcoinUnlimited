@@ -405,14 +405,14 @@ public:
     template <class T, class TAl>
     explicit CFlatData(std::vector<T,TAl> &v)
     {
-        pbegin = (char*)begin_ptr(v);
-        pend = (char*)end_ptr(v);
+        pbegin = (char*)v.data();
+        pend = (char*)(v.data() + v.size());
     }
     template <unsigned int N, typename T, typename S, typename D>
     explicit CFlatData(prevector<N, T, S, D> &v)
     {
-        pbegin = (char*)begin_ptr(v);
-        pend = (char*)end_ptr(v);
+        pbegin = (char*)v.data();
+        pend = (char*)(v.data() + v.size());
     }
     char* begin() { return pbegin; }
     const char* begin() const { return pbegin; }
@@ -578,7 +578,6 @@ inline void Unserialize(Stream& is, T& a)
 {
      //    if (coinlog)
       //      printf("serialize.h unserialize 1\n");
-printf("deserialize call member function\n");
    a.Unserialize(is);
 }
 
