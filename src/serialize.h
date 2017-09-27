@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "prevector.h"
+//extern bool coinlog;
 
 static const unsigned int MAX_SIZE = 0x02000000*8;  // BU Allow 256MB JSON encodings
 
@@ -30,8 +31,11 @@ static const unsigned int MAX_SIZE = 0x02000000*8;  // BU Allow 256MB JSON encod
  * where it makes sense with wrappers such as CFlatData or CTxDB
  */
 template<typename T>
-inline T& REF(const T& val)
+inline T& REF(const T& val, bool coinlog=false)
 {
+        if (coinlog)
+            printf("serialize REF step 1\n");
+
     return const_cast<T&>(val);
 }
 
@@ -541,7 +545,9 @@ inline void Serialize(Stream& os, const T& a)
 template<typename Stream, typename T>
 inline void Unserialize(Stream& is, T& a)
 {
-    a.Unserialize(is);
+     //    if (coinlog)
+      //      printf("serialize.h unserialize 1\n");
+   a.Unserialize(is);
 }
 
 

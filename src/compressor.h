@@ -14,6 +14,7 @@
 class CKeyID;
 class CPubKey;
 class CScriptID;
+extern bool coinlog;
 
 /** Compact serializer for scripts.
  *
@@ -110,12 +111,26 @@ public:
             uint64_t nVal = CompressAmount(txout.nValue);
             READWRITE(VARINT(nVal));
         } else {
+        if (coinlog)
+            printf("compresser step 1\n");
+
             uint64_t nVal = 0;
+        if (coinlog)
+            printf("compresser step 2\n");
             READWRITE(VARINT(nVal));
+        if (coinlog)
+            printf("compresser step 3\n");
             txout.nValue = DecompressAmount(nVal);
+        if (coinlog)
+            printf("compresser step 4\n");
+
         }
-        CScriptCompressor cscript(REF(txout.scriptPubKey));
+        CScriptCompressor cscript(REF(txout.scriptPubKey, coinlog));
+        if (coinlog)
+            printf("compresser step 5\n");
         READWRITE(cscript);
+        if (coinlog)
+            printf("compresser step 6\n");
     }
 };
 

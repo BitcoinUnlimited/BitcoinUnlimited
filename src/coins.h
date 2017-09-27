@@ -24,6 +24,8 @@
 
 #include <unordered_map>
 
+extern bool coinlog;
+
 struct CCoinsStats
 {
     int nHeight;
@@ -84,11 +86,23 @@ public:
 
     template<typename Stream>
     void Unserialize(Stream &s) {
+        if (coinlog)
+            printf("deserialize step 1\n");
         uint32_t code = 0;
+        if (coinlog)
+            printf("deserialize step 2\n");
         ::Unserialize(s, VARINT(code));
+        if (coinlog)
+            printf("deserialize step 3\n");
         nHeight = code >> 1;
+        if (coinlog)
+            printf("deserialize step 4\n");
         fCoinBase = code & 1;
+        if (coinlog)
+            printf("deserialize step 5\n");
         ::Unserialize(s, REF(CTxOutCompressor(out)));
+        if (coinlog)
+            printf("deserialize step 6\n");
     }
 
     bool IsSpent() const {
