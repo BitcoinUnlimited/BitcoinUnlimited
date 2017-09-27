@@ -164,7 +164,7 @@ void DoTest(const CScript& scriptPubKey, const CScript& scriptSig, int flags, co
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
     stream << tx2;
     if (nValue == 0) {
-        BOOST_CHECK_MESSAGE(bitcoinconsensus_verify_script(begin_ptr(scriptPubKey), scriptPubKey.size(), (const unsigned char*)&stream[0], stream.size(), 0, flags, NULL) == expect,message);
+        BOOST_CHECK_MESSAGE(bitcoinconsensus_verify_script(scriptPubKey.data(), scriptPubKey.size(), (const unsigned char*)&stream[0], stream.size(), 0, flags, NULL) == expect,message);
     }
 #endif
 }
