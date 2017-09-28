@@ -9,6 +9,7 @@
 
 #include "crypto/common.h"
 #include "prevector.h"
+#include "serialize.h"
 
 #include <assert.h>
 #include <climits>
@@ -27,6 +28,12 @@ static const int MAX_OPS_PER_SCRIPT = 201;
 
 // Maximum number of public keys per multisig
 static const int MAX_PUBKEYS_PER_MULTISIG = 20;
+
+// Maximum script length in bytes
+static const int MAX_SCRIPT_SIZE = 10000;
+
+// Maximum number of values on script interpreter stack
+static const int MAX_STACK_SIZE = 1000;
 
 // Threshold for nLockTime: below this value it is interpreted as block number,
 // otherwise as UNIX timestamp.
@@ -373,6 +380,12 @@ private:
     int64_t m_value;
 };
 
+/**
+ * We use a prevector for the script to reduce the considerable memory overhead
+ *  of vectors in cases where they normally contain a small number of small elements.
+ * Tests in October 2015 showed use of this reduced dbcache memory usage by 23%
+ *  and made an initial sync 13% faster.
+ */
 typedef prevector<28, unsigned char> CScriptBase;
 
 /** Serialized script, used inside transaction inputs and outputs */
@@ -401,6 +414,13 @@ public:
     CScript(const_iterator pbegin, const_iterator pend) : CScriptBase(pbegin, pend) { }
     CScript(std::vector<unsigned char>::const_iterator pbegin, std::vector<unsigned char>::const_iterator pend) : CScriptBase(pbegin, pend) { }
     CScript(const unsigned char* pbegin, const unsigned char* pend) : CScriptBase(pbegin, pend) { }
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        READWRITE(static_cast<CScriptBase&>(*this));
+    }
 
     CScript& operator+=(const CScript& b)
     {
@@ -628,13 +648,14 @@ public:
      */
     bool IsUnspendable() const
     {
-        return (size() > 0 && *begin() == OP_RETURN);
+        return (size() > 0 && *begin() == OP_RETURN) || (size() > MAX_SCRIPT_SIZE);
     }
 
     void clear()
     {
-        // The default std::vector::clear() does not release memory.
-        CScriptBase().swap(*this);
+        // The default prevector::clear() does not release memory
+        CScriptBase::clear();
+        shrink_to_fit();
     }
 };
 

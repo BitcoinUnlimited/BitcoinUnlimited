@@ -14,6 +14,7 @@
 class CKeyID;
 class CPubKey;
 class CScriptID;
+extern bool coinlog;
 
 /** Compact serializer for scripts.
  *
@@ -54,41 +55,67 @@ protected:
     unsigned int GetSpecialSize(unsigned int nSize) const;
     bool Decompress(unsigned int nSize, const std::vector<unsigned char> &out);
 public:
-    CScriptCompressor(CScript &scriptIn) : script(scriptIn) { }
-
-    unsigned int GetSerializeSize(int nType, int nVersion) const {
-        std::vector<unsigned char> compr;
-        if (Compress(compr))
-            return compr.size();
-        unsigned int nSize = script.size() + nSpecialScripts;
-        return script.size() + VARINT(nSize).GetSerializeSize(nType, nVersion);
-    }
+    explicit CScriptCompressor(CScript &scriptIn) : script(scriptIn) { }
 
     template<typename Stream>
-    void Serialize(Stream &s, int nType, int nVersion) const {
+    void Serialize(Stream &s) const {
+       if (coinlog)
+             printf("Serialize stream compressor.h A\n");
         std::vector<unsigned char> compr;
         if (Compress(compr)) {
-            s << CFlatData(compr);
+       if (coinlog)
+             printf("Serialize stream compressor.h B\n");
+           s << CFlatData(compr);
+       if (coinlog)
+             printf("Serialize stream compressor.h C\n");
             return;
         }
         unsigned int nSize = script.size() + nSpecialScripts;
         s << VARINT(nSize);
+       if (coinlog)
+             printf("Serialize stream compressor.h D\n");
         s << CFlatData(script);
+       if (coinlog)
+             printf("Serialize stream compressor.h E\n");
     }
 
     template<typename Stream>
-    void Unserialize(Stream &s, int nType, int nVersion) {
+    void Unserialize(Stream &s) {
         unsigned int nSize = 0;
+        if (coinlog)
+             printf("unserialize compressor.h nsize is %d\n", nSize);
         s >> VARINT(nSize);
+        if (coinlog)
+            printf("unserialize compressor.h 2 nsizeis %d\n", nSize);
         if (nSize < nSpecialScripts) {
             std::vector<unsigned char> vch(GetSpecialSize(nSize), 0x00);
+        if (coinlog)
+              printf("unserialize compressor.h 3\n");
             s >> REF(CFlatData(vch));
             Decompress(nSize, vch);
+        if (coinlog)
+             printf("unserialize compressor.h 4\n");
             return;
         }
         nSize -= nSpecialScripts;
-        script.resize(nSize);
-        s >> REF(CFlatData(script));
+        if (nSize > MAX_SCRIPT_SIZE) {
+          if (coinlog)
+             printf("unserialize compressor.h 5\n");
+            // Overly long script, replace with a short invalid one
+            script << OP_RETURN;
+            if (coinlog)
+                printf("unserialize compressor.h 6\n");
+            s.ignore(nSize);
+        } else {
+          if (coinlog)
+                printf("unserialize compressor.h 7\n");
+            script.resize(nSize);
+              if (coinlog)
+                printf("unserialize compressor.h 7a script size %d\n", script.size() );
+            s >> REF(CFlatData(script));
+              if (coinlog)
+                 printf("unserialize compressor.h 8\n");
+        }
     }
 };
 
@@ -102,22 +129,36 @@ public:
     static uint64_t CompressAmount(uint64_t nAmount);
     static uint64_t DecompressAmount(uint64_t nAmount);
 
-    CTxOutCompressor(CTxOut &txoutIn) : txout(txoutIn) { }
+    explicit CTxOutCompressor(CTxOut &txoutIn) : txout(txoutIn) { }
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         if (!ser_action.ForRead()) {
             uint64_t nVal = CompressAmount(txout.nValue);
             READWRITE(VARINT(nVal));
         } else {
+        if (coinlog)
+            printf("compresser step 1\n");
             uint64_t nVal = 0;
+
+        if (coinlog)
+            printf("compresser step 2\n");
             READWRITE(VARINT(nVal));
+        if (coinlog)
+            printf("compresser step 3\n");
             txout.nValue = DecompressAmount(nVal);
+        if (coinlog)
+            printf("compresser step 4 txout nvalue %d\n", (int)txout.nValue);
+
         }
         CScriptCompressor cscript(REF(txout.scriptPubKey));
+        if (coinlog)
+            printf("compresser step 5\n");
         READWRITE(cscript);
+        if (coinlog)
+            printf("compresser step 6\n");
     }
 };
 

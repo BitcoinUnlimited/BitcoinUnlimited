@@ -258,7 +258,7 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
     if (sighashtype) *sighashtype=0;
 
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
-    if (script.size() > 10000)
+    if (script.size() > MAX_SCRIPT_SIZE)
         return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
     int nOpCount = 0;
     bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
@@ -844,15 +844,15 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                     valtype& vch = stacktop(-1);
                     valtype vchHash((opcode == OP_RIPEMD160 || opcode == OP_SHA1 || opcode == OP_HASH160) ? 20 : 32);
                     if (opcode == OP_RIPEMD160)
-                        CRIPEMD160().Write(begin_ptr(vch), vch.size()).Finalize(begin_ptr(vchHash));
+                        CRIPEMD160().Write(vch.data(), vch.size()).Finalize(vchHash.data());
                     else if (opcode == OP_SHA1)
-                        CSHA1().Write(begin_ptr(vch), vch.size()).Finalize(begin_ptr(vchHash));
+                        CSHA1().Write(vch.data(), vch.size()).Finalize(vchHash.data());
                     else if (opcode == OP_SHA256)
-                        CSHA256().Write(begin_ptr(vch), vch.size()).Finalize(begin_ptr(vchHash));
+                        CSHA256().Write(vch.data(), vch.size()).Finalize(vchHash.data());
                     else if (opcode == OP_HASH160)
-                        CHash160().Write(begin_ptr(vch), vch.size()).Finalize(begin_ptr(vchHash));
+                        CHash160().Write(vch.data(), vch.size()).Finalize(vchHash.data());
                     else if (opcode == OP_HASH256)
-                        CHash256().Write(begin_ptr(vch), vch.size()).Finalize(begin_ptr(vchHash));
+                        CHash256().Write(vch.data(), vch.size()).Finalize(vchHash.data());
                     popstack(stack);
                     stack.push_back(vchHash);
                 }
@@ -1014,7 +1014,7 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
             }
 
             // Size limits
-            if (stack.size() + altstack.size() > 1000)
+            if (stack.size() + altstack.size() > MAX_STACK_SIZE)
                 return set_error(serror, SCRIPT_ERR_STACK_SIZE);
         }
     }
@@ -1053,7 +1053,7 @@ public:
 
     /** Serialize the passed scriptCode, skipping OP_CODESEPARATORs */
     template<typename S>
-    void SerializeScriptCode(S &s, int nType, int nVersion) const {
+    void SerializeScriptCode(S &s) const {
         CScript::const_iterator it = scriptCode.begin();
         CScript::const_iterator itBegin = it;
         opcodetype opcode;
@@ -1076,53 +1076,53 @@ public:
 
     /** Serialize an input of txTo */
     template<typename S>
-    void SerializeInput(S &s, unsigned int nInput, int nType, int nVersion) const {
+    void SerializeInput(S &s, unsigned int nInput) const {
         // In case of SIGHASH_ANYONECANPAY, only the input being signed is serialized
         if (fAnyoneCanPay)
             nInput = nIn;
         // Serialize the prevout
-        ::Serialize(s, txTo.vin[nInput].prevout, nType, nVersion);
+        ::Serialize(s, txTo.vin[nInput].prevout);
         // Serialize the script
         if (nInput != nIn)
             // Blank out other inputs' signatures
-            ::Serialize(s, CScriptBase(), nType, nVersion);
+            ::Serialize(s, CScript());
         else
-            SerializeScriptCode(s, nType, nVersion);
+            SerializeScriptCode(s);
         // Serialize the nSequence
         if (nInput != nIn && (fHashSingle || fHashNone))
             // let the others update at will
-            ::Serialize(s, (int)0, nType, nVersion);
+            ::Serialize(s, (int)0);
         else
-            ::Serialize(s, txTo.vin[nInput].nSequence, nType, nVersion);
+            ::Serialize(s, txTo.vin[nInput].nSequence);
     }
 
     /** Serialize an output of txTo */
     template<typename S>
-    void SerializeOutput(S &s, unsigned int nOutput, int nType, int nVersion) const {
+    void SerializeOutput(S &s, unsigned int nOutput) const {
         if (fHashSingle && nOutput != nIn)
             // Do not lock-in the txout payee at other indices as txin
-            ::Serialize(s, CTxOut(), nType, nVersion);
+            ::Serialize(s, CTxOut());
         else
-            ::Serialize(s, txTo.vout[nOutput], nType, nVersion);
+            ::Serialize(s, txTo.vout[nOutput]);
     }
 
     /** Serialize txTo */
     template<typename S>
-    void Serialize(S &s, int nType, int nVersion) const {
+    void Serialize(S &s) const {
         // Serialize nVersion
-        ::Serialize(s, txTo.nVersion, nType, nVersion);
+        ::Serialize(s, txTo.nVersion);
         // Serialize vin
         unsigned int nInputs = fAnyoneCanPay ? 1 : txTo.vin.size();
         ::WriteCompactSize(s, nInputs);
         for (unsigned int nInput = 0; nInput < nInputs; nInput++)
-             SerializeInput(s, nInput, nType, nVersion);
+             SerializeInput(s, nInput);
         // Serialize vout
         unsigned int nOutputs = fHashNone ? 0 : (fHashSingle ? nIn+1 : txTo.vout.size());
         ::WriteCompactSize(s, nOutputs);
         for (unsigned int nOutput = 0; nOutput < nOutputs; nOutput++)
-             SerializeOutput(s, nOutput, nType, nVersion);
+             SerializeOutput(s, nOutput);
         // Serialize nLockTime
-        ::Serialize(s, txTo.nLockTime, nType, nVersion);
+        ::Serialize(s, txTo.nLockTime);
     }
 };
 
@@ -1195,7 +1195,7 @@ uint256 SignatureHashBitcoinCash(const CScript &scriptCode, const CTransaction &
         // amount). The prevout may already be contained in hashPrevout, and the
         // nSequence may already be contain in hashSequence.
         ss << txTo.vin[nIn].prevout;
-        ss << static_cast<const CScriptBase &>(scriptCode);
+        ss << scriptCode;
         ss << amount;
         ss << txTo.vin[nIn].nSequence;
         // Outputs (none/one/all, depending on flags)

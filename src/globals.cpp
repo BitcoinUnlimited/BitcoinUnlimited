@@ -106,6 +106,8 @@ vector<std::string> vUseDNSSeeds;
 vector<std::string> vAddedNodes;
 set<CNetAddr> setservAddNodeAddresses;
 
+bool coinlog = false;
+
 uint64_t maxGeneratedBlock = DEFAULT_MAX_GENERATED_BLOCK_SIZE;
 uint64_t excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
 unsigned int excessiveAcceptDepth = DEFAULT_EXCESSIVE_ACCEPT_DEPTH;

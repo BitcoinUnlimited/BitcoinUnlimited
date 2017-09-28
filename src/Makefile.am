@@ -100,6 +100,7 @@ BITCOIN_CORE_H = \
   core_memusage.h \
   dosman.h \
   expedited.h \
+  fs.h \
   httprpc.h \
   httpserver.h \
   init.h \
@@ -189,6 +190,7 @@ libbitcoin_server_a_SOURCES = \
   connmgr.cpp \
   dosman.cpp \
   expedited.cpp \
+  fs.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \

@@ -778,14 +778,14 @@ public:
         vchGroupA = a->addr.GetGroup();
         vchGroupB = b->addr.GetGroup();
 
-        hashA.Write(begin_ptr(vchGroupA), vchGroupA.size());
-        hashB.Write(begin_ptr(vchGroupB), vchGroupB.size());
+        hashA.Write(vchGroupA.data(), vchGroupA.size());
+        hashB.Write(vchGroupB.data(), vchGroupB.size());
 
-        hashA.Write(begin_ptr(vchSecretKey), vchSecretKey.size());
-        hashB.Write(begin_ptr(vchSecretKey), vchSecretKey.size());
+        hashA.Write(vchSecretKey.data(), vchSecretKey.size());
+        hashB.Write(vchSecretKey.data(), vchSecretKey.size());
 
-        hashA.Finalize(begin_ptr(vchA));
-        hashB.Finalize(begin_ptr(vchB));
+        hashA.Finalize(vchA.data());
+        hashB.Finalize(vchB.data());
 
         return vchA < vchB;
     }

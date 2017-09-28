@@ -61,7 +61,10 @@
 #endif
 #define _WIN32_IE 0x0501
 
+#ifndef  WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
+#endif
+
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -597,7 +600,7 @@ bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest)
  * Specifically handles case where path p exists, but it wasn't possible for the user to
  * write to the parent directory.
  */
-bool TryCreateDirectory(const boost::filesystem::path& p)
+bool TryCreateDirectories(const boost::filesystem::path& p)
 {
     try
     {
@@ -610,6 +613,7 @@ bool TryCreateDirectory(const boost::filesystem::path& p)
     // create_directory didn't create the directory, it had to have existed already
     return false;
 }
+
 
 void FileCommit(FILE *fileout)
 {
@@ -715,13 +719,13 @@ void ShrinkDebugFile()
         // Restart the file with some of the end
         std::vector <char> vch(200000,0);
         fseek(file, -((long)vch.size()), SEEK_END);
-        int nBytes = fread(begin_ptr(vch), 1, vch.size(), file);
+        int nBytes = fread(vch.data(), 1, vch.size(), file);
         fclose(file);
 
         file = fopen(pathLog.string().c_str(), "w");
         if (file)
         {
-            fwrite(begin_ptr(vch), 1, nBytes, file);
+            fwrite(vch.data(), 1, nBytes, file);
             fclose(file);
         }
     }
