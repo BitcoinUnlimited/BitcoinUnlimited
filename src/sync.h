@@ -168,14 +168,18 @@ class SCOPED_LOCKABLE CMutexLock
 {
 private:
     boost::unique_lock<Mutex> lock;
+#ifdef DEBUG_LOCKTIME
     uint64_t lockedTime;
+#endif
     const char* name;
     const char* file;
     int line;
 
     void Enter(const char* pszName, const char* pszFile, int nLine)
     {
+#ifdef DEBUG_LOCKTIME
         uint64_t startWait = GetStopwatch();
+#endif
         name = pszName;
         file = pszFile;
         line = nLine;
@@ -188,11 +192,14 @@ private:
 #ifdef DEBUG_LOCKCONTENTION
         }
 #endif
+
+#ifdef DEBUG_LOCKTIME
         lockedTime = GetStopwatch();
         if (lockedTime - startWait > LOCK_WARN_TIME)
           {
             LogPrint("lck", "Lock %s at %s:%d waited for %d ms\n", pszName, pszFile, nLine,(lockedTime - startWait));
           }
+#endif
     }
 
     bool TryEnter(const char* pszName, const char* pszFile, int nLine)
@@ -203,11 +210,16 @@ private:
         EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()), true);
         lock.try_lock();
         if (!lock.owns_lock())
-          {
+        {
+#ifdef DEBUG_LOCKTIME
             lockedTime = 0;
+#endif
             LeaveCritical();
-          }
-        else lockedTime = GetStopwatch();
+        }
+#ifdef DEBUG_LOCKTIME
+        else
+            lockedTime = GetStopwatch();
+#endif
         return lock.owns_lock();
     }
 
@@ -236,11 +248,14 @@ public:
         if (lock.owns_lock())
           {
             LeaveCritical();
+#ifdef DEBUG_LOCKTIME
             uint64_t doneTime = GetStopwatch();
             if (doneTime - lockedTime > LOCK_WARN_TIME)
-              {
-                LogPrint("lck", "Lock %s at %s:%d remained locked for %d ms\n", name, file, line,doneTime - lockedTime);
-              }
+            {
+                LogPrint(
+                    "lck", "Lock %s at %s:%d remained locked for %d ms\n", name, file, line, doneTime - lockedTime);
+            }
+#endif
           }
     }
 
@@ -263,12 +278,14 @@ private:
 
     void Enter(const char* pszName, const char* pszFile, int nLine)
     {
+#ifdef DEBUG_LOCKTIME
         uint64_t startWait = GetStopwatch();
+#endif
         name = pszName;
         file = pszFile;
         line = nLine;
         EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()));
-        LogPrint("lck","try ReadLock %p %s by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
+        //LogPrint("lck","try ReadLock %p %s by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
 #ifdef DEBUG_LOCKCONTENTION
         if (!lock.try_lock()) {
             PrintLockContention(pszName, pszFile, nLine);
@@ -277,12 +294,14 @@ private:
 #ifdef DEBUG_LOCKCONTENTION
         }
 #endif
-        LogPrint("lck","ReadLock %p %s taken by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
+        //LogPrint("lck","ReadLock %p %s taken by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
+#ifdef DEBUG_LOCKTIME
         lockedTime = GetStopwatch();
         if (lockedTime - startWait > LOCK_WARN_TIME)
           {
             LogPrint("lck", "Lock %s at %s:%d waited for %d ms\n", pszName, pszFile, nLine,(lockedTime - startWait));
           }
+#endif
     }
 
     bool TryEnter(const char* pszName, const char* pszFile, int nLine)
@@ -293,11 +312,16 @@ private:
         EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()), true);
         if (!lock.try_lock())
           {
-            lockedTime = 0;
-            LeaveCritical();
+#ifdef DEBUG_LOCKTIME
+              lockedTime = 0;
+#endif
+              LeaveCritical();
           }
-        else lockedTime = GetStopwatch();
-        return lock.owns_lock();
+#ifdef DEBUG_LOCKTIME
+          else
+              lockedTime = GetStopwatch();
+#endif
+          return lock.owns_lock();
     }
 
 public:
@@ -325,13 +349,16 @@ public:
         if (lock.owns_lock())
           {
             LeaveCritical();
+#ifdef DEBUG_LOCKTIME
             int64_t doneTime = GetStopwatch();
             if (doneTime - lockedTime > LOCK_WARN_TIME)
-              {
-                LogPrint("lck", "Lock %s at %s:%d remained locked for %d ms\n", name, file, line,doneTime - lockedTime);
-              }
+            {
+                LogPrint(
+                    "lck", "Lock %s at %s:%d remained locked for %d ms\n", name, file, line, doneTime - lockedTime);
+            }
+#endif
           }
-        // When lock is destructed it will release
+          // When lock is destructed it will release
     }
 
     operator bool()

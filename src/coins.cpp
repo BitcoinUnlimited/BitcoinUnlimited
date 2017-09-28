@@ -158,7 +158,7 @@ const CCoins* CCoinsViewCache::_AccessCoins(const uint256 &txid) const {
 }
 
 bool CCoinsViewCache::HaveCoins(const uint256 &txid) const {
-    WRITELOCK(cs_utxo);
+    READLOCK(cs_utxo);
     CCoinsMap::const_iterator it = FetchCoins(txid);
     // We're using vtx.empty() instead of IsPruned here for performance reasons,
     // as we only care about the case where a transaction was replaced entirely

@@ -2459,19 +2459,7 @@ void static UpdateTip(CBlockIndex *pindexNew)
     // might be now valid, e.g. due to a nLockTime'd tx becoming valid,
     // or a double-spend. Reset the rejects filter and give those
     // txs a second chance.
-    if (1)
-    {
-        WRITELOCK(csRecentRejects);
-        if (recentRejects)
-        {
-            recentRejects->reset();
-        }
-        else
-        {
-            recentRejects.reset(new CRollingBloomFilter(120000, 0.000001));
-        }
-    }
-
+    recentRejects.reset();
 
     // New best block
     nTimeBestReceived = GetTime();
@@ -4455,7 +4443,7 @@ void UnloadBlockIndex()
     setDirtyBlockIndex.clear();
     setDirtyFileInfo.clear();
     mapNodeState.clear();
-    recentRejects.reset(NULL);
+    recentRejects.reset();
     versionbitscache.Clear();
     for (int b = 0; b < VERSIONBITS_NUM_BITS; b++)
     {
@@ -4480,12 +4468,7 @@ bool LoadBlockIndex()
 
 bool InitBlockIndex(const CChainParams &chainparams)
 {
-    if (1)
-    {
-        WRITELOCK(csRecentRejects);
-        // Initialize global variables that cannot be constructed at startup.
-        recentRejects.reset(new CRollingBloomFilter(120000, 0.000001));
-    }
+    recentRejects.reset();
 
     LOCK(cs_main);
 
@@ -4996,12 +4979,7 @@ bool AlreadyHaveLocking(const CInv &inv)
     {
     case MSG_TX:
     {
-        bool rrc = false;
-        if (1)
-        {
-            READLOCK(csRecentRejects);
-            rrc = recentRejects ? recentRejects->contains(inv.hash) : false;
-        }
+        bool rrc = recentRejects.contains(inv.hash);
         bool mrc = mempool.exists(inv.hash);
         LOCK(cs_main);
         return rrc || mrc || AlreadyHaveOrphan(inv.hash) || pcoinsTip->HaveCoins(inv.hash);
@@ -5032,12 +5010,7 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
     {
     case MSG_TX:
     {
-        bool rrc = false;
-        if (1)
-        {
-            READLOCK(csRecentRejects);
-            rrc = recentRejects ? recentRejects->contains(inv.hash) : false;
-        }
+        bool rrc = recentRejects.contains(inv.hash);
         return rrc || mempool.exists(inv.hash) || AlreadyHaveOrphan(inv.hash) || pcoinsTip->HaveCoins(inv.hash);
     }
     case MSG_BLOCK:
@@ -6584,7 +6557,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
 bool ProcessMessages(CNode *pfrom)
 {
-    AssertLockHeld(pfrom->cs_vRecvMsg);
     const CChainParams &chainparams = Params();
     // if (fDebug)
     //    LogPrintf("%s(%u messages)\n", __func__, pfrom->vRecvMsg.size());
@@ -6597,36 +6569,44 @@ bool ProcessMessages(CNode *pfrom)
     //  (4) checksum
     //  (x) data
     //
-    bool fOk = true;
+    bool gotWorkDone = false;
 
     //if (!pfrom->vRecvGetData.empty())
     //    ProcessGetData(pfrom, chainparams.GetConsensus(),pfrom->vRecvGetData);
 
     // this maintains the order of responses
     if (!pfrom->vRecvGetData.empty())
-        return fOk;
+        return gotWorkDone;
 
-    std::deque<CNetMessage>::iterator it = pfrom->vRecvMsg.begin();
-    while (!pfrom->fDisconnect && it != pfrom->vRecvMsg.end())
+    CNetMessage msg; // TODO make a pointer that I free
+    // Don't bother if send buffer is too full to respond anyway
+    while ((!pfrom->fDisconnect) && (pfrom->nSendSize < SendBufferSize()))
     {
-        // Don't bother if send buffer is too full to respond anyway
-        if (pfrom->nSendSize >= SendBufferSize())
-            break;
-
-        // get next message
-        CNetMessage &msg = *it;
+        if (1)
+        {
+            TRY_LOCK(pfrom->cs_vRecvMsg, lockRecv);
+            if (lockRecv)
+            {
+                if (pfrom->vRecvMsg.empty())
+                    break;
+                msg = pfrom->vRecvMsg.front();
+                if (!msg.complete()) // end if an incomplete message is on the top
+                    break;
+                // at this point, any failure means we can delete the current message
+                pfrom->vRecvMsg.pop_front();
+                pfrom->currentRecvMsgSize.value -= msg.size();
+                gotWorkDone=true;
+            }
+            else
+                break;
+        }
 
         // if (fDebug)
         //    LogPrintf("%s(message %u msgsz, %u bytes, complete:%s)\n", __func__,
         //            msg.hdr.nMessageSize, msg.vRecv.size(),
         //            msg.complete() ? "Y" : "N");
 
-        // end, if an incomplete message is found
-        if (!msg.complete())
-            break;
-
         // at this point, any failure means we can delete the current message
-        it++;
 
 #ifdef BITCOIN_CASH
         // This is a new peer. Before doing anything, we need to detect what magic the peer is using.
@@ -6645,8 +6625,8 @@ bool ProcessMessages(CNode *pfrom)
             if (!pfrom->fWhitelisted)
             {
                 dosMan.Ban(pfrom->addr, BanReasonNodeMisbehaving, 4 * 60 * 60); // ban for 4 hours
+                pfrom->fDisconnect = true;
             }
-            fOk = false;
             break;
         }
 
@@ -6721,11 +6701,7 @@ bool ProcessMessages(CNode *pfrom)
         break;
     }
 
-    // In case the connection got shut down, its receive buffer was wiped
-    if (!pfrom->fDisconnect)
-        pfrom->vRecvMsg.erase(pfrom->vRecvMsg.begin(), it);
-
-    return fOk;
+    return gotWorkDone;
 }
 
 

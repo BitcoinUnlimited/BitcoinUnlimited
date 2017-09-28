@@ -8,6 +8,7 @@
 #define BITCOIN_NET_H
 
 #include "bloom.h"
+#include "fastfilter.h"
 #include "chainparams.h"
 #include "compat.h"
 #include "limitedmap.h"
@@ -258,6 +259,13 @@ public:
 
     int64_t nTime; // time (in microseconds) of message receipt.
 
+CNetMessage():hdrbuf(0,0),hdr({0,0,0,0}),vRecv(0,0)
+    {
+        nHdrPos = 0;
+        nDataPos = 0;
+        nTime = 0;
+        in_data = false;
+    }
     CNetMessage(const CMessageHeader::MessageStartChars &pchMessageStartIn, int nTypeIn, int nVersionIn)
         : hdrbuf(nTypeIn, nVersionIn), hdr(pchMessageStartIn), vRecv(nTypeIn, nVersionIn)
     {
@@ -275,6 +283,11 @@ public:
         return (hdr.nMessageSize == nDataPos);
     }
 
+    unsigned int size() const
+    {
+        return hdrbuf.size() + vRecv.size();
+    }
+    
     void SetVersion(int nVersionIn)
     {
         hdrbuf.SetVersion(nVersionIn);
@@ -300,6 +313,10 @@ public:
 /** Information about a peer */
 class CNode
 {
+#ifdef ENABLE_MUTRACE
+    friend class PrintSomePointers;
+#endif
+
 public:
     struct CThinBlockInFlight
     {
@@ -325,6 +342,8 @@ public:
 
     std::deque<CInv> vRecvGetData;
     std::deque<CNetMessage> vRecvMsg;
+    CStatHistory<unsigned int> currentRecvMsgSize;
+
     CCriticalSection cs_vRecvMsg;
     uint64_t nRecvBytes;
     int nRecvVersion;
@@ -419,7 +438,7 @@ public:
     int64_t nNextLocalAddrSend;
 
     // inventory based relay
-    CRollingBloomFilter filterInventoryKnown;
+    CRollingFastFilter filterInventoryKnown;
     std::vector<CInv> vInventoryToSend;
     CCriticalSection cs_inventory;
     std::set<uint256> setAskFor;
@@ -495,10 +514,13 @@ public:
     // requires LOCK(cs_vRecvMsg)
     unsigned int GetTotalRecvSize()
     {
+        return currentRecvMsgSize.value;
+#if 0
         unsigned int total = 0;
         BOOST_FOREACH (const CNetMessage &msg, vRecvMsg)
             total += msg.vRecv.size() + 24;
         return total;
+#endif
     }
 
     // requires LOCK(cs_vRecvMsg)

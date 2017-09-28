@@ -364,14 +364,8 @@ extern CTweak<bool> onlyAcceptForkSig;
  * 1000/sec if we have fast peers, so we pick 120,000 to give our peers a
  * two minute window to send invs to us.
  *
- * Decreasing the false positive rate is fairly cheap, so we pick one in a
- * million to make it highly unlikely for users to have issues with this
- * filter.
- *
- * Memory used: 1.7MB
  */
-extern boost::scoped_ptr<CRollingBloomFilter> recentRejects;
-extern CSharedCriticalSection csRecentRejects;
+extern CRollingFastFilter recentRejects;
 
 extern bool TxAlreadyHave(const CInv &inv);
 extern void StopTxProcessing();

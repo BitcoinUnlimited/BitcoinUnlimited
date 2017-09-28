@@ -465,7 +465,10 @@ void CNode::CloseSocketDisconnect()
     // in case this fails, we'll empty the recv buffer when the CNode is deleted
     TRY_LOCK(cs_vRecvMsg, lockRecv);
     if (lockRecv)
+    {
         vRecvMsg.clear();
+        currentRecvMsgSize.value = 0;
+    }
 }
 
 void CNode::PushVersion()
@@ -601,7 +604,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
             messageHandlerCondition.notify_one();
         }
     }
-
+    currentRecvMsgSize.value += nBytes;
     return true;
 }
 
@@ -2091,22 +2094,8 @@ void ThreadMessageHandler()
                 continue;
 
             // Receive messages
-            {
-                TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                if (lockRecv)
-                {
-                    if (!g_signals.ProcessMessages(pnode))
-                        pnode->fDisconnect = true;
-
-                    if (pnode->nSendSize < SendBufferSize())
-                    {
-                        if (!pnode->vRecvGetData.empty() || (!pnode->vRecvMsg.empty() && pnode->vRecvMsg[0].complete()))
-                        {
-                            fSleep = false;
-                        }
-                    }
-                }
-            }
+            if (g_signals.ProcessMessages(pnode))
+                fSleep = false;
             boost::this_thread::interruption_point();
 
             // Send messages
@@ -2360,6 +2349,7 @@ void StartNode(boost::thread_group &threadGroup, CScheduler &scheduler)
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msg1", &ThreadMessageHandler));
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msg2", &ThreadMessageHandler));
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msg3", &ThreadMessageHandler));
+    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msg4", &ThreadMessageHandler));
 
     // Process transactions
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "tx1", &ThreadTxHandler));
@@ -2744,8 +2734,7 @@ bool CAddrDB::Read(CAddrMan &addr, CDataStream &ssPeers)
 uint32_t ReceiveFloodSize() { return 1000 * nMaxReceiveBuffer; }
 uint32_t SendBufferSize() { return 1000 * nMaxSendBuffer; }
 CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn, bool fInboundIn)
-    : ssSend(SER_NETWORK, INIT_PROTO_VERSION), id(connmgr->NextNodeId()), addrKnown(5000, 0.001),
-      filterInventoryKnown(50000, 0.000001)
+    : ssSend(SER_NETWORK, INIT_PROTO_VERSION), id(connmgr->NextNodeId()), addrKnown(5000, 0.001)
 {
     nServices = 0;
     hSocket = hSocketIn;
@@ -2811,6 +2800,9 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     {
         xmledName = "ip" + addr.ToStringIP() + "p" + addr.ToStringPort();
     }
+
+    currentRecvMsgSize.init("node/" + xmledName + "/recvBufSize", STAT_OP_MAX);
+
     bytesSent.init("node/" + xmledName + "/bytesSent");
     bytesReceived.init("node/" + xmledName + "/bytesReceived");
     txReqLatency.init("node/" + xmledName + "/txLatency", STAT_OP_AVE);

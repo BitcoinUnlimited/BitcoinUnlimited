@@ -93,6 +93,9 @@ public:
 class CRequestManager
 {
 protected:
+#ifdef ENABLE_MUTRACE
+    friend class PrintSomePointers;
+#endif
 #ifdef DEBUG
     friend UniValue getstructuresizes(const UniValue& params, bool fHelp);
 #endif

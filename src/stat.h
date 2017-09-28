@@ -74,7 +74,6 @@ template <class DataType, class RecordType = DataType>
 class CStat : public CStatBase
 {
 public:
-protected:
     RecordType value;
     std::string name;
 

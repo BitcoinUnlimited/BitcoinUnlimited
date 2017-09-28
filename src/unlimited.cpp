@@ -2439,12 +2439,7 @@ bool TxAlreadyHave(const CInv &inv)
     {
     case MSG_TX:
     {
-        bool rrc = false;
-        if (1)
-        {
-            READLOCK(csRecentRejects);
-            rrc = recentRejects ? recentRejects->contains(inv.hash) : false;
-        }
+        bool rrc = recentRejects.contains(inv.hash);
         bool mrc = mempool.exists(inv.hash);
         return rrc || mrc || AlreadyHaveOrphan(inv.hash) || pcoinsTip->HaveCoins(inv.hash);
     }
@@ -2624,12 +2619,7 @@ void ThreadTxHandler()
                 if (have)
                 {
                     LogPrint("mempool","already have\n");
-                    if (1)
-                    {
-                        WRITELOCK(csRecentRejects);
-                        if (recentRejects)
-                            recentRejects->insert(tx.GetHash()); // should always be true
-                    }
+                    recentRejects.insert(tx.GetHash());
 
                     if (txd.whitelisted && GetBoolArg("-whitelistforcerelay", DEFAULT_WHITELISTFORCERELAY))
                     {
