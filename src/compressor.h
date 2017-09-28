@@ -112,7 +112,7 @@ public:
             script.resize(nSize);
               if (coinlog)
                 printf("unserialize compressor.h 7a script size %d\n", script.size() );
-            s >> REF(CFlatData(script), coinlog);
+            s >> REF(CFlatData(script));
               if (coinlog)
                  printf("unserialize compressor.h 8\n");
         }
@@ -153,7 +153,7 @@ public:
             printf("compresser step 4 txout nvalue %d\n", (int)txout.nValue);
 
         }
-        CScriptCompressor cscript(REF(txout.scriptPubKey, coinlog));
+        CScriptCompressor cscript(REF(txout.scriptPubKey));
         if (coinlog)
             printf("compresser step 5\n");
         READWRITE(cscript);

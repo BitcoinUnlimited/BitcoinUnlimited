@@ -23,7 +23,6 @@
 #include <vector>
 
 #include "prevector.h"
-//extern bool coinlog;
 
 /**
  * Dummy data type to identify deserializing constructors.
@@ -46,11 +45,8 @@ static const unsigned int MAX_SIZE = 0x02000000*8;  // BU Allow 256MB JSON encod
  * where it makes sense with wrappers such as CFlatData or CTxDB
  */
 template<typename T>
-inline T& REF(const T& val, bool coinlog=false)
+inline T& REF(const T& val)
 {
-        if (coinlog)
-            printf("serialize REF step 1\n");
-
     return const_cast<T&>(val);
 }
 
@@ -372,17 +368,16 @@ class CFlatData
 protected:
     char* pbegin;
     char* pend;
-bool coinlog;
 public:
     CFlatData(void* pbeginIn, void* pendIn) : pbegin((char*)pbeginIn), pend((char*)pendIn) { }
     template <class T, class TAl>
-    explicit CFlatData(std::vector<T,TAl> &v,  bool coinlog = false)
+    explicit CFlatData(std::vector<T,TAl> &v)
     {
         pbegin = (char*)v.data();
         pend = (char*)(v.data() + v.size());
     }
     template <unsigned int N, typename T, typename S, typename D>
-    explicit CFlatData(prevector<N, T, S, D> &v, bool coinlog = false)
+    explicit CFlatData(prevector<N, T, S, D> &v)
     {
         pbegin = (char*)v.data();
         pend = (char*)(v.data() + v.size());
