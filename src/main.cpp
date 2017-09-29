@@ -6586,29 +6586,30 @@ bool ProcessMessages(CNode *pfrom)
 
     CNetMessage msg; // TODO make a pointer that I free
     // Don't bother if send buffer is too full to respond anyway
+    // LogPrintf("send size: %d %d msg queue:%d  tx in Q: %d\n", pfrom->nSendSize, SendBufferSize(), pfrom->vRecvMsg.size(),txInQ.size());
+    int msgsProcessed=0;
     while ((!pfrom->fDisconnect) && (pfrom->nSendSize < SendBufferSize()))
     {
         if (1)
         {
             TRY_LOCK(pfrom->cs_vRecvMsg, lockRecv);
-            if (lockRecv)
-            {
-                if (pfrom->vRecvMsg.empty())
-                    break;
-                CNetMessage& msgOnQ = pfrom->vRecvMsg.front();
-                if (!msgOnQ.complete()) // end if an incomplete message is on the top
-                {
-                    // LogPrintf("%s: partial message %d of size %d. Recvd bytes: %d\n", pfrom->GetLogName(), msgOnQ.nDataPos, msgOnQ.size(), pfrom->currentRecvMsgSize.value);
-                    break;
-                }
-                msg = msgOnQ;
-                // at this point, any failure means we can delete the current message
-                pfrom->vRecvMsg.pop_front();
-                pfrom->currentRecvMsgSize.value -= msg.size();
-                gotWorkDone=true;
-            }
-            else
+            if (!lockRecv) break;
+
+            if (pfrom->vRecvMsg.empty())
                 break;
+            CNetMessage &msgOnQ = pfrom->vRecvMsg.front();
+            if (!msgOnQ.complete()) // end if an incomplete message is on the top
+            {
+                // LogPrintf("%s: partial message %d of size %d. Recvd bytes: %d\n", pfrom->GetLogName(),
+                // msgOnQ.nDataPos, msgOnQ.size(), pfrom->currentRecvMsgSize.value);
+                break;
+            }
+            msg = msgOnQ;
+            // at this point, any failure means we can delete the current message
+            pfrom->vRecvMsg.pop_front();
+            pfrom->currentRecvMsgSize.value -= msg.size();
+            msgsProcessed++;
+            gotWorkDone = true;
         }
 
         // if (fDebug)
@@ -6708,7 +6709,7 @@ bool ProcessMessages(CNode *pfrom)
             LogPrintf(
                 "%s(%s, %u bytes) FAILED peer=%d\n", __func__, SanitizeString(strCommand), nMessageSize, pfrom->id);
 
-        break;
+        if (msgsProcessed > 2000) break;  // let someone else do something periodically
     }
 
     return false; // gotWorkDone;

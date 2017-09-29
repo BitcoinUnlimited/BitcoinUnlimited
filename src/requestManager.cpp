@@ -453,7 +453,8 @@ void CRequestManager::SendRequests()
     int64_t now = 0;
 
     // TODO: if a node goes offline, rerequest txns from someone else and cleanup references right away
-    LOCK(cs_objDownloader);
+    TRY_LOCK(cs_objDownloader, locked);
+    if (!locked) return; // don't wait around if some other thread is already sending requests
     if (sendBlkIter == mapBlkInfo.end())
         sendBlkIter = mapBlkInfo.begin();
 
