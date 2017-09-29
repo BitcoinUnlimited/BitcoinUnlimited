@@ -69,6 +69,8 @@
 
 using namespace std;
 
+extern bool ProcessMessages(CNode *pfrom);
+
 namespace
 {
 // BU replaced this with a configuration option: const int MAX_OUTBOUND_CONNECTIONS = 8;
@@ -540,6 +542,7 @@ void CNode::copyStats(CNodeStats &stats)
 // requires LOCK(cs_vRecvMsg)
 bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 {
+    AssertLockHeld(cs_vRecvMsg);
     while (nBytes > 0)
     {
         // get current incomplete message, or create a new one
@@ -571,6 +574,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 
         pch += handled;
         nBytes -= handled;
+        currentRecvMsgSize.value += handled;
 
         if (msg.complete())
         {
@@ -604,7 +608,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
             messageHandlerCondition.notify_one();
         }
     }
-    currentRecvMsgSize.value += nBytes;
+
     return true;
 }
 
@@ -2094,7 +2098,7 @@ void ThreadMessageHandler()
                 continue;
 
             // Receive messages
-            if (g_signals.ProcessMessages(pnode))
+            if (ProcessMessages(pnode))
                 fSleep = false;
             boost::this_thread::interruption_point();
 
@@ -2801,7 +2805,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
         xmledName = "ip" + addr.ToStringIP() + "p" + addr.ToStringPort();
     }
 
-    currentRecvMsgSize.init("node/" + xmledName + "/recvBufSize", STAT_OP_MAX);
+    currentRecvMsgSize.init("node/" + xmledName + "/recvBufSize", STAT_KEEP | STAT_OP_MAX);
 
     bytesSent.init("node/" + xmledName + "/bytesSent");
     bytesReceived.init("node/" + xmledName + "/bytesReceived");

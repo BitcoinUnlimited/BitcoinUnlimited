@@ -5033,8 +5033,9 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
     return true;
 }
 
-void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParams, std::vector<CInv>& vInv)
+static bool ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParams, std::vector<CInv>& vInv)
 {
+    bool gotWorkDone = false;
     std::vector<CInv>::iterator it = vInv.begin();
 
     std::vector<CInv> vNotFound;
@@ -5049,7 +5050,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
         {
             boost::this_thread::interruption_point();
             it++;
-
+            gotWorkDone = true;
             // BUIP010 Xtreme Thinblocks: if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
             if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK ||
                 inv.type == MSG_XTHINBLOCK)
@@ -5247,6 +5248,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
         // having to download the entire memory pool.
         pfrom->PushMessage(NetMsgType::NOTFOUND, vNotFound);
     }
+    return gotWorkDone;
 }
 
 bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived)
@@ -6573,12 +6575,14 @@ bool ProcessMessages(CNode *pfrom)
     {
         TRY_LOCK(pfrom->csRecvGetData, locked);
         if (locked && !pfrom->vRecvGetData.empty())
-            ProcessGetData(pfrom, chainparams.GetConsensus(),pfrom->vRecvGetData);
+        {
+            gotWorkDone |= ProcessGetData(pfrom, chainparams.GetConsensus(),pfrom->vRecvGetData);
+        }
     }
 
     // this maintains the order of responses
-    if (!pfrom->vRecvGetData.empty())
-        return gotWorkDone;
+    //if (!pfrom->vRecvGetData.empty())
+    //    return gotWorkDone;
 
     CNetMessage msg; // TODO make a pointer that I free
     // Don't bother if send buffer is too full to respond anyway
@@ -6591,9 +6595,13 @@ bool ProcessMessages(CNode *pfrom)
             {
                 if (pfrom->vRecvMsg.empty())
                     break;
-                msg = pfrom->vRecvMsg.front();
-                if (!msg.complete()) // end if an incomplete message is on the top
+                CNetMessage& msgOnQ = pfrom->vRecvMsg.front();
+                if (!msgOnQ.complete()) // end if an incomplete message is on the top
+                {
+                    // LogPrintf("%s: partial message %d of size %d. Recvd bytes: %d\n", pfrom->GetLogName(), msgOnQ.nDataPos, msgOnQ.size(), pfrom->currentRecvMsgSize.value);
                     break;
+                }
+                msg = msgOnQ;
                 // at this point, any failure means we can delete the current message
                 pfrom->vRecvMsg.pop_front();
                 pfrom->currentRecvMsgSize.value -= msg.size();
@@ -6703,7 +6711,7 @@ bool ProcessMessages(CNode *pfrom)
         break;
     }
 
-    return gotWorkDone;
+    return false; // gotWorkDone;
 }
 
 
@@ -6783,7 +6791,7 @@ bool SendMessages(CNode *pto)
             }
         }
 
-        bool isInitialBlockDownload = IsInitialBlockDownload();;
+        bool isInitialBlockDownload = IsInitialBlockDownload();
         // state won't be deleted unless this node is deleted but it can't because we have run addref()
         CNodeState *statep = State(pto->GetId());
         CBlockIndex *tip = chainActive.Tip();

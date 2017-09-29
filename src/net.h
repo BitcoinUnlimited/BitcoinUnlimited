@@ -286,7 +286,7 @@ CNetMessage():hdrbuf(0,0),hdr({0,0,0,0}),vRecv(0,0)
 
     unsigned int size() const
     {
-        return hdrbuf.size() + vRecv.size();
+        return ((in_data) ? sizeof(CMessageHeader) : hdrbuf.size()) + nDataPos;
     }
     
     void SetVersion(int nVersionIn)
@@ -296,6 +296,7 @@ CNetMessage():hdrbuf(0,0),hdr({0,0,0,0}),vRecv(0,0)
     }
 
     int readHeader(const char *pch, unsigned int nBytes);
+    // copies the data from pch INTO this message.
     int readData(const char *pch, unsigned int nBytes);
 };
 
@@ -517,13 +518,17 @@ public:
     // requires LOCK(cs_vRecvMsg)
     unsigned int GetTotalRecvSize()
     {
-        return currentRecvMsgSize.value;
 #if 0
         unsigned int total = 0;
         BOOST_FOREACH (const CNetMessage &msg, vRecvMsg)
             total += msg.vRecv.size() + 24;
-        return total;
+        // ^ Note this sums that total memory whereas currentRecvMsgSize is the amount used so they may differ by 256k
+        if (total != currentRecvMsgSize.value)
+        {
+            LogPrintf("GetTotalRecvSize mismatch: %d, %d\n", total, currentRecvMsgSize.value);
+        }
 #endif
+        return currentRecvMsgSize.value;
     }
 
     // requires LOCK(cs_vRecvMsg)
