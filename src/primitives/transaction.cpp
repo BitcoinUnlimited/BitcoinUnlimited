@@ -144,9 +144,9 @@ std::string CTransaction::ToString() const
 
 bool CTransaction::ReplayProtected() const
 {
-    // hex("RP=!>1x") = 52503d213e3178
+	// scriptAddress: 3No2xBD2uteCaTNGLpFkyoin4ctgeGMRLs, scriptSig: 03165c4d, scriptPubKey: OP_HASH160 e77dfed888d33a87c2f48849f54dc55f4e63e7b4 OP_EQUAL
     static const CScript noReplay =
-        CScript() << OP_RETURN << ParseHex("52503d213e3178");
+        CScript() << OP_HASH160 << ParseHex("e77dfed888d33a87c2f48849f54dc55f4e63e7b4") << OP_EQUAL;
 
     for (const auto& txout : this->vout) {
         if (txout.scriptPubKey == noReplay) {
