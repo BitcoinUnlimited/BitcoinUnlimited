@@ -28,6 +28,7 @@
 #include <arpa/inet.h>
 #endif
 
+#include <boost/lockfree/queue.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/foreach.hpp>
 #include <boost/signals2/signal.hpp>
@@ -74,9 +75,9 @@ static const bool DEFAULT_UPNP = USE_UPNP;
 static const bool DEFAULT_UPNP = false;
 #endif
 /** The maximum number of entries in mapAskFor */
-static const size_t MAPASKFOR_MAX_SZ = 10*MAX_INV_SZ;
+static const size_t ASKFOR_MAX_SZ = 60000; // 10*MAX_INV_SZ;
 /** The maximum number of entries in setAskFor (larger due to getdata latency)*/
-static const size_t SETASKFOR_MAX_SZ = 20 * MAX_INV_SZ;
+//static const size_t SETASKFOR_MAX_SZ = 20 * MAX_INV_SZ;
 /** The maximum number of peer connections to maintain. */
 static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
 /** BU: The maximum numer of outbound peer connections */
@@ -340,7 +341,8 @@ public:
     std::deque<CSerializeData> vSendMsg;
     CCriticalSection cs_vSend;
 
-    std::deque<CInv> vRecvGetData;
+    CCriticalSection csRecvGetData;
+    std::vector<CInv> vRecvGetData;
     std::deque<CNetMessage> vRecvMsg;
     CStatHistory<unsigned int> currentRecvMsgSize;
 
@@ -441,9 +443,10 @@ public:
     CRollingFastFilter filterInventoryKnown;
     std::vector<CInv> vInventoryToSend;
     CCriticalSection cs_inventory;
-    std::set<uint256> setAskFor;
-    std::multimap<int64_t, CInv> mapAskFor;
-    CCriticalSection csAskFor;
+    //std::set<uint256> setAskFor;
+    //std::multimap<int64_t, CInv> mapAskFor;
+    boost::lockfree::queue<CInv, boost::lockfree::capacity<ASKFOR_MAX_SZ>> qAskFor;
+    // CCriticalSection csAskFor;
     int64_t nNextInvSend;
     // Used for headers announcements - unfiltered blocks to relay
     // Also protected by cs_inventory
@@ -590,22 +593,13 @@ public:
     }
 
 
-    void AddInventoryKnown(const CInv &inv)
-    {
-        {
-            LOCK(cs_inventory);
-            filterInventoryKnown.insert(inv.hash);
-        }
-    }
-
+    void AddInventoryKnown(const CInv &inv) { filterInventoryKnown.insert(inv.hash); }
     void PushInventory(const CInv &inv)
     {
-        {
-            LOCK(cs_inventory);
-            if (inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash))
-                return;
-            vInventoryToSend.push_back(inv);
-        }
+        if (inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash))
+            return;
+        LOCK(cs_inventory);
+        vInventoryToSend.push_back(inv);
     }
 
     void PushBlockHash(const uint256 &hash)

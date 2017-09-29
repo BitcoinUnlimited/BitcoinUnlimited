@@ -68,6 +68,7 @@ int64_t nTimeOffset = 0;
 CRITSEC( cs_rpcWarmup);
 
 CRITSEC( cs_main);
+//SCRITSEC(csMapBlockIndex);
 BlockMap mapBlockIndex;
 CChain chainActive;
 CWaitableCriticalSection csBestBlock;

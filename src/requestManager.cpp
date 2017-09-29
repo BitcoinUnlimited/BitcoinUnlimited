@@ -62,13 +62,10 @@ CRequestManager::CRequestManager()
 #endif
       inFlightTxns("reqMgr/inFlight", STAT_OP_MAX), receivedTxns("reqMgr/received"), rejectedTxns("reqMgr/rejected"),
       droppedTxns("reqMgr/dropped", STAT_KEEP), pendingTxns("reqMgr/pending", STAT_KEEP),
-      requestPacer(16384, 8192) // Max and average # of requests that can be made per second
-      ,
+      requestPacer(32768, 16384), // Max and average # of requests that can be made per second
       blockPacer(64, 32) // Max and average # of block requests that can be made per second
 {
     inFlight = 0;
-    // maxInFlight = 256;
-
     sendIter = mapTxnInfo.end();
     sendBlkIter = mapBlkInfo.end();
 }
@@ -648,7 +645,7 @@ void CRequestManager::SendRequests()
                         CInv obj = item.obj;
                         if (1)
                         {
-                            // from->AskFor(item.obj); basically just shoves the req into mapAskFor
+                            // from->AskFor(item.obj); basically just shoves the req into the node's ask Q
                             // This commented code does skips requesting TX if the node is not synced.  But the req mgr
                             // should not make this decision, the caller should not give the TX to me...
                             // if (!item.lastRequestTime || (item.lastRequestTime && IsChainNearlySyncd()))
@@ -658,8 +655,7 @@ void CRequestManager::SendRequests()
                             LEAVE_CRITICAL_SECTION(cs_objDownloader);  // do not use "item" after releasing this
                             if (1)
                             {
-                                LOCK(next.node->csAskFor);
-                                next.node->mapAskFor.insert(std::make_pair(now, obj));
+                                next.node->AskFor(obj);
                             }
                             ENTER_CRITICAL_SECTION(cs_objDownloader);
                         }

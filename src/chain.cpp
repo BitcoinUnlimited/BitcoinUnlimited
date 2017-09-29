@@ -14,9 +14,11 @@ using namespace std;
 void CChain::SetTip(CBlockIndex *pindex) {
     if (pindex == NULL) {
         vChain.clear();
+        tip = nullptr;
         return;
     }
     vChain.resize(pindex->nHeight + 1);
+    tip = pindex;
     while (pindex && vChain[pindex->nHeight] != pindex) {
         vChain[pindex->nHeight] = pindex;
         pindex = pindex->pprev;

@@ -363,7 +363,8 @@ public:
 class CChain {
 private:
     std::vector<CBlockIndex*> vChain;
-
+    // hold a copy of the tip outside of the vector so it can be accessed without holding cs_main
+    std::atomic<CBlockIndex*> tip;  
 public:
     /** Returns the index entry for the genesis block of this chain, or NULL if none. */
     CBlockIndex *Genesis() const {
@@ -372,7 +373,7 @@ public:
 
     /** Returns the index entry for the tip of this chain, or NULL if none. */
     CBlockIndex *Tip() const {
-        return vChain.size() > 0 ? vChain[vChain.size() - 1] : NULL;
+        return tip;
     }
 
     /** Returns the index entry at a particular height in this chain, or NULL if no such height exists. */

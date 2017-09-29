@@ -386,6 +386,7 @@ void ProcessBlockAvailability(NodeId nodeid)
 {
     CNodeState *state = State(nodeid);
     DbgAssert(state != NULL, return ); // node already destructed, nothing to do in production mode
+    //AssertLockHeld(csMapBlockIndex);
 
     if (!state->hashLastUnknownBlock.IsNull())
     {
@@ -4981,7 +4982,6 @@ bool AlreadyHaveLocking(const CInv &inv)
     {
         bool rrc = recentRejects.contains(inv.hash);
         bool mrc = mempool.exists(inv.hash);
-        LOCK(cs_main);
         return rrc || mrc || AlreadyHaveOrphan(inv.hash) || pcoinsTip->HaveCoins(inv.hash);
     }
     case MSG_BLOCK:
@@ -5234,7 +5234,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
         }
     }
 
-    // pfrom->vRecvGetData.erase(pfrom->vRecvGetData.begin(), it);
+    vInv.erase(vInv.begin(), it);
 
     if (!vNotFound.empty())
     {
@@ -5701,8 +5701,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
             LogPrint("net", "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
 
-        //pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
-        ProcessGetData(pfrom, chainparams.GetConsensus(), vInv);
+        ProcessGetData(pfrom, chainparams.GetConsensus(),vInv);
+        if (!vInv.empty())  // Add any left over to the handling queue
+        {
+            LOCK(pfrom->csRecvGetData);
+            pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
+        }
     }
 
 
@@ -5834,11 +5838,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CInv inv(MSG_TX, txd.tx.GetHash());
         pfrom->AddInventoryKnown(inv);
         requester.Received(inv, pfrom, msgSize);
-        if (1)
-        {
-            LOCK(pfrom->csAskFor);
-            pfrom->setAskFor.erase(inv.hash);
-        }
 
         if (1)
         {
@@ -6571,8 +6570,11 @@ bool ProcessMessages(CNode *pfrom)
     //
     bool gotWorkDone = false;
 
-    //if (!pfrom->vRecvGetData.empty())
-    //    ProcessGetData(pfrom, chainparams.GetConsensus(),pfrom->vRecvGetData);
+    {
+        TRY_LOCK(pfrom->csRecvGetData, locked);
+        if (locked && !pfrom->vRecvGetData.empty())
+            ProcessGetData(pfrom, chainparams.GetConsensus(),pfrom->vRecvGetData);
+    }
 
     // this maintains the order of responses
     if (!pfrom->vRecvGetData.empty())
@@ -6759,57 +6761,37 @@ bool SendMessages(CNode *pto)
         // finally did show up. Better to just disconnect this slow node instead.
         if (pto->mapThinBlocksInFlight.size() > 0)
         {
-            LOCK(pto->cs_mapthinblocksinflight);
-            std::map<uint256, CNode::CThinBlockInFlight>::iterator iter = pto->mapThinBlocksInFlight.begin();
-            while (iter != pto->mapThinBlocksInFlight.end())
+            TRY_LOCK(pto->cs_mapthinblocksinflight, locked);
+            if (locked)
             {
-                if (!(*iter).second.fReceived && (GetTime() - (*iter).second.nRequestTime) > thinBlockTimeout.value)
+                std::map<uint256, CNode::CThinBlockInFlight>::iterator iter = pto->mapThinBlocksInFlight.begin();
+                while (iter != pto->mapThinBlocksInFlight.end())
                 {
-                    if (!pto->fWhitelisted && Params().NetworkIDString() != "regtest")
+                    if (!(*iter).second.fReceived && (GetTime() - (*iter).second.nRequestTime) > thinBlockTimeout.value)
                     {
-                        LogPrint("thin", "ERROR: Disconnecting peer=%d due to download timeout exceeded "
-                                         "(%d secs)\n",
-                            pto->GetId(), (GetTime() - (*iter).second.nRequestTime));
-                        pto->fDisconnect = true;
-                        break;
+                        if (!pto->fWhitelisted && Params().NetworkIDString() != "regtest")
+                        {
+                            LogPrint("thin", "ERROR: Disconnecting peer=%d due to download timeout exceeded "
+                                             "(%d secs)\n",
+                                pto->GetId(), (GetTime() - (*iter).second.nRequestTime));
+                            pto->fDisconnect = true;
+                            break;
+                        }
                     }
+                    iter++;
                 }
-                iter++;
             }
         }
 
-        bool isInitialBlockDownload = false;
-        CNodeState *statep = nullptr;
-        CBlockIndex *tip = nullptr;
-        if (1)
-        {
-            TRY_LOCK(cs_main, lockMain); // Acquire cs_main for IsInitialBlockDownload() and CNodeState()
-            if (!lockMain)
-            {
-                //LogPrint("net", "skipping SendMessages to %s, cs_main is locked\n", pto->addr.ToString());
-                return true;
-            }
-            isInitialBlockDownload = IsInitialBlockDownload();
-            // state won't be deleted unless this node is deleted but it can't because we have run addref()
-            statep = State(pto->GetId());
-
-            tip = chainActive.Tip();
-            if (pindexBestHeader == NULL)
-              pindexBestHeader = tip;
-        }
-
-#if 0
-        TRY_LOCK(pto->cs_vSend, lockSend);
-        if (!lockSend)
-        {
-            //LogPrint("net", "skipping SendMessages to %s, pto->cs_vSend is locked\n", pto->addr.ToString());
-            return true;
-        }
-#endif
+        bool isInitialBlockDownload = IsInitialBlockDownload();;
+        // state won't be deleted unless this node is deleted but it can't because we have run addref()
+        CNodeState *statep = State(pto->GetId());
+        CBlockIndex *tip = chainActive.Tip();
+        if (pindexBestHeader == NULL) pindexBestHeader = tip;
 
         // Address refresh broadcast
         int64_t nNow = GetTimeMicros();
-        if (isInitialBlockDownload && pto->nNextLocalAddrSend < nNow)
+        if (isInitialBlockDownload && (pto->nNextLocalAddrSend < nNow))
         {
             AdvertiseLocal(pto);
             pto->nNextLocalAddrSend = PoissonNextSend(nNow, AVG_LOCAL_ADDRESS_BROADCAST_INTERVAL);
@@ -6849,7 +6831,7 @@ bool SendMessages(CNode *pto)
         // period.
         // If not then disconnect and ban the node and a new node will automatically be selected to start the headers
         // download.
-        if ((state.fSyncStarted) && (state.fSyncStartTime < GetTime() - INITIAL_HEADERS_TIMEOUT) &&
+        if (state.fSyncStarted && (state.fSyncStartTime < nNow - ((int64_t)INITIAL_HEADERS_TIMEOUT*1000000)) &&
             (!state.fFirstHeadersReceived) && !pto->fWhitelisted)
         {
             pto->fDisconnect = true;
@@ -6865,7 +6847,7 @@ bool SendMessages(CNode *pto)
         {
             // Only actively request headers from a single peer, unless we're close to today.
             if ((nSyncStarted < MAX_HEADER_REQS_DURING_IBD && fFetch) ||
-                tip->GetBlockTime() > GetAdjustedTime() - SINGLE_PEER_REQUEST_MODE_AGE)
+                tip->GetBlockTime() > nNow/1000000 + GetTimeOffset() - SINGLE_PEER_REQUEST_MODE_AGE)
             {
                 const CBlockIndex *pindexStart = tip;
                 /* If possible, start at the block preceding the currently
@@ -6881,7 +6863,7 @@ bool SendMessages(CNode *pto)
                 if (pindexStart->nHeight < pto->nStartingHeight)
                 {
                     state.fSyncStarted = true;
-                    state.fSyncStartTime = GetTime();
+                    state.fSyncStartTime = GetTimeMicros();
                     state.fFirstHeadersReceived = false;
                     state.nFirstHeadersExpectedHeight = pindexBestHeader->nHeight;
                     nSyncStarted++;
@@ -6916,9 +6898,13 @@ bool SendMessages(CNode *pto)
             std::vector<uint256> blockHashesToAnnounce;
             if (1)
             {
-            LOCK(pto->cs_inventory);
-            // make a copy so that we do not need to keep cs_inventory which cannot be taken before cs_main
-            blockHashesToAnnounce = pto->vBlockHashesToAnnounce;
+                TRY_LOCK(pto->cs_inventory, locked);
+                if (locked)
+                {
+                    // make a copy so that we do not need to keep cs_inventory which cannot be taken before cs_main
+                    blockHashesToAnnounce = pto->vBlockHashesToAnnounce; // TODO optimize
+                    pto->vBlockHashesToAnnounce.clear();
+                }
             }
 
             std::vector<CBlock> vHeaders;
@@ -6938,6 +6924,7 @@ bool SendMessages(CNode *pto)
                     if (1)
                     {
                         LOCK(cs_main);
+                        //READLOCK(csMapBlockIndex);
                         BlockMap::iterator mi = mapBlockIndex.find(hash);
                         // BU skip blocks that we don't know about.  was: assert(mi != mapBlockIndex.end());
                         if (mi == mapBlockIndex.end())
@@ -7049,11 +7036,6 @@ bool SendMessages(CNode *pto)
                 pto->PushMessage(NetMsgType::HEADERS, vHeaders);
                 state.pindexBestHeaderSent = pBestIndex;
             }
-            if (1)
-            {
-                LOCK(pto->cs_inventory);
-                pto->vBlockHashesToAnnounce.clear();
-            }
         }
 
         //
@@ -7085,7 +7067,7 @@ bool SendMessages(CNode *pto)
                 //      However we will still send them block inventory in the case they are a pruned node or wallet
                 //      waiting for block
                 //      announcements, therefore we have to check each inv in pto->vInventoryToSend.
-                bool chokeTxInv = (pto->nActivityBytes == 0 && (GetTime() - pto->nTimeConnected) > 120);
+                bool chokeTxInv = (pto->nActivityBytes == 0 && (nNow/1000000 - pto->nTimeConnected) > 120);
                 LOCK(pto->cs_inventory);
 
                 vInvSend.reserve(pto->vInventoryToSend.size());
@@ -7111,6 +7093,7 @@ bool SendMessages(CNode *pto)
                     vInvSend.push_back(inv);
                     pto->filterInventoryKnown.insert(inv.hash);
                 }
+                pto->vInventoryToSend = vInvWait;
             }
 
             const int MAX_INV_ELEMENTS=1000;
@@ -7125,7 +7108,6 @@ bool SendMessages(CNode *pto)
                     pto->PushMessage(NetMsgType::INV, vInv); // TODO subvector PushMessage to avoid copy
                 }
             }
-            pto->vInventoryToSend = vInvWait;
         }
 
         // In case there is a block that has been in flight from this peer for 2 + 0.5 * N times the block interval
@@ -7152,7 +7134,6 @@ bool SendMessages(CNode *pto)
         //
         // Message: getdata (blocks)
         //
-        std::vector<CInv> vGetData;
         if (!pto->fDisconnect && !pto->fClient && state.nBlocksInFlight < (int)MAX_BLOCKS_IN_TRANSIT_PER_PEER)
         {
             std::vector<CBlockIndex *> vToDownload;
@@ -7174,30 +7155,13 @@ bool SendMessages(CNode *pto)
         //
         // Message: getdata (non-blocks)
         //
+        std::vector<CInv> vGetData;
         while (!pto->fDisconnect)
         {
             CInv inv;
-            if (1)
-            {
-                LOCK(pto->csAskFor);
-                if (pto->mapAskFor.empty()) break;
-                auto top = pto->mapAskFor.begin();
-                if ((*top).first > nNow) break;
-                inv = (*top).second;
-                if (1)
-                {
-                    // LOCK(pto->csAskFor);
-                    pto->mapAskFor.erase(top);
-                }
-            }
+            if (!pto->qAskFor.pop(inv)) break;
 
-            bool alreadyHave = false;
-            if (0)
-            {
-                LOCK(cs_main); // AlreadyHave()
-                alreadyHave = AlreadyHave(inv);
-            }
-            alreadyHave = TxAlreadyHave(inv);
+            bool alreadyHave = TxAlreadyHave(inv);
             if (!alreadyHave)
             {
                 if (fDebug)
@@ -7213,12 +7177,6 @@ bool SendMessages(CNode *pto)
             else
             {
                 requester.AlreadyReceived(inv); // BU indicate that we already got this item
-                if (1)
-                {
-                    LOCK(pto->csAskFor);
-                    // If we're not going to ask, don't expect a response.
-                    pto->setAskFor.erase(inv.hash);
-                }
             }
         }
         if (!vGetData.empty())

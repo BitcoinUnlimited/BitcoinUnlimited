@@ -122,7 +122,7 @@ static const int64_t BLOCK_DOWNLOAD_TIMEOUT_BASE = 1000000;
 /** Additional block download timeout per parallel downloading peer (i.e. 5 min) */
 static const int64_t BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 500000;
 /** Timeout in secs for the initial sync. If we don't receive the first batch of headers */
-static const uint32_t INITIAL_HEADERS_TIMEOUT = 120;
+static const uint64_t INITIAL_HEADERS_TIMEOUT = 120;
 /** The maximum number of headers in the mapUnconnectedHeaders cache **/
 static const uint32_t MAX_UNCONNECTED_HEADERS = 144;
 /** The maximum length of time, in seconds, we keep unconnected headers in the cache **/
@@ -153,6 +153,7 @@ struct BlockHasher
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
+// extern CSharedCriticalSection csMapBlockIndex;
 typedef boost::unordered_map<uint256, CBlockIndex *, BlockHasher> BlockMap;
 extern BlockMap mapBlockIndex;
 extern uint64_t nLastBlockTx;
@@ -259,6 +260,7 @@ void UnloadBlockIndex();
 /** Process protocol messages received from a given node */
 bool ProcessMessages(CNode *pfrom);
 bool AlreadyHave(const CInv &);
+bool AlreadyHaveLocking(const CInv &inv); // does its own locking if needed
 bool AcceptBlockHeader(const CBlockHeader &block,
     CValidationState &state,
     const CChainParams &chainparams,

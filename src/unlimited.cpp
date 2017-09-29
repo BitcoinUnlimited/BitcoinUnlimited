@@ -1751,8 +1751,6 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         node.push_back(Pair("xThinBlockHashes", n.xThinBlockHashes.size()));
         node.push_back(Pair("vAddrToSend", n.vAddrToSend.size()));
         node.push_back(Pair("vInventoryToSend", n.vInventoryToSend.size()));
-        node.push_back(Pair("setAskFor", n.setAskFor.size()));
-        node.push_back(Pair("mapAskFor", n.mapAskFor.size()));
         ret.push_back(Pair(n.addrName, node));
     }
     ret.push_back(Pair("totalThinBlockSize", totalThinBlockSize));
