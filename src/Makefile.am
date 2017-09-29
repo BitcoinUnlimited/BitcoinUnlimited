@@ -81,6 +81,7 @@ BITCOIN_CORE_H = \
   bitnodes.h \
   bloom.h \
   buip055fork.h \
+  cashaddr.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
@@ -314,6 +315,7 @@ libbitcoin_common_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_common_a_SOURCES = \
   amount.cpp \
   base58.cpp \
+  cashaddr.cpp \
   chainparams.cpp \
   coins.cpp \
   compressor.cpp \
