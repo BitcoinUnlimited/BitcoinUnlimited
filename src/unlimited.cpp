@@ -55,6 +55,8 @@ extern atomic<bool> fIsInitialBlockDownload;
 extern CTweakRef<uint64_t> miningBlockSize;
 extern CTweakRef<uint64_t> ebTweak;
 
+Snapshot txHandlerSnap;
+
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
 bool txProcessing = true;
 bool txCommitProcessing = true;
@@ -2545,10 +2547,13 @@ void CommitToMempool()
     // cache.
     pcoinsTip->Trim(nCoinCacheUsage);
 
-    while (!blockCommitQ.empty())
-    {
-    }
+    // TODO: add block commits here
+    //while (!blockCommitQ.empty())
+    //{
+    //}
+    txHandlerSnap.Load();  // Get the changed view for the transaction processors
 }
+
 
 void ThreadCommitToMempool()
 {
@@ -2578,6 +2583,7 @@ void StopTxProcessing()
     cvCommitQ.notify_all();
 }
 
+
 void ThreadTxHandler()
 {
     while (!ShutdownRequested())
@@ -2586,7 +2592,7 @@ void ThreadTxHandler()
 
         bool fMissingInputs = false;
         CValidationState state;
-        Snapshot ss;
+        //Snapshot ss;
         CTxInputData txd;
         if (1)
         {
@@ -2611,7 +2617,7 @@ void ThreadTxHandler()
             std::vector<uint256> vHashTxToUncache;
             if (1)
             {
-                ss.Load();
+                //ss.Load();
                 // Check for recently rejected (and do other quick existence checks)
                 bool have = TxAlreadyHave(inv);
                 if (have)
@@ -2646,7 +2652,7 @@ void ThreadTxHandler()
                 }
             }
 
-            if (ParallelAcceptToMemoryPool(ss, mempool, state, tx, true, &fMissingInputs, false, false, vHashTxToUncache))
+            if (ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false, false, vHashTxToUncache))
             {
                 RelayTransaction(tx);
 
