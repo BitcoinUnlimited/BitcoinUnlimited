@@ -111,6 +111,7 @@ BITCOIN_CORE_H = \
   core_memusage.h \
   dosman.h \
   expedited.h \
+  fastfilter.h \
   httprpc.h \
   httpserver.h \
   init.h \
