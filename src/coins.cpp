@@ -104,9 +104,12 @@ size_t CCoinsViewCache::ResetCachedCoinUsage() const
 
 CCoinsMap::const_iterator CCoinsViewCache::FetchCoins(const uint256 &txid) const {
     AssertLockHeld(cs_utxo);
-    CCoinsMap::iterator it = cacheCoins.find(txid);
-    if (it != cacheCoins.end())
-        return it;
+    {
+        READLOCK(csCacheInsert);
+        CCoinsMap::iterator it = cacheCoins.find(txid);
+        if (it != cacheCoins.end())
+            return it;
+    }
     CCoins tmp;
     if (!base->GetCoins(txid, tmp))
         return cacheCoins.end();
@@ -114,7 +117,7 @@ CCoinsMap::const_iterator CCoinsViewCache::FetchCoins(const uint256 &txid) const
     // lock held.
     CCoinsMap::iterator ret;
     {
-        LOCK(csCacheInsert);
+        WRITELOCK(csCacheInsert);
         ret = cacheCoins.insert(std::make_pair(txid, CCoinsCacheEntry())).first;
     }
     tmp.swap(ret->second.coins);
@@ -172,7 +175,7 @@ CCoinsModifier CCoinsViewCache::ModifyCoins(const uint256 &txid) {
     assert(!hasModifier);
     std::pair<CCoinsMap::iterator, bool> ret;
     {
-        LOCK(csCacheInsert);
+        WRITELOCK(csCacheInsert);
         ret = cacheCoins.insert(std::make_pair(txid, CCoinsCacheEntry()));
     }
     size_t cachedCoinUsage = 0;
@@ -198,7 +201,7 @@ CCoinsModifier CCoinsViewCache::ModifyNewCoins(const uint256 &txid) {
     assert(!hasModifier);
     std::pair<CCoinsMap::iterator, bool> ret;
     {
-        LOCK(csCacheInsert);
+        WRITELOCK(csCacheInsert);
         ret = cacheCoins.insert(std::make_pair(txid, CCoinsCacheEntry()));
     }
     ret.first->second.coins.Clear();

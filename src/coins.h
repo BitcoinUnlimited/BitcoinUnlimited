@@ -397,7 +397,7 @@ protected:
      */
     mutable uint256 hashBlock;
     mutable CCoinsMap cacheCoins;
-    mutable CCriticalSection csCacheInsert;
+    mutable CSharedCriticalSection csCacheInsert;
 
     /* Cached dynamic memory usage for the inner CCoins objects. */
     mutable size_t cachedCoinsUsage;
