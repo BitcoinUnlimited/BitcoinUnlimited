@@ -2596,8 +2596,15 @@ bool static DisconnectTip(CValidationState &state, const Consensus::Params &cons
                 txd.nodeName = "unwind";
                 txd.whitelisted = false;
                 // TODO updatetransactionsfrom block
-                txInQ.push(txd); // add this transaction onto the processing queue
-                cvTxInQ.notify_one();
+                if (incomingConflicts.checkAndSet(tx.GetHash()))
+                {
+                    txInQ.push(txd); // add this transaction onto the processing queue
+                    cvTxInQ.notify_one();
+                }
+                else
+                {
+                    // In the rare case of a conflict, during a reorg I'm just going to forget about the tx.
+                }
             }
         }
     }
@@ -5834,8 +5841,15 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (1)
         {
             LOCK(csTxInQ);
-            txInQ.push(txd); // add this transaction onto the processing queue
-            cvTxInQ.notify_one();
+            if (incomingConflicts.checkAndSet(txd.tx.GetHash()))
+            {
+                txInQ.push(txd); // add this transaction onto the processing queue
+                cvTxInQ.notify_one();
+            }
+            else
+            {
+                txDeferQ.push(txd);
+            }
         }
         CInv inv(MSG_TX, txd.tx.GetHash());
         pfrom->AddInventoryKnown(inv);

@@ -153,7 +153,9 @@ CNodeSignals g_signals;
 CAddrMan addrman;
 CDoSManager dosMan;
 
+CFastFilter incomingConflicts;
 std::queue<CTxInputData> txInQ;
+std::queue<CTxInputData> txDeferQ;
 CCriticalSection csTxInQ;
 CCond cvTxInQ;
 std::queue<CTxCommitData> txCommitQ;

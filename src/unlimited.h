@@ -102,7 +102,10 @@ public:
     bool whitelisted;
     std::string nodeName;
 };
+
+extern CFastFilter incomingConflicts;  // quickly matches txs that conflict with txs that are being considered
 extern std::queue<CTxInputData> txInQ;
+extern std::queue<CTxInputData> txDeferQ;
 extern CCriticalSection csTxInQ;
 extern CCond cvTxInQ;
 extern void ThreadTxHandler();

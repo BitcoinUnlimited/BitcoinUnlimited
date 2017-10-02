@@ -12,7 +12,7 @@
 class COutPoint;
 class uint256;
 
-#define FILTER_SIZE (512*1024)
+#define FILTER_SIZE (1024*1024)
 #define FILTER_BYTES (FILTER_SIZE/8)
 #define REL_PRIME 27061
 /**
@@ -39,6 +39,19 @@ public:
         // by sampling from a different part of the uint256, we make it harder for an attacker to generate collisions
         grabFrom = (insecure_rand() % 7)*4;  // should be 4 byte aligned for speed
     }
+
+    // returns true IF this function made a change (i.e. the value was previously not set).
+    bool checkAndSet(const uint256 &hash)
+    {
+        const unsigned char* mem = hash.begin();
+        const uint32_t *pos = (const uint32_t*) &(mem[grabFrom]);
+        uint32_t idx = (*pos) & (FILTER_SIZE - 1);
+
+        bool ret = vData[idx >> 3] & (1 << (idx & 7));
+        vData[idx >> 3] |= (1 << (idx & 7));
+        return !ret;
+    }
+    
     void insert(const uint256 &hash)
     {
         const unsigned char* mem = hash.begin();

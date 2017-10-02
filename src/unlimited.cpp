@@ -2484,6 +2484,7 @@ void processOrphans(std::vector<uint256>& vWorkQueue)
 
                 if (setMisbehaving.count(fromPeer))
                     continue;
+                bool txPush = false;
                 if (1)
                 {
                     CTxInputData txd;
@@ -2492,8 +2493,16 @@ void processOrphans(std::vector<uint256>& vWorkQueue)
                     txd.nodeName = "orphan";
                     txd.whitelisted = false;
                     LOCK(csTxInQ);
-                    txInQ.push(txd); // add this transaction onto the processing queue
-                    cvTxInQ.notify_one();
+                    txPush = !incomingConflicts.checkAndSet(orphanTx.GetHash());
+                    if (txPush)
+                    {
+                        txInQ.push(txd); // add this transaction onto the processing queue
+                        cvTxInQ.notify_one();
+                    }
+                    else
+                    {
+                        txDeferQ.push(txd);
+                    }
                 }
                 vEraseQueue.push_back(orphanHash);
             }
@@ -2573,6 +2582,14 @@ void ThreadCommitToMempool()
             CORRAL(txProcessingCorral, BLOCK_PROCESSING);
             boost::this_thread::interruption_point();
             CommitToMempool();
+            
+            // move the previously deferred txs into active processing
+            if (!txDeferQ.empty())
+            {
+                LOCK(csTxInQ);
+                txInQ = txDeferQ; // TODO move pointers
+                txDeferQ = std::queue<CTxInputData>();
+            }
         }
     }
 }
