@@ -119,6 +119,11 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason)
         return false;
     }
 
+    if (tx.ReplayProtected()) {
+        reason = "replay-protected";
+        return false;
+    }
+
     return true;
 }
 

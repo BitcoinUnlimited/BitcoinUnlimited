@@ -429,6 +429,28 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout[0].scriptPubKey = CScript() << OP_RETURN;
     t.vout[1].scriptPubKey = CScript() << OP_RETURN;
     BOOST_CHECK(!IsStandardTx(t, reason));
+
+	// scriptAddress: 3Bit1xA4apyzgmFNT2k8Pvnd6zb6TnwcTi, scriptSig: 04148f33be, scriptPubKey: OP_HASH160 6e0b7d51f9f68ba28cc33a6844d41a1880c58a19 OP_EQUAL
+    t.vout.resize(1);
+    t.vout[0].scriptPubKey = CScript() << OP_HASH160 << ParseHex("6e0b7d51f9f68ba28cc33a6844d41a1880c58a19") << OP_EQUAL;
+    BOOST_CHECK(!IsStandardTx(t, reason));
+}
+
+BOOST_AUTO_TEST_CASE(test_ReplayProtected)
+{
+    CMutableTransaction t;
+
+	// scriptAddress: 3Bit1xA4apyzgmFNT2k8Pvnd6zb6TnwcTi, scriptSig: 04148f33be, scriptPubKey: OP_HASH160 6e0b7d51f9f68ba28cc33a6844d41a1880c58a19 OP_EQUAL
+    t.vout.resize(1);
+    t.vout[0].scriptPubKey = CScript() << OP_HASH160 << ParseHex("6e0b7d51f9f68ba28cc33a6844d41a1880c58a19") << OP_EQUAL;
+    CTransaction tx1(t);
+    BOOST_CHECK(tx1.ReplayProtected());	
+
+	// scriptAddress: 3EZT2iZWYCpy1uXX6XtjX429TnsZ3vKvVV, scriptSig: 777777, scriptPubKey: OP_HASH160 8d2b43ea8081126af5bc392612b1471a0c4fe503 OP_EQUAL
+    t.vout.resize(1);
+    t.vout[0].scriptPubKey = CScript() << OP_HASH160 << ParseHex("8d2b43ea8081126af5bc392612b1471a0c4fe503") << OP_EQUAL;
+    CTransaction tx2(t);
+    BOOST_CHECK(!tx2.ReplayProtected());	
 }
 
 BOOST_AUTO_TEST_SUITE_END()
