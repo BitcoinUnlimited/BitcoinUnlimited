@@ -12,7 +12,7 @@
 class COutPoint;
 class uint256;
 
-#define FILTER_SIZE (1024*1024)
+#define FILTER_SIZE (4*1024*1024)
 #define FILTER_BYTES (FILTER_SIZE/8)
 #define REL_PRIME 27061
 /**
@@ -31,6 +31,7 @@ class CFastFilter
 protected:
     std::vector<unsigned char> vData;
     unsigned int grabFrom;
+    unsigned int conflicts;
 
 public:
     CFastFilter()
@@ -49,6 +50,7 @@ public:
 
         bool ret = vData[idx >> 3] & (1 << (idx & 7));
         vData[idx >> 3] |= (1 << (idx & 7));
+        if (ret) conflicts++;
         return !ret;
     }
     
@@ -72,7 +74,7 @@ public:
 
     void reset()
     {
-        vData.clear();
+        bzero(&vData[0],FILTER_BYTES);
     }
 };
 

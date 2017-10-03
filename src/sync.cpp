@@ -255,11 +255,11 @@ CCriticalSection::~CCriticalSection()
 #endif
 
 #ifdef DEBUG_LOCKORDER // BU normally CSharedCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical section from the lockorder map
-CSharedCriticalSection::CSharedCriticalSection():name(NULL)
+CSharedCriticalSection::CSharedCriticalSection():name(NULL),exclusiveOwner(0)
 {
 }
 
-CSharedCriticalSection::CSharedCriticalSection(const char* n):name(n)
+CSharedCriticalSection::CSharedCriticalSection(const char* n):name(n),exclusiveOwner(0)
 {
 // print the address of named critical sections so they can be found in the mutrace output
 #ifdef ENABLE_MUTRACE

@@ -130,6 +130,48 @@ public:
 #endif
 
 
+// This object can be locked or shared locked some time during its lifetime.
+// Subsequent locks or shared lock calls will be ignored.
+// When it is deleted, the lock is released.
+class CDeferredSharedLocker
+{
+    enum class LockState
+    {
+        UNLOCKED,
+        SHARED,
+        EXCLUSIVE
+    };
+    CSharedCriticalSection &scs;
+    LockState state;
+
+public:
+    CDeferredSharedLocker(CSharedCriticalSection &scsp) : scs(scsp), state(LockState::UNLOCKED) {}
+    void lock_shared()
+    {
+        if (state == LockState::UNLOCKED)
+        {
+            scs.lock_shared();
+            state = LockState::SHARED;
+        }
+    }
+    void lock()
+    {
+        if (state == LockState::UNLOCKED)
+        {
+            scs.lock();
+            state = LockState::EXCLUSIVE;
+        }
+    }
+
+    void unlock()
+    {
+        if (state == LockState::SHARED)
+            scs.unlock_shared();
+        else if (state == LockState::EXCLUSIVE)
+            scs.unlock();
+    }
+    ~CDeferredSharedLocker() { unlock(); }
+};
 
 /** Wrapped boost mutex: supports waiting but not recursive locking */
 typedef AnnotatedMixin<boost::mutex> CWaitableCriticalSection;

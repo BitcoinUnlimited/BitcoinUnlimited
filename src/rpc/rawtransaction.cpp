@@ -639,10 +639,10 @@ UniValue signrawtransaction(const UniValue& params, bool fHelp)
         CCoinsViewMemPool viewMempool(&viewChain, mempool);
         view.SetBackend(viewMempool); // temporarily switch cache backend to db+mempool view
 
-        BOOST_FOREACH(const CTxIn& txin, mergedTx.vin) {
-            const uint256& prevHash = txin.prevout.hash;
-            CCoins coins;
-            view.AccessCoins(prevHash); // this is certainly allowed to fail
+        // Bring the coins into the cache
+        BOOST_FOREACH(const CTxIn& txin, mergedTx.vin)
+        {
+            CCoinsAccessor coins(view, txin.prevout.hash);
         }
 
         view.SetBackend(viewDummy); // switch back to avoid locking mempool for too long
@@ -692,8 +692,8 @@ UniValue signrawtransaction(const UniValue& params, bool fHelp)
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
-                // WRITELOCK(view.cs_utxo);
-                CCoinsModifier coins = view.ModifyCoins(txid);
+                CCoinsModifier coins;
+                view.ModifyCoins(txid, coins);
                 if (coins->IsAvailable(nOut) && coins->vout[nOut].scriptPubKey != scriptPubKey) {
                     string err("Previous output scriptPubKey mismatch:\n");
                     err = err + ScriptToAsmStr(coins->vout[nOut].scriptPubKey) + "\nvs:\n"+
@@ -797,15 +797,21 @@ UniValue signrawtransaction(const UniValue& params, bool fHelp)
     // transaction to avoid rehashing.
     const CTransaction txConst(mergedTx);
     // Sign what we can:
-    for (unsigned int i = 0; i < mergedTx.vin.size(); i++) {
+    for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
+    {
         CTxIn& txin = mergedTx.vin[i];
-        const CCoins* coins = view.AccessCoins(txin.prevout.hash);
-        if (coins == NULL || !coins->IsAvailable(txin.prevout.n)) {
-            TxInErrorToJSON(txin, vErrors, "Input not found or already spent");
-            continue;
+        CScript prevPubKey;
+        CAmount amount;
+        {
+            CCoinsAccessor coins(view, txin.prevout.hash);
+            if (!coins || !coins->IsAvailable(txin.prevout.n))
+            {
+                TxInErrorToJSON(txin, vErrors, "Input not found or already spent");
+                continue;
+            }
+            prevPubKey = coins->vout[txin.prevout.n].scriptPubKey;
+            amount = coins->vout[txin.prevout.n].nValue;
         }
-        const CScript& prevPubKey = coins->vout[txin.prevout.n].scriptPubKey;
-        const CAmount &amount = coins->vout[txin.prevout.n].nValue;
         txin.scriptSig.clear();
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if (!fHashSingle || (i < mergedTx.vout.size()))
@@ -883,9 +889,12 @@ UniValue sendrawtransaction(const UniValue& params, bool fHelp)
         fOverrideFees = params[1].get_bool();
 
     CCoinsViewCache &view = *pcoinsTip;
-    const CCoins* existingCoins = view.AccessCoins(hashTx);
+    bool fHaveChain = false;
+    {
+        CCoinsAccessor existingCoins(view,hashTx);
+        fHaveChain = existingCoins && existingCoins->nHeight < 1000000000;
+    }
     bool fHaveMempool = mempool.exists(hashTx);
-    bool fHaveChain = existingCoins && existingCoins->nHeight < 1000000000;
     if (!fHaveMempool && !fHaveChain) {
         // push to local node and sync with wallets
         CValidationState state;

@@ -132,7 +132,8 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
         {
             uint256 txid = txids[insecure_rand() % txids.size()]; // txid we're going to modify in this iteration.
             CCoins& coins = result[txid];
-            CCoinsModifier entry = stack.back()->ModifyCoins(txid);
+            CCoinsModifier entry;
+            stack.back()->ModifyCoins(txid, entry);
             BOOST_CHECK(coins == *entry);
             if (insecure_rand() % 5 == 0 || coins.IsPruned()) {
                 if (coins.IsPruned()) {
@@ -154,7 +155,8 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
         // Once every 1000 iterations and at the end, verify the full cache.
         if (insecure_rand() % 1000 == 1 || i == NUM_SIMULATION_ITERATIONS - 1) {
             for (std::map<uint256, CCoins>::iterator it = result.begin(); it != result.end(); it++) {
-                const CCoins* coins = stack.back()->AccessCoins(it->first);
+                // const CCoins* coins = stack.back()->AccessCoins(it->first);
+                CCoinsAccessor coins(stack.back(),it->first);
                 if (coins) {
                     BOOST_CHECK(*coins == it->second);
                     found_an_entry = true;
@@ -307,8 +309,10 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
 
         // Once every 1000 iterations and at the end, verify the full cache.
         if (insecure_rand() % 1000 == 1 || i == NUM_SIMULATION_ITERATIONS - 1) {
-            for (std::map<uint256, CCoins>::iterator it = result.begin(); it != result.end(); it++) {
-                const CCoins* coins = stack.back()->AccessCoins(it->first);
+            for (std::map<uint256, CCoins>::iterator it = result.begin(); it != result.end(); it++)
+            {
+                //const CCoins* coins = stack.back()->AccessCoins(it->first);
+                CCoinsAccessor coins(stack.back(), it->first);
                 if (coins) {
                     BOOST_CHECK(*coins == it->second);
                 } else {

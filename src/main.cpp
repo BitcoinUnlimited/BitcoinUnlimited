@@ -921,7 +921,8 @@ unsigned int GetP2SHSigOpCount(const CTransaction &tx, const CCoinsViewCache &in
     unsigned int nSigOps = 0;
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        const CTxOut &prevout = inputs.GetOutputFor(tx.vin[i]);
+        CTxOut prevout;
+        inputs.GetOutputFor(tx.vin[i], prevout);
         if (prevout.scriptPubKey.IsPayToScriptHash())
             nSigOps += prevout.scriptPubKey.GetSigOpCount(tx.vin[i].scriptSig);
     }
@@ -1071,7 +1072,7 @@ bool GetTransaction(const uint256 &hash,
         int nHeight = -1;
         {
             CCoinsViewCache &view = *pcoinsTip;
-            const CCoins *coins = view.AccessCoins(hash);
+            CCoinsAccessor coins(view, hash);
             if (coins)
                 nHeight = coins->nHeight;
         }
@@ -1329,7 +1330,8 @@ void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCach
         txundo.vprevout.reserve(tx.vin.size());
         BOOST_FOREACH (const CTxIn &txin, tx.vin)
         {
-            CCoinsModifier coins = inputs.ModifyCoins(txin.prevout.hash);
+            CCoinsModifier coins;
+            inputs.ModifyCoins(txin.prevout.hash, coins);
             unsigned nPos = txin.prevout.n;
 
             if (nPos >= coins->vout.size() || coins->vout[nPos].IsNull())
@@ -1346,7 +1348,9 @@ void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCach
             }
         }
         // add outputs
-        inputs.ModifyNewCoins(tx.GetHash())->FromTx(tx, nHeight);
+        CCoinsModifier m;
+        inputs.ModifyNewCoins(tx.GetHash(), m);
+        m->FromTx(tx, nHeight);
     }
     else
     {
@@ -1355,7 +1359,9 @@ void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCach
         // lookup to be sure the coins do not already exist otherwise we do not
         // know whether to mark them fresh or not.  We want the duplicate coinbases
         // before BIP30 to still be properly overwritten.
-        inputs.ModifyCoins(tx.GetHash())->FromTx(tx, nHeight);
+        CCoinsModifier m;
+        inputs.ModifyCoins(tx.GetHash(),m);
+        m->FromTx(tx, nHeight);
     }
 }
 
@@ -1406,7 +1412,7 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state, const CCoins
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
         const COutPoint &prevout = tx.vin[i].prevout;
-        const CCoins *coins = inputs.AccessCoins(prevout.hash);
+        CCoinsAccessor coins(inputs, prevout.hash);
         assert(coins);
 
         // If prev is coinbase, check that it's matured
@@ -1470,7 +1476,7 @@ bool CheckInputs(const CTransaction &tx,
             for (unsigned int i = 0; i < tx.vin.size(); i++)
             {
                 const COutPoint &prevout = tx.vin[i].prevout;
-                const CCoins *coins = inputs.AccessCoins(prevout.hash);
+                CCoinsAccessor coins(inputs, prevout.hash);
                 if (!coins)
                     LogPrintf("ASSERTION: no inputs available\n");
                 assert(coins);
@@ -1611,7 +1617,8 @@ bool AbortNode(CValidationState &state, const std::string &strMessage, const std
 static bool ApplyTxInUndo(const CTxInUndo &undo, CCoinsViewCache &view, const COutPoint &out)
 {
     bool fClean = true;
-    CCoinsModifier coins = view.ModifyCoins(out.hash);
+    CCoinsModifier coins;
+    view.ModifyCoins(out.hash, coins);
     if (undo.nHeight != 0)
     {
         // undo data contains height: this is the last output of the prevout tx being spent
@@ -1668,7 +1675,8 @@ bool DisconnectBlock(const CBlock &block,
         // Check that all outputs are available and match the outputs in the block itself
         // exactly.
         {
-            CCoinsModifier outs = view.ModifyCoins(hash);
+            CCoinsModifier outs;
+            view.ModifyCoins(hash, outs);
             outs->ClearUnspendable();
 
             CCoins outsBlock(tx, pindex->nHeight);
@@ -1956,7 +1964,7 @@ bool ConnectBlock(const CBlock &block,
         {
             BOOST_FOREACH (const CTransaction &tx, block.vtx)
             {
-                const CCoins *coins = view.AccessCoins(tx.GetHash());
+                CCoinsAccessor coins(view, tx.GetHash());
                 if (coins && !coins->IsPruned())
                     return state.DoS(
                         100, error("ConnectBlock(): tried to overwrite transaction"), REJECT_INVALID, "bad-txns-BIP30");
@@ -2093,7 +2101,9 @@ bool ConnectBlock(const CBlock &block,
                 prevheights.resize(tx.vin.size());
                 for (size_t j = 0; j < tx.vin.size(); j++)
                 {
-                    prevheights[j] = viewTempCache.AccessCoins(tx.vin[j].prevout.hash)->nHeight;
+                    CCoinsAccessor coins(viewTempCache, tx.vin[j].prevout.hash);
+                    assert(coins);
+                    prevheights[j] = coins->nHeight;
                 }
 
                 if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex))

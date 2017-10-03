@@ -2230,8 +2230,8 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
         bool fSpendsCoinbase = false;
         BOOST_FOREACH (const CTxIn &txin, tx.vin)
         {
-            const CCoins *coins = view.AccessCoins(txin.prevout.hash);
-            if (coins->IsCoinBase())
+            CCoinsAccessor coins(view, txin.prevout.hash);
+            if (coins && coins->IsCoinBase())
             {
                 fSpendsCoinbase = true;
                 break;
@@ -2571,7 +2571,7 @@ void ThreadCommitToMempool()
         if (1)
         {
             boost::unique_lock<boost::mutex> lock(csCommitQ);
-            while (txCommitQ.empty() && blockCommitQ.empty())
+            while (txCommitQ.empty() && blockCommitQ.empty() && txDeferQ.empty())
             {
                 cvCommitQ.timed_wait(lock, boost::posix_time::milliseconds(5000));
                 boost::this_thread::interruption_point();
@@ -2589,7 +2589,9 @@ void ThreadCommitToMempool()
                 LOCK(csTxInQ);
                 txInQ = txDeferQ; // TODO move pointers
                 txDeferQ = std::queue<CTxInputData>();
+                cvTxInQ.notify_all();
             }
+            incomingConflicts.reset();
         }
     }
 }

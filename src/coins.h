@@ -371,17 +371,42 @@ class CCoinsViewCache;
 class CCoinsModifier
 {
 private:
-    CCoinsViewCache& cache;
+    CCoinsViewCache* cache;
     CCoinsMap::iterator it;
     size_t cachedCoinUsage; // Cached memory usage of the CCoins object before modification
-    CCoinsModifier(CCoinsViewCache& cache_, CCoinsMap::iterator it_, size_t usage);
 
 public:
     CCoins* operator->() { return &it->second.coins; }
     CCoins& operator*() { return it->second.coins; }
+    void lock(CCoinsViewCache& cacheObj);
+    CCoinsModifier();
     ~CCoinsModifier();
     friend class CCoinsViewCache;
 };
+
+/**
+ * A reference to an immutable cache entry.  This class holds the appropriate lock for you
+ * while you access the underlying data.
+ */
+class CCoinsAccessor
+{
+private:
+    const CCoinsViewCache *cache;
+    CCoinsMap::const_iterator it;
+    const CCoins* coins;
+    CDeferredSharedLocker lock;
+public:
+    operator bool() const
+    {
+        return coins != nullptr;
+    }
+    const CCoins *operator->() { return coins; }
+    const CCoins &operator*() { return *coins; }
+    CCoinsAccessor(const CCoinsViewCache &cacheObj, const uint256& hash);
+    ~CCoinsAccessor();
+    friend class CCoinsViewCache;
+};
+
 
 /** CCoinsView that adds a memory cache for transactions to another CCoinsView */
 class CCoinsViewCache : public CCoinsViewBacked
@@ -425,15 +450,15 @@ public:
      * more efficient than GetCoins. Modifications to other cache entries are
      * allowed while accessing the returned pointer.
      */
-    const CCoins* AccessCoins(const uint256 &txid) const;
-    const CCoins* _AccessCoins(const uint256 &txid) const;
+    // does not take read lock: const CCoins* AccessCoins(const uint256 &txid) const;
+    const CCoins* _AccessCoins(const uint256 &txid, CDeferredSharedLocker& lock) const;
 
     /**
      * Return a modifiable reference to a CCoins. If no entry with the given
      * txid exists, a new one is created. Simultaneous modifications are not
-     * allowed.
+     * allowed.  The view is locked until ret is destructed.
      */
-    CCoinsModifier ModifyCoins(const uint256 &txid);
+    bool ModifyCoins(const uint256 &txid, CCoinsModifier& ret);
 
     /**
      * Return a modifiable reference to a CCoins. Assumes that no entry with the given
@@ -442,9 +467,9 @@ public:
      * the 2 historical coinbase duplicate pairs because the new coins are marked fresh, and
      * in the event the duplicate coinbase was spent before a flush, the now pruned coins
      * would not properly overwrite the first coinbase of the pair. Simultaneous modifications
-     * are not allowed.
+     * are not allowed.  The view is locked until ret is destructed.
      */
-    CCoinsModifier ModifyNewCoins(const uint256 &txid);
+    bool ModifyNewCoins(const uint256 &txid, CCoinsModifier& ret);
 
     /**
      * Push the modifications applied to this cache to its base.
@@ -489,6 +514,8 @@ public:
 
     //! Check whether all prevouts of the transaction are present in the UTXO set represented by this view
     bool HaveInputs(const CTransaction& tx) const;
+    //! Check whether a prevout is present in the UTXO set represented by this view
+    bool HaveInput(const COutPoint &prevout) const;
 
     /**
      * Return priority of tx at height nHeight. Also calculate the sum of the values of the inputs
@@ -497,19 +524,37 @@ public:
      */
     double GetPriority(const CTransaction &tx, int nHeight, CAmount &inChainInputValue) const;
 
-    const CTxOut &GetOutputFor(const CTxIn& input) const;
-    const CTxOut &_GetOutputFor(const CTxIn& input) const;
+    bool GetOutputFor(const CTxIn& input, CTxOut& ret) const;
+    const CTxOut &_GetOutputFor(const CTxIn& input, CDeferredSharedLocker& lock) const;
 
     friend class CCoinsModifier;
+    friend class CCoinsAccessor;
 
 private:
     //CCoinsMap::iterator FetchCoins(const uint256 &txid);
-    CCoinsMap::const_iterator FetchCoins(const uint256 &txid) const;
+    CCoinsMap::const_iterator FetchCoins(const uint256 &txid, CDeferredSharedLocker& lock) const;
+    // *coins is assigned the data you are requesting
+    bool FetchCoins(const uint256 &txid, CCoins *coins) const;
 
     /**
      * By making the copy constructor private, we prevent accidentally using it when one intends to create a cache on top of a base cache.
      */
     CCoinsViewCache(const CCoinsViewCache &);
 };
+
+
+inline void CCoinsModifier::lock(CCoinsViewCache &cacheObj)
+{
+    cache = &cacheObj;
+    AssertLockHeld(cache->cs_utxo);
+    // cache->hasModifier = true; not needed because of csCacheInsert lock
+    cache->csCacheInsert.lock();
+}
+
+inline CCoinsAccessor::~CCoinsAccessor()
+    {
+        LeaveCritical();
+        cache->cs_utxo.unlock_shared();
+    }
 
 #endif // BITCOIN_COINS_H

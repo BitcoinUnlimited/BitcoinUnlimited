@@ -129,7 +129,9 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
 
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        const CTxOut& prev = mapInputs.GetOutputFor(tx.vin[i]);
+        CTxOut prev;
+
+        mapInputs.GetOutputFor(tx.vin[i], prev);
 
         std::vector<std::vector<unsigned char> > vSolutions;
         txnouttype whichType;

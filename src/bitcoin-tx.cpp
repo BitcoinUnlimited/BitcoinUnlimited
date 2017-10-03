@@ -445,7 +445,8 @@ static void MutateTxSign(CMutableTransaction& tx, const string& flagStr)
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
-                CCoinsModifier coins = view.ModifyCoins(txid);
+                CCoinsModifier coins;
+                view.ModifyCoins(txid, coins);
                 if (coins->IsAvailable(nOut) && coins->vout[nOut].scriptPubKey != scriptPubKey) {
                     string err("Previous output scriptPubKey mismatch:\n");
                     err = err + ScriptToAsmStr(coins->vout[nOut].scriptPubKey) + "\nvs:\n"+
@@ -477,13 +478,18 @@ static void MutateTxSign(CMutableTransaction& tx, const string& flagStr)
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn& txin = mergedTx.vin[i];
-        const CCoins* coins = view.AccessCoins(txin.prevout.hash);
-        if (!coins || !coins->IsAvailable(txin.prevout.n)) {
-            fComplete = false;
-            continue;
+        CScript prevPubKey;
+        CAmount amount;
+        {
+            CCoinsModifier cm;
+            if (!view.ModifyCoins(txin.prevout.hash, cm) || !cm->IsAvailable(txin.prevout.n))
+            {
+                fComplete = false;
+                continue;
+            }
+            prevPubKey = cm->vout[txin.prevout.n].scriptPubKey;
+            amount = cm->vout[txin.prevout.n].nValue;
         }
-        const CScript& prevPubKey = coins->vout[txin.prevout.n].scriptPubKey;
-        const CAmount &amount = coins->vout[txin.prevout.n].nValue;
 
         txin.scriptSig.clear();
         // Only sign SIGHASH_SINGLE if there's a corresponding output:

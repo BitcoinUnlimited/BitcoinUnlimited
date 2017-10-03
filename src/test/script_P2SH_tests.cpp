@@ -325,7 +325,9 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard)
 
     {
         //WRITELOCK(coins.cs_utxo);
-        coins.ModifyCoins(txFrom.GetHash())->FromTx(txFrom, 0);
+        CCoinsModifier cm;
+        coins.ModifyCoins(txFrom.GetHash(), cm);
+        cm->FromTx(txFrom, 0);
     }
 
     CMutableTransaction txTo;
