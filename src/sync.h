@@ -169,6 +169,7 @@ public:
             scs.unlock_shared();
         else if (state == LockState::EXCLUSIVE)
             scs.unlock();
+        state = LockState::UNLOCKED;
     }
     ~CDeferredSharedLocker() { unlock(); }
 };

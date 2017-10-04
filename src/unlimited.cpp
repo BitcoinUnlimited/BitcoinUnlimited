@@ -2447,6 +2447,39 @@ bool TxAlreadyHave(const CInv &inv)
     DbgAssert(0, return false); // this fn should only be called if CInv is a tx
 }
 
+
+void retryOrphans()
+{
+    WRITELOCK(cs_orphancache);
+    std::vector<uint256> vWorkQueue;
+    for (auto &i : mapOrphanTransactions)
+    {
+        if (1)
+        {
+            COrphanTx& otx = i.second;
+            CTxInputData txd;
+            txd.tx = otx.tx;
+            txd.nodeId = otx.fromPeer;
+            txd.nodeName = "orphan";
+            txd.whitelisted = false;
+            LOCK(csTxInQ);
+            bool txPush = !incomingConflicts.checkAndSet(txd.tx.GetHash());
+            if (txPush)
+            {
+                txInQ.push(txd); // add this transaction onto the processing queue
+                cvTxInQ.notify_one();
+            }
+            else
+            {
+                txDeferQ.push(txd);
+            }
+        }
+    }
+    mapOrphanTransactionsByPrev.clear();
+    mapOrphanTransactions.clear();
+    nBytesOrphanPool = 0;
+}
+
 void processOrphans(std::vector<uint256>& vWorkQueue)
 {
     std::vector<uint256> vEraseQueue;
@@ -2587,8 +2620,11 @@ void ThreadCommitToMempool()
             if (!txDeferQ.empty())
             {
                 LOCK(csTxInQ);
-                txInQ = txDeferQ; // TODO move pointers
-                txDeferQ = std::queue<CTxInputData>();
+                while(!txDeferQ.empty())  // TODO efficient append
+                {
+                    txInQ.push(txDeferQ.front());
+                    txDeferQ.pop();
+                }
                 cvTxInQ.notify_all();
             }
             incomingConflicts.reset();
@@ -2601,7 +2637,6 @@ void StopTxProcessing()
     cvTxInQ.notify_all();
     cvCommitQ.notify_all();
 }
-
 
 void ThreadTxHandler()
 {
@@ -2629,14 +2664,12 @@ void ThreadTxHandler()
         if (1)
         {
             CORRAL(txProcessingCorral, TX_PROCESSING);
-            boost::this_thread::interruption_point();
             CTransaction& tx = txd.tx;
             CInv inv(MSG_TX, tx.GetHash());
 
             std::vector<uint256> vHashTxToUncache;
             if (1)
             {
-                //ss.Load();
                 // Check for recently rejected (and do other quick existence checks)
                 bool have = TxAlreadyHave(inv);
                 if (have)
@@ -2699,6 +2732,10 @@ void ThreadTxHandler()
                         unsigned int nEvicted = LimitOrphanTxSize(nMaxOrphanTx, nMaxOrphanPoolSize);
                         if (nEvicted > 0)
                             LogPrint("mempool", "mapOrphan overflow, removed %u tx\n", nEvicted);
+                    }
+                    else
+                    {
+                        LogPrint("mempool", "rejected orphan as likely contains old sighash");
                     }
                 }
             }

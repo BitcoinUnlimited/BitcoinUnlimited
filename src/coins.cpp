@@ -110,6 +110,7 @@ CCoinsMap::const_iterator CCoinsViewCache::FetchCoins(const uint256 &txid, CDefe
         CCoinsMap::iterator it = cacheCoins.find(txid);
         if (it != cacheCoins.end())
             return it;
+        lock.unlock();
     }
     CCoins tmp;
     if (!base->GetCoins(txid, tmp))
@@ -117,10 +118,9 @@ CCoinsMap::const_iterator CCoinsViewCache::FetchCoins(const uint256 &txid, CDefe
     // Note iterators are unaffected by map insertions so its ok to do this with just the read
     // lock held.
     CCoinsMap::iterator ret;
-    {
-        lock.lock();
-        ret = cacheCoins.insert(std::make_pair(txid, CCoinsCacheEntry())).first;
-    }
+
+    lock.lock();
+    ret = cacheCoins.insert(std::make_pair(txid, CCoinsCacheEntry())).first;
     tmp.swap(ret->second.coins);
     if (ret->second.coins.IsPruned()) {
         // The parent only has an empty entry for this txid; we can consider our

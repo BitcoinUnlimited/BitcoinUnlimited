@@ -4997,9 +4997,8 @@ bool AlreadyHaveLocking(const CInv &inv)
     {
     case MSG_TX:
     {
-        bool rrc = recentRejects.contains(inv.hash);
-        bool mrc = mempool.exists(inv.hash);
-        return rrc || mrc || AlreadyHaveOrphan(inv.hash) || pcoinsTip->HaveCoins(inv.hash);
+        // Lazy evaluation is important for performance here
+        return  recentRejects.contains(inv.hash) ||  mempool.exists(inv.hash) || AlreadyHaveOrphan(inv.hash) || pcoinsTip->HaveCoins(inv.hash);
     }
     case MSG_BLOCK:
     case MSG_XTHINBLOCK:
@@ -5267,6 +5266,7 @@ static bool ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
     }
     return gotWorkDone;
 }
+
 
 bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived)
 {
