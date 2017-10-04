@@ -23,7 +23,7 @@
 
 #include "prevector.h"
 
-static const unsigned int MAX_SIZE = 0x02000000*8;  // BU Allow 256MB JSON encodings
+static const unsigned int MAX_SIZE = (1024*1024*1025);  // BU allow a bit over 1GB messages
 
 /**
  * Used to bypass the rule against non-const reference to temporary
