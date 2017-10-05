@@ -1358,6 +1358,15 @@ CStatBase *FindStatistic(const char *name)
     CStatMap::iterator item = statistics.find(name);
     if (item != statistics.end())
         return item->second;
+
+    for (auto item: statistics)
+    {
+        if (match(name, item.first.c_str()))
+        {
+            return item.second;
+        }
+    }
+
     return NULL;
 }
 
