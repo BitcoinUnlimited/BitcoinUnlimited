@@ -117,7 +117,7 @@ public:
     ~CParallelValidation();
 
     /* Initialize mapBlockValidationThreads*/
-    void InitThread(const boost::thread::id this_id, const CNode *pfrom, const CBlock &block, const CInv &inv);
+    void InitThread(const boost::thread::id this_id, const CNode *pfrom, std::shared_ptr<CBlock> block, const CInv &inv, uint64_t blockSize);
 
     /* Initialize a PV session */
     bool Initialize(const boost::thread::id this_id, const CBlockIndex *pindex, const bool fParallel);
@@ -169,7 +169,11 @@ public:
     void ClearOrphanCache(const CBlock &block);
 
     /* Process a block message */
-    void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, const CBlock &block, const CInv &inv);
+    void HandleBlockMessage(CNode *pfrom,
+        const std::string &strCommand,
+        std::shared_ptr<CBlock> block,
+        const CInv &inv,
+        uint64_t blockSize = 0); // If blockSize is not supplied it is calculated
 
     // The number of script validation threads
     unsigned int ThreadCount() { return nThreads; }

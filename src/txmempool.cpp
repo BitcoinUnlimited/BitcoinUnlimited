@@ -476,7 +476,7 @@ bool CTxMemPool::addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry,
     AssertWriteLockHeld(cs);
     if (mapTx.find(hash) != mapTx.end()) // already inserted
     {
-        LogPrintf("WARNING: transaction already in mempool\n");
+        // LogPrintf("WARNING: transaction already in mempool\n");
         return true;
     }
     indexed_transaction_set::iterator newit = mapTx.insert(entry).first;

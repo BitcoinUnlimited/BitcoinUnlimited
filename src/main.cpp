@@ -6269,24 +6269,26 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) // Ignore blocks received while importing
     {
-        CBlock block;
-        vRecv >> block;
+        std::shared_ptr<CBlock> block(new CBlock);
+        uint64_t nBlockSize = vRecv.size();
+        vRecv >> *block;
+        DbgAssert(nBlockSize == ::GetSerializeSize(*block, SER_NETWORK, PROTOCOL_VERSION), return true);
 
-        CInv inv(MSG_BLOCK, block.GetHash());
+        CInv inv(MSG_BLOCK, block->GetHash());
         LogPrint("blk", "received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
-        UnlimitedLogBlock(block, inv.hash.ToString(), receiptTime);
+        UnlimitedLogBlock(*block, inv.hash.ToString(), receiptTime);
 
         if (IsChainNearlySyncd()) // BU send the received block out expedited channels quickly
         {
             CValidationState state;
-            if (CheckBlockHeader(block, state, true)) // block header is fine
-                SendExpeditedBlock(block, pfrom);
+            if (CheckBlockHeader(*block, state, true)) // block header is fine
+                SendExpeditedBlock(*block, pfrom);
         }
 
         // Message consistency checking
         // NOTE: consistency checking is handled by checkblock() which is called during
         //       ProcessNewBlock() during HandleBlockMessage.
-        PV->HandleBlockMessage(pfrom, strCommand, block, inv);
+        PV->HandleBlockMessage(pfrom, strCommand, block, inv, nBlockSize);
     }
 
 
