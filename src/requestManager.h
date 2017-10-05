@@ -124,6 +124,12 @@ protected:
 public:
     CRequestManager();
 
+    // Return the number of blocks currently in the process of being requested
+    int getOutstandingBlockRequests()
+    {
+        return mapBlkInfo.size();
+    }
+        
     // Get this object from somewhere, asynchronously.
     void AskFor(const CInv &obj, CNode *from, unsigned int priority = 0);
 

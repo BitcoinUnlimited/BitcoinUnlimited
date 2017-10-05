@@ -18,6 +18,7 @@
 #include "crypto/common.h"
 #include "dosman.h"
 #include "hash.h"
+#include "nodestate.h"
 #include "primitives/transaction.h"
 #include "requestManager.h"
 #include "scheduler.h"
@@ -2067,10 +2068,29 @@ void ThreadMessageHandler()
     {
         requester.SendRequests(); // BU send out any requests for tx or blks that I don't know about yet
 
+        // Request manager can drop an outstanding block if it runs out of sources.
+        // In this case, clear the blocks in flight from all nodes so that new requests can be made
+        int outstanding = requester.getOutstandingBlockRequests();
+        
+
         vector<CNode *> vNodesCopy;
         {
             LOCK(cs_vNodes);
             vNodesCopy.reserve(vNodes.size());
+            if (outstanding==0)
+            {
+                BOOST_FOREACH (CNode *pnode, vNodes)
+                {
+                    CNodeState *state = State(pnode->id);
+                    if (state)
+                    {
+                        state->nDownloadingSince = 0;
+                        state->nBlocksInFlight = 0;
+                        state->nBlocksInFlightValidHeaders = 0;
+                    }
+                }
+            }
+
             // Prefer thinBlockCapable nodes when doing communications.
             BOOST_FOREACH (CNode *pnode, vNodes)
             {
