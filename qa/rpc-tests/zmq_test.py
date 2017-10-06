@@ -26,6 +26,7 @@ class ZMQTest (BitcoinTestFramework):
         self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"hashblock")
         self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"hashtx")
         self.zmqSubSocket.linger = 500
+        self.zmqSubSocket.RCVTIMEO = 5 * 1000
         self.zmqSubSocket.connect("tcp://127.0.0.1:%i" % self.port)
         return start_nodes(4, self.options.tmpdir, extra_args=[
             ['-zmqpubhashtx=tcp://127.0.0.1:'+str(self.port), '-zmqpubhashblock=tcp://127.0.0.1:'+str(self.port)],
@@ -45,13 +46,15 @@ class ZMQTest (BitcoinTestFramework):
             msg = self.zmqSubSocket.recv_multipart()
             topic = msg[0]
             body = msg[1]
-
+            print("tx message:\n",topic, "\n", bytes_to_hex_str(body))
+            assert_equal(topic, b"hashtx")
             msg = self.zmqSubSocket.recv_multipart()
             topic = msg[0]
             body = msg[1]
             blkhash = bytes_to_hex_str(body)
-
+            assert_equal(topic, b"hashblock")
             assert_equal(genhashes[0], blkhash) #blockhash from generate must be equal to the hash received over zmq
+            print("block message\n",topic, "\n", blkhash)
 
             n = 10
             genhashes = self.nodes[1].generate(n)
@@ -81,6 +84,10 @@ class ZMQTest (BitcoinTestFramework):
                 hashZMQ = bytes_to_hex_str(body)
 
             assert_equal(hashRPC, hashZMQ) #blockhash from generate must be equal to the hash received over zmq
+        except  zmq.ZMQError as e:
+            if str(e) == "Resource temporarily unavailable":
+                print ("test FAILED:  ZMQ error: timeout.  bitcoind probably did not send the notification")
+            raise
         finally:
             self.zmqSubSocket.close()
             self.zmqSubSocket = None
@@ -93,4 +100,4 @@ if __name__ == '__main__':
 
 def Test():
     ZMQTest ().main ()
- 
+

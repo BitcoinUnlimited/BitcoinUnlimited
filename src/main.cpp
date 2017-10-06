@@ -3179,9 +3179,11 @@ bool static ConnectTip(CValidationState &state,
         SyncWithWallets(tx, NULL);
     }
     // ... and about transactions that got confirmed:
+    int txIdx = 0;
     BOOST_FOREACH (const CTransaction &tx, pblock->vtx)
     {
-        SyncWithWallets(tx, pblock);
+        SyncWithWallets(tx, pblock, txIdx);
+        txIdx++;
     }
 
     int64_t nTime6 = GetTimeMicros();
