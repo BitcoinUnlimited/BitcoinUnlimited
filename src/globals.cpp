@@ -101,7 +101,7 @@ CRITSEC( cs_mapInboundConnectionTracker);
 CRITSEC( cs_vOneShots);
 
 CRITSEC( cs_statMap);
-
+CRITSEC(csBlockHashToIdx);
 CThreadCorral txProcessingCorral;
 
 deque<string> vOneShots;

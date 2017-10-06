@@ -718,6 +718,7 @@ bool CRequestManager::IsNodePingAcceptable(CNode *pfrom)
     if (pfrom->nPingUsecTime < ACCEPTABLE_PING_USEC)
         return true;
 
+#if 0 // TODO: this needs to be calculated periodically (rarely) and outside of any locks
     // Calculate average ping time of all nodes
     uint16_t nValidNodes = 0;
     std::vector<uint64_t> vPingTimes;
@@ -746,5 +747,6 @@ bool CRequestManager::IsNodePingAcceptable(CNode *pfrom)
     {
         return false;
     }
+#endif
     return true;
 }

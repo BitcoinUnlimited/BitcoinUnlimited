@@ -8,6 +8,7 @@
 #define BITCOIN_PRIMITIVES_BLOCK_H
 
 #include "primitives/transaction.h"
+#include "sync.h"
 #include "serialize.h"
 #include "uint256.h"
 
@@ -15,6 +16,8 @@ const uint32_t BIP_009_MASK = 0x20000000;
 const uint32_t BASE_VERSION = 0x20000000;
 const uint32_t FORK_BIT_2MB = 0x10000000;  // Vote for 2MB fork
 const bool DEFAULT_2MB_VOTE = false;
+
+extern CCriticalSection csBlockHashToIdx;
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
@@ -89,7 +92,6 @@ public:
     mutable bool fExcessive;  // BU: is the block "excessive" (bigger than this node prefers to accept)
     mutable uint64_t nBlockSize; // BU: length of this block in bytes
     mutable std::map<uint256, int32_t> hashToIdx;  // BU: this map translates a tx hash to an vtx index for rapid lookup
-
     CBlock()
     {
         SetNull();
@@ -104,6 +106,7 @@ public:
     // return the index of the transaction in this block.  Return -1 if tx is not in this block
     int find(uint256 hash) const
     {
+        LOCK(csBlockHashToIdx);
         // If the hash to idx map is empty, then fill it up
         if (hashToIdx.empty()&& (!vtx.empty()))
         {
