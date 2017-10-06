@@ -668,6 +668,8 @@ static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 static const unsigned int REJECT_CONFLICT = 0x102;
 /** Transaction cannot be committed on my fork */
 static const unsigned int REJECT_WRONG_FORK = 0x103;
+/** Transaction has missing inputs */
+static const unsigned int REJECT_MISSING_INPUTS = 0x104;
 
 struct COrphanTx
 {

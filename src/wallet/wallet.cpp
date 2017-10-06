@@ -2561,11 +2561,11 @@ bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey)
 {
     if (fBroadcastTransactions)
     {
-        // Broadcast
-        if (!wtxNew.AcceptToMemoryPool(false))
+        CValidationState state;
+        if (!::AcceptToMemoryPool(mempool, state, wtxNew, false, NULL, false, true))
         {
             // This must not fail. The transaction has already been signed and recorded.
-            LogPrintf("CommitTransaction(): Error: Transaction not accepted into memory pool\n");
+            LogPrintf("CommitTransaction(): Error: Transaction not accepted into memory pool.  code: %d reason: %s msg: %s\n",state.GetRejectCode(), state.GetRejectReason(), state.GetDebugMessage());
             return false;
         }
         CORRAL(txProcessingCorral, BLOCK_PROCESSING);

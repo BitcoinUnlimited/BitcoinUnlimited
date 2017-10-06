@@ -1405,7 +1405,7 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state, const CCoins
     // This doesn't trigger the DoS code on purpose; if it did, it would make it easier
     // for an attacker to attempt to split the network.
     if (!inputs.HaveInputs(tx))
-        return state.Invalid(false, 0, "", "Inputs unavailable");
+        return state.Invalid(false, REJECT_MISSING_INPUTS, "bad-txns-missing-inputs", "Inputs unavailable in CheckTxInputs");
 
     CAmount nValueIn = 0;
     CAmount nFees = 0;

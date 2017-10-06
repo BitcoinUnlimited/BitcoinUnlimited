@@ -895,30 +895,29 @@ UniValue sendrawtransaction(const UniValue& params, bool fHelp)
         fHaveChain = existingCoins && existingCoins->nHeight < 1000000000;
     }
     bool fHaveMempool = mempool.exists(hashTx);
-    if (!fHaveMempool && !fHaveChain) {
+    if (!fHaveMempool && !fHaveChain)
+    {
         // push to local node and sync with wallets
         CValidationState state;
         bool fMissingInputs;
-        if (!AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, false, !fOverrideFees)) {
-            if (state.IsInvalid()) {
-                throw JSONRPCError(RPC_TRANSACTION_REJECTED, strprintf("%i: %s", state.GetRejectCode(), state.GetRejectReason()));
-            } else {
-                if (fMissingInputs) {
-                    throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
-                }
-                throw JSONRPCError(RPC_TRANSACTION_ERROR, state.GetRejectReason());
-            }
+        if (!AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, false, !fOverrideFees))
+        {
+            if (fMissingInputs)
+                throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
+            if (state.IsInvalid())
+                throw JSONRPCError(
+                    RPC_TRANSACTION_REJECTED, strprintf("%i: %s", state.GetRejectCode(), state.GetRejectReason()));
+
+            throw JSONRPCError(RPC_TRANSACTION_ERROR, state.GetRejectReason());
         }
         else
         {
             CORRAL(txProcessingCorral, BLOCK_PROCESSING);
             CommitToMempool();
-#ifdef ENABLE_WALLET
-            SyncWithWallets(tx, NULL);
-#endif
         }
-
-    } else if (fHaveChain) {
+    }
+    else if (fHaveChain)
+    {
         throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "transaction already in block chain");
     }
     RelayTransaction(tx);

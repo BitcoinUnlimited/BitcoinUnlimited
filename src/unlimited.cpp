@@ -2190,8 +2190,7 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
                 {
                     if (pfMissingInputs)
                         *pfMissingInputs = true;
-                    // fMissingInputs and !state.IsInvalid() is used to detect this condition, don't set state.Invalid()
-                    return false;
+                    return state.Invalid(false, REJECT_MISSING_INPUTS, "bad-txns-missing-inputs","Inputs unavailable in ParallelAcceptToMemoryPool");
                 }
             }
 
