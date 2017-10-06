@@ -73,7 +73,7 @@ public:
     bool rateLimited;
     int64_t lastRequestTime; // In microseconds, 0 means no request
     unsigned int outstandingReqs;
-    // unsigned int receivingFrom;
+    NodeId receivingFrom;
     // char    requestCount[MAX_AVAIL_FROM];
     // CNode* availableFrom[MAX_AVAIL_FROM];
     ObjectSourceList availableFrom;
@@ -81,6 +81,7 @@ public:
 
     CUnknownObj()
     {
+        receivingFrom = 0;
         rateLimited = false;
         outstandingReqs = 0;
         lastRequestTime = 0;
@@ -149,6 +150,9 @@ public:
 
     // Indicates whether a node ping time is acceptable relative to the overall average of all nodes.
     bool IsNodePingAcceptable(CNode *pnode);
+
+    // Call if the passed node is or is about to be disconnected to notify the request manager to not expect data.
+    void RemoveSource(CNode* from);
 };
 
 

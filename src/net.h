@@ -345,7 +345,7 @@ public:
     CCriticalSection csRecvGetData;
     std::vector<CInv> vRecvGetData;
     std::deque<CNetMessage> vRecvMsg;
-    CStatHistory<unsigned int> currentRecvMsgSize;
+    CStatHistory<uint64_t> currentRecvMsgSize;
 
     CCriticalSection cs_vRecvMsg;
     uint64_t nRecvBytes;
@@ -467,9 +467,9 @@ public:
 
     // BU instrumentation
     // track the number of bytes sent to this node
-    CStatHistory<unsigned int> bytesSent;
+    CStatHistory<uint64_t> bytesSent;
     // track the number of bytes received from this node
-    CStatHistory<unsigned int> bytesReceived;
+    CStatHistory<uint64_t> bytesReceived;
     // track the average round trip latency for transaction requests to this node
     CStatHistory<unsigned int> txReqLatency;
     // track the # of times this node is the first to send us a transaction INV
@@ -479,7 +479,7 @@ public:
     // track the # of times we sent this node a block
     CStatHistory<unsigned int> blocksSent;
     // track the # of times we sent this node a transaction
-    CStatHistory<unsigned int> txsSent;
+    CStatHistory<uint64_t> txsSent;
     // track the # of times we sent this node a transaction
     CStatHistory<unsigned int> sendGap;
     // track the # of times we sent this node a transaction

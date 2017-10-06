@@ -2138,7 +2138,7 @@ bool ConnectBlock(const CBlock &block,
 
                     if ((inOrphanCache) || (!inVerifiedCache && !inOrphanCache))
                     {
-                        LogPrint("parallel_2", "checking inputs for tx: %d\n", i);
+                        // LogPrint("parallel_2", "checking inputs for tx: %d\n", i);
                         if (inOrphanCache)
                             nOrphansChecked++;
 
@@ -3977,11 +3977,11 @@ bool ProcessNewBlock(CValidationState &state,
     LogPrint("bench",
         "ProcessNewBlock, time: %d, block: %s, len: %d, numTx: %d, maxVin: %llu, maxVout: %llu, maxTx:%llu\n",
         end - start, pblock->GetHash().ToString(), pblock->nBlockSize, pblock->vtx.size(), maxVin, maxVout, maxTxSize);
-    LogPrint("bench", "tx: %s, vin: %llu, vout: %llu, len: %d\n", txIn.GetHash().ToString(), txIn.vin.size(),
+    LogPrint("bench", "tx with most inputs: %s, vin: %llu, vout: %llu, len: %d\n", txIn.GetHash().ToString(), txIn.vin.size(),
         txIn.vout.size(), ::GetSerializeSize(txIn, SER_NETWORK, PROTOCOL_VERSION));
-    LogPrint("bench", "tx: %s, vin: %llu, vout: %llu, len: %d\n", txOut.GetHash().ToString(), txOut.vin.size(),
+    LogPrint("bench", "tx with most outputs: %s, vin: %llu, vout: %llu, len: %d\n", txOut.GetHash().ToString(), txOut.vin.size(),
         txOut.vout.size(), ::GetSerializeSize(txOut, SER_NETWORK, PROTOCOL_VERSION));
-    LogPrint("bench", "tx: %s, vin: %llu, vout: %llu, len: %d\n", txLen.GetHash().ToString(), txLen.vin.size(),
+    LogPrint("bench", "longest tx: %s, vin: %llu, vout: %llu, len: %d\n", txLen.GetHash().ToString(), txLen.vin.size(),
         txLen.vout.size(), ::GetSerializeSize(txLen, SER_NETWORK, PROTOCOL_VERSION));
 
     LOCK(cs_blockvalidationtime);
@@ -5096,7 +5096,7 @@ static bool ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                                 __func__, pfrom->GetId());
                         }
                         else
-                        { // BU: don't relay excessive blocks
+                        { // BU: don't relay excessive blocks that are not on the active chain
                             if (mi->second->nStatus & BLOCK_EXCESSIVE)
                                 send = false;
                             if (!send)
@@ -7145,6 +7145,7 @@ bool SendMessages(CNode *pto)
             }
         }
 
+#if 0  // removed because giga_blocks take time.  ReqMgr will ensure a minimum bandwidth
         // In case there is a block that has been in flight from this peer for 2 + 0.5 * N times the block interval
         // (with N the number of peers from which we're downloading validated blocks), disconnect due to timeout.
         // We compensate for other peers to prevent killing off peers due to our own downstream link
@@ -7165,6 +7166,7 @@ bool SendMessages(CNode *pto)
                 pto->fDisconnect = true;
             }
         }
+#endif
 
         //
         // Message: getdata (blocks)

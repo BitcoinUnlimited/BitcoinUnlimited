@@ -143,7 +143,7 @@ extern uint32_t blockVersion; // Overrides the mined block version if non-zero
 extern uint64_t maxGeneratedBlock;
 extern uint64_t excessiveBlockSize;
 extern unsigned int excessiveAcceptDepth;
-extern unsigned int maxMessageSizeMultiplier;
+extern uint64_t maxMessageSizeMultiplier;
 /** BU Default maximum number of Outbound connections to simultaneously allow*/
 extern int nMaxOutConnections;
 

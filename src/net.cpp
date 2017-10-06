@@ -1065,6 +1065,9 @@ void ThreadSocketHandler()
                 if (pnode->fDisconnect || (pnode->GetRefCount() <= 0 && pnode->vRecvMsg.empty() &&
                                               pnode->nSendSize == 0 && pnode->ssSend.empty()))
                 {
+                    // inform request manager
+                    requester.RemoveSource(pnode);
+
                     // remove from vNodes
                     vNodes.erase(remove(vNodes.begin(), vNodes.end(), pnode), vNodes.end());
 
@@ -1270,6 +1273,7 @@ void ThreadSocketHandler()
                             pnode->nRecvBytes += nBytes;
                             pnode->bytesReceived += nBytes; // BU stats
                             pnode->RecordBytesRecv(nBytes);
+                            recvAmt += nBytes;
                         }
                         else if (nBytes == 0)
                         {
@@ -2114,9 +2118,6 @@ void ThreadMessageHandler()
 
         BOOST_FOREACH (CNode *pnode, vNodesCopy)
         {
-            if (pnode->fDisconnect)
-                continue;
-
             // Receive messages
             if (ProcessMessages(pnode))
                 fSleep = false;

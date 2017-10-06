@@ -447,6 +447,40 @@ bool RequestBlock(CNode *pfrom, CInv obj)
     }
 }
 
+void CRequestManager::RemoveSource(CNode *from)
+{
+    int tx = 0;
+    int blk = 0;
+    {
+        LOCK(cs_objDownloader);
+        for (auto rq : mapTxnInfo)
+        {
+            CUnknownObj &req = rq.second;
+            if (req.receivingFrom == from->id)
+            {
+                req.lastRequestTime = 0; // request aborted
+                req.outstandingReqs--;
+                req.receivingFrom = 0;
+                // We will delete from the availableFrom list when we next process this req
+                tx++;
+            }
+        }
+
+        for (auto rq : mapBlkInfo)
+        {
+            CUnknownObj &req = rq.second;
+            if (req.receivingFrom == from->id)
+            {
+                req.lastRequestTime = 0; // request aborted
+                req.outstandingReqs--;
+                req.receivingFrom = 0;
+                // We will delete from the availableFrom list when we next process this req
+                blk++;
+            }
+        }
+    }
+    LogPrint("req", "ReqMgr: Removed source %s, outstanding: %d tx, %d blk\n", from->GetLogName(), tx, blk);
+}
 
 void CRequestManager::SendRequests()
 {
@@ -538,6 +572,7 @@ void CRequestManager::SendRequests()
                     item.outstandingReqs++;
                     int64_t then = item.lastRequestTime;
                     item.lastRequestTime = now;
+                    item.receivingFrom = next.node->id;
                     LEAVE_CRITICAL_SECTION(cs_objDownloader);  // item and itemIter are now invalid
                     bool reqblkResult = RequestBlock(next.node, obj);
                     ENTER_CRITICAL_SECTION(cs_objDownloader);
@@ -653,6 +688,8 @@ void CRequestManager::SendRequests()
 
                             item.outstandingReqs++;
                             item.lastRequestTime = now;
+                            item.receivingFrom = next.node->id;
+
                             LEAVE_CRITICAL_SECTION(cs_objDownloader);  // do not use "item" after releasing this
                             if (1)
                             {
