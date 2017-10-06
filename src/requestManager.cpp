@@ -453,7 +453,7 @@ void CRequestManager::RemoveSource(CNode *from)
     int blk = 0;
     {
         LOCK(cs_objDownloader);
-        for (auto rq : mapTxnInfo)
+        for (auto &rq : mapTxnInfo)
         {
             CUnknownObj &req = rq.second;
             if (req.receivingFrom == from->id)
@@ -466,7 +466,7 @@ void CRequestManager::RemoveSource(CNode *from)
             }
         }
 
-        for (auto rq : mapBlkInfo)
+        for (auto &rq : mapBlkInfo)
         {
             CUnknownObj &req = rq.second;
             if (req.receivingFrom == from->id)

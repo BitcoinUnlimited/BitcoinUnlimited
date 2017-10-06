@@ -27,8 +27,8 @@ bool UpdateBUIP055Globals(CBlockIndex *activeTip)
     {
         if ((miningForkTime.value != 0) && activeTip->forkAtNextBlock(miningForkTime.value))
         {
-            excessiveBlockSize = miningForkEB.value;
-            maxGeneratedBlock = miningForkMG.value;
+            if (excessiveBlockSize < miningForkEB.value) excessiveBlockSize = miningForkEB.value;
+            if (maxGeneratedBlock < miningForkMG.value) maxGeneratedBlock = miningForkMG.value;
             return true;
         }
     }
