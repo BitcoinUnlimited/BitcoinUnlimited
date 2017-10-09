@@ -37,12 +37,14 @@ public:
     bool DoS(int level, bool ret = false,
              unsigned int chRejectCodeIn=0, const std::string &strRejectReasonIn="",
              bool corruptionIn=false,
-             const std::string &strDebugMessageIn="") {
+             const std::string &strDebugMessageIn="", bool log=true) {
         chRejectCode = chRejectCodeIn;
         strRejectReason = strRejectReasonIn;
         corruptionPossible = corruptionIn;
         strDebugMessage = strDebugMessageIn;
-        LogPrintf("ValidationState Error: %s, debug msg: %s\n", strRejectReasonIn.c_str(), strDebugMessageIn.c_str());
+        if (log)
+            LogPrintf(
+                "ValidationState Error: %s, debug msg: %s\n", strRejectReasonIn.c_str(), strDebugMessageIn.c_str());
         if (mode == MODE_ERROR)
             return ret;
         nDoS += level;
@@ -51,8 +53,8 @@ public:
     }
     bool Invalid(bool ret = false,
                  unsigned int _chRejectCode=0, const std::string &_strRejectReason="",
-                 const std::string &_strDebugMessage="") {
-        return DoS(0, ret, _chRejectCode, _strRejectReason, false, _strDebugMessage);
+                 const std::string &_strDebugMessage="", bool log = true) {
+        return DoS(0, ret, _chRejectCode, _strRejectReason, false, _strDebugMessage, log);
     }
     bool Error(const std::string& strRejectReasonIn) {
         if (mode == MODE_VALID)

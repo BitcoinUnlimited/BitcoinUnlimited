@@ -2908,7 +2908,7 @@ void CNode::BeginMessage(const char *pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSen
             start = &temp;
         }
     ssSend << CMessageHeader(*start, pszCommand, 0);
-    LogPrint("net", "sending: %s ", SanitizeString(pszCommand));
+    LogPrint("net", "sending: %s\n", SanitizeString(pszCommand));
     currentCommand = pszCommand;
 }
 

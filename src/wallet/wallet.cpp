@@ -1280,11 +1280,12 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
                     ret++;
                 txIdx++;
             }
-            pindex = chainActive.Next(pindex);
-            if (GetTime() >= nNow + 60) {
+            if (GetTime() >= nNow + 60)
+            {
                 nNow = GetTime();
                 LogPrintf("Still rescanning. At block %d. Progress=%f\n", pindex->nHeight, Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), pindex));
             }
+            pindex = chainActive.Next(pindex);  // pindex could be null below this line, don't use
         }
         ShowProgress(_("Rescanning..."), 100); // hide progress dialog in GUI
     }
