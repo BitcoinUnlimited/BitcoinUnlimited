@@ -3680,18 +3680,29 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
     if (block.nVersion >= 2 &&
         IsSuperMajority(2, pindexPrev, consensusParams.nMajorityEnforceBlockUpgrade, consensusParams))
     {
+        // For legacy reasons keep the original way of checking BIP34 compliance
         CScript expect = CScript() << nHeight;
         if (block.vtx[0].vin[0].scriptSig.size() < expect.size() ||
             !std::equal(expect.begin(), expect.end(), block.vtx[0].vin[0].scriptSig.begin()))
         {
+            // However the original way only checks a specific serialized int encoding, BUT BIP34 does not mandate
+            // the most efficient encoding, only that it be a "serialized CScript", and then gives an example with
+            // 3 byte encoding.  Therefore we've ended up with miners that only generate 3 byte encodings...
             int blockCoinbaseHeight = block.GetHeight();
-            uint256 hashp = block.hashPrevBlock;
-            uint256 hash = block.GetHash();
-            return state.DoS(100, error("%s: block height mismatch in coinbase, expected %d, got %d, block is %s, "
-                                        "parent block is %s, pprev is %s",
-                                      __func__, nHeight, blockCoinbaseHeight, hash.ToString(), hashp.ToString(),
-                                      pindexPrev->phashBlock->ToString()),
-                REJECT_INVALID, "bad-cb-height");
+            if (blockCoinbaseHeight == nHeight)
+            {
+                LogPrint("blk","Mined block valid but suboptimal height format, different client interpretions of BIP34 may cause fork");
+            }
+            else
+            {
+                uint256 hashp = block.hashPrevBlock;
+                uint256 hash = block.GetHash();
+                return state.DoS(100, error("%s: block height mismatch in coinbase, expected %d, got %d, block is %s, "
+                                            "parent block is %s, pprev is %s",
+                                          __func__, nHeight, blockCoinbaseHeight, hash.ToString(), hashp.ToString(),
+                                          pindexPrev->phashBlock->ToString()),
+                    REJECT_INVALID, "bad-cb-height");
+            }
         }
     }
 

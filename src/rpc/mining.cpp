@@ -695,7 +695,14 @@ public:
     bool found;
     CValidationState state;
 
-    submitblock_StateCatcher(const uint256 &hashIn) : hash(hashIn), found(false), state() {};
+    submitblock_StateCatcher(const uint256 &hashIn) : hash(hashIn), found(false), state()
+    {
+        RegisterValidationInterface(this);
+    };
+    ~submitblock_StateCatcher()
+    {
+        UnregisterValidationInterface(this);
+    }
 
 protected:
     virtual void BlockChecked(const CBlock& block, const CValidationState& stateIn) {
@@ -748,29 +755,30 @@ UniValue submitblock(const UniValue& params, bool fHelp)
     }
 
     CValidationState state;
-    submitblock_StateCatcher sc(block.GetHash());
-    LogPrint("rpc", "Received block %s via RPC.\n", block.GetHash().ToString());
-    RegisterValidationInterface(&sc);
-
-    // In we are mining our own block or not running in parallel for any reason
-    // we must terminate any block validation threads that are currently running,
-    // Unless they have more work than our own block or are processing a chain
-    // that has more work than our block.
-    PV->StopAllValidationThreads(block.GetBlockHeader().nBits);
-
-    bool fAccepted = ProcessNewBlock(state, Params(), NULL, &block, true, NULL, false);
-    UnregisterValidationInterface(&sc);
-    if (fBlockPresent)
     {
-        if (fAccepted && !sc.found)
-            return "duplicate-inconclusive";
-        return "duplicate";
-    }
-    if (fAccepted)
-    {
-        if (!sc.found)
-            return "inconclusive";
-        state = sc.state;
+        submitblock_StateCatcher sc(block.GetHash());
+        LogPrint("rpc", "Received block %s via RPC.\n", block.GetHash().ToString());
+        
+
+        // In we are mining our own block or not running in parallel for any reason
+        // we must terminate any block validation threads that are currently running,
+        // Unless they have more work than our own block or are processing a chain
+        // that has more work than our block.
+        PV->StopAllValidationThreads(block.GetBlockHeader().nBits);
+
+        bool fAccepted = ProcessNewBlock(state, Params(), NULL, &block, true, NULL, false);
+        if (fBlockPresent)
+        {
+            if (fAccepted && !sc.found)
+                return "duplicate-inconclusive";
+            return "duplicate";
+        }
+        if (fAccepted)
+        {
+            if (!sc.found)
+                return "inconclusive";
+            state = sc.state;
+        }
     }
     return BIP22ValidationResult(state);
 }
