@@ -692,7 +692,7 @@ public:
 
     const CWalletTx* GetWalletTx(const uint256& hash) const;
 
-    bool IsTxSpendable(const CWalletTx*);
+    bool IsTxSpendable(const CWalletTx*) const;
     void FillAvailableCoins(const CCoinControl *coinControl); // populate available COutputs.
     bool SelectCoinsBU(const CAmount& nTargetValue, CFeeRate fee, unsigned int changeLen, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, const CCoinControl *coinControl = NULL);
 

@@ -1722,6 +1722,7 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
             const uint256& wtxid = it->first;
             const CWalletTx* pcoin = &(*it).second;
 
+#if 0
             if (!CheckFinalTx(*pcoin))
                 continue;
 
@@ -1739,7 +1740,9 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
             // It's possible for these to be conflicted via ancestors which we may never be able to detect
             if (nDepth == 0 && !pcoin->InMempool())
                 continue;
-
+#endif
+            if (!IsTxSpendable(pcoin)) continue;
+            int nDepth = pcoin->GetDepthInMainChain();
             LOCK(cs_KeyStore); // BU move lock out of inner loop
             for (unsigned int i = 0; i < pcoin->vout.size(); i++)
             {
@@ -1920,7 +1923,7 @@ bool CWallet::SelectCoinsMinConf(const CAmount& nTargetValue, int nConfMine, int
 
 
 
-bool CWallet::IsTxSpendable(const CWalletTx* pcoin)
+bool CWallet::IsTxSpendable(const CWalletTx* pcoin) const
 {
   if (!CheckFinalTx(*pcoin)) return false;
 
@@ -2024,8 +2027,8 @@ bool CWallet::SelectCoinsBU(const CAmount &nTargetValue,
             // flush the txns waiting to enter the mempool so we can respend them
             CommitToMempool();
             FillAvailableCoins(coinControl);
+            filled = true;
         }
-        filled = true;
     }
     else if (available.size() < 100) // If there are very few TXOs, then regenerate them.  If the wallet HAS few TXOs
                                      // then regenerate every time -- its fast for few.
