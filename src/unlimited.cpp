@@ -585,6 +585,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
         if (!coinbaseScript || coinbaseScript->reserveScript.empty())
             throw std::runtime_error("No coinbase script available (mining requires a wallet)");
 
+        uint64_t cumulativeNonce = 0;
         while (true)
         {
             if (chainparams.MiningRequiresPeers())
@@ -608,12 +609,14 @@ void static BitcoinMiner(const CChainParams &chainparams)
             // Create new block
             //
             unsigned int nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
+            uint64_t mempoolSz = mempool.size();
             CBlockIndex *pindexPrev;
             {
                 LOCK(cs_main);
                 pindexPrev = chainActive.Tip();
             }
 
+            LogPrint("miner", "BitcoinMiner: Create new block template\n");
             unique_ptr<CBlockTemplate> pblocktemplate(
                 BlockAssembler(chainparams).CreateNewBlock(coinbaseScript->reserveScript));
             if (!pblocktemplate.get())
@@ -625,7 +628,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
             CBlock *pblock = &pblocktemplate->block;
             IncrementExtraNonce(pblock, nExtraNonce);
 
-            LogPrintf("Running BitcoinMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
+            LogPrint("miner", "Running BitcoinMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
                 ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
 
             //
@@ -661,7 +664,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
                         break;
                     }
                 }
-
+                LogPrint("miner","BitcoinMiner: tried %d nonces\n", cumulativeNonce + nNonce);
                 // Check for stop or if block needs to be rebuilt
                 boost::this_thread::interruption_point();
                 // Regtest mode doesn't require peers
@@ -669,7 +672,8 @@ void static BitcoinMiner(const CChainParams &chainparams)
                     break;
                 if (nNonce >= 0xffff0000)
                     break;
-                if (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 60)
+                // Mempool must change size by 1% and at least 1 minute pass
+                if ((mempool.size()/100 != mempoolSz/100) && (GetTime() - nStart > 60))
                     break;
                 {
                     LOCK(cs_main);
@@ -687,6 +691,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
                     hashTarget.SetCompact(pblock->nBits);
                 }
             }
+            cumulativeNonce += nNonce;
         }
     }
     catch (const boost::thread_interrupted &)

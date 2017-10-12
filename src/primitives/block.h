@@ -11,6 +11,7 @@
 #include "sync.h"
 #include "serialize.h"
 #include "uint256.h"
+#include "version.h"
 
 const uint32_t BIP_009_MASK = 0x20000000;
 const uint32_t BASE_VERSION = 0x20000000;
@@ -175,6 +176,13 @@ public:
         return block;
     }
 
+    uint64_t size(void) const
+    {
+        if (nBlockSize) return nBlockSize;
+        nBlockSize = ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+        return nBlockSize;
+    }
+    
     std::string ToString() const;
 };
 
