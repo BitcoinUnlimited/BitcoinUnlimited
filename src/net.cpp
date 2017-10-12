@@ -599,9 +599,14 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                     strCommand == NetMsgType::XTHINBLOCK || strCommand == NetMsgType::THINBLOCK ||
                     strCommand == NetMsgType::XBLOCKTX || strCommand == NetMsgType::GET_XBLOCKTX)
                 {
-                    vRecvMsg.push_front(msg);
-                    vRecvMsg.pop_back();
-                    LogPrint("thin", "Receive Queue: pushed %s to the front of the queue\n", strCommand);
+                    // Temporarely disabled cause it probably trigs a validation error. Quoting ptschip
+                    // from BU slack: "this routine should be optimized anyway, it involves a copy opertaion...
+                    // it would be better to just swap pointers somehow...perhaps create a fake txn and push
+                    // it to the front, then swap the pointer with the xthin at the back, then delete the back
+                    // entry...that probbly would be much more efficient."
+                    //vRecvMsg.push_front(msg);
+                    //vRecvMsg.pop_back();
+                    //LogPrint("thin", "Receive Queue: pushed %s to the front of the queue\n", strCommand);
                 }
             }
             // BU: end
