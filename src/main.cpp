@@ -1837,16 +1837,12 @@ static uint32_t GetBlockScriptFlags(const CBlockIndex* pindex, const Consensus::
 {
     AssertLockHeld(cs_main);
 
-    // BIP16 didn't become active until Apr 1 2012
-    int64_t nBIP16SwitchTime = 1333238400;
-    bool fStrictPayToScriptHash = (pindex->GetBlockTime() >= nBIP16SwitchTime);
+    uint32_t flags = SCRIPT_VERIFY_NONE;
 
-    uint32_t flags = fStrictPayToScriptHash ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE;
-
-    if (UAHFforkActivated(pindex->nHeight))
+    // Start enforcing P2SH (Bip16)
+    if (pindex->GetBlockTime() >= consensusparams.BIP16Height)
     {
-        flags |= SCRIPT_VERIFY_STRICTENC;
-        flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
+        flags |= SCRIPT_VERIFY_P2SH;
     }
 
     // Start enforcing the DERSIG (BIP66) rule
@@ -1866,6 +1862,13 @@ static uint32_t GetBlockScriptFlags(const CBlockIndex* pindex, const Consensus::
         THRESHOLD_ACTIVE)
     {
         flags |= SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
+    }
+
+    // Start enforcing the UAHF fork
+    if (UAHFforkActivated(pindex->nHeight))
+    {
+        flags |= SCRIPT_VERIFY_STRICTENC;
+        flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
     }
 
     // If the DAA HF is enabled, we start rejecting transaction that use a high
