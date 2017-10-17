@@ -5,6 +5,7 @@ dist: trusty
 addons:
   hostname: bitcoin-tester
 
+
 os: linux
 language: generic
 cache:
