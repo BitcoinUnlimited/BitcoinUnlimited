@@ -648,7 +648,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
                         SetThreadPriority(THREAD_PRIORITY_NORMAL);
                         LogPrintf(
                             "BitcoinMiner: POW found hash: %s target: %s height: %d size: %llu numtx: %d parent: %s\n",
-                            hash.GetHex(), hashTarget.GetHex(), pblock->GetHeight(), pblock->size(),
+                            hash.GetHex(), hashTarget.GetHex(), pblock->GetHeight(), pblock->size(), pblock->vtx.size(),
                             pblock->hashPrevBlock.GetHex());
                         ProcessBlockFound(pblock, chainparams);
                         SetThreadPriority(THREAD_PRIORITY_LOWEST);
