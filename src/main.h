@@ -520,13 +520,20 @@ bool DisconnectBlock(const CBlock &block,
     CCoinsViewCache &coins,
     bool *pfClean = NULL);
 
+enum class CheckTxInputsOption
+{
+    FALSE = 0,
+    TRUE = 1,
+};
+
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins */
 bool ConnectBlock(const CBlock &block,
     CValidationState &state,
     CBlockIndex *pindex,
     CCoinsViewCache &coins,
     bool fJustCheck = false,
-    bool fParallel = false);
+    bool fParallel = false,
+    CheckTxInputsOption fCheckInputs = CheckTxInputsOption::TRUE);
 
 /** Context-independent validity checks */
 bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state, bool fCheckPOW = true);
@@ -548,7 +555,8 @@ bool TestBlockValidity(CValidationState &state,
     const CBlock &block,
     CBlockIndex *pindexPrev,
     bool fCheckPOW = true,
-    bool fCheckMerkleRoot = true);
+    bool fCheckMerkleRoot = true,
+    CheckTxInputsOption fCheckInputs = CheckTxInputsOption::TRUE);
 
 // BU needed in unlimited.cpp
 bool CheckIndexAgainstCheckpoint(const CBlockIndex *pindexPrev,
@@ -648,6 +656,7 @@ extern CBlockTreeDB *pblocktree;
  */
 int GetSpendHeight(const CCoinsViewCache &inputs);
 
+extern CCriticalSection csVersionBitsCache;
 extern VersionBitsCache versionbitscache;
 
 /**

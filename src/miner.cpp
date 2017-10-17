@@ -169,79 +169,93 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn)
 
 CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bool blockstreamCoreCompatible)
 {
-    resetBlock(scriptPubKeyIn);
-
-    // The constructed block template
-    std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
-
-    CBlock *pblock = &pblocktemplate->block;
-
-    // Add dummy coinbase tx as first transaction
-    pblock->vtx.push_back(CTransaction());
-    pblocktemplate->vTxFees.push_back(-1); // updated at end
-    pblocktemplate->vTxSigOps.push_back(-1); // updated at end
-
-    LOCK(cs_main);
-    READLOCK(mempool.cs);
-    CBlockIndex *pindexPrev = chainActive.Tip();
-    nHeight = pindexPrev->nHeight + 1;
-
-    buip055ChainBlock = pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value);
-
-    pblock->nTime = GetAdjustedTime();
-    pblock->nVersion = UnlimitedComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), pblock->nTime);
-    // -regtest only: allow overriding block.nVersion with
-    // -blockversion=N to test forking scenarios
-    if (chainparams.MineBlocksOnDemand())
-        pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
-
-    const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
-
-    nLockTimeCutoff =
-        (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
-
-    addPriorityTxs(pblocktemplate.get());
-    addScoreTxs(pblocktemplate.get());
-
-    nLastBlockTx = nBlockTx;
-    nLastBlockSize = nBlockSize;
-    LogPrintf("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
-        nBlockSigOps);
-
-    // Create coinbase transaction.
-    pblock->vtx[0] = coinbaseTx(scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
-    pblocktemplate->vTxFees[0] = -nFees;
-
-    // Fill in header
-    pblock->hashPrevBlock = pindexPrev->GetBlockHash();
-    UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
-    pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
-    pblock->nNonce = 0;
-    pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
-
-    CValidationState state;
-    if (blockstreamCoreCompatible)
+    while (1)
     {
-        if (!TestConservativeBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
+        resetBlock(scriptPubKeyIn);
+
+        // The constructed block template
+        std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
+
+        CBlock *pblock = &pblocktemplate->block;
+
+        // Add dummy coinbase tx as first transaction
+        pblock->vtx.push_back(CTransaction());
+        pblocktemplate->vTxFees.push_back(-1); // updated at end
+        pblocktemplate->vTxSigOps.push_back(-1); // updated at end
+
+        CBlockIndex *pindexPrev = chainActive.Tip();
+        {
+            READLOCK(mempool.cs);
+            nHeight = pindexPrev->nHeight + 1;
+
+            buip055ChainBlock = pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value);
+
+            pblock->nTime = GetAdjustedTime();
+            pblock->nVersion = UnlimitedComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), pblock->nTime);
+            // -regtest only: allow overriding block.nVersion with
+            // -blockversion=N to test forking scenarios
+            if (chainparams.MineBlocksOnDemand())
+                pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
+
+            const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
+
+            nLockTimeCutoff =
+                (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
+
+            addPriorityTxs(pblocktemplate.get());
+            addScoreTxs(pblocktemplate.get());
+
+            nLastBlockTx = nBlockTx;
+            nLastBlockSize = nBlockSize;
+            LogPrintf("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
+                nBlockSigOps);
+
+            // Create coinbase transaction.
+            pblock->vtx[0] =
+                coinbaseTx(scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
+            pblocktemplate->vTxFees[0] = -nFees;
+
+            // Fill in header
+            pblock->hashPrevBlock = pindexPrev->GetBlockHash();
+            UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
+            pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
+            pblock->nNonce = 0;
+            pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
+        }
+
+        CValidationState state;
+        {
+            LOCK(cs_main);
+            // blockchain advanced while building the new block, build another one
+            if (pindexPrev != chainActive.Tip())
+                continue;
+
+            if (blockstreamCoreCompatible)
+            {
+                if (!TestConservativeBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
+                {
+                    throw std::runtime_error(
+                        strprintf("%s: TestConservativeBlockValidity failed: %s", __func__, FormatStateMessage(state)));
+                }
+            }
+            else
+            {
+                // WRT TxInputs: transactions would not ever enter the mempool if their inputs were invalid
+                if (!TestBlockValidity(
+                        state, chainparams, *pblock, pindexPrev, false, false, CheckTxInputsOption::FALSE))
+                {
+                    throw std::runtime_error(
+                        strprintf("%s: TestBlockValidity failed: %s", __func__, FormatStateMessage(state)));
+                }
+            }
+        }
+        if (pblock->fExcessive)
         {
             throw std::runtime_error(
-                strprintf("%s: TestConservativeBlockValidity failed: %s", __func__, FormatStateMessage(state)));
+                strprintf("%s: Excessive block generated: %s", __func__, FormatStateMessage(state)));
         }
+        return pblocktemplate.release();
     }
-    else
-    {
-        if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
-        {
-            throw std::runtime_error(
-                strprintf("%s: TestBlockValidity failed: %s", __func__, FormatStateMessage(state)));
-        }
-    }
-    if (pblock->fExcessive)
-    {
-        throw std::runtime_error(strprintf("%s: Excessive block generated: %s", __func__, FormatStateMessage(state)));
-    }
-
-    return pblocktemplate.release();
 }
 
 bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter)

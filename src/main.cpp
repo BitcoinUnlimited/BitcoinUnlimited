@@ -1819,11 +1819,12 @@ void PartitionCheck(bool (*initialDownloadCheck)(),
 }
 
 // Protected by cs_main
+CRITSEC( csVersionBitsCache);
 VersionBitsCache versionbitscache;
 
 int32_t ComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Params &params)
 {
-    LOCK(cs_main);
+    LOCK(csVersionBitsCache);
     int32_t nVersion = VERSIONBITS_TOP_BITS;
 
     for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++)
@@ -1876,7 +1877,8 @@ bool ConnectBlock(const CBlock &block,
     CBlockIndex *pindex,
     CCoinsViewCache &view,
     bool fJustCheck,
-    bool fParallel)
+    bool fParallel,
+    CheckTxInputsOption fCheckInputs)
 {
     /** BU: Start Section to validate inputs - if there are parallel blocks being checked
      *      then the winner of this race will get to update the UTXO.
@@ -2128,6 +2130,7 @@ bool ConnectBlock(const CBlock &block,
                 // Only check inputs when the tx hash in not in the setPreVerifiedTxHash as would only
                 // happen if this were a regular block or when a tx is found within the returning XThinblock.
                 uint256 hash = tx.GetHash();
+                if (fCheckInputs == CheckTxInputsOption::TRUE)
                 {
                     {
                         LOCK(cs_xval);
@@ -3657,9 +3660,13 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
 
     // Start enforcing BIP113 (Median Time Past) using versionbits logic.
     int nLockTimeFlags = 0;
-    if (VersionBitsState(pindexPrev, consensusParams, Consensus::DEPLOYMENT_CSV, versionbitscache) == THRESHOLD_ACTIVE)
     {
-        nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
+        LOCK(csVersionBitsCache);
+        if (VersionBitsState(pindexPrev, consensusParams, Consensus::DEPLOYMENT_CSV, versionbitscache) ==
+            THRESHOLD_ACTIVE)
+        {
+            nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
+        }
     }
 
     int64_t nLockTimeCutoff =
@@ -4007,7 +4014,8 @@ bool TestBlockValidity(CValidationState &state,
     const CBlock &block,
     CBlockIndex *pindexPrev,
     bool fCheckPOW,
-    bool fCheckMerkleRoot)
+    bool fCheckMerkleRoot,
+    CheckTxInputsOption fCheckInputs)
 {
     AssertLockHeld(cs_main);
     assert(pindexPrev && pindexPrev == chainActive.Tip());
@@ -4026,7 +4034,7 @@ bool TestBlockValidity(CValidationState &state,
         return false;
     if (!ContextualCheckBlock(block, state, pindexPrev))
         return false;
-    if (!ConnectBlock(block, state, &indexDummy, viewNew, true))
+    if (!ConnectBlock(block, state, &indexDummy, viewNew, true, false, fCheckInputs))
         return false;
     assert(state.IsValid());
 
@@ -4456,13 +4464,19 @@ void UnloadBlockIndex()
         nBytesOrphanPool = 0;
     }
 
+    mempool.clear();
+
+    {
+        LOCK(csVersionBitsCache);
+        versionbitscache.Clear();
+    }
+
     LOCK(cs_main);
     mapUnConnectedHeaders.clear();
     setBlockIndexCandidates.clear();
     chainActive.SetTip(NULL);
     pindexBestInvalid = NULL;
     pindexBestHeader = NULL;
-    mempool.clear();
     nSyncStarted = 0;
     mapBlocksUnlinked.clear();
     vinfoBlockFile.clear();
@@ -4475,7 +4489,6 @@ void UnloadBlockIndex()
     setDirtyFileInfo.clear();
     mapNodeState.clear();
     recentRejects.reset();
-    versionbitscache.Clear();
     for (int b = 0; b < VERSIONBITS_NUM_BITS; b++)
     {
         warningcache[b].clear();
@@ -7246,7 +7259,7 @@ std::string CBlockFileInfo::ToString() const
 
 ThresholdState VersionBitsTipState(const Consensus::Params &params, Consensus::DeploymentPos pos)
 {
-    LOCK(cs_main);
+    LOCK(csVersionBitsCache);
     return VersionBitsState(chainActive.Tip(), params, pos, versionbitscache);
 }
 

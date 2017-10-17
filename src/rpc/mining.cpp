@@ -451,7 +451,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
             if (block.hashPrevBlock != pindexPrev->GetBlockHash())
                 return "inconclusive-not-best-prevblk";
             CValidationState state;
-            TestBlockValidity(state, Params(), block, pindexPrev, false, true);
+            TestBlockValidity(state, Params(), block, pindexPrev, false, true, CheckTxInputsOption::FALSE);
             return BIP22ValidationResult(state);
         }
 
@@ -619,7 +619,11 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     UniValue vbavailable(UniValue::VOBJ);
     for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++i) {
         Consensus::DeploymentPos pos = Consensus::DeploymentPos(i);
-        ThresholdState state = VersionBitsState(pindexPrev, consensusParams, pos, versionbitscache);
+        ThresholdState state;
+        {
+            LOCK(csVersionBitsCache);
+            state = VersionBitsState(pindexPrev, consensusParams, pos, versionbitscache);
+        }
         switch (state) {
             case THRESHOLD_DEFINED:
             case THRESHOLD_FAILED:

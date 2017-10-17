@@ -632,8 +632,8 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, string strComm
         }
         else
         {
-            LogPrint("thin", "Received %s %s from peer %s. Size %d bytes.\n", strCommand, inv.hash.ToString(),
-                pfrom->GetLogName(), nSizeThinBlock);
+            LogPrint("thin", "Received %s %s from peer %s. Size %d bytes.  Current mempool size %d\n",
+                     strCommand, inv.hash.ToString(), pfrom->GetLogName(), nSizeThinBlock, mempool.size());
 
             // Do not process unrequested xthinblocks unless from an expedited node.
             LOCK(pfrom->cs_mapthinblocksinflight);

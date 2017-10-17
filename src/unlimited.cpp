@@ -610,11 +610,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
             //
             unsigned int nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
             uint64_t mempoolSz = mempool.size();
-            CBlockIndex *pindexPrev;
-            {
-                LOCK(cs_main);
-                pindexPrev = chainActive.Tip();
-            }
+            CBlockIndex *pindexPrev = chainActive.Tip();
 
             LogPrint("miner", "BitcoinMiner: Create new block template\n");
             unique_ptr<CBlockTemplate> pblocktemplate(
@@ -629,7 +625,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
             IncrementExtraNonce(pblock, nExtraNonce);
 
             LogPrint("miner", "Running BitcoinMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
-                ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
+                     pblock->size());
 
             //
             // Search
@@ -650,9 +646,10 @@ void static BitcoinMiner(const CChainParams &chainparams)
                         assert(hash == pblock->GetHash());
 
                         SetThreadPriority(THREAD_PRIORITY_NORMAL);
-                        LogPrintf("BitcoinMiner:\n");
                         LogPrintf(
-                            "proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(), hashTarget.GetHex());
+                            "BitcoinMiner: POW found hash: %s target: %s height: %d size: %llu numtx: %d parent: %s\n",
+                            hash.GetHex(), hashTarget.GetHex(), pblock->GetHeight(), pblock->size(),
+                            pblock->hashPrevBlock.GetHex());
                         ProcessBlockFound(pblock, chainparams);
                         SetThreadPriority(THREAD_PRIORITY_LOWEST);
                         coinbaseScript->KeepScript();
@@ -664,7 +661,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
                         break;
                     }
                 }
-                LogPrint("miner","BitcoinMiner: tried %d nonces\n", cumulativeNonce + nNonce);
+                //LogPrint("miner","BitcoinMiner: tried %d nonces\n", cumulativeNonce + nNonce);
                 // Check for stop or if block needs to be rebuilt
                 boost::this_thread::interruption_point();
                 // Regtest mode doesn't require peers
@@ -672,19 +669,28 @@ void static BitcoinMiner(const CChainParams &chainparams)
                     break;
                 if (nNonce >= 0xffff0000)
                     break;
-                // Mempool must change size by 1% and at least 1 minute pass
-                if ((mempool.size()/100 != mempoolSz/100) && (GetTime() - nStart > 60))
-                    break;
+                // Mempool must change size by 1% in either direction and at least 1 minute pass
+                uint64_t curmpsz = mempool.size();
+                uint64_t onepct = mempoolSz/100;
+                if (((curmpsz <= mempoolSz - onepct)||(curmpsz >= mempoolSz + onepct)) && (GetTime() - nStart > 60))
                 {
-                    LOCK(cs_main);
-                    if (pindexPrev != chainActive.Tip())
-                        break;
+                    LogPrint("miner","BitcoinMiner: Mempool changed a lot %llu %llu.\n", mempool.size(), mempoolSz);
+                    break;
+                }
+                // If a block is found by someone else, calculate a new block
+                if (pindexPrev != chainActive.Tip())
+                {
+                    LogPrint("miner","BitcoinMiner: blockchain tip changed\n");
+                    break;
                 }
 
                 // Update nTime every few seconds
                 if (UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev) < 0)
+                {
+                    LogPrint("miner","BitcoinMiner: time ran backwards\n");
                     break; // Recreate the block if the clock has run backwards,
-                // so that we can use the correct time.
+                    // so that we can use the correct time.
+                }
                 if (chainparams.GetConsensus().fPowAllowMinDifficultyBlocks)
                 {
                     // Changing pblock->nTime can change work required on testnet:
@@ -1648,7 +1654,8 @@ UniValue validateblocktemplate(const UniValue &params, bool fHelp)
         }
         else
         {
-            if (!TestBlockValidity(state, chainparams, block, pindexPrev, false, true))
+            // No need to test transaction inputs because the tx would not be in the mempool if it was invalid
+            if (!TestBlockValidity(state, chainparams, block, pindexPrev, false, true, CheckTxInputsOption::TRUE))
             {
                 throw runtime_error(std::string("invalid block: ") + state.GetRejectReason());
             }
@@ -2437,10 +2444,12 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
 
 
     uint64_t interval = (GetStopwatch()-start)/1000;
+    /* typically too much logging, but useful when optimizing tx validation
     LogPrint("bench", "ValidateTransaction, time: %d, tx: %s, len: %d, sigops: %llu (legacy: %u), sighash: %llu, Vin: "
                       "%llu, Vout: %llu\n",
         interval, tx.GetHash().ToString(), nSize, resourceTracker.GetSigOps(), (unsigned int)nSigOps,
         resourceTracker.GetSighashBytes(), tx.vin.size(), tx.vout.size());
+    */
     nTxValidationTime << interval;
 
     return true;
