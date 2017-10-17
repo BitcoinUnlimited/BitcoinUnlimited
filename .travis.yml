@@ -5,7 +5,6 @@ dist: trusty
 addons:
   hostname: bitcoin-tester
 
-
 os: linux
 language: generic
 cache:
@@ -15,7 +14,7 @@ cache:
   - $HOME/.ccache
 env:
   global:
-    - MAKEJOBS=-j3
+    - MAKEJOBS=-j2
     - RUN_TESTS=false
     - RUN_FORMATTING_CHECK=false
     - CHECK_DOC=0
