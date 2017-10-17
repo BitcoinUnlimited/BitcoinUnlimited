@@ -117,13 +117,18 @@ void CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin* moveout) {
     LOCK(cs_utxo);
     CCoinsMap::iterator it = FetchCoin(outpoint);
     if (it == cacheCoins.end()) return;
-    cachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
     if (moveout) {
         *moveout = std::move(it->second.coin);
     }
-    if (it->second.flags & CCoinsCacheEntry::FRESH) {
+    if (it->second.flags & CCoinsCacheEntry::FRESH)
+    {
+        cachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
         cacheCoins.erase(it);
-    } else {
+    }
+    else
+    {
+        // The coin is about to be cleared so delete the size of the scriptPubKey
+        cachedCoinsUsage -= memusage::DynamicUsage(it->second.coin.out.scriptPubKey);
         it->second.flags |= CCoinsCacheEntry::DIRTY;
         it->second.coin.Clear();
     }

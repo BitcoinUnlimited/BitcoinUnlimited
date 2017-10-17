@@ -96,7 +96,8 @@ public:
     }
 
     size_t DynamicMemoryUsage() const {
-        return memusage::DynamicUsage(out.scriptPubKey);
+        // return the sum of sizes for out.scriptPubKey, out.nValue, nHeight and fCoinbase.
+        return memusage::DynamicUsage(out.scriptPubKey) + sizeof(int64_t) + sizeof(uint32_t) + sizeof(unsigned int);
     }
 };
 
