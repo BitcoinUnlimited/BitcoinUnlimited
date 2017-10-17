@@ -84,6 +84,8 @@ public:
     }
 };
 
+extern Snapshot txHandlerSnap;
+
 extern bool ParallelAcceptToMemoryPool(Snapshot &ss,
     CTxMemPool &pool,
     CValidationState &state,

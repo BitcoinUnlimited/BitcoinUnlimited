@@ -3205,8 +3205,9 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
         pblock = NULL;
         fOneDone = true;
     } while (pindexMostWork->nChainWork > chainActive.Tip()->nChainWork);
-    CheckBlockIndex(chainparams.GetConsensus());
 
+    CheckBlockIndex(chainparams.GetConsensus());
+    txHandlerSnap.Load();  // Load the new block into the transaction processor's state snapshot
     return true;
 }
 
