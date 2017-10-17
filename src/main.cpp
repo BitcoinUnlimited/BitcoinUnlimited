@@ -5018,6 +5018,40 @@ std::string GetWarnings(const std::string &strFor)
 // Messages
 //
 
+bool AlreadyHaveInv(const CInv &inv)
+{
+    switch (inv.type)
+    {
+    case MSG_TX:
+    {
+        // Lazy evaluation is important for performance here
+        return  recentRejects.contains(inv.hash) ||  mempool.exists(inv.hash) || AlreadyHaveOrphan(inv.hash);
+        // If we search the UTXO for the hash of incoming INVs, an attacker could consume a lot of CPU and disk
+        // accesses by giving us bogus hashes.  Its better to force that attacker to send us the whole tx.
+        // Its rare for tx to still be relayed even though the block is committed, so checking is probably not
+        // worth it but ideally we could check just the cached coins rather than not check at all.
+        // || pcoinsTip->HaveCoins(inv.hash);
+    }
+    case MSG_BLOCK:
+    case MSG_XTHINBLOCK:
+    case MSG_THINBLOCK:
+    {
+        LOCK(cs_main);
+        // The Request Manager functionality requires that we return true only when we actually have received
+        // the block and not when we have received the header only.  Otherwise the request manager may not
+        // be able to update its block source in order to make re-requests.
+        BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
+        if (mi == mapBlockIndex.end())
+            return false;
+        if (!(mi->second->nStatus & BLOCK_HAVE_DATA))
+            return false;
+        return true;
+    }
+    }
+    // Don't know what it is, just say we already got one
+    return true;
+}
+
 bool AlreadyHaveLocking(const CInv &inv)
 {
     switch (inv.type)
@@ -5661,7 +5695,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             boost::this_thread::interruption_point();
 
-            bool fAlreadyHave = AlreadyHaveLocking(inv);
+            bool fAlreadyHave = AlreadyHaveInv(inv);
             //LogPrint("net", "got inv: %s  %s %s peer=%s\n", inv.ToString(), fAlreadyHave ? "have" : "new",
             //         ibd ? "ignoring" : "", pfrom->GetLogName());
 
