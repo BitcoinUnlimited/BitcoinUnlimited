@@ -172,6 +172,7 @@ public:
             boost::assign::list_of(0x04)(0x88)(0xB2)(0x1E).convert_to_container<std::vector<unsigned char> >();
         base58Prefixes[EXT_SECRET_KEY] =
             boost::assign::list_of(0x04)(0x88)(0xAD)(0xE4).convert_to_container<std::vector<unsigned char> >();
+        cashaddrPrefix = "bitcoincash";
 
         // BITCOINUNLIMITED START
         vFixedSeeds = std::vector<SeedSpec6>();
@@ -265,6 +266,7 @@ public:
             boost::assign::list_of(0x42)(0x69)(0x67)(0x20).convert_to_container<std::vector<unsigned char> >();
         base58Prefixes[EXT_SECRET_KEY] =
             boost::assign::list_of(0x42)(0x6c)(0x6b)(0x73).convert_to_container<std::vector<unsigned char> >();
+        cashaddrPrefix = "bchnol";
 
         vFixedSeeds = std::vector<SeedSpec6>();
 
@@ -367,6 +369,7 @@ public:
             boost::assign::list_of(0x04)(0x35)(0x87)(0xCF).convert_to_container<std::vector<unsigned char> >();
         base58Prefixes[EXT_SECRET_KEY] =
             boost::assign::list_of(0x04)(0x35)(0x83)(0x94).convert_to_container<std::vector<unsigned char> >();
+        cashaddrPrefix = "bchtest";
 
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
 
@@ -455,6 +458,7 @@ public:
             boost::assign::list_of(0x04)(0x35)(0x87)(0xCF).convert_to_container<std::vector<unsigned char> >();
         base58Prefixes[EXT_SECRET_KEY] =
             boost::assign::list_of(0x04)(0x35)(0x83)(0x94).convert_to_container<std::vector<unsigned char> >();
+        cashaddrPrefix = "bchreg";
     }
 };
 static CRegTestParams regTestParams;
