@@ -7199,8 +7199,10 @@ bool SendMessages(CNode *pto)
                 LOCK(pto->cs_vSend);
                 for (int i = 0; i < sz; i += MAX_INV_ELEMENTS)
                 {
-                    int last = std::min(i + MAX_INV_ELEMENTS, sz);
-                    std::vector<CInv> vInv(&vInvSend[i], &vInvSend[last]);
+                    int sendsz = std::min(MAX_INV_ELEMENTS, sz - i);
+                    std::vector<CInv> vInv(sendsz);
+                    for (int j=0;j<sendsz;j++)
+                        vInv[j] = vInvSend[i+j];
                     pto->PushMessage(NetMsgType::INV, vInv); // TODO subvector PushMessage to avoid copy
                 }
             }
