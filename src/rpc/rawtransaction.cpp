@@ -899,7 +899,7 @@ UniValue sendrawtransaction(const UniValue& params, bool fHelp)
     {
         // push to local node and sync with wallets
         CValidationState state;
-        bool fMissingInputs;
+        bool fMissingInputs = false;
         if (!AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, false, !fOverrideFees))
         {
             if (fMissingInputs)

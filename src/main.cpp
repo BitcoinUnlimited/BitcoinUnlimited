@@ -5295,6 +5295,28 @@ static bool ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                             pfrom->txsSent += 1;
                         }
                     }
+                    else  // Look in the commit queue for the transaction
+                    {
+                        bool filled = false;
+                        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+                        {
+                            boost::unique_lock<boost::mutex> lock(csCommitQ);
+                            const auto &elem = txCommitQ.find(inv.hash);
+                            if (elem != txCommitQ.end())
+                            {
+                                filled = true;
+                                ss.reserve(1000);
+                                ss << elem->second.entry.GetTx();
+                                LogPrintf("Filled req from tx commit Q\n");  // TEMP
+                             }
+                        }
+                        if (filled)
+                        {
+                            pfrom->PushMessage(NetMsgType::TX, ss);
+                            pushed = true;
+                            pfrom->txsSent += 1;
+                        }
+                    }
                 }
                 if (!pushed)
                 {

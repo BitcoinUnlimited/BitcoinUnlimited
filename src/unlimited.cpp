@@ -2437,7 +2437,7 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
         if (1)
         {
             boost::unique_lock<boost::mutex> lock(csCommitQ);
-            txCommitQ.push(eData);
+            txCommitQ[eData.hash] = eData;
         }
     }
 
@@ -2583,17 +2583,16 @@ void CommitToMempool()
     if (1)
     {
         boost::unique_lock<boost::mutex> lock(csCommitQ);
-        while (!txCommitQ.empty())
+        for (auto& it: txCommitQ)
         {
-            CTxCommitData &data = txCommitQ.front();
+            CTxCommitData &data = it.second;
             // Store transaction in memory
-            mempool.addUnchecked(data.hash, data.entry, !IsInitialBlockDownload());
+            mempool.addUnchecked(it.first, data.entry, !IsInitialBlockDownload());
             if (mempool.exists(data.hash))
                 SyncWithWallets(data.entry.GetTx(), NULL);
             vWorkQueue.push_back(data.hash);
-
-            txCommitQ.pop();
         }
+        txCommitQ.clear();
     }
 
     processOrphans(vWorkQueue);
@@ -2637,7 +2636,7 @@ void ThreadCommitToMempool()
             CORRAL(txProcessingCorral, BLOCK_PROCESSING);
             boost::this_thread::interruption_point();
             CommitToMempool();
-            
+
             // move the previously deferred txs into active processing
             if (!txDeferQ.empty())
             {

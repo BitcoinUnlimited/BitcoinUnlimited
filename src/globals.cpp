@@ -158,7 +158,7 @@ std::queue<CTxInputData> txInQ;
 std::queue<CTxInputData> txDeferQ;
 CCriticalSection csTxInQ;
 CCond cvTxInQ;
-std::queue<CTxCommitData> txCommitQ;
+std::map<uint256, CTxCommitData> txCommitQ;
 CWaitableCriticalSection csCommitQ;
 CConditionVariable cvCommitQ;
 std::queue<CBlockCommitData> blockCommitQ;

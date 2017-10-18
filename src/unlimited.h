@@ -133,7 +133,10 @@ public:
     uint256 hash;
 };
 
-extern std::queue<CTxCommitData> txCommitQ;
+// The queue of transactions ready to be committed into the mempool.
+// This data structure's primary use is that of a queue, but I need to be able to look up TX in it to service
+// GETDATA requests so it is a map.
+extern std::map<uint256, CTxCommitData> txCommitQ;
 extern std::queue<CBlockCommitData> blockCommitQ;
 extern CWaitableCriticalSection csCommitQ;
 extern CConditionVariable cvCommitQ;
