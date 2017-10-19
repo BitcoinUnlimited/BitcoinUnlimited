@@ -66,7 +66,7 @@ CRequestManager::CRequestManager()
       blockPacer(64, 32) // Max and average # of block requests that can be made per second
 {
     inFlight = 0;
-    sendIter = mapTxnInfo.end();
+    // sendIter = mapTxnInfo.end();
     sendBlkIter = mapBlkInfo.end();
 }
 
@@ -120,8 +120,8 @@ void CRequestManager::cleanup(ShardedMap::iterator &itemIt)
     CUnknownObj &item = itemIt->second;
     cleanup(item);
     assert(item.obj.type == MSG_TX);
-    if (sendIter == itemIt)
-       ++sendIter;
+    //if (sendIter == itemIt)
+    //   ++sendIter;
     mapTxnInfo._erase(itemIt);
 }
 
@@ -140,6 +140,7 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
         OdMap::iterator &item = result.first;
         CUnknownObj &data = item->second;
         data.obj = obj;
+        LogPrint("req", "ReqMgr: Ask for %s.\n", data.obj.ToString().c_str());
         if (result.second) // inserted
         {
             pendingTxns += 1;
@@ -282,7 +283,7 @@ void CRequestManager::Rejected(const CInv &obj, CNode *from, unsigned char reaso
     }
     else if (reason == REJECT_INSUFFICIENTFEE)
     {
-        item->second.rateLimited = true;
+        // TODO: outside of lock: item->second.rateLimited = true;
     }
     else if (reason == REJECT_DUPLICATE)
     {
@@ -666,18 +667,23 @@ void CRequestManager::SendRequests()
     }
 
     // Get Transactions
-    if (sendIter == mapTxnInfo.end())
-        sendIter = mapTxnInfo.begin();
-    while ((sendIter != mapTxnInfo.end()) && requestPacer.try_leak(1))
+    
+    int shard = insecure_rand()&(ShardedMap::NUM_SHARDS-1);
+    ShardedMap::Accessor macc(mapTxnInfo, shard);  // take the lock so we can use this map
+    OdMap::iterator sendIter = macc->begin();
+        // mapTxnInfo.begin(sendIter, shard);
+    //if (sendIter == mapTxnInfo.end())
+    //    mapTxnInfo.begin(sendIter);
+    while (sendIter != macc->end())
     {
         now = GetTimeMicros();
         auto itemIter = sendIter;
-        ShardedMap::Accessor macc(*itemIter.sm, itemIter.shard);  // take the lock so we can use this map
         CUnknownObj &item = itemIter->second;
 
-        ++sendIter; // move it forward up here in case we need to erase the item we are working with.
-        if (itemIter == mapTxnInfo.end())
+        if (itemIter == macc->end())
             break;
+        LogPrint("req", "handling item %s.\n", item.obj.ToString().c_str());
+        ++sendIter; // move it forward up here in case we need to erase the item we are working with.
 
         // if never requested then lastRequestTime==0 so this will always be true
         if (now - item.lastRequestTime > txReqRetryInterval)
@@ -696,12 +702,14 @@ void CRequestManager::SendRequests()
                     droppedTxns += 1;
                 }
 
+                if (!requestPacer.try_leak(1)) break;  // No more send slots available
+    
                 if (item.availableFrom.empty())
                 {
                     // TODO: tell someone about this issue, look in a random node, or something.
                     cleanup(itemIter); // right now we give up requesting it if we have no other sources...
                 }
-                else // Ok, we have at least on source so request this item.
+                else // Ok, we have at least one source so request this item.
                 {
                     CNodeRequestData next;
                     // Go thru the availableFrom list, looking for the first node that isn't disconnected
@@ -736,13 +744,14 @@ void CRequestManager::SendRequests()
                             item.lastRequestTime = now;
                             item.receivingFrom = next.node->id;
 
-                            macc.release();  // do not use "item" after releasing this
+                            //macc.unlock();  // do not use "item" after releasing this
                             if (1)
                             {
                                 next.node->AskFor(obj);
                             }
-                            
+                            //macc.lock();
                         }
+                        
                         {
                             //LOCK(cs_vNodes);
                             //LogPrint("req", "ReqMgr: %s removed tx ref to %d count %d\n",
@@ -801,60 +810,69 @@ bool CRequestManager::IsNodePingAcceptable(CNode *pfrom)
 ShardedMap::iterator ShardedMap::end(int shard)
 {
     ShardedMap::iterator ret;
+    if (shard == -1)  // Asking for the end of the whole sharded map
+    {
+        ret.sm = this;
+        ret.shard = -1;
+        return ret;
+    }
     LOCK(cs[shard]);
     ret.sm = this;
     ret.shard = shard;
-    ret.it = map[shard].end();
+    ret.it = mp[shard].end();
     return ret;
 }
 
-ShardedMap::iterator ShardedMap::begin(int shard)
+void ShardedMap::begin(ShardedMap::iterator& ret, int shard)
 {
-    ShardedMap::iterator ret;
     bool atend = false;
     {
     LOCK(cs[shard]);
     ret.sm = this;
     ret.shard = shard;
-    ret.it = map[shard].begin();
-    atend = (ret.it == map[shard].end());
+    ret.it = mp[shard].begin();
+    atend = (ret.it == mp[shard].end());
     }
 
     while(atend && ret.shard < NUM_SHARDS-1)
     {
         ret.shard++;
         LOCK(cs[ret.shard]);
-        ret.it = map[ret.shard].begin();
-        atend = (ret.it == map[ret.shard].end());
+        ret.it = mp[ret.shard].begin();
+        atend = (ret.it == mp[ret.shard].end());
     }
-    return ret;
+    if (atend) ret.shard=-1;
 }
 
 
 ShardedMap::iterator& ShardedMap::iterator::operator++()
 {
     // Don't increment beyond the end
-    if ((shard==NUM_SHARDS-1) && (it == sm->map[NUM_SHARDS-1].end())) return *this;
+    if (shard == -1) return *this;
 
     bool atend = false;
     {
         LOCK(sm->cs[shard]);
-        atend = it == sm->map[shard].end();
+        atend = it == sm->mp[shard].end();
         if (!atend)
         {
             ++it;
-            atend = (it == sm->map[shard].end());
+            atend = (it == sm->mp[shard].end());
         }
     }
 
     while (atend)
     {
-        if (shard==NUM_SHARDS-1) return *this;  // at the end
+        if (shard==NUM_SHARDS-1)
+        {
+            shard = -1;
+            return *this;  // at the end
+        }
         ++shard;
         {
             LOCK(sm->cs[shard]);
-            it = sm->map[shard].begin();
-            atend = (it == sm->map[shard].end());
+            it = sm->mp[shard].begin();
+            atend = (it == sm->mp[shard].end());
         }
     }
     return *this;

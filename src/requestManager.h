@@ -101,44 +101,50 @@ public:
 
     typedef std::map<uint256, CUnknownObj> OdMap;
 
-    OdMap            map[NUM_SHARDS];
+    OdMap            mp[NUM_SHARDS];
     CCriticalSection cs[NUM_SHARDS];
 
     class Accessor
     {
     protected:
-        OdMap* map;
+        OdMap* mp;
         CCriticalSection* cs;
 
     public:
         Accessor(ShardedMap& sm, unsigned int index)
         {
             int shard = index&(NUM_SHARDS-1);
-            map = &sm.map[shard];
+            mp = &sm.mp[shard];
             cs  = &sm.cs[shard];
             cs->lock();
         }
         Accessor(ShardedMap& sm, uint256 val)
         {
             int shard = (*val.begin())&(NUM_SHARDS-1);
-            map = &sm.map[shard];
+            mp = &sm.mp[shard];
             cs  = &sm.cs[shard];
             cs->lock();
         }
 
-        // Allow for an early release
-        void release()
+        // you must lock again before destruction
+        void unlock()
         {
             if (cs)
             {
                 cs->unlock();
-                cs=NULL;
             }
         }
-        
+        void lock()
+        {
+            if (cs)
+            {
+                cs->lock();
+            }
+        }
+
         ~Accessor()
         {
-            if (map) map = NULL;
+            if (mp) mp = NULL;
             if (cs)
             {
                 cs->unlock();
@@ -146,8 +152,8 @@ public:
             }
         }
 
-        OdMap& operator*(void) { return *map; }
-        OdMap* operator->(void) { return map; }
+        OdMap& operator*(void) { return *mp; }
+        OdMap* operator->(void) { return mp; }
     };
 
     class iterator
@@ -162,6 +168,17 @@ public:
 
         bool operator == (const iterator& other) const
         {
+            // special case the end
+            if (other.shard == -1)
+            {
+                if (shard == -1) return true;
+                return false;
+            }
+            if (shard == -1)
+            {
+                if (other.shard == -1) return true;
+                return false;
+            }
             return (shard == other.shard) && (it == other.it);
         }
         bool operator != (const iterator& other) const
@@ -180,7 +197,7 @@ public:
 
     void _erase(iterator& it)
     {
-        map[it.shard].erase(it.it);
+        mp[it.shard].erase(it.it);
     }
     
     size_t size()
@@ -194,8 +211,10 @@ public:
         return ret;
     }
 
-    iterator end(int shard=NUM_SHARDS-1);
-    iterator begin(int shard=0);
+    iterator end(int shard=-1);
+    // I need to pass the iterator so I can assign it
+    // within the lock
+    void begin(iterator& ret, int shard=0);
 
 };
 
@@ -215,7 +234,7 @@ protected:
     OdMap mapBlkInfo;
     CCriticalSection cs_objDownloader; // protects mapTxnInfo and mapBlkInfo
 
-    ShardedMap::iterator sendIter;
+    // ShardedMap::iterator sendIter;
     OdMap::iterator sendBlkIter;
 
     int inFlight;
