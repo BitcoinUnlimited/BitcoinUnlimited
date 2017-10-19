@@ -677,7 +677,7 @@ void CRequestManager::SendRequests()
     while (sendIter != macc->end())
     {
         now = GetTimeMicros();
-        auto itemIter = sendIter;
+        OdMap::iterator itemIter = sendIter;
         CUnknownObj &item = itemIter->second;
 
         if (itemIter == macc->end())
@@ -707,7 +707,7 @@ void CRequestManager::SendRequests()
                 if (item.availableFrom.empty())
                 {
                     // TODO: tell someone about this issue, look in a random node, or something.
-                    cleanup(itemIter); // right now we give up requesting it if we have no other sources...
+                    cleanup(macc, itemIter); // right now we give up requesting it if we have no other sources...
                 }
                 else // Ok, we have at least one source so request this item.
                 {
