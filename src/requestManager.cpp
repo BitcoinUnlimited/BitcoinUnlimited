@@ -71,9 +71,8 @@ CRequestManager::CRequestManager()
 }
 
 
-void CRequestManager::cleanup(OdMap::iterator &itemIt)
+void CRequestManager::cleanup(CUnknownObj &item)
 {
-    CUnknownObj &item = itemIt->second;
     // Because we'll ignore anything deleted from the map, reduce the # of requests in flight by every request we made
     // for this object
     inFlight -= item.outstandingReqs;
@@ -95,32 +94,49 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
         }
     }
     item.availableFrom.clear();
-
-    if (item.obj.type == MSG_TX)
-    {
-        if (sendIter == itemIt)
-            ++sendIter;
-        mapTxnInfo.erase(itemIt);
-    }
-    else
-    {
-        if (sendBlkIter == itemIt)
-            ++sendBlkIter;
-        mapBlkInfo.erase(itemIt);
-    }
 }
+
+void CRequestManager::cleanup(OdMap::iterator &itemIt)
+{
+    CUnknownObj &item = itemIt->second;
+    cleanup(item);
+    if (sendBlkIter == itemIt)
+            ++sendBlkIter;
+    mapBlkInfo.erase(itemIt);
+}
+
+void CRequestManager::cleanup(ShardedMap::Accessor &macc, OdMap::iterator &itemIt)
+{
+    CUnknownObj &item = itemIt->second;
+    cleanup(item);
+    if (sendBlkIter == itemIt)
+            ++sendBlkIter;
+    macc->erase(itemIt);
+}
+
+
+void CRequestManager::cleanup(ShardedMap::iterator &itemIt)
+{
+    CUnknownObj &item = itemIt->second;
+    cleanup(item);
+    assert(item.obj.type == MSG_TX);
+    if (sendIter == itemIt)
+       ++sendIter;
+    mapTxnInfo._erase(itemIt);
+}
+
 
 // Get this object from somewhere, asynchronously.
 void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority)
 {
     // LogPrint("req", "ReqMgr: Ask for %s.\n", obj.ToString().c_str());
 
-    LOCK(cs_objDownloader);
     if (obj.type == MSG_TX)
     {
         uint256 temp = obj.hash;
         OdMap::value_type v(temp, CUnknownObj());
-        std::pair<OdMap::iterator, bool> result = mapTxnInfo.insert(v);
+        ShardedMap::Accessor macc(mapTxnInfo, temp);
+        std::pair<OdMap::iterator, bool> result = macc->insert(v);
         OdMap::iterator &item = result.first;
         CUnknownObj &data = item->second;
         data.obj = obj;
@@ -137,6 +153,7 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
     }
     else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_THINBLOCK) || (obj.type == MSG_XTHINBLOCK))
     {
+        LOCK(cs_objDownloader);
         uint256 temp = obj.hash;
         OdMap::value_type v(temp, CUnknownObj());
         std::pair<OdMap::iterator, bool> result = mapBlkInfo.insert(v);
@@ -172,20 +189,21 @@ void CRequestManager::AskFor(const std::vector<CInv> &objArray, CNode *from, uns
 void CRequestManager::Received(const CInv &obj, CNode *from, int bytes)
 {
     int64_t now = GetTimeMicros();
-    LOCK(cs_objDownloader);
     if (obj.type == MSG_TX)
     {
-        OdMap::iterator item = mapTxnInfo.find(obj.hash);
-        if (item == mapTxnInfo.end())
+        ShardedMap::Accessor macc(mapTxnInfo, obj.hash);
+        OdMap::iterator item = macc->find(obj.hash);
+        if (item == macc->end())
             return; // item has already been removed
         LogPrint("req", "ReqMgr: TX received for %s.\n", item->second.obj.ToString().c_str());
         from->txReqLatency << (now - item->second.lastRequestTime); // keep track of response latency of this node
         // will be decremented in the item cleanup: if (inFlight) inFlight--;
-        cleanup(item); // remove the item
+        cleanup(macc, item); // remove the item
         receivedTxns += 1;
     }
     else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_THINBLOCK) || (obj.type == MSG_XTHINBLOCK))
     {
+        LOCK(cs_objDownloader);
         OdMap::iterator item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
             return; // item has already been removed
@@ -200,28 +218,34 @@ void CRequestManager::Received(const CInv &obj, CNode *from, int bytes)
 // Indicate that we got this object, from and bytes are optional (for node performance tracking)
 void CRequestManager::AlreadyReceived(const CInv &obj)
 {
-    LOCK(cs_objDownloader);
-    OdMap::iterator item = mapTxnInfo.find(obj.hash);
-    if (item == mapTxnInfo.end())
+    LogPrint("req", "ReqMgr: Already received %s.  Removing request.\n", obj.ToString().c_str());
+    if (obj.type == MSG_TX)
     {
-        item = mapBlkInfo.find(obj.hash);
-        if (item == mapBlkInfo.end())
-            return; // Not in any map
+        ShardedMap::Accessor macc(mapTxnInfo, obj.hash);
+        OdMap::iterator item = macc->find(obj.hash);
+        if (item == macc->end())
+            return; // item has already been removed
+        cleanup(macc, item);
     }
-    LogPrint("req", "ReqMgr: Already received %s.  Removing request.\n", item->second.obj.ToString().c_str());
-    // will be decremented in the item cleanup: if (inFlight) inFlight--;
-    cleanup(item); // remove the item
+    else
+    {
+        LOCK(cs_objDownloader);
+        OdMap::iterator item = mapBlkInfo.find(obj.hash);
+        if (item == mapBlkInfo.end())
+            return; // item has already been removed
+        cleanup(item); // remove the item
+    }
 }
 
 // Indicate that we got this object, from and bytes are optional (for node performance tracking)
 void CRequestManager::Rejected(const CInv &obj, CNode *from, unsigned char reason)
 {
-    LOCK(cs_objDownloader);
     OdMap::iterator item;
     if (obj.type == MSG_TX)
     {
-        item = mapTxnInfo.find(obj.hash);
-        if (item == mapTxnInfo.end())
+        ShardedMap::Accessor macc(mapTxnInfo, obj.hash);
+        item = macc->find(obj.hash);
+        if (item == macc->end())
         {
             LogPrint("req", "ReqMgr: Item already removed. Unknown txn rejected %s\n", obj.ToString().c_str());
             return;
@@ -235,6 +259,7 @@ void CRequestManager::Rejected(const CInv &obj, CNode *from, unsigned char reaso
     }
     else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_THINBLOCK) || (obj.type == MSG_XTHINBLOCK))
     {
+        LOCK(cs_objDownloader);
         item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
         {
@@ -452,20 +477,25 @@ void CRequestManager::RemoveSource(CNode *from)
     int tx = 0;
     int blk = 0;
     {
-        LOCK(cs_objDownloader);
-        for (auto &rq : mapTxnInfo)
+        for (int i = 0; i < ShardedMap::NUM_SHARDS; i++)
         {
-            CUnknownObj &req = rq.second;
-            if (req.receivingFrom == from->id)
+            ShardedMap::Accessor macc(mapTxnInfo, i);
+            for (auto &rq : *macc)
             {
-                req.lastRequestTime = 0; // request aborted
-                req.outstandingReqs--;
-                req.receivingFrom = 0;
-                // We will delete from the availableFrom list when we next process this req
-                tx++;
+                CUnknownObj &req = rq.second;
+                if (req.receivingFrom == from->id)
+                {
+                    req.lastRequestTime = 0; // request aborted
+                    req.outstandingReqs--;
+                    req.receivingFrom = 0;
+                    // We will delete from the availableFrom list when we next process this req
+                    tx++;
+                }
             }
         }
 
+        {
+        LOCK(cs_objDownloader);
         for (auto &rq : mapBlkInfo)
         {
             CUnknownObj &req = rq.second;
@@ -477,6 +507,7 @@ void CRequestManager::RemoveSource(CNode *from)
                 // We will delete from the availableFrom list when we next process this req
                 blk++;
             }
+        }
         }
     }
     LogPrint("req", "ReqMgr: Removed source %s, outstanding: %d tx, %d blk\n", from->GetLogName(), tx, blk);
@@ -626,7 +657,8 @@ void CRequestManager::SendRequests()
     while ((sendIter != mapTxnInfo.end()) && requestPacer.try_leak(1))
     {
         now = GetTimeMicros();
-        OdMap::iterator itemIter = sendIter;
+        auto itemIter = sendIter;
+        ShardedMap::Accessor macc(*itemIter.sm, itemIter.shard);  // take the lock so we can use this map
         CUnknownObj &item = itemIter->second;
 
         ++sendIter; // move it forward up here in case we need to erase the item we are working with.
@@ -749,4 +781,67 @@ bool CRequestManager::IsNodePingAcceptable(CNode *pfrom)
     }
 #endif
     return true;
+}
+
+
+ShardedMap::iterator ShardedMap::end(int shard)
+{
+    ShardedMap::iterator ret;
+    LOCK(cs[shard]);
+    ret.sm = this;
+    ret.shard = shard;
+    ret.it = map[shard].end();
+    return ret;
+}
+
+ShardedMap::iterator ShardedMap::begin(int shard)
+{
+    ShardedMap::iterator ret;
+    bool atend = false;
+    {
+    LOCK(cs[shard]);
+    ret.sm = this;
+    ret.shard = shard;
+    ret.it = map[shard].begin();
+    atend = (ret.it == map[shard].end());
+    }
+
+    while(atend && ret.shard < NUM_SHARDS-1)
+    {
+        ret.shard++;
+        LOCK(cs[ret.shard]);
+        ret.it = map[ret.shard].begin();
+        atend = (ret.it == map[ret.shard].end());
+    }
+    return ret;
+}
+
+
+ShardedMap::iterator& ShardedMap::iterator::operator++()
+{
+    // Don't increment beyond the end
+    if ((shard==NUM_SHARDS-1) && (it == sm->map[NUM_SHARDS-1].end())) return *this;
+
+    bool atend = false;
+    {
+        LOCK(sm->cs[shard]);
+        atend = it == sm->map[shard].end();
+        if (!atend)
+        {
+            ++it;
+            atend = (it == sm->map[shard].end());
+        }
+    }
+
+    while (atend)
+    {
+        if (shard==NUM_SHARDS-1) return *this;  // at the end
+        ++shard;
+        {
+            LOCK(sm->cs[shard]);
+            it = sm->map[shard].begin();
+            atend = (it == sm->map[shard].end());
+        }
+    }
+    return *this;
 }

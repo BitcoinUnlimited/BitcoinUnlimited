@@ -91,6 +91,104 @@ public:
     bool AddSource(CNode *from); // returns true if the source did not already exist
 };
 
+class ShardedMap
+{
+public:
+    enum
+    {
+        NUM_SHARDS = 8
+    };
+
+    typedef std::map<uint256, CUnknownObj> OdMap;
+
+    OdMap            map[NUM_SHARDS];
+    CCriticalSection cs[NUM_SHARDS];
+
+    class Accessor
+    {
+    protected:
+        OdMap* map;
+        CCriticalSection* cs;
+
+    public:
+        Accessor(ShardedMap& sm, unsigned int index)
+        {
+            int shard = index&(NUM_SHARDS-1);
+            map = &sm.map[shard];
+            cs  = &sm.cs[shard];
+            cs->lock();
+        }
+        Accessor(ShardedMap& sm, uint256 val)
+        {
+            int shard = (*val.begin())&(NUM_SHARDS-1);
+            map = &sm.map[shard];
+            cs  = &sm.cs[shard];
+            cs->lock();
+        }
+
+        ~Accessor()
+        {
+            if (map) map = NULL;
+            if (cs)
+            {
+                cs->unlock();
+                cs=NULL;
+            }
+        }
+
+        OdMap& operator*(void) { return *map; }
+        OdMap* operator->(void) { return map; }
+    };
+
+    class iterator
+    {
+    public:
+        int shard;
+        ShardedMap* sm;
+        OdMap::iterator it;
+        friend class ShardedMap;
+        OdMap::iterator& operator->() { return it; }
+        OdMap::value_type operator*() { return *it; }
+
+        bool operator == (const iterator& other) const
+        {
+            return (shard == other.shard) && (it == other.it);
+        }
+        bool operator != (const iterator& other) const
+        {
+            return !(*this == other);
+        }
+
+        iterator& operator++();
+
+        iterator()
+        {
+            shard = -1;
+            sm = NULL;
+        }
+    };
+
+    void _erase(iterator& it)
+    {
+        map[it.shard].erase(it.it);
+    }
+    
+    size_t size()
+    {
+        size_t ret=0;
+        for (int i=0;i<NUM_SHARDS;i++)
+        {
+            Accessor macc(*this, i);
+            ret += macc->size();
+        }
+        return ret;
+    }
+
+    iterator end(int shard=NUM_SHARDS-1);
+    iterator begin(int shard=0);
+
+};
+
 class CRequestManager
 {
 protected:
@@ -103,11 +201,11 @@ protected:
 
     // map of transactions
     typedef std::map<uint256, CUnknownObj> OdMap;
-    OdMap mapTxnInfo;
+    ShardedMap mapTxnInfo;
     OdMap mapBlkInfo;
     CCriticalSection cs_objDownloader; // protects mapTxnInfo and mapBlkInfo
 
-    OdMap::iterator sendIter;
+    ShardedMap::iterator sendIter;
     OdMap::iterator sendBlkIter;
 
     int inFlight;
@@ -118,7 +216,11 @@ protected:
     CStatHistory<int> droppedTxns;
     CStatHistory<int> pendingTxns;
 
+    void cleanup(CUnknownObj &item);
+    void cleanup(ShardedMap::Accessor &macc, OdMap::iterator &itemIt);
     void cleanup(OdMap::iterator &item);
+    void cleanup(ShardedMap::iterator &item);
+
     CLeakyBucket requestPacer;
     CLeakyBucket blockPacer;
 
@@ -130,7 +232,7 @@ public:
     {
         return mapBlkInfo.size();
     }
-        
+
     // Get this object from somewhere, asynchronously.
     void AskFor(const CInv &obj, CNode *from, unsigned int priority = 0);
 

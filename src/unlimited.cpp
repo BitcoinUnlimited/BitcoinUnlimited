@@ -1686,6 +1686,7 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.push_back(Pair("requester.mapBlkInfo", requester.mapBlkInfo.size()));
     unsigned long int max = 0;
     unsigned long int size = 0;
+#if 0 // TODO: fix for shardmap changes
     for (CRequestManager::OdMap::iterator i = requester.mapTxnInfo.begin(); i != requester.mapTxnInfo.end(); i++)
     {
         unsigned long int temp = i->second.availableFrom.size();
@@ -1695,7 +1696,7 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     }
     ret.push_back(Pair("requester.mapTxnInfo.maxobj", max));
     ret.push_back(Pair("requester.mapTxnInfo.totobj", size));
-
+#endif
     max = 0;
     size = 0;
     for (CRequestManager::OdMap::iterator i = requester.mapBlkInfo.begin(); i != requester.mapBlkInfo.end(); i++)
