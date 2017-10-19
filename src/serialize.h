@@ -23,7 +23,7 @@
 
 #include "prevector.h"
 
-static const unsigned int MAX_SIZE = (1024*1024*1025);  // BU allow a bit over 1GB messages
+static const unsigned int MAX_SIZE = (1024*1024*1100);  // BU allow a bit over 1GB messages
 
 /**
  * Used to bypass the rule against non-const reference to temporary
