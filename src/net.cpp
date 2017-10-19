@@ -2972,15 +2972,18 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
         nActivityBytes += nSize;
 
         // BU: furthermore, if the message is a priority message then move to the front of the deque
-        if (strcmp(strCommand, NetMsgType::GET_XTHIN) == 0 || strcmp(strCommand, NetMsgType::XTHINBLOCK) == 0 ||
-            strcmp(strCommand, NetMsgType::THINBLOCK) == 0 || strcmp(strCommand, NetMsgType::XBLOCKTX) == 0 ||
-            strcmp(strCommand, NetMsgType::GET_XBLOCKTX) == 0)
-        {
-            it = vSendMsg.insert(vSendMsg.begin(), CSerializeData());
-            LogPrint("thin", "Send Queue: pushed %s to the front of the queue\n", strCommand);
-        }
-        else
-            it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
+        // FIXME: Temporary disabled pushing of xthin message in front of the send message queue
+        //if (strcmp(strCommand, NetMsgType::GET_XTHIN) == 0 || strcmp(strCommand, NetMsgType::XTHINBLOCK) == 0 ||
+        //    strcmp(strCommand, NetMsgType::THINBLOCK) == 0 || strcmp(strCommand, NetMsgType::XBLOCKTX) == 0 ||
+        //    strcmp(strCommand, NetMsgType::GET_XBLOCKTX) == 0)
+        //{
+        //    it = vSendMsg.insert(vSendMsg.begin(), CSerializeData());
+        //    LogPrint("thin", "Send Queue: pushed %s to the front of the queue\n", strCommand);
+        //}
+        //else
+        //    it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
+
+        it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
     }
     else
         it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
