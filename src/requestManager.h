@@ -126,6 +126,16 @@ public:
             cs->lock();
         }
 
+        // Allow for an early release
+        void release()
+        {
+            if (cs)
+            {
+                cs->unlock();
+                cs=NULL;
+            }
+        }
+        
         ~Accessor()
         {
             if (map) map = NULL;
