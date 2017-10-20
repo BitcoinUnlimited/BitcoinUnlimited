@@ -632,8 +632,9 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, string strComm
         }
         else
         {
-            LogPrint("thin", "Received %s %s from peer %s. Size %d bytes.  Current mempool size %d\n",
-                     strCommand, inv.hash.ToString(), pfrom->GetLogName(), nSizeThinBlock, mempool.size());
+            LogPrint("thin", "Received %s %s from peer %s. Size %d bytes (%d hashes, %d tx).  Current mempool size %d\n",
+                     strCommand, inv.hash.ToString(), pfrom->GetLogName(), nSizeThinBlock, thinBlock.vTxHashes.size(),
+                     thinBlock.vMissingTx.size(), mempool.size());
 
             // Do not process unrequested xthinblocks unless from an expedited node.
             LOCK(pfrom->cs_mapthinblocksinflight);
@@ -705,41 +706,61 @@ bool CXThinBlock::process(CNode *pfrom,
              ++mi)
         {
             uint64_t cheapHash = (*mi).first.GetCheapHash();
-            if (mapPartialTxHash.count(cheapHash)) // Check for collisions
+            auto const& item = mapPartialTxHash.insert(map<uint64_t, uint256>::value_type(cheapHash,(*mi).first));
+            if (!item.second)
+            {
                 collision = true;
-            mapPartialTxHash[cheapHash] = (*mi).first;
+                break;
+            }
         }
 
         // We don't have to keep the lock on mempool.cs here to do mempool.queryHashes
         // but we take the lock anyway so we don't have to re-lock again later.
         READLOCK(mempool.cs);
         LOCK(cs_xval);
-        mempool.queryHashes(memPoolHashes);
 
-        for (uint64_t i = 0; i < memPoolHashes.size(); i++)
+        if (!collision)
         {
-            uint64_t cheapHash = memPoolHashes[i].GetCheapHash();
-            if (mapPartialTxHash.count(cheapHash)) // Check for collisions
-                collision = true;
-            mapPartialTxHash[cheapHash] = memPoolHashes[i];
-        }
-        for (map<uint64_t, CTransaction>::iterator mi = pfrom->mapMissingTx.begin(); mi != pfrom->mapMissingTx.end();
-             ++mi)
-        {
-            uint64_t cheapHash = (*mi).first;
-            // Check for cheap hash collision. Only mark as collision if the full hash is not the same,
-            // because the same tx could have been received into the mempool during the request of the xthinblock.
-            // In that case we would have the same transaction twice, so it is not a real cheap hash collision and we
-            // continue normally.
-            const uint256 existingHash = mapPartialTxHash[cheapHash];
-            if (!existingHash.IsNull())
-            { // Check if we already have the cheap hash
-                if (existingHash != (*mi).second.GetHash())
-                { // Check if it really is a cheap hash collision and not just the same transaction
+            mempool.queryHashes(memPoolHashes);
+
+            for (uint64_t i = 0; i < memPoolHashes.size(); i++)
+            {
+                uint64_t cheapHash = memPoolHashes[i].GetCheapHash();
+                auto const &item =
+                    mapPartialTxHash.insert(map<uint64_t, uint256>::value_type(cheapHash, memPoolHashes[i]));
+                if (!item.second)
+                {
                     collision = true;
+                    break;
                 }
             }
-            mapPartialTxHash[cheapHash] = (*mi).second.GetHash();
+        }
+
+        if (!collision)
+        {
+            for (map<uint64_t, CTransaction>::iterator mi = pfrom->mapMissingTx.begin();
+                 mi != pfrom->mapMissingTx.end(); ++mi)
+            {
+                uint64_t cheapHash = (*mi).first;
+                // Check for cheap hash collision. Only mark as collision if the full hash is not the same,
+                // because the same tx could have been received into the mempool during the request of the xthinblock.
+                // In that case we would have the same transaction twice, so it is not a real cheap hash collision and
+                // we
+                // continue normally.
+                uint256 fullHash = (*mi).second.GetHash();
+                auto const &item = mapPartialTxHash.insert(map<uint64_t, uint256>::value_type(cheapHash, fullHash));
+                if (!item.second)
+                {
+                    const uint256 existingHash = item.first->second;
+                    // if (!existingHash.IsNull())
+                    // Check if we already have the cheap hash
+                    if (existingHash != fullHash)
+                    { // Check if it really is a cheap hash collision and not just the same transaction
+                        collision = true;
+                        break;
+                    }
+                }
+            }
         }
 
         if (!collision)
@@ -748,8 +769,9 @@ bool CXThinBlock::process(CNode *pfrom,
             uint256 nullhash;
             BOOST_FOREACH (const uint64_t &cheapHash, vTxHashes)
             {
-                if (mapPartialTxHash.find(cheapHash) != mapPartialTxHash.end())
-                    pfrom->thinBlockHashes.push_back(mapPartialTxHash[cheapHash]);
+                auto item = mapPartialTxHash.find(cheapHash);
+                if (item != mapPartialTxHash.end())
+                    pfrom->thinBlockHashes.push_back(item->second);
                 else
                 {
                     pfrom->thinBlockHashes.push_back(nullhash); // placeholder
@@ -801,7 +823,8 @@ bool CXThinBlock::process(CNode *pfrom,
         return true;
     }
 
-    pfrom->thinBlockWaitingForTxns = missingCount;
+    pfrom->thinBlockWaitingForTxns = setHashesToRequest.size();
+    ;
     LogPrint("thin", "xthinblock waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n",
         pfrom->thinBlockWaitingForTxns, unnecessaryCount, pfrom->thinBlock.vtx.size(), pfrom->mapMissingTx.size());
 
@@ -812,9 +835,11 @@ bool CXThinBlock::process(CNode *pfrom,
         pfrom->thinBlockWaitingForTxns = setHashesToRequest.size();
         CXRequestThinBlockTx thinBlockTx(header.GetHash(), setHashesToRequest);
         pfrom->PushMessage(NetMsgType::GET_XBLOCKTX, thinBlockTx);
-
         // Update run-time statistics of thin block bandwidth savings
         thindata.UpdateInBoundReRequestedTx(pfrom->thinBlockWaitingForTxns);
+
+        LogPrint("thin", "Sending re-req for %d missing transaction(s), peer=%s", pfrom->thinBlockWaitingForTxns,
+            pfrom->GetLogName());
         return true;
     }
 
@@ -844,7 +869,8 @@ bool CXThinBlock::process(CNode *pfrom,
     LogPrint("thin", "thin block stats: %s\n", thindata.ToString().c_str());
 
     // Process the full block
-    PV->HandleBlockMessage(pfrom, strCommand, std::shared_ptr<CBlock>(std::shared_ptr<CBlock>{}, &pfrom->thinBlock), GetInv(), blockSize);
+    PV->HandleBlockMessage(
+        pfrom, strCommand, std::shared_ptr<CBlock>(std::shared_ptr<CBlock>{}, &pfrom->thinBlock), GetInv(), blockSize);
 
     return true;
 }

@@ -667,13 +667,9 @@ void CRequestManager::SendRequests()
     }
 
     // Get Transactions
-    
     int shard = insecure_rand()&(ShardedMap::NUM_SHARDS-1);
     ShardedMap::Accessor macc(mapTxnInfo, shard);  // take the lock so we can use this map
     OdMap::iterator sendIter = macc->begin();
-        // mapTxnInfo.begin(sendIter, shard);
-    //if (sendIter == mapTxnInfo.end())
-    //    mapTxnInfo.begin(sendIter);
     while (sendIter != macc->end())
     {
         now = GetTimeMicros();
@@ -682,7 +678,7 @@ void CRequestManager::SendRequests()
 
         if (itemIter == macc->end())
             break;
-        LogPrint("req", "handling item %s.\n", item.obj.ToString().c_str());
+        //LogPrint("req", "handling item %s.\n", item.obj.ToString().c_str());
         ++sendIter; // move it forward up here in case we need to erase the item we are working with.
 
         // if never requested then lastRequestTime==0 so this will always be true
@@ -696,14 +692,13 @@ void CRequestManager::SendRequests()
                 {
                     LogPrint("req", "Request timeout for %s.  Retrying\n", item.obj.ToString().c_str());
                     // Not reducing inFlight; it's still outstanding and will be cleaned up when item is removed from
-                    // map
-                    // note we can never be sure its really dropped verses just delayed for a long time so this is not
-                    // authoritative.
+                    // map.  note we can never be sure its really dropped verses just delayed for a long time so this
+                    // is not authoritative.
                     droppedTxns += 1;
                 }
 
                 if (!requestPacer.try_leak(1)) break;  // No more send slots available
-    
+
                 if (item.availableFrom.empty())
                 {
                     // TODO: tell someone about this issue, look in a random node, or something.
@@ -721,7 +716,6 @@ void CRequestManager::SendRequests()
                         {
                             if (next.node->fDisconnect) // Node was disconnected so we can't request from it
                             {
-                                //LOCK(cs_vNodes);
                                 //LogPrint("req", "ReqMgr: %s removed tx ref to %d count %d (on disconnect).\n",
                                 //    item.obj.ToString(), next.node->GetId(), next.node->GetRefCount());
                                 next.node->Release();
@@ -751,9 +745,7 @@ void CRequestManager::SendRequests()
                             }
                             //macc.lock();
                         }
-                        
                         {
-                            //LOCK(cs_vNodes);
                             //LogPrint("req", "ReqMgr: %s removed tx ref to %d count %d\n",
                             //    obj.ToString(), next.node->GetId(), next.node->GetRefCount());
                             next.node->Release();
