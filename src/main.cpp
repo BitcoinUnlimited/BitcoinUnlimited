@@ -3903,13 +3903,15 @@ bool ProcessNewBlock(CValidationState &state,
     bool fParallel)
 {
     int64_t start = GetTimeMicros();
-
+    uint256 hash = pblock->GetHash();
+    CInv inv(MSG_BLOCK, hash);
     LogPrint("thin", "Processing new block %s from peer %s (%d).\n", pblock->GetHash().ToString(),
         pfrom ? pfrom->addrName.c_str() : "myself", pfrom ? pfrom->id : 0);
     // Preliminary checks
     if (!CheckBlockHeader(*pblock, state, true))
     { // block header is bad
         // demerit the sender
+        requester.Resume(inv);
         return error("%s: CheckBlockHeader FAILED", __func__);
     }
     if (IsChainNearlySyncd() && !fImporting && !fReindex)
@@ -3930,11 +3932,11 @@ bool ProcessNewBlock(CValidationState &state,
     //                called from other places.  Currently it seems best to leave cs_main here as is.
     {
         LOCK(cs_main);
-        uint256 hash = pblock->GetHash();
         bool fRequested = MarkBlockAsReceived(hash);
         fRequested |= fForceProcessing;
         if (!checked)
         {
+            requester.Resume(inv);
             return error("%s: CheckBlock FAILED", __func__);
         }
 
@@ -3950,12 +3952,12 @@ bool ProcessNewBlock(CValidationState &state,
         {
             // BU TODO: if block comes out of order (before its parent) this will happen.  We should cache the block
             // until the parents arrive.
+            requester.Resume(inv);
             return error("%s: AcceptBlock FAILED", __func__);
         }
 
         // We must indicate to the request manager that the block was received only after it has
         // been stored to disk. Doing so prevents unnecessary re-requests.
-        CInv inv(MSG_BLOCK, hash);
         requester.Received(inv, pfrom);
     }
     if (!ActivateBestChain(state, chainparams, pblock, fParallel))

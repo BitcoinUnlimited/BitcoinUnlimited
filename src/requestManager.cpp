@@ -489,6 +489,8 @@ void CRequestManager::RemoveSource(CNode *from)
                     req.lastRequestTime = 0; // request aborted
                     req.outstandingReqs--;
                     req.receivingFrom = 0;
+                    req.paused = 0;  // In case processing data from this node caused a pause, we must resume.
+                                     // this could lead to a double request
                     // We will delete from the availableFrom list when we next process this req
                     tx++;
                 }
@@ -505,6 +507,9 @@ void CRequestManager::RemoveSource(CNode *from)
                 req.lastRequestTime = 0; // request aborted
                 req.outstandingReqs--;
                 req.receivingFrom = 0;
+                // In case processing data from this node caused a pause, we must resume.
+                // this could lead to a double request
+                req.paused = 0;
                 // We will delete from the availableFrom list when we next process this req
                 blk++;
             }
@@ -551,7 +556,7 @@ void CRequestManager::SendRequests()
                     break;
 
                 // if never requested then lastRequestTime==0 so this will always be true
-                if (now - item.lastRequestTime > blkReqRetryInterval)
+                if ((!item.paused)&&(now - item.lastRequestTime > blkReqRetryInterval))
                 {
                     if (!item.availableFrom.empty())
                     {
@@ -684,7 +689,7 @@ void CRequestManager::SendRequests()
         // if never requested then lastRequestTime==0 so this will always be true
         if (now - item.lastRequestTime > txReqRetryInterval)
         {
-            if (!item.rateLimited)
+            if (!item.paused)
             {
                 // If item.lastRequestTime is true then we've requested at least once, so this is a rerequest -> a txn
                 // request was dropped.
@@ -868,4 +873,50 @@ ShardedMap::iterator& ShardedMap::iterator::operator++()
         }
     }
     return *this;
+}
+
+
+void CRequestManager::Pause(const CInv &obj)
+{
+    if (obj.type == MSG_TX)
+    {
+        ShardedMap::Accessor macc(mapTxnInfo, obj.hash);
+        OdMap::iterator item = macc->find(obj.hash);
+        if (item == macc->end())
+            return; // item has already been removed
+        LogPrint("req", "ReqMgr: TX %s paused.\n", item->second.obj.ToString().c_str());
+
+        item->second.paused++;
+    }
+    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_THINBLOCK) || (obj.type == MSG_XTHINBLOCK))
+    {
+        LOCK(cs_objDownloader);
+        OdMap::iterator item = mapBlkInfo.find(obj.hash);
+        if (item == mapBlkInfo.end())
+            return; // item has already been removed
+        LogPrint("blk", "ReqMgr: block %s paused\n", item->second.obj.ToString().c_str());
+        item->second.paused++;
+    }
+}
+
+void CRequestManager::Resume(const CInv &obj)
+{
+    if (obj.type == MSG_TX)
+    {
+        ShardedMap::Accessor macc(mapTxnInfo, obj.hash);
+        OdMap::iterator item = macc->find(obj.hash);
+        if (item == macc->end())
+            return; // item has already been removed
+        if (item->second.paused) item->second.paused--;
+        LogPrint("req", "ReqMgr: TX  %s resumed (count %d)\n", item->second.obj.ToString().c_str(), item->second.paused);
+    }
+    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_THINBLOCK) || (obj.type == MSG_XTHINBLOCK))
+    {
+        LOCK(cs_objDownloader);
+        OdMap::iterator item = mapBlkInfo.find(obj.hash);
+        if (item == mapBlkInfo.end())
+            return; // item has already been removed
+        if (item->second.paused) item->second.paused--;
+        LogPrint("blk", "ReqMgr: block %s resumed (count %d)\n", item->second.obj.ToString().c_str(),item->second.paused);
+    }
 }

@@ -61,11 +61,14 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     CThinBlock thinBlock;
     vRecv >> thinBlock;
+    CInv inv(MSG_BLOCK, thinBlock.header.GetHash());
 
+    requester.Pause(inv);
     // Message consistency checking
     if (!IsThinBlockValid(pfrom, thinBlock.vMissingTx, thinBlock.header))
     {
         dosMan.Misbehaving(pfrom, 100);
+        requester.Resume(inv);
         return error("Invalid thinblock received");
     }
 
@@ -76,6 +79,7 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         BlockMap::iterator mi = mapBlockIndex.find(prevHash);
         if (mi == mapBlockIndex.end())
         {
+            requester.Resume(inv);  // TODO, should I stop requesting this block?
             return error("thinblock from peer %s will not connect, unknown previous block %s", pfrom->GetLogName(),
                 prevHash.ToString());
         }
@@ -84,13 +88,13 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         if (!ContextualCheckBlockHeader(thinBlock.header, state, pprev))
         {
             // Thin block does not fit within our blockchain
+            requester.Resume(inv);  // TODO, should I stop requesting this block?
             dosMan.Misbehaving(pfrom, 100);
             return error(
                 "thinblock from peer %s contextual error: %s", pfrom->GetLogName(), state.GetRejectReason().c_str());
         }
     }
 
-    CInv inv(MSG_BLOCK, thinBlock.header.GetHash());
     int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);
     LogPrint("thin", "received thinblock %s from peer %s of %d bytes\n", inv.hash.ToString(), pfrom->GetLogName(),
         nSizeThinBlock);
@@ -148,7 +152,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
     if (header.hashMerkleRoot != merkleroot || mutated)
     {
         thindata.ClearThinBlockData(pfrom, header.GetHash());
-
+        requester.Resume(CInv(MSG_BLOCK, header.GetHash()));
         dosMan.Misbehaving(pfrom, 100);
         return error("Thinblock merkle root does not match computed merkle root, peer=%s", pfrom->GetLogName());
     }
@@ -165,7 +169,10 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
         int unnecessaryCount = 0;
 
         if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
+        {
+            requester.Resume(CInv(MSG_BLOCK, header.GetHash()));
             return false;
+        }
 
         pfrom->thinBlockWaitingForTxns = missingCount;
         LogPrint("thin", "Thinblock %s waiting for: %d, unnecessary: %d, total txns: %d received txns: %d peer=%s\n",
@@ -208,6 +215,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
         vector<CInv> vGetData;
         vGetData.push_back(CInv(MSG_BLOCK, header.GetHash()));
         pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+        requester.Resume(vGetData[0]);
 
         LOCK(cs_xval);
         setPreVerifiedTxHash.clear(); // Xpress Validation - clear the set since we do not do XVal on regular blocks

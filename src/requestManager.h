@@ -70,7 +70,7 @@ class CUnknownObj
 public:
     typedef std::list<CNodeRequestData> ObjectSourceList;
     CInv obj;
-    bool rateLimited;
+    uint8_t paused;
     int64_t lastRequestTime; // In microseconds, 0 means no request
     unsigned int outstandingReqs;
     NodeId receivingFrom;
@@ -81,8 +81,8 @@ public:
 
     CUnknownObj()
     {
+        paused = 0;
         receivingFrom = 0;
-        rateLimited = false;
         outstandingReqs = 0;
         lastRequestTime = 0;
         priority = 0;
@@ -199,7 +199,7 @@ public:
     {
         mp[it.shard].erase(it.it);
     }
-    
+
     size_t size()
     {
         size_t ret=0;
@@ -276,6 +276,14 @@ public:
 
     // Indicate that getting this object was rejected
     void Rejected(const CInv &obj, CNode *from, unsigned char reason = 0);
+
+    // Do not rerequest this object, but hold onto the data (recursive)
+    // This is useful once the data has been received, but still needs to be processed
+    // "Resume" unpauses, "Received" unpauses all and marks the data received.
+    void Pause(const CInv &obj);
+
+    // Undo a pause
+    void Resume(const CInv &obj);
 
     void SendRequests();
 
