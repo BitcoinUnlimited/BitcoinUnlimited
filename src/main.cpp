@@ -2597,8 +2597,7 @@ bool static DisconnectTip(CValidationState &state, const Consensus::Params &cons
 #endif
     if (1)
     {
-        // lock is already held
-        //boost::unique_lock<boost::mutex> lock(csTxInQ);
+        LOCK(csTxInQ);
         for (const CTransaction &tx : block.vtx)
         {
             if (!tx.IsCoinBase())

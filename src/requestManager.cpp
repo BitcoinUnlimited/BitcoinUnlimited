@@ -140,7 +140,6 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
         OdMap::iterator &item = result.first;
         CUnknownObj &data = item->second;
         data.obj = obj;
-        LogPrint("req", "ReqMgr: Ask for %s.\n", data.obj.ToString().c_str());
         if (result.second) // inserted
         {
             pendingTxns += 1;
@@ -675,9 +674,9 @@ void CRequestManager::SendRequests()
     int shard = insecure_rand()&(ShardedMap::NUM_SHARDS-1);
     ShardedMap::Accessor macc(mapTxnInfo, shard);  // take the lock so we can use this map
     OdMap::iterator sendIter = macc->begin();
+    now = GetTimeMicros();  // we don't need a lot of precision and this is surprisingly slow based on monte carlo
     while (sendIter != macc->end())
     {
-        now = GetTimeMicros();
         OdMap::iterator itemIter = sendIter;
         CUnknownObj &item = itemIter->second;
 
