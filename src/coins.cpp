@@ -281,11 +281,65 @@ bool CCoinsViewCache::Flush()
 
 void CCoinsViewCache::Trim(size_t nTrimSize) const
 {
-    uint64_t nTrimmed = 0;
-
     LOCK(cs_utxo);
 
+    uint64_t nTrimmed = 0;
+    uint64_t nTrimmedByHeight = 0;
+    static uint64_t nTrimHeightDelta = nBestCoinHeight * 0.80; // This is where we attempt to do our first trim
+    int64_t nTrimHeight = nBestCoinHeight - nTrimHeightDelta;
+
+    // Begin first Trim loop. This loop will trim coins from cache by the coin height. Removing the oldest coins first.
+    // This has been proven to improve sync performance significantly for nodes that can not hold the entire dbcache
+    // in memory.
+    bool fDone = false;
+    int nSmallestDelta = 100;
+    while (!fDone && DynamicMemoryUsage() > nTrimSize)
+    {
+        LogPrint("coindb", "cacheCoinsUsage at start: %d total dynamic usage: %d trim to size: %d nBestCoinHeight: %d trim height:%d\n", 
+                  cachedCoinsUsage, DynamicMemoryUsage(), nTrimSize, nBestCoinHeight, nTrimHeight);
+
+        CCoinsMap::iterator iter = cacheCoins.begin();
+        while (DynamicMemoryUsage() > nTrimSize)
+        {
+            if (iter == cacheCoins.end())
+            {
+                fDone = true;
+                break;
+            }
+
+            if (iter->second.flags == 0 && iter->second.coin.nHeight < nTrimHeight)
+            {
+                cachedCoinsUsage -= iter->second.coin.DynamicMemoryUsage();
+
+                iter = cacheCoins.erase(iter);
+                nTrimmed++;
+                nTrimmedByHeight++;
+            }
+            else
+                iter++;
+        }
+
+        // Gradually increase the nTrimHeight if there are no more entries to delete below a certain height.
+        if (fDone && DynamicMemoryUsage() > nTrimSize && nTrimHeightDelta > nSmallestDelta)
+        {
+            if (nTrimHeightDelta <= nSmallestDelta * 50)
+                nTrimHeightDelta -= nSmallestDelta;
+            else if (nTrimHeightDelta <= nSmallestDelta * 200)
+                nTrimHeightDelta -= (nSmallestDelta * 5);
+            else
+                nTrimHeightDelta -= (nSmallestDelta * 100);
+
+            nTrimHeight = nBestCoinHeight - nTrimHeightDelta;
+            fDone = false; // we're not done yet we have adjusted the nTrimHeight downward so we have to go back and trim again.
+
+            LogPrint("coindb", "Re-adjusting trim height to %d using a trim height delta of %d\n", nTrimHeight, nTrimHeightDelta);
+        }
+    }
+
+    // If trimming by coin height failed to find any or enough coins to trim then trim the cache further by ignoring coin height.
+    // While this is not ideal we still have to trim to keep the cache from growing unbounded.
     CCoinsMap::iterator iter = cacheCoins.begin();
+    iter = cacheCoins.begin();
     while (DynamicMemoryUsage() > nTrimSize)
     {
         if (iter == cacheCoins.end())
@@ -303,8 +357,21 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
             iter++;
     }
     if (nTrimmed > 0)
+    {
+        LogPrint("coindb", "Trimmed %d by coin height\n", nTrimmedByHeight);
         LogPrint("coindb", "Trimmed %ld from the CoinsViewCache, current size after trim: %ld and usage %ld bytes\n",
             nTrimmed, cacheCoins.size(), cachedCoinsUsage);
+    }
+
+    // If we're not trimming anything then gradually walk the trim height backwards from the tip.  This is to adjust
+    // and account for the possiblity that the average block size could be getting smaller for certain periods of time
+    // and thus we can keep more of the recent coins from getting trimmed.
+    if (nTrimmedByHeight == 0 && nTrimmed == 0)
+    {
+        nTrimHeightDelta += (nSmallestDelta >> 1);
+        nTrimHeight = nBestCoinHeight - nTrimHeightDelta;
+        LogPrint("coindb", "Re-adjusting trim height to %d using a trim height delta of %d\n", nTrimHeight, nTrimHeightDelta);
+    }
 }
 
 void CCoinsViewCache::Uncache(const COutPoint &hash)
