@@ -175,7 +175,7 @@ public:
 
     //! Do a bulk modification (multiple Coin changes + BestBlock change).
     //! The passed mapCoins can be modified.
-    virtual bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock, size_t &nChildCachedCoinsUsage);
+    virtual bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock, const uint64_t bestCoinHeight, size_t &nChildCachedCoinsUsage);
 
     //! Get a cursor to iterate over the whole state
     virtual CCoinsViewCursor *Cursor() const;
@@ -199,7 +199,7 @@ public:
     bool HaveCoin(const COutPoint &outpoint) const override;
     uint256 GetBestBlock() const override;
     void SetBackend(CCoinsView &viewIn);
-    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock, size_t &nChildCachedCoinsUsage) override;
+    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock, const uint64_t nBestCoinHeight, size_t &nChildCachedCoinsUsage) override;
     CCoinsViewCursor *Cursor() const override;
     size_t EstimateSize() const override;
 };
@@ -214,10 +214,12 @@ protected:
      * declared as "const".
      */
     mutable uint256 hashBlock;
+    mutable uint64_t nBestCoinHeight;
     mutable CCoinsMap cacheCoins;
 
     /* Cached dynamic memory usage for the inner Coin objects. */
     mutable size_t cachedCoinsUsage;
+
 
 public:
     CCoinsViewCache(CCoinsView *baseIn);
@@ -227,7 +229,7 @@ public:
     bool HaveCoin(const COutPoint &outpoint) const;
     uint256 GetBestBlock() const;
     void SetBestBlock(const uint256 &hashBlock);
-    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock, size_t &nChildCachedCoinsUsage);
+    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock, const uint64_t nBestCoinHeight, size_t &nChildCachedCoinsUsage);
 
     /**
      * Check if we have the given utxo already loaded in this cache.

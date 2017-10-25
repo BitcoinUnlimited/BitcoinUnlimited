@@ -63,7 +63,8 @@ public:
     }
 
     uint256 GetBestBlock() const { return hashBestBlock_; }
-    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock, size_t &nChildCachedCoinsUsage)
+
+    bool BatchWrite(CCoinsMap& mapCoins, const uint256& hashBlock, const uint64_t nBestCoinHeight, size_t &nChildCachedCoinsUsage)
     {
         for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();)
         {
@@ -453,7 +454,8 @@ void WriteCoinsViewEntry(CCoinsView &view, CAmount value, char flags)
     uint256 hash;
     hash.SetNull();
     size_t cacheusage = 0;
-    view.BatchWrite(map, hash, cacheusage);
+    uint64_t bestCoinHeight = 0;
+    view.BatchWrite(map, hash, bestCoinHeight, cacheusage);
 }
 
 class SingleEntryCacheTest
