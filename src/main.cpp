@@ -2504,6 +2504,7 @@ bool ConnectBlock(const CBlock &block,
     if (IsCashHFEnabled(chainparams, pindex->pprev))
     {
         flags |= SCRIPT_VERIFY_LOW_S;
+        flags |= SCRIPT_VERIFY_NULLDUMMY;
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
 #endif
