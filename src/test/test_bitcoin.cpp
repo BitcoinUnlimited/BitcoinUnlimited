@@ -11,6 +11,7 @@
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
 #include "crypto/sha256.h"
+#include "fs.h"
 #include "key.h"
 #include "main.h"
 #include "miner.h"
@@ -22,11 +23,12 @@
 #include "ui_interface.h"
 #include "rpc/server.h"
 #include "rpc/register.h"
-
 #include "test/testutil.h"
 
-#include <boost/filesystem.hpp>
 #include <boost/test/unit_test.hpp>
+
+#include <memory>
+
 #include <boost/thread.hpp>
 
 CClientUIInterface uiInterface; // Declared but not defined in ui_interface.h
@@ -59,8 +61,7 @@ TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(cha
         RegisterAllCoreRPCCommands(tableRPC);
         ClearDatadirCache();
         pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i", (unsigned long)GetTime(), (int)(GetRand(100000)));
-        boost::filesystem::create_directories(pathTemp);
-        mapArgs["-datadir"] = pathTemp.string();
+        fs::create_directories(pathTemp);
         pblocktree = new CBlockTreeDB(1 << 20, true);
         pcoinsdbview = new CCoinsViewDB(1 << 23, true);
         pcoinsTip = new CCoinsViewCache(pcoinsdbview);
@@ -79,7 +80,7 @@ TestingSetup::~TestingSetup()
         delete pcoinsTip;
         delete pcoinsdbview;
         delete pblocktree;
-        boost::filesystem::remove_all(pathTemp);
+        fs::remove_all(pathTemp);
 }
 
 TestChain100Setup::TestChain100Setup() : TestingSetup(CBaseChainParams::REGTEST)

@@ -112,6 +112,7 @@ BITCOIN_CORE_H = \
   dosman.h \
   expedited.h \
   fastfilter.h \
+  fs.h \
   httprpc.h \
   httpserver.h \
   init.h \
@@ -354,6 +355,7 @@ libbitcoin_util_a_SOURCES = \
   compat/glibc_sanity.cpp \
   compat/glibcxx_sanity.cpp \
   compat/strnlen.cpp \
+  fs.cpp \
   random.cpp \
   rpc/protocol.cpp \
   support/cleanse.cpp \

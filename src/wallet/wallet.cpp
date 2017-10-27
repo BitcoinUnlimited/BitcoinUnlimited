@@ -13,6 +13,7 @@
 #include "coincontrol.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
+#include "fs.h"
 #include "key.h"
 #include "keystore.h"
 #include "main.h"
@@ -31,7 +32,6 @@
 #include <assert.h>
 
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 
 using namespace std;
@@ -2301,7 +2301,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                         return false;
                       }
                     txNew.vout.push_back(txout);
-                    voutSize += txout.GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION);
+                    voutSize += ::GetSerializeSize(txout, SER_NETWORK, PROTOCOL_VERSION);
                   }
                 LogPrint("wallet","txout len %d\n", voutSize);
 

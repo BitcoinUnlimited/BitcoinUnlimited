@@ -94,7 +94,7 @@ extern bool ParallelAcceptToMemoryPool(Snapshot &ss,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
-    std::vector<uint256> &vHashTxnToUncache);
+    std::vector<COutPoint>& vCoinsToUncache);
 
 class CTxInputData
 {

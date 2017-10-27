@@ -1759,12 +1759,12 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         node.push_back(Pair("vRecvMsg", n.vRecvMsg.size()));
         if (n.pfilter)
         {
-            node.push_back(Pair("pfilter", n.pfilter->GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION)));
+            node.push_back(Pair("pfilter", ::GetSerializeSize(*n.pfilter, SER_NETWORK, PROTOCOL_VERSION)));
         }
         if (n.pThinBlockFilter)
         {
             node.push_back(
-                Pair("pThinBlockFilter", n.pThinBlockFilter->GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION)));
+                Pair("pThinBlockFilter", ::GetSerializeSize(*n.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION)));
         }
         node.push_back(Pair("thinblock.vtx", n.thinBlock.vtx.size()));
         uint64_t thinBlockSize = ::GetSerializeSize(n.thinBlock, SER_NETWORK, PROTOCOL_VERSION);
@@ -1873,6 +1873,7 @@ bool AddOrphanTx(const CTransaction &tx, NodeId peer) EXCLUSIVE_LOCKS_REQUIRED(c
     if (mapOrphanTransactions.count(hash))
         return false;
 
+#if 0  // we've already checked that the transaction is standard as part of mempool acceptance
     // Ignore orphans larger than the largest txn size allowed.
     unsigned int sz = tx.GetSerializeSize(SER_NETWORK, CTransaction::CURRENT_VERSION);
     if (sz > MAX_STANDARD_TX_SIZE)
@@ -1880,6 +1881,7 @@ bool AddOrphanTx(const CTransaction &tx, NodeId peer) EXCLUSIVE_LOCKS_REQUIRED(c
         LogPrint("mempool", "ignoring large orphan tx (size: %u, hash: %s)\n", sz, hash.ToString());
         return false;
     }
+#endif
 
     uint64_t txSize = RecursiveDynamicUsage(tx);
     mapOrphanTransactions[hash].tx = tx;
@@ -2021,19 +2023,19 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints *lp, bool 
         for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++)
         {
             const CTxIn &txin = tx.vin[txinIndex];
-            CCoins coins;
-            if (!viewMemPool.GetCoins(txin.prevout.hash, coins))
+            Coin coin;
+            if (!viewMemPool.GetCoin(txin.prevout, coin))
             {
                 return error("%s: Missing input", __func__);
             }
-            if (coins.nHeight == MEMPOOL_HEIGHT)
+            if (coin.nHeight == MEMPOOL_HEIGHT)
             {
                 // Assume all mempool transaction confirm in the next block
                 prevheights[txinIndex] = tip->nHeight + 1;
             }
             else
             {
-                prevheights[txinIndex] = coins.nHeight;
+                prevheights[txinIndex] = coin.nHeight;
             }
         }
         lockPair = CalculateSequenceLocks(tx, flags, &prevheights, index);
@@ -2105,7 +2107,7 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
-    std::vector<uint256> &vHashTxnToUncache)
+    std::vector<COutPoint> &vCoinsToUncache)
 {
     unsigned int forkVerifyFlags = 0;
     CTransaction tx = consttx;
@@ -2197,12 +2199,16 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
             // and only helps with filling in pfMissingInputs (to determine missing vs spent).
             BOOST_FOREACH (const CTxIn txin, tx.vin)
             {
-                if (!ss.coins->HaveCoinsInCache(txin.prevout.hash))
-                    vHashTxnToUncache.push_back(txin.prevout.hash);
-                if (!view.HaveCoins(txin.prevout.hash))
+                if (!ss.coins->HaveCoinInCache(txin.prevout))
+                {
+                    vCoinsToUncache.push_back(txin.prevout);
+                }
+                if (!view.HaveCoin(txin.prevout))
                 {
                     if (pfMissingInputs)
+                    {
                         *pfMissingInputs = true;
+                    }
                     // invalid but expected (likely an orphan) so do not log
                     return state.Invalid(false, REJECT_MISSING_INPUTS, "bad-txns-missing-inputs","Inputs unavailable in ParallelAcceptToMemoryPool", false);
                 }
@@ -2251,8 +2257,8 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
         bool fSpendsCoinbase = false;
         BOOST_FOREACH (const CTxIn &txin, tx.vin)
         {
-            CCoinsAccessor coins(view, txin.prevout.hash);
-            if (coins && coins->IsCoinBase())
+            CoinAccessor coin(view, txin.prevout);
+            if (coin->IsCoinBase())
             {
                 fSpendsCoinbase = true;
                 break;
@@ -2464,7 +2470,7 @@ bool TxAlreadyHave(const CInv &inv)
     {
         bool rrc = recentRejects.contains(inv.hash);
         bool mrc = mempool.exists(inv.hash);
-        return rrc || mrc || AlreadyHaveOrphan(inv.hash) || pcoinsTip->HaveCoins(inv.hash);
+        return rrc || mrc || AlreadyHaveOrphan(inv.hash);
     }
     }
     DbgAssert(0, return false); // this fn should only be called if CInv is a tx
@@ -2689,7 +2695,7 @@ void ThreadTxHandler()
             CTransaction& tx = txd.tx;
             CInv inv(MSG_TX, tx.GetHash());
 
-            std::vector<uint256> vHashTxToUncache;
+            std::vector<COutPoint> vCoinsToUncache;
             if (1)
             {
                 // Check for recently rejected (and do other quick existence checks)
@@ -2726,7 +2732,7 @@ void ThreadTxHandler()
                 }
             }
 
-            if (ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false, false, vHashTxToUncache))
+            if (ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false, false, vCoinsToUncache))
             {
                 RelayTransaction(tx);
 
@@ -2736,8 +2742,8 @@ void ThreadTxHandler()
             }
             else
             {
-                BOOST_FOREACH (const uint256 &hashTx, vHashTxToUncache)
-                   pcoinsTip->Uncache(hashTx);
+                for (const COutPoint &remove : vCoinsToUncache)
+                    pcoinsTip->Uncache(remove);
                 if (fMissingInputs)
                 {
                     // If we've forked and this is probably not a valid tx, then skip adding it to the orphan pool

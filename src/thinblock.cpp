@@ -188,7 +188,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
     {
         // We have all the transactions now that are in this block: try to reassemble and process.
         pfrom->thinBlockWaitingForTxns = -1;
-        int blockSize = pfrom->thinBlock.GetSerializeSize(SER_NETWORK, CBlock::CURRENT_VERSION);
+        int blockSize = ::GetSerializeSize(pfrom->thinBlock, SER_NETWORK, CBlock::CURRENT_VERSION);
         LogPrint("thin",
             "Reassembled thinblock for %s (%d bytes). Message was %d bytes, compression ratio %3.2f peer=%s\n",
             pfrom->thinBlock.GetHash().ToString(), blockSize, nSizeThinBlock,
@@ -414,7 +414,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
         // for compression statistics, we have to add up the size of xthinblock and the re-requested thinBlockTx.
         int nSizeThinBlockTx = msgSize;
-        int blockSize = pfrom->thinBlock.GetSerializeSize(SER_NETWORK, CBlock::CURRENT_VERSION);
+        int blockSize = ::GetSerializeSize(pfrom->thinBlock, SER_NETWORK, CBlock::CURRENT_VERSION);
         LogPrint("thin", "Reassembled xblocktx for %s (%d bytes). Message was %d bytes (thinblock) and %d bytes "
                          "(re-requested tx), compression ratio %3.2f, peer=%s\n",
             pfrom->thinBlock.GetHash().ToString(), blockSize, pfrom->nSizeThinBlock, nSizeThinBlockTx,
@@ -866,7 +866,7 @@ bool CXThinBlock::process(CNode *pfrom,
 
     // We now have all the transactions now that are in this block
     pfrom->thinBlockWaitingForTxns = -1;
-    int blockSize = pfrom->thinBlock.GetSerializeSize(SER_NETWORK, CBlock::CURRENT_VERSION);
+    int blockSize = ::GetSerializeSize(pfrom->thinBlock, SER_NETWORK, CBlock::CURRENT_VERSION);
     LogPrint("thin",
         "Reassembled xthinblock for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
         pfrom->thinBlock.GetHash().ToString(), blockSize, pfrom->nSizeThinBlock,
@@ -1351,10 +1351,9 @@ void CThinBlockData::ClearThinBlockData(CNode *pnode, uint256 hash)
 uint64_t CThinBlockData::AddThinBlockBytes(uint64_t bytes, CNode *pfrom)
 {
     pfrom->nLocalThinBlockBytes += bytes;
+    nThinBlockBytes.fetch_add(bytes);
 
-    LOCK(cs_thinblockstats);
-    nThinBlockBytes += bytes;
-    return nThinBlockBytes;
+    return nThinBlockBytes.load();
 }
 
 void CThinBlockData::DeleteThinBlockBytes(uint64_t bytes, CNode *pfrom)
@@ -1364,23 +1363,12 @@ void CThinBlockData::DeleteThinBlockBytes(uint64_t bytes, CNode *pfrom)
 
     if (bytes <= nThinBlockBytes)
     {
-        LOCK(cs_thinblockstats);
-        nThinBlockBytes -= bytes;
+        nThinBlockBytes.fetch_sub(bytes);
     }
 }
 
-void CThinBlockData::ResetThinBlockBytes()
-{
-    LOCK(cs_thinblockstats);
-    nThinBlockBytes = 0;
-}
-
-uint64_t CThinBlockData::GetThinBlockBytes()
-{
-    LOCK(cs_thinblockstats);
-    return nThinBlockBytes;
-}
-
+void CThinBlockData::ResetThinBlockBytes() { nThinBlockBytes.store(0); }
+uint64_t CThinBlockData::GetThinBlockBytes() { return nThinBlockBytes.load(); }
 bool HaveConnectThinblockNodes()
 {
     // Strip the port from then list of all the current in and outbound ip addresses

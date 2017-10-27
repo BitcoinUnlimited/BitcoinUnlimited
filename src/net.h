@@ -11,6 +11,8 @@
 #include "fastfilter.h"
 #include "chainparams.h"
 #include "compat.h"
+#include "fs.h"
+#include "hash.h"
 #include "limitedmap.h"
 #include "netbase.h"
 #include "primitives/block.h"
