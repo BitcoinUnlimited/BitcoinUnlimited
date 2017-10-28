@@ -1532,8 +1532,8 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     if (!res && !*pfMissingInputs)
     {
         // Uncache any coins for txns that failed to enter the mempool but we're NOT orphan txns
-        for (const CTxIn &txin : tx.vin)
-            pcoinsTip->Uncache(txin.prevout);
+        for (const COutPoint &remove : vCoinsToUncache)
+            pcoinsTip->Uncache(remove);
     }
 
     return res;
@@ -3067,7 +3067,8 @@ bool static DisconnectTip(CValidationState &state, const Consensus::Params &cons
         // ignore validation errors in resurrected transactions
         std::list<CTransaction> removed;
         CValidationState stateDummy;
-        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, NULL, true))
+        bool fMissingInputsDummy = false;
+        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, &fMissingInputsDummy, true))
         {
             mempool.remove(tx, removed, true);
         }
