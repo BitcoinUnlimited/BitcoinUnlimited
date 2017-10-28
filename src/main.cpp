@@ -1459,7 +1459,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true, &resourceTracker,
                 NULL, &sighashType))
         {
-            LogPrint("mempool", "txn CheckInputs failed");
+            LogPrint("mempool", "CheckInputs failed for tx: %s\n", tx.GetHash().ToString().c_str());
             return false;
         }
         entry.UpdateRuntimeSigOps(resourceTracker.GetSigOps(), resourceTracker.GetSighashBytes());
