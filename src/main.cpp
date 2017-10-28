@@ -1529,10 +1529,11 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     std::vector<COutPoint> vCoinsToUncache;
     bool res = AcceptToMemoryPoolWorker(
         pool, state, tx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit, fRejectAbsurdFee, vCoinsToUncache);
-    if (!res)
+    if (!res && !*pfMissingInputs)
     {
-        for (const COutPoint &remove : vCoinsToUncache)
-            pcoinsTip->Uncache(remove);
+        // Uncache any coins for txns that failed to enter the mempool but we're NOT orphan txns
+        for (const CTxIn &txin : tx.vin)
+            pcoinsTip->Uncache(txin.prevout);
     }
 
     return res;
