@@ -1260,10 +1260,21 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             // do all inputs exist?
             BOOST_FOREACH (const CTxIn txin, tx.vin)
             {
+                // At this point we begin to collect coins that are potential candidates for uncaching because as
+                // soon as we make the call below to view.HaveCoin() any missing coins will be pulled into cache.
+                // Therefore, any coin in this transaction that is not already in cache will be tracked here such that
+                // if this transaction fails to enter the memory pool, we will then uncache those coins that were not
+                // already present, unless the transaction is an orphan.
+                //
+                // We still want to keep orphantx coins in the event the orphantx is finally
+                // accepted into the mempool or shows up in a block that is mined; this way the coins in the orphan
+                // do not have to be pulled back into the coins cache from disk. Furthermore, coins for orphans are
+                // only removed if/when the orphan expires either by time or otherwise expelled from the orphan pool.
                 if (!pcoinsTip->HaveCoinInCache(txin.prevout))
                 {
                     vCoinsToUncache.push_back(txin.prevout);
                 }
+
                 if (!view.HaveCoin(txin.prevout))
                 {
                     if (pfMissingInputs)
