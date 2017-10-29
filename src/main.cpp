@@ -1130,13 +1130,16 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
 
 void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
 {
-    int expired = pool.Expire(GetTime() - age);
+    std::vector<COutPoint> vCoinsToUncache;
+    int expired = pool.Expire(GetTime() - age, vCoinsToUncache);
+    for (const COutPoint &txin : vCoinsToUncache)
+        pcoinsTip->Uncache(txin);
     if (expired != 0)
         LogPrint("mempool", "Expired %i transactions from the memory pool\n", expired);
 
     std::vector<COutPoint> vNoSpendsRemaining;
     pool.TrimToSize(limit, &vNoSpendsRemaining);
-    BOOST_FOREACH (const COutPoint &removed, vNoSpendsRemaining)
+    for (const COutPoint &removed : vNoSpendsRemaining)
         pcoinsTip->Uncache(removed);
 }
 

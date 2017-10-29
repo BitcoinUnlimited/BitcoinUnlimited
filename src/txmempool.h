@@ -580,11 +580,11 @@ public:
       *  pvNoSpendsRemaining, if set, will be populated with the list of outpoints
       *  which are not in mempool which no longer have any spends in this mempool.
       */
-    void TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpendsRemaining = NULL);
+    void TrimToSize(size_t sizelimit, std::vector<COutPoint>* pvNoSpendsRemaining = nullptr);
 
     /** Expire all transaction (and their dependencies) in the mempool older than time. Return the number of removed
      * transactions. */
-    int Expire(int64_t time);
+    int Expire(int64_t time, std::vector<COutPoint> &vCoinsToUncache);
 
     /** BU: Every transaction that is accepted into the mempool will call this method to update the current value*/
     void UpdateTransactionsPerSecond();

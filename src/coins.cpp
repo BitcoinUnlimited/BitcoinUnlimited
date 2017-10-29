@@ -308,6 +308,8 @@ void CCoinsViewCache::Uncache(const COutPoint &hash)
 {
     LOCK(cs_utxo);
     CCoinsMap::iterator it = cacheCoins.find(hash);
+
+    // only uncache coins that are not dirty.
     if (it != cacheCoins.end() && it->second.flags == 0)
     {
         cachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
