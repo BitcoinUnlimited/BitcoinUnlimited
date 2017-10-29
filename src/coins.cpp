@@ -315,6 +315,12 @@ void CCoinsViewCache::Uncache(const COutPoint &hash)
     }
 }
 
+void CCoinsViewCache::UncacheTx(const CTransaction &tx)
+{
+    for (const CTxIn &txin : tx.vin)
+        Uncache(txin.prevout);
+}
+
 unsigned int CCoinsViewCache::GetCacheSize() const
 {
     LOCK(cs_utxo);

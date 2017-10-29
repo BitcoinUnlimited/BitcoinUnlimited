@@ -767,8 +767,7 @@ void EraseOrphansByTime() EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
             uint256 txHash = mi->second.tx.GetHash();
 
             // Uncache any coins that may exist for orphans that will be erased
-            for (const CTxIn &txin : mi->second.tx.vin)
-                pcoinsTip->Uncache(txin.prevout);
+            pcoinsTip->UncacheTx(mi->second.tx);
 
             LogPrint(
                 "mempool", "Erased old orphan tx %s of age %d seconds\n", txHash.ToString(), GetTime() - nEntryTime);
@@ -797,8 +796,7 @@ unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t nMaxBytes) EXC
             it = mapOrphanTransactions.begin();
 
         // Uncache any coins that may exist for orphans that will be erased
-        for (const CTxIn &txin : it->second.tx.vin)
-            pcoinsTip->Uncache(txin.prevout);
+        pcoinsTip->UncacheTx(it->second.tx);
 
         EraseOrphanTx(it->first);
         ++nEvicted;
