@@ -1266,10 +1266,9 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
                 // if this transaction fails to enter the memory pool, we will then uncache those coins that were not
                 // already present, unless the transaction is an orphan.
                 //
-                // We still want to keep orphantx coins in the event the orphantx is finally
-                // accepted into the mempool or shows up in a block that is mined; this way the coins in the orphan
-                // do not have to be pulled back into the coins cache from disk. Furthermore, coins for orphans are
-                // only removed if/when the orphan expires either by time or otherwise expelled from the orphan pool.
+                // We still want to keep orphantx coins in the event the orphantx is finally accepted into the mempool
+                // or shows up in a block that is mined.  Therefore if pfMissingInputs returns true then any coins
+                // in vCoinsToUncache will NOT be uncached.
                 if (!pcoinsTip->HaveCoinInCache(txin.prevout))
                 {
                     vCoinsToUncache.push_back(txin.prevout);
@@ -1277,11 +1276,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
                 if (!view.HaveCoin(txin.prevout))
                 {
-                    if (pfMissingInputs)
-                    {
-                        *pfMissingInputs = true;
-                    }
-                    // fMissingInputs and !state.IsInvalid() is used to detect this condition, don't set state.Invalid()
+                    // fMissingInputs and not state.IsInvalid() is used to detect this condition, don't set
+                    // state.Invalid()
+                    *pfMissingInputs = true;
+
                     return false;
                 }
             }
