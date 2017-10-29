@@ -876,7 +876,7 @@ UniValue sendrawtransaction(const UniValue& params, bool fHelp)
     for (size_t o = 0; !fHaveChain && o < tx.vout.size(); o++)
     {
         CoinAccessor existingCoin(view,COutPoint(hashTx, o));
-        fHaveChain = !existingCoin->IsSpent();
+        fHaveChain = existingCoin && !existingCoin->IsSpent();
     }
     bool fHaveMempool = mempool.exists(hashTx);
     if (!fHaveMempool && !fHaveChain)
