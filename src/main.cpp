@@ -674,7 +674,7 @@ bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
 
 bool CheckFinalTx(const CTransaction &tx, int flags)
 {
-    AssertLockHeld(cs_main);
+    // AssertLockHeld(cs_main); no longer needed, although caller may want to take to ensure chain does not advance
 
     // By convention a negative value for flags indicates that the
     // current network-enforced consensus rules should be used. In
@@ -684,13 +684,14 @@ bool CheckFinalTx(const CTransaction &tx, int flags)
     // scheduled, so no flags are set.
     flags = std::max(flags, 0);
 
+    CBlockIndex *tip = chainActive.Tip();
     // CheckFinalTx() uses chainActive.Height()+1 to evaluate
     // nLockTime because when IsFinalTx() is called within
     // CBlock::AcceptBlock(), the height of the block *being*
     // evaluated is what is used. Thus if we want to know if a
     // transaction can be part of the *next* block, we need to call
     // IsFinalTx() with one more than chainActive.Height().
-    const int nBlockHeight = chainActive.Height() + 1;
+    const int nBlockHeight = tip ? tip->nHeight + 1: 0;
 
     // BIP113 will require that time-locked transactions have nLockTime set to
     // less than the median time of the previous block they're contained in.
@@ -698,7 +699,7 @@ bool CheckFinalTx(const CTransaction &tx, int flags)
     // chain tip, so we use that to calculate the median time passed to
     // IsFinalTx() if LOCKTIME_MEDIAN_TIME_PAST is set.
     const int64_t nBlockTime =
-        (flags & LOCKTIME_MEDIAN_TIME_PAST) ? chainActive.Tip()->GetMedianTimePast() : GetAdjustedTime();
+        (flags & LOCKTIME_MEDIAN_TIME_PAST) ? tip->GetMedianTimePast() : GetAdjustedTime();
 
     return IsFinalTx(tx, nBlockHeight, nBlockTime);
 }
@@ -3219,7 +3220,6 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
         // unconditionally valid already, so force disconnect away from it.
 
         // Stop all mempool processing and input all pending tx into the mempool first
-        boost::unique_lock<boost::mutex> lock2(csCommitQ);
         CommitToMempool();
 
         if (!DisconnectTip(state, consensusParams))

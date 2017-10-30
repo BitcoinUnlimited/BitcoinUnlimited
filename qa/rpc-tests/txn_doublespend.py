@@ -141,3 +141,12 @@ class TxnMallTest(BitcoinTestFramework):
 if __name__ == '__main__':
     TxnMallTest().main()
 
+
+def Test():
+    t = TxnMallTest()
+    t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],  # "lck"
+        "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
+    }
+    t.main(["--tmpdir=/ramdisk/test","--nocleanup","--noshutdown"], bitcoinConf, None)  # , "--tracerpc"])

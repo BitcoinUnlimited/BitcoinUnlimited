@@ -11,7 +11,7 @@
 #include "util.h"
 
 #include <assert.h>
-
+Coin emptyCoin;
 bool CCoinsView::GetCoin(const COutPoint &outpoint, Coin &coin) const { return false; }
 bool CCoinsView::HaveCoin(const COutPoint &outpoint) const { return false; }
 uint256 CCoinsView::GetBestBlock() const { return uint256(); }
@@ -359,13 +359,14 @@ const Coin& AccessByTxid(const CCoinsViewCache& view, const uint256& txid)
 }
 #endif
 
+
 CoinAccessor::CoinAccessor(const CCoinsViewCache& view, const uint256& txid):
     cache(&view), lock(cache->csCacheInsert)
 {
     cache->cs_utxo.lock_shared();
     EnterCritical("CCoinsViewCache.cs_utxo", __FILE__, __LINE__, (void*)(&cache->cs_utxo));
     COutPoint iter(txid, 0);
-    coin = nullptr;
+    coin = &emptyCoin;
     while (iter.n < nMaxOutputsPerBlock)
     {
         const Coin& alternate = view._AccessCoin(iter);
@@ -385,11 +386,12 @@ CoinAccessor::CoinAccessor(const CCoinsViewCache &cacheObj, const COutPoint &out
     EnterCritical("CCoinsViewCache.cs_utxo", __FILE__, __LINE__, (void*)(&cache->cs_utxo));
     it  = cache->FetchCoin(output, &lock);
     if (it != cache->cacheCoins.end()) coin = &it->second.coin;
-    else coin = nullptr;
+    else coin = &emptyCoin;
 }
 
 CoinAccessor::~CoinAccessor()
     {
+        coin=nullptr;
         LeaveCritical();
         cache->cs_utxo.unlock_shared();
     }
@@ -402,11 +404,12 @@ CoinModifier::CoinModifier(const CCoinsViewCache &cacheObj, const COutPoint &out
     EnterCritical("CCoinsViewCache.cs_utxo", __FILE__, __LINE__, (void*)(&cache->cs_utxo));
     it  = cache->FetchCoin(output, nullptr);
     if (it != cache->cacheCoins.end()) coin = &it->second.coin;
-    else coin = nullptr;
+    else coin = &emptyCoin;
 }
 
 CoinModifier::~CoinModifier()
     {
+        coin=nullptr;
         LeaveCritical();
         cache->cs_utxo.unlock();
     }

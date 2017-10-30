@@ -141,8 +141,10 @@ if __name__ == '__main__':
 
 def Test():
     t = InvalidateTest()
+    t.drop_to_pdb = True
     bitcoinConf = {
     "debug":["net","blk","thin","mempool","req","bench","evict"], # "lck"
     "blockprioritysize":2000000  # we don't want any transactions rejected due to insufficient fees...
      }
+    
     t.main(["--nocleanup","--noshutdown", "--tmpdir=/ramdisk/test"],bitcoinConf,None)

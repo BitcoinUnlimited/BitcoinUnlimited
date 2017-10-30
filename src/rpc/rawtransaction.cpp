@@ -636,6 +636,7 @@ UniValue signrawtransaction(const UniValue& params, bool fHelp)
     CCoinsViewCache view(&viewDummy);
     {
         READLOCK(mempool.cs);
+        WRITELOCK(view.cs_utxo);
         CCoinsViewCache &viewChain = *pcoinsTip;
         CCoinsViewMemPool viewMempool(&viewChain, mempool);
         view.SetBackend(viewMempool); // temporarily switch cache backend to db+mempool view
@@ -693,20 +694,23 @@ UniValue signrawtransaction(const UniValue& params, bool fHelp)
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
-                CoinAccessor coin(view, out);
-                if (!coin->IsSpent() && coin->out.scriptPubKey != scriptPubKey) {
-                    std::string err("Previous output scriptPubKey mismatch:\n");
-                    err = err + ScriptToAsmStr(coin->out.scriptPubKey) + "\nvs:\n"+
-                        ScriptToAsmStr(scriptPubKey);
-                    throw JSONRPCError(RPC_DESERIALIZATION_ERROR, err);
-                }
                 Coin newcoin;
-                newcoin.out.scriptPubKey = scriptPubKey;
-                newcoin.out.nValue = 0;
-                if (prevOut.exists("amount")) {
-                    newcoin.out.nValue = AmountFromValue(find_value(prevOut, "amount"));
+                {
+                    CoinAccessor coin(view, out);
+                    if (!coin->IsSpent() && coin->out.scriptPubKey != scriptPubKey)
+                    {
+                        std::string err("Previous output scriptPubKey mismatch:\n");
+                        err = err + ScriptToAsmStr(coin->out.scriptPubKey) + "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
+                        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, err);
+                    }
+                    newcoin.out.scriptPubKey = scriptPubKey;
+                    newcoin.out.nValue = 0;
+                    if (prevOut.exists("amount"))
+                    {
+                        newcoin.out.nValue = AmountFromValue(find_value(prevOut, "amount"));
+                    }
+                    newcoin.nHeight = 1;
                 }
-                newcoin.nHeight = 1;
                 view.AddCoin(out, std::move(newcoin), true);
             }
 
