@@ -1279,10 +1279,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
                     // fMissingInputs and not state.IsInvalid() is used to detect this condition, don't set
                     // state.Invalid()
                     *pfMissingInputs = true;
-
-                    return false;
                 }
             }
+            if (*pfMissingInputs == true)
+                return false;
 
             // Bring the best block into scope
             view.GetBestBlock();
