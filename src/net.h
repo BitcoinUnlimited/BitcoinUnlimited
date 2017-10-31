@@ -536,9 +536,9 @@ public:
     // requires LOCK(cs_vRecvMsg)
     bool ReceiveMsgBytes(const char *pch, unsigned int nBytes);
 
-    // requires LOCK(cs_vRecvMsg)
     void SetRecvVersion(int nVersionIn)
     {
+        LOCK(cs_vRecvMsg);
         nRecvVersion = nVersionIn;
         BOOST_FOREACH (CNetMessage &msg, vRecvMsg)
             msg.SetVersion(nVersionIn);

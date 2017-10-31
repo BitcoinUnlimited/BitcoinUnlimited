@@ -5870,11 +5870,13 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         uint256 hashStop;
         vRecv >> locator >> hashStop;
 
+#if 0 // TBD: I can't ignore GETHEADERs or node will time out and disconnect me
         if (IsInitialBlockDownload() && !pfrom->fWhitelisted)
         {
             LogPrint("net", "Ignoring getheaders from peer=%d because node is in initial block download\n", pfrom->id);
             return true;
         }
+#endif
 
         LOCK(cs_main);
         CNodeState *nodestate = State(pfrom->GetId());
@@ -6944,6 +6946,7 @@ bool SendMessages(CNode *pto)
 
         CNodeState &state = *statep;
 
+#if 0 // Aggressive disconnecting not necessary anymore
         // If a sync has been started check whether we received the first batch of headers requested within the timeout
         // period.
         // If not then disconnect and ban the node and a new node will automatically be selected to start the headers
@@ -6956,6 +6959,7 @@ bool SendMessages(CNode *pto)
                 "Initial headers were either not received or not received before the timeout - disconnecting peer=%s\n",
                 pto->GetLogName());
         }
+#endif
 
         // Start block sync
         // Download if this is a nice peer, or we have no nice peers and this one might do.

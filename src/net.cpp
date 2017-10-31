@@ -2904,15 +2904,6 @@ void CNode::BeginMessage(const char *pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSen
     assert(ssSend.size() == 0);
 
     const CMessageHeader::MessageStartChars *start = &GetMagic(Params());
-    CMessageHeader::MessageStartChars temp;
-    if (netMagic.value!=0)
-        {
-            temp[0] = netMagic.value&255;
-            temp[1] = (netMagic.value>>8)&255;
-            temp[2] = (netMagic.value>>16)&255;
-            temp[3] = (netMagic.value>>24)&255;
-            start = &temp;
-        }
     ssSend << CMessageHeader(*start, pszCommand, 0);
     LogPrint("net", "sending: %s\n", SanitizeString(pszCommand));
     currentCommand = pszCommand;
