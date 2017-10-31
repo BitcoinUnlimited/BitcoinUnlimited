@@ -1230,17 +1230,21 @@ void IsInitialBlockDownloadInit()
         fIsInitialBlockDownload.store(true);
         return;
     }
-    static bool lockIBDState = false;
-    if (lockIBDState)
+
+    // Using fInitialSyncComplete, once the chain is caught up the first time, and if we fall behind again due to a
+    // large re-org or for lack of mined blocks, then we continue to return false for IsInitialBlockDownload().
+    static bool fInitialSyncComplete = false;
+    if (fInitialSyncComplete)
     {
         fIsInitialBlockDownload.store(false);
         return;
     }
+
     bool state =
         (chainActive.Height() < pindexBestHeader->nHeight - 24 * 6 ||
             std::max(chainActive.Tip()->GetBlockTime(), pindexBestHeader->GetBlockTime()) < GetTime() - nMaxTipAge);
     if (!state)
-        lockIBDState = true;
+        fInitialSyncComplete = true;
     fIsInitialBlockDownload.store(state);
     return;
 }
