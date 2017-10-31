@@ -190,6 +190,9 @@ extern int64_t nMaxTipAge;
 /** Best header we've seen so far (used for getheaders queries' starting points). */
 extern CBlockIndex *pindexBestHeader;
 
+/** Used to determine whether it is time to check the orphan pool for any txns that can be evicted. */
+extern int64_t nLastOrphanCheck;
+
 /** Minimum disk space required - used in CheckDiskSpace() */
 static const uint64_t nMinDiskSpace = 52428800;
 
