@@ -15,6 +15,7 @@
 #include "dosman.h"
 #include "expedited.h"
 #include "hash.h"
+#include "init.h"
 #include "leakybucket.h"
 #include "miner.h"
 #include "net.h"
@@ -35,7 +36,6 @@
 #include "utilstrencodings.h"
 #include "validationinterface.h"
 #include "version.h"
-#include "init.h"
 
 #include <atomic>
 #include <boost/foreach.hpp>
@@ -525,12 +525,8 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phas
 static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainparams)
 {
     LogPrintf("CBlock(hash=%s, ver=%d, hashPrevBlock=%s, hashMerkleRoot=%s, nTime=%u, nBits=%08x, nNonce=%u, vtx=%u)\n",
-        pblock->GetHash().ToString(),
-        pblock->nVersion,
-        pblock->hashPrevBlock.ToString(),
-        pblock->hashMerkleRoot.ToString(),
-        pblock->nTime, pblock->nBits, pblock->nNonce,
-        pblock->vtx.size());
+        pblock->GetHash().ToString(), pblock->nVersion, pblock->hashPrevBlock.ToString(),
+        pblock->hashMerkleRoot.ToString(), pblock->nTime, pblock->nBits, pblock->nNonce, pblock->vtx.size());
     LogPrintf("generated %s\n", FormatMoney(pblock->vtx[0].vout[0].nValue));
 
     // Found a solution
@@ -625,7 +621,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
             IncrementExtraNonce(pblock, nExtraNonce);
 
             LogPrint("miner", "Running BitcoinMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
-                     pblock->size());
+                pblock->size());
 
             //
             // Search
@@ -661,7 +657,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
                         break;
                     }
                 }
-                //LogPrint("miner","BitcoinMiner: tried %d nonces\n", cumulativeNonce + nNonce);
+                // LogPrint("miner","BitcoinMiner: tried %d nonces\n", cumulativeNonce + nNonce);
                 // Check for stop or if block needs to be rebuilt
                 boost::this_thread::interruption_point();
                 // Regtest mode doesn't require peers
@@ -671,23 +667,23 @@ void static BitcoinMiner(const CChainParams &chainparams)
                     break;
                 // Mempool must change size by 1% in either direction and at least 1 minute pass
                 uint64_t curmpsz = mempool.size();
-                uint64_t onepct = mempoolSz/100;
-                if (((curmpsz <= mempoolSz - onepct)||(curmpsz >= mempoolSz + onepct)) && (GetTime() - nStart > 60))
+                uint64_t onepct = mempoolSz / 100;
+                if (((curmpsz <= mempoolSz - onepct) || (curmpsz >= mempoolSz + onepct)) && (GetTime() - nStart > 60))
                 {
-                    LogPrint("miner","BitcoinMiner: Mempool changed a lot %llu %llu.\n", mempool.size(), mempoolSz);
+                    LogPrint("miner", "BitcoinMiner: Mempool changed a lot %llu %llu.\n", mempool.size(), mempoolSz);
                     break;
                 }
                 // If a block is found by someone else, calculate a new block
                 if (pindexPrev != chainActive.Tip())
                 {
-                    LogPrint("miner","BitcoinMiner: blockchain tip changed\n");
+                    LogPrint("miner", "BitcoinMiner: blockchain tip changed\n");
                     break;
                 }
 
                 // Update nTime every few seconds
                 if (UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev) < 0)
                 {
-                    LogPrint("miner","BitcoinMiner: time ran backwards\n");
+                    LogPrint("miner", "BitcoinMiner: time ran backwards\n");
                     break; // Recreate the block if the clock has run backwards,
                     // so that we can use the correct time.
                 }
@@ -1369,7 +1365,7 @@ CStatBase *FindStatistic(const char *name)
     if (item != statistics.end())
         return item->second;
 
-    for (auto item: statistics)
+    for (auto item : statistics)
     {
         if (match(name, item.first.c_str()))
         {
@@ -1435,7 +1431,7 @@ UniValue getstat(const UniValue &params, bool fHelp)
     if (fHelp || (params.size() < 1))
         throw runtime_error("getstat"
                             "\nReturns the current settings for the network send and receive bandwidth and burst in "
-                            "kilobytes per second.\n"
+                            "kilobytes per second.\nTo get a list of available statistics use \"getstatlist\".\n"
                             "\nArguments: \n"
                             "1. \"statistic\"     (string, required) Specify what statistic you want\n"
                             "2. \"series\"  (string, optional) Specify what data series you want.  Options are "
@@ -1873,7 +1869,7 @@ bool AddOrphanTx(const CTransaction &tx, NodeId peer) EXCLUSIVE_LOCKS_REQUIRED(c
     if (mapOrphanTransactions.count(hash))
         return false;
 
-#if 0  // we've already checked that the transaction is standard as part of mempool acceptance
+#if 0 // we've already checked that the transaction is standard as part of mempool acceptance
     // Ignore orphans larger than the largest txn size allowed.
     unsigned int sz = tx.GetSerializeSize(SER_NETWORK, CTransaction::CURRENT_VERSION);
     if (sz > MAX_STANDARD_TX_SIZE)
@@ -1972,27 +1968,32 @@ void EraseOrphansByTime() EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
 // BU - Xtreme Thinblocks: end
 
 void Snapshot::Load(void)
+{
+    if (1)
     {
-        if (1)
-        {
-            LOCK(cs_main);
-            tipHeight = chainActive.Height();
-            tip = chainActive.Tip();
-            tipMedianTimePast = tip->GetMedianTimePast();
-            adjustedTime = GetAdjustedTime();
-            coins = pcoinsTip; // TODO pcoinsTip can change
-        }
-        if (cvMempool) delete cvMempool;
-        if (1)
-        {
-            READLOCK(mempool.cs);
-            // ss.coins contains the UTXO set for the tip in ss
-            cvMempool = new CCoinsViewMemPool(coins, mempool);
-        }
+        LOCK(cs_main);
+        tipHeight = chainActive.Height();
+        tip = chainActive.Tip();
+        tipMedianTimePast = tip->GetMedianTimePast();
+        adjustedTime = GetAdjustedTime();
+        coins = pcoinsTip; // TODO pcoinsTip can change
     }
+    if (cvMempool)
+        delete cvMempool;
+    if (1)
+    {
+        READLOCK(mempool.cs);
+        // ss.coins contains the UTXO set for the tip in ss
+        cvMempool = new CCoinsViewMemPool(coins, mempool);
+    }
+}
 
 
-bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints *lp, bool useExistingLockPoints, const Snapshot& ss)
+bool CheckSequenceLocks(const CTransaction &tx,
+    int flags,
+    LockPoints *lp,
+    bool useExistingLockPoints,
+    const Snapshot &ss)
 {
     AssertLockHeld(mempool.cs);
 
@@ -2016,8 +2017,8 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints *lp, bool 
     }
     else
     {
-         // CCoinsViewMemPool viewMemPool(ss.coins, mempool);
-        CCoinsViewMemPool& viewMemPool(*ss.cvMempool);
+        // CCoinsViewMemPool viewMemPool(ss.coins, mempool);
+        CCoinsViewMemPool &viewMemPool(*ss.cvMempool);
         std::vector<int> prevheights;
         prevheights.resize(tx.vin.size());
         for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++)
@@ -2071,7 +2072,7 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints *lp, bool 
     return EvaluateSequenceLocks(index, lockPair);
 }
 
-bool CheckFinalTx(const CTransaction &tx, int flags, const Snapshot& ss)
+bool CheckFinalTx(const CTransaction &tx, int flags, const Snapshot &ss)
 {
     // By convention a negative value for flags indicates that the
     // current network-enforced consensus rules should be used. In
@@ -2094,13 +2095,13 @@ bool CheckFinalTx(const CTransaction &tx, int flags, const Snapshot& ss)
     // When the next block is created its previous block will be the current
     // chain tip, so we use that to calculate the median time passed to
     // IsFinalTx() if LOCKTIME_MEDIAN_TIME_PAST is set.
-    const int64_t nBlockTime =
-        (flags & LOCKTIME_MEDIAN_TIME_PAST) ? ss.tipMedianTimePast: GetAdjustedTime();
+    const int64_t nBlockTime = (flags & LOCKTIME_MEDIAN_TIME_PAST) ? ss.tipMedianTimePast : GetAdjustedTime();
 
     return IsFinalTx(tx, nBlockHeight, nBlockTime);
 }
 
-bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
+bool ParallelAcceptToMemoryPool(Snapshot &ss,
+    CTxMemPool &pool,
     CValidationState &state,
     const CTransaction &consttx,
     bool fLimitFree,
@@ -2120,9 +2121,9 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
         *pfMissingInputs = false;
 
     if (!CheckTransaction(tx, state))
-      {
+    {
         return false;
-      }
+    }
 
     // Coinbase is only valid in a block, not as a loose transaction
     if (tx.IsCoinBase())
@@ -2165,9 +2166,9 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
     // is it already in the memory pool?
     uint256 hash = tx.GetHash();
     if (pool.exists(hash))
-      {
+    {
         return state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
-      }
+    }
 
     // Check for conflicts with in-memory transactions
     {
@@ -2191,7 +2192,7 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
         LockPoints lp;
         {
             READLOCK(pool.cs);
-            CCoinsViewMemPool& viewMemPool(*ss.cvMempool);
+            CCoinsViewMemPool &viewMemPool(*ss.cvMempool);
             view.SetBackend(viewMemPool);
 
             // do all inputs exist?
@@ -2210,7 +2211,8 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
                         *pfMissingInputs = true;
                     }
                     // invalid but expected (likely an orphan) so do not log
-                    return state.Invalid(false, REJECT_MISSING_INPUTS, "bad-txns-missing-inputs","Inputs unavailable in ParallelAcceptToMemoryPool", false);
+                    return state.Invalid(false, REJECT_MISSING_INPUTS, "bad-txns-missing-inputs",
+                        "Inputs unavailable in ParallelAcceptToMemoryPool", false);
                 }
             }
 
@@ -2268,8 +2270,8 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
         CTxCommitData eData;
         CTxMemPoolEntry entryTemp(tx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(tx),
             inChainInputValue, fSpendsCoinbase, nSigOps, lp);
-        eData.entry=entryTemp;
-        CTxMemPoolEntry& entry(eData.entry);
+        eData.entry = entryTemp;
+        CTxMemPoolEntry &entry(eData.entry);
         nSize = entry.GetTxSize();
 
         // Check that the transaction doesn't have an excessive number of
@@ -2288,7 +2290,8 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
                  !AllowFree(entry.GetPriority(chainActive.Height() + 1)))
         {
             // Require that free transactions have sufficient priority to be mined in the next block.
-	    LogPrint("mempool","Txn fee %lld (%d - %d), priority fee delta was %lld\n",nFees, nValueIn, nValueOut, nModifiedFees - nFees);
+            LogPrint("mempool", "Txn fee %lld (%d - %d), priority fee delta was %lld\n", nFees, nValueIn, nValueOut,
+                nModifiedFees - nFees);
             return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "insufficient priority");
         }
 
@@ -2396,8 +2399,8 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
         size_t nLimitDescendantSize = GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
         std::string errString;
         // note we could resolve ancestors to hashes and return those if that saves time in the txc thread
-        if (!pool.CalculateMemPoolAncestors(entry, nLimitAncestors, nLimitAncestorSize, nLimitDescendants,
-                nLimitDescendantSize, errString))
+        if (!pool.CalculateMemPoolAncestors(
+                entry, nLimitAncestors, nLimitAncestorSize, nLimitDescendants, nLimitDescendantSize, errString))
         {
             return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
         }
@@ -2413,7 +2416,7 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
         }
         entry.UpdateRuntimeSigOps(resourceTracker.GetSigOps(), resourceTracker.GetSighashBytes());
 
-#if 0  // to be removed -- bugs in this should have been shaken out
+#if 0 // to be removed -- bugs in this should have been shaken out
         // Check again against just the consensus-critical mandatory script
         // verification flags, in case of bugs in the standard flags that cause
         // transactions to pass as valid when they're actually invalid. For
@@ -2449,8 +2452,7 @@ bool ParallelAcceptToMemoryPool(Snapshot& ss, CTxMemPool &pool,
     }
 
 
-
-    uint64_t interval = (GetStopwatch()-start)/1000;
+    uint64_t interval = (GetStopwatch() - start) / 1000;
     /* typically too much logging, but useful when optimizing tx validation
     LogPrint("bench", "ValidateTransaction, time: %d, tx: %s, len: %d, sigops: %llu (legacy: %u), sighash: %llu, Vin: "
                       "%llu, Vout: %llu\n",
@@ -2485,7 +2487,7 @@ void retryOrphans()
     {
         if (1)
         {
-            COrphanTx& otx = i.second;
+            COrphanTx &otx = i.second;
             CTxInputData txd;
             txd.tx = otx.tx;
             txd.nodeId = otx.fromPeer;
@@ -2509,7 +2511,7 @@ void retryOrphans()
     nBytesOrphanPool = 0;
 }
 
-void processOrphans(std::vector<uint256>& vWorkQueue)
+void processOrphans(std::vector<uint256> &vWorkQueue)
 {
     std::vector<uint256> vEraseQueue;
 
@@ -2579,18 +2581,17 @@ void processOrphans(std::vector<uint256>& vWorkQueue)
         //  BU: Xtreme thinblocks - purge orphans that are too old
         EraseOrphansByTime();
     }
-
 }
 
 void CommitToMempool()
 {
     std::vector<uint256> vWorkQueue;
 
-    LOCK(cs_main);  // cs_main must lock before csCommitQ
+    LOCK(cs_main); // cs_main must lock before csCommitQ
     if (1)
     {
         boost::unique_lock<boost::mutex> lock(csCommitQ);
-        for (auto& it: txCommitQ)
+        for (auto &it : txCommitQ)
         {
             CTxCommitData &data = it.second;
             // Store transaction in memory
@@ -2618,10 +2619,10 @@ void CommitToMempool()
     pcoinsTip->Trim(nCoinCacheUsage);
 
     // TODO: add block commits here
-    //while (!blockCommitQ.empty())
+    // while (!blockCommitQ.empty())
     //{
     //}
-    txHandlerSnap.Load();  // Get the changed view for the transaction processors
+    txHandlerSnap.Load(); // Get the changed view for the transaction processors
 }
 
 
@@ -2648,7 +2649,7 @@ void ThreadCommitToMempool()
             if (!txDeferQ.empty())
             {
                 LOCK(csTxInQ);
-                while(!txDeferQ.empty())  // TODO efficient append
+                while (!txDeferQ.empty()) // TODO efficient append
                 {
                     txInQ.push(txDeferQ.front());
                     txDeferQ.pop();
@@ -2674,17 +2675,18 @@ void ThreadTxHandler()
 
         bool fMissingInputs = false;
         CValidationState state;
-        //Snapshot ss;
+        // Snapshot ss;
         CTxInputData txd;
         if (1)
         {
-            CCriticalBlock lock(csTxInQ,"csTxInQ",__FILE__,__LINE__);
+            CCriticalBlock lock(csTxInQ, "csTxInQ", __FILE__, __LINE__);
             while (txInQ.empty() && !ShutdownRequested())
             {
                 cvTxInQ.wait(csTxInQ);
                 boost::this_thread::interruption_point();
             }
-            if (ShutdownRequested()) break;
+            if (ShutdownRequested())
+                break;
             txd = txInQ.front(); // make copy so I can pop & release
             txInQ.pop();
         }
@@ -2692,7 +2694,7 @@ void ThreadTxHandler()
         if (1)
         {
             CORRAL(txProcessingCorral, TX_PROCESSING);
-            CTransaction& tx = txd.tx;
+            CTransaction &tx = txd.tx;
             CInv inv(MSG_TX, tx.GetHash());
 
             std::vector<COutPoint> vCoinsToUncache;
@@ -2702,7 +2704,7 @@ void ThreadTxHandler()
                 bool have = TxAlreadyHave(inv);
                 if (have)
                 {
-                    LogPrint("mempool","already have\n");
+                    LogPrint("mempool", "already have\n");
                     recentRejects.insert(tx.GetHash());
 
                     if (txd.whitelisted && GetBoolArg("-whitelistforcerelay", DEFAULT_WHITELISTFORCERELAY))
@@ -2732,13 +2734,13 @@ void ThreadTxHandler()
                 }
             }
 
-            if (ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false, false, vCoinsToUncache))
+            if (ParallelAcceptToMemoryPool(
+                    txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false, false, vCoinsToUncache))
             {
                 RelayTransaction(tx);
 
-                LogPrint("mempool", "AcceptToMemoryPool: peer=%s: accepted %s onto Q\n",
-                    txd.nodeName, tx.GetHash().ToString());
-
+                LogPrint("mempool", "AcceptToMemoryPool: peer=%s: accepted %s onto Q\n", txd.nodeName,
+                    tx.GetHash().ToString());
             }
             else
             {
@@ -2774,9 +2776,9 @@ void ThreadTxHandler()
                     FormatStateMessage(state));
                 if (state.GetRejectCode() < REJECT_INTERNAL) // Never send AcceptToMemoryPool's internal codes over P2P
                 {
-                    // TODO
-                    //pfrom->PushMessage(NetMsgType::REJECT, strCommand, (unsigned char)state.GetRejectCode(),
-                    //    state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
+// TODO
+// pfrom->PushMessage(NetMsgType::REJECT, strCommand, (unsigned char)state.GetRejectCode(),
+//    state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
 #if 0                    
                     if (nDoS > 0)
                     {
@@ -2788,7 +2790,7 @@ void ThreadTxHandler()
                         dosMan.Misbehaving(pfrom, nDoS);
 #endif
                     }
-#endif                    
+#endif
                 }
             }
         }

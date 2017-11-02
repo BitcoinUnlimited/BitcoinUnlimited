@@ -294,7 +294,7 @@ bool BlockAssembler::IsIncrementallyGood(uint64_t nExtraSize, unsigned int nExtr
         return false;
     }
 
-#if 0  // for giga network use EC sigops
+#if 0 // for giga network use EC sigops
     // Enforce the "old" sigops for <= 1MB blocks
     if (nBlockSize + nExtraSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
     {

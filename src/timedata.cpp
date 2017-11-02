@@ -32,8 +32,8 @@ extern int64_t nTimeOffset;
 int64_t GetTimeOffset()
 {
     int64_t t1;
-#ifdef __GNUC__  // BU optimze -- do a barrier rather than a lock
-    t1 = __sync_fetch_and_add(&nTimeOffset,0);
+#ifdef __GNUC__ // BU optimze -- do a barrier rather than a lock
+    t1 = __sync_fetch_and_add(&nTimeOffset, 0);
 #else
     LOCK(cs_nTimeOffset);
     t1 = nTimeOffset;
@@ -41,19 +41,11 @@ int64_t GetTimeOffset()
     return t1;
 }
 
-int64_t GetAdjustedTime()
-{
-    return GetTime() + GetTimeOffset();
-}
-
-static int64_t abs64(int64_t n)
-{
-    return (n >= 0 ? n : -n);
-}
-
+int64_t GetAdjustedTime() { return GetTime() + GetTimeOffset(); }
+static int64_t abs64(int64_t n) { return (n >= 0 ? n : -n); }
 #define BITCOIN_TIMEDATA_MAX_SAMPLES 200
 
-void AddTimeData(const CNetAddr& ip, int64_t nOffsetSample)
+void AddTimeData(const CNetAddr &ip, int64_t nOffsetSample)
 {
     LOCK(cs_nTimeOffset);
     // Ignore duplicates
@@ -66,7 +58,8 @@ void AddTimeData(const CNetAddr& ip, int64_t nOffsetSample)
     // Add data
     static CMedianFilter<int64_t> vTimeOffsets(BITCOIN_TIMEDATA_MAX_SAMPLES, 0);
     vTimeOffsets.input(nOffsetSample);
-    LogPrint("net","added time data, samples %d, offset %+d (%+d minutes)\n", vTimeOffsets.size(), nOffsetSample, nOffsetSample/60);
+    LogPrint("net", "added time data, samples %d, offset %+d (%+d minutes)\n", vTimeOffsets.size(), nOffsetSample,
+        nOffsetSample / 60);
 
     // There is a known issue here (see issue #4521):
     //
@@ -103,24 +96,26 @@ void AddTimeData(const CNetAddr& ip, int64_t nOffsetSample)
             {
                 // If nobody has a time different than ours but within 5 minutes of ours, give a warning
                 bool fMatch = false;
-                BOOST_FOREACH(int64_t nOffset, vSorted)
+                BOOST_FOREACH (int64_t nOffset, vSorted)
                     if (nOffset != 0 && abs64(nOffset) < 5 * 60)
                         fMatch = true;
 
                 if (!fMatch)
                 {
                     fDone = true;
-                    string strMessage = strprintf(_("Please check that your computer's date and time are correct! If your clock is wrong, %s will not work properly."), _(PACKAGE_NAME));
+                    string strMessage = strprintf(_("Please check that your computer's date and time are correct! If "
+                                                    "your clock is wrong, %s will not work properly."),
+                        _(PACKAGE_NAME));
                     strMiscWarning = strMessage;
                     uiInterface.ThreadSafeMessageBox(strMessage, "", CClientUIInterface::MSG_WARNING);
                 }
             }
         }
 
-        BOOST_FOREACH(int64_t n, vSorted)
+        BOOST_FOREACH (int64_t n, vSorted)
             LogPrint("net", "%+d  ", n);
         LogPrint("net", "|  ");
 
-        LogPrint("net", "nTimeOffset = %+d  (%+d minutes)\n", nTimeOffset, nTimeOffset/60);
+        LogPrint("net", "nTimeOffset = %+d  (%+d minutes)\n", nTimeOffset, nTimeOffset / 60);
     }
 }

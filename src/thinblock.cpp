@@ -79,7 +79,7 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         BlockMap::iterator mi = mapBlockIndex.find(prevHash);
         if (mi == mapBlockIndex.end())
         {
-            requester.Resume(inv);  // TODO, should I stop requesting this block?
+            requester.Resume(inv); // TODO, should I stop requesting this block?
             return error("thinblock from peer %s will not connect, unknown previous block %s", pfrom->GetLogName(),
                 prevHash.ToString());
         }
@@ -88,7 +88,7 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         if (!ContextualCheckBlockHeader(thinBlock.header, state, pprev))
         {
             // Thin block does not fit within our blockchain
-            requester.Resume(inv);  // TODO, should I stop requesting this block?
+            requester.Resume(inv); // TODO, should I stop requesting this block?
             dosMan.Misbehaving(pfrom, 100);
             return error(
                 "thinblock from peer %s contextual error: %s", pfrom->GetLogName(), state.GetRejectReason().c_str());
@@ -640,9 +640,10 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, string strComm
         }
         else
         {
-            LogPrint("thin", "Received %s %s from peer %s. Size %d bytes (%d hashes, %d tx).  Current mempool size %d\n",
-                     strCommand, inv.hash.ToString(), pfrom->GetLogName(), nSizeThinBlock, thinBlock.vTxHashes.size(),
-                     thinBlock.vMissingTx.size(), mempool.size());
+            LogPrint("thin",
+                "Received %s %s from peer %s. Size %d bytes (%d hashes, %d tx).  Current mempool size %d\n", strCommand,
+                inv.hash.ToString(), pfrom->GetLogName(), nSizeThinBlock, thinBlock.vTxHashes.size(),
+                thinBlock.vMissingTx.size(), mempool.size());
 
             // Do not process unrequested xthinblocks unless from an expedited node.
             LOCK(pfrom->cs_mapthinblocksinflight);
@@ -714,7 +715,7 @@ bool CXThinBlock::process(CNode *pfrom,
              ++mi)
         {
             uint64_t cheapHash = (*mi).first.GetCheapHash();
-            auto const& item = mapPartialTxHash.insert(map<uint64_t, uint256>::value_type(cheapHash,(*mi).first));
+            auto const &item = mapPartialTxHash.insert(map<uint64_t, uint256>::value_type(cheapHash, (*mi).first));
             if (!item.second)
             {
                 collision = true;

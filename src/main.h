@@ -87,7 +87,7 @@ static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 72;
 /** Default for -orphanpoolexpiry, expiration time for orphan pool transactions in hours */
 static const unsigned int DEFAULT_ORPHANPOOL_EXPIRY = 4;
 /** The maximum size of a blk?????.dat file (since 0.8) */
-static const uint64_t MAX_BLOCKFILE_SIZE = 16ULL*0x8000000ULL; // Giga-blocks: use a 2 GB file size
+static const uint64_t MAX_BLOCKFILE_SIZE = 16ULL * 0x8000000ULL; // Giga-blocks: use a 2 GB file size
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
 static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
 /** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
@@ -634,9 +634,12 @@ public:
 #endif
 
 void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);
-extern CStatHistory<uint64_t> nTxValidationTime;;
+extern CStatHistory<uint64_t> nTxValidationTime;
+;
 std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx,
-    int flags, std::vector<int> *prevHeights, const CBlockIndex &block);
+    int flags,
+    std::vector<int> *prevHeights,
+    const CBlockIndex &block);
 
 bool EvaluateSequenceLocks(const CBlockIndex &block, std::pair<int, int64_t> lockPair);
 

@@ -71,16 +71,17 @@ public:
     uint64_t tipHeight;
     uint64_t tipMedianTimePast;
     int64_t adjustedTime;
-    CBlockIndex *tip;  // CBlockIndexes are never deleted once created (even if the tip changes) so we can use this ptr
+    CBlockIndex *tip; // CBlockIndexes are never deleted once created (even if the tip changes) so we can use this ptr
     CCoinsViewCache *coins;
-    CCoinsViewMemPool* cvMempool;
+    CCoinsViewMemPool *cvMempool;
 
     void Load(void);
 
-    Snapshot():coins(nullptr), cvMempool(nullptr) {}
+    Snapshot() : coins(nullptr), cvMempool(nullptr) {}
     ~Snapshot()
     {
-        if (cvMempool) delete cvMempool;
+        if (cvMempool)
+            delete cvMempool;
     }
 };
 
@@ -94,7 +95,7 @@ extern bool ParallelAcceptToMemoryPool(Snapshot &ss,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
-    std::vector<COutPoint>& vCoinsToUncache);
+    std::vector<COutPoint> &vCoinsToUncache);
 
 class CTxInputData
 {
@@ -105,7 +106,7 @@ public:
     std::string nodeName;
 };
 
-extern CFastFilter incomingConflicts;  // quickly matches txs that conflict with txs that are being considered
+extern CFastFilter incomingConflicts; // quickly matches txs that conflict with txs that are being considered
 extern std::queue<CTxInputData> txInQ;
 extern std::queue<CTxInputData> txDeferQ;
 extern CCriticalSection csTxInQ;
@@ -116,8 +117,8 @@ extern void CommitToMempool();
 extern CThreadCorral txProcessingCorral;
 enum
 {
-    TX_PROCESSING=1,
-    BLOCK_PROCESSING=2
+    TX_PROCESSING = 1,
+    BLOCK_PROCESSING = 2
 };
 
 class CTxCommitData
@@ -129,7 +130,7 @@ public:
 class CBlockCommitData
 {
 public:
-    CBlock* block;  // queue popper owns this
+    CBlock *block; // queue popper owns this
     uint256 hash;
 };
 

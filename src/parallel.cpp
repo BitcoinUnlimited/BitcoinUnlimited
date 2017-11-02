@@ -285,7 +285,7 @@ bool CParallelValidation::Enabled() { return GetBoolArg("-parallel", true); }
 void CParallelValidation::InitThread(const boost::thread::id this_id,
     const CNode *pfrom,
     shared_ptr<CBlock> block,
-                                     const CInv &inv,
+    const CInv &inv,
     uint64_t blockSize)
 {
     const CBlockHeader &header = block->GetBlockHeader();
@@ -440,8 +440,9 @@ void CParallelValidation::ClearOrphanCache(const CBlock &block)
 //  has finished.
 void CParallelValidation::HandleBlockMessage(CNode *pfrom,
     const string &strCommand,
-                                             std::shared_ptr<CBlock> block,
-                                             const CInv &inv, uint64_t nBlockSize)
+    std::shared_ptr<CBlock> block,
+    const CInv &inv,
+    uint64_t nBlockSize)
 {
     if (nBlockSize == 0)
         nBlockSize = ::GetSerializeSize(*block, SER_NETWORK, PROTOCOL_VERSION);
@@ -539,7 +540,11 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom,
     }
 }
 
-void HandleBlockMessageThread(CNode *pfrom, const string strCommand, shared_ptr<CBlock> block, const CInv inv, uint64_t nSizeBlock)
+void HandleBlockMessageThread(CNode *pfrom,
+    const string strCommand,
+    shared_ptr<CBlock> block,
+    const CInv inv,
+    uint64_t nSizeBlock)
 {
     int64_t startTime = GetTimeMicros();
     CValidationState state;

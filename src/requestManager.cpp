@@ -40,7 +40,7 @@ using namespace std;
 extern CRequestManager requester;
 
 // Any ping < 25 ms is good
-unsigned int ACCEPTABLE_PING_USEC = 25*1000;
+unsigned int ACCEPTABLE_PING_USEC = 25 * 1000;
 
 // When should I request an object from someone else (in microseconds)
 unsigned int MIN_TX_REQUEST_RETRY_INTERVAL = DEFAULT_MIN_TX_REQUEST_RETRY_INTERVAL;
@@ -88,7 +88,7 @@ void CRequestManager::cleanup(CUnknownObj &item)
         if (node)
         {
             i->clear();
-            //LogPrint("req", "ReqMgr: %s cleanup - removed ref to %d count %d.\n", item.obj.ToString(), node->GetId(),
+            // LogPrint("req", "ReqMgr: %s cleanup - removed ref to %d count %d.\n", item.obj.ToString(), node->GetId(),
             //    node->GetRefCount());
             node->Release();
         }
@@ -101,7 +101,7 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
     CUnknownObj &item = itemIt->second;
     cleanup(item);
     if (sendBlkIter == itemIt)
-            ++sendBlkIter;
+        ++sendBlkIter;
     mapBlkInfo.erase(itemIt);
 }
 
@@ -110,7 +110,7 @@ void CRequestManager::cleanup(ShardedMap::Accessor &macc, OdMap::iterator &itemI
     CUnknownObj &item = itemIt->second;
     cleanup(item);
     if (sendBlkIter == itemIt)
-            ++sendBlkIter;
+        ++sendBlkIter;
     macc->erase(itemIt);
 }
 
@@ -120,7 +120,7 @@ void CRequestManager::cleanup(ShardedMap::iterator &itemIt)
     CUnknownObj &item = itemIt->second;
     cleanup(item);
     assert(item.obj.type == MSG_TX);
-    //if (sendIter == itemIt)
+    // if (sendIter == itemIt)
     //   ++sendIter;
     mapTxnInfo._erase(itemIt);
 }
@@ -165,7 +165,7 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
         data.priority = max(priority, data.priority);
         if (data.AddSource(from))
         {
-            //LogPrint("blk", "%s available at %s\n", obj.ToString().c_str(), from->addrName.c_str());
+            // LogPrint("blk", "%s available at %s\n", obj.ToString().c_str(), from->addrName.c_str());
         }
     }
     else
@@ -344,7 +344,8 @@ bool CUnknownObj::AddSource(CNode *from)
     {
         LogPrint("req", "AddSource %s is available at %s.\n", obj.ToString(), from->GetLogName());
         {
-            // no longer needed (ref count is an atomic) LOCK(cs_vNodes); // This lock is needed to ensure that AddRef happens atomically
+            // This lock is needed to ensure that AddRef happens atomically
+            // no longer needed (ref count is an atomic) LOCK(cs_vNodes);
             from->AddRef();
         }
         CNodeRequestData req(from);
@@ -359,7 +360,7 @@ bool CUnknownObj::AddSource(CNode *from)
         availableFrom.push_back(req);
         return true;
     }
-  return false;
+    return false;
 }
 
 bool RequestBlock(CNode *pfrom, CInv obj)
@@ -380,9 +381,10 @@ bool RequestBlock(CNode *pfrom, CInv obj)
     if (IsChainNearlySyncd() || chainParams.NetworkIDString() == "regtest")
     {
         BlockMap::iterator idxIt = mapBlockIndex.find(obj.hash);
-        if (idxIt == mapBlockIndex.end())  // only request if we don't already have the header
+        if (idxIt == mapBlockIndex.end()) // only request if we don't already have the header
         {
-            LogPrint("net", "getheaders (%d) %s to peer=%d\n", pindexBestHeader->nHeight, obj.hash.ToString(), pfrom->id);
+            LogPrint(
+                "net", "getheaders (%d) %s to peer=%d\n", pindexBestHeader->nHeight, obj.hash.ToString(), pfrom->id);
             pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexBestHeader), obj.hash);
         }
     }
@@ -488,8 +490,8 @@ void CRequestManager::RemoveSource(CNode *from)
                     req.lastRequestTime = 0; // request aborted
                     req.outstandingReqs--;
                     req.receivingFrom = 0;
-                    req.paused = 0;  // In case processing data from this node caused a pause, we must resume.
-                                     // this could lead to a double request
+                    req.paused = 0; // In case processing data from this node caused a pause, we must resume.
+                    // this could lead to a double request
                     // We will delete from the availableFrom list when we next process this req
                     tx++;
                 }
@@ -497,22 +499,22 @@ void CRequestManager::RemoveSource(CNode *from)
         }
 
         {
-        LOCK(cs_objDownloader);
-        for (auto &rq : mapBlkInfo)
-        {
-            CUnknownObj &req = rq.second;
-            if (req.receivingFrom == from->id)
+            LOCK(cs_objDownloader);
+            for (auto &rq : mapBlkInfo)
             {
-                req.lastRequestTime = 0; // request aborted
-                req.outstandingReqs--;
-                req.receivingFrom = 0;
-                // In case processing data from this node caused a pause, we must resume.
-                // this could lead to a double request
-                req.paused = 0;
-                // We will delete from the availableFrom list when we next process this req
-                blk++;
+                CUnknownObj &req = rq.second;
+                if (req.receivingFrom == from->id)
+                {
+                    req.lastRequestTime = 0; // request aborted
+                    req.outstandingReqs--;
+                    req.receivingFrom = 0;
+                    // In case processing data from this node caused a pause, we must resume.
+                    // this could lead to a double request
+                    req.paused = 0;
+                    // We will delete from the availableFrom list when we next process this req
+                    blk++;
+                }
             }
-        }
         }
     }
     LogPrint("req", "ReqMgr: Removed source %s, outstanding: %d tx, %d blk\n", from->GetLogName(), tx, blk);
@@ -555,7 +557,7 @@ void CRequestManager::SendRequests()
                     break;
 
                 // if never requested then lastRequestTime==0 so this will always be true
-                if ((!item.paused)&&(now - item.lastRequestTime > blkReqRetryInterval))
+                if ((!item.paused) && (now - item.lastRequestTime > blkReqRetryInterval))
                 {
                     if (!item.availableFrom.empty())
                     {
@@ -671,10 +673,10 @@ void CRequestManager::SendRequests()
     }
 
     // Get Transactions
-    int shard = insecure_rand()&(ShardedMap::NUM_SHARDS-1);
-    ShardedMap::Accessor macc(mapTxnInfo, shard);  // take the lock so we can use this map
+    int shard = insecure_rand() & (ShardedMap::NUM_SHARDS - 1);
+    ShardedMap::Accessor macc(mapTxnInfo, shard); // take the lock so we can use this map
     OdMap::iterator sendIter = macc->begin();
-    now = GetTimeMicros();  // we don't need a lot of precision and this is surprisingly slow based on monte carlo
+    now = GetTimeMicros(); // we don't need a lot of precision and this is surprisingly slow based on monte carlo
     while (sendIter != macc->end())
     {
         OdMap::iterator itemIter = sendIter;
@@ -682,7 +684,7 @@ void CRequestManager::SendRequests()
 
         if (itemIter == macc->end())
             break;
-        //LogPrint("req", "handling item %s.\n", item.obj.ToString().c_str());
+        // LogPrint("req", "handling item %s.\n", item.obj.ToString().c_str());
         ++sendIter; // move it forward up here in case we need to erase the item we are working with.
 
         // if never requested then lastRequestTime==0 so this will always be true
@@ -701,7 +703,8 @@ void CRequestManager::SendRequests()
                     droppedTxns += 1;
                 }
 
-                if (!requestPacer.try_leak(1)) break;  // No more send slots available
+                if (!requestPacer.try_leak(1))
+                    break; // No more send slots available
 
                 if (item.availableFrom.empty())
                 {
@@ -720,7 +723,7 @@ void CRequestManager::SendRequests()
                         {
                             if (next.node->fDisconnect) // Node was disconnected so we can't request from it
                             {
-                                //LogPrint("req", "ReqMgr: %s removed tx ref to %d count %d (on disconnect).\n",
+                                // LogPrint("req", "ReqMgr: %s removed tx ref to %d count %d (on disconnect).\n",
                                 //    item.obj.ToString(), next.node->GetId(), next.node->GetRefCount());
                                 next.node->Release();
                                 next.node = NULL; // force the loop to get another node
@@ -742,15 +745,15 @@ void CRequestManager::SendRequests()
                             item.lastRequestTime = now;
                             item.receivingFrom = next.node->id;
 
-                            //macc.unlock();  // do not use "item" after releasing this
+                            // macc.unlock();  // do not use "item" after releasing this
                             if (1)
                             {
                                 next.node->AskFor(obj);
                             }
-                            //macc.lock();
+                            // macc.lock();
                         }
                         {
-                            //LogPrint("req", "ReqMgr: %s removed tx ref to %d count %d\n",
+                            // LogPrint("req", "ReqMgr: %s removed tx ref to %d count %d\n",
                             //    obj.ToString(), next.node->GetId(), next.node->GetRefCount());
                             next.node->Release();
                             next.node = NULL;
@@ -806,7 +809,7 @@ bool CRequestManager::IsNodePingAcceptable(CNode *pfrom)
 ShardedMap::iterator ShardedMap::end(int shard)
 {
     ShardedMap::iterator ret;
-    if (shard == -1)  // Asking for the end of the whole sharded map
+    if (shard == -1) // Asking for the end of the whole sharded map
     {
         ret.sm = this;
         ret.shard = -1;
@@ -819,32 +822,34 @@ ShardedMap::iterator ShardedMap::end(int shard)
     return ret;
 }
 
-void ShardedMap::begin(ShardedMap::iterator& ret, int shard)
+void ShardedMap::begin(ShardedMap::iterator &ret, int shard)
 {
     bool atend = false;
     {
-    LOCK(cs[shard]);
-    ret.sm = this;
-    ret.shard = shard;
-    ret.it = mp[shard].begin();
-    atend = (ret.it == mp[shard].end());
+        LOCK(cs[shard]);
+        ret.sm = this;
+        ret.shard = shard;
+        ret.it = mp[shard].begin();
+        atend = (ret.it == mp[shard].end());
     }
 
-    while(atend && ret.shard < NUM_SHARDS-1)
+    while (atend && ret.shard < NUM_SHARDS - 1)
     {
         ret.shard++;
         LOCK(cs[ret.shard]);
         ret.it = mp[ret.shard].begin();
         atend = (ret.it == mp[ret.shard].end());
     }
-    if (atend) ret.shard=-1;
+    if (atend)
+        ret.shard = -1;
 }
 
 
-ShardedMap::iterator& ShardedMap::iterator::operator++()
+ShardedMap::iterator &ShardedMap::iterator::operator++()
 {
     // Don't increment beyond the end
-    if (shard == -1) return *this;
+    if (shard == -1)
+        return *this;
 
     bool atend = false;
     {
@@ -859,10 +864,10 @@ ShardedMap::iterator& ShardedMap::iterator::operator++()
 
     while (atend)
     {
-        if (shard==NUM_SHARDS-1)
+        if (shard == NUM_SHARDS - 1)
         {
             shard = -1;
-            return *this;  // at the end
+            return *this; // at the end
         }
         ++shard;
         {
@@ -906,8 +911,10 @@ void CRequestManager::Resume(const CInv &obj)
         OdMap::iterator item = macc->find(obj.hash);
         if (item == macc->end())
             return; // item has already been removed
-        if (item->second.paused) item->second.paused--;
-        LogPrint("req", "ReqMgr: TX  %s resumed (count %d)\n", item->second.obj.ToString().c_str(), item->second.paused);
+        if (item->second.paused)
+            item->second.paused--;
+        LogPrint(
+            "req", "ReqMgr: TX  %s resumed (count %d)\n", item->second.obj.ToString().c_str(), item->second.paused);
     }
     else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_THINBLOCK) || (obj.type == MSG_XTHINBLOCK))
     {
@@ -915,7 +922,9 @@ void CRequestManager::Resume(const CInv &obj)
         OdMap::iterator item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
             return; // item has already been removed
-        if (item->second.paused) item->second.paused--;
-        LogPrint("blk", "ReqMgr: block %s resumed (count %d)\n", item->second.obj.ToString().c_str(),item->second.paused);
+        if (item->second.paused)
+            item->second.paused--;
+        LogPrint(
+            "blk", "ReqMgr: block %s resumed (count %d)\n", item->second.obj.ToString().c_str(), item->second.paused);
     }
 }

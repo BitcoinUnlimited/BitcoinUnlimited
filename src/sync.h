@@ -8,8 +8,8 @@
 #define BITCOIN_SYNC_H
 
 #include "threadsafety.h"
-#include "utiltime.h"
 #include "util.h"
+#include "utiltime.h"
 
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
@@ -60,20 +60,9 @@ template <typename PARENT>
 class LOCKABLE AnnotatedMixin : public PARENT
 {
 public:
-    void lock() EXCLUSIVE_LOCK_FUNCTION()
-    {
-        PARENT::lock();
-    }
-
-    void unlock() UNLOCK_FUNCTION()
-    {
-        PARENT::unlock();
-    }
-
-    bool try_lock() EXCLUSIVE_TRYLOCK_FUNCTION(true)
-    {
-        return PARENT::try_lock();
-    }
+    void lock() EXCLUSIVE_LOCK_FUNCTION() { PARENT::lock(); }
+    void unlock() UNLOCK_FUNCTION() { PARENT::unlock(); }
+    bool try_lock() EXCLUSIVE_TRYLOCK_FUNCTION(true) { return PARENT::try_lock(); }
 };
 
 /**
@@ -83,14 +72,14 @@ public:
 #ifndef DEBUG_LOCKORDER
 typedef AnnotatedMixin<boost::recursive_mutex> CCriticalSection;
 #define CRITSEC(x) CCriticalSection x
-#else  // BU we need to remove the critical section from the lockorder map when destructed
-class CCriticalSection:public AnnotatedMixin<boost::recursive_mutex>
+#else // BU we need to remove the critical section from the lockorder map when destructed
+class CCriticalSection : public AnnotatedMixin<boost::recursive_mutex>
 {
 public:
-  const char* name;
-  CCriticalSection(const char* name);
-  CCriticalSection();
-  ~CCriticalSection();
+    const char *name;
+    CCriticalSection(const char *name);
+    CCriticalSection();
+    ~CCriticalSection();
 };
 #define CRITSEC(zzname) CCriticalSection zzname(#zzname)
 #endif
@@ -98,33 +87,32 @@ public:
 #ifndef DEBUG_LOCKORDER
 typedef AnnotatedMixin<boost::shared_mutex> CSharedCriticalSection;
 #define SCRITSEC(x) CSharedCriticalSection x
-#else  // BU we need to remove the critical section from the lockorder map when destructed
-class CSharedCriticalSection:public AnnotatedMixin<boost::shared_mutex>
+#else // BU we need to remove the critical section from the lockorder map when destructed
+class CSharedCriticalSection : public AnnotatedMixin<boost::shared_mutex>
 {
 public:
-
     class LockInfo
     {
     public:
-        const char* file;
+        const char *file;
         unsigned int line;
-    LockInfo():file(""), line(0) {}
-    LockInfo(const char* f, unsigned int l): file(f), line(l) {}
+        LockInfo() : file(""), line(0) {}
+        LockInfo(const char *f, unsigned int l) : file(f), line(l) {}
     };
 
-  boost::mutex setlock;
-  std::map<uint64_t, LockInfo> sharedowners;
-  const char* name;
-  uint64_t exclusiveOwner;
-  CSharedCriticalSection(const char* name);
-  CSharedCriticalSection();
-  ~CSharedCriticalSection();
-  void lock_shared();
-  bool try_lock_shared();
-  void unlock_shared();
-  void lock();
-  void unlock();
-  bool try_lock();
+    boost::mutex setlock;
+    std::map<uint64_t, LockInfo> sharedowners;
+    const char *name;
+    uint64_t exclusiveOwner;
+    CSharedCriticalSection(const char *name);
+    CSharedCriticalSection();
+    ~CSharedCriticalSection();
+    void lock_shared();
+    bool try_lock_shared();
+    void unlock_shared();
+    void lock();
+    void unlock();
+    bool try_lock();
 };
 #define SCRITSEC(zzname) CSharedCriticalSection zzname(#zzname)
 #endif
@@ -184,26 +172,33 @@ typedef boost::condition_variable CConditionVariable;
 typedef std::condition_variable_any CCond;
 
 #ifdef DEBUG_LOCKORDER
-void EnterCritical(const char* pszName, const char* pszFile, int nLine, void* cs, bool fTry = false);
+void EnterCritical(const char *pszName, const char *pszFile, int nLine, void *cs, bool fTry = false);
 void LeaveCritical();
-void DeleteCritical(const void* cs); // BU if a CCriticalSection is allocated on the heap we need to clean it from the lockorder map upon destruction because another CCriticalSection could be created on top of it.
+// BU if a CCriticalSection is allocated on the heap we need to clean it from the lockorder map upon destruction because
+// another CCriticalSection could be created on top of it.
+void DeleteCritical(const void *cs);
 std::string LocksHeld();
-void AssertLockHeldInternal(const char* pszName, const char* pszFile, int nLine, void* cs);
-void AssertWriteLockHeldInternal(const char* pszName, const char* pszFile, int nLine, CSharedCriticalSection *cs);
+void AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs);
+void AssertWriteLockHeldInternal(const char *pszName, const char *pszFile, int nLine, CSharedCriticalSection *cs);
 #else
-void static inline EnterCritical(const char* pszName, const char* pszFile, int nLine, void* cs, bool fTry = false) {}
+void static inline EnterCritical(const char *pszName, const char *pszFile, int nLine, void *cs, bool fTry = false) {}
 void static inline LeaveCritical() {}
-void static inline AssertLockHeldInternal(const char* pszName, const char* pszFile, int nLine, void* cs) {}
-void static inline AssertWriteLockHeldInternal(const char* pszName, const char* pszFile, int nLine, CSharedCriticalSection *cs) {}
+void static inline AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs) {}
+void static inline AssertWriteLockHeldInternal(const char *pszName,
+    const char *pszFile,
+    int nLine,
+    CSharedCriticalSection *cs)
+{
+}
 #endif
 #define AssertLockHeld(cs) AssertLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
 #define AssertWriteLockHeld(cs) AssertWriteLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
 
 #ifdef DEBUG_LOCKCONTENTION
-void PrintLockContention(const char* pszName, const char* pszFile, int nLine);
+void PrintLockContention(const char *pszName, const char *pszFile, int nLine);
 #endif
 
-#define LOCK_WARN_TIME (500ULL*1000ULL*1000ULL)
+#define LOCK_WARN_TIME (500ULL * 1000ULL * 1000ULL)
 
 /** Wrapper around boost::unique_lock<Mutex> */
 template <typename Mutex>
@@ -214,11 +209,11 @@ private:
 #ifdef DEBUG_LOCKTIME
     uint64_t lockedTime;
 #endif
-    const char* name;
-    const char* file;
+    const char *name;
+    const char *file;
     int line;
 
-    void Enter(const char* pszName, const char* pszFile, int nLine)
+    void Enter(const char *pszName, const char *pszFile, int nLine)
     {
 #ifdef DEBUG_LOCKTIME
         uint64_t startWait = GetStopwatch();
@@ -226,9 +221,10 @@ private:
         name = pszName;
         file = pszFile;
         line = nLine;
-        EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()));
+        EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()));
 #ifdef DEBUG_LOCKCONTENTION
-        if (!lock.try_lock()) {
+        if (!lock.try_lock())
+        {
             PrintLockContention(pszName, pszFile, nLine);
 #endif
             lock.lock();
@@ -239,18 +235,18 @@ private:
 #ifdef DEBUG_LOCKTIME
         lockedTime = GetStopwatch();
         if (lockedTime - startWait > LOCK_WARN_TIME)
-          {
-            LogPrint("lck", "Lock %s at %s:%d waited for %d ms\n", pszName, pszFile, nLine,(lockedTime - startWait));
-          }
+        {
+            LogPrint("lck", "Lock %s at %s:%d waited for %d ms\n", pszName, pszFile, nLine, (lockedTime - startWait));
+        }
 #endif
     }
 
-    bool TryEnter(const char* pszName, const char* pszFile, int nLine)
+    bool TryEnter(const char *pszName, const char *pszFile, int nLine)
     {
         name = pszName;
         file = pszFile;
         line = nLine;
-        EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()), true);
+        EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()), true);
         lock.try_lock();
         if (!lock.owns_lock())
         {
@@ -267,7 +263,9 @@ private:
     }
 
 public:
-    CMutexLock(Mutex& mutexIn, const char* pszName, const char* pszFile, int nLine, bool fTry = false) EXCLUSIVE_LOCK_FUNCTION(mutexIn) : lock(mutexIn, boost::defer_lock)
+    CMutexLock(Mutex &mutexIn, const char *pszName, const char *pszFile, int nLine, bool fTry = false)
+        EXCLUSIVE_LOCK_FUNCTION(mutexIn)
+        : lock(mutexIn, boost::defer_lock)
     {
         if (fTry)
             TryEnter(pszName, pszFile, nLine);
@@ -275,9 +273,11 @@ public:
             Enter(pszName, pszFile, nLine);
     }
 
-    CMutexLock(Mutex* pmutexIn, const char* pszName, const char* pszFile, int nLine, bool fTry = false) EXCLUSIVE_LOCK_FUNCTION(pmutexIn)
+    CMutexLock(Mutex *pmutexIn, const char *pszName, const char *pszFile, int nLine, bool fTry = false)
+        EXCLUSIVE_LOCK_FUNCTION(pmutexIn)
     {
-        if (!pmutexIn) return;
+        if (!pmutexIn)
+            return;
 
         lock = boost::unique_lock<Mutex>(*pmutexIn, boost::defer_lock);
         if (fTry)
@@ -289,7 +289,7 @@ public:
     ~CMutexLock() UNLOCK_FUNCTION()
     {
         if (lock.owns_lock())
-          {
+        {
             LeaveCritical();
 #ifdef DEBUG_LOCKTIME
             uint64_t doneTime = GetStopwatch();
@@ -299,13 +299,10 @@ public:
                     "lck", "Lock %s at %s:%d remained locked for %d ms\n", name, file, line, doneTime - lockedTime);
             }
 #endif
-          }
+        }
     }
 
-    operator bool()
-    {
-        return lock.owns_lock();
-    }
+    operator bool() { return lock.owns_lock(); }
 };
 
 /** Wrapper around boost::unique_lock<Mutex> */
@@ -315,11 +312,11 @@ class SCOPED_LOCKABLE CMutexReadLock
 private:
     boost::shared_lock<Mutex> lock;
     uint64_t lockedTime;
-    const char* name;
-    const char* file;
+    const char *name;
+    const char *file;
     int line;
 
-    void Enter(const char* pszName, const char* pszFile, int nLine)
+    void Enter(const char *pszName, const char *pszFile, int nLine)
     {
 #ifdef DEBUG_LOCKTIME
         uint64_t startWait = GetStopwatch();
@@ -327,48 +324,51 @@ private:
         name = pszName;
         file = pszFile;
         line = nLine;
-        EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()));
-        //LogPrint("lck","try ReadLock %p %s by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
+        EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()));
+// LogPrint("lck","try ReadLock %p %s by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
 #ifdef DEBUG_LOCKCONTENTION
-        if (!lock.try_lock()) {
+        if (!lock.try_lock())
+        {
             PrintLockContention(pszName, pszFile, nLine);
 #endif
             lock.lock();
 #ifdef DEBUG_LOCKCONTENTION
         }
 #endif
-        //LogPrint("lck","ReadLock %p %s taken by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
+// LogPrint("lck","ReadLock %p %s taken by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
 #ifdef DEBUG_LOCKTIME
         lockedTime = GetStopwatch();
         if (lockedTime - startWait > LOCK_WARN_TIME)
-          {
-            LogPrint("lck", "Lock %s at %s:%d waited for %d ms\n", pszName, pszFile, nLine,(lockedTime - startWait));
-          }
+        {
+            LogPrint("lck", "Lock %s at %s:%d waited for %d ms\n", pszName, pszFile, nLine, (lockedTime - startWait));
+        }
 #endif
     }
 
-    bool TryEnter(const char* pszName, const char* pszFile, int nLine)
+    bool TryEnter(const char *pszName, const char *pszFile, int nLine)
     {
         name = pszName;
         file = pszFile;
         line = nLine;
-        EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()), true);
+        EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()), true);
         if (!lock.try_lock())
-          {
+        {
 #ifdef DEBUG_LOCKTIME
-              lockedTime = 0;
+            lockedTime = 0;
 #endif
-              LeaveCritical();
-          }
+            LeaveCritical();
+        }
 #ifdef DEBUG_LOCKTIME
-          else
-              lockedTime = GetStopwatch();
+        else
+            lockedTime = GetStopwatch();
 #endif
-          return lock.owns_lock();
+        return lock.owns_lock();
     }
 
 public:
-    CMutexReadLock(Mutex& mutexIn, const char* pszName, const char* pszFile, int nLine, bool fTry = false) SHARED_LOCK_FUNCTION(mutexIn) : lock(mutexIn, boost::defer_lock)
+    CMutexReadLock(Mutex &mutexIn, const char *pszName, const char *pszFile, int nLine, bool fTry = false)
+        SHARED_LOCK_FUNCTION(mutexIn)
+        : lock(mutexIn, boost::defer_lock)
     {
         if (fTry)
             TryEnter(pszName, pszFile, nLine);
@@ -376,9 +376,11 @@ public:
             Enter(pszName, pszFile, nLine);
     }
 
-    CMutexReadLock(Mutex* pmutexIn, const char* pszName, const char* pszFile, int nLine, bool fTry = false) SHARED_LOCK_FUNCTION(pmutexIn)
+    CMutexReadLock(Mutex *pmutexIn, const char *pszName, const char *pszFile, int nLine, bool fTry = false)
+        SHARED_LOCK_FUNCTION(pmutexIn)
     {
-        if (!pmutexIn) return;
+        if (!pmutexIn)
+            return;
 
         lock = boost::shared_lock<Mutex>(*pmutexIn, boost::defer_lock);
         if (fTry)
@@ -390,7 +392,7 @@ public:
     ~CMutexReadLock() UNLOCK_FUNCTION()
     {
         if (lock.owns_lock())
-          {
+        {
             LeaveCritical();
 #ifdef DEBUG_LOCKTIME
             int64_t doneTime = GetStopwatch();
@@ -400,14 +402,11 @@ public:
                     "lck", "Lock %s at %s:%d remained locked for %d ms\n", name, file, line, doneTime - lockedTime);
             }
 #endif
-          }
-          // When lock is destructed it will release
+        }
+        // When lock is destructed it will release
     }
 
-    operator bool()
-    {
-        return lock.owns_lock();
-    }
+    operator bool() { return lock.owns_lock(); }
 };
 
 typedef CMutexReadLock<CSharedCriticalSection> CReadBlock;
@@ -416,17 +415,19 @@ typedef CMutexLock<CCriticalSection> CCriticalBlock;
 
 #define READLOCK(cs) CReadBlock UNIQUIFY(readblock)(cs, #cs, __FILE__, __LINE__)
 #define WRITELOCK(cs) CWriteBlock UNIQUIFY(writeblock)(cs, #cs, __FILE__, __LINE__)
-#define READLOCK2(cs1, cs2) CReadBlock readblock1(cs1, #cs1, __FILE__, __LINE__), readblock2(cs2, #cs2, __FILE__, __LINE__)
+#define READLOCK2(cs1, cs2) \
+    CReadBlock readblock1(cs1, #cs1, __FILE__, __LINE__), readblock2(cs2, #cs2, __FILE__, __LINE__)
 #define TRY_READ_LOCK(cs, name) CReadBlock name(cs, #cs, __FILE__, __LINE__, true)
 
 #define LOCK(cs) CCriticalBlock UNIQUIFY(criticalblock)(cs, #cs, __FILE__, __LINE__)
-#define LOCK2(cs1, cs2) CCriticalBlock criticalblock1(cs1, #cs1, __FILE__, __LINE__), criticalblock2(cs2, #cs2, __FILE__, __LINE__)
+#define LOCK2(cs1, cs2) \
+    CCriticalBlock criticalblock1(cs1, #cs1, __FILE__, __LINE__), criticalblock2(cs2, #cs2, __FILE__, __LINE__)
 #define TRY_LOCK(cs, name) CCriticalBlock name(cs, #cs, __FILE__, __LINE__, true)
 
-#define ENTER_CRITICAL_SECTION(cs)                            \
-    {                                                         \
-        EnterCritical(#cs, __FILE__, __LINE__, (void*)(&cs)); \
-        (cs).lock();                                          \
+#define ENTER_CRITICAL_SECTION(cs)                             \
+    {                                                          \
+        EnterCritical(#cs, __FILE__, __LINE__, (void *)(&cs)); \
+        (cs).lock();                                           \
     }
 
 #define LEAVE_CRITICAL_SECTION(cs) \
@@ -444,11 +445,11 @@ private:
 
 public:
     CSemaphore(int init) : value(init) {}
-
     void wait()
     {
         boost::unique_lock<boost::mutex> lock(mutex);
-        while (value < 1) {
+        while (value < 1)
+        {
             condition.wait(lock);
         }
         value--;
@@ -477,7 +478,7 @@ public:
 class CSemaphoreGrant
 {
 private:
-    CSemaphore* sem;
+    CSemaphore *sem;
     bool fHaveGrant;
 
 public:
@@ -504,7 +505,7 @@ public:
         return fHaveGrant;
     }
 
-    void MoveTo(CSemaphoreGrant& grant)
+    void MoveTo(CSemaphoreGrant &grant)
     {
         grant.Release();
         grant.sem = sem;
@@ -514,8 +515,7 @@ public:
     }
 
     CSemaphoreGrant() : sem(NULL), fHaveGrant(false) {}
-
-    CSemaphoreGrant(CSemaphore& sema, bool fTry = false) : sem(&sema), fHaveGrant(false)
+    CSemaphoreGrant(CSemaphore &sema, bool fTry = false) : sem(&sema), fHaveGrant(false)
     {
         if (fTry)
             TryAcquire();
@@ -523,33 +523,27 @@ public:
             Acquire();
     }
 
-    ~CSemaphoreGrant()
-    {
-        Release();
-    }
-
-    operator bool()
-    {
-        return fHaveGrant;
-    }
+    ~CSemaphoreGrant() { Release(); }
+    operator bool() { return fHaveGrant; }
 };
 
 // BU move from sync.c because I need to create these in globals.cpp
 struct CLockLocation
 {
-    CLockLocation(const char* pszName, const char* pszFile, int nLine, bool fTryIn);
+    CLockLocation(const char *pszName, const char *pszFile, int nLine, bool fTryIn);
     std::string ToString() const;
     std::string MutexName() const;
 
     bool fTry;
+
 private:
     std::string mutexName;
     std::string sourceFile;
     int sourceLine;
 };
 
-typedef std::vector<std::pair<void*, CLockLocation> > LockStack;
-typedef std::map<std::pair<void*, void*>, LockStack> LockStackMap;
+typedef std::vector<std::pair<void *, CLockLocation> > LockStack;
+typedef std::map<std::pair<void *, void *>, LockStack> LockStackMap;
 
 
 class CThreadCorral
@@ -560,31 +554,32 @@ protected:
     int maxRequestedRegion;
     CCriticalSection mutex;
     CCond cond;
-public:
-    CThreadCorral():curRegion(0),curCount(0),maxRequestedRegion(0) {}
 
+public:
+    CThreadCorral() : curRegion(0), curCount(0), maxRequestedRegion(0) {}
     void Enter(int region)
     {
         LOCK(mutex);
         while (1)
         {
             // If no region is running and I'm the biggest requested region, then run my region
-            if ((curCount == 0)&&(region>=maxRequestedRegion))
+            if ((curCount == 0) && (region >= maxRequestedRegion))
             {
                 curRegion = region;
-                maxRequestedRegion=0;
+                maxRequestedRegion = 0;
                 curCount = 1;
                 return;
             }
             // If the current region is mine, and no higher priority regions want to run, then I can run
-            else if ((curRegion == region)&&(region>=maxRequestedRegion))
+            else if ((curRegion == region) && (region >= maxRequestedRegion))
             {
                 curCount++;
                 return;
             }
-            else  // I can't run now.
+            else // I can't run now.
             {
-                if (region > maxRequestedRegion) maxRequestedRegion = region;
+                if (region > maxRequestedRegion)
+                    maxRequestedRegion = region;
                 cond.wait(mutex);
             }
         }
@@ -595,12 +590,11 @@ public:
         LOCK(mutex);
         assert(curRegion == region);
         curCount--;
-        if (curCount==0)
+        if (curCount == 0)
         {
             cond.notify_all();
         }
     }
-
 };
 
 class CCorralLock
@@ -614,6 +608,6 @@ public:
     ~CCorralLock() { corral.Exit(region); }
 };
 
-#define CORRAL(cral, region) CCorralLock UNIQUIFY(corral)(cral,region);
+#define CORRAL(cral, region) CCorralLock UNIQUIFY(corral)(cral, region);
 
 #endif // BITCOIN_SYNC_H

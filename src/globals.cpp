@@ -40,8 +40,8 @@
 #include <atomic>
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread.hpp>
 #include <boost/lockfree/queue.hpp>
+#include <boost/thread.hpp>
 #include <inttypes.h>
 #include <iomanip>
 #include <list>
@@ -59,16 +59,16 @@ boost::thread_specific_ptr<LockStack> lockstack;
 std::atomic<bool> fIsInitialBlockDownload{false};
 
 // main.cpp CriticalSections:
-CRITSEC( cs_LastBlockFile);
-CRITSEC( cs_nBlockSequenceId);
+CRITSEC(cs_LastBlockFile);
+CRITSEC(cs_nBlockSequenceId);
 
-CRITSEC( cs_nTimeOffset);
+CRITSEC(cs_nTimeOffset);
 int64_t nTimeOffset = 0;
 
-CRITSEC( cs_rpcWarmup);
+CRITSEC(cs_rpcWarmup);
 
-CRITSEC( cs_main);
-//SCRITSEC(csMapBlockIndex);
+CRITSEC(cs_main);
+// SCRITSEC(csMapBlockIndex);
 BlockMap mapBlockIndex;
 CChain chainActive;
 CWaitableCriticalSection csBestBlock;
@@ -76,7 +76,7 @@ CConditionVariable cvBlockChange;
 
 proxyType proxyInfo[NET_MAX];
 proxyType nameProxy;
-CRITSEC( cs_proxyInfos);
+CRITSEC(cs_proxyInfos);
 
 // moved from main.cpp (now part of nodestate.h)
 std::map<uint256, pair<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
@@ -84,23 +84,23 @@ std::map<NodeId, CNodeState> mapNodeState;
 
 set<uint256> setPreVerifiedTxHash;
 set<uint256> setUnVerifiedOrphanTxHash;
-CRITSEC( cs_xval);
-CRITSEC( cs_vNodes);
-CRITSEC( cs_mapLocalHost);
+CRITSEC(cs_xval);
+CRITSEC(cs_vNodes);
+CRITSEC(cs_mapLocalHost);
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
 uint64_t CNode::nTotalBytesRecv = 0;
 uint64_t CNode::nTotalBytesSent = 0;
-CRITSEC( CNode::cs_totalBytesRecv);
-CRITSEC( CNode::cs_totalBytesSent);
+CRITSEC(CNode::cs_totalBytesRecv);
+CRITSEC(CNode::cs_totalBytesSent);
 
 // critical sections from net.cpp
-CRITSEC( cs_setservAddNodeAddresses);
-CRITSEC( cs_vAddedNodes);
-CRITSEC( cs_vUseDNSSeeds);
-CRITSEC( cs_mapInboundConnectionTracker);
-CRITSEC( cs_vOneShots);
+CRITSEC(cs_setservAddNodeAddresses);
+CRITSEC(cs_vAddedNodes);
+CRITSEC(cs_vUseDNSSeeds);
+CRITSEC(cs_mapInboundConnectionTracker);
+CRITSEC(cs_vOneShots);
 
-CRITSEC( cs_statMap);
+CRITSEC(cs_statMap);
 CRITSEC(csBlockHashToIdx);
 CThreadCorral txProcessingCorral;
 
@@ -141,9 +141,9 @@ CTweakMap tweaks;
 
 map<CInv, CDataStream> mapRelay;
 deque<pair<int64_t, CInv> > vRelayExpiration;
-CRITSEC( cs_mapRelay);
+CRITSEC(cs_mapRelay);
 limitedmap<uint256, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
-CRITSEC( cs_mapAlreadyAskedFor);
+CRITSEC(cs_mapAlreadyAskedFor);
 
 vector<CNode *> vNodes;
 list<CNode *> vNodesDisconnected;
@@ -169,9 +169,7 @@ SCRITSEC(cs_orphancache);
 map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs_orphancache);
 map<uint256, set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs_orphancache);
 
-CTweak<uint32_t> netMagic("net.magic",
-    "network prefix override. If 0 use the default",
-    0);
+CTweak<uint32_t> netMagic("net.magic", "network prefix override. If 0 use the default", 0);
 
 CTweakRef<uint64_t> ebTweak("net.excessiveBlock",
     "Excessive block size in bytes",
@@ -239,8 +237,12 @@ CTweakRef<int> maxOutConnectionsTweak("net.maxOutboundConnections",
     &nMaxOutConnections,
     &OutboundConnectionValidator);
 CTweakRef<int> maxConnectionsTweak("net.maxConnections", "Maximum number of connections", &nMaxConnections);
-CTweakRef<uint32_t> maxSendBuffer("maxsendbuffer", "Maximum per-connection send buffer, <n>*1000 bytes", &nMaxSendBuffer);
-CTweakRef<uint32_t> maxReceiveBuffer("maxreceivebuffer", "Maximum per-connection receive buffer, <n>*1000 bytes", &nMaxReceiveBuffer);
+CTweakRef<uint32_t> maxSendBuffer("maxsendbuffer",
+    "Maximum per-connection send buffer, <n>*1000 bytes",
+    &nMaxSendBuffer);
+CTweakRef<uint32_t> maxReceiveBuffer("maxreceivebuffer",
+    "Maximum per-connection receive buffer, <n>*1000 bytes",
+    &nMaxReceiveBuffer);
 CTweakRef<int> minXthinNodesTweak("net.minXthinNodes",
     "Minimum number of outbound xthin capable nodes to connect to",
     &nMinXthinNodes);
@@ -266,8 +268,14 @@ CTweak<CAmount> maxTxFee("wallet.maxTxFee",
     "transactions.",
     DEFAULT_TRANSACTION_MAXFEE);
 
-CTweak<unsigned int> maxCoinSelSearchTime("wallet.coinSelSearchTime", "When sending, how long should this wallet search for a no-change payment solution in milliseconds.  A no-change solution reduces transaction fees.", 2000);
-CTweak<unsigned int> preferredNumUTXO("wallet.preferredNumUTXO", "How many UTXOs should be maintained in this wallet (on average).  If the number of UTXOs exceeds this value, transactions will be found that tend to have more inputs.  This will consolidate UTXOs.",5000);
+CTweak<unsigned int> maxCoinSelSearchTime("wallet.coinSelSearchTime",
+    "When sending, how long should this wallet search for a no-change payment solution in milliseconds.  A no-change "
+    "solution reduces transaction fees.",
+    2000);
+CTweak<unsigned int> preferredNumUTXO("wallet.preferredNumUTXO",
+    "How many UTXOs should be maintained in this wallet (on average).  If the number of UTXOs exceeds this value, "
+    "transactions will be found that tend to have more inputs.  This will consolidate UTXOs.",
+    5000);
 
 /** Number of blocks that can be requested at any given time from a single peer. */
 CTweak<unsigned int> maxBlocksInTransitPerPeer("net.maxBlocksInTransitPerPeer",
@@ -281,7 +289,11 @@ CTweak<unsigned int> blockDownloadWindow("net.blockDownloadWindow",
     "How far ahead of our current height do we fetch? 0 means use algorithm.",
     0);
 
-CTweak<unsigned int> txDust("wallet.txFeeOverpay","If transactions overpay by less than this amount in Satoshis, the extra will be put in the fee rather than a change address.  Zero means calculate this dynamically as a fraction of the current transaction fee (recommended).", 0);
+CTweak<unsigned int> txDust("wallet.txFeeOverpay",
+    "If transactions overpay by less than this amount in Satoshis, the extra will be put in the fee rather than a "
+    "change address.  Zero means calculate this dynamically as a fraction of the current transaction fee "
+    "(recommended).",
+    0);
 
 /** This is the initial size of CFileBuffer's RAM buffer during reindex.  A
 larger size will result in a tiny bit better performance if blocks are that
@@ -318,8 +330,8 @@ CThinBlockData thindata; // Singleton class
 
 uint256 bitcoinCashForkBlockHash = uint256S("000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec");
 
-//SCRITSEC(csRecentRejects);
-//boost::scoped_ptr<CRollingBloomFilter> recentRejects;
+// SCRITSEC(csRecentRejects);
+// boost::scoped_ptr<CRollingBloomFilter> recentRejects;
 CRollingFastFilter recentRejects;
 
 #ifdef ENABLE_MUTRACE
@@ -333,10 +345,10 @@ public:
         printf("csTxInQ %p\n", &csTxInQ);
         printf("cvTxInQ %p\n", &cvTxInQ);
         printf("cs_LastBlockFile %p\n", &cs_LastBlockFile);
-        printf("cs_nBlockSequenceId %p\n",&cs_nBlockSequenceId);
-        printf("cs_nTimeOffset %p\n",&cs_nTimeOffset);
-        printf("cs_rpcWarmup %p\n",&cs_rpcWarmup);
-        printf("cs_main %p\n",&cs_main);
+        printf("cs_nBlockSequenceId %p\n", &cs_nBlockSequenceId);
+        printf("cs_nTimeOffset %p\n", &cs_nTimeOffset);
+        printf("cs_rpcWarmup %p\n", &cs_rpcWarmup);
+        printf("cs_main %p\n", &cs_main);
         printf("csBestBlock %p\n", &csBestBlock);
         printf("cs_proxyInfos %p\n", &cs_proxyInfos);
         printf("cs_xval %p\n", &cs_xval);
@@ -345,7 +357,7 @@ public:
         printf("CNode::cs_totalBytesRecv %p\n", &CNode::cs_totalBytesRecv);
         printf("CNode::cs_totalBytesSent %p\n", &CNode::cs_totalBytesSent);
 
-// critical sections from net.cpp
+        // critical sections from net.cpp
         printf("cs_setservAddNodeAddresses %p\n", &cs_setservAddNodeAddresses);
         printf("cs_vAddedNodes %p\n", &cs_vAddedNodes);
         printf("cs_vUseDNSSeeds %p\n", &cs_vUseDNSSeeds);
@@ -358,7 +370,6 @@ public:
 
         printf("\nCondition variables:\n");
         printf("cvBlockChange %p\n", &cvBlockChange);
-
     }
 };
 

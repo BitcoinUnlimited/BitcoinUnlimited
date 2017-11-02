@@ -36,7 +36,7 @@ extern unsigned int MIN_BLK_REQUEST_RETRY_INTERVAL;
 static const unsigned int DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL = 5 * 1000 * 1000;
 
 // How long in seconds we wait for a xthin request to be fullfilled before disconnecting the node.
-static const unsigned int THINBLOCK_DOWNLOAD_TIMEOUT = 5*60;
+static const unsigned int THINBLOCK_DOWNLOAD_TIMEOUT = 5 * 60;
 
 class CNode;
 
@@ -60,9 +60,9 @@ public:
 
 struct MatchCNodeRequestData // Compare a CNodeRequestData object to a node
 {
-    CNode* node;
-    MatchCNodeRequestData(CNode* n) : node(n){};
-    inline bool operator()(const CNodeRequestData& nd) const { return nd.node == node; }
+    CNode *node;
+    MatchCNodeRequestData(CNode *n) : node(n){};
+    inline bool operator()(const CNodeRequestData &nd) const { return nd.node == node; }
 };
 
 class CUnknownObj
@@ -101,28 +101,28 @@ public:
 
     typedef std::map<uint256, CUnknownObj> OdMap;
 
-    OdMap            mp[NUM_SHARDS];
+    OdMap mp[NUM_SHARDS];
     CCriticalSection cs[NUM_SHARDS];
 
     class Accessor
     {
     protected:
-        OdMap* mp;
-        CCriticalSection* cs;
+        OdMap *mp;
+        CCriticalSection *cs;
 
     public:
-        Accessor(ShardedMap& sm, unsigned int index)
+        Accessor(ShardedMap &sm, unsigned int index)
         {
-            int shard = index&(NUM_SHARDS-1);
+            int shard = index & (NUM_SHARDS - 1);
             mp = &sm.mp[shard];
-            cs  = &sm.cs[shard];
+            cs = &sm.cs[shard];
             cs->lock();
         }
-        Accessor(ShardedMap& sm, uint256 val)
+        Accessor(ShardedMap &sm, uint256 val)
         {
-            int shard = (*val.begin())&(NUM_SHARDS-1);
+            int shard = (*val.begin()) & (NUM_SHARDS - 1);
             mp = &sm.mp[shard];
-            cs  = &sm.cs[shard];
+            cs = &sm.cs[shard];
             cs->lock();
         }
 
@@ -144,49 +144,47 @@ public:
 
         ~Accessor()
         {
-            if (mp) mp = NULL;
+            if (mp)
+                mp = NULL;
             if (cs)
             {
                 cs->unlock();
-                cs=NULL;
+                cs = NULL;
             }
         }
 
-        OdMap& operator*(void) { return *mp; }
-        OdMap* operator->(void) { return mp; }
+        OdMap &operator*(void) { return *mp; }
+        OdMap *operator->(void) { return mp; }
     };
 
     class iterator
     {
     public:
         int shard;
-        ShardedMap* sm;
+        ShardedMap *sm;
         OdMap::iterator it;
         friend class ShardedMap;
-        OdMap::iterator& operator->() { return it; }
+        OdMap::iterator &operator->() { return it; }
         OdMap::value_type operator*() { return *it; }
-
-        bool operator == (const iterator& other) const
+        bool operator==(const iterator &other) const
         {
             // special case the end
             if (other.shard == -1)
             {
-                if (shard == -1) return true;
+                if (shard == -1)
+                    return true;
                 return false;
             }
             if (shard == -1)
             {
-                if (other.shard == -1) return true;
+                if (other.shard == -1)
+                    return true;
                 return false;
             }
             return (shard == other.shard) && (it == other.it);
         }
-        bool operator != (const iterator& other) const
-        {
-            return !(*this == other);
-        }
-
-        iterator& operator++();
+        bool operator!=(const iterator &other) const { return !(*this == other); }
+        iterator &operator++();
 
         iterator()
         {
@@ -195,15 +193,11 @@ public:
         }
     };
 
-    void _erase(iterator& it)
-    {
-        mp[it.shard].erase(it.it);
-    }
-
+    void _erase(iterator &it) { mp[it.shard].erase(it.it); }
     size_t size()
     {
-        size_t ret=0;
-        for (int i=0;i<NUM_SHARDS;i++)
+        size_t ret = 0;
+        for (int i = 0; i < NUM_SHARDS; i++)
         {
             Accessor macc(*this, i);
             ret += macc->size();
@@ -211,11 +205,10 @@ public:
         return ret;
     }
 
-    iterator end(int shard=-1);
+    iterator end(int shard = -1);
     // I need to pass the iterator so I can assign it
     // within the lock
-    void begin(iterator& ret, int shard=0);
-
+    void begin(iterator &ret, int shard = 0);
 };
 
 class CRequestManager
@@ -225,7 +218,7 @@ protected:
     friend class PrintSomePointers;
 #endif
 #ifdef DEBUG
-    friend UniValue getstructuresizes(const UniValue& params, bool fHelp);
+    friend UniValue getstructuresizes(const UniValue &params, bool fHelp);
 #endif
 
     // map of transactions
@@ -257,11 +250,7 @@ public:
     CRequestManager();
 
     // Return the number of blocks currently in the process of being requested
-    int getOutstandingBlockRequests()
-    {
-        return mapBlkInfo.size();
-    }
-
+    int getOutstandingBlockRequests() { return mapBlkInfo.size(); }
     // Get this object from somewhere, asynchronously.
     void AskFor(const CInv &obj, CNode *from, unsigned int priority = 0);
 
@@ -291,7 +280,7 @@ public:
     bool IsNodePingAcceptable(CNode *pnode);
 
     // Call if the passed node is or is about to be disconnected to notify the request manager to not expect data.
-    void RemoveSource(CNode* from);
+    void RemoveSource(CNode *from);
 };
 
 

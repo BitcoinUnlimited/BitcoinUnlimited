@@ -116,7 +116,11 @@ public:
     ~CParallelValidation();
 
     /* Initialize mapBlockValidationThreads*/
-    void InitThread(const boost::thread::id this_id, const CNode *pfrom, std::shared_ptr<CBlock> block, const CInv &inv, uint64_t blockSize);
+    void InitThread(const boost::thread::id this_id,
+        const CNode *pfrom,
+        std::shared_ptr<CBlock> block,
+        const CInv &inv,
+        uint64_t blockSize);
 
     /* Initialize a PV session */
     bool Initialize(const boost::thread::id this_id, const CBlockIndex *pindex, const bool fParallel);

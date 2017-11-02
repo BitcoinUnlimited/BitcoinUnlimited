@@ -604,9 +604,9 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                     // it would be better to just swap pointers somehow...perhaps create a fake txn and push
                     // it to the front, then swap the pointer with the xthin at the back, then delete the back
                     // entry...that probbly would be much more efficient."
-                    //vRecvMsg.push_front(msg);
-                    //vRecvMsg.pop_back();
-                    //LogPrint("thin", "Receive Queue: pushed %s to the front of the queue\n", strCommand);
+                    // vRecvMsg.push_front(msg);
+                    // vRecvMsg.pop_back();
+                    // LogPrint("thin", "Receive Queue: pushed %s to the front of the queue\n", strCommand);
                 }
             }
             // BU: end
@@ -2080,13 +2080,13 @@ void ThreadMessageHandler()
         // Request manager can drop an outstanding block if it runs out of sources.
         // In this case, clear the blocks in flight from all nodes so that new requests can be made
         int outstanding = requester.getOutstandingBlockRequests();
-        
+
 
         vector<CNode *> vNodesCopy;
         {
             LOCK(cs_vNodes);
             vNodesCopy.reserve(vNodes.size());
-            if (outstanding==0)
+            if (outstanding == 0)
             {
                 BOOST_FOREACH (CNode *pnode, vNodes)
                 {
@@ -2138,7 +2138,8 @@ void ThreadMessageHandler()
         }
 
         {
-            // no need to lock here, because I am accessing the copy and pnode must exist until I release  LOCK(cs_vNodes);
+            // no need to lock here, because I am accessing the copy and pnode must exist until I release
+            // LOCK(cs_vNodes);
             BOOST_FOREACH (CNode *pnode, vNodesCopy)
                 pnode->Release();
         }
@@ -2893,11 +2894,7 @@ CNode::~CNode()
     GetNodeSignals().FinalizeNode(GetId());
 }
 
-void CNode::AskFor(const CInv &inv)
-{
-    qAskFor.push(inv);
-}
-
+void CNode::AskFor(const CInv &inv) { qAskFor.push(inv); }
 void CNode::BeginMessage(const char *pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend)
 {
     ENTER_CRITICAL_SECTION(cs_vSend);
@@ -2965,14 +2962,14 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
 
         // BU: furthermore, if the message is a priority message then move to the front of the deque
         // FIXME: Temporary disabled pushing of xthin message in front of the send message queue
-        //if (strcmp(strCommand, NetMsgType::GET_XTHIN) == 0 || strcmp(strCommand, NetMsgType::XTHINBLOCK) == 0 ||
+        // if (strcmp(strCommand, NetMsgType::GET_XTHIN) == 0 || strcmp(strCommand, NetMsgType::XTHINBLOCK) == 0 ||
         //    strcmp(strCommand, NetMsgType::THINBLOCK) == 0 || strcmp(strCommand, NetMsgType::XBLOCKTX) == 0 ||
         //    strcmp(strCommand, NetMsgType::GET_XBLOCKTX) == 0)
         //{
         //    it = vSendMsg.insert(vSendMsg.begin(), CSerializeData());
         //    LogPrint("thin", "Send Queue: pushed %s to the front of the queue\n", strCommand);
         //}
-        //else
+        // else
         //    it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
 
         it = vSendMsg.insert(vSendMsg.end(), CSerializeData());

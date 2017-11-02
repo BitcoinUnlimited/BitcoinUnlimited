@@ -4,11 +4,11 @@
 
 #include "buip055fork.h"
 #include "chain.h"
+#include "chainparams.h"
 #include "primitives/block.h"
 #include "script/interpreter.h"
-#include "unlimited.h"
-#include "chainparams.h"
 #include "txmempool.h"
+#include "unlimited.h"
 
 #include <inttypes.h>
 #include <vector>
@@ -27,8 +27,10 @@ bool UpdateBUIP055Globals(CBlockIndex *activeTip)
     {
         if ((miningForkTime.value != 0) && activeTip->forkAtNextBlock(miningForkTime.value))
         {
-            if (excessiveBlockSize < miningForkEB.value) excessiveBlockSize = miningForkEB.value;
-            if (maxGeneratedBlock < miningForkMG.value) maxGeneratedBlock = miningForkMG.value;
+            if (excessiveBlockSize < miningForkEB.value)
+                excessiveBlockSize = miningForkEB.value;
+            if (maxGeneratedBlock < miningForkMG.value)
+                maxGeneratedBlock = miningForkMG.value;
             return true;
         }
     }
@@ -40,17 +42,18 @@ bool ValidateBUIP055Block(const CBlock &block, CValidationState &state, int nHei
     // Validate transactions are HF compatible
     for (const CTransaction &tx : block.vtx)
     {
-        int sunsetHeight = (Params().NetworkIDString() == "testnet") ? TESTNET_REQ_6_1_SUNSET_HEIGHT : REQ_6_1_SUNSET_HEIGHT;
+        int sunsetHeight =
+            (Params().NetworkIDString() == "testnet") ? TESTNET_REQ_6_1_SUNSET_HEIGHT : REQ_6_1_SUNSET_HEIGHT;
         if ((nHeight <= sunsetHeight) && IsTxOpReturnInvalid(tx))
-            return state.DoS(100,
-                             error("transaction is invalid on BUIP055 chain"), REJECT_INVALID, "bad-txns-wrong-fork");
+            return state.DoS(
+                100, error("transaction is invalid on BUIP055 chain"), REJECT_INVALID, "bad-txns-wrong-fork");
     }
     return true;
 }
 
-bool IsTxProbablyNewSigHash(const CTransaction& tx)
+bool IsTxProbablyNewSigHash(const CTransaction &tx)
 {
-    //bool newsighash = false;
+    // bool newsighash = false;
     bool oldsighash = false;
     for (auto txin : tx.vin)
     {
@@ -63,7 +66,7 @@ bool IsTxProbablyNewSigHash(const CTransaction& tx)
             {
                 if (data.back() & SIGHASH_FORKID)
                 {
-                    //newsighash = true;
+                    // newsighash = true;
                 }
                 else
                 {
@@ -71,12 +74,11 @@ bool IsTxProbablyNewSigHash(const CTransaction& tx)
                 }
             }
         }
-
     }
     return (oldsighash == false);
 }
 
-bool IsTxBUIP055Only(const CTxMemPoolEntry& txentry)
+bool IsTxBUIP055Only(const CTxMemPoolEntry &txentry)
 {
     if (txentry.sighashType & SIGHASH_FORKID)
     {
@@ -105,9 +107,10 @@ bool IsTxOpReturnInvalid(const CTransaction &tx)
             }
 #else // OP_RETURN must be the first instruction
             if (txout.scriptPubKey.GetOp(pc, op))
-                {
-                    if (op != OP_RETURN) return false;
-                }
+            {
+                if (op != OP_RETURN)
+                    return false;
+            }
 #endif
             if (pc != txout.scriptPubKey.end())
             {
@@ -126,4 +129,3 @@ bool IsTxOpReturnInvalid(const CTransaction &tx)
     }
     return false;
 }
-

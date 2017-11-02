@@ -55,7 +55,7 @@ public:
      * @param[in] pNode    The node which is misbehaving.  No effect if nullptr.
      * @param[in] howmuch  Incremental misbehaving score for the latest infraction by this node.
      */
-    void Misbehaving(CNode *pNode, int howmuch, const char* reason=NULL, const char* file=NULL, int line=-1);
+    void Misbehaving(CNode *pNode, int howmuch, const char *reason = NULL, const char *file = NULL, int line = -1);
 
     /**
      * Increment the misbehaving score for this node.  If the ban threshold is reached, flag the node to be
@@ -110,6 +110,6 @@ protected:
 // actual definition should be in globals.cpp for ordered construction/destruction
 extern CDoSManager dosMan;
 
-#define MISBEHAVING(node,amt, reason) dosMan.Misbehaving(node, amt, reason, __FILE__, __LINE__)
+#define MISBEHAVING(node, amt, reason) dosMan.Misbehaving(node, amt, reason, __FILE__, __LINE__)
 
 #endif // BITCOIN_DOSMANAGER_H

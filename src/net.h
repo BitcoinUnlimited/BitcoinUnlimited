@@ -8,9 +8,9 @@
 #define BITCOIN_NET_H
 
 #include "bloom.h"
-#include "fastfilter.h"
 #include "chainparams.h"
 #include "compat.h"
+#include "fastfilter.h"
 #include "fs.h"
 #include "hash.h"
 #include "limitedmap.h"
@@ -30,9 +30,9 @@
 #include <arpa/inet.h>
 #endif
 
-#include <boost/lockfree/queue.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/foreach.hpp>
+#include <boost/lockfree/queue.hpp>
 #include <boost/signals2/signal.hpp>
 
 #include "banentry.h"
@@ -79,7 +79,7 @@ static const bool DEFAULT_UPNP = false;
 /** The maximum number of entries in mapAskFor */
 static const size_t ASKFOR_MAX_SZ = 60000; // 10*MAX_INV_SZ;
 /** The maximum number of entries in setAskFor (larger due to getdata latency)*/
-//static const size_t SETASKFOR_MAX_SZ = 20 * MAX_INV_SZ;
+// static const size_t SETASKFOR_MAX_SZ = 20 * MAX_INV_SZ;
 /** The maximum number of peer connections to maintain. */
 static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
 /** BU: The maximum numer of outbound peer connections */
@@ -262,7 +262,7 @@ public:
 
     int64_t nTime; // time (in microseconds) of message receipt.
 
-CNetMessage():hdrbuf(0,0),hdr({0,0,0,0}),vRecv(0,0)
+    CNetMessage() : hdrbuf(0, 0), hdr({0, 0, 0, 0}), vRecv(0, 0)
     {
         nHdrPos = 0;
         nDataPos = 0;
@@ -286,11 +286,7 @@ CNetMessage():hdrbuf(0,0),hdr({0,0,0,0}),vRecv(0,0)
         return (hdr.nMessageSize == nDataPos);
     }
 
-    unsigned int size() const
-    {
-        return ((in_data) ? sizeof(CMessageHeader) : hdrbuf.size()) + nDataPos;
-    }
-    
+    unsigned int size() const { return ((in_data) ? sizeof(CMessageHeader) : hdrbuf.size()) + nDataPos; }
     void SetVersion(int nVersionIn)
     {
         hdrbuf.SetVersion(nVersionIn);
@@ -446,9 +442,9 @@ public:
     CRollingFastFilter filterInventoryKnown;
     std::vector<CInv> vInventoryToSend;
     CCriticalSection cs_inventory;
-    //std::set<uint256> setAskFor;
-    //std::multimap<int64_t, CInv> mapAskFor;
-    boost::lockfree::queue<CInv, boost::lockfree::capacity<ASKFOR_MAX_SZ>> qAskFor;
+    // std::set<uint256> setAskFor;
+    // std::multimap<int64_t, CInv> mapAskFor;
+    boost::lockfree::queue<CInv, boost::lockfree::capacity<ASKFOR_MAX_SZ> > qAskFor;
     // CCriticalSection csAskFor;
     int64_t nNextInvSend;
     // Used for headers announcements - unfiltered blocks to relay
@@ -546,12 +542,12 @@ public:
 
     const CMessageHeader::MessageStartChars &GetMagic(const CChainParams &params) const
     {
-        if (netMagic.value!=0)
+        if (netMagic.value != 0)
         {
-            netOverride[0] = netMagic.value&255;
-            netOverride[1] = (netMagic.value>>8)&255;
-            netOverride[2] = (netMagic.value>>16)&255;
-            netOverride[3] = (netMagic.value>>24)&255;
+            netOverride[0] = netMagic.value & 255;
+            netOverride[1] = (netMagic.value >> 8) & 255;
+            netOverride[2] = (netMagic.value >> 16) & 255;
+            netOverride[3] = (netMagic.value >> 24) & 255;
             return netOverride;
         }
         return fUsesCashMagic ? params.CashMessageStart() : params.MessageStart();

@@ -260,7 +260,7 @@ bool CDoSManager::BannedSetIsDirty()
  * Increment the misbehaving count score for this node.  If the ban threshold is reached, flag the node to be
  * banned.  No locks are needed to call this function.
  */
-void CDoSManager::Misbehaving(CNode *pNode, int howmuch, const char* reason, const char* file, int line)
+void CDoSManager::Misbehaving(CNode *pNode, int howmuch, const char *reason, const char *file, int line)
 {
     if (howmuch == 0 || !pNode)
         return;
@@ -269,13 +269,17 @@ void CDoSManager::Misbehaving(CNode *pNode, int howmuch, const char* reason, con
 
     if (prior + howmuch >= nBanThreshold && prior < nBanThreshold)
     {
-        if (!reason) reason="";
-        if (!file) file="";
-        LogPrintf("%s: %s (%d -> %d) BAN THRESHOLD EXCEEDED (%s:%d: %s)\n", __func__, pNode->GetLogName(), prior, prior + howmuch, reason, file, line);
+        if (!reason)
+            reason = "";
+        if (!file)
+            file = "";
+        LogPrintf("%s: %s (%d -> %d) BAN THRESHOLD EXCEEDED (%s:%d: %s)\n", __func__, pNode->GetLogName(), prior,
+            prior + howmuch, reason, file, line);
         pNode->fShouldBan = true;
     }
     else
-        LogPrintf("%s: %s (%d -> %d) misbehaving (%s:%d: %s)\n", __func__, pNode->GetLogName(), prior, prior + howmuch, reason, file, line);
+        LogPrintf("%s: %s (%d -> %d) misbehaving (%s:%d: %s)\n", __func__, pNode->GetLogName(), prior, prior + howmuch,
+            reason, file, line);
 }
 
 /**
