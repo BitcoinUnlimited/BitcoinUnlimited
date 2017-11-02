@@ -50,6 +50,7 @@ BOOST_AUTO_TEST_CASE(stat_testvectors)
   s4 += 4.3;
   BOOST_CHECK(s4() == 7.6);
 
+  statMinInterval=std::chrono::milliseconds(100000);
   //statMinInterval=boost::posix_time::milliseconds(50); // boost::posix_time::seconds(1); // Speed things up
   //for (int i=0;i<numMetrics;i++)  doesn't work because there are other global variable stats
   //  stat_io_service.run_one();
@@ -84,7 +85,7 @@ BOOST_AUTO_TEST_CASE(stat_testvectors)
   BOOST_CHECK(s3.History(1,0) == 120000);  
   BOOST_CHECK(s4.History(1,0) == 3.3); 
 
-  statMinInterval=boost::posix_time::milliseconds(10); // boost::posix_time::seconds(1); // Speed things up
+  // statMinInterval=boost::posix_time::milliseconds(10); // boost::posix_time::seconds(1); // Speed things up
   for (int i=0;i<12;i++)
     for (int j=0;j<30;j++)
     {
