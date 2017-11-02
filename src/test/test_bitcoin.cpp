@@ -24,7 +24,7 @@
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
-
+#include <boost/program_options.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include <memory>
@@ -133,6 +133,49 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(CMutableTransaction &tx, CTxMemPo
     return CTxMemPoolEntry(
         txn, nFee, nTime, dPriority, nHeight, hasNoDependencies, inChainValue, spendsCoinbase, sigOpCount, lp);
 }
+
+using namespace boost::program_options;
+
+struct StartupShutdown
+{
+    StartupShutdown()
+    {
+        options_description optDef("Options");
+        optDef.add_options()
+            ("testhelp", "program options information")
+            ("log_level", "set boost logging (all, test_suite, message, warning, error, ...)")
+            ("log_bitcoin", value<std::string>()->required(), "bitcoin logging destination (console, none)");
+        variables_map opts;
+        store(parse_command_line(boost::unit_test::framework::master_test_suite().argc,
+                                 boost::unit_test::framework::master_test_suite().argv, optDef), opts);
+
+        if (opts.count("testhelp"))
+        {
+            std::cout << optDef << std::endl;
+            exit(0);
+        }
+
+        if (opts.count("log_bitcoin"))
+        {
+            std::string s = opts["log_bitcoin"].as<std::string>();
+            if (s == "console")
+            {
+                fPrintToConsole = true;
+                fPrintToDebugLog = false;
+            }
+            else if (s == "none")
+            {
+                fPrintToConsole = false;
+                fPrintToDebugLog = false;
+            }
+        }
+    }
+    ~StartupShutdown()
+    {
+    }
+};
+
+BOOST_GLOBAL_FIXTURE( StartupShutdown );
 
 void Shutdown(void *parg) { exit(0); }
 void StartShutdown() { exit(0); }
