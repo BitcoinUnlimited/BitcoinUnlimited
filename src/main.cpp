@@ -6551,8 +6551,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 {
                     if (nDoS > 0)
                         dosMan.Misbehaving(pfrom, nDoS);
-                    return error("invalid header received");
                 }
+                return error("invalid header received");
             }
             PV->UpdateMostWorkOurFork(header);
         }
