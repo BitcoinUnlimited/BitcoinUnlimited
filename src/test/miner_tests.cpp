@@ -24,6 +24,21 @@
 
 BOOST_FIXTURE_TEST_SUITE(miner_tests, TestingSetup)
 
+// BOOST_CHECK_EXCEPTION predicates to check the specific validation error
+class HasReason
+{
+public:
+    HasReason(const std::string &reason) : m_reason(reason) {}
+    bool operator()(const std::runtime_error &e) const
+    {
+        return std::string(e.what()).find(m_reason) != std::string::npos;
+    };
+
+private:
+    const std::string m_reason;
+};
+
+
 static struct
 {
     unsigned char extranonce;
@@ -152,7 +167,9 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).SpendsCoinbase(spendsCoinbase).FromTx(tx));
         tx.vin[0].prevout.hash = hash;
     }
-    BOOST_CHECK_THROW(BlockAssembler(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error);
+
+    BOOST_CHECK_EXCEPTION(
+        BlockAssembler(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error, HasReason("bad-blk-sigops"));
     mempool.clear();
 
     tx.vin[0].prevout.hash = txFirst[0]->GetHash();
@@ -271,7 +288,8 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     // orphan in mempool, template creation fails
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).FromTx(tx));
-    BOOST_CHECK_THROW(BlockAssembler(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error);
+    BOOST_CHECK_EXCEPTION(BlockAssembler(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error,
+        HasReason("bad-txns-inputs-missingorspent"));
     mempool.clear();
 
     // child with higher priority than parent
@@ -300,7 +318,9 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     hash = tx.GetHash();
     // give it a fee so it'll get mined
     mempool.addUnchecked(hash, entry.Fee(100000).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
-    BOOST_CHECK_THROW(BlockAssembler(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error);
+    // Should throw bad-cb-multiple
+    BOOST_CHECK_EXCEPTION(
+        BlockAssembler(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error, HasReason("bad-cb-multiple"));
     mempool.clear();
 
     // invalid (pre-p2sh) txn in mempool, template creation fails
@@ -317,7 +337,8 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.vout[0].nValue -= 1000000;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
-    BOOST_CHECK_THROW(BlockAssembler(chainparams_regtest).CreateNewBlock(scriptPubKey), std::runtime_error);
+    BOOST_CHECK_EXCEPTION(BlockAssembler(chainparams_regtest).CreateNewBlock(scriptPubKey), std::runtime_error,
+        HasReason("bad-blk-signatures"));
     mempool.clear();
 
     // double spend txn pair in mempool, template creation fails
@@ -330,7 +351,8 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.vout[0].scriptPubKey = CScript() << OP_2;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(100000000L).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
-    BOOST_CHECK_THROW(BlockAssembler(chainparams_regtest).CreateNewBlock(scriptPubKey), std::runtime_error);
+    BOOST_CHECK_EXCEPTION(BlockAssembler(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error,
+        HasReason("bad-txns-inputs-missingorspent"));
     mempool.clear();
 
     // subsidy changing
@@ -363,7 +385,6 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         chainActive.SetTip(next);
     }
     BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
-    delete pblocktemplate;
 
     // Delete the dummy blocks again.
     while (chainActive.Tip()->nHeight > nHeight)
