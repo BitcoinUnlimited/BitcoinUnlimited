@@ -5,6 +5,7 @@
 
 #include "base58.h"
 #include "chain.h"
+#include "dstencode.h"
 #include "rpc/server.h"
 #include "init.h"
 #include "main.h"

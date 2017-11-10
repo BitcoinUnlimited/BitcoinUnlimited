@@ -15,6 +15,7 @@
 #include "walletmodel.h"
 
 #include "coincontrol.h"
+#include "dstencode.h"
 #include "init.h"
 #include "main.h" // For minRelayTxFee
 #include "wallet/wallet.h"

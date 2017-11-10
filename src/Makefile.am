@@ -97,6 +97,7 @@ BITCOIN_CORE_H = \
   compat/endian.h \
   compat/sanity.h \
   compressor.h \
+  config.h \
   connmgr.h \
   consensus/consensus.h \
   core_io.h \
@@ -104,6 +105,7 @@ BITCOIN_CORE_H = \
   dosman.h \
   expedited.h \
   fs.h \
+  dstencode.h \
   httprpc.h \
   httpserver.h \
   init.h \
@@ -190,6 +192,7 @@ libbitcoin_server_a_SOURCES = \
   buip055fork.cpp \
   chain.cpp \
   checkpoints.cpp \
+  config.cpp \
   connmgr.cpp \
   dosman.cpp \
   expedited.cpp \
@@ -319,6 +322,8 @@ libbitcoin_common_a_SOURCES = \
   cashaddr.cpp \
   cashaddrenc.cpp \
   chainparams.cpp \
+  dstencode.cpp \
+  config.cpp \
   coins.cpp \
   compressor.cpp \
   core_read.cpp \

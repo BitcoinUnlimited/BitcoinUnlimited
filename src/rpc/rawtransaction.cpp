@@ -9,6 +9,7 @@
 #include "coins.h"
 #include "consensus/validation.h"
 #include "core_io.h"
+#include "dstencode.h"
 #include "init.h"
 #include "keystore.h"
 #include "main.h"

@@ -9,9 +9,9 @@
 #include "guiutil.h"
 #include "optionsmodel.h"
 
-#include "base58.h"
 #include "chainparams.h"
 #include "main.h" // For minRelayTxFee
+#include "dstencode.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "wallet/wallet.h"

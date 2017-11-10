@@ -12,6 +12,7 @@
 #include "walletmodel.h"
 
 #include "fs.h"
+#include "dstencode.h"
 #include "init.h"
 #include "main.h" // For minRelayTxFee
 #include "primitives/transaction.h"

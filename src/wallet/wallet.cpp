@@ -6,14 +6,14 @@
 
 #include "wallet/wallet.h"
 
-#include "base58.h"
 #include "buip055fork.h"
-#include "checkpoints.h"
 #include "chain.h"
+#include "checkpoints.h"
 #include "coincontrol.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
 #include "fs.h"
+#include "dstencode.h"
 #include "key.h"
 #include "keystore.h"
 #include "main.h"
