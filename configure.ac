@@ -175,6 +175,18 @@ AC_ARG_ENABLE([gperf],
   [use_gperf=yes],
   [use_gperf=no])
 
+AC_ARG_ENABLE([gprof],
+  [AS_HELP_STRING([--enable-gprof],
+  [enable gnu profiler build (default is no)])],
+  [use_gprof=yes],
+  [use_gprof=no])
+
+AC_ARG_ENABLE([mutrace],
+  [AS_HELP_STRING([--enable-mutrace],
+  [enable mutex profiler build (default is no)])],
+  [use_mutrace=yes],
+  [use_mutrace=no])
+
 AC_ARG_ENABLE([glibc-back-compat],
   [AS_HELP_STRING([--enable-glibc-back-compat],
   [enable backwards compatibility with glibc])],
@@ -426,6 +438,12 @@ case $host in
      if test "x$use_gperf" = "xyes"; then
        AC_CHECK_LIB([tcmalloc],      [malloc],, AC_MSG_ERROR(tcmalloc lib missing))
        AC_DEFINE([ENABLE_GPERF],[1],[Define to 1 to enable GPERF])
+     fi
+     if test "x$use_gprof" = "xyes"; then
+       AC_DEFINE([ENABLE_GPROF],[1],[Define to 1 to enable profiling])
+     fi
+     if test "x$use_mutrace" = "xyes"; then
+       AC_DEFINE([ENABLE_MUTRACE],[1],[Define to 1 to enable mutex tracing])
      fi
      ;;
    *dragonfly*)
@@ -1036,6 +1054,10 @@ AM_CONDITIONAL([ENABLE_BENCH],[test x$use_bench = xyes])
 AM_CONDITIONAL([USE_QRCODE], [test x$use_qr = xyes])
 AM_CONDITIONAL([USE_LCOV],[test x$use_lcov = xyes])
 AM_CONDITIONAL([ENABLE_GPERF],[test x$use_gperf = xyes])
+AM_CONDITIONAL([ENABLE_GPROF],[test x$use_gprof = xyes])
+AM_CONDITIONAL([ENABLE_MUTRACE],[test x$use_mutrace = xyes])
+AM_CONDITIONAL([USE_COMPARISON_TOOL],[test x$use_comparison_tool != xno])
+AM_CONDITIONAL([USE_COMPARISON_TOOL_REORG_TESTS],[test x$use_comparison_tool_reorg_test != xno])
 AM_CONDITIONAL([GLIBC_BACK_COMPAT],[test x$use_glibc_compat = xyes])
 AM_CONDITIONAL([HARDEN],[test x$use_hardening = xyes])
 AM_CONDITIONAL([ENABLE_HWCRC32],[test x$enable_hwcrc32 = xyes])

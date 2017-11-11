@@ -207,14 +207,27 @@ void AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine,
 // from the lockorder map
 #ifdef DEBUG_LOCKORDER
 CCriticalSection::CCriticalSection() : name(NULL) {}
-CCriticalSection::CCriticalSection(const char *n) : name(n) {}
+CCriticalSection::CCriticalSection(const char *n) : name(n)
+{
+// print the address of named critical sections so they can be found in the mutrace output
+#ifdef ENABLE_MUTRACE
+    if (name)
+    {
+        printf("CCriticalSection %s at %p\n", name, this);
+        fflush(stdout);
+    }
+#endif
+}
+
 CCriticalSection::~CCriticalSection()
 {
+#ifdef ENABLE_MUTRACE
     if (name)
     {
         printf("Destructing %s\n", name);
         fflush(stdout);
     }
+#endif
     DeleteCritical((void *)this);
 }
 #endif
