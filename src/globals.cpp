@@ -299,10 +299,10 @@ public:
         printf("csBestBlock %p\n", &csBestBlock);
         printf("cvBlockChange %p\n", &cvBlockChange);
         printf("cs_LastBlockFile %p\n", &cs_LastBlockFile);
-        printf("cs_nBlockSequenceId %p\n",&cs_nBlockSequenceId);
-        printf("cs_nTimeOffset %p\n",&cs_nTimeOffset);
-        printf("cs_rpcWarmup %p\n",&cs_rpcWarmup);
-        printf("cs_main %p\n",&cs_main);
+        printf("cs_nBlockSequenceId %p\n", &cs_nBlockSequenceId);
+        printf("cs_nTimeOffset %p\n", &cs_nTimeOffset);
+        printf("cs_rpcWarmup %p\n", &cs_rpcWarmup);
+        printf("cs_main %p\n", &cs_main);
         printf("csBestBlock %p\n", &csBestBlock);
         printf("cs_proxyInfos %p\n", &cs_proxyInfos);
         printf("cs_xval %p\n", &cs_xval);
@@ -311,7 +311,7 @@ public:
         printf("CNode::cs_totalBytesRecv %p\n", &CNode::cs_totalBytesRecv);
         printf("CNode::cs_totalBytesSent %p\n", &CNode::cs_totalBytesSent);
 
-// critical sections from net.cpp
+        // critical sections from net.cpp
         printf("cs_setservAddNodeAddresses %p\n", &cs_setservAddNodeAddresses);
         printf("cs_vAddedNodes %p\n", &cs_vAddedNodes);
         printf("cs_vUseDNSSeeds %p\n", &cs_vUseDNSSeeds);
@@ -324,7 +324,6 @@ public:
 
         printf("\nCondition variables:\n");
         printf("cvBlockChange %p\n", &cvBlockChange);
-
     }
 };
 
