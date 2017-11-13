@@ -18,7 +18,6 @@
 #include "chainparams.h"
 #include "key.h"
 #include "pubkey.h"
-#include "script/script.h"
 #include "script/standard.h"
 #include "support/allocators/zeroafterfree.h"
 
@@ -151,7 +150,6 @@ typedef CBitcoinExtKeyBase<CExtPubKey, 74, CChainParams::EXT_PUBLIC_KEY> CBitcoi
 std::string EncodeDestination(const CTxDestination &dest);
 CTxDestination DecodeDestination(const std::string &str);
 bool IsValidDestinationString(const std::string &str);
-bool IsValidDestinationString(const std::string &str,
-                              const CChainParams &params);
+bool IsValidDestinationString(const std::string &str, const CChainParams &params);
 
 #endif // BITCOIN_BASE58_H
