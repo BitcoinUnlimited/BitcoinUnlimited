@@ -1335,7 +1335,7 @@ void CWallet::ReacceptWalletTransactions()
 
         LOCK(mempool.cs);
         wtx.AcceptToMemoryPool(false);
-        SyncWithWallets(wtx,NULL);
+        SyncWithWallets(wtx, NULL, -1);
     }
 }
 
@@ -2418,7 +2418,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey)
                 return false;
             }
 #else
-            SyncWithWallets(wtxNew,NULL);
+            SyncWithWallets(wtxNew, NULL, -1);
 #endif
             wtxNew.RelayWalletTransaction();
         }

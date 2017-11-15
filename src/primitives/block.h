@@ -17,8 +17,6 @@ const uint32_t BASE_VERSION = 0x20000000;
 const uint32_t FORK_BIT_2MB = 0x10000000;  // Vote for 2MB fork
 const bool DEFAULT_2MB_VOTE = false;
 
-extern CCriticalSection csBlockHashToIdx;
-
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
  * requirements.  When they solve the proof-of-work, they broadcast the block
