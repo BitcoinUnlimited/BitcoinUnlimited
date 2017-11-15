@@ -171,7 +171,7 @@ def initialize_datadir(dirname, n,bitcoinConfDict=None,wallet=None):
         os.makedirs(datadir)
 
     defaults = {"server":1, "discover":0, "regtest":1,"rpcuser":"rt","rpcpassword":"rt",
-                "port":p2p_port(n),"rpcport":str(rpc_port(n)),"listenonion":0,"maxlimitertxfee":0}
+                "port":p2p_port(n),"rpcport":str(rpc_port(n)),"listenonion":0,"maxlimitertxfee":0,"usecashaddr":1}
     if bitcoinConfDict: defaults.update(bitcoinConfDict)
 
     with open(os.path.join(datadir, "bitcoin.conf"), 'w') as f:

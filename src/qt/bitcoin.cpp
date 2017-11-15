@@ -8,7 +8,7 @@
 #endif
 
 #include "bitcoingui.h"
-
+#include "config.h"
 #include "chainparams.h"
 #include "clientmodel.h"
 #include "fs.h"
@@ -82,6 +82,9 @@ Q_IMPORT_PLUGIN(QCocoaIntegrationPlugin);
 // Declare meta types used for QMetaObject::invokeMethod
 Q_DECLARE_METATYPE(bool *)
 Q_DECLARE_METATYPE(CAmount)
+
+// Config is non-copyable so we can only register pointers to it
+Q_DECLARE_METATYPE(Config *)
 
 static void InitMessage(const std::string &message) { LogPrintf("init message: %s\n", message); }
 /*
@@ -174,7 +177,7 @@ public:
     explicit BitcoinCore();
 
 public Q_SLOTS:
-    void initialize();
+    void initialize(Config *config);
     void shutdown();
 
 Q_SIGNALS:
@@ -261,12 +264,13 @@ void BitcoinCore::handleRunawayException(const std::exception *e)
     Q_EMIT runawayException(QString::fromStdString(strMiscWarning));
 }
 
-void BitcoinCore::initialize()
+void BitcoinCore::initialize(Config *cfg)
 {
+    Config &config(*cfg);
     try
     {
         qDebug() << __func__ << ": Running AppInit2 in thread";
-        int rv = AppInit2(threadGroup, scheduler);
+        int rv = AppInit2(config, threadGroup, scheduler);
         Q_EMIT initializeResult(rv);
     }
     catch (const std::exception &e)

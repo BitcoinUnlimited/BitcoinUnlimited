@@ -439,7 +439,10 @@ static void addWalletOptions(AllowedArgs &allowedArgs)
             _("Delete all wallet transactions and only recover those parts of the blockchain through -rescan on "
               "startup") +
                 " " +
-                _("(1 = keep tx meta data e.g. account owner and payment request information, 2 = drop tx meta data)"));
+                _("(1 = keep tx meta data e.g. account owner and payment request information, 2 = drop tx meta data)"))
+        .addArg("usecashaddr", optionalBool,
+            _("Bitcoin Cash November 13th activation time") + " " + strprintf(_("(default: %u)"), DEFAULT_USE_CASHADDR))
+        ;
 #endif
 }
 

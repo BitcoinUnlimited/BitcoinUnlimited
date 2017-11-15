@@ -9,6 +9,7 @@
 
 #include <string>
 
+class Config;
 class CScheduler;
 class CWallet;
 
@@ -26,7 +27,7 @@ void Shutdown();
 void InitLogging();
 //! Parameter interaction: change current parameters depending on various rules
 void InitParameterInteraction();
-bool AppInit2(boost::thread_group &threadGroup, CScheduler &scheduler);
+bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &scheduler);
 
 void MainCleanup();
 void NetCleanup();
@@ -36,6 +37,8 @@ static const bool DEFAULT_REST_ENABLE = false;
 static const bool DEFAULT_DISABLE_SAFEMODE = false;
 static const bool DEFAULT_STOPAFTERBLOCKIMPORT = false;
 static const bool DEFAULT_PV_TESTMODE = false;
+//! if set, all addresses will be encoded with cashaddr instead of base58
+static const bool DEFAULT_USE_CASHADDR = false;
 
 /** Returns licensing information (for -version) */
 std::string LicenseInfo();
