@@ -29,3 +29,7 @@ bool GlobalConfig::UseCashAddrEncoding() const
 {
     return useCashAddr;
 }
+
+const CChainParams &DummyConfig::GetChainParams() const {
+    return Params(CBaseChainParams::REGTEST);
+}
