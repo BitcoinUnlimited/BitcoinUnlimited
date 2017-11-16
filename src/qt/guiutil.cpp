@@ -12,6 +12,7 @@
 #include "walletmodel.h"
 
 #include "fs.h"
+#include "config.h"
 #include "dstencode.h"
 #include "init.h"
 #include "main.h" // For minRelayTxFee
@@ -20,6 +21,7 @@
 #include "script/script.h"
 #include "script/standard.h"
 #include "util.h"
+#include "utilstrencodings.h"
 
 #ifdef WIN32
 #ifdef _WIN32_WINNT
@@ -100,6 +102,31 @@ QFont fixedPitchFont()
 #endif
 }
 
+static std::string MakeAddrInvalid(std::string addr) {
+    if (addr.size() < 2) {
+        return "";
+    }
+
+    // Checksum is at the end of the address. Swapping chars to make it invalid.
+    std::swap(addr[addr.size() - 1], addr[addr.size() - 2]);
+    if (!IsValidDestinationString(addr)) {
+        return addr;
+    }
+    return "";
+}
+
+std::string DummyAddress(const CChainParams &params, const Config &cfg) {
+
+    // Just some dummy data to generate an convincing random-looking (but
+    // consistent) address
+    static const std::vector<uint8_t> dummydata = {
+        0xeb, 0x15, 0x23, 0x1d, 0xfc, 0xeb, 0x60, 0x92, 0x58, 0x86,
+        0xb6, 0x7d, 0x06, 0x52, 0x99, 0x92, 0x59, 0x15, 0xae, 0xb1};
+
+    const CTxDestination dstKey = CKeyID(uint160(dummydata));
+    return MakeAddrInvalid(EncodeDestination(dstKey, params, cfg));
+}
+
 void setupAddressWidget(QValidatedLineEdit *widget, QWidget *parent) {
     parent->setFocusProxy(widget);
 
@@ -107,8 +134,9 @@ void setupAddressWidget(QValidatedLineEdit *widget, QWidget *parent) {
 #if QT_VERSION >= 0x040700
     // We don't want translators to use own addresses in translations
     // and this is the only place, where this address is supplied.
-    widget->setPlaceholderText(
-        QObject::tr("Enter a Bitcoin address (e.g. %1)").arg("1NS17iag9jJgTHD1VXjvLCEnZuQ3rJDE9L"));
+    widget->setPlaceholderText(QObject::tr("Enter a Bitcoin address (e.g. %1)")
+                                   .arg(QString::fromStdString(DummyAddress(
+                                       Params(), GlobalConfig()))));
 #endif
     widget->setValidator(new BitcoinAddressEntryValidator(parent));
     widget->setCheckValidator(new BitcoinAddressCheckValidator(parent));

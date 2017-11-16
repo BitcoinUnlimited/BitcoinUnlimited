@@ -19,6 +19,8 @@
 
 class QValidatedLineEdit;
 class SendCoinsRecipient;
+class CChainParams;
+class Config;
 
 QT_BEGIN_NAMESPACE
 class QAbstractItemView;
@@ -39,6 +41,9 @@ QString dateTimeStr(qint64 nTime);
 
 // Return a monospace font
 QFont fixedPitchFont();
+
+// Generate an invalid, but convincing address.
+std::string DummyAddress(const CChainParams &params, const Config &cfg);
 
 // Set up widgets for address and amounts
 void setupAddressWidget(QValidatedLineEdit *widget, QWidget *parent);
