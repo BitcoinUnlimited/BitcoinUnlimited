@@ -338,8 +338,8 @@ void ReceiveCoinsDialog::copyURI()
         return;
     }
 
-    const RecentRequestsTableModel * const submodel = model->getRecentRequestsTableModel();
-    const QString uri = GUIUtil::formatBitcoinURI(submodel->entry(sel.row()).recipient);
+    const RecentRequestsTableModel *const submodel = model->getRecentRequestsTableModel();
+    const QString uri = GUIUtil::formatBitcoinURI(*cfg, submodel->entry(sel.row()).recipient);
     GUIUtil::setClipboard(uri);
 }
 
