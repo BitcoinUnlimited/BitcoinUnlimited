@@ -2121,7 +2121,7 @@ bool ConnectBlock(const CBlock &block,
                 // Only check inputs when the tx hash in not in the setPreVerifiedTxHash as would only
                 // happen if this were a regular block or when a tx is found within the returning XThinblock.
                 uint256 hash = tx.GetHash();
-                if (fCheckInputs == CheckTxInputsOption::TRUE)
+                if (fCheckInputs == CheckTxInputsOption::YES)
                 {
                     {
                         LOCK(cs_xval);

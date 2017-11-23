@@ -1651,7 +1651,7 @@ UniValue validateblocktemplate(const UniValue &params, bool fHelp)
         else
         {
             // No need to test transaction inputs because the tx would not be in the mempool if it was invalid
-            if (!TestBlockValidity(state, chainparams, block, pindexPrev, false, true, CheckTxInputsOption::TRUE))
+            if (!TestBlockValidity(state, chainparams, block, pindexPrev, false, true, CheckTxInputsOption::YES))
             {
                 throw runtime_error(std::string("invalid block: ") + state.GetRejectReason());
             }
