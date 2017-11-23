@@ -11,7 +11,7 @@
 
 #include <QUrl>
 
-OpenURIDialog::OpenURIDialog(QWidget *parent) : QDialog(parent), ui(new Ui::OpenURIDialog)
+OpenURIDialog::OpenURIDialog(const Config *cfg, QWidget *parent) : QDialog(parent), ui(new Ui::OpenURIDialog), cfg(cfg)
 {
     ui->setupUi(this);
     ui->uriEdit->setPlaceholderText(GUIUtil::uriPrefix() + ':');

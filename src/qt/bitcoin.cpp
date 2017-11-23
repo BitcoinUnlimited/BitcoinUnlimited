@@ -212,12 +212,12 @@ public:
     /// Create options model
     void createOptionsModel(bool resetSettings);
     /// Create main window
-    void createWindow(const NetworkStyle *networkStyle);
+    void createWindow(const Config *, const NetworkStyle *networkStyle);
     /// Create splash screen
     void createSplashScreen(const NetworkStyle *networkStyle);
 
     /// Request core initialization
-    void requestInitialize();
+    void requestInitialize(Config &config);
     /// Request core shutdown
     void requestShutdown();
 
@@ -233,7 +233,7 @@ public Q_SLOTS:
     void handleRunawayException(const QString &message);
 
 Q_SIGNALS:
-    void requestedInitialize();
+    void requestedInitialize(Config *config);
     void requestedShutdown();
     void stopThread();
     void splashFinished(QWidget *window);
@@ -360,9 +360,9 @@ void BitcoinApplication::createOptionsModel(bool resetSettings)
     unlimitedModel = new UnlimitedModel(); // BU
 }
 
-void BitcoinApplication::createWindow(const NetworkStyle *networkStyle)
+void BitcoinApplication::createWindow(const Config *config, const NetworkStyle *networkStyle)
 {
-    window = new BitcoinGUI(platformStyle, networkStyle, 0);
+    window = new BitcoinGUI(config, platformStyle, networkStyle, 0);
 
     pollShutdownTimer = new QTimer(window);
     connect(pollShutdownTimer, SIGNAL(timeout()), window, SLOT(detectShutdown()));
@@ -391,7 +391,7 @@ void BitcoinApplication::startThread()
     connect(executor, SIGNAL(initializeResult(int)), this, SLOT(initializeResult(int)));
     connect(executor, SIGNAL(shutdownResult(int)), this, SLOT(shutdownResult(int)));
     connect(executor, SIGNAL(runawayException(QString)), this, SLOT(handleRunawayException(QString)));
-    connect(this, SIGNAL(requestedInitialize()), executor, SLOT(initialize()));
+    connect(this, SIGNAL(requestedInitialize(Config *)), executor, SLOT(initialize(Config *)));
     connect(this, SIGNAL(requestedShutdown()), executor, SLOT(shutdown()));
     /*  make sure executor object is deleted in its own thread */
     connect(this, SIGNAL(stopThread()), executor, SLOT(deleteLater()));
@@ -406,11 +406,11 @@ void BitcoinApplication::parameterSetup()
     InitParameterInteraction();
 }
 
-void BitcoinApplication::requestInitialize()
+void BitcoinApplication::requestInitialize(Config &config)
 {
     qDebug() << __func__ << ": Requesting initialize";
     startThread();
-    Q_EMIT requestedInitialize();
+    Q_EMIT requestedInitialize(&config);
 }
 
 void BitcoinApplication::requestShutdown()
@@ -686,6 +686,8 @@ int main(int argc, char *argv[])
     //   Need to pass name here as CAmount is a typedef (see http:
     //   IMPORTANT if it is no longer a typedef use the normal variant above
     qRegisterMetaType<CAmount>("CAmount");
+    //Config is non-copyable so we can't register as a non pointer type
+    qRegisterMetaType<Config *>();
 
     /// 2. Parse command-line options. Command-line options take precedence:
     AllowedArgs::BitcoinQt allowedArgs(&tweaks);
@@ -852,10 +854,13 @@ int main(int argc, char *argv[])
 
     UnlimitedSetup();
 
+    // Get global config
+    Config &config = const_cast<Config &>(GetConfig());
+
     try
     {
-        app.createWindow(networkStyle.data());
-        app.requestInitialize();
+        app.createWindow(&config, networkStyle.data());
+        app.requestInitialize(config);
 #if defined(Q_OS_WIN) && QT_VERSION >= 0x050000
         WinShutdownMonitor::registerShutdownBlockReason(
             QObject::tr("%1 didn't yet exit safely...").arg(QObject::tr(PACKAGE_NAME)), (HWND)app.getMainWinId());
