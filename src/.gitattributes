@@ -1,0 +1,14 @@
+#
+# .gitattributes file
+#
+# NOTE: This file currently lists all files  that _might_ be required
+# to be formatted properly. The files listed here are filtered once
+# more by the list of files in .formatted-files before formatting
+# is applied.
+
+*.h filter=bitcoin-clang-format
+*.cpp filter=bitcoin-clang-format
+test/*.h filter=bitcoin-clang-format
+test/*.cpp filter=bitcoin-clang-format
+qt/*.h filter=bitcoin-clang-format
+qt/*.cpp filter=bitcoin-clang-format
