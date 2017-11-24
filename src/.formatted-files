@@ -379,6 +379,7 @@ bench/bench.h
 bench/crypto_hash.cpp
 bench/Examples.cpp
 bench/verify_script.cpp
+bench/murmur_hash.cpp
 compat/byteswap.h
 compat/endian.h
 compat/glibc_compat.cpp
