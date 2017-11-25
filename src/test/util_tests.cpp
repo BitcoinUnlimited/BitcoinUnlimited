@@ -534,7 +534,7 @@ BOOST_AUTO_TEST_CASE(util_Logging)
 	
 	LogTurnOnCategory(THN,true);
 	LogTurnOnCategory(NET,true);
-	BOOST_CHECK(LogAcceptCategory(THN||NET));
+	BOOST_CHECK(LogAcceptCategory(THN|NET));
 	
 	LogTurnOnAll(false);
 	BOOST_CHECK_EQUAL(0UL,categoriesEnabled);
