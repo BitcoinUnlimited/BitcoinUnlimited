@@ -520,4 +520,30 @@ BOOST_AUTO_TEST_CASE(test_ParseFixedPoint)
     BOOST_CHECK(!ParseFixedPoint("1.", 8, &amount));
 }
 
+BOOST_AUTO_TEST_CASE(util_Logging)
+{
+	{using namespace Logging;
+	BOOST_CHECK_EQUAL(8,sizeof(categoriesEnabled));
+	BOOST_CHECK_EQUAL(0UL,categoriesEnabled);
+	
+	LogTurnOnCategory(THN,true);
+	BOOST_CHECK(LogAcceptCategory(THN));
+	
+	LogTurnOnCategory(THN,false);
+	BOOST_CHECK(!LogAcceptCategory(THN));
+	
+	LogTurnOnCategory(THN,true);
+	LogTurnOnCategory(NET,true);
+	BOOST_CHECK(LogAcceptCategory(THN||NET));
+	
+	LogTurnOnAll(false);
+	BOOST_CHECK_EQUAL(0UL,categoriesEnabled);
+	
+	LogTurnOnAll(true);
+	BOOST_CHECK_EQUAL(ALL,categoriesEnabled);
+
+	BOOST_CHECK_EQUAL(LogGetLabel(ADR),"ADR");
+	}
+}
+
 BOOST_AUTO_TEST_SUITE_END()
