@@ -19,7 +19,7 @@
 using namespace std;
 
 /**
- * Get nodes from Bitnodes.21.co using public API.
+ * Get nodes from Bitnodes using public API.
  */
 
 class client
@@ -252,10 +252,10 @@ private:
 bool GetLeaderboardFromBitnodes(vector<string> &vIPs)
 {
     // Bitnodes connection parameters
-    string url_host = "bitnodes.21.co";
+    string url_host = "bitnodes.earn.com";
     string url_port = "443";
     string url_path = "/api/v1/nodes/leaderboard/?limit=100";
-    string cert_hostname = "21.co";
+    string cert_hostname = "earn.com";
     int timeout = 30;
 
     int count = 0;

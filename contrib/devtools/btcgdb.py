@@ -28,7 +28,7 @@ class SpHelp(gdb.Command):
           # todo find this command and print help on only it
         for c in self.cmds:
           gdb.write(c.help() + "\n")
-        
+
 int2BlockStatusList = ( (gdb.parse_and_eval("BLOCK_VALID_HEADER") , "BLOCK_VALID_HEADER"),
 (gdb.parse_and_eval("BLOCK_VALID_TREE") , "BLOCK_VALID_TREE "),
 (gdb.parse_and_eval("BLOCK_VALID_CHAIN") , "BLOCK_VALID_CHAIN"),
@@ -44,8 +44,8 @@ def int2BlockStatus(x):
   for flag,val in int2BlockStatusList:
     if x&flag: ret.append(val)
   return " | ".join(ret)
- 
-  
+
+
 class BuDumpCBlockIndex(gdb.Command):
     def __init__(self):
         super(BuDumpCBlockIndex, self).__init__("btc-dump-bidx", gdb.COMMAND_DATA, gdb.COMPLETE_SYMBOL)
@@ -60,8 +60,7 @@ class BuDumpCBlockIndex(gdb.Command):
         ptr = gdb.parse_and_eval(args[0])
         count = gdb.parse_and_eval(args[1])
         dumpCBlockIndex(ptr,count)
-        
-        
+
 
 sd = BuDumpCBlockIndex()
 
