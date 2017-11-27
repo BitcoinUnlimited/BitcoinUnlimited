@@ -7630,10 +7630,10 @@ bool SendMessages(CNode *pto)
         std::vector<CInv> vInvWait;
         std::vector<CInv> vInvSend;
         {
-            bool fSendTrickle = pto->fWhitelisted;
+            bool fSendTrickle = !pto->fWhitelisted;
             if (pto->nNextInvSend < nNow)
             {
-                fSendTrickle = true;
+                fSendTrickle = false;
                 pto->nNextInvSend = PoissonNextSend(nNow, AVG_INVENTORY_BROADCAST_INTERVAL);
             }
 
@@ -7648,12 +7648,13 @@ bool SendMessages(CNode *pto)
                 bool chokeTxInv = (pto->nActivityBytes == 0 && (nNow / 1000000 - pto->nTimeConnected) > 120);
                 LOCK(pto->cs_inventory);
 
-                vInvSend.reserve(pto->vInventoryToSend.size());
-                // about 1/4 of the nodes should end up in this list, so over-allocate
-                vInvWait.reserve(pto->vInventoryToSend.size() / 3);
+                int invsz = pto->vInventoryToSend.size();
+                vInvSend.reserve(invsz);
+                // about 3/4 of the nodes should end up in this list, so over-allocate by 1/10th + 10 items
+                vInvWait.reserve((invsz * 3) / 4 + invsz / 10 + 10);
 
                 // Make copy of vInventoryToSend while cs_inventory is locked but also ignore some tx and defer others
-                BOOST_FOREACH (const CInv &inv, pto->vInventoryToSend)
+                for (const CInv &inv : pto->vInventoryToSend)
                 {
                     if (inv.type == MSG_TX)
                     {
@@ -7662,9 +7663,10 @@ bool SendMessages(CNode *pto)
                         // skip if we already know abt this one
                         if (pto->filterInventoryKnown.contains(inv.hash))
                             continue;
-                        if (!fSendTrickle)
+                        if (fSendTrickle)
                         {
-                            if ((insecure_rand() & 3) == 0)
+                            // 1/4 of tx invs blast to all immediately
+                            if ((insecure_rand() & 3) != 0)
                             {
                                 vInvWait.push_back(inv);
                                 continue;
