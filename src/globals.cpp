@@ -291,10 +291,10 @@ CThinBlockData thindata; // Singleton class
 uint256 bitcoinCashForkBlockHash = uint256S("000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec");
 
 #ifdef ENABLE_MUTRACE
-class PrintSomePointers
+class CPrintSomePointers
 {
 public:
-    PrintSomePointers()
+    CPrintSomePointers()
     {
         printf("csBestBlock %p\n", &csBestBlock);
         printf("cvBlockChange %p\n", &cvBlockChange);
@@ -327,5 +327,5 @@ public:
     }
 };
 
-static PrintSomePointers unused;
+static CPrintSomePointers unused;
 #endif

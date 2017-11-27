@@ -296,7 +296,7 @@ public:
 class CNode
 {
 #ifdef ENABLE_MUTRACE
-    friend class PrintSomePointers;
+    friend class CPrintSomePointers;
 #endif
 
 public:
