@@ -6573,21 +6573,30 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
 
         // Check and accept each header in order from youngest block to oldest
-        CBlockIndex *pindexLast = NULL;
+        CBlockIndex *pindexLast = nullptr;
+        int i = 0;
         for (const CBlockHeader &header : headers)
         {
             CValidationState state;
             if (!AcceptBlockHeader(header, state, chainparams, &pindexLast))
             {
-                int nDoS;
-                if (state.IsInvalid(nDoS))
+                int nDos;
+                if (state.IsInvalid(nDos))
                 {
-                    if (nDoS > 0)
-                        dosMan.Misbehaving(pfrom, nDoS);
-                    return error("invalid header received");
+                    if (nDos > 0)
+                    {
+                        dosMan.Misbehaving(pfrom, nDos);
+                    }
                 }
+
+                headers.erase(headers.begin() + i, headers.end());
+                nCount = headers.size();
+                break;
             }
-            PV->UpdateMostWorkOurFork(header);
+            else
+                PV->UpdateMostWorkOurFork(header);
+
+            i++;
         }
 
         if (pindexLast)
