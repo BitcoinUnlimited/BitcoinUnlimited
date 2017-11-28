@@ -447,8 +447,9 @@ static void addZmqOptions(AllowedArgs &allowedArgs)
 
 static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
 {
-    std::string debugCategories = "addrman, alert, bench, coindb, db, lock, rand, rpc, selectcoins, mempool, "
-                                  "mempoolrej, net, proxy, prune, http, libevent, tor, zmq, thin, NWM";
+    std::string debugCategories = "addrman, bench, blk, bloom, coindb, db, estimatefee, evict, http, lck, "
+                                  "libevent, mempool, mempoolrej, miner, net, parallel, partitioncheck, "
+                                  "proxy, prune, rand, reindex, req, rpc, selectcoins, thin, tor, wallet, zmq";
     if (mode == HMM_BITCOIN_QT)
         debugCategories += ", qt";
 
@@ -473,7 +474,8 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addDebugArg("testsafemode", optionalBool, strprintf("Force safe mode (default: %u)", DEFAULT_TESTSAFEMODE))
         .addDebugArg("dropmessagestest=<n>", requiredInt, "Randomly drop 1 of every <n> network messages")
         .addDebugArg("fuzzmessagestest=<n>", requiredInt, "Randomly fuzz 1 of every <n> network messages")
-        .addDebugArg("pvtest", optionalBool, strprintf("Slow down input checking to 1 every second (default: %u)", DEFAULT_PV_TESTMODE))
+        .addDebugArg("pvtest", optionalBool,
+            strprintf("Slow down input checking to 1 every second (default: %u)", DEFAULT_PV_TESTMODE))
 #ifdef ENABLE_WALLET
         .addDebugArg("flushwallet", optionalBool,
             strprintf("Run a thread to flush wallet periodically (default: %u)", DEFAULT_FLUSHWALLET))
@@ -499,15 +501,10 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
             strprintf(_("Output debugging information (default: %u, supplying <category> is optional)"), 0) + ". " +
                 _("If <category> is not supplied or if <category> = 1, output all debugging information.") +
                 _("<category> can be:") + " " + debugCategories + ".")
-        .addArg("flextrans", optionalBool, "Accept and relay transactions of version 4")
-        .addArg("ft-strict", optionalBool,
-            "On incoming FlexTrans transactions reject tx that have not specified tokens. default: false")
         .addArg("gen", optionalBool, strprintf(_("Generate coins (default: %u)"), DEFAULT_GENERATE))
         .addArg("genproclimit=<n>", requiredInt,
             strprintf(_("Set the number of threads for coin generation if enabled (-1 = all cores, default: %d)"),
                     DEFAULT_GENERATE_THREADS))
-        .addArg("gencoinbase=<pubkey>", requiredStr,
-            "When generating coins a coinbase has to be provided in the form of a public key")
         .addArg(
             "logips", optionalBool, strprintf(_("Include IP addresses in debug output (default: %u)"), DEFAULT_LOGIPS))
         .addArg("logtimestamps", optionalBool,
@@ -588,7 +585,7 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
         .addArg("use-thinblocks", optionalBool, _("Enable thin blocks to speed up the relay of blocks (default: 1)"))
         .addArg("xthinbloomfiltersize=<n>", requiredInt,
             strprintf(_("The maximum xthin bloom filter size that our node will accept in Bytes (default: %u)"),
-                    MAX_BLOOM_FILTER_SIZE));
+                    SMALLEST_MAX_BLOOM_FILTER_SIZE));
 }
 
 static void addBlockCreationOptions(AllowedArgs &allowedArgs)

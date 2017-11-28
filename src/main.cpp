@@ -88,7 +88,7 @@ bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
 size_t nCoinCacheUsage = 5000 * 300;
 uint64_t nPruneTarget = 0;
-uint32_t nXthinBloomFilterSize = MAX_BLOOM_FILTER_SIZE;
+uint32_t nXthinBloomFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE;
 
 CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
 
@@ -139,10 +139,6 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams);
 CScript COINBASE_FLAGS;
 
 const std::string strMessageMagic = "Bitcoin Signed Message:\n";
-
-extern CStatHistory<uint64_t> nTxValidationTime;
-extern CStatHistory<uint64_t> nBlockValidationTime;
-extern CCriticalSection cs_blockvalidationtime;
 
 extern CCriticalSection cs_LastBlockFile;
 extern CCriticalSection cs_nBlockSequenceId;
@@ -1142,6 +1138,23 @@ std::string FormatStateMessage(const CValidationState &state)
     return strprintf("%s%s (code %i)", state.GetRejectReason(),
         state.GetDebugMessage().empty() ? "" : ", " + state.GetDebugMessage(), state.GetRejectCode());
 }
+
+#ifdef BITCOIN_CASH
+static bool IsCashHFEnabled(const CChainParams &chainparams, int64_t nMedianTimePast)
+{
+    return nMedianTimePast >= chainparams.GetConsensus().cashHardForkActivationTime;
+}
+
+bool IsCashHFEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev)
+{
+    if (pindexPrev == nullptr)
+    {
+        return false;
+    }
+
+    return IsCashHFEnabled(chainparams, pindexPrev->GetMedianTimePast());
+}
+#endif
 
 bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     CValidationState &state,
@@ -2451,7 +2464,7 @@ bool ConnectBlock(const CBlock &block,
     int64_t nBIP16SwitchTime = 1333238400;
     bool fStrictPayToScriptHash = (pindex->GetBlockTime() >= nBIP16SwitchTime);
 
-    unsigned int flags = fStrictPayToScriptHash ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE;
+    uint32_t flags = fStrictPayToScriptHash ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE;
 
     if (pindex->forkActivated(miningForkTime.value))
     {
@@ -2483,6 +2496,18 @@ bool ConnectBlock(const CBlock &block,
         nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
     }
 
+// If the Cash HF is enabled, we start rejecting transaction that use a high
+// s in their signature. We also make sure that signature that are supposed
+// to fail (for instance in multisig or other forms of smart contracts) are
+// null.
+#ifdef BITCOIN_CASH
+    if (IsCashHFEnabled(chainparams, pindex->pprev))
+    {
+        flags |= SCRIPT_VERIFY_LOW_S;
+        flags |= SCRIPT_VERIFY_NULLFAIL;
+    }
+#endif
+
     int64_t nTime2 = GetTimeMicros();
     nTimeForks += nTime2 - nTime1;
     LogPrint("bench", "    - Fork checks: %.2fms [%.2fs]\n", 0.001 * (nTime2 - nTime1), nTimeForks * 0.000001);
@@ -2505,9 +2530,6 @@ bool ConnectBlock(const CBlock &block,
     // We will delete these hashes only if and when this block is the one that is accepted saving us the unnecessary
     // repeated locking and unlocking of cs_xval.
     std::vector<uint256> vHashesToDelete;
-
-    // Create a temporary view of the UTXO set
-    CCoinsViewCache viewTempCache(pcoinsTip);
 
     // Section for boost scoped lock on the scriptcheck_mutex
     boost::thread::id this_id(boost::this_thread::get_id());
@@ -2556,7 +2578,7 @@ bool ConnectBlock(const CBlock &block,
 
             if (!tx.IsCoinBase())
             {
-                if (!viewTempCache.HaveInputs(tx))
+                if (!view.HaveInputs(tx))
                 {
                     // If we were validating at the same time as another block and the other block wins the validation
                     // race
@@ -2577,7 +2599,7 @@ bool ConnectBlock(const CBlock &block,
                 prevheights.resize(tx.vin.size());
                 for (size_t j = 0; j < tx.vin.size(); j++)
                 {
-                    prevheights[j] = viewTempCache.AccessCoin(tx.vin[j].prevout).nHeight;
+                    prevheights[j] = view.AccessCoin(tx.vin[j].prevout).nHeight;
                 }
 
                 if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex))
@@ -2591,13 +2613,13 @@ bool ConnectBlock(const CBlock &block,
                     // Add in sigops done by pay-to-script-hash inputs;
                     // this is to prevent a "rogue miner" from creating
                     // an incredibly-expensive-to-validate block.
-                    nSigOps += GetP2SHSigOpCount(tx, viewTempCache);
+                    nSigOps += GetP2SHSigOpCount(tx, view);
                     // if (nSigOps > MAX_BLOCK_SIGOPS)
                     //    return state.DoS(100, error("ConnectBlock(): too many sigops"),
                     //                     REJECT_INVALID, "bad-blk-sigops");
                 }
 
-                nFees += viewTempCache.GetValueIn(tx) - tx.GetValueOut();
+                nFees += view.GetValueIn(tx) - tx.GetValueOut();
 
                 // Only check inputs when the tx hash in not in the setPreVerifiedTxHash as would only
                 // happen if this were a regular block or when a tx is found within the returning XThinblock.
@@ -2619,8 +2641,8 @@ bool ConnectBlock(const CBlock &block,
                         std::vector<CScriptCheck> vChecks;
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
-                        if (!CheckInputs(tx, state, viewTempCache, fScriptChecks, flags, fCacheResults,
-                                &resourceTracker, PV->ThreadCount() ? &vChecks : NULL))
+                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, fCacheResults, &resourceTracker,
+                                PV->ThreadCount() ? &vChecks : NULL))
                         {
                             return error("ConnectBlock(): CheckInputs on %s failed with %s", tx.GetHash().ToString(),
                                 FormatStateMessage(state));
@@ -2640,7 +2662,7 @@ bool ConnectBlock(const CBlock &block,
             {
                 blockundo.vtxundo.push_back(CTxUndo());
             }
-            UpdateCoins(tx, state, viewTempCache, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
+            UpdateCoins(tx, state, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
             vPos.push_back(std::make_pair(tx.GetHash(), pos));
             pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
 
@@ -2695,14 +2717,6 @@ bool ConnectBlock(const CBlock &block,
 
     // Quit any competing threads may be validating which have the same previous block before updating the UTXO.
     PV->QuitCompetingThreads(block.GetBlockHeader().hashPrevBlock);
-
-    // Flush the temporary UTXO view to the base view (the in memory UTXO main cache)
-    int64_t nUpdateCoinsTimeBegin = GetTimeMicros();
-    LogPrint("parallel", "Updating UTXO for %s\n", block.GetHash().ToString());
-    viewTempCache.Flush();
-
-    int64_t nUpdateCoinsTimeEnd = GetTimeMicros();
-    LogPrint("bench", "      - Update Coins %.3fms\n", nUpdateCoinsTimeEnd - nUpdateCoinsTimeBegin);
 
     int64_t nTime3 = GetTimeMicros();
     nTimeConnect += nTime3 - nTime2;
@@ -3129,13 +3143,16 @@ bool static ConnectTip(CValidationState &state,
             }
             return false;
         }
+        int64_t nStart = GetTimeMicros();
+        bool result = view.Flush();
+        assert(result);
+        LogPrint("bench", "      - Update Coins %.3fms\n", GetTimeMicros() - nStart);
+
         mapBlockSource.erase(pindexNew->GetBlockHash());
         nTime3 = GetTimeMicros();
         nTimeConnectTotal += nTime3 - nTime2;
         LogPrint(
             "bench", "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
-        bool result = view.Flush();
-        assert(result);
     }
 
     int64_t nTime4 = GetTimeMicros();
@@ -4089,8 +4106,12 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
         nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
     }
 
-    int64_t nLockTimeCutoff =
-        (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST) ? pindexPrev->GetMedianTimePast() : block.GetBlockTime();
+    int64_t nLockTimeCutoff;
+    if (pindexPrev == NULL)
+        nLockTimeCutoff = block.GetBlockTime();
+    else
+        nLockTimeCutoff =
+            (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST) ? pindexPrev->GetMedianTimePast() : block.GetBlockTime();
 
     // Check that all transactions are finalized
     BOOST_FOREACH (const CTransaction &tx, block.vtx)
@@ -6074,7 +6095,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 if ((!fAlreadyHave && !IsInitialBlockDownload()) ||
                     (!fAlreadyHave && Params().NetworkIDString() == "regtest"))
                 {
-                    requester.AskFor(inv, pfrom);
+                    // Since we now only rely on headers for block requests, if we get an INV from an older node or
+                    // if there was a very large re-org which resulted in a revert to block announcements via INV,
+                    // we will instead request the header rather than the block.  This is safer and prevents an
+                    // attacker from sending us fake INV's for blocks that do not exist or try to get us to request
+                    // and download fake blocks.
+                    pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexBestHeader), inv.hash);
                 }
                 else
                 {
@@ -7053,6 +7079,15 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (pfrom->ThinBlockCapable())
         {
             vRecv >> pfrom->nXthinBloomfilterSize;
+
+            // As a safeguard don't allow a smaller max bloom filter size than the default max size.
+            if (!pfrom->nXthinBloomfilterSize || (pfrom->nXthinBloomfilterSize < SMALLEST_MAX_BLOOM_FILTER_SIZE))
+            {
+                pfrom->PushMessage(
+                    NetMsgType::REJECT, strCommand, REJECT_INVALID, std::string("filter size was too small"));
+                pfrom->fDisconnect = true;
+                return false;
+            }
         }
         else
         {
@@ -7330,11 +7365,14 @@ bool SendMessages(CNode *pto)
             std::map<uint256, CNode::CThinBlockInFlight>::iterator iter = pto->mapThinBlocksInFlight.begin();
             while (iter != pto->mapThinBlocksInFlight.end())
             {
-                if (!(*iter).second.fReceived && (GetTime() - (*iter).second.nRequestTime) > THINBLOCK_DOWNLOAD_TIMEOUT)
+                // Use a timeout of 6 times the retry inverval before disconnecting.  This way only a max of 6
+                // re-requested thinblocks could be in memory at any one time.
+                if (!(*iter).second.fReceived &&
+                    (GetTime() - (*iter).second.nRequestTime) > 6 * blkReqRetryInterval / 1000000)
                 {
                     if (!pto->fWhitelisted && Params().NetworkIDString() != "regtest")
                     {
-                        LogPrint("thin", "ERROR: Disconnecting peer=%d due to download timeout exceeded "
+                        LogPrint("thin", "ERROR: Disconnecting peer=%d due to thinblock download timeout exceeded "
                                          "(%d secs)\n",
                             pto->GetId(), (GetTime() - (*iter).second.nRequestTime));
                         pto->fDisconnect = true;
