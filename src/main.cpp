@@ -6572,7 +6572,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
         }
 
-        // Check and accept each header in order from youngest block to oldest
+        // Check and accept each header in dependency order (oldest block to most recent)
         CBlockIndex *pindexLast = nullptr;
         int i = 0;
         for (const CBlockHeader &header : headers)
@@ -6588,7 +6588,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                         dosMan.Misbehaving(pfrom, nDos);
                     }
                 }
-
+                // all headers from this one forward reference a fork that we don't follow, so erase them
                 headers.erase(headers.begin() + i, headers.end());
                 nCount = headers.size();
                 break;
