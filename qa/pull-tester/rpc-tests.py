@@ -37,7 +37,14 @@ import subprocess
 import tempfile
 import re
 
-sys.path.append("qa/pull-tester/")
+# to support out-of-source builds, we need to add both the source directory to the path, and the out-of-source directory
+# because tests_config is a generated file
+sourcePath = os.path.dirname(os.path.realpath(__file__))
+outOfSourceBuildPath = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(sourcePath)
+if sourcePath != outOfSourceBuildPath:
+    sys.path.append(outOfSourceBuildPath)
+
 from tests_config import *
 from test_classes import RpcTest, Disabled, Skip
 
