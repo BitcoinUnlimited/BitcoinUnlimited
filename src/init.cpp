@@ -581,7 +581,7 @@ void InitParameterInteraction()
 
 void InitLogging()
 {
-    fPrintToConsole = GetBoolArg("-printtoconsole", false);
+    fPrintToConsole = GetBoolArg("-printtoconsole", DEFAULT_PRINTTOCONSOLE);
     fLogTimestamps = GetBoolArg("-logtimestamps", DEFAULT_LOGTIMESTAMPS);
     fLogTimeMicros = GetBoolArg("-logtimemicros", DEFAULT_LOGTIMEMICROS);
     fLogIPs = GetBoolArg("-logips", DEFAULT_LOGIPS);
@@ -808,11 +808,11 @@ bool AppInit2(boost::thread_group &threadGroup, CScheduler &scheduler)
     // Option to startup with mocktime set (used for regression testing):
     SetMockTime(GetArg("-mocktime", 0)); // SetMockTime(0) is a no-op
 
-    if (GetBoolArg("-peerbloomfilters", true))
+    if (GetBoolArg("-peerbloomfilters", DEFAULT_PEERBLOOMFILTERS))
         nLocalServices |= NODE_BLOOM;
 
     // BUIP010 Xtreme Thinblocks: begin section Initialize XTHIN service
-    if (GetBoolArg("-use-thinblocks", true))
+    if (GetBoolArg("-use-thinblocks", DEFAULT_USE_THINBLOCKS))
         nLocalServices |= NODE_XTHIN;
 // BUIP010 Xtreme Thinblocks: end section
 
@@ -920,7 +920,7 @@ bool AppInit2(boost::thread_group &threadGroup, CScheduler &scheduler)
 #endif // ENABLE_WALLET
     // ********************************************************* Step 6: load block chain
 
-    fReindex = GetBoolArg("-reindex", false);
+    fReindex = GetBoolArg("-reindex", DEFAULT_REINDEX);
 
     // Upgrading to 0.8; hard-link the old blknnnn.dat files into /blocks/
     fs::path blocksDir = GetDataDir() / "blocks";
@@ -1280,7 +1280,7 @@ bool AppInit2(boost::thread_group &threadGroup, CScheduler &scheduler)
 
     // see Step 2: parameter interactions for more information about these
     fListen = GetBoolArg("-listen", DEFAULT_LISTEN);
-    fDiscover = GetBoolArg("-discover", true);
+    fDiscover = GetBoolArg("-discover", DEFAULT_DISCOVER);
     fNameLookup = GetBoolArg("-dns", DEFAULT_NAME_LOOKUP);
 
     bool fBound = false;
