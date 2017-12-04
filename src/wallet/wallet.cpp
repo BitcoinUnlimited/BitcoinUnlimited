@@ -3348,6 +3348,8 @@ CWalletKey::CWalletKey(int64_t nExpires)
 int CMerkleTx::SetMerkleBranch(const CBlock& block, int txIdx)
 {
     AssertLockHeld(cs_main);
+    // if a bad txIdx is passed, then in release builds set the tx index to "I don't know". In debug builds assert.
+    DbgAssert(txIdx >= -1, txIdx=-1);
     CBlock blockTmp;
 
     // Update the tx's hashBlock
