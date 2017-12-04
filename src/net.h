@@ -295,6 +295,10 @@ public:
 /** Information about a peer */
 class CNode
 {
+#ifdef ENABLE_MUTRACE
+    friend class CPrintSomePointers;
+#endif
+
 public:
     struct CThinBlockInFlight
     {

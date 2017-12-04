@@ -289,3 +289,43 @@ CStatHistory<uint64_t> nBlockValidationTime("blockValidationTime", STAT_OP_MAX |
 CThinBlockData thindata; // Singleton class
 
 uint256 bitcoinCashForkBlockHash = uint256S("000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec");
+
+#ifdef ENABLE_MUTRACE
+class CPrintSomePointers
+{
+public:
+    CPrintSomePointers()
+    {
+        printf("csBestBlock %p\n", &csBestBlock);
+        printf("cvBlockChange %p\n", &cvBlockChange);
+        printf("cs_LastBlockFile %p\n", &cs_LastBlockFile);
+        printf("cs_nBlockSequenceId %p\n", &cs_nBlockSequenceId);
+        printf("cs_nTimeOffset %p\n", &cs_nTimeOffset);
+        printf("cs_rpcWarmup %p\n", &cs_rpcWarmup);
+        printf("cs_main %p\n", &cs_main);
+        printf("csBestBlock %p\n", &csBestBlock);
+        printf("cs_proxyInfos %p\n", &cs_proxyInfos);
+        printf("cs_xval %p\n", &cs_xval);
+        printf("cs_vNodes %p\n", &cs_vNodes);
+        printf("cs_mapLocalHost %p\n", &cs_mapLocalHost);
+        printf("CNode::cs_totalBytesRecv %p\n", &CNode::cs_totalBytesRecv);
+        printf("CNode::cs_totalBytesSent %p\n", &CNode::cs_totalBytesSent);
+
+        // critical sections from net.cpp
+        printf("cs_setservAddNodeAddresses %p\n", &cs_setservAddNodeAddresses);
+        printf("cs_vAddedNodes %p\n", &cs_vAddedNodes);
+        printf("cs_vUseDNSSeeds %p\n", &cs_vUseDNSSeeds);
+        printf("cs_mapInboundConnectionTracker %p\n", &cs_mapInboundConnectionTracker);
+        printf("cs_vOneShots %p\n", &cs_vOneShots);
+
+        printf("cs_statMap %p\n", &cs_statMap);
+
+        printf("requester.cs_objDownloader %p\n", &requester.cs_objDownloader);
+
+        printf("\nCondition variables:\n");
+        printf("cvBlockChange %p\n", &cvBlockChange);
+    }
+};
+
+static CPrintSomePointers unused;
+#endif
