@@ -1425,5 +1425,5 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 #endif
 
     uiInterface.InitMessage(_("Done loading"));
-    return !fRequestShutdown;
+    return true;
 }
