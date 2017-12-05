@@ -15,14 +15,26 @@
 bool CCoinsView::GetCoin(const COutPoint &outpoint, Coin &coin) const { return false; }
 bool CCoinsView::HaveCoin(const COutPoint &outpoint) const { return false; }
 uint256 CCoinsView::GetBestBlock() const { return uint256(); }
-bool CCoinsView::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock, const uint64_t nBestCoinHeight, size_t &nChildCachedCoinsUsage) { return false; }
+bool CCoinsView::BatchWrite(CCoinsMap &mapCoins,
+    const uint256 &hashBlock,
+    const uint64_t nBestCoinHeight,
+    size_t &nChildCachedCoinsUsage)
+{
+    return false;
+}
 CCoinsViewCursor *CCoinsView::Cursor() const { return nullptr; }
 CCoinsViewBacked::CCoinsViewBacked(CCoinsView *viewIn) : base(viewIn) {}
 bool CCoinsViewBacked::GetCoin(const COutPoint &outpoint, Coin &coin) const { return base->GetCoin(outpoint, coin); }
 bool CCoinsViewBacked::HaveCoin(const COutPoint &outpoint) const { return base->HaveCoin(outpoint); }
 uint256 CCoinsViewBacked::GetBestBlock() const { return base->GetBestBlock(); }
 void CCoinsViewBacked::SetBackend(CCoinsView &viewIn) { base = &viewIn; }
-bool CCoinsViewBacked::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock, const uint64_t nBestCoinHeight, size_t &nChildCachedCoinsUsage) { return base->BatchWrite(mapCoins, hashBlock,  nBestCoinHeight, nChildCachedCoinsUsage); }
+bool CCoinsViewBacked::BatchWrite(CCoinsMap &mapCoins,
+    const uint256 &hashBlock,
+    const uint64_t nBestCoinHeight,
+    size_t &nChildCachedCoinsUsage)
+{
+    return base->BatchWrite(mapCoins, hashBlock, nBestCoinHeight, nChildCachedCoinsUsage);
+}
 CCoinsViewCursor *CCoinsViewBacked::Cursor() const { return base->Cursor(); }
 size_t CCoinsViewBacked::EstimateSize() const { return base->EstimateSize(); }
 SaltedOutpointHasher::SaltedOutpointHasher()
@@ -30,9 +42,12 @@ SaltedOutpointHasher::SaltedOutpointHasher()
 {
 }
 
-CCoinsViewCache::CCoinsViewCache(CCoinsView *baseIn) : CCoinsViewBacked(baseIn), nBestCoinHeight(0), cachedCoinsUsage(0) {}
+CCoinsViewCache::CCoinsViewCache(CCoinsView *baseIn) : CCoinsViewBacked(baseIn), nBestCoinHeight(0), cachedCoinsUsage(0)
+{
+}
 
-size_t CCoinsViewCache::DynamicMemoryUsage() const {
+size_t CCoinsViewCache::DynamicMemoryUsage() const
+{
     LOCK(cs_utxo);
     return memusage::DynamicUsage(cacheCoins) + cachedCoinsUsage;
 }
@@ -199,12 +214,14 @@ void CCoinsViewCache::SetBestBlock(const uint256 &hashBlockIn)
     hashBlock = hashBlockIn;
 }
 
-bool CCoinsViewCache::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlockIn, const uint64_t nBestCoinHeightIn, size_t &nChildCachedCoinsUsage)
+bool CCoinsViewCache::BatchWrite(CCoinsMap &mapCoins,
+    const uint256 &hashBlockIn,
+    const uint64_t nBestCoinHeightIn,
+    size_t &nChildCachedCoinsUsage)
 {
     LOCK(cs_utxo);
     for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();)
     {
-        
         if (it->second.flags & CCoinsCacheEntry::DIRTY)
         { // Ignore non-dirty entries (optimization).
             // Update usage of the child cache before we do any swapping and deleting
@@ -295,8 +312,9 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     int nSmallestDelta = 100;
     while (!fDone && DynamicMemoryUsage() > nTrimSize)
     {
-        LogPrint("coindb", "cacheCoinsUsage at start: %d total dynamic usage: %d trim to size: %d nBestCoinHeight: %d trim height:%d\n", 
-                  cachedCoinsUsage, DynamicMemoryUsage(), nTrimSize, nBestCoinHeight, nTrimHeight);
+        LogPrint("coindb", "cacheCoinsUsage at start: %d total dynamic usage: %d trim to size: %d nBestCoinHeight: %d "
+                           "trim height:%d\n",
+            cachedCoinsUsage, DynamicMemoryUsage(), nTrimSize, nBestCoinHeight, nTrimHeight);
 
         CCoinsMap::iterator iter = cacheCoins.begin();
         while (DynamicMemoryUsage() > nTrimSize)
@@ -330,13 +348,16 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
                 nTrimHeightDelta -= (nSmallestDelta * 100);
 
             nTrimHeight = nBestCoinHeight - nTrimHeightDelta;
-            fDone = false; // we're not done yet we have adjusted the nTrimHeight downward so we have to go back and trim again.
+            // we're not done yet we have adjusted the nTrimHeight downward so we have to go back and trim again.
+            fDone = false;
 
-            LogPrint("coindb", "Re-adjusting trim height to %d using a trim height delta of %d\n", nTrimHeight, nTrimHeightDelta);
+            LogPrint("coindb", "Re-adjusting trim height to %d using a trim height delta of %d\n", nTrimHeight,
+                nTrimHeightDelta);
         }
     }
 
-    // If trimming by coin height failed to find any or enough coins to trim then trim the cache further by ignoring coin height.
+    // If trimming by coin height failed to find any or enough coins to trim then trim the cache further by ignoring
+    // coin height.
     // While this is not ideal we still have to trim to keep the cache from growing unbounded.
     CCoinsMap::iterator iter = cacheCoins.begin();
     iter = cacheCoins.begin();
@@ -370,7 +391,8 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     {
         nTrimHeightDelta += (nSmallestDelta >> 1);
         nTrimHeight = nBestCoinHeight - nTrimHeightDelta;
-        LogPrint("coindb", "Re-adjusting trim height to %d using a trim height delta of %d\n", nTrimHeight, nTrimHeightDelta);
+        LogPrint("coindb", "Re-adjusting trim height to %d using a trim height delta of %d\n", nTrimHeight,
+            nTrimHeightDelta);
     }
 }
 
