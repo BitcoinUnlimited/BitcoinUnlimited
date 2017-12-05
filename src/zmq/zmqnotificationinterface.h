@@ -25,7 +25,7 @@ protected:
     void Shutdown();
 
     // CValidationInterface
-    void SyncTransaction(const CTransaction &tx, const CBlock *pblock);
+    void SyncTransaction(const CTransaction &tx, const CBlock *pblock, int txIndex=-1);
     void UpdatedBlockTip(const CBlockIndex *pindex);
 
 private:

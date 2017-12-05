@@ -8,6 +8,7 @@
 #define BITCOIN_PRIMITIVES_BLOCK_H
 
 #include "primitives/transaction.h"
+#include "sync.h"
 #include "serialize.h"
 #include "uint256.h"
 
@@ -100,6 +101,34 @@ public:
         *((CBlockHeader*)this) = header;
     }
 
+    // return the index of the transaction in this block.  Return -1 if tx is not in this block
+    int find(uint256 hash) const
+    {
+        int nIndex;
+        for (nIndex = 0; nIndex < (int)vtx.size(); nIndex++)
+            if (vtx[nIndex] == *(CTransaction *)this)
+                break;
+        if (nIndex == (int)vtx.size())
+        {
+            nIndex = -1;
+        }
+        return nIndex;
+
+#if 0 // efficient but unnecessary
+        LOCK(csBlockHashToIdx);
+        // If the hash to idx map is empty, then fill it up
+        if (hashToIdx.empty()&& (!vtx.empty()))
+        {
+            for (int nIndex = 0; nIndex < (int)vtx.size(); nIndex++)
+                hashToIdx[vtx[nIndex].GetHash()] = nIndex;
+        }
+        // find the hash and return the idx
+        auto pos = hashToIdx.find(hash);
+        if (pos == hashToIdx.end()) return -1;
+        return pos->second;
+#endif
+    }
+
     static bool VersionKnown(int32_t nVersion, int32_t voteBits)
     {
         if (nVersion >= 1 && nVersion <= 4)
@@ -113,7 +142,7 @@ public:
         }
         return false;
     }
-    
+
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
@@ -133,7 +162,7 @@ public:
       CScriptNum coinbaseHeight(heightScript, false,numlen);
       return coinbaseHeight.getint();
     }
-    
+
     void SetNull()
     {
         CBlockHeader::SetNull();

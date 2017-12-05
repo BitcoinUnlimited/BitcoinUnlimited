@@ -1495,7 +1495,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     }
 
     if (!fRejectAbsurdFee)
-        SyncWithWallets(tx, NULL);
+        SyncWithWallets(tx, NULL, -1);
 
     int64_t end = GetTimeMicros();
 
@@ -3077,7 +3077,7 @@ bool static DisconnectTip(CValidationState &state, const Consensus::Params &cons
     // 0-confirmed or conflicted:
     BOOST_FOREACH (const CTransaction &tx, block.vtx)
     {
-        SyncWithWallets(tx, NULL);
+        SyncWithWallets(tx, NULL, -1);
     }
 
     return true;
@@ -3176,12 +3176,14 @@ bool static ConnectTip(CValidationState &state,
     // to conflicted:
     BOOST_FOREACH (const CTransaction &tx, txConflicted)
     {
-        SyncWithWallets(tx, NULL);
+        SyncWithWallets(tx, NULL, -1);
     }
     // ... and about transactions that got confirmed:
+    int txIdx = 0;
     BOOST_FOREACH (const CTransaction &tx, pblock->vtx)
     {
-        SyncWithWallets(tx, pblock);
+        SyncWithWallets(tx, pblock, txIdx);
+        txIdx++;
     }
 
     int64_t nTime6 = GetTimeMicros();

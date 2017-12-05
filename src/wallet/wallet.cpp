@@ -797,7 +797,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFromLoadWallet, CWalletD
  * pblock is optional, but should be provided if the transaction is known to be in a block.
  * If fUpdate is true, existing transactions will be updated.
  */
-bool CWallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pblock, bool fUpdate)
+bool CWallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pblock, bool fUpdate, int txIndex)
 {
     {
         AssertLockHeld(cs_wallet);
@@ -823,7 +823,7 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pbl
 
             // Get merkle branch if transaction was found in a block
             if (pblock)
-                wtx.SetMerkleBranch(*pblock);
+                wtx.SetMerkleBranch(*pblock, txIndex);
 
             // Do not flush the wallet here for performance reasons
             // this is safe, as in case of a crash, we rescan the necessary blocks on startup through our SetBestChain-mechanism
@@ -952,11 +952,11 @@ void CWallet::MarkConflicted(const uint256& hashBlock, const uint256& hashTx)
     }
 }
 
-void CWallet::SyncTransaction(const CTransaction& tx, const CBlock* pblock)
+void CWallet::SyncTransaction(const CTransaction& tx, const CBlock* pblock, int txIdx)
 {
     LOCK2(cs_main, cs_wallet);
 
-    if (!AddToWalletIfInvolvingMe(tx, pblock, true))
+    if (!AddToWalletIfInvolvingMe(tx, pblock, true, txIdx))
         return; // Not one of ours
 
     // If a transaction changes 'conflicted' state, that changes the balance
@@ -1285,10 +1285,12 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
 
             CBlock block;
             ReadBlockFromDisk(block, pindex, Params().GetConsensus());
+            int txIdx = 0;
             BOOST_FOREACH(CTransaction& tx, block.vtx)
             {
-                if (AddToWalletIfInvolvingMe(tx, &block, fUpdate))
+                if (AddToWalletIfInvolvingMe(tx, &block, fUpdate, txIdx))
                     ret++;
+                txIdx++;
             }
             pindex = chainActive.Next(pindex);
             if (GetTime() >= nNow + 60) {
@@ -1333,7 +1335,7 @@ void CWallet::ReacceptWalletTransactions()
 
         LOCK(mempool.cs);
         wtx.AcceptToMemoryPool(false);
-        SyncWithWallets(wtx,NULL);
+        SyncWithWallets(wtx, NULL, -1);
     }
 }
 
@@ -2416,7 +2418,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey)
                 return false;
             }
 #else
-            SyncWithWallets(wtxNew,NULL);
+            SyncWithWallets(wtxNew, NULL, -1);
 #endif
             wtxNew.RelayWalletTransaction();
         }
@@ -3343,23 +3345,29 @@ CWalletKey::CWalletKey(int64_t nExpires)
     nTimeExpires = nExpires;
 }
 
-int CMerkleTx::SetMerkleBranch(const CBlock& block)
+int CMerkleTx::SetMerkleBranch(const CBlock& block, int txIdx)
 {
     AssertLockHeld(cs_main);
+    // if a bad txIdx is passed, then in release builds set the tx index to "I don't know". In debug builds assert.
+    DbgAssert(txIdx >= -1, txIdx=-1);
     CBlock blockTmp;
 
     // Update the tx's hashBlock
     hashBlock = block.GetHash();
 
-    // Locate the transaction
-    for (nIndex = 0; nIndex < (int)block.vtx.size(); nIndex++)
-        if (block.vtx[nIndex] == *(CTransaction*)this)
-            break;
-    if (nIndex == (int)block.vtx.size())
+    if (txIdx != -1)
     {
-        nIndex = -1;
-        LogPrintf("ERROR: SetMerkleBranch(): couldn't find tx in block\n");
-        return 0;
+        nIndex = txIdx;
+    }
+    else
+    {
+        // Locate the transaction
+        nIndex = block.find(((CTransaction *)this)->GetHash());
+        if (nIndex == -1)
+        {
+            LogPrintf("ERROR: SetMerkleBranch(): couldn't find tx in block\n");
+            return 0;
+        }
     }
 
     // Is the tx in a block that's in the main chain
