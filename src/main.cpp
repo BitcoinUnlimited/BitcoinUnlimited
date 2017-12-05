@@ -7637,70 +7637,74 @@ bool SendMessages(CNode *pto)
         //
         // Message: inventory
         //
-        std::vector<CInv> vInv;
+
         std::vector<CInv> vInvWait;
+        std::vector<CInv> vInvSend;
         {
-            bool fSendTrickle = pto->fWhitelisted;
+            bool fSendTrickle = !pto->fWhitelisted;
             if (pto->nNextInvSend < nNow)
             {
-                fSendTrickle = true;
+                fSendTrickle = false;
                 pto->nNextInvSend = PoissonNextSend(nNow, AVG_INVENTORY_BROADCAST_INTERVAL);
             }
-            LOCK(pto->cs_inventory);
-            vInv.reserve(std::min<size_t>(1000, pto->vInventoryToSend.size()));
-            vInvWait.reserve(pto->vInventoryToSend.size());
-            BOOST_FOREACH (const CInv &inv, pto->vInventoryToSend)
+
+            if (1)
             {
-                if (inv.type == MSG_TX && pto->filterInventoryKnown.contains(inv.hash))
-                    continue;
+                // BU - here we only want to forward message inventory if our peer has actually been requesting
+                // useful data or giving us useful data.  We give them 2 minutes to be useful but then choke off
+                // their inventory.  This prevents fake peers from connecting and listening to our inventory
+                // while providing no value to the network.
+                // However we will still send them block inventory in the case they are a pruned node or wallet
+                // waiting for block announcements, therefore we have to check each inv in pto->vInventoryToSend.
+                bool chokeTxInv = (pto->nActivityBytes == 0 && (nNow / 1000000 - pto->nTimeConnected) > 120);
+                LOCK(pto->cs_inventory);
 
-                // BU - here we only want to forward message inventory if our peer has actually been requesting useful
-                // data or
-                //      giving us useful data.  We give them 2 minutes to be useful but then choke off their inventory.
-                //      This
-                //      prevents fake peers from connecting and listening to our inventory while providing no value to
-                //      the network.
-                //      However we will still send them block inventory in the case they are a pruned node or wallet
-                //      waiting for block
-                //      announcements, therefore we have to check each inv in pto->vInventoryToSend.
-                if (inv.type == MSG_TX && pto->nActivityBytes == 0 && (GetTime() - pto->nTimeConnected) > 120)
+                int invsz = pto->vInventoryToSend.size();
+                vInvSend.reserve(invsz);
+                // about 3/4 of the nodes should end up in this list, so over-allocate by 1/10th + 10 items
+                vInvWait.reserve((invsz * 3) / 4 + invsz / 10 + 10);
+
+                // Make copy of vInventoryToSend while cs_inventory is locked but also ignore some tx and defer others
+                for (const CInv &inv : pto->vInventoryToSend)
                 {
-                    LogPrint("evict", "choking off tx inventory for %s time connected %d\n", pto->addr.ToString(),
-                        GetTime() - pto->nTimeConnected);
-                    continue;
-                }
-
-                // trickle out tx inv to protect privacy
-                if (inv.type == MSG_TX && !fSendTrickle)
-                {
-                    // 1/4 of tx invs blast to all immediately
-                    static uint256 hashSalt;
-                    if (hashSalt.IsNull())
-                        hashSalt = GetRandHash();
-                    uint256 hashRand = ArithToUint256(UintToArith256(inv.hash) ^ UintToArith256(hashSalt));
-                    hashRand = Hash(BEGIN(hashRand), END(hashRand));
-                    bool fTrickleWait = ((UintToArith256(hashRand) & 3) != 0);
-
-                    if (fTrickleWait)
+                    if (inv.type == MSG_TX)
                     {
-                        vInvWait.push_back(inv);
-                        continue;
+                        if (chokeTxInv)
+                            continue;
+                        // skip if we already know abt this one
+                        if (pto->filterInventoryKnown.contains(inv.hash))
+                            continue;
+                        if (fSendTrickle)
+                        {
+                            // 1/4 of tx invs blast to all immediately
+                            if ((insecure_rand() & 3) != 0)
+                            {
+                                vInvWait.push_back(inv);
+                                continue;
+                            }
+                        }
                     }
+                    vInvSend.push_back(inv);
+                    pto->filterInventoryKnown.insert(inv.hash);
                 }
+                pto->vInventoryToSend = vInvWait;
+            }
 
-                pto->filterInventoryKnown.insert(inv.hash);
-
-                vInv.push_back(inv);
-                if (vInv.size() >= 1000)
+            const int MAX_INV_ELEMENTS = 1000;
+            int sz = vInvSend.size();
+            if (sz)
+            {
+                LOCK(pto->cs_vSend);
+                for (int i = 0; i < sz; i += MAX_INV_ELEMENTS)
                 {
-                    pto->PushMessage(NetMsgType::INV, vInv);
-                    vInv.clear();
+                    int sendsz = std::min(MAX_INV_ELEMENTS, sz - i);
+                    std::vector<CInv> vInv(sendsz);
+                    for (int j = 0; j < sendsz; j++)
+                        vInv[j] = vInvSend[i + j];
+                    pto->PushMessage(NetMsgType::INV, vInv); // TODO subvector PushMessage to avoid copy
                 }
             }
-            pto->vInventoryToSend = vInvWait;
         }
-        if (!vInv.empty())
-            pto->PushMessage(NetMsgType::INV, vInv);
 
         // In case there is a block that has been in flight from this peer for 2 + 0.5 * N times the block interval
         // (with N the number of peers from which we're downloading validated blocks), disconnect due to timeout.
