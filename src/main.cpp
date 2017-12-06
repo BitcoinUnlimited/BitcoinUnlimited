@@ -1140,19 +1140,19 @@ std::string FormatStateMessage(const CValidationState &state)
 }
 
 #ifdef BITCOIN_CASH
-static bool IsCashHFEnabled(const CChainParams &chainparams, int64_t nMedianTimePast)
+static bool IsDAAEnabled(const CChainParams &chainparams, int nHeight)
 {
-    return nMedianTimePast >= chainparams.GetConsensus().cashHardForkActivationTime;
+    return nHeight >= chainparams.GetConsensus().daaHeight;
 }
 
-bool IsCashHFEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev)
+bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev)
 {
     if (pindexPrev == nullptr)
     {
         return false;
     }
 
-    return IsCashHFEnabled(chainparams, pindexPrev->GetMedianTimePast());
+    return IsDAAEnabled(chainparams, pindexPrev->nHeight);
 }
 #endif
 
@@ -2496,12 +2496,12 @@ bool ConnectBlock(const CBlock &block,
         nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
     }
 
-// If the Cash HF is enabled, we start rejecting transaction that use a high
+// If the DAA HF is enabled, we start rejecting transaction that use a high
 // s in their signature. We also make sure that signature that are supposed
 // to fail (for instance in multisig or other forms of smart contracts) are
 // null.
 #ifdef BITCOIN_CASH
-    if (IsCashHFEnabled(chainparams, pindex->pprev))
+    if (IsDAAEnabled(chainparams, pindex->pprev))
     {
         flags |= SCRIPT_VERIFY_LOW_S;
         flags |= SCRIPT_VERIFY_NULLFAIL;
@@ -4072,7 +4072,10 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
     const Consensus::Params &consensusParams = Params().GetConsensus();
     // Check proof of work
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
+    {
+        LogPrintf("bad bits after height: %d\n", pindexPrev->nHeight);
         return state.DoS(100, error("%s: incorrect proof of work", __func__), REJECT_INVALID, "bad-diffbits");
+    }
 
     // Check timestamp against prev
     if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())

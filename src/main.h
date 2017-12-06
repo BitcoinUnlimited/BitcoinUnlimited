@@ -349,7 +349,7 @@ void PruneAndFlush();
 
 #ifdef BITCOIN_CASH
 /** Check is Cash HF has activated. */
-bool IsCashHFEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev);
+bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev);
 #endif
 
 /** (try to) add transaction to memory pool **/

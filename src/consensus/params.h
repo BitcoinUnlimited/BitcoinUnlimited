@@ -66,8 +66,8 @@ struct Params {
     int64_t SizeForkExpiration() const { return 1514764800; } // BU (classic compatibility) 2018-01-01 00:00:00 GMT
 
 #ifdef BITCOIN_CASH
-    /** Activation time at which the cash HF kicks in. */
-    int64_t cashHardForkActivationTime;
+    /** Block height at which the new DAA becomes active */
+    int daaHeight;
 #endif
 };
 } // namespace Consensus

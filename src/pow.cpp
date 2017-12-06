@@ -178,7 +178,7 @@ uint32_t GetNextWorkRequired(const CBlockIndex *pindexPrev, const CBlockHeader *
         return pindexPrev->nBits;
     }
 
-    if (pindexPrev->GetMedianTimePast() >= GetArg("-newdaaactivationtime", params.cashHardForkActivationTime))
+    if (pindexPrev->nHeight >= params.daaHeight)
     {
         return GetNextCashWorkRequired(pindexPrev, pblock, params);
     }
