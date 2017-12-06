@@ -1220,35 +1220,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     // often time consuming functions can be executed without holding up other threads.
     // cs_main will then be relocked automatically, by the BOOST scope guard, when we leave this scope.
     {
-
-        // Need to grab both these values before unlocking cs_main.
-        int nChainActiveHeight = chainActive.Height();
-        bool fIsForkActiveOnNextBlock = chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value);
-
-        // Leave cs_main and create the scope guard
-        LEAVE_CRITICAL_SECTION(cs_main);
-        BOOST_SCOPE_EXIT(&cs_main) { ENTER_CRITICAL_SECTION(cs_main); }
-        BOOST_SCOPE_EXIT_END;
-
-        // is it already in the memory pool?
-        uint256 hash = tx.GetHash();
-        if (pool.exists(hash))
-            return state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
-
-        // Check for conflicts with in-memory transactions
-        {
-            LOCK(pool.cs); // protect pool.mapNextTx
-            BOOST_FOREACH (const CTxIn &txin, tx.vin)
-            {
-                auto itConflicting = pool.mapNextTx.find(txin.prevout);
-                if (itConflicting != pool.mapNextTx.end())
-                {
-                    // Disable replacement feature for good
-                    return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
-                }
-            }
-        }
-
         CCoinsView dummy;
         CCoinsViewCache view(&dummy);
 
@@ -1292,6 +1263,34 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             // CoinsViewCache instead of create its own
             if (!CheckSequenceLocks(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp))
                 return state.DoS(0, false, REJECT_NONSTANDARD, "non-BIP68-final");
+        }
+
+        // Need to grab both these values before unlocking cs_main.
+        int nChainActiveHeight = chainActive.Height();
+        bool fIsForkActiveOnNextBlock = chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value);
+
+        // Leave cs_main and create the scope guard
+        LEAVE_CRITICAL_SECTION(cs_main);
+        BOOST_SCOPE_EXIT(&cs_main) { ENTER_CRITICAL_SECTION(cs_main); }
+        BOOST_SCOPE_EXIT_END;
+
+        // is it already in the memory pool?
+        uint256 hash = tx.GetHash();
+        if (pool.exists(hash))
+            return state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
+
+        // Check for conflicts with in-memory transactions
+        {
+            LOCK(pool.cs); // protect pool.mapNextTx
+            BOOST_FOREACH (const CTxIn &txin, tx.vin)
+            {
+                auto itConflicting = pool.mapNextTx.find(txin.prevout);
+                if (itConflicting != pool.mapNextTx.end())
+                {
+                    // Disable replacement feature for good
+                    return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
+                }
+            }
         }
 
         // Check for non-standard pay-to-script-hash in inputs
