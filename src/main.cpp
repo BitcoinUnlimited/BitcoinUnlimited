@@ -1210,10 +1210,17 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         return state.DoS(0, false, REJECT_NONSTANDARD, "premature-version2-tx");
     }
 
+    // Only accept nLockTime-using transactions that can be mined in the next
+    // block; we don't want our mempool filled up with transactions that can't
+    // be mined yet.
+    if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS))
+        return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
+
     // WARNING: for the following scope cs_main will now be in an unlocked state so that the remaining and
     // often time consuming functions can be executed without holding up other threads.
     // cs_main will then be relocked automatically, by the BOOST scope guard, when we leave this scope.
     {
+
         // Need to grab both these values before unlocking cs_main.
         int nChainActiveHeight = chainActive.Height();
         bool fIsForkActiveOnNextBlock = chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value);
@@ -1222,12 +1229,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         LEAVE_CRITICAL_SECTION(cs_main);
         BOOST_SCOPE_EXIT(&cs_main) { ENTER_CRITICAL_SECTION(cs_main); }
         BOOST_SCOPE_EXIT_END;
-
-        // Only accept nLockTime-using transactions that can be mined in the next
-        // block; we don't want our mempool filled up with transactions that can't
-        // be mined yet.
-        if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS))
-            return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
 
         // is it already in the memory pool?
         uint256 hash = tx.GetHash();
