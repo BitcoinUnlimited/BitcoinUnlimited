@@ -1210,32 +1210,39 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         return state.DoS(0, false, REJECT_NONSTANDARD, "premature-version2-tx");
     }
 
-    // Only accept nLockTime-using transactions that can be mined in the next
-    // block; we don't want our mempool filled up with transactions that can't
-    // be mined yet.
-    if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS))
-        return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
-
-    // is it already in the memory pool?
-    uint256 hash = tx.GetHash();
-    if (pool.exists(hash))
-        return state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
-
-    // Check for conflicts with in-memory transactions
+    // WARNING: for this scope cs_main will now be in an unlocked state so that the remaining and often time
+    // consuming functions can be executed without holding up other threads.
+    // cs_main will be relocked automatically when we leave this scope.
     {
-        LOCK(pool.cs); // protect pool.mapNextTx
-        BOOST_FOREACH (const CTxIn &txin, tx.vin)
+        LEAVE_CRITICAL_SECTION(cs_main);
+        BOOST_SCOPE_EXIT(&cs_main) { ENTER_CRITICAL_SECTION(cs_main); }
+        BOOST_SCOPE_EXIT_END;
+
+        // Only accept nLockTime-using transactions that can be mined in the next
+        // block; we don't want our mempool filled up with transactions that can't
+        // be mined yet.
+        if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS))
+            return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
+
+        // is it already in the memory pool?
+        uint256 hash = tx.GetHash();
+        if (pool.exists(hash))
+            return state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
+
+        // Check for conflicts with in-memory transactions
         {
-            auto itConflicting = pool.mapNextTx.find(txin.prevout);
-            if (itConflicting != pool.mapNextTx.end())
+            LOCK(pool.cs); // protect pool.mapNextTx
+            BOOST_FOREACH (const CTxIn &txin, tx.vin)
             {
-                // Disable replacement feature for good
-                return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
+                auto itConflicting = pool.mapNextTx.find(txin.prevout);
+                if (itConflicting != pool.mapNextTx.end())
+                {
+                    // Disable replacement feature for good
+                    return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
+                }
             }
         }
-    }
 
-    {
         CCoinsView dummy;
         CCoinsViewCache view(&dummy);
 
@@ -1495,7 +1502,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     }
 
     if (!fRejectAbsurdFee)
-        SyncWithWallets(tx, NULL, -1);
+        SyncWithWallets(tx, nullptr, -1);
 
     int64_t end = GetTimeMicros();
 
