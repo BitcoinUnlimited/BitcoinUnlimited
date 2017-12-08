@@ -1259,31 +1259,34 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             // do all inputs exist?
             if (pfMissingInputs)
             {
-            BOOST_FOREACH (const CTxIn txin, tx.vin)
-            {
-                // At this point we begin to collect coins that are potential candidates for uncaching because as
-                // soon as we make the call below to view.HaveCoin() any missing coins will be pulled into cache.
-                // Therefore, any coin in this transaction that is not already in cache will be tracked here such that
-                // if this transaction fails to enter the memory pool, we will then uncache those coins that were not
-                // already present, unless the transaction is an orphan.
-                //
-                // We still want to keep orphantx coins in the event the orphantx is finally accepted into the mempool
-                // or shows up in a block that is mined.  Therefore if pfMissingInputs returns true then any coins
-                // in vCoinsToUncache will NOT be uncached.
-                if (!pcoinsTip->HaveCoinInCache(txin.prevout))
+                BOOST_FOREACH (const CTxIn txin, tx.vin)
                 {
-                    vCoinsToUncache.push_back(txin.prevout);
-                }
+                    // At this point we begin to collect coins that are potential candidates for uncaching because as
+                    // soon as we make the call below to view.HaveCoin() any missing coins will be pulled into cache.
+                    // Therefore, any coin in this transaction that is not already in cache will be tracked here such
+                    // that
+                    // if this transaction fails to enter the memory pool, we will then uncache those coins that were
+                    // not
+                    // already present, unless the transaction is an orphan.
+                    //
+                    // We still want to keep orphantx coins in the event the orphantx is finally accepted into the
+                    // mempool
+                    // or shows up in a block that is mined.  Therefore if pfMissingInputs returns true then any coins
+                    // in vCoinsToUncache will NOT be uncached.
+                    if (!pcoinsTip->HaveCoinInCache(txin.prevout))
+                    {
+                        vCoinsToUncache.push_back(txin.prevout);
+                    }
 
-                if (!view.HaveCoin(txin.prevout))
-                {
-                    // fMissingInputs and not state.IsInvalid() is used to detect this condition, don't set
-                    // state.Invalid()
-                    *pfMissingInputs = true;
+                    if (!view.HaveCoin(txin.prevout))
+                    {
+                        // fMissingInputs and not state.IsInvalid() is used to detect this condition, don't set
+                        // state.Invalid()
+                        *pfMissingInputs = true;
+                    }
                 }
-            }
-            if (*pfMissingInputs == true)
-                return false;
+                if (*pfMissingInputs == true)
+                    return false;
             }
 
             // Bring the best block into scope
