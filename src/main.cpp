@@ -1257,6 +1257,8 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             view.SetBackend(viewMemPool);
 
             // do all inputs exist?
+            if (pfMissingInputs)
+            {
             BOOST_FOREACH (const CTxIn txin, tx.vin)
             {
                 // At this point we begin to collect coins that are potential candidates for uncaching because as
@@ -1282,6 +1284,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             }
             if (*pfMissingInputs == true)
                 return false;
+            }
 
             // Bring the best block into scope
             view.GetBestBlock();
@@ -1538,13 +1541,13 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     std::vector<COutPoint> vCoinsToUncache;
     bool res = AcceptToMemoryPoolWorker(
         pool, state, tx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit, fRejectAbsurdFee, vCoinsToUncache);
-    if (!res && !*pfMissingInputs)
+
+    // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
+    if (pfMissingInputs && !res && !*pfMissingInputs)
     {
-        // Uncache any coins for txns that failed to enter the mempool but we're NOT orphan txns
         for (const COutPoint &remove : vCoinsToUncache)
             pcoinsTip->Uncache(remove);
     }
-
     return res;
 }
 
@@ -3076,8 +3079,7 @@ bool static DisconnectTip(CValidationState &state, const Consensus::Params &cons
         // ignore validation errors in resurrected transactions
         std::list<CTransaction> removed;
         CValidationState stateDummy;
-        bool fMissingInputsDummy = false;
-        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, &fMissingInputsDummy, true))
+        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, nullptr, true))
         {
             mempool.remove(tx, removed, true);
         }
