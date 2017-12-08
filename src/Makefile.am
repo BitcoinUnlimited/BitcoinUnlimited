@@ -155,6 +155,7 @@ BITCOIN_CORE_H = \
   httpserver.h \
   iblt.h \
   iblt_params.h \
+  index/txindex.h \
   init.h \
   key.h \
   keystore.h \
@@ -276,6 +277,7 @@ libbitcoin_server_a_SOURCES = \
   httprpc.cpp \
   httpserver.cpp \
   iblt.cpp \
+  index/txindex.cpp \
   init.cpp \
   dbwrapper.cpp \
   main.cpp \
