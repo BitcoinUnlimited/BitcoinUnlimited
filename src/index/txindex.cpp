@@ -2,9 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "index/txindex.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
-#include "index/txindex.h"
 #include "init.h"
 #include "tinyformat.h"
 #include "ui_interface.h"
@@ -25,6 +25,12 @@ static void FatalError(const char *fmt, const Args &... args)
 }
 
 TxIndex::TxIndex(std::unique_ptr<TxIndexDB> db) : m_db(std::move(db)), m_synced(false), m_best_block_index(nullptr) {}
+TxIndex::~TxIndex()
+{
+    Interrupt();
+    Stop();
+}
+
 bool TxIndex::Init()
 {
     LOCK(cs_main);
@@ -77,6 +83,12 @@ void TxIndex::ThreadSync()
         int64_t last_locator_write_time = 0;
         while (true)
         {
+            if (shutdown_threads.load() == true)
+            {
+                WriteBestBlock(pindex);
+                return;
+            }
+
             {
                 LOCK(cs_main);
                 const CBlockIndex *pindex_next = NextSyncBlock(pindex);
