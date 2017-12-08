@@ -228,7 +228,7 @@ void PaymentServer::ipcParseCommandLine(int argc, char *argv[])
             savedPaymentRequests.append(arg);
 
             SendCoinsRecipient r;
-            if (GUIUtil::parseBitcoinURI(arg, &r) && !r.address.isEmpty())
+            if (GUIUtil::parseBitcoinURI(GUIUtil::URI_SCHEME, arg, &r) && !r.address.isEmpty())
             {
                 if (IsValidDestinationString(r.address.toStdString(),
                                              Params(CBaseChainParams::MAIN)))
@@ -445,7 +445,7 @@ void PaymentServer::handleURIOrFile(const QString &s)
         else // normal URI
         {
             SendCoinsRecipient recipient;
-            if (GUIUtil::parseBitcoinURI(s, &recipient))
+            if (GUIUtil::parseBitcoinURI(GUIUtil::URI_SCHEME, s, &recipient))
             {
                 if (!IsValidDestinationString(recipient.address.toStdString()))
                 {
