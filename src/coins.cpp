@@ -310,13 +310,14 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     // in memory.
     bool fDone = false;
     int nSmallestDelta = 100;
+    CCoinsMap::iterator iter = cacheCoins.begin();
     while (!fDone && DynamicMemoryUsage() > nTrimSize)
     {
         LogPrint("coindb", "cacheCoinsUsage at start: %d total dynamic usage: %d trim to size: %d nBestCoinHeight: %d "
                            "trim height:%d\n",
             cachedCoinsUsage, DynamicMemoryUsage(), nTrimSize, nBestCoinHeight, nTrimHeight);
 
-        CCoinsMap::iterator iter = cacheCoins.begin();
+        iter = cacheCoins.begin();
         while (DynamicMemoryUsage() > nTrimSize)
         {
             if (iter == cacheCoins.end())
@@ -359,7 +360,6 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     // If trimming by coin height failed to find any or enough coins to trim then trim the cache further by ignoring
     // coin height.
     // While this is not ideal we still have to trim to keep the cache from growing unbounded.
-    CCoinsMap::iterator iter = cacheCoins.begin();
     iter = cacheCoins.begin();
     while (DynamicMemoryUsage() > nTrimSize)
     {
