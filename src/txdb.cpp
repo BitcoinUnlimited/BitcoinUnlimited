@@ -710,6 +710,7 @@ void GetCacheConfiguration(int64_t &_nBlockDBCache,
     int64_t &_nBlockUndoDBcache,
     int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
+    int64_t &_nTxIndexCache,
     bool fDefault)
 {
 #ifdef WIN32
@@ -749,14 +750,16 @@ void GetCacheConfiguration(int64_t &_nBlockDBCache,
     }
 
     // Now that we have the nTotalCache we can calculate all the various cache sizes.
-    CacheSizeCalculations(nTotalCache, _nBlockDBCache, _nBlockUndoDBcache, _nBlockTreeDBCache, _nCoinDBCache);
+    CacheSizeCalculations(nTotalCache, _nBlockDBCache, _nBlockUndoDBcache, _nBlockTreeDBCache, _nCoinDBCache,
+        _nTxIndexCache);
 }
 
 void CacheSizeCalculations(int64_t _nTotalCache,
     int64_t &_nBlockDBCache,
     int64_t &_nBlockUndoDBcache,
     int64_t &_nBlockTreeDBCache,
-    int64_t &_nCoinDBCache)
+    int64_t &_nCoinDBCache,
+    int64_t &_nTxIndexCache)
 {
     // make sure total cache is within limits
     _nTotalCache = std::max(_nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache
@@ -765,7 +768,7 @@ void CacheSizeCalculations(int64_t _nTotalCache,
     // calculate the block index leveldb cache size. It shouldn't be larger than 2 MiB.
     // NOTE: this is not the same as the in memory block index which is fully stored in memory.
     _nBlockTreeDBCache = _nTotalCache / 8;
-    if (_nBlockTreeDBCache > (1 << 21) && !GetBoolArg("-txindex", DEFAULT_TXINDEX))
+    if (_nBlockTreeDBCache > (1 << 21))
         _nBlockTreeDBCache = (1 << 21);
 
     // If we are in block db storage mode then calculated the level db cache size for the block and undo caches.
@@ -788,13 +791,25 @@ void CacheSizeCalculations(int64_t _nTotalCache,
             _nBlockUndoDBcache = 64 << 20;
     }
 
-    // use 25%-50% of the remainder for the utxo leveldb disk cache
+    // use 25%-50% of the remainder for the utxo leveldb disk cache and the txindex cache.
     _nTotalCache -= _nBlockDBCache;
     _nTotalCache -= _nBlockUndoDBcache;
     _nCoinDBCache = std::min(_nTotalCache / 2, (_nTotalCache / 4) + (1 << 23));
+    if (!GetBoolArg("-txindex", DEFAULT_TXINDEX))
+    {
+        _nTxIndexCache = 0;
+    }
+    else
+    {
+        // TODO: For now we divide the memory equally between the two but we probably need to refine
+        // this in the future.
+        _nCoinDBCache /= 2;
+        _nTxIndexCache = _nCoinDBCache;
+    }
 
     // the remainder goes to the global in-memory utxo coins cache max size
     _nTotalCache -= _nCoinDBCache;
+    _nTotalCache -= _nTxIndexCache;
     nCoinCacheMaxSize = _nTotalCache;
 }
 
@@ -806,8 +821,11 @@ void AdjustCoinCacheSize()
     // value for dbcache. This will cause the current coins cache to be immediately trimmed to size.
     if (!IsInitialBlockDownload() && IsChainSyncd() && !GetArg("-dbcache", 0) && chainActive.Tip())
     {
-        int64_t dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache = 0;
-        GetCacheConfiguration(dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, true);
+        // Get the default value for nCoinCacheMaxSize.
+        int64_t dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache,
+            dummyTxIndexCache = 0;
+        CacheSizeCalculations(nDefaultDbCache, dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache,
+            dummyTxIndexCache, true);
         return;
     }
 

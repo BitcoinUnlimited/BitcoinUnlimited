@@ -14,6 +14,8 @@
 constexpr int64_t SYNC_LOG_INTERVAL = 30; // seconds
 constexpr int64_t SYNC_LOCATOR_WRITE_INTERVAL = 30; // seconds
 
+std::unique_ptr<TxIndex> g_txindex;
+
 template <typename... Args>
 static void FatalError(const char *fmt, const Args &... args)
 {
@@ -25,12 +27,7 @@ static void FatalError(const char *fmt, const Args &... args)
 }
 
 TxIndex::TxIndex(std::unique_ptr<TxIndexDB> db) : m_db(std::move(db)), m_synced(false), m_best_block_index(nullptr) {}
-TxIndex::~TxIndex()
-{
-    Interrupt();
-    Stop();
-}
-
+TxIndex::~TxIndex() { Stop(); }
 bool TxIndex::Init()
 {
     LOCK(cs_main);
@@ -278,6 +275,7 @@ void TxIndex::Start()
 
 void TxIndex::Stop()
 {
+    shutdown_threads.store(true);
     UnregisterValidationInterface(this);
 
     if (m_thread_sync.joinable())

@@ -71,8 +71,6 @@ public:
     /// Look up the on-disk location of a transaction by hash.
     bool FindTx(const uint256 &txid, CDiskTxPos &pos) const;
 
-    void Interrupt();
-
     /// Start initializes the sync state and registers the instance as a
     /// ValidationInterface so that it stays in sync with blockchain updates.
     void Start();
@@ -80,5 +78,8 @@ public:
     /// Stops the instance from staying in sync with blockchain updates.
     void Stop();
 };
+
+/// The global transaction index, used in GetTransaction. May be null.
+extern std::unique_ptr<TxIndex> g_txindex;
 
 #endif // BITCOIN_INDEX_TXINDEX_H

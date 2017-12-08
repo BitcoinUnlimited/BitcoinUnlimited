@@ -28,6 +28,7 @@
 #include "httprpc.h"
 #include "httpserver.h"
 #include "httpserver.h"
+#include "index/txindex.h"
 #include "key.h"
 #include "main.h"
 #include "miner.h"
@@ -188,6 +189,10 @@ void Interrupt(thread_group &threadGroup)
     // stop TxAdmission needs to be done before threadGroup tries to join_all
     // we only join_all after Interrupt so call StopTxAdmission here
     StopTxAdmission();
+    if (g_txindex)
+    {
+        g_txindex->Stop();
+    }
 }
 
 void Shutdown()
@@ -227,6 +232,11 @@ void Shutdown()
     GenerateBitcoins(false, 0, Params());
     StopTxAdmission();
     StopNode();
+    if (g_txindex)
+    {
+        g_txindex.reset();
+    }
+
     StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
     if (fDumpMempoolLater && GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
@@ -1074,11 +1084,14 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     int64_t nBlockUndoDBCache = 0;
     int64_t nBlockTreeDBCache = 0;
     int64_t nCoinDBCache = 0;
-    GetCacheConfiguration(nBlockDBCache, nBlockUndoDBCache, nBlockTreeDBCache, nCoinDBCache, nCoinCacheMaxSize);
+    int64_t nTxIndexCache = 0;
+    GetCacheConfiguration(
+        nBlockDBCache, nBlockUndoDBCache, nBlockTreeDBCache, nCoinDBCache, nCoinCacheMaxSize, nTxIndexCache);
     LOGA("Cache configuration:\n");
     LOGA("* Using %.1fMiB for block database\n", nBlockDBCache * (1.0 / 1024 / 1024));
     LOGA("* Using %.1fMiB for block undo database\n", nBlockUndoDBCache * (1.0 / 1024 / 1024));
     LOGA("* Using %.1fMiB for block index database\n", nBlockTreeDBCache * (1.0 / 1024 / 1024));
+    LOGA("* Using %.1fMiB for txindex database\n", nTxIndexCache * (1.0 / 1024 / 1024));
     LOGA("* Using %.1fMiB for chain state database\n", nCoinDBCache * (1.0 / 1024 / 1024));
     LOGA("* Using %.1fMiB for in-memory UTXO set\n", nCoinCacheMaxSize * (1.0 / 1024 / 1024));
 
@@ -1277,6 +1290,12 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 #endif // !ENABLE_WALLET
 
     // ********************************************************* Step 8: data directory maintenance
+    if (GetBoolArg("-txindex", DEFAULT_TXINDEX))
+    {
+        auto txindex_db = std::make_unique<TxIndexDB>(nTxIndexCache, false, fReindex);
+        g_txindex = std::make_unique<TxIndex>(std::move(txindex_db));
+        g_txindex->Start();
+    }
 
     // if pruning, unset the service bit and perform the initial blockstore prune
     // after any wallet rescanning has taken place.

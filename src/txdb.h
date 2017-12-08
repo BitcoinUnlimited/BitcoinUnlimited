@@ -51,7 +51,7 @@ static const int64_t nMaxBlockDBCache = 2;
 //! Max memory allocated to block tree DB specific cache, if -txindex (MiB)
 // Unlike for the UTXO database, for the txindex scenario the leveldb cache make
 // a meaningful difference: https://github.com/bitcoin/bitcoin/pull/8273#issuecomment-229601991
-static const int64_t nMaxBlockDBAndTxIndexCache = 1024;
+static const int64_t nMaxTxIndexCache = 1024;
 //! Max memory allocated to coin DB specific cache (MiB)
 static const int64_t nMaxCoinsDBCache = 8;
 
@@ -66,6 +66,7 @@ void GetCacheConfiguration(int64_t &_nBlockDBCache,
     int64_t &_nBlockUndoDBcache,
     int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
+    int64_t &_nTxIndexCache,
     bool fDefault = false);
 /** Calculate the various cache sizes. This is primarily used in GetCacheConfiguration() however during
  *  dynamic sizing of the coins cache we also need to use this function directly.
@@ -74,7 +75,8 @@ void CacheSizeCalculations(int64_t _nTotalCache,
     int64_t &_nBlockDBCache,
     int64_t &_nBlockUndoDBcache,
     int64_t &_nBlockTreeDBCache,
-    int64_t &_nCoinDBCache);
+    int64_t &_nCoinDBCache,
+    int64_t &_nTxIndexCache);
 /** This function is called during FlushStateToDisk.  The coins cache is dynamically sized before any
  *  checking is done for cache flushing and trimming
  */
