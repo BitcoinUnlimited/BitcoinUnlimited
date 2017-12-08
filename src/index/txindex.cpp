@@ -248,6 +248,19 @@ void TxIndex::SetBestChain(const CBlockLocator &locator)
     }
 }
 
+bool TxIndex::BlockUntilSyncedToCurrentChain()
+{
+    AssertLockNotHeld(cs_main);
+
+    if (!m_synced)
+    {
+        return false;
+    }
+
+    LOGA("%s: txindex is catching up on block notifications\n", __func__);
+    return true;
+}
+
 bool TxIndex::FindTx(const uint256 &txid, CDiskTxPos &pos) const { return m_db->ReadTxPos(txid, pos); }
 void TxIndex::Start()
 {
