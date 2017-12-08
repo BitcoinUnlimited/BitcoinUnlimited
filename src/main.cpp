@@ -1182,8 +1182,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     unsigned int nSize = 0;
     uint64_t start = GetTimeMicros();
     AssertLockHeld(cs_main);
-    if (pfMissingInputs)
-        *pfMissingInputs = false;
 
     if (!CheckTransaction(tx, state))
         return false;
@@ -1259,20 +1257,18 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             // do all inputs exist?
             if (pfMissingInputs)
             {
+                *pfMissingInputs = false;
                 BOOST_FOREACH (const CTxIn txin, tx.vin)
                 {
                     // At this point we begin to collect coins that are potential candidates for uncaching because as
                     // soon as we make the call below to view.HaveCoin() any missing coins will be pulled into cache.
                     // Therefore, any coin in this transaction that is not already in cache will be tracked here such
-                    // that
-                    // if this transaction fails to enter the memory pool, we will then uncache those coins that were
-                    // not
-                    // already present, unless the transaction is an orphan.
+                    // that if this transaction fails to enter the memory pool, we will then uncache those coins that
+                    // were not already present, unless the transaction is an orphan.
                     //
                     // We still want to keep orphantx coins in the event the orphantx is finally accepted into the
-                    // mempool
-                    // or shows up in a block that is mined.  Therefore if pfMissingInputs returns true then any coins
-                    // in vCoinsToUncache will NOT be uncached.
+                    // mempool or shows up in a block that is mined.  Therefore if pfMissingInputs returns true then
+                    // any coins in vCoinsToUncache will NOT be uncached.
                     if (!pcoinsTip->HaveCoinInCache(txin.prevout))
                     {
                         vCoinsToUncache.push_back(txin.prevout);
