@@ -79,8 +79,10 @@ bool HandleExpeditedRequest(CDataStream &vRecv, CNode *pfrom)
     return true;
 }
 
-bool IsRecentlyExpeditedAndStore(const uint256 &hash)
+static inline bool IsRecentlyExpeditedAndStore(const uint256 &hash)
 {
+    AssertLockHeld(connmgr->cs_expedited);
+
     for (int i = 0; i < NUM_XPEDITED_STORE; i++)
         if (xpeditedBlkSent[i] == hash)
             return true;
@@ -138,6 +140,7 @@ void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode 
 
 void SendExpeditedBlock(const CBlock &block, const CNode *skip)
 {
+    LOCK(connmgr->cs_expedited);
     if (!IsRecentlyExpeditedAndStore(block.GetHash()))
     {
         CXThinBlock thinBlock(block);
