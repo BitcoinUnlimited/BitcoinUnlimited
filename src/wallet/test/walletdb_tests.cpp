@@ -11,9 +11,27 @@
 
 #include <boost/test/unit_test.hpp>
 
-static std::unique_ptr<CWalletDB>
-TmpDB(const boost::filesystem::path &pathTemp) {
-    fs::path path = pathTemp / strprintf("testwallet%i", static_cast<int>(insecure_rand() % 1000000));
+namespace {
+struct WalletDBTestingSetup : public TestingSetup
+{
+    WalletDBTestingSetup(const std::string &chainName = CBaseChainParams::MAIN)
+    {
+        bitdb.MakeMock();
+    }
+
+    ~WalletDBTestingSetup()
+    {
+        bitdb.Flush(true);
+        bitdb.Reset();
+    }
+};
+
+static std::unique_ptr<CWalletDB> TmpDB(const fs::path &pathTemp, const std::string &testname)
+{
+    fs::path dir = pathTemp / testname;
+    BOOST_CHECK_MESSAGE(fs::create_directory(dir),
+                        "Unable to create a directory for test " + testname);
+    fs::path path = dir / strprintf("testwallet%i", static_cast<int>(insecure_rand() % 1000000));
     return std::unique_ptr<CWalletDB>(new CWalletDB(path.string(), "cr+"));
 }
 
@@ -21,14 +39,15 @@ static std::unique_ptr<CWallet> LoadWallet(CWalletDB *db) {
     std::unique_ptr<CWallet> wallet(new CWallet);
     DBErrors res = db->LoadWallet(wallet.get());
     BOOST_CHECK(res == DB_LOAD_OK);
-    return std::move(wallet);
+    return wallet;
+}
 }
 
-BOOST_FIXTURE_TEST_SUITE(walletdb_tests, TestingSetup);
+BOOST_FIXTURE_TEST_SUITE(walletdb_tests, WalletDBTestingSetup);
 
 BOOST_AUTO_TEST_CASE(write_erase_name) {
+    auto walletdb = TmpDB(pathTemp, "write_erase_name");
 
-    auto walletdb = TmpDB(pathTemp);
     CTxDestination dst1 = CKeyID(uint160S("c0ffee"));
     CTxDestination dst2 = CKeyID(uint160S("f00d"));
 
@@ -51,8 +70,8 @@ BOOST_AUTO_TEST_CASE(write_erase_name) {
 }
 
 BOOST_AUTO_TEST_CASE(write_erase_purpose) {
+    auto walletdb = TmpDB(pathTemp, "write_erase_purpose");
 
-    auto walletdb = TmpDB(pathTemp);
     CTxDestination dst1 = CKeyID(uint160S("c0ffee"));
     CTxDestination dst2 = CKeyID(uint160S("f00d"));
 
@@ -75,8 +94,8 @@ BOOST_AUTO_TEST_CASE(write_erase_purpose) {
 }
 
 BOOST_AUTO_TEST_CASE(write_erase_destdata) {
+    auto walletdb = TmpDB(pathTemp, "write_erase_destdata");
 
-    auto walletdb = TmpDB(pathTemp);
     CTxDestination dst1 = CKeyID(uint160S("c0ffee"));
     CTxDestination dst2 = CKeyID(uint160S("f00d"));
 
@@ -110,7 +129,8 @@ BOOST_AUTO_TEST_CASE(write_erase_destdata) {
 }
 
 BOOST_AUTO_TEST_CASE(no_dest_fails) {
-    auto walletdb = TmpDB(pathTemp);
+    auto walletdb = TmpDB(pathTemp, "no_dest_fails");
+
     CTxDestination dst = CNoDestination{};
     BOOST_CHECK(!walletdb->WriteName(dst, "name"));
     BOOST_CHECK(!walletdb->WritePurpose(dst, "purpose"));

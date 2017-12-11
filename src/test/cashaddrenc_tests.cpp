@@ -26,12 +26,13 @@ uint160 insecure_GetRandUInt160(FastRandomContext &rand) {
     return n;
 }
 
-std::vector<uint8_t> insecure_GetRandomByteArray(FastRandomContext &rand,
-                                                 size_t n) {
+std::vector<uint8_t> insecure_GetRandomByteArray(FastRandomContext &rand, size_t n)
+{
     std::vector<uint8_t> out;
     out.reserve(n);
 
-    for (size_t i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++)
+    {
         out.push_back(uint8_t(rand.randbits(8)));
     }
     return out;
