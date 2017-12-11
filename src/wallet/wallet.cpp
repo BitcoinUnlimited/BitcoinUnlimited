@@ -1329,11 +1329,10 @@ void CWallet::ReacceptWalletTransactions()
     }
 
     // Try to add wallet transactions to memory pool
-    BOOST_FOREACH(PAIRTYPE(const int64_t, CWalletTx*)& item, mapSorted)
+    for (std::pair<const int64_t, CWalletTx*> &item : mapSorted)
     {
         CWalletTx& wtx = *(item.second);
 
-        LOCK(mempool.cs);
         wtx.AcceptToMemoryPool(false);
         SyncWithWallets(wtx, NULL, -1);
     }
