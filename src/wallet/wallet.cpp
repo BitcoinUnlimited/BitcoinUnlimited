@@ -661,6 +661,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFromLoadWallet, CWalletD
 {
     uint256 hash = wtxIn.GetHash();
 
+    LOCK(cs_wallet);
     if (fFromLoadWallet)
     {
         mapWallet[hash] = wtxIn;
@@ -679,7 +680,6 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFromLoadWallet, CWalletD
     }
     else
     {
-        LOCK(cs_wallet);
         // Inserts only if not already there, returns tx inserted or tx found
         pair<map<uint256, CWalletTx>::iterator, bool> ret = mapWallet.insert(make_pair(hash, wtxIn));
         CWalletTx& wtx = (*ret.first).second;
