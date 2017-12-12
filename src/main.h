@@ -528,7 +528,6 @@ bool CheckAgainstCheckpoint(unsigned int height, const uint256 &hash, const CCha
 
 /** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
 bool AcceptBlock(CBlock &block, CValidationState &state, CBlockIndex **pindex, bool fRequested, CDiskBlockPos *dbp);
-bool AcceptBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex **ppindex = nullptr);
 
 /** RAII wrapper for VerifyDB: Verify consistency of the block and coin databases */
 class CVerifyDB
