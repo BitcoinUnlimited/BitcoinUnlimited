@@ -309,7 +309,7 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     // This has been proven to improve sync performance significantly for nodes that can not hold the entire dbcache
     // in memory.
     bool fDone = false;
-    int nSmallestDelta = 50; // number of blocks to adjust trim height by
+    uint64_t nSmallestDelta = 50; // number of blocks to adjust trim height by
     CCoinsMap::iterator iter = cacheCoins.begin();
     while (!fDone && DynamicMemoryUsage() > nTrimSize)
     {
