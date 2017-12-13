@@ -104,10 +104,10 @@ namespace boost {
 using namespace std;
 
 namespace Logging {
-//Globals defined here because link fails if in globals.cpp.
-//Keep at top of file so init first:
-	uint64_t categoriesEnabled = 0; //64 bit log id mask.
-	static map<uint64_t, std::string> logLabelMap = LOGLABELMAP; //Lookup log label from log id.
+// Globals defined here because link fails if in globals.cpp.
+// Keep at top of file so init first:
+	uint64_t categoriesEnabled = 0; // 64 bit log id mask.
+	static map<uint64_t, std::string> logLabelMap = LOGLABELMAP; // Lookup log label from log id.
 
 
 uint64_t LogFindCategory(const std::string label)
@@ -127,11 +127,6 @@ std::string LogGetLabel(uint64_t category)
 		label = logLabelMap[category];
 
 	return label;
-}
-
-int LogWriteStr(const std::string &str)
-{
-	return LogPrintStr(str);
 }
 
 std::string LogGetAllString()
@@ -162,16 +157,10 @@ void LogInit()
 			category = boost::algorithm::to_upper_copy(cat);
 			catg = LogFindCategory(category);
 
-			if(catg==NONE) //not a valid category
+			if(catg==NONE) // Not a valid category
 				continue;
 
-			if(catg==ALL)
-			{
-				LogTurnOnAll(true);
-				break;
-			}
-
-			LogTurnOnCategory(catg,true);
+			LogToggleCategory(catg,true);
 		}
 }
 
@@ -369,7 +358,7 @@ static void MonitorLogfile()
 	//If so re-open
 	static int existcounter = 1;
 	existcounter++;
-	if(existcounter%64==0) //Check every 64 log msgs
+	if(existcounter%63==0) //Check every 64 log msgs
 	{
 		fs::path fileName = GetDataDir() / "debug.log";
 		bool exists = boost::filesystem::exists(fileName);

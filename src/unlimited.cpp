@@ -1458,84 +1458,80 @@ UniValue getstat(const UniValue &params, bool fHelp)
     return ret;
 }
 
-
-
 UniValue setlog(const UniValue &params, bool fHelp)
 {
-	//Uses internal log functions
-	//Logging::
-	//Don't use them in other places.
+    // Uses internal log functions
+    // Logging::
+    // Don't use them in other places.
 
-	UniValue ret = UniValue("");
-	uint64_t catg=Logging::NONE;
-	int nparm = params.size();
-	bool action = false;
+    UniValue ret = UniValue("");
+    uint64_t catg = Logging::NONE;
+    int nparm = params.size();
+    bool action = false;
 
-	if(fHelp ||nparm <1 || nparm>2)
-	{
-		throw runtime_error(
-			"log \"category|all\" \"on|off\""
-			"\nTurn categories on or off\n"
-			"\nArguments:\n"
-			"1. \"category|all\" (string, required) Category or all categories\n"
-			"2. \"on\"           (string, optional) Turn a category, or all categories, on\n"
-			"2. \"off\"          (string, optional) Turn a category, or all categories, off\n"
-			"2.                (string, optional) No argument. Show a category, or all categories, state: on|off\n"
-			 +
-			HelpExampleCli("log", "\"NET\" on") +
-			HelpExampleCli("log", "\"all\" off") +
-			HelpExampleCli("log", "\"tor\" ")+
-			HelpExampleCli("log", "\"ALL\" "));
-	}
+    if (fHelp || nparm < 1 || nparm > 2)
+    {
+        throw runtime_error(
+            "log \"category|all\" \"on|off\""
+            "\nTurn categories on or off\n"
+            "\nArguments:\n"
+            "1. \"category|all\" (string, required) Category or all categories\n"
+            "2. \"on\"           (string, optional) Turn a category, or all categories, on\n"
+            "2. \"off\"          (string, optional) Turn a category, or all categories, off\n"
+            "2.                (string, optional) No argument. Show a category, or all categories, state: on|off\n" +
+            HelpExampleCli("log", "\"NET\" on") + HelpExampleCli("log", "\"all\" off") +
+            HelpExampleCli("log", "\"tor\" ") + HelpExampleCli("log", "\"ALL\" "));
+    }
 
-	//LOGA("LOG: Before mask: 0x%llx\n", Logging::categoriesEnabled);
+    // LOGA("LOG: Before mask: 0x%llx\n", Logging::categoriesEnabled);
 
-	try
-	{
-		if(nparm>0)
-			{
-				string category = boost::algorithm::to_upper_copy(params[0].get_str());
-				catg = Logging::LogFindCategory(category);
-				if(catg==Logging::NONE)
-					return UniValue("Category not found: "+params[0].get_str()); //quit
-			}
+    try
+    {
+        if (nparm > 0)
+        {
+            std::string category;
+            std::string data = params[0].get_str();
+            std::transform(data.begin(), data.end(), std::back_inserter(category), ::toupper);
+            catg = Logging::LogFindCategory(category);
+            if (catg == Logging::NONE)
+                return UniValue("Category not found: " + params[0].get_str()); // quit
+        }
 
-		switch(nparm)
-		{
-			case 1:
-				if(catg==Logging::ALL)
-					ret = UniValue(Logging::LogGetAllString());
-				else
-					ret = UniValue(Logging::LogAcceptCategory(catg)?"on":"off");
-				break;
+        switch (nparm)
+        {
+        case 1:
+            if (catg == Logging::ALL)
+                ret = UniValue(Logging::LogGetAllString());
+            else
+                ret = UniValue(Logging::LogAcceptCategory(catg) ? "on" : "off");
+            break;
 
-			case 2:
-				try
-				{
-					action = IsStringTrue(params[1].get_str());
-				}catch(...)
-				{
-					ret = UniValue("Please pass on|off as last argument.");
-					break; //quit
-				}
-				if(catg==Logging::ALL)
-					Logging::LogTurnOnAll(action);
-				else
-					Logging::LogTurnOnCategory(catg,action);
-				break;
+        case 2:
+            try
+            {
+                action = IsStringTrue(params[1].get_str());
+            }
+            catch (...)
+            {
+                ret = UniValue("Please pass on|off as last argument.");
+                break; // quit
+            }
 
-			default:
-				break;
-		}
-	}catch(...)
-		{
-			LOGA("LOG: Something went wrong in setlog function \n");
-			ret = UniValue("Something went wrong. That is all we know.");
-		}
+            Logging::LogToggleCategory(catg, action);
 
-	//LOGA("LOG: After  mask: 0x%llx\n", Logging::categoriesEnabled);
+        default:
+            break;
+        }
+    }
+    catch (...)
+    {
+        LOG(ALL, "LOG: Something went wrong in setlog function \n");
+        ret = UniValue("Something went wrong. That is all we know.");
+    }
 
-    return ret;;
+    // LOGA("LOG: After  mask: 0x%llx\n", Logging::categoriesEnabled);
+
+    return ret;
 }
 /* clang-format off */
 static const CRPCCommand commands[] =
@@ -1567,7 +1563,7 @@ static const CRPCCommand commands[] =
 #ifdef DEBUG
     { "util",               "getstructuresizes",      &getstructuresizes,      true  },  // BU
 #endif
-    { "util",               "log",                    &setlog,                 true  }, //VDH
+    { "util",               "log",                    &setlog,                 true  },
     /* Coin generation */
     { "generating",         "getgenerate",            &getgenerate,            true  },
     { "generating",         "setgenerate",            &setgenerate,            true  },

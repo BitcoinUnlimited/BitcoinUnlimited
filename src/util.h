@@ -74,19 +74,19 @@ extern CTranslationInterface translationInterface;
 extern const char * const BITCOIN_CONF_FILENAME;
 extern const char * const BITCOIN_PID_FILENAME;
 
+/** Send a string to the log output */
+int LogPrintStr(const std::string &str);
 
-//Logging API:
-//Use the two macros
-//LOG(ctgr,...)
-//LOGA(...) 
-//located further down.
-//(Do not use the Logging functions directly)
+// Logging API:
+// Use the two macros
+// LOG(ctgr,...)
+// LOGA(...) 
+// located further down.
+// (Do not use the Logging functions directly)
 namespace Logging
 {
 
 extern uint64_t categoriesEnabled;
-int LogWriteStr(const std::string &str);
-//
 
 /*
 To add a new log category:
@@ -95,14 +95,14 @@ To add a new log category:
 2) Add an category/string pair to LOGLABELMAP macro below.
 */
 
-//Log Categories:
-//64 Bits: (Define unique bits, not 'normal' numbers)
+// Log Categories:
+// 64 Bits: (Define unique bits, not 'normal' numbers)
 enum
 {
-	NONE = 0x0,//No logging
-	ALL = 0xFFFFFFFFFFFFFFFFUL, //Log everything
+	NONE = 0x0,// No logging
+	ALL = 0xFFFFFFFFFFFFFFFFUL,// Log everything
 
-//LOG Categories:
+// LOG Categories:
 	THN = 0x1,
 	MEP = 0x2,
 	CDB = 0x4,
@@ -136,7 +136,7 @@ enum
 
 };
 
-//Add corresponding 3 char upper case string for category:
+// Add corresponding upper case string for the category:
 #define LOGLABELMAP \
 { \
 	{NONE, "NONE"}, \
@@ -183,24 +183,12 @@ inline bool LogAcceptCategory(uint64_t category)
  * @param[in] category
  * @param[in] on  True turn on, False turn off.
  */
-inline void LogTurnOnCategory(uint64_t category,bool on)
+inline void LogToggleCategory(uint64_t category,bool on)
 {
 	if(on)
 		categoriesEnabled |= category;
 	else
-		categoriesEnabled &= ~category; //off
-}
-
-/**
- * Turn on/off logging
- * @param[in] on True turn on, False turn off.
- */
-inline void LogTurnOnAll(bool on)
-{
-	if(on)
-		categoriesEnabled = ALL;
-	else
-		categoriesEnabled = NONE;
+		categoriesEnabled &= ~category; // off
 }
 
 /**
@@ -241,9 +229,10 @@ inline void LogStdout(const char* fmt, const T1& v1, const Args&... args)
 	{
 		std::string str = tfm::format(fmt, v1, args...);
 		::fwrite(str.data(), 1, str.size(), stdout);
-	} catch(...)
+	} 
+	catch(...)
 	{
-		//Number of format specifiers (%) do not match argument count, etc
+		// Number of format specifiers (%) do not match argument count, etc
 	};
 }
 
@@ -253,7 +242,7 @@ inline void LogStdout(const char* fmt, const T1& v1, const Args&... args)
  */
 inline void LogStdout(const std::string &str)
 {
-	::fwrite(str.data(), 1, str.size(), stdout); //No formatting for a simple string
+	::fwrite(str.data(), 1, str.size(), stdout); // No formatting for a simple string
 }
 
 /**
@@ -265,10 +254,11 @@ inline void LogWrite(const char* fmt, const T1& v1, const Args&... args)
 {
 	try
 	{
-		LogWriteStr(tfm::format(fmt, v1, args...));
-	} catch(...)
+		LogPrintStr(tfm::format(fmt, v1, args...));
+	} 
+	catch(...)
 	{
-			//Number of format specifiers (%) do not match argument count, etc
+		// Number of format specifiers (%) do not match argument count, etc
 	};
 }
 
@@ -278,12 +268,12 @@ inline void LogWrite(const char* fmt, const T1& v1, const Args&... args)
  */
 inline void LogWrite(const std::string &str)
 {
-	LogWriteStr(str); //No formatting for a simple string
+	LogPrintStr(str); // No formatting for a simple string
 }
 
 }
 
-//Logging API:
+// Logging API:
 //
 /**
  * LOG macro: Log a string if a category is enabled.
@@ -301,7 +291,10 @@ inline void LogWrite(const std::string &str)
  */
 #define LOGA(...) Logging::LogStdout(__VA_ARGS__)
 //
-//END logging.
+
+// Log tests:
+UniValue setlog(const UniValue &params, bool fHelp);
+// END logging.
 
 
 /**
@@ -328,8 +321,7 @@ bool SetupNetworking();
 
 /** Return true if log accepts specified category */
 bool LogAcceptCategory(const char* category);
-/** Send a string to the log output */
-int LogPrintStr(const std::string &str);
+
 
 #define LogPrintf(...) LogPrint(NULL, __VA_ARGS__)
 
