@@ -67,6 +67,8 @@
 #endif
 #endif
 
+extern std::atomic<bool> fRescan;
+
 using namespace std;
 
 namespace
@@ -589,9 +591,12 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                     strCommand == NetMsgType::XTHINBLOCK || strCommand == NetMsgType::THINBLOCK ||
                     strCommand == NetMsgType::XBLOCKTX || strCommand == NetMsgType::GET_XBLOCKTX)
                 {
-                    vRecvMsg.push_front(msg);
-                    vRecvMsg.pop_back();
-                    LogPrint("thin", "Receive Queue: pushed %s to the front of the queue\n", strCommand);
+                    // Move the this last message to the front of the queue.
+                    std::rotate(vRecvMsg.begin(), vRecvMsg.end() - 1, vRecvMsg.end());
+
+                    std::string strFirstMsgCommand = vRecvMsg[0].hdr.GetCommand();
+                    DbgAssert(strFirstMsgCommand == strCommand, );
+                    LogPrint("thin", "Receive Queue: pushed %s to the front of the queue\n", strFirstMsgCommand);
                 }
             }
             // BU: end
@@ -883,6 +888,10 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
 
 static void AcceptConnection(const ListenSocket &hListenSocket)
 {
+    // If a wallet rescan has started then do not accept any more connections until the rescan has completed.
+    if (fRescan)
+        return;
+
     struct sockaddr_storage sockaddr;
     socklen_t len = sizeof(sockaddr);
     SOCKET hSocket = accept(hListenSocket.socket, (struct sockaddr *)&sockaddr, &len);
