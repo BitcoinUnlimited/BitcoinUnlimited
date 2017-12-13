@@ -105,67 +105,67 @@ std::string to_internal(const std::string &);
 
 using namespace std;
 
-namespace Logging {
+namespace Logging
+{
 // Globals defined here because link fails if in globals.cpp.
 // Keep at top of file so init first:
-	uint64_t categoriesEnabled = 0; // 64 bit log id mask.
-	static map<uint64_t, std::string> logLabelMap = LOGLABELMAP; // Lookup log label from log id.
+uint64_t categoriesEnabled = 0; // 64 bit log id mask.
+static map<uint64_t, std::string> logLabelMap = LOGLABELMAP; // Lookup log label from log id.
 
 
 uint64_t LogFindCategory(const std::string label)
 {
-	for (auto& x: logLabelMap)
-	{
-		if((std::string)x.second == label)
-			return (uint64_t)x.first;
-	}
-	return NONE;
+    for (auto &x : logLabelMap)
+    {
+        if ((std::string)x.second == label)
+            return (uint64_t)x.first;
+    }
+    return NONE;
 }
 
 std::string LogGetLabel(uint64_t category)
 {
-	string label = "none";
-	if(logLabelMap.count(category)!=0)
-		label = logLabelMap[category];
+    string label = "none";
+    if (logLabelMap.count(category) != 0)
+        label = logLabelMap[category];
 
-	return label;
+    return label;
 }
 
 std::string LogGetAllString()
 {
-	string ret="";
-	for (auto& x: logLabelMap)
-	{
-		if(x.first==ALL||x.first==NONE)
-			continue;
+    string ret = "";
+    for (auto &x : logLabelMap)
+    {
+        if (x.first == ALL || x.first == NONE)
+            continue;
 
-		ret+=(std::string)x.second;
-		if(LogAcceptCategory(x.first))
-			ret+= " on";
-		ret+="\n";
-	}
+        ret += (std::string)x.second;
+        if (LogAcceptCategory(x.first))
+            ret += " on";
+        ret += "\n";
+    }
 
-	return ret;
+    return ret;
 }
 
 void LogInit()
 {
-	string category = "";
-	uint64_t catg=Logging::NONE;
-	const vector<string>& categories = mapMultiArgs["-debug"];
+    string category = "";
+    uint64_t catg = Logging::NONE;
+    const vector<string> &categories = mapMultiArgs["-debug"];
 
-	for (string const& cat : categories)
-		{
-			category = boost::algorithm::to_upper_copy(cat);
-			catg = LogFindCategory(category);
+    for (string const &cat : categories)
+    {
+        category = boost::algorithm::to_upper_copy(cat);
+        catg = LogFindCategory(category);
 
-			if(catg==NONE) // Not a valid category
-				continue;
+        if (catg == NONE) // Not a valid category
+            continue;
 
-			LogToggleCategory(catg,true);
-		}
+        LogToggleCategory(catg, true);
+    }
 }
-
 }
 
 const char *const BITCOIN_CONF_FILENAME = "bitcoin.conf";
@@ -358,17 +358,17 @@ static std::string LogTimestampStr(const std::string &str, bool *fStartedNewLine
 
 static void MonitorLogfile()
 {
-    //Check if debug.log has been deleted or moved.
-	//If so re-open
-	static int existcounter = 1;
-	existcounter++;
-	if(existcounter%63==0) //Check every 64 log msgs
-	{
-		fs::path fileName = GetDataDir() / "debug.log";
-		bool exists = boost::filesystem::exists(fileName);
-		if(!exists)
-			fReopenDebugLog = true;
-	}
+    // Check if debug.log has been deleted or moved.
+    // If so re-open
+    static int existcounter = 1;
+    existcounter++;
+    if (existcounter % 63 == 0) // Check every 64 log msgs
+    {
+        fs::path fileName = GetDataDir() / "debug.log";
+        bool exists = boost::filesystem::exists(fileName);
+        if (!exists)
+            fReopenDebugLog = true;
+    }
 }
 
 int LogPrintStr(const std::string &str)
@@ -935,18 +935,18 @@ std::string CopyrightHolders(const std::string &strPrefix)
 
 bool IsStringTrue(const std::string &str)
 {
-	const std::set<std::string> strOn =  {"enable" ,"1","true" , "on"};
-	const std::set<std::string> strOff = {"disable","0","false","off"};
-	const std::string lowstr = boost::algorithm::to_lower_copy(str);
+    const std::set<std::string> strOn = {"enable", "1", "true", "on"};
+    const std::set<std::string> strOff = {"disable", "0", "false", "off"};
+    const std::string lowstr = boost::algorithm::to_lower_copy(str);
 
-	if(strOn.count(lowstr))
-		return true;
+    if (strOn.count(lowstr))
+        return true;
 
-	if(strOff.count(lowstr))
-		return false;
+    if (strOff.count(lowstr))
+        return false;
 
-	//If not found:
-	throw std::string("IsStringTrue() was passed an Invalid string");
+    // If not found:
+    throw std::string("IsStringTrue() was passed an Invalid string");
 
-	return false;
+    return false;
 }
