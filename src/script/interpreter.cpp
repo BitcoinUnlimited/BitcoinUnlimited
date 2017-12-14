@@ -496,6 +496,8 @@ bool CheckPubKeyEncoding(const valtype &vchPubKey, unsigned int flags, ScriptErr
 
 bool static CheckMinimalPush(const valtype &data, opcodetype opcode)
 {
+    // Excludes OP_1NEGATE, OP_1-16 since they are by definition minimal
+    assert(0 <= opcode && opcode <= OP_PUSHDATA4);
     if (data.size() == 0)
     {
         // Could have used OP_0.
@@ -504,12 +506,12 @@ bool static CheckMinimalPush(const valtype &data, opcodetype opcode)
     else if (data.size() == 1 && data[0] >= 1 && data[0] <= 16)
     {
         // Could have used OP_1 .. OP_16.
-        return opcode == OP_1 + (data[0] - 1);
+        return false;
     }
     else if (data.size() == 1 && data[0] == 0x81)
     {
         // Could have used OP_1NEGATE.
-        return opcode == OP_1NEGATE;
+        return false;
     }
     else if (data.size() <= 75)
     {
