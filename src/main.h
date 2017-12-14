@@ -138,7 +138,7 @@ static const uint32_t UNCONNECTED_HEADERS_TIMEOUT = 120;
  */
 static const uint32_t DEFAULT_LIMITFREERELAY = DEFAULT_BLOCK_MAX_SIZE * 0.000015;
 /** Subject free transactions to priority checking when entering the mempool */
-static const bool DEFAULT_RELAYPRIORITY = true;
+static const bool DEFAULT_RELAYPRIORITY = false;
 
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 
