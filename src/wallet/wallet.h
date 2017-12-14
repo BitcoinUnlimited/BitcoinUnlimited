@@ -8,6 +8,7 @@
 #define BITCOIN_WALLET_WALLET_H
 
 #include "amount.h"
+#include "clientversion.h"
 #include "streams.h"
 #include "tinyformat.h"
 #include "ui_interface.h"
@@ -57,8 +58,13 @@ static const bool DEFAULT_SPEND_ZEROCONF_CHANGE = true;
 static const bool DEFAULT_SEND_FREE_TRANSACTIONS = false;
 //! -txconfirmtarget default
 static const unsigned int DEFAULT_TX_CONFIRM_TARGET = 2;
-//! Largest (in bytes) free transaction we're willing to create
+//! Largest (in bytes) free transaction we're willing to creat
+#ifdef BITCOIN_CASH
+//! We can allow a maximum sized free transaction in the Bitcoin Cash Network.
+static const unsigned int MAX_FREE_TRANSACTION_CREATE_SIZE = MAX_STANDARD_TX_SIZE;
+#else
 static const unsigned int MAX_FREE_TRANSACTION_CREATE_SIZE = 1000;
+#endif
 static const bool DEFAULT_WALLETBROADCAST = true;
 
 extern const char * DEFAULT_WALLET_DAT;
