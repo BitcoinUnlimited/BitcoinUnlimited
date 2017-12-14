@@ -18,6 +18,7 @@
 #include "consensus/consensus.h"
 #include "fs.h"
 #include "net.h"
+#include "policy/policy.h"
 #include "script/script_error.h"
 #include "sync.h"
 #include "txdb.h"
