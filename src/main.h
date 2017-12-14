@@ -133,8 +133,13 @@ static const uint32_t MAX_UNCONNECTED_HEADERS = 144;
 /** The maximum length of time, in seconds, we keep unconnected headers in the cache **/
 static const uint32_t UNCONNECTED_HEADERS_TIMEOUT = 120;
 
-static const unsigned int DEFAULT_LIMITFREERELAY = 15;
+/** The maximum number of free transactions (in KB) that can enter the mempool per minute.
+ *  For a 1MB block we allow 15KB of free transactions per 1 minute.
+ */
+static const uint32_t DEFAULT_LIMITFREERELAY = DEFAULT_BLOCK_MAX_SIZE * 0.000015;
+/** Subject free transactions to priority checking when entering the mempool */
 static const bool DEFAULT_RELAYPRIORITY = true;
+
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 
 /** Default for -permitbaremultisig */
