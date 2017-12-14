@@ -142,7 +142,7 @@ bool validate(const TxoGroup& grp,const CAmount targetValue)
 // Select coins.
 TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetValue,const CAmount &dust,CFeeRate feeRate, unsigned int changeLen)
 {
-  uint utxosInWallet = available.size();
+  uint64_t utxosInWallet = available.size();
   SpendableTxos::iterator aEnd = available.end();
   TxoGroupMap solutions;
   TxoGroupMap candidates;
@@ -229,7 +229,7 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
 	}
 #endif
 
-      uint nSolutions = solutions.size();
+      uint64_t nSolutions = solutions.size();
       if ((GetTimeMillis() - startTime > maxCoinSelSearchTime.value)&&(nSolutions >= 1)) // Have we looked for a long time
         {
           LogPrint("wallet","CoinSelection searched for the alloted time and found %d solutions\n",nSolutions);
