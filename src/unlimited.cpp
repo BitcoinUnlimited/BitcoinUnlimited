@@ -63,7 +63,7 @@ UniValue validatechainhistory(const UniValue &params, bool fHelp);
 bool MiningAndExcessiveBlockValidatorRule(const uint64_t newExcessiveBlockSize, const uint64_t newMiningBlockSize)
 {
     // The mined block size must be less then or equal too the excessive block size.
-    LogPrintf("newMiningBlockSizei: %d - newExcessiveBlockSize: %d", newMiningBlockSize, newExcessiveBlockSize);
+    LogPrintf("newMiningBlockSize: %d - newExcessiveBlockSize: %d\n", newMiningBlockSize, newExcessiveBlockSize);
     return (newMiningBlockSize <= newExcessiveBlockSize);
 }
 
