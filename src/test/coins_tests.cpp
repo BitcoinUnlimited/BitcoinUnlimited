@@ -236,9 +236,10 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
                 stack[flushIndex]->Flush();
             }
         }
-        if (insecure_rand() % 100 == 0)
+
+        // Every 50 iterations, change the cache stack.
+        if (insecure_rand() % 50 == 0)
         {
-            // Every 100 iterations, change the cache stack.
             if (stack.size() > 0 && insecure_rand() % 2 == 0)
             {
                 // Remove the top cache
