@@ -11,6 +11,7 @@
 
 #include "chainparams.h"
 #include "main.h" // For minRelayTxFee
+#include "config.h"
 #include "dstencode.h"
 #include "ui_interface.h"
 #include "util.h"
@@ -218,17 +219,18 @@ void PaymentServer::ipcParseCommandLine(int argc, char *argv[])
         QString arg(argv[i]);
         if (arg.startsWith("-")) continue;
 
+        QString scheme = GUIUtil::bitcoinURIScheme(Params(), false);
         // If the bitcoincash: URI contains a payment request, we are not able
         // to detect the network as that would require fetching and parsing the
         // payment request. That means clicking such an URI which contains a
         // testnet payment request will start a mainnet instance and throw a
         // "wrong network" error.
-        if (arg.startsWith(GUIUtil::URI_SCHEME + ":", Qt::CaseInsensitive)) // bitcoincash: URI
+        if (arg.startsWith(scheme + ":", Qt::CaseInsensitive)) // bitcoincash: URI
         {
             savedPaymentRequests.append(arg);
 
             SendCoinsRecipient r;
-            if (GUIUtil::parseBitcoinURI(GUIUtil::URI_SCHEME, arg, &r) && !r.address.isEmpty())
+            if (GUIUtil::parseBitcoinURI(scheme, arg, &r) && !r.address.isEmpty())
             {
                 if (IsValidDestinationString(r.address.toStdString(),
                                              Params(CBaseChainParams::MAIN)))
@@ -331,9 +333,9 @@ PaymentServer::PaymentServer(QObject *parent, bool startLocalServer)
 
         if (!uriServer->listen(name))
         {
-            // constructor is called early in init, so don't use "Q_EMIT message()" here
-            QMessageBox::critical(0, tr("Payment request error"),tr("Cannot start %1: click-to-pay handler")
-                                  .arg(GUIUtil::URI_SCHEME));
+            // constructor is called early in init, so don't use "Q_EMIT
+            // message()" here
+            QMessageBox::critical(0, tr("Payment request error"), tr("Cannot start click-to-pay handler"));
         }
         else
         {
@@ -413,7 +415,8 @@ void PaymentServer::handleURIOrFile(const QString &s)
     }
 
     // bitcoincash: URI
-    if (s.startsWith(GUIUtil::URI_SCHEME + ":", Qt::CaseInsensitive))
+    QString scheme = GUIUtil::bitcoinURIScheme(Params(), false);
+    if (s.startsWith(scheme + ":", Qt::CaseInsensitive))
     {
 #if QT_VERSION < 0x050000
         QUrl uri(s);
@@ -445,7 +448,7 @@ void PaymentServer::handleURIOrFile(const QString &s)
         else // normal URI
         {
             SendCoinsRecipient recipient;
-            if (GUIUtil::parseBitcoinURI(GUIUtil::URI_SCHEME, s, &recipient))
+            if (GUIUtil::parseBitcoinURI(scheme, s, &recipient))
             {
                 if (!IsValidDestinationString(recipient.address.toStdString()))
                 {

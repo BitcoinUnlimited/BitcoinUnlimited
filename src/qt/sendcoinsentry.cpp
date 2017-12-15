@@ -8,6 +8,7 @@
 
 #include "addressbookpage.h"
 #include "addresstablemodel.h"
+#include "config.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
 #include "platformstyle.h"
@@ -31,7 +32,7 @@ SendCoinsEntry::SendCoinsEntry(const PlatformStyle *platformStyle, QWidget *pare
         tr("A message that was attached to the %1 URI which will be"
            " stored with the transaction for your reference. Note: "
            "This message will not be sent over the Bitcoin network.")
-            .arg(GUIUtil::URI_SCHEME));
+            .arg(GUIUtil::bitcoinURIScheme(GetConfig())));
 
     setCurrentWidget(ui->SendCoins);
 
