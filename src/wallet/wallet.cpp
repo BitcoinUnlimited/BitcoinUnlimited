@@ -1333,7 +1333,7 @@ void CWallet::ReacceptWalletTransactions()
     {
         CWalletTx& wtx = *(item.second);
 
-        wtx.AcceptToMemoryPool(false);
+        wtx.AcceptToMemoryPool(LimitFree());
         SyncWithWallets(wtx, NULL, -1);
     }
 }
@@ -2368,7 +2368,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey)
         if (fBroadcastTransactions)
         {
             // Broadcast
-            if (!wtxNew.AcceptToMemoryPool(false))
+            if (!wtxNew.AcceptToMemoryPool(LimitFree()))
             {
                 // This must not fail. The transaction has already been signed and recorded.
                 LogPrintf("CommitTransaction(): Error: Transaction not valid\n");
