@@ -11,6 +11,8 @@
 #include <QDialog>
 #include <QImage>
 #include <QLabel>
+#include <QPainter>
+#include <QString>
 
 class OptionsModel;
 class Config;
@@ -70,5 +72,8 @@ private:
     SendCoinsRecipient info;
     const Config *cfg;
 };
+
+// exported for unittesting
+QString ToCurrentEncoding(const QString &addr, const Config &);
 
 #endif // BITCOIN_QT_RECEIVEREQUESTDIALOG_H
