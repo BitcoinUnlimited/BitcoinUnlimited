@@ -118,7 +118,7 @@ public:
 
 #ifdef BITCOIN_CASH
         // Nov, 13 hard fork
-        consensus.cashHardForkActivationTime = 1510600000;
+        consensus.daaHeight = 504031;
 #endif
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -251,7 +251,7 @@ public:
 
 #ifdef BITCOIN_CASH
         // Nov, 13 hard fork
-        consensus.cashHardForkActivationTime = 1510600000;
+        consensus.daaHeight = 0;
 #endif
 
         vFixedSeeds.clear();
@@ -315,7 +315,7 @@ public:
 
 #ifdef BITCOIN_CASH
         // Nov, 13 hard fork
-        consensus.cashHardForkActivationTime = 1510600000;
+        consensus.daaHeight = 1188697;
 #endif
         pchMessageStart[0] = 0x0b;
         pchMessageStart[1] = 0x11;
@@ -399,7 +399,7 @@ public:
 
 #ifdef BITCOIN_CASH
         // Nov, 13 hard fork is always on on regtest.
-        consensus.cashHardForkActivationTime = 0;
+        consensus.daaHeight = 0;
 #endif
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;
