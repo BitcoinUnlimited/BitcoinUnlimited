@@ -543,4 +543,76 @@ BOOST_AUTO_TEST_CASE(test_ParseFixedPoint)
     BOOST_CHECK(!ParseFixedPoint("1.", 8, &amount));
 }
 
+// Log tests:
+bool TestSetLog(uint64_t categoriesExpected, const char *arg1, const char *arg2 = NULL)
+{
+    UniValue logargs(UniValue::VARR);
+    bool ret = false;
+    logargs.push_back(arg1);
+    if (arg2 != NULL)
+        logargs.push_back(arg2);
+
+    setlog(logargs, false); // The function to be tested
+
+    if (categoriesExpected == Logging::categoriesEnabled)
+        ret = true;
+
+    // LOGA("TestSetLog %s %s ret: %d\n", arg1, ((arg2 == NULL)?"":arg2),(int)ret);
+    return ret;
+}
+
+bool IsStringTrueBadArgTest(const char *arg1)
+{
+    try
+    {
+        IsStringTrue(arg1);
+    }
+    catch (...)
+    {
+        return true; // If bad arg return true
+    }
+    return false;
+}
+
+BOOST_AUTO_TEST_CASE(util_Logging)
+{
+    {
+        using namespace Logging;
+        BOOST_CHECK_EQUAL(8, sizeof(categoriesEnabled));
+        BOOST_CHECK_EQUAL(NONE, categoriesEnabled);
+        LogToggleCategory(THN, true);
+        BOOST_CHECK(LogAcceptCategory(THN));
+        LogToggleCategory(THN, false);
+        BOOST_CHECK(!LogAcceptCategory(THN));
+        LogToggleCategory(THN, true);
+        LogToggleCategory(NET, true);
+        BOOST_CHECK(LogAcceptCategory(THN | NET));
+        LogToggleCategory(ALL, true);
+        BOOST_CHECK_EQUAL(ALL, categoriesEnabled);
+        LogToggleCategory(ALL, false);
+        BOOST_CHECK_EQUAL(NONE, categoriesEnabled);
+        BOOST_CHECK_EQUAL(LogGetLabel(ADR), "ADR");
+        BOOST_CHECK(TestSetLog(ALL, "all", "on"));
+        BOOST_CHECK(TestSetLog(NONE, "all", "off"));
+        BOOST_CHECK(TestSetLog(NONE, "tor"));
+        BOOST_CHECK(TestSetLog(TOR, "tor", "on"));
+        BOOST_CHECK(TestSetLog(NONE, "tor", "off"));
+        BOOST_CHECK(!TestSetLog(TOR, "tor", "bad-arg"));
+        BOOST_CHECK(TestSetLog(categoriesEnabled, "badcategory", "on"));
+        LogToggleCategory(ALL, true);
+        LOG(THN, "missing args %s %d\n");
+        LOG(THN, "wrong order args %s %d\n", 3, "hello");
+        LOG(THN, "null arg %s\n", NULL);
+        BOOST_CHECK(IsStringTrue("true"));
+        BOOST_CHECK(IsStringTrue("enable"));
+        BOOST_CHECK(IsStringTrue("1"));
+        BOOST_CHECK(IsStringTrue("on"));
+        BOOST_CHECK(!IsStringTrue("false"));
+        BOOST_CHECK(!IsStringTrue("disable"));
+        BOOST_CHECK(!IsStringTrue("0"));
+        BOOST_CHECK(!IsStringTrue("off"));
+        BOOST_CHECK(IsStringTrueBadArgTest("bad"));
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
