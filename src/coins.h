@@ -277,6 +277,12 @@ public:
      */
     void Uncache(const COutPoint &outpoint);
 
+    /**
+     * Removes all the UTXO outpoints for a given transaction, if they are
+     * not modified.
+     */
+    void UncacheTx(const CTransaction &tx);
+
     //! Calculate the size of the cache (in number of transaction outputs)
     unsigned int GetCacheSize() const;
 

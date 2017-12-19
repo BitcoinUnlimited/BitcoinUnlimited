@@ -751,7 +751,6 @@ void EraseOrphanTx(uint256 hash) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
 void EraseOrphansByTime() EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
 {
     AssertLockHeld(cs_orphancache);
-
     // Because we have to iterate through the entire orphan cache which can be large we don't want to check this
     // every time a tx enters the mempool but just once every 5 minutes is good enough.
     if (GetTime() < nLastOrphanCheck + 5 * 60)
@@ -765,6 +764,10 @@ void EraseOrphansByTime() EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
         if (nEntryTime < nOrphanTxCutoffTime)
         {
             uint256 txHash = mi->second.tx.GetHash();
+
+            // Uncache any coins that may exist for orphans that will be erased
+            pcoinsTip->UncacheTx(mi->second.tx);
+
             LogPrint(
                 "mempool", "Erased old orphan tx %s of age %d seconds\n", txHash.ToString(), GetTime() - nEntryTime);
             EraseOrphanTx(txHash);
@@ -790,6 +793,10 @@ unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t nMaxBytes) EXC
         std::map<uint256, COrphanTx>::iterator it = mapOrphanTransactions.lower_bound(randomhash);
         if (it == mapOrphanTransactions.end())
             it = mapOrphanTransactions.begin();
+
+        // Uncache any coins that may exist for orphans that will be erased
+        pcoinsTip->UncacheTx(it->second.tx);
+
         EraseOrphanTx(it->first);
         ++nEvicted;
     }
@@ -1122,13 +1129,16 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
 
 void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
 {
-    int expired = pool.Expire(GetTime() - age);
+    std::vector<COutPoint> vCoinsToUncache;
+    int expired = pool.Expire(GetTime() - age, vCoinsToUncache);
+    for (const COutPoint &txin : vCoinsToUncache)
+        pcoinsTip->Uncache(txin);
     if (expired != 0)
         LogPrint("mempool", "Expired %i transactions from the memory pool\n", expired);
 
     std::vector<COutPoint> vNoSpendsRemaining;
     pool.TrimToSize(limit, &vNoSpendsRemaining);
-    BOOST_FOREACH (const COutPoint &removed, vNoSpendsRemaining)
+    for (const COutPoint &removed : vNoSpendsRemaining)
         pcoinsTip->Uncache(removed);
 }
 
@@ -1172,8 +1182,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     unsigned int nSize = 0;
     uint64_t start = GetTimeMicros();
     AssertLockHeld(cs_main);
-    if (pfMissingInputs)
-        *pfMissingInputs = false;
 
     if (!CheckTransaction(tx, state))
         return false;
@@ -1247,21 +1255,34 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             view.SetBackend(viewMemPool);
 
             // do all inputs exist?
-            BOOST_FOREACH (const CTxIn txin, tx.vin)
+            if (pfMissingInputs)
             {
-                if (!pcoinsTip->HaveCoinInCache(txin.prevout))
+                *pfMissingInputs = false;
+                BOOST_FOREACH (const CTxIn txin, tx.vin)
                 {
-                    vCoinsToUncache.push_back(txin.prevout);
-                }
-                if (!view.HaveCoin(txin.prevout))
-                {
-                    if (pfMissingInputs)
+                    // At this point we begin to collect coins that are potential candidates for uncaching because as
+                    // soon as we make the call below to view.HaveCoin() any missing coins will be pulled into cache.
+                    // Therefore, any coin in this transaction that is not already in cache will be tracked here such
+                    // that if this transaction fails to enter the memory pool, we will then uncache those coins that
+                    // were not already present, unless the transaction is an orphan.
+                    //
+                    // We still want to keep orphantx coins in the event the orphantx is finally accepted into the
+                    // mempool or shows up in a block that is mined.  Therefore if pfMissingInputs returns true then
+                    // any coins in vCoinsToUncache will NOT be uncached.
+                    if (!pcoinsTip->HaveCoinInCache(txin.prevout))
                     {
+                        vCoinsToUncache.push_back(txin.prevout);
+                    }
+
+                    if (!view.HaveCoin(txin.prevout))
+                    {
+                        // fMissingInputs and not state.IsInvalid() is used to detect this condition, don't set
+                        // state.Invalid()
                         *pfMissingInputs = true;
                     }
-                    // fMissingInputs and !state.IsInvalid() is used to detect this condition, don't set state.Invalid()
-                    return false;
                 }
+                if (*pfMissingInputs == true)
+                    return false;
             }
 
             // Bring the best block into scope
@@ -1449,7 +1470,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true, &resourceTracker,
                 NULL, &sighashType))
         {
-            LogPrint("mempool", "txn CheckInputs failed");
+            LogPrint("mempool", "CheckInputs failed for tx: %s\n", tx.GetHash().ToString().c_str());
             return false;
         }
         entry.UpdateRuntimeSigOps(resourceTracker.GetSigOps(), resourceTracker.GetSighashBytes());
@@ -1519,12 +1540,13 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     std::vector<COutPoint> vCoinsToUncache;
     bool res = AcceptToMemoryPoolWorker(
         pool, state, tx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit, fRejectAbsurdFee, vCoinsToUncache);
-    if (!res)
+
+    // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
+    if (pfMissingInputs && !res && !*pfMissingInputs)
     {
         for (const COutPoint &remove : vCoinsToUncache)
             pcoinsTip->Uncache(remove);
     }
-
     return res;
 }
 
@@ -3056,7 +3078,7 @@ bool static DisconnectTip(CValidationState &state, const Consensus::Params &cons
         // ignore validation errors in resurrected transactions
         std::list<CTransaction> removed;
         CValidationState stateDummy;
-        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, NULL, true))
+        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, nullptr, true))
         {
             mempool.remove(tx, removed, true);
         }
