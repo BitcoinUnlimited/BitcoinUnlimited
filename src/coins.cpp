@@ -303,7 +303,7 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     uint64_t nTrimmed = 0;
     uint64_t nTrimmedByHeight = 0;
     static uint64_t nTrimHeightDelta = nBestCoinHeight * 0.80; // This is where we attempt to do our first trim
-    int64_t nTrimHeight = nBestCoinHeight - nTrimHeightDelta;
+    uint64_t nTrimHeight = nBestCoinHeight - nTrimHeightDelta;
 
     // Begin first Trim loop. This loop will trim coins from cache by the coin height, removing the oldest coins first.
     // This has been proven to improve sync performance significantly for nodes that can not hold the entire dbcache
@@ -342,13 +342,16 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
         if (fDone && DynamicMemoryUsage() > nTrimSize && nTrimHeightDelta > nSmallestDelta)
         {
             if (nTrimHeightDelta <= nSmallestDelta * 100)
-                nTrimHeightDelta -= (nSmallestDelta * 2);
+                nTrimHeightDelta =
+                    (nTrimHeightDelta > (nSmallestDelta * 2) ? nTrimHeightDelta - (nSmallestDelta * 2) : 0);
             else if (nTrimHeightDelta <= nSmallestDelta * 400)
-                nTrimHeightDelta -= (nSmallestDelta * 10);
+                nTrimHeightDelta =
+                    (nTrimHeightDelta > (nSmallestDelta * 10) ? nTrimHeightDelta - (nSmallestDelta * 10) : 0);
             else
-                nTrimHeightDelta -= (nSmallestDelta * 200);
+                nTrimHeightDelta =
+                    (nTrimHeightDelta > (nSmallestDelta * 200) ? nTrimHeightDelta - (nSmallestDelta * 200) : 0);
 
-            nTrimHeight = nBestCoinHeight - nTrimHeightDelta;
+            nTrimHeight = (nBestCoinHeight > nTrimHeightDelta ? nBestCoinHeight - nTrimHeightDelta : 0);
 
             // We're not done yet. We've adjusted the nTrimHeight so we have to go back and trim again.
             fDone = false;
