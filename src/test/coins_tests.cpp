@@ -205,6 +205,13 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
             uncached_an_entry |= !stack[cacheid]->HaveCoinInCache(out);
         }
 
+        // One every 500 iterations, trim a random cache to zero
+        if (insecure_rand() % 500)
+        {
+            int cacheid = insecure_rand() % stack.size();
+            stack[cacheid]->Trim(0);
+        }
+
         // Once every 1000 iterations and at the end, verify the full cache.
         if (insecure_rand() % 1000 == 1 || i == NUM_SIMULATION_ITERATIONS - 1)
         {
