@@ -93,7 +93,7 @@ BOOST_AUTO_TEST_CASE(util_sharedcriticalsection)
         boost::thread_group thrds;
         {
             WRITELOCK(cs);
-            boost::thread *t = thrds.create_thread(boost::bind(ThreadSharedCritTest, &cs));
+            thrds.create_thread(boost::bind(ThreadSharedCritTest, &cs));
             MilliSleep(250); // give thread a chance to run.
             BOOST_CHECK(threadStarted == true);
             BOOST_CHECK(threadExited == false);
@@ -109,7 +109,6 @@ BOOST_AUTO_TEST_CASE(util_sharedcriticalsection)
 
 void ThreadCorralTest(CThreadCorral *c, int region, int *readVal, int setVal)
 {
-    threadStarted = true;
     CORRAL(*c, region);
     *readVal = critVal;
     if (setVal != 0)
@@ -129,8 +128,9 @@ BOOST_AUTO_TEST_CASE(util_threadcorral)
             critVal = 1;
             thrds.create_thread(boost::bind(ThreadCorralTest, &corral, 0, &readVals[0], 4));
             thrds.create_thread(boost::bind(ThreadCorralTest, &corral, 1, &readVals[1], 0));
+            MilliSleep(500); // Thread 1 should run now because there is no higher region waiting.
             thrds.create_thread(boost::bind(ThreadCorralTest, &corral, 2, &readVals[2], 3));
-            MilliSleep(1000); // give threads a chance to run (if they are going to).
+            MilliSleep(500); // give threads a chance to run (if they are going to).
             critVal = 2;
         }
         MilliSleep(1000); // give threads a chance to run (if they are going to).
