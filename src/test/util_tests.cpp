@@ -130,10 +130,10 @@ BOOST_AUTO_TEST_CASE(util_threadcorral)
             thrds.create_thread(boost::bind(ThreadCorralTest, &corral, 0, &readVals[0], 4));
             thrds.create_thread(boost::bind(ThreadCorralTest, &corral, 1, &readVals[1], 0));
             thrds.create_thread(boost::bind(ThreadCorralTest, &corral, 2, &readVals[2], 3));
-            MilliSleep(250); // give threads a chance to run (if they are going to).
+            MilliSleep(1000); // give threads a chance to run (if they are going to).
             critVal = 2;
         }
-        MilliSleep(250); // give threads a chance to run (if they are going to).
+        MilliSleep(1000); // give threads a chance to run (if they are going to).
         BOOST_CHECK(readVals[1] == 1); // since region 1 was active, thread 1 should have run right away
         BOOST_CHECK(readVals[2] == 2); // After release, region 2 should have run since its higher priority
         BOOST_CHECK(readVals[0] == 3); // Finally, region 0 should have run (and gotten the value set by region 2)
