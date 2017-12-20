@@ -2329,6 +2329,13 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                     if (dPriority >= dPriorityNeeded && AllowFree(dPriority))
                         break;
                 }
+                else if (fSendFreeTransactions && LimitFree())
+                {
+                    strFailReason =
+                        _("You can not send free transactions if you have configured a -limitfreerelay of zero");
+                    return false;
+                }
+
 
                 CAmount nFeeNeeded = GetMinimumFee(nBytes, nTxConfirmTarget, mempool);
                 if (coinControl && nFeeNeeded > 0 && coinControl->nMinimumTotalFee > nFeeNeeded) {
