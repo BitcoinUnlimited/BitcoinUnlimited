@@ -2319,8 +2319,9 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 
                 dPriority = wtxNew.ComputePriority(dPriority, nBytes);
 
-                // Can we complete this as a free transaction?
-                if (fSendFreeTransactions && nBytes <= MAX_FREE_TRANSACTION_CREATE_SIZE)
+               // Can we complete this as a free transaction?
+                if (fSendFreeTransactions && nBytes <= MAX_STANDARD_TX_SIZE &&
+                    GetBoolArg("-relaypriority", DEFAULT_RELAYPRIORITY))
                 {
                     // Not enough fee: enough priority?
                     double dPriorityNeeded = mempool.estimateSmartPriority(nTxConfirmTarget);
