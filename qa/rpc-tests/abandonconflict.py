@@ -72,7 +72,7 @@ class AbandonConflictTest(BitcoinTestFramework):
         # TODO: redo with eviction
         # Note: had to make sure tx was a considered a free transaction to prevent it from getting into the mempool.
         stop_node(self.nodes[0],0)
-        self.nodes[0]=start_node(0, self.options.tmpdir, ["-debug","-logtimemicros","-limitfreerelay=0", "-minlimitertxfee=10.0"])
+        self.nodes[0]=start_node(0, self.options.tmpdir, ["-debug","-logtimemicros","-relaypriority=1", "-minlimitertxfee=10.0"])
 
         # Verify txs no longer in mempool
         assert(len(self.nodes[0].getrawmempool()) == 0)
@@ -118,7 +118,7 @@ class AbandonConflictTest(BitcoinTestFramework):
 
         # Remove using high relay fee again
         stop_node(self.nodes[0],0)
-        self.nodes[0]=start_node(0, self.options.tmpdir, ["-debug","-logtimemicros","-limitfreerelay=0","-minlimitertxfee=10.0"])
+        self.nodes[0]=start_node(0, self.options.tmpdir, ["-debug","-logtimemicros","-relaypriority=1","-minlimitertxfee=10.0"])
         assert(len(self.nodes[0].getrawmempool()) == 0)
         newbalance = self.nodes[0].getbalance()
         assert(newbalance == balance - Decimal("24.9996"))
