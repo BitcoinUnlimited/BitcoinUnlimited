@@ -435,8 +435,9 @@ typedef CMutexLock<CCriticalSection> CCriticalBlock;
 #define TRY_READ_LOCK(cs, name) CReadBlock name(cs, #cs, __FILE__, __LINE__, true)
 
 #define LOCK(cs) CCriticalBlock UNIQUIFY(criticalblock)(cs, #cs, __FILE__, __LINE__)
-#define LOCK2(cs1, cs2) \
-    CCriticalBlock UNIQUIFY(criticalblock1)(cs1, #cs1, __FILE__, __LINE__), UNIQUIFY(criticalblock2)(cs2, #cs2, __FILE__, __LINE__)
+#define LOCK2(cs1, cs2)                                                     \
+    CCriticalBlock UNIQUIFY(criticalblock1)(cs1, #cs1, __FILE__, __LINE__), \
+        UNIQUIFY(criticalblock2)(cs2, #cs2, __FILE__, __LINE__)
 #define TRY_LOCK(cs, name) CCriticalBlock name(cs, #cs, __FILE__, __LINE__, true)
 
 #define ENTER_CRITICAL_SECTION(cs)                             \
@@ -568,9 +569,9 @@ Multiple threads can be running in the same corral, but threads cannot run in mu
 Higher corral numbers block lower ones, but are themselves blocked from entry until the all other corrals are clear.
 For example, lets us assume threads are running in corral region 1.
 If a thread wants to enter corral region 2, threads are blocked from entering region 1.  Once all threads have left 1,
-the thread(s) waiting to enter 2 are released.
+the thread(s) waiting to enter 2 are allowed to run.
 Now, a thread wants to enter corral region 1.  Threads can continue to enter and leave region 2 (since it is > 1).
-If all threads leave region 2, the threads waiting for region 1 are released.
+If all threads leave region 2, the threads waiting for region 1 are allowed to run.
 
 Higher corral numbers are used to implement higher priority tasks.
 */
