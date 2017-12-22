@@ -2319,8 +2319,9 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 
                 dPriority = wtxNew.ComputePriority(dPriority, nBytes);
 
-                // Can we complete this as a free transaction?
-                if (fSendFreeTransactions && nBytes <= MAX_FREE_TRANSACTION_CREATE_SIZE)
+               // Can we complete this as a free transaction?
+                if (fSendFreeTransactions && nBytes <= MAX_STANDARD_TX_SIZE &&
+                    GetBoolArg("-relaypriority", DEFAULT_RELAYPRIORITY))
                 {
                     // Not enough fee: enough priority?
                     double dPriorityNeeded = mempool.estimateSmartPriority(nTxConfirmTarget);
@@ -2328,6 +2329,13 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                     if (dPriority >= dPriorityNeeded && AllowFree(dPriority))
                         break;
                 }
+                if (fSendFreeTransactions && AreFreeTxnsDisallowed())
+                {
+                    strFailReason =
+                        _("You can not send free transactions if you have configured a -limitfreerelay of zero");
+                    return false;
+                }
+
 
                 CAmount nFeeNeeded = GetMinimumFee(nBytes, nTxConfirmTarget, mempool);
                 if (coinControl && nFeeNeeded > 0 && coinControl->nMinimumTotalFee > nFeeNeeded) {
@@ -2368,7 +2376,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey)
         if (fBroadcastTransactions)
         {
             // Broadcast
-            if (!wtxNew.AcceptToMemoryPool(false))
+            if (!wtxNew.AcceptToMemoryPool(AreFreeTxnsDisallowed()))
             {
                 // This must not fail. The transaction has already been signed and recorded.
                 LogPrintf("CommitTransaction(): Error: Transaction not valid\n");

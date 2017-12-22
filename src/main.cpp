@@ -1166,6 +1166,14 @@ bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev
 }
 #endif
 
+bool AreFreeTxnsDisallowed()
+{
+    if (GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY) > 0)
+        return false;
+
+    return true;
+}
+
 bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     CValidationState &state,
     const CTransaction &consttx,
@@ -1374,9 +1382,9 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         //   When the feeCutoff is larger than the satoshiPerByte of the
         //   current transaction then spam blocking will be in effect. However
         //   Some free transactions will still get through based on -limitfreerelay
-        static double feeCutoff;
+        static double feeCutoff = initFeeCutoff;
         static double nFreeLimit = nLimitFreeRelay;
-        static int64_t nLastTime;
+        static int64_t nLastTime = GetTime();
         int64_t nNow = GetTime();
 
         // When the mempool starts falling use an exponentially decaying ~24 hour window:
@@ -1423,7 +1431,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             nFees);
         if (fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize))
         {
-            static double dFreeCount;
+            static double dFreeCount = 0;
 
             // Use an exponentially decaying ~10-minute window:
             dFreeCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - nLastTime));
@@ -3078,7 +3086,7 @@ bool static DisconnectTip(CValidationState &state, const Consensus::Params &cons
         // ignore validation errors in resurrected transactions
         std::list<CTransaction> removed;
         CValidationState stateDummy;
-        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, nullptr, true))
+        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, AreFreeTxnsDisallowed(), nullptr, true))
         {
             mempool.remove(tx, removed, true);
         }
