@@ -16,7 +16,7 @@ int64_t GetTimeMicros();
 int64_t GetLogTimeMicros();
 void SetMockTime(int64_t nMockTimeIn);
 void MilliSleep(int64_t n);
-
+uint64_t GetStopwatch(); // Returns a monotonically increasing time for interval measurement (in nSec)
 std::string DateTimeStrFormat(const char *pszFormat, int64_t nTime);
 
 #endif // BITCOIN_UTILTIME_H

@@ -44,6 +44,103 @@ BOOST_AUTO_TEST_CASE(util_criticalsection)
     } while (0);
 }
 
+
+static volatile int critVal = 0;
+static volatile int readVal = 0;
+static volatile bool threadExited = false;
+static volatile bool threadStarted = false;
+void ThreadSharedCritTest(CSharedCriticalSection *cs)
+{
+    threadStarted = true;
+    READLOCK(*cs);
+    readVal = critVal;
+
+    threadExited = true;
+}
+
+BOOST_AUTO_TEST_CASE(util_sharedcriticalsection)
+{
+    CSharedCriticalSection cs;
+
+    do
+    {
+        READLOCK(cs);
+        break;
+
+        BOOST_ERROR("break was swallowed!");
+    } while (0);
+
+    do
+    {
+        WRITELOCK(cs);
+        break;
+
+        BOOST_ERROR("break was swallowed!");
+    } while (0);
+
+    { // If the read lock does not allow simultaneous locking, this code will hang in the join_all
+        boost::thread_group thrds;
+        READLOCK(cs);
+        thrds.create_thread(boost::bind(ThreadSharedCritTest, &cs));
+        thrds.join_all();
+    }
+
+    { // Ensure that the exclusive lock works
+        threadStarted = false;
+        threadExited = false;
+        readVal = 0;
+        critVal = 1;
+        boost::thread_group thrds;
+        {
+            WRITELOCK(cs);
+            thrds.create_thread(boost::bind(ThreadSharedCritTest, &cs));
+            MilliSleep(250); // give thread a chance to run.
+            BOOST_CHECK(threadStarted == true);
+            BOOST_CHECK(threadExited == false);
+            critVal = 2;
+        }
+        // Now the write lock is released so the thread should read the value.
+        thrds.join_all();
+        BOOST_CHECK(threadExited == true);
+        BOOST_CHECK(readVal == 2);
+    }
+}
+
+
+void ThreadCorralTest(CThreadCorral *c, int region, int *readVal, int setVal)
+{
+    CORRAL(*c, region);
+    *readVal = critVal;
+    if (setVal != 0)
+        critVal = setVal;
+}
+
+
+BOOST_AUTO_TEST_CASE(util_threadcorral)
+{
+    CThreadCorral corral;
+
+    { // ensure that regions lock out other regions, but not the current region.
+        boost::thread_group thrds;
+        int readVals[3] = {0, 0, 0};
+        {
+            CORRAL(corral, 1);
+            critVal = 1;
+            thrds.create_thread(boost::bind(ThreadCorralTest, &corral, 0, &readVals[0], 4));
+            thrds.create_thread(boost::bind(ThreadCorralTest, &corral, 1, &readVals[1], 0));
+            MilliSleep(500); // Thread 1 should run now because there is no higher region waiting.
+            thrds.create_thread(boost::bind(ThreadCorralTest, &corral, 2, &readVals[2], 3));
+            MilliSleep(500); // give threads a chance to run (if they are going to).
+            critVal = 2;
+        }
+        MilliSleep(1000); // give threads a chance to run (if they are going to).
+        BOOST_CHECK(readVals[1] == 1); // since region 1 was active, thread 1 should have run right away
+        BOOST_CHECK(readVals[2] == 2); // After release, region 2 should have run since its higher priority
+        BOOST_CHECK(readVals[0] == 3); // Finally, region 0 should have run (and gotten the value set by region 2)
+    }
+}
+
+
 static const unsigned char ParseHex_expected[65] = {0x04, 0x67, 0x8a, 0xfd, 0xb0, 0xfe, 0x55, 0x48, 0x27, 0x19, 0x67,
     0xf1, 0xa6, 0x71, 0x30, 0xb7, 0x10, 0x5c, 0xd6, 0xa8, 0x28, 0xe0, 0x39, 0x09, 0xa6, 0x79, 0x62, 0xe0, 0xea, 0x1f,
     0x61, 0xde, 0xb6, 0x49, 0xf6, 0xbc, 0x3f, 0x4c, 0xef, 0x38, 0xc4, 0xf3, 0x55, 0x04, 0xe5, 0x1e, 0xc1, 0x12, 0xde,

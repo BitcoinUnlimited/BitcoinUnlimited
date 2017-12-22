@@ -51,6 +51,12 @@
     } while (0)
 #endif
 
+#define UNIQUE2(pfx, LINE) pfx##LINE
+#define UNIQUE1(pfx, LINE) UNIQUE2(pfx, LINE)
+/// UNIQUIFY is a macro that appends the current file's line number to the passed prefix, creating a symbol
+// that is unique in this file.
+#define UNIQUIFY(pfx) UNIQUE1(pfx, __LINE__)
+
 static const bool DEFAULT_LOGTIMEMICROS = false;
 static const bool DEFAULT_LOGIPS = true;
 static const bool DEFAULT_LOGTIMESTAMPS = true;

@@ -22,6 +22,23 @@ void PrintLockContention(const char *pszName, const char *pszFile, int nLine)
 #endif /* DEBUG_LOCKCONTENTION */
 
 #ifdef DEBUG_LOCKORDER
+#include <sys/syscall.h>
+
+#ifdef __linux__
+uint64_t getTid(void)
+{
+    // "native" thread id used so the number correlates with what is shown in gdb
+    pid_t tid = (pid_t)syscall(SYS_gettid);
+    return tid;
+}
+#else
+uint64_t getTid(void)
+{
+    uint64_t tid = boost::lexical_cast<uint64_t>(boost::this_thread::get_id());
+    return tid;
+}
+#endif
+
 //
 // Early deadlock detection.
 // Problem being solved:
@@ -203,8 +220,19 @@ void AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine,
     abort();
 }
 
-// BU normally CCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical section
-// from the lockorder map
+void AssertWriteLockHeldInternal(const char *pszName, const char *pszFile, int nLine, CSharedCriticalSection *cs)
+{
+    if (cs->try_lock()) // It would be better to check that this thread has the lock
+    {
+        fprintf(stderr, "Assertion failed: lock %s not held in %s:%i; locks held:\n%s", pszName, pszFile, nLine,
+            LocksHeld().c_str());
+        fflush(stderr);
+        abort();
+    }
+}
+
+// BU normally CCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical
+// section from the lockorder map
 #ifdef DEBUG_LOCKORDER
 CCriticalSection::CCriticalSection() : name(NULL) {}
 CCriticalSection::CCriticalSection(const char *n) : name(n)
@@ -231,5 +259,117 @@ CCriticalSection::~CCriticalSection()
     DeleteCritical((void *)this);
 }
 #endif
+
+// BU normally CSharedCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical
+// section from the lockorder map
+#ifdef DEBUG_LOCKORDER
+CSharedCriticalSection::CSharedCriticalSection() : name(NULL), exclusiveOwner(0) {}
+CSharedCriticalSection::CSharedCriticalSection(const char *n) : name(n), exclusiveOwner(0)
+{
+// print the address of named critical sections so they can be found in the mutrace output
+#ifdef ENABLE_MUTRACE
+    if (name)
+    {
+        printf("CSharedCriticalSection %s at %p\n", name, this);
+        fflush(stdout);
+    }
+#endif
+}
+
+CSharedCriticalSection::~CSharedCriticalSection()
+{
+#ifdef ENABLE_MUTRACE
+    if (name)
+    {
+        printf("Destructing CSharedCriticalSection %s\n", name);
+        fflush(stdout);
+    }
+#endif
+    DeleteCritical((void *)this);
+}
+#endif
+
+
+void CSharedCriticalSection::lock_shared()
+{
+    uint64_t tid = getTid();
+    // detect recursive locking
+    {
+        boost::unique_lock<boost::mutex> lock(setlock);
+        assert(exclusiveOwner != tid);
+        assert(sharedowners.find(tid) == sharedowners.end());
+        auto alreadyLocked = sharedowners.find(tid);
+        if (alreadyLocked != sharedowners.end())
+        {
+            LockInfo li = alreadyLocked->second;
+            printf("already locked at %s:%d\n", li.file, li.line);
+            assert(alreadyLocked == sharedowners.end());
+        }
+    }
+    boost::shared_mutex::lock_shared();
+    {
+        boost::unique_lock<boost::mutex> lock(setlock);
+        sharedowners[tid] = LockInfo("", 0);
+    }
+}
+
+void CSharedCriticalSection::unlock_shared()
+{
+    // detect recursive locking
+    uint64_t tid = getTid();
+    {
+        boost::unique_lock<boost::mutex> lock(setlock);
+        auto alreadyLocked = sharedowners.find(tid);
+        if (alreadyLocked == sharedowners.end())
+        {
+            LockInfo li = alreadyLocked->second;
+            printf("never locked at %s:%d\n", li.file, li.line);
+            assert(alreadyLocked != sharedowners.end());
+        }
+    }
+    boost::shared_mutex::unlock_shared();
+    {
+        boost::unique_lock<boost::mutex> lock(setlock);
+        sharedowners.erase(tid);
+    }
+}
+
+bool CSharedCriticalSection::try_lock_shared()
+{
+    // detect recursive locking
+    uint64_t tid = getTid();
+    assert(exclusiveOwner != tid);
+    assert(sharedowners.find(tid) == sharedowners.end());
+
+    bool result = boost::shared_mutex::try_lock_shared();
+    if (result)
+    {
+        sharedowners[tid] = LockInfo("", 0);
+    }
+    return result;
+}
+void CSharedCriticalSection::lock()
+{
+    boost::shared_mutex::lock();
+    exclusiveOwner = getTid();
+}
+void CSharedCriticalSection::unlock()
+{
+    uint64_t tid = getTid();
+    assert(exclusiveOwner == tid);
+    exclusiveOwner = 0;
+    boost::shared_mutex::unlock();
+}
+
+bool CSharedCriticalSection::try_lock()
+{
+    bool result = boost::shared_mutex::try_lock();
+    if (result)
+    {
+        exclusiveOwner = getTid();
+    }
+    return result;
+}
+
 
 #endif /* DEBUG_LOCKORDER */
