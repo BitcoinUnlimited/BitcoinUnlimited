@@ -361,12 +361,11 @@ void PruneAndFlush();
 bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev);
 #endif
 
-/** What is the value of fLimitFree on startup or when we disconnect the tip.
- *  If -limitfreerelay is zero on startup or when we disconnect the tip then we do not
-    want to accept free transactions into the memory pool, since this nodes policy is
-    to reject forwarding such transactions.
+/** 
+   Determine whether free transactions are subject to rate limiting. If -limitfreerelay is not zero then rate limiting
+   for free txns will be in effect. If it is zero, then no free transactions will be allowed to enter the memory pool.
  */
-bool LimitFree();
+bool AreFreeTxnsDisallowed();
 
 /** (try to) add transaction to memory pool **/
 bool AcceptToMemoryPool(CTxMemPool &pool,

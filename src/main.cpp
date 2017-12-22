@@ -1166,14 +1166,13 @@ bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev
 }
 #endif
 
-bool LimitFree()
+bool AreFreeTxnsDisallowed()
 {
     if (GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY) > 0)
         return false;
 
     return true;
 }
-
 
 bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     CValidationState &state,
@@ -3087,7 +3086,7 @@ bool static DisconnectTip(CValidationState &state, const Consensus::Params &cons
         // ignore validation errors in resurrected transactions
         std::list<CTransaction> removed;
         CValidationState stateDummy;
-        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, LimitFree(), nullptr, true))
+        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, AreFreeTxnsDisallowed(), nullptr, true))
         {
             mempool.remove(tx, removed, true);
         }

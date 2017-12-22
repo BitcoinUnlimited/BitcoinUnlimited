@@ -2329,7 +2329,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                     if (dPriority >= dPriorityNeeded && AllowFree(dPriority))
                         break;
                 }
-                if (fSendFreeTransactions && LimitFree())
+                if (fSendFreeTransactions && AreFreeTxnsDisallowed())
                 {
                     strFailReason =
                         _("You can not send free transactions if you have configured a -limitfreerelay of zero");
@@ -2376,7 +2376,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey)
         if (fBroadcastTransactions)
         {
             // Broadcast
-            if (!wtxNew.AcceptToMemoryPool(LimitFree()))
+            if (!wtxNew.AcceptToMemoryPool(AreFreeTxnsDisallowed()))
             {
                 // This must not fail. The transaction has already been signed and recorded.
                 LogPrintf("CommitTransaction(): Error: Transaction not valid\n");
