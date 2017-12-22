@@ -1333,7 +1333,7 @@ void CWallet::ReacceptWalletTransactions()
     {
         CWalletTx& wtx = *(item.second);
 
-        wtx.AcceptToMemoryPool(LimitFree());
+        wtx.AcceptToMemoryPool(false);
         SyncWithWallets(wtx, NULL, -1);
     }
 }
