@@ -441,7 +441,7 @@ static void addWalletOptions(AllowedArgs &allowedArgs)
                 " " +
                 _("(1 = keep tx meta data e.g. account owner and payment request information, 2 = drop tx meta data)"))
         .addArg("usecashaddr", optionalBool,
-            _("Bitcoin Cash November 13th activation time") + " " + strprintf(_("(default: %u)"), DEFAULT_USE_CASHADDR))
+            _("Use Bitcoin Cash Address for destination encoding (Activates by default Jan 14, 2017)"))
         ;
 #endif
 }

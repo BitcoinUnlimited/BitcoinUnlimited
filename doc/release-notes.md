@@ -5,6 +5,7 @@ Bitcoin Unlimited version 0.12.1 is now available from:
 This is a new minor version release, including ........,
 various bugfixes and updated translations.
 
+<<<<<<< HEAD
 Please report bugs using the issue tracker at github:
 
   <https://github.com/BitcoinUnlimited/BitcoinUnlimited/issues>
@@ -122,3 +123,10 @@ Thanks to everyone who directly contributed to this release:
 
 
 As well as everyone that helped translating on [Transifex](https://www.transifex.com/projects/p/bitcoin/).
+=======
+ - Remove the newdaaactivationtime configuration.
+ - Do not use the NODE_BITCOIN_CASH service bit for preferencial peering anymore.
+ - Only connect to node using the cash magic.
+ - Remove indicator mentionning if a node uses the cash magic getpeerinfo RPC.
+ - Add support for the new cashaddr format. The `-usecashaddr` flag can be used to select which format is used when presenting addresses to users. By default, Bitcoin ABC will keep using the old format until Jan, 14 and then switch to the new format. Both format are now accepted as input.
+>>>>>>> 7557637... Activate cashaddr on Jan, 14

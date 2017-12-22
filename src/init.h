@@ -37,8 +37,6 @@ static const bool DEFAULT_REST_ENABLE = false;
 static const bool DEFAULT_DISABLE_SAFEMODE = false;
 static const bool DEFAULT_STOPAFTERBLOCKIMPORT = false;
 static const bool DEFAULT_PV_TESTMODE = false;
-//! if set, all addresses will be encoded with cashaddr instead of base58
-static const bool DEFAULT_USE_CASHADDR = false;
 
 /** Returns licensing information (for -version) */
 std::string LicenseInfo();

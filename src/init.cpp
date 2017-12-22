@@ -1137,8 +1137,8 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 #ifdef ENABLE_WALLET
 
     // Encoded addresses using cashaddr instead of base58
-    config.SetCashAddrEncoding(
-        GetBoolArg("-usecashaddr", DEFAULT_USE_CASHADDR));
+    // Activates by default on Jan, 14
+    config.SetCashAddrEncoding(GetBoolArg("-usecashaddr", GetAdjustedTime() > 1515900000));
 
     if (fDisableWallet)
     {
