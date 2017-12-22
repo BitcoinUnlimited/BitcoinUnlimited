@@ -361,7 +361,7 @@ void PruneAndFlush();
 bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev);
 #endif
 
-/** 
+/**
    Determine whether free transactions are subject to rate limiting. If -limitfreerelay is not zero then rate limiting
    for free txns will be in effect. If it is zero, then no free transactions will be allowed to enter the memory pool.
  */
