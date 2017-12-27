@@ -91,7 +91,7 @@ public:
     const std::vector<uint8_t> &Base58Prefix(Base58Type type) const { return base58Prefixes[type]; }
     const std::string &CashAddrPrefix() const { return cashaddrPrefix; }
     const std::vector<SeedSpec6> &FixedSeeds() const { return vFixedSeeds; }
-    const CCheckpointData &Checkpoints() const { return checkpointData; }...
+    const CCheckpointData &Checkpoints() const { return checkpointData; }
 protected:
     CChainParams() {}
     Consensus::Params consensus;
