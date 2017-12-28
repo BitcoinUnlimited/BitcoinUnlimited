@@ -5,6 +5,7 @@
 
 #include "base58.h" // Freeze CBitcoinAddress
 #include "chain.h" // Freeze CBlockIndex
+#include "dstencode.h"
 #include "key.h"
 #include "keystore.h"
 #include "policy/policy.h"

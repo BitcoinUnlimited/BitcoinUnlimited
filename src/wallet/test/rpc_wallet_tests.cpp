@@ -7,6 +7,7 @@
 #include "rpc/client.h"
 
 #include "base58.h"
+#include "dstencode.h"
 #include "main.h"
 #include "wallet/wallet.h"
 
