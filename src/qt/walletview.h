@@ -38,8 +38,7 @@ class WalletView : public QStackedWidget
     Q_OBJECT
 
 public:
-    explicit WalletView(const PlatformStyle *platformStyle, const Config *cfg,
-                        QWidget *parent);
+    explicit WalletView(const PlatformStyle *platformStyle, const Config *cfg, QWidget *parent);
     ~WalletView();
 
     void setBitcoinGUI(BitcoinGUI *gui);

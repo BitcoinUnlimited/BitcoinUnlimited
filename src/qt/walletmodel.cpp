@@ -161,11 +161,7 @@ void WalletModel::updateWatchOnlyFlag(bool fHaveWatchonly)
     Q_EMIT notifyWatchonlyChanged(fHaveWatchonly);
 }
 
-bool WalletModel::validateAddress(const QString &address)
-{
-    return IsValidDestinationString(address.toStdString());
-}
-
+bool WalletModel::validateAddress(const QString &address) { return IsValidDestinationString(address.toStdString()); }
 WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransaction &transaction,
     const CCoinControl *coinControl)
 {
@@ -311,11 +307,12 @@ WalletModel::SendCoinsReturn WalletModel::sendCoins(WalletModelTransaction &tran
                 std::string value;
                 rcp.paymentRequest.SerializeToString(&value);
                 newTx->vOrderForm.push_back(make_pair(key, value));
-            } else if (!rcp.message.isEmpty()) {
+            }
+            else if (!rcp.message.isEmpty())
+            {
                 // Message from normal bitcoincash:URI
                 // (bitcoincash:123...?message=example)
-                newTx->vOrderForm.push_back(
-                    make_pair("Message", rcp.message.toStdString()));
+                newTx->vOrderForm.push_back(make_pair("Message", rcp.message.toStdString()));
             }
             else if (!rcp.message.isEmpty()) // Message from normal bitcoin:URI (bitcoin:123...?message=example)
                 newTx->vOrderForm.push_back(make_pair("Message", rcp.message.toStdString()));
@@ -534,10 +531,7 @@ bool WalletModel::getPubKey(const CKeyID &address, CPubKey &vchPubKeyOut) const
     return wallet->GetPubKey(address, vchPubKeyOut);
 }
 
-bool WalletModel::IsSpendable(const CTxDestination &dest) const {
-    return wallet->IsMine(dest) & ISMINE_SPENDABLE;
-}
-
+bool WalletModel::IsSpendable(const CTxDestination &dest) const { return wallet->IsMine(dest) & ISMINE_SPENDABLE; }
 // returns a list of COutputs from COutPoints
 void WalletModel::getOutputs(const std::vector<COutPoint> &vOutpoints, std::vector<COutput> &vOutputs)
 {

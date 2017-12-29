@@ -8,9 +8,9 @@
 #endif
 
 #include "bitcoingui.h"
-#include "config.h"
 #include "chainparams.h"
 #include "clientmodel.h"
+#include "config.h"
 #include "fs.h"
 #include "guiconstants.h"
 #include "guiutil.h"
@@ -686,7 +686,7 @@ int main(int argc, char *argv[])
     //   Need to pass name here as CAmount is a typedef (see http:
     //   IMPORTANT if it is no longer a typedef use the normal variant above
     qRegisterMetaType<CAmount>("CAmount");
-    //Config is non-copyable so we can't register as a non pointer type
+    // Config is non-copyable so we can't register as a non pointer type
     qRegisterMetaType<Config *>();
 
     /// 2. Parse command-line options. Command-line options take precedence:

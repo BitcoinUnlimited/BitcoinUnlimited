@@ -67,7 +67,10 @@
 
 const QString BitcoinGUI::DEFAULT_WALLET = "~Default";
 
-BitcoinGUI::BitcoinGUI(const Config *cfg, const PlatformStyle *platformStyle, const NetworkStyle *networkStyle, QWidget *parent)
+BitcoinGUI::BitcoinGUI(const Config *cfg,
+    const PlatformStyle *platformStyle,
+    const NetworkStyle *networkStyle,
+    QWidget *parent)
     : QMainWindow(parent), clientModel(0), walletFrame(0), unitDisplayControl(0), labelEncryptionIcon(0),
       labelConnectionsIcon(0), labelBlocksIcon(0), progressBarLabel(0), progressBar(0), progressDialog(0),
       appMenuBar(0), overviewAction(0), historyAction(0), quitAction(0), sendCoinsAction(0), sendCoinsMenuAction(0),

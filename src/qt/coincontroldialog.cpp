@@ -771,10 +771,9 @@ void CoinControlDialog::updateView()
             // address
             CTxDestination outputAddress;
             QString sAddress = "";
-            if (ExtractDestination(out.tx->vout[out.i].scriptPubKey,
-                                   outputAddress)) {
-                sAddress =
-                    QString::fromStdString(EncodeDestination(outputAddress));
+            if (ExtractDestination(out.tx->vout[out.i].scriptPubKey, outputAddress))
+            {
+                sAddress = QString::fromStdString(EncodeDestination(outputAddress));
 
                 // if listMode or change => show bitcoin address. In tree mode,
                 // address is not shown again for direct wallet address outputs

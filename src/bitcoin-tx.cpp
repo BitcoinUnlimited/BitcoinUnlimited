@@ -199,7 +199,7 @@ static CAmount ExtractAndValidateValue(const std::string &strValue)
     if (!ParseMoney(strValue, value))
         throw runtime_error("Invalid TX output value");
 
-    return value;     
+    return value;
 }
 
 static void MutateTxVersion(CMutableTransaction &tx, const string &cmdVal)

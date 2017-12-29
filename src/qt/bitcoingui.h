@@ -52,8 +52,10 @@ class BitcoinGUI : public QMainWindow
 public:
     static const QString DEFAULT_WALLET;
 
-    explicit BitcoinGUI(const Config *, const PlatformStyle *platformStyle,
-                        const NetworkStyle *networkStyle, QWidget *parent = 0);
+    explicit BitcoinGUI(const Config *,
+        const PlatformStyle *platformStyle,
+        const NetworkStyle *networkStyle,
+        QWidget *parent = 0);
     ~BitcoinGUI();
 
     /** Set the client model.

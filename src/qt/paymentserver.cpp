@@ -10,9 +10,9 @@
 #include "optionsmodel.h"
 
 #include "chainparams.h"
-#include "main.h" // For minRelayTxFee
 #include "config.h"
 #include "dstencode.h"
+#include "main.h" // For minRelayTxFee
 #include "ui_interface.h"
 #include "util.h"
 #include "wallet/wallet.h"
@@ -203,30 +203,32 @@ void PaymentServer::LoadRootCAs(X509_STORE *_store)
     //   "certificate stapling" with server-side caching is more efficient
 }
 
-static std::string ipcParseURI(const QString &arg, const CChainParams &params,
-                               bool useCashAddr) {
+static std::string ipcParseURI(const QString &arg, const CChainParams &params, bool useCashAddr)
+{
     const QString scheme = GUIUtil::bitcoinURIScheme(params, useCashAddr);
-    if (!arg.startsWith(scheme + ":", Qt::CaseInsensitive)) {
+    if (!arg.startsWith(scheme + ":", Qt::CaseInsensitive))
+    {
         return {};
     }
 
     SendCoinsRecipient r;
-    if (!GUIUtil::parseBitcoinURI(scheme, arg, &r)) {
+    if (!GUIUtil::parseBitcoinURI(scheme, arg, &r))
+    {
         return {};
     }
 
     return r.address.toStdString();
 }
 
-static bool ipcCanParseCashAddrURI(const QString &arg,
-                                   const std::string &network) {
+static bool ipcCanParseCashAddrURI(const QString &arg, const std::string &network)
+{
     const CChainParams &params(Params(network));
     std::string addr = ipcParseURI(arg, params, true);
     return IsValidDestinationString(addr, params);
 }
 
-static bool ipcCanParseLegacyURI(const QString &arg,
-                                 const std::string &network) {
+static bool ipcCanParseLegacyURI(const QString &arg, const std::string &network)
+{
     const CChainParams &params(Params(network));
     std::string addr = ipcParseURI(arg, params, false);
     return IsValidDestinationString(addr, params);
@@ -241,46 +243,55 @@ static bool ipcCanParseLegacyURI(const QString &arg,
 // Warning: ipcSendCommandLine() is called early in init,
 // so don't use "Q_EMIT message()", but "QMessageBox::"!
 //
-void PaymentServer::ipcParseCommandLine(int argc, char *argv[]) {
-    std::array<const std::string *, 3> networks = {&CBaseChainParams::MAIN,
-                                                   &CBaseChainParams::TESTNET,
-                                                   &CBaseChainParams::REGTEST};
+void PaymentServer::ipcParseCommandLine(int argc, char *argv[])
+{
+    std::array<const std::string *, 3> networks = {
+        &CBaseChainParams::MAIN, &CBaseChainParams::TESTNET, &CBaseChainParams::REGTEST};
 
     const std::string *chosenNetwork = nullptr;
 
     for (int i = 1; i < argc; i++)
     {
         QString arg(argv[i]);
-        if (arg.startsWith("-")) continue;
+        if (arg.startsWith("-"))
+            continue;
 
         const std::string *itemNetwork = nullptr;
 
         // Try to parse as a URI
-        for (auto net : networks) {
-            if (ipcCanParseCashAddrURI(arg, *net)) {
+        for (auto net : networks)
+        {
+            if (ipcCanParseCashAddrURI(arg, *net))
+            {
                 itemNetwork = net;
                 break;
             }
 
-            if (ipcCanParseLegacyURI(arg, *net)) {
+            if (ipcCanParseLegacyURI(arg, *net))
+            {
                 itemNetwork = net;
                 break;
             }
         }
 
-        if (!itemNetwork && QFile::exists(arg)) {
+        if (!itemNetwork && QFile::exists(arg))
+        {
             // Filename
             PaymentRequestPlus request;
-            if (readPaymentRequestFromFile(arg, request)) {
-                for (auto net : networks) {
-                    if (*net == request.getDetails().network()) {
+            if (readPaymentRequestFromFile(arg, request))
+            {
+                for (auto net : networks)
+                {
+                    if (*net == request.getDetails().network())
+                    {
                         itemNetwork = net;
                     }
                 }
             }
         }
 
-        if (itemNetwork == nullptr) {
+        if (itemNetwork == nullptr)
+        {
             // Printing to debug.log is about the best we can do here, the GUI
             // hasn't started yet so we can't pop up a message box.
             qWarning() << "PaymentServer::ipcSendCommandLine: Payment request "
@@ -289,11 +300,11 @@ void PaymentServer::ipcParseCommandLine(int argc, char *argv[]) {
             continue;
         }
 
-        if (chosenNetwork && chosenNetwork != itemNetwork) {
+        if (chosenNetwork && chosenNetwork != itemNetwork)
+        {
             qWarning() << "PaymentServer::ipcSendCommandLine: Payment request "
                           "from network "
-                       << QString(itemNetwork->c_str())
-                       << " does not match already chosen network "
+                       << QString(itemNetwork->c_str()) << " does not match already chosen network "
                        << QString(chosenNetwork->c_str());
             continue;
         }
@@ -302,7 +313,8 @@ void PaymentServer::ipcParseCommandLine(int argc, char *argv[]) {
         chosenNetwork = itemNetwork;
     }
 
-    if (chosenNetwork) {
+    if (chosenNetwork)
+    {
         SelectParams(*chosenNetwork);
     }
 }
@@ -443,8 +455,10 @@ void PaymentServer::uiReady()
     savedPaymentRequests.clear();
 }
 
-bool PaymentServer::handleURI(const QString &scheme, const QString &s) {
-    if (!s.startsWith(scheme + ":", Qt::CaseInsensitive)) {
+bool PaymentServer::handleURI(const QString &scheme, const QString &s)
+{
+    if (!s.startsWith(scheme + ":", Qt::CaseInsensitive))
+    {
         return false;
     }
 
@@ -453,24 +467,24 @@ bool PaymentServer::handleURI(const QString &scheme, const QString &s) {
 #else
     QUrlQuery uri((QUrl(s)));
 #endif
-    if (uri.hasQueryItem("r")) {
+    if (uri.hasQueryItem("r"))
+    {
         // payment request URI
         QByteArray temp;
         temp.append(uri.queryItemValue("r"));
         QString decoded = QUrl::fromPercentEncoding(temp);
         QUrl fetchUrl(decoded, QUrl::StrictMode);
 
-        if (fetchUrl.isValid()) {
-            qDebug() << "PaymentServer::handleURIOrFile: fetchRequest("
-                     << fetchUrl << ")";
+        if (fetchUrl.isValid())
+        {
+            qDebug() << "PaymentServer::handleURIOrFile: fetchRequest(" << fetchUrl << ")";
             fetchRequest(fetchUrl);
-        } else {
-            qWarning() << "PaymentServer::handleURIOrFile: Invalid URL: "
-                       << fetchUrl;
-            Q_EMIT message(tr("URI handling"),
-                           tr("Payment request fetch URL is invalid: %1")
-                               .arg(fetchUrl.toString()),
-                           CClientUIInterface::ICON_WARNING);
+        }
+        else
+        {
+            qWarning() << "PaymentServer::handleURIOrFile: Invalid URL: " << fetchUrl;
+            Q_EMIT message(tr("URI handling"), tr("Payment request fetch URL is invalid: %1").arg(fetchUrl.toString()),
+                CClientUIInterface::ICON_WARNING);
         }
 
         return true;
@@ -478,41 +492,47 @@ bool PaymentServer::handleURI(const QString &scheme, const QString &s) {
 
     // normal URI
     SendCoinsRecipient recipient;
-    if (GUIUtil::parseBitcoinURI(scheme, s, &recipient)) {
-        if (!IsValidDestinationString(recipient.address.toStdString())) {
-            Q_EMIT message(
-                tr("URI handling"),
-                tr("Invalid payment address %1").arg(recipient.address),
+    if (GUIUtil::parseBitcoinURI(scheme, s, &recipient))
+    {
+        if (!IsValidDestinationString(recipient.address.toStdString()))
+        {
+            Q_EMIT message(tr("URI handling"), tr("Invalid payment address %1").arg(recipient.address),
                 CClientUIInterface::MSG_ERROR);
-        } else {
+        }
+        else
+        {
             Q_EMIT receivedPaymentRequest(recipient);
         }
-    } else {
-        Q_EMIT message(
-            tr("URI handling"),
-            tr("URI cannot be parsed! This can be caused by an invalid "
-               "Bitcoin address or malformed URI parameters."),
+    }
+    else
+    {
+        Q_EMIT message(tr("URI handling"), tr("URI cannot be parsed! This can be caused by an invalid "
+                                              "Bitcoin address or malformed URI parameters."),
             CClientUIInterface::ICON_WARNING);
     }
 
     return true;
 }
 
-void PaymentServer::handleURIOrFile(const QString &s) {
-    if (saveURIs) {
+void PaymentServer::handleURIOrFile(const QString &s)
+{
+    if (saveURIs)
+    {
         savedPaymentRequests.append(s);
         return;
     }
 
     // bitcoincash: CashAddr URI
     QString schemeCash = GUIUtil::bitcoinURIScheme(Params(), true);
-    if (handleURI(schemeCash, s)) {
+    if (handleURI(schemeCash, s))
+    {
         return;
     }
 
     // bitcoincash: Legacy URI
     QString schemeLegacy = GUIUtil::bitcoinURIScheme(Params(), false);
-    if (handleURI(schemeLegacy, s)) {
+    if (handleURI(schemeLegacy, s))
+    {
         return;
     }
 

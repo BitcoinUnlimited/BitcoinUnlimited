@@ -301,10 +301,10 @@ void ReceiveCoinsDialog::keyPressEvent(QKeyEvent *event)
 
 QModelIndex ReceiveCoinsDialog::selectedRow()
 {
-    if(!model || !model->getRecentRequestsTableModel() || !ui->recentRequestsView->selectionModel())
+    if (!model || !model->getRecentRequestsTableModel() || !ui->recentRequestsView->selectionModel())
         return QModelIndex();
     QModelIndexList selection = ui->recentRequestsView->selectionModel()->selectedRows();
-    if(selection.empty())
+    if (selection.empty())
         return QModelIndex();
     // correct for selection mode ContiguousSelection
     QModelIndex firstIndex = selection.at(0);
@@ -315,16 +315,20 @@ QModelIndex ReceiveCoinsDialog::selectedRow()
 void ReceiveCoinsDialog::copyColumnToClipboard(int column)
 {
     QModelIndex firstIndex = selectedRow();
-    if (!firstIndex.isValid()) {
+    if (!firstIndex.isValid())
+    {
         return;
     }
-    GUIUtil::setClipboard(model->getRecentRequestsTableModel()->data(firstIndex.child(firstIndex.row(), column), Qt::EditRole).toString());
+    GUIUtil::setClipboard(model->getRecentRequestsTableModel()
+                              ->data(firstIndex.child(firstIndex.row(), column), Qt::EditRole)
+                              .toString());
 }
 
 // context menu
 void ReceiveCoinsDialog::showMenu(const QPoint &point)
 {
-    if (!selectedRow().isValid()) {
+    if (!selectedRow().isValid())
+    {
         return;
     }
     contextMenu->exec(QCursor::pos());
@@ -334,7 +338,8 @@ void ReceiveCoinsDialog::showMenu(const QPoint &point)
 void ReceiveCoinsDialog::copyURI()
 {
     QModelIndex sel = selectedRow();
-    if (!sel.isValid()) {
+    if (!sel.isValid())
+    {
         return;
     }
 

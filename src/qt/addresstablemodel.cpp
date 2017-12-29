@@ -79,11 +79,11 @@ public:
             {
                 const CTxDestination &address = item.first;
                 bool fMine = wallet->IsMine(address);
-                AddressTableEntry::Type addressType = translateTransactionType(
-                    QString::fromStdString(item.second.purpose), fMine);
+                AddressTableEntry::Type addressType =
+                    translateTransactionType(QString::fromStdString(item.second.purpose), fMine);
                 const std::string &strName = item.second.name;
-                cachedAddressTable.append(AddressTableEntry(addressType, QString::fromStdString(strName),
-                    QString::fromStdString(EncodeDestination(address))));
+                cachedAddressTable.append(AddressTableEntry(
+                    addressType, QString::fromStdString(strName), QString::fromStdString(EncodeDestination(address))));
             }
         }
         // qLowerBound() and qUpperBound() require our cachedAddressTable list to be sorted in asc order
@@ -230,23 +230,24 @@ bool AddressTableModel::setData(const QModelIndex &index, const QVariant &value,
     std::string strPurpose = (rec->type == AddressTableEntry::Sending ? "send" : "receive");
     editStatus = OK;
 
-    if (role == Qt::EditRole) {
+    if (role == Qt::EditRole)
+    {
         /* For SetAddressBook / DelAddressBook */
         LOCK(wallet->cs_wallet);
-        CTxDestination curAddress =
-            DecodeDestination(rec->address.toStdString());
-        if (index.column() == Label) {
+        CTxDestination curAddress = DecodeDestination(rec->address.toStdString());
+        if (index.column() == Label)
+        {
             // Do nothing, if old label == new label
             if (rec->label == value.toString())
             {
                 editStatus = NO_CHANGES;
                 return false;
             }
-            wallet->SetAddressBook(curAddress, value.toString().toStdString(),
-                                   strPurpose);
-        } else if (index.column() == Address) {
-            CTxDestination newAddress =
-                DecodeDestination(value.toString().toStdString());
+            wallet->SetAddressBook(curAddress, value.toString().toStdString(), strPurpose);
+        }
+        else if (index.column() == Address)
+        {
+            CTxDestination newAddress = DecodeDestination(value.toString().toStdString());
             // Refuse to set invalid address, set error status and return false
             if (boost::get<CNoDestination>(&newAddress))
             {
@@ -353,7 +354,8 @@ QString AddressTableModel::addRow(const QString &type,
         // Check for duplicate addresses
         {
             LOCK(wallet->cs_wallet);
-            if (wallet->mapAddressBook.count(DecodeDestination(strAddress))) {
+            if (wallet->mapAddressBook.count(DecodeDestination(strAddress)))
+            {
                 editStatus = DUPLICATE_ADDRESS;
                 return QString();
             }

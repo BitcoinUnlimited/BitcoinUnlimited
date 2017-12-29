@@ -6,8 +6,8 @@
 #include "transactionrecord.h"
 
 #include "consensus/consensus.h"
-#include "main.h"
 #include "dstencode.h"
+#include "main.h"
 #include "timedata.h"
 
 #include <stdint.h>
@@ -77,11 +77,10 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     // Received by Bitcoin Address
                     sub.type = TransactionRecord::RecvWithAddress;
                     if (labelPublic == "")
-                        sub.addresses.push_back(std::make_pair(
-                            EncodeDestination(address), txout.scriptPubKey));
+                        sub.addresses.push_back(std::make_pair(EncodeDestination(address), txout.scriptPubKey));
                     else
-                        sub.addresses.push_back(std::make_pair(
-                            "<" + labelPublic + "> " + EncodeDestination(address), txout.scriptPubKey));
+                        sub.addresses.push_back(
+                            std::make_pair("<" + labelPublic + "> " + EncodeDestination(address), txout.scriptPubKey));
                 }
                 else
                 {

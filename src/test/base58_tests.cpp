@@ -154,23 +154,19 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_parse)
 
             // Private key must be invalid public key
             destination = DecodeLegacyAddr(exp_base58string, Params());
-            BOOST_CHECK_MESSAGE(!IsValidDestination(destination),
-                                "IsValid privkey as pubkey:" + strTest);
-        } else {
+            BOOST_CHECK_MESSAGE(!IsValidDestination(destination), "IsValid privkey as pubkey:" + strTest);
+        }
+        else
+        {
             // "script" or "pubkey"
-            std::string exp_addrType =
-                find_value(metadata, "addrType").get_str();
+            std::string exp_addrType = find_value(metadata, "addrType").get_str();
             // Must be valid public key
             destination = DecodeLegacyAddr(exp_base58string, Params());
-            BOOST_CHECK_MESSAGE(IsValidDestination(destination),
-                                "!IsValid:" + strTest);
-            BOOST_CHECK_MESSAGE((boost::get<CScriptID>(&destination) !=
-                                 nullptr) == (exp_addrType == "script"),
-                                "isScript mismatch" + strTest);
+            BOOST_CHECK_MESSAGE(IsValidDestination(destination), "!IsValid:" + strTest);
+            BOOST_CHECK_MESSAGE((boost::get<CScriptID>(&destination) != nullptr) == (exp_addrType == "script"),
+                "isScript mismatch" + strTest);
             BOOST_CHECK_MESSAGE(
-                boost::apply_visitor(TestAddrTypeVisitor(exp_addrType),
-                                     destination),
-                "addrType mismatch" + strTest);
+                boost::apply_visitor(TestAddrTypeVisitor(exp_addrType), destination), "addrType mismatch" + strTest);
 
             // Public key must be invalid private key
             secret.SetString(exp_base58string);
@@ -266,8 +262,7 @@ BOOST_AUTO_TEST_CASE(base58_keys_invalid)
 
         // must be invalid as public and as private key
         destination = DecodeLegacyAddr(exp_base58string, Params());
-        BOOST_CHECK_MESSAGE(!IsValidDestination(destination),
-                            "IsValid pubkey:" + strTest);
+        BOOST_CHECK_MESSAGE(!IsValidDestination(destination), "IsValid pubkey:" + strTest);
         secret.SetString(exp_base58string);
         BOOST_CHECK_MESSAGE(!secret.IsValid(), "IsValid privkey:" + strTest);
     }

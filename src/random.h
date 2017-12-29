@@ -69,14 +69,13 @@ public:
     }
 
     bool randbool() { return rand32() & 1; }
-
     uint64_t randbits(int bits)
     {
         if (bits == 0)
         {
             return 0;
         }
-        else if(bits > 32)
+        else if (bits > 32)
         {
             return rand64() >> (64 - bits);
         }
@@ -91,7 +90,6 @@ public:
             return ret;
         }
     }
-
 };
 
 /* Number of random bytes returned by GetOSRand.

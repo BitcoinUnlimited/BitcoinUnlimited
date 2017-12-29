@@ -441,8 +441,7 @@ static void addWalletOptions(AllowedArgs &allowedArgs)
                 " " +
                 _("(1 = keep tx meta data e.g. account owner and payment request information, 2 = drop tx meta data)"))
         .addArg("usecashaddr", optionalBool,
-            _("Use Bitcoin Cash Address for destination encoding (Activates by default Jan 14, 2017)"))
-        ;
+            _("Use Bitcoin Cash Address for destination encoding (Activates by default Jan 14, 2017)"));
 #endif
 }
 
