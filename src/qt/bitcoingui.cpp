@@ -78,7 +78,7 @@ BitcoinGUI::BitcoinGUI(const Config *cfg,
       aboutAction(0), receiveCoinsAction(0), receiveCoinsMenuAction(0), optionsAction(0), unlimitedAction(0),
       toggleHideAction(0), encryptWalletAction(0), backupWalletAction(0), changePassphraseAction(0), aboutQtAction(0),
       openRPCConsoleAction(0), openAction(0), showHelpMessageAction(0), trayIcon(0), trayIconMenu(0), notificator(0),
-      rpcConsole(0), helpMessageDialog(0), prevBlocks(0), spinnerFrame(0), platformStyle(platformStyle)
+      rpcConsole(0), helpMessageDialog(0), prevBlocks(0), spinnerFrame(0), platformStyle(platformStyle), cfg(cfg)
 {
     GUIUtil::restoreWindowGeometry("nWindow", QSize(850, 550), this);
 

@@ -29,7 +29,7 @@ ReceiveFreezeDialog *freezeDialog;
 #include <QTextDocument>
 
 ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *platformStyle, const Config *cfg, QWidget *parent)
-    : QDialog(parent), ui(new Ui::ReceiveCoinsDialog), model(0), platformStyle(platformStyle)
+    : QDialog(parent), ui(new Ui::ReceiveCoinsDialog), model(0), platformStyle(platformStyle), cfg(cfg)
 {
     ui->setupUi(this);
 
