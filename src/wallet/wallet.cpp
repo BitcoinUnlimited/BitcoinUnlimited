@@ -215,12 +215,11 @@ bool CWallet::LoadFreezeScript(CPubKey newKey, CScriptNum nFreezeLockTime, std::
         LogPrintf("LoadFreezeScript: Error adding p2sh freeze redeemScript to wallet. \n ");
         return false;
     }
-    else
-    {
-        // If just added then return P2SH for user
-        LogPrintf("CLTV Freeze Script Load \n %s => %s \n ", ::ScriptToAsmStr(freezeScript), CScriptID(freezeScript).ToString());
-        return true;
-    }
+
+    // If just added then return P2SH for user
+    address = EncodeDestination(CScriptID(freezeScript));
+    LogPrintf("CLTV Freeze Script Load \n %s => %s \n ", ::ScriptToAsmStr(freezeScript), address.c_str());
+    return true;
 }
 
 bool CWallet::AddWatchOnly(const CScript &dest)
