@@ -37,78 +37,26 @@ earlier.
 Notable changes
 ===============
 
-Example item
----------------------------------------
-
-Example text.
-
-
-- Full UTF-8 support in the RPC API. Non-ASCII characters in, for example,
-  wallet labels have always been malformed because they weren't taken into account
-  properly in JSON RPC processing. This is no longer the case. This also affects
-  the GUI debug console.
-
-- Command line and config option checking improvements (ported from Classic; see
-  https://zander.github.io/posts/20170220-Whatsnew/).  Using non-existent options
-  is no longer ignored but produces a hard error; inputs are properly validated, and
-  yes/no, false/true, 0/1 all now work consistently.
-  Obsolete command line and config arguments 'rpcssl' ,'socks', 'debugnet', 'tor',
-  'benchmark' and 'whitelistalwaysrelay' now give a hard error about an unknown option.
-
-C++11
------
-
-Various code modernizations have been done. The Bitcoin Unlimited code base has
-started using C++11. This means that a C++11-capable compiler is now needed for
-building. Effectively this means GCC 4.7 or higher, or Clang 3.3 or higher.
-
-When cross-compiling for a target that doesn't have C++11 libraries, configure with
-`./configure --enable-glibc-back-compat ... LDFLAGS=-static-libstdc++`.
-
-RPC low-level changes
-----------------------
-
-- `gettxoutsetinfo` UTXO hash (`hash_serialized`) has changed. There was a divergence between
-  32-bit and 64-bit platforms, and the txids were missing in the hashed data. This has been
-  fixed, but this means that the output will be different than from previous versions.
-
-Detailed release notes follow. This overview includes changes that affect
-behavior, not code moves, refactors and string updates. For convenience in locating
-the code changes and accompanying discussion, both the pull request and
-git merge commit are mentioned.
 
 ### RPC and REST
-
-Asm script outputs replacements for OP_NOP2 and OP_NOP3
--------------------------------------------------------
-
-OP_NOP2 has been renamed to OP_CHECKLOCKTIMEVERIFY by [BIP
-65](https://github.com/bitcoin/bips/blob/master/bip-0065.mediawiki)
-
-OP_NOP3 has been renamed to OP_CHECKSEQUENCEVERIFY by [BIP
-112](https://github.com/bitcoin/bips/blob/master/bip-0112.mediawiki)
-
-The following outputs are affected by this change:
-- RPC `getrawtransaction` (in verbose mode)
-- RPC `decoderawtransaction`
-- RPC `decodescript`
-- REST `/rest/tx/` (JSON format)
-- REST `/rest/block/` (JSON format when including extended tx details)
-- `bitcoin-tx -json`
 
 ### Configuration and command-line options
 
 ### Block and transaction handling
 
+Remove the newdaaactivationtime configuration.
+
 ### P2P protocol and network code
 
-The p2p alert system has been removed in #7692 and the 'alert' message is no longer supported.
+Only connect to node using the cash magic.
 
 ### Validation
 
 ### Build system
 
 ### Wallet
+
+Add support for the new cashaddr format. The `-usecashaddr` flag can be used to select which format is used when presenting addresses to users. By default, This client will keep using the old format until Jan, 14 and then switch to the new format. Both format are now accepted as input.
 
 ### GUI
 
@@ -123,10 +71,3 @@ Thanks to everyone who directly contributed to this release:
 
 
 As well as everyone that helped translating on [Transifex](https://www.transifex.com/projects/p/bitcoin/).
-=======
- - Remove the newdaaactivationtime configuration.
- - Do not use the NODE_BITCOIN_CASH service bit for preferencial peering anymore.
- - Only connect to node using the cash magic.
- - Remove indicator mentionning if a node uses the cash magic getpeerinfo RPC.
- - Add support for the new cashaddr format. The `-usecashaddr` flag can be used to select which format is used when presenting addresses to users. By default, Bitcoin ABC will keep using the old format until Jan, 14 and then switch to the new format. Both format are now accepted as input.
->>>>>>> 7557637... Activate cashaddr on Jan, 14
