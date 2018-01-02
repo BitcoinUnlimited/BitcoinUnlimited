@@ -322,7 +322,7 @@ static void MutateTxAddOutScript(CMutableTransaction &tx, const string &strInput
 
     // Extract FLAGS
     bool bScriptHash = false;
-    if (vStrInputParts.size() == 3)
+    if (vStrInputParts.size() > 2)
     {
         std::string flags = vStrInputParts.back();
         bScriptHash = (flags.find("S") != std::string::npos);
