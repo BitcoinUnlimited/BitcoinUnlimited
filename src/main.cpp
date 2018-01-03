@@ -4776,10 +4776,9 @@ bool static LoadBlockIndexDB()
     for (std::set<int>::iterator it = setBlkDataFiles.begin(); it != setBlkDataFiles.end(); it++)
     {
         CDiskBlockPos pos(*it, 0);
-        if (CAutoFile(OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION).IsNull())
-        {
+        fs::path path = GetBlockPosFilename(pos, "blk");
+        if (!fs::exists(path))
             return false;
-        }
     }
 
     // Check whether we have ever pruned block & undo files
