@@ -44,11 +44,7 @@ Notable changes
 
 ### Block and transaction handling
 
-Remove the newdaaactivationtime configuration.
-
 ### P2P protocol and network code
-
-Only connect to node using the cash magic.
 
 ### Validation
 
