@@ -403,7 +403,7 @@
     </message>
     <message>
         <source>Request payments (generates QR codes and %1 URIs)</source>
-        <translation>지불 요청하기 (QR코드와 비트코인이 생성됩니다: URIs)</translation>
+        <translation>지불 요청하기 (QR코드와 비트코인이 생성됩니다 %1: URIs)</translation>
     </message>
     <message>
         <source>&amp;About Bitcoin Unlimited</source>

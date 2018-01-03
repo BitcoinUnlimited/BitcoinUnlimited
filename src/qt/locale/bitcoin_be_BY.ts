@@ -415,7 +415,7 @@
     </message>
     <message>
         <source>Open a %1 URI or payment request</source>
-        <translation>Адкрыць біткойн: URI ці запыт плацяжу</translation>
+        <translation>Адкрыць %1: URI ці запыт плацяжу</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>
