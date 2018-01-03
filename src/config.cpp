@@ -7,29 +7,10 @@
 #include "consensus/consensus.h"
 
 GlobalConfig::GlobalConfig() : useCashAddr(false) {}
-
-const CChainParams &GlobalConfig::GetChainParams() const
-{
-    return Params();
-}
-
+const CChainParams &GlobalConfig::GetChainParams() const { return Params(); }
 static GlobalConfig gConfig;
 
-const Config &GetConfig()
-{
-    return gConfig;
-}
-
-void GlobalConfig::SetCashAddrEncoding(bool c)
-{
-    useCashAddr = c;
-}
-
-bool GlobalConfig::UseCashAddrEncoding() const
-{
-    return useCashAddr;
-}
-
-const CChainParams &DummyConfig::GetChainParams() const {
-    return Params(CBaseChainParams::REGTEST);
-}
+const Config &GetConfig() { return gConfig; }
+void GlobalConfig::SetCashAddrEncoding(bool c) { useCashAddr = c; }
+bool GlobalConfig::UseCashAddrEncoding() const { return useCashAddr; }
+const CChainParams &DummyConfig::GetChainParams() const { return Params(CBaseChainParams::REGTEST); }

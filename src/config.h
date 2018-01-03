@@ -32,7 +32,8 @@ private:
 };
 
 // Dummy for subclassing in unittests
-class DummyConfig : public Config {
+class DummyConfig : public Config
+{
 public:
     const CChainParams &GetChainParams() const override;
     void SetCashAddrEncoding(bool) override {}

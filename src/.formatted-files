@@ -21,6 +21,10 @@ bloom.cpp
 bloom.h
 buip055fork.cpp
 buip055fork.h
+cashaddr.cpp
+cashaddr.h
+cashaddrenc.cpp
+cashaddrenc.h
 chain.cpp
 chain.h
 chainparamsbase.cpp
@@ -36,6 +40,8 @@ clientversion.h
 coincontrol.h
 coins.cpp
 coins.h
+config.cpp
+config.h
 compat.h
 compressor.cpp
 compressor.h
@@ -49,6 +55,8 @@ dbwrapper.cpp
 dbwrapper.h
 dosman.cpp
 dosman.h
+dstencode.cpp
+dstencode.h
 ecwrapper.cpp
 expedited.cpp
 expedited.h
@@ -258,6 +266,8 @@ test/bip32_tests.cpp
 test/bloom_tests.cpp
 test/bswap_tests.cpp
 test/buip055_test.cpp
+test/cashaddr_tests.cpp
+test/cashaddrenc_tests.cpp
 test/checkblock_tests.cpp
 test/Checkpoints_tests.cpp
 test/coins_tests.cpp

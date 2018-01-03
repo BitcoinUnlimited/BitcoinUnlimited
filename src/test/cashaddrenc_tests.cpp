@@ -11,16 +11,18 @@
 
 #include <boost/test/unit_test.hpp>
 
-namespace {
-
-std::vector<std::string> GetNetworks() {
-    return {CBaseChainParams::MAIN, CBaseChainParams::TESTNET,
-            CBaseChainParams::REGTEST};
+namespace
+{
+std::vector<std::string> GetNetworks()
+{
+    return {CBaseChainParams::MAIN, CBaseChainParams::TESTNET, CBaseChainParams::REGTEST};
 }
 
-uint160 insecure_GetRandUInt160(FastRandomContext &rand) {
+uint160 insecure_GetRandUInt160(FastRandomContext &rand)
+{
     uint160 n;
-    for (uint8_t *c = n.begin(); c != n.end(); ++c) {
+    for (uint8_t *c = n.begin(); c != n.end(); ++c)
+    {
         *c = static_cast<uint8_t>(rand.rand32());
     }
     return n;
@@ -38,19 +40,21 @@ std::vector<uint8_t> insecure_GetRandomByteArray(FastRandomContext &rand, size_t
     return out;
 }
 
-class DstTypeChecker : public boost::static_visitor<void> {
+class DstTypeChecker : public boost::static_visitor<void>
+{
 public:
     void operator()(const CKeyID &id) { isKey = true; }
     void operator()(const CScriptID &id) { isScript = true; }
     void operator()(const CNoDestination &) {}
-
-    static bool IsScriptDst(const CTxDestination &d) {
+    static bool IsScriptDst(const CTxDestination &d)
+    {
         DstTypeChecker checker;
         boost::apply_visitor(checker, d);
         return checker.isScript;
     }
 
-    static bool IsKeyDst(const CTxDestination &d) {
+    static bool IsKeyDst(const CTxDestination &d)
+    {
         DstTypeChecker checker;
         boost::apply_visitor(checker, d);
         return checker.isKey;
@@ -71,47 +75,49 @@ const std::array<std::pair<uint8_t, uint32_t>, 8> valid_sizes = {
 
 BOOST_FIXTURE_TEST_SUITE(cashaddrenc_tests, BasicTestingSetup)
 
-BOOST_AUTO_TEST_CASE(encode_decode_all_sizes) {
+BOOST_AUTO_TEST_CASE(encode_decode_all_sizes)
+{
     FastRandomContext rand(true);
     const CChainParams &params = Params(CBaseChainParams::MAIN);
 
-    for (auto ps : valid_sizes) {
-        std::vector<uint8_t> data =
-            insecure_GetRandomByteArray(rand, ps.second);
+    for (auto ps : valid_sizes)
+    {
+        std::vector<uint8_t> data = insecure_GetRandomByteArray(rand, ps.second);
         CashAddrContent content = {PUBKEY_TYPE, data};
         std::vector<uint8_t> packed_data = PackCashAddrContent(content);
 
         // Check that the packed size is correct
         BOOST_CHECK_EQUAL(packed_data[1] >> 2, ps.first);
-        std::string address =
-            cashaddr::Encode(params.CashAddrPrefix(), packed_data);
+        std::string address = cashaddr::Encode(params.CashAddrPrefix(), packed_data);
 
         // Check that the address decodes properly
         CashAddrContent decoded = DecodeCashAddrContent(address, params);
         BOOST_CHECK_EQUAL_COLLECTIONS(
-            std::begin(content.hash), std::end(content.hash),
-            std::begin(decoded.hash), std::end(decoded.hash));
+            std::begin(content.hash), std::end(content.hash), std::begin(decoded.hash), std::end(decoded.hash));
     }
 }
 
-BOOST_AUTO_TEST_CASE(check_packaddr_throws) {
+BOOST_AUTO_TEST_CASE(check_packaddr_throws)
+{
     FastRandomContext rand(true);
 
-    for (auto ps : valid_sizes) {
-        std::vector<uint8_t> data =
-            insecure_GetRandomByteArray(rand, ps.second - 1);
+    for (auto ps : valid_sizes)
+    {
+        std::vector<uint8_t> data = insecure_GetRandomByteArray(rand, ps.second - 1);
         CashAddrContent content = {PUBKEY_TYPE, data};
         BOOST_CHECK_THROW(PackCashAddrContent(content), std::runtime_error);
     }
 }
 
-BOOST_AUTO_TEST_CASE(encode_decode) {
-    std::vector<CTxDestination> toTest = {CNoDestination{},
-                                          CKeyID(uint160S("badf00d")),
-                                          CScriptID(uint160S("f00dbad"))};
+BOOST_AUTO_TEST_CASE(encode_decode)
+{
+    std::vector<CTxDestination> toTest = {
+        CNoDestination{}, CKeyID(uint160S("badf00d")), CScriptID(uint160S("f00dbad"))};
 
-    for (auto dst : toTest) {
-        for (auto net : GetNetworks()) {
+    for (auto dst : toTest)
+    {
+        for (auto net : GetNetworks())
+        {
             std::string encoded = EncodeCashAddr(dst, Params(net));
             CTxDestination decoded = DecodeCashAddr(encoded, Params(net));
             BOOST_CHECK(dst == decoded);
@@ -120,14 +126,17 @@ BOOST_AUTO_TEST_CASE(encode_decode) {
 }
 
 // Check that an encoded cash address is not valid on another network.
-BOOST_AUTO_TEST_CASE(invalid_on_wrong_network) {
-
+BOOST_AUTO_TEST_CASE(invalid_on_wrong_network)
+{
     const CTxDestination dst = CKeyID(uint160S("c0ffee"));
     const CTxDestination invalidDst = CNoDestination{};
 
-    for (auto net : GetNetworks()) {
-        for (auto otherNet : GetNetworks()) {
-            if (net == otherNet) continue;
+    for (auto net : GetNetworks())
+    {
+        for (auto otherNet : GetNetworks())
+        {
+            if (net == otherNet)
+                continue;
 
             std::string encoded = EncodeCashAddr(dst, Params(net));
             CTxDestination decoded = DecodeCashAddr(encoded, Params(otherNet));
@@ -137,13 +146,15 @@ BOOST_AUTO_TEST_CASE(invalid_on_wrong_network) {
     }
 }
 
-BOOST_AUTO_TEST_CASE(random_dst) {
+BOOST_AUTO_TEST_CASE(random_dst)
+{
     FastRandomContext rand(true);
 
     const size_t NUM_TESTS = 5000;
     const CChainParams &params = Params(CBaseChainParams::MAIN);
 
-    for (size_t i = 0; i < NUM_TESTS; ++i) {
+    for (size_t i = 0; i < NUM_TESTS; ++i)
+    {
         uint160 hash = insecure_GetRandUInt160(rand);
         const CTxDestination dst_key = CKeyID(hash);
         const CTxDestination dst_scr = CScriptID(hash);
@@ -170,10 +181,12 @@ BOOST_AUTO_TEST_CASE(random_dst) {
  * converting back to bytes, this extra padding is truncated. In order to ensure
  * cashaddr are cannonicals, we check that the data we truncate is zeroed.
  */
-BOOST_AUTO_TEST_CASE(check_padding) {
+BOOST_AUTO_TEST_CASE(check_padding)
+{
     uint8_t version = 0;
     std::vector<uint8_t> data = {version};
-    for (size_t i = 0; i < 33; ++i) {
+    for (size_t i = 0; i < 33; ++i)
+    {
         data.push_back(1);
     }
 
@@ -182,16 +195,20 @@ BOOST_AUTO_TEST_CASE(check_padding) {
     const CTxDestination nodst = CNoDestination{};
     const CChainParams params = Params(CBaseChainParams::MAIN);
 
-    for (uint8_t i = 0; i < 32; i++) {
+    for (uint8_t i = 0; i < 32; i++)
+    {
         data[data.size() - 1] = i;
         std::string fake = cashaddr::Encode(params.CashAddrPrefix(), data);
         CTxDestination dst = DecodeCashAddr(fake, params);
 
         // We have 168 bits of payload encoded as 170 bits in 5 bits nimbles. As
         // a result, we must have 2 zeros.
-        if (i & 0x03) {
+        if (i & 0x03)
+        {
             BOOST_CHECK(dst == nodst);
-        } else {
+        }
+        else
+        {
             BOOST_CHECK(dst != nodst);
         }
     }
@@ -200,24 +217,24 @@ BOOST_AUTO_TEST_CASE(check_padding) {
 /**
  * We ensure type is extracted properly from the version.
  */
-BOOST_AUTO_TEST_CASE(check_type) {
+BOOST_AUTO_TEST_CASE(check_type)
+{
     std::vector<uint8_t> data;
     data.resize(34);
 
     const CChainParams params = Params(CBaseChainParams::MAIN);
 
-    for (uint8_t v = 0; v < 16; v++) {
+    for (uint8_t v = 0; v < 16; v++)
+    {
         std::fill(begin(data), end(data), 0);
         data[0] = v;
-        auto content = DecodeCashAddrContent(
-            cashaddr::Encode(params.CashAddrPrefix(), data), params);
+        auto content = DecodeCashAddrContent(cashaddr::Encode(params.CashAddrPrefix(), data), params);
         BOOST_CHECK_EQUAL(content.type, v);
         BOOST_CHECK_EQUAL(content.hash.size(), 20UL);
 
         // Check that using the reserved bit result in a failure.
         data[0] |= 0x10;
-        content = DecodeCashAddrContent(
-            cashaddr::Encode(params.CashAddrPrefix(), data), params);
+        content = DecodeCashAddrContent(cashaddr::Encode(params.CashAddrPrefix(), data), params);
         BOOST_CHECK_EQUAL(content.type, 0);
         BOOST_CHECK_EQUAL(content.hash.size(), 0UL);
     }
@@ -226,13 +243,15 @@ BOOST_AUTO_TEST_CASE(check_type) {
 /**
  * We ensure size is extracted and checked properly.
  */
-BOOST_AUTO_TEST_CASE(check_size) {
+BOOST_AUTO_TEST_CASE(check_size)
+{
     const CTxDestination nodst = CNoDestination{};
     const CChainParams params = Params(CBaseChainParams::MAIN);
 
     std::vector<uint8_t> data;
 
-    for (auto ps : valid_sizes) {
+    for (auto ps : valid_sizes)
+    {
         // Number of bytes required for a 5-bit packed version of a hash, with
         // version byte.  Add half a byte(4) so integer math provides the next
         // multiple-of-5 that would fit all the data.
@@ -243,50 +262,44 @@ BOOST_AUTO_TEST_CASE(check_size) {
         // be in the second 5-bit group, shifted left twice.
         data[1] = ps.first << 2;
 
-        auto content = DecodeCashAddrContent(
-            cashaddr::Encode(params.CashAddrPrefix(), data), params);
+        auto content = DecodeCashAddrContent(cashaddr::Encode(params.CashAddrPrefix(), data), params);
 
         BOOST_CHECK_EQUAL(content.type, 0);
         BOOST_CHECK_EQUAL(content.hash.size(), ps.second);
 
         data.push_back(0);
-        content = DecodeCashAddrContent(
-            cashaddr::Encode(params.CashAddrPrefix(), data), params);
+        content = DecodeCashAddrContent(cashaddr::Encode(params.CashAddrPrefix(), data), params);
 
         BOOST_CHECK_EQUAL(content.type, 0);
         BOOST_CHECK_EQUAL(content.hash.size(), 0UL);
 
         data.pop_back();
         data.pop_back();
-        content = DecodeCashAddrContent(
-            cashaddr::Encode(params.CashAddrPrefix(), data), params);
+        content = DecodeCashAddrContent(cashaddr::Encode(params.CashAddrPrefix(), data), params);
 
         BOOST_CHECK_EQUAL(content.type, 0);
         BOOST_CHECK_EQUAL(content.hash.size(), 0UL);
     }
 }
 
-BOOST_AUTO_TEST_CASE(test_addresses) {
+BOOST_AUTO_TEST_CASE(test_addresses)
+{
     const CChainParams params = Params(CBaseChainParams::MAIN);
 
-    std::vector<std::vector<uint8_t>> hash{
-        {118, 160, 64,  83, 189, 160, 168, 139, 218, 81,
-         119, 184, 106, 21, 195, 178, 159, 85,  152, 115},
-        {203, 72, 18, 50, 41,  156, 213, 116, 49,  81,
-         172, 75, 45, 99, 174, 25,  142, 123, 176, 169},
-        {1,   31, 40,  228, 115, 201, 95, 64,  19,  215,
-         213, 62, 197, 251, 195, 180, 45, 248, 237, 16}};
+    std::vector<std::vector<uint8_t> > hash{
+        {118, 160, 64, 83, 189, 160, 168, 139, 218, 81, 119, 184, 106, 21, 195, 178, 159, 85, 152, 115},
+        {203, 72, 18, 50, 41, 156, 213, 116, 49, 81, 172, 75, 45, 99, 174, 25, 142, 123, 176, 169},
+        {1, 31, 40, 228, 115, 201, 95, 64, 19, 215, 213, 62, 197, 251, 195, 180, 45, 248, 237, 16}};
 
-    std::vector<std::string> pubkey = {
-        "bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a",
+    std::vector<std::string> pubkey = {"bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a",
         "bitcoincash:qr95sy3j9xwd2ap32xkykttr4cvcu7as4y0qverfuy",
         "bitcoincash:qqq3728yw0y47sqn6l2na30mcw6zm78dzqre909m2r"};
-    std::vector<std::string> script = {
-        "bitcoincash:ppm2qsznhks23z7629mms6s4cwef74vcwvn0h829pq",
+    std::vector<std::string> script = {"bitcoincash:ppm2qsznhks23z7629mms6s4cwef74vcwvn0h829pq",
         "bitcoincash:pr95sy3j9xwd2ap32xkykttr4cvcu7as4yc93ky28e",
         "bitcoincash:pqq3728yw0y47sqn6l2na30mcw6zm78dzq5ucqzc37"};
 
-    for (size_t i = 0; i < hash.size(); ++i) {
+    for (size_t i = 0; i < hash.size(); ++i)
+    {
         const CTxDestination dstKey = CKeyID(uint160(hash[i]));
         BOOST_CHECK_EQUAL(pubkey[i], EncodeCashAddr(dstKey, params));
 

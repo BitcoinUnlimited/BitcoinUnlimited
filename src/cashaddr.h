@@ -9,19 +9,17 @@
 #include <string>
 #include <vector>
 
-namespace cashaddr {
-
+namespace cashaddr
+{
 /**
  * Encode a cashaddr string. Returns the empty string in case of failure.
  */
-std::string Encode(const std::string &prefix,
-                   const std::vector<uint8_t> &values);
+std::string Encode(const std::string &prefix, const std::vector<uint8_t> &values);
 
 /**
  * Decode a cashaddr string. Returns (prefix, data). Empty prefix means failure.
  */
-std::pair<std::string, std::vector<uint8_t>>
-Decode(const std::string &str, const std::string &default_prefix);
+std::pair<std::string, std::vector<uint8_t> > Decode(const std::string &str, const std::string &default_prefix);
 
 std::vector<uint8_t> EncodingCharset();
 

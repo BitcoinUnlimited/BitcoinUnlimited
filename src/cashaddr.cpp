@@ -5,8 +5,8 @@
 
 #include "cashaddr.h"
 
-namespace {
-
+namespace
+{
 typedef std::vector<uint8_t> data;
 
 /**
@@ -17,19 +17,17 @@ const char *CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 /**
  * The cashaddr character set for decoding.
  */
-const int8_t CHARSET_REV[128] = {
-    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15, -1, 10, 17, 21, 20, 26, 30, 7,
-    5,  -1, -1, -1, -1, -1, -1, -1, 29, -1, 24, 13, 25, 9,  8,  23, -1, 18, 22,
-    31, 27, 19, -1, 1,  0,  3,  16, 11, 28, 12, 14, 6,  4,  2,  -1, -1, -1, -1,
-    -1, -1, 29, -1, 24, 13, 25, 9,  8,  23, -1, 18, 22, 31, 27, 19, -1, 1,  0,
-    3,  16, 11, 28, 12, 14, 6,  4,  2,  -1, -1, -1, -1, -1};
+const int8_t CHARSET_REV[128] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15, -1, 10,
+    17, 21, 20, 26, 30, 7, 5, -1, -1, -1, -1, -1, -1, -1, 29, -1, 24, 13, 25, 9, 8, 23, -1, 18, 22, 31, 27, 19, -1, 1,
+    0, 3, 16, 11, 28, 12, 14, 6, 4, 2, -1, -1, -1, -1, -1, -1, 29, -1, 24, 13, 25, 9, 8, 23, -1, 18, 22, 31, 27, 19, -1,
+    1, 0, 3, 16, 11, 28, 12, 14, 6, 4, 2, -1, -1, -1, -1, -1};
 
 /**
  * Concatenate two byte arrays.
  */
-data Cat(data x, const data &y) {
+data Cat(data x, const data &y)
+{
     x.insert(x.end(), y.begin(), y.end());
     return x;
 }
@@ -39,7 +37,8 @@ data Cat(data x, const data &y) {
  * values, in order to make the checksum 0. These 8 values are packed together
  * in a single 40-bit integer. The higher bits correspond to earlier values.
  */
-uint64_t PolyMod(const data &v) {
+uint64_t PolyMod(const data &v)
+{
     /**
      * The input is interpreted as a list of coefficients of a polynomial over F
      * = GF(32), with an implicit 1 in front. If the input is [v0,v1,v2,v3,v4],
@@ -74,7 +73,8 @@ uint64_t PolyMod(const data &v) {
      * starting value for `c`.
      */
     uint64_t c = 1;
-    for (uint8_t d : v) {
+    for (uint8_t d : v)
+    {
         /**
          * We want to update `c` to correspond to a polynomial with one extra
          * term. If the initial value of `c` consists of the coefficients of
@@ -105,31 +105,36 @@ uint64_t PolyMod(const data &v) {
         c = ((c & 0x07ffffffff) << 5) ^ d;
 
         // Finally, for each set bit n in c0, conditionally add {2^n}k(x):
-        if (c0 & 0x01) {
+        if (c0 & 0x01)
+        {
             // k(x) = {19}*x^7 + {3}*x^6 + {25}*x^5 + {11}*x^4 + {25}*x^3 +
             //        {3}*x^2 + {19}*x + {1}
             c ^= 0x98f2bc8e61;
         }
 
-        if (c0 & 0x02) {
+        if (c0 & 0x02)
+        {
             // {2}k(x) = {15}*x^7 + {6}*x^6 + {27}*x^5 + {22}*x^4 + {27}*x^3 +
             //           {6}*x^2 + {15}*x + {2}
             c ^= 0x79b76d99e2;
         }
 
-        if (c0 & 0x04) {
+        if (c0 & 0x04)
+        {
             // {4}k(x) = {30}*x^7 + {12}*x^6 + {31}*x^5 + {5}*x^4 + {31}*x^3 +
             //           {12}*x^2 + {30}*x + {4}
             c ^= 0xf33e5fb3c4;
         }
 
-        if (c0 & 0x08) {
+        if (c0 & 0x08)
+        {
             // {8}k(x) = {21}*x^7 + {24}*x^6 + {23}*x^5 + {10}*x^4 + {23}*x^3 +
             //           {24}*x^2 + {21}*x + {8}
             c ^= 0xae2eabe2a8;
         }
 
-        if (c0 & 0x10) {
+        if (c0 & 0x10)
+        {
             // {16}k(x) = {3}*x^7 + {25}*x^6 + {7}*x^5 + {20}*x^4 + {7}*x^3 +
             //            {25}*x^2 + {3}*x + {16}
             c ^= 0x1e4f43e470;
@@ -144,7 +149,8 @@ uint64_t PolyMod(const data &v) {
  *
  * Assume the input is a character.
  */
-inline uint8_t LowerCase(uint8_t c) {
+inline uint8_t LowerCase(uint8_t c)
+{
     // ASCII black magic.
     return c | 0x20;
 }
@@ -152,10 +158,12 @@ inline uint8_t LowerCase(uint8_t c) {
 /**
  * Expand the address prefix for the checksum computation.
  */
-data ExpandPrefix(const std::string &prefix) {
+data ExpandPrefix(const std::string &prefix)
+{
     data ret;
     ret.resize(prefix.size() + 1);
-    for (size_t i = 0; i < prefix.size(); ++i) {
+    for (size_t i = 0; i < prefix.size(); ++i)
+    {
         ret[i] = prefix[i] & 0x1f;
     }
 
@@ -166,7 +174,8 @@ data ExpandPrefix(const std::string &prefix) {
 /**
  * Verify a checksum.
  */
-bool VerifyChecksum(const std::string &prefix, const data &values) {
+bool VerifyChecksum(const std::string &prefix, const data &values)
+{
     /**
      * PolyMod computes what value to xor into the final values to make the
      * checksum 0. However, if we required that the checksum was 0, it would be
@@ -180,14 +189,16 @@ bool VerifyChecksum(const std::string &prefix, const data &values) {
 /**
  * Create a checksum.
  */
-data CreateChecksum(const std::string &prefix, const data &values) {
+data CreateChecksum(const std::string &prefix, const data &values)
+{
     data enc = Cat(ExpandPrefix(prefix), values);
     // Append 8 zeroes.
     enc.resize(enc.size() + 8);
     // Determine what to XOR into those 8 zeroes.
     uint64_t mod = PolyMod(enc) ^ 1;
     data ret(8);
-    for (size_t i = 0; i < 8; ++i) {
+    for (size_t i = 0; i < 8; ++i)
+    {
         // Convert the 5-bit groups in mod to checksum values.
         ret[i] = (mod >> (5 * (7 - i))) & 0x1f;
     }
@@ -197,18 +208,20 @@ data CreateChecksum(const std::string &prefix, const data &values) {
 
 } // namespace
 
-namespace cashaddr {
-
+namespace cashaddr
+{
 /**
  * Encode a cashaddr string.
  */
-std::string Encode(const std::string &prefix, const data &values) {
+std::string Encode(const std::string &prefix, const data &values)
+{
     data checksum = CreateChecksum(prefix, values);
     data combined = Cat(values, checksum);
     std::string ret = prefix + ':';
 
     ret.reserve(ret.size() + combined.size());
-    for (uint8_t c : combined) {
+    for (uint8_t c : combined)
+    {
         ret += CHARSET[c];
     }
 
@@ -218,33 +231,39 @@ std::string Encode(const std::string &prefix, const data &values) {
 /**
  * Decode a cashaddr string.
  */
-std::pair<std::string, data> Decode(const std::string &str,
-                                    const std::string &default_prefix) {
+std::pair<std::string, data> Decode(const std::string &str, const std::string &default_prefix)
+{
     // Go over the string and do some sanity checks.
     bool lower = false, upper = false, hasNumber = false;
     size_t prefixSize = 0;
-    for (size_t i = 0; i < str.size(); ++i) {
+    for (size_t i = 0; i < str.size(); ++i)
+    {
         uint8_t c = str[i];
-        if (c >= 'a' && c <= 'z') {
+        if (c >= 'a' && c <= 'z')
+        {
             lower = true;
             continue;
         }
 
-        if (c >= 'A' && c <= 'Z') {
+        if (c >= 'A' && c <= 'Z')
+        {
             upper = true;
             continue;
         }
 
-        if (c >= '0' && c <= '9') {
+        if (c >= '0' && c <= '9')
+        {
             // We cannot have numbers in the prefix.
             hasNumber = true;
             continue;
         }
 
-        if (c == ':') {
+        if (c == ':')
+        {
             // The separator cannot be the first character, cannot have number
             // and there must not be 2 separators.
-            if (hasNumber || i == 0 || prefixSize != 0) {
+            if (hasNumber || i == 0 || prefixSize != 0)
+            {
                 return {};
             }
 
@@ -257,17 +276,22 @@ std::pair<std::string, data> Decode(const std::string &str,
     }
 
     // We can't have both upper case and lowercase.
-    if (upper && lower) {
+    if (upper && lower)
+    {
         return {};
     }
 
     // Get the prefix.
     std::string prefix;
-    if (prefixSize == 0) {
+    if (prefixSize == 0)
+    {
         prefix = default_prefix;
-    } else {
+    }
+    else
+    {
         prefix.reserve(prefixSize);
-        for (size_t i = 0; i < prefixSize; ++i) {
+        for (size_t i = 0; i < prefixSize; ++i)
+        {
             prefix += LowerCase(str[i]);
         }
 
@@ -278,10 +302,12 @@ std::pair<std::string, data> Decode(const std::string &str,
     // Decode values.
     const size_t valuesSize = str.size() - prefixSize;
     data values(valuesSize);
-    for (size_t i = 0; i < valuesSize; ++i) {
+    for (size_t i = 0; i < valuesSize; ++i)
+    {
         uint8_t c = str[i + prefixSize];
         // We have an invalid char in there.
-        if (c > 127 || CHARSET_REV[c] == -1) {
+        if (c > 127 || CHARSET_REV[c] == -1)
+        {
             return {};
         }
 
@@ -289,14 +315,16 @@ std::pair<std::string, data> Decode(const std::string &str,
     }
 
     // Verify the checksum.
-    if (!VerifyChecksum(prefix, values)) {
+    if (!VerifyChecksum(prefix, values))
+    {
         return {};
     }
 
     return {std::move(prefix), data(values.begin(), values.end() - 8)};
 }
 
-std::vector<uint8_t> EncodingCharset() {
+std::vector<uint8_t> EncodingCharset()
+{
     const size_t size = 32;
     return std::vector<uint8_t>(CHARSET, CHARSET + size);
 }
