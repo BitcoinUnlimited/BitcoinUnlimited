@@ -1386,9 +1386,9 @@ bool AppInit2(boost::thread_group &threadGroup, CScheduler &scheduler)
     // ********************************************************* Step 12: finished
 
     SetRPCWarmupFinished();
-    uiInterface.InitMessage(_("Done loading"));
 
 #ifdef ENABLE_WALLET
+    uiInterface.InitMessage(_("Reaccepting Wallet Transactions"));
     if (pwalletMain)
     {
         // Add wallet transactions that aren't already in a block to mapTransactions
@@ -1399,5 +1399,6 @@ bool AppInit2(boost::thread_group &threadGroup, CScheduler &scheduler)
     }
 #endif
 
+    uiInterface.InitMessage(_("Done loading"));
     return !fRequestShutdown;
 }
