@@ -4748,6 +4748,16 @@ bool static LoadBlockIndexDB()
             pindexBestHeader = pindex;
     }
 
+    // Check presence of blk files
+    LogPrintf("Checking all blk files are present...\n");
+    for (std::set<int>::iterator it = setBlkDataFiles.begin(); it != setBlkDataFiles.end(); it++)
+    {
+        CDiskBlockPos pos(*it, 0);
+        fs::path path = GetBlockPosFilename(pos, "blk");
+        if (!fs::exists(path))
+            return false;
+    }
+
     // Load block file info
     pblocktree->ReadLastBlockFile(nLastBlockFile);
     vinfoBlockFile.resize(nLastBlockFile + 1);
@@ -4768,16 +4778,6 @@ bool static LoadBlockIndexDB()
         {
             break;
         }
-    }
-
-    // Check presence of blk files
-    LogPrintf("Checking all blk files are present...\n");
-    for (std::set<int>::iterator it = setBlkDataFiles.begin(); it != setBlkDataFiles.end(); it++)
-    {
-        CDiskBlockPos pos(*it, 0);
-        fs::path path = GetBlockPosFilename(pos, "blk");
-        if (!fs::exists(path))
-            return false;
     }
 
     // Check whether we have ever pruned block & undo files
