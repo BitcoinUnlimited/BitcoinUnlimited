@@ -4697,13 +4697,13 @@ bool static LoadBlockIndexDB()
     // Calculate nChainWork
     std::vector<std::pair<int, CBlockIndex *> > vSortedByHeight;
     vSortedByHeight.reserve(mapBlockIndex.size());
-    BOOST_FOREACH (const PAIRTYPE(uint256, CBlockIndex *) & item, mapBlockIndex)
+    for (const std::pair<uint256, CBlockIndex *> &item : mapBlockIndex)
     {
         CBlockIndex *pindex = item.second;
         vSortedByHeight.push_back(std::make_pair(pindex->nHeight, pindex));
     }
     std::sort(vSortedByHeight.begin(), vSortedByHeight.end());
-    BOOST_FOREACH (const PAIRTYPE(int, CBlockIndex *) & item, vSortedByHeight)
+    for (const std::pair<int, CBlockIndex *> &item : vSortedByHeight)
     {
         CBlockIndex *pindex = item.second;
         pindex->nChainWork = (pindex->pprev ? pindex->pprev->nChainWork : 0) + GetBlockProof(*pindex);
@@ -4765,7 +4765,7 @@ bool static LoadBlockIndexDB()
     // Check presence of blk files
     LogPrintf("Checking all blk files are present...\n");
     std::set<int> setBlkDataFiles;
-    BOOST_FOREACH (const PAIRTYPE(uint256, CBlockIndex *) & item, mapBlockIndex)
+    for (const std::pair<uint256, CBlockIndex *> &item : mapBlockIndex)
     {
         CBlockIndex *pindex = item.second;
         if (pindex->nStatus & BLOCK_HAVE_DATA)
