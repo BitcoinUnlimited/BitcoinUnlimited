@@ -4694,14 +4694,22 @@ bool static LoadBlockIndexDB()
 
     boost::this_thread::interruption_point();
 
-    // Calculate nChainWork
+    // Gather data necessary to perform the following checks
     std::vector<std::pair<int, CBlockIndex *> > vSortedByHeight;
     vSortedByHeight.reserve(mapBlockIndex.size());
+    std::set<int> setBlkDataFiles;
     for (const std::pair<uint256, CBlockIndex *> &item : mapBlockIndex)
     {
         CBlockIndex *pindex = item.second;
         vSortedByHeight.push_back(std::make_pair(pindex->nHeight, pindex));
+
+        if (pindex->nStatus & BLOCK_HAVE_DATA)
+        {
+            setBlkDataFiles.insert(pindex->nFile);
+        }
     }
+
+    // Calculate nChainWork
     std::sort(vSortedByHeight.begin(), vSortedByHeight.end());
     for (const std::pair<int, CBlockIndex *> &item : vSortedByHeight)
     {
@@ -4764,15 +4772,6 @@ bool static LoadBlockIndexDB()
 
     // Check presence of blk files
     LogPrintf("Checking all blk files are present...\n");
-    std::set<int> setBlkDataFiles;
-    for (const std::pair<uint256, CBlockIndex *> &item : mapBlockIndex)
-    {
-        CBlockIndex *pindex = item.second;
-        if (pindex->nStatus & BLOCK_HAVE_DATA)
-        {
-            setBlkDataFiles.insert(pindex->nFile);
-        }
-    }
     for (std::set<int>::iterator it = setBlkDataFiles.begin(); it != setBlkDataFiles.end(); it++)
     {
         CDiskBlockPos pos(*it, 0);
