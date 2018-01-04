@@ -11,8 +11,11 @@
 #include <QDialog>
 #include <QImage>
 #include <QLabel>
+#include <QPainter>
+#include <QString>
 
 class OptionsModel;
+class Config;
 
 namespace Ui
 {
@@ -51,7 +54,7 @@ class ReceiveRequestDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit ReceiveRequestDialog(QWidget *parent = 0);
+    explicit ReceiveRequestDialog(const Config *cfg, QWidget *parent = 0);
     ~ReceiveRequestDialog();
 
     void setModel(OptionsModel *model);
@@ -67,6 +70,10 @@ private:
     Ui::ReceiveRequestDialog *ui;
     OptionsModel *model;
     SendCoinsRecipient info;
+    const Config *cfg;
 };
+
+// exported for unittesting
+QString ToCurrentEncoding(const QString &addr, const Config &);
 
 #endif // BITCOIN_QT_RECEIVEREQUESTDIALOG_H

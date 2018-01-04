@@ -18,7 +18,6 @@
 #include "chainparams.h"
 #include "key.h"
 #include "pubkey.h"
-#include "script/script.h"
 #include "script/standard.h"
 #include "support/allocators/zeroafterfree.h"
 
@@ -98,30 +97,6 @@ public:
     bool operator>(const CBase58Data &b58) const { return CompareTo(b58) > 0; }
 };
 
-/** base58-encoded Bitcoin addresses.
- * Public-key-hash-addresses have version 0 (or 111 testnet).
- * The data vector contains RIPEMD160(SHA256(pubkey)), where pubkey is the serialized public key.
- * Script-hash-addresses have version 5 (or 196 testnet).
- * The data vector contains RIPEMD160(SHA256(cscript)), where cscript is the serialized redemption script.
- */
-class CBitcoinAddress : public CBase58Data
-{
-public:
-    bool Set(const CKeyID &id);
-    bool Set(const CScriptID &id);
-    bool Set(const CTxDestination &dest);
-    bool IsValid() const;
-    bool IsValid(const CChainParams &params) const;
-
-    CBitcoinAddress() {}
-    CBitcoinAddress(const CTxDestination &dest) { Set(dest); }
-    CBitcoinAddress(const std::string &strAddress) { SetString(strAddress); }
-    CBitcoinAddress(const char *pszAddress) { SetString(pszAddress); }
-    CTxDestination Get() const;
-    bool GetKeyID(CKeyID &keyID) const;
-    bool IsScript() const;
-};
-
 /**
  * A base58-encoded secret key
  */
@@ -171,5 +146,8 @@ public:
 
 typedef CBitcoinExtKeyBase<CExtKey, 74, CChainParams::EXT_SECRET_KEY> CBitcoinExtKey;
 typedef CBitcoinExtKeyBase<CExtPubKey, 74, CChainParams::EXT_PUBLIC_KEY> CBitcoinExtPubKey;
+
+std::string EncodeLegacyAddr(const CTxDestination &dest, const CChainParams &);
+CTxDestination DecodeLegacyAddr(const std::string &str, const CChainParams &);
 
 #endif // BITCOIN_BASE58_H

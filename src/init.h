@@ -9,6 +9,7 @@
 
 #include <string>
 
+class Config;
 class CScheduler;
 class CWallet;
 
@@ -26,7 +27,7 @@ void Shutdown();
 void InitLogging();
 //! Parameter interaction: change current parameters depending on various rules
 void InitParameterInteraction();
-bool AppInit2(boost::thread_group &threadGroup, CScheduler &scheduler);
+bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &scheduler);
 
 void MainCleanup();
 void NetCleanup();

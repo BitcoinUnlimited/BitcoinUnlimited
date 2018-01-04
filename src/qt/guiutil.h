@@ -19,6 +19,8 @@
 
 class QValidatedLineEdit;
 class SendCoinsRecipient;
+class CChainParams;
+class Config;
 
 QT_BEGIN_NAMESPACE
 class QAbstractItemView;
@@ -40,14 +42,20 @@ QString dateTimeStr(qint64 nTime);
 // Return a monospace font
 QFont fixedPitchFont();
 
+// Generate an invalid, but convincing address.
+std::string DummyAddress(const CChainParams &params, const Config &cfg);
+
 // Set up widgets for address and amounts
 void setupAddressWidget(QValidatedLineEdit *widget, QWidget *parent);
 void setupAmountWidget(QLineEdit *widget, QWidget *parent);
 
-// Parse "bitcoin:" URI into recipient object, return true on successful parsing
-bool parseBitcoinURI(const QUrl &uri, SendCoinsRecipient *out);
-bool parseBitcoinURI(QString uri, SendCoinsRecipient *out);
-QString formatBitcoinURI(const SendCoinsRecipient &info);
+QString bitcoinURIScheme(const CChainParams &, bool useCashAddr);
+QString bitcoinURIScheme(const Config &);
+// Parse "bitcoincash:" URI into recipient object, return true on successful
+// parsing
+bool parseBitcoinURI(const QString &scheme, const QUrl &uri, SendCoinsRecipient *out);
+bool parseBitcoinURI(const QString &scheme, QString uri, SendCoinsRecipient *out);
+QString formatBitcoinURI(const Config &cfg, const SendCoinsRecipient &info);
 
 QString uriPrefix();
 

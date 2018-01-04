@@ -9,6 +9,7 @@
 
 #include "chainparams.h"
 #include "clientversion.h"
+#include "config.h"
 #include "fs.h"
 #include "httprpc.h"
 #include "httpserver.h"
@@ -70,6 +71,8 @@ bool AppInit(int argc, char *argv[])
 {
     boost::thread_group threadGroup;
     CScheduler scheduler;
+
+    auto &config = const_cast<Config &>(GetConfig());
 
     bool fRet = false;
 
@@ -184,7 +187,7 @@ bool AppInit(int argc, char *argv[])
         // Set this early so that parameter interactions go to console
         InitLogging();
         InitParameterInteraction();
-        fRet = AppInit2(threadGroup, scheduler);
+        fRet = AppInit2(config, threadGroup, scheduler);
     }
     catch (const std::exception &e)
     {

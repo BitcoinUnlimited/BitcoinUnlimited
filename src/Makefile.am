@@ -81,6 +81,8 @@ BITCOIN_CORE_H = \
   bitnodes.h \
   bloom.h \
   buip055fork.h \
+  cashaddr.h \
+  cashaddrenc.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
@@ -95,6 +97,7 @@ BITCOIN_CORE_H = \
   compat/endian.h \
   compat/sanity.h \
   compressor.h \
+  config.h \
   connmgr.h \
   consensus/consensus.h \
   core_io.h \
@@ -102,6 +105,7 @@ BITCOIN_CORE_H = \
   dosman.h \
   expedited.h \
   fs.h \
+  dstencode.h \
   httprpc.h \
   httpserver.h \
   init.h \
@@ -314,11 +318,15 @@ libbitcoin_common_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_common_a_SOURCES = \
   amount.cpp \
   base58.cpp \
+  cashaddr.cpp \
+  cashaddrenc.cpp \
   chainparams.cpp \
   coins.cpp \
   compressor.cpp \
+  config.cpp \
   core_read.cpp \
   core_write.cpp \
+  dstencode.cpp \
   key.cpp \
   keystore.cpp \
   netaddress.cpp \
@@ -477,7 +485,6 @@ clean-local:
 	-$(MAKE) -C secp256k1 clean
 	-$(MAKE) -C univalue clean
 	-rm -f leveldb/*/*.gcda leveldb/*/*.gcno leveldb/helpers/memenv/*.gcda leveldb/helpers/memenv/*.gcno
-	-rm -f config.h
 	-rm -rf test/__pycache__
 
 .rc.o:

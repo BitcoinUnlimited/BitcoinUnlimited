@@ -382,8 +382,8 @@
         <translation>Биткойн ядро</translation>
     </message>
     <message>
-        <source>Request payments (generates QR codes and %1: URIs)</source>
-        <translation>Изискване на плащания(генерира QR кодове и %1: URIs)</translation>
+        <source>Request payments (generates QR codes and %1 URIs)</source>
+        <translation>Изискване на плащания(генерира QR кодове и %1 URIs)</translation>
     </message>
     <message>
         <source>&amp;About Bitcoin Unlimited</source>
@@ -398,8 +398,8 @@
         <translation>Покажи списък с използваните адреси и имена.</translation>
     </message>
     <message>
-        <source>Open a %1: URI or payment request</source>
-        <translation>Отворете %1: URI  или заявка за плащане</translation>
+        <source>Open a %1 URI or payment request</source>
+        <translation>Отворете %1 URI  или заявка за плащане</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>
@@ -1073,6 +1073,14 @@
     </context>
 <context>
     <name>PaymentServer</name>
+    <message>
+        <source>Payment request error</source>
+        <translation>Възникна грешка по време назаявката за плащане</translation>
+    </message>
+    <message>
+        <source>Cannot start %1 click-to-pay handler</source>
+        <translation>Биткойн не можe да се %1 click-to-pay handler</translation>
+    </message>
     <message>
         <source>URI handling</source>
         <translation>Справяне с URI</translation>

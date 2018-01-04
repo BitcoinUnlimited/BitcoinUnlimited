@@ -402,8 +402,8 @@
         <translation>Bitcoin Unlimited</translation>
     </message>
     <message>
-        <source>Request payments (generates QR codes and %1: URIs)</source>
-        <translation>Forespør betalinger (genererer QR-koder og %1: URIer)</translation>
+        <source>Request payments (generates QR codes and %1 URIs)</source>
+        <translation>Forespør betalinger (genererer QR-koder og %1 URIer)</translation>
     </message>
     <message>
         <source>&amp;About Bitcoin Unlimited</source>
@@ -422,8 +422,8 @@
         <translation>Vis listen over bruke mottaksadresser og merkelapper</translation>
     </message>
     <message>
-        <source>Open a %1: URI or payment request</source>
-        <translation>Åpne en %1: URI eller betalingsetterspørring</translation>
+        <source>Open a %1 URI or payment request</source>
+        <translation>Åpne en %1 URI eller betalingsetterspørring</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>
@@ -2688,6 +2688,10 @@
     <message>
         <source>Type of transaction.</source>
         <translation>Type transaksjon.</translation>
+    </message>
+    <message>
+        <source>A message that was attached to the %1 URI which will be stored with the transaction for your reference. Note: This message will not be sent over the Bitcoin network.</source>
+        <translation>En melding som var tilknyttet %1 URI vil bli lagret med transaksjonen for din oversikt. Denne meldingen vil ikke bli sendt over Bitcoin-nettverket.</translation>
     </message>
     <message>
         <source>Whether or not a watch-only address is involved in this transaction.</source>

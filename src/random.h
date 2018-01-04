@@ -38,6 +38,16 @@ void seed_insecure_rand(bool fDeterministic = false);
  */
 class FastRandomContext
 {
+private:
+    uint64_t bitbuf;
+    int bitbuf_size;
+
+    void FillBitBuffer()
+    {
+        bitbuf = rand64();
+        bitbuf_size = 64;
+    }
+
 public:
     explicit FastRandomContext(bool fDeterministic = false);
 
@@ -59,6 +69,27 @@ public:
     }
 
     bool randbool() { return rand32() & 1; }
+    uint64_t randbits(int bits)
+    {
+        if (bits == 0)
+        {
+            return 0;
+        }
+        else if (bits > 32)
+        {
+            return rand64() >> (64 - bits);
+        }
+        else
+        {
+            if (bitbuf_size < bits)
+                FillBitBuffer();
+
+            uint64_t ret = bitbuf & (~uint64_t(0) >> (64 - bits));
+            bitbuf >>= bits;
+            bitbuf_size -= bits;
+            return ret;
+        }
+    }
 };
 
 /* Number of random bytes returned by GetOSRand.

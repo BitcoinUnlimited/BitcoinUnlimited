@@ -18,6 +18,7 @@
 #include <QPoint>
 #include <QVariant>
 
+class Config;
 class OptionsModel;
 class PlatformStyle;
 class WalletModel;
@@ -45,7 +46,7 @@ public:
         MINIMUM_COLUMN_WIDTH = 130
     };
 
-    explicit ReceiveCoinsDialog(const PlatformStyle *platformStyle, QWidget *parent = 0);
+    explicit ReceiveCoinsDialog(const PlatformStyle *platformStyle, const Config *cfg, QWidget *parent = 0);
     ~ReceiveCoinsDialog();
 
     void setModel(WalletModel *model);
@@ -67,7 +68,9 @@ private:
     WalletModel *model;
     QMenu *contextMenu;
     const PlatformStyle *platformStyle;
+    const Config *cfg;
 
+    QModelIndex selectedRow();
     void copyColumnToClipboard(int column);
     virtual void resizeEvent(QResizeEvent *event);
 
@@ -81,7 +84,7 @@ private Q_SLOTS:
     void recentRequestsView_selectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
     void updateDisplayUnit();
     void showMenu(const QPoint &point);
-    void copyAddress();
+    void copyURI();
     void copyLabel();
     void copyMessage();
     void copyAmount();

@@ -53,11 +53,14 @@ BITCOIN_TESTS =\
   test/checkblock_tests.cpp \
   test/Checkpoints_tests.cpp \
   test/bswap_tests.cpp \
+  test/cashaddr_tests.cpp \
+  test/cashaddrenc_tests.cpp \
   test/coins_tests.cpp \
   test/compress_tests.cpp \
   test/crypto_tests.cpp \
   test/DoS_tests.cpp \
   test/exploit_tests.cpp \
+  test/dstencode_tests.cpp \
   test/getarg_tests.cpp \
   test/hash_tests.cpp \
   test/key_tests.cpp \
@@ -107,8 +110,8 @@ BITCOIN_TESTS += \
   wallet/test/wallet_test_fixture.h \
   wallet/test/accounting_tests.cpp \
   wallet/test/wallet_tests.cpp \
-  wallet/test/crypto_tests.cpp \
-  wallet/test/rpc_wallet_tests.cpp
+  wallet/test/walletdb_tests.cpp \
+  wallet/test/crypto_tests.cpp
 endif
 
 test_test_bitcoin_SOURCES = $(BITCOIN_TESTS) $(JSON_TEST_FILES) $(RAW_TEST_FILES)

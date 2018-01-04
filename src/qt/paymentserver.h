@@ -7,7 +7,7 @@
 #define BITCOIN_QT_PAYMENTSERVER_H
 
 // This class handles payment requests from clicking on
-// bitcoin: URIs
+// bitcoincash: URIs
 //
 // This is somewhat tricky, because we have to deal with
 // the situation where the user clicks on a link during
@@ -135,6 +135,7 @@ protected:
 
 private:
     static bool readPaymentRequestFromFile(const QString &filename, PaymentRequestPlus &request);
+    bool handleURI(const QString &scheme, const QString &s);
     bool processPaymentRequest(const PaymentRequestPlus &request, SendCoinsRecipient &recipient);
     void fetchRequest(const QUrl &url);
 

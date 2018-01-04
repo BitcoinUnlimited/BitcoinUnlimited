@@ -218,6 +218,14 @@
         <translation>Bitcoin Unlimited</translation>
     </message>
     <message>
+        <source>Tabs toolbar</source>
+        <translation>Thanh công cụ (toolbar)</translation>
+    </message>
+    <message>
+        <source>Request payments (generates QR codes and %1 URIs)</source>
+        <translation>Yêu cầu thanh toán(tạo mã QR và địa chỉ %1 URLs)</translation>
+    </message>
+    <message>
         <source>&amp;About Bitcoin Unlimited</source>
         <translation>&amp;Về Bitcoin Unlimited</translation>
     </message>
@@ -228,6 +236,10 @@
     <message numerus="yes">
         <source>%n day(s)</source>
         <translation><numerusform>%n ngày</numerusform></translation>
+    </message>
+    <message>
+        <source>Open a %1 URI or payment request</source>
+        <translation>Mở %1URL hoặc yêu cầu thanh toán</translation>
     </message>
     <message numerus="yes">
         <source>%n week(s)</source>

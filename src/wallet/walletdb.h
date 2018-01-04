@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2017 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -8,6 +9,9 @@
 #define BITCOIN_WALLET_WALLETDB_H
 
 #include "amount.h"
+#include "key.h"
+#include "primitives/transaction.h"
+#include "script/standard.h" // for CTxDestination
 #include "wallet/db.h"
 #include "key.h"
 
@@ -82,11 +86,11 @@ public:
     {
     }
 
-    bool WriteName(const std::string& strAddress, const std::string& strName);
-    bool EraseName(const std::string& strAddress);
+    bool WriteName(const CTxDestination &address, const std::string &strName);
+    bool EraseName(const CTxDestination &address);
 
-    bool WritePurpose(const std::string& strAddress, const std::string& purpose);
-    bool ErasePurpose(const std::string& strAddress);
+    bool WritePurpose(const CTxDestination &address, const std::string &purpose);
+    bool ErasePurpose(const CTxDestination &address);
 
     bool WriteTx(uint256 hash, const CWalletTx& wtx);
     bool EraseTx(uint256 hash);
@@ -115,17 +119,18 @@ public:
 
     /// This writes directly to the database, and will not update the CWallet's cached accounting entries!
     /// Use wallet.AddAccountingEntry instead, to write *and* update its caches.
-    bool WriteAccountingEntry_Backend(const CAccountingEntry& acentry);
-    bool ReadAccount(const std::string& strAccount, CAccount& account);
-    bool WriteAccount(const std::string& strAccount, const CAccount& account);
+    bool WriteAccountingEntry(const uint64_t nAccEntryNum, const CAccountingEntry &acentry);
+    bool WriteAccountingEntry_Backend(const CAccountingEntry &acentry);
+    bool ReadAccount(const std::string &strAccount, CAccount &account);
+    bool WriteAccount(const std::string &strAccount, const CAccount &account);
 
-    /// Write destination data key,value tuple to database
-    bool WriteDestData(const std::string &address, const std::string &key, const std::string &value);
-    /// Erase destination data tuple from wallet database
-    bool EraseDestData(const std::string &address, const std::string &key);
+    /// Write destination data key,value tuple to database.
+    bool WriteDestData(const CTxDestination &address, const std::string &key, const std::string &value);
+    /// Erase destination data tuple from wallet database.
+    bool EraseDestData(const CTxDestination &address, const std::string &key);
 
-    CAmount GetAccountCreditDebit(const std::string& strAccount);
-    void ListAccountCreditDebit(const std::string& strAccount, std::list<CAccountingEntry>& acentries);
+    CAmount GetAccountCreditDebit(const std::string &strAccount);
+    void ListAccountCreditDebit(const std::string &strAccount, std::list<CAccountingEntry> &acentries);
 
     DBErrors ReorderTransactions(CWallet* pwallet);
     DBErrors LoadWallet(CWallet* pwallet);
@@ -138,8 +143,6 @@ public:
 private:
     CWalletDB(const CWalletDB&);
     void operator=(const CWalletDB&);
-
-    bool WriteAccountingEntry(const uint64_t nAccEntryNum, const CAccountingEntry& acentry);
 };
 
 bool BackupWallet(const CWallet& wallet, const std::string& strDest);
