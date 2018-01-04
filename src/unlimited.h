@@ -199,7 +199,6 @@ extern CLeakyBucket sendShaper;
 // Test to determine if traffic shaping is enabled
 extern bool IsTrafficShapingEnabled();
 
-
 // Check whether we are doing an initial block download (synchronizing from disk or network)
 extern bool IsInitialBlockDownload();
 extern void IsInitialBlockDownloadInit();

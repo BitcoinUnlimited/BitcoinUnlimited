@@ -87,8 +87,9 @@ UniValue importprivkey(const UniValue& params, bool fHelp)
             "\nArguments:\n"
             "1. \"bitcoinprivkey\"   (string, required) The private key (see dumpprivkey)\n"
             "2. \"label\"            (string, optional, default=\"\") An optional label\n"
-            "3. rescan               (boolean, optional, default=true) Rescan the wallet for transactions\n"
-            "\nNote: This call can take minutes to complete if rescan is true.\n"
+            "3. rescan               (boolean, optional, default=true) Scan the blockchain for transactions\n"
+            "\nNote: This call can take hours to complete if rescan is true.  To import multiple private keys\n"
+            "\nuse the importprivatekeys RPC call.\n"
             "\nExamples:\n"
             "\nDump a private key\n"
             + HelpExampleCli("dumpprivkey", "\"myaddress\"") +
@@ -153,6 +154,91 @@ UniValue importprivkey(const UniValue& params, bool fHelp)
     return NullUniValue;
 }
 
+UniValue importprivatekeys(const UniValue& params, bool fHelp)
+{
+    if (!EnsureWalletIsAvailable(fHelp))
+        return NullUniValue;
+
+    if (fHelp || params.size() < 1)
+        throw runtime_error(
+            "importprivatekeys [rescan | no-rescan] \"bitcoinprivkey\"...\n"
+            "\nAdds private keys (as returned by dumpprivkey) to your wallet.\n"
+            "\nArguments:\n"
+            "1. \"rescan | no-rescan\" (string, optional default rescan) If \"no-rescan\", skip wallet rescan\n"
+            "2. \"bitcoinprivkey\"   (string, at least 1 required) The private keys (see dumpprivkey)\n"
+            "\nNote: This command will return before the rescan (may take hours) is complete.\n"
+            "\nExamples:\n"
+            "\nDump a private key\n"
+            + HelpExampleCli("dumpprivkey", "\"myaddress\"") +
+            "\nImport the private key with rescan\n"
+            + HelpExampleCli("importprivatekey", "\"mykey\"") +
+            "\nImport using a label and without rescan\n"
+            + HelpExampleCli("importprivkey", "no-rescan \"mykey\"") +
+            "\nAs a JSON-RPC call\n"
+            + HelpExampleRpc("importprivkey", "\"mykey\"")
+        );
+
+    LOCK2(cs_main, pwalletMain->cs_wallet);
+    
+    EnsureWalletIsUnlocked();
+
+    unsigned int paramNum = 0;
+    bool fRescan = true;
+
+    if (params[0].get_str() == "no-rescan")
+    {
+        fRescan = false;
+        paramNum++;
+    }
+    else if (params[0].get_str() == "rescan")
+    {
+        fRescan = true;
+        paramNum++;
+    }
+
+    for (; paramNum < params.size(); paramNum++)
+    {
+        string strSecret = params[paramNum].get_str();
+        string strLabel = "";
+
+        CBitcoinSecret vchSecret;
+        bool fGood = vchSecret.SetString(strSecret);
+
+        if (!fGood)
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key encoding");
+
+        CKey key = vchSecret.GetKey();
+        if (!key.IsValid())
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Private key outside allowed range");
+
+        CPubKey pubkey = key.GetPubKey();
+        assert(key.VerifyPubKey(pubkey));
+        CKeyID vchAddress = pubkey.GetID();
+
+        pwalletMain->MarkDirty();
+        pwalletMain->SetAddressBook(vchAddress, strLabel, "receive");
+
+        // Don't throw error in case a key is already there
+        if (!pwalletMain->HaveKey(vchAddress))
+        {
+            pwalletMain->mapKeyMetadata[vchAddress].nCreateTime = 1;
+
+            if (!pwalletMain->AddKeyPubKey(key, pubkey))
+                throw JSONRPCError(RPC_WALLET_ERROR, "Error adding key to wallet");
+
+            // whenever a key is imported, we need to scan the whole chain
+            pwalletMain->nTimeFirstKey = 1; // 0 would be considered 'no value'
+        }
+    }
+
+    if (fRescan)
+    {
+        StartWalletRescanThread();
+    }
+
+    return NullUniValue;
+}
+
 void ImportAddress(const CBitcoinAddress& address, const string& strLabel);
 void ImportScript(const CScript& script, const string& strLabel, bool isRedeemScript)
 {
@@ -180,11 +266,13 @@ void ImportAddress(const CBitcoinAddress& address, const string& strLabel)
         pwalletMain->SetAddressBook(address.Get(), strLabel, "receive");
 }
 
+
+
 UniValue importaddress(const UniValue& params, bool fHelp)
 {
     if (!EnsureWalletIsAvailable(fHelp))
         return NullUniValue;
-    
+
     if (fHelp || params.size() < 1 || params.size() > 4)
         throw runtime_error(
             "importaddress \"address\" ( \"label\" rescan p2sh )\n"
@@ -194,7 +282,7 @@ UniValue importaddress(const UniValue& params, bool fHelp)
             "2. \"label\"            (string, optional, default=\"\") An optional label\n"
             "3. rescan               (boolean, optional, default=true) Rescan the wallet for transactions\n"
             "4. p2sh                 (boolean, optional, default=false) Add the P2SH version of the script as well\n"
-            "\nNote: This call can take minutes to complete if rescan is true.\n"
+            "\nNote: This call can take hours to complete if rescan is true.\n"
             "If you have the full public key, you should call importpublickey instead of this.\n"
             "\nExamples:\n"
             "\nImport a script with rescan\n"
@@ -241,6 +329,82 @@ UniValue importaddress(const UniValue& params, bool fHelp)
     {
         pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true);
         pwalletMain->ReacceptWalletTransactions();
+    }
+
+    return NullUniValue;
+}
+
+UniValue importaddresses(const UniValue& params, bool fHelp)
+{
+    if (!EnsureWalletIsAvailable(fHelp))
+        return NullUniValue;
+
+    if (fHelp || params.size() < 1 || params.size() > 4)
+        throw runtime_error(
+            "importaddresses [rescan | no-rescan] \"address\"...\n"
+            "\nAdds a script (in hex) or address that can be watched as if it were in your wallet but cannot be used to spend.\n"
+            "\nArguments:\n"
+            "1. \"rescan | no-rescan\" (string, optional default rescan) If \"no-rescan\", skip wallet rescan\n"
+            "1. \"address\"           (string, 0 or more) The address or hex-encoded script\n"
+            "\nNote, this command will return before the rescan (may take hours) is complete..\n"
+            "If you have the full public key, you should call importpublickey instead of this.\n"
+            "\nExamples:\n"
+            "\nImport a script with rescan\n"
+            + HelpExampleCli("importaddresses", "\"myscript\"") +
+            "\nImport using a label without rescan\n"
+            + HelpExampleCli("importaddresses", "no-rescan \"myscript\"") +
+            "\nAs a JSON-RPC call\n"
+            + HelpExampleRpc("importaddress", "\"myscript\"")
+        );
+
+    string strLabel = "";
+    if (params.size() > 1)
+        strLabel = params[1].get_str();
+
+    // Whether to perform rescan after import
+    bool fRescan = true;
+    // Whether to import a p2sh version, too
+    bool fP2SH = false;
+
+    unsigned int paramNum = 0;
+
+    if (params[0].get_str() == "no-rescan")
+    {
+        fRescan = false;
+        paramNum++;
+    }
+    else if (params[0].get_str() == "rescan")
+    {
+        fRescan = true;
+        paramNum++;
+    }
+
+    if (fRescan && fPruneMode)
+        throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
+
+    LOCK2(cs_main, pwalletMain->cs_wallet);
+
+    for (; paramNum < params.size(); paramNum++)
+    {
+        CBitcoinAddress address(params[paramNum].get_str());
+        if (address.IsValid())
+        {
+            ImportAddress(address, strLabel);
+        }
+        else if (IsHex(params[0].get_str()))
+        {
+            std::vector<unsigned char> data(ParseHex(params[0].get_str()));
+            ImportScript(CScript(data.begin(), data.end()), strLabel, fP2SH);
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Bitcoin address or script");
+        }
+    }
+
+    if (fRescan)
+    {
+        StartWalletRescanThread();
     }
 
     return NullUniValue;

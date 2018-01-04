@@ -3420,3 +3420,16 @@ bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectAbsurdFee)
     CValidationState state;
     return ::AcceptToMemoryPool(mempool, state, *this, fLimitFree, nullptr, false, fRejectAbsurdFee);
 }
+
+
+void ThreadRescan()
+{
+    pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true);
+    pwalletMain->ReacceptWalletTransactions();
+}
+
+void StartWalletRescanThread()
+{
+    boost::thread rescanThread(boost::bind(&TraceThread<void (*)()>, "rescan", &ThreadRescan));
+    rescanThread.detach();
+}

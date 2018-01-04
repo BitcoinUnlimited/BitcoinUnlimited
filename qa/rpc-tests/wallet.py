@@ -317,6 +317,46 @@ class WalletTest (BitcoinTestFramework):
         except JSONRPCException as e:
             assert("Invalid or non-wallet transaction id" not in e.error['message'])
 
+        self.sync_all()
+
+        # test multiple private key import, and watch only address import
+        bal = self.nodes[2].getbalance()
+        addrs = [ self.nodes[1].getnewaddress() for i in range(0,20)]
+        pks   = [ self.nodes[1].dumpprivkey(x) for x in addrs]
+        for a in addrs:
+            self.nodes[0].sendtoaddress(a, 1)
+        self.nodes[0].generate(1)
+        self.nodes[2].importprivatekeys(pks[0], pks[1])
+        time.sleep(1)
+        assert(bal + 2 == self.nodes[2].getbalance())
+        self.nodes[2].importprivatekeys("rescan", pks[2], pks[3])
+        time.sleep(1)
+        assert(bal + 4 == self.nodes[2].getbalance())
+        self.nodes[2].importprivatekeys("no-rescan", pks[4], pks[5])
+        time.sleep(1)
+        assert(bal + 4 == self.nodes[2].getbalance())  # since the recan didn't happen, there won't be a balance change
+        self.nodes[2].importaddresses("rescan") # force a rescan although we imported nothing
+        time.sleep(1)
+        assert(bal + 6 == self.nodes[2].getbalance())  # since the recan didn't happen, there won't be a balance change
+
+        self.nodes[2].importaddresses(addrs[6], addrs[7])  # import watch only addresses
+        time.sleep(1)
+        assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
+        assert(bal + 8 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+
+        self.nodes[2].importaddresses("rescan", addrs[8], addrs[9])  # import watch only addresses
+        time.sleep(1)
+        assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
+        assert(bal + 10 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+
+        self.nodes[2].importaddresses("no-rescan", addrs[10], addrs[11])  # import watch only addresses
+        time.sleep(1)
+        assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
+        assert(bal + 10 == self.nodes[2].getbalance("*",1,True)) # show the full balance, will be same because no rescan
+        self.nodes[2].importaddresses("rescan") # force a rescan although we imported nothing
+        time.sleep(1)
+        assert(bal + 12 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+
         #check if wallet or blochchain maintenance changes the balance
         self.sync_all()
         blocks = self.nodes[0].generate(2)
@@ -362,6 +402,7 @@ class WalletTest (BitcoinTestFramework):
         assert_equal(coinbase_tx_1["transactions"][0]["blockhash"], blocks[1])
         assert_equal(len(self.nodes[0].listsinceblock(blocks[1])["transactions"]), 0)
 
+
 if __name__ == '__main__':
     WalletTest ().main ()
 
@@ -371,5 +412,5 @@ def Test():
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],  # "lck"
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
-    # "--tmpdir=/ramdisk/test",
-    t.main(["--nocleanup", "--noshutdown"], bitcoinConf, None)
+    # "--tmpdir=/ramdisk/test", "--srcdir=../../debug/src"
+    t.main(["--srcdir=../../debug/src", "--tmpdir=/ramdisk/test", "--nocleanup", "--noshutdown"], bitcoinConf, None)
