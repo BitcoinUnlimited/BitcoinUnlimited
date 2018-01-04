@@ -161,11 +161,7 @@ void WalletModel::updateWatchOnlyFlag(bool fHaveWatchonly)
     Q_EMIT notifyWatchonlyChanged(fHaveWatchonly);
 }
 
-bool WalletModel::validateAddress(const QString &address)
-{
-    return IsValidDestinationString(address.toStdString());
-}
-
+bool WalletModel::validateAddress(const QString &address) { return IsValidDestinationString(address.toStdString()); }
 WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransaction &transaction,
     const CCoinControl *coinControl)
 {

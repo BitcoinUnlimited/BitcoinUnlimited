@@ -231,15 +231,13 @@ void PaymentServer::ipcParseCommandLine(int argc, char *argv[])
             SendCoinsRecipient r;
             if (GUIUtil::parseBitcoinURI(arg, &r) && !r.address.isEmpty())
             {
-                if (IsValidDestinationString(r.address.toStdString(),
-                                             Params(CBaseChainParams::MAIN)))
+                if (IsValidDestinationString(r.address.toStdString(), Params(CBaseChainParams::MAIN)))
                 {
                     SelectParams(CBaseChainParams::MAIN);
                 }
-                else if (IsValidDestinationString(r.address.toStdString(),
-                               Params(CBaseChainParams::TESTNET)))
+                else if (IsValidDestinationString(r.address.toStdString(), Params(CBaseChainParams::TESTNET)))
                 {
-                   SelectParams(CBaseChainParams::TESTNET);
+                    SelectParams(CBaseChainParams::TESTNET);
                 }
             }
         }

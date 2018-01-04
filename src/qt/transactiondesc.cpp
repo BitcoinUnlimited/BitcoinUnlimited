@@ -95,8 +95,7 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
             {
                 if (wallet->mapAddressBook.count(address))
                 {
-                    strHTML +=
-                        "<b>" + tr("From") + ":</b> " + tr("unknown") + "<br>";
+                    strHTML += "<b>" + tr("From") + ":</b> " + tr("unknown") + "<br>";
                     strHTML += "<b>" + tr("To") + ":</b> ";
                     if (!wallet->mapAddressBook[address].name.empty())
                         strHTML += GUIUtil::HtmlEscape(wallet->mapAddressBook[address].name) + " ";

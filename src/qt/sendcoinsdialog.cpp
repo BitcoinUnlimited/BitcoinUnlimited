@@ -808,13 +808,11 @@ void SendCoinsDialog::coinControlChangeEdited(const QString &text)
                 ui->labelCoinControlChangeLabel->setText(tr("Warning: Unknown change address"));
 
                 // confirmation dialog
-                QMessageBox::StandardButton btnRetVal = QMessageBox::question(
-                    this, tr("Confirm custom change address"),
+                QMessageBox::StandardButton btnRetVal = QMessageBox::question(this, tr("Confirm custom change address"),
                     tr("The address you selected for change is not part of "
                        "this wallet. Any or all funds in your wallet may be "
                        "sent to this address. Are you sure?"),
-                    QMessageBox::Yes | QMessageBox::Cancel,
-                    QMessageBox::Cancel);
+                    QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
 
                 if (btnRetVal == QMessageBox::Yes)
                     CoinControlDialog::coinControl->destChange = dest;

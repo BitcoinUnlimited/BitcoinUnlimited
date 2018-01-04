@@ -80,7 +80,8 @@ QValidator::State BitcoinAddressCheckValidator::validate(QString &input, int &po
 {
     Q_UNUSED(pos);
     // Validate the passed Bitcoin address
-    if (IsValidDestinationString(input.toStdString())) {
+    if (IsValidDestinationString(input.toStdString()))
+    {
         return QValidator::Acceptable;
     }
 
