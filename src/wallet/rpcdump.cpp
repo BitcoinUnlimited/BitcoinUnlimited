@@ -400,10 +400,10 @@ UniValue importaddresses(const UniValue &params, bool fHelp)
 
     for (; paramNum < params.size(); paramNum++)
     {
-        CBitcoinAddress address(params[paramNum].get_str());
-        if (address.IsValid())
+        CTxDestination dest = DecodeDestination(params[paramNum].get_str());
+        if (IsValidDestination(dest))
         {
-            ImportAddress(address, strLabel);
+            ImportAddress(dest, strLabel);
         }
         else if (IsHex(params[0].get_str()))
         {
