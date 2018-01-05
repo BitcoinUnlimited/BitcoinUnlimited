@@ -77,11 +77,10 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     // Received by Bitcoin Address
                     sub.type = TransactionRecord::RecvWithAddress;
                     if (labelPublic == "")
-                        sub.addresses.push_back(
-                            std::make_pair(CBitcoinAddress(address).ToString(), txout.scriptPubKey));
+                        sub.addresses.push_back(std::make_pair(EncodeDestination(address), txout.scriptPubKey));
                     else
-                        sub.addresses.push_back(std::make_pair(
-                            "<" + labelPublic + "> " + CBitcoinAddress(address).ToString(), txout.scriptPubKey));
+                        sub.addresses.push_back(
+                            std::make_pair("<" + labelPublic + "> " + EncodeDestination(address), txout.scriptPubKey));
                 }
                 else
                 {
@@ -126,7 +125,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 listAllAddresses.push_back(std::make_pair("<" + labelPublic + ">", txout.scriptPubKey));
             else if (ExtractDestination(txout.scriptPubKey, address))
                 // a standard address
-                listAllAddresses.push_back(std::make_pair(CBitcoinAddress(address).ToString(), txout.scriptPubKey));
+                listAllAddresses.push_back(std::make_pair(EncodeDestination(address), txout.scriptPubKey));
 
             else
                 // add the unknown scriptPubKey as n/a - TODO could also skip these if there is no need to
@@ -184,7 +183,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 {
                     // Sent to Bitcoin Address
                     sub.type = TransactionRecord::SendToAddress;
-                    // sub.addresses.push_back(std::make_pair(CBitcoinAddress(address).ToString(), txout.scriptPubKey));
+                    // sub.addresses.push_back(std::make_pair(EncodeDestination(address), txout.scriptPubKey));
                 }
                 else
                 {
