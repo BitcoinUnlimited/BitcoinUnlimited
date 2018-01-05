@@ -115,7 +115,7 @@ bool HandleExpeditedBlock(CDataStream &vRecv, CNode *pfrom)
     }
 }
 
-void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *skip)
+void ActuallySendExpreditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *skip)
 {
     VNodeRefs vNodeRefs(connmgr->ExpeditedBlockNodes());
 
@@ -138,13 +138,22 @@ void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode 
     }
 }
 
+void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *skip)
+{
+    LOCK(connmgr->cs_expedited);
+    if (!IsRecentlyExpeditedAndStore(thinBlock.header.GetHash()))
+    {
+        ActuallySendExpreditedBlock(thinBlock, hops, skip);
+    }
+}
+
 void SendExpeditedBlock(const CBlock &block, const CNode *skip)
 {
     LOCK(connmgr->cs_expedited);
     if (!IsRecentlyExpeditedAndStore(block.GetHash()))
     {
         CXThinBlock thinBlock(block);
-        SendExpeditedBlock(thinBlock, 0, skip);
+        ActuallySendExpreditedBlock(thinBlock, 0, skip);
     }
     // else, nothing to do
 }
