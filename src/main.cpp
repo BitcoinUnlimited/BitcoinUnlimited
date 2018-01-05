@@ -31,6 +31,7 @@
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "requestManager.h"
+#include "respend/respenddetector.h"
 #include "script/script.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
@@ -43,6 +44,7 @@
 #include "undo.h"
 #include "util.h"
 #include "utilmoneystr.h"
+#include "utilprocessmsg.h"
 #include "utilstrencodings.h"
 #include "validationinterface.h"
 #include "versionbits.h"
@@ -679,15 +681,17 @@ bool AreFreeTxnsDisallowed()
     return true;
 }
 
-bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
+static bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     CValidationState &state,
     const CTransaction &consttx,
     bool fLimitFree,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
-    std::vector<COutPoint> &vCoinsToUncache)
+    std::vector<COutPoint> &vCoinsToUncache,
+    bool *isRespend)
 {
+    *isRespend = false;
     unsigned int forkVerifyFlags = 0;
     CTransaction tx = consttx;
     unsigned int nSigOps = 0;
@@ -743,20 +747,17 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     if (pool.exists(hash))
         return state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
 
-    // Check for conflicts with in-memory transactions
-    {
-        READLOCK(pool.cs); // protect pool.mapNextTx
-        BOOST_FOREACH (const CTxIn &txin, tx.vin)
-        {
-            auto itConflicting = pool.mapNextTx.find(txin.prevout);
-            if (itConflicting != pool.mapNextTx.end())
-            {
-                // Disable replacement feature for good
-                return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
-            }
-        }
-    }
+    // Check for conflicts with in-memory transactions and triggers actions at
+    // end of scope (relay tx, sync wallet, etc)
+    respend::RespendDetector respend(pool, tx);
+    *isRespend = respend.IsRespend();
 
+    if (respend.IsRespend() && !respend.IsInteresting())
+    {
+        // Tx is a respend, and it's not an interesting one (we don't care to
+        // validate it further)
+        return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
+    }
     {
         CCoinsView dummy;
         CCoinsViewCache view(&dummy);
@@ -938,23 +939,19 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         if (fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize))
         {
             static double dFreeCount = 0;
+            static int64_t nLastFreeTime;
+            static int64_t nFreeLimit = GetArg("-limitfreerelay", 15);
+            static CCriticalSection csLimiter;
+            LOCK(csLimiter);
 
-            // Use an exponentially decaying ~10-minute window:
-            dFreeCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - nLastTime));
-            nLastTime = nNow;
-
-            // -limitfreerelay unit is thousand-bytes-per-minute
             // At default rate it would take over a month to fill 1GB
-            LOG(MEMPOOL, "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount + nSize);
-            if ((dFreeCount + nSize) >= (nFreeLimit * 10 * 1000 * nLargestBlockSeen / BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
+            if (RateLimitExceeded(dFreeCount, nLastFreeTime, nFreeLimit, nSize))
             {
                 thindata.UpdateMempoolLimiterBytesSaved(nSize);
                 LOG(MEMPOOL, "AcceptToMemoryPool : free transaction %s rejected by rate limiter\n", hash.ToString());
                 return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "rate limited free transaction");
             }
-            dFreeCount += nSize;
         }
-        nLastTime = nNow;
         // BU - Xtreme Thinblocks Auto Mempool Limiter - end section
 
         // BU: we calculate the recommended fee by looking at what's in the mempool.  This starts at 0 though for an
@@ -1009,6 +1006,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             return state.Invalid(false, REJECT_WRONG_FORK, "txn-uses-old-sighash-algorithm");
         }
 
+        respend.SetValid(true);
+        if (respend.IsRespend())
+            return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
+
         {
             READLOCK(pool.cs);
 
@@ -1057,11 +1058,12 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     bool fRejectAbsurdFee)
 {
     std::vector<COutPoint> vCoinsToUncache;
-    bool res = AcceptToMemoryPoolWorker(
-        pool, state, tx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit, fRejectAbsurdFee, vCoinsToUncache);
+    bool isRespend;
+    bool res = AcceptToMemoryPoolWorker(pool, state, tx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit,
+        fRejectAbsurdFee, vCoinsToUncache, &isRespend);
 
     // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
-    if (pfMissingInputs && !res && !*pfMissingInputs)
+    if (isRespend || (pfMissingInputs && !res && !*pfMissingInputs))
     {
         for (const COutPoint &remove : vCoinsToUncache)
             pcoinsTip->Uncache(remove);

@@ -149,6 +149,10 @@ BITCOIN_CORE_H = \
   rpc/protocol.h \
   rpc/server.h \
   rpc/register.h \
+  respend/respendaction.h \
+  respend/respendlogger.h \
+  respend/respendrelayer.h \
+  respend/respenddetector.h \
   scheduler.h \
   script/sigcache.h \
   script/sign.h \
@@ -175,6 +179,7 @@ BITCOIN_CORE_H = \
   requestManager.h \
   util.h \
   utilmoneystr.h \
+  utilprocessmsg.h \
   utiltime.h \
   validationinterface.h \
   versionbits.h \
@@ -232,6 +237,9 @@ libbitcoin_server_a_SOURCES = \
   rpc/net.cpp \
   rpc/rawtransaction.cpp \
   rpc/server.cpp \
+  respend/respendlogger.cpp \
+  respend/respendrelayer.cpp \
+  respend/respenddetector.cpp \
   script/sigcache.cpp \
   thinblock.cpp \
   script/ismine.cpp \
@@ -242,6 +250,7 @@ libbitcoin_server_a_SOURCES = \
   tweak.cpp \
   uahf_fork.cpp \
   unlimited.cpp \
+  utilprocessmsg.cpp \
   requestManager.cpp \
   validationinterface.cpp \
   versionbits.cpp \

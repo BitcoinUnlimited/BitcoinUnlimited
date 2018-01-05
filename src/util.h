@@ -150,7 +150,9 @@ enum
 
     SELECTCOINS = 0x1000000,
     ZMQ = 0x2000000,
-    QT = 0x4000000
+    QT = 0x4000000,
+
+    RESPEND = 0x8000000
 };
 
 // Add corresponding lower case string for the category:
@@ -161,7 +163,7 @@ enum
             {PARTITIONCHECK, "partitioncheck"}, {BENCH, "bench"}, {PRUNE, "prune"}, {REINDEX, "reindex"},       \
             {MEMPOOLREJ, "mempoolrej"}, {BLK, "blk"}, {EVICT, "evict"}, {PARALLEL, "parallel"}, {RAND, "rand"}, \
             {REQ, "req"}, {BLOOM, "bloom"}, {LCK, "lck"}, {PROXY, "proxy"}, {DBASE, "dbase"},                   \
-            {SELECTCOINS, "selectcoins"}, {ESTIMATEFEE, "estimatefee"}, {QT, "qt"},                             \
+            {SELECTCOINS, "selectcoins"}, {ESTIMATEFEE, "estimatefee"}, {QT, "qt"}, {RESPEND, "respend"},       \
         {                                                                                                       \
             ZMQ, "zmq"                                                                                          \
         }                                                                                                       \
