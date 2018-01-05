@@ -345,9 +345,11 @@ UniValue importaddresses(const UniValue& params, bool fHelp)
             "\nAdds a script (in hex) or address that can be watched as if it were in your wallet but cannot be used to spend.\n"
             "\nArguments:\n"
             "1. \"rescan | no-rescan\" (string, optional default rescan) If \"no-rescan\", skip wallet rescan\n"
-            "1. \"address\"           (string, 0 or more) The address or hex-encoded script\n"
+            "1. \"address\"           (string, 0 or more) The address or hex-encoded P2SH script\n"
             "\nNote, this command will return before the rescan (may take hours) is complete..\n"
             "If you have the full public key, you should call importpublickey instead of this.\n"
+            "This command assumes all scripts are P2SH, so you should call importaddress to\n"
+            "import a nonstandard non-P2SH script.\n"
             "\nExamples:\n"
             "\nImport a script with rescan\n"
             + HelpExampleCli("importaddresses", "\"myscript\"") +
@@ -363,8 +365,6 @@ UniValue importaddresses(const UniValue& params, bool fHelp)
 
     // Whether to perform rescan after import
     bool fRescan = true;
-    // Whether to import a p2sh version, too
-    bool fP2SH = false;
 
     unsigned int paramNum = 0;
 
@@ -386,14 +386,16 @@ UniValue importaddresses(const UniValue& params, bool fHelp)
 
     for (; paramNum < params.size(); paramNum++)
     {
-        CBitcoinAddress address(params[paramNum].get_str());
+        std::string param = params[paramNum].get_str();
+        CBitcoinAddress address(param);
         if (address.IsValid())
         {
             ImportAddress(address, strLabel);
         }
-        else if (IsHex(params[0].get_str()))
+        else if (IsHex(param))
         {
-            std::vector<unsigned char> data(ParseHex(params[0].get_str()));
+            bool fP2SH = true;
+            std::vector<unsigned char> data(ParseHex(param));
             ImportScript(CScript(data.begin(), data.end()), strLabel, fP2SH);
         }
         else

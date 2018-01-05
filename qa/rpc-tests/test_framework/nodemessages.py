@@ -1,3 +1,4 @@
+import sys
 import socket
 import struct
 import random
@@ -37,6 +38,75 @@ def wait_until(predicate, attempts=float('inf'), timeout=float('inf')):
 
     return False
 
+def bitcoinAddress2bin(btcAddress):
+    """convert a bitcoin address to binary data capable of being put in a CScript"""
+    # chop the version and checksum out of the bytes of the address
+    return decodeBase58(btcAddress)[1:-4]
+
+B58_DIGITS = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+
+def decodeBase58(s):
+    """Decode a base58-encoding string, returning bytes"""
+    if not s:
+        return b''
+
+    # Convert the string to an integer
+    n = 0
+    for c in s:
+        n *= 58
+        if c not in B58_DIGITS:
+            raise InvalidBase58Error('Character %r is not a valid base58 character' % c)
+        digit = B58_DIGITS.index(c)
+        n += digit
+
+    # Convert the integer to bytes
+    h = '%x' % n
+    if len(h) % 2:
+        h = '0' + h
+    res = unhexlify(h.encode('utf8'))
+
+    # Add padding back.
+    pad = 0
+    for c in s[:-1]:
+        if c == B58_DIGITS[0]:
+            pad += 1
+        else:
+            break
+    return b'\x00' * pad + res
+
+
+def encodeBase58(b):
+    """Encode bytes to a base58-encoded string"""
+
+    # Convert big-endian bytes to integer
+    n = int('0x0' + hexlify(b).decode('utf8'), 16)
+
+    # Divide that integer into bas58
+    res = []
+    while n > 0:
+        n, r = divmod(n, 58)
+        res.append(B58_DIGITS[r])
+    res = ''.join(res[::-1])
+
+    # Encode leading zeros as base58 zeros
+    czero = b'\x00'
+    if sys.version > '3':
+        # In Python3 indexing a bytes returns numbers, not characters.
+        czero = 0
+    pad = 0
+    for c in b:
+        if c == czero:
+            pad += 1
+        else:
+            break
+    return B58_DIGITS[0] * pad + res
+
+def encodeBitcoinAddress(prefix, data):
+    data2 = prefix + data
+    cksm = hash256(data2)[:4]
+    data3 = data2 + cksm
+    b58 = encodeBase58(data3)
+    return b58
 
 # Serialization/deserialization tools
 def sha256(s):
@@ -55,6 +125,12 @@ def hash256(s):
     b'730ac30b1e7f4061346277ab639d7a68c6686aeba4cc63280968b903024a0a40'
     """
     return sha256(sha256(s))
+
+def hash160(msg):
+    """RIPEME160(SHA256(msg)) -> bytes"""
+    h = hashlib.new('ripemd160')
+    h.update(hashlib.sha256(msg).digest())
+    return h.digest()
 
 
 def deser_string(f):
