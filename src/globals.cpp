@@ -58,6 +58,7 @@ boost::thread_specific_ptr<LockStack> lockstack;
 std::atomic<bool> fIsInitialBlockDownload{false};
 std::atomic<bool> fRescan{false}; // this flag is set to true when a wallet rescan has been invoked.
 
+CStatusString statusStrings;
 // main.cpp CriticalSections:
 CCriticalSection cs_LastBlockFile;
 CCriticalSection cs_nBlockSequenceId;
