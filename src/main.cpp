@@ -30,6 +30,7 @@
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "requestManager.h"
+#include "respend/respenddetector.h"
 #include "script/script.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
@@ -583,7 +584,7 @@ bool AreFreeTxnsDisallowed()
     return true;
 }
 
-bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
+static bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     CValidationState &state,
     const CTransactionRef &ptx,
     bool fLimitFree,
@@ -591,8 +592,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
     TransactionClass allowedTx,
-    std::vector<COutPoint> &vCoinsToUncache)
+    std::vector<COutPoint> &vCoinsToUncache,
+    bool *isRespend)
 {
+    *isRespend = false;
     unsigned int nSigOps = 0;
     ValidationResourceTracker resourceTracker;
     unsigned int nSize = 0;
@@ -642,20 +645,17 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     if (pool.exists(hash))
         return state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
 
-    // Check for conflicts with in-memory transactions
-    {
-        READLOCK(pool.cs); // protect pool.mapNextTx
-        for (const CTxIn &txin : ptx->vin)
-        {
-            auto itConflicting = pool.mapNextTx.find(txin.prevout);
-            if (itConflicting != pool.mapNextTx.end())
-            {
-                // Disable replacement feature for good
-                return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
-            }
-        }
-    }
+    // Check for conflicts with in-memory transactions and triggers actions at
+    // end of scope (relay tx, sync wallet, etc)
+    respend::RespendDetector respend(pool, *ptx);
+    *isRespend = respend.IsRespend();
 
+    if (respend.IsRespend() && !respend.IsInteresting())
+    {
+        // Tx is a respend, and it's not an interesting one (we don't care to
+        // validate it further)
+        return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
+    }
     {
         CCoinsView dummy;
         CCoinsViewCache view(&dummy);
@@ -917,6 +917,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             return state.Invalid(false, REJECT_WRONG_FORK, "txn-uses-old-sighash-algorithm");
         }
 
+        respend.SetValid(true);
+        if (respend.IsRespend())
+            return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
+
         {
             READLOCK(pool.cs);
 
@@ -985,11 +989,12 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     TransactionClass allowedTx)
 {
     std::vector<COutPoint> vCoinsToUncache;
+    bool isRespend;
     bool res = AcceptToMemoryPoolWorker(pool, state, ptx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit,
-        fRejectAbsurdFee, allowedTx, vCoinsToUncache);
+        fRejectAbsurdFee, allowedTx, vCoinsToUncache, &isRespend);
 
     // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
-    if (pfMissingInputs && !res && !*pfMissingInputs)
+    if (isRespend || (pfMissingInputs && !res && !*pfMissingInputs))
     {
         for (const COutPoint &remove : vCoinsToUncache)
             pcoinsTip->Uncache(remove);
