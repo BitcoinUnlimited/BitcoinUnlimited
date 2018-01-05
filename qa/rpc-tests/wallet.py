@@ -12,6 +12,16 @@ logging.basicConfig(format='%(asctime)s.%(levelname)s: %(message)s', level=loggi
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
+import binascii
+from test_framework.script import *
+from test_framework.nodemessages import *
+
+def GenerateSingleSigP2SH(btcAddress):
+    redeemScript = CScript([OP_DUP, OP_HASH160, bitcoinAddress2bin(btcAddress), OP_EQUALVERIFY, OP_CHECKSIG])
+    p2shAddressBin = hash160(redeemScript)
+    p2shAddress = encodeBitcoinAddress(bytes([196]), p2shAddressBin)  # 196 is regtest P2SH addr prefix
+    pubkeyScript = CScript([OP_HASH160, p2shAddressBin, OP_EQUAL])
+    return ( p2shAddress, redeemScript)
 
 def waitForRescan(node):
     info = node.getinfo()
@@ -19,6 +29,7 @@ def waitForRescan(node):
         logging.info("rescanning")
         time.sleep(.25)
         info = node.getinfo()
+
 
 class WalletTest (BitcoinTestFramework):
 
@@ -364,6 +375,25 @@ class WalletTest (BitcoinTestFramework):
         self.nodes[2].importaddresses("rescan") # force a rescan although we imported nothing
         waitForRescan(self.nodes[2])
         assert(bal + 12 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+
+        # now try P2SH
+        btcAddress = self.nodes[1].getnewaddress()
+        ( p2shAddress, redeemScript) = GenerateSingleSigP2SH(btcAddress)
+        self.nodes[0].sendtoaddress(p2shAddress,1)
+
+        btcAddress2 = self.nodes[1].getnewaddress()
+        ( p2shAddress2, redeemScript2) = GenerateSingleSigP2SH(btcAddress2)
+        self.nodes[0].sendtoaddress(p2shAddress2,1)
+
+        self.nodes[0].generate(1)
+        sync_blocks(self.nodes)
+
+        bal1 = self.nodes[2].getbalance('*', 1, True)
+        self.nodes[2].importaddresses(hexlify(redeemScript).decode("ascii"),hexlify(redeemScript2).decode("ascii"))
+        waitForRescan(self.nodes[2])
+        bal2 = self.nodes[2].getbalance('*', 1, True)
+        assert_equal(bal1 + 2, bal2)
+
 
         #check if wallet or blochchain maintenance changes the balance
         self.sync_all()
