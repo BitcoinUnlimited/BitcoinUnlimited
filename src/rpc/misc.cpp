@@ -64,6 +64,7 @@ UniValue getinfo(const UniValue& params, bool fHelp)
             "  \"paytxfee\": x.xxxx,         (numeric) the transaction fee set in " + CURRENCY_UNIT + "/kB\n"
             "  \"relayfee\": x.xxxx,         (numeric) minimum relay fee for non-free transactions in " + CURRENCY_UNIT + "/kB\n"
             "  \"fork\": \"...\"             (string) \"Bitcoin Cash\" or \"Bitcoin\".  Will display as Bitcoin pre-fork.\n"
+            "  \"status\":\"...\"            (string) long running operations are indicated here (rescan).\n" 
             "  \"errors\": \"...\"           (string) any error messages\n"
             "}\n"
             "\nExamples:\n"
@@ -105,6 +106,7 @@ UniValue getinfo(const UniValue& params, bool fHelp)
     obj.push_back(Pair("paytxfee",      ValueFromAmount(payTxFee.GetFeePerK())));
 #endif
     obj.push_back(Pair("relayfee",      ValueFromAmount(::minRelayTxFee.GetFeePerK())));
+    obj.push_back(Pair("status",        statusStrings.GetPrintable()));
     obj.push_back(Pair("errors",        GetWarnings("statusbar")));
     CBlockIndex *cashFork = chainActive.Tip();
     if (cashFork) cashFork = cashFork->GetAncestor(BITCOIN_CASH_FORK_HEIGHT);

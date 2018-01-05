@@ -1938,3 +1938,31 @@ void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
     if (dirty)
         FlushStateToDisk();
 }
+
+std::string CStatusString::GetPrintable() const
+{
+    LOCK(cs);
+    if (strSet.empty())
+        return "ready";
+    std::string ret;
+    for (auto it : strSet)
+    {
+        if (!ret.empty())
+            ret.append(" ");
+        std::string &s = it;
+        ret.append(s);
+    }
+    return ret;
+}
+
+void CStatusString::Set(const std::string &yourStatus)
+{
+    LOCK(cs);
+    strSet.insert(yourStatus);
+}
+
+void CStatusString::Clear(const std::string &yourStatus)
+{
+    LOCK(cs);
+    strSet.erase(yourStatus);
+}

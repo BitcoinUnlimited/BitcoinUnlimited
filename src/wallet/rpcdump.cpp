@@ -161,11 +161,11 @@ UniValue importprivatekeys(const UniValue& params, bool fHelp)
 
     if (fHelp || params.size() < 1)
         throw runtime_error(
-            "importprivatekeys [rescan | no-rescan] \"bitcoinprivkey\"...\n"
+            "importprivatekeys [rescan | no-rescan] \"bitcoinprivatekey\"...\n"
             "\nAdds private keys (as returned by dumpprivkey) to your wallet.\n"
             "\nArguments:\n"
             "1. \"rescan | no-rescan\" (string, optional default rescan) If \"no-rescan\", skip wallet rescan\n"
-            "2. \"bitcoinprivkey\"   (string, at least 1 required) The private keys (see dumpprivkey)\n"
+            "2. \"bitcoinprivatekey\"   (string, at least 1 required) The private keys (see dumpprivkey)\n"
             "\nNote: This command will return before the rescan (may take hours) is complete.\n"
             "\nExamples:\n"
             "\nDump a private key\n"
@@ -173,9 +173,9 @@ UniValue importprivatekeys(const UniValue& params, bool fHelp)
             "\nImport the private key with rescan\n"
             + HelpExampleCli("importprivatekey", "\"mykey\"") +
             "\nImport using a label and without rescan\n"
-            + HelpExampleCli("importprivkey", "no-rescan \"mykey\"") +
+            + HelpExampleCli("importprivatekeys", "no-rescan \"mykey\"") +
             "\nAs a JSON-RPC call\n"
-            + HelpExampleRpc("importprivkey", "\"mykey\"")
+            + HelpExampleRpc("importprivatekeys", "\"mykey\"")
         );
 
     LOCK2(cs_main, pwalletMain->cs_wallet);

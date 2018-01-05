@@ -13,6 +13,13 @@ logging.basicConfig(format='%(asctime)s.%(levelname)s: %(message)s', level=loggi
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 
+def waitForRescan(node):
+    info = node.getinfo()
+    while "rescanning" in info["status"]:
+        logging.info("rescanning")
+        time.sleep(.25)
+        info = node.getinfo()
+
 class WalletTest (BitcoinTestFramework):
 
     def check_fee_amount(self, curr_balance, balance_with_fee, fee_per_byte, tx_size):
@@ -27,7 +34,7 @@ class WalletTest (BitcoinTestFramework):
         return curr_balance
 
     def setup_chain(self,bitcoinConfDict=None, wallets=None):
-        print("Initializing test directory "+self.options.tmpdir)
+        logging.info("Initializing test directory "+self.options.tmpdir)
         initialize_chain_clean(self.options.tmpdir, 4, bitcoinConfDict, wallets)
 
     def setup_network(self, split=False):
@@ -45,7 +52,7 @@ class WalletTest (BitcoinTestFramework):
         assert_equal(len(self.nodes[1].listunspent()), 0)
         assert_equal(len(self.nodes[2].listunspent()), 0)
 
-        print("Mining blocks...")
+        logging.info("Mining blocks...")
 
         self.nodes[0].generate(1)
 
@@ -317,7 +324,7 @@ class WalletTest (BitcoinTestFramework):
         except JSONRPCException as e:
             assert("Invalid or non-wallet transaction id" not in e.error['message'])
 
-        self.sync_all()
+        sync_blocks(self.nodes)
 
         # test multiple private key import, and watch only address import
         bal = self.nodes[2].getbalance()
@@ -326,26 +333,27 @@ class WalletTest (BitcoinTestFramework):
         for a in addrs:
             self.nodes[0].sendtoaddress(a, 1)
         self.nodes[0].generate(1)
+        sync_blocks(self.nodes)
         self.nodes[2].importprivatekeys(pks[0], pks[1])
-        time.sleep(1)
+        waitForRescan(self.nodes[2])
         assert(bal + 2 == self.nodes[2].getbalance())
         self.nodes[2].importprivatekeys("rescan", pks[2], pks[3])
-        time.sleep(1)
+        waitForRescan(self.nodes[2])
         assert(bal + 4 == self.nodes[2].getbalance())
         self.nodes[2].importprivatekeys("no-rescan", pks[4], pks[5])
         time.sleep(1)
         assert(bal + 4 == self.nodes[2].getbalance())  # since the recan didn't happen, there won't be a balance change
         self.nodes[2].importaddresses("rescan") # force a rescan although we imported nothing
-        time.sleep(1)
-        assert(bal + 6 == self.nodes[2].getbalance())  # since the recan didn't happen, there won't be a balance change
+        waitForRescan(self.nodes[2])
+        assert(bal + 6 == self.nodes[2].getbalance())
 
         self.nodes[2].importaddresses(addrs[6], addrs[7])  # import watch only addresses
-        time.sleep(1)
+        waitForRescan(self.nodes[2])
         assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
         assert(bal + 8 == self.nodes[2].getbalance("*",1,True)) # show the full balance
 
         self.nodes[2].importaddresses("rescan", addrs[8], addrs[9])  # import watch only addresses
-        time.sleep(1)
+        waitForRescan(self.nodes[2])
         assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
         assert(bal + 10 == self.nodes[2].getbalance("*",1,True)) # show the full balance
 
@@ -354,7 +362,7 @@ class WalletTest (BitcoinTestFramework):
         assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
         assert(bal + 10 == self.nodes[2].getbalance("*",1,True)) # show the full balance, will be same because no rescan
         self.nodes[2].importaddresses("rescan") # force a rescan although we imported nothing
-        time.sleep(1)
+        waitForRescan(self.nodes[2])
         assert(bal + 12 == self.nodes[2].getbalance("*",1,True)) # show the full balance
 
         #check if wallet or blochchain maintenance changes the balance
@@ -386,7 +394,7 @@ class WalletTest (BitcoinTestFramework):
             '-salvagewallet',
         ]
         for m in maintenance:
-            print("check " + m)
+            logging.info("check " + m)
             stop_nodes(self.nodes)
             wait_bitcoinds()
             self.nodes = start_nodes(3, self.options.tmpdir, [[m]] * 3)
@@ -413,4 +421,4 @@ def Test():
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
     # "--tmpdir=/ramdisk/test", "--srcdir=../../debug/src"
-    t.main(["--srcdir=../../debug/src", "--tmpdir=/ramdisk/test", "--nocleanup", "--noshutdown"], bitcoinConf, None)
+    t.main(["--nocleanup", "--noshutdown"], bitcoinConf, None)
