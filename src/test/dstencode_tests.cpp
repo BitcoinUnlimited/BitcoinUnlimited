@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "base58.h"  // for bitpay encoding
 #include "chainparams.h"
 #include "config.h"
 #include "dstencode.h"
@@ -39,6 +40,8 @@ BOOST_AUTO_TEST_CASE(test_addresses) {
         "bitcoincash:ppm2qsznhks23z7629mms6s4cwef74vcwvn0h829pq";
     std::string base58_pubkey = "1BpEi6DfDAUFd7GtittLSdBeYJvcoaVggu";
     std::string base58_script = "3CWFddi6m4ndiGyKqzYvsFYagqDLPVMTzC";
+    std::string bitpay_pubkey = "CTH8H8Zj6DSnXFBKQeDG28ogAS92iS16Bp";
+    std::string bitpay_script = "HHLN6S9BcP1JLSrMhgD5qe57iVEMFMLCBT";
 
     const CChainParams &params = Params(CBaseChainParams::MAIN);
     DstCfgDummy cfg;
@@ -52,17 +55,25 @@ BOOST_AUTO_TEST_CASE(test_addresses) {
     BOOST_CHECK_EQUAL(base58_pubkey, EncodeDestination(dstKey, params, cfg));
     BOOST_CHECK_EQUAL(base58_script, EncodeDestination(dstScript, params, cfg));
 
+    BOOST_CHECK_EQUAL(bitpay_pubkey, EncodeBitpayAddr(dstKey, params));
+    BOOST_CHECK_EQUAL(bitpay_script, EncodeBitpayAddr(dstScript, params));
+
     // Check decoding
     BOOST_CHECK(dstKey == DecodeDestination(cashaddr_pubkey, params));
     BOOST_CHECK(dstScript == DecodeDestination(cashaddr_script, params));
     BOOST_CHECK(dstKey == DecodeDestination(base58_pubkey, params));
     BOOST_CHECK(dstScript == DecodeDestination(base58_script, params));
 
+    BOOST_CHECK(dstKey == DecodeDestination(bitpay_pubkey, params));
+    BOOST_CHECK(dstScript == DecodeDestination(bitpay_script, params));
+
     // Validation
     BOOST_CHECK(IsValidDestinationString(cashaddr_pubkey, params));
     BOOST_CHECK(IsValidDestinationString(cashaddr_script, params));
     BOOST_CHECK(IsValidDestinationString(base58_pubkey, params));
     BOOST_CHECK(IsValidDestinationString(base58_script, params));
+    BOOST_CHECK(IsValidDestinationString(bitpay_pubkey, params));
+    BOOST_CHECK(IsValidDestinationString(bitpay_script, params));
     BOOST_CHECK(!IsValidDestinationString("notvalid", params));
 }
 

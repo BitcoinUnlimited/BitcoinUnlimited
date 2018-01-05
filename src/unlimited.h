@@ -192,7 +192,8 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp);
 
 // RPC Set a node to receive expedited blocks from
 UniValue expedited(const UniValue &params, bool fHelp);
-
+// RPC display all variant forms of an address
+UniValue getaddressforms(const UniValue &params, bool fHelp);
 // These variables for traffic shaping need to be globally scoped so the GUI and CLI can adjust the parameters
 extern CLeakyBucket receiveShaper;
 extern CLeakyBucket sendShaper;

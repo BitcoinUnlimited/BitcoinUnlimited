@@ -3,6 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "unlimited.h"
+#include "base58.h"
+#include "cashaddrenc.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -13,6 +15,7 @@
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "dosman.h"
+#include "dstencode.h"
 #include "expedited.h"
 #include "hash.h"
 #include "leakybucket.h"
@@ -1533,6 +1536,7 @@ static const CRPCCommand commands[] =
 #ifdef DEBUG
     { "util",               "getstructuresizes",      &getstructuresizes,      true  },  // BU
 #endif
+    { "util",               "getaddressforms",        &getaddressforms,        true  },
 
     /* Coin generation */
     { "generating",         "getgenerate",            &getgenerate,            true  },
@@ -1858,4 +1862,42 @@ void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
 
     if (dirty)
         FlushStateToDisk();
+}
+
+UniValue getaddressforms(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 1)
+        throw runtime_error("getaddressforms \"address\"\n"
+                            "\nReturns all ways of displaying this address.\n"
+                            "\nArguments\n"
+                            "1. \"address\"    (string, required) the address\n"
+                            "\nResult:\n"
+                            "{\n"
+                            "\"legacy\": \"1 or 3 prefixed address\",\n"
+                            "\"bitcoincash\": \"bitcoincash prefixed address\",\n"
+                            "\"bitpay\": \"C or H prefixed address\"\n"
+                            "}\n"
+                            "\nExamples:\n" +
+                            HelpExampleCli("getaddressforms", "\"address\"") +
+                            HelpExampleRpc("getaddressforms", "\"address\""));
+
+    UniValue ret(UniValue::VARR);
+    CBlock block;
+
+    CTxDestination dest = DecodeDestination(params[0].get_str());
+
+    if (!IsValidDestination(dest))
+    {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address or script");
+    }
+
+    std::string cashAddr = EncodeCashAddr(dest, Params());
+    std::string legacyAddr = EncodeLegacyAddr(dest, Params());
+    std::string bitpayAddr = EncodeBitpayAddr(dest, Params());
+
+    UniValue node(UniValue::VOBJ);
+    node.push_back(Pair("legacy", legacyAddr));
+    node.push_back(Pair("bitcoincash", cashAddr));
+    node.push_back(Pair("bitpay", bitpayAddr));
+    return node;
 }
