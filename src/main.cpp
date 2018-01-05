@@ -751,7 +751,6 @@ void EraseOrphanTx(uint256 hash) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
 void EraseOrphansByTime() EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
 {
     AssertLockHeld(cs_orphancache);
-
     // Because we have to iterate through the entire orphan cache which can be large we don't want to check this
     // every time a tx enters the mempool but just once every 5 minutes is good enough.
     if (GetTime() < nLastOrphanCheck + 5 * 60)
@@ -765,6 +764,10 @@ void EraseOrphansByTime() EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
         if (nEntryTime < nOrphanTxCutoffTime)
         {
             uint256 txHash = mi->second.tx.GetHash();
+
+            // Uncache any coins that may exist for orphans that will be erased
+            pcoinsTip->UncacheTx(mi->second.tx);
+
             LogPrint(
                 "mempool", "Erased old orphan tx %s of age %d seconds\n", txHash.ToString(), GetTime() - nEntryTime);
             EraseOrphanTx(txHash);
@@ -790,6 +793,10 @@ unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t nMaxBytes) EXC
         std::map<uint256, COrphanTx>::iterator it = mapOrphanTransactions.lower_bound(randomhash);
         if (it == mapOrphanTransactions.end())
             it = mapOrphanTransactions.begin();
+
+        // Uncache any coins that may exist for orphans that will be erased
+        pcoinsTip->UncacheTx(it->second.tx);
+
         EraseOrphanTx(it->first);
         ++nEvicted;
     }
@@ -1122,13 +1129,16 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
 
 void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
 {
-    int expired = pool.Expire(GetTime() - age);
+    std::vector<COutPoint> vCoinsToUncache;
+    int expired = pool.Expire(GetTime() - age, vCoinsToUncache);
+    for (const COutPoint &txin : vCoinsToUncache)
+        pcoinsTip->Uncache(txin);
     if (expired != 0)
         LogPrint("mempool", "Expired %i transactions from the memory pool\n", expired);
 
     std::vector<COutPoint> vNoSpendsRemaining;
     pool.TrimToSize(limit, &vNoSpendsRemaining);
-    BOOST_FOREACH (const COutPoint &removed, vNoSpendsRemaining)
+    for (const COutPoint &removed : vNoSpendsRemaining)
         pcoinsTip->Uncache(removed);
 }
 
@@ -1140,21 +1150,29 @@ std::string FormatStateMessage(const CValidationState &state)
 }
 
 #ifdef BITCOIN_CASH
-static bool IsCashHFEnabled(const CChainParams &chainparams, int64_t nMedianTimePast)
+static bool IsDAAEnabled(const CChainParams &chainparams, int nHeight)
 {
-    return nMedianTimePast >= chainparams.GetConsensus().cashHardForkActivationTime;
+    return nHeight >= chainparams.GetConsensus().daaHeight;
 }
 
-bool IsCashHFEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev)
+bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev)
 {
     if (pindexPrev == nullptr)
     {
         return false;
     }
 
-    return IsCashHFEnabled(chainparams, pindexPrev->GetMedianTimePast());
+    return IsDAAEnabled(chainparams, pindexPrev->nHeight);
 }
 #endif
+
+bool AreFreeTxnsDisallowed()
+{
+    if (GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY) > 0)
+        return false;
+
+    return true;
+}
 
 bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     CValidationState &state,
@@ -1172,8 +1190,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     unsigned int nSize = 0;
     uint64_t start = GetTimeMicros();
     AssertLockHeld(cs_main);
-    if (pfMissingInputs)
-        *pfMissingInputs = false;
 
     if (!CheckTransaction(tx, state))
         return false;
@@ -1247,21 +1263,34 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             view.SetBackend(viewMemPool);
 
             // do all inputs exist?
-            BOOST_FOREACH (const CTxIn txin, tx.vin)
+            if (pfMissingInputs)
             {
-                if (!pcoinsTip->HaveCoinInCache(txin.prevout))
+                *pfMissingInputs = false;
+                BOOST_FOREACH (const CTxIn txin, tx.vin)
                 {
-                    vCoinsToUncache.push_back(txin.prevout);
-                }
-                if (!view.HaveCoin(txin.prevout))
-                {
-                    if (pfMissingInputs)
+                    // At this point we begin to collect coins that are potential candidates for uncaching because as
+                    // soon as we make the call below to view.HaveCoin() any missing coins will be pulled into cache.
+                    // Therefore, any coin in this transaction that is not already in cache will be tracked here such
+                    // that if this transaction fails to enter the memory pool, we will then uncache those coins that
+                    // were not already present, unless the transaction is an orphan.
+                    //
+                    // We still want to keep orphantx coins in the event the orphantx is finally accepted into the
+                    // mempool or shows up in a block that is mined.  Therefore if pfMissingInputs returns true then
+                    // any coins in vCoinsToUncache will NOT be uncached.
+                    if (!pcoinsTip->HaveCoinInCache(txin.prevout))
                     {
+                        vCoinsToUncache.push_back(txin.prevout);
+                    }
+
+                    if (!view.HaveCoin(txin.prevout))
+                    {
+                        // fMissingInputs and not state.IsInvalid() is used to detect this condition, don't set
+                        // state.Invalid()
                         *pfMissingInputs = true;
                     }
-                    // fMissingInputs and !state.IsInvalid() is used to detect this condition, don't set state.Invalid()
-                    return false;
                 }
+                if (*pfMissingInputs == true)
+                    return false;
             }
 
             // Bring the best block into scope
@@ -1353,9 +1382,9 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         //   When the feeCutoff is larger than the satoshiPerByte of the
         //   current transaction then spam blocking will be in effect. However
         //   Some free transactions will still get through based on -limitfreerelay
-        static double feeCutoff;
+        static double feeCutoff = initFeeCutoff;
         static double nFreeLimit = nLimitFreeRelay;
-        static int64_t nLastTime;
+        static int64_t nLastTime = GetTime();
         int64_t nNow = GetTime();
 
         // When the mempool starts falling use an exponentially decaying ~24 hour window:
@@ -1402,7 +1431,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             nFees);
         if (fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize))
         {
-            static double dFreeCount;
+            static double dFreeCount = 0;
 
             // Use an exponentially decaying ~10-minute window:
             dFreeCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - nLastTime));
@@ -1449,7 +1478,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true, &resourceTracker,
                 NULL, &sighashType))
         {
-            LogPrint("mempool", "txn CheckInputs failed");
+            LogPrint("mempool", "CheckInputs failed for tx: %s\n", tx.GetHash().ToString().c_str());
             return false;
         }
         entry.UpdateRuntimeSigOps(resourceTracker.GetSigOps(), resourceTracker.GetSighashBytes());
@@ -1495,7 +1524,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     }
 
     if (!fRejectAbsurdFee)
-        SyncWithWallets(tx, NULL);
+        SyncWithWallets(tx, NULL, -1);
 
     int64_t end = GetTimeMicros();
 
@@ -1519,12 +1548,13 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     std::vector<COutPoint> vCoinsToUncache;
     bool res = AcceptToMemoryPoolWorker(
         pool, state, tx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit, fRejectAbsurdFee, vCoinsToUncache);
-    if (!res)
+
+    // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
+    if (pfMissingInputs && !res && !*pfMissingInputs)
     {
         for (const COutPoint &remove : vCoinsToUncache)
             pcoinsTip->Uncache(remove);
     }
-
     return res;
 }
 
@@ -2497,12 +2527,12 @@ bool ConnectBlock(const CBlock &block,
         nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
     }
 
-// If the Cash HF is enabled, we start rejecting transaction that use a high
+// If the DAA HF is enabled, we start rejecting transaction that use a high
 // s in their signature. We also make sure that signature that are supposed
 // to fail (for instance in multisig or other forms of smart contracts) are
 // null.
 #ifdef BITCOIN_CASH
-    if (IsCashHFEnabled(chainparams, pindex->pprev))
+    if (IsDAAEnabled(chainparams, pindex->pprev))
     {
         flags |= SCRIPT_VERIFY_LOW_S;
         flags |= SCRIPT_VERIFY_NULLFAIL;
@@ -3057,7 +3087,7 @@ bool static DisconnectTip(CValidationState &state, const Consensus::Params &cons
         // ignore validation errors in resurrected transactions
         std::list<CTransaction> removed;
         CValidationState stateDummy;
-        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, NULL, true))
+        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, AreFreeTxnsDisallowed(), nullptr, true))
         {
             mempool.remove(tx, removed, true);
         }
@@ -3078,7 +3108,7 @@ bool static DisconnectTip(CValidationState &state, const Consensus::Params &cons
     // 0-confirmed or conflicted:
     BOOST_FOREACH (const CTransaction &tx, block.vtx)
     {
-        SyncWithWallets(tx, NULL);
+        SyncWithWallets(tx, NULL, -1);
     }
 
     return true;
@@ -3177,12 +3207,14 @@ bool static ConnectTip(CValidationState &state,
     // to conflicted:
     BOOST_FOREACH (const CTransaction &tx, txConflicted)
     {
-        SyncWithWallets(tx, NULL);
+        SyncWithWallets(tx, NULL, -1);
     }
     // ... and about transactions that got confirmed:
+    int txIdx = 0;
     BOOST_FOREACH (const CTransaction &tx, pblock->vtx)
     {
-        SyncWithWallets(tx, pblock);
+        SyncWithWallets(tx, pblock, txIdx);
+        txIdx++;
     }
 
     int64_t nTime6 = GetTimeMicros();
@@ -4071,7 +4103,10 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
     const Consensus::Params &consensusParams = Params().GetConsensus();
     // Check proof of work
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
+    {
+        LogPrintf("bad bits after height: %d\n", pindexPrev->nHeight);
         return state.DoS(100, error("%s: incorrect proof of work", __func__), REJECT_INVALID, "bad-diffbits");
+    }
 
     // Check timestamp against prev
     if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())
@@ -4107,8 +4142,12 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
         nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
     }
 
-    int64_t nLockTimeCutoff =
-        (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST) ? pindexPrev->GetMedianTimePast() : block.GetBlockTime();
+    int64_t nLockTimeCutoff;
+    if (pindexPrev == NULL)
+        nLockTimeCutoff = block.GetBlockTime();
+    else
+        nLockTimeCutoff =
+            (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST) ? pindexPrev->GetMedianTimePast() : block.GetBlockTime();
 
     // Check that all transactions are finalized
     BOOST_FOREACH (const CTransaction &tx, block.vtx)
@@ -4656,16 +4695,24 @@ bool static LoadBlockIndexDB()
 
     boost::this_thread::interruption_point();
 
-    // Calculate nChainWork
+    // Gather data necessary to perform the following checks
     std::vector<std::pair<int, CBlockIndex *> > vSortedByHeight;
     vSortedByHeight.reserve(mapBlockIndex.size());
-    BOOST_FOREACH (const PAIRTYPE(uint256, CBlockIndex *) & item, mapBlockIndex)
+    std::set<int> setBlkDataFiles;
+    for (const std::pair<uint256, CBlockIndex *> &item : mapBlockIndex)
     {
         CBlockIndex *pindex = item.second;
         vSortedByHeight.push_back(std::make_pair(pindex->nHeight, pindex));
+
+        if (pindex->nStatus & BLOCK_HAVE_DATA)
+        {
+            setBlkDataFiles.insert(pindex->nFile);
+        }
     }
+
+    // Calculate nChainWork
     std::sort(vSortedByHeight.begin(), vSortedByHeight.end());
-    BOOST_FOREACH (const PAIRTYPE(int, CBlockIndex *) & item, vSortedByHeight)
+    for (const std::pair<int, CBlockIndex *> &item : vSortedByHeight)
     {
         CBlockIndex *pindex = item.second;
         pindex->nChainWork = (pindex->pprev ? pindex->pprev->nChainWork : 0) + GetBlockProof(*pindex);
@@ -4690,7 +4737,7 @@ bool static LoadBlockIndexDB()
                 pindex->nChainTx = pindex->nTx;
             }
         }
-        if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->pprev == NULL))
+        if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->pprev == nullptr))
             setBlockIndexCandidates.insert(pindex);
         if (pindex->nStatus & BLOCK_FAILED_MASK &&
             (!pindexBestInvalid || pindex->nChainWork > pindexBestInvalid->nChainWork))
@@ -4698,8 +4745,18 @@ bool static LoadBlockIndexDB()
         if (pindex->pprev)
             pindex->BuildSkip();
         if (pindex->IsValid(BLOCK_VALID_TREE) &&
-            (pindexBestHeader == NULL || CBlockIndexWorkComparator()(pindexBestHeader, pindex)))
+            (pindexBestHeader == nullptr || CBlockIndexWorkComparator()(pindexBestHeader, pindex)))
             pindexBestHeader = pindex;
+    }
+
+    // Check presence of blk files
+    LogPrintf("Checking all blk files are present...\n");
+    for (std::set<int>::iterator it = setBlkDataFiles.begin(); it != setBlkDataFiles.end(); it++)
+    {
+        CDiskBlockPos pos(*it, 0);
+        fs::path path = GetBlockPosFilename(pos, "blk");
+        if (!fs::exists(path))
+            return false;
     }
 
     // Load block file info
@@ -4721,26 +4778,6 @@ bool static LoadBlockIndexDB()
         else
         {
             break;
-        }
-    }
-
-    // Check presence of blk files
-    LogPrintf("Checking all blk files are present...\n");
-    std::set<int> setBlkDataFiles;
-    BOOST_FOREACH (const PAIRTYPE(uint256, CBlockIndex *) & item, mapBlockIndex)
-    {
-        CBlockIndex *pindex = item.second;
-        if (pindex->nStatus & BLOCK_HAVE_DATA)
-        {
-            setBlkDataFiles.insert(pindex->nFile);
-        }
-    }
-    for (std::set<int>::iterator it = setBlkDataFiles.begin(); it != setBlkDataFiles.end(); it++)
-    {
-        CDiskBlockPos pos(*it, 0);
-        if (CAutoFile(OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION).IsNull())
-        {
-            return false;
         }
     }
 
@@ -6569,22 +6606,31 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
         }
 
-        // Check and accept each header in order from youngest block to oldest
-        CBlockIndex *pindexLast = NULL;
+        // Check and accept each header in dependency order (oldest block to most recent)
+        CBlockIndex *pindexLast = nullptr;
+        int i = 0;
         for (const CBlockHeader &header : headers)
         {
             CValidationState state;
             if (!AcceptBlockHeader(header, state, chainparams, &pindexLast))
             {
-                int nDoS;
-                if (state.IsInvalid(nDoS))
+                int nDos;
+                if (state.IsInvalid(nDos))
                 {
-                    if (nDoS > 0)
-                        dosMan.Misbehaving(pfrom, nDoS);
-                    return error("invalid header received");
+                    if (nDos > 0)
+                    {
+                        dosMan.Misbehaving(pfrom, nDos);
+                    }
                 }
+                // all headers from this one forward reference a fork that we don't follow, so erase them
+                headers.erase(headers.begin() + i, headers.end());
+                nCount = headers.size();
+                break;
             }
-            PV->UpdateMostWorkOurFork(header);
+            else
+                PV->UpdateMostWorkOurFork(header);
+
+            i++;
         }
 
         if (pindexLast)
@@ -7623,70 +7669,74 @@ bool SendMessages(CNode *pto)
         //
         // Message: inventory
         //
-        std::vector<CInv> vInv;
+
         std::vector<CInv> vInvWait;
+        std::vector<CInv> vInvSend;
         {
-            bool fSendTrickle = pto->fWhitelisted;
+            bool fSendTrickle = !pto->fWhitelisted;
             if (pto->nNextInvSend < nNow)
             {
-                fSendTrickle = true;
+                fSendTrickle = false;
                 pto->nNextInvSend = PoissonNextSend(nNow, AVG_INVENTORY_BROADCAST_INTERVAL);
             }
-            LOCK(pto->cs_inventory);
-            vInv.reserve(std::min<size_t>(1000, pto->vInventoryToSend.size()));
-            vInvWait.reserve(pto->vInventoryToSend.size());
-            BOOST_FOREACH (const CInv &inv, pto->vInventoryToSend)
+
+            if (1)
             {
-                if (inv.type == MSG_TX && pto->filterInventoryKnown.contains(inv.hash))
-                    continue;
+                // BU - here we only want to forward message inventory if our peer has actually been requesting
+                // useful data or giving us useful data.  We give them 2 minutes to be useful but then choke off
+                // their inventory.  This prevents fake peers from connecting and listening to our inventory
+                // while providing no value to the network.
+                // However we will still send them block inventory in the case they are a pruned node or wallet
+                // waiting for block announcements, therefore we have to check each inv in pto->vInventoryToSend.
+                bool chokeTxInv = (pto->nActivityBytes == 0 && (nNow / 1000000 - pto->nTimeConnected) > 120);
+                LOCK(pto->cs_inventory);
 
-                // BU - here we only want to forward message inventory if our peer has actually been requesting useful
-                // data or
-                //      giving us useful data.  We give them 2 minutes to be useful but then choke off their inventory.
-                //      This
-                //      prevents fake peers from connecting and listening to our inventory while providing no value to
-                //      the network.
-                //      However we will still send them block inventory in the case they are a pruned node or wallet
-                //      waiting for block
-                //      announcements, therefore we have to check each inv in pto->vInventoryToSend.
-                if (inv.type == MSG_TX && pto->nActivityBytes == 0 && (GetTime() - pto->nTimeConnected) > 120)
+                int invsz = pto->vInventoryToSend.size();
+                vInvSend.reserve(invsz);
+                // about 3/4 of the nodes should end up in this list, so over-allocate by 1/10th + 10 items
+                vInvWait.reserve((invsz * 3) / 4 + invsz / 10 + 10);
+
+                // Make copy of vInventoryToSend while cs_inventory is locked but also ignore some tx and defer others
+                for (const CInv &inv : pto->vInventoryToSend)
                 {
-                    LogPrint("evict", "choking off tx inventory for %s time connected %d\n", pto->addr.ToString(),
-                        GetTime() - pto->nTimeConnected);
-                    continue;
-                }
-
-                // trickle out tx inv to protect privacy
-                if (inv.type == MSG_TX && !fSendTrickle)
-                {
-                    // 1/4 of tx invs blast to all immediately
-                    static uint256 hashSalt;
-                    if (hashSalt.IsNull())
-                        hashSalt = GetRandHash();
-                    uint256 hashRand = ArithToUint256(UintToArith256(inv.hash) ^ UintToArith256(hashSalt));
-                    hashRand = Hash(BEGIN(hashRand), END(hashRand));
-                    bool fTrickleWait = ((UintToArith256(hashRand) & 3) != 0);
-
-                    if (fTrickleWait)
+                    if (inv.type == MSG_TX)
                     {
-                        vInvWait.push_back(inv);
-                        continue;
+                        if (chokeTxInv)
+                            continue;
+                        // skip if we already know abt this one
+                        if (pto->filterInventoryKnown.contains(inv.hash))
+                            continue;
+                        if (fSendTrickle)
+                        {
+                            // 1/4 of tx invs blast to all immediately
+                            if ((insecure_rand() & 3) != 0)
+                            {
+                                vInvWait.push_back(inv);
+                                continue;
+                            }
+                        }
                     }
+                    vInvSend.push_back(inv);
+                    pto->filterInventoryKnown.insert(inv.hash);
                 }
+                pto->vInventoryToSend = vInvWait;
+            }
 
-                pto->filterInventoryKnown.insert(inv.hash);
-
-                vInv.push_back(inv);
-                if (vInv.size() >= 1000)
+            const int MAX_INV_ELEMENTS = 1000;
+            int sz = vInvSend.size();
+            if (sz)
+            {
+                LOCK(pto->cs_vSend);
+                for (int i = 0; i < sz; i += MAX_INV_ELEMENTS)
                 {
-                    pto->PushMessage(NetMsgType::INV, vInv);
-                    vInv.clear();
+                    int sendsz = std::min(MAX_INV_ELEMENTS, sz - i);
+                    std::vector<CInv> vInv(sendsz);
+                    for (int j = 0; j < sendsz; j++)
+                        vInv[j] = vInvSend[i + j];
+                    pto->PushMessage(NetMsgType::INV, vInv); // TODO subvector PushMessage to avoid copy
                 }
             }
-            pto->vInventoryToSend = vInvWait;
         }
-        if (!vInv.empty())
-            pto->PushMessage(NetMsgType::INV, vInv);
 
         // In case there is a block that has been in flight from this peer for 2 + 0.5 * N times the block interval
         // (with N the number of peers from which we're downloading validated blocks), disconnect due to timeout.

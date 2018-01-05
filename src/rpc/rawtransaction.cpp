@@ -907,8 +907,8 @@ UniValue sendrawtransaction(const UniValue& params, bool fHelp)
             }
         }
 #ifdef ENABLE_WALLET
-        else  
-            SyncWithWallets(tx, NULL);
+        else
+            SyncWithWallets(tx, NULL, -1);
 #endif
 
     } else if (fHaveChain) {

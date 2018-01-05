@@ -72,14 +72,16 @@ class CCoinsViewDB : public CCoinsView
 protected:
     CDBWrapper db;
 
-
 public:
     CCoinsViewDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
 
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
     uint256 GetBestBlock() const override;
-    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock, size_t &nChildCachedCoinsUsage) override;
+    bool BatchWrite(CCoinsMap &mapCoins,
+        const uint256 &hashBlock,
+        const uint64_t nBestCoinHeight,
+        size_t &nChildCachedCoinsUsage) override;
     CCoinsViewCursor *Cursor() const override;
 
     //! Attempt to update from an older database format. Returns whether an error occurred.

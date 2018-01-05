@@ -8,11 +8,13 @@
 #define BITCOIN_WALLET_WALLET_H
 
 #include "amount.h"
+#include "clientversion.h"
 #include "streams.h"
 #include "tinyformat.h"
 #include "ui_interface.h"
 #include "utilstrencodings.h"
 #include "validationinterface.h"
+#include "policy/policy.h"
 #include "script/ismine.h"
 #include "wallet/crypter.h"
 #include "wallet/walletdb.h"
@@ -57,8 +59,13 @@ static const bool DEFAULT_SPEND_ZEROCONF_CHANGE = true;
 static const bool DEFAULT_SEND_FREE_TRANSACTIONS = false;
 //! -txconfirmtarget default
 static const unsigned int DEFAULT_TX_CONFIRM_TARGET = 2;
-//! Largest (in bytes) free transaction we're willing to create
+//! Largest (in bytes) free transaction we're willing to creat
+#ifdef BITCOIN_CASH
+//! We can allow a maximum sized free transaction in the Bitcoin Cash Network.
+static const unsigned int MAX_FREE_TRANSACTION_CREATE_SIZE = MAX_STANDARD_TX_SIZE;
+#else
 static const unsigned int MAX_FREE_TRANSACTION_CREATE_SIZE = 1000;
+#endif
 static const bool DEFAULT_WALLETBROADCAST = true;
 
 extern const char * DEFAULT_WALLET_DAT;
@@ -200,7 +207,7 @@ public:
         READWRITE(nIndex);
     }
 
-    int SetMerkleBranch(const CBlock& block);
+    int SetMerkleBranch(const CBlock& block, int txIndex);
 
     /**
      * Return depth of transaction in blockchain:
@@ -729,8 +736,8 @@ public:
 
     void MarkDirty();
     bool AddToWallet(const CWalletTx& wtxIn, bool fFromLoadWallet, CWalletDB* pwalletdb);
-    void SyncTransaction(const CTransaction& tx, const CBlock* pblock);
-    bool AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pblock, bool fUpdate);
+    void SyncTransaction(const CTransaction& tx, const CBlock* pblock, int txIndex=-1);
+    bool AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pblock, bool fUpdate, int txIndex=-1);
     int ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate = false);
     void ReacceptWalletTransactions();
     void ResendWalletTransactions(int64_t nBestBlockTime);
@@ -950,5 +957,9 @@ public:
         READWRITE(vchPubKey);
     }
 };
+
+// Rescan the blockchain for wallet transactions in a separate thread
+// This will drop all connections and spend a LONG time to complete
+extern void StartWalletRescanThread();
 
 #endif // BITCOIN_WALLET_WALLET_H

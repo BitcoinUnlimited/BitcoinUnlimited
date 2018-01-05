@@ -208,9 +208,6 @@ void ReceiveCoinsDialog::on_receiveButton_clicked()
     }
     else
     {
-        /* Generate new receiving address and add to the address table */
-        address = model->getAddressTableModel()->addRow(AddressTableModel::Receive, label, "", CScriptNum(0));
-
         // only use coin freeze if the freeze value is valid and the check box is still set
         if ((nFreezeLockTime > 0) && (ui->freezeCheck) && (ui->freezeCheck->isChecked()))
         {
@@ -218,6 +215,11 @@ void ReceiveCoinsDialog::on_receiveButton_clicked()
              * The address variable needs to show the freeze P2SH public key  */
             address = model->getAddressTableModel()->addRow(AddressTableModel::Receive, label, "", nFreezeLockTime);
             sFreezeLockTime = model->getAddressTableModel()->labelForFreeze(address);
+        }
+        else
+        {
+            /* Generate new receiving address and add to the address table */
+            address = model->getAddressTableModel()->addRow(AddressTableModel::Receive, label, "", CScriptNum(0));
         }
     }
     SendCoinsRecipient info(address, label, ui->reqAmount->value(), ui->reqMessage->text(), sFreezeLockTime, "");

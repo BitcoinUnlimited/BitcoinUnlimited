@@ -23,6 +23,7 @@
 
 #include <exception>
 #include <map>
+#include <set>
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -50,6 +51,12 @@
         }                                                                                                     \
     } while (0)
 #endif
+
+#define UNIQUE2(pfx, LINE) pfx##LINE
+#define UNIQUE1(pfx, LINE) UNIQUE2(pfx, LINE)
+/// UNIQUIFY is a macro that appends the current file's line number to the passed prefix, creating a symbol
+// that is unique in this file.
+#define UNIQUIFY(pfx) UNIQUE1(pfx, __LINE__)
 
 static const bool DEFAULT_LOGTIMEMICROS = false;
 static const bool DEFAULT_LOGIPS = true;
@@ -83,6 +90,218 @@ extern CTranslationInterface translationInterface;
 extern const char *const BITCOIN_CONF_FILENAME;
 extern const char *const BITCOIN_PID_FILENAME;
 
+/** Send a string to the log output */
+int LogPrintStr(const std::string &str);
+
+// Logging API:
+// Use the two macros
+// LOG(ctgr,...)
+// LOGA(...)
+// located further down.
+// (Do not use the Logging functions directly)
+namespace Logging
+{
+extern uint64_t categoriesEnabled;
+
+/*
+To add a new log category:
+1) Create a unique 1 bit category mask. (Easiest is to 2* the last enum entry.)
+   Put it at the end of enum below.
+2) Add an category/string pair to LOGLABELMAP macro below.
+*/
+
+// Log Categories:
+// 64 Bits: (Define unique bits, not 'normal' numbers)
+enum
+{
+    NONE = 0x0, // No logging
+    ALL = 0xFFFFFFFFFFFFFFFFUL, // Log everything
+
+    // LOG Categories:
+    THN = 0x1,
+    MEP = 0x2,
+    CDB = 0x4,
+    TOR = 0x8,
+
+    NET = 0x10,
+    ADR = 0x20,
+    LIB = 0x40,
+    HTP = 0x80,
+
+    RPC = 0x100,
+    PRT = 0x200,
+    BNC = 0x400,
+    PRN = 0x800,
+
+    RDX = 0x1000,
+    MPR = 0x2000,
+    BLK = 0x4000,
+    EVC = 0x8000,
+
+    PRL = 0x10000,
+    RND = 0x20000,
+    REQ = 0x40000,
+    BLM = 0x80000,
+
+    EST = 0x100000,
+    LCK = 0x200000,
+    PRX = 0x400000,
+    DBS = 0x800000,
+    SLC = 0x1000000,
+
+};
+
+// Add corresponding upper case string for the category:
+#define LOGLABELMAP                                                                                           \
+    {                                                                                                         \
+        {NONE, "NONE"}, {ALL, "ALL"}, {THN, "THN"}, {MEP, "MEP"}, {CDB, "CDB"}, {TOR, "TOR"}, {NET, "NET"},   \
+            {ADR, "ADR"}, {LIB, "LIB"}, {HTP, "HTP"}, {RPC, "RPC"}, {PRT, "PRT"}, {BNC, "BNC"}, {PRN, "PRN"}, \
+            {RDX, "RDX"}, {MPR, "MPR"}, {BLK, "BLK"}, {EVC, "EVC"}, {PRL, "PRL"}, {RND, "RND"}, {REQ, "REQ"}, \
+            {BLM, "BLM"}, {LCK, "LCK"}, {PRX, "PRX"}, {DBS, "DBS"}, {SLC, "SLC"},                             \
+        {                                                                                                     \
+            EST, "EST"                                                                                        \
+        }                                                                                                     \
+    }
+
+/**
+ * Check if a category should be logged
+ * @param[in] category
+ * returns true if should be logged
+ */
+inline bool LogAcceptCategory(uint64_t category) { return (categoriesEnabled & category); }
+/**
+ * Turn on/off logging for a category
+ * @param[in] category
+ * @param[in] on  True turn on, False turn off.
+ */
+inline void LogToggleCategory(uint64_t category, bool on)
+{
+    if (on)
+        categoriesEnabled |= category;
+    else
+        categoriesEnabled &= ~category; // off
+}
+
+/**
+* Get a category associated with a string.
+* @param[in] label string
+* returns category
+*/
+uint64_t LogFindCategory(const std::string label);
+
+/**
+ * Get the label / associated string for a category.
+ * @param[in] category
+ * returns label
+ */
+std::string LogGetLabel(uint64_t category);
+
+/**
+ * Get all categories and their state.
+ * Formatted for display.
+ * returns all categories and states
+ */
+std::string LogGetAllString();
+
+/**
+ * Initialize
+ */
+void LogInit();
+
+/**
+ * Write log string to console:
+ *
+ * @param[in] All parameters are "printf like".
+ */
+template <typename T1, typename... Args>
+inline void LogStdout(const char *fmt, const T1 &v1, const Args &... args)
+{
+    try
+    {
+        std::string str = tfm::format(fmt, v1, args...);
+        ::fwrite(str.data(), 1, str.size(), stdout);
+    }
+    catch (...)
+    {
+        // Number of format specifiers (%) do not match argument count, etc
+    };
+}
+
+/**
+ * Write log string to console:
+ * @param[in] str String to log.
+ */
+inline void LogStdout(const std::string &str)
+{
+    ::fwrite(str.data(), 1, str.size(), stdout); // No formatting for a simple string
+}
+
+/**
+ * Log a string
+ * @param[in] All parameters are "printf like args".
+ */
+template <typename T1, typename... Args>
+inline void LogWrite(const char *fmt, const T1 &v1, const Args &... args)
+{
+    try
+    {
+        LogPrintStr(tfm::format(fmt, v1, args...));
+    }
+    catch (...)
+    {
+        // Number of format specifiers (%) do not match argument count, etc
+    };
+}
+
+/**
+ * Log a string
+ * @param[in] str String to log.
+ */
+inline void LogWrite(const std::string &str)
+{
+    LogPrintStr(str); // No formatting for a simple string
+}
+}
+
+// Logging API:
+//
+/**
+ * LOG macro: Log a string if a category is enabled.
+ * Note that categories can be ORed, such as: (NET|TOR)
+ *
+ * @param[in] category -Which category to log
+ * @param[in] ... "printf like args".
+ */
+#define LOG(ctgr, ...)               \
+    {                                \
+        using namespace Logging;     \
+        if (LogAcceptCategory(ctgr)) \
+            LogWrite(__VA_ARGS__);   \
+    }                                \
+    void(0)
+
+/**
+ * LOGA macro: Log a string to the console.
+ *
+ * @param[in] ... "printf like args".
+ */
+#define LOGA(...) Logging::LogStdout(__VA_ARGS__)
+//
+
+// Log tests:
+UniValue setlog(const UniValue &params, bool fHelp);
+// END logging.
+
+
+/**
+ * Translate a boolean string to a bool.
+ * Throws an exception if not one of the strings.
+ * Is case insensitive.
+ * @param[in] one of "enable|disable|1|0|true|false|on|off"
+ * returns true if enabled, false if not.
+ */
+bool IsStringTrue(const std::string &str);
+
 /**
  * Translation function: Call Translate signal on UI interface, which returns a boost::optional result.
  * If no translation slot is registered, nothing is returned, and simply return the input.
@@ -98,8 +317,6 @@ bool SetupNetworking();
 
 /** Return true if log accepts specified category */
 bool LogAcceptCategory(const char *category);
-/** Send a string to the log output */
-int LogPrintStr(const std::string &str);
 
 #define LogPrintf(...) LogPrint(NULL, __VA_ARGS__)
 

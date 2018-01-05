@@ -647,8 +647,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, string strComm
     }
 
     // Send expedited block without checking merkle root.
-    if (!IsRecentlyExpeditedAndStore(inv.hash))
-        SendExpeditedBlock(thinBlock, nHops, pfrom);
+    SendExpeditedBlock(thinBlock, nHops, pfrom);
 
     return thinBlock.process(pfrom, nSizeThinBlock, strCommand);
 }

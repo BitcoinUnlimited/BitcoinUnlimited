@@ -18,6 +18,7 @@
 #include "consensus/consensus.h"
 #include "fs.h"
 #include "net.h"
+#include "policy/policy.h"
 #include "script/script_error.h"
 #include "sync.h"
 #include "txdb.h"
@@ -133,8 +134,13 @@ static const uint32_t MAX_UNCONNECTED_HEADERS = 144;
 /** The maximum length of time, in seconds, we keep unconnected headers in the cache **/
 static const uint32_t UNCONNECTED_HEADERS_TIMEOUT = 120;
 
-static const unsigned int DEFAULT_LIMITFREERELAY = 15;
-static const bool DEFAULT_RELAYPRIORITY = true;
+/** The maximum number of free transactions (in KB) that can enter the mempool per minute.
+ *  For a 1MB block we allow 15KB of free transactions per 1 minute.
+ */
+static const uint32_t DEFAULT_LIMITFREERELAY = DEFAULT_BLOCK_MAX_SIZE * 0.000015;
+/** Subject free transactions to priority checking when entering the mempool */
+static const bool DEFAULT_RELAYPRIORITY = false;
+
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 
 /** Default for -permitbaremultisig */
@@ -149,6 +155,11 @@ static const bool DEFAULT_TESTSAFEMODE = false;
 static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 8;
 
 static const bool DEFAULT_PEERBLOOMFILTERS = true;
+static const bool DEFAULT_USE_THINBLOCKS = true;
+
+static const bool DEFAULT_REINDEX = false;
+static const bool DEFAULT_DISCOVER = true;
+static const bool DEFAULT_PRINTTOCONSOLE = false;
 
 struct BlockHasher
 {
@@ -184,6 +195,9 @@ extern int64_t nMaxTipAge;
 
 /** Best header we've seen so far (used for getheaders queries' starting points). */
 extern CBlockIndex *pindexBestHeader;
+
+/** Used to determine whether it is time to check the orphan pool for any txns that can be evicted. */
+extern int64_t nLastOrphanCheck;
 
 /** Minimum disk space required - used in CheckDiskSpace() */
 static const uint64_t nMinDiskSpace = 52428800;
@@ -344,8 +358,14 @@ void PruneAndFlush();
 
 #ifdef BITCOIN_CASH
 /** Check is Cash HF has activated. */
-bool IsCashHFEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev);
+bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev);
 #endif
+
+/**
+   Determine whether free transactions are subject to rate limiting. If -limitfreerelay is not zero then rate limiting
+   for free txns will be in effect. If it is zero, then no free transactions will be allowed to enter the memory pool.
+ */
+bool AreFreeTxnsDisallowed();
 
 /** (try to) add transaction to memory pool **/
 bool AcceptToMemoryPool(CTxMemPool &pool,

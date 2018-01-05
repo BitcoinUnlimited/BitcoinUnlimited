@@ -422,6 +422,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
     {
         LOCK(cs_orphancache);
         int64_t nStartTime = GetTime();
+        nLastOrphanCheck = nStartTime;
         SetMockTime(nStartTime); // Overrides future calls to GetTime()
         for (int i = 0; i < 50; i++)
         {
@@ -470,6 +471,8 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         SetMockTime(nStartTime + 60 * 60 * DEFAULT_ORPHANPOOL_EXPIRY + 300);
         EraseOrphansByTime();
         BOOST_CHECK(mapOrphanTransactions.size() == 0);
+
+        SetMockTime(0);
     }
 }
 
