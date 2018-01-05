@@ -231,6 +231,33 @@ public:
     std::string operator()(const CNoDestination &no) const { return ""; }
 };
 
+const std::vector<uint8_t> &bitpay_pubkey_prefix = std::vector<unsigned char>(1, 28);
+const std::vector<uint8_t> &bitpay_script_prefix = std::vector<unsigned char>(1, 40);
+
+class BitpayDestinationEncoder : public boost::static_visitor<std::string>
+{
+private:
+    const CChainParams &m_params;
+
+public:
+    BitpayDestinationEncoder(const CChainParams &params) : m_params(params) {}
+    std::string operator()(const CKeyID &id) const
+    {
+        std::vector<uint8_t> data = bitpay_pubkey_prefix;
+        data.insert(data.end(), id.begin(), id.end());
+        return EncodeBase58Check(data);
+    }
+
+    std::string operator()(const CScriptID &id) const
+    {
+        std::vector<uint8_t> data = bitpay_script_prefix;
+        data.insert(data.end(), id.begin(), id.end());
+        return EncodeBase58Check(data);
+    }
+
+    std::string operator()(const CNoDestination &no) const { return ""; }
+};
+
 CTxDestination DecodeDestination(const std::string &str, const CChainParams &params)
 {
     std::vector<uint8_t> data;
@@ -252,6 +279,21 @@ CTxDestination DecodeDestination(const std::string &str, const CChainParams &par
         std::equal(script_prefix.begin(), script_prefix.end(), data.begin()))
     {
         memcpy(hash.begin(), &data[script_prefix.size()], 20);
+        return CScriptID(hash);
+    }
+
+    // Decode Bitpay forms
+    if (data.size() == 20 + bitpay_pubkey_prefix.size() &&
+        std::equal(bitpay_pubkey_prefix.begin(), bitpay_pubkey_prefix.end(), data.begin()))
+    {
+        memcpy(hash.begin(), &data[bitpay_pubkey_prefix.size()], 20);
+        return CKeyID(hash);
+    }
+
+    if (data.size() == 20 + bitpay_script_prefix.size() &&
+        std::equal(bitpay_script_prefix.begin(), bitpay_script_prefix.end(), data.begin()))
+    {
+        memcpy(hash.begin(), &data[bitpay_script_prefix.size()], 20);
         return CScriptID(hash);
     }
     return CNoDestination();
@@ -291,4 +333,9 @@ std::string EncodeLegacyAddr(const CTxDestination &dest, const CChainParams &par
 CTxDestination DecodeLegacyAddr(const std::string &str, const CChainParams &params)
 {
     return DecodeDestination(str, params);
+}
+
+std::string EncodeBitpayAddr(const CTxDestination &dest, const CChainParams &params)
+{
+    return boost::apply_visitor(BitpayDestinationEncoder(params), dest);
 }
