@@ -364,5 +364,8 @@ CScript GetScriptLabelPublic(const string &labelPublic)
         return scriptDataPublic;
 
     } else return CScript();
+}
 
+bool IsValidDestination(const CTxDestination &dest) {
+    return dest.which() != 0;
 }
