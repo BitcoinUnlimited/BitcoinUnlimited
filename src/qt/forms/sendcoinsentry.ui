@@ -224,7 +224,7 @@
     <item row="2" column="0">
      <widget class="QLabel" name="labelPublic">
       <property name="text">
-       <string>&amp;Public Label:</string>
+       <string>Public Label:</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
