@@ -46,6 +46,9 @@ int64_t GetTimeMicros()
     return now;
 }
 
+#ifdef MAC_OSX
+uint64_t GetStopwatch() { return 1000 * GetTimeMicros(); }
+#else
 uint64_t GetStopwatch()
 {
     struct timespec t;
@@ -58,6 +61,7 @@ uint64_t GetStopwatch()
     }
     return 0;
 }
+#endif
 
 /** Return a time useful for the debug log */
 int64_t GetLogTimeMicros()
