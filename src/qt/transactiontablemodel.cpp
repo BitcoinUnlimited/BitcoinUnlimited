@@ -433,8 +433,10 @@ QVariant TransactionTableModel::addressColor(const TransactionRecord *wtx) const
     case TransactionRecord::SendToAddress:
     case TransactionRecord::Generated:
     {
-        QString label =
-            walletModel->getAddressTableModel()->labelForAddress(QString::fromStdString(wtx->addresses.begin()->first));
+        auto firstAddr = wtx->addresses.begin();
+        if (firstAddr == wtx->addresses.end())
+            return COLOR_BAREADDRESS;
+        QString label = walletModel->getAddressTableModel()->labelForAddress(QString::fromStdString(firstAddr->first));
         if (label.isEmpty())
             return COLOR_BAREADDRESS;
     }

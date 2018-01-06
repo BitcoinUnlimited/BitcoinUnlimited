@@ -232,7 +232,7 @@ class NodeConn(asyncore.dispatcher):
         "regtest": b"\xda\xb5\xbf\xfa",
     }
 
-    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=1, bitcoinCash=False):
+    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=1, bitcoinCash=True):
         self.bitcoinCash = bitcoinCash
         if self.bitcoinCash:
             self.MAGIC_BYTES = self.CASH_MAGIC_BYTES

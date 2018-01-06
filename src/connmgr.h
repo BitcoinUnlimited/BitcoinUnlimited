@@ -12,8 +12,6 @@
 
 class CConnMgr
 {
-    // This critical section protects the vectors
-    CCriticalSection cs_expedited;
     // We send expedited blocks to these nodes
     std::vector<CNode *> vSendExpeditedBlocks;
     // We send expedited txs to these nodes
@@ -28,6 +26,11 @@ class CConnMgr
     std::atomic<NodeId> next;
 
 public:
+    /* This critical section protects the vectors regarding xpedited
+     * operation, as well as the data structures internal to the
+     * expedited.cpp module */
+    CCriticalSection cs_expedited;
+
     CConnMgr();
 
     /**

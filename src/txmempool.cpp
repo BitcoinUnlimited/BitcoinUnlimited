@@ -1015,7 +1015,7 @@ void CTxMemPool::RemoveStaged(setEntries &stage)
     }
 }
 
-int CTxMemPool::Expire(int64_t time)
+int CTxMemPool::Expire(int64_t time, std::vector<COutPoint> &vCoinsToUncache)
 {
     LOCK(cs);
     indexed_transaction_set::index<entry_time>::type::iterator it = mapTx.get<entry_time>().begin();
@@ -1026,10 +1026,12 @@ int CTxMemPool::Expire(int64_t time)
         it++;
     }
     setEntries stage;
-    BOOST_FOREACH (txiter removeit, toremove)
-    {
+    for (txiter removeit : toremove)
         CalculateDescendants(removeit, stage);
-    }
+    for (txiter it : stage)
+        for (const CTxIn &txin : it->GetTx().vin)
+            vCoinsToUncache.push_back(txin.prevout);
+
     RemoveStaged(stage);
     return stage.size();
 }

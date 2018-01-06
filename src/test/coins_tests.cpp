@@ -63,7 +63,10 @@ public:
     }
 
     uint256 GetBestBlock() const { return hashBestBlock_; }
-    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock, size_t &nChildCachedCoinsUsage)
+    bool BatchWrite(CCoinsMap &mapCoins,
+        const uint256 &hashBlock,
+        const uint64_t nBestCoinHeight,
+        size_t &nChildCachedCoinsUsage)
     {
         for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();)
         {
@@ -202,6 +205,13 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
             uncached_an_entry |= !stack[cacheid]->HaveCoinInCache(out);
         }
 
+        // One every 500 iterations, trim a random cache to zero
+        if (insecure_rand() % 500)
+        {
+            int cacheid = insecure_rand() % stack.size();
+            stack[cacheid]->Trim(0);
+        }
+
         // Once every 1000 iterations and at the end, verify the full cache.
         if (insecure_rand() % 1000 == 1 || i == NUM_SIMULATION_ITERATIONS - 1)
         {
@@ -227,18 +237,19 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
             }
         }
 
+        // Every 100 iterations, flush an intermediate cache
         if (insecure_rand() % 100 == 0)
         {
-            // Every 100 iterations, flush an intermediate cache
             if (stack.size() > 1 && insecure_rand() % 2 == 0)
             {
                 unsigned int flushIndex = insecure_rand() % (stack.size() - 1);
                 stack[flushIndex]->Flush();
             }
         }
-        if (insecure_rand() % 100 == 0)
+
+        // Every 50 iterations, change the cache stack.
+        if (insecure_rand() % 50 == 0)
         {
-            // Every 100 iterations, change the cache stack.
             if (stack.size() > 0 && insecure_rand() % 2 == 0)
             {
                 // Remove the top cache
@@ -452,7 +463,8 @@ void WriteCoinsViewEntry(CCoinsView &view, CAmount value, char flags)
     uint256 hash;
     hash.SetNull();
     size_t cacheusage = 0;
-    view.BatchWrite(map, hash, cacheusage);
+    uint64_t bestCoinHeight = 0;
+    view.BatchWrite(map, hash, bestCoinHeight, cacheusage);
 }
 
 class SingleEntryCacheTest
