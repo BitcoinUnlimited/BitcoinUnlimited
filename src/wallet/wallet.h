@@ -957,4 +957,8 @@ public:
     }
 };
 
+// Rescan the blockchain for wallet transactions in a separate thread
+// This will drop all connections and spend a LONG time to complete
+extern void StartWalletRescanThread();
+
 #endif // BITCOIN_WALLET_WALLET_H

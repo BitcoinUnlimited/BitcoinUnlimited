@@ -60,6 +60,22 @@ class CNode;
 class CNodeRef;
 class CChainParams;
 
+/** Add or remove a string to indicate ongoing status */
+class CStatusString
+{
+    mutable CCriticalSection cs;
+    std::set<std::string> strSet;
+
+public:
+    void Set(const std::string &yourStatus);
+    void Clear(const std::string &yourStatus);
+
+    std::string GetPrintable() const;
+};
+
+extern CStatusString statusStrings;
+
+
 extern uint256 bitcoinCashForkBlockHash;
 
 extern std::set<CBlockIndex *> setDirtyBlockIndex;
@@ -198,7 +214,6 @@ extern CLeakyBucket sendShaper;
 
 // Test to determine if traffic shaping is enabled
 extern bool IsTrafficShapingEnabled();
-
 
 // Check whether we are doing an initial block download (synchronizing from disk or network)
 extern bool IsInitialBlockDownload();

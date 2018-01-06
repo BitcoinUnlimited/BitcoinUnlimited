@@ -373,7 +373,7 @@ BOOST_AUTO_TEST_CASE(cltv_freeze)
 
     // check cltv solve for block
     CPubKey newKey1 = ToByteVector(key[0].GetPubKey());
-    CBitcoinAddress newAddr1(newKey1.GetID());
+    CTxDestination newAddr1 = CTxDestination(newKey1.GetID());
     CScriptNum nFreezeLockTime(50000);
     CScript s1 = GetScriptForFreeze(nFreezeLockTime, newKey1);
 
@@ -385,15 +385,14 @@ BOOST_AUTO_TEST_CASE(cltv_freeze)
     nRequiredReturn = 0;
     ExtractDestinations(s1, type, addresses, nRequiredReturn);
 
-    BOOST_FOREACH (const CTxDestination &addr, addresses)
-        BOOST_CHECK(newAddr1.ToString() == CBitcoinAddress(addr).ToString());
-
+    for (const CTxDestination &addr : addresses)
+        BOOST_CHECK(EncodeDestination(newAddr1) == EncodeDestination(addr));
     BOOST_CHECK(nRequiredReturn == 1);
 
 
     // check cltv solve for datetime
     CPubKey newKey2 = ToByteVector(key[0].GetPubKey());
-    CBitcoinAddress newAddr2(newKey2.GetID());
+    CTxDestination newAddr2 = CTxDestination(newKey2.GetID());
     nFreezeLockTime = CScriptNum(1482255731);
     CScript s2 = GetScriptForFreeze(nFreezeLockTime, newKey2);
 
@@ -405,8 +404,8 @@ BOOST_AUTO_TEST_CASE(cltv_freeze)
     nRequiredReturn = 0;
     ExtractDestinations(s2, type, addresses, nRequiredReturn);
 
-    BOOST_FOREACH (const CTxDestination &addr, addresses)
-        BOOST_CHECK(newAddr2.ToString() == CBitcoinAddress(addr).ToString());
+    for (const CTxDestination &addr : addresses)
+        BOOST_CHECK(newAddr2 == addr);
 
     BOOST_CHECK(nRequiredReturn == 1);
 }
