@@ -224,6 +224,7 @@ class WalletTest (BitcoinTestFramework):
             if uTx['txid'] == zeroValueTxid:
                 found = True
                 assert_equal(uTx['amount'], Decimal('0'))
+                assert_equal(uTx['satoshi'], Decimal('0'))
         assert(found)
 
         #do some -walletbroadcast tests
@@ -272,10 +273,12 @@ class WalletTest (BitcoinTestFramework):
         txId  = self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), "2")
         txObj = self.nodes[0].gettransaction(txId)
         assert_equal(txObj['amount'], Decimal('-2'))
+        assert_equal(txObj['satoshi'], Decimal('-200000000'));
 
         txId  = self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), "0.0001")
         txObj = self.nodes[0].gettransaction(txId)
         assert_equal(txObj['amount'], Decimal('-0.0001'))
+        assert_equal(txObj['satoshi'], Decimal('-10000'))
 
         #check if JSON parser can handle scientific notation in strings
         txId  = self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), "1e-4")
@@ -438,6 +441,7 @@ class WalletTest (BitcoinTestFramework):
         assert_equal(coinbase_tx_1["lastblock"], blocks[1])
         assert_equal(len(coinbase_tx_1["transactions"]), 1)
         assert_equal(coinbase_tx_1["transactions"][0]["blockhash"], blocks[1])
+        assert_equal(coinbase_tx_1["transactions"][0]["satoshi"], Decimal('2500000000'))
         assert_equal(len(self.nodes[0].listsinceblock(blocks[1])["transactions"]), 0)
 
 
