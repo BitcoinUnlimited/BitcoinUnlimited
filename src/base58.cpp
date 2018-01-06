@@ -325,7 +325,6 @@ bool CBitcoinSecret::IsValid() const
 
 bool CBitcoinSecret::SetString(const char *pszSecret) { return CBase58Data::SetString(pszSecret) && IsValid(); }
 bool CBitcoinSecret::SetString(const std::string &strSecret) { return SetString(strSecret.c_str()); }
-
 std::string EncodeLegacyAddr(const CTxDestination &dest, const CChainParams &params)
 {
     return boost::apply_visitor(DestinationEncoder(params), dest);
