@@ -1181,14 +1181,20 @@ UniValue ListReceived(const UniValue& params, bool fByAccounts)
         {
             UniValue obj(UniValue::VOBJ);
             if(fIsWatchonly)
+            {
                 obj.push_back(Pair("involvesWatchonly", true));
-            obj.push_back(Pair("address",       address.ToString()));
-            obj.push_back(Pair("account",       strAccount));
-            obj.push_back(Pair("satoshi",       UniValue(nAmount)));
-            obj.push_back(Pair("amount",        ValueFromAmount(nAmount)));
-            obj.push_back(Pair("confirmations", (nConf == std::numeric_limits<int>::max() ? 0 : nConf)));
+            }
+            obj.push_back(Pair("address", address.ToString()));
+            obj.push_back(Pair("account", strAccount));
+            obj.push_back(Pair("satoshi", UniValue(nAmount)));
+            obj.push_back(Pair("amount", ValueFromAmount(nAmount)));
+            obj.push_back(
+                Pair("confirmations",
+                    (nConf == std::numeric_limits<int>::max() ? 0 : nConf)));
             if (!fByAccounts)
+            {
                 obj.push_back(Pair("label", strAccount));
+            }
             UniValue transactions(UniValue::VARR);
             if (it != mapTally.end())
             {
