@@ -378,10 +378,12 @@ class WalletTest (BitcoinTestFramework):
 
         # now try P2SH
         btcAddress = self.nodes[1].getnewaddress()
+        btcAddress = self.nodes[1].getaddressforms(btcAddress)["legacy"]
         ( p2shAddress, redeemScript) = GenerateSingleSigP2SH(btcAddress)
         self.nodes[0].sendtoaddress(p2shAddress,1)
 
         btcAddress2 = self.nodes[1].getnewaddress()
+        btcAddress2 = self.nodes[1].getaddressforms(btcAddress2)["legacy"]
         ( p2shAddress2, redeemScript2) = GenerateSingleSigP2SH(btcAddress2)
         self.nodes[0].sendtoaddress(p2shAddress2,1)
 

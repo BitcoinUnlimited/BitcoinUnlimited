@@ -45,6 +45,12 @@ def bitcoinAddress2bin(btcAddress):
 
 B58_DIGITS = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
+class InvalidBase58Error(Exception):
+    """Raised on generic invalid base58 data, such as bad characters.
+    Checksum failures raise Base58ChecksumError specifically.
+    """
+    pass
+
 def decodeBase58(s):
     """Decode a base58-encoding string, returning bytes"""
     if not s:
