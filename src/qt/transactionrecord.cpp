@@ -111,27 +111,6 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
 
         // load all tx addresses for user display/filter
         AddressList listAllAddresses;
-        CTxDestination address;
-        BOOST_FOREACH (const CTxOut &txout, wtx.vout)
-        {
-            if (!fAllToMe && wallet->IsMine(txout))
-            {
-                continue; // skip change if some tx went to somewhere else
-            }
-            // get public label if it exists
-            std::string labelPublic = getLabelPublic(txout.scriptPubKey);
-            if (labelPublic != "")
-                // use public label before address
-                listAllAddresses.push_back(std::make_pair("<" + labelPublic + ">", txout.scriptPubKey));
-            else if (ExtractDestination(txout.scriptPubKey, address))
-                // a standard address
-                listAllAddresses.push_back(std::make_pair(EncodeDestination(address), txout.scriptPubKey));
-
-            else
-                // add the unknown scriptPubKey as n/a - TODO could also skip these if there is no need to
-                // display/filter??
-                listAllAddresses.push_back(std::make_pair("n/a", txout.scriptPubKey));
-        }
 
         isminetype fAllFromMe = ISMINE_SPENDABLE;
         BOOST_FOREACH (const CTxIn &txin, wtx.vin)
@@ -183,16 +162,14 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 {
                     // Sent to Bitcoin Address
                     sub.type = TransactionRecord::SendToAddress;
-                    // sub.addresses.push_back(std::make_pair(EncodeDestination(address), txout.scriptPubKey));
+                    sub.addresses.push_back(std::make_pair(EncodeDestination(address), txout.scriptPubKey));
                 }
                 else
                 {
                     // Sent to IP, or other non-address transaction like OP_EVAL
                     sub.type = TransactionRecord::SendToOther;
-                    // sub.addresses.push_back(std::make_pair(mapValue["to"], txout.scriptPubKey));
+                    sub.addresses.push_back(std::make_pair(mapValue["to"], txout.scriptPubKey));
                 }
-
-                sub.addresses = listAllAddresses;
 
                 CAmount nValue = txout.nValue;
                 /* Add fee to first output */
