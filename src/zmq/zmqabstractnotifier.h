@@ -11,16 +11,16 @@
 class CBlockIndex;
 class CZMQAbstractNotifier;
 
-typedef CZMQAbstractNotifier* (*CZMQNotifierFactory)();
+typedef CZMQAbstractNotifier *(*CZMQNotifierFactory)();
 
 class CZMQAbstractNotifier
 {
 public:
-    CZMQAbstractNotifier() : psocket(0) { }
+    CZMQAbstractNotifier() : psocket(0) {}
     virtual ~CZMQAbstractNotifier();
 
     template <typename T>
-    static CZMQAbstractNotifier* Create()
+    static CZMQAbstractNotifier *Create()
     {
         return new T();
     }
@@ -29,7 +29,6 @@ public:
     void SetType(const std::string &t) { type = t; }
     std::string GetAddress() const { return address; }
     void SetAddress(const std::string &a) { address = a; }
-
     virtual bool Initialize(void *pcontext) = 0;
     virtual void Shutdown() = 0;
 

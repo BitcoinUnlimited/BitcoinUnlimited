@@ -3,15 +3,15 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "chainparams.h"
 #include "zmqpublishnotifier.h"
+#include "chainparams.h"
 #include "main.h"
 #include "util.h"
 
-static std::multimap<std::string, CZMQAbstractPublishNotifier*> mapPublishNotifiers;
+static std::multimap<std::string, CZMQAbstractPublishNotifier *> mapPublishNotifiers;
 
 // Internal function to send multipart message
-static int zmq_send_multipart(void *sock, const void* data, size_t size, ...)
+static int zmq_send_multipart(void *sock, const void *data, size_t size, ...)
 {
     va_list args;
     va_start(args, size);
@@ -30,7 +30,7 @@ static int zmq_send_multipart(void *sock, const void* data, size_t size, ...)
         void *buf = zmq_msg_data(&msg);
         memcpy(buf, data, size);
 
-        data = va_arg(args, const void*);
+        data = va_arg(args, const void *);
 
         rc = zmq_msg_send(&msg, sock, data ? ZMQ_SNDMORE : 0);
         if (rc == -1)
@@ -55,9 +55,9 @@ bool CZMQAbstractPublishNotifier::Initialize(void *pcontext)
     assert(!psocket);
 
     // check if address is being used by other publish notifier
-    std::multimap<std::string, CZMQAbstractPublishNotifier*>::iterator i = mapPublishNotifiers.find(address);
+    std::multimap<std::string, CZMQAbstractPublishNotifier *>::iterator i = mapPublishNotifiers.find(address);
 
-    if (i==mapPublishNotifiers.end())
+    if (i == mapPublishNotifiers.end())
     {
         psocket = zmq_socket(pcontext, ZMQ_PUB);
         if (!psocket)
@@ -67,7 +67,7 @@ bool CZMQAbstractPublishNotifier::Initialize(void *pcontext)
         }
 
         int rc = zmq_bind(psocket, address.c_str());
-        if (rc!=0)
+        if (rc != 0)
         {
             zmqError("Failed to bind address");
             return false;
@@ -95,12 +95,12 @@ void CZMQAbstractPublishNotifier::Shutdown()
     int count = mapPublishNotifiers.count(address);
 
     // remove this notifier from the list of publishers using this address
-    typedef std::multimap<std::string, CZMQAbstractPublishNotifier*>::iterator iterator;
+    typedef std::multimap<std::string, CZMQAbstractPublishNotifier *>::iterator iterator;
     std::pair<iterator, iterator> iterpair = mapPublishNotifiers.equal_range(address);
 
     for (iterator it = iterpair.first; it != iterpair.second; ++it)
     {
-        if (it->second==this)
+        if (it->second == this)
         {
             mapPublishNotifiers.erase(it);
             break;
@@ -144,12 +144,12 @@ bool CZMQPublishRawBlockNotifier::NotifyBlock(const CBlockIndex *pindex)
 {
     LogPrint("zmq", "zmq: Publish rawblock %s\n", pindex->GetBlockHash().GetHex());
 
-    const Consensus::Params& consensusParams = Params().GetConsensus();
+    const Consensus::Params &consensusParams = Params().GetConsensus();
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     {
         LOCK(cs_main);
         CBlock block;
-        if(!ReadBlockFromDisk(block, pindex, consensusParams))
+        if (!ReadBlockFromDisk(block, pindex, consensusParams))
         {
             zmqError("Can't read block from disk");
             return false;

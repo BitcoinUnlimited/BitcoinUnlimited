@@ -13,12 +13,8 @@
 #include <sys/select.h>
 #endif
 
-extern "C" void* memcpy(void* a, const void* b, size_t c);
-void* memcpy_int(void* a, const void* b, size_t c)
-{
-    return memcpy(a, b, c);
-}
-
+extern "C" void *memcpy(void *a, const void *b, size_t c);
+void *memcpy_int(void *a, const void *b, size_t c) { return memcpy(a, b, c); }
 namespace
 {
 // trigger: Use the memcpy_int wrapper which calls our internal memcpy.
@@ -36,7 +32,8 @@ bool sanity_test_memcpy()
 
     memcpy_int(memcpy_verify, memcpy_test, sizeof(memcpy_test));
 
-    for (unsigned int i = 0; i != T; ++i) {
+    for (unsigned int i = 0; i != T; ++i)
+    {
         if (memcpy_verify[i] != i)
             return false;
     }

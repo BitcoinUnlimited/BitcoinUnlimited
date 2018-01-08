@@ -5,12 +5,12 @@
 
 #include "base58.h"
 #include "chain.h"
-#include "dstencode.h"
-#include "rpc/server.h"
 #include "core_io.h"
+#include "dstencode.h"
 #include "init.h"
 #include "main.h"
 #include "merkleblock.h"
+#include "rpc/server.h"
 #include "rpc/server.h"
 #include "script/script.h"
 #include "script/standard.h"
@@ -242,8 +242,7 @@ UniValue importprivatekeys(const UniValue &params, bool fHelp)
 }
 
 void ImportAddress(const CTxDestination &dest, const std::string &strLabel);
-void ImportScript(const CScript &script, const std::string &strLabel,
-                  bool isRedeemScript)
+void ImportScript(const CScript &script, const std::string &strLabel, bool isRedeemScript)
 {
     if (!isRedeemScript && ::IsMine(*pwalletMain, script, chainActive.Tip()) == ISMINE_SPENDABLE)
         throw JSONRPCError(RPC_WALLET_ERROR, "The wallet already contains the "

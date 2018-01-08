@@ -22,34 +22,34 @@ public:
     uint32_t n;
 
     COutPoint() { SetNull(); }
-    COutPoint(uint256 hashIn, uint32_t nIn) { hash = hashIn; n = nIn; }
+    COutPoint(uint256 hashIn, uint32_t nIn)
+    {
+        hash = hashIn;
+        n = nIn;
+    }
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
+    inline void SerializationOp(Stream &s, Operation ser_action)
+    {
         READWRITE(hash);
         READWRITE(n);
     }
 
-    void SetNull() { hash.SetNull(); n = (uint32_t) -1; }
-    bool IsNull() const { return (hash.IsNull() && n == (uint32_t) -1); }
-
-    friend bool operator<(const COutPoint& a, const COutPoint& b)
+    void SetNull()
+    {
+        hash.SetNull();
+        n = (uint32_t)-1;
+    }
+    bool IsNull() const { return (hash.IsNull() && n == (uint32_t)-1); }
+    friend bool operator<(const COutPoint &a, const COutPoint &b)
     {
         return (a.hash < b.hash || (a.hash == b.hash && a.n < b.n));
     }
 
-    friend bool operator==(const COutPoint& a, const COutPoint& b)
-    {
-        return (a.hash == b.hash && a.n == b.n);
-    }
-
-    friend bool operator!=(const COutPoint& a, const COutPoint& b)
-    {
-        return !(a == b);
-    }
-
+    friend bool operator==(const COutPoint &a, const COutPoint &b) { return (a.hash == b.hash && a.n == b.n); }
+    friend bool operator!=(const COutPoint &a, const COutPoint &b) { return !(a == b); }
     std::string ToString() const;
 };
 
@@ -91,35 +91,26 @@ public:
      * 9 bits. */
     static const int SEQUENCE_LOCKTIME_GRANULARITY = 9;
 
-    CTxIn()
-    {
-        nSequence = SEQUENCE_FINAL;
-    }
-
-    explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn=CScript(), uint32_t nSequenceIn=SEQUENCE_FINAL);
-    CTxIn(uint256 hashPrevTx, uint32_t nOut, CScript scriptSigIn=CScript(), uint32_t nSequenceIn=SEQUENCE_FINAL);
+    CTxIn() { nSequence = SEQUENCE_FINAL; }
+    explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn = CScript(), uint32_t nSequenceIn = SEQUENCE_FINAL);
+    CTxIn(uint256 hashPrevTx, uint32_t nOut, CScript scriptSigIn = CScript(), uint32_t nSequenceIn = SEQUENCE_FINAL);
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
+    inline void SerializationOp(Stream &s, Operation ser_action)
+    {
         READWRITE(prevout);
-        READWRITE(*(CScriptBase*)(&scriptSig));
+        READWRITE(*(CScriptBase *)(&scriptSig));
         READWRITE(nSequence);
     }
 
-    friend bool operator==(const CTxIn& a, const CTxIn& b)
+    friend bool operator==(const CTxIn &a, const CTxIn &b)
     {
-        return (a.prevout   == b.prevout &&
-                a.scriptSig == b.scriptSig &&
-                a.nSequence == b.nSequence);
+        return (a.prevout == b.prevout && a.scriptSig == b.scriptSig && a.nSequence == b.nSequence);
     }
 
-    friend bool operator!=(const CTxIn& a, const CTxIn& b)
-    {
-        return !(a == b);
-    }
-
+    friend bool operator!=(const CTxIn &a, const CTxIn &b) { return !(a == b); }
     std::string ToString() const;
 };
 
@@ -132,19 +123,16 @@ public:
     CAmount nValue;
     CScript scriptPubKey;
 
-    CTxOut()
-    {
-        SetNull();
-    }
-
-    CTxOut(const CAmount& nValueIn, CScript scriptPubKeyIn);
+    CTxOut() { SetNull(); }
+    CTxOut(const CAmount &nValueIn, CScript scriptPubKeyIn);
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
+    inline void SerializationOp(Stream &s, Operation ser_action)
+    {
         READWRITE(nValue);
-        READWRITE(*(CScriptBase*)(&scriptPubKey));
+        READWRITE(*(CScriptBase *)(&scriptPubKey));
     }
 
     void SetNull()
@@ -153,11 +141,7 @@ public:
         scriptPubKey.clear();
     }
 
-    bool IsNull() const
-    {
-        return (nValue == -1);
-    }
-
+    bool IsNull() const { return (nValue == -1); }
     uint256 GetHash() const;
 
     CAmount GetDustThreshold(const CFeeRate &minRelayTxFee) const
@@ -174,25 +158,16 @@ public:
             return 0;
 
         size_t nSize = GetSerializeSize(*this, SER_DISK, 0) + 148u;
-        return 3*minRelayTxFee.GetFee(nSize);
+        return 3 * minRelayTxFee.GetFee(nSize);
     }
 
-    bool IsDust(const CFeeRate &minRelayTxFee) const
+    bool IsDust(const CFeeRate &minRelayTxFee) const { return (nValue < GetDustThreshold(minRelayTxFee)); }
+    friend bool operator==(const CTxOut &a, const CTxOut &b)
     {
-        return (nValue < GetDustThreshold(minRelayTxFee));
+        return (a.nValue == b.nValue && a.scriptPubKey == b.scriptPubKey);
     }
 
-    friend bool operator==(const CTxOut& a, const CTxOut& b)
-    {
-        return (a.nValue       == b.nValue &&
-                a.scriptPubKey == b.scriptPubKey);
-    }
-
-    friend bool operator!=(const CTxOut& a, const CTxOut& b)
-    {
-        return !(a == b);
-    }
-
+    friend bool operator!=(const CTxOut &a, const CTxOut &b) { return !(a == b); }
     std::string ToString() const;
 };
 
@@ -210,13 +185,13 @@ private:
 
 public:
     // Default transaction version.
-    static const int32_t CURRENT_VERSION=1;
+    static const int32_t CURRENT_VERSION = 1;
 
     // Changing the default transaction version requires a two step process: first
     // adapting relay policy by bumping MAX_STANDARD_VERSION, and then later date
     // bumping the default CURRENT_VERSION at which point both CURRENT_VERSION and
     // MAX_STANDARD_VERSION will be equal.
-    static const int32_t MAX_STANDARD_VERSION=2;
+    static const int32_t MAX_STANDARD_VERSION = 2;
 
     // The local variables are made const to prevent unintended modification
     // without updating the cached hash value. However, CTransaction is not
@@ -234,55 +209,38 @@ public:
     /** Convert a CMutableTransaction into a CTransaction. */
     CTransaction(const CMutableTransaction &tx);
 
-    CTransaction& operator=(const CTransaction& tx);
+    CTransaction &operator=(const CTransaction &tx);
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITE(*const_cast<int32_t*>(&this->nVersion));
-        READWRITE(*const_cast<std::vector<CTxIn>*>(&vin));
-        READWRITE(*const_cast<std::vector<CTxOut>*>(&vout));
-        READWRITE(*const_cast<uint32_t*>(&nLockTime));
+    inline void SerializationOp(Stream &s, Operation ser_action)
+    {
+        READWRITE(*const_cast<int32_t *>(&this->nVersion));
+        READWRITE(*const_cast<std::vector<CTxIn> *>(&vin));
+        READWRITE(*const_cast<std::vector<CTxOut> *>(&vout));
+        READWRITE(*const_cast<uint32_t *>(&nLockTime));
         if (ser_action.ForRead())
             UpdateHash();
     }
 
 
-    bool IsNull() const {
-        return vin.empty() && vout.empty();
-    }
-
-    const uint256& GetHash() const {
-        return hash;
-    }
-
+    bool IsNull() const { return vin.empty() && vout.empty(); }
+    const uint256 &GetHash() const { return hash; }
     // Return sum of txouts.
     CAmount GetValueOut() const;
     // GetValueIn() is a method on CCoinsViewCache, because
     // inputs must be known to compute value in.
 
     // Compute priority, given priority of inputs and (optionally) tx size
-    double ComputePriority(double dPriorityInputs, unsigned int nTxSize=0) const;
+    double ComputePriority(double dPriorityInputs, unsigned int nTxSize = 0) const;
 
     // Compute modified tx size for priority calculation (optionally given tx size)
-    unsigned int CalculateModifiedSize(unsigned int nTxSize=0) const;
+    unsigned int CalculateModifiedSize(unsigned int nTxSize = 0) const;
 
-    bool IsCoinBase() const
-    {
-        return (vin.size() == 1 && vin[0].prevout.IsNull());
-    }
-
-    friend bool operator==(const CTransaction& a, const CTransaction& b)
-    {
-        return a.hash == b.hash;
-    }
-
-    friend bool operator!=(const CTransaction& a, const CTransaction& b)
-    {
-        return a.hash != b.hash;
-    }
-
+    bool IsCoinBase() const { return (vin.size() == 1 && vin[0].prevout.IsNull()); }
+    friend bool operator==(const CTransaction &a, const CTransaction &b) { return a.hash == b.hash; }
+    friend bool operator!=(const CTransaction &a, const CTransaction &b) { return a.hash != b.hash; }
     std::string ToString() const;
 };
 
@@ -295,12 +253,13 @@ struct CMutableTransaction
     uint32_t nLockTime;
 
     CMutableTransaction();
-    CMutableTransaction(const CTransaction& tx);
+    CMutableTransaction(const CTransaction &tx);
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
+    inline void SerializationOp(Stream &s, Operation ser_action)
+    {
         READWRITE(this->nVersion);
         nVersion = this->nVersion;
         READWRITE(vin);
@@ -315,10 +274,7 @@ struct CMutableTransaction
 };
 
 typedef std::shared_ptr<const CTransaction> CTransactionRef;
-static inline CTransactionRef MakeTransactionRef()
-{
-    return std::make_shared<const CTransaction>();
-}
+static inline CTransactionRef MakeTransactionRef() { return std::make_shared<const CTransaction>(); }
 template <typename Tx>
 static inline CTransactionRef MakeTransactionRef(Tx &&txIn)
 {

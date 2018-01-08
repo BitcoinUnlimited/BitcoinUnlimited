@@ -920,9 +920,7 @@ void restoreWindowGeometry(const QString &strSetting, const QSize &defaultSize, 
     QPoint pos = settings.value(strSetting + "Pos").toPoint();
     QSize size = settings.value(strSetting + "Size", defaultSize).toSize();
     QRect screen = QApplication::desktop()->screenGeometry();
-    QPoint posCenter(
-        abs((screen.width() - size.width()) / 2),
-        abs((screen.height() - size.height()) / 2));
+    QPoint posCenter(abs((screen.width() - size.width()) / 2), abs((screen.height() - size.height()) / 2));
 
     if (!pos.x() && !pos.y())
     {

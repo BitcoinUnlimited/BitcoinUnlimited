@@ -6,45 +6,39 @@
 #include "zmqnotificationinterface.h"
 #include "zmqpublishnotifier.h"
 
-#include "version.h"
 #include "main.h"
 #include "streams.h"
 #include "util.h"
+#include "version.h"
 
-void zmqError(const char *str)
-{
-    LogPrint("zmq", "zmq: Error: %s, errno=%s\n", str, zmq_strerror(errno));
-}
-
-CZMQNotificationInterface::CZMQNotificationInterface() : pcontext(NULL)
-{
-}
-
+void zmqError(const char *str) { LogPrint("zmq", "zmq: Error: %s, errno=%s\n", str, zmq_strerror(errno)); }
+CZMQNotificationInterface::CZMQNotificationInterface() : pcontext(NULL) {}
 CZMQNotificationInterface::~CZMQNotificationInterface()
 {
     Shutdown();
 
-    for (std::list<CZMQAbstractNotifier*>::iterator i=notifiers.begin(); i!=notifiers.end(); ++i)
+    for (std::list<CZMQAbstractNotifier *>::iterator i = notifiers.begin(); i != notifiers.end(); ++i)
     {
         delete *i;
     }
 }
 
-CZMQNotificationInterface* CZMQNotificationInterface::CreateWithArguments(const std::map<std::string, std::string> &args)
+CZMQNotificationInterface *CZMQNotificationInterface::CreateWithArguments(
+    const std::map<std::string, std::string> &args)
 {
-    CZMQNotificationInterface* notificationInterface = NULL;
+    CZMQNotificationInterface *notificationInterface = NULL;
     std::map<std::string, CZMQNotifierFactory> factories;
-    std::list<CZMQAbstractNotifier*> notifiers;
+    std::list<CZMQAbstractNotifier *> notifiers;
 
     factories["pubhashblock"] = CZMQAbstractNotifier::Create<CZMQPublishHashBlockNotifier>;
     factories["pubhashtx"] = CZMQAbstractNotifier::Create<CZMQPublishHashTransactionNotifier>;
     factories["pubrawblock"] = CZMQAbstractNotifier::Create<CZMQPublishRawBlockNotifier>;
     factories["pubrawtx"] = CZMQAbstractNotifier::Create<CZMQPublishRawTransactionNotifier>;
 
-    for (std::map<std::string, CZMQNotifierFactory>::const_iterator i=factories.begin(); i!=factories.end(); ++i)
+    for (std::map<std::string, CZMQNotifierFactory>::const_iterator i = factories.begin(); i != factories.end(); ++i)
     {
         std::map<std::string, std::string>::const_iterator j = args.find("-zmq" + i->first);
-        if (j!=args.end())
+        if (j != args.end())
         {
             CZMQNotifierFactory factory = i->second;
             std::string address = j->second;
@@ -84,8 +78,8 @@ bool CZMQNotificationInterface::Initialize()
         return false;
     }
 
-    std::list<CZMQAbstractNotifier*>::iterator i=notifiers.begin();
-    for (; i!=notifiers.end(); ++i)
+    std::list<CZMQAbstractNotifier *>::iterator i = notifiers.begin();
+    for (; i != notifiers.end(); ++i)
     {
         CZMQAbstractNotifier *notifier = *i;
         if (notifier->Initialize(pcontext))
@@ -99,7 +93,7 @@ bool CZMQNotificationInterface::Initialize()
         }
     }
 
-    if (i!=notifiers.end())
+    if (i != notifiers.end())
     {
         Shutdown();
         return false;
@@ -114,7 +108,7 @@ void CZMQNotificationInterface::Shutdown()
     LogPrint("zmq", "zmq: Shutdown notification interface\n");
     if (pcontext)
     {
-        for (std::list<CZMQAbstractNotifier*>::iterator i=notifiers.begin(); i!=notifiers.end(); ++i)
+        for (std::list<CZMQAbstractNotifier *>::iterator i = notifiers.begin(); i != notifiers.end(); ++i)
         {
             CZMQAbstractNotifier *notifier = *i;
             LogPrint("zmq", "   Shutdown notifier %s at %s\n", notifier->GetType(), notifier->GetAddress());
@@ -128,7 +122,7 @@ void CZMQNotificationInterface::Shutdown()
 
 void CZMQNotificationInterface::UpdatedBlockTip(const CBlockIndex *pindex)
 {
-    for (std::list<CZMQAbstractNotifier*>::iterator i = notifiers.begin(); i!=notifiers.end(); )
+    for (std::list<CZMQAbstractNotifier *>::iterator i = notifiers.begin(); i != notifiers.end();)
     {
         CZMQAbstractNotifier *notifier = *i;
         if (notifier->NotifyBlock(pindex))
@@ -145,7 +139,7 @@ void CZMQNotificationInterface::UpdatedBlockTip(const CBlockIndex *pindex)
 
 void CZMQNotificationInterface::SyncTransaction(const CTransaction &tx, const CBlock *pblock, int txIndex)
 {
-    for (std::list<CZMQAbstractNotifier*>::iterator i = notifiers.begin(); i!=notifiers.end(); )
+    for (std::list<CZMQAbstractNotifier *>::iterator i = notifiers.begin(); i != notifiers.end();)
     {
         CZMQAbstractNotifier *notifier = *i;
         if (notifier->NotifyTransaction(tx))

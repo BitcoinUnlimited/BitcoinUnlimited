@@ -13,8 +13,8 @@
 #include "utiltime.h"
 #include "version.h"
 
-#include <stdint.h>
 #include <fstream>
+#include <stdint.h>
 
 using namespace std;
 
@@ -22,12 +22,12 @@ using namespace std;
  * JSON-RPC protocol.  Bitcoin speaks version 1.0 for maximum compatibility,
  * but uses JSON-RPC 1.1/2.0 standards for parts of the 1.0 standard that were
  * unspecified (HTTP errors and contents of 'error').
- * 
+ *
  * 1.0 spec: http://json-rpc.org/wiki/specification
  * 1.2 spec: http://jsonrpc.org/historical/json-rpc-over-http.html
  */
 
-string JSONRPCRequest(const string& strMethod, const UniValue& params, const UniValue& id)
+string JSONRPCRequest(const string &strMethod, const UniValue &params, const UniValue &id)
 {
     UniValue request(UniValue::VOBJ);
     request.push_back(Pair("method", strMethod));
@@ -36,7 +36,7 @@ string JSONRPCRequest(const string& strMethod, const UniValue& params, const Uni
     return request.write() + "\n";
 }
 
-UniValue JSONRPCReplyObj(const UniValue& result, const UniValue& error, const UniValue& id)
+UniValue JSONRPCReplyObj(const UniValue &result, const UniValue &error, const UniValue &id)
 {
     UniValue reply(UniValue::VOBJ);
     if (!error.isNull())
@@ -48,13 +48,13 @@ UniValue JSONRPCReplyObj(const UniValue& result, const UniValue& error, const Un
     return reply;
 }
 
-string JSONRPCReply(const UniValue& result, const UniValue& error, const UniValue& id)
+string JSONRPCReply(const UniValue &result, const UniValue &error, const UniValue &id)
 {
     UniValue reply = JSONRPCReplyObj(result, error, id);
     return reply.write() + "\n";
 }
 
-UniValue JSONRPCError(int code, const string& message)
+UniValue JSONRPCError(int code, const string &message)
 {
     UniValue error(UniValue::VOBJ);
     error.push_back(Pair("code", code));
@@ -72,7 +72,8 @@ static const std::string COOKIEAUTH_FILE = ".cookie";
 fs::path GetAuthCookieFile()
 {
     fs::path path(GetArg("-rpccookiefile", COOKIEAUTH_FILE));
-    if (!path.is_complete()) path = GetDataDir() / path;
+    if (!path.is_complete())
+        path = GetDataDir() / path;
     return path;
 }
 
@@ -80,7 +81,7 @@ bool GenerateAuthCookie(std::string *cookie_out)
 {
     unsigned char rand_pwd[32];
     GetRandBytes(rand_pwd, 32);
-    std::string cookie = COOKIEAUTH_USER + ":" + EncodeBase64(&rand_pwd[0],32);
+    std::string cookie = COOKIEAUTH_USER + ":" + EncodeBase64(&rand_pwd[0], 32);
 
     /** the umask determines what permissions are used to create this file -
      * these are set to 077 in init.cpp unless overridden with -sysperms.
@@ -88,7 +89,8 @@ bool GenerateAuthCookie(std::string *cookie_out)
     std::ofstream file;
     fs::path filepath = GetAuthCookieFile();
     file.open(filepath.string().c_str());
-    if (!file.is_open()) {
+    if (!file.is_open())
+    {
         LogPrintf("Unable to open cookie authentication file %s for writing\n", filepath.string());
         return false;
     }
@@ -119,10 +121,12 @@ bool GetAuthCookie(std::string *cookie_out)
 
 void DeleteAuthCookie()
 {
-    try {
+    try
+    {
         fs::remove(GetAuthCookieFile());
-    } catch (const fs::filesystem_error& e) {
+    }
+    catch (const fs::filesystem_error &e)
+    {
         LogPrintf("%s: Unable to remove random auth cookie file: %s\n", __func__, e.what());
     }
 }
-

@@ -11,20 +11,18 @@
 #include "script/interpreter.h"
 #include "version.h"
 
-namespace {
-
+namespace
+{
 /** A class that deserializes a single CTransaction one time. */
 class TxInputStream
 {
 public:
-    TxInputStream(int nTypeIn, int nVersionIn, const unsigned char *txTo, size_t txToLen) :
-    m_type(nTypeIn),
-    m_version(nVersionIn),
-    m_data(txTo),
-    m_remaining(txToLen)
-    {}
+    TxInputStream(int nTypeIn, int nVersionIn, const unsigned char *txTo, size_t txToLen)
+        : m_type(nTypeIn), m_version(nVersionIn), m_data(txTo), m_remaining(txToLen)
+    {
+    }
 
-    void read(char* pch, size_t nSize)
+    void read(char *pch, size_t nSize)
     {
         if (nSize > m_remaining)
             throw std::ios_base::failure(std::string(__func__) + ": end of data");
@@ -40,8 +38,8 @@ public:
         m_data += nSize;
     }
 
-    template<typename T>
-    TxInputStream& operator>>(T& obj)
+    template <typename T>
+    TxInputStream &operator>>(T &obj)
     {
         ::Unserialize(*this, obj);
         return *this;
@@ -52,11 +50,11 @@ public:
 private:
     const int m_type;
     const int m_version;
-    const unsigned char* m_data;
+    const unsigned char *m_data;
     size_t m_remaining;
 };
 
-inline int set_error(bitcoinconsensus_error* ret, bitcoinconsensus_error serror)
+inline int set_error(bitcoinconsensus_error *ret, bitcoinconsensus_error serror)
 {
     if (ret)
         *ret = serror;
@@ -71,11 +69,17 @@ struct ECCryptoClosure
 ECCryptoClosure instance_of_eccryptoclosure;
 }
 
-static int verify_script(const unsigned char *scriptPubKey, unsigned int scriptPubKeyLen, CAmount amount,
-                                    const unsigned char *txTo        , unsigned int txToLen,
-                                    unsigned int nIn, unsigned int flags, bitcoinconsensus_error* err)
+static int verify_script(const unsigned char *scriptPubKey,
+    unsigned int scriptPubKeyLen,
+    CAmount amount,
+    const unsigned char *txTo,
+    unsigned int txToLen,
+    unsigned int nIn,
+    unsigned int flags,
+    bitcoinconsensus_error *err)
 {
-    try {
+    try
+    {
         TxInputStream stream(SER_NETWORK, PROTOCOL_VERSION, txTo, txToLen);
         CTransaction tx;
         stream >> tx;
@@ -87,23 +91,35 @@ static int verify_script(const unsigned char *scriptPubKey, unsigned int scriptP
         // Regardless of the verification result, the tx did not error.
         set_error(err, bitcoinconsensus_ERR_OK);
 
-        return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags, TransactionSignatureChecker(&tx, nIn, amount, flags), NULL);
-    } catch (const std::exception&) {
+        return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags,
+            TransactionSignatureChecker(&tx, nIn, amount, flags), NULL);
+    }
+    catch (const std::exception &)
+    {
         return set_error(err, bitcoinconsensus_ERR_TX_DESERIALIZE); // Error deserializing
     }
 }
 
-int bitcoinconsensus_verify_script_with_amount(const unsigned char *scriptPubKey, unsigned int scriptPubKeyLen, int64_t amount,
-                                    const unsigned char *txTo        , unsigned int txToLen,
-                                    unsigned int nIn, unsigned int flags, bitcoinconsensus_error* err)
+int bitcoinconsensus_verify_script_with_amount(const unsigned char *scriptPubKey,
+    unsigned int scriptPubKeyLen,
+    int64_t amount,
+    const unsigned char *txTo,
+    unsigned int txToLen,
+    unsigned int nIn,
+    unsigned int flags,
+    bitcoinconsensus_error *err)
 {
     CAmount am(amount);
     return ::verify_script(scriptPubKey, scriptPubKeyLen, am, txTo, txToLen, nIn, flags, err);
 }
 
-int bitcoinconsensus_verify_script(const unsigned char *scriptPubKey, unsigned int scriptPubKeyLen,
-                                    const unsigned char *txTo        , unsigned int txToLen,
-                                    unsigned int nIn, unsigned int flags, bitcoinconsensus_error* err)
+int bitcoinconsensus_verify_script(const unsigned char *scriptPubKey,
+    unsigned int scriptPubKeyLen,
+    const unsigned char *txTo,
+    unsigned int txToLen,
+    unsigned int nIn,
+    unsigned int flags,
+    bitcoinconsensus_error *err)
 {
     CAmount am(0);
     return ::verify_script(scriptPubKey, scriptPubKeyLen, am, txTo, txToLen, nIn, flags, err);

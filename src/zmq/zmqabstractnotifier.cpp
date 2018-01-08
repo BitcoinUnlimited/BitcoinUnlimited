@@ -7,17 +7,6 @@
 #include "util.h"
 
 
-CZMQAbstractNotifier::~CZMQAbstractNotifier()
-{
-    assert(!psocket);
-}
-
-bool CZMQAbstractNotifier::NotifyBlock(const CBlockIndex * /*CBlockIndex*/)
-{
-    return true;
-}
-
-bool CZMQAbstractNotifier::NotifyTransaction(const CTransaction &/*transaction*/)
-{
-    return true;
-}
+CZMQAbstractNotifier::~CZMQAbstractNotifier() { assert(!psocket); }
+bool CZMQAbstractNotifier::NotifyBlock(const CBlockIndex * /*CBlockIndex*/) { return true; }
+bool CZMQAbstractNotifier::NotifyTransaction(const CTransaction & /*transaction*/) { return true; }

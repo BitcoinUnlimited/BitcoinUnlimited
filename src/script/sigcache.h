@@ -23,9 +23,18 @@ private:
     bool store;
 
 public:
-    CachingTransactionSignatureChecker(const CTransaction* txToIn, unsigned int nInIn, const CAmount& amount, unsigned int flags, bool storeIn=true) : TransactionSignatureChecker(txToIn, nInIn, amount, flags), store(storeIn) {}
+    CachingTransactionSignatureChecker(const CTransaction *txToIn,
+        unsigned int nInIn,
+        const CAmount &amount,
+        unsigned int flags,
+        bool storeIn = true)
+        : TransactionSignatureChecker(txToIn, nInIn, amount, flags), store(storeIn)
+    {
+    }
 
-    bool VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& vchPubKey, const uint256& sighash) const;
+    bool VerifySignature(const std::vector<unsigned char> &vchSig,
+        const CPubKey &vchPubKey,
+        const uint256 &sighash) const;
 };
 
 #endif // BITCOIN_SCRIPT_SIGCACHE_H

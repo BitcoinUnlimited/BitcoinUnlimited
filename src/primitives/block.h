@@ -8,13 +8,13 @@
 #define BITCOIN_PRIMITIVES_BLOCK_H
 
 #include "primitives/transaction.h"
-#include "sync.h"
 #include "serialize.h"
+#include "sync.h"
 #include "uint256.h"
 
 const uint32_t BIP_009_MASK = 0x20000000;
 const uint32_t BASE_VERSION = 0x20000000;
-const uint32_t FORK_BIT_2MB = 0x10000000;  // Vote for 2MB fork
+const uint32_t FORK_BIT_2MB = 0x10000000; // Vote for 2MB fork
 const bool DEFAULT_2MB_VOTE = false;
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
@@ -36,15 +36,12 @@ public:
     uint32_t nBits;
     uint32_t nNonce;
 
-    CBlockHeader()
-    {
-        SetNull();
-    }
-
+    CBlockHeader() { SetNull(); }
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
+    inline void SerializationOp(Stream &s, Operation ser_action)
+    {
         READWRITE(this->nVersion);
         nVersion = this->nVersion;
         READWRITE(hashPrevBlock);
@@ -64,17 +61,10 @@ public:
         nNonce = 0;
     }
 
-    bool IsNull() const
-    {
-        return (nBits == 0);
-    }
-
+    bool IsNull() const { return (nBits == 0); }
     uint256 GetHash() const;
 
-    int64_t GetBlockTime() const
-    {
-        return (int64_t)nTime;
-    }
+    int64_t GetBlockTime() const { return (int64_t)nTime; }
 };
 
 
@@ -85,20 +75,16 @@ public:
     std::vector<CTransaction> vtx;
 
     // memory only
-        // 0.11: mutable std::vector<uint256> vMerkleTree;
+    // 0.11: mutable std::vector<uint256> vMerkleTree;
     mutable bool fChecked;
-    mutable bool fExcessive;  // BU: is the block "excessive" (bigger than this node prefers to accept)
+    mutable bool fExcessive; // BU: is the block "excessive" (bigger than this node prefers to accept)
     mutable uint64_t nBlockSize; // BU: length of this block in bytes
 
-    CBlock()
-    {
-        SetNull();
-    }
-
+    CBlock() { SetNull(); }
     CBlock(const CBlockHeader &header)
     {
         SetNull();
-        *((CBlockHeader*)this) = header;
+        *((CBlockHeader *)this) = header;
     }
 
     // return the index of the transaction in this block.  Return -1 if tx is not in this block
@@ -146,21 +132,24 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITE(*(CBlockHeader*)this);
+    inline void SerializationOp(Stream &s, Operation ser_action)
+    {
+        READWRITE(*(CBlockHeader *)this);
         READWRITE(vtx);
     }
 
-    uint64_t GetHeight() const  // Returns the block's height as specified in its coinbase transaction
+    uint64_t GetHeight() const // Returns the block's height as specified in its coinbase transaction
     {
-      const CScript& sig = vtx[0].vin[0].scriptSig;
-      int numlen = sig[0];
-      if (numlen == OP_0) return 0;
-      if ((numlen >= OP_1) && (numlen <= OP_16)) return numlen-OP_1+1;
-      std::vector<unsigned char> heightScript(numlen);
-      copy(sig.begin()+1, sig.begin()+1+numlen,heightScript.begin());
-      CScriptNum coinbaseHeight(heightScript, false,numlen);
-      return coinbaseHeight.getint();
+        const CScript &sig = vtx[0].vin[0].scriptSig;
+        int numlen = sig[0];
+        if (numlen == OP_0)
+            return 0;
+        if ((numlen >= OP_1) && (numlen <= OP_16))
+            return numlen - OP_1 + 1;
+        std::vector<unsigned char> heightScript(numlen);
+        copy(sig.begin() + 1, sig.begin() + 1 + numlen, heightScript.begin());
+        CScriptNum coinbaseHeight(heightScript, false, numlen);
+        return coinbaseHeight.getint();
     }
 
     void SetNull()
@@ -176,12 +165,12 @@ public:
     CBlockHeader GetBlockHeader() const
     {
         CBlockHeader block;
-        block.nVersion       = nVersion;
-        block.hashPrevBlock  = hashPrevBlock;
+        block.nVersion = nVersion;
+        block.hashPrevBlock = hashPrevBlock;
         block.hashMerkleRoot = hashMerkleRoot;
-        block.nTime          = nTime;
-        block.nBits          = nBits;
-        block.nNonce         = nNonce;
+        block.nTime = nTime;
+        block.nBits = nBits;
+        block.nNonce = nNonce;
         return block;
     }
 
@@ -198,31 +187,20 @@ struct CBlockLocator
     std::vector<uint256> vHave;
 
     CBlockLocator() {}
-
-    CBlockLocator(const std::vector<uint256>& vHaveIn)
-    {
-        vHave = vHaveIn;
-    }
-
+    CBlockLocator(const std::vector<uint256> &vHaveIn) { vHave = vHaveIn; }
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
+    inline void SerializationOp(Stream &s, Operation ser_action)
+    {
         int nVersion = s.GetVersion();
         if (!(s.GetType() & SER_GETHASH))
             READWRITE(nVersion);
         READWRITE(vHave);
     }
 
-    void SetNull()
-    {
-        vHave.clear();
-    }
-
-    bool IsNull() const
-    {
-        return vHave.empty();
-    }
+    void SetNull() { vHave.clear(); }
+    bool IsNull() const { return vHave.empty(); }
 };
 
 #endif // BITCOIN_PRIMITIVES_BLOCK_H

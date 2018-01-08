@@ -34,40 +34,42 @@ static void CODE_TO_TIME(benchmark::State& state)
 BENCHMARK(CODE_TO_TIME);
 
  */
- 
-namespace benchmark {
 
-    class State {
-        std::string name;
-        double maxElapsed;
-        double beginTime;
-        double lastTime, minTime, maxTime;
-        int64_t count;
-        int64_t timeCheckCount;
-    public:
-        State(std::string _name, double _maxElapsed) : name(_name), maxElapsed(_maxElapsed), count(0) {
-            minTime = std::numeric_limits<double>::max();
-            maxTime = std::numeric_limits<double>::min();
-            timeCheckCount = 1;
-        }
-        bool KeepRunning();
-    };
+namespace benchmark
+{
+class State
+{
+    std::string name;
+    double maxElapsed;
+    double beginTime;
+    double lastTime, minTime, maxTime;
+    int64_t count;
+    int64_t timeCheckCount;
 
-    typedef boost::function<void(State&)> BenchFunction;
-
-    class BenchRunner
+public:
+    State(std::string _name, double _maxElapsed) : name(_name), maxElapsed(_maxElapsed), count(0)
     {
-        static std::map<std::string, BenchFunction> benchmarks;
+        minTime = std::numeric_limits<double>::max();
+        maxTime = std::numeric_limits<double>::min();
+        timeCheckCount = 1;
+    }
+    bool KeepRunning();
+};
 
-    public:
-        BenchRunner(std::string name, BenchFunction func);
+typedef boost::function<void(State &)> BenchFunction;
 
-        static void RunAll(double elapsedTimeForOne=1.0);
-    };
+class BenchRunner
+{
+    static std::map<std::string, BenchFunction> benchmarks;
+
+public:
+    BenchRunner(std::string name, BenchFunction func);
+
+    static void RunAll(double elapsedTimeForOne = 1.0);
+};
 }
 
 // BENCHMARK(foo) expands to:  benchmark::BenchRunner bench_11foo("foo", foo);
-#define BENCHMARK(n) \
-    benchmark::BenchRunner BOOST_PP_CAT(bench_, BOOST_PP_CAT(__LINE__, n))(BOOST_PP_STRINGIZE(n), n);
+#define BENCHMARK(n) benchmark::BenchRunner BOOST_PP_CAT(bench_, BOOST_PP_CAT(__LINE__, n))(BOOST_PP_STRINGIZE(n), n);
 
 #endif // BITCOIN_BENCH_BENCH_H
