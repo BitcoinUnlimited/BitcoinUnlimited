@@ -32,16 +32,16 @@ class CMessageHeader
 public:
     typedef unsigned char MessageStartChars[MESSAGE_START_SIZE];
 
-    CMessageHeader(const MessageStartChars& pchMessageStartIn);
-    CMessageHeader(const MessageStartChars& pchMessageStartIn, const char* pszCommand, unsigned int nMessageSizeIn);
+    CMessageHeader(const MessageStartChars &pchMessageStartIn);
+    CMessageHeader(const MessageStartChars &pchMessageStartIn, const char *pszCommand, unsigned int nMessageSizeIn);
 
     std::string GetCommand() const;
-    bool IsValid(const MessageStartChars& messageStart) const;
+    bool IsValid(const MessageStartChars &messageStart) const;
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion)
+    inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(FLATDATA(pchMessageStart));
         READWRITE(FLATDATA(pchCommand));
@@ -51,7 +51,8 @@ public:
 
     // TODO: make private (improves encapsulation)
 public:
-    enum {
+    enum
+    {
         COMMAND_SIZE = 12,
         MESSAGE_SIZE_SIZE = sizeof(int),
         CHECKSUM_SIZE = sizeof(int),
@@ -70,8 +71,8 @@ public:
  * Bitcoin protocol message types. When adding new message types, don't forget
  * to update allNetMessageTypes in protocol.cpp.
  */
-namespace NetMsgType {
-
+namespace NetMsgType
+{
 /**
  * The version message provides information about the transmitting node to the
  * receiving node at the beginning of a connection.
@@ -186,13 +187,6 @@ extern const char *PING;
  */
 extern const char *PONG;
 /**
- * The alert message warns nodes of problems that may affect them or the rest
- * of the network.
- * @since protocol version 311.
- * @see https://bitcoin.org/en/developer-reference#alert
- */
-extern const char *ALERT;
-/**
  * The notfound message is a reply to a getdata message which requested an
  * object the receiving node does not have available for relay.
  * @ince protocol version 70001.
@@ -227,6 +221,11 @@ extern const char *FILTERADD;
  */
 extern const char *FILTERCLEAR;
 /**
+ * The filtersizexthin message tells the receiving peer the maximum xthin bloom
+ * filter size that it will accept.
+ */
+extern const char *FILTERSIZEXTHIN;
+/**
  * The reject message informs the receiving node that one of its previous
  * messages has been rejected.
  * @since protocol version 70002 as described by BIP61.
@@ -242,19 +241,19 @@ extern const char *REJECT;
 extern const char *SENDHEADERS;
 
 /**
- * Indicates that a node prefers to receive new block announcements 
+ * Indicates that a node prefers to receive new block announcements
  * and transactions directly without INVs
  * @since protocol version 80000.
  */
 extern const char *XPEDITEDREQUEST;
 
 /**
- * Block or transactions sent without explicit solicitation 
+ * Block or transactions sent without explicit solicitation
  * @since protocol version 80000.
  */
 extern const char *XPEDITEDBLK;
 /**
- * Block or transactions sent without explicit solicitation 
+ * Block or transactions sent without explicit solicitation
  * @since protocol version 80000.
  */
 extern const char *XPEDITEDTXN;
@@ -276,7 +275,8 @@ extern const char *BUVERACK;
 const std::vector<std::string> &getAllNetMessageTypes();
 
 /** nServices flags */
-enum {
+enum
+{
     // NODE_NETWORK means that the node is capable of serving the block chain. It is currently
     // set by all Bitcoin Unlimited nodes, and is unset by SPV clients or other peers that just want
     // network services but don't provide them.
@@ -297,10 +297,17 @@ enum {
 
     // BUIP010 - Xtreme Thinblocks - begin section
     // NODE_XTHIN means the node supports Xtreme Thinblocks
-    // If this is turned off then the node will not service xthin requests nor  
+    // If this is turned off then the node will not service xthin requests nor
     // make xthin requests
     NODE_XTHIN = (1 << 4),
     // BUIP010 - Xtreme Thinblocks - end section
+
+    // BUIP055 - UAHF
+    // NODE_UAHF means the node supports the UAHF hard fork.  This is intended to be just
+    // a temporary service bit until the fork actually happens.  After the for it can be
+    // removed.
+    // If this is turned off then the node will not follow the UAHF hardfork
+    NODE_BITCOIN_CASH = (1 << 5),
 
     // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
     // isn't getting used, or one not being used much, and notify the
@@ -323,17 +330,17 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion)
+    inline void SerializationOp(Stream &s, Operation ser_action)
     {
         if (ser_action.ForRead())
             Init();
-        if (nType & SER_DISK)
+        int nVersion = s.GetVersion();
+        if (s.GetType() & SER_DISK)
             READWRITE(nVersion);
-        if ((nType & SER_DISK) ||
-            (nVersion >= CADDR_TIME_VERSION && !(nType & SER_GETHASH)))
+        if ((s.GetType() & SER_DISK) || (nVersion >= CADDR_TIME_VERSION && !(s.GetType() & SER_GETHASH)))
             READWRITE(nTime);
         READWRITE(nServices);
-        READWRITE(*(CService*)this);
+        READWRITE(*(CService *)this);
     }
 
     // TODO: make private (improves encapsulation)
@@ -349,23 +356,23 @@ class CInv
 {
 public:
     CInv();
-    CInv(int typeIn, const uint256& hashIn);
-    CInv(const std::string& strType, const uint256& hashIn);
+    CInv(int typeIn, const uint256 &hashIn);
+    CInv(const std::string &strType, const uint256 &hashIn);
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion)
+    inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(type);
         READWRITE(hash);
     }
 
-    friend bool operator<(const CInv& a, const CInv& b);
+    friend bool operator<(const CInv &a, const CInv &b);
 
     /// returns true if this inv is one of any of the inv types ever used.
     bool IsKnownType() const;
-    const char* GetCommand() const;
+    const char *GetCommand() const;
     std::string ToString() const;
 
     // TODO: make private (improves encapsulation)
@@ -374,7 +381,8 @@ public:
     uint256 hash;
 };
 
-enum {
+enum
+{
     MSG_TX = 1,
     MSG_BLOCK,
     // Nodes may always request a MSG_FILTERED_BLOCK in a getdata, however,
@@ -383,7 +391,7 @@ enum {
     // BUIP010 Xtreme Thinblocks: a thin block contains all the transactions hashes in a block
     // and also provides the missing transactions that are needed at the other end to reconstruct the block
     MSG_THINBLOCK,
-    // BUIP010 Xtreme Thinblocks: an Xtreme thin block contains the first 8 bytes of all the tx hashes 
+    // BUIP010 Xtreme Thinblocks: an Xtreme thin block contains the first 8 bytes of all the tx hashes
     // and also provides the missing transactions that are needed at the other end to reconstruct the block
     MSG_XTHINBLOCK,
 };

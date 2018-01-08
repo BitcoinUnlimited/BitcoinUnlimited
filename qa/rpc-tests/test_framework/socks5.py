@@ -128,10 +128,26 @@ class Socks5Connection(object):
 class Socks5Server(object):
     def __init__(self, conf):
         self.conf = conf
-        self.s = socket.socket(conf.af)
-        self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.s.bind(conf.addr)
-        self.s.listen(5)
+
+        # auto retry binding to subsequent ports - a port might be in
+        # use by other processing running on the OS during testing. This
+        # should reduce sporadic failures due to 'address in use'.
+        # Note that this implicitly auto-changes the socket configuration.
+        for i in range(1, 6):
+            try:
+                self.s = socket.socket(conf.af)
+                self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.s.bind(conf.addr)
+                self.s.listen(5)
+                break
+            except OSError as e:
+                if "Address already in use" not in str(e):
+                    raise
+                else:
+                    print("Warning: Address in use:", conf.addr)
+                    conf.addr = (conf.addr[0], conf.addr[1] + i)
+                    print("Warning: Attempting to use address:", conf.addr)
+
         self.running = False
         self.thread = None
         self.queue = queue.Queue() # report connections and exceptions to client
@@ -144,7 +160,7 @@ class Socks5Server(object):
                 thread = threading.Thread(None, conn.handle)
                 thread.daemon = True
                 thread.start()
-    
+
     def start(self):
         assert(not self.running)
         self.running = True
@@ -159,4 +175,3 @@ class Socks5Server(object):
         s.connect(self.conf.addr)
         s.close()
         self.thread.join()
-

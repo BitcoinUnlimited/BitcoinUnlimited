@@ -10,12 +10,11 @@
 #include <QMutex>
 #include <QThread>
 
-static const bool DEFAULT_CHOOSE_DATADIR = false;
-
 class FreespaceChecker;
 
-namespace Ui {
-    class Intro;
+namespace Ui
+{
+class Intro;
 }
 
 /** Introduction screen (pre-GUI startup).

@@ -16,27 +16,13 @@ const std::string CBaseChainParams::UNL = "nol";
 const std::string CBaseChainParams::TESTNET = "test";
 const std::string CBaseChainParams::REGTEST = "regtest";
 
-void AppendParamsHelpMessages(std::string& strUsage, bool debugHelp)
-{
-    strUsage += HelpMessageGroup(_("Chain selection options:"));
-    strUsage += HelpMessageOpt("-testnet", _("Use the test chain"));
-    strUsage += HelpMessageOpt("-chain_nol", _("Use the no-limit blockchain"));
-    if (debugHelp) {
-        strUsage += HelpMessageOpt("-regtest", "Enter regression test mode, which uses a special chain in which blocks can be solved instantly. "
-                                   "This is intended for regression testing tools and app development.");
-    }
-}
-
 /**
  * Main network
  */
 class CBaseMainParams : public CBaseChainParams
 {
 public:
-    CBaseMainParams()
-    {
-        nRPCPort = 8332;
-    }
+    CBaseMainParams() { nRPCPort = 8332; }
 };
 static CBaseMainParams mainParams;
 
@@ -82,15 +68,15 @@ public:
 };
 static CBaseRegTestParams regTestParams;
 
-static CBaseChainParams* pCurrentBaseParams = 0;
+static CBaseChainParams *pCurrentBaseParams = 0;
 
-const CBaseChainParams& BaseParams()
+const CBaseChainParams &BaseParams()
 {
     assert(pCurrentBaseParams);
     return *pCurrentBaseParams;
 }
 
-CBaseChainParams& BaseParams(const std::string& chain)
+CBaseChainParams &BaseParams(const std::string &chain)
 {
     if (chain == CBaseChainParams::MAIN)
         return mainParams;
@@ -104,11 +90,7 @@ CBaseChainParams& BaseParams(const std::string& chain)
         throw std::runtime_error(strprintf("%s: Unknown chain %s.", __func__, chain));
 }
 
-void SelectBaseParams(const std::string& chain)
-{
-    pCurrentBaseParams = &BaseParams(chain);
-}
-
+void SelectBaseParams(const std::string &chain) { pCurrentBaseParams = &BaseParams(chain); }
 std::string ChainNameFromCommandLine()
 {
     bool fRegTest = GetBoolArg("-regtest", false);
@@ -126,7 +108,4 @@ std::string ChainNameFromCommandLine()
     return CBaseChainParams::MAIN;
 }
 
-bool AreBaseParamsConfigured()
-{
-    return pCurrentBaseParams != NULL;
-}
+bool AreBaseParamsConfigured() { return pCurrentBaseParams != NULL; }

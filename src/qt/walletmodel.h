@@ -38,9 +38,20 @@ QT_END_NAMESPACE
 class SendCoinsRecipient
 {
 public:
-    explicit SendCoinsRecipient() : amount(0), fSubtractFeeFromAmount(false), nVersion(SendCoinsRecipient::CURRENT_VERSION) { }
-    explicit SendCoinsRecipient(const QString &addr, const QString &label, const CAmount& amount, const QString &message):
-        address(addr), label(label), amount(amount), message(message), fSubtractFeeFromAmount(false), nVersion(SendCoinsRecipient::CURRENT_VERSION) {}
+    explicit SendCoinsRecipient()
+        : amount(0), fSubtractFeeFromAmount(false), nVersion(SendCoinsRecipient::CURRENT_VERSION)
+    {
+    }
+    explicit SendCoinsRecipient(const QString &addr,
+        const QString &label,
+        const CAmount &amount,
+        const QString &message,
+        const QString &freezeLockTime,
+        const QString &labelPublic)
+        : address(addr), label(label), labelPublic(labelPublic), amount(amount), message(message),
+          freezeLockTime(freezeLockTime), fSubtractFeeFromAmount(false), nVersion(SendCoinsRecipient::CURRENT_VERSION)
+    {
+    }
 
     // If from an unauthenticated payment request, this is used for storing
     // the addresses, e.g. address-A<br />address-B<br />address-C.
@@ -49,9 +60,12 @@ public:
     // Todo: This is a hack, should be replaced with a cleaner solution!
     QString address;
     QString label;
+    QString labelPublic;
     CAmount amount;
     // If from a payment request, this is used for storing the memo
     QString message;
+    // Freeze Lock Time
+    QString freezeLockTime;
 
     // If from a payment request, paymentRequest.IsInitialized() will be true
     PaymentRequestPlus paymentRequest;
@@ -60,16 +74,19 @@ public:
 
     bool fSubtractFeeFromAmount; // memory only
 
-    static const int CURRENT_VERSION = 1;
+    static const int CURRENT_VERSION = 2;
     int nVersion;
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+    inline void SerializationOp(Stream &s, Operation ser_action)
+    {
         std::string sAddress = address.toStdString();
         std::string sLabel = label.toStdString();
         std::string sMessage = message.toStdString();
+        std::string sFreezeLockTime = freezeLockTime.toStdString();
+        std::string slabelPublic = labelPublic.toStdString();
         std::string sPaymentRequest;
         if (!ser_action.ForRead() && paymentRequest.IsInitialized())
             paymentRequest.SerializeToString(&sPaymentRequest);
@@ -83,12 +100,16 @@ public:
         READWRITE(sMessage);
         READWRITE(sPaymentRequest);
         READWRITE(sAuthenticatedMerchant);
+        if (nVersion >= 2)
+            READWRITE(sFreezeLockTime);
 
         if (ser_action.ForRead())
         {
             address = QString::fromStdString(sAddress);
             label = QString::fromStdString(sLabel);
             message = QString::fromStdString(sMessage);
+            freezeLockTime = QString::fromStdString(sFreezeLockTime);
+            labelPublic = QString::fromStdString(slabelPublic);
             if (!sPaymentRequest.empty())
                 paymentRequest.parse(QByteArray::fromRawData(sPaymentRequest.data(), sPaymentRequest.size()));
             authenticatedMerchant = QString::fromStdString(sAuthenticatedMerchant);
@@ -102,7 +123,10 @@ class WalletModel : public QObject
     Q_OBJECT
 
 public:
-    explicit WalletModel(const PlatformStyle *platformStyle, CWallet *wallet, OptionsModel *optionsModel, QObject *parent = 0);
+    explicit WalletModel(const PlatformStyle *platformStyle,
+        CWallet *wallet,
+        OptionsModel *optionsModel,
+        QObject *parent = 0);
     ~WalletModel();
 
     enum StatusCode // Returned by sendCoins
@@ -121,9 +145,9 @@ public:
 
     enum EncryptionStatus
     {
-        Unencrypted,  // !wallet->IsCrypted()
-        Locked,       // wallet->IsCrypted() && wallet->IsLocked()
-        Unlocked      // wallet->IsCrypted() && !wallet->IsLocked()
+        Unencrypted, // !wallet->IsCrypted()
+        Locked, // wallet->IsCrypted() && wallet->IsLocked()
+        Unlocked // wallet->IsCrypted() && !wallet->IsLocked()
     };
 
     OptionsModel *getOptionsModel();
@@ -146,8 +170,7 @@ public:
     // Return status record for SendCoins, contains error id + information
     struct SendCoinsReturn
     {
-        SendCoinsReturn(StatusCode status = OK):
-            status(status) {}
+        SendCoinsReturn(StatusCode status = OK) : status(status) {}
         StatusCode status;
     };
 
@@ -160,7 +183,7 @@ public:
     // Wallet encryption
     bool setWalletEncrypted(bool encrypted, const SecureString &passphrase);
     // Passphrase only needed when unlocking
-    bool setWalletLocked(bool locked, const SecureString &passPhrase=SecureString());
+    bool setWalletLocked(bool locked, const SecureString &passPhrase = SecureString());
     bool changePassphrase(const SecureString &oldPass, const SecureString &newPass);
     // Wallet backup
     bool backupWallet(const QString &filename);
@@ -173,32 +196,36 @@ public:
         ~UnlockContext();
 
         bool isValid() const { return valid; }
-
         // Copy operator and constructor transfer the context
-        UnlockContext(const UnlockContext& obj) { CopyFrom(obj); }
-        UnlockContext& operator=(const UnlockContext& rhs) { CopyFrom(rhs); return *this; }
+        UnlockContext(const UnlockContext &obj) { CopyFrom(obj); }
+        UnlockContext &operator=(const UnlockContext &rhs)
+        {
+            CopyFrom(rhs);
+            return *this;
+        }
+
     private:
         WalletModel *wallet;
         bool valid;
         mutable bool relock; // mutable, as it can be set to false by copying
 
-        void CopyFrom(const UnlockContext& rhs);
+        void CopyFrom(const UnlockContext &rhs);
     };
 
     UnlockContext requestUnlock();
 
-    bool getPubKey(const CKeyID &address, CPubKey& vchPubKeyOut) const;
-    bool havePrivKey(const CKeyID &address) const;
-    void getOutputs(const std::vector<COutPoint>& vOutpoints, std::vector<COutput>& vOutputs);
-    bool isSpent(const COutPoint& outpoint) const;
-    void listCoins(std::map<QString, std::vector<COutput> >& mapCoins) const;
+    bool getPubKey(const CKeyID &address, CPubKey &vchPubKeyOut) const;
+    bool IsSpendable(const CTxDestination &dest) const;
+    void getOutputs(const std::vector<COutPoint> &vOutpoints, std::vector<COutput> &vOutputs);
+    bool isSpent(const COutPoint &outpoint) const;
+    void listCoins(std::map<QString, std::vector<COutput> > &mapCoins) const;
 
     bool isLockedCoin(uint256 hash, unsigned int n) const;
-    void lockCoin(COutPoint& output);
-    void unlockCoin(COutPoint& output);
-    void listLockedCoins(std::vector<COutPoint>& vOutpts);
+    void lockCoin(COutPoint &output);
+    void unlockCoin(COutPoint &output);
+    void listLockedCoins(std::vector<COutPoint> &vOutpts);
 
-    void loadReceiveRequests(std::vector<std::string>& vReceiveRequests);
+    void loadReceiveRequests(std::vector<std::string> &vReceiveRequests);
     bool saveReceiveRequest(const std::string &sAddress, const int64_t nId, const std::string &sRequest);
 
 private:
@@ -232,8 +259,12 @@ private:
 
 Q_SIGNALS:
     // Signal that balance in wallet changed
-    void balanceChanged(const CAmount& balance, const CAmount& unconfirmedBalance, const CAmount& immatureBalance,
-                        const CAmount& watchOnlyBalance, const CAmount& watchUnconfBalance, const CAmount& watchImmatureBalance);
+    void balanceChanged(const CAmount &balance,
+        const CAmount &unconfirmedBalance,
+        const CAmount &immatureBalance,
+        const CAmount &watchOnlyBalance,
+        const CAmount &watchUnconfBalance,
+        const CAmount &watchImmatureBalance);
 
     // Encryption status of wallet changed
     void encryptionStatusChanged(int status);
@@ -247,7 +278,7 @@ Q_SIGNALS:
     void message(const QString &title, const QString &message, unsigned int style);
 
     // Coins sent: from wallet, to recipient, in (serialized) transaction:
-    void coinsSent(CWallet* wallet, SendCoinsRecipient recipient, QByteArray transaction);
+    void coinsSent(CWallet *wallet, SendCoinsRecipient recipient, QByteArray transaction);
 
     // Show progress dialog e.g. for rescan
     void showProgress(const QString &title, int nProgress);
@@ -261,7 +292,11 @@ public Q_SLOTS:
     /* New transaction, or transaction changed status */
     void updateTransaction();
     /* New, updated or removed address book entry */
-    void updateAddressBook(const QString &address, const QString &label, bool isMine, const QString &purpose, int status);
+    void updateAddressBook(const QString &address,
+        const QString &label,
+        bool isMine,
+        const QString &purpose,
+        int status);
     /* Watch-only added */
     void updateWatchOnlyFlag(bool fHaveWatchonly);
     /* Current, immature or unconfirmed balance might have changed - emit 'balanceChanged' if so */

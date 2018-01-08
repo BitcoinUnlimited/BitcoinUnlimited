@@ -87,7 +87,7 @@ double TxConfirmStats::EstimateMedianVal(int confTarget, double sufficientTxVal,
     int maxbucketindex = buckets.size() - 1;
 
     // requireGreater means we are looking for the lowest fee/priority such that all higher
-    // values pass, so we start at maxbucketindex (highest fee) and look at succesively
+    // values pass, so we start at maxbucketindex (highest fee) and look at successively
     // smaller buckets until we reach failure.  Otherwise, we are looking for the highest
     // fee/priority such that all lower values fail, and we go in the opposite direction.
     unsigned int startbucket = requireGreater ? maxbucketindex : 0;
@@ -370,7 +370,7 @@ void CBlockPolicyEstimator::processTransaction(const CTxMemPoolEntry& entry, boo
         return;
     }
 
-    // Fees are stored and reported as BTC-per-kb:
+    // Fees are stored and reported as BCH-per-kb:
     CFeeRate feeRate(entry.GetFee(), entry.GetTxSize());
 
     // Want the priority of the tx at confirmation. However we don't know
@@ -416,7 +416,7 @@ void CBlockPolicyEstimator::processBlockTx(unsigned int nBlockHeight, const CTxM
         return;
     }
 
-    // Fees are stored and reported as BTC-per-kb:
+    // Fees are stored and reported as BCH-per-kb:
     CFeeRate feeRate(entry.GetFee(), entry.GetTxSize());
 
     // Want the priority of the tx at confirmation.  The priority when it

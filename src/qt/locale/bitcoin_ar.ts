@@ -394,6 +394,22 @@
         <translation>جوهر البيت كوين</translation>
     </message>
     <message>
+        <source>Request payments (generates QR codes and %1 URIs)</source>
+        <translation>أطلب دفعات (يولد كودات الرمز المربع وبيت كوين: العناوين المعطاة)</translation>
+    </message>
+    <message>
+        <source>Show the list of used sending addresses and labels</source>
+        <translation>عرض قائمة عناوين الإرسال المستخدمة والملصقات</translation>
+    </message>
+    <message>
+        <source>Show the list of used receiving addresses and labels</source>
+        <translation>عرض قائمة عناوين الإستقبال المستخدمة والملصقات</translation>
+    </message>
+    <message>
+        <source>Open a %1 URI or payment request</source>
+        <translation>فتح URI : Bitcoin أو طلب دفع</translation>
+    </message>
+    <message>
         <source>&amp;About Bitcoin Unlimited</source>
         <translation>حول bitcoin core</translation>
     </message>
@@ -410,8 +426,8 @@
         <translation>عرض قائمة عناوين الإستقبال المستخدمة والملصقات</translation>
     </message>
     <message>
-        <source>Open a bitcoin: URI or payment request</source>
-        <translation>فتح URI : Bitcoin أو طلب دفع</translation>
+        <source>Open a %1: URI or payment request</source>
+        <translation>فتح URI : %1 أو طلب دفع</translation>
     </message>
     <message>
         <source>%1 and %2</source>

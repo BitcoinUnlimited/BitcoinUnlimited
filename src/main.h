@@ -16,9 +16,12 @@
 #include "chain.h"
 #include "coins.h"
 #include "consensus/consensus.h"
+#include "fs.h"
 #include "net.h"
+#include "policy/policy.h"
 #include "script/script_error.h"
 #include "sync.h"
+#include "txdb.h"
 #include "versionbits.h"
 
 #include <algorithm>
@@ -39,6 +42,7 @@ class CBloomFilter;
 class CChainParams;
 class CInv;
 class CScriptCheck;
+class CScriptCheckAndAnalyze;
 class CTxMemPool;
 class CValidationInterface;
 class CValidationState;
@@ -46,8 +50,17 @@ class CValidationState;
 struct CNodeStateStats;
 struct LockPoints;
 
-/** Default for accepting alerts from the P2P network. BUIP013 disables network alerts. */
-static const bool DEFAULT_ALERTS = false;
+/** Global variable that points to the coins database */
+extern CCoinsViewDB *pcoinsdbview;
+
+enum FlushStateMode
+{
+    FLUSH_STATE_NONE,
+    FLUSH_STATE_IF_NEEDED,
+    FLUSH_STATE_PERIODIC,
+    FLUSH_STATE_ALWAYS
+};
+
 /** Default for DEFAULT_WHITELISTRELAY. */
 static const bool DEFAULT_WHITELISTRELAY = true;
 /** Default for DEFAULT_WHITELISTFORCERELAY. */
@@ -87,9 +100,6 @@ static const int MAX_SCRIPTCHECK_THREADS = 16;
 static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
 /** Number of blocks that can be requested at any given time from a single peer. */
 // static const int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 16;
-/** Timeout in seconds during which a peer must stall block download progress before being disconnected. */
-// static const unsigned int BLOCK_STALLING_TIMEOUT = 2;
-static const unsigned int BLOCK_STALLING_TIMEOUT = 60; // BU: request manager handles block timeouts at 30 seconds
 /** Timeout in seconds during which we must receive a VERACK message after having first sent a VERSION message */
 static const unsigned int VERACK_TIMEOUT = 60;
 /** Number of headers sent in one getheaders result. We rely on the assumption that if a peer sends
@@ -118,28 +128,38 @@ static const int64_t BLOCK_DOWNLOAD_TIMEOUT_BASE = 1000000;
 /** Additional block download timeout per parallel downloading peer (i.e. 5 min) */
 static const int64_t BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 500000;
 /** Timeout in secs for the initial sync. If we don't receive the first batch of headers */
-static const uint32_t INITIAL_HEADERS_TIMEOUT = 30;
+static const uint32_t INITIAL_HEADERS_TIMEOUT = 120;
 /** The maximum number of headers in the mapUnconnectedHeaders cache **/
 static const uint32_t MAX_UNCONNECTED_HEADERS = 144;
 /** The maximum length of time, in seconds, we keep unconnected headers in the cache **/
 static const uint32_t UNCONNECTED_HEADERS_TIMEOUT = 120;
 
-static const unsigned int DEFAULT_LIMITFREERELAY = 15;
-static const bool DEFAULT_RELAYPRIORITY = true;
+/** The maximum number of free transactions (in KB) that can enter the mempool per minute.
+ *  For a 1MB block we allow 15KB of free transactions per 1 minute.
+ */
+static const uint32_t DEFAULT_LIMITFREERELAY = DEFAULT_BLOCK_MAX_SIZE * 0.000015;
+/** Subject free transactions to priority checking when entering the mempool */
+static const bool DEFAULT_RELAYPRIORITY = false;
+
+static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 
 /** Default for -permitbaremultisig */
 static const bool DEFAULT_PERMIT_BAREMULTISIG = true;
 static const unsigned int DEFAULT_BYTES_PER_SIGOP = 20;
 static const bool DEFAULT_CHECKPOINTS_ENABLED = true;
 static const bool DEFAULT_TXINDEX = false;
-static const unsigned int DEFAULT_BANSCORE_THRESHOLD = 100;
 
 static const bool DEFAULT_TESTSAFEMODE = false;
-/** Default for -mempoolreplacement */
-static const bool DEFAULT_ENABLE_REPLACEMENT = false; // BUIP004: Replace by fee is NOT allowed.
 
 /** Maximum number of headers to announce when relaying blocks with headers message.*/
 static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 8;
+
+static const bool DEFAULT_PEERBLOOMFILTERS = true;
+static const bool DEFAULT_USE_THINBLOCKS = true;
+
+static const bool DEFAULT_REINDEX = false;
+static const bool DEFAULT_DISCOVER = true;
+static const bool DEFAULT_PRINTTOCONSOLE = false;
 
 struct BlockHasher
 {
@@ -158,7 +178,6 @@ extern CWaitableCriticalSection csBestBlock;
 extern CConditionVariable cvBlockChange;
 extern bool fImporting;
 extern bool fReindex;
-extern int nScriptCheckThreads;
 extern bool fTxIndex;
 extern bool fIsBareMultisigStd;
 extern bool fRequireStandard;
@@ -166,16 +185,19 @@ extern unsigned int nBytesPerSigOp;
 extern bool fCheckBlockIndex;
 extern bool fCheckpointsEnabled;
 extern size_t nCoinCacheUsage;
-extern bool fAlerts;
 /** A fee rate smaller than this is considered zero fee (for relaying, mining and transaction creation) */
 extern CFeeRate minRelayTxFee;
 /** Absolute maximum transaction fee (in satoshis) used by wallet and mempool (rejects high fee in sendrawtransaction)
  */
 extern CTweak<CAmount> maxTxFee;
-extern bool fEnableReplacement; // BU TODO is this RBF flag?
+/** If the tip is older than this (in seconds), the node is considered to be in initial block download. */
+extern int64_t nMaxTipAge;
 
 /** Best header we've seen so far (used for getheaders queries' starting points). */
 extern CBlockIndex *pindexBestHeader;
+
+/** Used to determine whether it is time to check the orphan pool for any txns that can be evicted. */
+extern int64_t nLastOrphanCheck;
 
 /** Minimum disk space required - used in CheckDiskSpace() */
 static const uint64_t nMinDiskSpace = 52428800;
@@ -187,10 +209,14 @@ extern bool fHavePruned;
 extern bool fPruneMode;
 /** Number of MiB of block files that we're trying to stay below. */
 extern uint64_t nPruneTarget;
+/** The maximum bloom filter size that we will support for an xthin request. This value is communicated to
+ *  our peer at the time we first make the connection.
+ */
+extern uint32_t nXthinBloomFilterSize;
 /** Block files containing a block-height within MIN_BLOCKS_TO_KEEP of chainActive.Tip() will not be pruned. */
 static const unsigned int MIN_BLOCKS_TO_KEEP = 288;
 
-static const signed int DEFAULT_CHECKBLOCKS = MIN_BLOCKS_TO_KEEP;
+static const signed int DEFAULT_CHECKBLOCKS = 6;
 static const unsigned int DEFAULT_CHECKLEVEL = 3;
 
 // Require that user allocate at least 550MB for block & undo files (blk???.dat and rev???.dat)
@@ -231,7 +257,8 @@ bool ProcessNewBlock(CValidationState &state,
     CNode *pfrom,
     const CBlock *pblock,
     bool fForceProcessing,
-    CDiskBlockPos *dbp);
+    CDiskBlockPos *dbp,
+    bool fParallel);
 /** Check whether enough disk space is available for an incoming block */
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 /** Open a block file (blk?????.dat) */
@@ -239,7 +266,7 @@ FILE *OpenBlockFile(const CDiskBlockPos &pos, bool fReadOnly = false);
 /** Open an undo file (rev?????.dat) */
 FILE *OpenUndoFile(const CDiskBlockPos &pos, bool fReadOnly = false);
 /** Translation to a filesystem path */
-boost::filesystem::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
+fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
 /** Import blocks from an external file */
 bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskBlockPos *dbp = NULL);
 /** Initialize a new block tree database + block data on disk */
@@ -258,21 +285,22 @@ bool AcceptBlockHeader(const CBlockHeader &block,
 
 /** Process a single protocol messages received from a given node */
 bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived);
+
 /**
  * Send queued protocol messages to be sent to a give node.
  *
  * @param[in]   pto             The node which we are sending messages to.
  */
 bool SendMessages(CNode *pto);
+// BU: moves to parallel.h
 /** Run an instance of the script checking thread */
-void ThreadScriptCheck();
+// void ThreadScriptCheck();
+
 /** Try to detect Partition (network isolation) attacks against us */
 void PartitionCheck(bool (*initialDownloadCheck)(),
     CCriticalSection &cs,
     const CBlockIndex *const &bestHeader,
     int64_t nPowTargetSpacing);
-/** Check whether we are doing an initial block download (synchronizing from disk or network) */
-bool IsInitialBlockDownload();
 /** Format a string that describes several potential problems detected by the core.
  * strFor can have three values:
  * - "rpc": get critical warnings, which should put the client in safe mode if non-empty
@@ -288,7 +316,10 @@ bool GetTransaction(const uint256 &hash,
     uint256 &hashBlock,
     bool fAllowSlow = false);
 /** Find the best known block, and make it the tip of the block chain */
-bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams, const CBlock *pblock = NULL);
+bool ActivateBestChain(CValidationState &state,
+    const CChainParams &chainparams,
+    const CBlock *pblock = NULL,
+    bool fParallel = false);
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
 
 /**
@@ -319,12 +350,22 @@ void UnlinkPrunedFiles(std::set<int> &setFilesToPrune);
 CBlockIndex *InsertBlockIndex(uint256 hash);
 /** Get statistics from node state */
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats);
-/** Increase a node's misbehavior score. */
-void Misbehaving(NodeId nodeid, int howmuch);
 /** Flush all state, indexes and buffers to disk. */
 void FlushStateToDisk();
+bool FlushStateToDisk(CValidationState &state, FlushStateMode mode);
 /** Prune block files and flush state to disk. */
 void PruneAndFlush();
+
+#ifdef BITCOIN_CASH
+/** Check is Cash HF has activated. */
+bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev);
+#endif
+
+/**
+   Determine whether free transactions are subject to rate limiting. If -limitfreerelay is not zero then rate limiting
+   for free txns will be in effect. If it is zero, then no free transactions will be allowed to enter the memory pool.
+ */
+bool AreFreeTxnsDisallowed();
 
 /** (try to) add transaction to memory pool **/
 bool AcceptToMemoryPool(CTxMemPool &pool,
@@ -348,33 +389,6 @@ struct CNodeStateStats
     int nCommonHeight;
     std::vector<int> vHeightInFlight;
 };
-
-struct CDiskTxPos : public CDiskBlockPos
-{
-    unsigned int nTxOffset; // after header
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action, int nType, int nVersion)
-    {
-        READWRITE(*(CDiskBlockPos *)this);
-        READWRITE(VARINT(nTxOffset));
-    }
-
-    CDiskTxPos(const CDiskBlockPos &blockIn, unsigned int nTxOffsetIn)
-        : CDiskBlockPos(blockIn.nFile, blockIn.nPos), nTxOffset(nTxOffsetIn)
-    {
-    }
-
-    CDiskTxPos() { SetNull(); }
-    void SetNull()
-    {
-        CDiskBlockPos::SetNull();
-        nTxOffset = 0;
-    }
-};
-
 
 /**
  * Count ECDSA signature operations the old-fashioned (pre-0.6) way
@@ -405,7 +419,9 @@ bool CheckInputs(const CTransaction &tx,
     unsigned int flags,
     bool cacheStore,
     ValidationResourceTracker *resourceTracker,
-    std::vector<CScriptCheck> *pvChecks = NULL);
+    std::vector<CScriptCheck> *pvChecks = NULL,
+    unsigned char *sighashType = NULL);
+
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
 void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache &inputs, int nHeight);
@@ -487,53 +503,6 @@ public:
     }
 };
 
-/**
- * Closure representing one script verification
- * Note that this stores references to the spending transaction
- */
-class CScriptCheck
-{
-private:
-    ValidationResourceTracker *resourceTracker;
-    CScript scriptPubKey;
-    const CTransaction *ptxTo;
-    unsigned int nIn;
-    unsigned int nFlags;
-    bool cacheStore;
-    ScriptError error;
-
-public:
-    CScriptCheck()
-        : resourceTracker(NULL), ptxTo(0), nIn(0), nFlags(0), cacheStore(false), error(SCRIPT_ERR_UNKNOWN_ERROR)
-    {
-    }
-    CScriptCheck(ValidationResourceTracker *resourceTrackerIn,
-        const CCoins &txFromIn,
-        const CTransaction &txToIn,
-        unsigned int nInIn,
-        unsigned int nFlagsIn,
-        bool cacheIn)
-        : resourceTracker(resourceTrackerIn), scriptPubKey(txFromIn.vout[txToIn.vin[nInIn].prevout.n].scriptPubKey),
-          ptxTo(&txToIn), nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn), error(SCRIPT_ERR_UNKNOWN_ERROR)
-    {
-    }
-
-    bool operator()();
-
-    void swap(CScriptCheck &check)
-    {
-        std::swap(resourceTracker, check.resourceTracker);
-        scriptPubKey.swap(check.scriptPubKey);
-        std::swap(ptxTo, check.ptxTo);
-        std::swap(nIn, check.nIn);
-        std::swap(nFlags, check.nFlags);
-        std::swap(cacheStore, check.cacheStore);
-        std::swap(error, check.error);
-    }
-
-    ScriptError GetScriptError() const { return error; }
-};
-
 
 /** Functions for disk access for blocks */
 bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHeader::MessageStartChars &messageStart);
@@ -557,7 +526,8 @@ bool ConnectBlock(const CBlock &block,
     CValidationState &state,
     CBlockIndex *pindex,
     CCoinsViewCache &coins,
-    bool fJustCheck = false);
+    bool fJustCheck = false,
+    bool fParallel = false);
 
 /** Context-independent validity checks */
 bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state, bool fCheckPOW = true);
@@ -589,61 +559,6 @@ bool CheckIndexAgainstCheckpoint(const CBlockIndex *pindexPrev,
 /** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
 bool AcceptBlock(CBlock &block, CValidationState &state, CBlockIndex **pindex, bool fRequested, CDiskBlockPos *dbp);
 bool AcceptBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex **ppindex = NULL);
-
-
-class CBlockFileInfo
-{
-public:
-    unsigned int nBlocks; //! number of blocks stored in file
-    unsigned int nSize; //! number of used bytes of block file
-    unsigned int nUndoSize; //! number of used bytes in the undo file
-    unsigned int nHeightFirst; //! lowest height of block in file
-    unsigned int nHeightLast; //! highest height of block in file
-    uint64_t nTimeFirst; //! earliest time of block in file
-    uint64_t nTimeLast; //! latest time of block in file
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action, int nType, int nVersion)
-    {
-        READWRITE(VARINT(nBlocks));
-        READWRITE(VARINT(nSize));
-        READWRITE(VARINT(nUndoSize));
-        READWRITE(VARINT(nHeightFirst));
-        READWRITE(VARINT(nHeightLast));
-        READWRITE(VARINT(nTimeFirst));
-        READWRITE(VARINT(nTimeLast));
-    }
-
-    void SetNull()
-    {
-        nBlocks = 0;
-        nSize = 0;
-        nUndoSize = 0;
-        nHeightFirst = 0;
-        nHeightLast = 0;
-        nTimeFirst = 0;
-        nTimeLast = 0;
-    }
-
-    CBlockFileInfo() { SetNull(); }
-    std::string ToString() const;
-
-    /** update statistics (does not update nSize) */
-    void AddBlock(unsigned int nHeightIn, uint64_t nTimeIn)
-    {
-        if (nBlocks == 0 || nHeightFirst > nHeightIn)
-            nHeightFirst = nHeightIn;
-        if (nBlocks == 0 || nTimeFirst > nTimeIn)
-            nTimeFirst = nTimeIn;
-        nBlocks++;
-        if (nHeightIn > nHeightLast)
-            nHeightLast = nHeightIn;
-        if (nTimeIn > nTimeLast)
-            nTimeLast = nTimeIn;
-    }
-};
 
 /** RAII wrapper for VerifyDB: Verify consistency of the block and coin databases */
 class CVerifyDB
@@ -697,6 +612,8 @@ static const unsigned int REJECT_HIGHFEE = 0x100;
 static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 /** Transaction conflicts with a transaction already known */
 static const unsigned int REJECT_CONFLICT = 0x102;
+/** Transaction cannot be committed on my fork */
+static const unsigned int REJECT_WRONG_FORK = 0x103;
 
 struct COrphanTx
 {
@@ -712,6 +629,8 @@ extern std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED
 
 void EraseOrphanTx(uint256 hash) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache);
 // BU: end
+
+CBlockIndex *FindMostWorkChain();
 
 // BU cleaning up at destuction time creates many global variable dependencies.  Instead clean up in a function called
 // in main()

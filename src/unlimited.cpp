@@ -3,23 +3,29 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "unlimited.h"
+#include "base58.h"
+#include "cashaddrenc.h"
 #include "chain.h"
 #include "chainparams.h"
+#include "checkpoints.h"
 #include "clientversion.h"
+#include "connmgr.h"
 #include "consensus/consensus.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "core_io.h"
+#include "dosman.h"
+#include "dstencode.h"
 #include "expedited.h"
 #include "hash.h"
 #include "leakybucket.h"
-#include "main.h"
 #include "miner.h"
 #include "net.h"
+#include "parallel.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
 #include "requestManager.h"
-#include "rpcserver.h"
+#include "rpc/server.h"
 #include "stat.h"
 #include "thinblock.h"
 #include "timedata.h"
@@ -28,50 +34,43 @@
 #include "txmempool.h"
 #include "ui_interface.h"
 #include "util.h"
+#include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include "validationinterface.h"
 #include "version.h"
 
-// just for size reporting
-#include "alert.h"
-
-#include <boost/atomic.hpp>
+#include <atomic>
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
 #include <inttypes.h>
 #include <iomanip>
+#include <limits>
 #include <queue>
 
 using namespace std;
 
 extern CTxMemPool mempool; // from main.cpp
-// track the largest block we've seen
-static boost::atomic<uint64_t> nLargestBlockSeen(BLOCKSTREAM_CORE_MAX_BLOCK_SIZE);
-static boost::atomic<bool> fIsChainNearlySyncd(false);
+static atomic<uint64_t> nLargestBlockSeen{BLOCKSTREAM_CORE_MAX_BLOCK_SIZE}; // track the largest block we've seen
+static atomic<bool> fIsChainNearlySyncd{false};
+extern atomic<bool> fIsInitialBlockDownload;
 extern CTweakRef<uint64_t> miningBlockSize;
-extern CTweakRef<unsigned int> ebTweak;
-extern std::vector<CNode *> xpeditedBlk; // Who requested expedited blocks from us
-extern std::vector<CNode *> xpeditedBlkUp; // Who we requested expedited blocks from
-extern std::vector<CNode *> xpeditedTxn;
+extern CTweakRef<uint64_t> ebTweak;
 
-extern CCriticalSection cs_previousblock; // Protects the vPreviousBlock array
-// This vector holds hashes of the transactions in the previous block.  When a new block comes in it is used to
-// flush the orphan pool of any transactions that may have trickled in AFTER the block that mines them has already
-// been processed.  In this case a transaction may look like an orphan because its parents have already been removed
-// from the UTXO set.
-vector<uint256> vPreviousBlock;
+int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
 
 bool IsTrafficShapingEnabled();
+UniValue validateblocktemplate(const UniValue &params, bool fHelp);
+UniValue validatechainhistory(const UniValue &params, bool fHelp);
 
-bool MiningAndExcessiveBlockValidatorRule(const unsigned int newExcessiveBlockSize,
-    const unsigned int newMiningBlockSize)
+bool MiningAndExcessiveBlockValidatorRule(const uint64_t newExcessiveBlockSize, const uint64_t newMiningBlockSize)
 {
     // The mined block size must be less then or equal too the excessive block size.
+    LogPrintf("newMiningBlockSize: %d - newExcessiveBlockSize: %d\n", newMiningBlockSize, newExcessiveBlockSize);
     return (newMiningBlockSize <= newExcessiveBlockSize);
 }
 
-std::string ExcessiveBlockValidator(const unsigned int &value, unsigned int *item, bool validate)
+std::string ExcessiveBlockValidator(const uint64_t &value, uint64_t *item, bool validate)
 {
     if (validate)
     {
@@ -153,7 +152,6 @@ std::string SubverValidator(const std::string &value, std::string *item, bool va
 // Push all transactions in the mempool to another node
 void UnlimitedPushTxns(CNode *dest);
 
-
 int32_t UnlimitedComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Params &params, uint32_t nTime)
 {
     if (blockVersion != 0) // BU: allow override of block version
@@ -211,70 +209,6 @@ void UpdateRecvStats(CNode *pfrom, const std::string &strCommand, int msgSize, i
 }
 
 
-std::string UnlimitedCmdLineHelp()
-{
-    std::string strUsage;
-    strUsage += HelpMessageGroup(_("Bitcoin Unlimited Options:"));
-    strUsage += HelpMessageOpt("-blockversion=<n>", _("Generated block version number.  Value must be an integer"));
-    strUsage +=
-        HelpMessageOpt("-excessiveblocksize=<n>", _("Blocks above this size in bytes are considered excessive"));
-    strUsage += HelpMessageOpt("-excessiveacceptdepth=<n>",
-        _("Excessive blocks are accepted anyway if this many blocks are mined on top of them"));
-    strUsage += HelpMessageOpt(
-        "-receiveburst", _("The maximum rate that data can be received in kB/s.  If there has been a period of lower "
-                           "than average data rates, the client may receive extra data to bring the average back to "
-                           "'-receiveavg' but the data rate will not exceed this parameter."));
-    strUsage += HelpMessageOpt(
-        "-sendburst", _("The maximum rate that data can be sent in kB/s.  If there has been a period of lower than "
-                        "average data rates, the client may send extra data to bring the average back to '-receiveavg' "
-                        "but the data rate will not exceed this parameter."));
-    strUsage += HelpMessageOpt("-receiveavg", _("The average rate that data can be received in kB/s"));
-    strUsage += HelpMessageOpt("-sendavg", _("The maximum rate that data can be sent in kB/s"));
-    strUsage += HelpMessageOpt(
-        "-use-thinblocks=<n>", strprintf(_("Turn Thinblocks on or off (off: 0, on: 1, default: %d)"), 1));
-    strUsage += HelpMessageOpt("-connect-thinblock=<ip:port>",
-        _("Connect to a thinblock node(s). Blocks will only be downloaded from a thinblock peer.  If no connections "
-          "are possible then regular blocks will then be downloaded form any other connected peers."));
-    strUsage +=
-        HelpMessageOpt("-minlimitertxfee=<amt>", strprintf(_("Fees (in satoshi/byte) smaller than this are considered "
-                                                             "zero fee and subject to -limitfreerelay (default: %s)"),
-                                                     DEFAULT_MINLIMITERTXFEE));
-    strUsage += HelpMessageOpt(
-        "-min-xthin-nodes=<n>", strprintf(_("Minimum number of xthin nodes to automatically find and connect "
-                                            "(default: %d)"),
-                                    4));
-    strUsage += HelpMessageOpt("-maxlimitertxfee=<amt>",
-        strprintf(_("Fees (in satoshi/byte) larger than this are always relayed (default: %s)"),
-                                   DEFAULT_MAXLIMITERTXFEE));
-    strUsage += HelpMessageOpt(
-        "-bitnodes", _("Query for peer addresses via Bitnodes API, if low on addresses (default: 1 unless -connect)"));
-    strUsage += HelpMessageOpt("-forcebitnodes",
-        strprintf(_("Always query for peer addresses via Bitnodes API (default: %u)"), DEFAULT_FORCEBITNODES));
-    strUsage += HelpMessageOpt("-usednsseed=<host>", _("Add a custom DNS seed to use.  If at least one custom DNS seed "
-                                                       "is set, the default DNS seeds will be ignored."));
-    strUsage += HelpMessageOpt(
-        "-expeditedblock=<host>", _("Request expedited blocks from this host whenever we are connected to it"));
-    strUsage += HelpMessageOpt("-maxexpeditedblockrecipients=<n>",
-        _("The maximum number of nodes this node will forward expedited blocks to"));
-    strUsage += HelpMessageOpt("-maxexpeditedtxrecipients=<n>",
-        _("The maximum number of nodes this node will forward expedited transactions to"));
-    strUsage += HelpMessageOpt("-maxoutconnections=<n>",
-        strprintf(_("Initiate at most <n> connections to peers (default: %u).  If this number is higher than "
-                    "--maxconnections, it will be reduced to --maxconnections."),
-                                   DEFAULT_MAX_OUTBOUND_CONNECTIONS));
-    strUsage += HelpMessageOpt(
-        "-parallel=<n>", strprintf(_("Turn Parallel Block Validation on or off (off: 0, on: 1, default: %d)"), 1));
-    strUsage += HelpMessageOpt("-gen", strprintf(_("Generate coins (default: %u)"), DEFAULT_GENERATE));
-    strUsage += HelpMessageOpt("-genproclimit=<n>",
-        strprintf(_("Set the number of threads for coin generation if enabled (-1 = all cores, default: %d)"),
-                                   DEFAULT_GENERATE_THREADS));
-    strUsage += HelpMessageOpt("-ophanpoolexpiry=<n>",
-        strprintf(_("Do not keep transactions in the orphanpool longer than <n> hours (default: %u)"),
-                                   DEFAULT_ORPHANPOOL_EXPIRY));
-    strUsage += TweakCmdLineHelp();
-    return strUsage;
-}
-
 std::string FormatCoinbaseMessage(const std::vector<std::string> &comments, const std::string &customComment)
 {
     std::ostringstream ss;
@@ -290,7 +224,7 @@ std::string FormatCoinbaseMessage(const std::vector<std::string> &comments, cons
     return ret;
 }
 
-CNode *FindLikelyNode(const std::string &addrName)
+CNodeRef FindLikelyNode(const std::string &addrName)
 {
     LOCK(cs_vNodes);
     bool wildcard = (addrName.find_first_of("*?") != std::string::npos);
@@ -329,7 +263,7 @@ UniValue expedited(const UniValue &params, bool fHelp)
     std::string obj = params[0].get_str();
     std::string strNode = params[1].get_str();
 
-    CNode *node = FindLikelyNode(strNode);
+    CNodeRef node(FindLikelyNode(strNode));
     if (!node)
     {
         throw runtime_error("Unknown node");
@@ -358,27 +292,8 @@ UniValue expedited(const UniValue &params, bool fHelp)
             flags |= EXPEDITED_STOP;
     }
 
-    // TODO: validate that the node can handle expedited blocks
+    connmgr->PushExpeditedRequest(node.get(), flags);
 
-    // Add or remove this node to our list of upstream nodes
-    {
-        LOCK(cs_xpedited);
-        std::vector<CNode *>::iterator elem = std::find(xpeditedBlkUp.begin(), xpeditedBlkUp.end(), node);
-        if ((flags & EXPEDITED_BLOCKS) && (flags & EXPEDITED_STOP))
-        {
-            if (elem != xpeditedBlkUp.end())
-                xpeditedBlkUp.erase(elem);
-        }
-        else if (flags & EXPEDITED_BLOCKS)
-        {
-            if (elem == xpeditedBlkUp.end()) // don't add it twice
-                xpeditedBlkUp.push_back(node);
-        }
-    }
-
-    // Push the expedited message even if its a repeat to allow the operator to reissue the CLI command to trigger
-    // another message.
-    node->PushMessage(NetMsgType::XPEDITEDREQUEST, flags);
     return NullUniValue;
 }
 
@@ -396,26 +311,11 @@ UniValue pushtx(const UniValue &params, bool fHelp)
 
     string strNode = params[0].get_str();
 
-    // BU: Add lock on cs_vNodes as FindNode now requries it to prevent potential use-after-free errors
-    CNode *node = NULL;
-    {
-        LOCK(cs_vNodes);
-        node = FindLikelyNode(strNode);
+    CNodeRef node(FindLikelyNode(strNode));
+    if (!node)
+        throw runtime_error("Unknown node");
 
-        if (!node)
-        {
-            throw runtime_error("Unknown node");
-        }
-
-        // BU: Since we are passing node to another function, add a ref to prevent use-after-free
-        //    This allows us to release the lock on cs_vNodes earlier while still protecting node from deletion
-        node->AddRef();
-    }
-
-    UnlimitedPushTxns(node);
-
-    // BU: Remember to release the reference we took on node to protect from use-after-free
-    node->Release();
+    UnlimitedPushTxns(node.get());
 
     return NullUniValue;
 }
@@ -450,13 +350,16 @@ void settingsToUserAgentString()
 {
     BUComments.clear();
 
-    double ebInMegaBytes = (double)excessiveBlockSize / 1000000;
     std::stringstream ebss;
-    ebss << std::fixed << std::setprecision(1) << ebInMegaBytes;
+    ebss << (excessiveBlockSize / 100000);
     std::string eb = ebss.str();
-    std::string eb_formatted;
-    eb_formatted = (eb.at(eb.size() - 1) == '0' ? eb.substr(0, eb.size() - 2) : eb); // strip zero decimal
-    BUComments.push_back("EB" + eb_formatted);
+    eb.insert(eb.size() - 1, ".", 1);
+    if (eb.substr(0, 1) == ".")
+        eb = "0" + eb;
+    if (eb.at(eb.size() - 1) == '0')
+        eb = eb.substr(0, eb.size() - 2);
+
+    BUComments.push_back("EB" + eb);
 
     int ad_formatted;
     ad_formatted = (excessiveAcceptDepth >= 9999999 ? 9999999 : excessiveAcceptDepth);
@@ -465,8 +368,8 @@ void settingsToUserAgentString()
 
 void UnlimitedSetup(void)
 {
-    MIN_TX_REQUEST_RETRY_INTERVAL = GetArg("-txretryinterval", MIN_TX_REQUEST_RETRY_INTERVAL);
-    MIN_BLK_REQUEST_RETRY_INTERVAL = GetArg("-blkretryinterval", MIN_BLK_REQUEST_RETRY_INTERVAL);
+    MIN_TX_REQUEST_RETRY_INTERVAL = GetArg("-txretryinterval", DEFAULT_MIN_TX_REQUEST_RETRY_INTERVAL);
+    MIN_BLK_REQUEST_RETRY_INTERVAL = GetArg("-blkretryinterval", DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL);
     maxGeneratedBlock = GetArg("-blockmaxsize", maxGeneratedBlock);
     blockVersion = GetArg("-blockversion", blockVersion);
     excessiveBlockSize = GetArg("-excessiveblocksize", excessiveBlockSize);
@@ -512,10 +415,6 @@ void UnlimitedSetup(void)
         mallocedStats.push_front(new CStatHistory<uint64_t>("net/send/msg/" + *i));
     }
 
-    xpeditedBlk.reserve(256);
-    xpeditedBlkUp.reserve(256);
-    xpeditedTxn.reserve(256);
-
     // make outbound conns modifiable by the user
     int nUserMaxOutConnections = GetArg("-maxoutconnections", DEFAULT_MAX_OUTBOUND_CONNECTIONS);
     nMaxOutConnections = std::max(nUserMaxOutConnections, 0);
@@ -530,10 +429,26 @@ void UnlimitedSetup(void)
             nUserMaxOutConnections, nMaxConnections);
         nMaxOutConnections = nMaxConnections;
     }
+
+    // Start Internal CPU miner
+    // Generate coins in the background
+    GenerateBitcoins(GetBoolArg("-gen", DEFAULT_GENERATE), GetArg("-genproclimit", DEFAULT_GENERATE_THREADS), Params());
 }
+
+FILE *blockReceiptLog = NULL;
 
 void UnlimitedCleanup()
 {
+    txAdded.Stop();
+    poolSize.Stop();
+    recvAmt.Stop();
+    sendAmt.Stop();
+    nTxValidationTime.Stop();
+    {
+        LOCK(cs_blockvalidationtime);
+        nBlockValidationTime.Stop();
+    }
+
     CStatBase *obj = NULL;
     while (!mallocedStats.empty())
     {
@@ -542,8 +457,6 @@ void UnlimitedCleanup()
         mallocedStats.pop_front();
     }
 }
-
-FILE *blockReceiptLog = NULL;
 
 extern void UnlimitedLogBlock(const CBlock &block, const std::string &hash, uint64_t receiptTime)
 {
@@ -576,6 +489,299 @@ std::string LicenseInfo()
            "\n";
 }
 
+//////////////////////////////////////////////////////////////////////////////
+//
+// Internal miner
+//
+// ScanHash scans nonces looking for a hash with at least some zero bits.
+// The nonce is usually preserved between calls, but periodically or if the
+// nonce is 0xffff0000 or above, the block is rebuilt and nNonce starts over at
+// zero.
+//
+bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phash)
+{
+    // Write the first 76 bytes of the block header to a double-SHA256 state.
+    CHash256 hasher;
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    ss << *pblock;
+    assert(ss.size() == 80);
+    hasher.Write((unsigned char *)&ss[0], 76);
+
+    while (true)
+    {
+        nNonce++;
+
+        // Write the last 4 bytes of the block header (the nonce) to a copy of
+        // the double-SHA256 state, and compute the result.
+        CHash256(hasher).Write((unsigned char *)&nNonce, 4).Finalize((unsigned char *)phash);
+
+        // Return the nonce if the hash has at least some zero bits,
+        // caller will check if it has enough to reach the target
+        if (((uint16_t *)phash)[15] == 0)
+            return true;
+
+        // If nothing found after trying for a while, return -1
+        if ((nNonce & 0xfff) == 0)
+            return false;
+    }
+}
+
+static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainparams)
+{
+    LogPrintf("%s\n", pblock->ToString());
+    LogPrintf("generated %s\n", FormatMoney(pblock->vtx[0].vout[0].nValue));
+
+    // Found a solution
+    {
+        LOCK(cs_main);
+        if (pblock->hashPrevBlock != chainActive.Tip()->GetBlockHash())
+            return error("BitcoinMiner: generated block is stale");
+    }
+
+    // Inform about the new block
+    GetMainSignals().BlockFound(pblock->GetHash());
+
+
+    {
+        // We take a cs_main lock here even though it will also be aquired in ProcessNewBlock.  We want
+        // to make sure we give priority to our own blocks.  This is in order to prevent any other Parallel
+        // Blocks to validate when we've just mined one of our own blocks.
+        LOCK(cs_main);
+
+        // In we are mining our own block or not running in parallel for any reason
+        // we must terminate any block validation threads that are currently running,
+        // Unless they have more work than our own block or are processing a chain
+        // that has more work than our block.
+        PV->StopAllValidationThreads(pblock->GetBlockHeader().nBits);
+
+        // Process this block the same as if we had received it from another node
+        CValidationState state;
+        if (!ProcessNewBlock(state, chainparams, NULL, pblock, true, NULL, false))
+            return error("BitcoinMiner: ProcessNewBlock, block not accepted");
+    }
+
+    return true;
+}
+
+
+void static BitcoinMiner(const CChainParams &chainparams)
+{
+    LogPrintf("BitcoinMiner started\n");
+    SetThreadPriority(THREAD_PRIORITY_LOWEST);
+    RenameThread("bitcoin-miner");
+
+    unsigned int nExtraNonce = 0;
+
+    boost::shared_ptr<CReserveScript> coinbaseScript;
+    GetMainSignals().ScriptForMining(coinbaseScript);
+
+    try
+    {
+        // Throw an error if no script was provided.  This can happen
+        // due to some internal error but also if the keypool is empty.
+        // In the latter case, already the pointer is NULL.
+        if (!coinbaseScript || coinbaseScript->reserveScript.empty())
+            throw std::runtime_error("No coinbase script available (mining requires a wallet)");
+
+        while (true)
+        {
+            if (chainparams.MiningRequiresPeers())
+            {
+                // Busy-wait for the network to come online so we don't waste time mining
+                // on an obsolete chain. In regtest mode we expect to fly solo.
+                do
+                {
+                    bool fvNodesEmpty;
+                    {
+                        LOCK(cs_vNodes);
+                        fvNodesEmpty = vNodes.empty();
+                    }
+                    if (!fvNodesEmpty && !IsInitialBlockDownload())
+                        break;
+                    MilliSleep(1000);
+                } while (true);
+            }
+
+            //
+            // Create new block
+            //
+            unsigned int nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
+            CBlockIndex *pindexPrev;
+            {
+                LOCK(cs_main);
+                pindexPrev = chainActive.Tip();
+            }
+
+            unique_ptr<CBlockTemplate> pblocktemplate(
+                BlockAssembler(chainparams).CreateNewBlock(coinbaseScript->reserveScript));
+            if (!pblocktemplate.get())
+            {
+                LogPrintf("Error in BitcoinMiner: Keypool ran out, please call keypoolrefill before restarting the "
+                          "mining thread\n");
+                return;
+            }
+            CBlock *pblock = &pblocktemplate->block;
+            IncrementExtraNonce(pblock, nExtraNonce);
+
+            LogPrintf("Running BitcoinMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
+                ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
+
+            //
+            // Search
+            //
+            int64_t nStart = GetTime();
+            arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
+            uint256 hash;
+            uint32_t nNonce = 0;
+            while (true)
+            {
+                // Check if something found
+                if (ScanHash(pblock, nNonce, &hash))
+                {
+                    if (UintToArith256(hash) <= hashTarget)
+                    {
+                        // Found a solution
+                        pblock->nNonce = nNonce;
+                        assert(hash == pblock->GetHash());
+
+                        SetThreadPriority(THREAD_PRIORITY_NORMAL);
+                        LogPrintf("BitcoinMiner:\n");
+                        LogPrintf(
+                            "proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(), hashTarget.GetHex());
+                        ProcessBlockFound(pblock, chainparams);
+                        SetThreadPriority(THREAD_PRIORITY_LOWEST);
+                        coinbaseScript->KeepScript();
+
+                        // In regression test mode, stop mining after a block is found.
+                        if (chainparams.MineBlocksOnDemand())
+                            throw boost::thread_interrupted();
+
+                        break;
+                    }
+                }
+
+                // Check for stop or if block needs to be rebuilt
+                boost::this_thread::interruption_point();
+                // Regtest mode doesn't require peers
+                if (vNodes.empty() && chainparams.MiningRequiresPeers())
+                    break;
+                if (nNonce >= 0xffff0000)
+                    break;
+                if (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 60)
+                    break;
+                {
+                    LOCK(cs_main);
+                    if (pindexPrev != chainActive.Tip())
+                        break;
+                }
+
+                // Update nTime every few seconds
+                if (UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev) < 0)
+                    break; // Recreate the block if the clock has run backwards,
+                // so that we can use the correct time.
+                if (chainparams.GetConsensus().fPowAllowMinDifficultyBlocks)
+                {
+                    // Changing pblock->nTime can change work required on testnet:
+                    hashTarget.SetCompact(pblock->nBits);
+                }
+            }
+        }
+    }
+    catch (const boost::thread_interrupted &)
+    {
+        LogPrintf("BitcoinMiner terminated\n");
+        throw;
+    }
+    catch (const std::runtime_error &e)
+    {
+        LogPrintf("BitcoinMiner runtime error: %s\n", e.what());
+        return;
+    }
+}
+
+void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams &chainparams)
+{
+    static boost::thread_group *minerThreads = NULL;
+
+    if (nThreads < 0)
+        nThreads = GetNumCores();
+
+    if (minerThreads != NULL)
+    {
+        minerThreads->interrupt_all();
+        delete minerThreads;
+        minerThreads = NULL;
+    }
+
+    if (nThreads == 0 || !fGenerate)
+        return;
+
+    minerThreads = new boost::thread_group();
+    for (int i = 0; i < nThreads; i++)
+        minerThreads->create_thread(boost::bind(&BitcoinMiner, boost::cref(chainparams)));
+}
+
+// RPC read mining status
+UniValue getgenerate(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error("getgenerate\n"
+                            "\nReturn if the server is set to generate coins or not. The default is false.\n"
+                            "It is set with the command line argument -gen (or " +
+                            std::string(BITCOIN_CONF_FILENAME) +
+                            " setting gen)\n"
+                            "It can also be set with the setgenerate call.\n"
+                            "\nResult\n"
+                            "true|false      (boolean) If the server is set to generate coins or not\n"
+                            "\nExamples:\n" +
+                            HelpExampleCli("getgenerate", "") + HelpExampleRpc("getgenerate", ""));
+
+    LOCK(cs_main);
+    return GetBoolArg("-gen", DEFAULT_GENERATE);
+}
+
+// RPC activate internal miner
+UniValue setgenerate(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)
+        throw runtime_error(
+            "setgenerate generate ( genproclimit )\n"
+            "\nSet 'generate' true or false to turn generation on or off.\n"
+            "Generation is limited to 'genproclimit' processors, -1 is unlimited.\n"
+            "See the getgenerate call for the current setting.\n"
+            "\nArguments:\n"
+            "1. generate         (boolean, required) Set to true to turn on generation, off to turn off.\n"
+            "2. genproclimit     (numeric, optional) Set the processor limit for when generation is on. Can be -1 for "
+            "unlimited.\n"
+            "\nExamples:\n"
+            "\nSet the generation on with a limit of one processor\n" +
+            HelpExampleCli("setgenerate", "true 1") + "\nCheck the setting\n" + HelpExampleCli("getgenerate", "") +
+            "\nTurn off generation\n" + HelpExampleCli("setgenerate", "false") + "\nUsing json rpc\n" +
+            HelpExampleRpc("setgenerate", "true, 1"));
+
+    if (Params().MineBlocksOnDemand())
+        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Use the generate method instead of setgenerate on this network");
+
+    bool fGenerate = true;
+    if (params.size() > 0)
+        fGenerate = params[0].get_bool();
+
+    int nGenProcLimit = GetArg("-genproclimit", DEFAULT_GENERATE_THREADS);
+    if (params.size() > 1)
+    {
+        nGenProcLimit = params[1].get_int();
+        if (nGenProcLimit == 0)
+            fGenerate = false;
+    }
+
+    mapArgs["-gen"] = (fGenerate ? "1" : "0");
+    mapArgs["-genproclimit"] = itostr(nGenProcLimit);
+    GenerateBitcoins(fGenerate, nGenProcLimit, Params());
+
+    return NullUniValue;
+}
+
+// End generate block internal CPU miner section
 
 int chainContainsExcessive(const CBlockIndex *blk, unsigned int goBack)
 {
@@ -639,8 +845,9 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
         }
 
         // check proportional sigops
-        // block size in megabytes rounded up. 1-1000000 -> 1, 1000001-2000000 -> 2, etc.
-        uint64_t blockMbSize = 1 + ((blockSize - 1) / 1000000);
+        uint64_t blockMbSize =
+            1 + ((blockSize - 1) /
+                    1000000); // block size in megabytes rounded up. 1-1000000 -> 1, 1000001-2000000 -> 2, etc.
         if (nSigOps > blockSigopsPerMb.value * blockMbSize)
         {
             LogPrintf("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
@@ -1004,29 +1211,68 @@ UniValue settrafficshaping(const UniValue &params, bool fHelp)
     return NullUniValue;
 }
 
+// fIsInitialBlockDownload is updated only during startup and whenever we receive a header.
+// This way we avoid having to lock cs_main so often which tends to be a bottleneck.
+void IsInitialBlockDownloadInit()
+{
+    const CChainParams &chainParams = Params();
+    LOCK(cs_main);
+    if (!pindexBestHeader)
+    {
+        // Not nearly synced if we don't have any blocks!
+        fIsInitialBlockDownload.store(true);
+        return;
+    }
+    if (fImporting || fReindex)
+    {
+        fIsInitialBlockDownload.store(true);
+        return;
+    }
+    if (fCheckpointsEnabled && chainActive.Height() < Checkpoints::GetTotalBlocksEstimate(chainParams.Checkpoints()))
+    {
+        fIsInitialBlockDownload.store(true);
+        return;
+    }
 
+    // Using fInitialSyncComplete, once the chain is caught up the first time, and if we fall behind again due to a
+    // large re-org or for lack of mined blocks, then we continue to return false for IsInitialBlockDownload().
+    static bool fInitialSyncComplete = false;
+    if (fInitialSyncComplete)
+    {
+        fIsInitialBlockDownload.store(false);
+        return;
+    }
+
+    bool state =
+        (chainActive.Height() < pindexBestHeader->nHeight - 24 * 6 ||
+            std::max(chainActive.Tip()->GetBlockTime(), pindexBestHeader->GetBlockTime()) < GetTime() - nMaxTipAge);
+    if (!state)
+        fInitialSyncComplete = true;
+    fIsInitialBlockDownload.store(state);
+    return;
+}
+
+bool IsInitialBlockDownload() { return fIsInitialBlockDownload.load(); }
 // fIsChainNearlySyncd is updated only during startup and whenever we receive a header.
 // This way we avoid having to lock cs_main so often which tends to be a bottleneck.
 void IsChainNearlySyncdInit()
 {
-    LOCK2(cs_main, cs_ischainnearlysyncd);
+    LOCK(cs_main);
     if (!pindexBestHeader)
-        fIsChainNearlySyncd = false; // Not nearly synced if we don't have any blocks!
+    {
+        // Not nearly synced if we don't have any blocks!
+        fIsChainNearlySyncd.store(false);
+    }
     else
     {
         if (chainActive.Height() < pindexBestHeader->nHeight - 2)
-            fIsChainNearlySyncd = false;
+            fIsChainNearlySyncd.store(false);
         else
-            fIsChainNearlySyncd = true;
+            fIsChainNearlySyncd.store(true);
     }
 }
 
-bool IsChainNearlySyncd()
-{
-    LOCK(cs_ischainnearlysyncd);
-    return fIsChainNearlySyncd;
-}
-
+bool IsChainNearlySyncd() { return fIsChainNearlySyncd.load(); }
 uint64_t LargestBlockSeen(uint64_t nBlockSize)
 {
     // C++98 lacks the capability to do static initialization properly
@@ -1050,142 +1296,28 @@ uint64_t LargestBlockSeen(uint64_t nBlockSize)
     return nSize;
 }
 
+/** Returns the block height of the current active chain tip. **/
+int GetBlockchainHeight()
+{
+    LOCK(cs_main);
+    return chainActive.Height();
+}
+
 void LoadFilter(CNode *pfrom, CBloomFilter *filter)
 {
     if (!filter->IsWithinSizeConstraints())
         // There is no excuse for sending a too-large filter
-        Misbehaving(pfrom->GetId(), 100);
+        dosMan.Misbehaving(pfrom, 100);
     else
     {
         LOCK(pfrom->cs_filter);
         delete pfrom->pThinBlockFilter;
         pfrom->pThinBlockFilter = new CBloomFilter(*filter);
-        pfrom->pThinBlockFilter->UpdateEmptyFull();
     }
     uint64_t nSizeFilter = ::GetSerializeSize(*pfrom->pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION);
     LogPrint("thin", "Thinblock Bloom filter size: %d\n", nSizeFilter);
     thindata.UpdateInBoundBloomFilter(nSizeFilter);
 }
-
-void HandleBlockMessage(CNode *pfrom, const string &strCommand, CBlock &block, const CInv &inv)
-{
-    int64_t startTime = GetTimeMicros();
-    CValidationState state;
-    uint64_t nSizeBlock = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-
-    // At this point we have either a block or a fully reconstructed thinblock but we still need to
-    // maintain a mapThinBlocksInFlight entry so that we don't re-request a full block from
-    // the same node while the block is processing. Furthermore by setting the time = -1 we prevent
-    // the timeout from triggering and inadvertently disconnecting the node in the event that the block
-    // takes a longer time to process than the THINBLOCK_DOWNLOAD_TIMEOUT interval.
-    {
-        LOCK(pfrom->cs_mapthinblocksinflight);
-        if (pfrom->mapThinBlocksInFlight.count(inv.hash))
-            pfrom->mapThinBlocksInFlight[inv.hash].fReceived = true;
-    }
-
-    // Process all blocks from whitelisted peers, even if not requested,
-    // unless we're still syncing with the network.
-    // Such an unrequested block may still be processed, subject to the
-    // conditions in AcceptBlock().
-    bool forceProcessing = pfrom->fWhitelisted && !IsInitialBlockDownload();
-    const CChainParams &chainparams = Params();
-    pfrom->firstBlock += 1;
-    ProcessNewBlock(state, chainparams, pfrom, &block, forceProcessing, NULL);
-    int nDoS;
-    if (state.IsInvalid(nDoS))
-    {
-        LogPrintf("Invalid block due to %s\n", state.GetRejectReason().c_str());
-        if (!strCommand.empty())
-        {
-            pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
-                state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
-            if (nDoS > 0)
-            {
-                LOCK(cs_main);
-                Misbehaving(pfrom->GetId(), nDoS);
-            }
-        }
-    }
-    else
-    {
-        LargestBlockSeen(nSizeBlock); // update largest block seen
-
-        double nValidationTime = (double)(GetTimeMicros() - startTime) / 1000000.0;
-        if (strCommand != NetMsgType::BLOCK)
-        {
-            LogPrint("thin", "Processed ThinBlock %s in %.2f seconds\n", inv.hash.ToString(),
-                (double)(GetTimeMicros() - startTime) / 1000000.0);
-            thindata.UpdateValidationTime(nValidationTime);
-        }
-        else
-            LogPrint("thin", "Processed Regular Block %s in %.2f seconds\n", inv.hash.ToString(),
-                (double)(GetTimeMicros() - startTime) / 1000000.0);
-    }
-
-    // When we request a thinblock we may get back a regular block if it is smaller than a thinblock
-    // Therefore we have to remove the thinblock in flight if it exists and we also need to check that
-    // the block didn't arrive from some other peer.  This code ALSO cleans up the thin block that
-    // was passed to us (&block), so do not use it after this.
-    {
-        int nTotalThinBlocksInFlight = 0;
-        {
-            LOCK2(cs_vNodes, pfrom->cs_mapthinblocksinflight);
-            // Erase this thinblock from the tracking map now that we're done with it.
-            if (pfrom->mapThinBlocksInFlight.count(inv.hash))
-            {
-                // Clear out and reset thinblock data
-                thindata.ClearThinBlockData(pfrom, inv.hash);
-            }
-
-            // Count up any other remaining nodes with thinblocks in flight.
-            BOOST_FOREACH (CNode *pnode, vNodes)
-            {
-                if (pnode->mapThinBlocksInFlight.size() > 0)
-                    nTotalThinBlocksInFlight++;
-            }
-            pfrom->firstBlock += 1; // update statistics, requires cs_vNodes
-        }
-
-        // When we no longer have any thinblocks in flight then clear the set
-        // just to make sure we don't somehow get growth over time.
-        if (nTotalThinBlocksInFlight == 0)
-        {
-            thindata.ResetThinBlockBytes();
-
-            LOCK(cs_xval);
-            setPreVerifiedTxHash.clear();
-            setUnVerifiedOrphanTxHash.clear();
-        }
-    }
-
-    if (!IsInitialBlockDownload())
-    {
-        LOCK(cs_orphancache);
-        {
-            // Erase any orphans that may have been in the previous block and arrived
-            // after the previous block had already been processed.
-            LOCK(cs_previousblock);
-            for (unsigned int i = 0; i < vPreviousBlock.size(); i++)
-            {
-                EraseOrphanTx(vPreviousBlock[i]);
-            }
-            vPreviousBlock.clear();
-
-            // Erase orphans from the current block that were already received.
-            for (unsigned int i = 0; i < block.vtx.size(); i++)
-            {
-                uint256 hash = block.vtx[i].GetHash();
-                vPreviousBlock.push_back(hash);
-                EraseOrphanTx(hash);
-            }
-        }
-    }
-
-    // Clear the thinblock timer used for preferential download
-    thindata.ClearThinBlockTimer(inv.hash);
-}
-
 
 // Similar to TestBlockValidity but is very conservative in parameters (used in mining)
 bool TestConservativeBlockValidity(CValidationState &state,
@@ -1259,17 +1391,26 @@ UniValue getstatlist(const UniValue &params, bool fHelp)
 UniValue getstat(const UniValue &params, bool fHelp)
 {
     string specificIssue;
+    bool verbose = false;
+
+    // check for param  --verbose or -v
+    string::size_type params_offset = 0;
+    if (params[0].isStr() && (params[0].get_str() == "--verbose" || params[0].get_str() == "-v"))
+    {
+        verbose = true;
+        ++params_offset;
+    }
 
     int count = 0;
-    if (params.size() < 3)
+    if (params.size() < (3 + params_offset))
         count = 1; // if a count is not specified, give the latest sample
     else
     {
-        if (!params[2].isNum())
+        if (!params[2 + params_offset].isNum())
         {
             try
             {
-                count = boost::lexical_cast<int>(params[2].get_str());
+                count = boost::lexical_cast<int>(params[2 + params_offset].get_str());
             }
             catch (const boost::bad_lexical_cast &)
             {
@@ -1279,27 +1420,37 @@ UniValue getstat(const UniValue &params, bool fHelp)
         }
         else
         {
-            count = params[2].get_int();
+            count = params[2 + params_offset].get_int();
         }
     }
-    if (fHelp || (params.size() < 1))
+    if (fHelp || (params.size() < (1 + params_offset)))
         throw runtime_error("getstat"
                             "\nReturns the current settings for the network send and receive bandwidth and burst in "
-                            "kilobytes per second.\n"
+                            "kilobytes per second.\nTo get a list of available statistics use \"getstatlist\".\n"
                             "\nArguments: \n"
-                            "1. \"statistic\"     (string, required) Specify what statistic you want\n"
-                            "2. \"series\"  (string, optional) Specify what data series you want.  Options are "
+                            "1. \"-v\" or \"--verbose\" (string, optional) full details\n"
+                            "2. \"statistic\"     (string, required) Specify what statistic you want\n"
+                            "3. \"series\"  (string, optional) Specify what data series you want.  Options are "
                             "\"total\", \"now\",\"all\", \"sec10\", \"min5\", \"hourly\", \"daily\",\"monthly\".  "
                             "Default is all.\n"
-                            "3. \"count\"  (string, optional) Specify the number of samples you want.\n"
+                            "4. \"count\"  (string, optional) Specify the number of samples you want.\n"
 
                             "\nResult:\n"
                             "  {\n"
                             "    \"<statistic name>\"\n"
                             "    {\n"
+                            "    \"<series meta>\"\n (Only with --verbose|-v) "
+                            "      [\n"
+                            "        \"Series\": Requested series.\n"
+                            "        \"SampleSize\": Requested sample group size.\"\n"
+                            "      ],\n"
                             "    \"<series name>\"\n"
                             "      [\n"
                             "      <data>, (any type) The data points in the series\n"
+                            "      ],\n"
+                            "    \"timestamp\"\n"
+                            "      [\n"
+                            "      <time> (time only with --verbose|-v)\n"
                             "      ],\n"
                             "    ...\n"
                             "    },\n"
@@ -1311,16 +1462,16 @@ UniValue getstat(const UniValue &params, bool fHelp)
     UniValue ret(UniValue::VARR);
 
     string seriesStr;
-    if (params.size() < 2)
+    if (params.size() < (2 + params_offset))
         seriesStr = "total";
     else
-        seriesStr = params[1].get_str();
+        seriesStr = params[1 + params_offset].get_str();
     // uint_t series = 0;
     // if (series == "now") series |= 1;
     // if (series == "all") series = 0xfffffff;
     LOCK(cs_statMap);
 
-    CStatBase *base = FindStatistic(params[0].get_str().c_str());
+    CStatBase *base = FindStatistic(params[0 + params_offset].get_str().c_str());
     if (base)
     {
         UniValue ustat(UniValue::VOBJ);
@@ -1334,14 +1485,281 @@ UniValue getstat(const UniValue &params, bool fHelp)
         }
         else
         {
-            UniValue series = base->GetSeries(seriesStr, count);
-            ustat.push_back(Pair(seriesStr, series));
+            UniValue series;
+            if (verbose)
+            {
+                series = base->GetSeriesTime(seriesStr, count);
+
+                string metaStr = "meta";
+                UniValue metaData(UniValue::VARR);
+                metaData.push_back("Series:" + seriesStr);
+                metaData.push_back("SampleSize:" + boost::lexical_cast<std::string>(count));
+                ustat.push_back(Pair(metaStr, metaData));
+                ustat.push_back(Pair(seriesStr, series[0]));
+                ustat.push_back(Pair("timestamp", series[1]));
+            }
+            else
+            {
+                series = base->GetSeries(seriesStr, count);
+                ustat.push_back(Pair(seriesStr, series));
+            }
         }
 
         ret.push_back(ustat);
     }
+    return ret;
+}
+
+UniValue setlog(const UniValue &params, bool fHelp)
+{
+    // Uses internal log functions
+    // Logging::
+    // Don't use them in other places.
+
+    UniValue ret = UniValue("");
+    uint64_t catg = Logging::NONE;
+    int nparm = params.size();
+    bool action = false;
+
+    if (fHelp || nparm < 1 || nparm > 2)
+    {
+        throw runtime_error(
+            "log \"category|all\" \"on|off\""
+            "\nTurn categories on or off\n"
+            "\nArguments:\n"
+            "1. \"category|all\" (string, required) Category or all categories\n"
+            "2. \"on\"           (string, optional) Turn a category, or all categories, on\n"
+            "2. \"off\"          (string, optional) Turn a category, or all categories, off\n"
+            "2.                (string, optional) No argument. Show a category, or all categories, state: on|off\n" +
+            HelpExampleCli("log", "\"NET\" on") + HelpExampleCli("log", "\"all\" off") +
+            HelpExampleCli("log", "\"tor\" ") + HelpExampleCli("log", "\"ALL\" "));
+    }
+
+    // LOGA("LOG: Before mask: 0x%llx\n", Logging::categoriesEnabled);
+
+    try
+    {
+        if (nparm > 0)
+        {
+            std::string category;
+            std::string data = params[0].get_str();
+            std::transform(data.begin(), data.end(), std::back_inserter(category), ::toupper);
+            catg = Logging::LogFindCategory(category);
+            if (catg == Logging::NONE)
+                return UniValue("Category not found: " + params[0].get_str()); // quit
+        }
+
+        switch (nparm)
+        {
+        case 1:
+            if (catg == Logging::ALL)
+                ret = UniValue(Logging::LogGetAllString());
+            else
+                ret = UniValue(Logging::LogAcceptCategory(catg) ? "on" : "off");
+            break;
+
+        case 2:
+            try
+            {
+                action = IsStringTrue(params[1].get_str());
+            }
+            catch (...)
+            {
+                ret = UniValue("Please pass on|off as last argument.");
+                break; // quit
+            }
+
+            Logging::LogToggleCategory(catg, action);
+
+        default:
+            break;
+        }
+    }
+    catch (...)
+    {
+        LOG(ALL, "LOG: Something went wrong in setlog function \n");
+        ret = UniValue("Something went wrong. That is all we know.");
+    }
+
+    // LOGA("LOG: After  mask: 0x%llx\n", Logging::categoriesEnabled);
 
     return ret;
+}
+/* clang-format off */
+static const CRPCCommand commands[] =
+{ //  category              name                      actor (function)         okSafeMode
+  //  --------------------- ------------------------  -----------------------  ----------
+    /* P2P networking */
+    { "network",            "settrafficshaping",      &settrafficshaping,      true  },
+    { "network",            "gettrafficshaping",      &gettrafficshaping,      true  },
+    { "network",            "pushtx",                 &pushtx,                 true  },
+    { "network",            "getexcessiveblock",      &getexcessiveblock,      true  },
+    { "network",            "setexcessiveblock",      &setexcessiveblock,      true  },
+    { "network",            "expedited",              &expedited,              true  },
+
+    /* Mining */
+    { "mining",             "getminingmaxblock",      &getminingmaxblock,      true  },
+    { "mining",             "setminingmaxblock",      &setminingmaxblock,      true  },
+    { "mining",             "getminercomment",        &getminercomment,        true  },
+    { "mining",             "setminercomment",        &setminercomment,        true  },
+    { "mining",             "getblockversion",        &getblockversion,        true  },
+    { "mining",             "setblockversion",        &setblockversion,        true  },
+    { "mining",             "validateblocktemplate",  &validateblocktemplate,  true  },
+
+    /* Utility functions */
+    { "util",               "getstatlist",            &getstatlist,            true  },
+    { "util",               "getstat",                &getstat,                true  },
+    { "util",               "get",                    &gettweak,               true  },
+    { "util",               "set",                    &settweak,               true  },
+    { "util",               "validatechainhistory",   &validatechainhistory,   true  },
+#ifdef DEBUG
+    { "util",               "getstructuresizes",      &getstructuresizes,      true  },  // BU
+#endif
+    { "util",               "getaddressforms",        &getaddressforms,        true  },
+    { "util",               "log",                    &setlog,                 true  },
+    /* Coin generation */
+    { "generating",         "getgenerate",            &getgenerate,            true  },
+    { "generating",         "setgenerate",            &setgenerate,            true  },
+};
+/* clang-format on */
+
+void RegisterUnlimitedRPCCommands(CRPCTable &tableRPC)
+{
+    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
+        tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
+}
+
+
+UniValue validatechainhistory(const UniValue &params, bool fHelp)
+{
+    if (fHelp)
+        throw runtime_error("validatechainhistory [hash]\n"
+                            "\nUpdates a chain's valid/invalid status based on parent blocks.\n");
+
+    std::stack<CBlockIndex *> stk;
+    CBlockIndex *pos = pindexBestHeader;
+    bool failedChain = false;
+    UniValue ret = NullUniValue;
+
+    LOCK(cs_main);
+
+    if (params.size() >= 1)
+    {
+        std::string strHash = params[0].get_str();
+        uint256 hash(uint256S(strHash));
+
+        if (mapBlockIndex.count(hash) == 0)
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+
+        CBlock block;
+        pos = mapBlockIndex[hash];
+    }
+
+    LogPrintf("validatechainhistory starting at %d %s\n", pos->nHeight, pos->phashBlock->ToString());
+    while (pos && !failedChain)
+    {
+        // LogPrintf("validate %d %s\n", pos->nHeight, pos->phashBlock->ToString());
+        failedChain = pos->nStatus & BLOCK_FAILED_MASK;
+        if (!failedChain)
+        {
+            stk.push(pos);
+        }
+        pos = pos->pprev;
+    }
+    if (failedChain)
+    {
+        ret = UniValue("Chain has a bad ancestor");
+        while (!stk.empty())
+        {
+            pos = stk.top();
+            if (pos)
+            {
+                pos->nStatus |= BLOCK_FAILED_CHILD;
+            }
+            setDirtyBlockIndex.insert(pos);
+            stk.pop();
+        }
+        FlushStateToDisk();
+        pindexBestHeader = FindMostWorkChain();
+    }
+    else
+    {
+        ret = UniValue("Chain is ok");
+    }
+
+    return ret;
+}
+
+
+UniValue validateblocktemplate(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 1)
+        throw runtime_error(
+            "validateblocktemplate \"hexdata\"\n"
+            "\nReturns whether this block template will be accepted if a hash solution is found.\n"
+            "The 'jsonparametersobject' parameter is currently ignored.\n"
+            "See https://en.bitcoin.it/wiki/BIP_0022 for full specification.\n"
+
+            "\nArguments\n"
+            "1. \"hexdata\"    (string, required) the hex-encoded block to validate (same format as submitblock)\n"
+            "\nResult:\n"
+            "true (boolean) submitted block template is valid\n"
+            "JSONRPCException if submitted block template is invalid\n"
+            "\nExamples:\n" +
+            HelpExampleCli("validateblocktemplate", "\"mydata\"") +
+            HelpExampleRpc("validateblocktemplate", "\"mydata\""));
+
+    UniValue ret(UniValue::VARR);
+    CBlock block;
+    if (!DecodeHexBlk(block, params[0].get_str()))
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
+
+    if (block.nBlockSize == 0)
+        block.nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+
+    CBlockIndex *pindexPrev = NULL;
+    {
+        LOCK(cs_main);
+
+        BlockMap::iterator i = mapBlockIndex.find(block.hashPrevBlock);
+        if (i == mapBlockIndex.end())
+        {
+            throw runtime_error("invalid block: unknown parent");
+        }
+
+        pindexPrev = i->second;
+
+        if (pindexPrev != chainActive.Tip())
+        {
+            throw runtime_error("invalid block: does not build on chain tip");
+        }
+
+        DbgAssert(pindexPrev, throw runtime_error("invalid block: unknown parent"));
+
+        const CChainParams &chainparams = Params();
+        CValidationState state;
+        if (block.nBlockSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
+        {
+            if (!TestConservativeBlockValidity(state, chainparams, block, pindexPrev, false, true))
+            {
+                throw runtime_error(std::string("invalid block: ") + state.GetRejectReason());
+            }
+        }
+        else
+        {
+            if (!TestBlockValidity(state, chainparams, block, pindexPrev, false, true))
+            {
+                throw runtime_error(std::string("invalid block: ") + state.GetRejectReason());
+            }
+        }
+
+        if (block.fExcessive)
+        {
+            throw runtime_error("invalid block: excessive");
+        }
+    }
+
+    return UniValue(true);
 }
 
 #ifdef DEBUG
@@ -1384,14 +1802,13 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 
     ret.push_back(Pair("mapBlockIndex", mapBlockIndex.size()));
     // CChain
-    ret.push_back(Pair("mapAlerts", mapAlerts.size()));
     {
         LOCK(cs_xval);
         ret.push_back(Pair("setPreVerifiedTxHash", setPreVerifiedTxHash.size()));
         ret.push_back(Pair("setUnVerifiedOrphanTxHash", setUnVerifiedOrphanTxHash.size()));
     }
     ret.push_back(Pair("mapLocalHost", mapLocalHost.size()));
-    ret.push_back(Pair("CNode::vWhitelistedRange", CNode::vWhitelistedRange.size()));
+    ret.push_back(Pair("CDoSManager::vWhitelistedRange", dosMan.vWhitelistedRange.size()));
     ret.push_back(Pair("mapInboundConnectionTracker", mapInboundConnectionTracker.size()));
     ret.push_back(Pair("vUseDNSSeeds", vUseDNSSeeds.size()));
     ret.push_back(Pair("vAddedNodes", vAddedNodes.size()));
@@ -1405,9 +1822,13 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     // CAddrMan
     ret.push_back(Pair("mapOrphanTransactions", mapOrphanTransactions.size()));
     ret.push_back(Pair("mapOrphanTransactionsByPrev", mapOrphanTransactionsByPrev.size()));
-    ret.push_back(Pair("xpeditedBlk", xpeditedBlk.size()));
-    ret.push_back(Pair("xpeditedBlkUp", xpeditedBlkUp.size()));
-    ret.push_back(Pair("xpeditedTxn", xpeditedTxn.size()));
+
+    uint32_t nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream;
+    connmgr->ExpeditedNodeCounts(nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream);
+    ret.push_back(Pair("xpeditedBlk", (uint64_t)nExpeditedBlocks));
+    ret.push_back(Pair("xpeditedBlkUp", (uint64_t)nExpeditedUpstream));
+    ret.push_back(Pair("xpeditedTxn", (uint64_t)nExpeditedTxs));
+
 #ifdef DEBUG_LOCKORDER
     ret.push_back(Pair("lockorders", lockorders.size()));
 #endif
@@ -1429,12 +1850,12 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         node.push_back(Pair("vRecvMsg", n.vRecvMsg.size()));
         if (n.pfilter)
         {
-            node.push_back(Pair("pfilter", n.pfilter->GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION)));
+            node.push_back(Pair("pfilter", ::GetSerializeSize(*n.pfilter, SER_NETWORK, PROTOCOL_VERSION)));
         }
         if (n.pThinBlockFilter)
         {
             node.push_back(
-                Pair("pThinBlockFilter", n.pThinBlockFilter->GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION)));
+                Pair("pThinBlockFilter", ::GetSerializeSize(*n.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION)));
         }
         node.push_back(Pair("thinblock.vtx", n.thinBlock.vtx.size()));
         uint64_t thinBlockSize = ::GetSerializeSize(n.thinBlock, SER_NETWORK, PROTOCOL_VERSION);
@@ -1454,3 +1875,136 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     return ret;
 }
 #endif
+
+/** Comparison function for sorting the getchaintips heads.  */
+struct CompareBlocksByHeight
+{
+    bool operator()(const CBlockIndex *a, const CBlockIndex *b) const
+    {
+        /* Make sure that unequal blocks with the same height do not compare
+           equal. Use the pointers themselves to make a distinction. */
+
+        if (a->nHeight != b->nHeight)
+            return (a->nHeight > b->nHeight);
+
+        return a < b;
+    }
+};
+
+void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
+{
+    LOCK(cs_main);
+
+    bool dirty = false;
+    DbgAssert(invalidBlock->nStatus & BLOCK_FAILED_MASK, return );
+
+    // Find all the chain tips:
+    std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
+    std::set<CBlockIndex *> setOrphans;
+    std::set<CBlockIndex *> setPrevs;
+
+    BOOST_FOREACH (const PAIRTYPE(const uint256, CBlockIndex *) & item, mapBlockIndex)
+    {
+        if (!chainActive.Contains(item.second))
+        {
+            setOrphans.insert(item.second);
+            setPrevs.insert(item.second->pprev);
+        }
+    }
+
+    for (std::set<CBlockIndex *>::iterator it = setOrphans.begin(); it != setOrphans.end(); ++it)
+    {
+        if (setPrevs.erase(*it) == 0)
+        {
+            setTips.insert(*it);
+        }
+    }
+
+    // Always report the currently active tip.
+    setTips.insert(chainActive.Tip());
+
+    BOOST_FOREACH (CBlockIndex *tip, setTips)
+    {
+        if (tip->GetAncestor(invalidBlock->nHeight) == invalidBlock)
+        {
+            for (CBlockIndex *blk = tip; blk != invalidBlock; blk = blk->pprev)
+            {
+                if ((blk->nStatus & BLOCK_FAILED_CHILD) == 0)
+                {
+                    blk->nStatus |= BLOCK_FAILED_CHILD;
+                    setDirtyBlockIndex.insert(blk);
+                    dirty = true;
+                }
+            }
+        }
+    }
+
+    if (dirty)
+        FlushStateToDisk();
+}
+
+UniValue getaddressforms(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 1)
+        throw runtime_error("getaddressforms \"address\"\n"
+                            "\nReturns all ways of displaying this address.\n"
+                            "\nArguments\n"
+                            "1. \"address\"    (string, required) the address\n"
+                            "\nResult:\n"
+                            "{\n"
+                            "\"legacy\": \"1 or 3 prefixed address\",\n"
+                            "\"bitcoincash\": \"bitcoincash prefixed address\",\n"
+                            "\"bitpay\": \"C or H prefixed address\"\n"
+                            "}\n"
+                            "\nExamples:\n" +
+                            HelpExampleCli("getaddressforms", "\"address\"") +
+                            HelpExampleRpc("getaddressforms", "\"address\""));
+
+    UniValue ret(UniValue::VARR);
+    CBlock block;
+
+    CTxDestination dest = DecodeDestination(params[0].get_str());
+
+    if (!IsValidDestination(dest))
+    {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address or script");
+    }
+
+    std::string cashAddr = EncodeCashAddr(dest, Params());
+    std::string legacyAddr = EncodeLegacyAddr(dest, Params());
+    std::string bitpayAddr = EncodeBitpayAddr(dest, Params());
+
+    UniValue node(UniValue::VOBJ);
+    node.push_back(Pair("legacy", legacyAddr));
+    node.push_back(Pair("bitcoincash", cashAddr));
+    node.push_back(Pair("bitpay", bitpayAddr));
+    return node;
+}
+
+std::string CStatusString::GetPrintable() const
+{
+    LOCK(cs);
+    if (strSet.empty())
+        return "ready";
+    std::string ret;
+    for (auto it : strSet)
+    {
+        if (!ret.empty())
+            ret.append(" ");
+        std::string &s = it;
+        ret.append(s);
+    }
+    return ret;
+}
+
+void CStatusString::Set(const std::string &yourStatus)
+{
+    LOCK(cs);
+    strSet.insert(yourStatus);
+}
+
+void CStatusString::Clear(const std::string &yourStatus)
+{
+    LOCK(cs);
+    strSet.erase(yourStatus);
+}

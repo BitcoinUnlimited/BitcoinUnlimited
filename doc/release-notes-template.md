@@ -5,6 +5,7 @@ Bitcoin Unlimited version x.y.z.k is now available from:
 This is a new minor version release, including ........,
 various bugfixes and updated translations.
 
+<<<<<<< HEAD
 Please report bugs using the issue tracker at github:
 
   <https://github.com/BitcoinUnlimited/BitcoinUnlimited/issues>
@@ -33,18 +34,6 @@ earlier.
 Notable changes
 ===============
 
-Example item
--------------
-
-Example text.
-
-x.y.z.k Change log
-=================
-
-Detailed release notes follow. This overview includes changes that affect
-behavior, not code moves, refactors and string updates. For convenience in locating
-the code changes and accompanying discussion, both the pull request and
-git merge commit are mentioned.
 
 ### RPC and REST
 
@@ -59,6 +48,8 @@ git merge commit are mentioned.
 ### Build system
 
 ### Wallet
+
+Add support for the new cashaddr format. The `-usecashaddr` flag can be used to select which format is used when presenting addresses to users. By default, This client will keep using the old format until Jan, 14 and then switch to the new format. Both format are now accepted as input.
 
 ### GUI
 

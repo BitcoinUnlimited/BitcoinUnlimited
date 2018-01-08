@@ -334,6 +334,14 @@
         <translation>Kirjeldus Bitcoini Tuumast</translation>
     </message>
     <message>
+        <source>Request payments (generates QR codes and %1 URIs)</source>
+        <translation>Loo maksepäring (genereerib QR koodid ja %1 URId)</translation>
+    </message>
+    <message>
+        <source>Open a %1 URI or payment request</source>
+        <translation>Ava %1 URI või maksepäring</translation>
+    </message>
+    <message>
         <source>&amp;Command-line options</source>
         <translation>Käsurea valikud</translation>
     </message>

@@ -1,6 +1,6 @@
 [Website](https://www.bitcoinunlimited.info)  | [Download](https://www.bitcoinunlimited.info/download) | [Setup](doc/README.md)  |  [Xthin](doc/bu-xthin.md)  |  [Xpedited](doc/bu-xpedited-forwarding.md)  |   [Miner](doc/miner.md)
 
-[![Build Status](https://travis-ci.org/BitcoinUnlimited/BitcoinUnlimited.svg?branch=release)](https://travis-ci.org/BitcoinUnlimited/BitcoinUnlimited)
+[![Build Status](https://travis-ci.org/BitcoinUnlimited/BitcoinUnlimited.svg?branch=dev)](https://travis-ci.org/BitcoinUnlimited/BitcoinUnlimited)
 
 What is Bitcoin?
 =====================================
@@ -51,7 +51,7 @@ sudo apt-get install libqt4-dev libprotobuf-dev protobuf-compiler libqrencode-de
 sudo apt-get install software-properties-common
 
 ## this not needed if your wallet will use the new
-## format, ot if you're not going to use a wallet at all
+## format, or if you're not going to use a wallet at all
 sudo add-apt-repository ppa:bitcoin-unlimited/bu-ppa
 sudo apt-get update
 sudo apt-get install libdb4.8-dev libdb4.8++-dev
@@ -60,6 +60,7 @@ mkdir -p ~/src
 cd ~/src
 git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git bu-src
 cd bu-src
+git checkout release
 ./autogen.sh
 ./configure
 make

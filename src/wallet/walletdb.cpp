@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2017 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -8,7 +9,9 @@
 
 #include "base58.h"
 #include "consensus/validation.h"
+#include "fs.h"
 #include "main.h" // For CheckTransaction
+#include "dstencode.h"
 #include "protocol.h"
 #include "serialize.h"
 #include "sync.h"
@@ -16,10 +19,11 @@
 #include "utiltime.h"
 #include "wallet/wallet.h"
 
-#include <boost/filesystem.hpp>
+#include <boost/version.hpp>
 #include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
+#include <fstream>
 
 using namespace std;
 
@@ -29,30 +33,42 @@ static uint64_t nAccountingEntryNumber = 0;
 // CWalletDB
 //
 
-bool CWalletDB::WriteName(const string& strAddress, const string& strName)
+bool CWalletDB::WriteName(const CTxDestination &address, const std::string &strName)
 {
+    if (!IsValidDestination(address))
+        return false;
+
     nWalletDBUpdated++;
-    return Write(make_pair(string("name"), strAddress), strName);
+    return Write(std::make_pair(std::string("name"), EncodeLegacyAddr(address, Params())), strName);
 }
 
-bool CWalletDB::EraseName(const string& strAddress)
+bool CWalletDB::EraseName(const CTxDestination &address)
 {
-    // This should only be used for sending addresses, never for receiving addresses,
-    // receiving addresses must always have an address book entry if they're not change return.
+    // This should only be used for sending addresses, never for receiving
+    // addresses, receiving addresses must always have an address book entry if
+    // they're not change return.
+    if (!IsValidDestination(address))
+        return false;
+
     nWalletDBUpdated++;
-    return Erase(make_pair(string("name"), strAddress));
+    return Erase(std::make_pair(std::string("name"), EncodeLegacyAddr(address, Params())));
 }
 
-bool CWalletDB::WritePurpose(const string& strAddress, const string& strPurpose)
-{
+bool CWalletDB::WritePurpose(const CTxDestination &address, const std::string &strPurpose) {
+    if (!IsValidDestination(address))
+        return false;
+
     nWalletDBUpdated++;
-    return Write(make_pair(string("purpose"), strAddress), strPurpose);
+    return Write(std::make_pair(std::string("purpose"), EncodeLegacyAddr(address, Params())), strPurpose);
 }
 
-bool CWalletDB::ErasePurpose(const string& strPurpose)
+bool CWalletDB::ErasePurpose(const CTxDestination &address)
 {
+    if (!IsValidDestination(address))
+        return false;
+
     nWalletDBUpdated++;
-    return Erase(make_pair(string("purpose"), strPurpose));
+    return Erase(std::make_pair(std::string("purpose"), EncodeLegacyAddr(address, Params())));
 }
 
 bool CWalletDB::WriteTx(uint256 hash, const CWalletTx& wtx)
@@ -359,16 +375,14 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
         {
             string strAddress;
             ssKey >> strAddress;
-            ssValue >> pwallet->mapAddressBook[CBitcoinAddress(strAddress).Get()].name;
-        }
-        else if (strType == "purpose")
-        {
-            string strAddress;
+            ssValue >>
+                pwallet->mapAddressBook[DecodeDestination(strAddress)].name;
+        } else if (strType == "purpose") {
+            std::string strAddress;
             ssKey >> strAddress;
-            ssValue >> pwallet->mapAddressBook[CBitcoinAddress(strAddress).Get()].purpose;
-        }
-        else if (strType == "tx")
-        {
+            ssValue >>
+                pwallet->mapAddressBook[DecodeDestination(strAddress)].purpose;
+        } else if (strType == "tx") {
             uint256 hash;
             ssKey >> hash;
             CWalletTx wtx;
@@ -593,8 +607,8 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             ssKey >> strAddress;
             ssKey >> strKey;
             ssValue >> strValue;
-            if (!pwallet->LoadDestData(CBitcoinAddress(strAddress).Get(), strKey, strValue))
-            {
+            if (!pwallet->LoadDestData(DecodeDestination(strAddress), strKey,
+                                       strValue)) {
                 strErr = "Error reading wallet database: LoadDestData failed";
                 return false;
             }
@@ -785,6 +799,45 @@ DBErrors CWalletDB::FindWalletTx(CWallet* pwallet, vector<uint256>& vTxHash, vec
     return result;
 }
 
+DBErrors CWalletDB::ZapSelectTx(CWallet* pwallet, vector<uint256>& vTxHashIn, vector<uint256>& vTxHashOut)
+{
+    // build list of wallet TXs and hashes
+    vector<uint256> vTxHash;
+    vector<CWalletTx> vWtx;
+    DBErrors err = FindWalletTx(pwallet, vTxHash, vWtx);
+    if (err != DB_LOAD_OK) {
+        return err;
+    }
+
+    std::sort(vTxHash.begin(), vTxHash.end());
+    std::sort(vTxHashIn.begin(), vTxHashIn.end());
+
+    // erase each matching wallet TX
+    bool delerror = false;
+    vector<uint256>::iterator it = vTxHashIn.begin();
+    BOOST_FOREACH (uint256 hash, vTxHash) {
+        while (it < vTxHashIn.end() && (*it) < hash) {
+            it++;
+        }
+        if (it == vTxHashIn.end()) {
+            break;
+        }
+        else if ((*it) == hash) {
+            pwallet->mapWallet.erase(hash);
+            if(!EraseTx(hash)) {
+                LogPrint("db", "Transaction was found for deletion but returned database error: %s\n", hash.GetHex());
+                delerror = true;
+            }
+            vTxHashOut.push_back(hash);
+        }
+    }
+
+    if (delerror) {
+        return DB_CORRUPT;
+    }
+    return DB_LOAD_OK;
+}
+
 DBErrors CWalletDB::ZapWalletTx(CWallet* pwallet, vector<CWalletTx>& vWtx)
 {
     // build list of wallet TXs
@@ -885,18 +938,41 @@ bool BackupWallet(const CWallet& wallet, const string& strDest)
                 if (boost::filesystem::is_directory(pathDest))
                     pathDest /= wallet.strWalletFile;
 
+// BU copy_file does not work with c++11, due to a link error in many versions of boost.  Return this code to use when the default boost version in most distros fix this bug.
+//                try {
+//#if BOOST_VERSION >= 104000
+//                    boost::filesystem::copy_file(pathSrc, pathDest, boost::filesystem::copy_option::overwrite_if_exists);
+//#else
+//                    boost::filesystem::copy_file(pathSrc, pathDest);
+//#endif
+//                    LogPrintf("copied wallet.dat to %s\n", pathDest.string());
+//                    return true;
+//                } catch (const boost::filesystem::filesystem_error& e) {
+//                    LogPrintf("error copying wallet.dat to %s - %s\n", pathDest.string(), e.what());
+//                    return false;
+//                }
+// Replacement copy code
                 try {
-#if BOOST_VERSION >= 104000
-                    boost::filesystem::copy_file(pathSrc, pathDest, boost::filesystem::copy_option::overwrite_if_exists);
-#else
-                    boost::filesystem::copy_file(pathSrc, pathDest);
-#endif
-                    LogPrintf("copied wallet.dat to %s\n", pathDest.string());
+                    ifstream source(pathSrc.string(), ios::binary);
+                    ofstream dest(pathDest.string(), ios::binary);
+                    if (!source)
+                      {
+                        LogPrintf("error opening source wallet file %s\n", pathSrc.string());
+                        return false;
+                      }
+                    if (!dest)
+                      {
+                        LogPrintf("error opening destination wallet file %s\n", pathDest.string());
+                        return false;
+                      }
+                    dest << source.rdbuf();
                     return true;
-                } catch (const boost::filesystem::filesystem_error& e) {
-                    LogPrintf("error copying wallet.dat to %s - %s\n", pathDest.string(), e.what());
+		}
+                catch (std::ios_base::failure& e) {
+                    LogPrintf("error copying wallet from %s to %s - %s\n", pathSrc.string(), pathDest.string(), e.what());
                     return false;
                 }
+// end replacement copy code              
             }
         }
         MilliSleep(100);
@@ -993,14 +1069,20 @@ bool CWalletDB::Recover(CDBEnv& dbenv, const std::string& filename)
     return CWalletDB::Recover(dbenv, filename, false);
 }
 
-bool CWalletDB::WriteDestData(const std::string &address, const std::string &key, const std::string &value)
+bool CWalletDB::WriteDestData(const CTxDestination &address, const std::string &key, const std::string &value)
 {
+    if (!IsValidDestination(address))
+        return false;
+
     nWalletDBUpdated++;
-    return Write(std::make_pair(std::string("destdata"), std::make_pair(address, key)), value);
+    return Write(std::make_pair(std::string("destdata"), std::make_pair(EncodeLegacyAddr(address, Params()), key)), value);
 }
 
-bool CWalletDB::EraseDestData(const std::string &address, const std::string &key)
+bool CWalletDB::EraseDestData(const CTxDestination &address, const std::string &key)
 {
+    if (!IsValidDestination(address))
+        return false;
+
     nWalletDBUpdated++;
-    return Erase(std::make_pair(std::string("destdata"), std::make_pair(address, key)));
+    return Erase(std::make_pair(std::string("destdata"), std::make_pair(EncodeLegacyAddr(address, Params()), key)));
 }

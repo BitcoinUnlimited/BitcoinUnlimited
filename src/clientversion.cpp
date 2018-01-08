@@ -16,21 +16,22 @@
  * for both bitcoind and bitcoin-core, to make it harder for attackers to
  * target servers or GUI users specifically.
  */
+#ifdef BITCOIN_CASH
+const std::string CLIENT_NAME("BUCash");
+#else
 const std::string CLIENT_NAME("BitcoinUnlimited");
+#endif
 
 // BU added
 /**
  * Override the standard sub-version field with this information.
- * this can be used to hide 
+ * this can be used to hide
  */
 std::string subverOverride("");
 
 // BU move instantiation to a single file
-const int CLIENT_VERSION =
-                           1000000 * CLIENT_VERSION_MAJOR
-                         +   10000 * CLIENT_VERSION_MINOR
-                         +     100 * CLIENT_VERSION_REVISION
-                         +       1 * CLIENT_VERSION_BUILD;
+const int CLIENT_VERSION = 1000000 * CLIENT_VERSION_MAJOR + 10000 * CLIENT_VERSION_MINOR +
+                           100 * CLIENT_VERSION_REVISION + 1 * CLIENT_VERSION_BUILD;
 
 /**
  * Client version number
@@ -76,11 +77,16 @@ const int CLIENT_VERSION =
 
 #ifndef BUILD_DESC
 #ifdef BUILD_SUFFIX
-#define BUILD_DESC BUILD_DESC_WITH_SUFFIX(CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_REVISION, CLIENT_VERSION_BUILD, BUILD_SUFFIX)
+#define BUILD_DESC          \
+    BUILD_DESC_WITH_SUFFIX( \
+        CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_REVISION, CLIENT_VERSION_BUILD, BUILD_SUFFIX)
 #elif defined(GIT_COMMIT_ID)
-#define BUILD_DESC BUILD_DESC_FROM_COMMIT(CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_REVISION, CLIENT_VERSION_BUILD, GIT_COMMIT_ID)
+#define BUILD_DESC          \
+    BUILD_DESC_FROM_COMMIT( \
+        CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_REVISION, CLIENT_VERSION_BUILD, GIT_COMMIT_ID)
 #else
-#define BUILD_DESC BUILD_DESC_FROM_UNKNOWN(CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_REVISION, CLIENT_VERSION_BUILD)
+#define BUILD_DESC \
+    BUILD_DESC_FROM_UNKNOWN(CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_REVISION, CLIENT_VERSION_BUILD)
 #endif
 #endif
 
@@ -100,20 +106,19 @@ static std::string FormatVersion(int nVersion)
     if (nVersion % 100 == 0)
         return strprintf("%d.%d.%d", nVersion / 1000000, (nVersion / 10000) % 100, (nVersion / 100) % 100);
     else
-        return strprintf("%d.%d.%d.%d", nVersion / 1000000, (nVersion / 10000) % 100, (nVersion / 100) % 100, nVersion % 100);
+        return strprintf(
+            "%d.%d.%d.%d", nVersion / 1000000, (nVersion / 10000) % 100, (nVersion / 100) % 100, nVersion % 100);
 }
 
-std::string FormatFullVersion()
-{
-    return CLIENT_BUILD;
-}
-
-/** 
- * Format the subversion field according to BIP 14 spec (https://github.com/bitcoin/bips/blob/master/bip-0014.mediawiki) 
+std::string FormatFullVersion() { return CLIENT_BUILD; }
+/**
+ //github.com/bitcoin/bips/blob/master/bip-0014.mediawiki)
+ * Format the subversion field according to BIP 14 spec (https:
  */
-std::string FormatSubVersion(const std::string& name, int nClientVersion, const std::vector<std::string>& comments)
+std::string FormatSubVersion(const std::string &name, int nClientVersion, const std::vector<std::string> &comments)
 {
-    if (!subverOverride.empty()) return subverOverride;
+    if (!subverOverride.empty())
+        return subverOverride;
 
     std::ostringstream ss;
     ss << "/";
@@ -122,7 +127,7 @@ std::string FormatSubVersion(const std::string& name, int nClientVersion, const 
     {
         std::vector<std::string>::const_iterator it(comments.begin());
         ss << "(" << *it;
-        for(++it; it != comments.end(); ++it)
+        for (++it; it != comments.end(); ++it)
             ss << "; " << *it;
         ss << ")";
     }

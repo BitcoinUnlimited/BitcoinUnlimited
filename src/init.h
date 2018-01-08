@@ -9,6 +9,7 @@
 
 #include <string>
 
+class Config;
 class CScheduler;
 class CWallet;
 
@@ -17,30 +18,26 @@ namespace boost
 class thread_group;
 } // namespace boost
 
-extern CWallet* pwalletMain;
-
 void StartShutdown();
 bool ShutdownRequested();
 /** Interrupt threads */
-void Interrupt(boost::thread_group& threadGroup);
+void Interrupt(boost::thread_group &threadGroup);
 void Shutdown();
-//!Initialize the logging infrastructure
+//! Initialize the logging infrastructure
 void InitLogging();
-//!Parameter interaction: change current parameters depending on various rules
+//! Parameter interaction: change current parameters depending on various rules
 void InitParameterInteraction();
-bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler);
+bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &scheduler);
 
 void MainCleanup();
 void NetCleanup();
 
-/** The help message mode determines what help message to show */
-enum HelpMessageMode {
-    HMM_BITCOIND,
-    HMM_BITCOIN_QT
-};
+static const bool DEFAULT_PROXYRANDOMIZE = true;
+static const bool DEFAULT_REST_ENABLE = false;
+static const bool DEFAULT_DISABLE_SAFEMODE = false;
+static const bool DEFAULT_STOPAFTERBLOCKIMPORT = false;
+static const bool DEFAULT_PV_TESTMODE = false;
 
-/** Help for options shared between UI and daemon (for -help) */
-std::string HelpMessage(HelpMessageMode mode);
 /** Returns licensing information (for -version) */
 std::string LicenseInfo();
 

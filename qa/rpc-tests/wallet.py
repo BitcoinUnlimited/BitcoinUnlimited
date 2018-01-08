@@ -3,9 +3,33 @@
 # Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
+import time
+import sys
+if sys.version_info[0] < 3:
+    raise "Use Python 3"
+import logging
+logging.basicConfig(format='%(asctime)s.%(levelname)s: %(message)s', level=logging.INFO,stream=sys.stdout)
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
+import binascii
+from test_framework.script import *
+from test_framework.nodemessages import *
+
+def GenerateSingleSigP2SH(btcAddress):
+    redeemScript = CScript([OP_DUP, OP_HASH160, bitcoinAddress2bin(btcAddress), OP_EQUALVERIFY, OP_CHECKSIG])
+    p2shAddressBin = hash160(redeemScript)
+    p2shAddress = encodeBitcoinAddress(bytes([196]), p2shAddressBin)  # 196 is regtest P2SH addr prefix
+    pubkeyScript = CScript([OP_HASH160, p2shAddressBin, OP_EQUAL])
+    return ( p2shAddress, redeemScript)
+
+def waitForRescan(node):
+    info = node.getinfo()
+    while "rescanning" in info["status"]:
+        logging.info("rescanning")
+        time.sleep(.25)
+        info = node.getinfo()
+
 
 class WalletTest (BitcoinTestFramework):
 
@@ -21,8 +45,8 @@ class WalletTest (BitcoinTestFramework):
         return curr_balance
 
     def setup_chain(self,bitcoinConfDict=None, wallets=None):
-        print("Initializing test directory "+self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir, 4)
+        logging.info("Initializing test directory "+self.options.tmpdir)
+        initialize_chain_clean(self.options.tmpdir, 4, bitcoinConfDict, wallets)
 
     def setup_network(self, split=False):
         self.nodes = start_nodes(3, self.options.tmpdir)
@@ -39,7 +63,7 @@ class WalletTest (BitcoinTestFramework):
         assert_equal(len(self.nodes[1].listunspent()), 0)
         assert_equal(len(self.nodes[2].listunspent()), 0)
 
-        print("Mining blocks...")
+        logging.info("Mining blocks...")
 
         self.nodes[0].generate(1)
 
@@ -144,7 +168,7 @@ class WalletTest (BitcoinTestFramework):
         node_2_bal = self.check_fee_amount(self.nodes[2].getbalance(), node_2_bal - Decimal('10'), fee_per_byte, count_bytes(self.nodes[2].getrawtransaction(txid)))
         assert_equal(self.nodes[0].getbalance(), node_0_bal)
 
-        # Sendmany 10 BTC with subtract fee from amount
+        # Sendmany 10 BTC with subtract fee from amountd
         txid = self.nodes[2].sendmany('from1', {address: 10}, 0, "", [address])
         self.nodes[2].generate(1)
         self.sync_all()
@@ -200,6 +224,7 @@ class WalletTest (BitcoinTestFramework):
             if uTx['txid'] == zeroValueTxid:
                 found = True
                 assert_equal(uTx['amount'], Decimal('0'))
+                assert_equal(uTx['satoshi'], Decimal('0'))
         assert(found)
 
         #do some -walletbroadcast tests
@@ -248,10 +273,12 @@ class WalletTest (BitcoinTestFramework):
         txId  = self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), "2")
         txObj = self.nodes[0].gettransaction(txId)
         assert_equal(txObj['amount'], Decimal('-2'))
+        assert_equal(txObj['satoshi'], Decimal('-200000000'));
 
         txId  = self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), "0.0001")
         txObj = self.nodes[0].gettransaction(txId)
         assert_equal(txObj['amount'], Decimal('-0.0001'))
+        assert_equal(txObj['satoshi'], Decimal('-10000'))
 
         #check if JSON parser can handle scientific notation in strings
         txId  = self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), "1e-4")
@@ -299,6 +326,80 @@ class WalletTest (BitcoinTestFramework):
                            {"address": address_to_import},
                            {"spendable": True})
 
+        # Mine a block from node0 to an address from node1
+        cbAddr = self.nodes[1].getnewaddress()
+        blkHash = self.nodes[0].generatetoaddress(1, cbAddr)[0]
+        cbTxId = self.nodes[0].getblock(blkHash)['tx'][0]
+        self.sync_all()
+
+        # Check that the txid and balance is found by node1
+        try:
+            self.nodes[1].gettransaction(cbTxId)
+        except JSONRPCException as e:
+            assert("Invalid or non-wallet transaction id" not in e.error['message'])
+
+        sync_blocks(self.nodes)
+
+        # test multiple private key import, and watch only address import
+        bal = self.nodes[2].getbalance()
+        addrs = [ self.nodes[1].getnewaddress() for i in range(0,20)]
+        pks   = [ self.nodes[1].dumpprivkey(x) for x in addrs]
+        for a in addrs:
+            self.nodes[0].sendtoaddress(a, 1)
+        self.nodes[0].generate(1)
+        sync_blocks(self.nodes)
+        self.nodes[2].importprivatekeys(pks[0], pks[1])
+        waitForRescan(self.nodes[2])
+        assert(bal + 2 == self.nodes[2].getbalance())
+        self.nodes[2].importprivatekeys("rescan", pks[2], pks[3])
+        waitForRescan(self.nodes[2])
+        assert(bal + 4 == self.nodes[2].getbalance())
+        self.nodes[2].importprivatekeys("no-rescan", pks[4], pks[5])
+        time.sleep(1)
+        assert(bal + 4 == self.nodes[2].getbalance())  # since the recan didn't happen, there won't be a balance change
+        self.nodes[2].importaddresses("rescan") # force a rescan although we imported nothing
+        waitForRescan(self.nodes[2])
+        assert(bal + 6 == self.nodes[2].getbalance())
+
+        self.nodes[2].importaddresses(addrs[6], addrs[7])  # import watch only addresses
+        waitForRescan(self.nodes[2])
+        assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
+        assert(bal + 8 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+
+        self.nodes[2].importaddresses("rescan", addrs[8], addrs[9])  # import watch only addresses
+        waitForRescan(self.nodes[2])
+        assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
+        assert(bal + 10 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+
+        self.nodes[2].importaddresses("no-rescan", addrs[10], addrs[11])  # import watch only addresses
+        time.sleep(1)
+        assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
+        assert(bal + 10 == self.nodes[2].getbalance("*",1,True)) # show the full balance, will be same because no rescan
+        self.nodes[2].importaddresses("rescan") # force a rescan although we imported nothing
+        waitForRescan(self.nodes[2])
+        assert(bal + 12 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+
+        # now try P2SH
+        btcAddress = self.nodes[1].getnewaddress()
+        btcAddress = self.nodes[1].getaddressforms(btcAddress)["legacy"]
+        ( p2shAddress, redeemScript) = GenerateSingleSigP2SH(btcAddress)
+        self.nodes[0].sendtoaddress(p2shAddress,1)
+
+        btcAddress2 = self.nodes[1].getnewaddress()
+        btcAddress2 = self.nodes[1].getaddressforms(btcAddress2)["legacy"]
+        ( p2shAddress2, redeemScript2) = GenerateSingleSigP2SH(btcAddress2)
+        self.nodes[0].sendtoaddress(p2shAddress2,1)
+
+        self.nodes[0].generate(1)
+        sync_blocks(self.nodes)
+
+        bal1 = self.nodes[2].getbalance('*', 1, True)
+        self.nodes[2].importaddresses(hexlify(redeemScript).decode("ascii"),hexlify(redeemScript2).decode("ascii"))
+        waitForRescan(self.nodes[2])
+        bal2 = self.nodes[2].getbalance('*', 1, True)
+        assert_equal(bal1 + 2, bal2)
+
+
         #check if wallet or blochchain maintenance changes the balance
         self.sync_all()
         blocks = self.nodes[0].generate(2)
@@ -306,6 +407,20 @@ class WalletTest (BitcoinTestFramework):
         balance_nodes = [self.nodes[i].getbalance() for i in range(3)]
         block_count = self.nodes[0].getblockcount()
 
+        # Check modes:
+        #   - True: unicode escaped as \u....
+        #   - False: unicode directly as UTF-8
+        for mode in [True, False]:
+            self.nodes[0].ensure_ascii = mode
+            # unicode check: Basic Multilingual Plane, Supplementary Plane respectively
+            for s in [u'рыба', u'𝅘𝅥𝅯']:
+                addr = self.nodes[0].getaccountaddress(s)
+                label = self.nodes[0].getaccount(addr)
+                assert_equal(label, s)
+                assert(s in self.nodes[0].listaccounts().keys())
+        self.nodes[0].ensure_ascii = True # restore to default
+
+        # maintenance tests
         maintenance = [
             '-rescan',
             '-reindex',
@@ -314,7 +429,7 @@ class WalletTest (BitcoinTestFramework):
             '-salvagewallet',
         ]
         for m in maintenance:
-            print("check " + m)
+            logging.info("check " + m)
             stop_nodes(self.nodes)
             wait_bitcoinds()
             self.nodes = start_nodes(3, self.options.tmpdir, [[m]] * 3)
@@ -328,7 +443,18 @@ class WalletTest (BitcoinTestFramework):
         assert_equal(coinbase_tx_1["lastblock"], blocks[1])
         assert_equal(len(coinbase_tx_1["transactions"]), 1)
         assert_equal(coinbase_tx_1["transactions"][0]["blockhash"], blocks[1])
+        assert_equal(coinbase_tx_1["transactions"][0]["satoshi"], Decimal('2500000000'))
         assert_equal(len(self.nodes[0].listsinceblock(blocks[1])["transactions"]), 0)
+
 
 if __name__ == '__main__':
     WalletTest ().main ()
+
+def Test():
+    t = WalletTest()
+    bitcoinConf = {
+        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],  # "lck"
+        "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
+    }
+    # "--tmpdir=/ramdisk/test", "--srcdir=../../debug/src"
+    t.main(["--nocleanup", "--noshutdown"], bitcoinConf, None)

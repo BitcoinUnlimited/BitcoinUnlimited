@@ -6,6 +6,7 @@
 #ifndef BITCOIN_POLICY_POLICY_H
 #define BITCOIN_POLICY_POLICY_H
 
+#include "clientversion.h"
 #include "consensus/consensus.h"
 #include "script/interpreter.h"
 #include "script/standard.h"
@@ -15,10 +16,16 @@
 class CCoinsViewCache;
 
 /** Default for -blockmaxsize and -blockminsize, which control the range of sizes the mining code will create **/
+#ifdef BITCOIN_CASH
+static const unsigned int DEFAULT_BLOCK_MAX_SIZE = 2000000;
+#else
 static const unsigned int DEFAULT_BLOCK_MAX_SIZE = BLOCKSTREAM_CORE_MAX_BLOCK_SIZE; // BU: crank the default up to the minimum  max defined in all clients.
+#endif
 static const unsigned int DEFAULT_BLOCK_MIN_SIZE = 0;
-/** Default for -blockprioritysize, maximum space for zero/low-fee transactions **/
-static const unsigned int DEFAULT_BLOCK_PRIORITY_SIZE = 50000;
+
+/** Default for -blockprioritysize, a 5% maximum space for zero/low-fee transactions **/
+static const unsigned int DEFAULT_BLOCK_PRIORITY_SIZE = DEFAULT_BLOCK_MAX_SIZE / 20;
+
 /** The maximum size for transactions we're willing to relay/mine */
 static const unsigned int MAX_STANDARD_TX_SIZE = 100000;
 /** Maximum number of signature check operations in an IsStandard() P2SH script */
@@ -40,6 +47,7 @@ static const unsigned int STANDARD_SCRIPT_VERIFY_FLAGS = MANDATORY_SCRIPT_VERIFY
                                                          SCRIPT_VERIFY_NULLDUMMY |
                                                          SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS |
                                                          SCRIPT_VERIFY_CLEANSTACK |
+                                                         SCRIPT_VERIFY_NULLFAIL |
                                                          SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY |
                                                          SCRIPT_VERIFY_CHECKSEQUENCEVERIFY |
                                                          SCRIPT_VERIFY_LOW_S;

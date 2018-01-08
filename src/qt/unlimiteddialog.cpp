@@ -23,6 +23,7 @@
 
 #include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
+#include <limits>
 
 #include <QDataWidgetMapper>
 #include <QDir>
@@ -49,7 +50,7 @@ UnlimitedDialog::UnlimitedDialog(QWidget *parent, UnlimitedModel *mdl)
 
     int64_t max, ave;
     sendShaper.get(&max, &ave);
-    int64_t longMax = std::numeric_limits<long long>::max();
+    auto longMax = std::numeric_limits<int64_t>::max();
     bool enabled = (ave != longMax);
     ui.sendShapingEnable->setChecked(enabled);
     // The slider is just for convenience so setting their ranges to what is commonly chosen
@@ -90,7 +91,7 @@ UnlimitedDialog::UnlimitedDialog(QWidget *parent, UnlimitedModel *mdl)
     }
 
     receiveShaper.get(&max, &ave);
-    enabled = (ave != std::numeric_limits<long long>::max());
+    enabled = (ave != std::numeric_limits<int64_t>::max());
     ui.recvShapingEnable->setChecked(enabled);
     if (enabled)
     {

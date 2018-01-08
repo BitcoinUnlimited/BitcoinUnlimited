@@ -7,7 +7,7 @@
 #define BITCOIN_QT_GUICONSTANTS_H
 
 /* Milliseconds between model updates */
-static const int MODEL_UPDATE_DELAY1 = 250;
+static const int MODEL_UPDATE_DELAY1 = 500;
 static const int MODEL_UPDATE_DELAY2 = 5000;
 
 /* AskPassphraseDialog -- Maximum passphrase length */
@@ -16,7 +16,20 @@ static const int MAX_PASSPHRASE_SIZE = 1024;
 /* BitcoinGUI -- Size of icons in status bar */
 static const int STATUSBAR_ICONSIZE = 16;
 
+static const bool DEFAULT_CHOOSE_DATADIR = false;
+static const bool DEFAULT_SELFSIGNED_ROOTCERTS = false;
 static const bool DEFAULT_SPLASHSCREEN = true;
+
+static const std::string DEFAULT_UIPLATFORM =
+#if defined(Q_OS_MAC)
+    "macosx"
+#elif defined(Q_OS_WIN)
+    "windows"
+#else
+    "other"
+#endif
+    ;
+
 
 /* Invalid field background style */
 #define STYLE_INVALID "background:#FF8080"
@@ -43,15 +56,17 @@ static const int TOOLTIP_WRAP_THRESHOLD = 80;
 static const int MAX_URI_LENGTH = 255;
 
 /* QRCodeDialog -- size of exported QR Code image */
-#define EXPORT_IMAGE_SIZE 256
+#define QR_IMAGE_SIZE 350
 
 /* Number of frames in spinner animation */
 #define SPINNER_FRAMES 36
 
 #define QAPP_ORG_NAME "BitcoinUnlimited"
+#define QAPP_ORG_NAME_LEGACY "Bitcoin"
 #define QAPP_ORG_DOMAIN "bitcoinunlimited.info"
 #define QAPP_APP_NAME_DEFAULT "Bitcoin-Qt"
 #define QAPP_APP_NAME_TESTNET "Bitcoin-Qt-testnet"
-#define QAPP_APP_NAME_NOLNET "Bitcoin-Qt-nolimit"   // BU
+#define QAPP_APP_NAME_NOLNET "Bitcoin-Qt-nolimit" // BU
+#define QAPP_APP_NAME_BUCASH "Bitcoin-Qt-BUcash"
 
 #endif // BITCOIN_QT_GUICONSTANTS_H

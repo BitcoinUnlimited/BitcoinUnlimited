@@ -16,17 +16,16 @@ class CWalletTx;
 
 /** Provide a human-readable extended HTML description of a transaction.
  */
-class TransactionDesc: public QObject
+class TransactionDesc : public QObject
 {
     Q_OBJECT
 
 public:
-    static QString toHTML(CWallet *wallet, CWalletTx &wtx, TransactionRecord *rec, int unit);
+    static QString toHTML(CWallet *wallet, CWalletTx &wtx, TransactionRecord *rec, int unit, QString labelFreeze);
 
 private:
     TransactionDesc() {}
-
-    static QString FormatTxStatus(const CWalletTx& wtx);
+    static QString FormatTxStatus(const CWalletTx &wtx);
 };
 
 #endif // BITCOIN_QT_TRANSACTIONDESC_H
