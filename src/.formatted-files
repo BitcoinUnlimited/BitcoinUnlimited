@@ -386,3 +386,12 @@ compat/glibc_sanity.cpp
 compat/glibcxx_sanity.cpp
 compat/sanity.h
 compat/strnlen.cpp
+policy/fees.cpp
+policy/fees.h
+policy/policy.cpp
+policy/policy.h
+consensus/consensus.h
+consensus/merkle.cpp
+consensus/merkle.h
+consensus/params.h
+consensus/validation.h

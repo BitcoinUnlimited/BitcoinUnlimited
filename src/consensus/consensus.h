@@ -8,12 +8,16 @@
 #define BITCOIN_CONSENSUS_CONSENSUS_H
 
 /** The maximum allowed size for a serialized block, in bytes (network rule) */
-//static const unsigned int BU_MAX_BLOCK_SIZE = 32000000;  // BU: this constant is deprecated but is still used in a few areas such as allocation of memory.  Removing it is a tradeoff between being perfect and changing more code. TODO: remove this entirely
+// BU: this constant is deprecated but is still used in a few areas such as allocation of memory.  Removing it is a
+// tradeoff between being perfect and changing more code. TODO: remove this entirely
+// static const unsigned int BU_MAX_BLOCK_SIZE = 32000000;
 static const unsigned int BLOCKSTREAM_CORE_MAX_BLOCK_SIZE = 1000000;
-/** The maximum allowed number of signature check operations in a 1MB block (network rule), and the suggested max sigops per (MB rounded up) in blocks > 1MB.  If greater, the block is considered excessive */
-static const unsigned int BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS = BLOCKSTREAM_CORE_MAX_BLOCK_SIZE/50;
-static const unsigned int MAX_TX_SIGOPS = BLOCKSTREAM_CORE_MAX_BLOCK_SIZE/50;
-/** The maximum suggested length of a transaction.  If greater, the transaction is not relayed, and the > 1MB block is considered "excessive".  
+/** The maximum allowed number of signature check operations in a 1MB block (network rule), and the suggested max sigops
+ * per (MB rounded up) in blocks > 1MB.  If greater, the block is considered excessive */
+static const unsigned int BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS = BLOCKSTREAM_CORE_MAX_BLOCK_SIZE / 50;
+static const unsigned int MAX_TX_SIGOPS = BLOCKSTREAM_CORE_MAX_BLOCK_SIZE / 50;
+/** The maximum suggested length of a transaction.  If greater, the transaction is not relayed, and the > 1MB block is
+   considered "excessive".
     For blocks < 1MB, there is no largest transaction so it is defacto 1MB.
 */
 static const unsigned int DEFAULT_LARGEST_TRANSACTION = 1000000;
@@ -27,7 +31,8 @@ static const unsigned int SMALLEST_MAX_BLOOM_FILTER_SIZE = 36000; // bytes
 static const int COINBASE_MATURITY = 100;
 
 /** Flags for nSequence and nLockTime locks */
-enum {
+enum
+{
     /* Interpret sequence numbers as relative lock-time constraints. */
     LOCKTIME_VERIFY_SEQUENCE = (1 << 0),
 
