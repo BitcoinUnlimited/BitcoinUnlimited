@@ -408,7 +408,7 @@ QString TransactionTableModel::formatTxToAddress(const TransactionRecord *wtx, b
 
     /* Get all the addresses so the user can filter for any of them */
     std::string addressList = "";
-    BOOST_FOREACH (const PAIRTYPE(std::string, CScript) & addr, wtx->addresses)
+    for (const std::pair<std::string, CScript> &addr : wtx->addresses)
     {
         std::string nextAddress = boost::replace_all_copy(addr.first, "\n", " ");
         // ensure list isn't prefixed by a space
@@ -421,7 +421,7 @@ QString TransactionTableModel::formatTxToAddress(const TransactionRecord *wtx, b
     if (label == "")
         return QString::fromStdString(addressList) + watchAddress;
     else
-        return label + " " + QString::fromStdString(addressList) + watchAddress;
+        return label + watchAddress;
 }
 
 QVariant TransactionTableModel::addressColor(const TransactionRecord *wtx) const
@@ -531,7 +531,7 @@ QString TransactionTableModel::pickLabelWithAddress(AddressList listAddresses, s
 {
     /* returns the first address wiith a label or the last address on the list */
     QString label = "";
-    BOOST_FOREACH (const PAIRTYPE(std::string, CScript) & addr, listAddresses)
+    for (const std::pair<std::string, CScript> &addr : listAddresses)
     {
         address = addr.first;
         label = walletModel->getAddressTableModel()->labelForAddress(QString::fromStdString(address));
