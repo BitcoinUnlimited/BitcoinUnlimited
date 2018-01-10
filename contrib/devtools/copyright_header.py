@@ -107,6 +107,14 @@ EXPECTED_HOLDER_NAMES = [
     "Jan-Klaas Kollhof\n",
     "Sam Rushing\n",
     "ArtForz -- public domain half-a-node\n",
+    "The Bitcoin Core, Unlimited, and XT developers\n",
+    "The Bitcoin Unlimited developers\n",
+    "The Bitcoin Unlimited Developers\n",
+    "Bitcoin Unlimited Developers\n",
+    "The Bitcoin Developers\n",
+    "G. Andrew Stone\n",
+    "Amaury SÉCHET\n",
+    "Stephen McCarthy\n",
 ]
 
 DOMINANT_STYLE_COMPILED = {}
@@ -342,7 +350,7 @@ def write_file_lines(filename, file_lines):
 COPYRIGHT = 'Copyright \(c\)'
 YEAR = "20[0-9][0-9]"
 YEAR_RANGE = '(%s)(-%s)?' % (YEAR, YEAR)
-HOLDER = 'The Bitcoin Core developers'
+HOLDER = 'The Bitcoin Unlimited developers'
 UPDATEABLE_LINE_COMPILED = re.compile(' '.join([COPYRIGHT, YEAR_RANGE, HOLDER]))
 
 def get_updatable_copyright_line(file_lines):
