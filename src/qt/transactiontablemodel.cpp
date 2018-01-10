@@ -632,7 +632,7 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
         return priv->describe(rec, walletModel->getOptionsModel()->getDisplayUnit(),
             walletModel->getAddressTableModel()->labelForFreeze(QString::fromStdString(address)));
     case AddressRole:
-        return formatTxToAddress(rec, false);
+        return QString::fromStdString(address);
     case LabelRole:
         return label;
     case AmountRole:
