@@ -820,12 +820,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     // BUIP010 Xtreme Thinblocks: begin section Initialize XTHIN service
     if (GetBoolArg("-use-thinblocks", DEFAULT_USE_THINBLOCKS))
         nLocalServices |= NODE_XTHIN;
-// BUIP010 Xtreme Thinblocks: end section
-
-// UAHF - BitcoinCash
-#ifdef BITCOIN_CASH
-    nLocalServices |= NODE_BITCOIN_CASH;
-#endif
+    // BUIP010 Xtreme Thinblocks: end section
 
     nMaxTipAge = GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
 

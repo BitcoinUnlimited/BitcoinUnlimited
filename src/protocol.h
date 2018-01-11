@@ -302,13 +302,6 @@ enum
     NODE_XTHIN = (1 << 4),
     // BUIP010 - Xtreme Thinblocks - end section
 
-    // UAHF
-    // NODE_BITCOIN_CASH means the node supports the UAHF hard fork.  This is intended to be just
-    // a temporary service bit until the fork actually happens.  After the for it can be
-    // removed.
-    // If this is turned off then the node will not follow the UAHF hardfork
-    NODE_BITCOIN_CASH = (1 << 5),
-
     // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
     // isn't getting used, or one not being used much, and notify the
     // bitcoin-development mailing list. Remember that service bits are just
