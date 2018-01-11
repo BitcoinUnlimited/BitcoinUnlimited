@@ -35,6 +35,8 @@ GENERATED_TEST_FILES = $(JSON_TEST_FILES:.json=.json.h) $(RAW_TEST_FILES:.raw=.r
 
 # test_bitcoin binary #
 BITCOIN_TESTS =\
+  respend/test/respendrelayer_tests.cpp \
+  respend/test/respenddetector_tests.cpp \
   test/uahf_test.cpp \
   test/fork_tests.cpp \
   test/excessiveblock_test.cpp \
