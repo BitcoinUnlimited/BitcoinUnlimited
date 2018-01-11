@@ -370,6 +370,8 @@ respend/respendlogger.cpp
 respend/respendlogger.h
 respend/respendrelayer.cpp
 respend/respendrelayer.h
+respend/test/respenddetector_tests.cpp
+respend/test/respendrelayer_tests.cpp
 rpc/blockchain.cpp
 rpc/client.cpp
 rpc/client.h
