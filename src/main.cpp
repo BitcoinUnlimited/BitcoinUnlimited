@@ -1232,25 +1232,9 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS))
         return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
 
-    // is it already in the memory pool?
-    uint256 hash = tx.GetHash();
-    if (pool.exists(hash))
-        return state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
-
-    // Check for conflicts with in-memory transactions
-    {
-        LOCK(pool.cs); // protect pool.mapNextTx
-        BOOST_FOREACH (const CTxIn &txin, tx.vin)
-        {
-            auto itConflicting = pool.mapNextTx.find(txin.prevout);
-            if (itConflicting != pool.mapNextTx.end())
-            {
-                // Disable replacement feature for good
-                return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
-            }
-        }
-    }
-
+    // WARNING: for the following scope cs_main will now be in an unlocked state so that the remaining and
+    // often time consuming functions can be executed without holding up other threads.
+    // cs_main will then be relocked automatically, by the BOOST scope guard, when we leave this scope.
     {
         CCoinsView dummy;
         CCoinsViewCache view(&dummy);
@@ -1310,6 +1294,34 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
                 return state.DoS(0, false, REJECT_NONSTANDARD, "non-BIP68-final");
         }
 
+        // Need to grab both these values before unlocking cs_main.
+        int nChainActiveHeight = chainActive.Height();
+        bool fIsForkActiveOnNextBlock = chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value);
+
+        // Leave cs_main and create the scope guard
+        LEAVE_CRITICAL_SECTION(cs_main);
+        BOOST_SCOPE_EXIT(&cs_main) { ENTER_CRITICAL_SECTION(cs_main); }
+        BOOST_SCOPE_EXIT_END;
+
+        // is it already in the memory pool?
+        uint256 hash = tx.GetHash();
+        if (pool.exists(hash))
+            return state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
+
+        // Check for conflicts with in-memory transactions
+        {
+            LOCK(pool.cs); // protect pool.mapNextTx
+            BOOST_FOREACH (const CTxIn &txin, tx.vin)
+            {
+                auto itConflicting = pool.mapNextTx.find(txin.prevout);
+                if (itConflicting != pool.mapNextTx.end())
+                {
+                    // Disable replacement feature for good
+                    return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
+                }
+            }
+        }
+
         // Check for non-standard pay-to-script-hash in inputs
         if (fRequireStandard && !AreInputsStandard(tx, view))
             return state.Invalid(false, REJECT_NONSTANDARD, "bad-txns-nonstandard-inputs");
@@ -1325,7 +1337,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         pool.ApplyDeltas(hash, nPriorityDummy, nModifiedFees);
 
         CAmount inChainInputValue;
-        double dPriority = view.GetPriority(tx, chainActive.Height(), inChainInputValue);
+        double dPriority = view.GetPriority(tx, nChainActiveHeight, inChainInputValue);
 
         // Keep track of transactions that spend a coinbase, which we re-scan
         // during reorgs to ensure COINBASE_MATURITY is still met.
@@ -1340,7 +1352,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             }
         }
 
-        CTxMemPoolEntry entry(tx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(tx),
+        CTxMemPoolEntry entry(tx, nFees, GetTime(), dPriority, nChainActiveHeight, pool.HasNoInputsOf(tx),
             inChainInputValue, fSpendsCoinbase, nSigOps, lp);
         nSize = entry.GetTxSize();
 
@@ -1357,7 +1369,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
                 strprintf("%d < %d", nFees, mempoolRejectFee));
         }
         else if (GetBoolArg("-relaypriority", DEFAULT_RELAYPRIORITY) && nModifiedFees < ::minRelayTxFee.GetFee(nSize) &&
-                 !AllowFree(entry.GetPriority(chainActive.Height() + 1)))
+                 !AllowFree(entry.GetPriority(nChainActiveHeight + 1)))
         {
             // Require that free transactions have sufficient priority to be mined in the next block.
             return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "insufficient priority");
@@ -1503,7 +1515,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
         entry.sighashType = sighashType | sighashType2;
         // This code denies old style tx from entering the mempool as soon as we fork
-        if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value) && !IsTxBUIP055Only(entry))
+        if (fIsForkActiveOnNextBlock && !IsTxBUIP055Only(entry))
         {
             return state.Invalid(false, REJECT_WRONG_FORK, "txn-uses-old-sighash-algorithm");
         }
@@ -1524,7 +1536,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     }
 
     if (!fRejectAbsurdFee)
-        SyncWithWallets(tx, NULL, -1);
+        SyncWithWallets(tx, nullptr, -1);
 
     int64_t end = GetTimeMicros();
 
