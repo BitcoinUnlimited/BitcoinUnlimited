@@ -119,7 +119,6 @@ thinblock.h
 threadsafety.h
 timedata.cpp
 timedata.h
-tinyformat.h
 torcontrol.cpp
 torcontrol.h
 tweak.cpp
