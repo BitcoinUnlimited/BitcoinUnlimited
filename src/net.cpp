@@ -1744,7 +1744,6 @@ void ThreadOpenConnections()
         // we don't have enough connections to XTHIN capable nodes yet.
         int nOutbound = 0;
         int nThinBlockCapable = 0;
-        int nBitcoinCash = 0;
         set<vector<unsigned char> > setConnected;
         CNode *ptemp = nullptr;
         bool fDisconnected = false;
@@ -2803,12 +2802,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nPingUsecStart = 0;
     nPingUsecTime = 0;
     fPingQueued = false;
-#ifdef BITCOIN_CASH
-    // set when etablishing connection
-    fUsesCashMagic = true;
-#else
-    fUsesCashMagic = false;
-#endif
     nMinPingUsecTime = std::numeric_limits<int64_t>::max();
     thinBlockWaitingForTxns = -1; // BUIP010 Xtreme Thinblocks
     nXthinBloomfilterSize = 0;

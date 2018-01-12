@@ -458,8 +458,6 @@ public:
 
 
     CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
-    // Whether the node uses the bitcoin cash magic to communicate.
-    std::atomic<bool> fUsesCashMagic;
     ~CNode();
 
 private:
@@ -508,7 +506,7 @@ public:
 
     const CMessageHeader::MessageStartChars &GetMagic(const CChainParams &params) const
     {
-        return fUsesCashMagic ? params.CashMessageStart() : params.MessageStart();
+        return params.CashMessageStart();
     }
 
     CNode *AddRef()
