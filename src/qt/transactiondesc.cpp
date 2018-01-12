@@ -107,7 +107,8 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
                         (wallet->IsMine(address) == ISMINE_SPENDABLE) ? tr("own address") : tr("watch-only");
 
                     if (!wallet->mapAddressBook[address].name.empty())
-                        strHTML += " (" + addressOwned + tr("label") + ": " + GUIUtil::HtmlEscape(wallet->mapAddressBook[address].name) + ")";
+                        strHTML += " (" + addressOwned + tr("label") + ": " +
+                                   GUIUtil::HtmlEscape(wallet->mapAddressBook[address].name) + ")";
                     else
                         strHTML += " (" + addressOwned + ")";
 
@@ -217,7 +218,8 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
                             strHTML += "<b>" + tr("To") + ":</b> ";
                             strHTML += GUIUtil::HtmlEscape(EncodeDestination(address));
                             if (wallet->mapAddressBook.count(address) && !wallet->mapAddressBook[address].name.empty())
-                                strHTML += " (" + tr("label") + ": " + GUIUtil::HtmlEscape(wallet->mapAddressBook[address].name) + ")";
+                                strHTML += " (" + tr("label") + ": " +
+                                           GUIUtil::HtmlEscape(wallet->mapAddressBook[address].name) + ")";
                             if (txout.nValue == wtx.GetChange() && toSelf == ISMINE_SPENDABLE)
                                 strHTML += " (change address)";
                             else if (toSelf == ISMINE_SPENDABLE)
