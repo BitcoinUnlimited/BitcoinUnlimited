@@ -7,8 +7,8 @@
 #include "consensus.h"
 #include "primitives/transaction.h"
 #include "script/interpreter.h"
-#include "validation.h"
 #include "unlimited.h"
+#include "validation.h"
 
 // TODO remove the following dependencies
 #include "chain.h"
@@ -31,7 +31,10 @@ bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
     return true;
 }
 
-std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx, int flags, std::vector<int>* prevHeights, const CBlockIndex& block)
+std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx,
+    int flags,
+    std::vector<int> *prevHeights,
+    const CBlockIndex &block)
 {
     assert(prevHeights->size() == tx.vin.size());
 
@@ -100,7 +103,7 @@ std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx, int flags
     return std::make_pair(nMinHeight, nMinTime);
 }
 
-bool EvaluateSequenceLocks(const CBlockIndex& block, std::pair<int, int64_t> lockPair)
+bool EvaluateSequenceLocks(const CBlockIndex &block, std::pair<int, int64_t> lockPair)
 {
     assert(block.pprev);
     int64_t nBlockTime = block.pprev->GetMedianTimePast();
@@ -120,21 +123,21 @@ bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int> *prevHeig
 // previous outputs are the most relevant, but not actually checked.
 // The purpose of this is to limit the outputs of transactions so that other transactions' "prevout"
 // is reasonably sized.
-unsigned int GetLegacySigOpCount(const CTransaction& tx)
+unsigned int GetLegacySigOpCount(const CTransaction &tx)
 {
     unsigned int nSigOps = 0;
-    for (const auto& txin : tx.vin)
+    for (const auto &txin : tx.vin)
     {
         nSigOps += txin.scriptSig.GetSigOpCount(false);
     }
-    for (const auto& txout : tx.vout)
+    for (const auto &txout : tx.vout)
     {
         nSigOps += txout.scriptPubKey.GetSigOpCount(false);
     }
     return nSigOps;
 }
 
-unsigned int GetP2SHSigOpCount(const CTransaction& tx, const CCoinsViewCache& inputs)
+unsigned int GetP2SHSigOpCount(const CTransaction &tx, const CCoinsViewCache &inputs)
 {
     if (tx.IsCoinBase())
         return 0;
@@ -149,7 +152,7 @@ unsigned int GetP2SHSigOpCount(const CTransaction& tx, const CCoinsViewCache& in
     return nSigOps;
 }
 
-bool CheckTransaction(const CTransaction& tx, CValidationState &state)
+bool CheckTransaction(const CTransaction &tx, CValidationState &state)
 {
     // Basic checks that don't depend on any context
     if (tx.vin.empty())
@@ -244,4 +247,3 @@ bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, c
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-fee-outofrange");
     return true;
 }
-
