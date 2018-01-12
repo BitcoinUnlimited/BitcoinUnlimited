@@ -23,7 +23,7 @@ bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
         return true;
     if ((int64_t)tx.nLockTime < ((int64_t)tx.nLockTime < LOCKTIME_THRESHOLD ? (int64_t)nBlockHeight : nBlockTime))
         return true;
-    BOOST_FOREACH (const CTxIn &txin, tx.vin)
+    for (const CTxIn &txin : tx.vin)
     {
         if (!(txin.nSequence == CTxIn::SEQUENCE_FINAL))
             return false;
@@ -163,7 +163,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
 
     // Check for negative or overflow output values
     CAmount nValueOut = 0;
-    BOOST_FOREACH (const CTxOut &txout, tx.vout)
+    for (const CTxOut &txout : tx.vout)
     {
         if (txout.nValue < 0)
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-vout-negative");
@@ -176,7 +176,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
 
     // Check for duplicate inputs
     std::set<COutPoint> vInOutPoints;
-    BOOST_FOREACH (const CTxIn &txin, tx.vin)
+    for (const CTxIn &txin : tx.vin)
     {
         if (vInOutPoints.count(txin.prevout))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputs-duplicate");
@@ -191,7 +191,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
     }
     else
     {
-        BOOST_FOREACH (const CTxIn &txin, tx.vin)
+        for (const CTxIn &txin : tx.vin)
             if (txin.prevout.IsNull())
                 return state.DoS(10, false, REJECT_INVALID, "bad-txns-prevout-null");
     }
