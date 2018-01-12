@@ -318,37 +318,43 @@ bool SetupNetworking();
 /** Return true if log accepts specified category */
 bool LogAcceptCategory(const char *category);
 
-#define LogPrintf(...) LogPrint(NULL, __VA_ARGS__)
-
-template <typename T1, typename... Args>
-static inline int LogPrint(const char *category, const char *fmt, const T1 &v1, const Args &... args)
+/** Get format string from VA_ARGS for error reporting */
+template <typename... Args>
+std::string FormatStringFromLogArgs(const char *fmt, const Args &... args)
 {
-    if (!LogAcceptCategory(category))
-        return 0;
-    return LogPrintStr(tfm::format(fmt, v1, args...));
+    return fmt;
 }
 
-template <typename T1, typename... Args>
-bool error(const char *fmt, const T1 &v1, const Args &... args)
-{
-    LogPrintStr("ERROR: " + tfm::format(fmt, v1, args...) + "\n");
-    return false;
-}
+#define LogPrintf(...)                                                                             \
+    do                                                                                             \
+    {                                                                                              \
+        std::string _log_msg_; /* Unlikely name to avoid shadowing variables */                    \
+        try                                                                                        \
+        {                                                                                          \
+            _log_msg_ = tfm::format(__VA_ARGS__);                                                  \
+        }                                                                                          \
+        catch (tinyformat::format_error & e)                                                       \
+        {                                                                                          \
+            /* Original format string will have newline so don't add one here */                   \
+            _log_msg_ = "Error \"" + std::string(e.what()) + "\" while formatting log message: " + \
+                        FormatStringFromLogArgs(__VA_ARGS__);                                      \
+        }                                                                                          \
+        LogPrintStr(_log_msg_);                                                                    \
+    } while (0)
 
-/**
- * Zero-arg versions of logging and error, these are not covered by
- * the variadic templates above (and don't take format arguments but
- * bare strings).
- */
-static inline int LogPrint(const char *category, const char *s)
+#define LogPrint(category, ...)            \
+    do                                     \
+    {                                      \
+        if (LogAcceptCategory((category))) \
+        {                                  \
+            LogPrintf(__VA_ARGS__);        \
+        }                                  \
+    } while (0)
+
+template <typename... Args>
+bool error(const char *fmt, const Args &... args)
 {
-    if (!LogAcceptCategory(category))
-        return 0;
-    return LogPrintStr(s);
-}
-static inline bool error(const char *s)
-{
-    LogPrintStr(std::string("ERROR: ") + s + "\n");
+    LogPrintStr("ERROR: " + tfm::format(fmt, args...) + "\n");
     return false;
 }
 
