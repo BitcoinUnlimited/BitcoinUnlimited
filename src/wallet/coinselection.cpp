@@ -41,10 +41,10 @@ CAmount reasonableExcess(CAmount targetValue)
 }
 
 // Create a group of Txos from a Txo index and another group.
-TxoGroup makeGroup(SpendableTxos::iterator i, const TxoGroup& prev = *(TxoGroup*)NULL)
+TxoGroup makeGroup(SpendableTxos::iterator i, const TxoGroup* prev = nullptr)
 {
   TxoGroup ret;
-  if (&prev) ret = prev;
+  if (prev != nullptr) ret = *prev;
   else ret.first = 0;
   // assert(ret.second.find(i) == ret.second.end());  // Don't add an element that already exists  -- allow this, bad solutions eliminated later
   ret.first += i->first;  // update the amount 
@@ -76,7 +76,7 @@ bool extend(const CAmount targetValue, /*const*/ SpendableTxos& available, TxoGr
 
       if (i!=aEnd)  // Ok we have a solution so add it.
 	{
- 	  TxoGroup g = makeGroup(i,grp);
+ 	  TxoGroup g = makeGroup(i, &grp);
   	  solutions.insert(TxoGroupMap::value_type(g.first,g));
           //LogPrint("wallet","CoinSelection solution found: excess %ld, txos: %d\n", g.first - targetValue, g.second.size());
           ret = true;
@@ -93,7 +93,7 @@ bool extend(const CAmount targetValue, /*const*/ SpendableTxos& available, TxoGr
           //while ((small != aBeg) && (grp.second.find(small) != grp.second.end())) --small;  // go to the prev if this one is already in the group.
           //if (small != aBeg)
           {
-            TxoGroup newGrp = makeGroup(small, grp);
+            TxoGroup newGrp = makeGroup(small, &grp);
             //LogPrint("wallet","CoinSelection recursive extend: need %ld, txos: %d\n", targetValue - newGrp.first, newGrp.second.size());
             ret |= extend(targetValue, available, newGrp, solutions, depth+1);
           }
@@ -167,7 +167,7 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos& available, const CAmount targetV
 	  --i;
           if (i==aEnd) break;
           total += i->first;
-          group = makeGroup(i,group);
+          group = makeGroup(i, &group);
 	}
       if (total >= targetValue)
 	{
