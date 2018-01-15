@@ -117,6 +117,8 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800; // May 1st, 2017
 
 #ifdef BITCOIN_CASH
+        // Aug, 1 2017 hard fork
+        consensus.uahfHeight = 478559;
         // Nov, 13 hard fork
         consensus.daaHeight = 504031;
 #endif
@@ -263,6 +265,8 @@ public:
         nPruneAfterHeight = 100000;
 
 #ifdef BITCOIN_CASH
+        // Aug, 1 2017 hard fork
+        consensus.uahfHeight = 0;
         // Nov, 13 hard fork
         consensus.daaHeight = 0;
 #endif
@@ -328,6 +332,8 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800; // May 1st, 2017
 
 #ifdef BITCOIN_CASH
+        // Aug, 1 2017 hard fork
+        consensus.uahfHeight = 1155876;
         // Nov, 13 hard fork
         consensus.daaHeight = 1188697;
 #endif
@@ -429,6 +435,8 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 999999999999ULL;
 
 #ifdef BITCOIN_CASH
+        // Hard fork is always enabled on regtest.
+        consensus.uahfHeight = 0;
         // Nov, 13 hard fork is always on on regtest.
         consensus.daaHeight = 0;
 #endif
