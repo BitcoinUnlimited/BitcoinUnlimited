@@ -1562,7 +1562,6 @@ CAmount CWalletTx::GetChange() const
 
 bool CWalletTx::InMempool() const
 {
-    LOCK(mempool.cs);
     if (mempool.exists(GetHash()))
     {
         return true;

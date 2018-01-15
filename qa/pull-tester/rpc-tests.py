@@ -143,7 +143,7 @@ bad_opts_found = []
 bad_opt_str="Unrecognized option: %s"
 for o in opts | double_opts:
     if o.startswith('--'):
-        if o not in framework_opts + test_script_opts + private_double_opts:
+        if o.split("=")[0] not in framework_opts + test_script_opts + private_double_opts:
             print(bad_opt_str % o)
             bad_opts_found.append(o)
     elif o.startswith('-'):

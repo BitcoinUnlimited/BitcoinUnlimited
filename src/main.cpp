@@ -1239,7 +1239,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
     // Check for conflicts with in-memory transactions
     {
-        LOCK(pool.cs); // protect pool.mapNextTx
+        READLOCK(pool.cs); // protect pool.mapNextTx
         BOOST_FOREACH (const CTxIn &txin, tx.vin)
         {
             auto itConflicting = pool.mapNextTx.find(txin.prevout);
@@ -1258,7 +1258,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         CAmount nValueIn = 0;
         LockPoints lp;
         {
-            LOCK(pool.cs);
+            READLOCK(pool.cs);
             CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
             view.SetBackend(viewMemPool);
 
@@ -1466,11 +1466,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         size_t nLimitDescendants = GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT);
         size_t nLimitDescendantSize = GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
         std::string errString;
-        if (!pool.CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize, nLimitDescendants,
-                nLimitDescendantSize, errString))
-        {
-            return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
-        }
+
 
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
@@ -1507,8 +1503,18 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         {
             return state.Invalid(false, REJECT_WRONG_FORK, "txn-uses-old-sighash-algorithm");
         }
-        // Store transaction in memory
-        pool.addUnchecked(hash, entry, setAncestors, !IsInitialBlockDownload());
+
+        {
+            READLOCK(pool.cs);
+
+            if (!pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize,
+                    nLimitDescendants, nLimitDescendantSize, errString))
+            {
+                return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
+            }
+            // Store transaction in memory
+            pool.addUnchecked(hash, entry, setAncestors, !IsInitialBlockDownload());
+        }
 
         // trim mempool and check if tx was trimmed
         if (!fOverrideMempoolLimit)
@@ -6946,11 +6952,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             return true;
         }
         std::vector<uint256> vtxid;
-        if (1) // Keep this lock for as short as possible, causing 2.6 second locks
-        {
-            LOCK2(cs_main, pfrom->cs_filter);
-            mempool.queryHashes(vtxid);
-        }
+        mempool.queryHashes(vtxid);
         std::vector<CInv> vInv;
         BOOST_FOREACH (uint256 &hash, vtxid)
         {

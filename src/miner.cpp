@@ -181,43 +181,47 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
     pblocktemplate->vTxFees.push_back(-1); // updated at end
     pblocktemplate->vTxSigOps.push_back(-1); // updated at end
 
-    LOCK2(cs_main, mempool.cs);
+    LOCK(cs_main);
     CBlockIndex *pindexPrev = chainActive.Tip();
     assert(pindexPrev); // can't make a new block if we don't even have the genesis block
-    nHeight = pindexPrev->nHeight + 1;
+    {
+        READLOCK(mempool.cs);
+        nHeight = pindexPrev->nHeight + 1;
 
-    buip055ChainBlock = pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value);
+        buip055ChainBlock = pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value);
 
-    pblock->nTime = GetAdjustedTime();
-    pblock->nVersion = UnlimitedComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), pblock->nTime);
-    // -regtest only: allow overriding block.nVersion with
-    // -blockversion=N to test forking scenarios
-    if (chainparams.MineBlocksOnDemand())
-        pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
+        pblock->nTime = GetAdjustedTime();
+        pblock->nVersion = UnlimitedComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), pblock->nTime);
+        // -regtest only: allow overriding block.nVersion with
+        // -blockversion=N to test forking scenarios
+        if (chainparams.MineBlocksOnDemand())
+            pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
 
-    const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
+        const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
 
-    nLockTimeCutoff =
-        (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
+        nLockTimeCutoff =
+            (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
 
-    addPriorityTxs(pblocktemplate.get());
-    addScoreTxs(pblocktemplate.get());
+        addPriorityTxs(pblocktemplate.get());
+        addScoreTxs(pblocktemplate.get());
 
-    nLastBlockTx = nBlockTx;
-    nLastBlockSize = nBlockSize;
-    LogPrintf("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
-        nBlockSigOps);
+        nLastBlockTx = nBlockTx;
+        nLastBlockSize = nBlockSize;
+        LogPrintf("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
+            nBlockSigOps);
 
-    // Create coinbase transaction.
-    pblock->vtx[0] = coinbaseTx(scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
-    pblocktemplate->vTxFees[0] = -nFees;
+        // Create coinbase transaction.
+        pblock->vtx[0] =
+            coinbaseTx(scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
+        pblocktemplate->vTxFees[0] = -nFees;
 
-    // Fill in header
-    pblock->hashPrevBlock = pindexPrev->GetBlockHash();
-    UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
-    pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
-    pblock->nNonce = 0;
-    pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
+        // Fill in header
+        pblock->hashPrevBlock = pindexPrev->GetBlockHash();
+        UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
+        pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
+        pblock->nNonce = 0;
+        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
+    }
 
     CValidationState state;
     if (blockstreamCoreCompatible)
@@ -338,7 +342,7 @@ void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, CTxMemPool::txit
     {
         double dPriority = iter->GetPriority(nHeight);
         CAmount dummy;
-        mempool.ApplyDeltas(iter->GetTx().GetHash(), dPriority, dummy);
+        mempool._ApplyDeltas(iter->GetTx().GetHash(), dPriority, dummy);
         LogPrintf("priority %.1f fee %s txid %s\n", dPriority,
             CFeeRate(iter->GetModifiedFee(), iter->GetTxSize()).ToString().c_str(),
             iter->GetTx().GetHash().ToString().c_str());
@@ -449,7 +453,7 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
     {
         double dPriority = mi->GetPriority(nHeight);
         CAmount dummy;
-        mempool.ApplyDeltas(mi->GetTx().GetHash(), dPriority, dummy);
+        mempool._ApplyDeltas(mi->GetTx().GetHash(), dPriority, dummy);
         vecPriority.push_back(TxCoinAgePriority(dPriority, mi));
     }
     std::make_heap(vecPriority.begin(), vecPriority.end(), pricomparer);

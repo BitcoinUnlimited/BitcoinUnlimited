@@ -443,7 +443,7 @@ public:
                 CompareTxMemPoolEntryByScore> > >
         indexed_transaction_set;
 
-    mutable CCriticalSection cs;
+    mutable CSharedCriticalSection cs;
     indexed_transaction_set mapTx;
     typedef indexed_transaction_set::nth_index<0>::type::iterator txiter;
     struct CompareIteratorByHash
@@ -467,8 +467,8 @@ private:
     typedef std::map<txiter, TxLinks, CompareIteratorByHash> txlinksMap;
     txlinksMap mapLinks;
 
-    void UpdateParent(txiter entry, txiter parent, bool add);
-    void UpdateChild(txiter entry, txiter child, bool add);
+    void _UpdateParent(txiter entry, txiter parent, bool add);
+    void _UpdateChild(txiter entry, txiter child, bool add);
 
 public:
     std::map<COutPoint, CInPoint> mapNextTx;
@@ -501,15 +501,18 @@ public:
         bool fCurrentEstimate = true);
 
     void remove(const CTransaction &tx, std::list<CTransaction> &removed, bool fRecursive = false);
+    void _remove(const CTransaction &tx, std::list<CTransaction> &removed, bool fRecursive = false);
     void removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags);
     void removeConflicts(const CTransaction &tx, std::list<CTransaction> &removed);
+    void _removeConflicts(const CTransaction &tx, std::list<CTransaction> &removed);
     void removeForBlock(const std::vector<CTransaction> &vtx,
         unsigned int nBlockHeight,
         std::list<CTransaction> &conflicts,
         bool fCurrentEstimate = true);
     void clear();
     void _clear(); // lock free
-    void queryHashes(std::vector<uint256> &vtxid);
+    void queryHashes(std::vector<uint256> &vtxid) const;
+    void _queryHashes(std::vector<uint256> &vtxid) const;
     bool isSpent(const COutPoint &outpoint);
     unsigned int GetTransactionsUpdated() const;
     void AddTransactionsUpdated(unsigned int n);
@@ -525,13 +528,15 @@ public:
         double dPriorityDelta,
         const CAmount &nFeeDelta);
     void ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount &nFeeDelta) const;
+    void _ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount &nFeeDelta) const;
     void ClearPrioritisation(const uint256 hash);
+    void _ClearPrioritisation(const uint256 hash);
 
 public:
     /** Remove a set of transactions from the mempool.
      *  If a transaction is in this set, then all in-mempool descendants must
      *  also be in the set.*/
-    void RemoveStaged(setEntries &stage);
+    void _RemoveStaged(setEntries &stage);
 
     /** When adding transactions from a disconnected block back to the mempool,
      *  new mempool entries may have children in the mempool (which is generally
@@ -553,8 +558,18 @@ public:
      *  errString = populated with error reason if any limits are hit
      *  fSearchForParents = whether to search a tx's vin for in-mempool parents, or
      *    look up parents from mapLinks. Must be true for entries not in the mempool
+     *
+     *  If you actually want the ancestor set returned, you must READLOCK(this->cs) for the duration of your
+     *  use of the returned setEntries.  Therefore only the lockless version returns the ancestor set.
      */
     bool CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
+        uint64_t limitAncestorCount,
+        uint64_t limitAncestorSize,
+        uint64_t limitDescendantCount,
+        uint64_t limitDescendantSize,
+        std::string &errString,
+        bool fSearchForParents = true);
+    bool _CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
         setEntries &setAncestors,
         uint64_t limitAncestorCount,
         uint64_t limitAncestorSize,
@@ -563,10 +578,15 @@ public:
         std::string &errString,
         bool fSearchForParents = true);
 
-    /** Populate setDescendants with all in-mempool descendants of hash.
-     *  Assumes that setDescendants includes all in-mempool descendants of anything
-     *  already in it.  */
-    void CalculateDescendants(txiter it, setEntries &setDescendants);
+    /** Similar to CalculateMemPoolAncestors, except only requires the inputs and just returns true/false depending on
+     * whether the input set conforms to the passed limits */
+    bool ValidateMemPoolAncestors(const std::vector<CTxIn> &txIn,
+        uint64_t limitAncestorCount,
+        uint64_t limitAncestorSize,
+        uint64_t limitDescendantCount,
+        uint64_t limitDescendantSize,
+        std::string &errString);
+
 
     /** The minimum fee to get into the mempool, which may itself not be enough
       *  for larger-sized transactions.
@@ -575,6 +595,7 @@ public:
       *  would otherwise be half of this, it is set to 0 instead.
       */
     CFeeRate GetMinFee(size_t sizelimit) const;
+    CFeeRate _GetMinFee(size_t sizelimit) const;
 
     /** Remove transactions from the mempool until its dynamic size is <= sizelimit.
       *  pvNoSpendsRemaining, if set, will be populated with the list of outpoints
@@ -591,22 +612,26 @@ public:
 
     unsigned long size()
     {
-        LOCK(cs);
+        READLOCK(cs);
+        return mapTx.size();
+    }
+    unsigned long _size()
+    {
         return mapTx.size();
     }
 
     uint64_t GetTotalTxSize()
     {
-        LOCK(cs);
+        READLOCK(cs);
         return totalTxSize;
     }
 
     bool exists(uint256 hash) const
     {
-        LOCK(cs);
+        READLOCK(cs);
         return (mapTx.count(hash) != 0);
     }
-
+    bool _exists(uint256 hash) const { return (mapTx.count(hash) != 0); }
     double TransactionsPerSecond()
     {
         boost::mutex::scoped_lock lock(cs_txPerSec);
@@ -615,7 +640,7 @@ public:
 
     bool exists(const COutPoint &outpoint) const
     {
-        LOCK(cs);
+        READLOCK(cs);
         auto it = mapTx.find(outpoint.hash);
         return (it != mapTx.end() && outpoint.n < it->GetTx().vout.size());
     }
@@ -624,8 +649,10 @@ public:
     TxMempoolInfo info(const uint256 &hash) const;
     std::vector<TxMempoolInfo> infoAll() const;
 
-    bool lookup(uint256 hash, CTxMemPoolEntry &result) const;
-    bool lookup(uint256 hash, CTransaction &result) const;
+    bool lookup(const uint256 &hash, CTxMemPoolEntry &result) const;
+    bool _lookup(const uint256 &hash, CTxMemPoolEntry &result) const;
+    bool lookup(const uint256 &hash, CTransaction &result) const;
+    bool _lookup(const uint256 &hash, CTransaction &result) const;
 
     /** Estimate fee rate needed to get into the next nBlocks
      *  If no answer can be given at nBlocks, return an estimate
@@ -650,6 +677,12 @@ public:
     bool ReadFeeEstimates(CAutoFile &filein);
 
     size_t DynamicMemoryUsage() const;
+    size_t _DynamicMemoryUsage() const; // no locks taken
+protected:
+    /** Populate setDescendants with all in-mempool descendants of hash.
+ *  Assumes that setDescendants includes all in-mempool descendants of anything
+ *  already in it.  */
+    void _CalculateDescendants(txiter it, setEntries &setDescendants);
 
 private:
     /** UpdateForDescendants is used by UpdateTransactionsFromBlock to update
@@ -673,9 +706,9 @@ private:
         cacheMap &cachedDescendants,
         const std::set<uint256> &setExclude);
     /** Update ancestors of hash to add/remove it as a descendant transaction. */
-    void UpdateAncestorsOf(bool add, txiter hash, setEntries &setAncestors);
+    void _UpdateAncestorsOf(bool add, txiter hash, setEntries &setAncestors);
     /** For each transaction being removed, update ancestors and any direct children. */
-    void UpdateForRemoveFromMempool(const setEntries &entriesToRemove);
+    void _UpdateForRemoveFromMempool(const setEntries &entriesToRemove);
     /** Sever link between specified transaction and direct children. */
     void UpdateChildrenForRemoval(txiter entry);
 

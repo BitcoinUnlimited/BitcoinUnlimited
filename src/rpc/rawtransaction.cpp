@@ -682,7 +682,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     CCoinsView viewDummy;
     CCoinsViewCache view(&viewDummy);
     {
-        LOCK(mempool.cs);
+        READLOCK(mempool.cs);
         CCoinsViewCache &viewChain = *pcoinsTip;
         CCoinsViewMemPool viewMempool(&viewChain, mempool);
         view.SetBackend(viewMempool); // temporarily switch cache backend to db+mempool view

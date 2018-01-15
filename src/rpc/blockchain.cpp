@@ -188,7 +188,7 @@ UniValue mempoolToJSON(bool fVerbose = false)
 {
     if (fVerbose)
     {
-        LOCK(mempool.cs);
+        READLOCK(mempool.cs);
         UniValue o(UniValue::VOBJ);
         BOOST_FOREACH (const CTxMemPoolEntry &e, mempool.mapTx)
         {
@@ -208,7 +208,7 @@ UniValue mempoolToJSON(bool fVerbose = false)
             set<string> setDepends;
             BOOST_FOREACH (const CTxIn &txin, tx.vin)
             {
-                if (mempool.exists(txin.prevout.hash))
+                if (mempool._exists(txin.prevout.hash))
                     setDepends.insert(txin.prevout.hash.ToString());
             }
 
@@ -614,7 +614,7 @@ UniValue gettxout(const UniValue &params, bool fHelp)
     Coin coin;
     if (fMempool)
     {
-        LOCK(mempool.cs);
+        READLOCK(mempool.cs);
         CCoinsViewMemPool view(pcoinsTip, mempool);
         // TODO: filtering spent coins should be done by the CCoinsViewMemPool
         if (!view.GetCoin(out, coin) || mempool.isSpent(out))
