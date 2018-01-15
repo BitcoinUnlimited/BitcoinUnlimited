@@ -40,11 +40,11 @@ cd "$DEPS_ROOT"
 # don't download if already downloaded
 if [ ! -e wget-1.19.1-win32.zip ]
 then
-	wget --no-check-certificate https://eternallybored.org/misc/wget/releases/wget-1.19.1-win32.zip -O "$DEPS_ROOT/wget-1.19.1-win32.zip"
+	wget --no-check-certificate https://eternallybored.org/misc/wget/releases/old/wget-1.19.1-win32.zip -O "$DEPS_ROOT/wget-1.19.1-win32.zip"
 	# Verify downloaded file's hash
 	# NOTE: This hash was self computed as it was not provided by the author
-	# v2016.04.08 sha256=745801b57fee4514c131b142346a4332351e90fbc7f696f6a3e02c361cccc27f
-	check_hash 745801b57fee4514c131b142346a4332351e90fbc7f696f6a3e02c361cccc27f "$DEPS_ROOT/wget-1.19.1-win32.zip"
+	# v2016.04.08 sha256=eab20c797098c9e9a9753b2bdb530ed8758bbdb1f4a9a434bff48ea8840c5bee
+	check_hash eab20c797098c9e9a9753b2bdb530ed8758bbdb1f4a9a434bff48ea8840c5bee "$DEPS_ROOT/wget-1.19.1-win32.zip"
 fi
 # don't extract if already extracted
 if [ ! -d wget-1.19.1-win32 ]
