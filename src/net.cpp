@@ -1136,12 +1136,14 @@ void ThreadSocketHandler()
         FD_ZERO(&fdsetError);
         SOCKET hSocketMax = 0;
         bool have_fds = false;
+        std::set<SOCKET> setSocket;
 
         BOOST_FOREACH (const ListenSocket &hListenSocket, vhListenSocket)
         {
             FD_SET(hListenSocket.socket, &fdsetRecv);
             hSocketMax = max(hSocketMax, hListenSocket.socket);
             have_fds = true;
+            setSocket.insert(hListenSocket.socket);
         }
 
         {
@@ -1158,6 +1160,7 @@ void ThreadSocketHandler()
                 FD_SET(hSocket, &fdsetError);
                 hSocketMax = max(hSocketMax, hSocket);
                 have_fds = true;
+                setSocket.insert(hSocket);
 
                 // Implement the following logic:
                 // * If there is data to send, select() for sending data. As this only
@@ -1200,8 +1203,9 @@ void ThreadSocketHandler()
             {
                 int nErr = WSAGetLastError();
                 LogPrintf("socket select error %s\n", NetworkErrorString(nErr));
-                for (unsigned int i = 0; i <= hSocketMax; i++)
-                    FD_SET(i, &fdsetRecv);
+
+                for (SOCKET hSocket : setSocket)
+                    FD_SET(hSocket, &fdsetRecv);
             }
             FD_ZERO(&fdsetSend);
             FD_ZERO(&fdsetError);
@@ -1229,6 +1233,7 @@ void ThreadSocketHandler()
             BOOST_FOREACH (CNode *pnode, vNodesCopy)
                 pnode->AddRef();
         }
+
         BOOST_FOREACH (CNode *pnode, vNodesCopy)
         {
             boost::this_thread::interruption_point();
