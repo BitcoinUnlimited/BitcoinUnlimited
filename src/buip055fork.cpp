@@ -150,16 +150,6 @@ bool forkActivated(int height)
     return false;
 }
 
-// return true only if we are exactly on the fork block [x,x]
-// state: fork activated
-bool forkActivateNow(int height)
-{
-    const Consensus::Params &consensusParams = Params().GetConsensus();
-    if (height == consensusParams.uahfHeight)
-        return true;
-    return false;
-}
-
 // This will check if the Fork will be enabled at the next block
 // i.e. we are at block x - 1, [x-1, +inf]
 // state fork: enabled or activated
