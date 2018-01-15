@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "base58.h"
+#include "buip055fork.h"
 #include "chain.h"
 #include "coins.h"
 #include "consensus/validation.h"
@@ -825,7 +826,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     }
     if (!pickedForkId) // If the user didn't specify, use the configured default for the hash type
     {
-        if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
+        if (IsforkActiveOnNextBlock(chainActive.Tip()->nHeight))
         {
             nHashType |= SIGHASH_FORKID;
             pickedForkId = true;

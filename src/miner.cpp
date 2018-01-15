@@ -7,6 +7,7 @@
 #include "miner.h"
 
 #include "amount.h"
+#include "buip055fork.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "coins.h"
@@ -186,7 +187,7 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
     assert(pindexPrev); // can't make a new block if we don't even have the genesis block
     nHeight = pindexPrev->nHeight + 1;
 
-    buip055ChainBlock = pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value);
+    buip055ChainBlock = IsforkActiveOnNextBlock(pindexPrev->nHeight);
 
     pblock->nTime = GetAdjustedTime();
     pblock->nVersion = UnlimitedComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), pblock->nTime);

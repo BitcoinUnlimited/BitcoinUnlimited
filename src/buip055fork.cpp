@@ -25,7 +25,7 @@ bool UpdateBUIP055Globals(CBlockIndex *activeTip)
 {
     if (activeTip)
     {
-        if ((miningForkTime.value != 0) && activeTip->forkAtNextBlock(miningForkTime.value))
+        if (forkAtNextBlock(activeTip->nHeight))
         {
             excessiveBlockSize = miningForkEB.value;
             maxGeneratedBlock = miningForkMG.value;
@@ -125,5 +125,59 @@ bool IsTxOpReturnInvalid(const CTransaction &tx)
             }
         }
     }
+    return false;
+}
+
+// According to UAHF spec there are 2 pre-conditions to get the fork activated:
+//
+// 1) First step is waiting for the first block to have GetMedianTimePast() (GMTP)
+// be higher or equal then 1501590000 (Aug 1st 2017, 12:20:00 UTC). This block would
+// be the last in common with the other branch to the fork.
+// Let's call this block x-1. The match of this conditions will be called "Fork Enabled"
+//
+// 2) x-1 could be extended only by a block bigger than 1MB, so that size(block x) > 1MB
+// The match of this conditions will be called "Fork Activated"
+
+// return true for every block from fork block and forward [x,+inf)
+// fork activated
+bool forkActivated(int height)
+{
+    const Consensus::Params &consensusParams = Params().GetConsensus();
+    if (height >= consensusParams.uahfHeight)
+    {
+        return true;
+    }
+    return false;
+}
+
+// return true only if we are exactly on the fork block [x,x]
+// state: fork activated
+bool forkActivateNow(int height)
+{
+    const Consensus::Params &consensusParams = Params().GetConsensus();
+    if (height == consensusParams.uahfHeight)
+        return true;
+    return false;
+}
+
+// This will check if the Fork will be enabled at the next block
+// i.e. we are at block x - 1, [x-1, +inf]
+// state fork: enabled or activated
+bool IsforkActiveOnNextBlock(int height)
+{
+    const Consensus::Params &consensusParams = Params().GetConsensus();
+    if (height >= (consensusParams.uahfHeight - 1))
+        return true;
+    return false;
+}
+
+// return true only if 1st condition is true (Median past time > UAHF time)
+// and not the 2nd, i.e. we are at precisely [x-1,x-1]
+// state: fork enabled
+bool forkAtNextBlock(int height)
+{
+    const Consensus::Params &consensusParams = Params().GetConsensus();
+    if (height == (consensusParams.uahfHeight - 1))
+        return true;
     return false;
 }

@@ -2346,8 +2346,10 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
 
                 // Sign
                 unsigned int sighashType = SIGHASH_ALL;
-                if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value) && walletSignWithForkSig.value)
+                if (IsforkActiveOnNextBlock(chainActive.Tip()->nHeight) && walletSignWithForkSig.value)
+                {
                     sighashType |= SIGHASH_FORKID;
+                }
                 int nIn = 0;
                 CTransaction txNewConst(txNew);
                 BOOST_FOREACH (const PAIRTYPE(const CWalletTx *, unsigned int) & coin, setCoins)

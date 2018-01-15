@@ -1,7 +1,9 @@
 // Copyright (c) 2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "addrman.h"
+#include "buip055fork.h"
 #include "chainparams.h"
 #include "hash.h"
 #include "net.h"
@@ -33,23 +35,23 @@ BOOST_AUTO_TEST_CASE(fork_trigger)
 
     for (int i = 0; i < SZ; i++)
     {
-        BOOST_CHECK(bi[i].forkAtNextBlock(SZ + 1) == false);
-        BOOST_CHECK(bi[i].forkActivated(SZ + 1) == false);
-        BOOST_CHECK(bi[i].forkActivateNow(SZ + 1) == false);
+        BOOST_CHECK(forkAtNextBlock(SZ + 1) == false);
+        BOOST_CHECK(forkActivated(SZ + 1) == false);
+        BOOST_CHECK(forkActivateNow(SZ + 1) == false);
     }
 
     for (int i = 0; i < SZ; i++)
     {
-        BOOST_CHECK(bi[i].forkAtNextBlock(0) == false);
-        BOOST_CHECK(bi[i].forkActivated(0) == false);
-        BOOST_CHECK(bi[i].forkActivateNow(0) == false);
+        BOOST_CHECK(forkAtNextBlock(0) == false);
+        BOOST_CHECK(forkActivated(0) == false);
+        BOOST_CHECK(forkActivateNow(0) == false);
     }
 
-    BOOST_CHECK(bi[SZ - 1].forkActivated(1) == true);
-    BOOST_CHECK(bi[SZ - 1].forkAtNextBlock(1) == false);
+    BOOST_CHECK(forkActivated(1) == true);
+    BOOST_CHECK(forkAtNextBlock(1) == false);
 
-    BOOST_CHECK(bi[SZ - 1].forkAtNextBlock(SZ - 6) == true);
-    BOOST_CHECK(bi[SZ - 1].forkAtNextBlock(SZ - 5) == false);
+    BOOST_CHECK(forkAtNextBlock(SZ - 6) == true);
+    BOOST_CHECK(forkAtNextBlock(SZ - 5) == false);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

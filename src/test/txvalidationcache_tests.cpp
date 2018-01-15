@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "buip055fork.h"
 #include "consensus/validation.h"
 #include "key.h"
 #include "main.h"
@@ -43,7 +44,7 @@ BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup)
 
 
     unsigned int sighashType = SIGHASH_ALL;
-    if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
+    if (IsforkActiveOnNextBlock(chainActive.Tip()->nHeight))
         sighashType |= SIGHASH_FORKID;
 
     // Create a double-spend of mature coinbase txn:
@@ -111,7 +112,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     CScript scriptPubKey = CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
 
     unsigned int sighashType = SIGHASH_ALL;
-    if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
+    if (IsforkActiveOnNextBlock(chainActive.Tip()->nHeight))
         sighashType |= SIGHASH_FORKID;
 
     std::vector<CMutableTransaction> spends;

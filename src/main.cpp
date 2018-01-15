@@ -1503,7 +1503,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
         entry.sighashType = sighashType | sighashType2;
         // This code denies old style tx from entering the mempool as soon as we fork
-        if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value) && !IsTxBUIP055Only(entry))
+        if (IsforkActiveOnNextBlock(chainActive.Tip()->nHeight) && !IsTxBUIP055Only(entry))
         {
             return state.Invalid(false, REJECT_WRONG_FORK, "txn-uses-old-sighash-algorithm");
         }
@@ -2496,7 +2496,7 @@ bool ConnectBlock(const CBlock &block,
 
     uint32_t flags = fStrictPayToScriptHash ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE;
 
-    if (pindex->forkActivated(miningForkTime.value))
+    if (forkActivated(pindex->nHeight))
     {
         flags |= SCRIPT_VERIFY_STRICTENC;
         flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
@@ -4183,7 +4183,8 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
     // (note subsequent blocks can be <= 1MB...)
     // An exception is added -- if the fork block is block 1 then it can be <= 1MB.  This allows test chains to
     // fork without having to create a large block so long as the fork time is in the past.
-    if (pindexPrev && pindexPrev->forkAtNextBlock(miningForkTime.value) && (pindexPrev->nHeight > 1))
+    // TODO: check if we can remove the second conditions since on regtest uahHeight is 0
+    if (pindexPrev && forkAtNextBlock(pindexPrev->nHeight) && (pindexPrev->nHeight > 1))
     {
         DbgAssert(block.nBlockSize, );
         if (block.nBlockSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
@@ -4196,7 +4197,7 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
         }
     }
     // BUIP055 check soft-fork items, such as tx targeted to the 1MB chain
-    if (pindexPrev && pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value))
+    if (pindexPrev && IsforkActiveOnNextBlock(pindexPrev->nHeight))
     {
         return ValidateBUIP055Block(block, state, nHeight);
     }
@@ -5705,7 +5706,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     {
                         // Only offer a TX to the fork if its signed properly
                         if (!(onlyAcceptForkSig.value && !IsTxBUIP055Only(txe) &&
-                                chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value)))
+                                IsforkActiveOnNextBlock(chainActive.Tip()->nHeight)))
                         {
                             CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
                             ss.reserve(1000);
@@ -6415,7 +6416,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         else if (fMissingInputs)
         {
             // If we've forked and this is probably not a valid tx, then skip adding it to the orphan pool
-            if (!chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value) || IsTxProbablyNewSigHash(tx))
+            if (!IsforkActiveOnNextBlock(chainActive.Tip()->nHeight) || IsTxProbablyNewSigHash(tx))
             {
                 LOCK(cs_orphancache);
                 AddOrphanTx(tx, pfrom->GetId());
@@ -6965,7 +6966,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     continue;
                 // don't relay old-style transactions after the fork.
                 if (onlyAcceptForkSig.value && !IsTxBUIP055Only(txe) &&
-                    chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
+                    IsforkActiveOnNextBlock(chainActive.Tip()->nHeight))
                     continue;
             }
             vInv.push_back(inv);
