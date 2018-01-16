@@ -5705,7 +5705,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     if (mempool.lookup(inv.hash, txe))
                     {
                         // Only offer a TX to the fork if its signed properly
-                        if (!(onlyAcceptForkSig.value && !IsTxBUIP055Only(txe) &&
+                        if (!(!IsTxBUIP055Only(txe) &&
                                 IsforkActiveOnNextBlock(chainActive.Tip()->nHeight)))
                         {
                             CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
@@ -6965,7 +6965,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 if (!pfrom->pfilter->IsRelevantAndUpdate(txe.GetTx()))
                     continue;
                 // don't relay old-style transactions after the fork.
-                if (onlyAcceptForkSig.value && !IsTxBUIP055Only(txe) &&
+                if (!IsTxBUIP055Only(txe) &&
                     IsforkActiveOnNextBlock(chainActive.Tip()->nHeight))
                     continue;
             }
