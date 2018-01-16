@@ -49,7 +49,6 @@ extern bool forkAtNextBlock(int height);
 // Is the fork active on the next block?
 extern bool IsforkActiveOnNextBlock(int height);
 
-extern CTweak<uint64_t> miningForkTime;
 extern CTweak<uint64_t> miningForkEB;
 extern CTweak<uint64_t> miningForkMG;
 extern CTweak<bool> walletSignWithForkSig;
