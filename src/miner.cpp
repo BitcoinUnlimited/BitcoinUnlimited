@@ -382,12 +382,12 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
             continue;
         }
         // Reject the tx if we are on the fork, but the tx is not fork-signed
-        if (uahfChainBlock && !IsTxBUIP055Only(*iter))
+        if (uahfChainBlock && !IsTxUAHFOnly(*iter))
         {
             continue;
         }
         // if tx is not applicable to this (unforked) chain, skip it
-        if (!uahfChainBlock && IsTxBUIP055Only(*iter))
+        if (!uahfChainBlock && IsTxUAHFOnly(*iter))
         {
             continue;
         }
@@ -484,12 +484,12 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
             continue;
         }
         // Reject the tx if we are on the fork, but the tx is not fork-signed
-        if (uahfChainBlock && !IsTxBUIP055Only(*iter))
+        if (uahfChainBlock && !IsTxUAHFOnly(*iter))
         {
             continue;
         }
         // if tx is not applicable to this (unforked) chain, skip it
-        if (!uahfChainBlock && IsTxBUIP055Only(*iter))
+        if (!uahfChainBlock && IsTxUAHFOnly(*iter))
         {
             continue;
         }

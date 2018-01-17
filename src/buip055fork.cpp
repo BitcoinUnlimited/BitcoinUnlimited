@@ -21,7 +21,7 @@ static const std::string ANTI_REPLAY_MAGIC_VALUE = "Bitcoin: A Peer-to-Peer Elec
 std::vector<unsigned char> invalidOpReturn =
     std::vector<unsigned char>(std::begin(ANTI_REPLAY_MAGIC_VALUE), std::end(ANTI_REPLAY_MAGIC_VALUE));
 
-bool UpdateBUIP055Globals(CBlockIndex *activeTip)
+bool UpdateUAHFGlobals(CBlockIndex *activeTip)
 {
     if (activeTip)
     {
@@ -35,7 +35,7 @@ bool UpdateBUIP055Globals(CBlockIndex *activeTip)
     return false;
 }
 
-bool ValidateBUIP055Block(const CBlock &block, CValidationState &state, int nHeight)
+bool ValidateUAHFBlock(const CBlock &block, CValidationState &state, int nHeight)
 {
     // Validate transactions are HF compatible
     for (const CTransaction &tx : block.vtx)
@@ -44,7 +44,7 @@ bool ValidateBUIP055Block(const CBlock &block, CValidationState &state, int nHei
             (Params().NetworkIDString() == "testnet") ? TESTNET_REQ_6_1_SUNSET_HEIGHT : REQ_6_1_SUNSET_HEIGHT;
         if ((nHeight <= sunsetHeight) && IsTxOpReturnInvalid(tx))
             return state.DoS(
-                100, error("transaction is invalid on BUIP055 chain"), REJECT_INVALID, "bad-txns-wrong-fork");
+                100, error("transaction is invalid on UAHF cash chain"), REJECT_INVALID, "bad-txns-wrong-fork");
     }
     return true;
 }
@@ -76,11 +76,11 @@ bool IsTxProbablyNewSigHash(const CTransaction &tx)
     return (oldsighash == false);
 }
 
-bool IsTxBUIP055Only(const CTxMemPoolEntry &txentry)
+bool IsTxUAHFOnly(const CTxMemPoolEntry &txentry)
 {
     if (txentry.sighashType & SIGHASH_FORKID)
     {
-        // LogPrintf("txn is BUIP055-specific\n");
+        // LogPrintf("txn is UAHF-specific\n");
         return true;
     }
     return false;

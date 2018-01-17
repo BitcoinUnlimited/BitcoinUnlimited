@@ -21,19 +21,19 @@ class CTxMemPoolEntry;
 // OP_RETURN magic invalid value:
 extern std::vector<unsigned char> invalidOpReturn;
 
-// Validate that the block's contents adhere to the BUIP055 hard fork requirements.
+// Validate that the block's contents adhere to the UAHF hard fork requirements.
 // the requirement that the fork block is >= 1MB is not checked because we do not
 // know whether this is the fork block.
-extern bool ValidateBUIP055Block(const CBlock &block, CValidationState &state, int nHeight);
+extern bool ValidateUAHFBlock(const CBlock &block, CValidationState &state, int nHeight);
 
-// Return true if this transaction is invalid on the BUIP055 fork due to a special OP_RETURN code
+// Return true if this transaction is invalid on the UAHF fork due to a special OP_RETURN code
 extern bool IsTxOpReturnInvalid(const CTransaction &tx);
 
 // Update global variables based on whether the next block is the fork block
-extern bool UpdateBUIP055Globals(CBlockIndex *activeTip);
+extern bool UpdateUAHFGlobals(CBlockIndex *activeTip);
 
 // Return true if this transaction can only be committed post-fork
-extern bool IsTxBUIP055Only(const CTxMemPoolEntry &tx);
+extern bool IsTxUAHFOnly(const CTxMemPoolEntry &tx);
 
 // It is not possible to provably determine whether an arbitrary script signs using the old or new sighash type
 // without executing the previous output and input scripts.  But we can make a good guess by assuming that

@@ -1501,7 +1501,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
         entry.sighashType = sighashType | sighashType2;
         // This code denies old style tx from entering the mempool as soon as we fork
-        if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) && !IsTxBUIP055Only(entry))
+        if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) && !IsTxUAHFOnly(entry))
         {
             return state.Invalid(false, REJECT_WRONG_FORK, "txn-uses-old-sighash-algorithm");
         }
@@ -2994,7 +2994,7 @@ void static UpdateTip(CBlockIndex *pindexNew)
         Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), chainActive.Tip()),
         pcoinsTip->DynamicMemoryUsage() * (1.0 / (1 << 20)), pcoinsTip->GetCacheSize());
 
-    UpdateBUIP055Globals(pindexNew);
+    UpdateUAHFGlobals(pindexNew);
     cvBlockChange.notify_all();
 
     // Check the version of the last 100 blocks to see if we need to upgrade:
@@ -4194,10 +4194,10 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
                 REJECT_INVALID, "bad-blk-too-small");
         }
     }
-    // BUIP055 check soft-fork items, such as tx targeted to the 1MB chain
+    // UAHF check soft-fork items, such as tx targeted to the 1MB chain
     if (pindexPrev && IsUAHFforkActiveOnNextBlock(pindexPrev->nHeight))
     {
-        return ValidateBUIP055Block(block, state, nHeight);
+        return ValidateUAHFBlock(block, state, nHeight);
     }
 
     return true;
@@ -5703,7 +5703,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     if (mempool.lookup(inv.hash, txe))
                     {
                         // Only offer a TX to the fork if its signed properly
-                        if (!(!IsTxBUIP055Only(txe) && IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight)))
+                        if (!(!IsTxUAHFOnly(txe) && IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight)))
                         {
                             CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
                             ss.reserve(1000);
@@ -6962,7 +6962,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 if (!pfrom->pfilter->IsRelevantAndUpdate(txe.GetTx()))
                     continue;
                 // don't relay old-style transactions after the fork.
-                if (!IsTxBUIP055Only(txe) && IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
+                if (!IsTxUAHFOnly(txe) && IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
                     continue;
             }
             vInv.push_back(inv);
