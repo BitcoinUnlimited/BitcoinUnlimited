@@ -7,7 +7,6 @@
 #include "miner.h"
 
 #include "amount.h"
-#include "buip055fork.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "coins.h"
@@ -24,6 +23,7 @@
 #include "script/standard.h"
 #include "timedata.h"
 #include "txmempool.h"
+#include "uahf_fork.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utilmoneystr.h"

@@ -6,7 +6,6 @@
 #ifndef BITCOIN_UNLIMITED_H
 #define BITCOIN_UNLIMITED_H
 
-#include "buip055fork.h"
 #include "chain.h"
 #include "checkqueue.h"
 #include "clientversion.h"
@@ -19,6 +18,7 @@
 #include "stat.h"
 #include "thinblock.h"
 #include "tweak.h"
+#include "uahf_fork.h"
 #include "univalue/include/univalue.h"
 #include <boost/thread.hpp>
 #include <list>

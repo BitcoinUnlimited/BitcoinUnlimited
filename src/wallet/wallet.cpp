@@ -6,7 +6,6 @@
 
 #include "wallet/wallet.h"
 
-#include "buip055fork.h"
 #include "chain.h"
 #include "checkpoints.h"
 #include "coincontrol.h"
@@ -26,6 +25,7 @@
 #include "script/sign.h"
 #include "timedata.h"
 #include "txmempool.h"
+#include "uahf_fork.h"
 #include "util.h"
 #include "utilmoneystr.h"
 

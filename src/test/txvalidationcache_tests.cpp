@@ -3,7 +3,6 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "buip055fork.h"
 #include "consensus/validation.h"
 #include "key.h"
 #include "main.h"
@@ -14,6 +13,7 @@
 #include "script/standard.h"
 #include "test/test_bitcoin.h"
 #include "txmempool.h"
+#include "uahf_fork.h"
 #include "utiltime.h"
 
 #include <boost/test/unit_test.hpp>

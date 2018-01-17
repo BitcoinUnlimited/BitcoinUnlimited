@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef BUIP055FORK_H
-#define BUIP055FORK_H
+#ifndef UAHF_FORK_H
+#define UAHF_FORK_H
 
 #include "amount.h"
 #include "arith_uint256.h"

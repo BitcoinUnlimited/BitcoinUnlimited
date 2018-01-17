@@ -6,7 +6,6 @@
 #include "data/tx_valid.json.h"
 #include "test/test_bitcoin.h"
 
-#include "buip055fork.h"
 #include "clientversion.h"
 #include "consensus/validation.h"
 #include "core_io.h"
@@ -17,6 +16,7 @@
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/sign.h"
+#include "uahf_fork.h"
 #include "utilstrencodings.h"
 
 #include <map>

@@ -9,7 +9,6 @@
 
 #include "addrman.h"
 #include "arith_uint256.h"
-#include "buip055fork.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "checkqueue.h"
@@ -38,6 +37,7 @@
 #include "tinyformat.h"
 #include "txdb.h"
 #include "txmempool.h"
+#include "uahf_fork.h"
 #include "ui_interface.h"
 #include "undo.h"
 #include "util.h"

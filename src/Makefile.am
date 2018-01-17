@@ -95,7 +95,6 @@ BITCOIN_CORE_H = \
   banentry.h \
   bitnodes.h \
   bloom.h \
-  buip055fork.h \
   cashaddr.h \
   cashaddrenc.h \
   chain.h \
@@ -167,6 +166,7 @@ BITCOIN_CORE_H = \
   txdb.h \
   txmempool.h \
   ui_interface.h \
+  uahf_fork.h \
   undo.h \
   unlimited.h \
   stat.h \
@@ -204,7 +204,6 @@ libbitcoin_server_a_SOURCES = \
   banentry.cpp \
   bitnodes.cpp \
   bloom.cpp \
-  buip055fork.cpp \
   chain.cpp \
   checkpoints.cpp \
   connmgr.cpp \
@@ -239,6 +238,7 @@ libbitcoin_server_a_SOURCES = \
   txdb.cpp \
   txmempool.cpp \
   tweak.cpp \
+  uahf_fork.cpp \
   unlimited.cpp \
   requestManager.cpp \
   validationinterface.cpp \

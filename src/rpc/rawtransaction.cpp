@@ -5,7 +5,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "base58.h"
-#include "buip055fork.h"
 #include "chain.h"
 #include "coins.h"
 #include "consensus/validation.h"
@@ -24,6 +23,7 @@
 #include "script/sign.h"
 #include "script/standard.h"
 #include "txmempool.h"
+#include "uahf_fork.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
 #ifdef ENABLE_WALLET
