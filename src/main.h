@@ -356,10 +356,8 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode);
 /** Prune block files and flush state to disk. */
 void PruneAndFlush();
 
-#ifdef BITCOIN_CASH
 /** Check is Cash HF has activated. */
 bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev);
-#endif
 
 /**
    Determine whether free transactions are subject to rate limiting. If -limitfreerelay is not zero then rate limiting

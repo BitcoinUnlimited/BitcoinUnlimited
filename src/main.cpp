@@ -1149,7 +1149,6 @@ std::string FormatStateMessage(const CValidationState &state)
         state.GetDebugMessage().empty() ? "" : ", " + state.GetDebugMessage(), state.GetRejectCode());
 }
 
-#ifdef BITCOIN_CASH
 static bool IsDAAEnabled(const CChainParams &chainparams, int nHeight)
 {
     return nHeight >= chainparams.GetConsensus().daaHeight;
@@ -1164,7 +1163,6 @@ bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev
 
     return IsDAAEnabled(chainparams, pindexPrev->nHeight);
 }
-#endif
 
 bool AreFreeTxnsDisallowed()
 {

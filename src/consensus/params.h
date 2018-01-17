@@ -66,12 +66,10 @@ struct Params
     int64_t nPowTargetTimespan;
     int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
     int64_t SizeForkExpiration() const { return 1514764800; } // BU (classic compatibility) 2018-01-01 00:00:00 GMT
-#ifdef BITCOIN_CASH
     /** UAHF Aug 1st 2017 block height */
     int uahfHeight;
     /** Block height at which the new DAA becomes active */
     int daaHeight;
-#endif
 };
 } // namespace Consensus
 

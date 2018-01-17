@@ -116,12 +116,11 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1462060800; // May 1st, 2016
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800; // May 1st, 2017
 
-#ifdef BITCOIN_CASH
         // Aug, 1 2017 hard fork
         consensus.uahfHeight = 478559;
         // Nov, 13 hard fork
         consensus.daaHeight = 504031;
-#endif
+
         /**
          * The message start string is designed to be unlikely to occur in normal data.
          * The characters are rarely used upper ASCII, not valid as UTF-8, and produce
@@ -200,7 +199,6 @@ public:
                 225430, uint256S("0x00000000000001c108384350f74090433e7fcf79a606b8e797f065b130575932"))(
                 250000, uint256S("0x000000000000003887df1f29024b06fc2200b55f8af8f35453d7be294df2d214"))(
                 279000, uint256S("0x0000000000000001ae8c72a0b0c301f67e3afca10e819efa9041e458e9bd7e40"))(
-#ifdef BITCOIN_CASH
                 295000, uint256S("0x00000000000000004d9b4ef50f0f9d686fd69db2e03af35a100370c64632a983"))(
                 // August 1st 2017 CASH fork (UAHF)
                 478559, uint256S("0x000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec"))(
@@ -210,13 +208,6 @@ public:
             184495391, // * total number of transactions between genesis and last checkpoint
             //   (the tx=... number in the SetBestChain debug.log lines)
             280000.0 // * estimated number of transactions per day after checkpoint (~3.5 TPS)
-#else
-                295000, uint256S("0x00000000000000004d9b4ef50f0f9d686fd69db2e03af35a100370c64632a983")),
-            1397080064, // * UNIX timestamp of last checkpoint block
-            36544669, // * total number of transactions between genesis and last checkpoint
-            //   (the tx=... number in the SetBestChain debug.log lines)
-            60000.0 // * estimated number of transactions per day after checkpoint
-#endif
         };
     }
 };
@@ -264,12 +255,10 @@ public:
         nDefaultPort = DEFAULT_NOLNET_PORT;
         nPruneAfterHeight = 100000;
 
-#ifdef BITCOIN_CASH
         // Aug, 1 2017 hard fork
         consensus.uahfHeight = 0;
         // Nov, 13 hard fork
         consensus.daaHeight = 0;
-#endif
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -331,12 +320,11 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1456790400; // March 1st, 2016
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800; // May 1st, 2017
 
-#ifdef BITCOIN_CASH
         // Aug, 1 2017 hard fork
         consensus.uahfHeight = 1155876;
         // Nov, 13 hard fork
         consensus.daaHeight = 1188697;
-#endif
+
         pchMessageStart[0] = 0x0b;
         pchMessageStart[1] = 0x11;
         pchMessageStart[2] = 0x09;
@@ -434,12 +422,11 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 0;
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 999999999999ULL;
 
-#ifdef BITCOIN_CASH
         // Hard fork is always enabled on regtest.
         consensus.uahfHeight = 0;
         // Nov, 13 hard fork is always on on regtest.
         consensus.daaHeight = 0;
-#endif
+
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;
         pchMessageStart[2] = 0xb5;
