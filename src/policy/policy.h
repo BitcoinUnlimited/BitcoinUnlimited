@@ -16,11 +16,7 @@
 class CCoinsViewCache;
 
 /** Default for -blockmaxsize and -blockminsize, which control the range of sizes the mining code will create **/
-#ifdef BITCOIN_CASH
-static const unsigned int DEFAULT_BLOCK_MAX_SIZE = 2000000;
-#else
 static const unsigned int DEFAULT_BLOCK_MAX_SIZE = BLOCKSTREAM_CORE_MAX_BLOCK_SIZE; // BU: crank the default up to the minimum  max defined in all clients.
-#endif
 static const unsigned int DEFAULT_BLOCK_MIN_SIZE = 0;
 
 /** Default for -blockprioritysize, a 5% maximum space for zero/low-fee transactions **/
