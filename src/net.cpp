@@ -93,7 +93,7 @@ uint64_t nLocalServices = NODE_NETWORK;
 // BU moved to globals.cpp: CCriticalSection cs_mapLocalHost;
 // BU moved to globals.cpp: map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfLimited[NET_MAX] = {};
-static CNode *pnodeLocalHost = NULL;
+static CNode *pnodeLocalHost = nullptr;
 uint64_t nLocalHostNonce = 0;
 static std::vector<ListenSocket> vhListenSocket;
 extern CAddrMan addrman;
@@ -345,28 +345,34 @@ uint64_t CNode::nMaxOutboundCycleStartTime = 0;
 static CNode *FindNode(const CNetAddr &ip)
 {
     AssertLockHeld(cs_vNodes);
-    BOOST_FOREACH (CNode *pnode, vNodes)
+    for (CNode *pnode : vNodes)
+    {
         if ((CNetAddr)pnode->addr == ip)
             return (pnode);
-    return NULL;
+    }
+    return nullptr;
 }
 
 static CNode *FindNode(const std::string &addrName)
 {
     AssertLockHeld(cs_vNodes);
-    BOOST_FOREACH (CNode *pnode, vNodes)
+    for (CNode *pnode : vNodes)
+    {
         if (pnode->addrName == addrName)
             return (pnode);
-    return NULL;
+    }
+    return nullptr;
 }
 
 static CNode *FindNode(const CService &addr)
 {
     AssertLockHeld(cs_vNodes);
-    BOOST_FOREACH (CNode *pnode, vNodes)
+    for (CNode *pnode : vNodes)
+    {
         if ((CService)pnode->addr == addr)
             return (pnode);
-    return NULL;
+    }
+    return nullptr;
 }
 
 CNodeRef FindNodeRef(const std::string &addrName)
@@ -379,12 +385,14 @@ int DisconnectSubNetNodes(const CSubNet &subNet)
 {
     int nDisconnected = 0;
     LOCK(cs_vNodes);
-    BOOST_FOREACH (CNode *pnode, vNodes)
+    for (CNode *pnode : vNodes)
+    {
         if (subNet.Match((CNetAddr)pnode->addr))
         {
             pnode->fDisconnect = true;
             nDisconnected++;
         }
+    }
 
     // return the number of nodes in this subnet marked for disconnection
     return nDisconnected;
@@ -392,10 +400,10 @@ int DisconnectSubNetNodes(const CSubNet &subNet)
 
 CNode *ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure)
 {
-    if (pszDest == NULL)
+    if (pszDest == nullptr)
     {
         if (IsLocal(addrConnect))
-            return NULL;
+            return nullptr;
 
         // BU: Add lock on cs_vNodes as FindNode now requries it to prevent potential use-after-free errors
         LOCK(cs_vNodes);
@@ -425,7 +433,7 @@ CNode *ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure
         {
             LogPrintf("Cannot create connection: non-selectable socket created (fd >= FD_SETSIZE ?)\n");
             CloseSocket(hSocket);
-            return NULL;
+            return nullptr;
         }
 
         addrman.Attempt(addrConnect, fCountFailure);
@@ -450,7 +458,7 @@ CNode *ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure
         addrman.Attempt(addrConnect, fCountFailure);
     }
 
-    return NULL;
+    return nullptr;
 }
 
 void CNode::CloseSocketDisconnect()
@@ -804,7 +812,7 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
         LOCK(cs_vNodes);
 
         static int64_t nLastTime = GetTime();
-        BOOST_FOREACH (CNode *node, vNodes)
+        for (CNode *node : vNodes)
         {
             // Decay the activity bytes for each node over a period of 2 hours.  This gradually de-prioritizes a
             // connection
@@ -962,7 +970,7 @@ static void AcceptConnection(const ListenSocket &hListenSocket)
     int nInbound = 0;
     {
         LOCK(cs_vNodes);
-        BOOST_FOREACH (CNode *pnode, vNodes)
+        for (CNode *pnode : vNodes)
             if (pnode->fInbound)
                 nInbound++;
     }
@@ -1059,7 +1067,7 @@ void ThreadSocketHandler()
             LOCK(cs_vNodes);
             // Disconnect unused nodes
             vector<CNode *> vNodesCopy = vNodes;
-            BOOST_FOREACH (CNode *pnode, vNodesCopy)
+            for (CNode *pnode : vNodesCopy)
             {
                 if (pnode->fDisconnect || (pnode->GetRefCount() <= 0 && pnode->vRecvMsg.empty() &&
                                               pnode->nSendSize == 0 && pnode->ssSend.empty()))
@@ -1086,7 +1094,7 @@ void ThreadSocketHandler()
         {
             // Delete disconnected nodes
             list<CNode *> vNodesDisconnectedCopy = vNodesDisconnected;
-            BOOST_FOREACH (CNode *pnode, vNodesDisconnectedCopy)
+            for (CNode *pnode : vNodesDisconnectedCopy)
             {
                 // wait until threads are done using it
                 if (pnode->GetRefCount() <= 0)
@@ -1136,17 +1144,19 @@ void ThreadSocketHandler()
         FD_ZERO(&fdsetError);
         SOCKET hSocketMax = 0;
         bool have_fds = false;
+        std::set<SOCKET> setSocket;
 
-        BOOST_FOREACH (const ListenSocket &hListenSocket, vhListenSocket)
+        for (const ListenSocket &hListenSocket : vhListenSocket)
         {
             FD_SET(hListenSocket.socket, &fdsetRecv);
             hSocketMax = max(hSocketMax, hListenSocket.socket);
             have_fds = true;
+            setSocket.insert(hListenSocket.socket);
         }
 
         {
             LOCK(cs_vNodes);
-            BOOST_FOREACH (CNode *pnode, vNodes)
+            for (CNode *pnode : vNodes)
             {
                 // It is necessary to use a temporary variable to ensure that pnode->hSocket is not changed by another
                 // thread during execution.
@@ -1158,6 +1168,7 @@ void ThreadSocketHandler()
                 FD_SET(hSocket, &fdsetError);
                 hSocketMax = max(hSocketMax, hSocket);
                 have_fds = true;
+                setSocket.insert(hSocket);
 
                 // Implement the following logic:
                 // * If there is data to send, select() for sending data. As this only
@@ -1200,8 +1211,9 @@ void ThreadSocketHandler()
             {
                 int nErr = WSAGetLastError();
                 LogPrintf("socket select error %s\n", NetworkErrorString(nErr));
-                for (unsigned int i = 0; i <= hSocketMax; i++)
-                    FD_SET(i, &fdsetRecv);
+
+                for (SOCKET hSocket : setSocket)
+                    FD_SET(hSocket, &fdsetRecv);
             }
             FD_ZERO(&fdsetSend);
             FD_ZERO(&fdsetError);
@@ -1211,7 +1223,7 @@ void ThreadSocketHandler()
         //
         // Accept new connections
         //
-        BOOST_FOREACH (const ListenSocket &hListenSocket, vhListenSocket)
+        for (const ListenSocket &hListenSocket : vhListenSocket)
         {
             if (hListenSocket.socket != INVALID_SOCKET && FD_ISSET(hListenSocket.socket, &fdsetRecv))
             {
@@ -1226,10 +1238,11 @@ void ThreadSocketHandler()
         {
             LOCK(cs_vNodes);
             vNodesCopy = vNodes;
-            BOOST_FOREACH (CNode *pnode, vNodesCopy)
+            for (CNode *pnode : vNodesCopy)
                 pnode->AddRef();
         }
-        BOOST_FOREACH (CNode *pnode, vNodesCopy)
+
+        for (CNode *pnode : vNodesCopy)
         {
             boost::this_thread::interruption_point();
 
@@ -1343,7 +1356,7 @@ void ThreadSocketHandler()
         }
         {
             LOCK(cs_vNodes);
-            BOOST_FOREACH (CNode *pnode, vNodesCopy)
+            for (CNode *pnode : vNodesCopy)
                 pnode->Release();
         }
 
@@ -1449,7 +1462,7 @@ void ThreadMapPort()
 
 void MapPort(bool fUseUPnP)
 {
-    static boost::thread *upnp_thread = NULL;
+    static boost::thread *upnp_thread = nullptr;
 
     if (fUseUPnP)
     {
@@ -1466,7 +1479,7 @@ void MapPort(bool fUseUPnP)
         upnp_thread->interrupt();
         upnp_thread->join();
         delete upnp_thread;
-        upnp_thread = NULL;
+        upnp_thread = nullptr;
     }
 }
 
@@ -1518,7 +1531,7 @@ static void DNSAddressSeed()
     }
     else
     {
-        BOOST_FOREACH (const string &seed, vUseDNSSeeds)
+        for (const string &seed : vUseDNSSeeds)
         {
             vSeeds.push_back(CDNSSeedData(seed, seed));
         }
@@ -1530,7 +1543,7 @@ static void DNSAddressSeed()
 
     LogPrintf("Loading addresses from DNS seeds (could take a while)\n");
 
-    BOOST_FOREACH (const CDNSSeedData &seed, vSeeds)
+    for (const CDNSSeedData &seed : vSeeds)
     {
         if (HaveNameProxy())
         {
@@ -1543,7 +1556,7 @@ static void DNSAddressSeed()
             uint64_t requiredServiceBits = NODE_NETWORK;
             if (LookupHost(GetDNSHost(seed, requiredServiceBits).c_str(), vIPs, 0, true))
             {
-                BOOST_FOREACH (const CNetAddr &ip, vIPs)
+                for (const CNetAddr &ip : vIPs)
                 {
                     int nOneDay = 24 * 3600;
                     CAddress addr = CAddress(CService(ip, Params().GetDefaultPort()), requiredServiceBits);
@@ -1593,7 +1606,7 @@ static void BitnodesAddressSeed()
     {
         int portOut;
         std::string hostOut = "";
-        BOOST_FOREACH (const string &seed, vIPs)
+        for (const string &seed : vIPs)
         {
             SplitHostPort(seed, portOut, hostOut);
             CNetAddr ip(hostOut);
@@ -1679,13 +1692,13 @@ void ThreadOpenConnections()
         for (int64_t nLoop = 0;; nLoop++)
         {
             ProcessOneShot();
-            BOOST_FOREACH (const std::string &strAddr, mapMultiArgs["-connect"])
+            for (const std::string &strAddr : mapMultiArgs["-connect"])
             {
                 CAddress addr;
                 // NOTE: Because the only nodes we are connecting to here are the ones the user put in their
                 //      bitcoin.conf/commandline args as "-connect", we don't use the semaphore to limit outbound
                 //      connections
-                OpenNetworkConnection(addr, false, NULL, strAddr.c_str());
+                OpenNetworkConnection(addr, false, nullptr, strAddr.c_str());
                 for (int i = 0; i < 10 && i < nLoop; i++)
                 {
                     MilliSleep(500);
@@ -1727,7 +1740,7 @@ void ThreadOpenConnections()
         bool fDisconnected = false;
         {
             LOCK(cs_vNodes);
-            BOOST_FOREACH (CNode *pnode, vNodes)
+            for (CNode *pnode : vNodes)
             {
                 if (pnode->fAutoOutbound) // only count outgoing connections.
                 {
@@ -1898,7 +1911,7 @@ void ThreadOpenConnections()
 
             // Seeded outbound connections track against the original semaphore
             if (OpenNetworkConnection(addrConnect, (int)setConnected.size() >= std::min(nMaxConnections - 1, 2), &grant,
-                    NULL, false, fFeeler))
+                    nullptr, false, fFeeler))
             {
                 LOCK(cs_vNodes);
                 CNode *pnode = FindNode((CService)addrConnect);
@@ -1920,7 +1933,7 @@ void ThreadOpenAddedConnections()
 
     // BU: we need our own separate semaphore for -addnodes otherwise we won't be able to reconnect
     //     after a remote node restarts, becuase all the outgoing connection slots will already be filled.
-    if (semOutboundAddNode == NULL)
+    if (semOutboundAddNode == nullptr)
     {
         // NOTE: Because the number of "-addnode" values can be changed via RPC calls to "addnode add|remove"
         //      we should always set the semaphore to have a count of nMaxOutConnections, otherwise
@@ -1938,10 +1951,10 @@ void ThreadOpenAddedConnections()
             list<string> lAddresses(0);
             {
                 LOCK(cs_vAddedNodes);
-                BOOST_FOREACH (const std::string &strAddNode, vAddedNodes)
+                for (const std::string &strAddNode : vAddedNodes)
                     lAddresses.push_back(strAddNode);
             }
-            BOOST_FOREACH (const std::string &strAddNode, lAddresses)
+            for (const std::string &strAddNode : lAddresses)
             {
                 CAddress addr;
                 // BU: always allow us to add a node manually. Whenever we use -addnode the maximum InBound connections
@@ -1964,12 +1977,12 @@ void ThreadOpenAddedConnections()
         list<string> lAddresses(0);
         {
             LOCK(cs_vAddedNodes);
-            BOOST_FOREACH (const std::string &strAddNode, vAddedNodes)
+            for (const std::string &strAddNode : vAddedNodes)
                 lAddresses.push_back(strAddNode);
         }
 
         list<vector<CService> > lservAddressesToAdd(0);
-        BOOST_FOREACH (const std::string &strAddNode, lAddresses)
+        for (const std::string &strAddNode : lAddresses)
         {
             vector<CService> vservNode(0);
             if (Lookup(strAddNode.c_str(), vservNode, Params().GetDefaultPort(), 0, fNameLookup))
@@ -1977,7 +1990,7 @@ void ThreadOpenAddedConnections()
                 lservAddressesToAdd.push_back(vservNode);
                 {
                     LOCK(cs_setservAddNodeAddresses);
-                    BOOST_FOREACH (const CService &serv, vservNode)
+                    for (const CService &serv : vservNode)
                         setservAddNodeAddresses.insert(serv);
                 }
             }
@@ -1986,19 +1999,25 @@ void ThreadOpenAddedConnections()
         // (keeping in mind that addnode entries can have many IPs if fNameLookup)
         {
             LOCK(cs_vNodes);
-            BOOST_FOREACH (CNode *pnode, vNodes)
+            for (CNode *pnode : vNodes)
+            {
                 for (list<vector<CService> >::iterator it = lservAddressesToAdd.begin();
                      it != lservAddressesToAdd.end(); it++)
-                    BOOST_FOREACH (const CService &addrNode, *(it))
+                {
+                    for (const CService &addrNode : *(it))
+                    {
                         if (pnode->addr == addrNode)
                         {
                             it = lservAddressesToAdd.erase(it);
                             it--;
                             break;
                         }
+                    }
+                }
+            }
         }
 
-        BOOST_FOREACH (vector<CService> &vserv, lservAddressesToAdd)
+        for (vector<CService> &vserv : lservAddressesToAdd)
         {
             // BU: always allow us to add a node manually. Whenever we use -addnode the maximum InBound connections are
             // reduced by
@@ -2072,7 +2091,7 @@ void ThreadMessageHandler()
             LOCK(cs_vNodes);
             vNodesCopy.reserve(vNodes.size());
             // Prefer thinBlockCapable nodes when doing communications.
-            BOOST_FOREACH (CNode *pnode, vNodes)
+            for (CNode *pnode : vNodes)
             {
                 if (pnode->ThinBlockCapable())
                 {
@@ -2080,7 +2099,7 @@ void ThreadMessageHandler()
                     pnode->AddRef();
                 }
             }
-            BOOST_FOREACH (CNode *pnode, vNodes)
+            for (CNode *pnode : vNodes)
             {
                 if (!pnode->ThinBlockCapable())
                 {
@@ -2092,7 +2111,7 @@ void ThreadMessageHandler()
 
         bool fSleep = true;
 
-        BOOST_FOREACH (CNode *pnode, vNodesCopy)
+        for (CNode *pnode : vNodesCopy)
         {
             if (pnode->fDisconnect)
                 continue;
@@ -2127,7 +2146,7 @@ void ThreadMessageHandler()
 
         {
             LOCK(cs_vNodes);
-            BOOST_FOREACH (CNode *pnode, vNodesCopy)
+            for (CNode *pnode : vNodesCopy)
                 pnode->Release();
         }
 
@@ -2256,7 +2275,7 @@ void static Discover(boost::thread_group &threadGroup)
         vector<CNetAddr> vaddr;
         if (LookupHost(pszHostName, vaddr, 0, true))
         {
-            BOOST_FOREACH (const CNetAddr &addr, vaddr)
+            for (const CNetAddr &addr : vaddr)
             {
                 if (AddLocal(addr, LOCAL_IF))
                     LogPrintf("%s: %s - %s\n", __func__, pszHostName, addr.ToString());
@@ -2268,9 +2287,9 @@ void static Discover(boost::thread_group &threadGroup)
     struct ifaddrs *myaddrs;
     if (getifaddrs(&myaddrs) == 0)
     {
-        for (struct ifaddrs *ifa = myaddrs; ifa != NULL; ifa = ifa->ifa_next)
+        for (struct ifaddrs *ifa = myaddrs; ifa != nullptr; ifa = ifa->ifa_next)
         {
-            if (ifa->ifa_addr == NULL)
+            if (ifa->ifa_addr == nullptr)
                 continue;
             if ((ifa->ifa_flags & IFF_UP) == 0)
                 continue;
@@ -2322,7 +2341,7 @@ void StartNode(boost::thread_group &threadGroup, CScheduler &scheduler)
 
     fAddressesInitialized = true;
 
-    if (semOutbound == NULL)
+    if (semOutbound == nullptr)
     {
         // initialize semaphore
         int nMaxOutbound = std::min((nMaxOutConnections + MAX_FEELER_CONNECTIONS), nMaxConnections);
@@ -2340,7 +2359,7 @@ void StartNode(boost::thread_group &threadGroup, CScheduler &scheduler)
         vAddedNodes = mapMultiArgs["-addnode"];
     }
 
-    if (pnodeLocalHost == NULL)
+    if (pnodeLocalHost == nullptr)
         pnodeLocalHost = new CNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), nLocalServices));
 
     Discover(threadGroup);
@@ -2392,32 +2411,36 @@ void NetCleanup()
     LOCK(cs_vNodes);
 
     // Close sockets
-    BOOST_FOREACH (CNode *pnode, vNodes)
+    for (CNode *pnode : vNodes)
+    {
         if (pnode->hSocket != INVALID_SOCKET)
             CloseSocket(pnode->hSocket);
-    BOOST_FOREACH (ListenSocket &hListenSocket, vhListenSocket)
+    }
+    for (ListenSocket &hListenSocket : vhListenSocket)
+    {
         if (hListenSocket.socket != INVALID_SOCKET)
             if (!CloseSocket(hListenSocket.socket))
                 LogPrintf("CloseSocket(hListenSocket) failed with error %s\n", NetworkErrorString(WSAGetLastError()));
+    }
 
     // clean up some globals (to help leak detection)
-    BOOST_FOREACH (CNode *pnode, vNodes)
+    for (CNode *pnode : vNodes)
         delete pnode;
-    BOOST_FOREACH (CNode *pnode, vNodesDisconnected)
+    for (CNode *pnode : vNodesDisconnected)
         delete pnode;
     vNodes.clear();
     vNodesDisconnected.clear();
     vhListenSocket.clear();
     if (semOutbound)
         delete semOutbound;
-    semOutbound = NULL;
+    semOutbound = nullptr;
     // BU: clean up the "-addnode" semaphore
     if (semOutboundAddNode)
         delete semOutboundAddNode;
-    semOutboundAddNode = NULL;
+    semOutboundAddNode = nullptr;
     if (pnodeLocalHost)
         delete pnodeLocalHost;
-    pnodeLocalHost = NULL;
+    pnodeLocalHost = nullptr;
 
 #ifdef WIN32
     // Shutdown Windows Sockets
@@ -2459,7 +2482,7 @@ void RelayTransaction(const CTransaction &tx, const CDataStream &ss)
         vRelayExpiration.push_back(std::make_pair(GetTime() + 15 * 60, inv));
     }
     LOCK(cs_vNodes);
-    BOOST_FOREACH (CNode *pnode, vNodes)
+    for (CNode *pnode : vNodes)
     {
         if (!pnode->fRelayTxes)
             continue;
@@ -2842,7 +2865,7 @@ CNode::~CNode()
     if (pfilter)
     {
         delete pfilter;
-        pfilter = NULL; // BU
+        pfilter = nullptr; // BU
     }
 
 
@@ -2850,7 +2873,7 @@ CNode::~CNode()
     if (pThinBlockFilter)
     {
         delete pThinBlockFilter;
-        pThinBlockFilter = NULL;
+        pThinBlockFilter = nullptr;
     }
     mapThinBlocksInFlight.clear();
     thinBlockWaitingForTxns = -1;
