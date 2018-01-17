@@ -14,9 +14,9 @@ BitcoinUnits::BitcoinUnits(QObject *parent) : QAbstractListModel(parent), unitli
 QList<BitcoinUnits::Unit> BitcoinUnits::availableUnits()
 {
     QList<BitcoinUnits::Unit> unitlist;
-    unitlist.append(BTC);
-    unitlist.append(mBTC);
-    unitlist.append(uBTC);
+    unitlist.append(BCH);
+    unitlist.append(mBCH);
+    unitlist.append(uBCH);
     return unitlist;
 }
 
@@ -24,9 +24,9 @@ bool BitcoinUnits::valid(int unit)
 {
     switch (unit)
     {
-    case BTC:
-    case mBTC:
-    case uBTC:
+    case BCH:
+    case mBCH:
+    case uBCH:
         return true;
     default:
         return false;
@@ -37,21 +37,12 @@ QString BitcoinUnits::name(int unit)
 {
     switch (unit)
     {
-#ifdef BITCOIN_CASH
-    case BTC:
+    case BCH:
         return QString("BCH");
-    case mBTC:
+    case mBCH:
         return QString("mBCH");
-    case uBTC:
+    case uBCH:
         return QString::fromUtf8("μBCH");
-#else
-    case BTC:
-        return QString("BTC");
-    case mBTC:
-        return QString("mBTC");
-    case uBTC:
-        return QString::fromUtf8("μBTC");
-#endif
     default:
         return QString("???");
     }
@@ -61,11 +52,11 @@ QString BitcoinUnits::description(int unit)
 {
     switch (unit)
     {
-    case BTC:
+    case BCH:
         return QString("Bitcoins");
-    case mBTC:
+    case mBCH:
         return QString("Milli-Bitcoins (1 / 1" THIN_SP_UTF8 "000)");
-    case uBTC:
+    case uBCH:
         return QString("Micro-Bitcoins (1 / 1" THIN_SP_UTF8 "000" THIN_SP_UTF8 "000)");
     default:
         return QString("???");
@@ -76,11 +67,11 @@ qint64 BitcoinUnits::factor(int unit)
 {
     switch (unit)
     {
-    case BTC:
+    case BCH:
         return 100000000;
-    case mBTC:
+    case mBCH:
         return 100000;
-    case uBTC:
+    case uBCH:
         return 100;
     default:
         return 100000000;
@@ -91,11 +82,11 @@ int BitcoinUnits::decimals(int unit)
 {
     switch (unit)
     {
-    case BTC:
+    case BCH:
         return 8;
-    case mBTC:
+    case mBCH:
         return 5;
-    case uBTC:
+    case uBCH:
         return 2;
     default:
         return 0;
