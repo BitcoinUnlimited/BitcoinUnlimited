@@ -3423,7 +3423,7 @@ static bool ActivateBestChainStep(CValidationState &state,
         nHeight = nTargetHeight;
 
         // Connect new blocks.
-        CBlockIndex *pindexNewTip;
+        CBlockIndex *pindexNewTip = nullptr;
         BOOST_REVERSE_FOREACH (CBlockIndex *pindexConnect, vpindexToConnect)
         {
             // Check if the best chain has changed while we were disconnecting or processing blocks.
@@ -3500,7 +3500,7 @@ static bool ActivateBestChainStep(CValidationState &state,
             break; // stop processing more blocks if the last one was invalid.
 
         // Notify the UI with the new block tip information.
-        if (pindexMostWork->nHeight >= nHeight && pindexNewTip != NULL)
+        if (pindexMostWork->nHeight >= nHeight && pindexNewTip != nullptr)
             uiInterface.NotifyBlockTip(true, pindexNewTip);
 
         if (fContinue)
