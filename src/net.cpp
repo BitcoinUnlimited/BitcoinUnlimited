@@ -1059,7 +1059,7 @@ void ThreadSocketHandler()
             LOCK(cs_vNodes);
             // Disconnect unused nodes
             vector<CNode *> vNodesCopy = vNodes;
-            BOOST_FOREACH (CNode *pnode, vNodesCopy)
+            for (CNode *pnode : vNodesCopy)
             {
                 if (pnode->fDisconnect || (pnode->GetRefCount() <= 0 && pnode->vRecvMsg.empty() &&
                                               pnode->nSendSize == 0 && pnode->ssSend.empty()))
@@ -1086,7 +1086,7 @@ void ThreadSocketHandler()
         {
             // Delete disconnected nodes
             list<CNode *> vNodesDisconnectedCopy = vNodesDisconnected;
-            BOOST_FOREACH (CNode *pnode, vNodesDisconnectedCopy)
+            for (CNode *pnode : vNodesDisconnectedCopy)
             {
                 // wait until threads are done using it
                 if (pnode->GetRefCount() <= 0)
@@ -1138,7 +1138,7 @@ void ThreadSocketHandler()
         bool have_fds = false;
         std::set<SOCKET> setSocket;
 
-        BOOST_FOREACH (const ListenSocket &hListenSocket, vhListenSocket)
+        for (const ListenSocket &hListenSocket : vhListenSocket)
         {
             FD_SET(hListenSocket.socket, &fdsetRecv);
             hSocketMax = max(hSocketMax, hListenSocket.socket);
@@ -1148,7 +1148,7 @@ void ThreadSocketHandler()
 
         {
             LOCK(cs_vNodes);
-            BOOST_FOREACH (CNode *pnode, vNodes)
+            for (CNode *pnode : vNodes)
             {
                 // It is necessary to use a temporary variable to ensure that pnode->hSocket is not changed by another
                 // thread during execution.
@@ -1215,7 +1215,7 @@ void ThreadSocketHandler()
         //
         // Accept new connections
         //
-        BOOST_FOREACH (const ListenSocket &hListenSocket, vhListenSocket)
+        for (const ListenSocket &hListenSocket : vhListenSocket)
         {
             if (hListenSocket.socket != INVALID_SOCKET && FD_ISSET(hListenSocket.socket, &fdsetRecv))
             {
@@ -1234,7 +1234,7 @@ void ThreadSocketHandler()
                 pnode->AddRef();
         }
 
-        BOOST_FOREACH (CNode *pnode, vNodesCopy)
+        for (CNode *pnode : vNodesCopy)
         {
             boost::this_thread::interruption_point();
 
@@ -1348,7 +1348,7 @@ void ThreadSocketHandler()
         }
         {
             LOCK(cs_vNodes);
-            BOOST_FOREACH (CNode *pnode, vNodesCopy)
+            for (CNode *pnode : vNodesCopy)
                 pnode->Release();
         }
 
