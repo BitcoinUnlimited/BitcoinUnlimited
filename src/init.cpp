@@ -822,7 +822,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         nLocalServices |= NODE_XTHIN;
 // BUIP010 Xtreme Thinblocks: end section
 
-// BUIP055 - BitcoinCash
+// UAHF - BitcoinCash
 #ifdef BITCOIN_CASH
     nLocalServices |= NODE_BITCOIN_CASH;
 #endif

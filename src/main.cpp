@@ -1196,7 +1196,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     if (tx.IsCoinBase())
         return state.DoS(100, false, REJECT_INVALID, "coinbase");
 
-    // BUIP055: reject transactions that won't work on the fork, starting 2 hours (~12 blocks) before the fork
+    // UAHF: reject transactions that won't work on the fork, starting 2 hours (~12 blocks) before the fork
     // based on op_return.
     // But accept both sighashtypes because we will need all the tx types during the transition.
     // This code uses the system time to determine when to start rejecting which is inaccurate relative to the
@@ -4177,7 +4177,7 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
         }
     }
 
-    // BUIP055 enforce that the fork block is > 1MB
+    // UAHF enforce that the fork block is > 1MB
     // (note subsequent blocks can be <= 1MB...)
     // An exception is added -- if the fork block is block 1 then it can be <= 1MB.  This allows test chains to
     // fork without having to create a large block so long as the fork time is in the past.
@@ -4189,7 +4189,7 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
         {
             uint256 hash = block.GetHash();
             return state.DoS(100,
-                error("%s: BUIP055 fork block (%s, height %d) must exceed %d, but this block is %d bytes", __func__,
+                error("%s: UAHF fork block (%s, height %d) must exceed %d, but this block is %d bytes", __func__,
                                  hash.ToString(), nHeight, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, block.nBlockSize),
                 REJECT_INVALID, "bad-blk-too-small");
         }

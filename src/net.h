@@ -530,7 +530,7 @@ public:
         return false;
     }
 
-    // BUIP055:
+    // UAHF:
     bool BitcoinCashCapable()
     {
         if (nServices & NODE_BITCOIN_CASH)
