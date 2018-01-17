@@ -1204,7 +1204,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     // This code uses the system time to determine when to start rejecting which is inaccurate relative to the
     // actual activation time (defined by times in the blocks).
     // But its ok to reject these transactions from the mempool a little early (or late).
-    if (IsforkActiveOnNextBlock((chainActive.Tip()->nHeight) - 12))
+    if (IsUAHFforkActiveOnNextBlock((chainActive.Tip()->nHeight) - 12))
     {
         forkVerifyFlags = SCRIPT_ENABLE_SIGHASH_FORKID;
         if (IsTxOpReturnInvalid(tx))
@@ -1503,7 +1503,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
         entry.sighashType = sighashType | sighashType2;
         // This code denies old style tx from entering the mempool as soon as we fork
-        if (IsforkActiveOnNextBlock(chainActive.Tip()->nHeight) && !IsTxBUIP055Only(entry))
+        if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) && !IsTxBUIP055Only(entry))
         {
             return state.Invalid(false, REJECT_WRONG_FORK, "txn-uses-old-sighash-algorithm");
         }
@@ -2496,7 +2496,7 @@ bool ConnectBlock(const CBlock &block,
 
     uint32_t flags = fStrictPayToScriptHash ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE;
 
-    if (forkActivated(pindex->nHeight))
+    if (UAHFforkActivated(pindex->nHeight))
     {
         flags |= SCRIPT_VERIFY_STRICTENC;
         flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
@@ -4184,7 +4184,7 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
     // An exception is added -- if the fork block is block 1 then it can be <= 1MB.  This allows test chains to
     // fork without having to create a large block so long as the fork time is in the past.
     // TODO: check if we can remove the second conditions since on regtest uahHeight is 0
-    if (pindexPrev && forkAtNextBlock(pindexPrev->nHeight) && (pindexPrev->nHeight > 1))
+    if (pindexPrev && UAHFforkAtNextBlock(pindexPrev->nHeight) && (pindexPrev->nHeight > 1))
     {
         DbgAssert(block.nBlockSize, );
         if (block.nBlockSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
@@ -4197,7 +4197,7 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
         }
     }
     // BUIP055 check soft-fork items, such as tx targeted to the 1MB chain
-    if (pindexPrev && IsforkActiveOnNextBlock(pindexPrev->nHeight))
+    if (pindexPrev && IsUAHFforkActiveOnNextBlock(pindexPrev->nHeight))
     {
         return ValidateBUIP055Block(block, state, nHeight);
     }
@@ -5705,7 +5705,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     if (mempool.lookup(inv.hash, txe))
                     {
                         // Only offer a TX to the fork if its signed properly
-                        if (!(!IsTxBUIP055Only(txe) && IsforkActiveOnNextBlock(chainActive.Tip()->nHeight)))
+                        if (!(!IsTxBUIP055Only(txe) && IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight)))
                         {
                             CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
                             ss.reserve(1000);
@@ -6415,7 +6415,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         else if (fMissingInputs)
         {
             // If we've forked and this is probably not a valid tx, then skip adding it to the orphan pool
-            if (!IsforkActiveOnNextBlock(chainActive.Tip()->nHeight) || IsTxProbablyNewSigHash(tx))
+            if (!IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) || IsTxProbablyNewSigHash(tx))
             {
                 LOCK(cs_orphancache);
                 AddOrphanTx(tx, pfrom->GetId());
@@ -6964,7 +6964,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 if (!pfrom->pfilter->IsRelevantAndUpdate(txe.GetTx()))
                     continue;
                 // don't relay old-style transactions after the fork.
-                if (!IsTxBUIP055Only(txe) && IsforkActiveOnNextBlock(chainActive.Tip()->nHeight))
+                if (!IsTxBUIP055Only(txe) && IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
                     continue;
             }
             vInv.push_back(inv);

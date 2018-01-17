@@ -41,13 +41,13 @@ extern bool IsTxBUIP055Only(const CTxMemPoolEntry &tx);
 bool IsTxProbablyNewSigHash(const CTransaction &tx);
 
 // was the fork activated on this or any prior block?
-extern bool forkActivated(int height);
+extern bool UAHFforkActivated(int height);
 
 // Is the next block the fork block?
-extern bool forkAtNextBlock(int height);
+extern bool UAHFforkAtNextBlock(int height);
 
 // Is the fork active on the next block?
-extern bool IsforkActiveOnNextBlock(int height);
+extern bool IsUAHFforkActiveOnNextBlock(int height);
 
 extern CTweak<uint64_t> miningForkEB;
 extern CTweak<uint64_t> miningForkMG;

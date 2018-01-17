@@ -25,7 +25,7 @@ bool UpdateBUIP055Globals(CBlockIndex *activeTip)
 {
     if (activeTip)
     {
-        if (forkAtNextBlock(activeTip->nHeight))
+        if (UAHFforkAtNextBlock(activeTip->nHeight))
         {
             excessiveBlockSize = miningForkEB.value;
             maxGeneratedBlock = miningForkMG.value;
@@ -140,7 +140,7 @@ bool IsTxOpReturnInvalid(const CTransaction &tx)
 
 // return true for every block from fork block and forward [x,+inf)
 // fork activated
-bool forkActivated(int height)
+bool UAHFforkActivated(int height)
 {
     const Consensus::Params &consensusParams = Params().GetConsensus();
     if (height >= consensusParams.uahfHeight)
@@ -153,7 +153,7 @@ bool forkActivated(int height)
 // This will check if the Fork will be enabled at the next block
 // i.e. we are at block x - 1, [x-1, +inf]
 // state fork: enabled or activated
-bool IsforkActiveOnNextBlock(int height)
+bool IsUAHFforkActiveOnNextBlock(int height)
 {
     const Consensus::Params &consensusParams = Params().GetConsensus();
     if (height >= (consensusParams.uahfHeight - 1))
@@ -164,7 +164,7 @@ bool IsforkActiveOnNextBlock(int height)
 // return true only if 1st condition is true (Median past time > UAHF time)
 // and not the 2nd, i.e. we are at precisely [x-1,x-1]
 // state: fork enabled
-bool forkAtNextBlock(int height)
+bool UAHFforkAtNextBlock(int height)
 {
     const Consensus::Params &consensusParams = Params().GetConsensus();
     if (height == (consensusParams.uahfHeight - 1))

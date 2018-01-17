@@ -826,7 +826,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     }
     if (!pickedForkId) // If the user didn't specify, use the configured default for the hash type
     {
-        if (IsforkActiveOnNextBlock(chainActive.Tip()->nHeight))
+        if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
         {
             nHashType |= SIGHASH_FORKID;
             pickedForkId = true;

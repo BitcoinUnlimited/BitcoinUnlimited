@@ -187,7 +187,7 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
     assert(pindexPrev); // can't make a new block if we don't even have the genesis block
     nHeight = pindexPrev->nHeight + 1;
 
-    buip055ChainBlock = IsforkActiveOnNextBlock(pindexPrev->nHeight);
+    buip055ChainBlock = IsUAHFforkActiveOnNextBlock(pindexPrev->nHeight);
 
     pblock->nTime = GetAdjustedTime();
     pblock->nVersion = UnlimitedComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), pblock->nTime);

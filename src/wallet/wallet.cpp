@@ -2346,7 +2346,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
 
                 // Sign
                 unsigned int sighashType = SIGHASH_ALL;
-                if (IsforkActiveOnNextBlock(chainActive.Tip()->nHeight) && walletSignWithForkSig.value)
+                if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) && walletSignWithForkSig.value)
                 {
                     sighashType |= SIGHASH_FORKID;
                 }
