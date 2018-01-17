@@ -615,11 +615,7 @@ public:
         READLOCK(cs);
         return mapTx.size();
     }
-    unsigned long _size()
-    {
-        return mapTx.size();
-    }
-
+    unsigned long _size() { return mapTx.size(); }
     uint64_t GetTotalTxSize()
     {
         READLOCK(cs);
