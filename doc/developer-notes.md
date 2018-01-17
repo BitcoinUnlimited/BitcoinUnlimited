@@ -45,6 +45,17 @@ class Class
 
 - To auto-format a file:
 
+  The fully-automatic way:
+  ========================
+  Add the following to your $HOME/.gitconfig or .git/config in the Bitcoin directory:
+  ```
+[filter "bitcoin-clang-format"]
+        clean = "contrib/devtools/clang-format.py format-stdout-if-wanted clang-format-3.8 %f"
+        smudge = cat
+  ```
+
+  The semi-automatic way:
+  =======================
    Formatting happens in two passes.  First a python script is run that finds trailing comments that exceed 120 characters
    and moves them up to the prior line.  Second clang-format-3.8 is executed.
 
