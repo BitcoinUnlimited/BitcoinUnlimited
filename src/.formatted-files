@@ -264,7 +264,6 @@ test/base64_tests.cpp
 test/bip32_tests.cpp
 test/bloom_tests.cpp
 test/bswap_tests.cpp
-test/buip055_test.cpp
 test/cashaddr_tests.cpp
 test/cashaddrenc_tests.cpp
 test/checkblock_tests.cpp
@@ -316,6 +315,7 @@ test/thinblock_util_tests.cpp
 test/timedata_tests.cpp
 test/transaction_tests.cpp
 test/txvalidationcache_tests.cpp
+test/uahf_test.cpp
 test/uint256_tests.cpp
 test/univalue_tests.cpp
 test/util_tests.cpp

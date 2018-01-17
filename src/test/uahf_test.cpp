@@ -30,7 +30,7 @@
 
 #include <univalue.h>
 
-BOOST_FIXTURE_TEST_SUITE(buip055_tests, BasicTestingSetup)
+BOOST_FIXTURE_TEST_SUITE(uahf_tests, BasicTestingSetup)
 
 // Helper: create two dummy transactions, each with
 // two outputs.  The first has 11 and 50 CENT outputs
@@ -69,7 +69,7 @@ static std::vector<CMutableTransaction> SetupDummyInputs(CBasicKeyStore &keystor
     return dummyTransactions;
 }
 
-BOOST_AUTO_TEST_CASE(buip055_op_return)
+BOOST_AUTO_TEST_CASE(uahf_op_return)
 {
     // Check that a transaction with the invalid OP_RETURN is seen as invalid
     CMutableTransaction tx;
@@ -113,7 +113,7 @@ BOOST_AUTO_TEST_CASE(buip055_op_return)
     BOOST_CHECK(IsTxOpReturnInvalid(tx) == false);
 }
 
-BOOST_AUTO_TEST_CASE(buip055_sighash)
+BOOST_AUTO_TEST_CASE(uahf_sighash)
 {
     LOCK(cs_main);
     CBasicKeyStore keystore;
