@@ -76,7 +76,7 @@ int64_t UpdateTime(CBlockHeader *pblock, const Consensus::Params &consensusParam
 
 BlockAssembler::BlockAssembler(const CChainParams &_chainparams)
     : chainparams(_chainparams), nBlockSize(0), nBlockTx(0), nBlockSigOps(0), nFees(0), nHeight(0), nLockTimeCutoff(0),
-      lastFewTxs(0), blockFinished(false), buip055ChainBlock(false)
+      lastFewTxs(0), blockFinished(false), uahfChainBlock(false)
 {
     // Largest block you're willing to create:
     nBlockMaxSize = maxGeneratedBlock;
@@ -187,7 +187,7 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
     assert(pindexPrev); // can't make a new block if we don't even have the genesis block
     nHeight = pindexPrev->nHeight + 1;
 
-    buip055ChainBlock = IsUAHFforkActiveOnNextBlock(pindexPrev->nHeight);
+    uahfChainBlock = IsUAHFforkActiveOnNextBlock(pindexPrev->nHeight);
 
     pblock->nTime = GetAdjustedTime();
     pblock->nVersion = UnlimitedComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), pblock->nTime);
@@ -377,17 +377,17 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
         }
 
         // If tx is not applicable to this (forked) chain, skip it
-        if (buip055ChainBlock && IsTxOpReturnInvalid(iter->GetTx()))
+        if (uahfChainBlock && IsTxOpReturnInvalid(iter->GetTx()))
         {
             continue;
         }
         // Reject the tx if we are on the fork, but the tx is not fork-signed
-        if (buip055ChainBlock && !IsTxBUIP055Only(*iter))
+        if (uahfChainBlock && !IsTxBUIP055Only(*iter))
         {
             continue;
         }
         // if tx is not applicable to this (unforked) chain, skip it
-        if (!buip055ChainBlock && IsTxBUIP055Only(*iter))
+        if (!uahfChainBlock && IsTxBUIP055Only(*iter))
         {
             continue;
         }
@@ -479,17 +479,17 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
         }
 
         // If tx is not applicable to this (forked) chain, skip it
-        if (buip055ChainBlock && IsTxOpReturnInvalid(iter->GetTx()))
+        if (uahfChainBlock && IsTxOpReturnInvalid(iter->GetTx()))
         {
             continue;
         }
         // Reject the tx if we are on the fork, but the tx is not fork-signed
-        if (buip055ChainBlock && !IsTxBUIP055Only(*iter))
+        if (uahfChainBlock && !IsTxBUIP055Only(*iter))
         {
             continue;
         }
         // if tx is not applicable to this (unforked) chain, skip it
-        if (!buip055ChainBlock && IsTxBUIP055Only(*iter))
+        if (!uahfChainBlock && IsTxBUIP055Only(*iter))
         {
             continue;
         }

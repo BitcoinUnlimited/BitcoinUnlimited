@@ -57,7 +57,8 @@ private:
     int lastFewTxs;
     bool blockFinished;
 
-    bool buip055ChainBlock;
+    // will be initialized by IsUAHFforkActiveOnNextBlock
+    bool uahfChainBlock;
 
 public:
     BlockAssembler(const CChainParams &chainparams);
