@@ -126,6 +126,77 @@ void CBlockIndex::BuildSkip()
         pskip = pprev->GetAncestor(GetSkipHeight(nHeight));
 }
 
+/** Member helper functions needed to implement time based fork activation
+ *
+ * In the following comments x-1 is used to identify the first block for which GetMedianTimePast()
+ * (GMTP) is equal or greater than fork time
+ * Instead we use 'x' to indicate the first block mined after the time based trigger fired.
+ * A fork is considered to be enabled at height x-1 and activated at height x.
+ * We chose this naming scheme because usually block 'x' has to satisfy additional conditions
+ * on e.g. block size in the UAHF case.
+ *
+ * The following helper will check if a given block belongs to 4 different intervals, namely:
+ * - [x,+inf)
+ * - [x,x]
+ * - [x-1,+inf)
+ * - [x-1,x-1]
+ */
+
+/** return true for every block from fork block and forward [x,+inf)
+ * state: fork activated */
+bool CBlockIndex::forkActivated(int time)
+{
+    if (time == 0)
+        return false;
+
+    if (pprev && pprev->GetMedianTimePast() >= time)
+    {
+        return true;
+    }
+    return false;
+}
+
+/** return true only if we are exactly on the fork block [x,x]
+ * state: fork activated */
+bool CBlockIndex::forkActivateNow(int time)
+{
+    if (time == 0)
+        return false;
+    return (pprev && pprev->forkAtNextBlock(time));
+}
+
+/** This will check if the Fork will be enabled at the next block
+ * i.e. we are at block x - 1, [x-1, +inf]
+ * state fork: enabled or activated */
+bool CBlockIndex::IsforkActiveOnNextBlock(int time)
+{
+    if (time == 0)
+        return false;
+    // if the fork is already activated
+    if (forkActivated(time))
+        return true;
+    if (GetMedianTimePast() >= time)
+        return true;
+    return false;
+}
+
+/* return true only if 1st condition is true (Median past time > UAHF time)
+ * and not the 2nd, i.e. we are at precisely [x-1,x-1]
+ * state: fork enabled but not activateda */
+bool CBlockIndex::forkAtNextBlock(int time)
+{
+    if (time == 0)
+        return false;
+
+    // if the fork is already activated
+    if (forkActivated(time))
+        return false;
+
+    if (GetMedianTimePast() >= time)
+        return true;
+    return false;
+}
+
 std::string CBlockFileInfo::ToString() const
 {
     return strprintf("CBlockFileInfo(blocks=%u, size=%u, heights=%u...%u, time=%s...%s)", nBlocks, nSize, nHeightFirst,
