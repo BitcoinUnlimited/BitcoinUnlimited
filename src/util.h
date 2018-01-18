@@ -112,6 +112,7 @@ To add a new log category:
 
 // Log Categories:
 // 64 Bits: (Define unique bits, not 'normal' numbers)
+//TODO Before replace make better labels:
 enum
 {
     NONE = 0x0, // No logging
