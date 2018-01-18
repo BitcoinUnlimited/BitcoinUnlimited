@@ -275,6 +275,7 @@ test/dbwrapper_tests.cpp
 test/DoS_tests.cpp
 test/excessiveblock_test.cpp
 test/exploit_tests.cpp
+test/fork_tests.cpp
 test/getarg_tests.cpp
 test/hash_tests.cpp
 test/key_tests.cpp
