@@ -431,7 +431,7 @@ CNode *ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure
     {
         if (!IsSelectableSocket(hSocket))
         {
-            LogPrintf("Cannot create connection: non-selectable socket created (fd >= FD_SETSIZE ?)\n");
+            LogPrint("net", "Cannot create connection: non-selectable socket created (fd >= FD_SETSIZE ?)\n");
             CloseSocket(hSocket);
             return nullptr;
         }
@@ -729,8 +729,8 @@ int SocketSendData(CNode *pnode)
                 int nErr = WSAGetLastError();
                 if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
                 {
-                    LogPrintf("socket send error '%s' to %s (%d)\n", NetworkErrorString(nErr), pnode->addrName.c_str(),
-                        pnode->id);
+                    LogPrint("net", "socket send error '%s' to %s (%d)\n", NetworkErrorString(nErr),
+                        pnode->addrName.c_str(), pnode->id);
                     pnode->fDisconnect = true;
                 }
             }
@@ -907,20 +907,20 @@ static void AcceptConnection(const ListenSocket &hListenSocket)
 
     if (hSocket != INVALID_SOCKET)
         if (!addr.SetSockAddr((const struct sockaddr *)&sockaddr))
-            LogPrintf("Warning: Unknown socket family\n");
+            LogPrint("net", "Warning: Unknown socket family\n");
 
     bool whitelisted = hListenSocket.whitelisted || dosMan.IsWhitelistedRange(addr);
     if (hSocket == INVALID_SOCKET)
     {
         int nErr = WSAGetLastError();
         if (nErr != WSAEWOULDBLOCK)
-            LogPrintf("socket error accept failed: %s\n", NetworkErrorString(nErr));
+            LogPrint("net", "socket error accept failed: %s\n", NetworkErrorString(nErr));
         return;
     }
 
     if (!IsSelectableSocket(hSocket))
     {
-        LogPrintf("connection from %s dropped: non-selectable socket\n", addr.ToString());
+        LogPrint("net", "connection from %s dropped: non-selectable socket\n", addr.ToString());
         CloseSocket(hSocket);
         return;
     }
@@ -1210,7 +1210,7 @@ void ThreadSocketHandler()
             if (have_fds)
             {
                 int nErr = WSAGetLastError();
-                LogPrintf("socket select error %s\n", NetworkErrorString(nErr));
+                LogPrint("net", "socket select error %s\n", NetworkErrorString(nErr));
 
                 for (SOCKET hSocket : setSocket)
                     FD_SET(hSocket, &fdsetRecv);
@@ -1298,7 +1298,7 @@ void ThreadSocketHandler()
                                 nErr != WSAEINPROGRESS)
                             {
                                 if (!pnode->fDisconnect)
-                                    LogPrintf("Node %s socket recv error '%s'\n", pnode->addrName.c_str(),
+                                    LogPrint("net", "Node %s socket recv error '%s'\n", pnode->addrName.c_str(),
                                         NetworkErrorString(nErr));
                                 pnode->fDisconnect = true;
                             }
@@ -2420,7 +2420,8 @@ void NetCleanup()
     {
         if (hListenSocket.socket != INVALID_SOCKET)
             if (!CloseSocket(hListenSocket.socket))
-                LogPrintf("CloseSocket(hListenSocket) failed with error %s\n", NetworkErrorString(WSAGetLastError()));
+                LogPrint(
+                    "net", "CloseSocket(hListenSocket) failed with error %s\n", NetworkErrorString(WSAGetLastError()));
     }
 
     // clean up some globals (to help leak detection)
