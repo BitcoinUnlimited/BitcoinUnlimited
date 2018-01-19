@@ -6,7 +6,6 @@
 
 #include "wallet/wallet.h"
 
-#include "buip055fork.h"
 #include "chain.h"
 #include "checkpoints.h"
 #include "coincontrol.h"
@@ -26,6 +25,7 @@
 #include "script/sign.h"
 #include "timedata.h"
 #include "txmempool.h"
+#include "uahf_fork.h"
 #include "util.h"
 #include "utilmoneystr.h"
 
@@ -2346,8 +2346,10 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
 
                 // Sign
                 unsigned int sighashType = SIGHASH_ALL;
-                if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value) && walletSignWithForkSig.value)
+                if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) && walletSignWithForkSig.value)
+                {
                     sighashType |= SIGHASH_FORKID;
+                }
                 int nIn = 0;
                 CTransaction txNewConst(txNew);
                 BOOST_FOREACH (const PAIRTYPE(const CWalletTx *, unsigned int) & coin, setCoins)

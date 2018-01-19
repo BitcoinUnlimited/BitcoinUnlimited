@@ -176,23 +176,9 @@ CTweakRef<uint64_t> miningBlockSize("mining.blockSize",
     &maxGeneratedBlock,
     &MiningBlockSizeValidator);
 
-#ifdef BITCOIN_CASH
-CTweak<uint64_t> miningForkTime("mining.forkTime",
-    "Time in seconds since the epoch to initiate a hard fork as per BUIP055.",
-    1501590000); // Tue 1 Aug 2017 12:20:00 UTC, uahf-technical-spec.md REQ-2
-CTweak<bool> onlyAcceptForkSig("net.onlyRelayForkSig",
-    "Once the fork occurs, only relay transactions signed using the new signature scheme",
-    true);
-
-#else
-CTweak<uint64_t> miningForkTime("mining.forkTime",
-    "Time in seconds since the epoch to initiate a hard fork as per BUIP055.",
-    0);
-CTweak<bool> onlyAcceptForkSig("net.onlyRelayForkSig",
-    "Once the fork occurs, only accept transactions signed using the new signature scheme",
-    false);
-
-#endif
+CTweak<uint64_t> miningForkTime("mining.forkMay2018Time",
+    "Time in seconds since the epoch to initiate a hard fork scheduled on 15th May 2018.",
+    1526386800); // Tue 15 May 2018 12:20:00 UTC FIXME: use the correct timestamp once the spec will be ready
 
 CTweak<bool> unsafeGetBlockTemplate("mining.unsafeGetBlockTemplate",
     "Allow getblocktemplate to succeed even if the chain tip is old or this node is not connected to other nodes",

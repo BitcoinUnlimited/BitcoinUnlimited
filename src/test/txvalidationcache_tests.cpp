@@ -13,6 +13,7 @@
 #include "script/standard.h"
 #include "test/test_bitcoin.h"
 #include "txmempool.h"
+#include "uahf_fork.h"
 #include "utiltime.h"
 
 #include <boost/test/unit_test.hpp>
@@ -43,7 +44,7 @@ BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup)
 
 
     unsigned int sighashType = SIGHASH_ALL;
-    if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
+    if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
         sighashType |= SIGHASH_FORKID;
 
     // Create a double-spend of mature coinbase txn:
@@ -111,7 +112,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     CScript scriptPubKey = CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
 
     unsigned int sighashType = SIGHASH_ALL;
-    if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
+    if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
         sighashType |= SIGHASH_FORKID;
 
     std::vector<CMutableTransaction> spends;

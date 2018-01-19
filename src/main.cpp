@@ -9,7 +9,6 @@
 
 #include "addrman.h"
 #include "arith_uint256.h"
-#include "buip055fork.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "checkqueue.h"
@@ -38,6 +37,7 @@
 #include "tinyformat.h"
 #include "txdb.h"
 #include "txmempool.h"
+#include "uahf_fork.h"
 #include "ui_interface.h"
 #include "undo.h"
 #include "util.h"
@@ -1149,7 +1149,6 @@ std::string FormatStateMessage(const CValidationState &state)
         state.GetDebugMessage().empty() ? "" : ", " + state.GetDebugMessage(), state.GetRejectCode());
 }
 
-#ifdef BITCOIN_CASH
 static bool IsDAAEnabled(const CChainParams &chainparams, int nHeight)
 {
     return nHeight >= chainparams.GetConsensus().daaHeight;
@@ -1164,7 +1163,6 @@ bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev
 
     return IsDAAEnabled(chainparams, pindexPrev->nHeight);
 }
-#endif
 
 bool AreFreeTxnsDisallowed()
 {
@@ -1198,13 +1196,13 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     if (tx.IsCoinBase())
         return state.DoS(100, false, REJECT_INVALID, "coinbase");
 
-    // BUIP055: reject transactions that won't work on the fork, starting 2 hours before the fork
+    // UAHF: reject transactions that won't work on the fork, starting 2 hours (~12 blocks) before the fork
     // based on op_return.
     // But accept both sighashtypes because we will need all the tx types during the transition.
     // This code uses the system time to determine when to start rejecting which is inaccurate relative to the
     // actual activation time (defined by times in the blocks).
     // But its ok to reject these transactions from the mempool a little early (or late).
-    if ((miningForkTime.value != 0) && (start / 1000000 >= miningForkTime.value - (2 * 60 * 60)))
+    if (IsUAHFforkActiveOnNextBlock((chainActive.Tip()->nHeight) - 12))
     {
         forkVerifyFlags = SCRIPT_ENABLE_SIGHASH_FORKID;
         if (IsTxOpReturnInvalid(tx))
@@ -1503,7 +1501,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
         entry.sighashType = sighashType | sighashType2;
         // This code denies old style tx from entering the mempool as soon as we fork
-        if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value) && !IsTxBUIP055Only(entry))
+        if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) && !IsTxUAHFOnly(entry))
         {
             return state.Invalid(false, REJECT_WRONG_FORK, "txn-uses-old-sighash-algorithm");
         }
@@ -2496,7 +2494,7 @@ bool ConnectBlock(const CBlock &block,
 
     uint32_t flags = fStrictPayToScriptHash ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE;
 
-    if (pindex->forkActivated(miningForkTime.value))
+    if (UAHFforkActivated(pindex->nHeight))
     {
         flags |= SCRIPT_VERIFY_STRICTENC;
         flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
@@ -2996,7 +2994,7 @@ void static UpdateTip(CBlockIndex *pindexNew)
         Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), chainActive.Tip()),
         pcoinsTip->DynamicMemoryUsage() * (1.0 / (1 << 20)), pcoinsTip->GetCacheSize());
 
-    UpdateBUIP055Globals(pindexNew);
+    UpdateUAHFGlobals(pindexNew);
     cvBlockChange.notify_all();
 
     // Check the version of the last 100 blocks to see if we need to upgrade:
@@ -4179,26 +4177,27 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
         }
     }
 
-    // BUIP055 enforce that the fork block is > 1MB
+    // UAHF enforce that the fork block is > 1MB
     // (note subsequent blocks can be <= 1MB...)
     // An exception is added -- if the fork block is block 1 then it can be <= 1MB.  This allows test chains to
     // fork without having to create a large block so long as the fork time is in the past.
-    if (pindexPrev && pindexPrev->forkAtNextBlock(miningForkTime.value) && (pindexPrev->nHeight > 1))
+    // TODO: check if we can remove the second conditions since on regtest uahHeight is 0
+    if (pindexPrev && UAHFforkAtNextBlock(pindexPrev->nHeight) && (pindexPrev->nHeight > 1))
     {
         DbgAssert(block.nBlockSize, );
         if (block.nBlockSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
         {
             uint256 hash = block.GetHash();
             return state.DoS(100,
-                error("%s: BUIP055 fork block (%s, height %d) must exceed %d, but this block is %d bytes", __func__,
+                error("%s: UAHF fork block (%s, height %d) must exceed %d, but this block is %d bytes", __func__,
                                  hash.ToString(), nHeight, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, block.nBlockSize),
                 REJECT_INVALID, "bad-blk-too-small");
         }
     }
-    // BUIP055 check soft-fork items, such as tx targeted to the 1MB chain
-    if (pindexPrev && pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value))
+    // UAHF check soft-fork items, such as tx targeted to the 1MB chain
+    if (pindexPrev && IsUAHFforkActiveOnNextBlock(pindexPrev->nHeight))
     {
-        return ValidateBUIP055Block(block, state, nHeight);
+        return ValidateUAHFBlock(block, state, nHeight);
     }
 
     return true;
@@ -5704,8 +5703,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     if (mempool.lookup(inv.hash, txe))
                     {
                         // Only offer a TX to the fork if its signed properly
-                        if (!(onlyAcceptForkSig.value && !IsTxBUIP055Only(txe) &&
-                                chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value)))
+                        if (!(!IsTxUAHFOnly(txe) && IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight)))
                         {
                             CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
                             ss.reserve(1000);
@@ -6415,7 +6413,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         else if (fMissingInputs)
         {
             // If we've forked and this is probably not a valid tx, then skip adding it to the orphan pool
-            if (!chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value) || IsTxProbablyNewSigHash(tx))
+            if (!IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) || IsTxProbablyNewSigHash(tx))
             {
                 LOCK(cs_orphancache);
                 AddOrphanTx(tx, pfrom->GetId());
@@ -6964,8 +6962,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 if (!pfrom->pfilter->IsRelevantAndUpdate(txe.GetTx()))
                     continue;
                 // don't relay old-style transactions after the fork.
-                if (onlyAcceptForkSig.value && !IsTxBUIP055Only(txe) &&
-                    chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
+                if (!IsTxUAHFOnly(txe) && IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
                     continue;
             }
             vInv.push_back(inv);
