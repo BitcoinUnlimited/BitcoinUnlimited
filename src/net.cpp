@@ -1637,7 +1637,9 @@ void ThreadAddressSeeding()
         LogPrintf("Bitnodes API seeding disabled\n");
     else
     {
-        BitnodesAddressSeed();
+        // TODO: re-enable bitnodes seeding once a site is available for the BitcoinCash chain.
+        // BitnodesAddressSeed();
+        LogPrintf("Bitnodes API seeding temporarily disabled\n");
     }
 }
 
