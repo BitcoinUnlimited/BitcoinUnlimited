@@ -393,4 +393,6 @@ consensus/consensus.h
 consensus/merkle.cpp
 consensus/merkle.h
 consensus/params.h
+consensus/tx_verify.cpp
+consensus/tx_verify.h
 consensus/validation.h
