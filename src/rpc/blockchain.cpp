@@ -19,6 +19,7 @@
 #include "sync.h"
 #include "txdb.h"
 #include "txmempool.h"
+#include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
 
@@ -1075,6 +1076,36 @@ UniValue reconsiderblock(const UniValue &params, bool fHelp)
     return NullUniValue;
 }
 
+UniValue rollbackchain(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error("rollbackchain \"block height\"\n"
+                            "\nRolls back the blockchain to the height indicated.\n"
+                            "\nArguments:\n"
+                            "1. blockheight   (int, required) the height that you want to roll the chain back to\n"
+                            "\nResult:\n"
+                            "\nExamples:\n" +
+                            HelpExampleCli("rollbackchain", "\"block height\"") +
+                            HelpExampleRpc("rollbackchain", "\"block height\""));
+
+    std::string strHeight = params[0].get_str();
+    uint64_t nRollBackHeight = boost::lexical_cast<uint64_t>(strHeight);
+
+    LOCK(cs_main);
+    while (chainActive.Height() > nRollBackHeight)
+    {
+        CValidationState state;
+        if (!DisconnectTip(state,  Params().GetConsensus()))
+            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+
+        if (!state.IsValid())
+            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+    }
+    uiInterface.NotifyBlockTip(true, chainActive.Tip());
+
+    return NullUniValue;
+}
+
 static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
     //  --------------------- ------------------------  -----------------------  ----------
@@ -1088,6 +1119,7 @@ static const CRPCCommand commands[] = {
 
     /* Not shown in help */
     {"hidden", "invalidateblock", &invalidateblock, true}, {"hidden", "reconsiderblock", &reconsiderblock, true},
+    {"hidden", "rollbackchain", &rollbackchain, true},
 };
 
 void RegisterBlockchainRPCCommands(CRPCTable &tableRPC)

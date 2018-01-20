@@ -2814,7 +2814,7 @@ void static UpdateTip(CBlockIndex *pindexNew)
 
 /** Disconnect chainActive's tip. You probably want to call mempool.removeForReorg and manually re-limit mempool size
  * after this, with cs_main held. */
-bool static DisconnectTip(CValidationState &state, const Consensus::Params &consensusParams)
+bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusParams)
 {
     AssertLockHeld(cs_main);
 
