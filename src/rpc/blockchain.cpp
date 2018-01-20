@@ -1073,6 +1073,8 @@ UniValue reconsiderblock(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
     }
 
+    uiInterface.NotifyBlockTip(false, chainActive.Tip());
+
     return NullUniValue;
 }
 
@@ -1101,7 +1103,7 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
         if (!state.IsValid())
             throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
     }
-    uiInterface.NotifyBlockTip(true, chainActive.Tip());
+    uiInterface.NotifyBlockTip(false, chainActive.Tip());
 
     return NullUniValue;
 }
