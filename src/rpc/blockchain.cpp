@@ -1087,8 +1087,8 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
                             "1. blockheight   (int, required) the height that you want to roll the chain back to\n"
                             "\nResult:\n"
                             "\nExamples:\n" +
-                            HelpExampleCli("rollbackchain", "\"block height\"") +
-                            HelpExampleRpc("rollbackchain", "\"block height\""));
+                            HelpExampleCli("rollbackchain", "\"blockheight\"") +
+                            HelpExampleRpc("rollbackchain", "\"blockheight\""));
 
     std::string strHeight = params[0].get_str();
     uint64_t nRollBackHeight = boost::lexical_cast<uint64_t>(strHeight);
@@ -1097,7 +1097,7 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
     while (chainActive.Height() > nRollBackHeight)
     {
         CValidationState state;
-        if (!DisconnectTip(state,  Params().GetConsensus()))
+        if (!DisconnectTip(state, Params().GetConsensus()))
             throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
 
         if (!state.IsValid())
