@@ -1080,11 +1080,15 @@ UniValue reconsiderblock(const UniValue &params, bool fHelp)
 
 UniValue rollbackchain(const UniValue &params, bool fHelp)
 {
+    // In case of operator error, limit the rollback to 100 blocks
+    uint32_t nLimit = 100;
+
     if (fHelp || params.size() != 1)
-        throw runtime_error("rollbackchain \"block height\"\n"
+        throw runtime_error("rollbackchain \"blockheight\"\n"
                             "\nRolls back the blockchain to the height indicated.\n"
                             "\nArguments:\n"
-                            "1. blockheight   (int, required) the height that you want to roll the chain back to\n"
+                            "1. blockheight   (int, required) the height that you want to roll the chain \
+                            back to (only maxiumum rollback of " + std::to_string(nLimit) + " blocks allowed)\n"
                             "\nResult:\n"
                             "\nExamples:\n" +
                             HelpExampleCli("rollbackchain", "\"blockheight\"") +
@@ -1094,6 +1098,12 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
     uint64_t nRollBackHeight = boost::lexical_cast<uint64_t>(strHeight);
 
     LOCK(cs_main);
+    uint32_t nRollBack = chainActive.Height() - nRollBackHeight;
+    if (nRollBack > nLimit)
+        throw runtime_error("You are attempting to rollback the chain by " + 
+                            std::to_string(nRollBack) + " blocks, however the limit is " + 
+                            std::to_string(nLimit) + " blocks.");
+
     while (chainActive.Height() > nRollBackHeight)
     {
         CValidationState state;
