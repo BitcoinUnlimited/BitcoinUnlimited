@@ -675,8 +675,12 @@ int SocketSendData(CNode *pnode)
     // solves spin loop issues where the select does not block but no bytes can be transferred (traffic shaping limited,
     // for example).
     int progress = 0;
-    std::deque<CSerializeData>::iterator it = pnode->vSendMsg.begin();
 
+    // Make sure we haven't already been asked to disconnect
+    if (pnode->fDisconnect)
+        return progress;
+
+    std::deque<CSerializeData>::iterator it = pnode->vSendMsg.begin();
     while (it != pnode->vSendMsg.end())
     {
         const CSerializeData &data = *it;
