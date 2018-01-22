@@ -47,9 +47,6 @@ enum
 #else
     SINGLE_PEER_REQUEST_MODE_AGE = (24 * 60 * 60),
 #endif
-
-    BITCOIN_CASH_FORK_HEIGHT = 478559,
-
 };
 
 class CBlock;

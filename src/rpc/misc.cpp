@@ -116,8 +116,9 @@ UniValue getinfo(const UniValue &params, bool fHelp)
     obj.push_back(Pair("status", statusStrings.GetPrintable()));
     obj.push_back(Pair("errors", GetWarnings("statusbar")));
     CBlockIndex *cashFork = chainActive.Tip();
+    const Consensus::Params &consensusParams = Params().GetConsensus();
     if (cashFork)
-        cashFork = cashFork->GetAncestor(BITCOIN_CASH_FORK_HEIGHT);
+        cashFork = cashFork->GetAncestor(consensusParams.uahfHeight);
     std::string fork = "Bitcoin";
     if (cashFork && cashFork->phashBlock)
     {
