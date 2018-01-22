@@ -260,7 +260,7 @@ bool ProcessNewBlock(CValidationState &state,
     CDiskBlockPos *dbp,
     bool fParallel);
 /** Disconnect the current chainActive.Tip() */
-bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusParams);
+bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusParams, const bool fRollBack = false);
 /** Check whether enough disk space is available for an incoming block */
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 /** Open a block file (blk?????.dat) */

@@ -1107,14 +1107,16 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
     while (chainActive.Height() > nRollBackHeight)
     {
         CValidationState state;
-        if (!DisconnectTip(state, Params().GetConsensus()))
+        // Disconnect the tip and by setting the third param (fRollBack) to true we avoid having to resurrect
+        // the transactions from the block back into the mempool, which saves a great deal of time.
+        if (!DisconnectTip(state, Params().GetConsensus(), true))
             throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
 
         if (!state.IsValid())
             throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
-    }
-    uiInterface.NotifyBlockTip(false, chainActive.Tip());
 
+        uiInterface.NotifyBlockTip(false, chainActive.Tip());
+    }
     return NullUniValue;
 }
 

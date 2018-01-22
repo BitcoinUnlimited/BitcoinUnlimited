@@ -2814,7 +2814,7 @@ void static UpdateTip(CBlockIndex *pindexNew)
 
 /** Disconnect chainActive's tip. You probably want to call mempool.removeForReorg and manually re-limit mempool size
  * after this, with cs_main held. */
-bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusParams)
+bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusParams, const bool fRollBack)
 {
     AssertLockHeld(cs_main);
 
@@ -2837,33 +2837,39 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     // Write the chain state to disk, if necessary.
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
-    // Resurrect mempool transactions from the disconnected block.
-    std::vector<uint256> vHashUpdate;
-    BOOST_FOREACH (const CTransaction &tx, block.vtx)
+
+    // Resurrect mempool transactions from the disconnected block but do not do this step if we are
+    // rolling back the chain using the "rollbackchain" rpc command.
+    if(!fRollBack)
     {
-        // ignore validation errors in resurrected transactions
-        std::list<CTransaction> removed;
-        CValidationState stateDummy;
-        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, AreFreeTxnsDisallowed(), nullptr, true))
+        std::vector<uint256> vHashUpdate;
+        for (const CTransaction &tx : block.vtx)
         {
-            mempool.remove(tx, removed, true);
+            // ignore validation errors in resurrected transactions
+            std::list<CTransaction> removed;
+            CValidationState stateDummy;
+            if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, AreFreeTxnsDisallowed(), nullptr, true))
+            {
+                mempool.remove(tx, removed, true);
+            }
+            else if (mempool.exists(tx.GetHash()))
+            {
+                vHashUpdate.push_back(tx.GetHash());
+            }
         }
-        else if (mempool.exists(tx.GetHash()))
-        {
-            vHashUpdate.push_back(tx.GetHash());
-        }
+        // AcceptToMemoryPool/addUnchecked all assume that new mempool entries have
+        // no in-mempool children, which is generally not true when adding
+        // previously-confirmed transactions back to the mempool.
+        // UpdateTransactionsFromBlock finds descendants of any transactions in this
+        // block that were added back and cleans up the mempool state.
+        mempool.UpdateTransactionsFromBlock(vHashUpdate);
     }
-    // AcceptToMemoryPool/addUnchecked all assume that new mempool entries have
-    // no in-mempool children, which is generally not true when adding
-    // previously-confirmed transactions back to the mempool.
-    // UpdateTransactionsFromBlock finds descendants of any transactions in this
-    // block that were added back and cleans up the mempool state.
-    mempool.UpdateTransactionsFromBlock(vHashUpdate);
+
     // Update chainActive and related variables.
     UpdateTip(pindexDelete->pprev);
     // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
-    BOOST_FOREACH (const CTransaction &tx, block.vtx)
+    for (const CTransaction &tx : block.vtx)
     {
         SyncWithWallets(tx, NULL, -1);
     }
