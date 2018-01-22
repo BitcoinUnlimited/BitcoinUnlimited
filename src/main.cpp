@@ -2840,7 +2840,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
 
     // Resurrect mempool transactions from the disconnected block but do not do this step if we are
     // rolling back the chain using the "rollbackchain" rpc command.
-    if(!fRollBack)
+    if (!fRollBack)
     {
         std::vector<uint256> vHashUpdate;
         for (const CTransaction &tx : block.vtx)

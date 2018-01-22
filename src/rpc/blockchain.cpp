@@ -1088,9 +1088,10 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
                             "\nRolls back the blockchain to the height indicated.\n"
                             "\nArguments:\n"
                             "1. blockheight   (int, required) the height that you want to roll the chain \
-                            back to (only maxiumum rollback of " + std::to_string(nLimit) + " blocks allowed)\n"
-                            "\nResult:\n"
-                            "\nExamples:\n" +
+                            back to (only maxiumum rollback of " +
+                            std::to_string(nLimit) + " blocks allowed)\n"
+                                                     "\nResult:\n"
+                                                     "\nExamples:\n" +
                             HelpExampleCli("rollbackchain", "\"blockheight\"") +
                             HelpExampleRpc("rollbackchain", "\"blockheight\""));
 
@@ -1100,11 +1101,10 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
     LOCK(cs_main);
     uint32_t nRollBack = chainActive.Height() - nRollBackHeight;
     if (nRollBack > nLimit)
-        throw runtime_error("You are attempting to rollback the chain by " + 
-                            std::to_string(nRollBack) + " blocks, however the limit is " + 
-                            std::to_string(nLimit) + " blocks.");
+        throw runtime_error("You are attempting to rollback the chain by " + std::to_string(nRollBack) +
+                            " blocks, however the limit is " + std::to_string(nLimit) + " blocks.");
 
-    while (chainActive.Height() > nRollBackHeight)
+    while ((uint64_t)chainActive.Height() > nRollBackHeight)
     {
         CValidationState state;
         // Disconnect the tip and by setting the third param (fRollBack) to true we avoid having to resurrect
