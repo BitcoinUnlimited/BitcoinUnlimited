@@ -1289,6 +1289,7 @@ void ThreadSocketHandler()
                             if (!pnode->fDisconnect)
                                 LogPrint("net", "Node %s socket closed\n", pnode->addrName.c_str());
                             pnode->fDisconnect = true;
+                            continue;
                         }
                         else if (nBytes < 0)
                         {
@@ -1301,6 +1302,7 @@ void ThreadSocketHandler()
                                     LogPrint("net", "Node %s socket recv error '%s'\n", pnode->addrName.c_str(),
                                         NetworkErrorString(nErr));
                                 pnode->fDisconnect = true;
+                                continue;
                             }
                         }
                     }
