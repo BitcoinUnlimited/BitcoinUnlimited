@@ -80,7 +80,7 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
     {
         pixPaint.setFont(QFont(font, 40 * fontFactor));
         pixPaint.setPen(QColor(200, 0, 0));
-        //fm = pixPaint.fontMetrics();
+        // fm = pixPaint.fontMetrics();
         // versionTextWidth = fm.width(versionText);
         pixPaint.drawText(TEXTX * devicePixelRatio, NETY * devicePixelRatio, titleAddText);
     }
