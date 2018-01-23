@@ -786,11 +786,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     {
         InitWarning(_("Config option -minrelaytxfee is no longer supported.  To set the limit "
                       "below which a transaction is considered zero fee please use -minlimitertxfee.  "
-#ifdef BITCOIN_CASH
                       "To convert -minrelaytxfee, which is specified  in BCH/KB, to -minlimtertxfee, "
-#else
-                      "To convert -minrelaytxfee, which is specified  in BTC/KB, to -minlimtertxfee, "
-#endif
                       "which is specified in Satoshi/Byte, simply multiply the original -minrelaytxfee "
                       "by 100,000. For example, a -minrelaytxfee=0.00001000 will become -minlimitertxfee=1.000"));
     }

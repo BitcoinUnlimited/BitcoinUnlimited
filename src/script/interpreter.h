@@ -155,7 +155,6 @@ protected:
         const uint256 &sighash) const;
 
 public:
-#ifdef BITCOIN_CASH
     TransactionSignatureChecker(const CTransaction *txToIn,
         unsigned int nInIn,
         const CAmount &amountIn,
@@ -163,15 +162,6 @@ public:
         : txTo(txToIn), nIn(nInIn), amount(amountIn), nBytesHashed(0), nSigops(0), nFlags(flags)
     {
     }
-#else
-    TransactionSignatureChecker(const CTransaction *txToIn,
-        unsigned int nInIn,
-        const CAmount &amountIn,
-        unsigned int flags = 0)
-        : txTo(txToIn), nIn(nInIn), amount(amountIn), nBytesHashed(0), nSigops(0), nFlags(flags)
-    {
-    }
-#endif
     bool CheckSig(const std::vector<unsigned char> &scriptSig,
         const std::vector<unsigned char> &vchPubKey,
         const CScript &scriptCode) const;
@@ -187,7 +177,6 @@ private:
     const CTransaction txTo;
 
 public:
-#ifdef BITCOIN_CASH
     MutableTransactionSignatureChecker(const CMutableTransaction *txToIn,
         unsigned int nInIn,
         const CAmount &amount,
@@ -195,15 +184,6 @@ public:
         : TransactionSignatureChecker(&txTo, nInIn, amount, flags), txTo(*txToIn)
     {
     }
-#else
-    MutableTransactionSignatureChecker(const CMutableTransaction *txToIn,
-        unsigned int nInIn,
-        const CAmount &amount,
-        unsigned int flags = 0)
-        : TransactionSignatureChecker(&txTo, nInIn, amount, flags), txTo(*txToIn)
-    {
-    }
-#endif
 };
 
 bool EvalScript(std::vector<std::vector<unsigned char> > &stack,
