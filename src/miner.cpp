@@ -207,7 +207,7 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
 
     nLastBlockTx = nBlockTx;
     nLastBlockSize = nBlockSize;
-    LogPrintf("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
+    LOGA("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
         nBlockSigOps);
 
     // Create coinbase transaction.
@@ -341,7 +341,7 @@ void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, CTxMemPool::txit
         double dPriority = iter->GetPriority(nHeight);
         CAmount dummy;
         mempool.ApplyDeltas(iter->GetTx().GetHash(), dPriority, dummy);
-        LogPrintf("priority %.1f fee %s txid %s\n", dPriority,
+        LOGA("priority %.1f fee %s txid %s\n", dPriority,
             CFeeRate(iter->GetModifiedFee(), iter->GetTxSize()).ToString().c_str(),
             iter->GetTx().GetHash().ToString().c_str());
     }

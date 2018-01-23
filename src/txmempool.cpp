@@ -708,7 +708,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
     if (insecure_rand() >= nCheckFrequency)
         return;
 
-    LogPrint("mempool", "Checking mempool with %u transactions and %u inputs\n", (unsigned int)mapTx.size(),
+    LOG(MEMPOOL, "Checking mempool with %u transactions and %u inputs\n", (unsigned int)mapTx.size(),
         (unsigned int)mapNextTx.size());
 
     uint64_t checkTotal = 0;
@@ -886,7 +886,7 @@ bool CTxMemPool::WriteFeeEstimates(CAutoFile &fileout) const
     }
     catch (const std::exception &)
     {
-        LogPrintf("CTxMemPool::WriteFeeEstimates(): unable to write policy estimator data (non-fatal)\n");
+        LOGA("CTxMemPool::WriteFeeEstimates(): unable to write policy estimator data (non-fatal)\n");
         return false;
     }
     return true;
@@ -906,7 +906,7 @@ bool CTxMemPool::ReadFeeEstimates(CAutoFile &filein)
     }
     catch (const std::exception &)
     {
-        LogPrintf("CTxMemPool::ReadFeeEstimates(): unable to read policy estimator data (non-fatal)\n");
+        LOGA("CTxMemPool::ReadFeeEstimates(): unable to read policy estimator data (non-fatal)\n");
         return false;
     }
     return true;
@@ -937,7 +937,7 @@ void CTxMemPool::PrioritiseTransaction(const uint256 hash,
             }
         }
     }
-    LogPrintf("PrioritiseTransaction: %s priority += %f, fee += %d\n", strHash, dPriorityDelta, FormatMoney(nFeeDelta));
+    LOGA("PrioritiseTransaction: %s priority += %f, fee += %d\n", strHash, dPriorityDelta, FormatMoney(nFeeDelta));
 }
 
 void CTxMemPool::ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount &nFeeDelta) const
@@ -1175,8 +1175,8 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpends
     }
 
     if (maxFeeRateRemoved > CFeeRate(0))
-        LogPrint(
-            "mempool", "Removed %u txn, rolling minimum fee bumped to %s\n", nTxnRemoved, maxFeeRateRemoved.ToString());
+        LOG(
+            MEMPOOL, "Removed %u txn, rolling minimum fee bumped to %s\n", nTxnRemoved, maxFeeRateRemoved.ToString());
 }
 
 void CTxMemPool::UpdateTransactionsPerSecond()

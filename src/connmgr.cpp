@@ -87,12 +87,12 @@ void CConnMgr::EnableExpeditedSends(CNode *pNode, bool fBlocks, bool fTxs, bool 
         if (fForceIfFull || vSendExpeditedBlocks.size() < nExpeditedBlocksMax)
         {
             AddNode(vSendExpeditedBlocks, pNode);
-            LogPrint("thin", "Enabled expedited blocks to peer %s (%u peers total)\n", pNode->GetLogName(),
+            LOG(THIN, "Enabled expedited blocks to peer %s (%u peers total)\n", pNode->GetLogName(),
                 vSendExpeditedBlocks.size());
         }
         else
         {
-            LogPrint("thin", "Cannot enable expedited blocks to peer %s, I am full (%u peers total)\n",
+            LOG(THIN, "Cannot enable expedited blocks to peer %s, I am full (%u peers total)\n",
                 pNode->GetLogName(), vSendExpeditedBlocks.size());
         }
     }
@@ -102,12 +102,12 @@ void CConnMgr::EnableExpeditedSends(CNode *pNode, bool fBlocks, bool fTxs, bool 
         if (fForceIfFull || vSendExpeditedTxs.size() < nExpeditedTxsMax)
         {
             AddNode(vSendExpeditedTxs, pNode);
-            LogPrint("thin", "Enabled expedited txs to peer %s (%u peers total)\n", pNode->GetLogName(),
+            LOG(THIN, "Enabled expedited txs to peer %s (%u peers total)\n", pNode->GetLogName(),
                 vSendExpeditedTxs.size());
         }
         else
         {
-            LogPrint("thin", "Cannot enable expedited txs to peer %s, I am full (%u peers total)\n",
+            LOG(THIN, "Cannot enable expedited txs to peer %s, I am full (%u peers total)\n",
                 pNode->GetLogName(), vSendExpeditedTxs.size());
         }
     }
@@ -118,11 +118,11 @@ void CConnMgr::DisableExpeditedSends(CNode *pNode, bool fBlocks, bool fTxs)
     LOCK(cs_expedited);
 
     if (fBlocks && RemoveNode(vSendExpeditedBlocks, pNode))
-        LogPrint("thin", "Disabled expedited blocks to peer %s (%u peers total)\n", pNode->GetLogName(),
+        LOG(THIN, "Disabled expedited blocks to peer %s (%u peers total)\n", pNode->GetLogName(),
             vSendExpeditedBlocks.size());
 
     if (fTxs && RemoveNode(vSendExpeditedTxs, pNode))
-        LogPrint("thin", "Disabled expedited txs to peer %s (%u peers total)\n", pNode->GetLogName(),
+        LOG(THIN, "Disabled expedited txs to peer %s (%u peers total)\n", pNode->GetLogName(),
             vSendExpeditedTxs.size());
 }
 
@@ -180,13 +180,13 @@ bool CConnMgr::PushExpeditedRequest(CNode *pNode, uint64_t flags)
         if (flags & EXPEDITED_STOP)
         {
             RemoveNode(vExpeditedUpstream, pNode);
-            LogPrintf("Requesting a stop of expedited blocks from peer %s\n", pNode->GetLogName());
+            LOGA("Requesting a stop of expedited blocks from peer %s\n", pNode->GetLogName());
         }
         else
         {
             if (FindNode(vExpeditedUpstream, pNode) == vExpeditedUpstream.end())
                 AddNode(vExpeditedUpstream, pNode);
-            LogPrintf("Requesting expedited blocks from peer %s\n", pNode->GetLogName());
+            LOGA("Requesting expedited blocks from peer %s\n", pNode->GetLogName());
         }
     }
 

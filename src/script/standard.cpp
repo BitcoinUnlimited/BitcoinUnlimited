@@ -75,7 +75,7 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsi
     }
 
     vSolutionsRet.clear();
-    // LogPrintf("Freeze Solve: %s \n ", ::ScriptToAsmStr(scriptPubKey));
+    // LOGA("Freeze Solve: %s \n ", ::ScriptToAsmStr(scriptPubKey));
 
     // Shortcut for pay-to-script-hash, which are more constrained than the other types:
     // it is always OP_HASH160 20 [20 byte hash] OP_EQUAL

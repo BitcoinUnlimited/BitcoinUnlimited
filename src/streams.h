@@ -507,7 +507,7 @@ public:
             throw std::ios_base::failure("Read attempted past buffer limit");
         if (nSize + nRewind > vchBuf.size()) // What's already read + what I want to read + how far I want to rewind
         {
-            LogPrint("reindex", "Large read, growing buffer\n", nSize);
+            LOG(REINDEX, "Large read, growing buffer\n", nSize);
             GrowTo(nSize + nRewind + RESIZE_EXTRA);
             if (nSize + nRewind > vchBuf.size()) // make sure it worked
                 throw std::ios_base::failure("Read larger than buffer size");
@@ -537,14 +537,14 @@ public:
         nReadPos = nPos;
         if (nReadPos + nRewind < nSrcPos)
         {
-            LogPrint("reindex", "Short SetPos: desired %lld actual %lld srcpos %lld buffer size %lld, rewind %lld\n",
+            LOG(REINDEX, "Short SetPos: desired %lld actual %lld srcpos %lld buffer size %lld, rewind %lld\n",
                 nPos, nReadPos, nSrcPos, vchBuf.size(), nRewind);
             nReadPos = nSrcPos - nRewind;
             return false;
         }
         else if (nReadPos > nSrcPos)
         {
-            LogPrint("reindex", "Long SetPos: desired %lld actual %lld srcpos %lld buffer size %lld, rewind %lld\n",
+            LOG(REINDEX, "Long SetPos: desired %lld actual %lld srcpos %lld buffer size %lld, rewind %lld\n",
                 nPos, nReadPos, nSrcPos, vchBuf.size(), nRewind);
             nReadPos = nSrcPos;
             return false;
@@ -610,7 +610,7 @@ public:
             // Resize is inefficient, so at a minimum double the buffer to make # resizes log(n)
             amt = std::max(amt, ((uint64_t)vchBuf.size()) * 2);
             vchBuf.resize(amt, 0);
-            LogPrint("reindex", "File buffer resize to %s\n", vchBuf.size());
+            LOG(REINDEX, "File buffer resize to %s\n", vchBuf.size());
 
             // Now at this new buffer size the boundaries will be different so I have to reload the rewinded data
             // Position the data to be read at the start of the old maximum rewind (or the file beginning)

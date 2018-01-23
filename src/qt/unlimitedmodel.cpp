@@ -71,7 +71,7 @@ void UnlimitedModel::Init()
         emsg << "Sorry, your configured maximum mined block (" << tmpMaxGeneratedBlock
              << ") is larger than your configured excessive size (" << tmpExcessiveBlockSize
              << ").  This would cause you to orphan your own blocks.";
-        LogPrintf(emsg.str().c_str());
+        LOGA(emsg.str().c_str());
     }
     else
     {

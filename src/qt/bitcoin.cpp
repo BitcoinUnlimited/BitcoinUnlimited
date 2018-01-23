@@ -86,7 +86,7 @@ Q_DECLARE_METATYPE(CAmount)
 // Config is non-copyable so we can only register pointers to it
 Q_DECLARE_METATYPE(Config *)
 
-static void InitMessage(const std::string &message) { LogPrintf("init message: %s\n", message); }
+static void InitMessage(const std::string &message) { LOGA("init message: %s\n", message); }
 /*
    Translate string to current locale using Qt.
  */
@@ -156,14 +156,14 @@ static void initTranslations(QTranslator &qtTranslatorBase,
 void DebugMessageHandler(QtMsgType type, const char *msg)
 {
     const char *category = (type == QtDebugMsg) ? "qt" : NULL;
-    LogPrint(category, "GUI: %s\n", msg);
+    LOG(category, "GUI: %s\n", msg);
 }
 #else
 void DebugMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
     Q_UNUSED(context);
     const char *category = (type == QtDebugMsg) ? "qt" : NULL;
-    LogPrint(category, "GUI: %s\n", msg.toStdString());
+    LOG(category, "GUI: %s\n", msg.toStdString());
 }
 #endif
 
@@ -577,7 +577,7 @@ bool BackupQtAppSettings(const QSettings &source, const QString &backupName)
         backup.setValue(key, source.value(key));
     }
 
-    LogPrintf("APP SETTINGS: Settings successfully backed up to '%s'\n", backupName.toStdString());
+    LOGA("APP SETTINGS: Settings successfully backed up to '%s'\n", backupName.toStdString());
 
     // NOTE: backup will go out of scope upon return so we don't need to manually call sync()
 
@@ -636,7 +636,7 @@ bool TryMigrateQtAppSettings(const QString &oldOrg, const QString &oldApp, const
     // lastly we need to add the flag which indicates we have performed a migration
     sink.setValue(APP_SETTINGS_MIGRATED_FLAG, true);
 
-    LogPrintf("APP SETTINGS: Settings successfully migrated from '%s/%s' to '%s/%s'\n", oldOrg.toStdString(),
+    LOGA("APP SETTINGS: Settings successfully migrated from '%s/%s' to '%s/%s'\n", oldOrg.toStdString(),
         oldApp.toStdString(), newOrg.toStdString(), newApp.toStdString());
 
     // NOTE: sink will go out of scope upon return so we don't need to manually call sync()

@@ -313,7 +313,7 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     CCoinsMap::iterator iter = cacheCoins.begin();
     while (!fDone && DynamicMemoryUsage() > nTrimSize)
     {
-        LogPrint("coindb", "cacheCoinsUsage at start: %d total dynamic usage: %d trim to size: %d nBestCoinHeight: %d "
+        LOG(COINDB, "cacheCoinsUsage at start: %d total dynamic usage: %d trim to size: %d nBestCoinHeight: %d "
                            "trim height:%d\n",
             cachedCoinsUsage, DynamicMemoryUsage(), nTrimSize, nBestCoinHeight, nTrimHeight);
 
@@ -356,7 +356,7 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
             // We're not done yet. We've adjusted the nTrimHeight so we have to go back and trim again.
             fDone = false;
 
-            LogPrint("coindb", "Re-adjusting trim height to %d using a trim height delta of %d\n", nTrimHeight,
+            LOG(COINDB, "Re-adjusting trim height to %d using a trim height delta of %d\n", nTrimHeight,
                 nTrimHeightDelta);
         }
     }
@@ -382,8 +382,8 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     }
     if (nTrimmed > 0)
     {
-        LogPrint("coindb", "Trimmed %d by coin height\n", nTrimmedByHeight);
-        LogPrint("coindb", "Trimmed %ld from the CoinsViewCache, current size after trim: %ld and usage %ld bytes\n",
+        LOG(COINDB, "Trimmed %d by coin height\n", nTrimmedByHeight);
+        LOG(COINDB, "Trimmed %ld from the CoinsViewCache, current size after trim: %ld and usage %ld bytes\n",
             nTrimmed, cacheCoins.size(), cachedCoinsUsage);
     }
 
@@ -394,7 +394,7 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     {
         nTrimHeightDelta += nSmallestDelta;
         nTrimHeight = nBestCoinHeight - nTrimHeightDelta;
-        LogPrint("coindb", "Re-adjusting trim height to %d using a trim height delta of %d\n", nTrimHeight,
+        LOG(COINDB, "Re-adjusting trim height to %d using a trim height delta of %d\n", nTrimHeight,
             nTrimHeightDelta);
     }
 }

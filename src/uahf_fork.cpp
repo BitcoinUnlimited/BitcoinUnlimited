@@ -80,7 +80,7 @@ bool IsTxUAHFOnly(const CTxMemPoolEntry &txentry)
 {
     if (txentry.sighashType & SIGHASH_FORKID)
     {
-        // LogPrintf("txn is UAHF-specific\n");
+        // LOGA("txn is UAHF-specific\n");
         return true;
     }
     return false;

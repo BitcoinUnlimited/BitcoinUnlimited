@@ -91,12 +91,12 @@ bool GenerateAuthCookie(std::string *cookie_out)
     file.open(filepath.string().c_str());
     if (!file.is_open())
     {
-        LogPrintf("Unable to open cookie authentication file %s for writing\n", filepath.string());
+        LOGA("Unable to open cookie authentication file %s for writing\n", filepath.string());
         return false;
     }
     file << cookie;
     file.close();
-    LogPrintf("Generated RPC authentication cookie %s\n", filepath.string());
+    LOGA("Generated RPC authentication cookie %s\n", filepath.string());
 
     if (cookie_out)
         *cookie_out = cookie;
@@ -127,6 +127,6 @@ void DeleteAuthCookie()
     }
     catch (const fs::filesystem_error &e)
     {
-        LogPrintf("%s: Unable to remove random auth cookie file: %s\n", __func__, e.what());
+        LOGA("%s: Unable to remove random auth cookie file: %s\n", __func__, e.what());
     }
 }

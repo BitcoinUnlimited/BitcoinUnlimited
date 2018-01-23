@@ -66,7 +66,7 @@ UniValue validatechainhistory(const UniValue &params, bool fHelp);
 bool MiningAndExcessiveBlockValidatorRule(const uint64_t newExcessiveBlockSize, const uint64_t newMiningBlockSize)
 {
     // The mined block size must be less then or equal too the excessive block size.
-    LogPrintf("newMiningBlockSize: %d - newExcessiveBlockSize: %d\n", newMiningBlockSize, newExcessiveBlockSize);
+    LOGA("newMiningBlockSize: %d - newExcessiveBlockSize: %d\n", newMiningBlockSize, newExcessiveBlockSize);
     return (newMiningBlockSize <= newExcessiveBlockSize);
 }
 
@@ -378,7 +378,7 @@ void UnlimitedSetup(void)
 
     if (maxGeneratedBlock > excessiveBlockSize)
     {
-        LogPrintf("Reducing the maximum mined block from the configured %d to your excessive block size %d.  Otherwise "
+        LOGA("Reducing the maximum mined block from the configured %d to your excessive block size %d.  Otherwise "
                   "you would orphan your own blocks.\n",
             maxGeneratedBlock, excessiveBlockSize);
         maxGeneratedBlock = excessiveBlockSize;
@@ -424,7 +424,7 @@ void UnlimitedSetup(void)
         // uiInterface.ThreadSafeMessageBox((strprintf(_("Reducing -maxoutconnections from %d to %d, because this value
         // is higher than max available connections."), nUserMaxOutConnections, nMaxConnections)),"",
         // CClientUIInterface::MSG_WARNING);
-        LogPrintf(
+        LOGA(
             "Reducing -maxoutconnections from %d to %d, because this value is higher than max available connections.\n",
             nUserMaxOutConnections, nMaxConnections);
         nMaxOutConnections = nMaxConnections;
@@ -528,8 +528,8 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phas
 
 static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainparams)
 {
-    LogPrintf("%s\n", pblock->ToString());
-    LogPrintf("generated %s\n", FormatMoney(pblock->vtx[0].vout[0].nValue));
+    LOGA("%s\n", pblock->ToString());
+    LOGA("generated %s\n", FormatMoney(pblock->vtx[0].vout[0].nValue));
 
     // Found a solution
     {
@@ -566,7 +566,7 @@ static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainpar
 
 void static BitcoinMiner(const CChainParams &chainparams)
 {
-    LogPrintf("BitcoinMiner started\n");
+    LOGA("BitcoinMiner started\n");
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
     RenameThread("bitcoin-miner");
 
@@ -616,14 +616,14 @@ void static BitcoinMiner(const CChainParams &chainparams)
                 BlockAssembler(chainparams).CreateNewBlock(coinbaseScript->reserveScript));
             if (!pblocktemplate.get())
             {
-                LogPrintf("Error in BitcoinMiner: Keypool ran out, please call keypoolrefill before restarting the "
+                LOGA("Error in BitcoinMiner: Keypool ran out, please call keypoolrefill before restarting the "
                           "mining thread\n");
                 return;
             }
             CBlock *pblock = &pblocktemplate->block;
             IncrementExtraNonce(pblock, nExtraNonce);
 
-            LogPrintf("Running BitcoinMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
+            LOGA("Running BitcoinMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
                 ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
 
             //
@@ -645,8 +645,8 @@ void static BitcoinMiner(const CChainParams &chainparams)
                         assert(hash == pblock->GetHash());
 
                         SetThreadPriority(THREAD_PRIORITY_NORMAL);
-                        LogPrintf("BitcoinMiner:\n");
-                        LogPrintf(
+                        LOGA("BitcoinMiner:\n");
+                        LOGA(
                             "proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(), hashTarget.GetHex());
                         ProcessBlockFound(pblock, chainparams);
                         SetThreadPriority(THREAD_PRIORITY_LOWEST);
@@ -689,12 +689,12 @@ void static BitcoinMiner(const CChainParams &chainparams)
     }
     catch (const boost::thread_interrupted &)
     {
-        LogPrintf("BitcoinMiner terminated\n");
+        LOGA("BitcoinMiner terminated\n");
         throw;
     }
     catch (const std::runtime_error &e)
     {
-        LogPrintf("BitcoinMiner runtime error: %s\n", e.what());
+        LOGA("BitcoinMiner runtime error: %s\n", e.what());
         return;
     }
 }
@@ -828,7 +828,7 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
 {
     if (blockSize > excessiveBlockSize)
     {
-        LogPrintf("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " Sig:%d  :too many bytes\n",
+        LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " Sig:%d  :too many bytes\n",
             block.nVersion, block.nTime, blockSize, nTx, nSigOps);
         return true;
     }
@@ -838,7 +838,7 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
         // Check transaction size to limit sighash
         if (largestTx > maxTxSize.value)
         {
-            LogPrintf("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
+            LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
                       " largest TX:%d  :tx too large.  Expected less than: %d\n",
                 block.nVersion, block.nTime, blockSize, nTx, largestTx, maxTxSize.value);
             return true;
@@ -850,7 +850,7 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
                     1000000); // block size in megabytes rounded up. 1-1000000 -> 1, 1000001-2000000 -> 2, etc.
         if (nSigOps > blockSigopsPerMb.value * blockMbSize)
         {
-            LogPrintf("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
+            LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
                       " Sig:%d  :too many sigops.  Expected less than: %d\n",
                 block.nVersion, block.nTime, blockSize, nTx, nSigOps, blockSigopsPerMb.value * blockMbSize);
             return true;
@@ -863,14 +863,14 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
         // Check max sigops
         if (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS)
         {
-            LogPrintf("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
+            LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
                       " Sig:%d  :too many sigops.  Expected < 1MB defined constant: %d\n",
                 block.nVersion, block.nTime, blockSize, nTx, nSigOps, BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
             return true;
         }
     }
 
-    LogPrintf("Acceptable block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " Sig:%d\n", block.nVersion, block.nTime,
+    LOGA("Acceptable block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " Sig:%d\n", block.nVersion, block.nTime,
         blockSize, nTx, nSigOps);
     return false;
 }
@@ -1315,7 +1315,7 @@ void LoadFilter(CNode *pfrom, CBloomFilter *filter)
         pfrom->pThinBlockFilter = new CBloomFilter(*filter);
     }
     uint64_t nSizeFilter = ::GetSerializeSize(*pfrom->pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION);
-    LogPrint("thin", "Thinblock Bloom filter size: %d\n", nSizeFilter);
+    LOG(THIN, "Thinblock Bloom filter size: %d\n", nSizeFilter);
     thindata.UpdateInBoundBloomFilter(nSizeFilter);
 }
 
@@ -1543,7 +1543,7 @@ UniValue setlog(const UniValue &params, bool fHelp)
         {
             std::string category;
             std::string data = params[0].get_str();
-            std::transform(data.begin(), data.end(), std::back_inserter(category), ::toupper);
+            std::transform(data.begin(), data.end(), std::back_inserter(category), ::tolower);
             catg = Logging::LogFindCategory(category);
             if (catg == Logging::NONE)
                 return UniValue("Category not found: " + params[0].get_str()); // quit
@@ -1655,10 +1655,10 @@ UniValue validatechainhistory(const UniValue &params, bool fHelp)
         pos = mapBlockIndex[hash];
     }
 
-    LogPrintf("validatechainhistory starting at %d %s\n", pos->nHeight, pos->phashBlock->ToString());
+    LOGA("validatechainhistory starting at %d %s\n", pos->nHeight, pos->phashBlock->ToString());
     while (pos && !failedChain)
     {
-        // LogPrintf("validate %d %s\n", pos->nHeight, pos->phashBlock->ToString());
+        // LOGA("validate %d %s\n", pos->nHeight, pos->phashBlock->ToString());
         failedChain = pos->nStatus & BLOCK_FAILED_MASK;
         if (!failedChain)
         {

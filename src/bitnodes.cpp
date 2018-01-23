@@ -84,7 +84,7 @@ public:
                 }
                 else
                 {
-                    LogPrintf("Unknown Subject Alternate Name type: %d.  This may cause a bitnodes cert error.\n",
+                    LOGA("Unknown Subject Alternate Name type: %d.  This may cause a bitnodes cert error.\n",
                         generalName->type);
                 }
             }
@@ -105,7 +105,7 @@ public:
     {
         if (!error)
         {
-            LogPrintf("Bitnodes connection timed out.\n");
+            LOGA("Bitnodes connection timed out.\n");
             socket_.lowest_layer().cancel();
         }
     }
@@ -317,7 +317,7 @@ bool GetLeaderboardFromBitnodes(vector<string> &vIPs)
     }
     catch (std::exception &e)
     {
-        LogPrintf("Bitnodes Exception: %s\n", e.what());
+        LOGA("Bitnodes Exception: %s\n", e.what());
     }
 
     return (count > 0);

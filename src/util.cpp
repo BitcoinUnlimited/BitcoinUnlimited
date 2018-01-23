@@ -140,9 +140,13 @@ std::string LogGetAllString()
         if (x.first == ALL || x.first == NONE)
             continue;
 
-        ret += (std::string)x.second;
+        //ret += (std::string)x.second;
         if (LogAcceptCategory(x.first))
-            ret += " on";
+            ret += "on "; 
+            else
+            ret+= "   "; 
+
+        ret += (std::string)x.second;    
         ret += "\n";
     }
 
@@ -157,7 +161,7 @@ void LogInit()
 
     for (string const &cat : categories)
     {
-        category = boost::algorithm::to_upper_copy(cat);
+        category = boost::algorithm::to_lower_copy(cat);
         catg = LogFindCategory(category);
 
         if (catg == NONE) // Not a valid category
@@ -240,7 +244,7 @@ public:
 } instance_of_cinit;
 
 /**
- * LogPrintf() has been broken a couple of times now
+ * LOGA() has been broken a couple of times now
  * by well-meaning people adding mutexes in the most straightforward way.
  * It breaks because it may be called by global destructors during shutdown.
  * Since the order of destruction of static/global objects is undefined,
@@ -295,34 +299,6 @@ void OpenDebugLog()
 
     delete vMsgsBeforeOpenLog;
     vMsgsBeforeOpenLog = NULL;
-}
-
-bool LogAcceptCategory(const char *category)
-{
-    if (category != NULL)
-    {
-        if (!fDebug)
-            return false;
-
-        // Give each thread quick access to -debug settings.
-        // This helps prevent issues debugging global destructors,
-        // where mapMultiArgs might be deleted before another
-        // global destructor calls LogPrint()
-        static boost::thread_specific_ptr<set<string> > ptrCategory;
-        if (ptrCategory.get() == NULL)
-        {
-            const vector<string> &categories = mapMultiArgs["-debug"];
-            ptrCategory.reset(new set<string>(categories.begin(), categories.end()));
-            // thread_specific_ptr automatically deletes the set when the thread ends.
-        }
-        const set<string> &setCategories = *ptrCategory.get();
-
-        // if not debugging everything and not debugging specific category, LogPrint does nothing.
-        if (setCategories.count(string("")) == 0 && setCategories.count(string("1")) == 0 &&
-            setCategories.count(string(category)) == 0)
-            return false;
-    }
-    return true;
 }
 
 /**
@@ -535,7 +511,7 @@ static std::string FormatException(const std::exception *pex, const char *pszThr
 void PrintExceptionContinue(const std::exception *pex, const char *pszThread)
 {
     std::string message = FormatException(pex, pszThread);
-    LogPrintf("\n\n************************\n%s\n", message);
+    LOGA("\n\n************************\n%s\n", message);
     fprintf(stderr, "\n\n************************\n%s\n", message.c_str());
 }
 
@@ -575,7 +551,7 @@ const fs::path &GetDataDir(bool fNetSpecific)
 
     fs::path &path = fNetSpecific ? pathCachedNetSpecific : pathCached;
 
-    // This can be called during exceptions by LogPrintf(), so we cache the
+    // This can be called during exceptions by LOGA(), so we cache the
     // value so we don't have to do memory allocations after that.
     if (!path.empty())
         return path;
@@ -602,7 +578,7 @@ const fs::path &GetDataDir(bool fNetSpecific)
     }
     catch (const fs::filesystem_error &e)
     {
-        LogPrintf("failed to create directories to (%s): %s\n", path, e.what());
+        LOGA("failed to create directories to (%s): %s\n", path, e.what());
     }
 
     return path;
@@ -839,7 +815,7 @@ fs::path GetSpecialFolderPath(int nFolder, bool fCreate)
         return fs::path(pszPath);
     }
 
-    LogPrintf("SHGetSpecialFolderPathA() failed, could not obtain requested path.\n");
+    LOGA("SHGetSpecialFolderPathA() failed, could not obtain requested path.\n");
     return fs::path("");
 }
 #endif
@@ -848,7 +824,7 @@ void runCommand(const std::string &strCommand)
 {
     int nErr = ::system(strCommand.c_str());
     if (nErr)
-        LogPrintf("runCommand error: system(%s) returned %d\n", strCommand, nErr);
+        LOGA("runCommand error: system(%s) returned %d\n", strCommand, nErr);
 }
 
 void RenameThread(const char *name)
