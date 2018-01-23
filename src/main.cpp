@@ -2753,7 +2753,6 @@ void static UpdateTip(CBlockIndex *pindexNew)
         Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), chainActive.Tip()),
         pcoinsTip->DynamicMemoryUsage() * (1.0 / (1 << 20)), pcoinsTip->GetCacheSize());
 
-    UpdateUAHFGlobals(pindexNew);
     cvBlockChange.notify_all();
 
     // Check the version of the last 100 blocks to see if we need to upgrade:
