@@ -1014,13 +1014,5 @@ QString formatTimeOffset(int64_t nTimeOffset)
     return QString(QObject::tr("%1 s")).arg(QString::number((int)nTimeOffset, 10));
 }
 
-QString uriPrefix()
-{
-#ifdef BITCOIN_CASH
-    return "bitcoincash";
-#else
-    return "bitcoin";
-#endif
-}
-
+QString uriPrefix() { return "bitcoincash"; }
 } // namespace GUIUtil

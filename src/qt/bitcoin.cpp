@@ -704,11 +704,10 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-/// 3. Migrate application settings, if necessary
-// BU changed the QAPP_ORG_NAME and since this is used for reading the app settings
-// from the registry (Windows) or a configuration file (Linux/OSX)
-// we need to check to see if we need to migrate old settings to the new location
-#ifdef BITCOIN_CASH
+    /// 3. Migrate application settings, if necessary
+    // BU changed the QAPP_ORG_NAME and since this is used for reading the app settings
+    // from the registry (Windows) or a configuration file (Linux/OSX)
+    // we need to check to see if we need to migrate old settings to the new location
     bool fMigrated = false;
     // For BUCash, first try to migrate from BTC BU settings
     fMigrated = TryMigrateQtAppSettings(QAPP_ORG_NAME, QAPP_APP_NAME_DEFAULT, QAPP_ORG_NAME, QAPP_APP_NAME_BUCASH);
@@ -721,23 +720,15 @@ int main(int argc, char *argv[])
     // in which case each instance requires a different data directory.
     if (fMigrated)
         SoftSetBoolArg("-choosedatadir", true);
-#else
-    // Try to migrate from non-BU client settings
-    TryMigrateQtAppSettings(QAPP_ORG_NAME_LEGACY, QAPP_APP_NAME_DEFAULT, QAPP_ORG_NAME, QAPP_APP_NAME_DEFAULT);
-#endif
 
     /// 4. Application identification
     // must be set before OptionsModel is initialized or translations are loaded,
     // as it is used to locate QSettings
     QApplication::setOrganizationName(QAPP_ORG_NAME);
     QApplication::setOrganizationDomain(QAPP_ORG_DOMAIN);
-#ifdef BITCOIN_CASH
     // Use a different app name for BUCash to enable side-by-side installations which won't
     // interfere with each other
     QApplication::setApplicationName(QAPP_APP_NAME_BUCASH);
-#else
-    QApplication::setApplicationName(QAPP_APP_NAME_DEFAULT);
-#endif
     GUIUtil::SubstituteFonts(GetLangTerritory());
 
     /// 5. Initialization of translations, so that intro dialog is in user's language
