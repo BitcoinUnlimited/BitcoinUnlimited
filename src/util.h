@@ -150,6 +150,7 @@ enum
 
     SELECTCOINS = 0x1000000,
     ZMQ = 0x2000000,
+    QT  = 0x4000000
 };
 
 // Add corresponding lower case string for the category:
@@ -284,11 +285,11 @@ inline void LogWrite(const std::string &str)
     void(0)
 
 /**
- * LOGA macro: Log a string to the console.
+ * LOGA macro: Always log a string.
  *
  * @param[in] ... "printf like args".
  */
-#define LOGA(...) Logging::LogStdout(__VA_ARGS__)
+#define LOGA(...) Logging::LogWrite(__VA_ARGS__)
 //
 
 // Log tests:
