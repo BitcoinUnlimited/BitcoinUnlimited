@@ -2281,17 +2281,15 @@ bool ConnectBlock(const CBlock &block,
         nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
     }
 
-// If the DAA HF is enabled, we start rejecting transaction that use a high
-// s in their signature. We also make sure that signature that are supposed
-// to fail (for instance in multisig or other forms of smart contracts) are
-// null.
-#ifdef BITCOIN_CASH
+    // If the DAA HF is enabled, we start rejecting transaction that use a high
+    // s in their signature. We also make sure that signature that are supposed
+    // to fail (for instance in multisig or other forms of smart contracts) are
+    // null.
     if (IsDAAEnabled(chainparams, pindex->pprev))
     {
         flags |= SCRIPT_VERIFY_LOW_S;
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
-#endif
 
     int64_t nTime2 = GetTimeMicros();
     nTimeForks += nTime2 - nTime1;
