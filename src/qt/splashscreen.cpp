@@ -29,32 +29,25 @@
 
 SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) : QWidget(0, f), curAlignment(0)
 {
+    int TEXTX = 260;
+    int VERY = 150;
+    // int COPYRIGHTY = 180;
+    int NETY = 250;
+
     // set reference point, paddings
-    int paddingRight = 50;
-    int paddingTop = 50;
-    int titleVersionVSpace = 17;
-#ifndef BITCOIN_CASH
-    int titleCopyrightVSpace = 40;
-#endif
     float fontFactor = 1.0;
     float devicePixelRatio = 1.0;
 #if QT_VERSION > 0x050100
     devicePixelRatio = ((QGuiApplication *)QCoreApplication::instance())->devicePixelRatio();
 #endif
 
-// define text to place
-#ifdef BITCOIN_CASH
-    QString titleText = tr("Bitcoin Unlimited");
+    // define text to place
+    QString titleText = tr("Bitcoin Unlimited Bitcoin Cash");
     // create a bitmap according to device pixelratio
-    QSize splashSize(480 * devicePixelRatio, 420 * devicePixelRatio);
-#else
-    QString titleText = tr(PACKAGE_NAME);
-    // create a bitmap according to device pixelratio
-    QSize splashSize(480 * devicePixelRatio, 320 * devicePixelRatio);
-#endif
+    QPixmap splash(":/images/splash");
+    QSize splashPixSize = splash.size();
+    QSize splashSize(splashPixSize.width() * devicePixelRatio, splashPixSize.height() * devicePixelRatio);
     QString versionText = QString("Version %1").arg(QString::fromStdString(FormatFullVersion()));
-    QString copyrightText =
-        QString::fromUtf8(CopyrightHolders(strprintf("\xc2\xA9 %u-%u ", 2009, COPYRIGHT_YEAR)).c_str());
     QString titleAddText = networkStyle->getTitleAddText();
 
     QString font = QApplication::font().toString();
@@ -71,80 +64,41 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
     // draw a slightly radial gradient
     QRadialGradient gradient(QPoint(0, 0), splashSize.width() / devicePixelRatio);
     gradient.setColorAt(0, Qt::white);
-    gradient.setColorAt(1, QColor(247, 247, 247));
+    gradient.setColorAt(1, QColor(220, 220, 220));
     QRect rGradient(QPoint(0, 0), splashSize);
     pixPaint.fillRect(rGradient, gradient);
 
-// draw the bitcoin icon, expected size of PNG: 1024x1024
-#ifdef BITCOIN_CASH
-    QRect rectIcon(QPoint(0, -20), QSize(480, 480));
-#else
-    QRect rectIcon(QPoint(-150, -122), QSize(430, 430));
-#endif
-    const QSize requiredSize(1024, 1024);
-    QPixmap icon(networkStyle->getAppIcon().pixmap(requiredSize));
+    pixPaint.drawPixmap(QRect(QPoint(0, 0), splashSize), splash);
 
-    pixPaint.drawPixmap(rectIcon, icon);
+    pixPaint.setFont(QFont(font, 16 * fontFactor));
+    // QFontMetrics fm = pixPaint.fontMetrics();
+    // int versionTextWidth = fm.width(versionText);
+    pixPaint.drawText(TEXTX * devicePixelRatio, VERY * devicePixelRatio, versionText);
 
-    // check font size and drawing with
-    pixPaint.setFont(QFont(font, 33 * fontFactor));
-    QFontMetrics fm = pixPaint.fontMetrics();
-    int titleTextWidth = fm.width(titleText);
-    if (titleTextWidth > 176)
+    // draw additional text if special network
+    if (!titleAddText.isEmpty())
     {
-        fontFactor = fontFactor * 176 / titleTextWidth;
+        pixPaint.setFont(QFont(font, 40 * fontFactor));
+        pixPaint.setPen(QColor(200, 0, 0));
+        //fm = pixPaint.fontMetrics();
+        // versionTextWidth = fm.width(versionText);
+        pixPaint.drawText(TEXTX * devicePixelRatio, NETY * devicePixelRatio, titleAddText);
     }
 
-    pixPaint.setFont(QFont(font, 33 * fontFactor));
-    fm = pixPaint.fontMetrics();
-    titleTextWidth = fm.width(titleText);
-#ifdef BITCOIN_CASH
-    pixPaint.drawText(paddingRight, paddingTop / 2, titleText);
-    int bccTextWidth = fm.width("Bitcoin Cash");
-    pixPaint.drawText(pixmap.width() / devicePixelRatio - bccTextWidth - paddingRight, paddingTop / 2, "Bitcoin Cash");
-#else
-    pixPaint.drawText(pixmap.width() / devicePixelRatio - titleTextWidth - paddingRight, paddingTop, titleText);
-#endif
+#if 0 // I don't think we need copyright on the splash screen but leaving this here for later
+    QString copyrightText =
+        QString::fromUtf8(CopyrightHolders(strprintf("\xc2\xA9 %u-%u ", 2009, COPYRIGHT_YEAR)).c_str());
 
-#ifdef BITCOIN_CASH
-    pixPaint.setFont(QFont(font, 24 * fontFactor));
-    int versionTextWidth = fm.width(versionText);
-    pixPaint.drawText((pixmap.width() / devicePixelRatio - versionTextWidth) / 2,
-        paddingTop / 2 + titleVersionVSpace + 10, versionText);
-#else
-    pixPaint.setFont(QFont(font, 15 * fontFactor));
-    // if the version string is to long, reduce size
-    fm = pixPaint.fontMetrics();
-    int versionTextWidth = fm.width(versionText);
-    if (versionTextWidth > titleTextWidth + paddingRight - 10)
-    {
-        pixPaint.setFont(QFont(font, 10 * fontFactor));
-        titleVersionVSpace -= 5;
-    }
-    pixPaint.drawText(pixmap.width() / devicePixelRatio - titleTextWidth - paddingRight + 2,
-        paddingTop + titleVersionVSpace, versionText);
-#endif
-
-#ifndef BITCOIN_CASH
     // draw copyright stuff
     {
         pixPaint.setFont(QFont(font, 10 * fontFactor));
-        const int x = pixmap.width() / devicePixelRatio - titleTextWidth - paddingRight;
-        const int y = paddingTop + titleCopyrightVSpace;
+        pixPaint.setPen(QColor(100, 100, 100));
+        const int x = TEXTX;
+        const int y = COPYRIGHTY;
         QRect copyrightRect(x, y, pixmap.width() - x - paddingRight, pixmap.height() - y);
         pixPaint.drawText(copyrightRect, Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap, copyrightText);
     }
 #endif
-    // draw additional text if special network
-    if (!titleAddText.isEmpty())
-    {
-        QFont boldFont = QFont(font, 10 * fontFactor);
-        boldFont.setWeight(QFont::Bold);
-        pixPaint.setFont(boldFont);
-        fm = pixPaint.fontMetrics();
-        int titleAddTextWidth = fm.width(titleAddText);
-        pixPaint.drawText(pixmap.width() / devicePixelRatio - titleAddTextWidth - 10, 15, titleAddText);
-    }
 
     pixPaint.end();
 
