@@ -2797,7 +2797,7 @@ void static UpdateTip(CBlockIndex *pindexNew)
                 anUnexpectedVersion);
         if (nUpgraded > 100 / 2)
         {
-            // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-LOG( code to warn the user:
+            // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-RPC( code to warn the user:
             strMiscWarning =
                 _("Warning: Unknown block versions being mined! It's possible unknown rules are in effect");
             if (!fWarned)
