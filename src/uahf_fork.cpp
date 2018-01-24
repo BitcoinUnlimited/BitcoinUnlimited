@@ -21,20 +21,6 @@ static const std::string ANTI_REPLAY_MAGIC_VALUE = "Bitcoin: A Peer-to-Peer Elec
 std::vector<unsigned char> invalidOpReturn =
     std::vector<unsigned char>(std::begin(ANTI_REPLAY_MAGIC_VALUE), std::end(ANTI_REPLAY_MAGIC_VALUE));
 
-bool UpdateUAHFGlobals(CBlockIndex *activeTip)
-{
-    if (activeTip)
-    {
-        if (UAHFforkAtNextBlock(activeTip->nHeight))
-        {
-            excessiveBlockSize = miningForkEB.value;
-            maxGeneratedBlock = miningForkMG.value;
-            return true;
-        }
-    }
-    return false;
-}
-
 bool ValidateUAHFBlock(const CBlock &block, CValidationState &state, int nHeight)
 {
     // Validate transactions are HF compatible

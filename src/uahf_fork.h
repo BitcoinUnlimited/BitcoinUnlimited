@@ -29,9 +29,6 @@ extern bool ValidateUAHFBlock(const CBlock &block, CValidationState &state, int 
 // Return true if this transaction is invalid on the UAHF fork due to a special OP_RETURN code
 extern bool IsTxOpReturnInvalid(const CTransaction &tx);
 
-// Update global variables based on whether the next block is the fork block
-extern bool UpdateUAHFGlobals(CBlockIndex *activeTip);
-
 // Return true if this transaction can only be committed post-fork
 extern bool IsTxUAHFOnly(const CTxMemPoolEntry &tx);
 
