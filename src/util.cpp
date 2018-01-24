@@ -140,13 +140,13 @@ std::string LogGetAllString()
         if (x.first == ALL || x.first == NONE)
             continue;
 
-        //ret += (std::string)x.second;
+        // ret += (std::string)x.second;
         if (LogAcceptCategory(x.first))
-            ret += "on "; 
-            else
-            ret+= "   "; 
+            ret += "on ";
+        else
+            ret += "   ";
 
-        ret += (std::string)x.second;    
+        ret += (std::string)x.second;
         ret += "\n";
     }
 

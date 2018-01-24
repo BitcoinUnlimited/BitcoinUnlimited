@@ -537,15 +537,15 @@ public:
         nReadPos = nPos;
         if (nReadPos + nRewind < nSrcPos)
         {
-            LOG(REINDEX, "Short SetPos: desired %lld actual %lld srcpos %lld buffer size %lld, rewind %lld\n",
-                nPos, nReadPos, nSrcPos, vchBuf.size(), nRewind);
+            LOG(REINDEX, "Short SetPos: desired %lld actual %lld srcpos %lld buffer size %lld, rewind %lld\n", nPos,
+                nReadPos, nSrcPos, vchBuf.size(), nRewind);
             nReadPos = nSrcPos - nRewind;
             return false;
         }
         else if (nReadPos > nSrcPos)
         {
-            LOG(REINDEX, "Long SetPos: desired %lld actual %lld srcpos %lld buffer size %lld, rewind %lld\n",
-                nPos, nReadPos, nSrcPos, vchBuf.size(), nRewind);
+            LOG(REINDEX, "Long SetPos: desired %lld actual %lld srcpos %lld buffer size %lld, rewind %lld\n", nPos,
+                nReadPos, nSrcPos, vchBuf.size(), nRewind);
             nReadPos = nSrcPos;
             return false;
         }

@@ -92,8 +92,8 @@ void CConnMgr::EnableExpeditedSends(CNode *pNode, bool fBlocks, bool fTxs, bool 
         }
         else
         {
-            LOG(THIN, "Cannot enable expedited blocks to peer %s, I am full (%u peers total)\n",
-                pNode->GetLogName(), vSendExpeditedBlocks.size());
+            LOG(THIN, "Cannot enable expedited blocks to peer %s, I am full (%u peers total)\n", pNode->GetLogName(),
+                vSendExpeditedBlocks.size());
         }
     }
 
@@ -107,8 +107,8 @@ void CConnMgr::EnableExpeditedSends(CNode *pNode, bool fBlocks, bool fTxs, bool 
         }
         else
         {
-            LOG(THIN, "Cannot enable expedited txs to peer %s, I am full (%u peers total)\n",
-                pNode->GetLogName(), vSendExpeditedTxs.size());
+            LOG(THIN, "Cannot enable expedited txs to peer %s, I am full (%u peers total)\n", pNode->GetLogName(),
+                vSendExpeditedTxs.size());
         }
     }
 }

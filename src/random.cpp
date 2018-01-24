@@ -93,8 +93,7 @@ void GetRandBytes(unsigned char *buf, int num)
 {
     if (RAND_bytes(buf, num) != 1)
     {
-        LOGA(
-            "%s: OpenSSL RAND_bytes() failed with error: %s\n", __func__, ERR_error_string(ERR_get_error(), NULL));
+        LOGA("%s: OpenSSL RAND_bytes() failed with error: %s\n", __func__, ERR_error_string(ERR_get_error(), NULL));
         assert(false);
     }
 }

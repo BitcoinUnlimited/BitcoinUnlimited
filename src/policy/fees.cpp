@@ -182,7 +182,7 @@ double TxConfirmStats::EstimateMedianVal(int confTarget,
     }
 
     LOG(ESTIMATEFEE, "%3d: For conf success %s %4.2f need %s %s: %12.5g from buckets %8g - %8g  Cur Bucket "
-                            "stats %6.2f%%  %8.1f/(%.1f+%d mempool)\n",
+                     "stats %6.2f%%  %8.1f/(%.1f+%d mempool)\n",
         confTarget, requireGreater ? ">" : "<", successBreakPoint, dataTypeString, requireGreater ? ">" : "<", median,
         buckets[minBucket], buckets[maxBucket], 100 * nConf / (totalNum + extraNum), nConf, totalNum, extraNum);
 
@@ -261,8 +261,8 @@ void TxConfirmStats::Read(CAutoFile &filein)
     for (unsigned int i = 0; i < buckets.size(); i++)
         bucketMap[buckets[i]] = i;
 
-    LOG(ESTIMATEFEE, "Reading estimates: %u %s buckets counting confirms up to %u blocks\n", numBuckets,
-        dataTypeString, maxConfirms);
+    LOG(ESTIMATEFEE, "Reading estimates: %u %s buckets counting confirms up to %u blocks\n", numBuckets, dataTypeString,
+        maxConfirms);
 }
 
 unsigned int TxConfirmStats::NewTx(unsigned int nBlockHeight, double val)

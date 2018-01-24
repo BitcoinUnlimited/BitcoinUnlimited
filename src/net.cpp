@@ -733,8 +733,8 @@ int SocketSendData(CNode *pnode)
                 int nErr = WSAGetLastError();
                 if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
                 {
-                    LOG(NET, "socket send error '%s' to %s (%d)\n", NetworkErrorString(nErr),
-                        pnode->addrName.c_str(), pnode->id);
+                    LOG(NET, "socket send error '%s' to %s (%d)\n", NetworkErrorString(nErr), pnode->addrName.c_str(),
+                        pnode->id);
                     pnode->fDisconnect = true;
                 }
             }
@@ -746,8 +746,8 @@ int SocketSendData(CNode *pnode)
     if (it == pnode->vSendMsg.end())
     {
         if (pnode->nSendOffset != 0 || pnode->nSendSize != 0)
-            LOGA("ERROR: One or more values were not Zero - nSendOffset was %d nSendSize was %d\n",
-                pnode->nSendOffset, pnode->nSendSize);
+            LOGA("ERROR: One or more values were not Zero - nSendOffset was %d nSendSize was %d\n", pnode->nSendOffset,
+                pnode->nSendSize);
         // assert(pnode->nSendOffset == 0);
         // assert(pnode->nSendSize == 0);
     }
@@ -876,8 +876,7 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
         mapInboundConnectionTracker[ipAddress].nEvictions = nEvictions;
         mapInboundConnectionTracker[ipAddress].nLastEvictionTime = GetTime();
 
-        LOG(EVICT, "Number of Evictions is %f for %s\n", nEvictions,
-            vEvictionCandidatesByActivity[0]->addr.ToString());
+        LOG(EVICT, "Number of Evictions is %f for %s\n", nEvictions, vEvictionCandidatesByActivity[0]->addr.ToString());
         if (nEvictions > 15)
         {
             int nHoursToBan = 4;
@@ -1334,8 +1333,8 @@ void ThreadSocketHandler()
             {
                 if (pnode->nLastRecv == 0 || pnode->nLastSend == 0)
                 {
-                    LOG(NET, "Node %s socket no message in first 60 seconds, %d %d from %d\n",
-                        pnode->addrName.c_str(), pnode->nLastRecv != 0, pnode->nLastSend != 0, pnode->id);
+                    LOG(NET, "Node %s socket no message in first 60 seconds, %d %d from %d\n", pnode->addrName.c_str(),
+                        pnode->nLastRecv != 0, pnode->nLastSend != 0, pnode->id);
                     pnode->fDisconnect = true;
                 }
                 else if (nTime - pnode->nLastSend > TIMEOUT_INTERVAL)
@@ -2426,8 +2425,7 @@ void NetCleanup()
     {
         if (hListenSocket.socket != INVALID_SOCKET)
             if (!CloseSocket(hListenSocket.socket))
-                LOG(
-                    NET, "CloseSocket(hListenSocket) failed with error %s\n", NetworkErrorString(WSAGetLastError()));
+                LOG(NET, "CloseSocket(hListenSocket) failed with error %s\n", NetworkErrorString(WSAGetLastError()));
     }
 
     // clean up some globals (to help leak detection)
@@ -2469,8 +2467,8 @@ void RelayTransaction(const CTransaction &tx, const CDataStream &ss)
     uint64_t len = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
     if (len > maxTxSize.value)
     {
-        LOGA("Will not announce (INV) excessive transaction %s.  Size: %llu, Limit: %llu\n",
-            tx.GetHash().ToString(), len, (uint64_t)maxTxSize.value);
+        LOGA("Will not announce (INV) excessive transaction %s.  Size: %llu, Limit: %llu\n", tx.GetHash().ToString(),
+            len, (uint64_t)maxTxSize.value);
         return;
     }
 
@@ -2534,8 +2532,7 @@ void CNode::SetMaxOutboundTarget(uint64_t limit)
     nMaxOutboundLimit = limit;
 
     if (limit > 0 && limit < recommendedMinimum)
-        LOGA(
-            "Max outbound target is very small (%s bytes) and will be overshot. Recommended minimum is %s bytes.\n",
+        LOGA("Max outbound target is very small (%s bytes) and will be overshot. Recommended minimum is %s bytes.\n",
             nMaxOutboundLimit, recommendedMinimum);
 }
 

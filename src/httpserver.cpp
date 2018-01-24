@@ -256,8 +256,8 @@ static void http_request_cb(struct evhttp_request *req, void *arg)
 {
     std::unique_ptr<HTTPRequest> hreq(new HTTPRequest(req));
 
-    LOG(HTTP, "Received a %s request for %s from %s\n", RequestMethodString(hreq->GetRequestMethod()),
-        hreq->GetURI(), hreq->GetPeer().ToString());
+    LOG(HTTP, "Received a %s request for %s from %s\n", RequestMethodString(hreq->GetRequestMethod()), hreq->GetURI(),
+        hreq->GetPeer().ToString());
 
     // Early address-based allow check
     if (!ClientAllowed(hreq->GetPeer()))
@@ -339,7 +339,7 @@ static bool HTTPBindAddresses(struct evhttp *http)
         if (mapArgs.count("-rpcbind"))
         {
             LOGA("WARNING: option -rpcbind was ignored because -rpcallowip was not specified, refusing to allow "
-                      "everyone to connect\n");
+                 "everyone to connect\n");
         }
     }
     else if (mapArgs.count("-rpcbind"))

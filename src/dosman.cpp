@@ -320,8 +320,7 @@ void CDoSManager::DumpBanlist()
         setBannedIsDirty = true;
     }
     else
-        LOG(NET, "Flushed %d banned node ips/subnets to banlist.dat  %dms\n", banmap.size(),
-            GetTimeMillis() - nStart);
+        LOG(NET, "Flushed %d banned node ips/subnets to banlist.dat  %dms\n", banmap.size(), GetTimeMillis() - nStart);
 }
 
 /**
@@ -344,8 +343,7 @@ void CDoSManager::LoadBanlist()
         // Remove any ban entries that were persisted to disk but have since expired
         SweepBannedInternal();
 
-        LOG(NET, "Loaded %d banned node ips/subnets from banlist.dat  %dms\n", banmap.size(),
-            GetTimeMillis() - nStart);
+        LOG(NET, "Loaded %d banned node ips/subnets from banlist.dat  %dms\n", banmap.size(), GetTimeMillis() - nStart);
     }
     else
         LOGA("Invalid or missing banlist.dat; recreating\n");

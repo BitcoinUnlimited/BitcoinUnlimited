@@ -508,8 +508,8 @@ public:
             Check();
         }
         if (fRet)
-            LOG(ADDRMAN, "Added %s from %s: %i tried, %i new\n", addr.ToStringIPPort(), source.ToString(),
-                nTried, nNew);
+            LOG(ADDRMAN, "Added %s from %s: %i tried, %i new\n", addr.ToStringIPPort(), source.ToString(), nTried,
+                nNew);
         return fRet;
     }
 

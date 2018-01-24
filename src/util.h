@@ -150,7 +150,7 @@ enum
 
     SELECTCOINS = 0x1000000,
     ZMQ = 0x2000000,
-    QT  = 0x4000000
+    QT = 0x4000000
 };
 
 // Add corresponding lower case string for the category:

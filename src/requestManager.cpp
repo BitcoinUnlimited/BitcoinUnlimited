@@ -361,8 +361,7 @@ bool RequestBlock(CNode *pfrom, CInv obj)
         BlockMap::iterator idxIt = mapBlockIndex.find(obj.hash);
         if (idxIt == mapBlockIndex.end()) // only request if we don't already have the header
         {
-            LOG(
-                NET, "getheaders (%d) %s to peer=%d\n", pindexBestHeader->nHeight, obj.hash.ToString(), pfrom->id);
+            LOG(NET, "getheaders (%d) %s to peer=%d\n", pindexBestHeader->nHeight, obj.hash.ToString(), pfrom->id);
             pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexBestHeader), obj.hash);
         }
     }
@@ -443,8 +442,8 @@ bool RequestBlock(CNode *pfrom, CInv obj)
             vToFetch.push_back(inv2);
             MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
             pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
-            LOG(THIN, "Requesting Regular Block %s from peer %s (%d)\n", inv2.hash.ToString(),
-                pfrom->addrName.c_str(), pfrom->id);
+            LOG(THIN, "Requesting Regular Block %s from peer %s (%d)\n", inv2.hash.ToString(), pfrom->addrName.c_str(),
+                pfrom->id);
             return true;
         }
         return false; // no block was requested
@@ -663,8 +662,8 @@ void CRequestManager::SendRequests()
                         }
                         {
                             LOCK(cs_vNodes);
-                            LOG(REQ, "ReqMgr: %s removed tx ref to %d count %d\n", obj.ToString(),
-                                next.node->GetId(), next.node->GetRefCount());
+                            LOG(REQ, "ReqMgr: %s removed tx ref to %d count %d\n", obj.ToString(), next.node->GetId(),
+                                next.node->GetRefCount());
                             next.node->Release();
                             next.node = NULL;
                         }

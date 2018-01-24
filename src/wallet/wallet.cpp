@@ -190,8 +190,8 @@ bool CWallet::LoadCScript(const CScript &redeemScript)
     {
         std::string strAddr = EncodeDestination(CScriptID(redeemScript));
         LOGA("%s: Warning: This wallet contains a redeemScript of size %i "
-                  "which exceeds maximum size %i thus can never be redeemed. "
-                  "Do not use address %s.\n",
+             "which exceeds maximum size %i thus can never be redeemed. "
+             "Do not use address %s.\n",
             __func__, redeemScript.size(), MAX_SCRIPT_ELEMENT_SIZE, strAddr);
         return true;
     }
@@ -302,8 +302,7 @@ bool CWallet::ChangeWalletPassphrase(const SecureString &strOldWalletPassphrase,
                 if (pMasterKey.second.nDeriveIterations < 25000)
                     pMasterKey.second.nDeriveIterations = 25000;
 
-                LOGA(
-                    "Wallet passphrase changed to an nDeriveIterations of %i\n", pMasterKey.second.nDeriveIterations);
+                LOGA("Wallet passphrase changed to an nDeriveIterations of %i\n", pMasterKey.second.nDeriveIterations);
 
                 if (!crypter.SetKeyFromPassphrase(strNewWalletPassphrase, pMasterKey.second.vchSalt,
                         pMasterKey.second.nDeriveIterations, pMasterKey.second.nDerivationMethod))
@@ -829,8 +828,7 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransaction &tx, const CBlock *pbl
                 {
                     if (range.first->second != tx.GetHash())
                     {
-                        LOGA(
-                            "Transaction %s (in block %s) conflicts with wallet transaction %s (both spend %s:%i)\n",
+                        LOGA("Transaction %s (in block %s) conflicts with wallet transaction %s (both spend %s:%i)\n",
                             tx.GetHash().ToString(), pblock->GetHash().ToString(), range.first->second.ToString(),
                             range.first->first.hash.ToString(), range.first->first.n);
                         MarkConflicted(pblock->GetHash(), range.first->second);

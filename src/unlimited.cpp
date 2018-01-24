@@ -379,7 +379,7 @@ void UnlimitedSetup(void)
     if (maxGeneratedBlock > excessiveBlockSize)
     {
         LOGA("Reducing the maximum mined block from the configured %d to your excessive block size %d.  Otherwise "
-                  "you would orphan your own blocks.\n",
+             "you would orphan your own blocks.\n",
             maxGeneratedBlock, excessiveBlockSize);
         maxGeneratedBlock = excessiveBlockSize;
     }
@@ -617,7 +617,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
             if (!pblocktemplate.get())
             {
                 LOGA("Error in BitcoinMiner: Keypool ran out, please call keypoolrefill before restarting the "
-                          "mining thread\n");
+                     "mining thread\n");
                 return;
             }
             CBlock *pblock = &pblocktemplate->block;
@@ -646,8 +646,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
 
                         SetThreadPriority(THREAD_PRIORITY_NORMAL);
                         LOGA("BitcoinMiner:\n");
-                        LOGA(
-                            "proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(), hashTarget.GetHex());
+                        LOGA("proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(), hashTarget.GetHex());
                         ProcessBlockFound(pblock, chainparams);
                         SetThreadPriority(THREAD_PRIORITY_LOWEST);
                         coinbaseScript->KeepScript();
@@ -839,7 +838,7 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
         if (largestTx > maxTxSize.value)
         {
             LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
-                      " largest TX:%d  :tx too large.  Expected less than: %d\n",
+                 " largest TX:%d  :tx too large.  Expected less than: %d\n",
                 block.nVersion, block.nTime, blockSize, nTx, largestTx, maxTxSize.value);
             return true;
         }
@@ -851,7 +850,7 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
         if (nSigOps > blockSigopsPerMb.value * blockMbSize)
         {
             LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
-                      " Sig:%d  :too many sigops.  Expected less than: %d\n",
+                 " Sig:%d  :too many sigops.  Expected less than: %d\n",
                 block.nVersion, block.nTime, blockSize, nTx, nSigOps, blockSigopsPerMb.value * blockMbSize);
             return true;
         }
@@ -864,7 +863,7 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
         if (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS)
         {
             LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
-                      " Sig:%d  :too many sigops.  Expected < 1MB defined constant: %d\n",
+                 " Sig:%d  :too many sigops.  Expected < 1MB defined constant: %d\n",
                 block.nVersion, block.nTime, blockSize, nTx, nSigOps, BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
             return true;
         }

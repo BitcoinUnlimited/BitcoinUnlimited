@@ -1000,8 +1000,7 @@ bool BackupWallet(const CWallet &wallet, const string &strDest)
                 }
                 catch (std::ios_base::failure &e)
                 {
-                    LOGA(
-                        "error copying wallet from %s to %s - %s\n", pathSrc.string(), pathDest.string(), e.what());
+                    LOGA("error copying wallet from %s to %s - %s\n", pathSrc.string(), pathDest.string(), e.what());
                     return false;
                 }
                 // end replacement copy code

@@ -154,8 +154,8 @@ void CParallelValidation::Cleanup(const CBlock &block, CBlockIndex *pindex)
                     nId = 1;
                 if ((*riter).first == 0)
                     (*riter).first = 1;
-                LOG(PARALLEL, "swapping sequence id for block %s before %d after %d\n",
-                    block.GetHash().ToString(), pindex->nSequenceId, (*riter).first);
+                LOG(PARALLEL, "swapping sequence id for block %s before %d after %d\n", block.GetHash().ToString(),
+                    pindex->nSequenceId, (*riter).first);
                 pindex->nSequenceId = (*riter).first;
                 (*riter).first = nId;
 
@@ -486,8 +486,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom,
                     // if your block is the biggest or of equal size to the biggest then reject it.
                     if (nLargestBlockSize <= nBlockSize)
                     {
-                        LOG(PARALLEL,
-                            "Block validation terminated - Too many blocks currently being validated: %s\n",
+                        LOG(PARALLEL, "Block validation terminated - Too many blocks currently being validated: %s\n",
                             block.GetHash().ToString());
                         return; // new block is rejected and does not enter PV
                     }
@@ -497,7 +496,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom,
                         LOG(PARALLEL, "Sending Quit() to scriptcheckqueue\n");
                         (*miLargestBlock).second.fQuit = true; // terminate the PV thread
                         LOG(PARALLEL, "Too many blocks being validated, interrupting thread with blockhash %s "
-                                             "and previous blockhash %s\n",
+                                      "and previous blockhash %s\n",
                             (*miLargestBlock).second.hash.ToString(),
                             (*miLargestBlock).second.hashPrevBlock.ToString());
                     }
@@ -600,9 +599,8 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, const CBloc
         double nValidationTime = (double)(GetTimeMicros() - startTime) / 1000000.0;
         if (strCommand != NetMsgType::BLOCK)
         {
-            LOG(THIN, "Processed Block %s reconstructed from (%s) in %.2f seconds, peer=%s\n",
-                inv.hash.ToString(), strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0,
-                pfrom->GetLogName());
+            LOG(THIN, "Processed Block %s reconstructed from (%s) in %.2f seconds, peer=%s\n", inv.hash.ToString(),
+                strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0, pfrom->GetLogName());
             thindata.UpdateValidationTime(nValidationTime);
         }
         else
