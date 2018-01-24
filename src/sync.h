@@ -310,7 +310,7 @@ public:
             uint64_t doneTime = GetStopwatch();
             if (doneTime - lockedTime > LOCK_WARN_TIME)
             {
-                LOG("lck", "Lock %s at %s:%d remained locked for %d ms\n", name, file, line, doneTime - lockedTime);
+                LOG(LCK, "Lock %s at %s:%d remained locked for %d ms\n", name, file, line, doneTime - lockedTime);
             }
 #endif
         }
@@ -412,7 +412,7 @@ public:
             int64_t doneTime = GetStopwatch();
             if (doneTime - lockedTime > LOCK_WARN_TIME)
             {
-                LOG("lck", "Lock %s at %s:%d remained locked for %d ms\n", name, file, line, doneTime - lockedTime);
+                LOG(LCK, "Lock %s at %s:%d remained locked for %d ms\n", name, file, line, doneTime - lockedTime);
             }
 #endif
         }

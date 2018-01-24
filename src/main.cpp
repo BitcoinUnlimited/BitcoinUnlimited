@@ -6914,8 +6914,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 ss << ": hash " << hash.ToString();
 
                 // We need to see this reject message in either "req" or "net" debug mode
-                LOG(REQ, "Reject %s\n", SanitizeString(ss.str()));
-                LOG(NET, "Reject %s\n", SanitizeString(ss.str()));
+                LOG(REQ | NET, "Reject %s\n", SanitizeString(ss.str()));
 
                 if (strMsg == NetMsgType::BLOCK)
                 {

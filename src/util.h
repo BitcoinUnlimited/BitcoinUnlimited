@@ -161,7 +161,7 @@ enum
             {PARTITIONCHECK, "partitioncheck"}, {BENCH, "bench"}, {PRUNE, "prune"}, {REINDEX, "reindex"},       \
             {MEMPOOLREJ, "mempoolrej"}, {BLK, "blk"}, {EVICT, "evict"}, {PARALLEL, "parallel"}, {RAND, "rand"}, \
             {REQ, "req"}, {BLOOM, "bloom"}, {LCK, "lck"}, {PROXY, "proxy"}, {DBASE, "dbase"},                   \
-            {SELECTCOINS, "selectcoins"}, {ESTIMATEFEE, "estimatefee"},                                         \
+            {SELECTCOINS, "selectcoins"}, {ESTIMATEFEE, "estimatefee"}, {QT, "qt"},                             \
         {                                                                                                       \
             ZMQ, "zmq"                                                                                          \
         }                                                                                                       \
@@ -276,13 +276,13 @@ inline void LogWrite(const std::string &str)
  * @param[in] category -Which category to log
  * @param[in] ... "printf like args".
  */
-#define LOG(ctgr, ...)               \
-    {                                \
-        using namespace Logging;     \
-        if (LogAcceptCategory(ctgr)) \
-            LogWrite(__VA_ARGS__);   \
-    }                                \
-    void(0)
+#define LOG(ctgr, ...)                        \
+    do                                        \
+    {                                         \
+        using namespace Logging;              \
+        if (Logging::LogAcceptCategory(ctgr)) \
+            Logging::LogWrite(__VA_ARGS__);   \
+    } while (0)
 
 /**
  * LOGA macro: Always log a string.
