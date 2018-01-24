@@ -13,15 +13,7 @@ from decimal import Decimal
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.authproxy import JSONRPCException
-from test_framework.util import (
-    initialize_chain,
-    assert_equal,
-    assert_raises,
-    assert_is_hex_string,
-    assert_is_hash_string,
-    start_nodes,
-    connect_nodes_bi,
-)
+from test_framework.util import *
 
 
 class BlockchainTest(BitcoinTestFramework):
@@ -38,7 +30,9 @@ class BlockchainTest(BitcoinTestFramework):
         initialize_chain(self.options.tmpdir)
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(2, self.options.tmpdir)
+        self.nodes = []
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug=net"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug=net"]))
         connect_nodes_bi(self.nodes, 0, 1)
         self.is_network_split = False
         self.sync_all()
@@ -46,6 +40,7 @@ class BlockchainTest(BitcoinTestFramework):
     def run_test(self):
         self._test_gettxoutsetinfo()
         self._test_getblockheader()
+        self._test_rollbackchain()
         self.nodes[0].verifychain(4, 0)
 
     def _test_gettxoutsetinfo(self):
@@ -111,6 +106,62 @@ class BlockchainTest(BitcoinTestFramework):
         assert isinstance(header['version'], int)
         assert isinstance(int(header['versionHex'], 16), int)
         assert isinstance(header['difficulty'], Decimal)
+
+    def _test_rollbackchain(self):
+        # Save the hash of the current chaintip and then mine 10 blocks
+        blockcount = self.nodes[0].getblockcount()
+
+        self.nodes[0].generate(10)
+        self.sync_all()
+        assert_equal(blockcount + 10, self.nodes[0].getblockcount())
+        assert_equal(blockcount + 10, self.nodes[1].getblockcount())
+
+        # Now Rollback the chain on Node 0 by 5 blocks
+        print ("Test that rollbackchain() works")
+        blockcount = self.nodes[0].getblockcount()
+        self.nodes[0].rollbackchain(str(self.nodes[0].getblockcount() - 5))
+        assert_equal(blockcount - 5, self.nodes[0].getblockcount())
+        assert_equal(blockcount, self.nodes[1].getblockcount())
+
+        # Invalidate the chaintip on Node 0 and then mine more blocks on Node 1
+        # - Node1 should advance in chain length but Node 0 shoudd not follow.
+        self.nodes[0].invalidateblock(self.nodes[0].getbestblockhash())
+        self.nodes[1].generate(5)
+        time.sleep(2) # give node0 a chance to sync (it shouldn't)
+
+        assert_equal(self.nodes[0].getblockcount() + 11, self.nodes[1].getblockcount())
+        assert_not_equal(self.nodes[0].getbestblockhash(), self.nodes[1].getbestblockhash())
+
+        # Now mine blocks on node0 which will extend the chain beyond node1.
+        self.nodes[0].generate(12)
+
+        # Reconnect nodes since they will have been disconnected when nod0's chain was previously invalidated.
+        # -  Node1 should re-org and follow node0's chain.
+        connect_nodes_bi(self.nodes, 0, 1)
+        self.sync_all()
+        assert_equal(self.nodes[0].getblockcount(), self.nodes[1].getblockcount())
+        assert_equal(self.nodes[0].getbestblockhash(), self.nodes[1].getbestblockhash())
+
+
+        # Test that we can only rollback the chain by max 100 blocks
+        self.nodes[0].generate(100)
+        self.sync_all()
+
+        # Roll back by 101 blocks, this should fail
+        blockcount = self.nodes[0].getblockcount()
+        try:
+            self.nodes[0].rollbackchain(str(self.nodes[0].getblockcount() - 101))
+        except JSONRPCException as e:
+            print (e.error['message'])
+            assert("You are attempting to rollback the chain by 101 blocks, however the limit is 100 blocks." in e.error['message'])
+        assert_equal(blockcount, self.nodes[0].getblockcount())
+        assert_equal(blockcount, self.nodes[1].getblockcount())
+
+        # Now rollback by 100 blocks
+        blockcount = self.nodes[0].getblockcount()
+        self.nodes[0].rollbackchain(str(self.nodes[0].getblockcount() - 100))
+        assert_equal(blockcount - 100, self.nodes[0].getblockcount())
+        assert_equal(blockcount, self.nodes[1].getblockcount())
 
 if __name__ == '__main__':
     BlockchainTest().main()
