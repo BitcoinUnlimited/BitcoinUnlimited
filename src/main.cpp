@@ -2419,7 +2419,6 @@ bool ConnectBlock(const CBlock &block,
 
                     if ((inOrphanCache) || (!inVerifiedCache && !inOrphanCache))
                     {
-                        LOG(PARALLEL, "parallel_2 checking inputs for tx: %d\n", i);
                         if (inOrphanCache)
                             nOrphansChecked++;
 
