@@ -8,7 +8,6 @@
 
 #include "chain.h"
 #include "checkqueue.h"
-#include "clientversion.h"
 #include "coins.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"

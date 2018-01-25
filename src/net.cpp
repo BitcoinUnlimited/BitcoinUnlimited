@@ -12,7 +12,6 @@
 
 #include "addrman.h"
 #include "chainparams.h"
-#include "clientversion.h"
 #include "connmgr.h"
 #include "consensus/consensus.h"
 #include "crypto/common.h"
