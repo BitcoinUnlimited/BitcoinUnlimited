@@ -1,5 +1,5 @@
 ---
-name: "BUcash-osx-1.1"
+name: "BUcash-osx-1.2"
 enable_cache: true
 suites:
 - "trusty"
@@ -26,7 +26,7 @@ packages:
 - "python-dev"
 - "python-setuptools"
 - "fonts-tuffy"
-reference_datetime: "2016-01-01 00:00:00"
+reference_datetime: "2018-01-24 00:00:00"
 remotes:
 - "url": "https://github.com/BitcoinUnlimited/BitcoinUnlimited.git"
   "dir": "bitcoin"
