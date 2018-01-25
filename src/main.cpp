@@ -2281,17 +2281,15 @@ bool ConnectBlock(const CBlock &block,
         nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
     }
 
-// If the DAA HF is enabled, we start rejecting transaction that use a high
-// s in their signature. We also make sure that signature that are supposed
-// to fail (for instance in multisig or other forms of smart contracts) are
-// null.
-#ifdef BITCOIN_CASH
+    // If the DAA HF is enabled, we start rejecting transaction that use a high
+    // s in their signature. We also make sure that signature that are supposed
+    // to fail (for instance in multisig or other forms of smart contracts) are
+    // null.
     if (IsDAAEnabled(chainparams, pindex->pprev))
     {
         flags |= SCRIPT_VERIFY_LOW_S;
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
-#endif
 
     int64_t nTime2 = GetTimeMicros();
     nTimeForks += nTime2 - nTime1;
@@ -5646,9 +5644,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (fLogIPs)
             remoteAddr = ", peeraddr=" + pfrom->addr.ToString();
 
-        LOG(NET, "receive version message: %s: version %d, blocks=%d, us=%s, peer=%d%s %s\n", pfrom->cleanSubVer,
-            pfrom->nVersion, pfrom->nStartingHeight, addrMe.ToString(), pfrom->id, remoteAddr,
-            pfrom->fUsesCashMagic ? "CashMagic" : "BTCMagic");
+        LOG(NET, "receive version message: %s: version %d, blocks=%d, us=%s, peer=%d%s\n", pfrom->cleanSubVer,
+            pfrom->nVersion, pfrom->nStartingHeight, addrMe.ToString(), pfrom->id, remoteAddr);
 
         int64_t nTimeOffset = nTime - GetTime();
         pfrom->nTimeOffset = nTimeOffset;
@@ -7003,15 +7000,6 @@ bool ProcessMessages(CNode *pfrom)
 
         // at this point, any failure means we can delete the current message
         it++;
-
-#ifdef BITCOIN_CASH
-        // This is a new peer. Before doing anything, we need to detect what magic the peer is using.
-        if (pfrom->nVersion == 0 &&
-            memcmp(msg.hdr.pchMessageStart, chainparams.CashMessageStart(), MESSAGE_START_SIZE) == 0)
-        {
-            pfrom->fUsesCashMagic = true;
-        }
-#endif
 
         // Scan for message start
         if (memcmp(msg.hdr.pchMessageStart, pfrom->GetMagic(chainparams), MESSAGE_START_SIZE) != 0)

@@ -99,7 +99,6 @@ static std::vector<ListenSocket> vhListenSocket;
 extern CAddrMan addrman;
 int nMaxConnections = DEFAULT_MAX_PEER_CONNECTIONS;
 int nMinXthinNodes = MIN_XTHIN_NODES;
-int nMinBitcoinCashNodes = MIN_BITCOIN_CASH_NODES;
 
 bool fAddressesInitialized = false;
 std::string strSubVersion;
@@ -1745,7 +1744,6 @@ void ThreadOpenConnections()
         // we don't have enough connections to XTHIN capable nodes yet.
         int nOutbound = 0;
         int nThinBlockCapable = 0;
-        int nBitcoinCash = 0;
         set<vector<unsigned char> > setConnected;
         CNode *ptemp = nullptr;
         bool fDisconnected = false;
@@ -1760,8 +1758,6 @@ void ThreadOpenConnections()
 
                     if (pnode->ThinBlockCapable())
                         nThinBlockCapable++;
-                    else if (pnode->BitcoinCashCapable())
-                        nBitcoinCash++;
                     else
                         ptemp = pnode;
                 }
@@ -1769,7 +1765,6 @@ void ThreadOpenConnections()
             // Disconnect a node that is not XTHIN capable if all outbound slots are full and we
             // have not yet connected to enough XTHIN nodes.
             nMinXthinNodes = GetArg("-min-xthin-nodes", MIN_XTHIN_NODES);
-            nMinBitcoinCashNodes = GetArg("-min-bitcoin-cash-nodes", MIN_BITCOIN_CASH_NODES);
             if (nOutbound >= nMaxOutConnections && nThinBlockCapable <= min(nMinXthinNodes, nMaxOutConnections) &&
                 nDisconnects < MAX_DISCONNECTS && IsThinBlocksEnabled() && IsChainNearlySyncd())
             {
@@ -1780,20 +1775,6 @@ void ThreadOpenConnections()
                     nDisconnects++;
                 }
             }
-#ifdef BITCOIN_CASH
-            // Disconnect a node that is not BitcoinCash capable if all outbound slots are full and we
-            // have not yet connected to enough BitcoinCash nodes.
-            else if (nOutbound >= nMaxOutConnections && nBitcoinCash <= min(nMinBitcoinCashNodes, nMaxOutConnections) &&
-                     nDisconnects < MAX_DISCONNECTS && IsChainNearlySyncd())
-            {
-                if (ptemp != nullptr)
-                {
-                    ptemp->fDisconnect = true;
-                    fDisconnected = true;
-                    nDisconnects++;
-                }
-            }
-#endif
 
             // In the event that outbound nodes restart or drop off the network over time we need to
             // replenish the number of disconnects allowed once per day.
@@ -2821,12 +2802,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nPingUsecStart = 0;
     nPingUsecTime = 0;
     fPingQueued = false;
-#ifdef BITCOIN_CASH
-    // set when etablishing connection
-    fUsesCashMagic = true;
-#else
-    fUsesCashMagic = false;
-#endif
     nMinPingUsecTime = std::numeric_limits<int64_t>::max();
     thinBlockWaitingForTxns = -1; // BUIP010 Xtreme Thinblocks
     nXthinBloomfilterSize = 0;

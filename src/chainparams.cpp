@@ -144,27 +144,12 @@ public:
         assert(
             genesis.hashMerkleRoot == uint256S("0x4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"));
 
-#ifdef BITCOIN_CASH
         // List of Bitcoin Cash compatible seeders
         vSeeds.push_back(CDNSSeedData("bitcoinunlimited.info", "btccash-seeder.bitcoinunlimited.info", true));
         vSeeds.push_back(CDNSSeedData("bitcoinabc.org", "seed.bitcoinabc.org", true));
         vSeeds.push_back(CDNSSeedData("bitcoinforks.org", "seed-abc.bitcoinforks.org", true));
         vSeeds.push_back(CDNSSeedData("bitprim.org", "seed.bitprim.org", true)); // Bitprim
         vSeeds.push_back(CDNSSeedData("deadalnix.me", "seed.deadalnix.me", true)); // Amaury SÉCHET
-
-#else
-        // List of BitcoinUnlimited seeders
-        vSeeds.push_back(CDNSSeedData("bitcoinunlimited.info", "seed.bitcoinunlimited.info", true)); // BU seeder
-        vSeeds.push_back(CDNSSeedData("bitnodes.io", "seed.bitnodes.io")); // Bitnodes (Addy Yeow)
-        // Pieter Wuille, only supports x1, x5, x9, and xd
-        vSeeds.push_back(CDNSSeedData("bitcoin.sipa.be", "seed.bitcoin.sipa.be", true));
-        vSeeds.push_back(CDNSSeedData("bluematt.me", "dnsseed.bluematt.me", true)); // Matt Corallo, only supports x9
-        vSeeds.push_back(CDNSSeedData("dashjr.org", "dnsseed.bitcoin.dashjr.org")); // Luke Dashjr
-        // Christian Decker, supports x1 - xf
-        vSeeds.push_back(CDNSSeedData("bitcoinstats.com", "seed.bitcoinstats.com", true));
-        // Jonas Schnelli, only supports x1, x5, x9, and xd
-        vSeeds.push_back(CDNSSeedData("bitcoin.jonasschnelli.ch", "seed.bitcoin.jonasschnelli.ch", true));
-#endif
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1, 0);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1, 5);
@@ -345,9 +330,8 @@ public:
 
         vFixedSeeds.clear();
         vSeeds.clear();
-// nodes with support for servicebits filtering should be at the top
+        // nodes with support for servicebits filtering should be at the top
 
-#ifdef BITCOIN_CASH
         // Bitcoin ABC seeder
         vSeeds.push_back(CDNSSeedData("bitcoinabc.org", "testnet-seed.bitcoinabc.org", true));
         // bitcoinforks seeders
@@ -360,13 +344,6 @@ public:
         vSeeds.push_back(CDNSSeedData("deadalnix.me", "testnet-seed.deadalnix.me", true));
         // criptolayer.net
         vSeeds.push_back(CDNSSeedData("criptolayer.net", "testnet-seeder.criptolayer.net", true));
-#else
-        vSeeds.push_back(
-            CDNSSeedData("testnetbitcoin.jonasschnelli.ch", "testnet-seed.bitcoin.jonasschnelli.ch", true));
-        vSeeds.push_back(CDNSSeedData("bitcoin.petertodd.org", "testnet-seed.bitcoin.petertodd.org"));
-        vSeeds.push_back(CDNSSeedData("bluematt.me", "testnet-seed.bluematt.me"));
-        vSeeds.push_back(CDNSSeedData("bitcoin.schildbach.de", "testnet-seed.bitcoin.schildbach.de"));
-#endif
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);

@@ -786,11 +786,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     {
         InitWarning(_("Config option -minrelaytxfee is no longer supported.  To set the limit "
                       "below which a transaction is considered zero fee please use -minlimitertxfee.  "
-#ifdef BITCOIN_CASH
                       "To convert -minrelaytxfee, which is specified  in BCH/KB, to -minlimtertxfee, "
-#else
-                      "To convert -minrelaytxfee, which is specified  in BTC/KB, to -minlimtertxfee, "
-#endif
                       "which is specified in Satoshi/Byte, simply multiply the original -minrelaytxfee "
                       "by 100,000. For example, a -minrelaytxfee=0.00001000 will become -minlimitertxfee=1.000"));
     }
@@ -820,12 +816,10 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     // BUIP010 Xtreme Thinblocks: begin section Initialize XTHIN service
     if (GetBoolArg("-use-thinblocks", DEFAULT_USE_THINBLOCKS))
         nLocalServices |= NODE_XTHIN;
-// BUIP010 Xtreme Thinblocks: end section
+    // BUIP010 Xtreme Thinblocks: end section
 
-// UAHF - BitcoinCash
-#ifdef BITCOIN_CASH
+    // UAHF - BitcoinCash service bit
     nLocalServices |= NODE_BITCOIN_CASH;
-#endif
 
     nMaxTipAge = GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
 
