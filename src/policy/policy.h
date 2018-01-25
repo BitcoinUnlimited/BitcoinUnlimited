@@ -6,7 +6,6 @@
 #ifndef BITCOIN_POLICY_POLICY_H
 #define BITCOIN_POLICY_POLICY_H
 
-#include "clientversion.h"
 #include "consensus/consensus.h"
 #include "script/interpreter.h"
 #include "script/standard.h"
