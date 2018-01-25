@@ -818,6 +818,9 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         nLocalServices |= NODE_XTHIN;
     // BUIP010 Xtreme Thinblocks: end section
 
+    // UAHF - BitcoinCash service bit
+    nLocalServices |= NODE_BITCOIN_CASH;
+
     nMaxTipAge = GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
 
     // xthin bloom filter limits

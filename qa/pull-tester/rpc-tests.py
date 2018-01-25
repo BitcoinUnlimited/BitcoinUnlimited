@@ -184,7 +184,7 @@ testScripts = [ RpcTest(t) for t in [
     'parallel',
     'wallet',
     'excessive',
-    Disabled('buip055', 'temporary disable due to remove of NODE_BITCOIN_CASH service bit'),
+    Disabled('buip055', 'temporary disable while waiting for a more comprehensive refactor'),
     'listtransactions',
     'receivedby',
     'mempool_resurrect_test',
