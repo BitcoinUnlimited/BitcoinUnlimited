@@ -115,19 +115,7 @@ UniValue getinfo(const UniValue &params, bool fHelp)
     obj.push_back(Pair("relayfee", ValueFromAmount(::minRelayTxFee.GetFeePerK())));
     obj.push_back(Pair("status", statusStrings.GetPrintable()));
     obj.push_back(Pair("errors", GetWarnings("statusbar")));
-    CBlockIndex *cashFork = chainActive.Tip();
-    const Consensus::Params &consensusParams = Params().GetConsensus();
-    if (cashFork)
-        cashFork = cashFork->GetAncestor(consensusParams.uahfHeight);
-    std::string fork = "Bitcoin";
-    if (cashFork && cashFork->phashBlock)
-    {
-        if (*cashFork->phashBlock == bitcoinCashForkBlockHash)
-        {
-            fork = "Bitcoin Cash";
-        }
-    }
-    obj.push_back(Pair("fork", fork));
+    obj.push_back(Pair("fork", "Bitcoin Cash"));
 
     return obj;
 }
