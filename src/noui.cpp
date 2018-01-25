@@ -36,12 +36,12 @@ static bool noui_ThreadSafeMessageBox(const std::string &message, const std::str
     }
 
     if (!fSecure)
-        LogPrintf("%s: %s\n", strCaption, message);
+        LOGA("%s: %s\n", strCaption, message);
     fprintf(stderr, "%s: %s\n", strCaption.c_str(), message.c_str());
     return false;
 }
 
-static void noui_InitMessage(const std::string &message) { LogPrintf("init message: %s\n", message); }
+static void noui_InitMessage(const std::string &message) { LOGA("init message: %s\n", message); }
 void noui_connect()
 {
     // Connect bitcoind signal handlers

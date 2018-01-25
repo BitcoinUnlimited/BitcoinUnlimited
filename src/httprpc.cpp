@@ -167,7 +167,7 @@ static bool HTTPReq_JSONRPC(HTTPRequest *req, const std::string &)
 
     if (!RPCAuthorized(authHeader.second))
     {
-        LogPrintf("ThreadRPCServer incorrect password attempt from %s\n", req->GetPeer().ToString());
+        LOGA("ThreadRPCServer incorrect password attempt from %s\n", req->GetPeer().ToString());
 
         /* Deter brute-forcing
            If this results in a DoS the user really
@@ -225,7 +225,7 @@ static bool InitRPCAuthentication()
 {
     if (mapArgs["-rpcpassword"] == "")
     {
-        LogPrintf("No rpcpassword set - using random cookie authentication\n");
+        LOGA("No rpcpassword set - using random cookie authentication\n");
         if (!GenerateAuthCookie(&strRPCUserColonPass))
         {
             uiInterface.ThreadSafeMessageBox(
@@ -236,9 +236,9 @@ static bool InitRPCAuthentication()
     }
     else
     {
-        LogPrintf("Config options rpcuser and rpcpassword will soon be deprecated. Locally-run instances may remove "
-                  "rpcuser to use cookie-based auth, or may be replaced with rpcauth. Please see share/rpcuser for "
-                  "rpcauth auth generation.\n");
+        LOGA("Config options rpcuser and rpcpassword will soon be deprecated. Locally-run instances may remove "
+             "rpcuser to use cookie-based auth, or may be replaced with rpcauth. Please see share/rpcuser for "
+             "rpcauth auth generation.\n");
         strRPCUserColonPass = mapArgs["-rpcuser"] + ":" + mapArgs["-rpcpassword"];
     }
     return true;
@@ -246,7 +246,7 @@ static bool InitRPCAuthentication()
 
 bool StartHTTPRPC()
 {
-    LogPrint("rpc", "Starting HTTP RPC server\n");
+    LOG(RPC, "Starting HTTP RPC server\n");
     if (!InitRPCAuthentication())
         return false;
 
@@ -258,10 +258,10 @@ bool StartHTTPRPC()
     return true;
 }
 
-void InterruptHTTPRPC() { LogPrint("rpc", "Interrupting HTTP RPC server\n"); }
+void InterruptHTTPRPC() { LOG(RPC, "Interrupting HTTP RPC server\n"); }
 void StopHTTPRPC()
 {
-    LogPrint("rpc", "Stopping HTTP RPC server\n");
+    LOG(RPC, "Stopping HTTP RPC server\n");
     UnregisterHTTPHandler("/", true);
     if (httpRPCTimerInterface)
     {

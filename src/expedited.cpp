@@ -129,8 +129,7 @@ void ActuallySendExpreditedBlock(CXThinBlock &thinBlock, unsigned char hops, con
         }
         else if (n != skip) // Don't send back to the sending node to avoid looping
         {
-            LogPrint(
-                "thin", "Sending expedited block %s to %s\n", thinBlock.header.GetHash().ToString(), n->GetLogName());
+            LOG(THIN, "Sending expedited block %s to %s\n", thinBlock.header.GetHash().ToString(), n->GetLogName());
 
             n->PushMessage(NetMsgType::XPEDITEDBLK, (unsigned char)EXPEDITED_MSG_XTHIN, hops, thinBlock);
             n->blocksSent += 1;

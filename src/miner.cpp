@@ -12,6 +12,7 @@
 #include "coins.h"
 #include "consensus/consensus.h"
 #include "consensus/merkle.h"
+#include "consensus/tx_verify.h"
 #include "consensus/validation.h"
 #include "hash.h"
 #include "main.h"
@@ -23,6 +24,7 @@
 #include "script/standard.h"
 #include "timedata.h"
 #include "txmempool.h"
+#include "uahf_fork.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -75,7 +77,7 @@ int64_t UpdateTime(CBlockHeader *pblock, const Consensus::Params &consensusParam
 
 BlockAssembler::BlockAssembler(const CChainParams &_chainparams)
     : chainparams(_chainparams), nBlockSize(0), nBlockTx(0), nBlockSigOps(0), nFees(0), nHeight(0), nLockTimeCutoff(0),
-      lastFewTxs(0), blockFinished(false), buip055ChainBlock(false)
+      lastFewTxs(0), blockFinished(false), uahfChainBlock(false)
 {
     // Largest block you're willing to create:
     nBlockMaxSize = maxGeneratedBlock;
@@ -186,7 +188,7 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
     assert(pindexPrev); // can't make a new block if we don't even have the genesis block
     nHeight = pindexPrev->nHeight + 1;
 
-    buip055ChainBlock = pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value);
+    uahfChainBlock = IsUAHFforkActiveOnNextBlock(pindexPrev->nHeight);
 
     pblock->nTime = GetAdjustedTime();
     pblock->nVersion = UnlimitedComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), pblock->nTime);
@@ -205,7 +207,7 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
 
     nLastBlockTx = nBlockTx;
     nLastBlockSize = nBlockSize;
-    LogPrintf("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
+    LOGA("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
         nBlockSigOps);
 
     // Create coinbase transaction.
@@ -339,7 +341,7 @@ void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, CTxMemPool::txit
         double dPriority = iter->GetPriority(nHeight);
         CAmount dummy;
         mempool.ApplyDeltas(iter->GetTx().GetHash(), dPriority, dummy);
-        LogPrintf("priority %.1f fee %s txid %s\n", dPriority,
+        LOGA("priority %.1f fee %s txid %s\n", dPriority,
             CFeeRate(iter->GetModifiedFee(), iter->GetTxSize()).ToString().c_str(),
             iter->GetTx().GetHash().ToString().c_str());
     }
@@ -376,17 +378,17 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
         }
 
         // If tx is not applicable to this (forked) chain, skip it
-        if (buip055ChainBlock && IsTxOpReturnInvalid(iter->GetTx()))
+        if (uahfChainBlock && IsTxOpReturnInvalid(iter->GetTx()))
         {
             continue;
         }
         // Reject the tx if we are on the fork, but the tx is not fork-signed
-        if (buip055ChainBlock && onlyAcceptForkSig.value && !IsTxBUIP055Only(*iter))
+        if (uahfChainBlock && !IsTxUAHFOnly(*iter))
         {
             continue;
         }
         // if tx is not applicable to this (unforked) chain, skip it
-        if (!buip055ChainBlock && IsTxBUIP055Only(*iter))
+        if (!uahfChainBlock && IsTxUAHFOnly(*iter))
         {
             continue;
         }
@@ -478,17 +480,17 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
         }
 
         // If tx is not applicable to this (forked) chain, skip it
-        if (buip055ChainBlock && IsTxOpReturnInvalid(iter->GetTx()))
+        if (uahfChainBlock && IsTxOpReturnInvalid(iter->GetTx()))
         {
             continue;
         }
         // Reject the tx if we are on the fork, but the tx is not fork-signed
-        if (buip055ChainBlock && onlyAcceptForkSig.value && !IsTxBUIP055Only(*iter))
+        if (uahfChainBlock && !IsTxUAHFOnly(*iter))
         {
             continue;
         }
         // if tx is not applicable to this (unforked) chain, skip it
-        if (!buip055ChainBlock && IsTxBUIP055Only(*iter))
+        if (!uahfChainBlock && IsTxUAHFOnly(*iter))
         {
             continue;
         }

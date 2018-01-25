@@ -30,11 +30,7 @@
 #endif
 
 // These globals are needed here so bitcoin-cli can link
-#ifdef BITCOIN_CASH
 const std::string CURRENCY_UNIT = "BCH";
-#else
-const std::string CURRENCY_UNIT = "BTC";
-#endif
 const std::string DEFAULT_TOR_CONTROL = "127.0.0.1:9051";
 const char DEFAULT_RPCCONNECT[] = "127.0.0.1";
 
@@ -239,11 +235,6 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addArg("checklevel=<n>", requiredInt,
             strprintf(_("How thorough the block verification of -checkblocks is (0-4, default: %u)"),
                     DEFAULT_CHECKLEVEL));
-
-#ifdef BITCOIN_CASH
-    allowedArgs.addArg("newdaaactivationtime=<epoch>", requiredInt,
-        strprintf(_("Bitcoin Cash November 13th activation time (default: %u"), 1510600000));
-#endif
 
 #ifndef WIN32
     if (mode == HMM_BITCOIND)

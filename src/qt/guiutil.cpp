@@ -230,7 +230,7 @@ bool parseBitcoinURI(const QString &scheme, const QUrl &uri, SendCoinsRecipient 
         {
             if (!i->second.isEmpty())
             {
-                if (!BitcoinUnits::parse(BitcoinUnits::BTC, i->second, &rv.amount))
+                if (!BitcoinUnits::parse(BitcoinUnits::BCH, i->second, &rv.amount))
                 {
                     return false;
                 }
@@ -275,7 +275,7 @@ QString formatBitcoinURI(const Config &cfg, const SendCoinsRecipient &info)
     if (info.amount)
     {
         ret += QString("?amount=%1")
-                   .arg(BitcoinUnits::format(BitcoinUnits::BTC, info.amount, false, BitcoinUnits::separatorNever));
+                   .arg(BitcoinUnits::format(BitcoinUnits::BCH, info.amount, false, BitcoinUnits::separatorNever));
         paramCount++;
     }
 
@@ -991,11 +991,9 @@ QString formatServicesStr(quint64 mask)
             case NODE_XTHIN:
                 strList.append("XTHIN");
                 break;
-#ifdef BITCOIN_CASH
             case NODE_BITCOIN_CASH:
                 strList.append("CASH");
                 break;
-#endif
             default:
                 strList.append(QString("%1[%2]").arg("UNKNOWN").arg(check));
             }
@@ -1019,13 +1017,5 @@ QString formatTimeOffset(int64_t nTimeOffset)
     return QString(QObject::tr("%1 s")).arg(QString::number((int)nTimeOffset, 10));
 }
 
-QString uriPrefix()
-{
-#ifdef BITCOIN_CASH
-    return "bitcoincash";
-#else
-    return "bitcoin";
-#endif
-}
-
+QString uriPrefix() { return "bitcoincash"; }
 } // namespace GUIUtil

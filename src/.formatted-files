@@ -19,8 +19,6 @@ bitnodes.cpp
 bitnodes.h
 bloom.cpp
 bloom.h
-buip055fork.cpp
-buip055fork.h
 cashaddr.cpp
 cashaddr.h
 cashaddrenc.cpp
@@ -119,7 +117,6 @@ thinblock.h
 threadsafety.h
 timedata.cpp
 timedata.h
-tinyformat.h
 torcontrol.cpp
 torcontrol.h
 tweak.cpp
@@ -128,6 +125,8 @@ txdb.cpp
 txdb.h
 txmempool.cpp
 txmempool.h
+uahf_fork.cpp
+uahf_fork.h
 ui_interface.h
 uint256.cpp
 uint256.h
@@ -265,7 +264,6 @@ test/base64_tests.cpp
 test/bip32_tests.cpp
 test/bloom_tests.cpp
 test/bswap_tests.cpp
-test/buip055_test.cpp
 test/cashaddr_tests.cpp
 test/cashaddrenc_tests.cpp
 test/checkblock_tests.cpp
@@ -318,6 +316,7 @@ test/thinblock_util_tests.cpp
 test/timedata_tests.cpp
 test/transaction_tests.cpp
 test/txvalidationcache_tests.cpp
+test/uahf_test.cpp
 test/uint256_tests.cpp
 test/univalue_tests.cpp
 test/util_tests.cpp
@@ -394,4 +393,6 @@ consensus/consensus.h
 consensus/merkle.cpp
 consensus/merkle.h
 consensus/params.h
+consensus/tx_verify.cpp
+consensus/tx_verify.h
 consensus/validation.h

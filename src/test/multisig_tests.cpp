@@ -32,11 +32,7 @@ BOOST_FIXTURE_TEST_SUITE(multisig_tests, BasicTestingSetup)
 
 CScript sign_multisig(CScript scriptPubKey, vector<CKey> keys, CTransaction transaction, int whichIn)
 {
-#ifdef BITCOIN_CASH
     uint256 hash = SignatureHash(scriptPubKey, transaction, whichIn, SIGHASH_ALL | SIGHASH_FORKID, 0);
-#else
-    uint256 hash = SignatureHash(scriptPubKey, transaction, whichIn, SIGHASH_ALL, 0);
-#endif
 
     CScript result;
     result << OP_0; // CHECKMULTISIG bug workaround
@@ -44,11 +40,7 @@ CScript sign_multisig(CScript scriptPubKey, vector<CKey> keys, CTransaction tran
     {
         vector<unsigned char> vchSig;
         BOOST_CHECK(key.Sign(hash, vchSig));
-#ifdef BITCOIN_CASH
         vchSig.push_back((unsigned char)SIGHASH_ALL | SIGHASH_FORKID);
-#else
-        vchSig.push_back((unsigned char)SIGHASH_ALL);
-#endif
         result << vchSig;
     }
     return result;
@@ -56,11 +48,7 @@ CScript sign_multisig(CScript scriptPubKey, vector<CKey> keys, CTransaction tran
 
 BOOST_AUTO_TEST_CASE(multisig_verify)
 {
-#ifdef BITCOIN_CASH
     unsigned int flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID;
-#else
-    unsigned int flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
-#endif
 
     ScriptError err;
     CKey key[4];
