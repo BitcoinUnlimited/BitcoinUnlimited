@@ -238,7 +238,7 @@ void CDoSManager::SweepBannedInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_setBanned)
         {
             setBanned.erase(it++);
             setBannedIsDirty = true;
-            LogPrint("net", "%s: Removed banned node ip/subnet from banlist.dat: %s\n", __func__, subNet.ToString());
+            LOG(NET, "%s: Removed banned node ip/subnet from banlist.dat: %s\n", __func__, subNet.ToString());
         }
         else
             ++it;
@@ -269,11 +269,11 @@ void CDoSManager::Misbehaving(CNode *pNode, int howmuch)
 
     if (prior + howmuch >= nBanThreshold && prior < nBanThreshold)
     {
-        LogPrintf("%s: %s (%d -> %d) BAN THRESHOLD EXCEEDED\n", __func__, pNode->GetLogName(), prior, prior + howmuch);
+        LOGA("%s: %s (%d -> %d) BAN THRESHOLD EXCEEDED\n", __func__, pNode->GetLogName(), prior, prior + howmuch);
         pNode->fShouldBan = true;
     }
     else
-        LogPrintf("%s: %s (%d -> %d)\n", __func__, pNode->GetLogName(), prior, prior + howmuch);
+        LOGA("%s: %s (%d -> %d)\n", __func__, pNode->GetLogName(), prior, prior + howmuch);
 }
 
 /**
@@ -320,8 +320,7 @@ void CDoSManager::DumpBanlist()
         setBannedIsDirty = true;
     }
     else
-        LogPrint("net", "Flushed %d banned node ips/subnets to banlist.dat  %dms\n", banmap.size(),
-            GetTimeMillis() - nStart);
+        LOG(NET, "Flushed %d banned node ips/subnets to banlist.dat  %dms\n", banmap.size(), GetTimeMillis() - nStart);
 }
 
 /**
@@ -344,9 +343,8 @@ void CDoSManager::LoadBanlist()
         // Remove any ban entries that were persisted to disk but have since expired
         SweepBannedInternal();
 
-        LogPrint("net", "Loaded %d banned node ips/subnets from banlist.dat  %dms\n", banmap.size(),
-            GetTimeMillis() - nStart);
+        LOG(NET, "Loaded %d banned node ips/subnets from banlist.dat  %dms\n", banmap.size(), GetTimeMillis() - nStart);
     }
     else
-        LogPrintf("Invalid or missing banlist.dat; recreating\n");
+        LOGA("Invalid or missing banlist.dat; recreating\n");
 }

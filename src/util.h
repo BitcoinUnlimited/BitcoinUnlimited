@@ -118,49 +118,53 @@ enum
     ALL = 0xFFFFFFFFFFFFFFFFUL, // Log everything
 
     // LOG Categories:
-    THN = 0x1,
-    MEP = 0x2,
-    CDB = 0x4,
+    THIN = 0x1,
+    MEMPOOL = 0x2,
+    COINDB = 0x4,
     TOR = 0x8,
 
     NET = 0x10,
-    ADR = 0x20,
-    LIB = 0x40,
-    HTP = 0x80,
+    ADDRMAN = 0x20,
+    LIBEVENT = 0x40,
+    HTTP = 0x80,
 
     RPC = 0x100,
-    PRT = 0x200,
-    BNC = 0x400,
-    PRN = 0x800,
+    PARTITIONCHECK = 0x200,
+    BENCH = 0x400,
+    PRUNE = 0x800,
 
-    RDX = 0x1000,
-    MPR = 0x2000,
+    REINDEX = 0x1000,
+    MEMPOOLREJ = 0x2000,
     BLK = 0x4000,
-    EVC = 0x8000,
+    EVICT = 0x8000,
 
-    PRL = 0x10000,
-    RND = 0x20000,
+    PARALLEL = 0x10000,
+    RAND = 0x20000,
     REQ = 0x40000,
-    BLM = 0x80000,
+    BLOOM = 0x80000,
 
-    EST = 0x100000,
+    ESTIMATEFEE = 0x100000,
     LCK = 0x200000,
-    PRX = 0x400000,
-    DBS = 0x800000,
-    SLC = 0x1000000,
+    PROXY = 0x400000,
+    DBASE = 0x800000,
 
+    SELECTCOINS = 0x1000000,
+    ZMQ = 0x2000000,
+    QT = 0x4000000
 };
 
-// Add corresponding upper case string for the category:
-#define LOGLABELMAP                                                                                           \
-    {                                                                                                         \
-        {NONE, "NONE"}, {ALL, "ALL"}, {THN, "THN"}, {MEP, "MEP"}, {CDB, "CDB"}, {TOR, "TOR"}, {NET, "NET"},   \
-            {ADR, "ADR"}, {LIB, "LIB"}, {HTP, "HTP"}, {RPC, "RPC"}, {PRT, "PRT"}, {BNC, "BNC"}, {PRN, "PRN"}, \
-            {RDX, "RDX"}, {MPR, "MPR"}, {BLK, "BLK"}, {EVC, "EVC"}, {PRL, "PRL"}, {RND, "RND"}, {REQ, "REQ"}, \
-            {BLM, "BLM"}, {LCK, "LCK"}, {PRX, "PRX"}, {DBS, "DBS"}, {SLC, "SLC"},                             \
-        {                                                                                                     \
-            EST, "EST"                                                                                        \
-        }                                                                                                     \
+// Add corresponding lower case string for the category:
+#define LOGLABELMAP                                                                                             \
+    {                                                                                                           \
+        {NONE, "none"}, {ALL, "all"}, {THIN, "thin"}, {MEMPOOL, "mempool"}, {COINDB, "coindb"}, {TOR, "tor"},   \
+            {NET, "net"}, {ADDRMAN, "addrman"}, {LIBEVENT, "libevent"}, {HTTP, "http"}, {RPC, "rpc"},           \
+            {PARTITIONCHECK, "partitioncheck"}, {BENCH, "bench"}, {PRUNE, "prune"}, {REINDEX, "reindex"},       \
+            {MEMPOOLREJ, "mempoolrej"}, {BLK, "blk"}, {EVICT, "evict"}, {PARALLEL, "parallel"}, {RAND, "rand"}, \
+            {REQ, "req"}, {BLOOM, "bloom"}, {LCK, "lck"}, {PROXY, "proxy"}, {DBASE, "dbase"},                   \
+            {SELECTCOINS, "selectcoins"}, {ESTIMATEFEE, "estimatefee"}, {QT, "qt"},                             \
+        {                                                                                                       \
+            ZMQ, "zmq"                                                                                          \
+        }                                                                                                       \
     }
 
 /**
@@ -272,20 +276,20 @@ inline void LogWrite(const std::string &str)
  * @param[in] category -Which category to log
  * @param[in] ... "printf like args".
  */
-#define LOG(ctgr, ...)               \
-    {                                \
-        using namespace Logging;     \
-        if (LogAcceptCategory(ctgr)) \
-            LogWrite(__VA_ARGS__);   \
-    }                                \
-    void(0)
+#define LOG(ctgr, ...)                        \
+    do                                        \
+    {                                         \
+        using namespace Logging;              \
+        if (Logging::LogAcceptCategory(ctgr)) \
+            Logging::LogWrite(__VA_ARGS__);   \
+    } while (0)
 
 /**
- * LOGA macro: Log a string to the console.
+ * LOGA macro: Always log a string.
  *
  * @param[in] ... "printf like args".
  */
-#define LOGA(...) Logging::LogStdout(__VA_ARGS__)
+#define LOGA(...) Logging::LogWrite(__VA_ARGS__)
 //
 
 // Log tests:
@@ -315,8 +319,6 @@ inline std::string _(const char *psz)
 void SetupEnvironment();
 bool SetupNetworking();
 
-/** Return true if log accepts specified category */
-bool LogAcceptCategory(const char *category);
 
 /** Get format string from VA_ARGS for error reporting */
 template <typename... Args>
@@ -324,32 +326,6 @@ std::string FormatStringFromLogArgs(const char *fmt, const Args &... args)
 {
     return fmt;
 }
-
-#define LogPrintf(...)                                                                             \
-    do                                                                                             \
-    {                                                                                              \
-        std::string _log_msg_; /* Unlikely name to avoid shadowing variables */                    \
-        try                                                                                        \
-        {                                                                                          \
-            _log_msg_ = tfm::format(__VA_ARGS__);                                                  \
-        }                                                                                          \
-        catch (tinyformat::format_error & e)                                                       \
-        {                                                                                          \
-            /* Original format string will have newline so don't add one here */                   \
-            _log_msg_ = "Error \"" + std::string(e.what()) + "\" while formatting log message: " + \
-                        FormatStringFromLogArgs(__VA_ARGS__);                                      \
-        }                                                                                          \
-        LogPrintStr(_log_msg_);                                                                    \
-    } while (0)
-
-#define LogPrint(category, ...)            \
-    do                                     \
-    {                                      \
-        if (LogAcceptCategory((category))) \
-        {                                  \
-            LogPrintf(__VA_ARGS__);        \
-        }                                  \
-    } while (0)
 
 template <typename... Args>
 bool error(const char *fmt, const Args &... args)
@@ -474,13 +450,13 @@ void TraceThread(const char *name, Callable func)
     RenameThread(s.c_str());
     try
     {
-        LogPrintf("%s thread start\n", name);
+        LOGA("%s thread start\n", name);
         func();
-        LogPrintf("%s thread exit\n", name);
+        LOGA("%s thread exit\n", name);
     }
     catch (const boost::thread_interrupted &)
     {
-        LogPrintf("%s thread interrupt\n", name);
+        LOGA("%s thread interrupt\n", name);
         throw;
     }
     catch (const std::exception &e)

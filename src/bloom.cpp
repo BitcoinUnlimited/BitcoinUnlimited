@@ -32,7 +32,7 @@ void CBloomFilter::setup(unsigned int nElements,
 {
     if (nElements == 0)
     {
-        LogPrintf("Construction of empty CBloomFilter attempted.\n");
+        LOGA("Construction of empty CBloomFilter attempted.\n");
         nElements = 1;
     }
     unsigned desired_vdata_size = (unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate) / 8);

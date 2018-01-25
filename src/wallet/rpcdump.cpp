@@ -653,7 +653,7 @@ UniValue importwallet(const UniValue &params, bool fHelp)
         CKeyID keyid = pubkey.GetID();
         if (pwalletMain->HaveKey(keyid))
         {
-            LogPrintf("Skipping import of %s (key already present)\n", EncodeDestination(keyid));
+            LOGA("Skipping import of %s (key already present)\n", EncodeDestination(keyid));
             continue;
         }
         int64_t nTime = DecodeDumpTime(vstr[1]);
@@ -673,7 +673,7 @@ UniValue importwallet(const UniValue &params, bool fHelp)
                 fLabel = true;
             }
         }
-        LogPrintf("Importing %s...\n", EncodeDestination(keyid));
+        LOGA("Importing %s...\n", EncodeDestination(keyid));
         if (!pwalletMain->AddKeyPubKey(key, pubkey))
         {
             fGood = false;
@@ -694,7 +694,7 @@ UniValue importwallet(const UniValue &params, bool fHelp)
     if (!pwalletMain->nTimeFirstKey || nTimeBegin < pwalletMain->nTimeFirstKey)
         pwalletMain->nTimeFirstKey = nTimeBegin;
 
-    LogPrintf("Rescanning last %i blocks\n", chainActive.Height() - pindex->nHeight + 1);
+    LOGA("Rescanning last %i blocks\n", chainActive.Height() - pindex->nHeight + 1);
     pwalletMain->ScanForWalletTransactions(pindex);
     pwalletMain->MarkDirty();
 

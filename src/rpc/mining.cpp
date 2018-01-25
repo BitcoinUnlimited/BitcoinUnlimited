@@ -802,7 +802,7 @@ UniValue submitblock(const UniValue &params, bool fHelp)
 
     CValidationState state;
     submitblock_StateCatcher sc(block.GetHash());
-    LogPrint("rpc", "Received block %s via RPC.\n", block.GetHash().ToString());
+    LOG(RPC, "Received block %s via RPC.\n", block.GetHash().ToString());
     RegisterValidationInterface(&sc);
 
 
