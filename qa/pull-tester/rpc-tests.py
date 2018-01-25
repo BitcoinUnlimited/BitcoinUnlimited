@@ -184,7 +184,7 @@ testScripts = [ RpcTest(t) for t in [
     'parallel',
     'wallet',
     'excessive',
-    Disabled('buip055', 'temporary disable while waiting for a more comprehensive refactor'),
+    Disabled('uahf', 'temporary disable while waiting, to use as a template for future tests'),
     'listtransactions',
     'receivedby',
     'mempool_resurrect_test',
