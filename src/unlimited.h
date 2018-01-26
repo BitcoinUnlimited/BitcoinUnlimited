@@ -6,7 +6,6 @@
 #ifndef BITCOIN_UNLIMITED_H
 #define BITCOIN_UNLIMITED_H
 
-#include "buip055fork.h"
 #include "chain.h"
 #include "checkqueue.h"
 #include "clientversion.h"
@@ -19,6 +18,7 @@
 #include "stat.h"
 #include "thinblock.h"
 #include "tweak.h"
+#include "uahf_fork.h"
 #include "univalue/include/univalue.h"
 #include <boost/thread.hpp>
 #include <list>
@@ -30,7 +30,7 @@ enum
     DEFAULT_EXCESSIVE_ACCEPT_DEPTH = 12, // Default is 12 to make it very expensive for a minority hash power to get
     // lucky, and potentially drive a block that the rest of the network sees as
     // "excessive" onto the blockchain.
-    DEFAULT_EXCESSIVE_BLOCK_SIZE = 16000000,
+    DEFAULT_EXCESSIVE_BLOCK_SIZE = 8000000, // per UAHF spec REQ-4-1, EB has to be at least 8MB at startup
     DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER = 16, // Allowed messages lengths will be this * the excessive block size
     DEFAULT_COINBASE_RESERVE_SIZE = 1000,
     MAX_COINBASE_SCRIPTSIG_SIZE = 100,
@@ -39,17 +39,11 @@ enum
         30, // Default for the number of days in the past we check scripts during initial block download
 
     MAX_HEADER_REQS_DURING_IBD = 3,
-// if the blockchain is this far (in seconds) behind the current time, only request headers from a single
-// peer.  This makes IBD more efficient.  We make BITCOIN_CASH more lenient here because mining could be
-// more erratic and this node is likely to connect to non-BCH nodes.
-#ifdef BITCOIN_CASH
+    // if the blockchain is this far (in seconds) behind the current time, only request headers from a single
+    // peer.  This makes IBD more efficient.
+    // TODO: since the new DAA cash mining is no more erratic than bitcoin legacy.
+    // Wouldn't been better to set it back to what it was? (i.e. 24 * 60 * 60)
     SINGLE_PEER_REQUEST_MODE_AGE = (7 * 24 * 60 * 60),
-#else
-    SINGLE_PEER_REQUEST_MODE_AGE = (24 * 60 * 60),
-#endif
-
-    BITCOIN_CASH_FORK_HEIGHT = 478559,
-
 };
 
 class CBlock;
@@ -288,6 +282,4 @@ extern std::list<CStatBase *> mallocedStats;
 extern CCriticalSection cs_blockvalidationthread;
 void InterruptBlockValidationThreads();
 
-extern CTweak<uint64_t> miningForkTime;
-extern CTweak<bool> onlyAcceptForkSig;
 #endif

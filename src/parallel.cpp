@@ -42,7 +42,7 @@ CParallelValidation::CParallelValidation(int threadCount, boost::thread_group *t
         threadCount = MAX_SCRIPTCHECK_THREADS;
     nThreads = threadCount;
 
-    LogPrintf("Using %d threads for script verification\n", threadCount);
+    LOGA("Using %d threads for script verification\n", threadCount);
 
     while (QueueCount() < nScriptCheckQueues)
     {
@@ -77,7 +77,7 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
         // return.
         if (chainActive.Tip()->nChainWork > pindex->nChainWork)
         {
-            LogPrintf("returning because chainactive tip is now ahead of chainwork for this block\n");
+            LOGA("returning because chainactive tip is now ahead of chainwork for this block\n");
             return false;
         }
 
@@ -90,7 +90,7 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
         // if another thread has just won the race and has sent an fQuit.
         if (pValidationThread->fQuit)
         {
-            LogPrint("parallel", "fQuit 0 called - Stopping validation of %s and returning\n",
+            LOG(PARALLEL, "fQuit 0 called - Stopping validation of %s and returning\n",
                 pValidationThread->hash.ToString());
             return false;
         }
@@ -105,7 +105,7 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
             if ((*iter).second.hash == pindex->GetBlockHash() && (*iter).second.fIsValidating &&
                 !(*iter).second.fQuit && (*iter).first != this_id)
             {
-                LogPrint("parallel", "Returning because another thread is already validating this block\n");
+                LOG(PARALLEL, "Returning because another thread is already validating this block\n");
                 return false;
             }
             iter++;
@@ -154,8 +154,8 @@ void CParallelValidation::Cleanup(const CBlock &block, CBlockIndex *pindex)
                     nId = 1;
                 if ((*riter).first == 0)
                     (*riter).first = 1;
-                LogPrint("parallel", "swapping sequence id for block %s before %d after %d\n",
-                    block.GetHash().ToString(), pindex->nSequenceId, (*riter).first);
+                LOG(PARALLEL, "swapping sequence id for block %s before %d after %d\n", block.GetHash().ToString(),
+                    pindex->nSequenceId, (*riter).first);
                 pindex->nSequenceId = (*riter).first;
                 (*riter).first = nId;
 
@@ -187,7 +187,7 @@ void CParallelValidation::QuitCompetingThreads(const uint256 &prevBlockHash)
             {
                 if ((*mi).second.pScriptQueue != NULL)
                 {
-                    LogPrint("parallel", "Terminating script queue with blockhash %s and previous blockhash %s\n",
+                    LOG(PARALLEL, "Terminating script queue with blockhash %s and previous blockhash %s\n",
                         (*mi).second.hash.ToString(), prevBlockHash.ToString());
                     // Send Quit to any other scriptcheckques that were running a parallel validation for the same
                     // block.
@@ -195,11 +195,11 @@ void CParallelValidation::QuitCompetingThreads(const uint256 &prevBlockHash)
                     // that it breaks from its processing loop in the event that it is still at the control.Wait() step.
                     // This allows us to end any long running block validations and allow a smaller block to begin
                     // processing when/if all the queues have been jammed by large blocks during an attack.
-                    LogPrint("parallel", "Sending Quit() to scriptcheckqueue\n");
+                    LOG(PARALLEL, "Sending Quit() to scriptcheckqueue\n");
                     (*mi).second.pScriptQueue->Quit();
                 }
                 (*mi).second.fQuit = true; // quit the thread
-                LogPrint("parallel", "interrupting a thread with blockhash %s and previous blockhash %s\n",
+                LOG(PARALLEL, "interrupting a thread with blockhash %s and previous blockhash %s\n",
                     (*mi).second.hash.ToString(), prevBlockHash.ToString());
             }
         }
@@ -299,7 +299,7 @@ void CParallelValidation::InitThread(const boost::thread::id this_id,
     mapBlockValidationThreads[this_id].nodeid = pfrom->id;
     mapBlockValidationThreads[this_id].fIsValidating = false;
     mapBlockValidationThreads[this_id].fIsReorgInProgress = false;
-    LogPrint("parallel", "Launching validation for %s with number of block validation threads running: %d\n",
+    LOG(PARALLEL, "Launching validation for %s with number of block validation threads running: %d\n",
         block.GetHash().ToString(), mapBlockValidationThreads.size());
 }
 
@@ -319,7 +319,7 @@ bool CParallelValidation::QuitReceived(const boost::thread::id this_id, const bo
         {
             if (mapBlockValidationThreads[this_id].fQuit)
             {
-                LogPrint("parallel", "fQuit called - Stopping validation of this block and returning\n");
+                LOG(PARALLEL, "fQuit called - Stopping validation of this block and returning\n");
                 return true;
             }
         }
@@ -332,7 +332,7 @@ bool CParallelValidation::ChainWorkHasChanged(const arith_uint256 &nStartingChai
     LOCK(cs_main);
     if (chainActive.Tip()->nChainWork != nStartingChainWork)
     {
-        LogPrint("parallel", "Quitting - Chain Work %s is not the same as the starting Chain Work %s\n",
+        LOG(PARALLEL, "Quitting - Chain Work %s is not the same as the starting Chain Work %s\n",
             chainActive.Tip()->nChainWork.ToString(), nStartingChainWork.ToString());
         return true;
     }
@@ -486,18 +486,17 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom,
                     // if your block is the biggest or of equal size to the biggest then reject it.
                     if (nLargestBlockSize <= nBlockSize)
                     {
-                        LogPrint("parallel",
-                            "Block validation terminated - Too many blocks currently being validated: %s\n",
+                        LOG(PARALLEL, "Block validation terminated - Too many blocks currently being validated: %s\n",
                             block.GetHash().ToString());
                         return; // new block is rejected and does not enter PV
                     }
                     else if (miLargestBlock != mapBlockValidationThreads.end())
                     { // terminate the chosen PV thread
                         (*miLargestBlock).second.pScriptQueue->Quit(); // terminate the script queue threads
-                        LogPrint("parallel", "Sending Quit() to scriptcheckqueue\n");
+                        LOG(PARALLEL, "Sending Quit() to scriptcheckqueue\n");
                         (*miLargestBlock).second.fQuit = true; // terminate the PV thread
-                        LogPrint("parallel", "Too many blocks being validated, interrupting thread with blockhash %s "
-                                             "and previous blockhash %s\n",
+                        LOG(PARALLEL, "Too many blocks being validated, interrupting thread with blockhash %s "
+                                      "and previous blockhash %s\n",
                             (*miLargestBlock).second.hash.ToString(),
                             (*miLargestBlock).second.hashPrevBlock.ToString());
                     }
@@ -571,7 +570,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, const CBloc
     int nDoS;
     if (state.IsInvalid(nDoS))
     {
-        LogPrintf("Invalid block due to %s\n", state.GetRejectReason().c_str());
+        LOGA("Invalid block due to %s\n", state.GetRejectReason().c_str());
         if (!strCommand.empty())
         {
             pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
@@ -600,13 +599,12 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, const CBloc
         double nValidationTime = (double)(GetTimeMicros() - startTime) / 1000000.0;
         if (strCommand != NetMsgType::BLOCK)
         {
-            LogPrint("thin", "Processed Block %s reconstructed from (%s) in %.2f seconds, peer=%s\n",
-                inv.hash.ToString(), strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0,
-                pfrom->GetLogName());
+            LOG(THIN, "Processed Block %s reconstructed from (%s) in %.2f seconds, peer=%s\n", inv.hash.ToString(),
+                strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0, pfrom->GetLogName());
             thindata.UpdateValidationTime(nValidationTime);
         }
         else
-            LogPrint("thin", "Processed Regular Block %s in %.2f seconds, peer=%s\n", inv.hash.ToString(),
+            LOG(THIN, "Processed Regular Block %s in %.2f seconds, peer=%s\n", inv.hash.ToString(),
                 (double)(GetTimeMicros() - startTime) / 1000000.0, pfrom->GetLogName());
     }
 
@@ -710,14 +708,14 @@ CCheckQueue<CScriptCheck> *CParallelValidation::GetScriptCheckQueue()
                         if (mapBlockValidationThreads.count(this_id))
                             mapBlockValidationThreads[this_id].pScriptQueue = pqueue;
 
-                        LogPrint("parallel", "next scriptqueue not in use is %d\n", i);
+                        LOG(PARALLEL, "next scriptqueue not in use is %d\n", i);
                         return pqueue;
                     }
                 }
             }
         }
 
-        LogPrint("parallel", "Sleeping 50 millis\n");
+        LOG(PARALLEL, "Sleeping 50 millis\n");
         MilliSleep(50);
     }
 }

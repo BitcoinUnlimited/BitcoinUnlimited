@@ -19,6 +19,7 @@
 #include "sync.h"
 #include "txdb.h"
 #include "txmempool.h"
+#include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
 
@@ -1072,6 +1073,50 @@ UniValue reconsiderblock(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
     }
 
+    uiInterface.NotifyBlockTip(false, chainActive.Tip());
+
+    return NullUniValue;
+}
+
+UniValue rollbackchain(const UniValue &params, bool fHelp)
+{
+    // In case of operator error, limit the rollback to 100 blocks
+    uint32_t nLimit = 100;
+
+    if (fHelp || params.size() != 1)
+        throw runtime_error("rollbackchain \"blockheight\"\n"
+                            "\nRolls back the blockchain to the height indicated.\n"
+                            "\nArguments:\n"
+                            "1. blockheight   (int, required) the height that you want to roll the chain \
+                            back to (only maxiumum rollback of " +
+                            std::to_string(nLimit) + " blocks allowed)\n"
+                                                     "\nResult:\n"
+                                                     "\nExamples:\n" +
+                            HelpExampleCli("rollbackchain", "\"blockheight\"") +
+                            HelpExampleRpc("rollbackchain", "\"blockheight\""));
+
+    std::string strHeight = params[0].get_str();
+    uint64_t nRollBackHeight = boost::lexical_cast<uint64_t>(strHeight);
+
+    LOCK(cs_main);
+    uint32_t nRollBack = chainActive.Height() - nRollBackHeight;
+    if (nRollBack > nLimit)
+        throw runtime_error("You are attempting to rollback the chain by " + std::to_string(nRollBack) +
+                            " blocks, however the limit is " + std::to_string(nLimit) + " blocks.");
+
+    while ((uint64_t)chainActive.Height() > nRollBackHeight)
+    {
+        CValidationState state;
+        // Disconnect the tip and by setting the third param (fRollBack) to true we avoid having to resurrect
+        // the transactions from the block back into the mempool, which saves a great deal of time.
+        if (!DisconnectTip(state, Params().GetConsensus(), true))
+            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+
+        if (!state.IsValid())
+            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+
+        uiInterface.NotifyBlockTip(false, chainActive.Tip());
+    }
     return NullUniValue;
 }
 
@@ -1088,6 +1133,7 @@ static const CRPCCommand commands[] = {
 
     /* Not shown in help */
     {"hidden", "invalidateblock", &invalidateblock, true}, {"hidden", "reconsiderblock", &reconsiderblock, true},
+    {"hidden", "rollbackchain", &rollbackchain, true},
 };
 
 void RegisterBlockchainRPCCommands(CRPCTable &tableRPC)

@@ -50,16 +50,16 @@ CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize, bool fMemory, bo
     {
         if (fWipe)
         {
-            LogPrintf("Wiping LevelDB in %s\n", path.string());
+            LOGA("Wiping LevelDB in %s\n", path.string());
             leveldb::Status result = leveldb::DestroyDB(path.string(), options);
             dbwrapper_private::HandleError(result);
         }
         TryCreateDirectories(path);
-        LogPrintf("Opening LevelDB in %s\n", path.string());
+        LOGA("Opening LevelDB in %s\n", path.string());
     }
     leveldb::Status status = leveldb::DB::Open(options, path.string(), &pdb);
     dbwrapper_private::HandleError(status);
-    LogPrintf("Opened LevelDB successfully\n");
+    LOGA("Opened LevelDB successfully\n");
 
     // The base-case obfuscation key, which is a noop.
     obfuscate_key = std::vector<unsigned char>(OBFUSCATE_KEY_NUM_BYTES, '\000');
@@ -76,10 +76,10 @@ CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize, bool fMemory, bo
         Write(OBFUSCATE_KEY_KEY, new_key);
         obfuscate_key = new_key;
 
-        LogPrintf("Wrote new obfuscate key for %s: %s\n", path.string(), HexStr(obfuscate_key));
+        LOGA("Wrote new obfuscate key for %s: %s\n", path.string(), HexStr(obfuscate_key));
     }
 
-    LogPrintf("Using obfuscation key for %s: %s\n", path.string(), HexStr(obfuscate_key));
+    LOGA("Using obfuscation key for %s: %s\n", path.string(), HexStr(obfuscate_key));
 }
 
 CDBWrapper::~CDBWrapper()
@@ -137,7 +137,7 @@ void HandleError(const leveldb::Status &status)
 {
     if (status.ok())
         return;
-    LogPrintf("%s\n", status.ToString());
+    LOGA("%s\n", status.ToString());
     if (status.IsCorruption())
         throw dbwrapper_error("Database corrupted");
     if (status.IsIOError())

@@ -84,11 +84,7 @@ BOOST_AUTO_TEST_CASE(GetBlockProofEquivalentTime_test)
         blocks[i].nHeight = i;
         blocks[i].nTime = 1269211443 + i * params.nPowTargetSpacing;
         blocks[i].nBits = 0x207fffff; /* target 0x7fffff000... */
-#ifndef BITCOIN_CASH
         blocks[i].nChainWork = i ? blocks[i - 1].nChainWork + GetBlockProof(blocks[i - 1]) : arith_uint256(0);
-#else
-        blocks[i].nChainWork = i ? blocks[i - 1].nChainWork + GetBlockProof(blocks[i]) : arith_uint256(0);
-#endif
     }
 
     for (int j = 0; j < 1000; j++)
@@ -109,9 +105,7 @@ static CBlockIndex GetBlockIndex(CBlockIndex *pindexPrev, int64_t nTimeInterval,
     block.nHeight = pindexPrev->nHeight + 1;
     block.nTime = pindexPrev->nTime + nTimeInterval;
     block.nBits = nBits;
-#ifdef BITCOIN_CASH
     block.nChainWork = pindexPrev->nChainWork + GetBlockProof(block);
-#endif
     return block;
 }
 
@@ -132,9 +126,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test)
     blocks[0].nTime = 1269211443;
     blocks[0].nBits = initialBits;
 
-#ifdef BITCOIN_CASH
     blocks[0].nChainWork = GetBlockProof(blocks[0]);
-#endif
     // Pile up some blocks.
     for (size_t i = 1; i < 100; i++)
     {
@@ -183,7 +175,6 @@ BOOST_AUTO_TEST_CASE(retargeting_test)
     BOOST_CHECK_EQUAL(GetNextWorkRequired(&blocks[114], &blkHeaderDummy, params), powLimit.GetCompact());
 }
 
-#ifdef BITCOIN_CASH
 BOOST_AUTO_TEST_CASE(cash_difficulty_test)
 {
     SelectParams(CBaseChainParams::MAIN);
@@ -356,6 +347,5 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test)
         nBits = nextBits;
     }
 }
-#endif
 
 BOOST_AUTO_TEST_SUITE_END()

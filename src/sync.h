@@ -251,7 +251,7 @@ private:
         lockedTime = GetStopwatch();
         if (lockedTime - startWait > LOCK_WARN_TIME)
         {
-            LogPrint("lck", "Lock %s at %s:%d waited for %d ms\n", pszName, pszFile, nLine, (lockedTime - startWait));
+            LOG(LCK, "Lock %s at %s:%d waited for %d ms\n", pszName, pszFile, nLine, (lockedTime - startWait));
         }
 #endif
     }
@@ -310,8 +310,7 @@ public:
             uint64_t doneTime = GetStopwatch();
             if (doneTime - lockedTime > LOCK_WARN_TIME)
             {
-                LogPrint(
-                    "lck", "Lock %s at %s:%d remained locked for %d ms\n", name, file, line, doneTime - lockedTime);
+                LOG(LCK, "Lock %s at %s:%d remained locked for %d ms\n", name, file, line, doneTime - lockedTime);
             }
 #endif
         }
@@ -340,7 +339,7 @@ private:
         file = pszFile;
         line = nLine;
         EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()));
-// LogPrint("lck","try ReadLock %p %s by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
+// LOG(LCK,"try ReadLock %p %s by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
 #ifdef DEBUG_LOCKCONTENTION
         if (!lock.try_lock())
         {
@@ -350,12 +349,12 @@ private:
 #ifdef DEBUG_LOCKCONTENTION
         }
 #endif
-// LogPrint("lck","ReadLock %p %s taken by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
+// LOG(LCK,"ReadLock %p %s taken by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
 #ifdef DEBUG_LOCKTIME
         lockedTime = GetStopwatch();
         if (lockedTime - startWait > LOCK_WARN_TIME)
         {
-            LogPrint("lck", "Lock %s at %s:%d waited for %d ms\n", pszName, pszFile, nLine, (lockedTime - startWait));
+            LOG(LCK, "Lock %s at %s:%d waited for %d ms\n", pszName, pszFile, nLine, (lockedTime - startWait));
         }
 #endif
     }
@@ -413,8 +412,7 @@ public:
             int64_t doneTime = GetStopwatch();
             if (doneTime - lockedTime > LOCK_WARN_TIME)
             {
-                LogPrint(
-                    "lck", "Lock %s at %s:%d remained locked for %d ms\n", name, file, line, doneTime - lockedTime);
+                LOG(LCK, "Lock %s at %s:%d remained locked for %d ms\n", name, file, line, doneTime - lockedTime);
             }
 #endif
         }

@@ -302,8 +302,8 @@ enum
     NODE_XTHIN = (1 << 4),
     // BUIP010 - Xtreme Thinblocks - end section
 
-    // BUIP055 - UAHF
-    // NODE_UAHF means the node supports the UAHF hard fork.  This is intended to be just
+    // UAHF
+    // NODE_BITCOIN_CASH means the node supports the UAHF hard fork.  This is intended to be just
     // a temporary service bit until the fork actually happens.  After the for it can be
     // removed.
     // If this is turned off then the node will not follow the UAHF hardfork

@@ -802,7 +802,7 @@ UniValue submitblock(const UniValue &params, bool fHelp)
 
     CValidationState state;
     submitblock_StateCatcher sc(block.GetHash());
-    LogPrint("rpc", "Received block %s via RPC.\n", block.GetHash().ToString());
+    LOG(RPC, "Received block %s via RPC.\n", block.GetHash().ToString());
     RegisterValidationInterface(&sc);
 
 
@@ -900,11 +900,7 @@ UniValue estimatesmartfee(const UniValue &params, bool fHelp)
                             "1. nblocks     (numeric)\n"
                             "\nResult:\n"
                             "{\n"
-#ifdef BITCOIN_CASH
                             "  \"feerate\" : x.x,     (numeric) estimate fee-per-kilobyte (in BCH)\n"
-#else
-                            "  \"feerate\" : x.x,     (numeric) estimate fee-per-kilobyte (in BTC)\n"
-#endif
                             "  \"blocks\" : n         (numeric) block number where estimate was found\n"
                             "}\n"
                             "\n"

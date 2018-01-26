@@ -13,81 +13,6 @@
 #include "uint256.h"
 #include "util.h"
 
-#ifndef BITCOIN_CASH
-uint32_t GetNextWorkRequired(const CBlockIndex *pindexLast, const CBlockHeader *pblock, const Consensus::Params &params)
-{
-    unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
-
-    // Genesis block
-    if (pindexLast == nullptr)
-        return nProofOfWorkLimit;
-
-    // Only change once per difficulty adjustment interval
-    uint32_t nHeight = pindexLast->nHeight + 1;
-    if (nHeight % params.DifficultyAdjustmentInterval() == 0)
-    {
-        // Go back by what we want to be 14 days worth of blocks
-        assert(nHeight >= params.DifficultyAdjustmentInterval());
-        uint32_t nHeightFirst = nHeight - params.DifficultyAdjustmentInterval();
-        const CBlockIndex *pindexFirst = pindexLast->GetAncestor(nHeightFirst);
-        assert(pindexFirst);
-
-        return CalculateNextWorkRequired(pindexLast, pindexFirst->GetBlockTime(), params);
-    }
-
-    if (params.fPowAllowMinDifficultyBlocks)
-    {
-        // Special difficulty rule for testnet:
-        // If the new block's timestamp is more than 2* 10 minutes then allow
-        // mining of a min-difficulty block.
-        if (pblock->GetBlockTime() > pindexLast->GetBlockTime() + 2 * params.nPowTargetSpacing)
-        {
-            return nProofOfWorkLimit;
-        }
-
-        // Return the last non-special-min-difficulty-rules-block
-        const CBlockIndex *pindex = pindexLast;
-        while (pindex->pprev && pindex->nHeight % params.DifficultyAdjustmentInterval() != 0 &&
-               pindex->nBits == nProofOfWorkLimit)
-        {
-            pindex = pindex->pprev;
-        }
-
-        return pindex->nBits;
-    }
-
-    // Do not go lower than the POW limit.
-    uint32_t nBits = pindexLast->nBits;
-    if (nBits == nProofOfWorkLimit)
-    {
-        return nProofOfWorkLimit;
-    }
-
-    // If producing the last 6 block took less than 12h, we keep the same difficulty.
-    const CBlockIndex *pindex6 = pindexLast->GetAncestor(nHeight - 7);
-    assert(pindex6);
-    int64_t mtp6blocks = pindexLast->GetMedianTimePast() - pindex6->GetMedianTimePast();
-    if (mtp6blocks < 12 * 3600)
-    {
-        return nBits;
-    }
-
-    // If producing the last 6 block took more than 12h, increase the difficulty
-    // target by 25% (which reduces the difficulty by 20%). This ensure the
-    // chain do not get stuck in case we lose hashrate abruptly.
-    arith_uint256 nPow;
-    nPow.SetCompact(nBits);
-    nPow += (nPow >> 2);
-
-    // Make sure we do not go below allowed values.
-    const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
-    if (nPow > bnPowLimit)
-        nPow = bnPowLimit;
-
-    return nPow.GetCompact();
-}
-
-#else
 /**
  * Compute the next required proof of work using the legacy Bitcoin difficulty
  * adjustement + Emergency Difficulty Adjustement (EDA).
@@ -185,7 +110,6 @@ uint32_t GetNextWorkRequired(const CBlockIndex *pindexPrev, const CBlockHeader *
 
     return GetNextEDAWorkRequired(pindexPrev, pblock, params);
 }
-#endif
 
 uint32_t CalculateNextWorkRequired(const CBlockIndex *pindexLast,
     int64_t nFirstBlockTime,
@@ -275,7 +199,7 @@ int64_t GetBlockProofEquivalentTime(const CBlockIndex &to,
     }
     return sign * r.GetLow64();
 }
-#ifdef BITCOIN_CASH
+
 /**
  * Compute the a target based on the work done between 2 blocks and the time
  * required to produce that work.
@@ -403,4 +327,3 @@ uint32_t GetNextCashWorkRequired(const CBlockIndex *pindexPrev,
 
     return nextTarget.GetCompact();
 }
-#endif

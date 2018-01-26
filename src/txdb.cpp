@@ -138,7 +138,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
         batch.Write(DB_BEST_BLOCK, hashBlock);
 
     bool ret = db.WriteBatch(batch);
-    LogPrint("coindb", "Committing %u changed transactions (out of %u) to coin database with %u batch writes...\n",
+    LOG(COINDB, "Committing %u changed transactions (out of %u) to coin database with %u batch writes...\n",
         (unsigned int)changed, (unsigned int)count, (unsigned int)nBatchWrites);
     return ret;
 }
@@ -379,7 +379,7 @@ bool CCoinsViewDB::Upgrade()
         return true;
     }
 
-    LogPrintf("Upgrading database...\n");
+    LOGA("Upgrading database...\n");
     uiInterface.InitMessage(_("Upgrading database...this may take a while"));
     size_t batch_size = 1 << 24;
     CDBBatch batch(db);

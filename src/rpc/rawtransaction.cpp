@@ -23,6 +23,7 @@
 #include "script/sign.h"
 #include "script/standard.h"
 #include "txmempool.h"
+#include "uahf_fork.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
 #ifdef ENABLE_WALLET
@@ -825,7 +826,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     }
     if (!pickedForkId) // If the user didn't specify, use the configured default for the hash type
     {
-        if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
+        if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
         {
             nHashType |= SIGHASH_FORKID;
             pickedForkId = true;

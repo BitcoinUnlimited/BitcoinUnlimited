@@ -16,8 +16,8 @@
 #ifdef DEBUG_LOCKCONTENTION
 void PrintLockContention(const char *pszName, const char *pszFile, int nLine)
 {
-    LogPrintf("LOCKCONTENTION: %s\n", pszName);
-    LogPrintf("Locker: %s:%d\n", pszFile, nLine);
+    LOGA("LOCKCONTENTION: %s\n", pszName);
+    LOGA("Locker: %s:%d\n", pszFile, nLine);
 }
 #endif /* DEBUG_LOCKCONTENTION */
 
@@ -97,46 +97,46 @@ static void potential_deadlock_detected(const std::pair<void *, void *> &mismatc
     bool secondLocked = false;
     bool onlyMaybeDeadlock = false;
 
-    LogPrintf("POTENTIAL DEADLOCK DETECTED\n");
-    LogPrintf("Previous lock order was:\n");
+    LOGA("POTENTIAL DEADLOCK DETECTED\n");
+    LOGA("Previous lock order was:\n");
     BOOST_FOREACH (const PAIRTYPE(void *, CLockLocation) & i, s2)
     {
         if (i.first == mismatch.first)
         {
-            LogPrintf(" (1)");
+            LOGA(" (1)");
             if (!firstLocked && secondLocked && i.second.fTry)
                 onlyMaybeDeadlock = true;
             firstLocked = true;
         }
         if (i.first == mismatch.second)
         {
-            LogPrintf(" (2)");
+            LOGA(" (2)");
             if (!secondLocked && firstLocked && i.second.fTry)
                 onlyMaybeDeadlock = true;
             secondLocked = true;
         }
-        LogPrintf(" %s\n", i.second.ToString());
+        LOGA(" %s\n", i.second.ToString());
     }
     firstLocked = false;
     secondLocked = false;
-    LogPrintf("Current lock order is:\n");
+    LOGA("Current lock order is:\n");
     BOOST_FOREACH (const PAIRTYPE(void *, CLockLocation) & i, s1)
     {
         if (i.first == mismatch.first)
         {
-            LogPrintf(" (1)");
+            LOGA(" (1)");
             if (!firstLocked && secondLocked && i.second.fTry)
                 onlyMaybeDeadlock = true;
             firstLocked = true;
         }
         if (i.first == mismatch.second)
         {
-            LogPrintf(" (2)");
+            LOGA(" (2)");
             if (!secondLocked && firstLocked && i.second.fTry)
                 onlyMaybeDeadlock = true;
             secondLocked = true;
         }
-        LogPrintf(" %s\n", i.second.ToString());
+        LOGA(" %s\n", i.second.ToString());
     }
     assert(onlyMaybeDeadlock);
 }

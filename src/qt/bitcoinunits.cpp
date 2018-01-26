@@ -4,8 +4,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "bitcoinunits.h"
-#include "clientversion.h" // for BITCOIN_CASH define (if on BUCash branch)
-
 #include "primitives/transaction.h"
 
 #include <QStringList>

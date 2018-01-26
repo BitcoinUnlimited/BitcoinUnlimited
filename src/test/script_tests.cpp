@@ -35,11 +35,7 @@ using namespace std;
 // Uncomment if you want to output updated JSON tests.
 // #define UPDATE_JSON_TESTS
 
-#ifdef BITCOIN_CASH
 static const unsigned int flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID;
-#else
-static const unsigned int flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
-#endif
 
 unsigned int ParseScriptFlags(string strFlags);
 string FormatScriptFlags(unsigned int flags);
@@ -998,11 +994,7 @@ BOOST_AUTO_TEST_CASE(script_PushData)
 
 CScript sign_multisig(const CScript &scriptPubKey, std::vector<CKey> keys, const CTransaction &transaction, CAmount amt)
 {
-#ifdef BITCOIN_CASH
     unsigned char sighashType = SIGHASH_ALL | SIGHASH_FORKID;
-#else
-    unsigned char sighashType = SIGHASH_ALL;
-#endif
 
     uint256 hash = SignatureHash(scriptPubKey, transaction, 0, sighashType, amt, 0);
 
@@ -1226,8 +1218,7 @@ BOOST_AUTO_TEST_CASE(script_combineSigs)
     combined = CombineSignatures(scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount), empty, scriptSig);
     BOOST_CHECK(combined == scriptSig);
 
-// A couple of partially-signed versions:
-#ifdef BITCOIN_CASH
+    // A couple of partially-signed versions:
     vector<unsigned char> sig1;
     uint256 hash1 = SignatureHash(scriptPubKey, txTo, 0, SIGHASH_ALL | SIGHASH_FORKID, 0);
     BOOST_CHECK(keys[0].Sign(hash1, sig1));
@@ -1240,20 +1231,6 @@ BOOST_AUTO_TEST_CASE(script_combineSigs)
     uint256 hash3 = SignatureHash(scriptPubKey, txTo, 0, SIGHASH_SINGLE | SIGHASH_FORKID, 0);
     BOOST_CHECK(keys[2].Sign(hash3, sig3));
     sig3.push_back(SIGHASH_SINGLE | SIGHASH_FORKID);
-#else
-    vector<unsigned char> sig1;
-    uint256 hash1 = SignatureHash(scriptPubKey, txTo, 0, SIGHASH_ALL, 0);
-    BOOST_CHECK(keys[0].Sign(hash1, sig1));
-    sig1.push_back(SIGHASH_ALL);
-    vector<unsigned char> sig2;
-    uint256 hash2 = SignatureHash(scriptPubKey, txTo, 0, SIGHASH_NONE, 0);
-    BOOST_CHECK(keys[1].Sign(hash2, sig2));
-    sig2.push_back(SIGHASH_NONE);
-    vector<unsigned char> sig3;
-    uint256 hash3 = SignatureHash(scriptPubKey, txTo, 0, SIGHASH_SINGLE, 0);
-    BOOST_CHECK(keys[2].Sign(hash3, sig3));
-    sig3.push_back(SIGHASH_SINGLE);
-#endif
 
     // Not fussy about order (or even existence) of placeholders or signatures:
     CScript partial1a = CScript() << OP_0 << sig1 << OP_0;

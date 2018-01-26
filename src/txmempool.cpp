@@ -8,6 +8,7 @@
 
 #include "clientversion.h"
 #include "consensus/consensus.h"
+#include "consensus/tx_verify.h"
 #include "consensus/validation.h"
 #include "main.h"
 #include "policy/fees.h"
@@ -382,7 +383,7 @@ bool CTxMemPool::ValidateMemPoolAncestors(const std::vector<CTxIn> &txIn,
         }
 
         const setEntries &setMemPoolParents = GetMemPoolParents(stageit);
-        BOOST_FOREACH (const txiter &phash, setMemPoolParents)
+        for (const txiter &phash : setMemPoolParents)
         {
             // If this is a new ancestor, add it.
             if (setAncestors.count(phash) == 0)
@@ -831,8 +832,9 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
     uint64_t innerUsage = 0;
 
     WRITELOCK(cs);
-    LogPrint("mempool", "Checking mempool with %u transactions and %u inputs\n", (unsigned int)mapTx.size(),
+    LOG(MEMPOOL, "Checking mempool with %u transactions and %u inputs\n", (unsigned int)mapTx.size(),
         (unsigned int)mapNextTx.size());
+
     CCoinsViewCache mempoolDuplicate(const_cast<CCoinsViewCache *>(pcoins));
 
     list<const CTxMemPoolEntry *> waitingOnDependants;
@@ -1023,7 +1025,7 @@ bool CTxMemPool::WriteFeeEstimates(CAutoFile &fileout) const
     }
     catch (const std::exception &)
     {
-        LogPrintf("CTxMemPool::WriteFeeEstimates(): unable to write policy estimator data (non-fatal)\n");
+        LOGA("CTxMemPool::WriteFeeEstimates(): unable to write policy estimator data (non-fatal)\n");
         return false;
     }
     return true;
@@ -1043,7 +1045,7 @@ bool CTxMemPool::ReadFeeEstimates(CAutoFile &filein)
     }
     catch (const std::exception &)
     {
-        LogPrintf("CTxMemPool::ReadFeeEstimates(): unable to read policy estimator data (non-fatal)\n");
+        LOGA("CTxMemPool::ReadFeeEstimates(): unable to read policy estimator data (non-fatal)\n");
         return false;
     }
     return true;
@@ -1074,7 +1076,7 @@ void CTxMemPool::PrioritiseTransaction(const uint256 hash,
             }
         }
     }
-    LogPrintf("PrioritiseTransaction: %s priority += %f, fee += %d\n", strHash, dPriorityDelta, FormatMoney(nFeeDelta));
+    LOGA("PrioritiseTransaction: %s priority += %f, fee += %d\n", strHash, dPriorityDelta, FormatMoney(nFeeDelta));
 }
 
 void CTxMemPool::ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount &nFeeDelta) const
@@ -1336,8 +1338,7 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpends
     }
 
     if (maxFeeRateRemoved > CFeeRate(0))
-        LogPrint(
-            "mempool", "Removed %u txn, rolling minimum fee bumped to %s\n", nTxnRemoved, maxFeeRateRemoved.ToString());
+        LOG(MEMPOOL, "Removed %u txn, rolling minimum fee bumped to %s\n", nTxnRemoved, maxFeeRateRemoved.ToString());
 }
 
 void CTxMemPool::UpdateTransactionsPerSecond()

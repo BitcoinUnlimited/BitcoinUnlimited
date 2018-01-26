@@ -11,7 +11,7 @@
 #include "compat.h" // for Windows API
 #endif
 #include "serialize.h" // for begin_ptr(vec)
-#include "util.h" // for LogPrint()
+#include "util.h" // for LOG()
 #include "utilstrencodings.h" // for GetTime()
 
 #include <limits>
@@ -75,14 +75,14 @@ void RandAddSeedPerfmon()
     {
         RAND_add(begin_ptr(vData), nSize, nSize / 100.0);
         memory_cleanse(begin_ptr(vData), nSize);
-        LogPrint("rand", "%s: %lu bytes\n", __func__, nSize);
+        LOG(RAND, "%s: %lu bytes\n", __func__, nSize);
     }
     else
     {
         static bool warned = false; // Warn only once
         if (!warned)
         {
-            LogPrintf("%s: Warning: RegQueryValueExA(HKEY_PERFORMANCE_DATA) failed with code %i\n", __func__, ret);
+            LOGA("%s: Warning: RegQueryValueExA(HKEY_PERFORMANCE_DATA) failed with code %i\n", __func__, ret);
             warned = true;
         }
     }
@@ -93,8 +93,7 @@ void GetRandBytes(unsigned char *buf, int num)
 {
     if (RAND_bytes(buf, num) != 1)
     {
-        LogPrintf(
-            "%s: OpenSSL RAND_bytes() failed with error: %s\n", __func__, ERR_error_string(ERR_get_error(), NULL));
+        LOGA("%s: OpenSSL RAND_bytes() failed with error: %s\n", __func__, ERR_error_string(ERR_get_error(), NULL));
         assert(false);
     }
 }
