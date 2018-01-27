@@ -87,7 +87,7 @@ bool fRequireStandard = true;
 unsigned int nBytesPerSigOp = DEFAULT_BYTES_PER_SIGOP;
 bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
-size_t nCoinCacheUsage = 5000 * 300;
+int64_t nCoinCacheUsage = 0;
 uint64_t nPruneTarget = 0;
 uint32_t nXthinBloomFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE;
 
@@ -2626,7 +2626,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
         {
             nLastSetChain = nNow;
         }
-        size_t cacheSize = pcoinsTip->DynamicMemoryUsage();
+        int64_t cacheSize = pcoinsTip->DynamicMemoryUsage();
         static int64_t nSizeAfterLastFlush = 0;
         // The cache is close to the limit. Try to flush and trim.
         bool fCacheCritical = ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > nCoinCacheUsage * 0.995)) ||
@@ -2713,7 +2713,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
         // As a safeguard, periodically check and correct any drift in the value of cachedCoinsUsage.  While a
         // correction should never be needed, resetting the value allows the node to continue operating, and only
         // an error is reported if the new and old values do not match.
-        if (fPeriodicFlush)
+        if (fPeriodicFlush || nCoinCacheUsage < 0)
             pcoinsTip->ResetCachedCoinUsage();
     }
     catch (const std::runtime_error &e)
