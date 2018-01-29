@@ -428,3 +428,105 @@ bool CCoinsViewDB::Upgrade()
 
     return true;
 }
+
+// For Windows we can use the current total available memory, however for other systems we can only use the
+// the physical RAM in our calculations.
+static uint64_t nDefaultPhysMem = 1000000000; // if we can't get RAM size then default to an assumed 1GB system memory
+#ifdef WIN32
+#include <windows.h>
+unsigned long long GetAvailableMemory()
+{
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    GlobalMemoryStatusEx(&status);
+    if (status.ullAvailPhys > 0)
+    {
+        return status.ullAvailPhys;
+    }
+    else
+    {
+        LOGA("Could not get size of avaialable memory - returning with default\n");
+        return nDefaultPhysMem / 2;
+    }
+}
+#elif __APPLE__
+#include <sys/sysctl.h>
+#include <sys/types.h>
+unsigned long long GetTotalSystemMemory()
+{
+    int mib[] = {CTL_HW, HW_MEMSIZE};
+    int64_t nPhysMem = 0;
+    size_t nLength = sizeof(nPhysMem);
+
+    if (sysctl(mib, 2, &nPhysMem, &nLength, nullptr, 0))
+    {
+        return nPhysMem;
+    }
+    else
+    {
+        LOGA("Could not get size of physical memory - returning with default\n");
+        return nDefaultPhysMem;
+    }
+}
+#elif __unix__
+#include <unistd.h>
+unsigned long long GetTotalSystemMemory()
+{
+    long nPages = sysconf(_SC_PHYS_PAGES);
+    long nPageSize = sysconf(_SC_PAGE_SIZE);
+    if (nPages > 0 && nPageSize > 0)
+    {
+        return nPages * nPageSize;
+    }
+    else
+    {
+        LOGA("Could not get size of physical memory - returning with default\n");
+        return nDefaultPhysMem;
+    }
+}
+#else
+unsigned long long GetTotalSystemMemory()
+{
+    LOGA("Could not get size of physical memory - returning with default\n");
+    return nDefaultPhysMem; // if we can't get RAM size then default to an assumed 1GB system memory
+}
+#endif
+
+void GetCacheConfiguration(int64_t &nBlockTreeDBCache, int64_t &nCoinDBCache, int64_t &nCoinCacheUsage)
+{
+#ifdef WIN32
+    // If using WINDOWS then determine the actual physical memory that is currently available. If the physical memory is
+    // small we use half the available memory. If it's large we use a much as possible but always leave 1GB available.
+    int64_t nMemAvailable = GetAvailableMemory();
+    nMemAvailable = std::max(nMemAvailable / 2, nMemAvailable - (1000 * 1000000));
+#else
+    // Get total system memory but only use half.
+    // - This half of system memory is only used as a basis for the total cache size
+    // - if and only if the operator has not already set a value for -dbcache. This mitigates a common problem
+    // - where new operators are unaware of the importance of the dbcache setting and therefore do not size their
+    // - dbcache correctly resulting in a very slow initial block sync.
+    int64_t nMemAvailable = GetTotalSystemMemory() / 2;
+#endif
+
+    // Convert from bytes to MiB.
+    nMemAvailable = nMemAvailable >> 20;
+
+    // nTotalCache size calculations returned in bytes (convert back from MiB to bytes)
+    int64_t nTotalCache = 0;
+    if (nDefaultDbCache < nMemAvailable)
+        nTotalCache = (GetArg("-dbcache", nMemAvailable) << 20);
+    else
+        nTotalCache = (GetArg("-dbcache", nDefaultDbCache) << 20);
+
+    // cache size calculations
+    nTotalCache = std::max(nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache
+    nTotalCache = std::min(nTotalCache, nMaxDbCache << 20); // total cache cannot be greater than nMaxDbcache
+    nBlockTreeDBCache = nTotalCache / 8;
+    if (nBlockTreeDBCache > (1 << 21) && !GetBoolArg("-txindex", DEFAULT_TXINDEX))
+        nBlockTreeDBCache = (1 << 21); // block tree db cache shouldn't be larger than 2 MiB
+    nTotalCache -= nBlockTreeDBCache;
+    // use 25%-50% of the remainder for disk cache
+    nCoinDBCache = std::min(nTotalCache / 2, (nTotalCache / 4) + (1 << 23));
+    nTotalCache -= nCoinDBCache;
+    nCoinCacheUsage = nTotalCache; // the rest goes to in-memory cache
+}

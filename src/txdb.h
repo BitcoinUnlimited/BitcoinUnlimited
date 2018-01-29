@@ -16,10 +16,11 @@
 #include <utility>
 #include <vector>
 
-
 class CBlockFileInfo;
 class CBlockIndex;
 class uint256;
+
+static const bool DEFAULT_TXINDEX = false;
 
 //! -dbcache default (MiB)
 static const int64_t nDefaultDbCache = 500;
@@ -37,6 +38,10 @@ static const int64_t nMaxBlockDBCache = 2;
 static const int64_t nMaxBlockDBAndTxIndexCache = 1024;
 //! Max memory allocated to coin DB specific cache (MiB)
 static const int64_t nMaxCoinsDBCache = 8;
+
+unsigned long long GetAvailableMemory();
+unsigned long long GetTotalSystemMemory();
+void GetCacheConfiguration(int64_t &nBlockTreeDBCache, int64_t &nCoinDBCache, int64_t &nCoinCacheUsage);
 
 struct CDiskTxPos : public CDiskBlockPos
 {

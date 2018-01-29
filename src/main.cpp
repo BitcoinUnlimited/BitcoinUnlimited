@@ -22,6 +22,7 @@
 #include "expedited.h"
 #include "hash.h"
 #include "init.h"
+#include "memusage.h"
 #include "merkleblock.h"
 #include "net.h"
 #include "nodestate.h"
@@ -2626,6 +2627,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
         {
             nLastSetChain = nNow;
         }
+
         int64_t cacheSize = pcoinsTip->DynamicMemoryUsage();
         static int64_t nSizeAfterLastFlush = 0;
         // The cache is close to the limit. Try to flush and trim.
