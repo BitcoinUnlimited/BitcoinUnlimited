@@ -22,7 +22,6 @@
 #include "expedited.h"
 #include "hash.h"
 #include "init.h"
-#include "memusage.h"
 #include "merkleblock.h"
 #include "net.h"
 #include "nodestate.h"
@@ -2595,6 +2594,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
     static int64_t nLastWrite = 0;
     static int64_t nLastFlush = 0;
     static int64_t nLastSetChain = 0;
+    static int64_t nLastDbAdjustment = 0;
     std::set<int> setFilesToPrune;
     bool fFlushForPrune = false;
     try
@@ -2627,7 +2627,29 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
         {
             nLastSetChain = nNow;
         }
+        if (nLastDbAdjustment == 0)
+        {
+            nLastDbAdjustment = nNow;
+        }
+#ifdef WIN32
+        // If there is no dbcache setting specified by the node operator then float the dbache setting down
+        // based on current available memory.
+        if (!GetArg("-dbcache", 0) && (nNow - nLastDbAdjustment) > 60000000)
+        {
+            int64_t nMemAvailable = GetAvailableMemory();
+            int64_t nTenPcnt = GetTotalSystemMemory() * nDefaultPcntMemUnused / 100;
 
+            // reduce nCoinCacheUsage if mem available drop below 10%. Also we don't want to constantly be 
+            // triggering a trim or flush every whenever the nMemAvailable crosses the threshold by just a
+            // few bytes. So we'll dampen the triggering by flushing/trimming only if the threshold is crossed by 5%.
+            if (nMemAvailable * 1.05 < nTenPcnt)
+            {
+                nCoinCacheUsage = std::max((int64_t)350000000, nCoinCacheUsage - (nTenPcnt - nMemAvailable));
+                LOGA("nCoinCacheUsage was reduced by %u bytes\n", nTenPcnt - nMemAvailable);
+                nLastDbAdjustment = nNow;
+            }
+        }
+#endif
         int64_t cacheSize = pcoinsTip->DynamicMemoryUsage();
         static int64_t nSizeAfterLastFlush = 0;
         // The cache is close to the limit. Try to flush and trim.

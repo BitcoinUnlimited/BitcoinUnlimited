@@ -445,8 +445,23 @@ unsigned long long GetAvailableMemory()
     }
     else
     {
-        LOGA("Could not get size of avaialable memory - returning with default\n");
+        LOGA("Could not get size of available memory - returning with default\n");
         return nDefaultPhysMem / 2;
+    }
+}
+unsigned long long GetTotalSystemMemory()
+{
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    GlobalMemoryStatusEx(&status);
+    if (status.ullTotalPhys > 0)
+    {
+        return status.ullTotalPhys;
+    }
+    else
+    {
+        LOGA("Could not get size of physical memory - returning with default\n");
+        return nDefaultPhysMem;
     }
 }
 #elif __APPLE__
@@ -495,10 +510,10 @@ unsigned long long GetTotalSystemMemory()
 void GetCacheConfiguration(int64_t &nBlockTreeDBCache, int64_t &nCoinDBCache, int64_t &nCoinCacheUsage)
 {
 #ifdef WIN32
-    // If using WINDOWS then determine the actual physical memory that is currently available. If the physical memory is
-    // small we use half the available memory. If it's large we use a much as possible but always leave 1GB available.
+    // If using WINDOWS then determine the actual physical memory that is currently available for dbcaching.
+    // Alway leave 10% of the available RAM unused.
     int64_t nMemAvailable = GetAvailableMemory();
-    nMemAvailable = std::max(nMemAvailable / 2, nMemAvailable - (1000 * 1000000));
+    nMemAvailable = nMemAvailable -  (nMemAvailable * nDefaultPcntMemUnused / 100);
 #else
     // Get total system memory but only use half.
     // - This half of system memory is only used as a basis for the total cache size
