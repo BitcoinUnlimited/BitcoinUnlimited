@@ -2639,12 +2639,17 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
             int64_t nMemAvailable = GetAvailableMemory();
             int64_t nTenPcnt = GetTotalSystemMemory() * nDefaultPcntMemUnused / 100;
 
-            // reduce nCoinCacheUsage if mem available drop below 10%. Also we don't want to constantly be 
+            // reduce nCoinCacheUsage if mem available drop below 10%. Also we don't want to constantly be
             // triggering a trim or flush every whenever the nMemAvailable crosses the threshold by just a
             // few bytes. So we'll dampen the triggering by flushing/trimming only if the threshold is crossed by 5%.
             if (nMemAvailable * 1.05 < nTenPcnt)
             {
-                nCoinCacheUsage = std::max((int64_t)350000000, nCoinCacheUsage - (nTenPcnt - nMemAvailable));
+                // Get the lowest possible default coins cache configuration possible and use this value as a limiter
+                // to prevent the nCoinCacheUsage from falling below this value.
+                int64_t dummyBICache, dummyLevelDbCache, nDefaultCoinCache = 0;
+                GetCacheConfiguration(dummyBICache, dummyLevelDbCache, nDefaultCoinCache, true);
+
+                nCoinCacheUsage = std::max(nDefaultCoinCache, nCoinCacheUsage - (nTenPcnt - nMemAvailable));
                 LOGA("nCoinCacheUsage was reduced by %u bytes\n", nTenPcnt - nMemAvailable);
                 nLastDbAdjustment = nNow;
             }

@@ -507,13 +507,13 @@ unsigned long long GetTotalSystemMemory()
 }
 #endif
 
-void GetCacheConfiguration(int64_t &nBlockTreeDBCache, int64_t &nCoinDBCache, int64_t &nCoinCacheUsage)
+void GetCacheConfiguration(int64_t &nBlockTreeDBCache, int64_t &nCoinDBCache, int64_t &nCoinCacheUsage, bool fDefault)
 {
 #ifdef WIN32
     // If using WINDOWS then determine the actual physical memory that is currently available for dbcaching.
     // Alway leave 10% of the available RAM unused.
     int64_t nMemAvailable = GetAvailableMemory();
-    nMemAvailable = nMemAvailable -  (nMemAvailable * nDefaultPcntMemUnused / 100);
+    nMemAvailable = nMemAvailable - (nMemAvailable * nDefaultPcntMemUnused / 100);
 #else
     // Get total system memory but only use half.
     // - This half of system memory is only used as a basis for the total cache size
@@ -528,10 +528,22 @@ void GetCacheConfiguration(int64_t &nBlockTreeDBCache, int64_t &nCoinDBCache, in
 
     // nTotalCache size calculations returned in bytes (convert back from MiB to bytes)
     int64_t nTotalCache = 0;
-    if (nDefaultDbCache < nMemAvailable)
+    if (fDefault)
+    {
+        // With the default flag set we only want the settings returned if the default dbcache were selected.
+        // This is useful in that it gives us the lowest possible dbcache configuration.
+        nTotalCache = nDefaultDbCache << 20;
+    }
+    else if (nDefaultDbCache < nMemAvailable)
+    {
+        // only use the dynamically calculated nMemAvailable if and only if the node operator has not set
+        // a value for dbcache!
         nTotalCache = (GetArg("-dbcache", nMemAvailable) << 20);
+    }
     else
+    {
         nTotalCache = (GetArg("-dbcache", nDefaultDbCache) << 20);
+    }
 
     // cache size calculations
     nTotalCache = std::max(nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache

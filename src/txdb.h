@@ -43,7 +43,10 @@ static const int64_t nMaxCoinsDBCache = 8;
 
 unsigned long long GetAvailableMemory();
 unsigned long long GetTotalSystemMemory();
-void GetCacheConfiguration(int64_t &nBlockTreeDBCache, int64_t &nCoinDBCache, int64_t &nCoinCacheUsage);
+void GetCacheConfiguration(int64_t &nBlockTreeDBCache,
+    int64_t &nCoinDBCache,
+    int64_t &nCoinCacheUsage,
+    bool fDefault = false);
 
 struct CDiskTxPos : public CDiskBlockPos
 {
