@@ -41,8 +41,8 @@ static const int64_t nMaxBlockDBAndTxIndexCache = 1024;
 //! Max memory allocated to coin DB specific cache (MiB)
 static const int64_t nMaxCoinsDBCache = 8;
 
-unsigned long long GetAvailableMemory();
-unsigned long long GetTotalSystemMemory();
+uint64_t GetAvailableMemory();
+uint64_t GetTotalSystemMemory();
 void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
     int64_t &_nCoinCacheUsage,

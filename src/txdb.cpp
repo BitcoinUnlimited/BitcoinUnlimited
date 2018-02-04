@@ -434,7 +434,7 @@ bool CCoinsViewDB::Upgrade()
 static uint64_t nDefaultPhysMem = 1000000000; // if we can't get RAM size then default to an assumed 1GB system memory
 #ifdef WIN32
 #include <windows.h>
-unsigned long long GetAvailableMemory()
+uint64_t GetAvailableMemory()
 {
     MEMORYSTATUSEX status;
     status.dwLength = sizeof(status);
@@ -445,11 +445,11 @@ unsigned long long GetAvailableMemory()
     }
     else
     {
-        LOGA("Could not get size of available memory - returning with default\n");
+        LOG(COINDB, "Could not get size of available memory - returning with default\n");
         return nDefaultPhysMem / 2;
     }
 }
-unsigned long long GetTotalSystemMemory()
+uint64_t GetTotalSystemMemory()
 {
     MEMORYSTATUSEX status;
     status.dwLength = sizeof(status);
@@ -460,14 +460,14 @@ unsigned long long GetTotalSystemMemory()
     }
     else
     {
-        LOGA("Could not get size of physical memory - returning with default\n");
+        LOG(COINDB, "Could not get size of physical memory - returning with default\n");
         return nDefaultPhysMem;
     }
 }
 #elif __APPLE__
 #include <sys/sysctl.h>
 #include <sys/types.h>
-unsigned long long GetTotalSystemMemory()
+uint64_t GetTotalSystemMemory()
 {
     int mib[] = {CTL_HW, HW_MEMSIZE};
     int64_t nPhysMem = 0;
@@ -479,13 +479,13 @@ unsigned long long GetTotalSystemMemory()
     }
     else
     {
-        LOGA("Could not get size of physical memory - returning with default\n");
+        LOG(COINDB, "Could not get size of physical memory - returning with default\n");
         return nDefaultPhysMem;
     }
 }
 #elif __unix__
 #include <unistd.h>
-unsigned long long GetTotalSystemMemory()
+uint64_t GetTotalSystemMemory()
 {
     long nPages = sysconf(_SC_PHYS_PAGES);
     long nPageSize = sysconf(_SC_PAGE_SIZE);
@@ -495,14 +495,14 @@ unsigned long long GetTotalSystemMemory()
     }
     else
     {
-        LOGA("Could not get size of physical memory - returning with default\n");
+        LOG(COINDB, "Could not get size of physical memory - returning with default\n");
         return nDefaultPhysMem;
     }
 }
 #else
-unsigned long long GetTotalSystemMemory()
+uint64_t GetTotalSystemMemory()
 {
-    LOGA("Could not get size of physical memory - returning with default\n");
+    LOG(COINDB, "Could not get size of physical memory - returning with default\n");
     return nDefaultPhysMem; // if we can't get RAM size then default to an assumed 1GB system memory
 }
 #endif
@@ -609,7 +609,7 @@ void AdjustCoinCacheSize()
             GetCacheConfiguration(dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache, true);
 
             nCoinCacheUsage = std::max(nDefaultCoinCache, nCoinCacheUsage - (nUnusedMem - nMemAvailable));
-            LOGA("Current cache size: %ld MB, nCoinCacheUsage was reduced by %u MB\n", nCoinCacheUsage / 1000000,
+            LOG(COINDB, "Current cache size: %ld MB, nCoinCacheUsage was reduced by %u MB\n", nCoinCacheUsage / 1000000,
                 (nUnusedMem - nMemAvailable) / 1000000);
             nLastDbAdjustment = nNow;
             nLastMemAvailable = nMemAvailable;
@@ -627,8 +627,8 @@ void AdjustCoinCacheSize()
                 std::numeric_limits<long long>::max(), dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
 
             nCoinCacheUsage = std::min(nMaxCoinCache, nCoinCacheUsage + (nMemAvailable - nLastMemAvailable));
-            LOGA("Current cache size: %ld MB, nCoinCacheUsage was increased by %u MB\n", nCoinCacheUsage / 1000000,
-                (nMemAvailable - nLastMemAvailable) / 1000000);
+            LOG(COINDB, "Current cache size: %ld MB, nCoinCacheUsage was increased by %u MB\n",
+                nCoinCacheUsage / 1000000, (nMemAvailable - nLastMemAvailable) / 1000000);
             nLastDbAdjustment = nNow;
             nLastMemAvailable = nMemAvailable;
         }
