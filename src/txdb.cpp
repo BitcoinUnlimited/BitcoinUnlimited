@@ -507,7 +507,10 @@ unsigned long long GetTotalSystemMemory()
 }
 #endif
 
-void GetCacheConfiguration(int64_t &nBlockTreeDBCache, int64_t &nCoinDBCache, int64_t &nCoinCacheUsage, bool fDefault)
+void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
+    int64_t &_nCoinDBCache,
+    int64_t &_nCoinCacheUsage,
+    bool fDefault)
 {
 #ifdef WIN32
     // If using WINDOWS then determine the actual physical memory that is currently available for dbcaching.
@@ -526,7 +529,7 @@ void GetCacheConfiguration(int64_t &nBlockTreeDBCache, int64_t &nCoinDBCache, in
     // Convert from bytes to MiB.
     nMemAvailable = nMemAvailable >> 20;
 
-    // nTotalCache size calculations returned in bytes (convert back from MiB to bytes)
+    // nTotalCache size calculations returned in bytes (convert from MiB to bytes)
     int64_t nTotalCache = 0;
     if (fDefault)
     {
@@ -545,15 +548,30 @@ void GetCacheConfiguration(int64_t &nBlockTreeDBCache, int64_t &nCoinDBCache, in
         nTotalCache = (GetArg("-dbcache", nDefaultDbCache) << 20);
     }
 
-    // cache size calculations
-    nTotalCache = std::max(nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache
-    nTotalCache = std::min(nTotalCache, nMaxDbCache << 20); // total cache cannot be greater than nMaxDbcache
-    nBlockTreeDBCache = nTotalCache / 8;
-    if (nBlockTreeDBCache > (1 << 21) && !GetBoolArg("-txindex", DEFAULT_TXINDEX))
-        nBlockTreeDBCache = (1 << 21); // block tree db cache shouldn't be larger than 2 MiB
-    nTotalCache -= nBlockTreeDBCache;
-    // use 25%-50% of the remainder for disk cache
-    nCoinDBCache = std::min(nTotalCache / 2, (nTotalCache / 4) + (1 << 23));
-    nTotalCache -= nCoinDBCache;
-    nCoinCacheUsage = nTotalCache; // the rest goes to in-memory cache
+    // Now that we have the nTotalCache we can calculate all the various cache sizes.
+    CacheSizeCalculations(nTotalCache, _nBlockTreeDBCache, _nCoinDBCache, _nCoinCacheUsage);
+}
+
+void CacheSizeCalculations(int64_t _nTotalCache,
+    int64_t &_nBlockTreeDBCache,
+    int64_t &_nCoinDBCache,
+    int64_t &_nCoinCacheUsage)
+{
+    // make sure total cache is within limits
+    _nTotalCache = std::max(_nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache
+    _nTotalCache = std::min(_nTotalCache, nMaxDbCache << 20); // total cache cannot be greater than nMaxDbcache
+
+    // calculate the block index leveldb cache size. It shouldn't be larger than 2 MiB.
+    // NOTE: this is not the same as the in memory block index which is fully stored in memory.
+    _nBlockTreeDBCache = _nTotalCache / 8;
+    if (_nBlockTreeDBCache > (1 << 21) && !GetBoolArg("-txindex", DEFAULT_TXINDEX))
+        _nBlockTreeDBCache = (1 << 21);
+
+    // use 25%-50% of the remainder for the utxo leveldb disk cache
+    _nTotalCache -= _nBlockTreeDBCache;
+    _nCoinDBCache = std::min(_nTotalCache / 2, (_nTotalCache / 4) + (1 << 23));
+
+    // the remainder goes to the in-memory utxo coins cache
+    _nTotalCache -= _nCoinDBCache;
+    _nCoinCacheUsage = _nTotalCache;
 }

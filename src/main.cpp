@@ -2632,26 +2632,50 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
             nLastDbAdjustment = nNow;
         }
 #ifdef WIN32
-        // If there is no dbcache setting specified by the node operator then float the dbache setting down
+        // used to determine if we had previously reduced the nCoinCacheUsage and also to tell us what the last
+        // mem available was when we modified the nCoinCacheUsage.
+        static int64_t nLastMemAvailable = 0;
+
+        // If there is no dbcache setting specified by the node operator then float the dbache setting down or up
         // based on current available memory.
         if (!GetArg("-dbcache", 0) && (nNow - nLastDbAdjustment) > 60000000)
         {
             int64_t nMemAvailable = GetAvailableMemory();
-            int64_t nTenPcnt = GetTotalSystemMemory() * nDefaultPcntMemUnused / 100;
+            int64_t nUnusedMem = GetTotalSystemMemory() * nDefaultPcntMemUnused / 100;
 
-            // reduce nCoinCacheUsage if mem available drop below 10%. Also we don't want to constantly be
+            // Reduce nCoinCacheUsage if mem available drop below 10%. We don't want to constantly be
             // triggering a trim or flush every whenever the nMemAvailable crosses the threshold by just a
-            // few bytes. So we'll dampen the triggering by flushing/trimming only if the threshold is crossed by 5%.
-            if (nMemAvailable * 1.05 < nTenPcnt)
+            // few bytes, so we'll dampen the triggering of flushing/trimming only if the threshold is crossed by 5%.
+            if (nMemAvailable * 1.05 < nUnusedMem)
             {
                 // Get the lowest possible default coins cache configuration possible and use this value as a limiter
                 // to prevent the nCoinCacheUsage from falling below this value.
-                int64_t dummyBICache, dummyLevelDbCache, nDefaultCoinCache = 0;
-                GetCacheConfiguration(dummyBICache, dummyLevelDbCache, nDefaultCoinCache, true);
+                int64_t dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache = 0;
+                GetCacheConfiguration(dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache, true);
 
-                nCoinCacheUsage = std::max(nDefaultCoinCache, nCoinCacheUsage - (nTenPcnt - nMemAvailable));
-                LOGA("nCoinCacheUsage was reduced by %u bytes\n", nTenPcnt - nMemAvailable);
+                nCoinCacheUsage = std::max(nDefaultCoinCache, nCoinCacheUsage - (nUnusedMem - nMemAvailable));
+                LOGA("Current cache size: %ld MB, nCoinCacheUsage was reduced by %u MB\n", nCoinCacheUsage / 1000000,
+                    (nUnusedMem - nMemAvailable) / 1000000);
                 nLastDbAdjustment = nNow;
+                nLastMemAvailable = nMemAvailable;
+            }
+
+            // Increase nCoinCacheUsage if mem available increases above 10%. We don't want to constantly be
+            // triggering an increase whenever the nMemAvailable crosses the threshold by just a
+            // few bytes, so we'll dampen the increases by triggering only when the threshold is crossed by 5%.
+            else if (nLastMemAvailable && nMemAvailable * 0.95 >= nLastMemAvailable)
+            {
+                // find the max coins cache possible for this configuration.  Use the max int possible for total cache
+                // size to ensure you receive the max cache size possible.
+                int64_t dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
+                CacheSizeCalculations(
+                    std::numeric_limits<long long>::max(), dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
+
+                nCoinCacheUsage = std::min(nMaxCoinCache, nCoinCacheUsage + (nMemAvailable - nLastMemAvailable));
+                LOGA("Current cache size: %ld MB, nCoinCacheUsage was increased by %u MB\n", nCoinCacheUsage / 1000000,
+                    (nMemAvailable - nLastMemAvailable) / 1000000);
+                nLastDbAdjustment = nNow;
+                nLastMemAvailable = nMemAvailable;
             }
         }
 #endif
