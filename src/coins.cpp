@@ -393,6 +393,8 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     if (nTrimmedByHeight == 0 && nTrimmed == 0)
     {
         nTrimHeightDelta += nSmallestDelta;
+        if (nTrimHeightDelta > nBestCoinHeight)
+            nTrimHeightDelta = nBestCoinHeight;
         nTrimHeight = nBestCoinHeight - nTrimHeightDelta;
         LOG(COINDB, "Re-adjusting trim height to %d using a trim height delta of %d\n", nTrimHeight, nTrimHeightDelta);
     }
