@@ -51,6 +51,7 @@ void CacheSizeCalculations(int64_t _nTotalCache,
     int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
     int64_t &_nCoinCacheUsage);
+void AdjustCoinCacheSize();
 
 struct CDiskTxPos : public CDiskBlockPos
 {

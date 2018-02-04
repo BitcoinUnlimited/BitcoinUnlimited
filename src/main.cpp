@@ -2594,7 +2594,6 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
     static int64_t nLastWrite = 0;
     static int64_t nLastFlush = 0;
     static int64_t nLastSetChain = 0;
-    static int64_t nLastDbAdjustment = 0;
     std::set<int> setFilesToPrune;
     bool fFlushForPrune = false;
     try
@@ -2627,58 +2626,11 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
         {
             nLastSetChain = nNow;
         }
-        if (nLastDbAdjustment == 0)
-        {
-            nLastDbAdjustment = nNow;
-        }
-#ifdef WIN32
-        // used to determine if we had previously reduced the nCoinCacheUsage and also to tell us what the last
-        // mem available was when we modified the nCoinCacheUsage.
-        static int64_t nLastMemAvailable = 0;
 
-        // If there is no dbcache setting specified by the node operator then float the dbache setting down or up
-        // based on current available memory.
-        if (!GetArg("-dbcache", 0) && (nNow - nLastDbAdjustment) > 60000000)
-        {
-            int64_t nMemAvailable = GetAvailableMemory();
-            int64_t nUnusedMem = GetTotalSystemMemory() * nDefaultPcntMemUnused / 100;
+        // If possible adjust the max size of the coin cache (nCoinCacheUsage) based on current available memory. Do
+        // this before determinining whether to flush the cache or not in the steps that follow.
+        AdjustCoinCacheSize();
 
-            // Reduce nCoinCacheUsage if mem available drop below 10%. We don't want to constantly be
-            // triggering a trim or flush every whenever the nMemAvailable crosses the threshold by just a
-            // few bytes, so we'll dampen the triggering of flushing/trimming only if the threshold is crossed by 5%.
-            if (nMemAvailable * 1.05 < nUnusedMem)
-            {
-                // Get the lowest possible default coins cache configuration possible and use this value as a limiter
-                // to prevent the nCoinCacheUsage from falling below this value.
-                int64_t dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache = 0;
-                GetCacheConfiguration(dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache, true);
-
-                nCoinCacheUsage = std::max(nDefaultCoinCache, nCoinCacheUsage - (nUnusedMem - nMemAvailable));
-                LOGA("Current cache size: %ld MB, nCoinCacheUsage was reduced by %u MB\n", nCoinCacheUsage / 1000000,
-                    (nUnusedMem - nMemAvailable) / 1000000);
-                nLastDbAdjustment = nNow;
-                nLastMemAvailable = nMemAvailable;
-            }
-
-            // Increase nCoinCacheUsage if mem available increases above 10%. We don't want to constantly be
-            // triggering an increase whenever the nMemAvailable crosses the threshold by just a
-            // few bytes, so we'll dampen the increases by triggering only when the threshold is crossed by 5%.
-            else if (nLastMemAvailable && nMemAvailable * 0.95 >= nLastMemAvailable)
-            {
-                // find the max coins cache possible for this configuration.  Use the max int possible for total cache
-                // size to ensure you receive the max cache size possible.
-                int64_t dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
-                CacheSizeCalculations(
-                    std::numeric_limits<long long>::max(), dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
-
-                nCoinCacheUsage = std::min(nMaxCoinCache, nCoinCacheUsage + (nMemAvailable - nLastMemAvailable));
-                LOGA("Current cache size: %ld MB, nCoinCacheUsage was increased by %u MB\n", nCoinCacheUsage / 1000000,
-                    (nMemAvailable - nLastMemAvailable) / 1000000);
-                nLastDbAdjustment = nNow;
-                nLastMemAvailable = nMemAvailable;
-            }
-        }
-#endif
         int64_t cacheSize = pcoinsTip->DynamicMemoryUsage();
         static int64_t nSizeAfterLastFlush = 0;
         // The cache is close to the limit. Try to flush and trim.
