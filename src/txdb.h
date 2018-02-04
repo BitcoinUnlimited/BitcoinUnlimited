@@ -41,16 +41,27 @@ static const int64_t nMaxBlockDBAndTxIndexCache = 1024;
 //! Max memory allocated to coin DB specific cache (MiB)
 static const int64_t nMaxCoinsDBCache = 8;
 
+/** Get the current available memory */
 uint64_t GetAvailableMemory();
+/** Get the total physical memory */
 uint64_t GetTotalSystemMemory();
+/** Get the sizes for each of the caches. This is done during init.cpp on startup but also
+ *  later, during dynamic sizing of the coins cache, when need to know the initial startup values.
+ */
 void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
     int64_t &_nCoinCacheUsage,
     bool fDefault = false);
+/** Calculate the various cache sizes. This is primarily used in GetCacheConfiguration() however during
+ *  dynamic sizing of the coins cache we also need to use this function directly.
+ */
 void CacheSizeCalculations(int64_t _nTotalCache,
     int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
     int64_t &_nCoinCacheUsage);
+/** This function is called during FlushStateToDisk.  The coins cache is dynamically sized before any
+ *  checking is done for cache flushing and trimming
+ */
 void AdjustCoinCacheSize();
 
 struct CDiskTxPos : public CDiskBlockPos
