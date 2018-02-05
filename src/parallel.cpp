@@ -436,17 +436,15 @@ void CParallelValidation::ClearOrphanCache(const CBlock &block)
 
 
 //  HandleBlockMessage launches a HandleBlockMessageThread.  And HandleBlockMessageThread processes each block and
-//  updates
-//  the UTXO if the block has been accepted and the tip updated. We cleanup and release the semaphore after the thread
-//  has finished.
+//  updates the UTXO if the block has been accepted and the tip updated. We cleanup and release the semaphore after
+//  the thread has finished.
 void CParallelValidation::HandleBlockMessage(CNode *pfrom,
     const string &strCommand,
     std::shared_ptr<CBlock> block,
     const CInv &inv,
     uint64_t nBlockSize)
 {
-    if (nBlockSize == 0)
-        nBlockSize = ::GetSerializeSize(*block, SER_NETWORK, PROTOCOL_VERSION);
+    nBlockSize = block->GetBlockSize();
 
     // NOTE: You must not have a cs_main lock before you aquire the semaphore grant or you can end up deadlocking
     // AssertLockNotHeld(cs_main); TODO: need to create this
