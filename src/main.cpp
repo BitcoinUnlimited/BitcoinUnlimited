@@ -6648,7 +6648,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         vRecv >> *block;
         DbgAssert(nBlockSize == ::GetSerializeSize(*block, SER_NETWORK, PROTOCOL_VERSION), return true);
 
-        CInv inv(MSG_BLOCK, block.GetHash());
+        CInv inv(MSG_BLOCK, block->GetHash());
         LOG(BLK, "received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
         UnlimitedLogBlock(*block, inv.hash.ToString(), receiptTime);
 
