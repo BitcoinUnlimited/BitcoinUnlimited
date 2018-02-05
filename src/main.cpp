@@ -4186,41 +4186,46 @@ bool ProcessNewBlock(CValidationState &state,
 
     int64_t end = GetTimeMicros();
 
-    uint64_t maxTxSize = 0;
-    uint64_t maxVin = 0;
-    uint64_t maxVout = 0;
-    CTransaction txIn;
-    CTransaction txOut;
-    CTransaction txLen;
-
-    for (unsigned int i = 0; i < pblock->vtx.size(); i++)
+    if (Logging::LogAcceptCategory(Logging::BENCH))
     {
-        if (pblock->vtx[i].vin.size() > maxVin)
-        {
-            maxVin = pblock->vtx[i].vin.size();
-            txIn = pblock->vtx[i];
-        }
-        if (pblock->vtx[i].vout.size() > maxVout)
-        {
-            maxVout = pblock->vtx[i].vout.size();
-            txOut = pblock->vtx[i];
-        }
-        uint64_t len = ::GetSerializeSize(pblock->vtx[i], SER_NETWORK, PROTOCOL_VERSION);
-        if (len > maxTxSize)
-        {
-            maxTxSize = len;
-            txLen = pblock->vtx[i];
-        }
-    }
+        uint64_t maxTxSize = 0;
+        uint64_t maxVin = 0;
+        uint64_t maxVout = 0;
+        CTransaction txIn;
+        CTransaction txOut;
+        CTransaction txLen;
 
-    LOG(BENCH, "ProcessNewBlock, time: %d, block: %s, len: %d, numTx: %d, maxVin: %llu, maxVout: %llu, maxTx:%llu\n",
-        end - start, pblock->GetHash().ToString(), pblock->nBlockSize, pblock->vtx.size(), maxVin, maxVout, maxTxSize);
-    LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txIn.GetHash().ToString(), txIn.vin.size(), txIn.vout.size(),
-        ::GetSerializeSize(txIn, SER_NETWORK, PROTOCOL_VERSION));
-    LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txOut.GetHash().ToString(), txOut.vin.size(),
-        txOut.vout.size(), ::GetSerializeSize(txOut, SER_NETWORK, PROTOCOL_VERSION));
-    LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txLen.GetHash().ToString(), txLen.vin.size(),
-        txLen.vout.size(), ::GetSerializeSize(txLen, SER_NETWORK, PROTOCOL_VERSION));
+        for (unsigned int i = 0; i < pblock->vtx.size(); i++)
+        {
+            if (pblock->vtx[i].vin.size() > maxVin)
+            {
+                maxVin = pblock->vtx[i].vin.size();
+                txIn = pblock->vtx[i];
+            }
+            if (pblock->vtx[i].vout.size() > maxVout)
+            {
+                maxVout = pblock->vtx[i].vout.size();
+                txOut = pblock->vtx[i];
+            }
+            uint64_t len = ::GetSerializeSize(pblock->vtx[i], SER_NETWORK, PROTOCOL_VERSION);
+            if (len > maxTxSize)
+            {
+                maxTxSize = len;
+                txLen = pblock->vtx[i];
+            }
+        }
+
+        LOG(BENCH,
+            "ProcessNewBlock, time: %d, block: %s, len: %d, numTx: %d, maxVin: %llu, maxVout: %llu, maxTx:%llu\n",
+            end - start, pblock->GetHash().ToString(), pblock->nBlockSize, pblock->vtx.size(), maxVin, maxVout,
+            maxTxSize);
+        LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txIn.GetHash().ToString(), txIn.vin.size(),
+            txIn.vout.size(), ::GetSerializeSize(txIn, SER_NETWORK, PROTOCOL_VERSION));
+        LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txOut.GetHash().ToString(), txOut.vin.size(),
+            txOut.vout.size(), ::GetSerializeSize(txOut, SER_NETWORK, PROTOCOL_VERSION));
+        LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txLen.GetHash().ToString(), txLen.vin.size(),
+            txLen.vout.size(), ::GetSerializeSize(txLen, SER_NETWORK, PROTOCOL_VERSION));
+    }
 
     LOCK(cs_blockvalidationtime);
     nBlockValidationTime << (end - start);
