@@ -32,4 +32,3 @@ uint64_t CBlock::GetBlockSize() const
         nBlockSize = ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
     return nBlockSize;
 }
-
