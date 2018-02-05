@@ -78,7 +78,7 @@ public:
     // 0.11: mutable std::vector<uint256> vMerkleTree;
     mutable bool fChecked;
     mutable bool fExcessive; // BU: is the block "excessive" (bigger than this node prefers to accept)
-    mutable uint64_t nBlockSize; // BU: length of this block in bytes
+    mutable uint64_t nBlockSize; // Serialized block size in bytes
 
     CBlock() { SetNull(); }
     CBlock(const CBlockHeader &header)
@@ -175,6 +175,10 @@ public:
     }
 
     std::string ToString() const;
+
+    // Return the serialized block size in bytes. This is only done once and then the result stored
+    // in nBlockSize for future reference, saving unncessary and expensive serializations.
+    uint64_t GetBlockSize() const;
 };
 
 

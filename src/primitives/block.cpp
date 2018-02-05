@@ -25,3 +25,11 @@ std::string CBlock::ToString() const
     }
     return s.str();
 }
+
+uint64_t CBlock::GetBlockSize() const
+{
+    if (nBlockSize == 0)
+        nBlockSize = ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+    return nBlockSize;
+}
+
