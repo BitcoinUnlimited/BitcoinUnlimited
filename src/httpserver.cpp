@@ -92,7 +92,6 @@ private:
 public:
     WorkQueue(size_t maxDepth) : running(true), maxDepth(maxDepth), numThreads(0) {}
     /** Precondition: worker threads have all stopped
-     * (call WaitExit)
      */
     ~WorkQueue() {}
     /** Enqueue a work item */
@@ -133,14 +132,6 @@ public:
         running = false;
         cond.notify_all();
     }
-    /** Wait for worker threads to exit */
-    void WaitExit()
-    {
-        std::unique_lock<std::mutex> lock(cs);
-        while (numThreads > 0)
-            cond.wait(lock);
-    }
-
     /** Return current depth of queue */
     size_t Depth()
     {
@@ -510,7 +501,6 @@ void StopHTTPServer()
     if (workQueue)
     {
         LOG(HTTP, "Waiting for HTTP worker threads to exit\n");
-        workQueue->WaitExit();
         for (auto &thread : g_thread_http_workers)
         {
             thread.join();
