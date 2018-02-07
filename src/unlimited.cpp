@@ -464,7 +464,7 @@ extern void UnlimitedLogBlock(const CBlock &block, const std::string &hash, uint
     if (!blockReceiptLog)
         blockReceiptLog = fopen("blockReceiptLog.txt", "a");
     if (blockReceiptLog) {
-        long int byteLen = block.GetBlockSize(), SER_NETWORK, PROTOCOL_VERSION);
+        long int byteLen = block.GetBlockSize();
         CBlockHeader bh = block.GetBlockHeader();
         fprintf(blockReceiptLog, "%" PRIu64 ",%" PRIu64 ",%ld,%ld,%s\n", receiptTime, (uint64_t)bh.nTime, byteLen, block.vtx.size(), hash.c_str());
         fflush(blockReceiptLog);
