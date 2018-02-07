@@ -438,7 +438,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom,
     const CBlock &block,
     const CInv &inv)
 {
-    uint64_t nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+    uint64_t nBlockSize = block.GetBlockSize();
 
     // NOTE: You must not have a cs_main lock before you aquire the semaphore grant or you can end up deadlocking
     // AssertLockNotHeld(cs_main); TODO: need to create this
@@ -536,7 +536,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, const CBloc
 {
     int64_t startTime = GetTimeMicros();
     CValidationState state;
-    uint64_t nSizeBlock = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+    uint64_t nSizeBlock = block.GetBlockSize();
 
     // Indicate that the thinblock was fully received. At this point we have either a block or a fully reconstructed
     // thinblock but we still need to maintain a mapThinBlocksInFlight entry so that we don't re-request a full block

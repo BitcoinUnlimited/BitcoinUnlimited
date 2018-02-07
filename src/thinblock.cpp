@@ -185,7 +185,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
     {
         // We have all the transactions now that are in this block: try to reassemble and process.
         pfrom->thinBlockWaitingForTxns = -1;
-        int blockSize = ::GetSerializeSize(pfrom->thinBlock, SER_NETWORK, CBlock::CURRENT_VERSION);
+        int blockSize = pfrom->thinBlock.GetBlockSize();
         LOG(THIN, "Reassembled thinblock for %s (%d bytes). Message was %d bytes, compression ratio %3.2f peer=%s\n",
             pfrom->thinBlock.GetHash().ToString(), blockSize, nSizeThinBlock,
             ((float)blockSize) / ((float)nSizeThinBlock), pfrom->GetLogName());
@@ -409,7 +409,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
         // for compression statistics, we have to add up the size of xthinblock and the re-requested thinBlockTx.
         int nSizeThinBlockTx = msgSize;
-        int blockSize = ::GetSerializeSize(pfrom->thinBlock, SER_NETWORK, CBlock::CURRENT_VERSION);
+        int blockSize = pfrom->thinBlock.GetBlockSize();
         LOG(THIN, "Reassembled xblocktx for %s (%d bytes). Message was %d bytes (thinblock) and %d bytes "
                   "(re-requested tx), compression ratio %3.2f, peer=%s\n",
             pfrom->thinBlock.GetHash().ToString(), blockSize, pfrom->nSizeThinBlock, nSizeThinBlockTx,
@@ -829,7 +829,7 @@ bool CXThinBlock::process(CNode *pfrom,
 
     // We now have all the transactions now that are in this block
     pfrom->thinBlockWaitingForTxns = -1;
-    int blockSize = ::GetSerializeSize(pfrom->thinBlock, SER_NETWORK, CBlock::CURRENT_VERSION);
+    int blockSize = pfrom->thinBlock.GetBlockSize();
     LOG(THIN, "Reassembled xthinblock for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
         pfrom->thinBlock.GetHash().ToString(), blockSize, pfrom->nSizeThinBlock,
         ((float)blockSize) / ((float)pfrom->nSizeThinBlock), pfrom->GetLogName());
@@ -1493,7 +1493,7 @@ void SendXThinBlock(CBlock &block, CNode *pfrom, const CInv &inv)
     if (inv.type == MSG_XTHINBLOCK)
     {
         CXThinBlock xThinBlock(block, pfrom->pThinBlockFilter);
-        int nSizeBlock = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+        int nSizeBlock = block.GetBlockSize();
         if (xThinBlock.collision ==
             true) // If there is a cheapHash collision in this block then send a normal thinblock
         {
@@ -1542,7 +1542,7 @@ void SendXThinBlock(CBlock &block, CNode *pfrom, const CInv &inv)
     else if (inv.type == MSG_THINBLOCK)
     {
         CThinBlock thinBlock(block, *pfrom->pThinBlockFilter);
-        int nSizeBlock = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+        int nSizeBlock = block.GetBlockSize();
         int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);
         if (nSizeThinBlock < nSizeBlock)
         { // Only send a thinblock if smaller than a regular block

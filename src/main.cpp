@@ -3791,11 +3791,6 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
     // because we receive the wrong transactions for it.
 
     // Size limits
-    if (block.nBlockSize == 0)
-        block.nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-
-    // || block.vtx.size() > MAX_BLOCK_SIZE || ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION) >
-    // MAX_BLOCK_SIZE)
     if (block.vtx.empty())
         return state.DoS(100, error("CheckBlock(): size limits failed"), REJECT_INVALID, "bad-blk-length");
 
@@ -3834,7 +3829,7 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
         block.fChecked = true;
 
     // BU: Check whether this block exceeds what we want to relay.
-    block.fExcessive = CheckExcessive(block, block.nBlockSize, nSigOps, nTx, nLargestTx);
+    block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nSigOps, nTx, nLargestTx);
 
     return true;
 }
@@ -4141,9 +4136,8 @@ bool ProcessNewBlock(CValidationState &state,
     bool checked = CheckBlock(*pblock, state);
     if (!checked)
     {
-        int byteLen = ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION);
         LOGA("Invalid block: ver:%x time:%d Tx size:%d len:%d\n", pblock->nVersion, pblock->nTime, pblock->vtx.size(),
-            byteLen);
+            pblock->GetBlockSize());
     }
 
     // WARNING: cs_main is not locked here throughout but is released and then re-locked during ActivateBestChain
