@@ -22,11 +22,7 @@ using namespace std;
 static const unsigned int nScriptCheckQueues = 4;
 std::unique_ptr<CParallelValidation> PV;
 
-static void HandleBlockMessageThread(CNode *pfrom,
-    const string strCommand,
-    shared_ptr<CBlock> block,
-    const CInv inv,
-    uint64_t nSizeBlock);
+static void HandleBlockMessageThread(CNode *pfrom, const string strCommand, shared_ptr<CBlock> block, const CInv inv);
 
 static void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck> *pqueue)
 {
@@ -441,10 +437,9 @@ void CParallelValidation::ClearOrphanCache(const CBlock &block)
 void CParallelValidation::HandleBlockMessage(CNode *pfrom,
     const string &strCommand,
     std::shared_ptr<CBlock> block,
-    const CInv &inv,
-    uint64_t nBlockSize)
+    const CInv &inv)
 {
-    nBlockSize = block->GetBlockSize();
+    uint64_t nBlockSize = block->GetBlockSize();
 
     // NOTE: You must not have a cs_main lock before you aquire the semaphore grant or you can end up deadlocking
     // AssertLockNotHeld(cs_main); TODO: need to create this
@@ -529,21 +524,18 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom,
     // only launch block validation in a separate thread if PV is enabled.
     if (PV->Enabled())
     {
-        boost::thread thread(boost::bind(&HandleBlockMessageThread, pfrom, strCommand, block, inv, nBlockSize));
+        boost::thread thread(boost::bind(&HandleBlockMessageThread, pfrom, strCommand, block, inv));
         thread.detach(); // Separate actual thread from the "thread" object so its fine to fall out of scope
     }
     else
     {
-        HandleBlockMessageThread(pfrom, strCommand, block, inv, nBlockSize);
+        HandleBlockMessageThread(pfrom, strCommand, block, inv);
     }
 }
 
-void HandleBlockMessageThread(CNode *pfrom,
-    const string strCommand,
-    shared_ptr<CBlock> block,
-    const CInv inv,
-    uint64_t nSizeBlock)
+void HandleBlockMessageThread(CNode *pfrom, const string strCommand, shared_ptr<CBlock> block, const CInv inv)
 {
+    uint64_t nSizeBlock = block->GetBlockSize();
     int64_t startTime = GetTimeMicros();
     CValidationState state;
 

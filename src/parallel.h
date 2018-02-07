@@ -175,8 +175,7 @@ public:
     void HandleBlockMessage(CNode *pfrom,
         const std::string &strCommand,
         std::shared_ptr<CBlock> block,
-        const CInv &inv,
-        uint64_t blockSize = 0); // If blockSize is not supplied it is calculated
+        const CInv &inv);
 
     // The number of script validation threads
     unsigned int ThreadCount() { return nThreads; }

@@ -846,7 +846,7 @@ bool CXThinBlock::process(CNode *pfrom,
 
     // Process the full block
     PV->HandleBlockMessage(
-        pfrom, strCommand, std::shared_ptr<CBlock>(std::shared_ptr<CBlock>{}, &pfrom->thinBlock), GetInv(), blockSize);
+        pfrom, strCommand, std::shared_ptr<CBlock>(std::shared_ptr<CBlock>{}, &pfrom->thinBlock), GetInv());
 
     return true;
 }

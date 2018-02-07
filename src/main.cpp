@@ -6656,7 +6656,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // Message consistency checking
         // NOTE: consistency checking is handled by checkblock() which is called during
         //       ProcessNewBlock() during HandleBlockMessage.
-        PV->HandleBlockMessage(pfrom, strCommand, block, inv, nBlockSize);
+        PV->HandleBlockMessage(pfrom, strCommand, block, inv);
     }
 
 
