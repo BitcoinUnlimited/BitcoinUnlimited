@@ -163,6 +163,7 @@ BITCOIN_CORE_H = \
   thinblock.h \
   threadsafety.h \
   timedata.h \
+  tokengroups.h \
   torcontrol.h \
   txdb.h \
   txmempool.h \
@@ -323,6 +324,8 @@ libbitcoin_consensus_a_SOURCES = \
   script/script_error.h \
   serialize.h \
   tinyformat.h \
+  tokengroups.h \
+  tokengroups.cpp \
   uint256.cpp \
   uint256.h \
   utilstrencodings.cpp \

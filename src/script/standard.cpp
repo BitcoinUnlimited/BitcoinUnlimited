@@ -42,6 +42,10 @@ const char *GetTxnOutputType(txnouttype t)
         return "cltv"; // CLTV HODL Freeze
     case TX_LABELPUBLIC:
         return "publiclabel";
+    case TX_GRP_PUBKEYHASH:
+        return "grouppubkeyhash";
+    case TX_GRP_SCRIPTHASH:
+        return "groupscripthash";
     }
     return NULL;
 }
@@ -55,6 +59,12 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsi
     static multimap<txnouttype, CScript> mTemplates;
     if (mTemplates.empty())
     {
+        // GP2PKH (group pay to public key hash): Bitcoin address tx, sender provides hash of pubkey, receiver provides
+        // signature and pubkey
+        mTemplates.insert(
+            make_pair(TX_GRP_PUBKEYHASH, CScript() << OP_GRP_DATA << OP_GROUP << OP_DROP << OP_DUP << OP_HASH160
+                                                   << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG));
+
         // Standard tx, sender provides pubkey, receiver adds signature
         mTemplates.insert(make_pair(TX_PUBKEY, CScript() << OP_PUBKEY << OP_CHECKSIG));
 
@@ -79,10 +89,11 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsi
 
     // Shortcut for pay-to-script-hash, which are more constrained than the other types:
     // it is always OP_HASH160 20 [20 byte hash] OP_EQUAL
-    if (scriptPubKey.IsPayToScriptHash())
+    // or [data] OP_GROUP OP_DROP OP_HASH160 20 [20 byte hash] OP_EQUAL
+    vector<unsigned char> hashBytes;
+    if (scriptPubKey.IsPayToScriptHash(&hashBytes))
     {
         typeRet = TX_SCRIPTHASH;
-        vector<unsigned char> hashBytes(scriptPubKey.begin() + 2, scriptPubKey.begin() + 22);
         vSolutionsRet.push_back(hashBytes);
         return true;
     }
@@ -96,6 +107,7 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsi
 
         opcodetype opcode1, opcode2;
         vector<unsigned char> vch1, vch2;
+        vector<unsigned char> group;
 
         // Compare
         CScript::const_iterator pc1 = script1.begin();
@@ -116,6 +128,9 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsi
                     if (m < 1 || n < 1 || m > n || vSolutionsRet.size() - 2 != n)
                         return false;
                 }
+                // group will always be the last entity in vSolutionsRet
+                if (!group.empty())
+                    vSolutionsRet.push_back(group);
                 return true;
             }
             if (!script1.GetOp(pc1, opcode1, vch1))
@@ -176,6 +191,13 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsi
             }
             else if (opcode2 == OP_DATA)
                 vSolutionsRet.push_back(vch1);
+            else if (opcode2 == OP_GRP_DATA)
+            {
+                // Expect that there is some data in the script at this point
+                if (vch1.size() == 0)
+                    break;
+                group = vch1;
+            }
             else if (opcode1 != opcode2 || vch1 != vch2)
             {
                 // Others must match exactly
@@ -200,10 +222,9 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsi
     return false;
 }
 
-bool ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet)
+bool ExtractDestinationAndType(const CScript &scriptPubKey, CTxDestination &addressRet, txnouttype &whichType)
 {
     vector<valtype> vSolutions;
-    txnouttype whichType;
     if (!Solver(scriptPubKey, whichType, vSolutions))
         return false;
 
@@ -216,12 +237,12 @@ bool ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet)
         addressRet = pubKey.GetID();
         return true;
     }
-    else if (whichType == TX_PUBKEYHASH)
+    else if ((whichType == TX_PUBKEYHASH) || (whichType == TX_GRP_PUBKEYHASH))
     {
         addressRet = CKeyID(uint160(vSolutions[0]));
         return true;
     }
-    else if (whichType == TX_SCRIPTHASH)
+    else if ((whichType == TX_SCRIPTHASH) || (whichType == TX_GRP_SCRIPTHASH))
     {
         addressRet = CScriptID(uint160(vSolutions[0]));
         return true;
@@ -237,6 +258,12 @@ bool ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet)
     }
     // Multisig txns have more than one address...
     return false;
+}
+
+bool ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet)
+{
+    txnouttype whichType;
+    return ExtractDestinationAndType(scriptPubKey, addressRet, whichType);
 }
 
 bool ExtractDestinations(const CScript &scriptPubKey,

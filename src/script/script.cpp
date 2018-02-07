@@ -244,8 +244,8 @@ const char *GetOpName(opcodetype opcode)
         return "OP_NOP5";
     case OP_NOP6:
         return "OP_NOP6";
-    case OP_NOP7:
-        return "OP_NOP7";
+    case OP_GROUP:
+        return "OP_GROUP";
     case OP_NOP8:
         return "OP_NOP8";
     case OP_NOP9:
@@ -314,10 +314,29 @@ unsigned int CScript::GetSigOpCount(const CScript &scriptSig) const
     return subscript.GetSigOpCount(true);
 }
 
-bool CScript::IsPayToScriptHash() const
+bool CScript::IsPayToScriptHash(vector<unsigned char> *hashBytes) const
 {
+    unsigned int offset = 0;
+    if ((*this)[0] > OP_0 && (*this)[0] < OP_PUSHDATA1)
+    {
+        offset += (*this)[0] + 1;
+        if ((*this)[offset] != OP_GROUP)
+            offset = 0;
+        else
+            offset += 2; // 2 more bytes for OP_GROUP and OP_DROP
+    }
     // Extra-fast test for pay-to-script-hash CScripts:
-    return (this->size() == 23 && (*this)[0] == OP_HASH160 && (*this)[1] == 0x14 && (*this)[22] == OP_EQUAL);
+    if (this->size() == offset + 23 && (*this)[offset] == OP_HASH160 && (*this)[offset + 1] == 0x14 &&
+        (*this)[offset + 22] == OP_EQUAL)
+    {
+        if (hashBytes)
+        {
+            hashBytes->reserve(20);
+            copy(begin() + offset + 2, begin() + offset + 22, back_inserter(*hashBytes));
+        }
+        return true;
+    }
+    return false;
 }
 
 bool CScript::IsPushOnly(const_iterator pc) const

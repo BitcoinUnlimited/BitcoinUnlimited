@@ -7,6 +7,7 @@
 #include "consensus.h"
 #include "primitives/transaction.h"
 #include "script/interpreter.h"
+#include "tokengroups.h"
 #include "unlimited.h"
 #include "validation.h"
 
@@ -191,6 +192,10 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
         // BU convert 100 to a constant so we can use it during generation
         if (tx.vin[0].scriptSig.size() < 2 || tx.vin[0].scriptSig.size() > MAX_COINBASE_SCRIPTSIG_SIZE)
             return state.DoS(100, false, REJECT_INVALID, "bad-cb-length");
+
+        // Coinbase tx can't have group outputs because it has no group inputs or mintable outputs
+        if (IsAnyTxOutputGrouped(tx))
+            return state.DoS(100, false, REJECT_INVALID, "coinbase-has-group-outputs");
     }
     else
     {
@@ -237,6 +242,12 @@ bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, c
     if (nValueIn < tx.GetValueOut())
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-belowout", false,
             strprintf("value in (%s) < value out (%s)", FormatMoney(nValueIn), FormatMoney(tx.GetValueOut())));
+
+    if (!CheckTokenGroups(tx, state, inputs))
+    {
+        return state.DoS(0, false, REJECT_MALFORMED, "token-group-imbalance", false,
+            strprintf("Token group inputs and outputs do not balance"));
+    }
 
     // Tally transaction fees
     CAmount nTxFee = nValueIn - tx.GetValueOut();
