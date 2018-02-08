@@ -612,25 +612,25 @@ BOOST_FIXTURE_TEST_CASE(tokengroup_blockchain, TestChain100Setup)
     CScript script = CScript() << fakeGrp << OP_GROUP << OP_DROP << OP_DUP << OP_HASH160
                                << ToByteVector(a1.addr) << OP_EQUALVERIFY << OP_CHECKSIG;
 
-    txns[0] = tx1x1(COutPoint(hash,0), script, blk1.vtx[1].vout[0].nValue);
+    txns[0] = tx1x1(COutPoint(hash,0), script, blk1.vtx[0].vout[0].nValue);
     ret = tryBlock(txns,p2pkh(a2.addr), badblk, state);
     BOOST_CHECK(!ret);
     }
 
     // Should fail: premature coinbase spend into a group mint
     uint256 hash = blk1.vtx[0].GetHash();
-    txns[0] = tx1x1(COutPoint(hash,0), gp2pkh(grp1.grp, a1.addr), blk1.vtx[1].vout[0].nValue);
+    txns[0] = tx1x1(COutPoint(hash,0), gp2pkh(grp1.grp, a1.addr), blk1.vtx[0].vout[0].nValue);
     ret = tryBlock(txns,p2pkh(a2.addr), badblk, state);
     BOOST_CHECK(!ret);
 
     // Since the TestChain100Setup creates p2pk outputs this won't work
-    txns[0] = tx1x1(COutPoint(coinbaseTxns[0].GetHash(),0), gp2pkh(p2pkGrp.grp, a1.addr), blk1.vtx[1].vout[0].nValue,
+    txns[0] = tx1x1(COutPoint(coinbaseTxns[0].GetHash(),0), gp2pkh(p2pkGrp.grp, a1.addr), coinbaseTxns[0].vout[0].nValue,
                     coinbaseKey, coinbaseTxns[0].vout[0].scriptPubKey, false);
     ret = tryBlock(txns,p2pkh(a2.addr), badblk, state);
     BOOST_CHECK(!ret);
 
     // so spend to a p2pkh address so we can tokenify it
-    txns[0] = tx1x1(COutPoint(coinbaseTxns[0].GetHash(),0), p2pkh(grp0.addr), blk1.vtx[1].vout[0].nValue,
+    txns[0] = tx1x1(COutPoint(coinbaseTxns[0].GetHash(),0), p2pkh(grp0.addr), coinbaseTxns[0].vout[0].nValue,
                     coinbaseKey, coinbaseTxns[0].vout[0].scriptPubKey, false);
     ret = tryBlock(txns,p2pkh(a2.addr), tipblk, state);
     BOOST_CHECK(ret);
@@ -702,9 +702,9 @@ BOOST_FIXTURE_TEST_CASE(tokengroup_blockchain, TestChain100Setup)
     CScriptID sid1 = CScriptID(p2shBaseScript1);
     CScript p2shBaseScript2 = p2pkh(a2.addr);
     CScriptID sid2 = CScriptID(p2shBaseScript2);
-    
+
     // Spend to a p2sh address so we can tokenify it
-    txns[0] = tx1x1(COutPoint(coinbaseTxns[1].GetHash(),0), p2sh(sid1), blk1.vtx[1].vout[0].nValue,
+    txns[0] = tx1x1(COutPoint(coinbaseTxns[1].GetHash(),0), p2sh(sid1), coinbaseTxns[1].vout[0].nValue,
                     coinbaseKey, coinbaseTxns[1].vout[0].scriptPubKey, false);
     ret = tryBlock(txns,p2pkh(a2.addr), tipblk, state);
     BOOST_CHECK(ret);
