@@ -181,7 +181,7 @@ This data should only be included in one (presumably, but not necessarily, the f
 
 The contents of the OP_RETURN output are defined as null separated strings:
 
-`<ticker> <0> <name> <0> <uri>`
+`<ticker> <0> <name> <0> <uri> <0> <double SHA256 of dictionary in the uri json document (see below)>`
 
 It is possible to have an empty field.  For example,
 
