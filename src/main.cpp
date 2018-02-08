@@ -6638,9 +6638,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) // Ignore blocks received while importing
     {
         std::shared_ptr<CBlock> block(new CBlock);
-        uint64_t nBlockSize = vRecv.size();
-        vRecv >> *block;
-        DbgAssert(nBlockSize == block->GetBlockSize(), return true);
+        {
+            uint64_t nCheckBlockSize = vRecv.size();
+            vRecv >> *block;
+
+            // Sanity check. The serialized block size should match the size that is in our receive queue.  If not
+            // this could be an attack block of some kind.
+            DbgAssert(nCheckBlockSize == block->GetBlockSize(), return true);
+        }
 
         CInv inv(MSG_BLOCK, block->GetHash());
         LOG(BLK, "received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
