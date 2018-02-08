@@ -95,8 +95,9 @@ CTokenGroupPair GetTokenGroup(const CScript& script)
         ret.associatedGroup = BitcoinGroup;
         return ret;
     }
-    // The script does not begin with the OP_GROUP prefix so its the bitcoin group
-    if ((opcode == 0) || (opcode >= OP_PUSHDATA1) || (opcode2 != OP_GROUP))
+    // The script does not begin with the correct data size or the OP_GROUP prefix
+    // so its the bitcoin group
+    if (((opcode != 0x14) && (opcode != 0x20)) || (opcode2 != OP_GROUP))
     {
         ret.associatedGroup = BitcoinGroup;
         return ret;
