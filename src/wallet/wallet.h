@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <functional>
 #include <map>
 #include <set>
 #include <stdexcept>
@@ -414,6 +415,10 @@ public:
     }
 
     std::string ToString() const;
+    /** returns the outpoint associated with this object */
+    COutPoint GetOutPoint() const { return COutPoint(tx->GetHash(), i); }
+    /** returns the value of this output in satoshis */
+    CAmount GetValue() const { return tx->vout[i].nValue; }
 };
 
 
@@ -656,6 +661,13 @@ public:
         bool fIncludeZeroValue = false) const;
 
     /**
+     * populate vCoins with vector of available COutputs, filtered by the passed lambda function.
+       Returns the number of matches.
+     */
+    unsigned int FilterCoins(std::vector<COutput> &vCoins,
+        std::function<bool(const CWalletTx *, const CTxOut *)>) const;
+
+    /**
      * Shuffle and select coins until nTargetValue is reached while avoiding
      * small change; This method is stochastic for some inputs and upon
      * completion the coin set and corresponding actual target value is
@@ -755,6 +767,9 @@ public:
         int &nChangePosRet,
         std::string &strFailReason,
         bool includeWatching);
+
+    /** Sign the provided transaction */
+    bool SignTransaction(CMutableTransaction &tx);
 
     /**
      * Create a new transaction paying the recipients with a set of coins
@@ -925,16 +940,22 @@ protected:
     CPubKey vchPubKey;
 
 public:
+    /** Constructor does not reserve a key */
     CReserveKey(CWallet *pwalletIn)
     {
         nIndex = -1;
         pwallet = pwalletIn;
     }
 
+    /** Destructor returns the key if one has been reserved (and KeepKey was not called) */
     ~CReserveKey() { ReturnKey(); }
+    /** Un-reserve the key -- its ok to call this if no key is currently reserved */
     void ReturnKey();
+    /** Get a new key from the wallet, or return the previously reserved key */
     bool GetReservedKey(CPubKey &pubkey);
+    /** Commit the key reservation, and this CReserveKey object resets to constucted state. */
     void KeepKey();
+    /** Commit the key reservation, and this CReserveKey object resets to constucted state. */
     void KeepScript() { KeepKey(); }
 };
 

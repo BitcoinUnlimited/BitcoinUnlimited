@@ -624,6 +624,7 @@ public:
      * instantly when entering the UTXO set.
      */
     bool IsUnspendable() const { return (size() > 0 && *begin() == OP_RETURN) || (size() > MAX_SCRIPT_SIZE); }
+    /** Remove all instructions in this script. */
     void clear()
     {
         // The default prevector::clear() does not release memory

@@ -179,6 +179,7 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
+    'tokens',
     'bip68-112-113-p2p',
     'validateblocktemplate',
     'parallel',

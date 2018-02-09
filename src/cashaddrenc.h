@@ -14,10 +14,12 @@ class CChainParams;
 enum CashAddrType : uint8_t
 {
     PUBKEY_TYPE = 0,
-    SCRIPT_TYPE = 1
+    SCRIPT_TYPE = 1,
+    GROUP_TYPE = 2,
 };
 
 std::string EncodeCashAddr(const CTxDestination &, const CChainParams &);
+std::string EncodeCashAddr(const std::vector<uint8_t> &id, const CashAddrType addrtype, const CChainParams &params);
 
 struct CashAddrContent
 {

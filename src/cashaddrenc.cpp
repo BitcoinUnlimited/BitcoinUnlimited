@@ -88,6 +88,14 @@ private:
 
 } // anon ns
 
+
+std::string EncodeCashAddr(const std::vector<uint8_t> &id, const CashAddrType addrtype, const CChainParams &params)
+{
+    std::vector<uint8_t> data = PackAddrData(id, addrtype);
+    return cashaddr::Encode(params.CashAddrPrefix(), data);
+}
+
+
 std::string EncodeCashAddr(const CTxDestination &dst, const CChainParams &params)
 {
     return boost::apply_visitor(CashAddrEncoder(params), dst);

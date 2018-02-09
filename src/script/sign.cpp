@@ -107,6 +107,7 @@ static bool SignStep(const BaseSignatureCreator &creator,
         return Sign1(keyID, creator, scriptPubKey, scriptSigRet);
 
     case TX_PUBKEYHASH:
+    case TX_GRP_PUBKEYHASH:
         keyID = CKeyID(uint160(vSolutions[0]));
         if (!Sign1(keyID, creator, scriptPubKey, scriptSigRet))
             return false;
@@ -119,6 +120,7 @@ static bool SignStep(const BaseSignatureCreator &creator,
         return true;
 
     case TX_SCRIPTHASH:
+    case TX_GRP_SCRIPTHASH:
         return creator.KeyStore().GetCScript(uint160(vSolutions[0]), scriptSigRet);
 
     case TX_MULTISIG:
@@ -135,7 +137,7 @@ bool ProduceSignature(const BaseSignatureCreator &creator, const CScript &fromPu
     if (!SignStep(creator, fromPubKey, scriptSig, whichType))
         return false;
 
-    if (whichType == TX_SCRIPTHASH)
+    if ((whichType == TX_SCRIPTHASH) || (whichType == TX_GRP_SCRIPTHASH))
     {
         // Solver returns the subscript that need to be evaluated;
         // the final scriptSig is the signatures from that
@@ -269,10 +271,12 @@ static CScript CombineSignatures(const CScript &scriptPubKey,
     case TX_CLTV: // Freeze CLTV contains pubkey
     case TX_PUBKEY:
     case TX_PUBKEYHASH:
+    case TX_GRP_PUBKEYHASH:
         // Signatures are bigger than placeholders or empty scripts:
         if (sigs1.empty() || sigs1[0].empty())
             return PushAll(sigs2);
         return PushAll(sigs1);
+    case TX_GRP_SCRIPTHASH:
     case TX_SCRIPTHASH:
         if (sigs1.empty() || sigs1.back().empty())
             return PushAll(sigs2);

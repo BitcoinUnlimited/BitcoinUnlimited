@@ -7,6 +7,7 @@
 #include "primitives/transaction.h"
 
 #include "hash.h"
+#include "streams.h"
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 
@@ -127,4 +128,18 @@ std::string CTransaction::ToString() const
     for (unsigned int i = 0; i < vout.size(); i++)
         str += "    " + vout[i].ToString() + "\n";
     return str;
+}
+
+std::string CMutableTransaction::HexStr(void) const
+{
+    CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
+    ssTx << *this;
+    return ::HexStr(ssTx.begin(), ssTx.end());
+}
+
+std::string CTransaction::HexStr(void) const
+{
+    CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
+    ssTx << *this;
+    return ::HexStr(ssTx.begin(), ssTx.end());
 }

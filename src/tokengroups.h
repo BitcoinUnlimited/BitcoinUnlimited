@@ -20,7 +20,6 @@ bool CheckTokenGroups(const CTransaction &tx, CValidationState &state, const CCo
 // Return true if any output in this transaction is part of a group
 bool IsAnyTxOutputGrouped(const CTransaction &tx);
 
-
 // The definitions below are used internally.  They are defined here for use in unit tests.
 class CTokenGroupID
 {
@@ -44,16 +43,26 @@ public:
     }
     //* Initialize the group id from an address
     CTokenGroupID(const CTxDestination &id);
+    //* Initialize a group ID from a string representation
+    CTokenGroupID(const std::string &cashAddrGrpId,const CChainParams &params=Params());
 
     void NoGroup(void) { data.resize(0); }
     bool operator==(const CTokenGroupID &id) const { return data == id.data; }
     bool operator!=(const CTokenGroupID &id) const { return data != id.data; }
 
-    // returns true if this is a user-defined group -- ie NOT bitcoin cash or no group
+    //* returns true if this is a user-defined group -- ie NOT bitcoin cash or no group
     bool isUserGroup(void) const;
 
     const std::vector<unsigned char>& bytes(void) const { return data; }
+
+    //* Convert this token group ID into a mint/melt address
+    CTxDestination ControllingAddress() const;
+    //* Returns this groupID as a string in cashaddr format
+    std::string Encode(const CChainParams &params=Params());
 };
+
+// Return the associated group (OP_GROUP) of a script
+CTokenGroupID GetTokenGroup(const CScript& script);
 
 namespace std
 {
@@ -86,8 +95,12 @@ public:
 };
 
 // Return the controlling (can mint and burn) and associated (OP_GROUP in script) group of a script
-CTokenGroupPair GetTokenGroup(const CScript& script);
+CTokenGroupPair GetTokenGroupPair(const CScript& script);
 
+
+// Pass a group and a destination address (or CNoDestination) to get the balance of all outputs in the group
+// or all outputs in that group and on that destination address.
+CAmount GetGroupBalance(const CTokenGroupID &grpID, const CTxDestination &dest, const CWallet *wallet);
 
 extern CTokenGroupID BitcoinGroup;
 
