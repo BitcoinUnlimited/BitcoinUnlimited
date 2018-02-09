@@ -296,7 +296,45 @@ BOOST_AUTO_TEST_CASE(tokengroup_basicfunctions)
     pubkey = secret.GetPubKey();
     addr = pubkey.GetID();
     eAddr = pubkey.GetHash();
-    
+
+    { // check incorrect group length
+        std::vector<unsigned char> fakeGrp(21);
+        CScript script = CScript() << fakeGrp << OP_GROUP << OP_DROP << OP_DUP << OP_HASH160 << ToByteVector(addr) << OP_EQUALVERIFY << OP_CHECKSIG;
+        CTokenGroupPair ret = GetTokenGroupPair(script);
+        BOOST_CHECK(ret == CTokenGroupPair(BitcoinGroup, CTokenGroupID(addr)));
+    }
+    { // check incorrect group length
+        std::vector<unsigned char> fakeGrp(19);
+        CScript script = CScript() << fakeGrp << OP_GROUP << OP_DROP << OP_DUP << OP_HASH160 << ToByteVector(addr) << OP_EQUALVERIFY << OP_CHECKSIG;
+        CTokenGroupPair ret = GetTokenGroupPair(script);
+        BOOST_CHECK(ret == CTokenGroupPair(BitcoinGroup, CTokenGroupID(addr)));
+    }
+    { // check incorrect group length
+        std::vector<unsigned char> fakeGrp(1);
+        CScript script = CScript() << fakeGrp << OP_GROUP << OP_DROP << OP_DUP << OP_HASH160 << ToByteVector(addr) << OP_EQUALVERIFY << OP_CHECKSIG;
+        CTokenGroupPair ret = GetTokenGroupPair(script);
+        BOOST_CHECK(ret == CTokenGroupPair(BitcoinGroup, CTokenGroupID(addr)));
+    }
+    { // check incorrect group length
+        std::vector<unsigned char> fakeGrp(33);
+        CScript script = CScript() << fakeGrp << OP_GROUP << OP_DROP << OP_DUP << OP_HASH160 << ToByteVector(addr) << OP_EQUALVERIFY << OP_CHECKSIG;
+        CTokenGroupPair ret = GetTokenGroupPair(script);
+        BOOST_CHECK(ret == CTokenGroupPair(BitcoinGroup, CTokenGroupID(addr)));
+    }
+
+    { // check correct group length
+        std::vector<unsigned char> fakeGrp(20);
+        CScript script = CScript() << fakeGrp << OP_GROUP << OP_DROP << OP_DUP << OP_HASH160 << ToByteVector(addr) << OP_EQUALVERIFY << OP_CHECKSIG;
+        CTokenGroupPair ret = GetTokenGroupPair(script);
+        BOOST_CHECK(ret == CTokenGroupPair(CTokenGroupID(fakeGrp), CTokenGroupID(addr)));
+    }
+    { // check correct group length
+        std::vector<unsigned char> fakeGrp(32);
+        CScript script = CScript() << fakeGrp << OP_GROUP << OP_DROP << OP_DUP << OP_HASH160 << ToByteVector(addr) << OP_EQUALVERIFY << OP_CHECKSIG;
+        CTokenGroupPair ret = GetTokenGroupPair(script);
+        BOOST_CHECK(ret == CTokenGroupPair(CTokenGroupID(fakeGrp), CTokenGroupID(addr)));
+    }
+
     { // check P2PKH
         CScript script = CScript() << OP_DUP << OP_HASH160 << ToByteVector(addr) << OP_EQUALVERIFY << OP_CHECKSIG;
         CTokenGroupPair ret = GetTokenGroupPair(script);
@@ -567,10 +605,22 @@ BOOST_FIXTURE_TEST_CASE(tokengroup_blockchain, TestChain100Setup)
 
     txns.push_back(CMutableTransaction());  // Make space for 1 tx in the vector
 
+    {
+    // Should fail: bad group size
+    uint256 hash = blk1.vtx[0].GetHash();
+    std::vector<unsigned char> fakeGrp(21);
+    CScript script = CScript() << fakeGrp << OP_GROUP << OP_DROP << OP_DUP << OP_HASH160
+                               << ToByteVector(a1.addr) << OP_EQUALVERIFY << OP_CHECKSIG;
+
+    txns[0] = tx1x1(COutPoint(hash,0), script, blk1.vtx[0].vout[0].nValue);
+    ret = tryBlock(txns,p2pkh(a2.addr), badblk, state);
+    BOOST_CHECK(!ret);
+    }
+
     // Should fail: premature coinbase spend into a group mint
     uint256 hash = blk1.vtx[0].GetHash();
     txns[0] = tx1x1(COutPoint(hash,0), gp2pkh(grp1.grp, a1.addr), blk1.vtx[0].vout[0].nValue);
-    ret = tryBlock(txns,p2pkh(a2.addr), tipblk, state);
+    ret = tryBlock(txns,p2pkh(a2.addr), badblk, state);
     BOOST_CHECK(!ret);
 
     // Since the TestChain100Setup creates p2pk outputs this won't work
@@ -627,8 +677,8 @@ BOOST_FIXTURE_TEST_CASE(tokengroup_blockchain, TestChain100Setup)
 
     // same tx as above but spend both to the group output should work because balanced
     txns[0] = tx1x2(tipblk.vtx[1],0,
-                    gp2pkh(grp0.grp, grp0.addr), tipblk.vtx[1].vout[0].nValue-100000,
-                    gp2pkh(grp0.grp, a2.addr), 100000,
+                    gp2pkh(grp0.grp, grp0.addr), tipblk.vtx[1].vout[0].nValue-1,
+                    gp2pkh(grp0.grp, a2.addr), 1,
                     a2.secret);
     ret = tryBlock(txns,p2pkh(a2.addr), tipblk, state);
     BOOST_CHECK(ret);
@@ -652,7 +702,7 @@ BOOST_FIXTURE_TEST_CASE(tokengroup_blockchain, TestChain100Setup)
     CScriptID sid1 = CScriptID(p2shBaseScript1);
     CScript p2shBaseScript2 = p2pkh(a2.addr);
     CScriptID sid2 = CScriptID(p2shBaseScript2);
-    
+
     // Spend to a p2sh address so we can tokenify it
     txns[0] = tx1x1(COutPoint(coinbaseTxns[1].GetHash(),0), p2sh(sid1), coinbaseTxns[1].vout[0].nValue,
                     coinbaseKey, coinbaseTxns[1].vout[0].scriptPubKey, false);

@@ -59,7 +59,7 @@ Please refer to [https://medium.com/@g.andrew.stone/bitcoin-scripting-applicatio
 
 ## Specification
 
-As a soft fork, this specification is divided into 2 sections: miner (consensus) requirements, and wallet implementations
+As a soft fork, this specification is divided into 3 sections: miner (consensus) requirements, full node implementations, and wallet implementations
 
 ### Miner (Consensus) Requirements
 
@@ -76,7 +76,7 @@ This opcode comes into play during transaction validation, and ensures that the 
 
 First a *"mint-melt group"* and a *"group identifier"* are identified for each input and output.
 
-The *group identifier* is the token group that this input or output belongs to.  Transactions that do not use OP_GROUP are put in a special group called the "bitcoin cash group" that designates the "native" BCH token.
+The *group identifier* is the token group that this input or output belongs to.  A *group identifier* is a data string of 20 or 32 bytes.  It is not a number (so no zero or sign extension is allowed).  A 19 byte group identifier is simply invalid.  Transactions that do not use OP_GROUP are put in a special group called the "bitcoin cash group" that designates the "native" BCH token.  The "bitcoin cash group" is a conceptual aid -- it will never be used outside your implementation.
 
 Inputs may also have a *mint-melt group* depending on their construction.  The *mint-melt group* indicates the ability to either mint or melt tokens into or from the corresponding group.
 
@@ -89,9 +89,9 @@ The mint-melt group and group identifier is the same as that of the "previous ou
 
 **For all outputs:**
 
-To specify a *group identifier*, a script **MUST** begin with the following exact format:  `<group identfier> OP_GROUP ...`
+To specify a *group identifier*, a script **MUST** begin with the following exact format:  `<20 or 32 byte group identfier> OP_GROUP ...`.
 
-In words, If a script begins with any form of data push (i.e. length codes 1 through 0x4b, OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4) followed by OP_GROUP, the *group identifier* is the data pushed.  This sequence **MUST** begin the script and there **MUST NOT** be other opcodes between the *group identifier* data push and the OP_GROUP instruction. 
+In words, If a script begins with 0x14 or 0x20 (i.e. 20 or 32 byte data push opcodes), followed by data, followed by OP_GROUP, the *group identifier* is the data pushed.  This sequence **MUST** begin the script and there **MUST NOT** be other opcodes between the *group identifier* data push and the OP_GROUP instruction. 
 
 If the script does not meet the above specification, its *group identifier* is the bitcoin cash group.
 
@@ -162,8 +162,19 @@ Algorithms with a lot of nested "ifs" are simpler to view in code.  For an examp
 
 https://github.com/gandrewstone/BitcoinUnlimited/tree/opgroup_consensus/src/tokengroups.cpp
 
+### Full node Implementations
 
-### Wallet Requirements
+#### Remove Dust Threshold
+
+Miners and full nodes should not require that a transaction exceed a "dust threshold" to be accepted and relayed if that transaction involves groups, since a single grouped satoshi may be worth a lot more than one satoshi.  The provided reference implementation removes the dust threshold entirely.  Attempts to determine the "value" of a transaction to the network as a whole and to only mine those transactions are full of problems.  Instead, if the transaction is valuable enough *to the issuer* he or she will pay a large enough fee for it to be relayed and mined.
+
+*[The dust threshold was originally created for user-friendliness -- to stop outputs from being created that would cost more in fees to spend than they were worth.  But the recent spendability issues in Bitcoin proved that the dust threshold does not work for that purpose because the future coin price and minimum fee cannot be predicted.  From a user friendliness perspective, stopping tiny outputs is best done in the wallet, especially because the wallets today typically also get a price feed so they know how much that output is worth in fiat.]*
+
+### Wallet Implementations
+
+OP_GROUP is implemented as a soft fork so wallets do not need to do anything if they do not want to add token support.  But in that case, the wallet will not recognise the format of an OP_GROUP tagged transaction output script and ignore it.  This could cause user confusion if someone accidentally sends that user a token rather than BCH.  To avoid this, it is recommended that wallets identify OP_GROUP outputs and issue an alert if one is received.
+
+*[since the bitcoin cash devs are contemplating adding quite a few new opcodes, this alert may be useful for more than just op_group]*
 
 #### Group Identifier
 
