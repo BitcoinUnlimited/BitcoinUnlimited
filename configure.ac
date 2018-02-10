@@ -86,7 +86,7 @@ AC_PATH_TOOL(RANLIB, ranlib)
 AC_PATH_TOOL(STRIP, strip)
 AC_PATH_TOOL(GCOV, gcov)
 AC_PATH_PROG(LCOV, lcov)
-AC_PATH_PROG(PYTHON, python)
+AC_PATH_PROG(PYTHON, python3)
 AC_PATH_PROG(GENHTML, genhtml)
 AC_PATH_PROG([GIT], [git])
 AC_PATH_PROG(CCACHE,ccache)
@@ -106,6 +106,13 @@ AC_ARG_ENABLE([wallet],
   [disable wallet (enabled by default)])],
   [enable_wallet=$enableval],
   [enable_wallet=yes])
+
+# Enable bitcoinpy
+AC_ARG_ENABLE([bitcoinpy],
+  [AS_HELP_STRING([--enable-bitcoinpy],
+  [Enable bitcoinpy SWIG python bindings (disabled by default)])],
+  [enable_bitcoinpy=$enableval],
+  [enable_bitcoinpy=no])
 
 AC_ARG_WITH([miniupnpc],
   [AS_HELP_STRING([--with-miniupnpc],
@@ -495,6 +502,15 @@ AC_C_BIGENDIAN
 
 dnl Check for pthread compile/link requirements
 AX_PTHREAD
+
+dnl SWIG for python
+if test x$enable_bitcoinpy = xyes; then
+    AX_PYTHON_DEVEL([>= '3'])
+    AX_PKG_SWIG(3.0, [], [ AC_MSG_ERROR([SWIG is required to build bitcoinpy..]) ])
+    AX_SWIG_ENABLE_CXX
+    AX_SWIG_MULTI_MODULE_SUPPORT
+    AX_SWIG_PYTHON
+fi
 
 # The following macro will add the necessary defines to bitcoin-config.h, but
 # they also need to be passed down to any subprojects. Pull the results out of
@@ -954,6 +970,16 @@ else
   AC_MSG_RESULT(no)
 fi
 
+dnl enable bitcoinpy
+AC_MSG_CHECKING([if bitcoinpy should be enabled])
+if test x$enable_bitcoinpy != xno; then
+  AC_MSG_RESULT(yes)
+  AC_DEFINE_UNQUOTED([ENABLE_BITCOINPY],[1],[Define to 1 to enable bitcoinpy functions])
+
+else
+  AC_MSG_RESULT(no)
+fi
+
 dnl enable upnp support
 AC_MSG_CHECKING([whether to build with support for UPnP])
 if test x$have_miniupnpc = xno; then
@@ -1047,6 +1073,7 @@ AM_CONDITIONAL([TARGET_DARWIN], [test x$TARGET_OS = xdarwin])
 AM_CONDITIONAL([BUILD_DARWIN], [test x$BUILD_OS = xdarwin])
 AM_CONDITIONAL([TARGET_WINDOWS], [test x$TARGET_OS = xwindows])
 AM_CONDITIONAL([ENABLE_WALLET],[test x$enable_wallet = xyes])
+AM_CONDITIONAL([ENABLE_BITCOINPY],[test x$enable_bitcoinpy = xyes])
 AM_CONDITIONAL([ENABLE_TESTS],[test x$BUILD_TEST = xyes])
 AM_CONDITIONAL([ENABLE_QT],[test x$bitcoin_enable_qt = xyes])
 AM_CONDITIONAL([ENABLE_QT_TESTS],[test x$BUILD_TEST_QT = xyes])
@@ -1155,6 +1182,7 @@ esac
 echo
 echo "Options used to compile and link:"
 echo "  with wallet   = $enable_wallet"
+echo "  with bitcoinpy= $enable_bitcoinpy"
 echo "  with gui / qt = $bitcoin_enable_qt"
 if test x$bitcoin_enable_qt != xno; then
     echo "    qt version  = $bitcoin_qt_got_major_vers"
