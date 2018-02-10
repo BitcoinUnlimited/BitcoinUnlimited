@@ -178,10 +178,107 @@ OP_GROUP is implemented as a soft fork so wallets do not need to do anything if 
 
 #### Group Identifier
 
-Group identifiers can be any number in theory, but in practice it is impossible to mint any token whose identifier is not a bitcoin cash address.  Therefore a group identifier is a 160 bit number today.  In the future, it is likely that P2SH scripts will be redefined to something like "OP_HASH256 [32-byte-hash-value] OP_EQUAL", so wallets should be prepared to accept 256 bit group identifiers in the future.
+Group identifiers are a 20 or 32 data bytes which are also bitcoin cash addresses.  Although addresses are 20 bytes today, in the future it is likely that P2SH scripts will be redefined to something like "OP_HASH256 [32-byte-hash-value] OP_EQUAL", so wallets should be prepared to accept 256 bit group identifiers.
 
 Group identifiers displayed in cashaddr format **MUST** use the "type" byte as 2.  This results in a cashaddr prefix of "z" for example:
 `bitcoincash:zrmn5e26cfkd0j97kx5jdm3jrrzv5l6a0upqxjxkw2`
+
+#### JSON-RPC calls
+
+It is recommended that all wallets with a JSON-RPC (bitcoin-cli) interface provide the same API so that applications built on top of this interface will work with different wallet implementations.
+
+One new RPC is defined, named "token" that contains several sub-functions.  Parameters are similar for all sub-functions and are as follows:
+
+**group id**  (*string*): The group identifier in cashaddr format.  This identifier is generated in the "token new" command.  All group identifiers have a "z" prefix.
+
+**address**  (*string*): A bitcoin cash address.  Token addresses are interchangable with each other and BCH addresses, so use the standard "getnewaddress" RPC command to create one.  *[having the same addresses for multiple token types allows one to put different tokens in the same address.  This feature may have many uses, such as paying interest in BCH to token holders]*
+
+**quantity** (large integer):  All functions express token quantities in single units.  This is different than the non-token API which expresses values as BCH or 100,000,000 Satoshi.
+
+
+
+### RPC: "token new"
+
+Create a new group (token type).  This operation is similar to "getnewaddress" in that no transactions are created.
+
+**Syntax:**
+
+token new
+
+**Returns:**
+```json
+{
+  "groupIdentifier": "<cashaddr format group id>",
+  "controllingAddress": "<cashaddr format mint/melt address>"
+}
+```
+
+**Example:**
+```bash
+$ ./bitcoin-cli token new
+{
+  "groupIdentifier": "bchreg:zzm4ufz5erpzphtxm5knllxyv9kwut8vnsjjrsfg48",
+  "controllingAddress": "bchreg:qzm4ufz5erpzphtxm5knllxyv9kwut8vns4csw8w25"
+}
+```
+
+### RPC: "token mint"
+
+Create a certain number of tokens of a particular type and sends them to specified addresses.  Converts (redeems) tokens back into BCH.  You must be the owner of this group (have the ability to sign the controllingAddress) to successfully execute this function.
+
+Depending on the implementation, you may need to manually load the group's controlling address with some BCH before calling this function.
+
+**Syntax:**
+
+`token mint <group id> <address> <quantity> [ <address> <quantity>...]`
+
+**Returns:**
+
+A transaction id (hex string) or list of transaction ids.
+
+**Example:**
+```bash
+./bitcoin-cli token mint bchreg:zzm4ufz5erpzphtxm5knllxyv9kwut8vnsjjrsfg48 bchreg:qza38qklu2ztay60xaxl2wuhdzc5327p0ssaqjadz0 100000 bchreg:qpjal7uqcgqv7crjc3s2098ha4thv4z6es6fjnww35 50000
+635243c3bc1f7b6f5f0dc0f3b5cd5aa82d483e9ec669f4e81b0c734bccb9c762
+```
+
+### RPC: "token send"
+
+Send tokens to other addresses.
+
+**Syntax:**
+
+`token send <group id> <address> <quantity> [ <address> <quantity>...]`
+
+**Returns:**
+
+A transaction id (hex string).
+
+**Example:**
+
+```bash
+./bitcoin-cli token send bchreg:zzm4ufz5erpzphtxm5knllxyv9kwut8vnsjjrsfg48 bchreg:qr4tj4zvfcmyjq55wmt4qcz0w27drzcmtcszn9xutz 42 bchreg:qrxqy0hjnjumjayf25sawvjkammspdeyxv8ejpe748 451
+```
+
+### RPC: "token melt"
+
+Converts (redeems) tokens back into BCH.  You must be the owner of this group (have the ability to sign the controllingAddress) to successfully execute this function. Some wallets may require that tokens first be sent to the controllingAddress before melting.  This allows you to control which tokens are melted.
+
+**Syntax:**
+
+`token melt <group id> <address> <quantity> [ <address> <quantity>...]`
+
+**Returns:**
+
+A transaction id (hex string).
+
+**Example:**
+
+```bash
+./bitcoin-cli token melt bchreg:zzm4ufz5erpzphtxm5knllxyv9kwut8vnsjjrsfg48 bchreg:qz52hzhqdlfrvwsrt74kf6rt5utzvf5zsv4hdywqxd 100
+9ef6465c47b620507fb99937b9df836820f2b103f9cf1b94be532865f7751757
+```
+
 
 #### Token Description Document
 
