@@ -83,6 +83,15 @@ public:
     }
 };
 
+#ifdef SWIG
+// instantiante templates so that SWIG can properly inherit the methods
+// of base_blob into uint256 and uint160.
+// clang-format off
+%template(base_blob160) base_blob<160>;
+%template(base_blob256) base_blob<256>;
+// clang-format on
+#endif
+
 /** 160-bit opaque blob.
  * @note This type is called uint160 for historical reasons only. It is an opaque
  * blob of 160 bits and has no integer operations.
