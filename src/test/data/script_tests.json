@@ -241,7 +241,6 @@
  "Discouraged NOPs are allowed if not executed"],
 
 ["0", "IF 0xba ELSE 1 ENDIF", "P2SH,STRICTENC", "OK", "opcodes above NOP10 invalid if executed"],
-["0", "IF 0xbb ELSE 1 ENDIF", "P2SH,STRICTENC", "OK"],
 ["0", "IF 0xbc ELSE 1 ENDIF", "P2SH,STRICTENC", "OK"],
 ["0", "IF 0xbd ELSE 1 ENDIF", "P2SH,STRICTENC", "OK"],
 ["0", "IF 0xbe ELSE 1 ENDIF", "P2SH,STRICTENC", "OK"],
@@ -879,7 +878,6 @@
 
 ["0x50","1", "P2SH,STRICTENC", "BAD_OPCODE", "opcode 0x50 is reserved"],
 ["1", "IF 0xba ELSE 1 ENDIF", "P2SH,STRICTENC", "BAD_OPCODE", "opcodes above NOP10 invalid if executed"],
-["1", "IF 0xbb ELSE 1 ENDIF", "P2SH,STRICTENC", "BAD_OPCODE"],
 ["1", "IF 0xbc ELSE 1 ENDIF", "P2SH,STRICTENC", "BAD_OPCODE"],
 ["1", "IF 0xbd ELSE 1 ENDIF", "P2SH,STRICTENC", "BAD_OPCODE"],
 ["1", "IF 0xbe ELSE 1 ENDIF", "P2SH,STRICTENC", "BAD_OPCODE"],

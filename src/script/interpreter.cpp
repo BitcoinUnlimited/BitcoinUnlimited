@@ -14,6 +14,8 @@
 #include "script/script.h"
 #include "uint256.h"
 
+const std::string strMessageMagic = "Bitcoin Signed Message:\n";
+
 using namespace std;
 
 typedef vector<unsigned char> valtype;
@@ -965,6 +967,31 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                 }
                 break;
 
+                case OP_DATASIGVERIFY:
+                {
+                    if (stack.size() < 3)
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+                    valtype &data = stacktop(-3);
+                    valtype &vchSig = stacktop(-2);
+                    valtype &vchAddr = stacktop(-1);
+
+                    if (vchAddr.size() != 20)
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+                    CHashWriter ss(SER_GETHASH, 0);
+                    ss << strMessageMagic << data;
+
+                    CPubKey pubkey;
+                    if (!pubkey.RecoverCompact(ss.GetHash(), vchSig))
+                        return set_error(serror, SCRIPT_ERR_VERIFY);
+                    CKeyID id = pubkey.GetID();
+                    if (id != uint160(vchAddr))
+                        return set_error(serror, SCRIPT_ERR_VERIFY);
+                    popstack(stack);
+                    popstack(stack);
+                }
+                break;
                 case OP_CHECKSIG:
                 case OP_CHECKSIGVERIFY:
                 {

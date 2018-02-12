@@ -9,6 +9,7 @@
 
 #include "script/interpreter.h"
 
+class CKey;
 class CKeyID;
 class CKeyStore;
 class CScript;
@@ -83,5 +84,10 @@ CScript CombineSignatures(const CScript &scriptPubKey,
     const BaseSignatureChecker &checker,
     const CScript &scriptSig1,
     const CScript &scriptSig2);
+
+/** sign arbitrary data using the same algorithm as the signmessage/verifymessage RPCs and OP_DATASIGVERIFY */
+std::vector<unsigned char> signmessage(const std::vector<unsigned char> &data, const CKey &key);
+std::vector<unsigned char> signmessage(const std::string &data, const CKey &key);
+
 
 #endif // BITCOIN_SCRIPT_SIGN_H

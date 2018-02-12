@@ -199,4 +199,7 @@ bool VerifyScript(const CScript &scriptSig,
     ScriptError *error = NULL,
     unsigned char *sighashtype = NULL);
 
+// string prefixed to data when validating signed messages either via DATASIGVERIFY or RPC call.  This ensures
+// that the signature was intended for use on this blockchain.
+extern const std::string strMessageMagic;
 #endif // BITCOIN_SCRIPT_INTERPRETER_H
