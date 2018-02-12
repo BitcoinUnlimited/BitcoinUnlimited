@@ -1,0 +1,5 @@
+coreio.py
+script.py
+primitives.py
+*_wrap.cxx
+*.so
