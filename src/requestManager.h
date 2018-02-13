@@ -145,9 +145,6 @@ public:
     void Rejected(const CInv &obj, CNode *from, unsigned char reason = 0);
 
     void SendRequests();
-
-    // Indicates whether a node ping time is acceptable relative to the overall average of all nodes.
-    bool IsNodePingAcceptable(CNode *pnode);
 };
 
 
