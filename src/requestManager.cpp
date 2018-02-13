@@ -176,7 +176,8 @@ void CRequestManager::AskForDuringIBD(const CInv &obj, CNode *from, unsigned int
     // add from this node first so that they get requested first.
     AskFor(obj, from, priority);
 
-    LOCK(cs_vNodes);
+    // Must lock cs_objDownloader here and before cs_vNodes to maintain proper locking order.
+    LOCK2(cs_objDownloader, cs_vNodes);
     for (CNode *pnode : vNodes)
     {
         if (pnode == from)
