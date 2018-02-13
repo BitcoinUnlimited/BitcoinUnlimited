@@ -473,7 +473,7 @@ libbitcoinconsensus_la_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 
 endif
 #
-CLEANFILES = ($EXTRA_LIBRARIES)
+CLEANFILES = $(EXTRA_LIBRARIES)
 
 CTAES_DIST =  crypto/ctaes/bench.c
 CTAES_DIST += crypto/ctaes/ctaes.c
