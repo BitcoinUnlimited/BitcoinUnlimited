@@ -114,7 +114,7 @@ static unsigned int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 1;
  *  Larger windows tolerate larger download speed differences between peer, but increase the potential
  *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
  *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
-static unsigned int BLOCK_DOWNLOAD_WINDOW = 256;
+static unsigned int BLOCK_DOWNLOAD_WINDOW = 1024;
 
 extern CTweak<unsigned int> maxBlocksInTransitPerPeer; // override the above
 extern CTweak<unsigned int> blockDownloadWindow;
