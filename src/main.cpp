@@ -371,6 +371,7 @@ bool MarkBlockAsReceived(const uint256 &hash)
         LOG(THIN, "BLOCK_DOWNLOAD_WINDOW is %d MAX_BLOCKS_IN_TRANSIT_PER_PEER is %d\n", BLOCK_DOWNLOAD_WINDOW,
             MAX_BLOCKS_IN_TRANSIT_PER_PEER);
 
+        if (IsChainNearlySyncd())
         {
             LOCK(cs_vNodes);
             BOOST_FOREACH (CNode *pnode, vNodes)
