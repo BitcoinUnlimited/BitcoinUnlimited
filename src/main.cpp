@@ -6405,7 +6405,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             // blocks that we need.  Therefore, update block availability for every connected node. If we
             // don't do this, then at the beginning of IBD we will end up only downloading from one peer.
             LOCK(cs_vNodes);
-            for (CNode *pnode: vNodes)
+            for (CNode *pnode : vNodes)
             {
                 UpdateBlockAvailability(pnode->GetId(), pindexLast->GetBlockHash());
             }
@@ -7238,7 +7238,7 @@ bool SendMessages(CNode *pto)
         CNodeState &state = *State(pto->GetId());
 
         // We need to update any newly connected peers with a best header if we are doing an initial sync.
-        // If we don't do this then we'll end up downloading blocks all from one peer. 
+        // If we don't do this then we'll end up downloading blocks all from one peer.
         if (IsInitialBlockDownload() && state.pindexBestKnownBlock == nullptr)
         {
             UpdateBlockAvailability(pto->GetId(), pindexBestHeader->GetBlockHash());
@@ -7547,8 +7547,6 @@ bool SendMessages(CNode *pto)
                         requester.AskForDuringIBD(inv, pto);
                     // LOG(REQ, "AskFor block %s (%d) peer=%s\n", pindex->GetBlockHash().ToString(),
                     //  pindex->nHeight, pto->GetLogName());
-
-
                 }
             }
         }
