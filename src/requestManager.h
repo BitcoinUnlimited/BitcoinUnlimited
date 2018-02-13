@@ -133,7 +133,7 @@ public:
     // can give us the blocks we need and so we tell the request manager about these sources. Otherwise the request
     // manager may not be able to re-request blocks from anyone after a timeout and we also need to be able to not
     // request another group of blocks that are already in flight.
-    void AskForDuringIBD(const CInv &obj, CNode *from, unsigned int priority = 0);
+    void AskForDuringIBD(const std::vector<CInv> &objArray, CNode *from, unsigned int priority = 0);
 
     // Indicate that we got this object, from and bytes are optional (for node performance tracking)
     void Received(const CInv &obj, CNode *from, int bytes = 0);

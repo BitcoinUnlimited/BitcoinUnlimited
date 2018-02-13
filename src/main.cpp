@@ -7530,30 +7530,35 @@ bool SendMessages(CNode *pto)
         //
         // Message: getdata (blocks)
         //
-        std::vector<CInv> vGetData;
         if (!pto->fDisconnect && !pto->fClient && state.nBlocksInFlight < (int)MAX_BLOCKS_IN_TRANSIT_PER_PEER)
         {
             std::vector<CBlockIndex *> vToDownload;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload);
             // LOG(REQ, "IBD AskFor %d blocks from peer=%s\n", vToDownload.size(), pto->GetLogName());
+            std::vector<CInv> vGetBlocks;
             for (CBlockIndex *pindex : vToDownload)
             {
                 CInv inv(MSG_BLOCK, pindex->GetBlockHash());
                 if (!AlreadyHave(inv))
                 {
-                    if (!IsInitialBlockDownload())
-                        requester.AskFor(inv, pto);
-                    else
-                        requester.AskForDuringIBD(inv, pto);
+                    vGetBlocks.emplace_back(inv);
                     // LOG(REQ, "AskFor block %s (%d) peer=%s\n", pindex->GetBlockHash().ToString(),
-                    //  pindex->nHeight, pto->GetLogName());
+                    //     pindex->nHeight, pto->GetLogName());
                 }
+            }
+            if (!vGetBlocks.empty())
+            {
+                if (!IsInitialBlockDownload())
+                    requester.AskFor(vGetBlocks, pto);
+                else
+                    requester.AskForDuringIBD(vGetBlocks, pto);
             }
         }
 
         //
         // Message: getdata (non-blocks)
         //
+        std::vector<CInv> vGetData;
         while (!pto->fDisconnect && !pto->mapAskFor.empty() && (*pto->mapAskFor.begin()).first <= nNow)
         {
             const CInv &inv = (*pto->mapAskFor.begin()).second;

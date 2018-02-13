@@ -164,17 +164,16 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
 // Get these objects from somewhere, asynchronously.
 void CRequestManager::AskFor(const std::vector<CInv> &objArray, CNode *from, unsigned int priority)
 {
-    unsigned int sz = objArray.size();
-    for (unsigned int nInv = 0; nInv < sz; nInv++)
+    for (auto &inv : objArray)
     {
-        AskFor(objArray[nInv], from, priority);
+        AskFor(inv, from, priority);
     }
 }
 
-void CRequestManager::AskForDuringIBD(const CInv &obj, CNode *from, unsigned int priority)
+void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *from, unsigned int priority)
 {
     // add from this node first so that they get requested first.
-    AskFor(obj, from, priority);
+    AskFor(objArray, from, priority);
 
     // Must lock cs_objDownloader here and before cs_vNodes to maintain proper locking order.
     LOCK2(cs_objDownloader, cs_vNodes);
@@ -183,7 +182,7 @@ void CRequestManager::AskForDuringIBD(const CInv &obj, CNode *from, unsigned int
         if (pnode == from)
             continue;
 
-        AskFor(obj, pnode, priority);
+        AskFor(objArray, pnode, priority);
     }
 }
 
@@ -466,7 +465,6 @@ bool RequestBlock(CNode *pfrom, CInv obj)
     }
 }
 
-
 void CRequestManager::SendRequests()
 {
     int64_t now = 0;
@@ -487,6 +485,12 @@ void CRequestManager::SendRequests()
         // minutes (default val of MIN_TX is 5 sec)
         txReqRetryInterval *= (12 * 2);
     }
+
+    // When we are still doing an initial sync we want to batch request the blocks instead of just
+    // asking for one at time. We can do this because there will be no XTHIN requests possible during
+    // this time.
+    bool fBatchBlockRequests = IsInitialBlockDownload();
+    std::map<CNode *, std::vector<CInv>> mapBatchBlockRequests;
 
     // Get Blocks
     while (sendBlkIter != mapBlkInfo.end())
@@ -534,12 +538,12 @@ void CRequestManager::SendRequests()
                             LOG(REQ, "ReqMgr: %s removed block ref to %s count %d (%s).\n", item.obj.ToString(),
                                 next.node->GetLogName(), next.node->GetRefCount(), reason);
                             next.node->Release();
-                            next.node = NULL; // force the loop to get another node
+                            next.node = nullptr; // force the loop to get another node
                         }
                     }
                 }
 
-                if (next.node != NULL)
+                if (next.node != nullptr)
                 {
                     // If item.lastRequestTime is true then we've requested at least once and we'll try a re-request
                     if (item.lastRequestTime)
@@ -551,20 +555,29 @@ void CRequestManager::SendRequests()
                     item.outstandingReqs++;
                     int64_t then = item.lastRequestTime;
                     item.lastRequestTime = now;
-                    LEAVE_CRITICAL_SECTION(cs_objDownloader); // item and itemIter are now invalid
-                    bool reqblkResult = RequestBlock(next.node, obj);
-                    ENTER_CRITICAL_SECTION(cs_objDownloader);
-                    if (!reqblkResult)
+
+                    if (fBatchBlockRequests)
                     {
-                        // having released cs_objDownloader, item and itemiter may be invalid.
-                        // So in the rare case that we could not request the block we need to
-                        // find the item again (if it exists) and set the tracking back to what it was
-                        itemIter = mapBlkInfo.find(obj.hash);
-                        if (itemIter != mapBlkInfo.end())
+                        mapBatchBlockRequests[next.node].push_back(obj);
+                    }
+                    else
+                    {
+                        LEAVE_CRITICAL_SECTION(cs_objDownloader); // item and itemIter are now invalid
+                        bool reqblkResult = RequestBlock(next.node, obj);
+                        ENTER_CRITICAL_SECTION(cs_objDownloader);
+
+                        if (!reqblkResult)
                         {
-                            item = itemIter->second;
-                            item.outstandingReqs--;
-                            item.lastRequestTime = then;
+                            // having released cs_objDownloader, item and itemiter may be invalid.
+                            // So in the rare case that we could not request the block we need to
+                            // find the item again (if it exists) and set the tracking back to what it was
+                            itemIter = mapBlkInfo.find(obj.hash);
+                            if (itemIter != mapBlkInfo.end())
+                            {
+                                item = itemIter->second;
+                                item.outstandingReqs--;
+                                item.lastRequestTime = then;
+                            }
                         }
                     }
 
@@ -576,11 +589,19 @@ void CRequestManager::SendRequests()
 
                     // Instead we'll forget about it -- the node is already popped of of the available list so now we'll
                     // release our reference.
-                    LOCK(cs_vNodes);
-                    // LOG(REQ, "ReqMgr: %s removed block ref to %d count %d\n", obj.ToString(),
-                    //    next.node->GetId(), next.node->GetRefCount());
-                    next.node->Release();
-                    next.node = NULL;
+                    if (!fBatchBlockRequests)
+                    {
+                        LOCK(cs_vNodes);
+                        // LOG(REQ, "ReqMgr: %s removed block ref to %d count %d\n", obj.ToString(),
+                        //     next.node->GetId(), next.node->GetRefCount());
+                        next.node->Release();
+                        next.node = nullptr;
+                    }
+                    else
+                    {
+                        // we won't release it until we send the batch requests
+                        next.node = nullptr;
+                    }
                 }
                 else
                 {
@@ -595,6 +616,30 @@ void CRequestManager::SendRequests()
                 LOG(REQ, "Block %s has no available sources. Removing\n", item.obj.ToString());
                 cleanup(itemIter);
             }
+        }
+    }
+    // send batched requests if any.
+    if (fBatchBlockRequests && !mapBatchBlockRequests.empty())
+    {
+        for (auto iter : mapBatchBlockRequests)
+        {
+            LEAVE_CRITICAL_SECTION(cs_objDownloader);
+            iter.first->PushMessage(NetMsgType::GETDATA, iter.second);
+            {
+                LOCK(cs_main);
+                for (auto &inv : iter.second)
+                {
+                    MarkBlockAsInFlight(iter.first->GetId(), inv.hash, Params().GetConsensus());
+                }
+            }
+            ENTER_CRITICAL_SECTION(cs_objDownloader);
+            LOG(REQ, "Sent batched rqst with %d blocks to node %s\n",  iter.second.size(), iter.first->GetLogName());
+        }
+
+        LOCK(cs_vNodes);
+        for (auto iter : mapBatchBlockRequests)
+        {
+            iter.first->Release();
         }
     }
 
