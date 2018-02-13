@@ -131,7 +131,7 @@ struct CRecipient
 typedef std::map<std::string, std::string> mapValue_t;
 
 
-static void ReadOrderPos(int64_t &nOrderPos, mapValue_t &mapValue)
+inline void ReadOrderPos(int64_t &nOrderPos, mapValue_t &mapValue)
 {
     if (!mapValue.count("n"))
     {
@@ -142,7 +142,7 @@ static void ReadOrderPos(int64_t &nOrderPos, mapValue_t &mapValue)
 }
 
 
-static void WriteOrderPos(const int64_t &nOrderPos, mapValue_t &mapValue)
+inline void WriteOrderPos(const int64_t &nOrderPos, mapValue_t &mapValue)
 {
     if (nOrderPos == -1)
         return;
