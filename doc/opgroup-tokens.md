@@ -52,6 +52,7 @@ This proposal also limits itself to exactly one opcode.  It is possible to inclu
 * *bitcoin cash group* - A special-case group that includes all transactions with no explicit group id.  This group represents the "native" BCH tokens during transaction analysis.
 * *mint* - Move ungrouped satoshis into a group, thereby creating new tokens
 * *melt* - Move tokens back to the native satoshis, thereby destroying existing tokens
+* *UTXO* - Unspend Transaction Output: A record of current value on the bitcoin cash blockchain
 
 ## Theory of Operation
 
@@ -61,10 +62,15 @@ Please refer to [https://medium.com/@g.andrew.stone/bitcoin-scripting-applicatio
 
 As a soft fork, this specification is divided into 3 sections: miner (consensus) requirements, full node implementations, and wallet implementations
 
+**[DISCUSSION: OP_GROUP can be triggered either via soft fork or hard fork.  If a hard fork is chosen, changes are minimal:  OP_GROUP would be assigned to a new opcode number, and OP_DROP would be removed. This saves a byte.  (Alternately, OP_DROP could be required as the next byte.  This would give us effectively 255 additional 16 bit opcodes: OP_GROUP.OP_XXX).  The advantage of a hard fork is that unupgraded light wallets would discard the transaction as bad (and hopefully indicate such to the user to reduce payment confusion in the case where someone accidentally pays a token rather than BCH).  Otherwise an unupgraded light wallet could be fed an illegal op_group transaction, but with a "normal" output that it understands.  The wallet would then accept this transaction from a 0-conf perspective.  Note that this not specific to op_group.  It is generally a vulnerability in the repurposing of OP_NOP to add functionality via soft fork.  The disadvantage of a hard fork is that all full nodes must upgrade]**
+
 ### Miner (Consensus) Requirements
 
 #### Deployment
 Miners **MUST** enforce OP_GROUP semantics after the May 2018 hard fork.
+
+#### Retirement
+Since this opcode may not exist inside a P2SH script, removal of this opcode is easier than other opcodes.  A "group stop" block height can be chosen where OP_GROUP balancing is no longer enforced by miners.  At that point OP_GROUP effectively becomes a no-op so all owners of OP_GROUP tokens may spend their UTXOs as normal BCH.  Issuers of tokens have until the group stop block to switch to another blockchain without interruption of their service.  Issuers may do so by importing the utxos marked by their group into a custom blockchain easily and without securing the signatures of all token owners.    When the group stop block occurs, OP_GROUP balances are effectively frozen although the underlying satoshis may now be spent.  So if an issuer has not created a custom blockchain, s/he may subsequently do so at any time by importing the utxos tagged with the relevant OP_GROUP address from the point of the group stop block. 
 
 #### Validation
 
