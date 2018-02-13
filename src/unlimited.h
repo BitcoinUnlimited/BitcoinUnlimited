@@ -81,8 +81,8 @@ extern unsigned int maxMessageSizeMultiplier;
 /** BU Default maximum number of Outbound connections to simultaneously allow*/
 extern int nMaxOutConnections;
 
-extern std::vector<std::string>
-    BUComments; // BU005: Strings specific to the config of this client that should be communicated to other clients
+// BU005: Strings specific to the config of this client that should be communicated to other clients
+extern std::vector<std::string> BUComments;
 extern std::string minerComment; // An arbitrary field that miners can change to annotate their blocks
 
 // BU - Xtreme Thinblocks Auto Mempool Limiter - begin section
@@ -265,6 +265,7 @@ extern CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize;
 
 // Configuration variable validators
 bool MiningAndExcessiveBlockValidatorRule(const uint64_t newExcessiveBlockSize, const uint64_t newMiningBlockSize);
+std::string AcceptDepthValidator(const unsigned int &value, unsigned int *item, bool validate);
 std::string ExcessiveBlockValidator(const uint64_t &value, uint64_t *item, bool validate);
 std::string OutboundConnectionValidator(const int &value, int *item, bool validate);
 std::string SubverValidator(const std::string &value, std::string *item, bool validate);

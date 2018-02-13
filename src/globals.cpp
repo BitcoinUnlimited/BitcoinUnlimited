@@ -199,7 +199,8 @@ CTweak<bool> walletSignWithForkSig("wallet.useNewSig",
 CTweak<unsigned int> maxTxSize("net.excessiveTx", "Largest transaction size in bytes", DEFAULT_LARGEST_TRANSACTION);
 CTweakRef<unsigned int> eadTweak("net.excessiveAcceptDepth",
     "Excessive block chain acceptance depth in blocks",
-    &excessiveAcceptDepth);
+    &excessiveAcceptDepth,
+    &AcceptDepthValidator);
 CTweakRef<int> maxOutConnectionsTweak("net.maxOutboundConnections",
     "Maximum number of outbound connections",
     &nMaxOutConnections,

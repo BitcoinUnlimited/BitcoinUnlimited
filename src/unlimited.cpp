@@ -69,6 +69,14 @@ bool MiningAndExcessiveBlockValidatorRule(const uint64_t newExcessiveBlockSize, 
     LOGA("newMiningBlockSize: %d - newExcessiveBlockSize: %d\n", newMiningBlockSize, newExcessiveBlockSize);
     return (newMiningBlockSize <= newExcessiveBlockSize);
 }
+std::string AcceptDepthValidator(const unsigned int &value, unsigned int *item, bool validate)
+{
+    if (!validate)
+    {
+        settingsToUserAgentString();
+    }
+    return std::string();
+}
 
 std::string ExcessiveBlockValidator(const uint64_t &value, uint64_t *item, bool validate)
 {
@@ -85,7 +93,7 @@ std::string ExcessiveBlockValidator(const uint64_t &value, uint64_t *item, bool 
     }
     else // Do anything to "take" the new value
     {
-        // nothing needed
+        settingsToUserAgentString();
     }
     return std::string();
 }
@@ -220,7 +228,7 @@ std::string FormatCoinbaseMessage(const std::vector<std::string> &comments, cons
             ss << "/" << *it;
         ss << "/";
     }
-    std::string ret = ss.str() + minerComment;
+    std::string ret = ss.str() + customComment;
     return ret;
 }
 
