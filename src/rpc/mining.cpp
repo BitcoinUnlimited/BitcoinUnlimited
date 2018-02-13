@@ -669,7 +669,8 @@ UniValue getblocktemplate(const UniValue &params, bool fHelp)
         case THRESHOLD_LOCKED_IN:
             // Ensure bit is set in block version
             pblock->nVersion |= VersionBitsMask(consensusParams, pos);
-        // FALL THROUGH to get vbavailable set...
+        // FALLTHROUGH
+        // to get vbavailable set...
         case THRESHOLD_STARTED:
         {
             const struct BIP9DeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
