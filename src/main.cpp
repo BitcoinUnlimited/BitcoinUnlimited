@@ -6398,6 +6398,16 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             LOG(NET, "more getheaders (%d) to end to peer=%s (startheight:%d)\n", pindexLast->nHeight,
                 pfrom->GetLogName(), pfrom->nStartingHeight);
             pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexLast), uint256());
+
+            // If we are here then we are beginning the process of IBD where we download all the headers.
+            // As a result we need to assume that every connected node is a full node and has all the
+            // blocks that we need.  Therefore, update block availability for every connected node. If we
+            // don't do this, then at the beginning of IBD we will end up only downloading from one peer.
+            LOCK(cs_vNodes);
+            for (CNode *pnode: vNodes)
+            {
+                UpdateBlockAvailability(pnode->GetId(), pindexLast->GetBlockHash());
+            }
         }
 
         bool fCanDirectFetch = CanDirectFetch(chainparams.GetConsensus());
@@ -7226,6 +7236,13 @@ bool SendMessages(CNode *pto)
 
         CNodeState &state = *State(pto->GetId());
 
+        // We need to update any newly connected peers with a best header if we are doing an initial sync.
+        // If we don't do this then we'll end up downloading blocks all from one peer. 
+        if (IsInitialBlockDownload() && state.pindexBestKnownBlock == nullptr)
+        {
+            UpdateBlockAvailability(pto->GetId(), pindexBestHeader->GetBlockHash());
+        }
+
         // If a sync has been started check whether we received the first batch of headers requested within the timeout
         // period.
         // If not then disconnect and ban the node and a new node will automatically be selected to start the headers
@@ -7523,9 +7540,14 @@ bool SendMessages(CNode *pto)
                 CInv inv(MSG_BLOCK, pindex->GetBlockHash());
                 if (!AlreadyHave(inv))
                 {
-                    requester.AskFor(inv, pto);
+                    if (!IsInitialBlockDownload())
+                        requester.AskFor(inv, pto);
+                    else
+                        requester.AskForDuringIBD(inv, pto);
                     // LOG(REQ, "AskFor block %s (%d) peer=%s\n", pindex->GetBlockHash().ToString(),
                     //  pindex->nHeight, pto->GetLogName());
+
+
                 }
             }
         }

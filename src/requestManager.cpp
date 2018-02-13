@@ -171,6 +171,20 @@ void CRequestManager::AskFor(const std::vector<CInv> &objArray, CNode *from, uns
     }
 }
 
+void CRequestManager::AskForDuringIBD(const CInv &obj, CNode *from, unsigned int priority)
+{
+    // add from this node first so that they get requested first.
+    AskFor(obj, from, priority);
+
+    LOCK(cs_vNodes);
+    for (CNode *pnode : vNodes)
+    {
+        if (pnode == from)
+            continue;
+
+        AskFor(obj, pnode, priority);
+    }
+}
 
 // Indicate that we got this object, from and bytes are optional (for node performance tracking)
 void CRequestManager::Received(const CInv &obj, CNode *from, int bytes)
