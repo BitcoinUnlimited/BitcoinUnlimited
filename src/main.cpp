@@ -107,9 +107,6 @@ extern std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED
 int64_t nLastOrphanCheck = GetTime(); // Used in EraseOrphansByTime()
 static uint64_t nBytesOrphanPool = 0; // Current in memory size of the orphan pool.
 
-// BU: start block download at low numbers in case our peers are slow when we start
-/** Number of blocks that can be requested at any given time from a single peer. */
-static unsigned int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 1;
 /** Size of the "block download window": how far ahead of our current height do we fetch?
  *  Larger windows tolerate larger download speed differences between peer, but increase the potential
  *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
@@ -294,8 +291,11 @@ void FinalizeNode(NodeId nodeid)
     if (state->fSyncStarted)
         nSyncStarted--;
 
-    BOOST_FOREACH (const QueuedBlock &entry, state->vBlocksInFlight)
+    for (const QueuedBlock &entry : state->vBlocksInFlight)
     {
+        printf("erasing map mapblocksinflight entries\n");
+
+        LOGA("erasing map mapblocksinflight entries\n");
         mapBlocksInFlight.erase(entry.hash);
     }
     nPreferredDownload -= state->fPreferredDownload;
@@ -313,63 +313,73 @@ void FinalizeNode(NodeId nodeid)
     }
 }
 
-// Requires cs_main.
 // Returns a bool indicating whether we requested this block.
-bool MarkBlockAsReceived(const uint256 &hash)
+static bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
 {
+    AssertLockHeld(cs_main);
+
     std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
         mapBlocksInFlight.find(hash);
     if (itInFlight != mapBlocksInFlight.end())
     {
-        // BUIP010 Xtreme Thinblocks: begin section
         int64_t getdataTime = itInFlight->second.second->nTime;
         int64_t now = GetTimeMicros();
         double nResponseTime = (double)(now - getdataTime) / 1000000.0;
 
-        // BU:  calculate avg block response time over last 20 blocks to be used for IBD tuning
-        // start at a higher number so that we don't start jamming IBD when we restart a node sync
-        static double avgResponseTime = 5;
-        static uint8_t blockRange = 20;
-        if (avgResponseTime > 0)
-            avgResponseTime -= (avgResponseTime / blockRange);
-        avgResponseTime += nResponseTime / blockRange;
-        if (avgResponseTime < 0.2)
+        // calculate avg block response time over a range of blocks to be used for IBD tuning.
+        static uint8_t blockRange = 50;
         {
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER = 32;
-        }
-        else if (avgResponseTime < 0.5)
-        {
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER = 16;
-        }
-        else if (avgResponseTime < 0.9)
-        {
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER = 8;
-        }
-        else if (avgResponseTime < 1.4)
-        {
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER = 4;
-        }
-        else if (avgResponseTime < 2.0)
-        {
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER = 2;
-        }
-        else
-        {
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER = 1;
+            LOCK(pnode->cs_nAvgBlkResponseTime);
+            if (pnode->nAvgBlkResponseTime < 0)
+                pnode->nAvgBlkResponseTime = 2.0;
+            if (pnode->nAvgBlkResponseTime > 0)
+                pnode->nAvgBlkResponseTime -= (pnode->nAvgBlkResponseTime / blockRange);
+            pnode->nAvgBlkResponseTime += nResponseTime / blockRange;
+
+            if (pnode->nAvgBlkResponseTime < 0.2)
+            {
+                pnode->nMaxBlocksInTransit.store(64);
+            }
+            else if (pnode->nAvgBlkResponseTime < 0.5)
+            {
+                pnode->nMaxBlocksInTransit.store(56);
+            }
+            else if (pnode->nAvgBlkResponseTime < 0.9)
+            {
+                pnode->nMaxBlocksInTransit.store(48);
+            }
+            else if (pnode->nAvgBlkResponseTime < 1.4)
+            {
+                pnode->nMaxBlocksInTransit.store(32);
+            }
+            else if (pnode->nAvgBlkResponseTime < 2.0)
+            {
+                pnode->nMaxBlocksInTransit.store(24);
+            }
+            else
+            {
+                pnode->nMaxBlocksInTransit.store(16);
+            }
+
+            LOG(THIN, "Average block response time is %.2f seconds\n", pnode->nAvgBlkResponseTime);
         }
 
-        LOG(THIN, "Received block %s in %.2f seconds\n", hash.ToString(), nResponseTime);
-        LOG(THIN, "Average block response time is %.2f seconds\n", avgResponseTime);
+        CNodeState *state = State(pnode->id);
+
+        // if there are no blocks in flight then ask for a few more blocks
+        if (state->nBlocksInFlight <= 0)
+            pnode->nMaxBlocksInTransit.fetch_add(4);
+
         if (maxBlocksInTransitPerPeer.value != 0)
         {
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER = maxBlocksInTransitPerPeer.value;
+            pnode->nMaxBlocksInTransit.store(maxBlocksInTransitPerPeer.value);
         }
         if (blockDownloadWindow.value != 0)
         {
             BLOCK_DOWNLOAD_WINDOW = blockDownloadWindow.value;
         }
-        LOG(THIN, "BLOCK_DOWNLOAD_WINDOW is %d MAX_BLOCKS_IN_TRANSIT_PER_PEER is %d\n", BLOCK_DOWNLOAD_WINDOW,
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER);
+        LOG(THIN, "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %d\n", BLOCK_DOWNLOAD_WINDOW,
+            pnode->nMaxBlocksInTransit.load());
 
         if (IsChainNearlySyncd())
         {
@@ -391,7 +401,6 @@ bool MarkBlockAsReceived(const uint256 &hash)
             }
         }
         // BUIP010 Xtreme Thinblocks: end section
-        CNodeState *state = State(itInFlight->second.first);
         state->nBlocksInFlightValidHeaders -= itInFlight->second.second->fValidatedHeaders;
         if (state->nBlocksInFlightValidHeaders == 0 && itInFlight->second.second->fValidatedHeaders)
         {
@@ -4152,7 +4161,7 @@ bool ProcessNewBlock(CValidationState &state,
     {
         LOCK(cs_main);
         uint256 hash = pblock->GetHash();
-        bool fRequested = MarkBlockAsReceived(hash);
+        bool fRequested = MarkBlockAsReceived(hash, pfrom);
         fRequested |= fForceProcessing;
         if (!checked)
         {
@@ -6447,7 +6456,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         {
             // Set tweak value.  Mostly used in testing direct fetch.
             if (maxBlocksInTransitPerPeer.value != 0)
-                MAX_BLOCKS_IN_TRANSIT_PER_PEER = maxBlocksInTransitPerPeer.value;
+                pfrom->nMaxBlocksInTransit.store(maxBlocksInTransitPerPeer.value);
 
             std::vector<CBlockIndex *> vToFetch;
             CBlockIndex *pindexWalk = pindexLast;
@@ -6474,7 +6483,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 // We don't care about how many blocks are in flight.  We just need to make sure we don't
                 // ask for more than the maximum allowed per peer because the request manager will take care
                 // of any duplicate requests.
-                if (nAskFor >= MAX_BLOCKS_IN_TRANSIT_PER_PEER)
+                if (nAskFor >= pfrom->nMaxBlocksInTransit.load())
                 {
                     LOG(NET, "Large reorg, could only direct fetch %d blocks\n", nAskFor);
                     break;
@@ -7533,10 +7542,11 @@ bool SendMessages(CNode *pto)
         //
         // Message: getdata (blocks)
         //
-        if (!pto->fDisconnect && !pto->fClient && state.nBlocksInFlight < (int)MAX_BLOCKS_IN_TRANSIT_PER_PEER)
+        if (!pto->fDisconnect && !pto->fClient && state.nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
         {
             std::vector<CBlockIndex *> vToDownload;
-            FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload);
+            FindNextBlocksToDownload(
+                pto->GetId(), pto->nMaxBlocksInTransit.load() - state.nBlocksInFlight, vToDownload);
             // LOG(REQ, "IBD AskFor %d blocks from peer=%s\n", vToDownload.size(), pto->GetLogName());
             std::vector<CInv> vGetBlocks;
             for (CBlockIndex *pindex : vToDownload)

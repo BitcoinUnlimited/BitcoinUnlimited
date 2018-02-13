@@ -392,6 +392,10 @@ public:
     uint32_t nXthinBloomfilterSize; // The maximum xthin bloom filter size (in bytes) that our peer will accept.
     // BUIP010 Xtreme Thinblocks: end section
 
+    CCriticalSection cs_nAvgBlkResponseTime;
+    double nAvgBlkResponseTime;
+    std::atomic<int64_t> nMaxBlocksInTransit;
+
     unsigned short addrFromPort;
 
 protected:
