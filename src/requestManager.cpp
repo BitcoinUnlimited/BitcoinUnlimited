@@ -372,6 +372,7 @@ bool RequestBlock(CNode *pfrom, CInv obj)
     //        here.
     if (IsChainNearlySyncd() || chainParams.NetworkIDString() == "regtest")
     {
+        LOCK(cs_main);
         BlockMap::iterator idxIt = mapBlockIndex.find(obj.hash);
         if (idxIt == mapBlockIndex.end()) // only request if we don't already have the header
         {
