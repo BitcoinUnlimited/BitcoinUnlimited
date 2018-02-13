@@ -491,7 +491,7 @@ void CRequestManager::SendRequests()
     // asking for one at time. We can do this because there will be no XTHIN requests possible during
     // this time.
     bool fBatchBlockRequests = IsInitialBlockDownload();
-    std::map<CNode *, std::vector<CInv>> mapBatchBlockRequests;
+    std::map<CNode *, std::vector<CInv> > mapBatchBlockRequests;
 
     // Get Blocks
     while (sendBlkIter != mapBlkInfo.end())
@@ -634,7 +634,7 @@ void CRequestManager::SendRequests()
                 }
             }
             ENTER_CRITICAL_SECTION(cs_objDownloader);
-            LOG(REQ, "Sent batched rqst with %d blocks to node %s\n",  iter.second.size(), iter.first->GetLogName());
+            LOG(REQ, "Sent batched rqst with %d blocks to node %s\n", iter.second.size(), iter.first->GetLogName());
         }
 
         LOCK(cs_vNodes);
