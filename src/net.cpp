@@ -2100,22 +2100,10 @@ void ThreadMessageHandler()
         {
             LOCK(cs_vNodes);
             vNodesCopy.reserve(vNodes.size());
-            // Prefer thinBlockCapable nodes when doing communications.
             for (CNode *pnode : vNodes)
             {
-                if (pnode->ThinBlockCapable())
-                {
-                    vNodesCopy.push_back(pnode);
-                    pnode->AddRef();
-                }
-            }
-            for (CNode *pnode : vNodes)
-            {
-                if (!pnode->ThinBlockCapable())
-                {
-                    vNodesCopy.push_back(pnode);
-                    pnode->AddRef();
-                }
+                vNodesCopy.push_back(pnode);
+                pnode->AddRef();
             }
         }
 
