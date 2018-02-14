@@ -192,6 +192,16 @@ void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *
     }
 }
 
+bool CRequestManager::AlreadyAskedFor(const uint256 &hash)
+{
+    LOCK(cs_objDownloader);
+    OdMap::iterator item = mapBlkInfo.find(hash);
+    if (item != mapBlkInfo.end())
+        return true;
+
+    return false;
+}
+
 // Indicate that we got this object, from and bytes are optional (for node performance tracking)
 void CRequestManager::Received(const CInv &obj, CNode *from, int bytes)
 {

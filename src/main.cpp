@@ -527,8 +527,11 @@ static void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vec
         // are not yet downloaded and not in flight to vBlocks. In the mean time, update
         // pindexLastCommonBlock as long as all ancestors are already downloaded, or if it's
         // already part of our chain (and therefore don't need it even if pruned).
-        BOOST_FOREACH (CBlockIndex *pindex, vToFetch)
+        for (CBlockIndex *pindex : vToFetch)
         {
+            if (requester.AlreadyAskedFor(pindex->GetBlockHash()))
+                continue;
+
             if (!pindex->IsValid(BLOCK_VALID_TREE))
             {
                 // We consider the chain that this peer is on invalid.

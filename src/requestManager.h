@@ -135,6 +135,10 @@ public:
     // request another group of blocks that are already in flight.
     void AskForDuringIBD(const std::vector<CInv> &objArray, CNode *from, unsigned int priority = 0);
 
+    // Did we already ask for this block. We need to do this during IBD to make sure we don't ask for another set
+    // of the same blocks.
+    bool AlreadyAskedFor(const uint256 &hash);
+
     // Indicate that we got this object, from and bytes are optional (for node performance tracking)
     void Received(const CInv &obj, CNode *from, int bytes = 0);
 
