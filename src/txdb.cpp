@@ -473,7 +473,7 @@ uint64_t GetTotalSystemMemory()
     int64_t nPhysMem = 0;
     size_t nLength = sizeof(nPhysMem);
 
-    if (sysctl(mib, 2, &nPhysMem, &nLength, nullptr, 0))
+    if (sysctl(mib, 2, &nPhysMem, &nLength, nullptr, 0) == 0)
     {
         return nPhysMem;
     }
