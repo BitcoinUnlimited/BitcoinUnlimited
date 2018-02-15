@@ -164,6 +164,11 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
 // Get these objects from somewhere, asynchronously.
 void CRequestManager::AskFor(const std::vector<CInv> &objArray, CNode *from, unsigned int priority)
 {
+    // In order to maintain locking order, we must lock cs_objDownloader first and before possibly taking cs_vNodes.
+    // Also, locking here prevents anyone from asking again for any of these objects again before we've notified the
+    // request manager of them all. In addition this helps keep blocks batached and requests for batches of blocks
+    // in a better order.
+    LOCK(cs_objDownloader);
     for (auto &inv : objArray)
     {
         AskFor(inv, from, priority);
@@ -173,10 +178,11 @@ void CRequestManager::AskFor(const std::vector<CInv> &objArray, CNode *from, uns
 void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *from, unsigned int priority)
 {
     // add from this node first so that they get requested first.
+    LOCK(cs_objDownloader);
     AskFor(objArray, from, priority);
 
     // Must lock cs_objDownloader here and before cs_vNodes to maintain proper locking order.
-    LOCK2(cs_objDownloader, cs_vNodes);
+    LOCK(cs_vNodes);
     for (CNode *pnode : vNodes)
     {
         if (pnode == from)
