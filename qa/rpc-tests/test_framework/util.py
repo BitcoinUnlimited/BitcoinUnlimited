@@ -214,7 +214,7 @@ def wait_for_bitcoind_start(process, url, i):
                 raise # unkown JSON RPC exception
         time.sleep(0.25)
 
-def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None):
+def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
     """
     Create (or copy from cache) a 200-block-long chain and
     4 wallets.
@@ -233,7 +233,10 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None):
         # Create cache directories, run bitcoinds:
         for i in range(4):
             datadir=initialize_datadir("cache", i,bitcoinConfDict)
-            args = [ os.getenv("BITCOIND", "bitcoind"), "-keypool=1", "-datadir="+datadir ]
+            if bins:
+                args = [ bins[i], "-keypool=1", "-datadir="+datadir ]
+            else:
+                args = [ os.getenv("BITCOIND", "bitcoind"), "-keypool=1", "-datadir="+datadir ]
             if i > 0:
                 args.append("-connect=127.0.0.1:"+str(p2p_port(0)))
             bitcoind_processes[i] = subprocess.Popen(args)

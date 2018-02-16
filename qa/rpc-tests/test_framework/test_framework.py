@@ -36,7 +36,7 @@ from .authproxy import JSONRPCException
 
 class BitcoinTestFramework(object):
     drop_to_pdb = os.getenv("DROP_TO_PDB", "")
-
+    bins = None
     # These may be over-ridden by subclasses:
     def run_test(self):
         for node in self.nodes:
@@ -58,7 +58,7 @@ class BitcoinTestFramework(object):
         before starting the node.
         """
         print("Initializing test directory ", self.options.tmpdir, "Bitcoin conf: ", str(bitcoinConfDict), "walletfiles: ", wallets)
-        initialize_chain(self.options.tmpdir,bitcoinConfDict, wallets)
+        initialize_chain(self.options.tmpdir,bitcoinConfDict, wallets, self.bins)
 
     def setup_nodes(self):
         return start_nodes(4, self.options.tmpdir)
@@ -267,7 +267,7 @@ class ComparisonTestFramework(BitcoinTestFramework):
 
     def setup_chain(self,bitcoinConfDict=None, wallets=None):  # BU add config params
         print("Initializing test directory ", self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir, self.num_nodes,bitcoinConfDict, wallets)
+        initialize_chain_clean(self.options.tmpdir, self.num_nodes,bitcoinConfDict, wallets, self.bins)
 
     def setup_network(self):
         self.nodes = start_nodes(
