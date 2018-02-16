@@ -282,4 +282,12 @@ extern std::list<CStatBase *> mallocedStats;
 extern CCriticalSection cs_blockvalidationthread;
 void InterruptBlockValidationThreads();
 
+// Fork configuration
+/** This specifies the MTP time of the next fork */
+extern CTweak<uint64_t> miningForkTime;
+/** This specifies the minimum excessive block setting at the fork point */
+extern CTweak<uint64_t> miningForkEB;
+/** This specifies the minimum max block size at the fork point */
+extern CTweak<uint64_t> miningForkMG;
+
 #endif
