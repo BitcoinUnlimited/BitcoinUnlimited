@@ -19,7 +19,6 @@ DOWNLOAD_RETRIES:=3
 host:=$(BUILD)
 ifneq ($(HOST),)
 host:=$(HOST)
-host_toolchain:=$(HOST)-
 endif
 
 ifneq ($(DEBUG),)
