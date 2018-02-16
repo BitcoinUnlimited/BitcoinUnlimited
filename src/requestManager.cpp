@@ -625,7 +625,6 @@ void CRequestManager::SendRequests()
         for (auto iter : mapBatchBlockRequests)
         {
             LEAVE_CRITICAL_SECTION(cs_objDownloader);
-            iter.first->PushMessage(NetMsgType::GETDATA, iter.second);
             {
                 LOCK(cs_main);
                 for (auto &inv : iter.second)
@@ -633,6 +632,7 @@ void CRequestManager::SendRequests()
                     MarkBlockAsInFlight(iter.first->GetId(), inv.hash, Params().GetConsensus());
                 }
             }
+            iter.first->PushMessage(NetMsgType::GETDATA, iter.second);
             ENTER_CRITICAL_SECTION(cs_objDownloader);
             LOG(REQ, "Sent batched rqst with %d blocks to node %s\n", iter.second.size(), iter.first->GetLogName());
         }
