@@ -57,7 +57,7 @@ extern bool CanDirectFetch(const Consensus::Params &consensusParams);
 extern void MarkBlockAsInFlight(NodeId nodeid,
     const uint256 &hash,
     const Consensus::Params &consensusParams,
-    CBlockIndex *pindex = NULL);
+    CBlockIndex *pindex = nullptr);
 // note mark block as in flight is redundant with the request manager now...
 
 CRequestManager::CRequestManager()
@@ -336,6 +336,7 @@ CNodeRequestData::CNodeRequestData(CNode *n)
     desirability -= latency;
 }
 
+// requires cs_objDownloader
 bool CUnknownObj::AddSource(CNode *from)
 {
     // node is not in the request list
@@ -517,33 +518,18 @@ void CRequestManager::SendRequests()
             {
                 CNodeRequestData next;
                 // Go thru the availableFrom list, looking for the first node that isn't disconnected
-                while (!item.availableFrom.empty() && (next.node == NULL))
+                while (!item.availableFrom.empty() && (next.node == nullptr))
                 {
                     next = item.availableFrom.front(); // Grab the next location where we can find this object.
                     item.availableFrom.pop_front();
-                    if (next.node != NULL)
+                    if (next.node != nullptr)
                     {
-                        // Do not request from this node if it was disconnected or the node pingtime is far beyond
-                        // acceptable during initial block download.
-                        // We only check pingtime during IBD because we don't want to lock vNodes too often and when the
-                        // chain is syncd, waiting
-                        // just 5 seconds for a timeout is not an issue, however waiting for a slow node during IBD can
-                        // really slow down the process.
-                        //   TODO: Eventually when we move away from vNodes or have a different mechanism for tracking
-                        //   ping times we can include
-                        //   this filtering in all our requests for blocks and transactions.
-                        bool release = false;
-                        std::string reason;
+                        // Do not request from this node if it was disconnected
                         if (next.node->fDisconnect)
                         {
-                            reason = "on disconnect";
-                            release = true;
-                        }
-                        if (release)
-                        {
                             LOCK(cs_vNodes);
-                            LOG(REQ, "ReqMgr: %s removed block ref to %s count %d (%s).\n", item.obj.ToString(),
-                                next.node->GetLogName(), next.node->GetRefCount(), reason);
+                            LOG(REQ, "ReqMgr: %s removed block ref to %s count %d (on disconnect).\n",
+                                item.obj.ToString(), next.node->GetLogName(), next.node->GetRefCount());
                             next.node->Release();
                             next.node = nullptr; // force the loop to get another node
                         }
@@ -566,6 +552,8 @@ void CRequestManager::SendRequests()
                     if (fBatchBlockRequests)
                     {
                         mapBatchBlockRequests[next.node].push_back(obj);
+                        LOCK(cs_vNodes);
+                        next.node->AddRef();
                     }
                     else
                     {
@@ -596,19 +584,11 @@ void CRequestManager::SendRequests()
 
                     // Instead we'll forget about it -- the node is already popped of of the available list so now we'll
                     // release our reference.
-                    if (!fBatchBlockRequests)
-                    {
-                        LOCK(cs_vNodes);
-                        // LOG(REQ, "ReqMgr: %s removed block ref to %d count %d\n", obj.ToString(),
-                        //     next.node->GetId(), next.node->GetRefCount());
-                        next.node->Release();
-                        next.node = nullptr;
-                    }
-                    else
-                    {
-                        // we won't release it until we send the batch requests
-                        next.node = nullptr;
-                    }
+                    LOCK(cs_vNodes);
+                    // LOG(REQ, "ReqMgr: %s removed block ref to %d count %d\n", obj.ToString(),
+                    //     next.node->GetId(), next.node->GetRefCount());
+                    next.node->Release();
+                    next.node = nullptr;
                 }
                 else
                 {
@@ -648,6 +628,7 @@ void CRequestManager::SendRequests()
         {
             iter.first->Release();
         }
+        mapBatchBlockRequests.clear();
     }
 
     // Get Transactions
@@ -689,11 +670,11 @@ void CRequestManager::SendRequests()
                 {
                     CNodeRequestData next;
                     // Go thru the availableFrom list, looking for the first node that isn't disconnected
-                    while (!item.availableFrom.empty() && (next.node == NULL))
+                    while (!item.availableFrom.empty() && (next.node == nullptr))
                     {
                         next = item.availableFrom.front(); // Grab the next location where we can find this object.
                         item.availableFrom.pop_front();
-                        if (next.node != NULL)
+                        if (next.node != nullptr)
                         {
                             if (next.node->fDisconnect) // Node was disconnected so we can't request from it
                             {
@@ -701,12 +682,12 @@ void CRequestManager::SendRequests()
                                 LOG(REQ, "ReqMgr: %s removed tx ref to %d count %d (on disconnect).\n",
                                     item.obj.ToString(), next.node->GetId(), next.node->GetRefCount());
                                 next.node->Release();
-                                next.node = NULL; // force the loop to get another node
+                                next.node = nullptr; // force the loop to get another node
                             }
                         }
                     }
 
-                    if (next.node != NULL)
+                    if (next.node != nullptr)
                     {
                         CInv obj = item.obj;
                         if (1)
@@ -727,7 +708,7 @@ void CRequestManager::SendRequests()
                             LOG(REQ, "ReqMgr: %s removed tx ref to %d count %d\n", obj.ToString(), next.node->GetId(),
                                 next.node->GetRefCount());
                             next.node->Release();
-                            next.node = NULL;
+                            next.node = nullptr;
                         }
                         inFlight++;
                         inFlightTxns << inFlight;
