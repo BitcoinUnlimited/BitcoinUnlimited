@@ -267,7 +267,7 @@ class ComparisonTestFramework(BitcoinTestFramework):
 
     def setup_chain(self,bitcoinConfDict=None, wallets=None):  # BU add config params
         print("Initializing test directory ", self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir, self.num_nodes,bitcoinConfDict, wallets, self.bins)
+        initialize_chain_clean(self.options.tmpdir, self.num_nodes,bitcoinConfDict, wallets)
 
     def setup_network(self):
         self.nodes = start_nodes(
