@@ -159,6 +159,22 @@ extern const char *GET_XBLOCKTX;
  * BUIP010 Xtreme Thinblocks: The get_xthin message transmits a single serialized get_xthin.
  */
 extern const char *GET_XTHIN;
+/**
+ * BUIPXXX Graphene: The grapheneblock message transmits a single serialized graphene block.
+ */
+extern const char *GRAPHENEBLOCK;
+/**
+ * BUIPXXX Graphene: The graphenetx message transmits a single serialized grblktx.
+ */
+extern const char *GRAPHENETX;
+/**
+ * BUIPXXX Graphene: The get_graphenetx message transmits a single serialized get_grblktx.
+ */
+extern const char *GET_GRAPHENETX;
+/**
+ * BUIPXXX Graphene: The get_graphene message transmits a single serialized get_grblk.
+ */
+extern const char *GET_GRAPHENE;
 
 /**
  * The getaddr message requests an addr message from the receiving node,
@@ -316,6 +332,14 @@ enum
     // collisions and other cases where nodes may be advertising a service they
     // do not actually support. Other service bits should be allocated via the
     // BIP process.
+
+    // BUIPXXX - Graphene blocks - begin section
+    // NODE_GRAPHENE means the node supports Graphene blocks
+    // If this is turned off then the node will not service graphene requests nor
+    // make graphene requests
+    NODE_GRAPHENE = (1 << 6),
+    // BUIPXXX - Graphene blocks - end section
+
 };
 
 /** A CService with information about it as peer */
@@ -394,6 +418,10 @@ enum
     // BUIP010 Xtreme Thinblocks: an Xtreme thin block contains the first 8 bytes of all the tx hashes
     // and also provides the missing transactions that are needed at the other end to reconstruct the block
     MSG_XTHINBLOCK,
+    // BUIPXXX Graphene blocks: similar to xtreme thin blocks, a graphene block contains all the transactions
+    // hashes in a block and also provides the missing transaction ids that are needed at the other end to
+    // reconstruct the block
+    MSG_GRAPHENEBLOCK,
 };
 
 #endif // BITCOIN_PROTOCOL_H

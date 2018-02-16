@@ -303,6 +303,9 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
             _("Connect to a thinblock node(s). Blocks will only be downloaded from a thinblock peer.  If no "
               "connections "
               "are possible then regular blocks will then be downloaded form any other connected peers"))
+        .addArg("connect-grapheneblock=<ip:port>", requiredStr,
+            _("Connect to graphene node(s). Blocks will only be downloaded from a graphene capable peer.  If no "
+              "connections are possible then regular blocks will then be downloaded form any other connected peers"))
         .addArg("discover", optionalBool,
             _("Discover own IP addresses (default: 1 when listening and no -externalip or -proxy)"))
         .addArg("dns", optionalBool, _("Allow DNS lookups for -addnode, -seednode and -connect") + " " +
@@ -331,6 +334,9 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
         .addArg("min-xthin-nodes=<n>", requiredInt,
             strprintf(_("Minimum number of xthin nodes to automatically find and connect (default: %d)"),
                     MIN_XTHIN_NODES))
+        .addArg("min-graphene-nodes=<n>", requiredInt,
+            strprintf(_("Minimum number of graphene nodes to automatically find and connect (default: %d)"),
+                    MIN_GRAPHENE_NODES))
         .addArg("onion=<ip:port>", requiredStr,
             strprintf(_("Use separate SOCKS5 proxy to reach peers via Tor hidden services (default: %s)"), "-proxy"))
         .addArg("onlynet=<net>", requiredStr, _("Only connect to nodes in network <net> (ipv4, ipv6 or onion)"))
@@ -461,7 +467,8 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
 {
     std::string debugCategories = "addrman, bench, blk, bloom, coindb, db, estimatefee, evict, http, lck, "
                                   "libevent, mempool, mempoolrej, miner, net, parallel, partitioncheck, "
-                                  "proxy, prune, rand, reindex, req, rpc, selectcoins, thin, tor, wallet, zmq";
+                                  "proxy, prune, rand, reindex, req, rpc, selectcoins, thin, tor, wallet, zmq"
+                                  "graphene";
     if (mode == HMM_BITCOIN_QT)
         debugCategories += ", qt";
 
@@ -600,7 +607,8 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
                     SMALLEST_MAX_BLOOM_FILTER_SIZE))
         .addArg("use-bloom-filter-targeting", optionalBool,
             _("Enable thin block bloom filter targeting which helps to keep the size of bloom filters to a minumum "
-              "although it can impact performance. (default: 0)"));
+              "although it can impact performance. (default: 0)"))
+        .addArg("use-grapheneblocks", optionalBool, _("Enable graphene to speed up the relay of blocks (default: 1)"));
 }
 
 static void addBlockCreationOptions(AllowedArgs &allowedArgs)

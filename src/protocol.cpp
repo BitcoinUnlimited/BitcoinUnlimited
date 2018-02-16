@@ -44,6 +44,12 @@ const char *XBLOCKTX = "xblocktx";
 const char *GET_XBLOCKTX = "get_xblocktx";
 const char *GET_XTHIN = "get_xthin";
 // BUIP010 Xtreme Thinblocks - end section
+// BUIPXXX Graphene - begin section
+const char *GRAPHENEBLOCK = "grblk";
+const char *GRAPHENETX = "grblktx";
+const char *GET_GRAPHENETX = "get_grblktx";
+const char *GET_GRAPHENE = "get_grblk";
+// BUIPXXX Graphene - end section
 const char *XPEDITEDREQUEST = "req_xpedited";
 const char *XPEDITEDBLK = "Xb";
 const char *XPEDITEDTxn = "Xt";

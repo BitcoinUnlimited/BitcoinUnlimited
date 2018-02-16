@@ -16,6 +16,7 @@
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "dosman.h"
+#include "graphene.h"
 #include "leakybucket.h"
 #include "main.h"
 #include "miner.h"
@@ -273,6 +274,7 @@ CCriticalSection cs_blockvalidationtime;
 CStatHistory<uint64_t> nBlockValidationTime("blockValidationTime", STAT_OP_MAX | STAT_INDIVIDUAL);
 
 CThinBlockData thindata; // Singleton class
+CGrapheneBlockData graphenedata; // Singleton class
 
 uint256 bitcoinCashForkBlockHash = uint256S("000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec");
 

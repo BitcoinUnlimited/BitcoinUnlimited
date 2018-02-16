@@ -12,6 +12,7 @@
 #include "compat.h"
 #include "fs.h"
 #include "hash.h"
+#include "iblt.h"
 #include "limitedmap.h"
 #include "netbase.h"
 #include "primitives/block.h"
@@ -82,6 +83,8 @@ static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
 static const unsigned int DEFAULT_MAX_OUTBOUND_CONNECTIONS = 16;
 /** BU: The minimum number of xthin nodes to connect */
 static const uint8_t MIN_XTHIN_NODES = 8;
+/** BU: The minimum number of graphene nodes to connect */
+static const uint8_t MIN_GRAPHENE_NODES = 8;
 /** BU: The daily maximum disconnects while searching for xthin nodes to connect */
 static const unsigned int MAX_DISCONNECTS = 200;
 /** The default for -maxuploadtarget. 0 = Unlimited */
@@ -307,6 +310,18 @@ public:
         }
     };
 
+    struct CGrapheneBlockInFlight
+    {
+        int64_t nRequestTime;
+        bool fReceived;
+
+        CGrapheneBlockInFlight()
+        {
+            nRequestTime = GetTime();
+            fReceived = false;
+        }
+    };
+
     // socket
     uint64_t nServices;
     SOCKET hSocket;
@@ -391,6 +406,27 @@ public:
     uint64_t nGetXthinLastTime; // The last time a get_xthin request was made
     uint32_t nXthinBloomfilterSize; // The maximum xthin bloom filter size (in bytes) that our peer will accept.
     // BUIP010 Xtreme Thinblocks: end section
+
+    // BUIPXXX Graphene blocks: begin section
+    CCriticalSection cs_mempoolsize;
+    CBlock grapheneBlock;
+    int64_t nGrapheneMemPoolTx;
+    std::vector<uint256> grapheneBlockHashes;
+    std::map<uint64_t, uint32_t> grapheneMapHashOrderIndex;
+    unsigned char grapheneTxOrderSeed;
+    std::map<uint64_t, CTransaction> mapGrapheneMissingTx;
+    uint64_t nLocalGrapheneBlockBytes; // the bytes used in creating this graphene block, updated dynamically
+    int nSizeGrapheneBlock; // Original on-wire size of the block. Just used for reporting
+    int grapheneBlockWaitingForTxns; // if -1 then not currently waiting
+    CCriticalSection cs_mapgrapheneblocksinflight; // lock mapGraheneBlocksInFlight
+    std::map<uint256, CGrapheneBlockInFlight>
+        mapGrapheneBlocksInFlight; // graphene blocks in flight and the time requested.
+    double nGetGrapheneBlockTxCount; // Count how many get_xblocktx requests are made
+    uint64_t nGetGrapheneBlockTxLastTime; // The last time a get_xblocktx request was made
+    double nGetGrapheneCount; // Count how many get_graphene requests are made
+    uint64_t nGetGrapheneLastTime; // The last time a get_graphene request was made
+    uint32_t nGrapheneBloomfilterSize; // The maximum graphene bloom filter size (in bytes) that our peer will accept.
+    // BUIPXXX Graphene blocks: end section
 
     CCriticalSection cs_nAvgBlkResponseTime;
     double nAvgBlkResponseTime;
@@ -532,6 +568,15 @@ public:
     }
 
     void AddAddressKnown(const CAddress &_addr) { addrKnown.insert(_addr.GetKey()); }
+    // BUIPXXX:
+    bool GrapheneCapable()
+    {
+        if (nServices & NODE_GRAPHENE)
+            return true;
+        return false;
+    }
+
+    void AddAddressKnown(const CAddress &addr) { addrKnown.insert(addr.GetKey()); }
     void PushAddress(const CAddress &_addr, FastRandomContext &insecure_rand)
     {
         // Known checking here is only to save space from duplicates.

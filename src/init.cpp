@@ -826,6 +826,11 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         nLocalServices |= NODE_XTHIN;
     // BUIP010 Xtreme Thinblocks: end section
 
+    // BUIPXXX Graphene Blocks: begin section initialize Graphene service
+    if (GetBoolArg("-use-grapheneblocks", true))
+        nLocalServices |= NODE_GRAPHENE;
+    // BUIPXXX Graphene Blocks: end section
+
     // UAHF - BitcoinCash service bit
     nLocalServices |= NODE_BITCOIN_CASH;
 

@@ -8,6 +8,7 @@
 #include "chainparams.h"
 #include "clientversion.h"
 #include "dosman.h"
+#include "graphene.h"
 #include "main.h"
 #include "net.h"
 #include "netbase.h"
@@ -462,6 +463,28 @@ static UniValue GetThinBlockStats()
 }
 // BitcoinUnlimited BUIP010 : End
 
+// BitcoinUnlimited BUIPXXX : Start
+static UniValue GetGrapheneStats()
+{
+    UniValue obj(UniValue::VOBJ);
+    bool enabled = IsGrapheneBlockEnabled();
+    obj.push_back(Pair("enabled", enabled));
+    if (enabled)
+    {
+        obj.push_back(Pair("summary", graphenedata.ToString()));
+        obj.push_back(Pair("mempool_limiter", graphenedata.MempoolLimiterBytesSavedToString()));
+        obj.push_back(Pair("inbound_percent", graphenedata.InBoundPercentToString()));
+        obj.push_back(Pair("outbound_percent", graphenedata.OutBoundPercentToString()));
+        obj.push_back(Pair("response_time", graphenedata.ResponseTimeToString()));
+        obj.push_back(Pair("validation_time", graphenedata.ValidationTimeToString()));
+        obj.push_back(Pair("outbound_bloom_filters", graphenedata.OutBoundMemPoolInfoToString()));
+        obj.push_back(Pair("inbound_bloom_filters", graphenedata.InBoundMemPoolInfoToString()));
+        obj.push_back(Pair("rerequested", graphenedata.ReRequestedTxToString()));
+    }
+    return obj;
+}
+// BitcoinUnlimited BUIPXXX : End
+
 UniValue getnetworkinfo(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -531,6 +554,9 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
     // BitcoinUnlimited BUIP010: Start
     obj.push_back(Pair("thinblockstats", GetThinBlockStats()));
     // BitcoinUnlimited BUIP010: End
+    //// BitcoinUnlimited BUIPXXX: Start
+    obj.push_back(Pair("grapheneblockstats", GetGrapheneStats()));
+    // BitcoinUnlimited BUIPXXX: End
     obj.push_back(Pair("warnings", GetWarnings("statusbar")));
     return obj;
 }

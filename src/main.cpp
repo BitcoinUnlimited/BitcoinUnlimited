@@ -18,6 +18,7 @@
 #include "consensus/validation.h"
 #include "dosman.h"
 #include "expedited.h"
+#include "graphene.h"
 #include "hash.h"
 #include "init.h"
 #include "merkleblock.h"
@@ -5092,7 +5093,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
 
             // BUIP010 Xtreme Thinblocks: if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
             if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK ||
-                inv.type == MSG_XTHINBLOCK)
+                inv.type == MSG_XTHINBLOCK || inv.type == MSG_GRAPHENEBLOCK)
             {
                 bool send = false;
                 BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
@@ -5173,6 +5174,14 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                             SendXThinBlock(MakeBlockRef(block), pfrom, inv);
                         }
                         // BUIP010 Xtreme Thinblocks: end section
+
+                        // BUIPXXX Graphene blocks: begin section
+                        else if (inv.type == MSG_GRAPHENEBLOCK)
+                        {
+                            LOG(GRAPHENE, "Sending graphene block by INV queue getdata message\n");
+                            SendGrapheneBlock(MakeBlockRef(block), pfrom, inv);
+                        }
+                        // BUIPXXX Graphene blocks: end section
 
                         else // MSG_FILTERED_BLOCK)
                         {
@@ -6475,6 +6484,33 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         return CXThinBlockTx::HandleMessage(vRecv, pfrom);
     }
     // BUIP010 Xtreme Thinblocks: end section
+
+    // BUIPXXX Graphene blocks: begin section
+    else if (strCommand == NetMsgType::GET_GRAPHENE && !fImporting && !fReindex && IsGrapheneBlockEnabled())
+    {
+        return HandleGrapheneBlockRequest(vRecv, pfrom, chainparams);
+    }
+
+    else if (strCommand == NetMsgType::GRAPHENEBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
+             IsGrapheneBlockEnabled())
+    {
+        return CGrapheneBlock::HandleMessage(vRecv, pfrom, strCommand, 0);
+    }
+
+
+    else if (strCommand == NetMsgType::GET_GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
+             IsGrapheneBlockEnabled())
+    {
+        return CRequestGrapheneBlockTx::HandleMessage(vRecv, pfrom);
+    }
+
+
+    else if (strCommand == NetMsgType::GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
+             IsGrapheneBlockEnabled())
+    {
+        return CGrapheneBlockTx::HandleMessage(vRecv, pfrom);
+    }
+    // BUIPXXX Graphene blocks: end section
 
 
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) // Ignore blocks received while importing

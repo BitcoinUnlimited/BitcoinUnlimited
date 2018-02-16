@@ -127,8 +127,10 @@ BITCOIN_CORE_H = \
   expedited.h \
   forks_csv.h \
   fs.h \
+  graphene.h \
   httprpc.h \
   httpserver.h \
+  iblt.h \
   init.h \
   key.h \
   keystore.h \
@@ -219,8 +221,10 @@ libbitcoin_server_a_SOURCES = \
   dosman.cpp \
   expedited.cpp \
   forks_csv.cpp \
+  graphene.cpp \
   httprpc.cpp \
   httpserver.cpp \
+  iblt.cpp \
   init.cpp \
   dbwrapper.cpp \
   main.cpp \

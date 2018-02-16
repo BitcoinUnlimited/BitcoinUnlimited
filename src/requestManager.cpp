@@ -8,6 +8,7 @@
 #include "consensus/consensus.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
+#include "graphene.h"
 #include "leakybucket.h"
 #include "main.h"
 #include "net.h"
@@ -428,10 +429,10 @@ bool CUnknownObj::AddSource(CNode *from)
 
 bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
 {
-    // BUIP010 Xtreme Thinblocks: begin section
     CInv inv2(obj);
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     CBloomFilter filterMemPool;
+    // BUIP010 Xtreme Thinblocks: begin section
     if (IsThinBlocksEnabled() && IsChainNearlySyncd())
     {
         if (HaveConnectThinblockNodes() || (HaveThinblockNodes() && thindata.CheckThinblockTimer(obj.hash)))
@@ -491,6 +492,73 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
             return true;
         }
     }
+    // BUIP010 Xtreme Thinblocks: end section
+    // BUIPXXX Graphene blocks: begin section
+    else if (IsGrapheneBlockEnabled() && IsChainNearlySyncd())
+    {
+        if (HaveConnectGrapheneNodes() || (HaveGrapheneNodes() && graphenedata.CheckGrapheneBlockTimer(obj.hash)))
+        {
+            // Must download a graphene block from a graphene enabled peer.
+            // We can only request one graphene block per peer at a time.
+            if (pfrom->mapGrapheneBlocksInFlight.size() < 1 && CanGrapheneBlockBeDownloaded(pfrom))
+            {
+                AddGrapheneBlockInFlight(pfrom, inv2.hash);
+
+                inv2.type = MSG_GRAPHENEBLOCK;
+                std::vector<uint256> vOrphanHashes;
+                {
+                    LOCK(orphanpool.cs);
+                    for (auto &mi : orphanpool.mapOrphanTransactions)
+                        vOrphanHashes.emplace_back(mi.first);
+                }
+                // Instead of building a bloom filter here, we actually just need to fill in CMempoolInfo
+                CMemPoolInfo receiverMemPoolInfo = GetGrapheneMempoolInfo();
+                ss << inv2;
+                ss << receiverMemPoolInfo;
+                graphenedata.UpdateOutBoundMemPoolInfo(
+                    ::GetSerializeSize(receiverMemPoolInfo, SER_NETWORK, PROTOCOL_VERSION));
+                MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
+                pfrom->PushMessage(NetMsgType::GET_GRAPHENE, ss);
+                LOG(GRAPHENE, "Requesting graphene block %s from peer %s (%d)\n", inv2.hash.ToString(),
+                    pfrom->addrName.c_str(), pfrom->id);
+                return true;
+            }
+        }
+        else
+        {
+            // Try to download a graphene block if possible otherwise just download a regular block.
+            // We can only request one graphene block per peer at a time.
+            MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
+            if (pfrom->mapGrapheneBlocksInFlight.size() < 1 && CanGrapheneBlockBeDownloaded(pfrom))
+            {
+                AddGrapheneBlockInFlight(pfrom, inv2.hash);
+
+                inv2.type = MSG_GRAPHENEBLOCK;
+                std::vector<uint256> vOrphanHashes;
+                {
+                    LOCK(orphanpool.cs);
+                    for (auto &mi : orphanpool.mapOrphanTransactions)
+                        vOrphanHashes.emplace_back(mi.first);
+                }
+                ss << inv2;
+                ss << GetGrapheneMempoolInfo();
+                pfrom->PushMessage(NetMsgType::GET_GRAPHENE, ss);
+                LOG(GRAPHENE, "Requesting graphene block %s from peer %s (%d)\n", inv2.hash.ToString(),
+                    pfrom->addrName.c_str(), pfrom->id);
+            }
+            else
+            {
+                LOG(GRAPHENE, "Requesting regular block %s from peer %s (%d)\n", inv2.hash.ToString(),
+                    pfrom->addrName.c_str(), pfrom->id);
+                std::vector<CInv> vToFetch;
+                inv2.type = MSG_BLOCK;
+                vToFetch.push_back(inv2);
+                pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
+            }
+            return true;
+        }
+    }
+    // BUIPXXX Graphene blocks: end section
     else
     {
         std::vector<CInv> vToFetch;
@@ -502,7 +570,6 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         return true;
     }
     return false; // no block was requested
-    // BUIP010 Xtreme Thinblocks: end section
 }
 
 void CRequestManager::ResetLastRequestTime(const uint256 &hash)
