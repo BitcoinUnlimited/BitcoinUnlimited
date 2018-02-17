@@ -159,7 +159,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
     }
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
-    BOOST_FOREACH (const CTransaction tx, vMissingTx)
+    for (const CTransaction tx : vMissingTx)
         pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
 
     {
@@ -338,7 +338,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
-    BOOST_FOREACH (const CTransaction tx, thinBlockTx.vMissingTx)
+    for (const CTransaction tx : thinBlockTx.vMissingTx)
         pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
 
     // Get the full hashes from the xblocktx and add them to the thinBlockHashes vector.  These should
@@ -689,7 +689,7 @@ bool CXThinBlock::process(CNode *pfrom,
     thindata.AddThinBlockBytes(vTxHashes.size() * sizeof(uint64_t), pfrom); // start counting bytes
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
-    BOOST_FOREACH (const CTransaction tx, vMissingTx)
+    for (const CTransaction tx : vMissingTx)
         pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
@@ -748,7 +748,7 @@ bool CXThinBlock::process(CNode *pfrom,
         {
             // Start gathering the full tx hashes. If some are not available then add them to setHashesToRequest.
             uint256 nullhash;
-            BOOST_FOREACH (const uint64_t &cheapHash, vTxHashes)
+            for (const uint64_t &cheapHash : vTxHashes)
             {
                 if (mapPartialTxHash.find(cheapHash) != mapPartialTxHash.end())
                     pfrom->thinBlockHashes.push_back(mapPartialTxHash[cheapHash]);
@@ -871,7 +871,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
 
     // Look for each transaction in our various pools and buffers.
     // With xThinBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
-    BOOST_FOREACH (const uint256 hash, pfrom->thinBlockHashes)
+    for (const uint256 hash : pfrom->thinBlockHashes)
     {
         // Replace the truncated hash with the full hash value if it exists
         CTransaction tx;
@@ -1342,7 +1342,7 @@ bool HaveConnectThinblockNodes()
     vector<string> vNodesIP;
     {
         LOCK(cs_vNodes);
-        BOOST_FOREACH (CNode *pnode, vNodes)
+        for (CNode *pnode : vNodes)
         {
             int pos = pnode->addrName.rfind(":");
             if (pos <= 0)
@@ -1361,7 +1361,7 @@ bool HaveConnectThinblockNodes()
     set<string> nNotCrossConnected;
 
     int nConnectionsOpen = 0;
-    BOOST_FOREACH (const string &strAddrNode, mapMultiArgs["-connect-thinblock"])
+    for (const string &strAddrNode : mapMultiArgs["-connect-thinblock"])
     {
         string strThinblockNode;
         int pos = strAddrNode.rfind(":");
@@ -1369,7 +1369,7 @@ bool HaveConnectThinblockNodes()
             strThinblockNode = strAddrNode;
         else
             strThinblockNode = strAddrNode.substr(0, pos);
-        BOOST_FOREACH (string strAddr, vNodesIP)
+        for (string strAddr : vNodesIP)
         {
             if (strAddr == strThinblockNode)
             {
@@ -1394,7 +1394,7 @@ bool HaveThinblockNodes()
 {
     {
         LOCK(cs_vNodes);
-        BOOST_FOREACH (CNode *pnode, vNodes)
+        for (CNode *pnode : vNodes)
             if (pnode->ThinBlockCapable())
                 return true;
     }
@@ -1417,7 +1417,7 @@ bool CanThinBlockBeDownloaded(CNode *pto)
         // that has invoked -connect-thinblock.
 
         // Check if this node is also a connect-thinblock node
-        BOOST_FOREACH (const string &strAddrNode, mapMultiArgs["-connect-thinblock"])
+        for (const string &strAddrNode : mapMultiArgs["-connect-thinblock"])
             if (pto->addrName == strAddrNode)
                 return true;
     }
@@ -1429,7 +1429,7 @@ void ConnectToThinBlockNodes()
     // Connect to specific addresses
     if (mapArgs.count("-connect-thinblock") && mapMultiArgs["-connect-thinblock"].size() > 0)
     {
-        BOOST_FOREACH (const string &strAddr, mapMultiArgs["-connect-thinblock"])
+        for (const string &strAddr : mapMultiArgs["-connect-thinblock"])
         {
             CAddress addr;
             // NOTE: Because the only nodes we are connecting to here are the ones the user put in their
@@ -1446,7 +1446,7 @@ void CheckNodeSupportForThinBlocks()
     if (IsThinBlocksEnabled())
     {
         // Check that a nodes pointed to with connect-thinblock actually supports thinblocks
-        BOOST_FOREACH (string &strAddr, mapMultiArgs["-connect-thinblock"])
+        for (string &strAddr : mapMultiArgs["-connect-thinblock"])
         {
             CNodeRef node = FindNodeRef(strAddr);
             if (node && !node->ThinBlockCapable())
@@ -1463,7 +1463,7 @@ bool ClearLargestThinBlockAndDisconnect(CNode *pfrom)
 {
     CNode *pLargest = NULL;
     LOCK(cs_vNodes);
-    BOOST_FOREACH (CNode *pnode, vNodes)
+    for (CNode *pnode : vNodes)
     {
         if ((pLargest == NULL) || (pnode->nLocalThinBlockBytes > pLargest->nLocalThinBlockBytes))
             pLargest = pnode;
@@ -1669,7 +1669,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
 
                 // Add children.  We don't need to look for parents here since they will all be parents.
                 iter = mempool.mapTx.project<0>(vPriority[i].second);
-                BOOST_FOREACH (CTxMemPool::txiter child, mempool.GetMemPoolChildren(iter))
+                for (CTxMemPool::txiter child : mempool.GetMemPoolChildren(iter))
                 {
                     uint256 childHash = child->GetTx().GetHash();
                     if (!setPriorityMemPoolHashes.count(childHash))
@@ -1715,7 +1715,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
 
                     // Add any parent tx's
                     bool fChild = false;
-                    BOOST_FOREACH (CTxMemPool::txiter parent, mempool.GetMemPoolParents(iter))
+                    for (CTxMemPool::txiter parent : mempool.GetMemPoolParents(iter))
                     {
                         fChild = true;
                         uint256 parentHash = parent->GetTx().GetHash();
@@ -1732,7 +1732,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
 
                     // Now add any children tx's.
                     bool fHasChildren = false;
-                    BOOST_FOREACH (CTxMemPool::txiter child, mempool.GetMemPoolChildren(iter))
+                    for (CTxMemPool::txiter child : mempool.GetMemPoolChildren(iter))
                     {
                         fHasChildren = true;
                         uint256 childHash = child->GetTx().GetHash();
@@ -1789,7 +1789,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
     // TODO: automatically calculate the nGrowthCoefficient from nHoursToGrow, nMinFalsePositve and nMaxFalsePositive
 
     // Count up all the transactions that we'll be putting into the filter, removing any duplicates
-    BOOST_FOREACH (uint256 txHash, setHighScoreMemPoolHashes)
+    for (uint256 txHash : setHighScoreMemPoolHashes)
         if (setPriorityMemPoolHashes.count(txHash))
             setPriorityMemPoolHashes.erase(txHash);
 
@@ -1816,11 +1816,11 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
         mempool.mapTx.size());
 
     // Add the selected tx hashes to the bloom filter
-    BOOST_FOREACH (uint256 txHash, setPriorityMemPoolHashes)
+    for (uint256 txHash : setPriorityMemPoolHashes)
         filterMemPool.insert(txHash);
-    BOOST_FOREACH (uint256 txHash, setHighScoreMemPoolHashes)
+    for (uint256 txHash : setHighScoreMemPoolHashes)
         filterMemPool.insert(txHash);
-    BOOST_FOREACH (uint256 txHash, vOrphanHashes)
+    for (uint256 txHash : vOrphanHashes)
         filterMemPool.insert(txHash);
     uint64_t nSizeFilter = ::GetSerializeSize(filterMemPool, SER_NETWORK, PROTOCOL_VERSION);
     LOG(THIN, "Created bloom filter: %d bytes for block: %s in:%d (ms)\n", nSizeFilter, hash.ToString(),
