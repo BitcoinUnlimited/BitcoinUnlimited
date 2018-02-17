@@ -1058,7 +1058,7 @@ string CThinBlockData::ToString()
     return ss.str();
 }
 
-// Calculate the xthin percentage compression over the last 24 hours
+// Calculate the xthin percentage compression over the last 24 hours for inbound blocks
 string CThinBlockData::InBoundPercentToString()
 {
     LOCK(cs_thinblockstats);
@@ -1093,7 +1093,7 @@ string CThinBlockData::InBoundPercentToString()
     return ss.str();
 }
 
-// Calculate the xthin percentage compression over the last 24 hours
+// Calculate the xthin percentage compression over the last 24 hours for outbound blocks
 string CThinBlockData::OutBoundPercentToString()
 {
     LOCK(cs_thinblockstats);
@@ -1145,7 +1145,7 @@ string CThinBlockData::OutBoundBloomFiltersToString()
     ss << "Outbound bloom filter size (last 24hrs) AVG: " << formatInfoUnit(avgBloomSize);
     return ss.str();
 }
-// Calculate the xthin percentage compression over the last 24 hours
+// Calculate the xthin average response time over the last 24 hours
 string CThinBlockData::ResponseTimeToString()
 {
     LOCK(cs_thinblockstats);
@@ -1180,7 +1180,7 @@ string CThinBlockData::ResponseTimeToString()
     return ss.str();
 }
 
-// Calculate the xthin percentage compression over the last 24 hours
+// Calculate the xthin average validation time over the last 24 hours
 string CThinBlockData::ValidationTimeToString()
 {
     LOCK(cs_thinblockstats);
@@ -1215,7 +1215,7 @@ string CThinBlockData::ValidationTimeToString()
     return ss.str();
 }
 
-// Calculate the xthin percentage compression over the last 24 hours
+// Calculate the xthin transaction re-request ratio and counter over the last 24 hours
 string CThinBlockData::ReRequestedTxToString()
 {
     LOCK(cs_thinblockstats);
