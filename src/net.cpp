@@ -2111,10 +2111,9 @@ void ThreadMessageHandler()
                 nLastRotation = GetTime();
             }
 
-            vNodesCopy.reserve(vNodes.size());
+            vNodesCopy = vNodes;
             for (CNode *pnode : vNodes)
             {
-                vNodesCopy.push_back(pnode);
                 pnode->AddRef();
             }
         }

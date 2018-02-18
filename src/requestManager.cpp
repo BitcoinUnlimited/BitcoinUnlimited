@@ -561,9 +561,11 @@ void CRequestManager::SendRequests()
 
                     if (fBatchBlockRequests)
                     {
+                        {
+                            LOCK(cs_vNodes);
+                            next.node->AddRef();
+                        }
                         mapBatchBlockRequests[next.node].push_back(obj);
-                        LOCK(cs_vNodes);
-                        next.node->AddRef();
                     }
                     else
                     {
