@@ -79,8 +79,8 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
     CDBBatch batch(db);
     size_t count = 0;
     size_t changed = 0;
-    size_t nBatchSize = 0;
     size_t nBatchWrites = 0;
+    size_t batch_size = nMaxDBBatchSize;
 
     for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();)
     {
@@ -121,12 +121,10 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
             // In order to prevent the spikes in memory usage that used to happen when we prepared large as
             // was possible, we instead break up the batches such that the performance gains for writing to
             // leveldb are still realized but the memory spikes are not seen.
-            nBatchSize += nUsage;
-            if (nBatchSize > nCoinCacheUsage * 0.01)
+            if (batch.SizeEstimate() > batch_size)
             {
                 db.WriteBatch(batch);
                 batch.Clear();
-                nBatchSize = 0;
                 nBatchWrites++;
             }
         }

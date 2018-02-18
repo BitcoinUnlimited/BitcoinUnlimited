@@ -32,6 +32,8 @@ static const int64_t nMinDbCache = 4;
 static const int64_t nDefaultPcntMemUnused = 10;
 //! max increase in cache size since the last time we did a full flush
 static const int64_t nMaxCacheIncreaseSinceLastFlush = 512 * 1000 * 1000;
+//! the max size a batch can get before a write to the utxo is made
+static const size_t nMaxDBBatchSize = 16 << 20;
 //! Max memory allocated to block tree DB specific cache, if no -txindex (MiB)
 static const int64_t nMaxBlockDBCache = 2;
 //! Max memory allocated to block tree DB specific cache, if -txindex (MiB)
