@@ -2099,6 +2099,18 @@ void ThreadMessageHandler()
         vector<CNode *> vNodesCopy;
         {
             LOCK(cs_vNodes);
+
+            // During IBD and because of the multithreading of PV we end up favoring the first peer that
+            // connected and end up downloading a disproportionate amount of data from that first peer.
+            // By rotating vNodes evertime we send messages we can alleviate this problem.
+            // Rotate every 60 seconds so we don't do this too often.
+            static int64_t nLastRotation = GetTime();
+            if (IsInitialBlockDownload() && vNodes.size() > 0 && GetTime() - nLastRotation > 60)
+            {
+                std::rotate(vNodes.begin(), vNodes.end() - 1, vNodes.end());
+                nLastRotation = GetTime();
+            }
+
             vNodesCopy.reserve(vNodes.size());
             for (CNode *pnode : vNodes)
             {
