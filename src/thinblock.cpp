@@ -573,7 +573,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         }
 
         CValidationState state;
-        CBlockIndex *pIndex = NULL;
+        CBlockIndex *pIndex = nullptr;
         if (!AcceptBlockHeader(thinBlock.header, state, Params(), &pIndex))
         {
             int nDoS;
@@ -1434,7 +1434,7 @@ void ConnectToThinBlockNodes()
             // NOTE: Because the only nodes we are connecting to here are the ones the user put in their
             //      bitcoin.conf/commandline args as "-connect-thinblock", we don't use the semaphore to limit outbound
             //      connections
-            OpenNetworkConnection(addr, false, NULL, strAddr.c_str());
+            OpenNetworkConnection(addr, false, nullptr, strAddr.c_str());
             MilliSleep(500);
         }
     }
@@ -1460,14 +1460,14 @@ void CheckNodeSupportForThinBlocks()
 
 bool ClearLargestThinBlockAndDisconnect(CNode *pfrom)
 {
-    CNode *pLargest = NULL;
+    CNode *pLargest = nullptr;
     LOCK(cs_vNodes);
     for (CNode *pnode : vNodes)
     {
-        if ((pLargest == NULL) || (pnode->nLocalThinBlockBytes > pLargest->nLocalThinBlockBytes))
+        if ((pLargest == nullptr) || (pnode->nLocalThinBlockBytes > pLargest->nLocalThinBlockBytes))
             pLargest = pnode;
     }
-    if (pLargest != NULL)
+    if (pLargest != nullptr)
     {
         thindata.ClearThinBlockData(pLargest, pLargest->thinBlock.GetBlockHeader().GetHash());
         pLargest->fDisconnect = true;
