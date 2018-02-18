@@ -215,7 +215,9 @@ std::string EntryDescriptionString()
            "    \"depends\" : [           (array) unconfirmed transactions used as inputs for this transaction\n"
            "        \"transactionid\",    (string) parent transaction id\n"
            "       ... ]\n"
-           "  }, ...\n";
+           "    \"spentby\" : [           (array) unconfirmed transactions spending outputs from this transaction\n"
+           "        \"transactionid\",    (string) child transaction id\n"
+           "       ... ]\n";
 }
 
 void entryToJSON(UniValue &info, const CTxMemPoolEntry &e)
@@ -248,8 +250,16 @@ void entryToJSON(UniValue &info, const CTxMemPoolEntry &e)
     {
         depends.push_back(dep);
     }
-
     info.push_back(Pair("depends", depends));
+
+    UniValue spent(UniValue::VARR);
+    const CTxMemPool::txiter &it = mempool.mapTx.find(tx.GetHash());
+    const CTxMemPool::setEntries &setChildren = mempool.GetMemPoolChildren(it);
+    for (const CTxMemPool::txiter &childiter : setChildren)
+    {
+        spent.push_back(childiter->GetTx().GetHash().ToString());
+    }
+    info.push_back(Pair("spentby", spent));
 }
 
 UniValue mempoolToJSON(bool fVerbose = false)
