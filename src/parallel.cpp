@@ -442,7 +442,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom,
     uint64_t nBlockSize = block->GetBlockSize();
 
     // NOTE: You must not have a cs_main lock before you aquire the semaphore grant or you can end up deadlocking
-    // AssertLockNotHeld(cs_main); TODO: need to create this
+    AssertLockNotHeld(cs_main);
 
     // Aquire semaphore grant
     if (IsChainNearlySyncd())
