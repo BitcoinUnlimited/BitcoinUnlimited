@@ -193,6 +193,16 @@ void Shutdown()
     RenameThread("bitcoin-shutoff");
     mempool.AddTransactionsUpdated(1);
 
+    {
+        LOCK(cs_main);
+        if (pcoinsTip != nullptr)
+        {
+            // Flush state and clear cache completely to release as much memory as possible before continuing.
+            FlushStateToDisk();
+            pcoinsTip->Clear();
+        }
+    }
+
     StopHTTPRPC();
     StopREST();
     StopRPC();
