@@ -147,6 +147,7 @@ CBlockTreeDB::CBlockTreeDB(size_t nCacheSize, bool fMemory, bool fWipe)
 {
 }
 
+size_t CCoinsViewDB::TotalWriteBufferSize() const { return db.TotalWriteBufferSize(); }
 bool CBlockTreeDB::ReadBlockFileInfo(int nFile, CBlockFileInfo &info)
 {
     return Read(make_pair(DB_BLOCK_FILES, nFile), info);
@@ -593,13 +594,20 @@ void AdjustCoinCacheSize()
     // based on current available memory.
     if (!GetArg("-dbcache", 0) && (nNow - nLastDbAdjustment) > 60000000)
     {
+        // The amount of system memory currently available
         int64_t nMemAvailable = GetAvailableMemory();
+        // The amount of memory we need to *keep* available.
         int64_t nUnusedMem = GetTotalSystemMemory() * nDefaultPcntMemUnused / 100;
 
-        // Reduce nCoinCacheUsage if mem available drop below 10%. We don't want to constantly be
-        // triggering a trim or flush every whenever the nMemAvailable crosses the threshold by just a
-        // few bytes, so we'll dampen the triggering of flushing/trimming only if the threshold is crossed by 5%.
-        if (nMemAvailable * 1.05 < nUnusedMem)
+        // Make sure we leave enough room for the leveldb write cache's
+        if (pcoinsdbview != nullptr && nUnusedMem < pcoinsdbview->TotalWriteBufferSize())
+        {
+            nUnusedMem = pcoinsdbview->TotalWriteBufferSize();
+        }
+
+        // Reduce nCoinCacheUsage if mem available gets near the threshold. We have to be more strict about flushing
+        // if we're running low on mem because on marginal systems with smaller RAM we have very little wiggle room.
+        if (nMemAvailable < nUnusedMem * 1.05)
         {
             // Get the lowest possible default coins cache configuration possible and use this value as a limiter
             // to prevent the nCoinCacheUsage from falling below this value.
@@ -613,10 +621,10 @@ void AdjustCoinCacheSize()
             nLastMemAvailable = nMemAvailable;
         }
 
-        // Increase nCoinCacheUsage if mem available increases above 10%. We don't want to constantly be
+        // Increase nCoinCacheUsage if mem available increases. We don't want to constantly be
         // triggering an increase whenever the nMemAvailable crosses the threshold by just a
         // few bytes, so we'll dampen the increases by triggering only when the threshold is crossed by 5%.
-        else if (nLastMemAvailable && nMemAvailable * 0.95 >= nLastMemAvailable)
+        else if (nLastMemAvailable > 0 && nMemAvailable * 0.95 >= nLastMemAvailable)
         {
             // find the max coins cache possible for this configuration.  Use the max int possible for total cache
             // size to ensure you receive the max cache size possible.

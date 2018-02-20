@@ -115,6 +115,9 @@ public:
     //! Attempt to update from an older database format. Returns whether an error occurred.
     bool Upgrade();
     size_t EstimateSize() const override;
+
+    //! Return the current memory allocated for the write buffers
+    size_t TotalWriteBufferSize() const;
 };
 
 /** Specialization of CCoinsViewCursor to iterate over a CCoinsViewDB */
