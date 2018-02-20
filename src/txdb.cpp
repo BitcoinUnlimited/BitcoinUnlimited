@@ -577,6 +577,18 @@ void CacheSizeCalculations(int64_t _nTotalCache,
 
 void AdjustCoinCacheSize()
 {
+    // If the operator has not set a dbcache and initial sync is complete then revert back to the default
+    // value for dbcache. This will cause the current coins cache to be immediately trimmed to size.
+    if (IsChainNearlySyncd() && !GetArg("-dbcache", 0))
+    {
+        // Get the default value for nCoinCacheUsage.
+        int64_t dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
+        CacheSizeCalculations(nDefaultDbCache, dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
+        nCoinCacheUsage = nMaxCoinCache;
+
+        return;
+    }
+
 #ifdef WIN32
     static int64_t nLastDbAdjustment = 0;
     int64_t nNow = GetTimeMicros();
