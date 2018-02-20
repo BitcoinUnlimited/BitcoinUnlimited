@@ -470,3 +470,251 @@ GUI
   - *Rationale*: Model classes pass through events and data from the core, they
     should not interact with the user. That's where View classes come in. The converse also
     holds: try to not directly access core data structures from Views.
+
+Subtrees
+----------
+
+Several parts of the repository are subtrees of software maintained elsewhere.
+
+Some of these are maintained by active developers of Bitcoin Core, in which case changes should probably go
+directly upstream without being PRed directly against the project.  They will be merged back in the next
+subtree merge.
+
+Others are external projects without a tight relationship with our project.  Changes to these should also
+be sent upstream but bugfixes may also be prudent to PR against Bitcoin Core so that they can be integrated
+quickly.  Cosmetic changes should be purely taken upstream.
+
+There is a tool in contrib/devtools/git-subtree-check.sh to check a subtree directory for consistency with
+its upstream repository.
+
+Current subtrees include:
+
+- src/leveldb
+  - Upstream at https://github.com/google/leveldb ; Maintained by Google, but
+    open important PRs to Core to avoid delay.
+  - **Note**: Follow the instructions in [Upgrading LevelDB](#upgrading-leveldb) when
+    merging upstream changes to the leveldb subtree.
+
+- src/libsecp256k1
+  - Upstream at https://github.com/bitcoin-core/secp256k1/ ; actively maintaned by Core contributors.
+
+- src/crypto/ctaes
+  - Upstream at https://github.com/bitcoin-core/ctaes ; actively maintained by Core contributors.
+
+- src/univalue
+  - Upstream at https://github.com/jgarzik/univalue ; report important PRs to Core to avoid delay.
+
+Upgrading LevelDB
+---------------------
+
+Extra care must be taken when upgrading LevelDB. This section explains issues
+you must be aware of.
+
+### File Descriptor Counts
+
+In most configurations we use the default LevelDB value for `max_open_files`,
+which is 1000 at the time of this writing. If LevelDB actually uses this many
+file descriptors it will cause problems with Bitcoin's `select()` loop, because
+it may cause new sockets to be created where the fd value is >= 1024. For this
+reason, on 64-bit Unix systems we rely on an internal LevelDB optimization that
+uses `mmap()` + `close()` to open table files without actually retaining
+references to the table file descriptors. If you are upgrading LevelDB, you must
+sanity check the changes to make sure that this assumption remains valid.
+
+In addition to reviewing the upstream changes in `env_posix.cc`, you can use `lsof` to
+check this. For example, on Linux this command will show open `.ldb` file counts:
+
+```bash
+$ lsof -p $(pidof bitcoind) |\
+    awk 'BEGIN { fd=0; mem=0; } /ldb$/ { if ($4 == "mem") mem++; else fd++ } END { printf "mem = %s, fd = %s\n", mem, fd}'
+mem = 119, fd = 0
+```
+
+The `mem` value shows how many files are mmap'ed, and the `fd` value shows you
+many file descriptors these files are using. You should check that `fd` is a
+small number (usually 0 on 64-bit hosts).
+
+See the notes in the `SetMaxOpenFiles()` function in `dbwrapper.cc` for more
+details.
+
+### Consensus Compatibility
+
+It is possible for LevelDB changes to inadvertently change consensus
+compatibility between nodes. This happened in Bitcoin 0.8 (when LevelDB was
+first introduced). When upgrading LevelDB you should review the upstream changes
+to check for issues affecting consensus compatibility.
+
+For example, if LevelDB had a bug that accidentally prevented a key from being
+returned in an edge case, and that bug was fixed upstream, the bug "fix" would
+be an incompatible consensus change. In this situation the correct behavior
+would be to revert the upstream fix before applying the updates to Bitcoin's
+copy of LevelDB. In general you should be wary of any upstream changes affecting
+what data is returned from LevelDB queries.
+
+Git and GitHub tips
+---------------------
+
+- For resolving merge/rebase conflicts, it can be useful to enable diff3 style using
+  `git config merge.conflictstyle diff3`. Instead of
+
+        <<<
+        yours
+        ===
+        theirs
+        >>>
+
+  you will see
+
+        <<<
+        yours
+        |||
+        original
+        ===
+        theirs
+        >>>
+
+  This may make it much clearer what caused the conflict. In this style, you can often just look
+  at what changed between *original* and *theirs*, and mechanically apply that to *yours* (or the other way around).
+
+- When reviewing patches which change indentation in C++ files, use `git diff -w` and `git show -w`. This makes
+  the diff algorithm ignore whitespace changes. This feature is also available on github.com, by adding `?w=1`
+  at the end of any URL which shows a diff.
+
+- When reviewing patches that change symbol names in many places, use `git diff --word-diff`. This will instead
+  of showing the patch as deleted/added *lines*, show deleted/added *words*.
+
+- When reviewing patches that move code around, try using
+  `git diff --patience commit~:old/file.cpp commit:new/file/name.cpp`, and ignoring everything except the
+  moved body of code which should show up as neither `+` or `-` lines. In case it was not a pure move, this may
+  even work when combined with the `-w` or `--word-diff` options described above.
+
+- When looking at other's pull requests, it may make sense to add the following section to your `.git/config`
+  file:
+
+        [remote "upstream-pull"]
+                fetch = +refs/pull/*:refs/remotes/upstream-pull/*
+                url = git@github.com:bitcoin/bitcoin.git
+
+  This will add an `upstream-pull` remote to your git repository, which can be fetched using `git fetch --all`
+  or `git fetch upstream-pull`. Afterwards, you can use `upstream-pull/NUMBER/head` in arguments to `git show`,
+  `git checkout` and anywhere a commit id would be acceptable to see the changes from pull request NUMBER.
+
+Scripted diffs
+--------------
+
+For reformatting and refactoring commits where the changes can be easily automated using a bash script, we use
+scripted-diff commits. The bash script is included in the commit message and our Travis CI job checks that
+the result of the script is identical to the commit. This aids reviewers since they can verify that the script
+does exactly what it's supposed to do. It is also helpful for rebasing (since the same script can just be re-run
+on the new master commit).
+
+To create a scripted-diff:
+
+- start the commit message with `scripted-diff:` (and then a description of the diff on the same line)
+- in the commit message include the bash script between lines containing just the following text:
+    - `-BEGIN VERIFY SCRIPT-`
+    - `-END VERIFY SCRIPT-`
+
+The scripted-diff is verified by the tool `contrib/devtools/commit-script-check.sh`
+
+Commit [`bb81e173`](https://github.com/bitcoin/bitcoin/commit/bb81e173) is an example of a scripted-diff.
+
+RPC interface guidelines
+--------------------------
+
+A few guidelines for introducing and reviewing new RPC interfaces:
+
+- Method naming: use consecutive lower-case names such as `getrawtransaction` and `submitblock`
+
+  - *Rationale*: Consistency with existing interface.
+
+- Argument naming: use snake case `fee_delta` (and not, e.g. camel case `feeDelta`)
+
+  - *Rationale*: Consistency with existing interface.
+
+- Use the JSON parser for parsing, don't manually parse integers or strings from
+  arguments unless absolutely necessary.
+
+  - *Rationale*: Introduces hand-rolled string manipulation code at both the caller and callee sites,
+    which is error prone, and it is easy to get things such as escaping wrong.
+    JSON already supports nested data structures, no need to re-invent the wheel.
+
+  - *Exception*: AmountFromValue can parse amounts as string. This was introduced because many JSON
+    parsers and formatters hard-code handling decimal numbers as floating point
+    values, resulting in potential loss of precision. This is unacceptable for
+    monetary values. **Always** use `AmountFromValue` and `ValueFromAmount` when
+    inputting or outputting monetary values. The only exceptions to this are
+    `prioritisetransaction` and `getblocktemplate` because their interface
+    is specified as-is in BIP22.
+
+- Missing arguments and 'null' should be treated the same: as default values. If there is no
+  default value, both cases should fail in the same way. The easiest way to follow this
+  guideline is detect unspecified arguments with `params[x].isNull()` instead of
+  `params.size() <= x`. The former returns true if the argument is either null or missing,
+  while the latter returns true if is missing, and false if it is null.
+
+  - *Rationale*: Avoids surprises when switching to name-based arguments. Missing name-based arguments
+  are passed as 'null'.
+
+- Try not to overload methods on argument type. E.g. don't make `getblock(true)` and `getblock("hash")`
+  do different things.
+
+  - *Rationale*: This is impossible to use with `bitcoin-cli`, and can be surprising to users.
+
+  - *Exception*: Some RPC calls can take both an `int` and `bool`, most notably when a bool was switched
+    to a multi-value, or due to other historical reasons. **Always** have false map to 0 and
+    true to 1 in this case.
+
+- Don't forget to fill in the argument names correctly in the RPC command table.
+
+  - *Rationale*: If not, the call can not be used with name-based arguments.
+
+- Set okSafeMode in the RPC command table to a sensible value: safe mode is when the
+  blockchain is regarded to be in a confused state, and the client deems it unsafe to
+  do anything irreversible such as send. Anything that just queries should be permitted.
+
+  - *Rationale*: Troubleshooting a node in safe mode is difficult if half the
+    RPCs don't work.
+
+- Add every non-string RPC argument `(method, idx, name)` to the table `vRPCConvertParams` in `rpc/client.cpp`.
+
+  - *Rationale*: `bitcoin-cli` and the GUI debug console use this table to determine how to
+    convert a plaintext command line to JSON. If the types don't match, the method can be unusable
+    from there.
+
+- A RPC method must either be a wallet method or a non-wallet method. Do not
+  introduce new methods such as `signrawtransaction` that differ in behavior
+  based on presence of a wallet.
+
+  - *Rationale*: as well as complicating the implementation and interfering
+    with the introduction of multi-wallet, wallet and non-wallet code should be
+    separated to avoid introducing circular dependencies between code units.
+
+- Try to make the RPC response a JSON object.
+
+  - *Rationale*: If a RPC response is not a JSON object then it is harder to avoid API breakage if
+    new data in the response is needed.
+
+- Wallet RPCs call BlockUntilSyncedToCurrentChain to maintain consistency with
+  `getblockchaininfo`'s state immediately prior to the call's execution. Wallet
+  RPCs whose behavior does *not* depend on the current chainstate may omit this
+  call.
+
+  - *Rationale*: In previous versions of Bitcoin Core, the wallet was always
+    in-sync with the chainstate (by virtue of them all being updated in the
+    same cs_main lock). In order to maintain the behavior that wallet RPCs
+    return results as of at least the highest best-known block an RPC
+    client may be aware of prior to entering a wallet RPC call, we must block
+    until the wallet is caught up to the chainstate as of the RPC call's entry.
+    This also makes the API much easier for RPC clients to reason about.
+
+- Be aware of RPC method aliases and generally avoid registering the same
+  callback function pointer for different RPCs.
+
+  - *Rationale*: RPC methods registered with the same function pointer will be
+    considered aliases and only the first method name will show up in the
+    `help` rpc command list.
+
+  - *Exception*: Using RPC method aliases may be appropriate in cases where a
+    new RPC is replacing a deprecated RPC, to avoid both RPCs confusingly
+    showing up in the command list.
