@@ -2700,7 +2700,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
             else
             {
                 // Trim, but never trim more than nMaxCacheIncreaseSinceLastFlush
-                size_t nTrimSize = nCoinCacheUsage * .90;
+                int64_t nTrimSize = nCoinCacheUsage * .90;
                 if (nCoinCacheUsage - nMaxCacheIncreaseSinceLastFlush > nTrimSize)
                     nTrimSize = nCoinCacheUsage - nMaxCacheIncreaseSinceLastFlush;
                 pcoinsTip->Trim(nTrimSize);
@@ -4629,7 +4629,7 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
         }
         // check level 3: check for inconsistencies during memory-only disconnect of tip blocks
         if (nCheckLevel >= 3 && pindex == pindexState &&
-            (coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheUsage)
+            (int64_t)(coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheUsage)
         {
             bool fClean = true;
             DisconnectResult res = DisconnectBlock(block, pindex, coins);
