@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-# Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+# Copyright (c) 2018 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
-# This is a template to make creating new QA tests easy.
-# You can also use this template to quickly start and connect a few regtest nodes.
 
 import time
 import sys
