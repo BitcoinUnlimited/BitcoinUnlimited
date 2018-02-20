@@ -157,7 +157,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
     }
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
-    for (const CTransaction tx : vMissingTx)
+    for (const CTransaction &tx : vMissingTx)
         pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
 
     {
@@ -336,7 +336,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
-    for (const CTransaction tx : thinBlockTx.vMissingTx)
+    for (const CTransaction &tx : thinBlockTx.vMissingTx)
         pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
 
     // Get the full hashes from the xblocktx and add them to the thinBlockHashes vector.  These should
@@ -687,7 +687,7 @@ bool CXThinBlock::process(CNode *pfrom,
     thindata.AddThinBlockBytes(vTxHashes.size() * sizeof(uint64_t), pfrom); // start counting bytes
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
-    for (const CTransaction tx : vMissingTx)
+    for (const CTransaction &tx : vMissingTx)
         pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
@@ -869,7 +869,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
 
     // Look for each transaction in our various pools and buffers.
     // With xThinBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
-    for (const uint256 hash : pfrom->thinBlockHashes)
+    for (const uint256 &hash : pfrom->thinBlockHashes)
     {
         // Replace the truncated hash with the full hash value if it exists
         CTransaction tx;
@@ -969,10 +969,10 @@ double CThinBlockData::average(std::map<int64_t, uint64_t> &map)
         return 0.0;
 
     uint64_t accum = 0U;
-    for (std::pair<int64_t, uint64_t> p : map)
+    for (std::pair<int64_t, uint64_t> const &ref : map)
     {
         // avoid wraparounds
-        accum = std::max(accum, accum + p.second);
+        accum = std::max(accum, accum + ref.second);
     }
     return (double)accum / map.size();
 }
@@ -1368,7 +1368,7 @@ bool HaveConnectThinblockNodes()
             strThinblockNode = strAddrNode;
         else
             strThinblockNode = strAddrNode.substr(0, pos);
-        for (std::string strAddr : vNodesIP)
+        for (std::string &strAddr : vNodesIP)
         {
             if (strAddr == strThinblockNode)
             {
@@ -1788,7 +1788,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
     // TODO: automatically calculate the nGrowthCoefficient from nHoursToGrow, nMinFalsePositve and nMaxFalsePositive
 
     // Count up all the transactions that we'll be putting into the filter, removing any duplicates
-    for (uint256 txHash : setHighScoreMemPoolHashes)
+    for (const uint256 &txHash : setHighScoreMemPoolHashes)
         if (setPriorityMemPoolHashes.count(txHash))
             setPriorityMemPoolHashes.erase(txHash);
 
@@ -1815,11 +1815,11 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
         mempool.mapTx.size());
 
     // Add the selected tx hashes to the bloom filter
-    for (uint256 txHash : setPriorityMemPoolHashes)
+    for (const uint256 &txHash : setPriorityMemPoolHashes)
         filterMemPool.insert(txHash);
-    for (uint256 txHash : setHighScoreMemPoolHashes)
+    for (const uint256 &txHash : setHighScoreMemPoolHashes)
         filterMemPool.insert(txHash);
-    for (uint256 txHash : vOrphanHashes)
+    for (const uint256 &txHash : vOrphanHashes)
         filterMemPool.insert(txHash);
     uint64_t nSizeFilter = ::GetSerializeSize(filterMemPool, SER_NETWORK, PROTOCOL_VERSION);
     LOG(THIN, "Created bloom filter: %d bytes for block: %s in:%d (ms)\n", nSizeFilter, hash.ToString(),
