@@ -464,7 +464,7 @@ extern void UnlimitedLogBlock(const CBlock &block, const std::string &hash, uint
     if (!blockReceiptLog)
         blockReceiptLog = fopen("blockReceiptLog.txt", "a");
     if (blockReceiptLog) {
-        long int byteLen = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+        long int byteLen = block.GetBlockSize();
         CBlockHeader bh = block.GetBlockHeader();
         fprintf(blockReceiptLog, "%" PRIu64 ",%" PRIu64 ",%ld,%ld,%s\n", receiptTime, (uint64_t)bh.nTime, byteLen, block.vtx.size(), hash.c_str());
         fflush(blockReceiptLog);
@@ -624,7 +624,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
             IncrementExtraNonce(pblock, nExtraNonce);
 
             LOGA("Running BitcoinMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
-                ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
+                pblock->GetBlockSize());
 
             //
             // Search
@@ -1713,9 +1713,6 @@ UniValue validateblocktemplate(const UniValue &params, bool fHelp)
     if (!DecodeHexBlk(block, params[0].get_str()))
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
 
-    if (block.nBlockSize == 0)
-        block.nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-
     CBlockIndex *pindexPrev = NULL;
     {
         LOCK(cs_main);
@@ -1737,7 +1734,7 @@ UniValue validateblocktemplate(const UniValue &params, bool fHelp)
 
         const CChainParams &chainparams = Params();
         CValidationState state;
-        if (block.nBlockSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
+        if (block.GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
         {
             if (!TestConservativeBlockValidity(state, chainparams, block, pindexPrev, false, true))
             {

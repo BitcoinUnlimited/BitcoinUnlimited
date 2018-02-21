@@ -48,8 +48,10 @@ unsigned int MurmurHash3(unsigned int nHashSeed, const std::vector<unsigned char
         {
         case 3:
             k1 ^= tail[2] << 16;
+        // FALLTHROUGH
         case 2:
             k1 ^= tail[1] << 8;
+        // FALLTHROUGH
         case 1:
             k1 ^= tail[0];
             k1 *= c1;

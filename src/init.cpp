@@ -977,8 +977,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         bool fReset = fReindex;
         std::string strLoadError;
 
-        uiInterface.InitMessage(_("Loading block index..."));
-
         nStart = GetTimeMillis();
         do
         {
@@ -990,9 +988,12 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 delete pcoinscatcher;
                 delete pblocktree;
 
+                uiInterface.InitMessage(_("Opening Block database..."));
                 pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
+                uiInterface.InitMessage(_("Opening UTXO database..."));
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
+                uiInterface.InitMessage(_("Opening Coins Cache database..."));
                 pcoinsTip = new CCoinsViewCache(pcoinscatcher);
 
                 if (fReindex)
@@ -1012,6 +1013,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                     }
                 }
 
+                uiInterface.InitMessage(_("Loading block index..."));
                 if (!LoadBlockIndex())
                 {
                     strLoadError = _("Error loading block database");

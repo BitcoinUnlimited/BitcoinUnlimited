@@ -25,6 +25,7 @@
 #include "primitives/block.h"
 #include "requestManager.h"
 #include "rpc/server.h"
+#include "script/standard.h"
 #include "stat.h"
 #include "thinblock.h"
 #include "timedata.h"
@@ -175,6 +176,9 @@ CTweakRef<uint64_t> miningBlockSize("mining.blockSize",
     "mining.coinbaseReserve.",
     &maxGeneratedBlock,
     &MiningBlockSizeValidator);
+CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
+    "Maximum size of OP_RETURN data script in bytes.",
+    &nMaxDatacarrierBytes);
 
 CTweak<uint64_t> miningForkTime("mining.forkMay2018Time",
     "Time in seconds since the epoch to initiate a hard fork scheduled on 15th May 2018.",
@@ -186,10 +190,10 @@ CTweak<bool> unsafeGetBlockTemplate("mining.unsafeGetBlockTemplate",
 
 CTweak<uint64_t> miningForkEB("mining.forkExcessiveBlock",
     "Set the excessive block to this value at the time of the fork.",
-    8000000); // 8MB, uahf-technical-spec.md REQ-4-1
+    32000000); // May2018 HF proposed max block size
 CTweak<uint64_t> miningForkMG("mining.forkBlockSize",
     "Set the maximum block generation size to this value at the time of the fork.",
-    2000000); // 2MB, uahf-technical-spec.md REQ-4-2
+    8000000);
 
 CTweak<bool> walletSignWithForkSig("wallet.useNewSig",
     "Once the fork occurs, sign transactions using the new signature scheme so that they will only be valid on the "

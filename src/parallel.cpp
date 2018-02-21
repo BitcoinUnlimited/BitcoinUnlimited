@@ -22,7 +22,7 @@ using namespace std;
 static const unsigned int nScriptCheckQueues = 4;
 std::unique_ptr<CParallelValidation> PV;
 
-static void HandleBlockMessageThread(CNode *pfrom, const std::string strCommand, const CBlock block, const CInv inv);
+static void HandleBlockMessageThread(CNode *pfrom, const string strCommand, shared_ptr<CBlock> block, const CInv inv);
 
 static void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck> *pqueue)
 {
@@ -280,10 +280,11 @@ void CParallelValidation::WaitForAllValidationThreadsToStop()
 bool CParallelValidation::Enabled() { return GetBoolArg("-parallel", true); }
 void CParallelValidation::InitThread(const boost::thread::id this_id,
     const CNode *pfrom,
-    const CBlock &block,
-    const CInv &inv)
+    shared_ptr<CBlock> block,
+    const CInv &inv,
+    uint64_t blockSize)
 {
-    const CBlockHeader &header = block.GetBlockHeader();
+    const CBlockHeader &header = block->GetBlockHeader();
 
     LOCK(cs_blockvalidationthread);
     assert(mapBlockValidationThreads.count(this_id) == 0); // this id should not already be in use
@@ -294,13 +295,14 @@ void CParallelValidation::InitThread(const boost::thread::id this_id,
     mapBlockValidationThreads[this_id].nMostWorkOurFork = header.nBits;
     mapBlockValidationThreads[this_id].nSequenceId = INT_MAX;
     mapBlockValidationThreads[this_id].nStartTime = GetTimeMillis();
-    mapBlockValidationThreads[this_id].nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+    mapBlockValidationThreads[this_id].nBlockSize = blockSize;
     mapBlockValidationThreads[this_id].fQuit = false;
     mapBlockValidationThreads[this_id].nodeid = pfrom->id;
     mapBlockValidationThreads[this_id].fIsValidating = false;
     mapBlockValidationThreads[this_id].fIsReorgInProgress = false;
+
     LOG(PARALLEL, "Launching validation for %s with number of block validation threads running: %d\n",
-        block.GetHash().ToString(), mapBlockValidationThreads.size());
+        block->GetHash().ToString(), mapBlockValidationThreads.size());
 }
 
 void CParallelValidation::Erase(const boost::thread::id this_id)
@@ -430,18 +432,17 @@ void CParallelValidation::ClearOrphanCache(const CBlock &block)
 
 
 //  HandleBlockMessage launches a HandleBlockMessageThread.  And HandleBlockMessageThread processes each block and
-//  updates
-//  the UTXO if the block has been accepted and the tip updated. We cleanup and release the semaphore after the thread
-//  has finished.
+//  updates the UTXO if the block has been accepted and the tip updated. We cleanup and release the semaphore after
+//  the thread has finished.
 void CParallelValidation::HandleBlockMessage(CNode *pfrom,
     const string &strCommand,
-    const CBlock &block,
+    std::shared_ptr<CBlock> block,
     const CInv &inv)
 {
-    uint64_t nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+    uint64_t nBlockSize = block->GetBlockSize();
 
     // NOTE: You must not have a cs_main lock before you aquire the semaphore grant or you can end up deadlocking
-    // AssertLockNotHeld(cs_main); TODO: need to create this
+    AssertLockNotHeld(cs_main);
 
     // Aquire semaphore grant
     if (IsChainNearlySyncd())
@@ -472,7 +473,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom,
                     {
                         // Find largest block where the previous block hash matches. Meaning this is a new block and
                         // it's a competitor to to your block.
-                        if ((*iter).second.hashPrevBlock == block.GetBlockHeader().hashPrevBlock)
+                        if ((*iter).second.hashPrevBlock == block->GetBlockHeader().hashPrevBlock)
                         {
                             if ((*iter).second.nBlockSize > nLargestBlockSize)
                             {
@@ -487,7 +488,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom,
                     if (nLargestBlockSize <= nBlockSize)
                     {
                         LOG(PARALLEL, "Block validation terminated - Too many blocks currently being validated: %s\n",
-                            block.GetHash().ToString());
+                            block->GetHash().ToString());
                         return; // new block is rejected and does not enter PV
                     }
                     else if (miLargestBlock != mapBlockValidationThreads.end())
@@ -532,11 +533,11 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom,
     }
 }
 
-void HandleBlockMessageThread(CNode *pfrom, const string strCommand, const CBlock block, const CInv inv)
+void HandleBlockMessageThread(CNode *pfrom, const string strCommand, shared_ptr<CBlock> block, const CInv inv)
 {
+    uint64_t nSizeBlock = block->GetBlockSize();
     int64_t startTime = GetTimeMicros();
     CValidationState state;
-    uint64_t nSizeBlock = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
 
     // Indicate that the thinblock was fully received. At this point we have either a block or a fully reconstructed
     // thinblock but we still need to maintain a mapThinBlocksInFlight entry so that we don't re-request a full block
@@ -549,7 +550,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, const CBloc
 
 
     boost::thread::id this_id(boost::this_thread::get_id());
-    PV->InitThread(this_id, pfrom, block, inv); // initialize the mapBlockValidationThread entries
+    PV->InitThread(this_id, pfrom, block, inv, nSizeBlock); // initialize the mapBlockValidationThread entries
 
     // Process all blocks from whitelisted peers, even if not requested,
     // unless we're still syncing with the network.
@@ -559,12 +560,12 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, const CBloc
     const CChainParams &chainparams = Params();
     if (PV->Enabled())
     {
-        ProcessNewBlock(state, chainparams, pfrom, &block, forceProcessing, NULL, true);
+        ProcessNewBlock(state, chainparams, pfrom, block.get(), forceProcessing, NULL, true);
     }
     else
     {
         LOCK(cs_main); // locking cs_main here prevents any other thread from beginning starting a block validation.
-        ProcessNewBlock(state, chainparams, pfrom, &block, forceProcessing, NULL, false);
+        ProcessNewBlock(state, chainparams, pfrom, block.get(), forceProcessing, NULL, false);
     }
 
     int nDoS;
@@ -646,7 +647,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, const CBloc
     }
 
     // Erase any txns from the orphan cache that are no longer needed
-    PV->ClearOrphanCache(block);
+    PV->ClearOrphanCache(*block);
 
     // Clear thread data - this must be done before the thread completes or else some other new
     // thread may grab the same thread id and we would end up deleting the entry for the new thread instead.

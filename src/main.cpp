@@ -3444,6 +3444,19 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
     } while (pindexMostWork->nChainWork > chainActive.Tip()->nChainWork);
     CheckBlockIndex(chainparams.GetConsensus());
 
+    // Activate May 2018 HF rules
+    if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
+    {
+        // Bump the accepted block size to 32MB and the default generated size to 8MB
+        if (miningForkEB.value > excessiveBlockSize)
+            excessiveBlockSize = miningForkEB.value;
+        if (miningForkMG.value > maxGeneratedBlock)
+            maxGeneratedBlock = miningForkMG.value;
+        settingsToUserAgentString();
+        // Bump OP_RETURN size:
+        if (nMaxDatacarrierBytes < MAX_OP_RETURN_MAY2018)
+            nMaxDatacarrierBytes = MAX_OP_RETURN_MAY2018;
+    }
     return true;
 }
 
@@ -3791,11 +3804,6 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
     // because we receive the wrong transactions for it.
 
     // Size limits
-    if (block.nBlockSize == 0)
-        block.nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-
-    // || block.vtx.size() > MAX_BLOCK_SIZE || ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION) >
-    // MAX_BLOCK_SIZE)
     if (block.vtx.empty())
         return state.DoS(100, error("CheckBlock(): size limits failed"), REJECT_INVALID, "bad-blk-length");
 
@@ -3834,7 +3842,7 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
         block.fChecked = true;
 
     // BU: Check whether this block exceeds what we want to relay.
-    block.fExcessive = CheckExcessive(block, block.nBlockSize, nSigOps, nTx, nLargestTx);
+    block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nSigOps, nTx, nLargestTx);
 
     return true;
 }
@@ -4141,9 +4149,8 @@ bool ProcessNewBlock(CValidationState &state,
     bool checked = CheckBlock(*pblock, state);
     if (!checked)
     {
-        int byteLen = ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION);
         LOGA("Invalid block: ver:%x time:%d Tx size:%d len:%d\n", pblock->nVersion, pblock->nTime, pblock->vtx.size(),
-            byteLen);
+            pblock->GetBlockSize());
     }
 
     // WARNING: cs_main is not locked here throughout but is released and then re-locked during ActivateBestChain
@@ -4192,41 +4199,46 @@ bool ProcessNewBlock(CValidationState &state,
 
     int64_t end = GetTimeMicros();
 
-    uint64_t maxTxSize = 0;
-    uint64_t maxVin = 0;
-    uint64_t maxVout = 0;
-    CTransaction txIn;
-    CTransaction txOut;
-    CTransaction txLen;
-
-    for (unsigned int i = 0; i < pblock->vtx.size(); i++)
+    if (Logging::LogAcceptCategory(Logging::BENCH))
     {
-        if (pblock->vtx[i].vin.size() > maxVin)
-        {
-            maxVin = pblock->vtx[i].vin.size();
-            txIn = pblock->vtx[i];
-        }
-        if (pblock->vtx[i].vout.size() > maxVout)
-        {
-            maxVout = pblock->vtx[i].vout.size();
-            txOut = pblock->vtx[i];
-        }
-        uint64_t len = ::GetSerializeSize(pblock->vtx[i], SER_NETWORK, PROTOCOL_VERSION);
-        if (len > maxTxSize)
-        {
-            maxTxSize = len;
-            txLen = pblock->vtx[i];
-        }
-    }
+        uint64_t maxTxSize = 0;
+        uint64_t maxVin = 0;
+        uint64_t maxVout = 0;
+        CTransaction txIn;
+        CTransaction txOut;
+        CTransaction txLen;
 
-    LOG(BENCH, "ProcessNewBlock, time: %d, block: %s, len: %d, numTx: %d, maxVin: %llu, maxVout: %llu, maxTx:%llu\n",
-        end - start, pblock->GetHash().ToString(), pblock->nBlockSize, pblock->vtx.size(), maxVin, maxVout, maxTxSize);
-    LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txIn.GetHash().ToString(), txIn.vin.size(), txIn.vout.size(),
-        ::GetSerializeSize(txIn, SER_NETWORK, PROTOCOL_VERSION));
-    LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txOut.GetHash().ToString(), txOut.vin.size(),
-        txOut.vout.size(), ::GetSerializeSize(txOut, SER_NETWORK, PROTOCOL_VERSION));
-    LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txLen.GetHash().ToString(), txLen.vin.size(),
-        txLen.vout.size(), ::GetSerializeSize(txLen, SER_NETWORK, PROTOCOL_VERSION));
+        for (unsigned int i = 0; i < pblock->vtx.size(); i++)
+        {
+            if (pblock->vtx[i].vin.size() > maxVin)
+            {
+                maxVin = pblock->vtx[i].vin.size();
+                txIn = pblock->vtx[i];
+            }
+            if (pblock->vtx[i].vout.size() > maxVout)
+            {
+                maxVout = pblock->vtx[i].vout.size();
+                txOut = pblock->vtx[i];
+            }
+            uint64_t len = ::GetSerializeSize(pblock->vtx[i], SER_NETWORK, PROTOCOL_VERSION);
+            if (len > maxTxSize)
+            {
+                maxTxSize = len;
+                txLen = pblock->vtx[i];
+            }
+        }
+
+        LOG(BENCH,
+            "ProcessNewBlock, time: %d, block: %s, len: %d, numTx: %d, maxVin: %llu, maxVout: %llu, maxTx:%llu\n",
+            end - start, pblock->GetHash().ToString(), pblock->nBlockSize, pblock->vtx.size(), maxVin, maxVout,
+            maxTxSize);
+        LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txIn.GetHash().ToString(), txIn.vin.size(),
+            txIn.vout.size(), ::GetSerializeSize(txIn, SER_NETWORK, PROTOCOL_VERSION));
+        LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txOut.GetHash().ToString(), txOut.vin.size(),
+            txOut.vout.size(), ::GetSerializeSize(txOut, SER_NETWORK, PROTOCOL_VERSION));
+        LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txLen.GetHash().ToString(), txLen.vin.size(),
+            txLen.vout.size(), ::GetSerializeSize(txLen, SER_NETWORK, PROTOCOL_VERSION));
+    }
 
     LOCK(cs_blockvalidationtime);
     nBlockValidationTime << (end - start);
@@ -6643,18 +6655,25 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) // Ignore blocks received while importing
     {
-        CBlock block;
-        vRecv >> block;
+        std::shared_ptr<CBlock> block(new CBlock);
+        {
+            uint64_t nCheckBlockSize = vRecv.size();
+            vRecv >> *block;
 
-        CInv inv(MSG_BLOCK, block.GetHash());
+            // Sanity check. The serialized block size should match the size that is in our receive queue.  If not
+            // this could be an attack block of some kind.
+            DbgAssert(nCheckBlockSize == block->GetBlockSize(), return true);
+        }
+
+        CInv inv(MSG_BLOCK, block->GetHash());
         LOG(BLK, "received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
-        UnlimitedLogBlock(block, inv.hash.ToString(), receiptTime);
+        UnlimitedLogBlock(*block, inv.hash.ToString(), receiptTime);
 
         if (IsChainNearlySyncd()) // BU send the received block out expedited channels quickly
         {
             CValidationState state;
-            if (CheckBlockHeader(block, state, true)) // block header is fine
-                SendExpeditedBlock(block, pfrom);
+            if (CheckBlockHeader(*block, state, true)) // block header is fine
+                SendExpeditedBlock(*block, pfrom);
         }
 
         // Message consistency checking
@@ -7199,7 +7218,7 @@ bool SendMessages(CNode *pto)
             pto->nNextAddrSend = PoissonNextSend(nNow, AVG_ADDRESS_BROADCAST_INTERVAL);
             std::vector<CAddress> vAddr;
             vAddr.reserve(pto->vAddrToSend.size());
-            BOOST_FOREACH (const CAddress &addr, pto->vAddrToSend)
+            for (const CAddress &addr : pto->vAddrToSend)
             {
                 if (!pto->addrKnown.contains(addr.GetKey()))
                 {
@@ -7233,21 +7252,8 @@ bool SendMessages(CNode *pto)
                 pto->GetLogName());
         }
 
-        // If a sync has been started check whether we received the first batch of headers requested within the timeout
-        // period.
-        // If not then disconnect and ban the node and a new node will automatically be selected to start the headers
-        // download.
-        if ((state.fSyncStarted) && (state.fSyncStartTime < GetTime() - INITIAL_HEADERS_TIMEOUT) &&
-            (!state.fFirstHeadersReceived) && !pto->fWhitelisted)
-        {
-            pto->fDisconnect = true;
-            LOGA(
-                "Initial headers were either not received or not received before the timeout - disconnecting peer=%s\n",
-                pto->GetLogName());
-        }
-
         // Start block sync
-        if (pindexBestHeader == NULL)
+        if (pindexBestHeader == nullptr)
             pindexBestHeader = chainActive.Tip();
         // Download if this is a nice peer, or we have no nice peers and this one might do.
         bool fFetch = state.fPreferredDownload || (nPreferredDownload == 0 && !pto->fClient && !pto->fOneShot);
@@ -7314,7 +7320,7 @@ bool SendMessages(CNode *pto)
                 // Try to find first header that our peer doesn't have, and
                 // then send all headers past that one.  If we come across any
                 // headers that aren't on chainActive, give up.
-                BOOST_FOREACH (const uint256 &hash, pto->vBlockHashesToAnnounce)
+                for (const uint256 &hash : pto->vBlockHashesToAnnounce)
                 {
                     BlockMap::iterator mi = mapBlockIndex.find(hash);
                     // BU skip blocks that we don't know about.  was: assert(mi != mapBlockIndex.end());
@@ -7327,7 +7333,7 @@ bool SendMessages(CNode *pto)
                         fRevertToInv = true;
                         break;
                     }
-                    if (pBestIndex != NULL && pindex->pprev != pBestIndex)
+                    if (pBestIndex != nullptr && pindex->pprev != pBestIndex)
                     {
                         // This means that the list of blocks to announce don't
                         // connect to each other.
@@ -7376,7 +7382,7 @@ bool SendMessages(CNode *pto)
                 // in the past.
                 if (!pto->vBlockHashesToAnnounce.empty())
                 {
-                    BOOST_FOREACH (const uint256 &hashToAnnounce, pto->vBlockHashesToAnnounce)
+                    for (const uint256 &hashToAnnounce : pto->vBlockHashesToAnnounce)
                     {
                         BlockMap::iterator mi = mapBlockIndex.find(hashToAnnounce);
                         if (mi != mapBlockIndex.end())
@@ -7525,7 +7531,7 @@ bool SendMessages(CNode *pto)
             std::vector<CBlockIndex *> vToDownload;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload);
             // LOG(REQ, "IBD AskFor %d blocks from peer=%s\n", vToDownload.size(), pto->GetLogName());
-            BOOST_FOREACH (CBlockIndex *pindex, vToDownload)
+            for (CBlockIndex *pindex : vToDownload)
             {
                 CInv inv(MSG_BLOCK, pindex->GetBlockHash());
                 if (!AlreadyHave(inv))

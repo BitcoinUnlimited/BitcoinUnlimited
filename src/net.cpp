@@ -422,7 +422,7 @@ CNode *ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure
         pszDest ? 0.0 : (double)(GetAdjustedTime() - addrConnect.nTime) / 3600.0);
 
     // Connect
-    SOCKET hSocket;
+    SOCKET hSocket = INVALID_SOCKET;
     bool proxyConnectionFailed = false;
     if (pszDest ? ConnectSocketByName(addrConnect, hSocket, pszDest, Params().GetDefaultPort(), nConnectTimeout,
                       &proxyConnectionFailed) :
