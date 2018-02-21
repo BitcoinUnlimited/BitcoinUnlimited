@@ -179,6 +179,11 @@ CTweakRef<uint64_t> miningBlockSize("mining.blockSize",
 CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
     "Maximum size of OP_RETURN data script in bytes.",
     &nMaxDatacarrierBytes);
+CTweak<bool> miningEnforceOpGroup("mining.opgroup", "Enable enforcement of the OP_GROUP opcode", false);
+
+CTweak<bool> miningForkOpGroup("mining.forkOpgroup",
+    "Enable enforcement of the OP_GROUP opcode at the fork point",
+    true);
 
 CTweak<uint64_t> miningForkTime("mining.forkMay2018Time",
     "Time in seconds since the epoch to initiate a hard fork scheduled on 15th May 2018.",

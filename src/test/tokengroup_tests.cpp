@@ -288,6 +288,10 @@ CTransaction tx2x2(const COutPoint &utxo1,const COutPoint &utxo2, const CScript 
 
 BOOST_AUTO_TEST_CASE(tokengroup_basicfunctions)
 {
+    // Have to enable the function to test it.
+    bool opgEnforcing = miningEnforceOpGroup.value;
+    miningEnforceOpGroup.value = true;
+    
     CKey secret;
     CPubKey pubkey;
     CKeyID addr;
@@ -545,6 +549,8 @@ BOOST_AUTO_TEST_CASE(tokengroup_basicfunctions)
         ok = CheckTokenGroups(t, state, coins);
         BOOST_CHECK(!ok);
     }
+
+    miningEnforceOpGroup.value = opgEnforcing;
 }
 
 static bool tryBlock(const std::vector<CMutableTransaction> &txns,
@@ -581,6 +587,10 @@ static bool tryMempool(const CTransaction& tx, CValidationState &state)
 
 BOOST_FIXTURE_TEST_CASE(tokengroup_blockchain, TestChain100Setup)
 {
+    // Have to enable the function to test it.
+    bool opgEnforcing = miningEnforceOpGroup.value;
+    miningEnforceOpGroup.value = true;
+
     //fPrintToConsole = true;
     //LogToggleCategory(Logging::TOKGRP, true);
     CScript scriptPubKey = CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
@@ -743,7 +753,8 @@ BOOST_FIXTURE_TEST_CASE(tokengroup_blockchain, TestChain100Setup)
     txns[0] = tx1x1_p2sh_of_p2pkh(tipblk.vtx[1], 0, p2pkh(a2.addr), tipblk.vtx[1].vout[0].nValue, a1.secret, p2shBaseScript1);
     ret = tryBlock(txns,p2pkh(a2.addr), tipblk, state);
     BOOST_CHECK(ret);
-    
+
+    miningEnforceOpGroup.value = opgEnforcing;
 }
 
 BOOST_AUTO_TEST_SUITE_END()

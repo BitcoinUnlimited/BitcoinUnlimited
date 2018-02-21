@@ -3447,6 +3447,8 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
     // Activate May 2018 HF rules
     if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
     {
+        // Switch to chosen OP_GROUP enforcement
+        miningEnforceOpGroup.value = miningForkOpGroup.value;
         // Bump the accepted block size to 32MB and the default generated size to 8MB
         if (miningForkEB.value > excessiveBlockSize)
             excessiveBlockSize = miningForkEB.value;

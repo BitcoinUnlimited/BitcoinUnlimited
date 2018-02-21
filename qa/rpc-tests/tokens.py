@@ -41,6 +41,8 @@ class TokenTest (BitcoinTestFramework):
         self.sync_all()
 
     def run_test (self):
+        # enable opgroup enforcement
+        [ x.set("mining.opgroup=true") for x in self.nodes ]
         self.nodes[0].generate(102)
         self.sync_blocks()
 
