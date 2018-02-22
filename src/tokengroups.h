@@ -9,6 +9,7 @@
 #include "chainparams.h"
 #include "script/standard.h"
 #include "consensus/validation.h"
+#include <unordered_map>
 class CWallet;
 
 /** Transaction cannot be committed on my fork */
@@ -58,7 +59,7 @@ public:
     //* Convert this token group ID into a mint/melt address
     CTxDestination ControllingAddress() const;
     //* Returns this groupID as a string in cashaddr format
-    std::string Encode(const CChainParams &params=Params());
+    std::string Encode(const CChainParams &params=Params()) const;
 };
 
 // Return the associated group (OP_GROUP) of a script
@@ -101,6 +102,9 @@ CTokenGroupPair GetTokenGroupPair(const CScript& script);
 // Pass a group and a destination address (or CNoDestination) to get the balance of all outputs in the group
 // or all outputs in that group and on that destination address.
 CAmount GetGroupBalance(const CTokenGroupID &grpID, const CTxDestination &dest, const CWallet *wallet);
+
+// Returns a mapping of groupID->balance
+void GetAllGroupBalances(const CWallet *wallet, std::unordered_map<CTokenGroupID,CAmount>& balances);
 
 extern CTokenGroupID BitcoinGroup;
 

@@ -289,7 +289,7 @@ CTokenGroupID::CTokenGroupID(const std::string &addr, const CChainParams &params
     // otherwise it becomes NoGroup (i.e. data is size 0)
 }
 
-std::string CTokenGroupID::Encode(const CChainParams &params)
+std::string CTokenGroupID::Encode(const CChainParams &params) const
 {
     return EncodeCashAddr(data, CashAddrType::GROUP_TYPE, params);
 }
@@ -342,6 +342,19 @@ public:
     }
 };
 
+void GetAllGroupBalances(const CWallet *wallet, std::unordered_map<CTokenGroupID,CAmount>& balances)
+{
+    std::vector<COutput> coins;
+    wallet->FilterCoins(coins, [&balances](const CWalletTx *tx, const CTxOut *out) {
+        CTokenGroupPair tg = GetTokenGroupPair(out->scriptPubKey);
+        if (tg.associatedGroup != BitcoinGroup) // must be sitting in any group address
+        {
+            balances[tg.associatedGroup] += out->nValue;
+        }
+        return false;  // I don't want to actually filter anything
+    });
+
+}
 
 CAmount GetGroupBalance(const CTokenGroupID &grpID, const CTxDestination &dest, const CWallet *wallet)
 {
@@ -756,6 +769,17 @@ extern UniValue token(const UniValue &params, bool fHelp)
         if (params.size() > 3)
         {
             throw std::runtime_error("Invalid number of argument to token balance");
+        }
+        if (params.size() == 1) // no group specified, show them all
+        {
+            std::unordered_map<CTokenGroupID,CAmount> balances;
+            GetAllGroupBalances(wallet, balances);
+            UniValue ret(UniValue::VOBJ);
+            for (const auto& item: balances)
+            {
+                ret.push_back(Pair(item.first.Encode(), item.second));
+            }
+            return ret;
         }
         CTokenGroupID grpID(params[1].get_str());
         if (!grpID.isUserGroup())
