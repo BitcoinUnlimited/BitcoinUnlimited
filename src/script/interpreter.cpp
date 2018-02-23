@@ -973,21 +973,29 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                         return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
 
                     valtype &data = stacktop(-3);
-                    valtype &vchSig = stacktop(-2);
+                    valtype &vchSigAndType = stacktop(-2);
                     valtype &vchAddr = stacktop(-1);
 
                     if (vchAddr.size() != 20)
                         return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
 
-                    CHashWriter ss(SER_GETHASH, 0);
-                    ss << strMessageMagic << data;
+                    if (vchSigAndType[0] == DATASIG_COMPACT_ECDSA)
+                    {
+                        std::vector<unsigned char> vchSig(vchSigAndType.begin() + 1, vchSigAndType.end());
+                        CHashWriter ss(SER_GETHASH, 0);
+                        ss << strMessageMagic << data;
 
-                    CPubKey pubkey;
-                    if (!pubkey.RecoverCompact(ss.GetHash(), vchSig))
+                        CPubKey pubkey;
+                        if (!pubkey.RecoverCompact(ss.GetHash(), vchSig))
+                            return set_error(serror, SCRIPT_ERR_VERIFY);
+                        CKeyID id = pubkey.GetID();
+                        if (id != uint160(vchAddr))
+                            return set_error(serror, SCRIPT_ERR_VERIFY);
+                    }
+                    else // No other signature types currently supported
+                    {
                         return set_error(serror, SCRIPT_ERR_VERIFY);
-                    CKeyID id = pubkey.GetID();
-                    if (id != uint160(vchAddr))
-                        return set_error(serror, SCRIPT_ERR_VERIFY);
+                    }
                     popstack(stack);
                     popstack(stack);
                 }

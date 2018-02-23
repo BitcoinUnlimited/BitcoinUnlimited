@@ -1,11 +1,14 @@
 # Enable oracle-based data import via OP_DATASIGVERIFY
 
-Version 0.1, 2018-02-12 - DRAFT FOR DISCUSSION
+Version 0.2, 2018-02-22
 
 ## Introduction
 
 OP_DATASIGVERIFY allows signed data to be imported into a script.  This data can then have many uses, depending on the rest of the script, such as deciding spendability of several possible addresses.  This opcode therefore enables the powerful blockchain concept of an "oracle" -- an entity that publishes authoritative statements about extra-blockchain events -- to be used in the Bitcoin Cash blockchain.  For an example use of how this opcode can be used to enable binary contracts on any security or betting on any quantitatively decidable event (such as a sports match) please [click here](https://medium.com/@g.andrew.stone/bitcoin-scripting-applications-decision-based-spending-8e7b93d7bdb9).  But this is just one example; as the Bitcoin Cash Script language grows in expressiveness, it is anticipated that this opcode will be used in many other applications.
 
+## Requirements on miners, full nodes, and clients
+
+Miners, full nodes, and clients will implement the OP_DATASIGVERIFY opcode and activate it during the May 2018 hard fork.
 
 ## OP_DATASIGVERIFY Specification
 
@@ -18,17 +21,23 @@ OP_DATASIGVERIFY allows signed data to be imported into a script.  This data can
 When OP_DATASIGVERIFY is executed, the stack should look like:
 
 *top of stack*
-* pubkeyhash
-* signature
-* data
+* *pubkeyhash*
+* *type and signature*
+* *data*
 
-If there are less then 3 items on the stack, the script fails.  If the pubkeyhash field is not 20 bytes, the script fails.  If the signature field is not 65 bytes, the script fails.
+If there are less then 3 items on the stack, the script fails.  If the pubkeyhash field is not 20 bytes, the script fails.  If the *'type and signature'* field is not 66 bytes, the script fails.  If the first byte of the *'type and signature'* field is not DATASIG_COMPACT_ECDSA (1), the script fails.
 
-OP_DATASIGVERIFY first computes the double-sha256 hash of the byte string "Bitcoin Signed Message:\n" prepended to the supplied data (stack top - 2). This is the same operation as the Bitcoin Cash message signing RPC, and is the same algorithm as is used in OP_CHECKSIGVERIFY.  It then computes a pubkey from this hash and the provided signature (stack top - 1).  If the pubkey cannot be recovered, the script fails.  It then compares the hash160 (same as OP_HASH160) of the recovered pubkey to the provided pubkeyhash (stack top).  If the comparison fails, the script fails.
+The first byte of the *'type and signature'* (stack top - 1) field defines the signature type, and subsequent bytes are the actual signature.  Note that this format is different from the OP_CHECKSIG format, and its SIGHASH flag byte has no relationship to this signature type byte.
 
-Otherwise, the top 2 items are popped off the stack (leaving "data" on the top of the stack), and opcode succeeds.
+OP_DATASIGVERIFY looks at this signature type byte to determine the signature validation algorithm and then executes that algorithm.  There is currently one defined algorithm:
 
-The signature must be a recoverable signature encoded in bitcoin's "compact" format.  This format is used in the standard "signmessage" RPC and its authoritative specification is beyond the scope of this document, but in essence it is comprised of a 1 byte recovery ID, 32 bytes "r", 32 bytes "s".
+#### value 1: DATASIG_COMPACT_ECDSA
+
+This algorithm is the same operation as the Bitcoin Cash message verification RPC call (e.g signmessage/verifymessage).  The signature must therefore be a pubkey-recoverable signature encoded in bitcoin's "compact" format.  The authoritative specification of this signature is beyond the scope of this document, but in essence it is comprised of a 1 byte recovery ID, 32 bytes "r", 32 bytes "s".
+
+The algorithm first computes the double-sha256 hash of the byte string "Bitcoin Signed Message:\n" prepended to the supplied *data* (stack top - 2).  It then computes a pubkey from this hash and the provided signature (stack top - 1, without the first byte).  If the pubkey cannot be recovered, the script fails.  It then compares the hash160 (same as OP_HASH160) of the recovered pubkey to the provided *pubkeyhash* (stack top).  If the comparison fails, the script fails.
+
+Otherwise, the top 2 items are popped off the stack (leaving *data* on the top of the stack), and the opcode succeeds.
 
 ## Examples
 
@@ -67,7 +76,9 @@ else-branch spend: `z' y' 0`
 
 ## Reference Implementation
 
-Please refer to [this github branch](https://github.com/gandrewstone/BitcoinUnlimited/tree/op_datasigverify) for a complete implementation.  But the opcode implementation is short enough to include here:
+Please refer to [this github branch](https://github.com/gandrewstone/BitcoinUnlimited/tree/op_datasigverify) for a complete implementation.  Implementation is in src/test/interpreter.cpp/h and unit tests are located at src/test/script_tests.cpp.
+
+The opcode implementation is short enough to include here:
 ```c++
 // This code sits inside the interpreter's opcode processing case statement
 case OP_DATASIGVERIFY:
@@ -76,24 +87,32 @@ case OP_DATASIGVERIFY:
         return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
 
     valtype &data = stacktop(-3);
-    valtype &vchSig = stacktop(-2);
+    valtype &vchSigAndType = stacktop(-2);
     valtype &vchAddr = stacktop(-1);
 
     if (vchAddr.size() != 20)
         return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
 
-    CHashWriter ss(SER_GETHASH, 0);
-    ss << strMessageMagic << data;
+    if (vchSigAndType[0] == DATASIG_COMPACT_ECDSA)
+    {
+        std::vector<unsigned char> vchSig(vchSigAndType.begin() + 1, vchSigAndType.end());
+        CHashWriter ss(SER_GETHASH, 0);
+        ss << strMessageMagic << data;
 
-    CPubKey pubkey;
-    if (!pubkey.RecoverCompact(ss.GetHash(), vchSig))
+        CPubKey pubkey;
+        if (!pubkey.RecoverCompact(ss.GetHash(), vchSig))
+            return set_error(serror, SCRIPT_ERR_VERIFY);
+        CKeyID id = pubkey.GetID();
+        if (id != uint160(vchAddr))
+            return set_error(serror, SCRIPT_ERR_VERIFY);
+    }
+    else // No other signature types currently supported
+    {
         return set_error(serror, SCRIPT_ERR_VERIFY);
-    CKeyID id = pubkey.GetID();
-    if (id != uint160(vchAddr))
-        return set_error(serror, SCRIPT_ERR_VERIFY);
+    }
     popstack(stack);
     popstack(stack);
 }
 break;
-
 ```
+

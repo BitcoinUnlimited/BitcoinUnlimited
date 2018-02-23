@@ -1454,31 +1454,40 @@ BOOST_AUTO_TEST_CASE(script_datasigverify)
     std::vector<unsigned char> data(1);
     data[0] = 123;
 
-    std::vector<unsigned char> sig = signmessage(data, dataSigner.secret);
+    std::vector<unsigned char> sigtype(1);
+    std::vector<unsigned char> sigbadtype(1);
 
-    CScript proveScript = CScript() << data << sig;
+    {
+        std::vector<unsigned char> sig = signmessage(data, dataSigner.secret);
+        sigtype[0] = DATASIG_COMPACT_ECDSA;
+        sigtype.insert(sigtype.end(), sig.begin(), sig.end());
+
+        sigbadtype[0] = 0xff;
+        sigbadtype.insert(sigbadtype.end(), sig.begin(), sig.end());
+    }
+
+
+    CScript proveScript = CScript() << data << sigtype;
 
     CScript condScript = CScript() << ToByteVector(dataSigner.addr) << OP_DATASIGVERIFY;
 
     vector<vector<unsigned char> > stack;
     ScriptError serror;
     BaseSignatureChecker sigChecker;
-    if (!EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr))
-    {
-        BOOST_CHECK(0);
-        return;
-    }
-    if (!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr))
-    {
-        BOOST_CHECK(0);
-        return;
-    }
+    BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+    BOOST_CHECK(EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
 
-    sig[1] ^= 1; // Screw up the signature
-    proveScript = CScript() << data << sig;
+    stack.clear();
+    CScript scriptBadSigType = CScript() << data << sigbadtype;
+    BOOST_CHECK(EvalScript(stack, scriptBadSigType, 0, sigChecker, &serror, nullptr));
+    BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+
+    stack.clear();
+    sigtype[2] ^= 1; // Screw up the signature
+    proveScript = CScript() << data << sigtype;
     BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
     BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
-    sig[1] ^= 1; // back to correct sig
+    sigtype[2] ^= 1; // back to correct sigtype
 
     QuickAddress u2;
 
@@ -1505,26 +1514,21 @@ BOOST_AUTO_TEST_CASE(script_datasigverify)
     txoSig.push_back((unsigned char)sighashType);
     SigPubkeyHashChecker pkhChecker;
 
-    proveScript = CScript() << txoSig << ToByteVector(u2.secret.GetPubKey()) << data << sig;
+    proveScript = CScript() << txoSig << ToByteVector(u2.secret.GetPubKey()) << data << sigtype;
 
-    if (!EvalScript(stack, proveScript, 0, pkhChecker, &serror, nullptr))
-    {
-        BOOST_CHECK(0);
-        return;
-    }
-    if (!EvalScript(stack, condScript, 0, pkhChecker, &serror, nullptr))
-    {
-        BOOST_CHECK(0);
-        return;
-    }
+    stack.clear();
+    BOOST_CHECK(EvalScript(stack, proveScript, 0, pkhChecker, &serror, nullptr));
+    BOOST_CHECK(EvalScript(stack, condScript, 0, pkhChecker, &serror, nullptr));
 
-    sig[1] ^= 1; // Screw up the data signature
-    proveScript = CScript() << data << sig << ToByteVector(u2.pubkey);
+    stack.clear();
+    sigtype[3] ^= 1; // Screw up the data signature
+    proveScript = CScript() << data << sigtype << ToByteVector(u2.pubkey);
     BOOST_CHECK(EvalScript(stack, proveScript, 0, pkhChecker, &serror, nullptr));
     BOOST_CHECK(!EvalScript(stack, condScript, 0, pkhChecker, &serror, nullptr));
-    sig[1] ^= 1; // back to correct data sig
+    sigtype[3] ^= 1; // back to correct data sig
     // provide the wrong utxo pubkey
-    proveScript = CScript() << data << sig << ToByteVector(dataSigner.pubkey);
+    proveScript = CScript() << data << sigtype << ToByteVector(dataSigner.pubkey);
+    stack.clear();
     BOOST_CHECK(EvalScript(stack, proveScript, 0, pkhChecker, &serror, nullptr));
     BOOST_CHECK(!EvalScript(stack, condScript, 0, pkhChecker, &serror, nullptr));
 }

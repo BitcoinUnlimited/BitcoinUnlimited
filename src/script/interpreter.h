@@ -30,6 +30,12 @@ enum
     SIGHASH_ANYONECANPAY = 0x80,
 };
 
+/** Data signature types (for OP_DATASIGVERIFY) */
+enum
+{
+    DATASIG_COMPACT_ECDSA = 1,
+};
+
 /** Script verification flags */
 enum
 {
