@@ -3157,14 +3157,14 @@ static bool ActivateBestChainStep(CValidationState &state,
         if (PV->QuitReceived(this_id, fParallel))
             return false;
 
-        PV->IsReorgInProgress(this_id, true, fParallel); // indicate that this thread has now initiated a re-org
+        // Indicate that this thread has now initiated a re-org
+        PV->IsReorgInProgress(this_id, true, fParallel);
 
-        // Disconnect active blocks which are no longer in the best chain.
+        // Disconnect active blocks which are no longer in the best chain. We do not need to concern ourselves with any
+        // block validation threads that may be running for the chain we are rolling back. They will automatically fail
+        // validation during ConnectBlock() once the chaintip has changed..
         if (!DisconnectTip(state, chainparams.GetConsensus()))
             return false;
-
-        if (fParallel && !fBlocksDisconnected)
-            PV->StopAllValidationThreads(this_id);
 
         fBlocksDisconnected = true;
     }
