@@ -609,7 +609,7 @@ void AdjustCoinCacheSize()
         // The amount of system memory currently available
         int64_t nMemAvailable = GetAvailableMemory();
         // The amount of memory we need to *keep* available.
-        int64_t nUnusedMem = GetTotalSystemMemory() * nDefaultPcntMemUnused / 100;
+        int64_t nUnusedMem = std::max(GetTotalSystemMemory() * nDefaultPcntMemUnused / 100, nMinMemToKeepAvaialable);
 
         // Make sure we leave enough room for the leveldb write cache's
         if (pcoinsdbview != nullptr && nUnusedMem < pcoinsdbview->TotalWriteBufferSize())
