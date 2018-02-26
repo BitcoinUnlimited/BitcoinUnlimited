@@ -16,10 +16,11 @@
 #include <utility>
 #include <vector>
 
-
 class CBlockFileInfo;
 class CBlockIndex;
 class uint256;
+
+static const bool DEFAULT_TXINDEX = false;
 
 //! -dbcache default (MiB)
 static const int64_t nDefaultDbCache = 500;
@@ -27,8 +28,14 @@ static const int64_t nDefaultDbCache = 500;
 static const int64_t nMaxDbCache = sizeof(void *) > 4 ? 16384 : 2048;
 //! min. -dbcache in (MiB)
 static const int64_t nMinDbCache = 4;
+//! % of available memory to leave unused by dbcache if/when we dynamically size the dbcache.
+static const int64_t nDefaultPcntMemUnused = 10;
 //! max increase in cache size since the last time we did a full flush
 static const int64_t nMaxCacheIncreaseSinceLastFlush = 512 * 1000 * 1000;
+//! the minimum system memory we always keep free when doing automatic dbcache sizing
+static const uint64_t nMinMemToKeepAvaialable = 300 * 1000 * 1000;
+//! the max size a batch can get before a write to the utxo is made
+static const size_t nMaxDBBatchSize = 16 << 20;
 //! Max memory allocated to block tree DB specific cache, if no -txindex (MiB)
 static const int64_t nMaxBlockDBCache = 2;
 //! Max memory allocated to block tree DB specific cache, if -txindex (MiB)
@@ -37,6 +44,29 @@ static const int64_t nMaxBlockDBCache = 2;
 static const int64_t nMaxBlockDBAndTxIndexCache = 1024;
 //! Max memory allocated to coin DB specific cache (MiB)
 static const int64_t nMaxCoinsDBCache = 8;
+
+/** Get the current available memory */
+uint64_t GetAvailableMemory();
+/** Get the total physical memory */
+uint64_t GetTotalSystemMemory();
+/** Get the sizes for each of the caches. This is done during init.cpp on startup but also
+ *  later, during dynamic sizing of the coins cache, when need to know the initial startup values.
+ */
+void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
+    int64_t &_nCoinDBCache,
+    int64_t &_nCoinCacheUsage,
+    bool fDefault = false);
+/** Calculate the various cache sizes. This is primarily used in GetCacheConfiguration() however during
+ *  dynamic sizing of the coins cache we also need to use this function directly.
+ */
+void CacheSizeCalculations(int64_t _nTotalCache,
+    int64_t &_nBlockTreeDBCache,
+    int64_t &_nCoinDBCache,
+    int64_t &_nCoinCacheUsage);
+/** This function is called during FlushStateToDisk.  The coins cache is dynamically sized before any
+ *  checking is done for cache flushing and trimming
+ */
+void AdjustCoinCacheSize();
 
 struct CDiskTxPos : public CDiskBlockPos
 {
@@ -87,6 +117,9 @@ public:
     //! Attempt to update from an older database format. Returns whether an error occurred.
     bool Upgrade();
     size_t EstimateSize() const override;
+
+    //! Return the current memory allocated for the write buffers
+    size_t TotalWriteBufferSize() const;
 };
 
 /** Specialization of CCoinsViewCursor to iterate over a CCoinsViewDB */
