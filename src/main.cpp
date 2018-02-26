@@ -322,6 +322,9 @@ static bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         mapBlocksInFlight.find(hash);
     if (itInFlight != mapBlocksInFlight.end())
     {
+        CNodeState *state = State(itInFlight->second.first);
+        DbgAssert(state != nullptr, return false);
+
         int64_t getdataTime = itInFlight->second.second->nTime;
         int64_t now = GetTimeMicros();
         double nResponseTime = (double)(now - getdataTime) / 1000000.0;
@@ -364,8 +367,6 @@ static bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
             LOG(THIN, "Average block response time is %.2f seconds\n", pnode->nAvgBlkResponseTime);
         }
 
-        CNodeState *state = State(pnode->id);
-
         // if there are no blocks in flight then ask for a few more blocks
         if (state->nBlocksInFlight <= 0)
             pnode->nMaxBlocksInTransit.fetch_add(4);
@@ -384,7 +385,7 @@ static bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         if (IsChainNearlySyncd())
         {
             LOCK(cs_vNodes);
-            BOOST_FOREACH (CNode *pnode, vNodes)
+            for (CNode *pnode : vNodes)
             {
                 if (pnode->mapThinBlocksInFlight.size() > 0)
                 {
