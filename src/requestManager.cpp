@@ -171,6 +171,21 @@ void CRequestManager::AskFor(const std::vector<CInv> &objArray, CNode *from, uns
     }
 }
 
+void CRequestManager::AskForDuringIBD(const CInv &obj, CNode *from, unsigned int priority)
+{
+    // add from this node first so that they get requested first.
+    AskFor(obj, from, priority);
+
+    // Must lock cs_objDownloader here and before cs_vNodes to maintain proper locking order.
+    LOCK2(cs_objDownloader, cs_vNodes);
+    for (CNode *pnode : vNodes)
+    {
+        if (pnode == from)
+            continue;
+
+        AskFor(obj, pnode, priority);
+    }
+}
 
 // Indicate that we got this object, from and bytes are optional (for node performance tracking)
 void CRequestManager::Received(const CInv &obj, CNode *from, int bytes)
@@ -513,11 +528,6 @@ void CRequestManager::SendRequests()
                             reason = "on disconnect";
                             release = true;
                         }
-                        else if (!IsChainNearlySyncd() && !IsNodePingAcceptable(next.node))
-                        {
-                            reason = "bad ping time";
-                            release = true;
-                        }
                         if (release)
                         {
                             LOCK(cs_vNodes);
@@ -674,40 +684,4 @@ void CRequestManager::SendRequests()
             }
         }
     }
-}
-
-bool CRequestManager::IsNodePingAcceptable(CNode *pfrom)
-{
-    if (pfrom->nPingUsecTime < ACCEPTABLE_PING_USEC)
-        return true;
-
-    // Calculate average ping time of all nodes
-    uint16_t nValidNodes = 0;
-    std::vector<uint64_t> vPingTimes;
-    LOCK(cs_vNodes);
-    BOOST_FOREACH (CNode *pnode, vNodes)
-    {
-        if (!pnode->fDisconnect && pnode->nPingUsecTime > 0)
-        {
-            nValidNodes++;
-            vPingTimes.push_back(pnode->nPingUsecTime);
-        }
-    }
-    if (nValidNodes < 10) // Take anything if we are poorly connected
-        return true;
-
-    // Calculate Standard Deviation and Mean of Ping Time
-    using namespace boost::accumulators;
-    accumulator_set<double, stats<tag::variance> > acc;
-    acc = for_each(vPingTimes.begin(), vPingTimes.end(), acc);
-    double nMean = mean(acc);
-    double sDeviation = sqrt(variance(acc));
-
-    // If node ping time is greater than the average plus 2 times the standard deviation, or
-    // the pong has not been received, then do not request from this node.
-    if ((pfrom->nPingUsecTime > (int64_t)(nMean + (2 * sDeviation))) || (pfrom->nPingUsecTime == 0))
-    {
-        return false;
-    }
-    return true;
 }
