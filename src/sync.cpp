@@ -310,7 +310,6 @@ void CSharedCriticalSection::lock_shared()
     {
         boost::unique_lock<boost::mutex> lock(setlock);
         assert(exclusiveOwner != tid);
-        assert(sharedowners.find(tid) == sharedowners.end());
         auto alreadyLocked = sharedowners.find(tid);
         if (alreadyLocked != sharedowners.end())
         {
