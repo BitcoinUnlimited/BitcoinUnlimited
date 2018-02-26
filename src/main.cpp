@@ -2423,7 +2423,6 @@ bool ConnectBlock(const CBlock &block,
 
                     if ((inOrphanCache) || (!inVerifiedCache && !inOrphanCache))
                     {
-                        LogPrint("parallel_2", "checking inputs for tx: %d\n", i);
                         if (inOrphanCache)
                             nOrphansChecked++;
 
