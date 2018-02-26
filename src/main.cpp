@@ -87,7 +87,7 @@ bool fRequireStandard = true;
 unsigned int nBytesPerSigOp = DEFAULT_BYTES_PER_SIGOP;
 bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
-size_t nCoinCacheUsage = 5000 * 300;
+int64_t nCoinCacheUsage = 0;
 uint64_t nPruneTarget = 0;
 uint32_t nXthinBloomFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE;
 
@@ -2626,7 +2626,12 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
         {
             nLastSetChain = nNow;
         }
-        size_t cacheSize = pcoinsTip->DynamicMemoryUsage();
+
+        // If possible adjust the max size of the coin cache (nCoinCacheUsage) based on current available memory. Do
+        // this before determinining whether to flush the cache or not in the steps that follow.
+        AdjustCoinCacheSize();
+
+        int64_t cacheSize = pcoinsTip->DynamicMemoryUsage();
         static int64_t nSizeAfterLastFlush = 0;
         // The cache is close to the limit. Try to flush and trim.
         bool fCacheCritical = ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > nCoinCacheUsage * 0.995)) ||
@@ -2695,7 +2700,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
             else
             {
                 // Trim, but never trim more than nMaxCacheIncreaseSinceLastFlush
-                size_t nTrimSize = nCoinCacheUsage * .90;
+                int64_t nTrimSize = nCoinCacheUsage * .90;
                 if (nCoinCacheUsage - nMaxCacheIncreaseSinceLastFlush > nTrimSize)
                     nTrimSize = nCoinCacheUsage - nMaxCacheIncreaseSinceLastFlush;
                 pcoinsTip->Trim(nTrimSize);
@@ -2713,7 +2718,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
         // As a safeguard, periodically check and correct any drift in the value of cachedCoinsUsage.  While a
         // correction should never be needed, resetting the value allows the node to continue operating, and only
         // an error is reported if the new and old values do not match.
-        if (fPeriodicFlush)
+        if (fPeriodicFlush || nCoinCacheUsage < 0)
             pcoinsTip->ResetCachedCoinUsage();
     }
     catch (const std::runtime_error &e)
@@ -4637,7 +4642,7 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
         }
         // check level 3: check for inconsistencies during memory-only disconnect of tip blocks
         if (nCheckLevel >= 3 && pindex == pindexState &&
-            (coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheUsage)
+            (int64_t)(coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheUsage)
         {
             bool fClean = true;
             DisconnectResult res = DisconnectBlock(block, pindex, coins);
