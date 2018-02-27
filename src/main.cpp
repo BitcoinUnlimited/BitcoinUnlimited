@@ -293,8 +293,6 @@ void FinalizeNode(NodeId nodeid)
 
     for (const QueuedBlock &entry : state->vBlocksInFlight)
     {
-        printf("erasing map mapblocksinflight entries\n");
-
         LOGA("erasing map mapblocksinflight entries\n");
         mapBlocksInFlight.erase(entry.hash);
     }
@@ -364,7 +362,7 @@ static bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 pnode->nMaxBlocksInTransit.store(16);
             }
 
-            LOG(THIN, "Average block response time is %.2f seconds\n", pnode->nAvgBlkResponseTime);
+            LOG(THIN | BLK, "Average block response time is %.2f seconds\n", pnode->nAvgBlkResponseTime);
         }
 
         // if there are no blocks in flight then ask for a few more blocks
@@ -379,7 +377,7 @@ static bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         {
             BLOCK_DOWNLOAD_WINDOW = blockDownloadWindow.value;
         }
-        LOG(THIN, "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %d\n", BLOCK_DOWNLOAD_WINDOW,
+        LOG(THIN | BLK, "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %d\n", BLOCK_DOWNLOAD_WINDOW,
             pnode->nMaxBlocksInTransit.load());
 
         if (IsChainNearlySyncd())

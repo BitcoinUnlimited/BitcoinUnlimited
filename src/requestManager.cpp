@@ -632,7 +632,7 @@ void CRequestManager::SendRequests()
             }
             iter.first->PushMessage(NetMsgType::GETDATA, iter.second);
             ENTER_CRITICAL_SECTION(cs_objDownloader);
-            LOG(REQ, "Sent batched rqst with %d blocks to node %s\n", iter.second.size(), iter.first->GetLogName());
+            LOG(REQ, "Sent batched request with %d blocks to node %s\n", iter.second.size(), iter.first->GetLogName());
         }
 
         LOCK(cs_vNodes);
