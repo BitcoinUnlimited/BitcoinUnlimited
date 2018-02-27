@@ -149,6 +149,12 @@ public:
     void Rejected(const CInv &obj, CNode *from, unsigned char reason = 0);
 
     void SendRequests();
+
+    // Check whether the last unknown block a peer advertised is not yet known.
+    void ProcessBlockAvailability(NodeId nodeid);
+
+    // Update tracking information about which blocks a peer is assumed to have.
+    void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash);
 };
 
 

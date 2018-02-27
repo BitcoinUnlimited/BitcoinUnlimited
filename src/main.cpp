@@ -421,25 +421,6 @@ static bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
 
 // BU MarkBlockAsInFlight moved out of anonymous namespace
 
-/** Check whether the last unknown block a peer advertised is not yet known. */
-void ProcessBlockAvailability(NodeId nodeid)
-{
-    CNodeState *state = State(nodeid);
-    DbgAssert(state != NULL, return ); // node already destructed, nothing to do in production mode
-
-    if (!state->hashLastUnknownBlock.IsNull())
-    {
-        BlockMap::iterator itOld = mapBlockIndex.find(state->hashLastUnknownBlock);
-        if (itOld != mapBlockIndex.end() && itOld->second->nChainWork > 0)
-        {
-            if (state->pindexBestKnownBlock == NULL ||
-                itOld->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
-                state->pindexBestKnownBlock = itOld->second;
-            state->hashLastUnknownBlock.SetNull();
-        }
-    }
-}
-
 
 // Requires cs_main
 bool PeerHasHeader(CNodeState *state, CBlockIndex *pindex)
@@ -487,7 +468,7 @@ static void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vec
     DbgAssert(state != NULL, return );
 
     // Make sure pindexBestKnownBlock is up to date, we'll need it.
-    ProcessBlockAvailability(nodeid);
+    requester.ProcessBlockAvailability(nodeid);
 
     if (state->pindexBestKnownBlock == NULL || state->pindexBestKnownBlock->nChainWork < chainActive.Tip()->nChainWork)
     {
@@ -570,28 +551,6 @@ static void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vec
 }
 
 } // anon namespace
-
-/** Update tracking information about which blocks a peer is assumed to have. */
-void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash)
-{
-    CNodeState *state = State(nodeid);
-    DbgAssert(state != NULL, return ); // node already destructed, nothing to do in production mode
-
-    ProcessBlockAvailability(nodeid);
-
-    BlockMap::iterator it = mapBlockIndex.find(hash);
-    if (it != mapBlockIndex.end() && it->second->nChainWork > 0)
-    {
-        // An actually better block was announced.
-        if (state->pindexBestKnownBlock == NULL || it->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
-            state->pindexBestKnownBlock = it->second;
-    }
-    else
-    {
-        // An unknown block was announced; just assume that the latest one is the best one.
-        state->hashLastUnknownBlock = hash;
-    }
-}
 
 void MarkBlockAsInFlight(NodeId nodeid,
     const uint256 &hash,
@@ -5883,7 +5842,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             if (inv.type == MSG_BLOCK)
             {
-                UpdateBlockAvailability(pfrom->GetId(), inv.hash);
+                requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
                 // RE !IsInitialBlockDownload(): We do not want to get the block if the system is executing the initial
                 // block download because
                 // blocks are stored in block files in the order of arrival.  So grabbing blocks "early" will cause new
@@ -6320,7 +6279,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
                 // update hashLastUnknownBlock so that we'll be able to download the block from this peer even
                 // if we receive the headers, which will connect this one, from a different peer.
-                UpdateBlockAvailability(pfrom->GetId(), hash);
+                requester.UpdateBlockAvailability(pfrom->GetId(), hash);
             }
 
             hashLastBlock = header.GetHash();
@@ -6400,7 +6359,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
 
         if (pindexLast)
-            UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
+            requester.UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
 
         if (nCount == MAX_HEADERS_RESULTS && pindexLast)
         {
@@ -6418,7 +6377,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             LOCK(cs_vNodes);
             for (CNode *pnode : vNodes)
             {
-                UpdateBlockAvailability(pnode->GetId(), pindexLast->GetBlockHash());
+                requester.UpdateBlockAvailability(pnode->GetId(), pindexLast->GetBlockHash());
             }
         }
 
@@ -7252,7 +7211,7 @@ bool SendMessages(CNode *pto)
         // If we don't do this then we'll end up downloading blocks all from one peer.
         if (IsInitialBlockDownload() && state.pindexBestKnownBlock == nullptr)
         {
-            UpdateBlockAvailability(pto->GetId(), pindexBestHeader->GetBlockHash());
+            requester.UpdateBlockAvailability(pto->GetId(), pindexBestHeader->GetBlockHash());
         }
 
         // If a sync has been started check whether we received the first batch of headers requested within the timeout
@@ -7328,7 +7287,7 @@ bool SendMessages(CNode *pto)
             std::vector<CBlock> vHeaders;
             bool fRevertToInv = (!state.fPreferHeaders || pto->vBlockHashesToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
             CBlockIndex *pBestIndex = NULL; // last header queued for delivery
-            ProcessBlockAvailability(pto->id); // ensure pindexBestKnownBlock is up-to-date
+            requester.ProcessBlockAvailability(pto->id); // ensure pindexBestKnownBlock is up-to-date
 
             if (!fRevertToInv)
             {

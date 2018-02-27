@@ -12,6 +12,7 @@
 #include "leakybucket.h"
 #include "main.h"
 #include "net.h"
+#include "nodestate.h"
 #include "parallel.h"
 #include "primitives/block.h"
 #include "rpc/server.h"
@@ -177,18 +178,39 @@ void CRequestManager::AskFor(const std::vector<CInv> &objArray, CNode *from, uns
 
 void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *from, unsigned int priority)
 {
-    // add from this node first so that they get requested first.
+    // must maintain correct locking order:  cs_main, then cs_objDownloader, then cs_vNodes.
+    AssertLockHeld(cs_main);
+
+    // This is block and peer that was selected in FindNextBlocksToDownload() so we want to add it as a block
+    // source first so that it gets requested first.
     LOCK(cs_objDownloader);
     AskFor(objArray, from, priority);
 
-    // Must lock cs_objDownloader here and before cs_vNodes to maintain proper locking order.
+    // Add the other peers as potential sources in the event the RequestManager needs to make a re-request
+    // for this block. Only add NETWORK nodes that have block availability.
     LOCK(cs_vNodes);
     for (CNode *pnode : vNodes)
     {
+        // skip the peer we added above
         if (pnode == from)
             continue;
+        // skip non NETWORK nodes
+        if (pnode->fClient)
+            continue;
 
-        AskFor(objArray, pnode, priority);
+        // Make sure pindexBestKnownBlock is up to date.
+        ProcessBlockAvailability(pnode->id);
+
+        // check block availability for this peer and only askfor a block if it is available.
+        CNodeState *state = State(pnode->id);
+        if (state != nullptr)
+        {
+            if (state->pindexBestKnownBlock != nullptr &&
+                state->pindexBestKnownBlock->nChainWork > chainActive.Tip()->nChainWork)
+            {
+                AskFor(objArray, pnode, priority);
+            }
+        }
     }
 }
 
@@ -728,5 +750,54 @@ void CRequestManager::SendRequests()
                 }
             }
         }
+    }
+}
+
+// Check whether the last unknown block a peer advertised is not yet known.
+void CRequestManager::ProcessBlockAvailability(NodeId nodeid)
+{
+    AssertLockHeld(cs_main);
+
+    CNodeState *state = State(nodeid);
+    DbgAssert(state != nullptr, return );
+
+    if (!state->hashLastUnknownBlock.IsNull())
+    {
+        BlockMap::iterator itOld = mapBlockIndex.find(state->hashLastUnknownBlock);
+        if (itOld != mapBlockIndex.end() && itOld->second->nChainWork > 0)
+        {
+            if (state->pindexBestKnownBlock == nullptr ||
+                itOld->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
+            {
+                state->pindexBestKnownBlock = itOld->second;
+            }
+            state->hashLastUnknownBlock.SetNull();
+        }
+    }
+}
+
+// Update tracking information about which blocks a peer is assumed to have.
+void CRequestManager::UpdateBlockAvailability(NodeId nodeid, const uint256 &hash)
+{
+    AssertLockHeld(cs_main);
+
+    CNodeState *state = State(nodeid);
+    DbgAssert(state != nullptr, return );
+
+    ProcessBlockAvailability(nodeid);
+
+    BlockMap::iterator it = mapBlockIndex.find(hash);
+    if (it != mapBlockIndex.end() && it->second->nChainWork > 0)
+    {
+        // An actually better block was announced.
+        if (state->pindexBestKnownBlock == nullptr || it->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
+        {
+            state->pindexBestKnownBlock = it->second;
+        }
+    }
+    else
+    {
+        // An unknown block was announced; just assume that the latest one is the best one.
+        state->hashLastUnknownBlock = hash;
     }
 }
