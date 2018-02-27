@@ -107,15 +107,11 @@ extern std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED
 int64_t nLastOrphanCheck = GetTime(); // Used in EraseOrphansByTime()
 static uint64_t nBytesOrphanPool = 0; // Current in memory size of the orphan pool.
 
-/** Size of the "block download window": how far ahead of our current height do we fetch?
- *  Larger windows tolerate larger download speed differences between peer, but increase the potential
- *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
- *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
-static unsigned int BLOCK_DOWNLOAD_WINDOW = 1024;
-
 extern CTweak<unsigned int> maxBlocksInTransitPerPeer; // override the above
 extern CTweak<unsigned int> blockDownloadWindow;
 extern CTweak<uint64_t> reindexTypicalBlockSize;
+
+extern unsigned int BLOCK_DOWNLOAD_WINDOW;
 
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
 extern CCriticalSection cs_mapInboundConnectionTracker;
@@ -431,125 +427,6 @@ bool PeerHasHeader(CNodeState *state, CBlockIndex *pindex)
         return true;
     return false;
 }
-
-/** Find the last common ancestor two blocks have.
- *  Both pa and pb must be non-NULL. */
-CBlockIndex *LastCommonAncestor(CBlockIndex *pa, CBlockIndex *pb)
-{
-    if (pa->nHeight > pb->nHeight)
-    {
-        pa = pa->GetAncestor(pb->nHeight);
-    }
-    else if (pb->nHeight > pa->nHeight)
-    {
-        pb = pb->GetAncestor(pa->nHeight);
-    }
-
-    while (pa != pb && pa && pb)
-    {
-        pa = pa->pprev;
-        pb = pb->pprev;
-    }
-
-    // Eventually all chain branches meet at the genesis block.
-    assert(pa == pb);
-    return pa;
-}
-
-/** Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
- *  at most count entries. */
-static void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex *> &vBlocks)
-{
-    if (count == 0)
-        return;
-
-    vBlocks.reserve(vBlocks.size() + count);
-    CNodeState *state = State(nodeid);
-    DbgAssert(state != NULL, return );
-
-    // Make sure pindexBestKnownBlock is up to date, we'll need it.
-    requester.ProcessBlockAvailability(nodeid);
-
-    if (state->pindexBestKnownBlock == NULL || state->pindexBestKnownBlock->nChainWork < chainActive.Tip()->nChainWork)
-    {
-        // This peer has nothing interesting.
-        return;
-    }
-
-    if (state->pindexLastCommonBlock == NULL)
-    {
-        // Bootstrap quickly by guessing a parent of our best tip is the forking point.
-        // Guessing wrong in either direction is not a problem.
-        state->pindexLastCommonBlock =
-            chainActive[std::min(state->pindexBestKnownBlock->nHeight, chainActive.Height())];
-    }
-
-    // If the peer reorganized, our previous pindexLastCommonBlock may not be an ancestor
-    // of its current tip anymore. Go back enough to fix that.
-    state->pindexLastCommonBlock = LastCommonAncestor(state->pindexLastCommonBlock, state->pindexBestKnownBlock);
-    if (state->pindexLastCommonBlock == state->pindexBestKnownBlock)
-        return;
-
-    std::vector<CBlockIndex *> vToFetch;
-    CBlockIndex *pindexWalk = state->pindexLastCommonBlock;
-    // Never fetch further than the current chain tip + the block download window.  We need to ensure
-    // the if running in pruning mode we don't download too many blocks ahead and as a result use to
-    // much disk space to store unconnected blocks.
-    int nWindowEnd = chainActive.Height() + BLOCK_DOWNLOAD_WINDOW;
-
-    int nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
-    while (pindexWalk->nHeight < nMaxHeight)
-    {
-        // Read up to 128 (or more, if more blocks than that are needed) successors of pindexWalk (towards
-        // pindexBestKnownBlock) into vToFetch. We fetch 128, because CBlockIndex::GetAncestor may be as expensive
-        // as iterating over ~100 CBlockIndex* entries anyway.
-        int nToFetch = std::min(nMaxHeight - pindexWalk->nHeight, std::max<int>(count - vBlocks.size(), 128));
-        vToFetch.resize(nToFetch);
-        pindexWalk = state->pindexBestKnownBlock->GetAncestor(pindexWalk->nHeight + nToFetch);
-        vToFetch[nToFetch - 1] = pindexWalk;
-        for (unsigned int i = nToFetch - 1; i > 0; i--)
-        {
-            vToFetch[i - 1] = vToFetch[i]->pprev;
-        }
-
-        // Iterate over those blocks in vToFetch (in forward direction), adding the ones that
-        // are not yet downloaded and not in flight to vBlocks. In the mean time, update
-        // pindexLastCommonBlock as long as all ancestors are already downloaded, or if it's
-        // already part of our chain (and therefore don't need it even if pruned).
-        for (CBlockIndex *pindex : vToFetch)
-        {
-            if (requester.AlreadyAskedFor(pindex->GetBlockHash()))
-                continue;
-
-            if (!pindex->IsValid(BLOCK_VALID_TREE))
-            {
-                // We consider the chain that this peer is on invalid.
-                return;
-            }
-            if (pindex->nStatus & BLOCK_HAVE_DATA || chainActive.Contains(pindex))
-            {
-                if (pindex->nChainTx)
-                    state->pindexLastCommonBlock = pindex;
-            }
-            else
-            {
-                // Return if we've reached the end of the download window.
-                if (pindex->nHeight > nWindowEnd)
-                {
-                    return;
-                }
-
-                // Return if we've reached the end of the number of blocks we can download for this peer.
-                vBlocks.push_back(pindex);
-                if (vBlocks.size() == count)
-                {
-                    return;
-                }
-            }
-        }
-    }
-}
-
 } // anon namespace
 
 void MarkBlockAsInFlight(NodeId nodeid,
@@ -7503,7 +7380,7 @@ bool SendMessages(CNode *pto)
         if (!pto->fDisconnect && !pto->fClient && state.nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
         {
             std::vector<CBlockIndex *> vToDownload;
-            FindNextBlocksToDownload(
+            requester.FindNextBlocksToDownload(
                 pto->GetId(), pto->nMaxBlocksInTransit.load() - state.nBlocksInFlight, vToDownload);
             // LOG(REQ, "IBD AskFor %d blocks from peer=%s\n", vToDownload.size(), pto->GetLogName());
             std::vector<CInv> vGetBlocks;

@@ -105,12 +105,6 @@ static const unsigned int VERACK_TIMEOUT = 60;
 /** Number of headers sent in one getheaders result. We rely on the assumption that if a peer sends
  *  less than this number, we reached its tip. Changing this value is a protocol upgrade. */
 static const unsigned int MAX_HEADERS_RESULTS = 2000;
-/** Size of the "block download window": how far ahead of our current height do we fetch?
- *  Larger windows tolerate larger download speed differences between peer, but increase the potential
- *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
- *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
-// static const unsigned int BLOCK_DOWNLOAD_WINDOW = 1024;
-/** Time to wait (in seconds) between writing blocks/block index to disk. */
 static const unsigned int DATABASE_WRITE_INTERVAL = 60 * 60;
 /** Time to wait (in seconds) between flushing chainstate to disk. */
 static const unsigned int DATABASE_FLUSH_INTERVAL = 24 * 60 * 60;
