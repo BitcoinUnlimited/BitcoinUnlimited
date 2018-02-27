@@ -107,7 +107,7 @@ extern std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED
 int64_t nLastOrphanCheck = GetTime(); // Used in EraseOrphansByTime()
 static uint64_t nBytesOrphanPool = 0; // Current in memory size of the orphan pool.
 
-extern CTweak<unsigned int> maxBlocksInTransitPerPeer; // override the above
+extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
 extern CTweak<unsigned int> blockDownloadWindow;
 extern CTweak<uint64_t> reindexTypicalBlockSize;
 
@@ -235,8 +235,6 @@ int nPreferredDownload = 0;
 /** Dirty block file entries. */
 std::set<int> setDirtyFileInfo;
 
-/** Number of peers from which we're downloading blocks. */
-int nPeersWithValidatedDownloads = 0;
 } // anon namespace
 
 /** Dirty block index entries. */
@@ -293,8 +291,8 @@ void FinalizeNode(NodeId nodeid)
         mapBlocksInFlight.erase(entry.hash);
     }
     nPreferredDownload -= state->fPreferredDownload;
-    nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
-    DbgAssert(nPeersWithValidatedDownloads >= 0, nPeersWithValidatedDownloads = 0);
+    requester.nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
+    DbgAssert(requester.nPeersWithValidatedDownloads >= 0, requester.nPeersWithValidatedDownloads = 0);
 
     mapNodeState.erase(nodeid);
 
@@ -303,120 +301,9 @@ void FinalizeNode(NodeId nodeid)
         // Do a consistency check after the last peer is removed.  Force consistent state if production code
         DbgAssert(mapBlocksInFlight.empty(), mapBlocksInFlight.clear());
         DbgAssert(nPreferredDownload == 0, nPreferredDownload = 0);
-        DbgAssert(nPeersWithValidatedDownloads == 0, nPeersWithValidatedDownloads = 0);
+        DbgAssert(requester.nPeersWithValidatedDownloads == 0, requester.nPeersWithValidatedDownloads = 0);
     }
 }
-
-// Returns a bool indicating whether we requested this block.
-static bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
-{
-    AssertLockHeld(cs_main);
-
-    std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
-        mapBlocksInFlight.find(hash);
-    if (itInFlight != mapBlocksInFlight.end())
-    {
-        CNodeState *state = State(itInFlight->second.first);
-        DbgAssert(state != nullptr, return false);
-
-        int64_t getdataTime = itInFlight->second.second->nTime;
-        int64_t now = GetTimeMicros();
-        double nResponseTime = (double)(now - getdataTime) / 1000000.0;
-
-        // calculate avg block response time over a range of blocks to be used for IBD tuning.
-        static uint8_t blockRange = 50;
-        {
-            LOCK(pnode->cs_nAvgBlkResponseTime);
-            if (pnode->nAvgBlkResponseTime < 0)
-                pnode->nAvgBlkResponseTime = 2.0;
-            if (pnode->nAvgBlkResponseTime > 0)
-                pnode->nAvgBlkResponseTime -= (pnode->nAvgBlkResponseTime / blockRange);
-            pnode->nAvgBlkResponseTime += nResponseTime / blockRange;
-
-            if (pnode->nAvgBlkResponseTime < 0.2)
-            {
-                pnode->nMaxBlocksInTransit.store(64);
-            }
-            else if (pnode->nAvgBlkResponseTime < 0.5)
-            {
-                pnode->nMaxBlocksInTransit.store(56);
-            }
-            else if (pnode->nAvgBlkResponseTime < 0.9)
-            {
-                pnode->nMaxBlocksInTransit.store(48);
-            }
-            else if (pnode->nAvgBlkResponseTime < 1.4)
-            {
-                pnode->nMaxBlocksInTransit.store(32);
-            }
-            else if (pnode->nAvgBlkResponseTime < 2.0)
-            {
-                pnode->nMaxBlocksInTransit.store(24);
-            }
-            else
-            {
-                pnode->nMaxBlocksInTransit.store(16);
-            }
-
-            LOG(THIN | BLK, "Average block response time is %.2f seconds\n", pnode->nAvgBlkResponseTime);
-        }
-
-        // if there are no blocks in flight then ask for a few more blocks
-        if (state->nBlocksInFlight <= 0)
-            pnode->nMaxBlocksInTransit.fetch_add(4);
-
-        if (maxBlocksInTransitPerPeer.value != 0)
-        {
-            pnode->nMaxBlocksInTransit.store(maxBlocksInTransitPerPeer.value);
-        }
-        if (blockDownloadWindow.value != 0)
-        {
-            BLOCK_DOWNLOAD_WINDOW = blockDownloadWindow.value;
-        }
-        LOG(THIN | BLK, "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %d\n", BLOCK_DOWNLOAD_WINDOW,
-            pnode->nMaxBlocksInTransit.load());
-
-        if (IsChainNearlySyncd())
-        {
-            LOCK(cs_vNodes);
-            for (CNode *pnode : vNodes)
-            {
-                if (pnode->mapThinBlocksInFlight.size() > 0)
-                {
-                    LOCK(pnode->cs_mapthinblocksinflight);
-                    if (pnode->mapThinBlocksInFlight.count(hash))
-                    {
-                        // Only update thinstats if this is actually a thinblock and not a regular block.
-                        // Sometimes we request a thinblock but then revert to requesting a regular block
-                        // as can happen when the thinblock preferential timer is exceeded.
-                        thindata.UpdateResponseTime(nResponseTime);
-                        break;
-                    }
-                }
-            }
-        }
-        // BUIP010 Xtreme Thinblocks: end section
-        state->nBlocksInFlightValidHeaders -= itInFlight->second.second->fValidatedHeaders;
-        if (state->nBlocksInFlightValidHeaders == 0 && itInFlight->second.second->fValidatedHeaders)
-        {
-            // Last validated block on the queue was received.
-            nPeersWithValidatedDownloads--;
-        }
-        if (state->vBlocksInFlight.begin() == itInFlight->second.second)
-        {
-            // First block on the queue was received, update the start download time for the next one
-            state->nDownloadingSince = std::max(state->nDownloadingSince, GetTimeMicros());
-        }
-        state->vBlocksInFlight.erase(itInFlight->second.second);
-        state->nBlocksInFlight--;
-        mapBlocksInFlight.erase(itInFlight);
-        return true;
-    }
-    return false;
-}
-
-// BU MarkBlockAsInFlight moved out of anonymous namespace
-
 
 // Requires cs_main
 bool PeerHasHeader(CNodeState *state, CBlockIndex *pindex)
@@ -429,41 +316,6 @@ bool PeerHasHeader(CNodeState *state, CBlockIndex *pindex)
 }
 } // anon namespace
 
-void MarkBlockAsInFlight(NodeId nodeid,
-    const uint256 &hash,
-    const Consensus::Params &consensusParams,
-    CBlockIndex *pindex = NULL)
-{
-    LOCK(cs_main);
-    CNodeState *state = State(nodeid);
-    DbgAssert(state != NULL, return );
-
-    // If started then clear the thinblock timer used for preferential downloading
-    thindata.ClearThinBlockTimer(hash);
-
-    // BU why mark as received? because this erases it from the inflight list.  Instead we'll check for it
-    // BU removed: MarkBlockAsReceived(hash);
-    std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
-        mapBlocksInFlight.find(hash);
-    if (itInFlight == mapBlocksInFlight.end()) // If it hasn't already been marked inflight...
-    {
-        int64_t nNow = GetTimeMicros();
-        QueuedBlock newentry = {hash, pindex, nNow, pindex != NULL};
-        std::list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
-        state->nBlocksInFlight++;
-        state->nBlocksInFlightValidHeaders += newentry.fValidatedHeaders;
-        if (state->nBlocksInFlight == 1)
-        {
-            // We're starting a block download (batch) from this peer.
-            state->nDownloadingSince = GetTimeMicros();
-        }
-        if (state->nBlocksInFlightValidHeaders == 1 && pindex != NULL)
-        {
-            nPeersWithValidatedDownloads++;
-        }
-        mapBlocksInFlight[hash] = std::make_pair(nodeid, it);
-    }
-}
 
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
@@ -3996,7 +3848,7 @@ bool ProcessNewBlock(CValidationState &state,
     {
         LOCK(cs_main);
         uint256 hash = pblock->GetHash();
-        bool fRequested = MarkBlockAsReceived(hash, pfrom);
+        bool fRequested = requester.MarkBlockAsReceived(hash, pfrom);
         fRequested |= fForceProcessing;
         if (!checked)
         {
@@ -7362,7 +7214,7 @@ bool SendMessages(CNode *pto)
         {
             QueuedBlock &queuedBlock = state.vBlocksInFlight.front();
             int nOtherPeersWithValidatedDownloads =
-                nPeersWithValidatedDownloads - (state.nBlocksInFlightValidHeaders > 0);
+                requester.nPeersWithValidatedDownloads - (state.nBlocksInFlightValidHeaders > 0);
             if (nNow > state.nDownloadingSince +
                            consensusParams.nPowTargetSpacing *
                                (BLOCK_DOWNLOAD_TIMEOUT_BASE +
