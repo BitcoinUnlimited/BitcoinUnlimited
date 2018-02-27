@@ -6099,14 +6099,24 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 pfrom->GetLogName(), pfrom->nStartingHeight);
             pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexLast), uint256());
 
-            // If we are here then we are beginning the process of IBD where we download all the headers.
-            // As a result we need to assume that every connected node is a full node and has all the
-            // blocks that we need.  Therefore, update block availability for every connected node. If we
-            // don't do this, then at the beginning of IBD we will end up only downloading from one peer.
-            LOCK(cs_vNodes);
-            for (CNode *pnode : vNodes)
+            // During the process of IBD we need to update block availability for every connected peer. To do that we
+            // request, from each NODE_NETWORK peer, a header that matches the last blockhash found in this recent set
+            // of headers. Once the reqeusted header is received then the block availability for this peer will get
+            // updated.
+            if (IsInitialBlockDownload())
             {
-                requester.UpdateBlockAvailability(pnode->GetId(), pindexLast->GetBlockHash());
+                LOCK(cs_vNodes);
+                for (CNode *pnode : vNodes)
+                {
+                    if (!pnode->fClient && pnode != pfrom)
+                    {
+                        // We only want one single header so we pass a null for CBlockLocator.
+                        pnode->PushMessage(NetMsgType::GETHEADERS, CBlockLocator(), pindexLast->GetBlockHash());
+                        LOG(NET | BLK, "Requesting header for blockavailability, peer=%s block=%s height=%d\n",
+                            pnode->GetLogName(), pindexLast->GetBlockHash().ToString().c_str(),
+                            pindexBestHeader->nHeight);
+                    }
+                }
             }
         }
 
@@ -6936,17 +6946,9 @@ bool SendMessages(CNode *pto)
 
         CNodeState &state = *State(pto->GetId());
 
-        // We need to update any newly connected peers with a best header if we are doing an initial sync.
-        // If we don't do this then we'll end up downloading blocks all from one peer.
-        if (IsInitialBlockDownload() && state.pindexBestKnownBlock == nullptr)
-        {
-            requester.UpdateBlockAvailability(pto->GetId(), pindexBestHeader->GetBlockHash());
-        }
-
         // If a sync has been started check whether we received the first batch of headers requested within the timeout
-        // period.
-        // If not then disconnect and ban the node and a new node will automatically be selected to start the headers
-        // download.
+        // period. If not then disconnect and ban the node and a new node will automatically be selected to start the
+        // headers download.
         if ((state.fSyncStarted) && (state.fSyncStartTime < GetTime() - INITIAL_HEADERS_TIMEOUT) &&
             (!state.fFirstHeadersReceived) && !pto->fWhitelisted)
         {
@@ -6983,6 +6985,7 @@ bool SendMessages(CNode *pto)
                     state.fSyncStarted = true;
                     state.fSyncStartTime = GetTime();
                     state.fFirstHeadersReceived = false;
+                    state.fRequestedInitialBlockAvailability = true;
                     state.nFirstHeadersExpectedHeight = pindexBestHeader->nHeight;
                     nSyncStarted++;
 
@@ -6990,6 +6993,24 @@ bool SendMessages(CNode *pto)
                         pto->GetLogName(), pto->nStartingHeight);
                     pto->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexStart), uint256());
                 }
+            }
+        }
+
+        // During IBD and when a new NODE_NETWORK peer connects we have to ask for if it has our best header in order
+        // to update our block availability. We only want/need to do this only once per peer (if the initial batch of
+        // headers has still not been etirely donwnloaded yet then the block availability will be updated during that
+        // process rather than here).
+        if (IsInitialBlockDownload() && !state.fRequestedInitialBlockAvailability &&
+            state.pindexBestKnownBlock == nullptr && !fReindex && !fImporting)
+        {
+            if (!pto->fClient)
+            {
+                state.fRequestedInitialBlockAvailability = true;
+
+                // We only want one single header so we pass a null CBlockLocator.
+                pto->PushMessage(NetMsgType::GETHEADERS, CBlockLocator(), pindexBestHeader->GetBlockHash());
+                LOG(NET | BLK, "Requesting header for initial blockavailability, peer=%s block=%s height=%d\n",
+                    pto->GetLogName(), pindexBestHeader->GetBlockHash().ToString().c_str(), pindexBestHeader->nHeight);
             }
         }
 
