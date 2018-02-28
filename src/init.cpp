@@ -33,6 +33,7 @@
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "scheduler.h"
+#include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
 #include "torcontrol.h"
@@ -893,6 +894,9 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     LOGA("Using config file %s\n", GetConfigFile(GetArg("-conf", BITCOIN_CONF_FILENAME)).string());
     LOGA("Using at most %i connections (%i file descriptors available)\n", nMaxConnections, nFD);
     std::ostringstream strErrors;
+
+    InitSignatureCache();
+    InitScriptExecutionCache();
 
     // -par=0 means autodetect, but passing 0 to the CParallelValidation constructor means no concurrency
     int nPVThreads = GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
