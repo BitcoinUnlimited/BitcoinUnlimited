@@ -13,6 +13,7 @@
 #include "sync.h"
 #include "util.h"
 
+CCriticalSection cs_scriptcache;
 static CuckooCache::cache<uint256, SignatureCacheHasher> scriptExecutionCache;
 static uint256 scriptExecutionCacheNonce(GetRandHash());
 
@@ -46,16 +47,12 @@ uint256 GetScriptCacheKey(const CTransaction &tx, uint32_t flags)
 
 bool IsKeyInScriptCache(uint256 key, bool erase)
 {
-    // TODO: Remove this requirement by making CuckooCache not require external
-    // locks
-    AssertLockHeld(cs_main);
+    LOCK(cs_scriptcache);
     return scriptExecutionCache.contains(key, erase);
 }
 
 void AddKeyInScriptCache(uint256 key)
 {
-    // TODO: Remove this requirement by making CuckooCache not require external
-    // locks
-    AssertLockHeld(cs_main);
+    LOCK(cs_scriptcache);
     scriptExecutionCache.insert(key);
 }
