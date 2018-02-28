@@ -243,8 +243,8 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
 
     allowedArgs
         .addArg("maxsigcachesize=<n>", requiredInt,
-            strprintf(
-                    _("Limit sum of signature cache and script execution cache sizes to <n> MiB (default: %u)"), DEFAULT_MAX_SIG_CACHE_SIZE))
+            strprintf(_("Limit sum of signature cache and script execution cache sizes to <n> MiB (default: %u)"),
+                    DEFAULT_MAX_SIG_CACHE_SIZE))
         .addArg("dbcache=<n>", requiredInt, strprintf(_("Set database cache size in megabytes (%d to %d, default: %d)"),
                                                 nMinDbCache, nMaxDbCache, nDefaultDbCache))
         .addArg("loadblock=<file>", requiredStr, _("Imports blocks from external blk000??.dat file on startup"))
