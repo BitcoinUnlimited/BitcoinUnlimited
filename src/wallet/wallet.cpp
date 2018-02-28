@@ -6,6 +6,7 @@
 
 #include "wallet/wallet.h"
 
+#include "blockdb/blockdb_wrapper.h"
 #include "chain.h"
 #include "checkpoints.h"
 #include "coincontrol.h"

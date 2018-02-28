@@ -50,13 +50,8 @@ class CValidationState;
 struct CNodeStateStats;
 struct LockPoints;
 
-enum FlushStateMode
-{
-    FLUSH_STATE_NONE,
-    FLUSH_STATE_IF_NEEDED,
-    FLUSH_STATE_PERIODIC,
-    FLUSH_STATE_ALWAYS
-};
+/** Global variable that points to the coins database */
+extern CCoinsViewDB *pcoinsdbview;
 
 /** Default for DEFAULT_WHITELISTRELAY. */
 static const bool DEFAULT_WHITELISTRELAY = true;
@@ -269,12 +264,6 @@ bool ProcessNewBlock(CValidationState &state,
 bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusParams, const bool fRollBack = false);
 /** Check whether enough disk space is available for an incoming block */
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
-/** Open a block file (blk?????.dat) */
-FILE *OpenBlockFile(const CDiskBlockPos &pos, bool fReadOnly = false);
-/** Open an undo file (rev?????.dat) */
-FILE *OpenUndoFile(const CDiskBlockPos &pos, bool fReadOnly = false);
-/** Translation to a filesystem path */
-fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
 /** Import blocks from an external file */
 bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskBlockPos *dbp = nullptr);
 /** Initialize a new block tree database + block data on disk */
@@ -333,39 +322,10 @@ bool ActivateBestChain(CValidationState &state,
     bool fParallel = false);
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
 
-/**
- * Prune block and undo files (blk???.dat and undo???.dat) so that the disk space used is less than a user-defined
- * target.
- * The user sets the target (in MB) on the command line or in config file.  This will be run on startup and whenever new
- * space is allocated in a block or undo file, staying below the target. Changing back to unpruned requires a reindex
- * (which in this case means the blockchain must be re-downloaded.)
- *
- * Pruning functions are called from FlushStateToDisk when the global fCheckForPruning flag has been set.
- * Block and undo files are deleted in lock-step (when blk00003.dat is deleted, so is rev00003.dat.)
- * Pruning cannot take place until the longest chain is at least a certain length (100000 on mainnet, 1000 on testnet,
- * 1000 on regtest).
- * Pruning will never delete a block within a defined distance (currently 288) from the active chain's tip.
- * The block index is updated by unsetting HAVE_DATA and HAVE_UNDO for any blocks that were stored in the deleted files.
- * A db flag records the fact that at least some block files have been pruned.
- *
- * @param[out]   setFilesToPrune   The set of file indices that can be unlinked will be returned
- */
-void FindFilesToPrune(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight);
-
-/**
- *  Actually unlink the specified files
- */
-void UnlinkPrunedFiles(std::set<int> &setFilesToPrune);
-
 /** Create a new block index entry for a given block hash */
 CBlockIndex *InsertBlockIndex(uint256 hash);
 /** Get statistics from node state */
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats);
-/** Flush all state, indexes and buffers to disk. */
-void FlushStateToDisk();
-bool FlushStateToDisk(CValidationState &state, FlushStateMode mode);
-/** Prune block files and flush state to disk. */
-void PruneAndFlush();
 
 /** Check is Cash HF has activated. */
 bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev);
@@ -494,11 +454,6 @@ public:
 };
 
 
-/** Functions for disk access for blocks */
-bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHeader::MessageStartChars &messageStart);
-bool ReadBlockFromDisk(CBlock &block, const CDiskBlockPos &pos, const Consensus::Params &consensusParams);
-bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex, const Consensus::Params &consensusParams);
-
 /** Functions for validating blocks and updating the block tree */
 
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
@@ -574,6 +529,9 @@ extern CCoinsViewCache *pcoinsTip;
 
 /** Global variable that points to the active block tree (protected by cs_main) */
 extern CBlockTreeDB *pblocktree;
+extern std::vector<CBlockFileInfo> vinfoBlockFile;
+extern int nLastBlockFile;
+
 
 extern VersionBitsCache versionbitscache;
 

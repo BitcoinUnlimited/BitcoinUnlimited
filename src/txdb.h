@@ -108,6 +108,8 @@ public:
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
     uint256 GetBestBlock() const override;
+    uint256 GetBestBlockDb() const;
+    void WriteBestBlockDb(const uint256 &hashBlock);
     bool BatchWrite(CCoinsMap &mapCoins,
         const uint256 &hashBlock,
         const uint64_t nBestCoinHeight,
@@ -167,6 +169,7 @@ public:
     bool WriteTxIndex(const std::vector<std::pair<uint256, CDiskTxPos> > &list);
     bool WriteFlag(const std::string &name, bool fValue);
     bool ReadFlag(const std::string &name, bool &fValue);
+    bool FindBlockIndex(uint256 blockhash, CBlockIndex& index);
     bool LoadBlockIndexGuts();
 };
 

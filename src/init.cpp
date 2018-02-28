@@ -12,6 +12,9 @@
 
 #include "addrman.h"
 #include "amount.h"
+#include "blockdb/blockdb_leveldb.h"
+#include "blockdb/blockdb_sequential.h"
+#include "blockdb/blockdb_wrapper.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -241,6 +244,8 @@ void Shutdown()
         pcoinsdbview = NULL;
         delete pblocktree;
         pblocktree = NULL;
+        delete pblockfull;
+        pblockfull = NULL;
     }
 #ifdef ENABLE_WALLET
     if (pwalletMain)
@@ -971,36 +976,59 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     // ********************************************************* Step 6: load block chain
 
     fReindex = GetBoolArg("-reindex", DEFAULT_REINDEX);
+    int64_t requested_block_mode = GetArg("-blockdbtype", 1);
+    // if invalid param, set to default setting,
+    if(requested_block_mode > 2 || requested_block_mode < 0)
+    {
+        BLOCK_DB_MODE = DEFAULT_BLOCK_DB_MODE;
+    }
+    /// TODO : this is not the way we want to do this, but it is fine for now
+    if(requested_block_mode == 0)
+    {
+        BLOCK_DB_MODE = SEQUENTIAL_BLOCK_FILES;
+    }
+    else if(requested_block_mode == 1)
+    {
+        BLOCK_DB_MODE = DB_BLOCK_STORAGE;
+    }
+    else if(requested_block_mode == 2)
+    {
+        BLOCK_DB_MODE = HYBRID_STORAGE;
+    }
+
 
     // Upgrading to 0.8; hard-link the old blknnnn.dat files into /blocks/
-    fs::path blocksDir = GetDataDir() / "blocks";
-    if (!fs::exists(blocksDir))
+    if(BLOCK_DB_MODE != DB_BLOCK_STORAGE)
     {
-        fs::create_directories(blocksDir);
-        bool linked = false;
-        for (unsigned int i = 1; i < 10000; i++)
+        fs::path blocksDir = GetDataDir() / "blocks";
+        if (!fs::exists(blocksDir))
         {
-            fs::path source = GetDataDir() / strprintf("blk%04u.dat", i);
-            if (!fs::exists(source))
-                break;
-            fs::path dest = blocksDir / strprintf("blk%05u.dat", i - 1);
-            try
+            fs::create_directories(blocksDir);
+            bool linked = false;
+            for (unsigned int i = 1; i < 10000; i++)
             {
-                fs::create_hard_link(source, dest);
-                LOGA("Hardlinked %s -> %s\n", source.string(), dest.string());
-                linked = true;
-            }
-            catch (const fs::filesystem_error &e)
-            {
+                fs::path source = GetDataDir() / strprintf("blk%04u.dat", i);
+                if (!fs::exists(source))
+                    break;
+                fs::path dest = blocksDir / strprintf("blk%05u.dat", i - 1);
+                try
+                {
+                    fs::create_hard_link(source, dest);
+                    LOGA("Hardlinked %s -> %s\n", source.string(), dest.string());
+                    linked = true;
+                }
+                catch (const fs::filesystem_error &e)
+                {
                 // Note: hardlink creation failing is not a disaster, it just means
                 // blocks will get re-downloaded from peers.
-                LOGA("Error hardlinking blk%04u.dat: %s\n", i, e.what());
-                break;
+                    LOGA("Error hardlinking blk%04u.dat: %s\n", i, e.what());
+                    break;
+                }
             }
-        }
-        if (linked)
-        {
-            fReindex = true;
+            if (linked)
+            {
+                fReindex = true;
+            }
         }
     }
 
@@ -1029,9 +1057,11 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 delete pcoinsdbview;
                 delete pcoinscatcher;
                 delete pblocktree;
+                delete pblockfull;
 
                 uiInterface.InitMessage(_("Opening Block database..."));
                 pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
+                pblockfull = new CFullBlockDB(nBlockTreeDBCache, false, false);
                 uiInterface.InitMessage(_("Opening UTXO database..."));
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
@@ -1109,7 +1139,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                         break;
                     }
                 }
-
                 if (!CVerifyDB().VerifyDB(chainparams, pcoinsdbview, GetArg("-checklevel", DEFAULT_CHECKLEVEL),
                         GetArg("-checkblocks", DEFAULT_CHECKBLOCKS)))
                 {

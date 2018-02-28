@@ -3,7 +3,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "unlimited.h"
+
 #include "base58.h"
+#include "blockdb/blockdb_wrapper.h"
 #include "cashaddrenc.h"
 #include "chain.h"
 #include "chainparams.h"
