@@ -13,7 +13,7 @@
 #include "sync.h"
 #include "util.h"
 
-CCriticalSection cs_scriptcache;
+boost::shared_mutex cs_scriptcache;
 static CuckooCache::cache<uint256, SignatureCacheHasher> scriptExecutionCache;
 static uint256 scriptExecutionCacheNonce(GetRandHash());
 
@@ -47,12 +47,12 @@ uint256 GetScriptCacheKey(const CTransaction &tx, uint32_t flags)
 
 bool IsKeyInScriptCache(uint256 key, bool erase)
 {
-    LOCK(cs_scriptcache);
+    boost::shared_lock<boost::shared_mutex> lock(cs_scriptcache);
     return scriptExecutionCache.contains(key, erase);
 }
 
 void AddKeyInScriptCache(uint256 key)
 {
-    LOCK(cs_scriptcache);
+    boost::unique_lock<boost::shared_mutex> lock(cs_scriptcache);
     scriptExecutionCache.insert(key);
 }
