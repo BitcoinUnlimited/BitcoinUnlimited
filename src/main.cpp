@@ -114,7 +114,7 @@ static unsigned int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 1;
  *  Larger windows tolerate larger download speed differences between peer, but increase the potential
  *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
  *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
-static unsigned int BLOCK_DOWNLOAD_WINDOW = 256;
+static unsigned int BLOCK_DOWNLOAD_WINDOW = 1024;
 
 extern CTweak<unsigned int> maxBlocksInTransitPerPeer; // override the above
 extern CTweak<unsigned int> blockDownloadWindow;
@@ -371,6 +371,7 @@ bool MarkBlockAsReceived(const uint256 &hash)
         LOG(THIN, "BLOCK_DOWNLOAD_WINDOW is %d MAX_BLOCKS_IN_TRANSIT_PER_PEER is %d\n", BLOCK_DOWNLOAD_WINDOW,
             MAX_BLOCKS_IN_TRANSIT_PER_PEER);
 
+        if (IsChainNearlySyncd())
         {
             LOCK(cs_vNodes);
             BOOST_FOREACH (CNode *pnode, vNodes)
@@ -6416,6 +6417,16 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             LOG(NET, "more getheaders (%d) to end to peer=%s (startheight:%d)\n", pindexLast->nHeight,
                 pfrom->GetLogName(), pfrom->nStartingHeight);
             pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexLast), uint256());
+
+            // If we are here then we are beginning the process of IBD where we download all the headers.
+            // As a result we need to assume that every connected node is a full node and has all the
+            // blocks that we need.  Therefore, update block availability for every connected node. If we
+            // don't do this, then at the beginning of IBD we will end up only downloading from one peer.
+            LOCK(cs_vNodes);
+            for (CNode *pnode : vNodes)
+            {
+                UpdateBlockAvailability(pnode->GetId(), pindexLast->GetBlockHash());
+            }
         }
 
         bool fCanDirectFetch = CanDirectFetch(chainparams.GetConsensus());
@@ -7244,6 +7255,13 @@ bool SendMessages(CNode *pto)
 
         CNodeState &state = *State(pto->GetId());
 
+        // We need to update any newly connected peers with a best header if we are doing an initial sync.
+        // If we don't do this then we'll end up downloading blocks all from one peer.
+        if (IsInitialBlockDownload() && state.pindexBestKnownBlock == nullptr)
+        {
+            UpdateBlockAvailability(pto->GetId(), pindexBestHeader->GetBlockHash());
+        }
+
         // If a sync has been started check whether we received the first batch of headers requested within the timeout
         // period.
         // If not then disconnect and ban the node and a new node will automatically be selected to start the headers
@@ -7530,27 +7548,35 @@ bool SendMessages(CNode *pto)
         //
         // Message: getdata (blocks)
         //
-        std::vector<CInv> vGetData;
         if (!pto->fDisconnect && !pto->fClient && state.nBlocksInFlight < (int)MAX_BLOCKS_IN_TRANSIT_PER_PEER)
         {
             std::vector<CBlockIndex *> vToDownload;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload);
             // LOG(REQ, "IBD AskFor %d blocks from peer=%s\n", vToDownload.size(), pto->GetLogName());
+            std::vector<CInv> vGetBlocks;
             for (CBlockIndex *pindex : vToDownload)
             {
                 CInv inv(MSG_BLOCK, pindex->GetBlockHash());
                 if (!AlreadyHave(inv))
                 {
-                    requester.AskFor(inv, pto);
+                    vGetBlocks.emplace_back(inv);
                     // LOG(REQ, "AskFor block %s (%d) peer=%s\n", pindex->GetBlockHash().ToString(),
-                    //  pindex->nHeight, pto->GetLogName());
+                    //     pindex->nHeight, pto->GetLogName());
                 }
+            }
+            if (!vGetBlocks.empty())
+            {
+                if (!IsInitialBlockDownload())
+                    requester.AskFor(vGetBlocks, pto);
+                else
+                    requester.AskForDuringIBD(vGetBlocks, pto);
             }
         }
 
         //
         // Message: getdata (non-blocks)
         //
+        std::vector<CInv> vGetData;
         while (!pto->fDisconnect && !pto->mapAskFor.empty() && (*pto->mapAskFor.begin()).first <= nNow)
         {
             const CInv &inv = (*pto->mapAskFor.begin()).second;

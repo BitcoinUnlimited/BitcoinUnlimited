@@ -129,6 +129,12 @@ public:
     // Get these objects from somewhere, asynchronously.
     void AskFor(const std::vector<CInv> &objArray, CNode *from, unsigned int priority = 0);
 
+    // Get these objects from somewhere, asynchronously during IBD. During IBD we must assume every peer connected
+    // can give us the blocks we need and so we tell the request manager about these sources. Otherwise the request
+    // manager may not be able to re-request blocks from anyone after a timeout and we also need to be able to not
+    // request another group of blocks that are already in flight.
+    void AskForDuringIBD(const std::vector<CInv> &objArray, CNode *from, unsigned int priority = 0);
+
     // Indicate that we got this object, from and bytes are optional (for node performance tracking)
     void Received(const CInv &obj, CNode *from, int bytes = 0);
 
@@ -139,9 +145,6 @@ public:
     void Rejected(const CInv &obj, CNode *from, unsigned char reason = 0);
 
     void SendRequests();
-
-    // Indicates whether a node ping time is acceptable relative to the overall average of all nodes.
-    bool IsNodePingAcceptable(CNode *pnode);
 };
 
 
