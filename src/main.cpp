@@ -2513,6 +2513,18 @@ void static UpdateTip(CBlockIndex *pindexNew)
                 fWarned = true;
             }
         }
+        else
+        {
+            // clear warning in case unknown block version descrease under 50% of the last 100 mined blocks
+            if (fWarned &&
+                strMiscWarning ==
+                    _("Warning: Unknown block versions being mined! It's possible unknown rules are in effect"))
+            {
+                strMiscWarning = "";
+                AlertNotify(strMiscWarning);
+                fWarned = false;
+            }
+        }
     }
 }
 
