@@ -670,20 +670,21 @@ void CRequestManager::SendRequests()
     // send batched requests if any.
     if (fBatchBlockRequests && !mapBatchBlockRequests.empty())
     {
-        for (auto iter : mapBatchBlockRequests)
+        LEAVE_CRITICAL_SECTION(cs_objDownloader);
         {
-            LEAVE_CRITICAL_SECTION(cs_objDownloader);
+            for (auto iter : mapBatchBlockRequests)
             {
                 LOCK(cs_main);
                 for (auto &inv : iter.second)
                 {
                     MarkBlockAsInFlight(iter.first->GetId(), inv.hash, Params().GetConsensus());
                 }
+                iter.first->PushMessage(NetMsgType::GETDATA, iter.second);
+                LOG(REQ, "Sent batched request with %d blocks to node %s\n", iter.second.size(),
+                    iter.first->GetLogName());
             }
-            iter.first->PushMessage(NetMsgType::GETDATA, iter.second);
-            ENTER_CRITICAL_SECTION(cs_objDownloader);
-            LOG(REQ, "Sent batched request with %d blocks to node %s\n", iter.second.size(), iter.first->GetLogName());
         }
+        ENTER_CRITICAL_SECTION(cs_objDownloader);
 
         LOCK(cs_vNodes);
         for (auto iter : mapBatchBlockRequests)
