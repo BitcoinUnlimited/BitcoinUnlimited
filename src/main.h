@@ -173,7 +173,6 @@ extern bool fImporting;
 extern bool fReindex;
 extern bool fTxIndex;
 extern bool fIsBareMultisigStd;
-extern bool fRequireStandard;
 extern unsigned int nBytesPerSigOp;
 extern bool fCheckBlockIndex;
 extern bool fCheckpointsEnabled;

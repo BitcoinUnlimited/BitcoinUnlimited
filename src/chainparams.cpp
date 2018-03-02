@@ -77,6 +77,13 @@ static CBlock CreateGenesisBlock(uint32_t nTime,
         nBits, nVersion, genesisReward);
 }
 
+bool CChainParams::RequireStandard() const
+{
+    // the acceptnonstdtxn flag can only be used to narrow the behavior.
+    // A blockchain whose default is to allow nonstandard txns can be configured to disallow them.
+    return fRequireStandard || !GetBoolArg("-acceptnonstdtxn", true);
+}
+
 /**
  * Main network
  */

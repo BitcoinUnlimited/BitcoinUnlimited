@@ -83,7 +83,6 @@ bool fTxIndex = false;
 bool fHavePruned = false;
 bool fPruneMode = false;
 bool fIsBareMultisigStd = DEFAULT_PERMIT_BAREMULTISIG;
-bool fRequireStandard = true;
 unsigned int nBytesPerSigOp = DEFAULT_BYTES_PER_SIGOP;
 bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
@@ -718,13 +717,14 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
     std::string reason;
+    const CChainParams &chainparams = Params();
+    bool fRequireStandard = chainparams.RequireStandard();
     if (fRequireStandard && !IsStandardTx(tx, reason))
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
 
     // Don't relay version 2 transactions until CSV is active, and we can be
     // sure that such transactions will be mined (unless we're on
     // -testnet/-regtest).
-    const CChainParams &chainparams = Params();
     if (fRequireStandard && tx.nVersion >= 2 &&
         VersionBitsTipState(chainparams.GetConsensus(), Consensus::DEPLOYMENT_CSV) != THRESHOLD_ACTIVE)
     {
