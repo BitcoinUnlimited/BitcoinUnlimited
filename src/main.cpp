@@ -6105,23 +6105,52 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             // updated.
             if (IsInitialBlockDownload())
             {
-                LOCK(cs_vNodes);
-                for (CNode *pnode : vNodes)
+                // To maintain locking order with cs_main we have to addrefs for each node and then release
+                // the lock on cs_vNodes before aquiring cs_main further down.
+                std::vector<CNode *> vNodesCopy;
+                {
+                    LOCK(cs_vNodes);
+                    vNodesCopy = vNodes;
+                    for (CNode *pnode : vNodes)
+                    {
+                        pnode->AddRef();
+                    }
+                }
+
+                for (CNode *pnode : vNodesCopy)
                 {
                     if (!pnode->fClient && pnode != pfrom)
                     {
-                        // We only want one single header so we pass a null for CBlockLocator.
-                        pnode->PushMessage(NetMsgType::GETHEADERS, CBlockLocator(), pindexLast->GetBlockHash());
-                        LOG(NET | BLK, "Requesting header for blockavailability, peer=%s block=%s height=%d\n",
-                            pnode->GetLogName(), pindexLast->GetBlockHash().ToString().c_str(),
-                            pindexBestHeader->nHeight);
+                        LOCK(cs_main);
+                        CNodeState *state = State(pfrom->GetId());
+                        DbgAssert(state != nullptr, ); // do not return, we need to release refs later.
+                        if (state == nullptr)
+                            continue;
+
+                        if (state->pindexBestKnownBlock == nullptr ||
+                            pindexLast->nChainWork > state->pindexBestKnownBlock->nChainWork)
+                        {
+                            // We only want one single header so we pass a null for CBlockLocator.
+                            pnode->PushMessage(NetMsgType::GETHEADERS, CBlockLocator(), pindexLast->GetBlockHash());
+                            LOG(NET | BLK, "Requesting header for blockavailability, peer=%s block=%s height=%d\n",
+                                pnode->GetLogName(), pindexLast->GetBlockHash().ToString().c_str(),
+                                pindexBestHeader->nHeight);
+                        }
                     }
+                }
+
+                // release refs
+                {
+                    LOCK(cs_vNodes);
+                    for (CNode *pnode : vNodesCopy)
+                        pnode->Release();
                 }
             }
         }
 
         bool fCanDirectFetch = CanDirectFetch(chainparams.GetConsensus());
         CNodeState *nodestate = State(pfrom->GetId());
+        DbgAssert(nodestate != nullptr, return false);
 
         // During the initial peer handshake we must receive the initial headers which should be greater
         // than or equal to our block height at the time of requesting GETHEADERS. This is because the peer has
