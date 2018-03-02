@@ -79,7 +79,7 @@ static const size_t SETASKFOR_MAX_SZ = 2 * MAX_INV_SZ;
 /** The maximum number of peer connections to maintain. */
 static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
 /** BU: The maximum numer of outbound peer connections */
-static const unsigned int DEFAULT_MAX_OUTBOUND_CONNECTIONS = 12;
+static const unsigned int DEFAULT_MAX_OUTBOUND_CONNECTIONS = 16;
 /** BU: The minimum number of xthin nodes to connect */
 static const uint8_t MIN_XTHIN_NODES = 8;
 /** BU: The daily maximum disconnects while searching for xthin nodes to connect */
@@ -391,6 +391,10 @@ public:
     uint64_t nGetXthinLastTime; // The last time a get_xthin request was made
     uint32_t nXthinBloomfilterSize; // The maximum xthin bloom filter size (in bytes) that our peer will accept.
     // BUIP010 Xtreme Thinblocks: end section
+
+    CCriticalSection cs_nAvgBlkResponseTime;
+    double nAvgBlkResponseTime;
+    std::atomic<int64_t> nMaxBlocksInTransit;
 
     unsigned short addrFromPort;
 
