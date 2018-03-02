@@ -118,8 +118,10 @@ public:
 
         // Aug, 1 2017 hard fork
         consensus.uahfHeight = 478559;
-        // Nov, 13 hard fork
+        // Nov, 13 2017 hard fork
         consensus.daaHeight = 504031;
+        // May, 15 2018 hard fork
+        consensus.may2018activationTime = 1526400000;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -244,6 +246,8 @@ public:
         consensus.uahfHeight = 0;
         // Nov, 13 hard fork
         consensus.daaHeight = 0;
+        // May, 15 2018 hard fork
+        consensus.may2018activationTime = 1526400000;
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -309,6 +313,8 @@ public:
         consensus.uahfHeight = 1155876;
         // Nov, 13 hard fork
         consensus.daaHeight = 1188697;
+        // May, 15 2018 hard fork
+        consensus.may2018activationTime = 1526400000;
 
         pchMessageStart[0] = 0x0b;
         pchMessageStart[1] = 0x11;

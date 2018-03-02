@@ -70,6 +70,8 @@ struct Params
     int uahfHeight;
     /** Block height at which the new DAA becomes active */
     int daaHeight;
+    /** May 15, 2018 Activation time */
+    int may2018activationTime;
 };
 } // namespace Consensus
 
