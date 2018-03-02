@@ -594,7 +594,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, string strComm
         }
 
         inv.hash = pIndex->GetBlockHash();
-        UpdateBlockAvailability(pfrom->GetId(), inv.hash);
+        requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
 
         // Return early if we already have the block data
         if (pIndex->nStatus & BLOCK_HAVE_DATA)

@@ -48,6 +48,9 @@ struct CNodeState
     bool fFirstHeadersReceived;
     //! Our current block height at the time we requested GETHEADERS
     int nFirstHeadersExpectedHeight;
+    //! During IBD we need to update the block availabiity for each peer. We do this by requesting a header
+    //  when a peer connects and also when we ask for the initial set of all headers.
+    bool fRequestedInitialBlockAvailability;
 
     std::list<QueuedBlock> vBlocksInFlight;
     //! When the first entry in vBlocksInFlight started downloading. Don't care when vBlocksInFlight is empty.
