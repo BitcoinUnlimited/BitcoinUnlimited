@@ -11,16 +11,17 @@
 */
 CNodeState::CNodeState()
 {
-    pindexBestKnownBlock = NULL;
+    pindexBestKnownBlock = nullptr;
     hashLastUnknownBlock.SetNull();
-    pindexLastCommonBlock = NULL;
-    pindexBestHeaderSent = NULL;
+    pindexLastCommonBlock = nullptr;
+    pindexBestHeaderSent = nullptr;
     fSyncStarted = false;
     nDownloadingSince = 0;
     nBlocksInFlight = 0;
     nBlocksInFlightValidHeaders = 0;
     fPreferredDownload = false;
     fPreferHeaders = false;
+    fRequestedInitialBlockAvailability = false;
 }
 
 /**
@@ -33,6 +34,6 @@ CNodeState *State(NodeId pnode)
 {
     std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(pnode);
     if (it == mapNodeState.end())
-        return NULL;
+        return nullptr;
     return &it->second;
 }

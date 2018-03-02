@@ -7,7 +7,7 @@ import pdb
 import binascii
 
 from .mininode import *
-from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG
+from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, OP_RETURN
 from .util import BTC
 
 # Create a block (with regtest difficulty)

@@ -346,6 +346,12 @@ public:
         leveldb::Slice slKey2(ssKey2.data(), ssKey2.size());
         pdb->CompactRange(&slKey1, &slKey2);
     }
+
+    size_t TotalWriteBufferSize() const
+    {
+        // There can be up to two write buffers so return the total
+        return options.write_buffer_size * 2;
+    }
 };
 
 #endif // BITCOIN_DBWRAPPER_H
