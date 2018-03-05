@@ -1933,6 +1933,8 @@ void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
         {
             for (CBlockIndex *blk = tip; blk != invalidBlock; blk = blk->pprev)
             {
+                blk->nStatus |= BLOCK_FAILED_VALID;
+
                 if ((blk->nStatus & BLOCK_FAILED_CHILD) == 0)
                 {
                     blk->nStatus |= BLOCK_FAILED_CHILD;
