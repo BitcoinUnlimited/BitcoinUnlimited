@@ -1907,7 +1907,7 @@ void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
     std::set<CBlockIndex *> setOrphans;
     std::set<CBlockIndex *> setPrevs;
 
-    for (const PAIRTYPE(const uint256, CBlockIndex *) &item : mapBlockIndex)
+    for (const PAIRTYPE(const uint256, CBlockIndex *) & item : mapBlockIndex)
     {
         if (!chainActive.Contains(item.second))
         {

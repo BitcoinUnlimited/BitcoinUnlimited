@@ -1084,20 +1084,20 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
     uint32_t nLimit = 100;
 
     if (fHelp || params.size() < 1 || params.size() > 2)
-        throw runtime_error("rollbackchain \"blockheight\"\n"
-                            "\nRolls back the blockchain to the height indicated.\n"
-                            "\nArguments:\n"
-                            "1. blockheight   (int, required) the height that you want to roll the chain \
+        throw runtime_error(
+            "rollbackchain \"blockheight\"\n"
+            "\nRolls back the blockchain to the height indicated.\n"
+            "\nArguments:\n"
+            "1. blockheight   (int, required) the height that you want to roll the chain \
                             back to (only maxiumum rollback of " +
-                            std::to_string(nLimit) + " blocks allowed)\n"
-                            "2. override      (boolean, optional, default=false) rollback more than the \
+            std::to_string(nLimit) + " blocks allowed)\n"
+                                     "2. override      (boolean, optional, default=false) rollback more than the \
                             allowed default limit of " +
-                            std::to_string(nLimit) + " blocks)\n"
-                                                     "\nResult:\n"
-                                                     "\nExamples:\n" +
-                            HelpExampleCli("rollbackchain", "\"501245\"") +
-                            HelpExampleCli("rollbackchain", "\"495623 true\"") +
-                            HelpExampleRpc("rollbackchain", "\"blockheight\""));
+            std::to_string(nLimit) + " blocks)\n"
+                                     "\nResult:\n"
+                                     "\nExamples:\n" +
+            HelpExampleCli("rollbackchain", "\"501245\"") + HelpExampleCli("rollbackchain", "\"495623 true\"") +
+            HelpExampleRpc("rollbackchain", "\"blockheight\""));
 
     int nRollBackHeight = params[0].get_int();
     bool fOverride = false;
