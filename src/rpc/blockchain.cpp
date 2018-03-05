@@ -1083,29 +1083,39 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
     // In case of operator error, limit the rollback to 100 blocks
     uint32_t nLimit = 100;
 
-    if (fHelp || params.size() != 1)
-        throw runtime_error("rollbackchain \"blockheight\"\n"
-                            "\nRolls back the blockchain to the height indicated.\n"
-                            "\nArguments:\n"
-                            "1. blockheight   (int, required) the height that you want to roll the chain \
+    if (fHelp || params.size() < 1 || params.size() > 2)
+        throw runtime_error(
+            "rollbackchain \"blockheight\"\n"
+            "\nRolls back the blockchain to the height indicated.\n"
+            "\nArguments:\n"
+            "1. blockheight   (int, required) the height that you want to roll the chain \
                             back to (only maxiumum rollback of " +
-                            std::to_string(nLimit) + " blocks allowed)\n"
-                                                     "\nResult:\n"
-                                                     "\nExamples:\n" +
-                            HelpExampleCli("rollbackchain", "\"blockheight\"") +
-                            HelpExampleRpc("rollbackchain", "\"blockheight\""));
+            std::to_string(nLimit) + " blocks allowed)\n"
+                                     "2. override      (boolean, optional, default=false) rollback more than the \
+                            allowed default limit of " +
+            std::to_string(nLimit) + " blocks)\n"
+                                     "\nResult:\n"
+                                     "\nExamples:\n" +
+            HelpExampleCli("rollbackchain", "\"501245\"") + HelpExampleCli("rollbackchain", "\"495623 true\"") +
+            HelpExampleRpc("rollbackchain", "\"blockheight\""));
 
-    std::string strHeight = params[0].get_str();
-    uint64_t nRollBackHeight = boost::lexical_cast<uint64_t>(strHeight);
+    int nRollBackHeight = params[0].get_int();
+    bool fOverride = false;
+    if (params.size() > 1)
+        fOverride = params[1].get_bool();
 
     LOCK(cs_main);
     uint32_t nRollBack = chainActive.Height() - nRollBackHeight;
-    if (nRollBack > nLimit)
+    if (nRollBack > nLimit && !fOverride)
         throw runtime_error("You are attempting to rollback the chain by " + std::to_string(nRollBack) +
-                            " blocks, however the limit is " + std::to_string(nLimit) + " blocks.");
+                            " blocks, however the limit is " + std::to_string(nLimit) + " blocks. Set " +
+                            "the override to true if you want rollback more than the default");
 
     while ((uint64_t)chainActive.Height() > nRollBackHeight)
     {
+        // save the current tip
+        CBlockIndex *pindex = chainActive.Tip();
+
         CValidationState state;
         // Disconnect the tip and by setting the third param (fRollBack) to true we avoid having to resurrect
         // the transactions from the block back into the mempool, which saves a great deal of time.
@@ -1114,6 +1124,14 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
 
         if (!state.IsValid())
             throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+
+        // Invalidate the now previous block tip after it was diconnected so that the chain will not reconnect
+        // if another block arrives.
+        InvalidateBlock(state, Params().GetConsensus(), pindex);
+        if (!state.IsValid())
+        {
+            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+        }
 
         uiInterface.NotifyBlockTip(false, chainActive.Tip());
     }

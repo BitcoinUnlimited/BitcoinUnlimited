@@ -237,7 +237,7 @@ CNodeRef FindLikelyNode(const std::string &addrName)
     LOCK(cs_vNodes);
     bool wildcard = (addrName.find_first_of("*?") != std::string::npos);
 
-    BOOST_FOREACH (CNode *pnode, vNodes)
+    for (CNode *pnode : vNodes)
     {
         if (wildcard)
         {
@@ -247,7 +247,7 @@ CNodeRef FindLikelyNode(const std::string &addrName)
         else if (pnode->addrName.find(addrName) != std::string::npos)
             return (pnode);
     }
-    return NULL;
+    return nullptr;
 }
 
 UniValue expedited(const UniValue &params, bool fHelp)
@@ -335,7 +335,7 @@ void UnlimitedPushTxns(CNode *dest)
     std::vector<uint256> vtxid;
     mempool.queryHashes(vtxid);
     vector<CInv> vInv;
-    BOOST_FOREACH (uint256 &hash, vtxid)
+    for (uint256 &hash : vtxid)
     {
         CInv inv(MSG_TX, hash);
         CTransaction tx;
@@ -443,7 +443,7 @@ void UnlimitedSetup(void)
     GenerateBitcoins(GetBoolArg("-gen", DEFAULT_GENERATE), GetArg("-genproclimit", DEFAULT_GENERATE_THREADS), Params());
 }
 
-FILE *blockReceiptLog = NULL;
+FILE *blockReceiptLog = nullptr;
 
 void UnlimitedCleanup()
 {
@@ -457,7 +457,7 @@ void UnlimitedCleanup()
         nBlockValidationTime.Stop();
     }
 
-    CStatBase *obj = NULL;
+    CStatBase *obj = nullptr;
     while (!mallocedStats.empty())
     {
         obj = mallocedStats.front();
@@ -564,7 +564,7 @@ static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainpar
 
         // Process this block the same as if we had received it from another node
         CValidationState state;
-        if (!ProcessNewBlock(state, chainparams, NULL, pblock, true, NULL, false))
+        if (!ProcessNewBlock(state, chainparams, nullptr, pblock, true, nullptr, false))
             return error("BitcoinMiner: ProcessNewBlock, block not accepted");
     }
 
@@ -708,16 +708,16 @@ void static BitcoinMiner(const CChainParams &chainparams)
 
 void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams &chainparams)
 {
-    static boost::thread_group *minerThreads = NULL;
+    static boost::thread_group *minerThreads = nullptr;
 
     if (nThreads < 0)
         nThreads = GetNumCores();
 
-    if (minerThreads != NULL)
+    if (minerThreads != nullptr)
     {
         minerThreads->interrupt_all();
         delete minerThreads;
-        minerThreads = NULL;
+        minerThreads = nullptr;
     }
 
     if (nThreads == 0 || !fGenerate)
@@ -1148,7 +1148,7 @@ UniValue settrafficshaping(const UniValue &params, bool fHelp)
     bool disable = false;
     bool badArg = false;
     string strCommand;
-    CLeakyBucket *bucket = NULL;
+    CLeakyBucket *bucket = nullptr;
     if (params.size() >= 2)
     {
         strCommand = params[0].get_str();
@@ -1169,7 +1169,7 @@ UniValue settrafficshaping(const UniValue &params, bool fHelp)
     else if (params.size() != 3)
         badArg = true;
 
-    if (fHelp || badArg || bucket == NULL)
+    if (fHelp || badArg || bucket == nullptr)
         throw runtime_error(
             "settrafficshaping \"send|receive\" \"burstKB\" \"averageKB\""
             "\nSets the network send or receive bandwidth and burst in kilobytes per second.\n"
@@ -1366,7 +1366,7 @@ CStatBase *FindStatistic(const char *name)
     CStatMap::iterator item = statistics.find(name);
     if (item != statistics.end())
         return item->second;
-    return NULL;
+    return nullptr;
 }
 
 UniValue getstatlist(const UniValue &params, bool fHelp)
@@ -1721,7 +1721,7 @@ UniValue validateblocktemplate(const UniValue &params, bool fHelp)
     if (!DecodeHexBlk(block, params[0].get_str()))
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
 
-    CBlockIndex *pindexPrev = NULL;
+    CBlockIndex *pindexPrev = nullptr;
     {
         LOCK(cs_main);
 
@@ -1843,7 +1843,7 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     int disconnected = 0; // watch # of disconnected nodes to ensure they are being cleaned up
     for (std::vector<CNode *>::iterator it = vNodes.begin(); it != vNodes.end(); ++it)
     {
-        if (*it == NULL)
+        if (*it == nullptr)
             continue;
         CNode &n = **it;
         UniValue node(UniValue::VOBJ);
@@ -1907,7 +1907,7 @@ void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
     std::set<CBlockIndex *> setOrphans;
     std::set<CBlockIndex *> setPrevs;
 
-    BOOST_FOREACH (const PAIRTYPE(const uint256, CBlockIndex *) & item, mapBlockIndex)
+    for (const PAIRTYPE(const uint256, CBlockIndex *) & item : mapBlockIndex)
     {
         if (!chainActive.Contains(item.second))
         {
@@ -1927,12 +1927,14 @@ void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
     // Always report the currently active tip.
     setTips.insert(chainActive.Tip());
 
-    BOOST_FOREACH (CBlockIndex *tip, setTips)
+    for (CBlockIndex *tip : setTips)
     {
         if (tip->GetAncestor(invalidBlock->nHeight) == invalidBlock)
         {
             for (CBlockIndex *blk = tip; blk != invalidBlock; blk = blk->pprev)
             {
+                blk->nStatus |= BLOCK_FAILED_VALID;
+
                 if ((blk->nStatus & BLOCK_FAILED_CHILD) == 0)
                 {
                     blk->nStatus |= BLOCK_FAILED_CHILD;
