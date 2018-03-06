@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <fcntl.h>
+#include <sched.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 
@@ -1000,4 +1001,19 @@ bool wildmatch(string pattern, string test)
         pattern = pattern.substr(1);
         test = test.substr(1);
     }
+}
+
+int ScheduleBatchPriority(void)
+{
+#ifdef SCHED_BATCH
+    const static sched_param param{.sched_priority = 0};
+    if (int ret = pthread_setschedparam(0, SCHED_BATCH, &param))
+    {
+        LOGA("Failed to pthread_setschedparam: %s\n", strerror(errno));
+        return ret;
+    }
+    return 0;
+#else
+    return 1;
+#endif
 }

@@ -480,4 +480,13 @@ the second argument will be matched to this pattern. Returns true iff the string
 matches pattern. */
 bool wildmatch(std::string pattern, std::string test);
 
+/**
+ * On platforms that support it, tell the kernel the calling thread is
+ * CPU-intensive and non-interactive. See SCHED_BATCH in sched(7) for details.
+ *
+ * @return The return value of sched_setschedule(), or 1 on systems without
+ * sched_setchedule().
+ */
+int ScheduleBatchPriority(void);
+
 #endif // BITCOIN_UTIL_H
