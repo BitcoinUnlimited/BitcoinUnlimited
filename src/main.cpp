@@ -119,7 +119,7 @@ extern CCriticalSection cs_mapInboundConnectionTracker;
 /** A cache to store headers that have arrived but can not yet be connected **/
 std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders;
 
-static void CheckBlockIndex(const Consensus::Params& consensusParams);
+static void CheckBlockIndex(const Consensus::Params &consensusParams);
 
 /** Constant stuff for coinbase transactions we create: */
 CScript COINBASE_FLAGS;
@@ -627,7 +627,7 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints *lp, bool 
 }
 
 // Returns the script flags which should be checked for a given block
-static unsigned int GetBlockScriptFlags(const CBlockIndex* pindex, const Consensus::Params& chainparams);
+static unsigned int GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &chainparams);
 
 void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
 {
@@ -1833,7 +1833,7 @@ public:
 // Protected by cs_main
 static ThresholdConditionCache warningcache[VERSIONBITS_NUM_BITS];
 
-static uint32_t GetBlockScriptFlags(const CBlockIndex* pindex, const Consensus::Params &consensusparams)
+static uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &consensusparams)
 {
     AssertLockHeld(cs_main);
 
@@ -2006,7 +2006,7 @@ bool ConnectBlock(const CBlock &block,
     }
 
     // Get the script flags for this block
-    uint32_t  flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus());
+    uint32_t flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus());
     bool fStrictPayToScriptHash = flags & SCRIPT_VERIFY_P2SH;
 
 
@@ -3600,11 +3600,12 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
 
     // Reject outdated version blocks when 95% (75% on testnet) of the network has upgraded:
     // check for version 2, 3 and 4 upgrades
-    if((block.nVersion < 2 && nHeight >= consensusParams.BIP34Height) ||
-       (block.nVersion < 3 && nHeight >= consensusParams.BIP66Height) ||
-       (block.nVersion < 4 && nHeight >= consensusParams.BIP65Height))
+    if ((block.nVersion < 2 && nHeight >= consensusParams.BIP34Height) ||
+        (block.nVersion < 3 && nHeight >= consensusParams.BIP66Height) ||
+        (block.nVersion < 4 && nHeight >= consensusParams.BIP65Height))
     {
-        return state.Invalid(error("%s: rejected nVersion=0x%08x block", __func__, block.nVersion), REJECT_OBSOLETE, "bad-version");
+        return state.Invalid(
+            error("%s: rejected nVersion=0x%08x block", __func__, block.nVersion), REJECT_OBSOLETE, "bad-version");
     }
 
     return true;
