@@ -122,7 +122,7 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
 
         logging.info("bad coinbase height")
         tip = int(self.nodes[0].getblockhash(height), 16)
-        block = create_block(tip, create_coinbase(height - 10), cur_time + 600)
+        block = create_block(tip, create_coinbase(height), cur_time + 600)
         block.nVersion = 0x20000000
         block.rehash()
         hexblk = ToHex(block)
