@@ -1111,7 +1111,7 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
                             " blocks, however the limit is " + std::to_string(nLimit) + " blocks. Set " +
                             "the override to true if you want rollback more than the default");
 
-    while ((uint64_t)chainActive.Height() > nRollBackHeight)
+    while (chainActive.Height() > nRollBackHeight)
     {
         // save the current tip
         CBlockIndex *pindex = chainActive.Tip();
