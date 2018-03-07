@@ -7273,26 +7273,10 @@ bool SendMessages(CNode *pto)
             }
         }
 
-        // In case there is a block that has been in flight from this peer for 2 + 0.5 * N times the block interval
-        // (with N the number of peers from which we're downloading validated blocks), disconnect due to timeout.
-        // We compensate for other peers to prevent killing off peers due to our own downstream link
-        // being saturated. We only count validated in-flight blocks so peers can't advertise non-existing block hashes
-        // to unreasonably increase our timeout.
-        if (!pto->fDisconnect && state.vBlocksInFlight.size() > 0)
-        {
-            QueuedBlock &queuedBlock = state.vBlocksInFlight.front();
-            int nOtherPeersWithValidatedDownloads =
-                requester.nPeersWithValidatedDownloads - (state.nBlocksInFlightValidHeaders > 0);
-            if (nNow > state.nDownloadingSince +
-                           consensusParams.nPowTargetSpacing *
-                               (BLOCK_DOWNLOAD_TIMEOUT_BASE +
-                                   BLOCK_DOWNLOAD_TIMEOUT_PER_PEER * nOtherPeersWithValidatedDownloads))
-            {
-                LOGA(
-                    "Timeout downloading block %s from peer=%d, disconnecting\n", queuedBlock.hash.ToString(), pto->id);
-                pto->fDisconnect = true;
-            }
-        }
+
+        // Check for block download timeout and disconnect node if necessary
+        requester.CheckForDownloadTimeout(pto, state, consensusParams, nNow);
+
 
         //
         // Message: getdata (blocks)

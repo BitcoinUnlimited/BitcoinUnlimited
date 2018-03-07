@@ -26,8 +26,11 @@ successful receipt, "requester.Rejected(...)" to indicate a bad object (request 
 
 #ifndef REQUEST_MANAGER_H
 #define REQUEST_MANAGER_H
+
 #include "net.h"
+#include "nodestate.h"
 #include "stat.h"
+
 // When should I request a tx from someone else (in microseconds). cmdline/bitcoin.conf: -txretryinterval
 extern unsigned int txReqRetryInterval;
 extern unsigned int MIN_TX_REQUEST_RETRY_INTERVAL;
@@ -174,6 +177,12 @@ public:
 
     // Returns a bool if successful in indicating we received this block.
     bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode);
+
+    // Check for block download timeout and disconnect node if necessary.
+    void CheckForDownloadTimeout(CNode *pnode,
+        const CNodeState &state,
+        const Consensus::Params &consensusParams,
+        int64_t nNow);
 };
 
 
