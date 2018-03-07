@@ -802,8 +802,9 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     }
 
 
-    fRequireStandard = !GetBoolArg("-acceptnonstdtxn", !Params().RequireStandard());
-    if (Params().RequireStandard() && !fRequireStandard)
+    bool fStandard = !GetBoolArg("-acceptnonstdtxn", !Params().RequireStandard());
+    // If we specified an override but that override was not accepted then its an error
+    if (fStandard != Params().RequireStandard())
         return InitError(
             strprintf("acceptnonstdtxn is not currently supported for %s chain", chainparams.NetworkIDString()));
     nBytesPerSigOp = GetArg("-bytespersigop", nBytesPerSigOp);
