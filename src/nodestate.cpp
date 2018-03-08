@@ -16,12 +16,15 @@ CNodeState::CNodeState()
     pindexLastCommonBlock = nullptr;
     pindexBestHeaderSent = nullptr;
     fSyncStarted = false;
+    fSyncStartTime = -1;
+    fFirstHeadersReceived = false;
+    nFirstHeadersExpectedHeight = -1;
+    fRequestedInitialBlockAvailability = false;
     nDownloadingSince = 0;
     nBlocksInFlight = 0;
     nBlocksInFlightValidHeaders = 0;
     fPreferredDownload = false;
-    fPreferHeaders = false;
-    fRequestedInitialBlockAvailability = false;
+    fPreferHeaders = true;
 }
 
 /**
