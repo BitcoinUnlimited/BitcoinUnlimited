@@ -788,7 +788,7 @@ void CRequestManager::ProcessBlockAvailability(NodeId nodeid)
     AssertLockHeld(cs_main);
 
     CNodeState *state = State(nodeid);
-    DbgAssert(state != nullptr, return);
+    DbgAssert(state != nullptr, return );
 
     if (!state->hashLastUnknownBlock.IsNull())
     {
@@ -811,7 +811,7 @@ void CRequestManager::UpdateBlockAvailability(NodeId nodeid, const uint256 &hash
     AssertLockHeld(cs_main);
 
     CNodeState *state = State(nodeid);
-    DbgAssert(state != nullptr, return);
+    DbgAssert(state != nullptr, return );
 
     ProcessBlockAvailability(nodeid);
 
@@ -842,7 +842,7 @@ void CRequestManager::FindNextBlocksToDownload(NodeId nodeid, unsigned int count
 
     vBlocks.reserve(vBlocks.size() + count);
     CNodeState *state = State(nodeid);
-    DbgAssert(state != nullptr, return);
+    DbgAssert(state != nullptr, return );
 
     // Make sure pindexBestKnownBlock is up to date, we'll need it.
     requester.ProcessBlockAvailability(nodeid);
@@ -936,7 +936,7 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid,
 {
     LOCK(cs_main);
     CNodeState *state = State(nodeid);
-    DbgAssert(state != nullptr, return);
+    DbgAssert(state != nullptr, return );
 
     // If started then clear the thinblock timer used for preferential downloading
     thindata.ClearThinBlockTimer(hash);
