@@ -9,7 +9,7 @@
 /**
 * Default constructor initializing all local member variables to "null" values
 */
-CNodeState::CNodeState()
+CNodeState::CNodeState(CAddress addrIn, std::string addrNameIn) : address(addrIn), name(addrNameIn)
 {
     pindexBestKnownBlock = nullptr;
     hashLastUnknownBlock.SetNull();

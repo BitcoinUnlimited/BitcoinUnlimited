@@ -270,10 +270,10 @@ void UpdatePreferredDownload(CNode *node, CNodeState *state)
 
 void InitializeNode(NodeId nodeid, const CNode *pnode)
 {
+    // Add an entry to the nodestate map
     LOCK(cs_main);
-    CNodeState &state = mapNodeState.insert(std::make_pair(nodeid, CNodeState())).first->second;
-    state.name = pnode->addrName;
-    state.address = pnode->addr;
+    mapNodeState.emplace_hint(mapNodeState.end(), std::piecewise_construct, std::forward_as_tuple(nodeid),
+        std::forward_as_tuple(pnode->addr, std::move(pnode->addrName)));
 }
 
 void FinalizeNode(NodeId nodeid)

@@ -62,7 +62,7 @@ struct CNodeState
     //! Whether this peer wants invs or headers (when possible) for block announcements.
     bool fPreferHeaders;
 
-    CNodeState();
+    CNodeState(CAddress addrIn, std::string addrNameIn);
 };
 
 /** Map maintaining per-node state. Requires cs_main. */
