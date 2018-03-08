@@ -24,8 +24,6 @@
 #include "util.h"
 #include "utiltime.h"
 
-using namespace std;
-
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
 
 CMemPoolInfo::CMemPoolInfo(uint64_t nTx) { this->nTx = nTx; }
@@ -50,7 +48,7 @@ CGrapheneBlock::CGrapheneBlock(const CBlock &block, uint64_t nReceiverMemPoolTx)
 
     // Construct Bloom filter
     pGrapheneBlockFilter =
-        new CBloomFilter(nBlockTxs, fpr, insecure_rand(), BLOOM_UPDATE_ALL, numeric_limits<uint32_t>::max());
+        new CBloomFilter(nBlockTxs, fpr, insecure_rand(), BLOOM_UPDATE_ALL, std::numeric_limits<uint32_t>::max());
     LOG(GRAPHENE, "fp rate: %f Num elements in bloom filter: %d\n", fpr, nBlockTxs);
 
     for (const CTransaction &tx : block.vtx)
@@ -81,7 +79,7 @@ CGrapheneBlock::CGrapheneBlock(const CBlock &block, uint64_t nReceiverMemPoolTx)
     }
 
     // Construct IBLT
-    uint64_t nIbltCells = max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
+    uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
     pGrapheneBlockIblt = new CIblt(nIbltCells, IBLT_VALUE_SIZE);
 
     for (const CTransaction &tx : block.vtx)
@@ -103,7 +101,7 @@ CGrapheneBlock::~CGrapheneBlock()
     }
 }
 
-CGrapheneBlockTx::CGrapheneBlockTx(uint256 blockHash, vector<CTransaction> &vTx)
+CGrapheneBlockTx::CGrapheneBlockTx(uint256 blockHash, std::vector<CTransaction> &vTx)
 {
     blockhash = blockHash;
     vMissingTx = vTx;
@@ -242,7 +240,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     return true;
 }
 
-CRequestGrapheneBlockTx::CRequestGrapheneBlockTx(uint256 blockHash, set<uint64_t> &setHashesToRequest)
+CRequestGrapheneBlockTx::CRequestGrapheneBlockTx(uint256 blockHash, std::set<uint64_t> &setHashesToRequest)
 {
     blockhash = blockHash;
     setCheapHashesToRequest = setHashesToRequest;
@@ -347,7 +345,7 @@ bool CGrapheneBlock::CheckBlockHeader(const CBlockHeader &block, CValidationStat
  * Handle an incoming graphene block
  * Once the block is validated apart from the Merkle root, forward the Xpedited block with a hop count of nHops.
  */
-bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, string strCommand, unsigned nHops)
+bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string strCommand, unsigned nHops)
 {
     if (!pfrom->GrapheneCapable())
     {
@@ -428,7 +426,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, string strC
         // Request full block if this one isn't extending the best chain
         if (pIndex->nChainWork <= chainActive.Tip()->nChainWork)
         {
-            vector<CInv> vGetData;
+            std::vector<CInv> vGetData;
             vGetData.push_back(inv);
             pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
 
@@ -461,7 +459,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, string strC
 
 bool CGrapheneBlock::process(CNode *pfrom,
     int nSizeGrapheneBlock,
-    string strCommand) // TODO: request from the "best" txn source not necessarily from the block source
+    std::string strCommand) // TODO: request from the "best" txn source not necessarily from the block source
 {
     // In PV we must prevent two graphene blocks from simulaneously processing from that were recieved from the
     // same peer. This would only happen as in the example of an expedited block coming in
@@ -495,16 +493,16 @@ bool CGrapheneBlock::process(CNode *pfrom,
     int missingCount = 0;
     int unnecessaryCount = 0;
     bool collision = false;
-    set<uint256> passingTxHashes;
-    map<uint64_t, uint256> mapPartialTxHash;
-    vector<uint256> memPoolHashes;
-    set<uint64_t> setHashesToRequest;
+    std::set<uint256> passingTxHashes;
+    std::map<uint64_t, uint256> mapPartialTxHash;
+    std::vector<uint256> memPoolHashes;
+    std::set<uint64_t> setHashesToRequest;
 
     bool fMerkleRootCorrect = true;
     {
         // Do the orphans first before taking the mempool.cs lock, so that we maintain correct locking order.
         LOCK(cs_orphancache);
-        using u256Tx_type = pair<uint256, COrphanTx>;
+        using u256Tx_type = std::pair<uint256, COrphanTx>;
         for (const u256Tx_type &kv : mapOrphanTransactions)
         {
             uint256 hash = kv.first;
@@ -550,8 +548,8 @@ bool CGrapheneBlock::process(CNode *pfrom,
                 localIblt.insert(hash.GetCheapHash(), IBLT_NULL_VALUE);
 
             CIblt diffIblt = (*pGrapheneBlockIblt) - localIblt;
-            set<pair<uint64_t, vector<uint8_t> > > senderHas;
-            set<pair<uint64_t, vector<uint8_t> > > weHave;
+            std::set<std::pair<uint64_t, std::vector<uint8_t> > > senderHas;
+            std::set<std::pair<uint64_t, std::vector<uint8_t> > > weHave;
 
             if (!((*pGrapheneBlockIblt) - localIblt).listEntries(senderHas, weHave))
             {
@@ -563,7 +561,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
             }
 
             // Remove false positives from passingTxHashes
-            using u64u8_type = pair<uint64_t, vector<uint8_t> >;
+            using u64u8_type = std::pair<uint64_t, std::vector<uint8_t> >;
             for (const u64u8_type &kv : weHave)
             {
                 passingTxHashes.erase(mapPartialTxHash[kv.first]);
@@ -637,7 +635,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
     //////////////// Maybe this should raise a ban in graphene? /////////////
     if (collision || !fMerkleRootCorrect)
     {
-        vector<CInv> vGetData;
+        std::vector<CInv> vGetData;
         vGetData.push_back(CInv(MSG_GRAPHENEBLOCK, header.GetHash()));
         pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
 
@@ -787,11 +785,11 @@ void CGrapheneBlockData::expireStats(std::map<int64_t, T> &statsMap)
     // Delete any entries that are more than 24 hours old
     int64_t nTimeCutoff = getTimeForStats() - 60 * 60 * 24 * 1000;
 
-    typename map<int64_t, T>::iterator iter = statsMap.begin();
+    typename std::map<int64_t, T>::iterator iter = statsMap.begin();
     while (iter != statsMap.end())
     {
         // increment to avoid iterator becoming invalid when erasing below
-        typename map<int64_t, T>::iterator mi = iter++;
+        typename std::map<int64_t, T>::iterator mi = iter++;
 
         if (mi->first < nTimeCutoff)
             statsMap.erase(mi);
@@ -819,10 +817,10 @@ double CGrapheneBlockData::average(std::map<int64_t, uint64_t> &map)
         return 0.0;
 
     uint64_t accum = 0U;
-    for (pair<int64_t, uint64_t> p : map)
+    for (std::pair<int64_t, uint64_t> p : map)
     {
         // avoid wraparounds
-        accum = max(accum, accum + p.second);
+        accum = std::max(accum, accum + p.second);
     }
     return (double)accum / map.size();
 }
@@ -834,7 +832,7 @@ void CGrapheneBlockData::UpdateInBound(uint64_t nGrapheneBlockSize, uint64_t nOr
     nOriginalSize += nOriginalBlockSize;
     nGrapheneSize += nGrapheneBlockSize;
     nBlocks += 1;
-    updateStats(mapGrapheneBlocksInBound, pair<uint64_t, uint64_t>(nGrapheneBlockSize, nOriginalBlockSize));
+    updateStats(mapGrapheneBlocksInBound, std::pair<uint64_t, uint64_t>(nGrapheneBlockSize, nOriginalBlockSize));
 }
 
 void CGrapheneBlockData::UpdateOutBound(uint64_t nGrapheneBlockSize, uint64_t nOriginalBlockSize)
@@ -843,7 +841,7 @@ void CGrapheneBlockData::UpdateOutBound(uint64_t nGrapheneBlockSize, uint64_t nO
     nOriginalSize += nOriginalBlockSize;
     nGrapheneSize += nGrapheneBlockSize;
     nBlocks += 1;
-    updateStats(mapGrapheneBlocksOutBound, pair<uint64_t, uint64_t>(nGrapheneBlockSize, nOriginalBlockSize));
+    updateStats(mapGrapheneBlocksOutBound, std::pair<uint64_t, uint64_t>(nGrapheneBlockSize, nOriginalBlockSize));
 }
 
 void CGrapheneBlockData::UpdateOutBoundMemPoolInfo(uint64_t nMemPoolInfoSize)
@@ -892,11 +890,11 @@ void CGrapheneBlockData::UpdateMempoolLimiterBytesSaved(unsigned int nBytesSaved
     nMempoolLimiterBytesSaved += nBytesSaved;
 }
 
-string CGrapheneBlockData::ToString()
+std::string CGrapheneBlockData::ToString()
 {
     LOCK(cs_graphenestats);
     double size = double(nOriginalSize() - nGrapheneSize() - nTotalMemPoolInfoBytes());
-    ostringstream ss;
+    std::ostringstream ss;
     ss << nBlocks() << " graphene " << ((nBlocks() > 1) ? "blocks have" : "block has") << " saved "
        << formatInfoUnit(size) << " of bandwidth";
 
@@ -904,7 +902,7 @@ string CGrapheneBlockData::ToString()
 }
 
 // Calculate the graphene percentage compression over the last 24 hours
-string CGrapheneBlockData::InBoundPercentToString()
+std::string CGrapheneBlockData::InBoundPercentToString()
 {
     LOCK(cs_graphenestats);
 
@@ -913,7 +911,7 @@ string CGrapheneBlockData::InBoundPercentToString()
     double nCompressionRate = 0;
     uint64_t nGrapheneSizeTotal = 0;
     uint64_t nOriginalSizeTotal = 0;
-    for (map<int64_t, pair<uint64_t, uint64_t> >::iterator mi = mapGrapheneBlocksInBound.begin();
+    for (std::map<int64_t, std::pair<uint64_t, uint64_t> >::iterator mi = mapGrapheneBlocksInBound.begin();
          mi != mapGrapheneBlocksInBound.end(); ++mi)
     {
         nGrapheneSizeTotal += (*mi).second.first;
@@ -921,7 +919,8 @@ string CGrapheneBlockData::InBoundPercentToString()
     }
     // We count up the outbound CMemPoolInfo sizes. Outbound CMemPoolInfo sizes go with Inbound graphene blocks.
     uint64_t nOutBoundMemPoolInfoSize = 0;
-    for (map<int64_t, uint64_t>::iterator mi = mapMemPoolInfoOutBound.begin(); mi != mapMemPoolInfoOutBound.end(); ++mi)
+    for (std::map<int64_t, uint64_t>::iterator mi = mapMemPoolInfoOutBound.begin(); mi != mapMemPoolInfoOutBound.end();
+         ++mi)
     {
         nOutBoundMemPoolInfoSize += (*mi).second;
     }
@@ -929,8 +928,8 @@ string CGrapheneBlockData::InBoundPercentToString()
     if (nOriginalSizeTotal > 0)
         nCompressionRate = 100 - (100 * (double)(nGrapheneSizeTotal + nOutBoundMemPoolInfoSize) / nOriginalSizeTotal);
 
-    ostringstream ss;
-    ss << fixed << setprecision(1);
+    std::ostringstream ss;
+    ss << std::fixed << std::setprecision(1);
     ss << "Compression for " << mapGrapheneBlocksInBound.size()
        << " Inbound  graphene blocks (last 24hrs): " << nCompressionRate << "%";
 
@@ -938,7 +937,7 @@ string CGrapheneBlockData::InBoundPercentToString()
 }
 
 // Calculate the graphene percentage compression over the last 24 hours
-string CGrapheneBlockData::OutBoundPercentToString()
+std::string CGrapheneBlockData::OutBoundPercentToString()
 {
     LOCK(cs_graphenestats);
 
@@ -947,7 +946,7 @@ string CGrapheneBlockData::OutBoundPercentToString()
     double nCompressionRate = 0;
     uint64_t nGrapheneSizeTotal = 0;
     uint64_t nOriginalSizeTotal = 0;
-    for (map<int64_t, pair<uint64_t, uint64_t> >::iterator mi = mapGrapheneBlocksOutBound.begin();
+    for (std::map<int64_t, std::pair<uint64_t, uint64_t> >::iterator mi = mapGrapheneBlocksOutBound.begin();
          mi != mapGrapheneBlocksOutBound.end(); ++mi)
     {
         nGrapheneSizeTotal += (*mi).second.first;
@@ -955,51 +954,52 @@ string CGrapheneBlockData::OutBoundPercentToString()
     }
     // We count up the inbound CMemPoolInfo sizes. Inbound CMemPoolInfo sizes go with Outbound graphene blocks.
     uint64_t nInBoundMemPoolInfoSize = 0;
-    for (map<int64_t, uint64_t>::iterator mi = mapMemPoolInfoInBound.begin(); mi != mapMemPoolInfoInBound.end(); ++mi)
+    for (std::map<int64_t, uint64_t>::iterator mi = mapMemPoolInfoInBound.begin(); mi != mapMemPoolInfoInBound.end();
+         ++mi)
         nInBoundMemPoolInfoSize += (*mi).second;
 
     if (nOriginalSizeTotal > 0)
         nCompressionRate = 100 - (100 * (double)(nGrapheneSizeTotal + nInBoundMemPoolInfoSize) / nOriginalSizeTotal);
 
-    ostringstream ss;
-    ss << fixed << setprecision(1);
+    std::ostringstream ss;
+    ss << std::fixed << std::setprecision(1);
     ss << "Compression for " << mapGrapheneBlocksOutBound.size()
        << " Outbound graphene blocks (last 24hrs): " << nCompressionRate << "%";
     return ss.str();
 }
 
 // Calculate the average inbound graphene CMemPoolInfo size
-string CGrapheneBlockData::InBoundMemPoolInfoToString()
+std::string CGrapheneBlockData::InBoundMemPoolInfoToString()
 {
     LOCK(cs_graphenestats);
     double avgMemPoolInfoSize = average(mapMemPoolInfoInBound);
-    ostringstream ss;
+    std::ostringstream ss;
     ss << "Inbound CMemPoolInfo size (last 24hrs) AVG: " << formatInfoUnit(avgMemPoolInfoSize);
     return ss.str();
 }
 
 // Calculate the average outbound graphene CMemPoolInfo size
-string CGrapheneBlockData::OutBoundMemPoolInfoToString()
+std::string CGrapheneBlockData::OutBoundMemPoolInfoToString()
 {
     LOCK(cs_graphenestats);
     double avgMemPoolInfoSize = average(mapMemPoolInfoOutBound);
-    ostringstream ss;
+    std::ostringstream ss;
     ss << "Outbound CMemPoolInfo size (last 24hrs) AVG: " << formatInfoUnit(avgMemPoolInfoSize);
     return ss.str();
 }
 
 // Calculate the graphene average response time over the last 24 hours
-string CGrapheneBlockData::ResponseTimeToString()
+std::string CGrapheneBlockData::ResponseTimeToString()
 {
     LOCK(cs_graphenestats);
 
-    vector<double> vResponseTime;
+    std::vector<double> vResponseTime;
 
     double nResponseTimeAverage = 0;
     double nPercentile = 0;
     double nTotalResponseTime = 0;
     double nTotalEntries = 0;
-    for (map<int64_t, double>::iterator mi = mapGrapheneBlockResponseTime.begin();
+    for (std::map<int64_t, double>::iterator mi = mapGrapheneBlockResponseTime.begin();
          mi != mapGrapheneBlockResponseTime.end(); ++mi)
     {
         nTotalEntries += 1;
@@ -1017,24 +1017,24 @@ string CGrapheneBlockData::ResponseTimeToString()
         nPercentile = vResponseTime[nPercentileElement];
     }
 
-    ostringstream ss;
-    ss << fixed << setprecision(2);
+    std::ostringstream ss;
+    ss << std::fixed << std::setprecision(2);
     ss << "Response time   (last 24hrs) AVG:" << nResponseTimeAverage << ", 95th pcntl:" << nPercentile;
     return ss.str();
 }
 
 // Calculate the graphene average block validation time over the last 24 hours
-string CGrapheneBlockData::ValidationTimeToString()
+std::string CGrapheneBlockData::ValidationTimeToString()
 {
     LOCK(cs_graphenestats);
 
-    vector<double> vValidationTime;
+    std::vector<double> vValidationTime;
 
     double nValidationTimeAverage = 0;
     double nPercentile = 0;
     double nTotalValidationTime = 0;
     double nTotalEntries = 0;
-    for (map<int64_t, double>::iterator mi = mapGrapheneBlockValidationTime.begin();
+    for (std::map<int64_t, double>::iterator mi = mapGrapheneBlockValidationTime.begin();
          mi != mapGrapheneBlockValidationTime.end(); ++mi)
     {
         nTotalEntries += 1;
@@ -1052,14 +1052,14 @@ string CGrapheneBlockData::ValidationTimeToString()
         nPercentile = vValidationTime[nPercentileElement];
     }
 
-    ostringstream ss;
-    ss << fixed << setprecision(2);
+    std::ostringstream ss;
+    ss << std::fixed << std::setprecision(2);
     ss << "Validation time (last 24hrs) AVG:" << nValidationTimeAverage << ", 95th pcntl:" << nPercentile;
     return ss.str();
 }
 
 // Calculate the graphene average tx re-requested ratio over the last 24 hours
-string CGrapheneBlockData::ReRequestedTxToString()
+std::string CGrapheneBlockData::ReRequestedTxToString()
 {
     LOCK(cs_graphenestats);
 
@@ -1068,7 +1068,7 @@ string CGrapheneBlockData::ReRequestedTxToString()
     double nReRequestRate = 0;
     uint64_t nTotalReRequests = 0;
     uint64_t nTotalReRequestedTxs = 0;
-    for (map<int64_t, int>::iterator mi = mapGrapheneBlocksInBoundReRequestedTx.begin();
+    for (std::map<int64_t, int>::iterator mi = mapGrapheneBlocksInBoundReRequestedTx.begin();
          mi != mapGrapheneBlocksInBoundReRequestedTx.end(); ++mi)
     {
         nTotalReRequests += 1;
@@ -1078,17 +1078,17 @@ string CGrapheneBlockData::ReRequestedTxToString()
     if (mapGrapheneBlocksInBound.size() > 0)
         nReRequestRate = 100 * (double)nTotalReRequests / mapGrapheneBlocksInBound.size();
 
-    ostringstream ss;
-    ss << fixed << setprecision(1);
+    std::ostringstream ss;
+    ss << std::fixed << std::setprecision(1);
     ss << "Tx re-request rate (last 24hrs): " << nReRequestRate << "% Total re-requests:" << nTotalReRequests;
     return ss.str();
 }
 
-string CGrapheneBlockData::MempoolLimiterBytesSavedToString()
+std::string CGrapheneBlockData::MempoolLimiterBytesSavedToString()
 {
     LOCK(cs_graphenestats);
     double size = (double)nMempoolLimiterBytesSaved();
-    ostringstream ss;
+    std::ostringstream ss;
     ss << "Graphene block mempool limiting has saved " << formatInfoUnit(size) << " of bandwidth";
     return ss.str();
 }
@@ -1180,7 +1180,7 @@ uint64_t CGrapheneBlockData::GetGrapheneBlockBytes() { return nGrapheneBlockByte
 bool HaveConnectGrapheneNodes()
 {
     // Strip the port from then list of all the current in and outbound ip addresses
-    vector<string> vNodesIP;
+    std::vector<std::string> vNodesIP;
     {
         LOCK(cs_vNodes);
         for (const CNode *pnode : vNodes)
@@ -1199,18 +1199,18 @@ bool HaveConnectGrapheneNodes()
     // connect-graphene. In those cases we have created a dead-lock where no blocks
     // can be downloaded unless we also have at least one additional connect-graphene
     // connection to a different node.
-    set<string> nNotCrossConnected;
+    std::set<std::string> nNotCrossConnected;
 
     int nConnectionsOpen = 0;
-    for (const string &strAddrNode : mapMultiArgs["-connect-graphene"])
+    for (const std::string &strAddrNode : mapMultiArgs["-connect-graphene"])
     {
-        string strGrapheneNode;
+        std::string strGrapheneNode;
         int pos = strAddrNode.rfind(":");
         if (pos <= 0)
             strGrapheneNode = strAddrNode;
         else
             strGrapheneNode = strAddrNode.substr(0, pos);
-        for (const string &strAddr : vNodesIP)
+        for (const std::string &strAddr : vNodesIP)
         {
             if (strAddr == strGrapheneNode)
             {
@@ -1262,7 +1262,7 @@ bool CanGrapheneBlockBeDownloaded(CNode *pto)
         // that has invoked -connect-graphene.
 
         // Check if this node is also a connect-graphene node
-        for (const string &strAddrNode : mapMultiArgs["-connect-graphene"])
+        for (const std::string &strAddrNode : mapMultiArgs["-connect-graphene"])
             if (pto->addrName == strAddrNode)
                 return true;
     }
@@ -1275,7 +1275,7 @@ void ConnectToGrapheneBlockNodes()
     // Connect to specific addresses
     if (mapArgs.count("-connect-graphene") && mapMultiArgs["-connect-graphene"].size() > 0)
     {
-        for (const string &strAddr : mapMultiArgs["-connect-graphene"])
+        for (const std::string &strAddr : mapMultiArgs["-connect-graphene"])
         {
             CAddress addr;
             // NOTE: Because the only nodes we are connecting to here are the ones the user put in their
@@ -1292,7 +1292,7 @@ void CheckNodeSupportForGrapheneBlocks()
     if (IsGrapheneBlockEnabled())
     {
         // Check that a nodes pointed to with connect-graphene actually supports graphene blocks
-        for (const string &strAddr : mapMultiArgs["-connect-graphene"])
+        for (const std::string &strAddr : mapMultiArgs["-connect-graphene"])
         {
             CNodeRef node = FindNodeRef(strAddr);
             if (node && !node->GrapheneCapable())
@@ -1378,7 +1378,7 @@ void SendGrapheneBlock(CBlock &block, CNode *pfrom, const CInv &inv)
                     nSizeBlock, pfrom->GetLogName());
             }
         }
-        catch (exception &e)
+        catch (std::exception &e)
         {
             pfrom->PushMessage(NetMsgType::BLOCK, block);
             LOG(GRAPHENE,

@@ -18,8 +18,6 @@
 #include <cmath>
 #include <vector>
 
-using namespace std;
-
 // c from graphene paper
 const double BLOOM_OVERHEAD_FACTOR = 8 * pow(log(2.0), 2.0);
 // tau from graphene paper
@@ -37,7 +35,7 @@ private:
         std::vector<size_t> idxs(items.size());
         iota(idxs.begin(), idxs.end(), 0);
 
-        sort(idxs.begin(), idxs.end(), [&items](size_t idx1, size_t idx2) { return items[idx1] < items[idx2]; });
+        std::sort(idxs.begin(), idxs.end(), [&items](size_t idx1, size_t idx2) { return items[idx1] < items[idx2]; });
 
         return idxs;
     }
@@ -73,11 +71,12 @@ public:
             fpr = optSymDiff / float(sizeDiff);
 
         // Construct Bloom filter
-        pSetFilter = new CBloomFilter(nItems, fpr, insecure_rand(), BLOOM_UPDATE_ALL, numeric_limits<uint32_t>::max());
+        pSetFilter =
+            new CBloomFilter(nItems, fpr, insecure_rand(), BLOOM_UPDATE_ALL, std::numeric_limits<uint32_t>::max());
         LOG(GRAPHENE, "fp rate: %f Num elements in bloom filter: %d\n", fpr, nItems);
 
         // Construct IBLT
-        uint64_t nIbltCells = max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
+        uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
         pSetIblt = new CIblt(nIbltCells, IBLT_VALUE_SIZE);
         std::map<uint64_t, T> mapCheapHashes;
 
@@ -99,7 +98,7 @@ public:
         if (ordered)
         {
             std::map<T, uint64_t> mapItems;
-            for (const pair<uint64_t, T> &kv : mapCheapHashes)
+            for (const std::pair<uint64_t, T> &kv : mapCheapHashes)
                 mapItems[kv.second] = kv.first;
 
             mapCheapHashes.clear();
@@ -118,7 +117,7 @@ public:
 
     std::vector<uint64_t> Reconcile(const std::vector<uint256> &receiverItemHashes)
     {
-        set<uint64_t> receiverSet;
+        std::set<uint64_t> receiverSet;
         std::map<uint64_t, uint256> mapCheapHashes;
         CIblt localIblt((*pSetIblt));
         localIblt.reset();
@@ -143,18 +142,18 @@ public:
 
         // Determine difference between sender and receiver IBLTs
         CIblt diffIblt = (*pSetIblt) - localIblt;
-        set<pair<uint64_t, std::vector<uint8_t> > > senderHas;
-        set<pair<uint64_t, std::vector<uint8_t> > > receiverHas;
+        std::set<std::pair<uint64_t, std::vector<uint8_t> > > senderHas;
+        std::set<std::pair<uint64_t, std::vector<uint8_t> > > receiverHas;
 
         if (!((*pSetIblt) - localIblt).listEntries(senderHas, receiverHas))
             throw error("Graphene set IBLT did not decode");
 
         // Remove false positives from receiverSet
-        for (const pair<uint64_t, std::vector<uint8_t> > &kv : receiverHas)
+        for (const std::pair<uint64_t, std::vector<uint8_t> > &kv : receiverHas)
             receiverSet.erase(kv.first);
 
         // Restore missing items recovered from sender
-        for (const pair<uint64_t, std::vector<uint8_t> > &kv : senderHas)
+        for (const std::pair<uint64_t, std::vector<uint8_t> > &kv : senderHas)
             receiverSet.insert(kv.first);
 
         std::vector<uint64_t> receiverSetItems(receiverSet.begin(), receiverSet.end());
@@ -163,7 +162,7 @@ public:
             return receiverSetItems;
 
         // Place items in order
-        sort(receiverSetItems.begin(), receiverSetItems.end(), [](uint64_t i1, uint64_t i2) { return i1 < i2; });
+        std::sort(receiverSetItems.begin(), receiverSetItems.end(), [](uint64_t i1, uint64_t i2) { return i1 < i2; });
         std::vector<uint64_t> orderedSetItems(itemRank.size(), 0);
         for (size_t i = 0; i < itemRank.size(); i++)
             orderedSetItems[itemRank[i].to_ulong()] = receiverSetItems[i];
