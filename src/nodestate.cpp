@@ -31,11 +31,11 @@ CNodeState::CNodeState()
 * Gets the CNodeState for the specified NodeId.
 *
 * @param[in] pnode  The NodeId to return CNodeState* for
-* @return CNodeState* matching the NodeId, or NULL if NodeId is not matched
+* @return CNodeState* matching the NodeId, or nullptr if NodeId is not matched
 */
-CNodeState *State(NodeId pnode)
+CNodeState *State(NodeId nId)
 {
-    std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(pnode);
+    std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(nId);
     if (it == mapNodeState.end())
         return nullptr;
     return &it->second;
