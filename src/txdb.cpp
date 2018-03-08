@@ -444,7 +444,7 @@ uint64_t GetAvailableMemory()
     }
     else
     {
-        LOG(COINDB, "Could not get size of available memory - returning with default\n");
+        LogPrint("coindb", "Could not get size of available memory - returning with default\n");
         return nDefaultPhysMem / 2;
     }
 }
@@ -459,7 +459,7 @@ uint64_t GetTotalSystemMemory()
     }
     else
     {
-        LOG(COINDB, "Could not get size of physical memory - returning with default\n");
+        LogPrint("coindb", "Could not get size of physical memory - returning with default\n");
         return nDefaultPhysMem;
     }
 }
@@ -478,7 +478,7 @@ uint64_t GetTotalSystemMemory()
     }
     else
     {
-        LOG(COINDB, "Could not get size of physical memory - returning with default\n");
+        LogPrint("coindb", "Could not get size of physical memory - returning with default\n");
         return nDefaultPhysMem;
     }
 }
@@ -494,14 +494,14 @@ uint64_t GetTotalSystemMemory()
     }
     else
     {
-        LOG(COINDB, "Could not get size of physical memory - returning with default\n");
+        LogPrint("coindb", "Could not get size of physical memory - returning with default\n");
         return nDefaultPhysMem;
     }
 }
 #else
 uint64_t GetTotalSystemMemory()
 {
-    LOG(COINDB, "Could not get size of physical memory - returning with default\n");
+    LogPrint("coindb", "Could not get size of physical memory - returning with default\n");
     return nDefaultPhysMem; // if we can't get RAM size then default to an assumed 1GB system memory
 }
 #endif
@@ -627,8 +627,8 @@ void AdjustCoinCacheSize()
             GetCacheConfiguration(dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache, true);
 
             nCoinCacheUsage = std::max(nDefaultCoinCache, nCoinCacheUsage - (nUnusedMem - nMemAvailable));
-            LOG(COINDB, "Current cache size: %ld MB, nCoinCacheUsage was reduced by %u MB\n", nCoinCacheUsage / 1000000,
-                (nUnusedMem - nMemAvailable) / 1000000);
+            LogPrint("coindb", "Current cache size: %ld MB, nCoinCacheUsage was reduced by %u MB\n",
+                nCoinCacheUsage / 1000000, (nUnusedMem - nMemAvailable) / 1000000);
             nLastDbAdjustment = nNow;
             nLastMemAvailable = nMemAvailable;
         }
@@ -645,7 +645,7 @@ void AdjustCoinCacheSize()
                 std::numeric_limits<long long>::max(), dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
 
             nCoinCacheUsage = std::min(nMaxCoinCache, nCoinCacheUsage + (nMemAvailable - nLastMemAvailable));
-            LOG(COINDB, "Current cache size: %ld MB, nCoinCacheUsage was increased by %u MB\n",
+            LogPrint("coindb", "Current cache size: %ld MB, nCoinCacheUsage was increased by %u MB\n",
                 nCoinCacheUsage / 1000000, (nMemAvailable - nLastMemAvailable) / 1000000);
             nLastDbAdjustment = nNow;
             nLastMemAvailable = nMemAvailable;
