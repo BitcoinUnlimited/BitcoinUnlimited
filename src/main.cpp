@@ -6996,7 +6996,7 @@ bool SendMessages(CNode *pto)
         // If a sync has been started check whether we received the first batch of headers requested within the timeout
         // period. If not then disconnect and ban the node and a new node will automatically be selected to start the
         // headers download.
-        if ((state.fSyncStarted) && (state.fSyncStartTime < GetTime() - INITIAL_HEADERS_TIMEOUT) &&
+        if ((state.fSyncStarted) && (state.nSyncStartTime < GetTime() - INITIAL_HEADERS_TIMEOUT) &&
             (!state.fFirstHeadersReceived) && !pto->fWhitelisted)
         {
             pto->fDisconnect = true;
@@ -7030,7 +7030,7 @@ bool SendMessages(CNode *pto)
                 if (pindexStart->nHeight < pto->nStartingHeight)
                 {
                     state.fSyncStarted = true;
-                    state.fSyncStartTime = GetTime();
+                    state.nSyncStartTime = GetTime();
                     state.fFirstHeadersReceived = false;
                     state.fRequestedInitialBlockAvailability = true;
                     state.nFirstHeadersExpectedHeight = pindexBestHeader->nHeight;

@@ -16,7 +16,7 @@ CNodeState::CNodeState(CAddress addrIn, std::string addrNameIn) : address(addrIn
     pindexLastCommonBlock = nullptr;
     pindexBestHeaderSent = nullptr;
     fSyncStarted = false;
-    fSyncStartTime = -1;
+    nSyncStartTime = -1;
     fFirstHeadersReceived = false;
     nFirstHeadersExpectedHeight = -1;
     fRequestedInitialBlockAvailability = false;
