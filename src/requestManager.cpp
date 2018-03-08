@@ -589,8 +589,8 @@ void CRequestManager::SendRequests()
                         if (next.node->fDisconnect)
                         {
                             LOCK(cs_vNodes);
-                            LogPrint("req", "ReqMgr: %s removed block ref to %s count %d (%s).\n", item.obj.ToString(),
-                                next.node->GetLogName(), next.node->GetRefCount(), reason);
+                            LogPrint("req", "ReqMgr: %s removed block ref to %s count %d\n", item.obj.ToString(),
+                                next.node->GetLogName(), next.node->GetRefCount());
                             next.node->Release();
                             next.node = nullptr; // force the loop to get another node
                         }
@@ -681,7 +681,7 @@ void CRequestManager::SendRequests()
                     MarkBlockAsInFlight(iter.first->GetId(), inv.hash, Params().GetConsensus());
                 }
                 iter.first->PushMessage(NetMsgType::GETDATA, iter.second);
-                LOG(REQ, "Sent batched request with %d blocks to node %s\n", iter.second.size(),
+                LogPrint("req", "Sent batched request with %d blocks to node %s\n", iter.second.size(),
                     iter.first->GetLogName());
             }
         }
@@ -1017,7 +1017,8 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 pnode->nMaxBlocksInTransit.store(16);
             }
 
-            LOG(THIN | BLK, "Average block response time is %.2f seconds\n", pnode->nAvgBlkResponseTime);
+            LogPrint("thin", "Average block response time is %.2f seconds\n", pnode->nAvgBlkResponseTime);
+            LogPrint("blk", "Average block response time is %.2f seconds\n", pnode->nAvgBlkResponseTime);
         }
 
         // if there are no blocks in flight then ask for a few more blocks
@@ -1032,7 +1033,9 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         {
             BLOCK_DOWNLOAD_WINDOW = blockDownloadWindow.value;
         }
-        LOG(THIN | BLK, "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %d\n", BLOCK_DOWNLOAD_WINDOW,
+        LogPrint("thin", "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %d\n", BLOCK_DOWNLOAD_WINDOW,
+            pnode->nMaxBlocksInTransit.load());
+        LogPrint("blk", "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %d\n", BLOCK_DOWNLOAD_WINDOW,
             pnode->nMaxBlocksInTransit.load());
 
         if (IsChainNearlySyncd())
