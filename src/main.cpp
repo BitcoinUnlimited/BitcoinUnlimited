@@ -268,11 +268,11 @@ void UpdatePreferredDownload(CNode *node, CNodeState *state)
     nPreferredDownload += state->fPreferredDownload;
 }
 
-void InitializeNode(NodeId nodeid, const CNode *pnode)
+void InitializeNode(const CNode *pnode)
 {
     // Add an entry to the nodestate map
     LOCK(cs_main);
-    mapNodeState.emplace_hint(mapNodeState.end(), std::piecewise_construct, std::forward_as_tuple(nodeid),
+    mapNodeState.emplace_hint(mapNodeState.end(), std::piecewise_construct, std::forward_as_tuple(pnode->GetId()),
         std::forward_as_tuple(pnode->addr, std::move(pnode->addrName)));
 }
 
