@@ -6,7 +6,6 @@
 #define BITCOIN_GRAPHENE_SET_H
 
 #include "bloom.h"
-#include "boost/dynamic_bitset.hpp"
 #include "hash.h"
 #include "iblt.h"
 #include "random.h"
@@ -15,6 +14,7 @@
 #include "util.h"
 
 #include <atomic>
+#include <boost/dynamic_bitset.hpp>
 #include <cmath>
 #include <vector>
 
