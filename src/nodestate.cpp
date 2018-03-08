@@ -24,7 +24,7 @@ CNodeState::CNodeState(CAddress addrIn, std::string addrNameIn) : address(addrIn
     nBlocksInFlight = 0;
     nBlocksInFlightValidHeaders = 0;
     fPreferredDownload = false;
-    fPreferHeaders = true;
+    fPreferHeaders = false;
 }
 
 /**
