@@ -280,6 +280,7 @@ void FinalizeNode(NodeId nodeid)
 {
     LOCK(cs_main);
     CNodeState *state = State(nodeid);
+    DbgAssert(state != nullptr, return );
 
     if (state->fSyncStarted)
         nSyncStarted--;
@@ -330,8 +331,8 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)
 
     LOCK(cs_main);
     CNodeState *state = State(nodeid);
-    if (state == NULL)
-        return false;
+    DbgAssert(state != nullptr, return false);
+
     stats.nMisbehavior = node->nMisbehavior;
     stats.nSyncHeight = state->pindexBestKnownBlock ? state->pindexBestKnownBlock->nHeight : -1;
     stats.nCommonHeight = state->pindexLastCommonBlock ? state->pindexLastCommonBlock->nHeight : -1;
