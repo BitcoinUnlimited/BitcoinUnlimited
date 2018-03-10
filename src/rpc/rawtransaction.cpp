@@ -200,19 +200,19 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
     if (params.size() > 1)
         fVerbose = (params[1].get_int() != 0);
 
-    CTransaction tx;
+    CTransactionRef tx;
     uint256 hashBlock;
     if (!GetTransaction(hash, tx, Params().GetConsensus(), hashBlock, true))
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available about transaction");
 
-    string strHex = EncodeHexTx(tx);
+    string strHex = EncodeHexTx(*tx);
 
     if (!fVerbose)
         return strHex;
 
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("hex", strHex));
-    TxToJSON(tx, hashBlock, result);
+    TxToJSON(*tx, hashBlock, result);
     return result;
 }
 
@@ -254,7 +254,7 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
 
     LOCK(cs_main);
 
-    CBlockIndex *pblockindex = NULL;
+    CBlockIndex *pblockindex = nullptr;
 
     uint256 hashBlock;
     if (params.size() > 1)
@@ -273,9 +273,9 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
         }
     }
 
-    if (pblockindex == NULL)
+    if (pblockindex == nullptr)
     {
-        CTransaction tx;
+        CTransactionRef tx;
         if (!GetTransaction(oneTxid, tx, Params().GetConsensus(), hashBlock, false) || hashBlock.IsNull())
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction not yet in block");
         if (!mapBlockIndex.count(hashBlock))

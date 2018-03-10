@@ -740,7 +740,7 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
     }
     for (const CTransaction &tx : transactionsToRemove)
     {
-        std::list<std::shared_ptr<const CTransaction> > removed;
+        std::list<CTransactionRef> removed;
         _remove(tx, removed, true);
     }
 }
@@ -775,7 +775,7 @@ void CTxMemPool::_removeConflicts(const CTransaction &tx,  std::list<CTransactio
  */
 void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
     unsigned int nBlockHeight,
-    std::list<std::shared_ptr<const CTransaction> > &conflicts,
+    std::list<CTransactionRef> &conflicts,
     bool fCurrentEstimate)
 {
     WRITELOCK(cs);
@@ -790,7 +790,7 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
     }
     for (const auto &tx : vtx)
     {
-        std::list<std::shared_ptr<const CTransaction> > dummy;
+        std::list<CTransactionRef> dummy;
         _remove(*tx, dummy, false);
         _removeConflicts(*tx, conflicts);
         _ClearPrioritisation(tx->GetHash());

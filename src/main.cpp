@@ -1066,18 +1066,19 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
 
 /** Return transaction in tx, and if it was found inside a block, its hash is placed in hashBlock */
 bool GetTransaction(const uint256 &hash,
-    CTransaction &txOut,
+    CTransactionRef &txOut,
     const Consensus::Params &consensusParams,
     uint256 &hashBlock,
     bool fAllowSlow)
 {
-    CBlockIndex *pindexSlow = NULL;
+    CBlockIndex *pindexSlow = nullptr;
 
     LOCK(cs_main);
 
     CTransactionRef ptx = mempool.get(hash);
     if (ptx)
     {
+        txOut = ptx;
         return true;
     }
 
@@ -1101,7 +1102,7 @@ bool GetTransaction(const uint256 &hash,
                 return error("%s: Deserialize or I/O error - %s", __func__, e.what());
             }
             hashBlock = header.GetHash();
-            if (txOut.GetHash() != hash)
+            if (txOut->GetHash() != hash)
                 return error("%s: txid mismatch", __func__);
             return true;
         }
@@ -1121,7 +1122,7 @@ bool GetTransaction(const uint256 &hash,
         if (ReadBlockFromDisk(block, pindexSlow, consensusParams)){
             for (const auto& tx : block.vtx) {
                 if (tx->GetHash() == hash) {
-                    txOut = *tx;
+                    txOut = tx;
                     hashBlock = pindexSlow->GetBlockHash();
                     return true;
                 }
@@ -2574,7 +2575,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
             const CTransaction tx = *it;
 
             // ignore validation errors in resurrected transactions
-            std::list<std::shared_ptr<const CTransaction> > removed;
+            std::list<CTransactionRef> removed;
             CValidationState stateDummy;
             if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, AreFreeTxnsDisallowed(), nullptr, true))
             {
@@ -2687,7 +2688,7 @@ bool static ConnectTip(CValidationState &state,
     LOG(BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
 
     // Remove conflicting transactions from the mempool.
-    std::list<std::shared_ptr<const CTransaction> > txConflicted;
+    std::list<CTransactionRef> txConflicted;
     mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload());
     // Update chainActive & related variables.
     UpdateTip(pindexNew);
