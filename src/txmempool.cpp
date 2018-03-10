@@ -648,13 +648,13 @@ void CTxMemPool::_CalculateDescendants(txiter entryit, setEntries &setDescendant
     }
 }
 
-void CTxMemPool::remove(const CTransaction &origTx,  std::list<CTransactionRef> &removed, bool fRecursive)
+void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransactionRef> &removed, bool fRecursive)
 {
     WRITELOCK(cs);
     _remove(origTx, removed, fRecursive);
 }
 
-void CTxMemPool::_remove(const CTransaction &origTx,  std::list<CTransactionRef> &removed, bool fRecursive)
+void CTxMemPool::_remove(const CTransaction &origTx, std::list<CTransactionRef> &removed, bool fRecursive)
 {
     AssertWriteLockHeld(cs);
     // Remove transaction from memory pool
@@ -751,7 +751,7 @@ void CTxMemPool::removeConflicts(const CTransaction &tx, std::list<CTransactionR
     _removeConflicts(tx, removed);
 }
 
-void CTxMemPool::_removeConflicts(const CTransaction &tx,  std::list<CTransactionRef> &removed)
+void CTxMemPool::_removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed)
 {
     AssertWriteLockHeld(cs);
     // Remove transactions which depend on inputs of tx, recursively

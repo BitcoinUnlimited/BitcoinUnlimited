@@ -83,12 +83,12 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
             // 10/10 blocks add highest fee/pri transactions
             // 9/10 blocks add 2nd highest and so on until ...
             // 1/10 blocks add lowest fee transactions
-            while (txHashes[9-h].size())
+            while (txHashes[9 - h].size())
             {
-                CTransactionRef ptx = mpool.get(txHashes[9-h].back());
+                CTransactionRef ptx = mpool.get(txHashes[9 - h].back());
                 if (ptx)
                     block.push_back(ptx);
-                txHashes[9-h].pop_back();
+                txHashes[9 - h].pop_back();
             }
         }
         mpool.removeForBlock(block, ++blocknum, dummyConflicted);
@@ -184,7 +184,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
     // Estimates should still not be below original
     for (int j = 0; j < 10; j++)
     {
-        while(txHashes[j].size())
+        while (txHashes[j].size())
         {
             CTransactionRef ptx = mpool.get(txHashes[j].back());
             if (ptx)

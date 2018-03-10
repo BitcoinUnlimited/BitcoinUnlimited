@@ -74,14 +74,14 @@ static inline size_t MallocUsage(size_t alloc)
 
 // STL data structures
 
-template<typename X>
+template <typename X>
 struct stl_tree_node
 {
 private:
     int color;
-    void* parent;
-    void* left;
-    void* right;
+    void *parent;
+    void *left;
+    void *right;
     X x;
 };
 
@@ -89,7 +89,7 @@ struct stl_shared_counter
 {
     /* Various platforms use different sized counters here.
      * Conservatively assume that they won't be larger than size_t. */
-    void* class_type;
+    void *class_type;
     size_t use_count;
     size_t weak_count;
 };
@@ -130,8 +130,8 @@ static inline size_t IncrementalDynamicUsage(const std::map<X, Y, Z> &m)
     return MallocUsage(sizeof(stl_tree_node<std::pair<const X, Y> >));
 }
 
-template<typename X>
-static inline size_t DynamicUsage(const std::shared_ptr<X>& p)
+template <typename X>
+static inline size_t DynamicUsage(const std::shared_ptr<X> &p)
 {
     // A shared_ptr can either use a single continuous memory block for both
     // the counter and the storage (when using std::make_shared), or separate.

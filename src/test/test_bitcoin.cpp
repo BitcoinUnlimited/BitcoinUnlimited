@@ -126,14 +126,14 @@ CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransa
 }
 
 TestChain100Setup::~TestChain100Setup() {}
-
 CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CMutableTransaction &tx, CTxMemPool *pool)
 {
     CTransaction txn(tx);
     return FromTx(txn, pool);
 }
 
-CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction &txn, CTxMemPool *pool) {
+CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction &txn, CTxMemPool *pool)
+{
     bool hasNoDependencies = pool ? pool->HasNoInputsOf(txn) : hadNoDependencies;
     // Hack to assume either its completely dependent on other mempool txs or not at all
     CAmount inChainValue = hasNoDependencies ? txn.GetValueOut() : 0;

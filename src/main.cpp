@@ -1119,9 +1119,12 @@ bool GetTransaction(const uint256 &hash,
     if (pindexSlow)
     {
         CBlock block;
-        if (ReadBlockFromDisk(block, pindexSlow, consensusParams)){
-            for (const auto& tx : block.vtx) {
-                if (tx->GetHash() == hash) {
+        if (ReadBlockFromDisk(block, pindexSlow, consensusParams))
+        {
+            for (const auto &tx : block.vtx)
+            {
+                if (tx->GetHash() == hash)
+                {
                     txOut = tx;
                     hashBlock = pindexSlow->GetBlockHash();
                     return true;
@@ -1642,7 +1645,8 @@ static DisconnectResult DisconnectBlock(const CBlock &block, const CBlockIndex *
     }
 
     // undo transactions in reverse order
-    for (int i = block.vtx.size() - 1; i >= 0; i--) {
+    for (int i = block.vtx.size() - 1; i >= 0; i--)
+    {
         const CTransaction &tx = *(block.vtx[i]);
         uint256 hash = tx.GetHash();
 
@@ -2571,7 +2575,8 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     if (!fRollBack)
     {
         std::vector<uint256> vHashUpdate;
-        for (const auto& it : block.vtx) {
+        for (const auto &it : block.vtx)
+        {
             const CTransaction tx = *it;
 
             // ignore validation errors in resurrected transactions
@@ -2598,7 +2603,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     UpdateTip(pindexDelete->pprev);
     // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
-    for (const auto& tx : block.vtx)
+    for (const auto &tx : block.vtx)
     {
         SyncWithWallets(*tx, NULL, -1);
     }
@@ -3545,7 +3550,7 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
             return state.DoS(100, error("CheckBlock(): more than one coinbase"), REJECT_INVALID, "bad-cb-multiple");
 
     // Check transactions
-    for (const auto& tx : block.vtx)
+    for (const auto &tx : block.vtx)
         if (!CheckTransaction(*tx, state))
             return error("CheckBlock(): CheckTransaction of %s failed with %s", tx->GetHash().ToString(),
                 FormatStateMessage(state));

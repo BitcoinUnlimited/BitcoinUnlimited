@@ -115,7 +115,7 @@ public:
     CTxMemPoolEntry(const CTxMemPoolEntry &other);
 
     const CTransaction &GetTx() const { return this->tx; }
-    CTransactionRef GetSharedTx() const {return MakeTransactionRef(std::move(this->tx)); }
+    CTransactionRef GetSharedTx() const { return MakeTransactionRef(std::move(this->tx)); }
     /**
      * Fast calculation of lower bound of current priority as update
      * from entry priority. Only inputs that were originally in-chain will age.

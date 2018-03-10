@@ -150,7 +150,7 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int nH
     }
     tx.vin[0].scriptSig = tx.vin[0].scriptSig + COINBASE_FLAGS;
 
-    
+
     return MakeTransactionRef(std::move(tx));
 }
 

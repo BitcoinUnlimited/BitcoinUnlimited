@@ -3473,7 +3473,7 @@ int CMerkleTx::SetMerkleBranch(const CBlock &block, int txIdx)
     else
     {
         // Locate the transaction
-        nIndex = block.find(((CTransactionRef)this)->GetHash());
+        nIndex = block.find(((CTransactionRef) this)->GetHash());
         if (nIndex == -1)
         {
             LOGA("ERROR: SetMerkleBranch(): couldn't find tx in block\n");

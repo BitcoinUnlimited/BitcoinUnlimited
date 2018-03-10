@@ -92,7 +92,7 @@ public:
     {
         int nIndex;
         for (nIndex = 0; nIndex < (int)vtx.size(); nIndex++)
-            if (vtx[nIndex] == *(std::shared_ptr<const CTransaction> *)this)
+            if (vtx[nIndex] == *(CTransactionRef *)this)
                 break;
         if (nIndex == (int)vtx.size())
         {
