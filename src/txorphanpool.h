@@ -18,11 +18,11 @@
 class CTxOrphanPool
 {
 private:
-    // Used in EraseOrphansByTime() to track when the last time was we checked the cache for anything to delete
+    //! Used in EraseOrphansByTime() to track when the last time was we checked the cache for anything to delete
     int64_t nLastOrphanCheck;
 
 public:
-    // Current in memory footprint of all txns in the orphan pool.
+    //! Current in memory footprint of all txns in the orphan pool.
     uint64_t nBytesOrphanPool;
 
     struct COrphanTx
@@ -39,10 +39,19 @@ public:
 
     CTxOrphanPool();
 
+    //! Do we already have this orphan in the orphan pool
     bool AlreadyHaveOrphan(const uint256 &hash);
+
+    //! Add a transaction to the orphan pool
     bool AddOrphanTx(const CTransaction &tx, NodeId peer);
+
+    //! Erase an ophan tx from the orphan pool
     void EraseOrphanTx(uint256 hash);
+
+    //! Expire old orphans from the orphan pool
     void EraseOrphansByTime();
+
+    //! Limit the orphan pool size by either number of transactions or the max orphan pool size allowed.
     unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t nMaxBytes);
 };
 extern CTxOrphanPool orphanpool;
