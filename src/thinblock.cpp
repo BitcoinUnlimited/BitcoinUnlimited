@@ -158,7 +158,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
     for (const CTransaction &tx : vMissingTx)
-        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
+        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     {
         LOCK(cs_orphancache);
@@ -337,7 +337,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
     for (const CTransaction &tx : thinBlockTx.vMissingTx)
-        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
+        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     // Get the full hashes from the xblocktx and add them to the thinBlockHashes vector.  These should
     // be all the missing or null hashes that we re-requested.
@@ -346,10 +346,10 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     {
         if (pfrom->thinBlockHashes[i].IsNull())
         {
-            std::map<uint64_t, CTransaction>::iterator val = pfrom->mapMissingTx.find(pfrom->xThinBlockHashes[i]);
+            std::map<uint64_t, CTransactionRef>::iterator val = pfrom->mapMissingTx.find(pfrom->xThinBlockHashes[i]);
             if (val != pfrom->mapMissingTx.end())
             {
-                pfrom->thinBlockHashes[i] = val->second.GetHash();
+                pfrom->thinBlockHashes[i] = val->second->GetHash();
             }
             count++;
         }
@@ -688,7 +688,7 @@ bool CXThinBlock::process(CNode *pfrom,
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
     for (const CTransaction &tx : vMissingTx)
-        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
+        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
     // We need to check all transaction sources (orphan list, mempool, and new (incoming) transactions in this block)
@@ -723,23 +723,24 @@ bool CXThinBlock::process(CNode *pfrom,
                 collision = true;
             mapPartialTxHash[cheapHash] = memPoolHashes[i];
         }
-        for (std::map<uint64_t, CTransaction>::iterator mi = pfrom->mapMissingTx.begin();
-             mi != pfrom->mapMissingTx.end(); ++mi)
+        for (auto mi : pfrom->mapMissingTx)
         {
-            uint64_t cheapHash = (*mi).first;
+            uint64_t cheapHash = mi.first;
             // Check for cheap hash collision. Only mark as collision if the full hash is not the same,
             // because the same tx could have been received into the mempool during the request of the xthinblock.
             // In that case we would have the same transaction twice, so it is not a real cheap hash collision and we
             // continue normally.
             const uint256 existingHash = mapPartialTxHash[cheapHash];
+            // Check if we already have the cheap hash
             if (!existingHash.IsNull())
-            { // Check if we already have the cheap hash
-                if (existingHash != (*mi).second.GetHash())
-                { // Check if it really is a cheap hash collision and not just the same transaction
+            {
+                // Check if it really is a cheap hash collision and not just the same transaction
+                if (existingHash != mi.second->GetHash())
+                {
                     collision = true;
                 }
             }
-            mapPartialTxHash[cheapHash] = (*mi).second.GetHash();
+            mapPartialTxHash[cheapHash] = mi.second->GetHash();
         }
 
         if (!collision)
@@ -894,7 +895,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
             else if (inMemPool && fXVal)
                 setPreVerifiedTxHash.insert(hash);
             else if (inMissingTx)
-                ptx = MakeTransactionRef(std::move(pfrom->mapMissingTx[hash.GetCheapHash()]));;
+                ptx = pfrom->mapMissingTx[hash.GetCheapHash()];
         }
         if (!ptx)
             missingCount++;
