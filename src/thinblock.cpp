@@ -894,7 +894,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
 
             if (inOrphanCache)
             {
-                ptx = MakeTransactionRef(std::move(mapOrphanTransactions[hash].tx));
+                ptx = mapOrphanTransactions[hash].ptx;
                 setUnVerifiedOrphanTxHash.insert(hash);
             }
             else if (inMemPool && fXVal)

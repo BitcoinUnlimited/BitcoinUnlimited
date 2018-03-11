@@ -404,11 +404,11 @@ bool AddOrphanTx(const CTransaction &tx, NodeId peer) EXCLUSIVE_LOCKS_REQUIRED(c
     }
 
     uint64_t txSize = RecursiveDynamicUsage(tx);
-    mapOrphanTransactions[hash].tx = tx;
+    mapOrphanTransactions[hash].ptx = MakeTransactionRef(tx);
     mapOrphanTransactions[hash].fromPeer = peer;
-    mapOrphanTransactions[hash].nEntryTime = GetTime(); // BU - Xtreme Thinblocks;
+    mapOrphanTransactions[hash].nEntryTime = GetTime();
     mapOrphanTransactions[hash].nOrphanTxSize = txSize;
-    BOOST_FOREACH (const CTxIn &txin, tx.vin)
+    for (const CTxIn &txin : tx.vin)
         mapOrphanTransactionsByPrev[txin.prevout.hash].insert(hash);
 
     nBytesOrphanPool += txSize;
@@ -424,7 +424,7 @@ void EraseOrphanTx(uint256 hash) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
     std::map<uint256, COrphanTx>::iterator it = mapOrphanTransactions.find(hash);
     if (it == mapOrphanTransactions.end())
         return;
-    BOOST_FOREACH (const CTxIn &txin, it->second.tx.vin)
+    for (const CTxIn &txin : it->second.ptx->vin)
     {
         std::map<uint256, std::set<uint256> >::iterator itPrev = mapOrphanTransactionsByPrev.find(txin.prevout.hash);
         if (itPrev == mapOrphanTransactionsByPrev.end())
@@ -435,7 +435,7 @@ void EraseOrphanTx(uint256 hash) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
     }
 
     nBytesOrphanPool -= it->second.nOrphanTxSize;
-    LOG(MEMPOOL, "Erased orphan tx %s of size %ld bytes, orphan pool bytes:%ld\n", it->second.tx.GetHash().ToString(),
+    LOG(MEMPOOL, "Erased orphan tx %s of size %ld bytes, orphan pool bytes:%ld\n", it->second.ptx->GetHash().ToString(),
         it->second.nOrphanTxSize, nBytesOrphanPool);
     mapOrphanTransactions.erase(it);
 }
@@ -456,10 +456,10 @@ void EraseOrphansByTime() EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
         int64_t nEntryTime = mi->second.nEntryTime;
         if (nEntryTime < nOrphanTxCutoffTime)
         {
-            uint256 txHash = mi->second.tx.GetHash();
+            uint256 txHash = mi->second.ptx->GetHash();
 
             // Uncache any coins that may exist for orphans that will be erased
-            pcoinsTip->UncacheTx(mi->second.tx);
+            pcoinsTip->UncacheTx(*mi->second.ptx);
 
             LOG(MEMPOOL, "Erased old orphan tx %s of age %d seconds\n", txHash.ToString(), GetTime() - nEntryTime);
             EraseOrphanTx(txHash);
@@ -487,7 +487,7 @@ unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t nMaxBytes) EXC
             it = mapOrphanTransactions.begin();
 
         // Uncache any coins that may exist for orphans that will be erased
-        pcoinsTip->UncacheTx(it->second.tx);
+        pcoinsTip->UncacheTx(*it->second.ptx);
 
         EraseOrphanTx(it->first);
         ++nEvicted;
@@ -5852,7 +5852,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     if (!fOk)
                         continue;
 
-                    const CTransaction &orphanTx = mapOrphanTransactions[orphanHash].tx;
+                    const CTransaction &orphanTx = *mapOrphanTransactions[orphanHash].ptx;
                     NodeId fromPeer = mapOrphanTransactions[orphanHash].fromPeer;
                     bool fMissingInputs2 = false;
                     // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan

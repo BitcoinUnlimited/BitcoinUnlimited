@@ -574,7 +574,7 @@ static const unsigned int REJECT_WRONG_FORK = 0x103;
 
 struct COrphanTx
 {
-    CTransaction tx;
+    CTransactionRef ptx;
     NodeId fromPeer;
     int64_t nEntryTime; // BU - Xtreme Thinblocks: used for aging orphans out of the cache
     uint64_t nOrphanTxSize;
