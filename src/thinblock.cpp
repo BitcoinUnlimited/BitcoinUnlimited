@@ -21,6 +21,7 @@
 #include "thinblock.h"
 #include "timedata.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "util.h"
 #include "utiltime.h"
 
@@ -161,7 +162,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
         pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     {
-        LOCK(cs_orphancache);
+        LOCK(orphanpool.cs);
         LOCK(cs_xval);
         int missingCount = 0;
         int unnecessaryCount = 0;
@@ -173,7 +174,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
         LOG(THIN, "Thinblock %s waiting for: %d, unnecessary: %d, total txns: %d received txns: %d peer=%s\n",
             pfrom->thinBlock.GetHash().ToString(), pfrom->thinBlockWaitingForTxns, unnecessaryCount,
             pfrom->thinBlock.vtx.size(), pfrom->mapMissingTx.size(), pfrom->GetLogName());
-    } // end lock cs_orphancache, mempool.cs, cs_xval
+    } // end lock orphanpool.cs, mempool.cs, cs_xval
     LOG(THIN, "Total in memory thinblockbytes size is %ld bytes\n", thindata.GetThinBlockBytes());
 
     // Clear out data we no longer need before processing block.
@@ -254,7 +255,7 @@ CXThinBlock::CXThinBlock(const CBlock &block)
     vTxHashes.reserve(nTx);
     std::set<uint64_t> setPartialTxHash;
 
-    LOCK(cs_orphancache);
+    LOCK(orphanpool.cs);
     for (unsigned int i = 0; i < nTx; i++)
     {
         const uint256 hash256 = block.vtx[i]->GetHash();
@@ -266,7 +267,7 @@ CXThinBlock::CXThinBlock(const CBlock &block)
         setPartialTxHash.insert(cheapHash);
 
         // if it is missing from this node, then add it to the thin block
-        if (!((mempool.exists(hash256)) || (mapOrphanTransactions.find(hash256) != mapOrphanTransactions.end())))
+        if (!((mempool.exists(hash256)) || (orphanpool.mapOrphanTransactions.find(hash256) != orphanpool.mapOrphanTransactions.end())))
         {
             vMissingTx.push_back(*block.vtx[i]);
         }
@@ -383,7 +384,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Look for each transaction in our various pools and buffers.
     // With xThinBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
     {
-        LOCK(cs_orphancache);
+        LOCK(orphanpool.cs);
         LOCK(cs_xval);
         if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
             return false;
@@ -703,14 +704,13 @@ bool CXThinBlock::process(CNode *pfrom,
     bool fMerkleRootCorrect = true;
     {
         // Do the orphans first before taking the mempool.cs lock, so that we maintain correct locking order.
-        LOCK(cs_orphancache);
-        for (std::map<uint256, COrphanTx>::iterator mi = mapOrphanTransactions.begin();
-             mi != mapOrphanTransactions.end(); ++mi)
+        LOCK(orphanpool.cs);
+        for (auto &mi : orphanpool.mapOrphanTransactions)
         {
-            uint64_t cheapHash = (*mi).first.GetCheapHash();
+            uint64_t cheapHash = mi.first.GetCheapHash();
             if (mapPartialTxHash.count(cheapHash)) // Check for collisions
                 collision = true;
-            mapPartialTxHash[cheapHash] = (*mi).first;
+            mapPartialTxHash[cheapHash] = mi.first;
         }
 
         LOCK(cs_xval);
@@ -723,7 +723,7 @@ bool CXThinBlock::process(CNode *pfrom,
                 collision = true;
             mapPartialTxHash[cheapHash] = memPoolHashes[i];
         }
-        for (auto mi : pfrom->mapMissingTx)
+        for (auto &mi : pfrom->mapMissingTx)
         {
             uint64_t cheapHash = mi.first;
             // Check for cheap hash collision. Only mark as collision if the full hash is not the same,
@@ -777,7 +777,7 @@ bool CXThinBlock::process(CNode *pfrom,
                 }
             }
         }
-    } // End locking cs_orphancache, mempool.cs and cs_xval
+    } // End locking orphanpool.cs, mempool.cs and cs_xval
     LOG(THIN, "Total in memory thinblockbytes size is %ld bytes\n", thindata.GetThinBlockBytes());
 
     // These must be checked outside of the mempool.cs lock or deadlock may occur.
@@ -887,14 +887,14 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
                 inMemPool = true;
 
             bool inMissingTx = pfrom->mapMissingTx.count(hash.GetCheapHash()) > 0;
-            bool inOrphanCache = mapOrphanTransactions.count(hash) > 0;
+            bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
 
             if ((inMemPool && inMissingTx) || (inOrphanCache && inMissingTx))
                 unnecessaryCount++;
 
             if (inOrphanCache)
             {
-                ptx = mapOrphanTransactions[hash].ptx;
+                ptx = orphanpool.mapOrphanTransactions[hash].ptx;
                 setUnVerifiedOrphanTxHash.insert(hash);
             }
             else if (inMemPool && fXVal)

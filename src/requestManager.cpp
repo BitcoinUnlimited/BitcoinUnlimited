@@ -20,6 +20,7 @@
 #include "thinblock.h"
 #include "tinyformat.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -36,8 +37,6 @@
 
 
 using namespace std;
-
-extern CCriticalSection cs_orphancache; // from main.h
 
 extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
 extern CTweak<unsigned int> blockDownloadWindow;
@@ -466,10 +465,9 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                     inv2.type = MSG_XTHINBLOCK;
                     std::vector<uint256> vOrphanHashes;
                     {
-                        LOCK(cs_orphancache);
-                        for (map<uint256, COrphanTx>::iterator mi = mapOrphanTransactions.begin();
-                             mi != mapOrphanTransactions.end(); ++mi)
-                            vOrphanHashes.push_back((*mi).first);
+                        LOCK(orphanpool.cs);
+                        for (auto &mi : orphanpool.mapOrphanTransactions)
+                            vOrphanHashes.emplace_back(mi.first);
                     }
                     BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
                     ss << inv2;
@@ -493,10 +491,9 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                     inv2.type = MSG_XTHINBLOCK;
                     std::vector<uint256> vOrphanHashes;
                     {
-                        LOCK(cs_orphancache);
-                        for (map<uint256, COrphanTx>::iterator mi = mapOrphanTransactions.begin();
-                             mi != mapOrphanTransactions.end(); ++mi)
-                            vOrphanHashes.push_back((*mi).first);
+                        LOCK(orphanpool.cs);
+                        for (auto &mi : orphanpool.mapOrphanTransactions)
+                            vOrphanHashes.emplace_back(mi.first);
                     }
                     BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
                     ss << inv2;

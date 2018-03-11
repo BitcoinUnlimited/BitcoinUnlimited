@@ -14,6 +14,7 @@
 #include "clientversion.h"
 #include "net.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "ui_interface.h"
 #include "util.h"
 
@@ -81,8 +82,8 @@ QDateTime ClientModel::getLastBlockDate() const
 long ClientModel::getMempoolSize() const { return mempool.size(); }
 long ClientModel::getOrphanPoolSize() const
 {
-    LOCK(cs_orphancache);
-    return mapOrphanTransactions.size();
+    LOCK(orphanpool.cs);
+    return orphanpool.mapOrphanTransactions.size();
 }
 
 size_t ClientModel::getMempoolDynamicUsage() const { return mempool.DynamicMemoryUsage(); }
