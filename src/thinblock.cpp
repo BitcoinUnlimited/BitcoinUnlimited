@@ -853,7 +853,12 @@ bool CXThinBlock::process(CNode *pfrom,
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount)
 {
     AssertLockHeld(cs_xval);
-    uint64_t maxAllowedSize = maxMessageSizeMultiplier * excessiveBlockSize;
+
+    // the total maximum bytes that we can use to create a thinblock. We use shared pointers for
+    // the transactions in the thinblock so we don't need to make so much memory available as we did in
+    // the past. The current excessive block size should be more than enough to accomodate many
+    // concurrent thinblock reconstructions without having a large memory footprint.
+    uint64_t maxAllowedSize = excessiveBlockSize;
 
     // We must have all the full tx hashes by this point.  We first check for any repeating
     // sequences in transaction id's.  This is a possible attack vector and has been used in the past.
