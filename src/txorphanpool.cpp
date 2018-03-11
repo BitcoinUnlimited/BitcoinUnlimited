@@ -40,10 +40,7 @@ bool CTxOrphanPool::AddOrphanTx(const CTransaction &tx, NodeId peer)
     }
 
     uint64_t txSize = RecursiveDynamicUsage(tx);
-    mapOrphanTransactions[hash].ptx = MakeTransactionRef(tx);
-    mapOrphanTransactions[hash].fromPeer = peer;
-    mapOrphanTransactions[hash].nEntryTime = GetTime();
-    mapOrphanTransactions[hash].nOrphanTxSize = txSize;
+    mapOrphanTransactions.emplace(hash, COrphanTx{MakeTransactionRef(tx), peer, GetTime(), txSize});
     for (const CTxIn &txin : tx.vin)
         mapOrphanTransactionsByPrev[txin.prevout.hash].insert(hash);
 
