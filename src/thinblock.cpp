@@ -872,10 +872,14 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
     for (const uint256 &hash : pfrom->thinBlockHashes)
     {
         // Replace the truncated hash with the full hash value if it exists
-        CTransaction tx;
+        CTransactionRef ptx = nullptr;
         if (!hash.IsNull())
         {
-            bool inMemPool = mempool.lookup(hash, tx);
+            bool inMemPool = false;
+            ptx = mempool.get(hash);
+            if (ptx)
+                inMemPool = true;
+
             bool inMissingTx = pfrom->mapMissingTx.count(hash.GetCheapHash()) > 0;
             bool inOrphanCache = mapOrphanTransactions.count(hash) > 0;
 
@@ -884,20 +888,20 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
 
             if (inOrphanCache)
             {
-                tx = mapOrphanTransactions[hash].tx;
+                ptx = MakeTransactionRef(std::move(mapOrphanTransactions[hash].tx));
                 setUnVerifiedOrphanTxHash.insert(hash);
             }
             else if (inMemPool && fXVal)
                 setPreVerifiedTxHash.insert(hash);
             else if (inMissingTx)
-                tx = pfrom->mapMissingTx[hash.GetCheapHash()];
+                ptx = MakeTransactionRef(std::move(pfrom->mapMissingTx[hash.GetCheapHash()]));;
         }
-        if (tx.IsNull())
+        if (!ptx)
             missingCount++;
 
         // In order to prevent a memory exhaustion attack we track transaction bytes used to create Block
         // to see if we've exceeded any limits and if so clear out data and return.
-        uint64_t nTxSize = RecursiveDynamicUsage(tx);
+        uint64_t nTxSize = sizeof(ptx);
         uint64_t nCurrentMax = 0;
         if (maxAllowedSize >= nTxSize)
             nCurrentMax = maxAllowedSize - nTxSize;
@@ -925,7 +929,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         }
 
         // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct ordering.
-        pfrom->thinBlock.vtx.push_back(MakeTransactionRef(std::move(tx)));
+        pfrom->thinBlock.vtx.emplace_back(ptx);
     }
     return true;
 }
