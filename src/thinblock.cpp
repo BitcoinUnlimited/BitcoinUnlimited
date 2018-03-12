@@ -267,7 +267,8 @@ CXThinBlock::CXThinBlock(const CBlock &block)
         setPartialTxHash.insert(cheapHash);
 
         // if it is missing from this node, then add it to the thin block
-        if (!((mempool.exists(hash256)) || (orphanpool.mapOrphanTransactions.find(hash256) != orphanpool.mapOrphanTransactions.end())))
+        if (!((mempool.exists(hash256)) ||
+                (orphanpool.mapOrphanTransactions.find(hash256) != orphanpool.mapOrphanTransactions.end())))
         {
             vMissingTx.push_back(*block.vtx[i]);
         }

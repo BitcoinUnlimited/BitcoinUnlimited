@@ -10,10 +10,10 @@
 #include "keystore.h"
 #include "main.h"
 #include "net.h"
-#include "txorphanpool.h"
 #include "pow.h"
 #include "script/sign.h"
 #include "serialize.h"
+#include "txorphanpool.h"
 #include "util.h"
 
 #include "test/test_bitcoin.h"
