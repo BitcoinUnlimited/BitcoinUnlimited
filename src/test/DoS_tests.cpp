@@ -10,6 +10,7 @@
 #include "keystore.h"
 #include "main.h"
 #include "net.h"
+#include "txorphanpool.h"
 #include "pow.h"
 #include "script/sign.h"
 #include "serialize.h"
@@ -24,12 +25,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/foreach.hpp>
 #include <boost/test/unit_test.hpp>
-
-// Tests this internal-to-main.cpp method:
-extern bool AddOrphanTx(const CTransaction &tx, NodeId peer);
-extern void EraseOrphansFor(NodeId peer);
-extern void EraseOrphansByTime();
-extern unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t nMaxBytes);
 
 CService ip(uint32_t i)
 {
@@ -302,11 +297,11 @@ BOOST_AUTO_TEST_CASE(DoS_bantime_expiration)
 
 CTransaction RandomOrphan()
 {
-    std::map<uint256, COrphanTx>::iterator it;
-    it = mapOrphanTransactions.lower_bound(GetRandHash());
-    if (it == mapOrphanTransactions.end())
-        it = mapOrphanTransactions.begin();
-    return it->second.tx;
+    std::map<uint256, CTxOrphanPool::COrphanTx>::iterator it;
+    it = orphanpool.mapOrphanTransactions.lower_bound(GetRandHash());
+    if (it == orphanpool.mapOrphanTransactions.end())
+        it = orphanpool.mapOrphanTransactions.begin();
+    return *it->second.ptx;
 }
 
 BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
@@ -329,20 +324,20 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         tx.vout[0].nValue = 1 * CENT;
         tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
-        LOCK(cs_orphancache);
-        AddOrphanTx(tx, i);
+        LOCK(orphanpool.cs);
+        orphanpool.AddOrphanTx(tx, i);
     }
 
     {
-        LOCK(cs_orphancache);
-        LimitOrphanTxSize(50, 8000);
-        BOOST_CHECK_EQUAL(mapOrphanTransactions.size(), 50);
-        LimitOrphanTxSize(50, 6300);
-        BOOST_CHECK(mapOrphanTransactions.size() <= 49);
-        LimitOrphanTxSize(50, 1000);
-        BOOST_CHECK(mapOrphanTransactions.size() <= 8);
-        LimitOrphanTxSize(50, 0);
-        BOOST_CHECK(mapOrphanTransactions.empty());
+        LOCK(orphanpool.cs);
+        orphanpool.LimitOrphanTxSize(50, 8000);
+        BOOST_CHECK_EQUAL(orphanpool.mapOrphanTransactions.size(), 50);
+        orphanpool.LimitOrphanTxSize(50, 6300);
+        BOOST_CHECK(orphanpool.mapOrphanTransactions.size() <= 49);
+        orphanpool.LimitOrphanTxSize(50, 1000);
+        BOOST_CHECK(orphanpool.mapOrphanTransactions.size() <= 8);
+        orphanpool.LimitOrphanTxSize(50, 0);
+        BOOST_CHECK(orphanpool.mapOrphanTransactions.empty());
     }
 
     // 50 orphan transactions:
@@ -357,8 +352,8 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         tx.vout[0].nValue = 1 * CENT;
         tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
-        LOCK(cs_orphancache);
-        AddOrphanTx(tx, i);
+        LOCK(orphanpool.cs);
+        orphanpool.AddOrphanTx(tx, i);
     }
 
     // ... and 50 that depend on other orphans:
@@ -375,8 +370,8 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
         SignSignature(keystore, txPrev, tx, 0);
 
-        LOCK(cs_orphancache);
-        AddOrphanTx(tx, i);
+        LOCK(orphanpool.cs);
+        orphanpool.AddOrphanTx(tx, i);
     }
 
     // This really-big orphan should be ignored:
@@ -400,29 +395,29 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         for (unsigned int j = 1; j < tx.vin.size(); j++)
             tx.vin[j].scriptSig = tx.vin[0].scriptSig;
 
-        LOCK(cs_orphancache);
+        LOCK(orphanpool.cs);
         // BU, we keep orphans up to the configured memory limit to help xthin compression so this should succeed
         // whereas it fails in other clients
-        BOOST_CHECK(AddOrphanTx(tx, i));
+        BOOST_CHECK(orphanpool.AddOrphanTx(tx, i));
     }
 
     // Test LimitOrphanTxSize() function: limit by number of txns
     {
-        LOCK(cs_orphancache);
-        LimitOrphanTxSize(40, 10000000);
-        BOOST_CHECK_EQUAL(mapOrphanTransactions.size(), 40);
-        LimitOrphanTxSize(10, 10000000);
-        BOOST_CHECK_EQUAL(mapOrphanTransactions.size(), 10);
-        LimitOrphanTxSize(0, 10000000);
-        BOOST_CHECK(mapOrphanTransactions.empty());
-        BOOST_CHECK(mapOrphanTransactionsByPrev.empty());
+        LOCK(orphanpool.cs);
+        orphanpool.LimitOrphanTxSize(40, 10000000);
+        BOOST_CHECK_EQUAL(orphanpool.mapOrphanTransactions.size(), 40);
+        orphanpool.LimitOrphanTxSize(10, 10000000);
+        BOOST_CHECK_EQUAL(orphanpool.mapOrphanTransactions.size(), 10);
+        orphanpool.LimitOrphanTxSize(0, 10000000);
+        BOOST_CHECK(orphanpool.mapOrphanTransactions.empty());
+        BOOST_CHECK(orphanpool.mapOrphanTransactionsByPrev.empty());
     }
 
     // Test EraseOrphansByTime():
     {
-        LOCK(cs_orphancache);
+        LOCK(orphanpool.cs);
         int64_t nStartTime = GetTime();
-        nLastOrphanCheck = nStartTime;
+        orphanpool.SetLastOrphanCheck(nStartTime);
         SetMockTime(nStartTime); // Overrides future calls to GetTime()
         for (int i = 0; i < 50; i++)
         {
@@ -435,42 +430,42 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
             tx.vout[0].nValue = 1 * CENT;
             tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
-            AddOrphanTx(tx, i);
+            orphanpool.AddOrphanTx(tx, i);
         }
-        BOOST_CHECK(mapOrphanTransactions.size() == 50);
-        EraseOrphansByTime();
-        BOOST_CHECK(mapOrphanTransactions.size() == 50);
+        BOOST_CHECK(orphanpool.mapOrphanTransactions.size() == 50);
+        orphanpool.EraseOrphansByTime();
+        BOOST_CHECK(orphanpool.mapOrphanTransactions.size() == 50);
 
         // Advance the clock 1 minute
         SetMockTime(nStartTime + 60);
-        EraseOrphansByTime();
-        BOOST_CHECK(mapOrphanTransactions.size() == 50);
+        orphanpool.EraseOrphansByTime();
+        BOOST_CHECK(orphanpool.mapOrphanTransactions.size() == 50);
 
         // Advance the clock 10 minutes
         SetMockTime(nStartTime + 60 * 10);
-        EraseOrphansByTime();
-        BOOST_CHECK(mapOrphanTransactions.size() == 50);
+        orphanpool.EraseOrphansByTime();
+        BOOST_CHECK(orphanpool.mapOrphanTransactions.size() == 50);
 
         // Advance the clock 1 hour
         SetMockTime(nStartTime + 60 * 60);
-        EraseOrphansByTime();
-        BOOST_CHECK(mapOrphanTransactions.size() == 50);
+        orphanpool.EraseOrphansByTime();
+        BOOST_CHECK(orphanpool.mapOrphanTransactions.size() == 50);
 
         // Advance the clock DEFAULT_ORPHANPOOL_EXPIRY hours
         SetMockTime(nStartTime + 60 * 60 * DEFAULT_ORPHANPOOL_EXPIRY);
-        EraseOrphansByTime();
-        BOOST_CHECK(mapOrphanTransactions.size() == 50);
+        orphanpool.EraseOrphansByTime();
+        BOOST_CHECK(orphanpool.mapOrphanTransactions.size() == 50);
 
         /** Test the boundary where orphans should get purged. **/
         // Advance the clock DEFAULT_ORPHANPOOL_EXPIRY hours plus 4 minutes 59 seconds
         SetMockTime(nStartTime + 60 * 60 * DEFAULT_ORPHANPOOL_EXPIRY + 299);
-        EraseOrphansByTime();
-        BOOST_CHECK(mapOrphanTransactions.size() == 50);
+        orphanpool.EraseOrphansByTime();
+        BOOST_CHECK(orphanpool.mapOrphanTransactions.size() == 50);
 
         // Advance the clock DEFAULT_ORPHANPOOL_EXPIRY hours plus 5 minutes
         SetMockTime(nStartTime + 60 * 60 * DEFAULT_ORPHANPOOL_EXPIRY + 300);
-        EraseOrphansByTime();
-        BOOST_CHECK(mapOrphanTransactions.size() == 0);
+        orphanpool.EraseOrphansByTime();
+        BOOST_CHECK(orphanpool.mapOrphanTransactions.size() == 0);
 
         SetMockTime(0);
     }

@@ -53,6 +53,9 @@ public:
 
     //! Limit the orphan pool size by either number of transactions or the max orphan pool size allowed.
     unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t nMaxBytes);
+
+    //! Set the last orphan check time (used primarily in testing)
+    void SetLastOrphanCheck(int64_t nTime) { nLastOrphanCheck = nTime; }
 };
 extern CTxOrphanPool orphanpool;
 
