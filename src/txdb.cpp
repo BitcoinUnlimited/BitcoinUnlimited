@@ -79,8 +79,8 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
     CDBBatch batch(db);
     size_t count = 0;
     size_t changed = 0;
-    size_t nBatchSize = 0;
     size_t nBatchWrites = 0;
+    size_t batch_size = nMaxDBBatchSize;
 
     for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();)
     {
@@ -121,12 +121,10 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
             // In order to prevent the spikes in memory usage that used to happen when we prepared large as
             // was possible, we instead break up the batches such that the performance gains for writing to
             // leveldb are still realized but the memory spikes are not seen.
-            nBatchSize += nUsage;
-            if (nBatchSize > nCoinCacheUsage * 0.01)
+            if (batch.SizeEstimate() > batch_size)
             {
                 db.WriteBatch(batch);
                 batch.Clear();
-                nBatchSize = 0;
                 nBatchWrites++;
             }
         }
@@ -149,6 +147,7 @@ CBlockTreeDB::CBlockTreeDB(size_t nCacheSize, bool fMemory, bool fWipe)
 {
 }
 
+size_t CCoinsViewDB::TotalWriteBufferSize() const { return db.TotalWriteBufferSize(); }
 bool CBlockTreeDB::ReadBlockFileInfo(int nFile, CBlockFileInfo &info)
 {
     return Read(make_pair(DB_BLOCK_FILES, nFile), info);
@@ -427,4 +426,230 @@ bool CCoinsViewDB::Upgrade()
     db.CompactRange({DB_COINS, uint256()}, key);
 
     return true;
+}
+
+// For Windows we can use the current total available memory, however for other systems we can only use the
+// the physical RAM in our calculations.
+static uint64_t nDefaultPhysMem = 1000000000; // if we can't get RAM size then default to an assumed 1GB system memory
+#ifdef WIN32
+#include <windows.h>
+uint64_t GetAvailableMemory()
+{
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    GlobalMemoryStatusEx(&status);
+    if (status.ullAvailPhys > 0)
+    {
+        return status.ullAvailPhys;
+    }
+    else
+    {
+        LogPrint("coindb", "Could not get size of available memory - returning with default\n");
+        return nDefaultPhysMem / 2;
+    }
+}
+uint64_t GetTotalSystemMemory()
+{
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    GlobalMemoryStatusEx(&status);
+    if (status.ullTotalPhys > 0)
+    {
+        return status.ullTotalPhys;
+    }
+    else
+    {
+        LogPrint("coindb", "Could not get size of physical memory - returning with default\n");
+        return nDefaultPhysMem;
+    }
+}
+#elif __APPLE__
+#include <sys/sysctl.h>
+#include <sys/types.h>
+uint64_t GetTotalSystemMemory()
+{
+    int mib[] = {CTL_HW, HW_MEMSIZE};
+    int64_t nPhysMem = 0;
+    size_t nLength = sizeof(nPhysMem);
+
+    if (sysctl(mib, 2, &nPhysMem, &nLength, nullptr, 0) == 0)
+    {
+        return nPhysMem;
+    }
+    else
+    {
+        LogPrint("coindb", "Could not get size of physical memory - returning with default\n");
+        return nDefaultPhysMem;
+    }
+}
+#elif __unix__
+#include <unistd.h>
+uint64_t GetTotalSystemMemory()
+{
+    long nPages = sysconf(_SC_PHYS_PAGES);
+    long nPageSize = sysconf(_SC_PAGE_SIZE);
+    if (nPages > 0 && nPageSize > 0)
+    {
+        return nPages * nPageSize;
+    }
+    else
+    {
+        LogPrint("coindb", "Could not get size of physical memory - returning with default\n");
+        return nDefaultPhysMem;
+    }
+}
+#else
+uint64_t GetTotalSystemMemory()
+{
+    LogPrint("coindb", "Could not get size of physical memory - returning with default\n");
+    return nDefaultPhysMem; // if we can't get RAM size then default to an assumed 1GB system memory
+}
+#endif
+
+void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
+    int64_t &_nCoinDBCache,
+    int64_t &_nCoinCacheUsage,
+    bool fDefault)
+{
+#ifdef WIN32
+    // If using WINDOWS then determine the actual physical memory that is currently available for dbcaching.
+    // Alway leave 10% of the available RAM unused.
+    int64_t nMemAvailable = GetAvailableMemory();
+    nMemAvailable = nMemAvailable - (nMemAvailable * nDefaultPcntMemUnused / 100);
+#else
+    // Get total system memory but only use half.
+    // - This half of system memory is only used as a basis for the total cache size
+    // - if and only if the operator has not already set a value for -dbcache. This mitigates a common problem
+    // - where new operators are unaware of the importance of the dbcache setting and therefore do not size their
+    // - dbcache correctly resulting in a very slow initial block sync.
+    int64_t nMemAvailable = GetTotalSystemMemory() / 2;
+#endif
+
+    // Convert from bytes to MiB.
+    nMemAvailable = nMemAvailable >> 20;
+
+    // nTotalCache size calculations returned in bytes (convert from MiB to bytes)
+    int64_t nTotalCache = 0;
+    if (fDefault)
+    {
+        // With the default flag set we only want the settings returned if the default dbcache were selected.
+        // This is useful in that it gives us the lowest possible dbcache configuration.
+        nTotalCache = nDefaultDbCache << 20;
+    }
+    else if (nDefaultDbCache < nMemAvailable)
+    {
+        // only use the dynamically calculated nMemAvailable if and only if the node operator has not set
+        // a value for dbcache!
+        nTotalCache = (GetArg("-dbcache", nMemAvailable) << 20);
+    }
+    else
+    {
+        nTotalCache = (GetArg("-dbcache", nDefaultDbCache) << 20);
+    }
+
+    // Now that we have the nTotalCache we can calculate all the various cache sizes.
+    CacheSizeCalculations(nTotalCache, _nBlockTreeDBCache, _nCoinDBCache, _nCoinCacheUsage);
+}
+
+void CacheSizeCalculations(int64_t _nTotalCache,
+    int64_t &_nBlockTreeDBCache,
+    int64_t &_nCoinDBCache,
+    int64_t &_nCoinCacheUsage)
+{
+    // make sure total cache is within limits
+    _nTotalCache = std::max(_nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache
+    _nTotalCache = std::min(_nTotalCache, nMaxDbCache << 20); // total cache cannot be greater than nMaxDbcache
+
+    // calculate the block index leveldb cache size. It shouldn't be larger than 2 MiB.
+    // NOTE: this is not the same as the in memory block index which is fully stored in memory.
+    _nBlockTreeDBCache = _nTotalCache / 8;
+    if (_nBlockTreeDBCache > (1 << 21) && !GetBoolArg("-txindex", DEFAULT_TXINDEX))
+        _nBlockTreeDBCache = (1 << 21);
+
+    // use 25%-50% of the remainder for the utxo leveldb disk cache
+    _nTotalCache -= _nBlockTreeDBCache;
+    _nCoinDBCache = std::min(_nTotalCache / 2, (_nTotalCache / 4) + (1 << 23));
+
+    // the remainder goes to the in-memory utxo coins cache
+    _nTotalCache -= _nCoinDBCache;
+    _nCoinCacheUsage = _nTotalCache;
+}
+
+void AdjustCoinCacheSize()
+{
+    // If the operator has not set a dbcache and initial sync is complete then revert back to the default
+    // value for dbcache. This will cause the current coins cache to be immediately trimmed to size.
+    if (IsChainNearlySyncd() && !GetArg("-dbcache", 0))
+    {
+        // Get the default value for nCoinCacheUsage.
+        int64_t dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
+        CacheSizeCalculations(nDefaultDbCache, dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
+        nCoinCacheUsage = nMaxCoinCache;
+
+        return;
+    }
+
+#ifdef WIN32
+    static int64_t nLastDbAdjustment = 0;
+    int64_t nNow = GetTimeMicros();
+
+    if (nLastDbAdjustment == 0)
+    {
+        nLastDbAdjustment = nNow;
+    }
+
+    // used to determine if we had previously reduced the nCoinCacheUsage and also to tell us what the last
+    // mem available was when we modified the nCoinCacheUsage.
+    static int64_t nLastMemAvailable = 0;
+
+    // If there is no dbcache setting specified by the node operator then float the dbache setting down or up
+    // based on current available memory.
+    if (!GetArg("-dbcache", 0) && (nNow - nLastDbAdjustment) > 60000000)
+    {
+        // The amount of system memory currently available
+        int64_t nMemAvailable = GetAvailableMemory();
+        // The amount of memory we need to *keep* available.
+        int64_t nUnusedMem = std::max(GetTotalSystemMemory() * nDefaultPcntMemUnused / 100, nMinMemToKeepAvaialable);
+
+        // Make sure we leave enough room for the leveldb write cache's
+        if (pcoinsdbview != nullptr && nUnusedMem < pcoinsdbview->TotalWriteBufferSize())
+        {
+            nUnusedMem = pcoinsdbview->TotalWriteBufferSize();
+        }
+
+        // Reduce nCoinCacheUsage if mem available gets near the threshold. We have to be more strict about flushing
+        // if we're running low on mem because on marginal systems with smaller RAM we have very little wiggle room.
+        if (nMemAvailable < nUnusedMem * 1.05)
+        {
+            // Get the lowest possible default coins cache configuration possible and use this value as a limiter
+            // to prevent the nCoinCacheUsage from falling below this value.
+            int64_t dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache = 0;
+            GetCacheConfiguration(dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache, true);
+
+            nCoinCacheUsage = std::max(nDefaultCoinCache, nCoinCacheUsage - (nUnusedMem - nMemAvailable));
+            LogPrint("coindb", "Current cache size: %ld MB, nCoinCacheUsage was reduced by %u MB\n",
+                nCoinCacheUsage / 1000000, (nUnusedMem - nMemAvailable) / 1000000);
+            nLastDbAdjustment = nNow;
+            nLastMemAvailable = nMemAvailable;
+        }
+
+        // Increase nCoinCacheUsage if mem available increases. We don't want to constantly be
+        // triggering an increase whenever the nMemAvailable crosses the threshold by just a
+        // few bytes, so we'll dampen the increases by triggering only when the threshold is crossed by 5%.
+        else if (nLastMemAvailable > 0 && nMemAvailable * 0.95 >= nLastMemAvailable)
+        {
+            // find the max coins cache possible for this configuration.  Use the max int possible for total cache
+            // size to ensure you receive the max cache size possible.
+            int64_t dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
+            CacheSizeCalculations(
+                std::numeric_limits<long long>::max(), dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
+
+            nCoinCacheUsage = std::min(nMaxCoinCache, nCoinCacheUsage + (nMemAvailable - nLastMemAvailable));
+            LogPrint("coindb", "Current cache size: %ld MB, nCoinCacheUsage was increased by %u MB\n",
+                nCoinCacheUsage / 1000000, (nMemAvailable - nLastMemAvailable) / 1000000);
+            nLastDbAdjustment = nNow;
+            nLastMemAvailable = nMemAvailable;
+        }
+    }
+#endif
 }
