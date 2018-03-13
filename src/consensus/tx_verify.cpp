@@ -243,12 +243,6 @@ bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, c
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-belowout", false,
             strprintf("value in (%s) < value out (%s)", FormatMoney(nValueIn), FormatMoney(tx.GetValueOut())));
 
-    if (miningEnforceOpGroup.value && (!CheckTokenGroups(tx, state, inputs)))
-    {
-        return state.DoS(0, false, REJECT_MALFORMED, "token-group-imbalance", false,
-            strprintf("Token group inputs and outputs do not balance"));
-    }
-
     // Tally transaction fees
     CAmount nTxFee = nValueIn - tx.GetValueOut();
     if (nTxFee < 0)

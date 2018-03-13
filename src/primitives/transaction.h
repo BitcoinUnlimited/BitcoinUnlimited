@@ -242,8 +242,6 @@ public:
     friend bool operator==(const CTransaction &a, const CTransaction &b) { return a.hash == b.hash; }
     friend bool operator!=(const CTransaction &a, const CTransaction &b) { return a.hash != b.hash; }
     std::string ToString() const;
-    /** return this transaction as a hex string.  Useful for debugging and display */
-    std::string HexStr() const;
 };
 
 /** A mutable version of CTransaction. */
@@ -273,9 +271,6 @@ struct CMutableTransaction
      * fly, as opposed to GetHash() in CTransaction, which uses a cached result.
      */
     uint256 GetHash() const;
-
-    /** return this transaction as a hex string.  Useful for debugging and display */
-    std::string HexStr() const;
 };
 
 typedef std::shared_ptr<const CTransaction> CTransactionRef;

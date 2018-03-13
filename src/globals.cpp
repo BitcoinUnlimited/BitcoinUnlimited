@@ -179,7 +179,9 @@ CTweakRef<uint64_t> miningBlockSize("mining.blockSize",
 CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
     "Maximum size of OP_RETURN data script in bytes.",
     &nMaxDatacarrierBytes);
-CTweak<bool> miningEnforceOpGroup("mining.opgroup", "Enable enforcement of the OP_GROUP opcode", false);
+CTweak<uint32_t> miningEnforceOpGroup("mining.opgroup",
+    "Enable enforcement of the OP_GROUP opcode at this block height",
+    std::numeric_limits<uint32_t>::max());
 
 CTweak<bool> miningForkOpGroup("mining.forkOpgroup",
     "Enable enforcement of the OP_GROUP opcode at the fork point",

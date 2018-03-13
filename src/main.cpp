@@ -16,6 +16,7 @@
 #include "connmgr.h"
 #include "consensus/consensus.h"
 #include "consensus/merkle.h"
+#include "consensus/tokengroups.h"
 #include "consensus/tx_verify.h"
 #include "consensus/validation.h"
 #include "dosman.h"
@@ -714,6 +715,15 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         forkVerifyFlags = SCRIPT_ENABLE_SIGHASH_FORKID;
         if (IsTxOpReturnInvalid(tx))
             return state.DoS(0, false, REJECT_WRONG_FORK, "wrong-fork");
+    }
+
+    // Disallow any OP_GROUP txs from entering the mempool until OP_GROUP is enabled.
+    // This ensures that someone won't create an invalid OP_GROUP tx that sits in the mempool until after activation,
+    // potentially causing this node to create a bad block.
+    if ((unsigned int)chainActive.Tip()->nHeight < miningEnforceOpGroup.value)
+    {
+        if (IsAnyTxOutputGrouped(tx))
+            return state.DoS(0, false, REJECT_NONSTANDARD, "premature-op_group-tx");
     }
 
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
@@ -1423,6 +1433,14 @@ bool CheckInputs(const CTransaction &tx,
     {
         if (!Consensus::CheckTxInputs(tx, state, inputs))
             return false;
+
+        if (((unsigned int)chainActive.Tip()->nHeight >= miningEnforceOpGroup.value) &&
+            !CheckTokenGroups(tx, state, inputs))
+        {
+            return state.DoS(0, false, REJECT_MALFORMED, "token-group-imbalance", false,
+                strprintf("Token group inputs and outputs do not balance"));
+        }
+
         if (pvChecks)
             pvChecks->reserve(tx.vin.size());
 

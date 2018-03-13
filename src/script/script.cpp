@@ -319,11 +319,16 @@ bool CScript::IsPayToScriptHash(vector<unsigned char> *hashBytes) const
     unsigned int offset = 0;
     if ((*this)[0] > OP_0 && (*this)[0] < OP_PUSHDATA1)
     {
+        unsigned int len = this->size();
         offset += (*this)[0] + 1;
-        if ((*this)[offset] != OP_GROUP)
-            offset = 0;
-        else
-            offset += 2; // 2 more bytes for OP_GROUP and OP_DROP
+        if ((offset < len) && ((*this)[offset] > OP_0) && ((*this)[offset] < OP_PUSHDATA1))
+        {
+            offset += (*this)[offset] + 1;
+            if ((offset < len) && ((*this)[offset] != OP_GROUP))
+                offset = 0;
+            else
+                offset += 3; // 2 more bytes for OP_GROUP OP_DROP OP_DROP
+        }
     }
     // Extra-fast test for pay-to-script-hash CScripts:
     if (this->size() == offset + 23 && (*this)[offset] == OP_HASH160 && (*this)[offset + 1] == 0x14 &&

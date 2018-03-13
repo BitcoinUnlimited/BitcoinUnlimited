@@ -45,8 +45,8 @@ This proposal also limits itself to exactly one opcode.  It is possible to inclu
 
 ## Definitions
 
-* *GP2PKH* - Group pay to public key hash script.  Specifically: `<group id> OP_GROUP OP_DROP OP_DUP OP_HASH160 <address> OP_EQUALVERIFY OP_CHECKSIG`
-* *GP2SH* - Group pay to script hash script.  Specifically: `<group id> OP_GROUP OP_DROP OP_HASH160 <address> OP_EQUAL`
+* *GP2PKH* - Group pay to public key hash script.  Specifically: `<group id> <quantity> OP_GROUP OP_DROP OP_DROP OP_DUP OP_HASH160 <address> OP_EQUALVERIFY OP_CHECKSIG`
+* *GP2SH* - Group pay to script hash script.  Specifically: `<group id> <quantity> OP_GROUP OP_DROP OP_DROP OP_HASH160 <address> OP_EQUAL`
 * *mint-melt address* - An address that can be used to mint or melt tokens.  This is actually the same number as the group identifier.
 * *group identifier* - A number used to identify a group.  This is the same number as the group's mint-melt address, but it uses a cashaddr type of 2.
 * *bitcoin cash group* - A special-case group that includes all transactions with no explicit group id.  This group represents the "native" BCH tokens during transaction analysis.
@@ -56,7 +56,9 @@ This proposal also limits itself to exactly one opcode.  It is possible to inclu
 
 ## Theory of Operation
 
-Please refer to [https://medium.com/@g.andrew.stone/bitcoin-scripting-applications-representative-tokens-ece42de81285](https://medium.com/@g.andrew.stone/bitcoin-scripting-applications-representative-tokens-ece42de81285).
+Please refer to [https://medium.com/@g.andrew.stone/bitcoin-scripting-applications-representative-tokens-ece42de81285](https://medium.com/@g.andrew.stone/bitcoin-scripting-applications-representative-tokens-ece42de81285).  This specification differs from this document slightly:
+* It does not constrain 1 token to 1 satoshi. Instead both token quantity and group id are pushed onto the stack.
+* It allows a group to have limited tokens by allowing a group to be created whose identifier is the hash of one of the transaction's inputs (COutPoint).
 
 ## Specification
 
@@ -80,11 +82,11 @@ This opcode **MUST** behave as a no-op during script evaluation. It therefore ma
 
 This opcode comes into play during transaction validation, and ensures that the quantity of input and outputs within every group balance.
 
-First a *"mint-melt group"* and a *"group identifier"* are identified for each input and output.
+First a *"mint-melt group"*, a *"single-mint group"* and a *"group identifier"* are identified for each input and output.
 
-The *group identifier* is the token group that this input or output belongs to.  A *group identifier* is a data string of 20 or 32 bytes.  It is not a number (so no zero or sign extension is allowed).  A 19 byte group identifier is simply invalid.  Transactions that do not use OP_GROUP are put in a special group called the "bitcoin cash group" that designates the "native" BCH token.  The "bitcoin cash group" is a conceptual aid -- it will never be used outside your implementation.
+The *group identifier* is the token group that this input or output belongs to.  A *group identifier* is a data string of 20 or 32 bytes.  It is not a number (so no zero or sign extension is allowed).  A 19 byte group identifier is simply invalid.  Transactions that do not use OP_GROUP are put in a special group called "NoGroup" that designates the "native" BCH token.  "NoGroup" is a conceptual aid -- it will never be used outside your implementation.
 
-Inputs may also have a *mint-melt group* depending on their construction.  The *mint-melt group* indicates the ability to either mint or melt tokens into or from the corresponding group.
+Inputs may also have a *mint-melt group*, depending on their construction.  The *mint-melt group* indicates the ability to either mint or melt tokens into or from the corresponding group.  All inputs have a *single-mint group*.
 
 Identification proceeds in the following manner:
 
@@ -93,13 +95,15 @@ Identification proceeds in the following manner:
 The mint-melt group and group identifier is the same as that of the "previous output" (specified in the input by its transaction id and index).
 *[The prevout is already needed for script validation and transaction signing, and is located in the UTXO database so this backpointer adds no additional data storage requirements on nodes or wallets]*
 
+The single-mint group is the double SHA256 of the input's serialized transaction id and vout index.
+
 **For all outputs:**
 
-To specify a *group identifier*, a script **MUST** begin with the following exact format:  `<20 or 32 byte group identfier> OP_GROUP ...`.
+To specify a *group identifier*, a script **MUST** begin with the following exact format:  `<20 or 32 byte group identfier> <1,2,4, or 8 byte unsigned little-endian quantity> OP_GROUP ...`.
 
 In words, If a script begins with 0x14 or 0x20 (i.e. 20 or 32 byte data push opcodes), followed by data, followed by OP_GROUP, the *group identifier* is the data pushed.  This sequence **MUST** begin the script and there **MUST NOT** be other opcodes between the *group identifier* data push and the OP_GROUP instruction. 
 
-If the script does not meet the above specification, its *group identifier* is the bitcoin cash group.
+If the script does not meet the above specification, its *group identifier* is "NoGroup".
 
 *[It is necessary to identify the group without executing the script so the group cannot be located within conditional code.  The simplest solution is to put it first]*
 
@@ -122,51 +126,28 @@ If a script does not match one of the above templates, it **MUST** have no *mint
 
 *[The algorithm below is described pedantically to make it easy to understand how it actually succeeds at balancing group inputs and outputs and how it correctly applies mint and melt coins.  It should be possible to write it much more succinctly -- for example, there is no need for an "input" field.  Instead, you could subtract the output field down to 0]*
 
-Create a data structure (let's call it GroupBalances) that associates group identifiers with 4 amounts named "mintable", "meltable", "input" and "output".  Initialize these to 0.
+Create a data structure (let's call it GroupBalances) that associates group identifiers with one boolean "mintableOrMeltable", and 2 Amounts "input" and "output".  Initialize these to false/0.
 
 First we'll find the final quantity of tokens in every group.  We need this so we can match it with inputs to balance the transaction:
 
 * For every transaction output (vout):
-  * Identify its *group identifier*.
-  * Add the vout's value to the group's "output" field.
-  * Do not forget to assign all "ungrouped" output's values to the special "bitcoin cash group"
-
+  * Identify its *group identifier* and *quantity*  If NoGroup, then continue.
+  * Add the vout's *quantity* to the group's "output" field.
 
 Next we go through every transaction input (vin) and add its value to the vin group's "input" field, in the same way we did for the output.  However, there is one caveat -- we need to identify whether the value of that input could be used as a mint or melt. In that case we add to the "mintable" or "meltable" field rather than the "input" field:
 
 
-* For every transaction input (vin), find its *group identifier*, *mint-melt group*, and value:
-  * If the *group identifier* is the bitcoin cash group:
-    * see if its *mint-melt group* is in GroupBalances.   
-      * If yes, add the value to the *mint-melt group*'s "mintable" field.
-      * If no, add the value to the the bitcoin cash group's "input" field.
-  * If the *group identifier* is NOT the bitcoin cash group:
-    * If the *group identifier* is equal to the *mint-melt group*: *[this is a possible melt]*
-      *  if the GroupBalances contains that group:
-          *  add the value to the GroupBalances *group identifier* "meltable" field
-          *  otherwise add the value to the bitcoin cash group's "input" field *[it's a guaranteed melt because the group doesn't exist as an output]*
-    * If the *group identifier* is not equal to the *mint-melt group*
-      * add the value to the GroupBalances *group identifier* input field *[no melting is possible so this is just a intra-group transfer]*.
-      * if the GroupBalances doesn't have a *group identifier* entry, FAIL *[we don't have permission to melt, but the transaction attempts to do it]*
+* For every transaction input (vin), find its *group identifier* and *quantity*, its *single-mint group*, and its *mint-melt group*:
+  * If the *single-mint group* is in GroupBalances, mark "mintableOrMeltable" true
+  * If the *mint-melt group* is in GroupBalances, mark "mintableOrMeltable" true
+  * If the *group identifier* is valid (not NoGroup), add the *quantity* to "input"
 
-The "mintable" and "meltable" quantities can either apply to their associated group, or to the bitcoin cash group.  So next, we apply the mintable and meltable coins to each group to equalize inputs and outputs within the group.  We place any excess into the bitcoin cash group:
+* For every group in GroupBalances, compare the "input" to the "output":
+  * If "mintableOrMeltable" is false and "input" != "output", FAIL
 
-* For every group in GroupBalances (except the bitcoin cash group), compare the "input" to the "output":
-  * If the "input" is less, equalize it by moving value from "mintable".  If there is not enough FAIL.
-  * If the "output" is less FAIL.
-  * Move any left over "mintable" and "meltable" into the "input" field of the bitcoin cash group.
+For an example implementation please refer to the CheckTokenGroup() function in this reference implementation:
 
-So we've balanced all the groups except the bitcoin cash group.  Last step:
-
-* Check the bitcoin cash group.
-  * If its input is less than its output FAIL.
-  * Otherwise, the transaction balances, SUCCESS.
-  * *[Note that the output may be less than the input... just like normal transactions, what's left over is the mining fee]*
-
-
-Algorithms with a lot of nested "ifs" are simpler to view in code.  For an example implementation please refer to the CheckTokenGroup() function in this reference implementation:
-
-https://github.com/gandrewstone/BitcoinUnlimited/tree/opgroup_consensus/src/tokengroups.cpp
+https://github.com/gandrewstone/BitcoinUnlimited/tree/opgroup2/src/tokengroups.cpp
 
 ### Full node Implementations
 
@@ -361,9 +342,6 @@ Any ISO4217 currency code, any NYSE ticker, any NASDAQ ticker, any symbol from y
 
 ## Reference implementation
 
-Consensus:
-https://github.com/gandrewstone/BitcoinUnlimited/tree/opgroup_consensus
-
-Full node (adds wallet and RPC functionality to the above consensus branch):
-https://github.com/gandrewstone/BitcoinUnlimited/tree/opgroup_fullnode
+Full node:
+https://github.com/gandrewstone/BitcoinUnlimited/tree/opgroup2
 

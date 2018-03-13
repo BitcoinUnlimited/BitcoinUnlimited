@@ -10,6 +10,7 @@
 #include "checkpoints.h"
 #include "coincontrol.h"
 #include "consensus/consensus.h"
+#include "consensus/tokengroups.h"
 #include "consensus/validation.h"
 #include "core_io.h" // Freeze for debug only
 #include "dstencode.h"
@@ -24,7 +25,7 @@
 #include "script/script.h"
 #include "script/sign.h"
 #include "timedata.h"
-#include "tokengroups.h"
+#include "tokengroupwallet.h"
 #include "txmempool.h"
 #include "uahf_fork.h"
 #include "util.h"
@@ -1497,7 +1498,7 @@ CAmount CWalletTx::GetAvailableCredit(bool fUseCache) const
     uint256 hashTx = GetHash();
     for (unsigned int i = 0; i < vout.size(); i++)
     {
-        if (!pwallet->IsSpent(hashTx, i) && (GetTokenGroup(vout[i].scriptPubKey) == BitcoinGroup))
+        if (!pwallet->IsSpent(hashTx, i) && (GetTokenGroup(vout[i].scriptPubKey) == NoGroup))
         {
             const CTxOut &txout = vout[i];
             nCredit += pwallet->GetCredit(txout, ISMINE_SPENDABLE);
@@ -1540,7 +1541,7 @@ CAmount CWalletTx::GetAvailableWatchOnlyCredit(const bool &fUseCache) const
     CAmount nCredit = 0;
     for (unsigned int i = 0; i < vout.size(); i++)
     {
-        if (!pwallet->IsSpent(GetHash(), i) && (GetTokenGroup(vout[i].scriptPubKey) == BitcoinGroup))
+        if (!pwallet->IsSpent(GetHash(), i) && (GetTokenGroup(vout[i].scriptPubKey) == NoGroup))
         {
             const CTxOut &txout = vout[i];
             nCredit += pwallet->GetCredit(txout, ISMINE_WATCH_ONLY);
