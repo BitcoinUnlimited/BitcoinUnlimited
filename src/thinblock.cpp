@@ -1612,7 +1612,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
     bool fDeterministic)
 {
     int64_t nStartTimer = GetTimeMillis();
-    seed_insecure_rand(fDeterministic);
+    FastRandomContext insecure_rand(fDeterministic);
     std::set<uint256> setHighScoreMemPoolHashes;
     std::set<uint256> setPriorityMemPoolHashes;
 
@@ -1808,7 +1808,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
         nFPRate = nMaxFalsePositive;
 
     uint32_t nMaxFilterSize = std::max(SMALLEST_MAX_BLOOM_FILTER_SIZE, pfrom->nXthinBloomfilterSize);
-    filterMemPool = CBloomFilter(nElements, nFPRate, insecure_rand(), BLOOM_UPDATE_ALL, nMaxFilterSize);
+    filterMemPool = CBloomFilter(nElements, nFPRate, insecure_rand.rand32(), BLOOM_UPDATE_ALL, nMaxFilterSize);
     LOG(THIN, "FPrate: %f Num elements in bloom filter:%d high priority txs:%d high fee txs:%d orphans:%d total "
               "txs in mempool:%d\n",
         nFPRate, nElements, setPriorityMemPoolHashes.size(), setHighScoreMemPoolHashes.size(), vOrphanHashes.size(),

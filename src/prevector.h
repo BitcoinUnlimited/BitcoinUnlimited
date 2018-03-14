@@ -400,10 +400,9 @@ public:
     const T &operator[](size_type pos) const { return *item_ptr(pos); }
     void resize(size_type new_size)
     {
-        while (size() > new_size)
+        if (size() > new_size)
         {
-            item_ptr(size() - 1)->~T();
-            _size--;
+            erase(item_ptr(new_size), end());
         }
         if (new_size > capacity())
         {
@@ -476,14 +475,7 @@ public:
         }
     }
 
-    iterator erase(iterator pos)
-    {
-        (*pos).~T();
-        memmove(&(*pos), &(*pos) + 1, ((char *)&(*end())) - ((char *)(1 + &(*pos))));
-        _size--;
-        return pos;
-    }
-
+    iterator erase(iterator pos) { return erase(pos, pos + 1); }
     iterator erase(iterator first, iterator last)
     {
         // Erase is not allowed to the change the object's capacity. That means
@@ -515,22 +507,14 @@ public:
         _size++;
     }
 
-    void pop_back() { _size--; }
+    void pop_back() { erase(end() - 1, end()); }
     T &front() { return *item_ptr(0); }
     const T &front() const { return *item_ptr(0); }
     T &back() { return *item_ptr(size() - 1); }
     const T &back() const { return *item_ptr(size() - 1); }
     void swap(prevector<N, T, Size, Diff> &other)
     {
-        if (_size & other._size & 1)
-        {
-            std::swap(_union.capacity, other._union.capacity);
-            std::swap(_union.indirect, other._union.indirect);
-        }
-        else
-        {
-            std::swap(_union, other._union);
-        }
+        std::swap(_union, other._union);
         std::swap(_size, other._size);
     }
 

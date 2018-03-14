@@ -13,6 +13,7 @@
 #include "amount.h"
 #include "coins.h"
 #include "primitives/transaction.h"
+#include "random.h"
 #include "sync.h"
 
 #undef foreach

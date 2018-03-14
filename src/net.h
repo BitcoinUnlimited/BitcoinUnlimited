@@ -529,7 +529,7 @@ public:
     }
 
     void AddAddressKnown(const CAddress &addr) { addrKnown.insert(addr.GetKey()); }
-    void PushAddress(const CAddress &addr)
+    void PushAddress(const CAddress &_addr, FastRandomContext &insecure_rand)
     {
         // Known checking here is only to save space from duplicates.
         // SendMessages will filter it again for knowns that were added
@@ -538,7 +538,7 @@ public:
         {
             if (vAddrToSend.size() >= MAX_ADDR_TO_SEND)
             {
-                vAddrToSend[insecure_rand() % vAddrToSend.size()] = addr;
+                vAddrToSend[insecure_rand.rand32() % vAddrToSend.size()] = addr;
             }
             else
             {
