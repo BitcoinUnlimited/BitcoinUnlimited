@@ -119,17 +119,16 @@ class BlockchainTest(BitcoinTestFramework):
         # Now Rollback the chain on Node 0 by 5 blocks
         print ("Test that rollbackchain() works")
         blockcount = self.nodes[0].getblockcount()
-        self.nodes[0].rollbackchain(str(self.nodes[0].getblockcount() - 5))
+        self.nodes[0].rollbackchain(self.nodes[0].getblockcount() - 5)
         assert_equal(blockcount - 5, self.nodes[0].getblockcount())
         assert_equal(blockcount, self.nodes[1].getblockcount())
 
         # Invalidate the chaintip on Node 0 and then mine more blocks on Node 1
         # - Node1 should advance in chain length but Node 0 shoudd not follow.
-        self.nodes[0].invalidateblock(self.nodes[0].getbestblockhash())
         self.nodes[1].generate(5)
         time.sleep(2) # give node0 a chance to sync (it shouldn't)
 
-        assert_equal(self.nodes[0].getblockcount() + 11, self.nodes[1].getblockcount())
+        assert_equal(self.nodes[0].getblockcount() + 10, self.nodes[1].getblockcount())
         assert_not_equal(self.nodes[0].getbestblockhash(), self.nodes[1].getbestblockhash())
 
         # Now mine blocks on node0 which will extend the chain beyond node1.
@@ -150,7 +149,7 @@ class BlockchainTest(BitcoinTestFramework):
         # Roll back by 101 blocks, this should fail
         blockcount = self.nodes[0].getblockcount()
         try:
-            self.nodes[0].rollbackchain(str(self.nodes[0].getblockcount() - 101))
+            self.nodes[0].rollbackchain(self.nodes[0].getblockcount() - 101)
         except JSONRPCException as e:
             print (e.error['message'])
             assert("You are attempting to rollback the chain by 101 blocks, however the limit is 100 blocks." in e.error['message'])
@@ -158,10 +157,66 @@ class BlockchainTest(BitcoinTestFramework):
         assert_equal(blockcount, self.nodes[1].getblockcount())
 
         # Now rollback by 100 blocks
+        bestblockhash = self.nodes[0].getbestblockhash() #save for later
         blockcount = self.nodes[0].getblockcount()
-        self.nodes[0].rollbackchain(str(self.nodes[0].getblockcount() - 100))
+        self.nodes[0].rollbackchain(self.nodes[0].getblockcount() - 100)
         assert_equal(blockcount - 100, self.nodes[0].getblockcount())
         assert_equal(blockcount, self.nodes[1].getblockcount())
+
+        # Now reconsider the now invalid chaintip on node0 which will reconnect the blocks
+        self.nodes[0].reconsiderblock(bestblockhash)
+        self.sync_all()
+
+        # Now rollback by 101 blocks by using the override
+        bestblockhash = self.nodes[0].getbestblockhash() #save for later
+        blockcount = self.nodes[0].getblockcount()
+        self.nodes[0].rollbackchain(self.nodes[0].getblockcount() - 101, True)
+        assert_equal(blockcount - 101, self.nodes[0].getblockcount())
+        assert_equal(blockcount, self.nodes[1].getblockcount())
+
+        # Now reconsider the now invalid chaintip on node0 which will reconnect the blocks
+        self.nodes[0].reconsiderblock(bestblockhash)
+        self.sync_all()
+
+        ### Test that we can rollback the chain beyond a forkpoint and then reconnect
+        #   the blocks on either chain
+
+        # Mine a few blocks
+        self.nodes[0].generate(50)
+
+        # Invalidate the chaintip and then mine another chain
+        bestblockhash1 = self.nodes[0].getbestblockhash() #save for later
+        self.nodes[0].invalidateblock(bestblockhash1)
+        self.nodes[0].generate(5)
+
+        # Reconsider the previous chain so both chains are either valid or fork-active.
+        self.nodes[0].reconsiderblock(bestblockhash1)
+
+        # Invalidate the current longer fork2 and mine 10 blocks on fork1
+        # which now makes it the longer fork
+        bestblockhash2 = self.nodes[0].getbestblockhash() #save for later
+        self.nodes[0].invalidateblock(bestblockhash2)
+        self.nodes[0].generate(10)
+
+        # Reconsider fork2 so both chains are active.
+        # fork1 should be 10 blocks long and fork 2 should be 5 blocks long with fork1 being active
+        # and fork2 being fork-valid.
+        self.nodes[0].reconsiderblock(bestblockhash2)
+
+        # Now we're ready to test the rollback. Rollback beyond the fork point (more than 10 blocks).
+        self.nodes[0].rollbackchain(self.nodes[0].getblockcount() - 20)
+
+        # Reconsider the fork1. Blocks should now be fully reconnected on fork1.
+        self.nodes[0].reconsiderblock(bestblockhash1)
+        assert_equal(self.nodes[0].getbestblockhash(), bestblockhash1);
+
+        # Rollback again beyond the fork point (more than 10 blocks).
+        self.nodes[0].rollbackchain(self.nodes[0].getblockcount() - 20)
+
+        # Reconsider the fork2. Blocks should now be fully reconnected on fork2.
+        self.nodes[0].reconsiderblock(bestblockhash2)
+        assert_equal(self.nodes[0].getbestblockhash(), bestblockhash2);
+
 
 if __name__ == '__main__':
     BlockchainTest().main()

@@ -26,8 +26,11 @@ successful receipt, "requester.Rejected(...)" to indicate a bad object (request 
 
 #ifndef REQUEST_MANAGER_H
 #define REQUEST_MANAGER_H
+
 #include "net.h"
+#include "nodestate.h"
 #include "stat.h"
+
 // When should I request a tx from someone else (in microseconds). cmdline/bitcoin.conf: -txretryinterval
 extern unsigned int txReqRetryInterval;
 extern unsigned int MIN_TX_REQUEST_RETRY_INTERVAL;
@@ -120,7 +123,13 @@ protected:
     CLeakyBucket requestPacer;
     CLeakyBucket blockPacer;
 
+    // Request a single block.
+    bool RequestBlock(CNode *pfrom, CInv obj);
+
 public:
+    // Number of peers from which we're downloading blocks.
+    int nPeersWithValidatedDownloads = 0;
+
     CRequestManager();
 
     // Get this object from somewhere, asynchronously.
@@ -128,6 +137,16 @@ public:
 
     // Get these objects from somewhere, asynchronously.
     void AskFor(const std::vector<CInv> &objArray, CNode *from, unsigned int priority = 0);
+
+    // Get these objects from somewhere, asynchronously during IBD. During IBD we must assume every peer connected
+    // can give us the blocks we need and so we tell the request manager about these sources. Otherwise the request
+    // manager may not be able to re-request blocks from anyone after a timeout and we also need to be able to not
+    // request another group of blocks that are already in flight.
+    void AskForDuringIBD(const std::vector<CInv> &objArray, CNode *from, unsigned int priority = 0);
+
+    // Did we already ask for this block. We need to do this during IBD to make sure we don't ask for another set
+    // of the same blocks.
+    bool AlreadyAskedFor(const uint256 &hash);
 
     // Indicate that we got this object, from and bytes are optional (for node performance tracking)
     void Received(const CInv &obj, CNode *from, int bytes = 0);
@@ -140,8 +159,30 @@ public:
 
     void SendRequests();
 
-    // Indicates whether a node ping time is acceptable relative to the overall average of all nodes.
-    bool IsNodePingAcceptable(CNode *pnode);
+    // Check whether the last unknown block a peer advertised is not yet known.
+    void ProcessBlockAvailability(NodeId nodeid);
+
+    // Update tracking information about which blocks a peer is assumed to have.
+    void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash);
+
+    // Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
+    // at most count entries.
+    void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex *> &vBlocks);
+
+    // Returns a bool indicating whether we requested this block.
+    void MarkBlockAsInFlight(NodeId nodeid,
+        const uint256 &hash,
+        const Consensus::Params &consensusParams,
+        CBlockIndex *pindex = nullptr);
+
+    // Returns a bool if successful in indicating we received this block.
+    bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode);
+
+    // Check for block download timeout and disconnect node if necessary.
+    void CheckForDownloadTimeout(CNode *pnode,
+        const CNodeState &state,
+        const Consensus::Params &consensusParams,
+        int64_t nNow);
 };
 
 

@@ -305,6 +305,12 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     static uint64_t nTrimHeightDelta = nBestCoinHeight * 0.80; // This is where we attempt to do our first trim
     uint64_t nTrimHeight = nBestCoinHeight - nTrimHeightDelta;
 
+    // if we've already walked the nTrimHeight all the way back as far as we can go and there is nothing to trim
+    // then no need to check further.  This should be the typical state after a block sync is completed and there is
+    // enough dbcache to hold all the coins from recent transactions in memory.
+    if (nTrimHeight == 0 && DynamicMemoryUsage() <= nTrimSize)
+        return;
+
     // Begin first Trim loop. This loop will trim coins from cache by the coin height, removing the oldest coins first.
     // This has been proven to improve sync performance significantly for nodes that can not hold the entire dbcache
     // in memory.
@@ -393,6 +399,8 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     if (nTrimmedByHeight == 0 && nTrimmed == 0)
     {
         nTrimHeightDelta += nSmallestDelta;
+        if (nTrimHeightDelta > nBestCoinHeight)
+            nTrimHeightDelta = nBestCoinHeight;
         nTrimHeight = nBestCoinHeight - nTrimHeightDelta;
         LOG(COINDB, "Re-adjusting trim height to %d using a trim height delta of %d\n", nTrimHeight, nTrimHeightDelta);
     }

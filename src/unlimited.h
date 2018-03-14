@@ -41,9 +41,7 @@ enum
     MAX_HEADER_REQS_DURING_IBD = 3,
     // if the blockchain is this far (in seconds) behind the current time, only request headers from a single
     // peer.  This makes IBD more efficient.
-    // TODO: since the new DAA cash mining is no more erratic than bitcoin legacy.
-    // Wouldn't been better to set it back to what it was? (i.e. 24 * 60 * 60)
-    SINGLE_PEER_REQUEST_MODE_AGE = (7 * 24 * 60 * 60),
+    SINGLE_PEER_REQUEST_MODE_AGE = (24 * 60 * 60),
 };
 
 class CBlock;
@@ -81,8 +79,8 @@ extern unsigned int maxMessageSizeMultiplier;
 /** BU Default maximum number of Outbound connections to simultaneously allow*/
 extern int nMaxOutConnections;
 
-extern std::vector<std::string>
-    BUComments; // BU005: Strings specific to the config of this client that should be communicated to other clients
+// BU005: Strings specific to the config of this client that should be communicated to other clients
+extern std::vector<std::string> BUComments;
 extern std::string minerComment; // An arbitrary field that miners can change to annotate their blocks
 
 // BU - Xtreme Thinblocks Auto Mempool Limiter - begin section
@@ -265,6 +263,7 @@ extern CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize;
 
 // Configuration variable validators
 bool MiningAndExcessiveBlockValidatorRule(const uint64_t newExcessiveBlockSize, const uint64_t newMiningBlockSize);
+std::string AcceptDepthValidator(const unsigned int &value, unsigned int *item, bool validate);
 std::string ExcessiveBlockValidator(const uint64_t &value, uint64_t *item, bool validate);
 std::string OutboundConnectionValidator(const int &value, int *item, bool validate);
 std::string SubverValidator(const std::string &value, std::string *item, bool validate);
@@ -281,5 +280,13 @@ extern std::list<CStatBase *> mallocedStats;
 
 extern CCriticalSection cs_blockvalidationthread;
 void InterruptBlockValidationThreads();
+
+// Fork configuration
+/** This specifies the MTP time of the next fork */
+extern CTweak<uint64_t> miningForkTime;
+/** This specifies the minimum excessive block setting at the fork point */
+extern CTweak<uint64_t> miningForkEB;
+/** This specifies the minimum max block size at the fork point */
+extern CTweak<uint64_t> miningForkMG;
 
 #endif

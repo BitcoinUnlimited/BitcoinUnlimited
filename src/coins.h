@@ -270,6 +270,10 @@ public:
     bool Flush();
 
     /**
+     * Empty the coins cache. Used primarily when we're shutting down and want to release memory
+     */
+    void Clear() { cacheCoins.clear(); }
+    /**
      * Remove excess entries from this cache.
      * Entries are trimmed starting from the beginning of the map.  In this way if those entries
      * are needed later they will all be collocated near the the beginning of the leveldb database

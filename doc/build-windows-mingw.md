@@ -8,6 +8,16 @@ NOTE: These instructions will allow you to build bitcoin as either 32-bit or 64-
       For the most part, the build instructions are the same after the toolchain and
       PATH variables are configured.  Any differences between the 32-bit and 64-bit
       build instructions have been noted inline at each instruction step.
+	  
+	  
+Semi-Automated Development Environment Configuration Scripts
+------------------------------------------------------------
+
+There now exists a set of scripts which automates most of the steps covered in
+this guide.  This set of scripts, plus instructions for configuring them to
+perform a semi-automated installation of the development enviornment may be found
+here [build-aux/mingw/readme.md](/build-aux/mingw/readme.md)
+
 
 Prepare your build system
 -------------------------

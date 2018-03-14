@@ -422,7 +422,7 @@ CNode *ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure
         pszDest ? 0.0 : (double)(GetAdjustedTime() - addrConnect.nTime) / 3600.0);
 
     // Connect
-    SOCKET hSocket;
+    SOCKET hSocket = INVALID_SOCKET;
     bool proxyConnectionFailed = false;
     if (pszDest ? ConnectSocketByName(addrConnect, hSocket, pszDest, Params().GetDefaultPort(), nConnectTimeout,
                       &proxyConnectionFailed) :
@@ -1745,7 +1745,8 @@ void ThreadOpenConnections()
         int nOutbound = 0;
         int nThinBlockCapable = 0;
         set<vector<unsigned char> > setConnected;
-        CNode *ptemp = nullptr;
+        CNode *pNonXthinNode = nullptr;
+        CNode *pNonNodeNetwork = nullptr;
         bool fDisconnected = false;
         {
             LOCK(cs_vNodes);
@@ -1759,7 +1760,11 @@ void ThreadOpenConnections()
                     if (pnode->ThinBlockCapable())
                         nThinBlockCapable++;
                     else
-                        ptemp = pnode;
+                        pNonXthinNode = pnode;
+
+                    // If sync is not yet complete then disconnect any pruned outbound connections
+                    if (IsInitialBlockDownload() && !(pnode->nServices & NODE_NETWORK))
+                        pNonNodeNetwork = pnode;
                 }
             }
             // Disconnect a node that is not XTHIN capable if all outbound slots are full and we
@@ -1768,9 +1773,18 @@ void ThreadOpenConnections()
             if (nOutbound >= nMaxOutConnections && nThinBlockCapable <= min(nMinXthinNodes, nMaxOutConnections) &&
                 nDisconnects < MAX_DISCONNECTS && IsThinBlocksEnabled() && IsChainNearlySyncd())
             {
-                if (ptemp != nullptr)
+                if (pNonXthinNode != nullptr)
                 {
-                    ptemp->fDisconnect = true;
+                    pNonXthinNode->fDisconnect = true;
+                    fDisconnected = true;
+                    nDisconnects++;
+                }
+            }
+            else if (IsInitialBlockDownload())
+            {
+                if (pNonNodeNetwork != nullptr)
+                {
+                    pNonNodeNetwork->fDisconnect = true;
                     fDisconnected = true;
                     nDisconnects++;
                 }
@@ -1793,8 +1807,12 @@ void ThreadOpenConnections()
                 MilliSleep(500);
                 {
                     LOCK(cs_vNodes);
-                    if (find(vNodes.begin(), vNodes.end(), ptemp) == vNodes.end())
+                    if (find(vNodes.begin(), vNodes.end(), pNonXthinNode) == vNodes.end() ||
+                        find(vNodes.begin(), vNodes.end(), pNonNodeNetwork) == vNodes.end())
+                    {
+                        nOutbound--;
                         break;
+                    }
                 }
             }
         }
@@ -2081,23 +2099,22 @@ void ThreadMessageHandler()
         vector<CNode *> vNodesCopy;
         {
             LOCK(cs_vNodes);
-            vNodesCopy.reserve(vNodes.size());
-            // Prefer thinBlockCapable nodes when doing communications.
-            for (CNode *pnode : vNodes)
+
+            // During IBD and because of the multithreading of PV we end up favoring the first peer that
+            // connected and end up downloading a disproportionate amount of data from that first peer.
+            // By rotating vNodes evertime we send messages we can alleviate this problem.
+            // Rotate every 60 seconds so we don't do this too often.
+            static int64_t nLastRotation = GetTime();
+            if (IsInitialBlockDownload() && vNodes.size() > 0 && GetTime() - nLastRotation > 60)
             {
-                if (pnode->ThinBlockCapable())
-                {
-                    vNodesCopy.push_back(pnode);
-                    pnode->AddRef();
-                }
+                std::rotate(vNodes.begin(), vNodes.end() - 1, vNodes.end());
+                nLastRotation = GetTime();
             }
+
+            vNodesCopy = vNodes;
             for (CNode *pnode : vNodes)
             {
-                if (!pnode->ThinBlockCapable())
-                {
-                    vNodesCopy.push_back(pnode);
-                    pnode->AddRef();
-                }
+                pnode->AddRef();
             }
         }
 
@@ -2807,6 +2824,8 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nXthinBloomfilterSize = 0;
     addrFromPort = 0; // BU
     nLocalThinBlockBytes = 0;
+    nAvgBlkResponseTime = -1.0;
+    nMaxBlocksInTransit = 16;
 
     nMisbehavior = 0;
     fShouldBan = false;
@@ -2844,7 +2863,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     if (hSocket != INVALID_SOCKET && !fInbound)
         PushVersion();
 
-    GetNodeSignals().InitializeNode(GetId(), this);
+    GetNodeSignals().InitializeNode(this);
 }
 
 CNode::~CNode()

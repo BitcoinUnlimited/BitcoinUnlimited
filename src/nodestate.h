@@ -43,11 +43,14 @@ struct CNodeState
     //! Whether we've started headers synchronization with this peer.
     bool fSyncStarted;
     //! The start time of the sync
-    int64_t fSyncStartTime;
+    int64_t nSyncStartTime;
     //! Were the first headers requested in a sync received
     bool fFirstHeadersReceived;
     //! Our current block height at the time we requested GETHEADERS
     int nFirstHeadersExpectedHeight;
+    //! During IBD we need to update the block availabiity for each peer. We do this by requesting a header
+    //  when a peer connects and also when we ask for the initial set of all headers.
+    bool fRequestedInitialBlockAvailability;
 
     std::list<QueuedBlock> vBlocksInFlight;
     //! When the first entry in vBlocksInFlight started downloading. Don't care when vBlocksInFlight is empty.
@@ -59,13 +62,13 @@ struct CNodeState
     //! Whether this peer wants invs or headers (when possible) for block announcements.
     bool fPreferHeaders;
 
-    CNodeState();
+    CNodeState(CAddress addrIn, std::string addrNameIn);
 };
 
 /** Map maintaining per-node state. Requires cs_main. */
 extern std::map<NodeId, CNodeState> mapNodeState;
 
 // Requires cs_main.
-extern CNodeState *State(NodeId pnode);
+extern CNodeState *State(NodeId nId);
 
 #endif // BITCOIN_NODESTATE_H

@@ -83,11 +83,10 @@ bool fTxIndex = false;
 bool fHavePruned = false;
 bool fPruneMode = false;
 bool fIsBareMultisigStd = DEFAULT_PERMIT_BAREMULTISIG;
-bool fRequireStandard = true;
 unsigned int nBytesPerSigOp = DEFAULT_BYTES_PER_SIGOP;
 bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
-size_t nCoinCacheUsage = 5000 * 300;
+int64_t nCoinCacheUsage = 0;
 uint64_t nPruneTarget = 0;
 uint32_t nXthinBloomFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE;
 
@@ -107,18 +106,11 @@ extern std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED
 int64_t nLastOrphanCheck = GetTime(); // Used in EraseOrphansByTime()
 static uint64_t nBytesOrphanPool = 0; // Current in memory size of the orphan pool.
 
-// BU: start block download at low numbers in case our peers are slow when we start
-/** Number of blocks that can be requested at any given time from a single peer. */
-static unsigned int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 1;
-/** Size of the "block download window": how far ahead of our current height do we fetch?
- *  Larger windows tolerate larger download speed differences between peer, but increase the potential
- *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
- *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
-static unsigned int BLOCK_DOWNLOAD_WINDOW = 256;
-
-extern CTweak<unsigned int> maxBlocksInTransitPerPeer; // override the above
+extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
 extern CTweak<unsigned int> blockDownloadWindow;
 extern CTweak<uint64_t> reindexTypicalBlockSize;
+
+extern unsigned int BLOCK_DOWNLOAD_WINDOW;
 
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
 extern CCriticalSection cs_mapInboundConnectionTracker;
@@ -240,8 +232,6 @@ int nPreferredDownload = 0;
 /** Dirty block file entries. */
 std::set<int> setDirtyFileInfo;
 
-/** Number of peers from which we're downloading blocks. */
-int nPeersWithValidatedDownloads = 0;
 } // anon namespace
 
 /** Dirty block index entries. */
@@ -276,29 +266,31 @@ void UpdatePreferredDownload(CNode *node, CNodeState *state)
     nPreferredDownload += state->fPreferredDownload;
 }
 
-void InitializeNode(NodeId nodeid, const CNode *pnode)
+void InitializeNode(const CNode *pnode)
 {
+    // Add an entry to the nodestate map
     LOCK(cs_main);
-    CNodeState &state = mapNodeState.insert(std::make_pair(nodeid, CNodeState())).first->second;
-    state.name = pnode->addrName;
-    state.address = pnode->addr;
+    mapNodeState.emplace_hint(mapNodeState.end(), std::piecewise_construct, std::forward_as_tuple(pnode->GetId()),
+        std::forward_as_tuple(pnode->addr, std::move(pnode->addrName)));
 }
 
 void FinalizeNode(NodeId nodeid)
 {
     LOCK(cs_main);
     CNodeState *state = State(nodeid);
+    DbgAssert(state != nullptr, return );
 
     if (state->fSyncStarted)
         nSyncStarted--;
 
-    BOOST_FOREACH (const QueuedBlock &entry, state->vBlocksInFlight)
+    for (const QueuedBlock &entry : state->vBlocksInFlight)
     {
+        LOGA("erasing map mapblocksinflight entries\n");
         mapBlocksInFlight.erase(entry.hash);
     }
     nPreferredDownload -= state->fPreferredDownload;
-    nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
-    DbgAssert(nPeersWithValidatedDownloads >= 0, nPeersWithValidatedDownloads = 0);
+    requester.nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
+    DbgAssert(requester.nPeersWithValidatedDownloads >= 0, requester.nPeersWithValidatedDownloads = 0);
 
     mapNodeState.erase(nodeid);
 
@@ -307,128 +299,9 @@ void FinalizeNode(NodeId nodeid)
         // Do a consistency check after the last peer is removed.  Force consistent state if production code
         DbgAssert(mapBlocksInFlight.empty(), mapBlocksInFlight.clear());
         DbgAssert(nPreferredDownload == 0, nPreferredDownload = 0);
-        DbgAssert(nPeersWithValidatedDownloads == 0, nPeersWithValidatedDownloads = 0);
+        DbgAssert(requester.nPeersWithValidatedDownloads == 0, requester.nPeersWithValidatedDownloads = 0);
     }
 }
-
-// Requires cs_main.
-// Returns a bool indicating whether we requested this block.
-bool MarkBlockAsReceived(const uint256 &hash)
-{
-    std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
-        mapBlocksInFlight.find(hash);
-    if (itInFlight != mapBlocksInFlight.end())
-    {
-        // BUIP010 Xtreme Thinblocks: begin section
-        int64_t getdataTime = itInFlight->second.second->nTime;
-        int64_t now = GetTimeMicros();
-        double nResponseTime = (double)(now - getdataTime) / 1000000.0;
-
-        // BU:  calculate avg block response time over last 20 blocks to be used for IBD tuning
-        // start at a higher number so that we don't start jamming IBD when we restart a node sync
-        static double avgResponseTime = 5;
-        static uint8_t blockRange = 20;
-        if (avgResponseTime > 0)
-            avgResponseTime -= (avgResponseTime / blockRange);
-        avgResponseTime += nResponseTime / blockRange;
-        if (avgResponseTime < 0.2)
-        {
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER = 32;
-        }
-        else if (avgResponseTime < 0.5)
-        {
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER = 16;
-        }
-        else if (avgResponseTime < 0.9)
-        {
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER = 8;
-        }
-        else if (avgResponseTime < 1.4)
-        {
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER = 4;
-        }
-        else if (avgResponseTime < 2.0)
-        {
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER = 2;
-        }
-        else
-        {
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER = 1;
-        }
-
-        LOG(THIN, "Received block %s in %.2f seconds\n", hash.ToString(), nResponseTime);
-        LOG(THIN, "Average block response time is %.2f seconds\n", avgResponseTime);
-        if (maxBlocksInTransitPerPeer.value != 0)
-        {
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER = maxBlocksInTransitPerPeer.value;
-        }
-        if (blockDownloadWindow.value != 0)
-        {
-            BLOCK_DOWNLOAD_WINDOW = blockDownloadWindow.value;
-        }
-        LOG(THIN, "BLOCK_DOWNLOAD_WINDOW is %d MAX_BLOCKS_IN_TRANSIT_PER_PEER is %d\n", BLOCK_DOWNLOAD_WINDOW,
-            MAX_BLOCKS_IN_TRANSIT_PER_PEER);
-
-        {
-            LOCK(cs_vNodes);
-            BOOST_FOREACH (CNode *pnode, vNodes)
-            {
-                if (pnode->mapThinBlocksInFlight.size() > 0)
-                {
-                    LOCK(pnode->cs_mapthinblocksinflight);
-                    if (pnode->mapThinBlocksInFlight.count(hash))
-                    {
-                        // Only update thinstats if this is actually a thinblock and not a regular block.
-                        // Sometimes we request a thinblock but then revert to requesting a regular block
-                        // as can happen when the thinblock preferential timer is exceeded.
-                        thindata.UpdateResponseTime(nResponseTime);
-                        break;
-                    }
-                }
-            }
-        }
-        // BUIP010 Xtreme Thinblocks: end section
-        CNodeState *state = State(itInFlight->second.first);
-        state->nBlocksInFlightValidHeaders -= itInFlight->second.second->fValidatedHeaders;
-        if (state->nBlocksInFlightValidHeaders == 0 && itInFlight->second.second->fValidatedHeaders)
-        {
-            // Last validated block on the queue was received.
-            nPeersWithValidatedDownloads--;
-        }
-        if (state->vBlocksInFlight.begin() == itInFlight->second.second)
-        {
-            // First block on the queue was received, update the start download time for the next one
-            state->nDownloadingSince = std::max(state->nDownloadingSince, GetTimeMicros());
-        }
-        state->vBlocksInFlight.erase(itInFlight->second.second);
-        state->nBlocksInFlight--;
-        mapBlocksInFlight.erase(itInFlight);
-        return true;
-    }
-    return false;
-}
-
-// BU MarkBlockAsInFlight moved out of anonymous namespace
-
-/** Check whether the last unknown block a peer advertised is not yet known. */
-void ProcessBlockAvailability(NodeId nodeid)
-{
-    CNodeState *state = State(nodeid);
-    DbgAssert(state != NULL, return ); // node already destructed, nothing to do in production mode
-
-    if (!state->hashLastUnknownBlock.IsNull())
-    {
-        BlockMap::iterator itOld = mapBlockIndex.find(state->hashLastUnknownBlock);
-        if (itOld != mapBlockIndex.end() && itOld->second->nChainWork > 0)
-        {
-            if (state->pindexBestKnownBlock == NULL ||
-                itOld->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
-                state->pindexBestKnownBlock = itOld->second;
-            state->hashLastUnknownBlock.SetNull();
-        }
-    }
-}
-
 
 // Requires cs_main
 bool PeerHasHeader(CNodeState *state, CBlockIndex *pindex)
@@ -439,181 +312,8 @@ bool PeerHasHeader(CNodeState *state, CBlockIndex *pindex)
         return true;
     return false;
 }
-
-/** Find the last common ancestor two blocks have.
- *  Both pa and pb must be non-NULL. */
-CBlockIndex *LastCommonAncestor(CBlockIndex *pa, CBlockIndex *pb)
-{
-    if (pa->nHeight > pb->nHeight)
-    {
-        pa = pa->GetAncestor(pb->nHeight);
-    }
-    else if (pb->nHeight > pa->nHeight)
-    {
-        pb = pb->GetAncestor(pa->nHeight);
-    }
-
-    while (pa != pb && pa && pb)
-    {
-        pa = pa->pprev;
-        pb = pb->pprev;
-    }
-
-    // Eventually all chain branches meet at the genesis block.
-    assert(pa == pb);
-    return pa;
-}
-
-/** Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
- *  at most count entries. */
-static void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex *> &vBlocks)
-{
-    if (count == 0)
-        return;
-
-    vBlocks.reserve(vBlocks.size() + count);
-    CNodeState *state = State(nodeid);
-    DbgAssert(state != NULL, return );
-
-    // Make sure pindexBestKnownBlock is up to date, we'll need it.
-    ProcessBlockAvailability(nodeid);
-
-    if (state->pindexBestKnownBlock == NULL || state->pindexBestKnownBlock->nChainWork < chainActive.Tip()->nChainWork)
-    {
-        // This peer has nothing interesting.
-        return;
-    }
-
-    if (state->pindexLastCommonBlock == NULL)
-    {
-        // Bootstrap quickly by guessing a parent of our best tip is the forking point.
-        // Guessing wrong in either direction is not a problem.
-        state->pindexLastCommonBlock =
-            chainActive[std::min(state->pindexBestKnownBlock->nHeight, chainActive.Height())];
-    }
-
-    // If the peer reorganized, our previous pindexLastCommonBlock may not be an ancestor
-    // of its current tip anymore. Go back enough to fix that.
-    state->pindexLastCommonBlock = LastCommonAncestor(state->pindexLastCommonBlock, state->pindexBestKnownBlock);
-    if (state->pindexLastCommonBlock == state->pindexBestKnownBlock)
-        return;
-
-    std::vector<CBlockIndex *> vToFetch;
-    CBlockIndex *pindexWalk = state->pindexLastCommonBlock;
-    // Never fetch further than the current chain tip + the block download window.  We need to ensure
-    // the if running in pruning mode we don't download too many blocks ahead and as a result use to
-    // much disk space to store unconnected blocks.
-    int nWindowEnd = chainActive.Height() + BLOCK_DOWNLOAD_WINDOW;
-
-    int nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
-    while (pindexWalk->nHeight < nMaxHeight)
-    {
-        // Read up to 128 (or more, if more blocks than that are needed) successors of pindexWalk (towards
-        // pindexBestKnownBlock) into vToFetch. We fetch 128, because CBlockIndex::GetAncestor may be as expensive
-        // as iterating over ~100 CBlockIndex* entries anyway.
-        int nToFetch = std::min(nMaxHeight - pindexWalk->nHeight, std::max<int>(count - vBlocks.size(), 128));
-        vToFetch.resize(nToFetch);
-        pindexWalk = state->pindexBestKnownBlock->GetAncestor(pindexWalk->nHeight + nToFetch);
-        vToFetch[nToFetch - 1] = pindexWalk;
-        for (unsigned int i = nToFetch - 1; i > 0; i--)
-        {
-            vToFetch[i - 1] = vToFetch[i]->pprev;
-        }
-
-        // Iterate over those blocks in vToFetch (in forward direction), adding the ones that
-        // are not yet downloaded and not in flight to vBlocks. In the mean time, update
-        // pindexLastCommonBlock as long as all ancestors are already downloaded, or if it's
-        // already part of our chain (and therefore don't need it even if pruned).
-        BOOST_FOREACH (CBlockIndex *pindex, vToFetch)
-        {
-            if (!pindex->IsValid(BLOCK_VALID_TREE))
-            {
-                // We consider the chain that this peer is on invalid.
-                return;
-            }
-            if (pindex->nStatus & BLOCK_HAVE_DATA || chainActive.Contains(pindex))
-            {
-                if (pindex->nChainTx)
-                    state->pindexLastCommonBlock = pindex;
-            }
-            else
-            {
-                // Return if we've reached the end of the download window.
-                if (pindex->nHeight > nWindowEnd)
-                {
-                    return;
-                }
-
-                // Return if we've reached the end of the number of blocks we can download for this peer.
-                vBlocks.push_back(pindex);
-                if (vBlocks.size() == count)
-                {
-                    return;
-                }
-            }
-        }
-    }
-}
-
 } // anon namespace
 
-/** Update tracking information about which blocks a peer is assumed to have. */
-void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash)
-{
-    CNodeState *state = State(nodeid);
-    DbgAssert(state != NULL, return ); // node already destructed, nothing to do in production mode
-
-    ProcessBlockAvailability(nodeid);
-
-    BlockMap::iterator it = mapBlockIndex.find(hash);
-    if (it != mapBlockIndex.end() && it->second->nChainWork > 0)
-    {
-        // An actually better block was announced.
-        if (state->pindexBestKnownBlock == NULL || it->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
-            state->pindexBestKnownBlock = it->second;
-    }
-    else
-    {
-        // An unknown block was announced; just assume that the latest one is the best one.
-        state->hashLastUnknownBlock = hash;
-    }
-}
-
-void MarkBlockAsInFlight(NodeId nodeid,
-    const uint256 &hash,
-    const Consensus::Params &consensusParams,
-    CBlockIndex *pindex = NULL)
-{
-    LOCK(cs_main);
-    CNodeState *state = State(nodeid);
-    DbgAssert(state != NULL, return );
-
-    // If started then clear the thinblock timer used for preferential downloading
-    thindata.ClearThinBlockTimer(hash);
-
-    // BU why mark as received? because this erases it from the inflight list.  Instead we'll check for it
-    // BU removed: MarkBlockAsReceived(hash);
-    std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
-        mapBlocksInFlight.find(hash);
-    if (itInFlight == mapBlocksInFlight.end()) // If it hasn't already been marked inflight...
-    {
-        int64_t nNow = GetTimeMicros();
-        QueuedBlock newentry = {hash, pindex, nNow, pindex != NULL};
-        std::list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
-        state->nBlocksInFlight++;
-        state->nBlocksInFlightValidHeaders += newentry.fValidatedHeaders;
-        if (state->nBlocksInFlight == 1)
-        {
-            // We're starting a block download (batch) from this peer.
-            state->nDownloadingSince = GetTimeMicros();
-        }
-        if (state->nBlocksInFlightValidHeaders == 1 && pindex != NULL)
-        {
-            nPeersWithValidatedDownloads++;
-        }
-        mapBlocksInFlight[hash] = std::make_pair(nodeid, it);
-    }
-}
 
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
@@ -629,8 +329,8 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)
 
     LOCK(cs_main);
     CNodeState *state = State(nodeid);
-    if (state == NULL)
-        return false;
+    DbgAssert(state != nullptr, return false);
+
     stats.nMisbehavior = node->nMisbehavior;
     stats.nSyncHeight = state->pindexBestKnownBlock ? state->pindexBestKnownBlock->nHeight : -1;
     stats.nCommonHeight = state->pindexLastCommonBlock ? state->pindexLastCommonBlock->nHeight : -1;
@@ -1016,13 +716,14 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
     std::string reason;
+    const CChainParams &chainparams = Params();
+    bool fRequireStandard = chainparams.RequireStandard();
     if (fRequireStandard && !IsStandardTx(tx, reason))
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
 
     // Don't relay version 2 transactions until CSV is active, and we can be
     // sure that such transactions will be mined (unless we're on
     // -testnet/-regtest).
-    const CChainParams &chainparams = Params();
     if (fRequireStandard && tx.nVersion >= 2 &&
         VersionBitsTipState(chainparams.GetConsensus(), Consensus::DEPLOYMENT_CSV) != THRESHOLD_ACTIVE)
     {
@@ -2624,7 +2325,12 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
         {
             nLastSetChain = nNow;
         }
-        size_t cacheSize = pcoinsTip->DynamicMemoryUsage();
+
+        // If possible adjust the max size of the coin cache (nCoinCacheUsage) based on current available memory. Do
+        // this before determinining whether to flush the cache or not in the steps that follow.
+        AdjustCoinCacheSize();
+
+        int64_t cacheSize = pcoinsTip->DynamicMemoryUsage();
         static int64_t nSizeAfterLastFlush = 0;
         // The cache is close to the limit. Try to flush and trim.
         bool fCacheCritical = ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > nCoinCacheUsage * 0.995)) ||
@@ -2693,7 +2399,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
             else
             {
                 // Trim, but never trim more than nMaxCacheIncreaseSinceLastFlush
-                size_t nTrimSize = nCoinCacheUsage * .90;
+                int64_t nTrimSize = nCoinCacheUsage * .90;
                 if (nCoinCacheUsage - nMaxCacheIncreaseSinceLastFlush > nTrimSize)
                     nTrimSize = nCoinCacheUsage - nMaxCacheIncreaseSinceLastFlush;
                 pcoinsTip->Trim(nTrimSize);
@@ -2711,7 +2417,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
         // As a safeguard, periodically check and correct any drift in the value of cachedCoinsUsage.  While a
         // correction should never be needed, resetting the value allows the node to continue operating, and only
         // an error is reported if the new and old values do not match.
-        if (fPeriodicFlush)
+        if (fPeriodicFlush || nCoinCacheUsage < 0)
             pcoinsTip->ResetCachedCoinUsage();
     }
     catch (const std::runtime_error &e)
@@ -2804,6 +2510,18 @@ void static UpdateTip(CBlockIndex *pindexNew)
             {
                 AlertNotify(strMiscWarning);
                 fWarned = true;
+            }
+        }
+        else
+        {
+            // clear warning in case unknown block version descrease under 50% of the last 100 mined blocks
+            if (fWarned &&
+                strMiscWarning ==
+                    _("Warning: Unknown block versions being mined! It's possible unknown rules are in effect"))
+            {
+                strMiscWarning = "";
+                AlertNotify(strMiscWarning);
+                fWarned = false;
             }
         }
     }
@@ -3142,14 +2860,14 @@ static bool ActivateBestChainStep(CValidationState &state,
         if (PV->QuitReceived(this_id, fParallel))
             return false;
 
-        PV->IsReorgInProgress(this_id, true, fParallel); // indicate that this thread has now initiated a re-org
+        // Indicate that this thread has now initiated a re-org
+        PV->IsReorgInProgress(this_id, true, fParallel);
 
-        // Disconnect active blocks which are no longer in the best chain.
+        // Disconnect active blocks which are no longer in the best chain. We do not need to concern ourselves with any
+        // block validation threads that may be running for the chain we are rolling back. They will automatically fail
+        // validation during ConnectBlock() once the chaintip has changed..
         if (!DisconnectTip(state, chainparams.GetConsensus()))
             return false;
-
-        if (fParallel && !fBlocksDisconnected)
-            PV->StopAllValidationThreads(this_id);
 
         fBlocksDisconnected = true;
     }
@@ -3442,6 +3160,19 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
     } while (pindexMostWork->nChainWork > chainActive.Tip()->nChainWork);
     CheckBlockIndex(chainparams.GetConsensus());
 
+    // Activate May 2018 HF rules
+    if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
+    {
+        // Bump the accepted block size to 32MB and the default generated size to 8MB
+        if (miningForkEB.value > excessiveBlockSize)
+            excessiveBlockSize = miningForkEB.value;
+        if (miningForkMG.value > maxGeneratedBlock)
+            maxGeneratedBlock = miningForkMG.value;
+        settingsToUserAgentString();
+        // Bump OP_RETURN size:
+        if (nMaxDatacarrierBytes < MAX_OP_RETURN_MAY2018)
+            nMaxDatacarrierBytes = MAX_OP_RETURN_MAY2018;
+    }
     return true;
 }
 
@@ -3789,11 +3520,6 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
     // because we receive the wrong transactions for it.
 
     // Size limits
-    if (block.nBlockSize == 0)
-        block.nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-
-    // || block.vtx.size() > MAX_BLOCK_SIZE || ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION) >
-    // MAX_BLOCK_SIZE)
     if (block.vtx.empty())
         return state.DoS(100, error("CheckBlock(): size limits failed"), REJECT_INVALID, "bad-blk-length");
 
@@ -3832,7 +3558,7 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
         block.fChecked = true;
 
     // BU: Check whether this block exceeds what we want to relay.
-    block.fExcessive = CheckExcessive(block, block.nBlockSize, nSigOps, nTx, nLargestTx);
+    block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nSigOps, nTx, nLargestTx);
 
     return true;
 }
@@ -4139,9 +3865,8 @@ bool ProcessNewBlock(CValidationState &state,
     bool checked = CheckBlock(*pblock, state);
     if (!checked)
     {
-        int byteLen = ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION);
         LOGA("Invalid block: ver:%x time:%d Tx size:%d len:%d\n", pblock->nVersion, pblock->nTime, pblock->vtx.size(),
-            byteLen);
+            pblock->GetBlockSize());
     }
 
     // WARNING: cs_main is not locked here throughout but is released and then re-locked during ActivateBestChain
@@ -4152,7 +3877,7 @@ bool ProcessNewBlock(CValidationState &state,
     {
         LOCK(cs_main);
         uint256 hash = pblock->GetHash();
-        bool fRequested = MarkBlockAsReceived(hash);
+        bool fRequested = requester.MarkBlockAsReceived(hash, pfrom);
         fRequested |= fForceProcessing;
         if (!checked)
         {
@@ -4190,41 +3915,46 @@ bool ProcessNewBlock(CValidationState &state,
 
     int64_t end = GetTimeMicros();
 
-    uint64_t maxTxSize = 0;
-    uint64_t maxVin = 0;
-    uint64_t maxVout = 0;
-    CTransaction txIn;
-    CTransaction txOut;
-    CTransaction txLen;
-
-    for (unsigned int i = 0; i < pblock->vtx.size(); i++)
+    if (Logging::LogAcceptCategory(Logging::BENCH))
     {
-        if (pblock->vtx[i].vin.size() > maxVin)
-        {
-            maxVin = pblock->vtx[i].vin.size();
-            txIn = pblock->vtx[i];
-        }
-        if (pblock->vtx[i].vout.size() > maxVout)
-        {
-            maxVout = pblock->vtx[i].vout.size();
-            txOut = pblock->vtx[i];
-        }
-        uint64_t len = ::GetSerializeSize(pblock->vtx[i], SER_NETWORK, PROTOCOL_VERSION);
-        if (len > maxTxSize)
-        {
-            maxTxSize = len;
-            txLen = pblock->vtx[i];
-        }
-    }
+        uint64_t maxTxSize = 0;
+        uint64_t maxVin = 0;
+        uint64_t maxVout = 0;
+        CTransaction txIn;
+        CTransaction txOut;
+        CTransaction txLen;
 
-    LOG(BENCH, "ProcessNewBlock, time: %d, block: %s, len: %d, numTx: %d, maxVin: %llu, maxVout: %llu, maxTx:%llu\n",
-        end - start, pblock->GetHash().ToString(), pblock->nBlockSize, pblock->vtx.size(), maxVin, maxVout, maxTxSize);
-    LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txIn.GetHash().ToString(), txIn.vin.size(), txIn.vout.size(),
-        ::GetSerializeSize(txIn, SER_NETWORK, PROTOCOL_VERSION));
-    LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txOut.GetHash().ToString(), txOut.vin.size(),
-        txOut.vout.size(), ::GetSerializeSize(txOut, SER_NETWORK, PROTOCOL_VERSION));
-    LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txLen.GetHash().ToString(), txLen.vin.size(),
-        txLen.vout.size(), ::GetSerializeSize(txLen, SER_NETWORK, PROTOCOL_VERSION));
+        for (unsigned int i = 0; i < pblock->vtx.size(); i++)
+        {
+            if (pblock->vtx[i].vin.size() > maxVin)
+            {
+                maxVin = pblock->vtx[i].vin.size();
+                txIn = pblock->vtx[i];
+            }
+            if (pblock->vtx[i].vout.size() > maxVout)
+            {
+                maxVout = pblock->vtx[i].vout.size();
+                txOut = pblock->vtx[i];
+            }
+            uint64_t len = ::GetSerializeSize(pblock->vtx[i], SER_NETWORK, PROTOCOL_VERSION);
+            if (len > maxTxSize)
+            {
+                maxTxSize = len;
+                txLen = pblock->vtx[i];
+            }
+        }
+
+        LOG(BENCH,
+            "ProcessNewBlock, time: %d, block: %s, len: %d, numTx: %d, maxVin: %llu, maxVout: %llu, maxTx:%llu\n",
+            end - start, pblock->GetHash().ToString(), pblock->nBlockSize, pblock->vtx.size(), maxVin, maxVout,
+            maxTxSize);
+        LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txIn.GetHash().ToString(), txIn.vin.size(),
+            txIn.vout.size(), ::GetSerializeSize(txIn, SER_NETWORK, PROTOCOL_VERSION));
+        LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txOut.GetHash().ToString(), txOut.vin.size(),
+            txOut.vout.size(), ::GetSerializeSize(txOut, SER_NETWORK, PROTOCOL_VERSION));
+        LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txLen.GetHash().ToString(), txLen.vin.size(),
+            txLen.vout.size(), ::GetSerializeSize(txLen, SER_NETWORK, PROTOCOL_VERSION));
+    }
 
     LOCK(cs_blockvalidationtime);
     nBlockValidationTime << (end - start);
@@ -4623,7 +4353,7 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
         }
         // check level 3: check for inconsistencies during memory-only disconnect of tip blocks
         if (nCheckLevel >= 3 && pindex == pindexState &&
-            (coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheUsage)
+            (int64_t)(coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheUsage)
         {
             bool fClean = true;
             DisconnectResult res = DisconnectBlock(block, pindex, coins);
@@ -5870,7 +5600,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             if (inv.type == MSG_BLOCK)
             {
-                UpdateBlockAvailability(pfrom->GetId(), inv.hash);
+                requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
                 // RE !IsInitialBlockDownload(): We do not want to get the block if the system is executing the initial
                 // block download because
                 // blocks are stored in block files in the order of arrival.  So grabbing blocks "early" will cause new
@@ -6307,7 +6037,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
                 // update hashLastUnknownBlock so that we'll be able to download the block from this peer even
                 // if we receive the headers, which will connect this one, from a different peer.
-                UpdateBlockAvailability(pfrom->GetId(), hash);
+                requester.UpdateBlockAvailability(pfrom->GetId(), hash);
             }
 
             hashLastBlock = header.GetHash();
@@ -6387,7 +6117,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
 
         if (pindexLast)
-            UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
+            requester.UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
 
         if (nCount == MAX_HEADERS_RESULTS && pindexLast)
         {
@@ -6397,10 +6127,59 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             LOG(NET, "more getheaders (%d) to end to peer=%s (startheight:%d)\n", pindexLast->nHeight,
                 pfrom->GetLogName(), pfrom->nStartingHeight);
             pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexLast), uint256());
+
+            // During the process of IBD we need to update block availability for every connected peer. To do that we
+            // request, from each NODE_NETWORK peer, a header that matches the last blockhash found in this recent set
+            // of headers. Once the reqeusted header is received then the block availability for this peer will get
+            // updated.
+            if (IsInitialBlockDownload())
+            {
+                // To maintain locking order with cs_main we have to addrefs for each node and then release
+                // the lock on cs_vNodes before aquiring cs_main further down.
+                std::vector<CNode *> vNodesCopy;
+                {
+                    LOCK(cs_vNodes);
+                    vNodesCopy = vNodes;
+                    for (CNode *pnode : vNodes)
+                    {
+                        pnode->AddRef();
+                    }
+                }
+
+                for (CNode *pnode : vNodesCopy)
+                {
+                    if (!pnode->fClient && pnode != pfrom)
+                    {
+                        LOCK(cs_main);
+                        CNodeState *state = State(pfrom->GetId());
+                        DbgAssert(state != nullptr, ); // do not return, we need to release refs later.
+                        if (state == nullptr)
+                            continue;
+
+                        if (state->pindexBestKnownBlock == nullptr ||
+                            pindexLast->nChainWork > state->pindexBestKnownBlock->nChainWork)
+                        {
+                            // We only want one single header so we pass a null for CBlockLocator.
+                            pnode->PushMessage(NetMsgType::GETHEADERS, CBlockLocator(), pindexLast->GetBlockHash());
+                            LOG(NET | BLK, "Requesting header for blockavailability, peer=%s block=%s height=%d\n",
+                                pnode->GetLogName(), pindexLast->GetBlockHash().ToString().c_str(),
+                                pindexBestHeader->nHeight);
+                        }
+                    }
+                }
+
+                // release refs
+                {
+                    LOCK(cs_vNodes);
+                    for (CNode *pnode : vNodesCopy)
+                        pnode->Release();
+                }
+            }
         }
 
         bool fCanDirectFetch = CanDirectFetch(chainparams.GetConsensus());
         CNodeState *nodestate = State(pfrom->GetId());
+        DbgAssert(nodestate != nullptr, return false);
 
         // During the initial peer handshake we must receive the initial headers which should be greater
         // than or equal to our block height at the time of requesting GETHEADERS. This is because the peer has
@@ -6432,7 +6211,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         {
             // Set tweak value.  Mostly used in testing direct fetch.
             if (maxBlocksInTransitPerPeer.value != 0)
-                MAX_BLOCKS_IN_TRANSIT_PER_PEER = maxBlocksInTransitPerPeer.value;
+                pfrom->nMaxBlocksInTransit.store(maxBlocksInTransitPerPeer.value);
 
             std::vector<CBlockIndex *> vToFetch;
             CBlockIndex *pindexWalk = pindexLast;
@@ -6459,7 +6238,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 // We don't care about how many blocks are in flight.  We just need to make sure we don't
                 // ask for more than the maximum allowed per peer because the request manager will take care
                 // of any duplicate requests.
-                if (nAskFor >= MAX_BLOCKS_IN_TRANSIT_PER_PEER)
+                if (nAskFor >= pfrom->nMaxBlocksInTransit.load())
                 {
                     LOG(NET, "Large reorg, could only direct fetch %d blocks\n", nAskFor);
                     break;
@@ -6641,18 +6420,25 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) // Ignore blocks received while importing
     {
-        CBlock block;
-        vRecv >> block;
+        std::shared_ptr<CBlock> block(new CBlock);
+        {
+            uint64_t nCheckBlockSize = vRecv.size();
+            vRecv >> *block;
 
-        CInv inv(MSG_BLOCK, block.GetHash());
+            // Sanity check. The serialized block size should match the size that is in our receive queue.  If not
+            // this could be an attack block of some kind.
+            DbgAssert(nCheckBlockSize == block->GetBlockSize(), return true);
+        }
+
+        CInv inv(MSG_BLOCK, block->GetHash());
         LOG(BLK, "received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
-        UnlimitedLogBlock(block, inv.hash.ToString(), receiptTime);
+        UnlimitedLogBlock(*block, inv.hash.ToString(), receiptTime);
 
         if (IsChainNearlySyncd()) // BU send the received block out expedited channels quickly
         {
             CValidationState state;
-            if (CheckBlockHeader(block, state, true)) // block header is fine
-                SendExpeditedBlock(block, pfrom);
+            if (CheckBlockHeader(*block, state, true)) // block header is fine
+                SendExpeditedBlock(*block, pfrom);
         }
 
         // Message consistency checking
@@ -7197,7 +6983,7 @@ bool SendMessages(CNode *pto)
             pto->nNextAddrSend = PoissonNextSend(nNow, AVG_ADDRESS_BROADCAST_INTERVAL);
             std::vector<CAddress> vAddr;
             vAddr.reserve(pto->vAddrToSend.size());
-            BOOST_FOREACH (const CAddress &addr, pto->vAddrToSend)
+            for (const CAddress &addr : pto->vAddrToSend)
             {
                 if (!pto->addrKnown.contains(addr.GetKey()))
                 {
@@ -7219,23 +7005,9 @@ bool SendMessages(CNode *pto)
         CNodeState &state = *State(pto->GetId());
 
         // If a sync has been started check whether we received the first batch of headers requested within the timeout
-        // period.
-        // If not then disconnect and ban the node and a new node will automatically be selected to start the headers
-        // download.
-        if ((state.fSyncStarted) && (state.fSyncStartTime < GetTime() - INITIAL_HEADERS_TIMEOUT) &&
-            (!state.fFirstHeadersReceived) && !pto->fWhitelisted)
-        {
-            pto->fDisconnect = true;
-            LOGA(
-                "Initial headers were either not received or not received before the timeout - disconnecting peer=%s\n",
-                pto->GetLogName());
-        }
-
-        // If a sync has been started check whether we received the first batch of headers requested within the timeout
-        // period.
-        // If not then disconnect and ban the node and a new node will automatically be selected to start the headers
-        // download.
-        if ((state.fSyncStarted) && (state.fSyncStartTime < GetTime() - INITIAL_HEADERS_TIMEOUT) &&
+        // period. If not then disconnect and ban the node and a new node will automatically be selected to start the
+        // headers download.
+        if ((state.fSyncStarted) && (state.nSyncStartTime < GetTime() - INITIAL_HEADERS_TIMEOUT) &&
             (!state.fFirstHeadersReceived) && !pto->fWhitelisted)
         {
             pto->fDisconnect = true;
@@ -7245,7 +7017,7 @@ bool SendMessages(CNode *pto)
         }
 
         // Start block sync
-        if (pindexBestHeader == NULL)
+        if (pindexBestHeader == nullptr)
             pindexBestHeader = chainActive.Tip();
         // Download if this is a nice peer, or we have no nice peers and this one might do.
         bool fFetch = state.fPreferredDownload || (nPreferredDownload == 0 && !pto->fClient && !pto->fOneShot);
@@ -7269,8 +7041,9 @@ bool SendMessages(CNode *pto)
                 if (pindexStart->nHeight < pto->nStartingHeight)
                 {
                     state.fSyncStarted = true;
-                    state.fSyncStartTime = GetTime();
+                    state.nSyncStartTime = GetTime();
                     state.fFirstHeadersReceived = false;
+                    state.fRequestedInitialBlockAvailability = true;
                     state.nFirstHeadersExpectedHeight = pindexBestHeader->nHeight;
                     nSyncStarted++;
 
@@ -7278,6 +7051,24 @@ bool SendMessages(CNode *pto)
                         pto->GetLogName(), pto->nStartingHeight);
                     pto->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexStart), uint256());
                 }
+            }
+        }
+
+        // During IBD and when a new NODE_NETWORK peer connects we have to ask for if it has our best header in order
+        // to update our block availability. We only want/need to do this only once per peer (if the initial batch of
+        // headers has still not been etirely donwnloaded yet then the block availability will be updated during that
+        // process rather than here).
+        if (IsInitialBlockDownload() && !state.fRequestedInitialBlockAvailability &&
+            state.pindexBestKnownBlock == nullptr && !fReindex && !fImporting)
+        {
+            if (!pto->fClient)
+            {
+                state.fRequestedInitialBlockAvailability = true;
+
+                // We only want one single header so we pass a null CBlockLocator.
+                pto->PushMessage(NetMsgType::GETHEADERS, CBlockLocator(), pindexBestHeader->GetBlockHash());
+                LOG(NET | BLK, "Requesting header for initial blockavailability, peer=%s block=%s height=%d\n",
+                    pto->GetLogName(), pindexBestHeader->GetBlockHash().ToString().c_str(), pindexBestHeader->nHeight);
             }
         }
 
@@ -7304,7 +7095,7 @@ bool SendMessages(CNode *pto)
             std::vector<CBlock> vHeaders;
             bool fRevertToInv = (!state.fPreferHeaders || pto->vBlockHashesToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
             CBlockIndex *pBestIndex = NULL; // last header queued for delivery
-            ProcessBlockAvailability(pto->id); // ensure pindexBestKnownBlock is up-to-date
+            requester.ProcessBlockAvailability(pto->id); // ensure pindexBestKnownBlock is up-to-date
 
             if (!fRevertToInv)
             {
@@ -7312,7 +7103,7 @@ bool SendMessages(CNode *pto)
                 // Try to find first header that our peer doesn't have, and
                 // then send all headers past that one.  If we come across any
                 // headers that aren't on chainActive, give up.
-                BOOST_FOREACH (const uint256 &hash, pto->vBlockHashesToAnnounce)
+                for (const uint256 &hash : pto->vBlockHashesToAnnounce)
                 {
                     BlockMap::iterator mi = mapBlockIndex.find(hash);
                     // BU skip blocks that we don't know about.  was: assert(mi != mapBlockIndex.end());
@@ -7325,7 +7116,7 @@ bool SendMessages(CNode *pto)
                         fRevertToInv = true;
                         break;
                     }
-                    if (pBestIndex != NULL && pindex->pprev != pBestIndex)
+                    if (pBestIndex != nullptr && pindex->pprev != pBestIndex)
                     {
                         // This means that the list of blocks to announce don't
                         // connect to each other.
@@ -7374,7 +7165,7 @@ bool SendMessages(CNode *pto)
                 // in the past.
                 if (!pto->vBlockHashesToAnnounce.empty())
                 {
-                    BOOST_FOREACH (const uint256 &hashToAnnounce, pto->vBlockHashesToAnnounce)
+                    for (const uint256 &hashToAnnounce : pto->vBlockHashesToAnnounce)
                     {
                         BlockMap::iterator mi = mapBlockIndex.find(hashToAnnounce);
                         if (mi != mapBlockIndex.end())
@@ -7493,51 +7284,44 @@ bool SendMessages(CNode *pto)
             }
         }
 
-        // In case there is a block that has been in flight from this peer for 2 + 0.5 * N times the block interval
-        // (with N the number of peers from which we're downloading validated blocks), disconnect due to timeout.
-        // We compensate for other peers to prevent killing off peers due to our own downstream link
-        // being saturated. We only count validated in-flight blocks so peers can't advertise non-existing block hashes
-        // to unreasonably increase our timeout.
-        if (!pto->fDisconnect && state.vBlocksInFlight.size() > 0)
-        {
-            QueuedBlock &queuedBlock = state.vBlocksInFlight.front();
-            int nOtherPeersWithValidatedDownloads =
-                nPeersWithValidatedDownloads - (state.nBlocksInFlightValidHeaders > 0);
-            if (nNow > state.nDownloadingSince +
-                           consensusParams.nPowTargetSpacing *
-                               (BLOCK_DOWNLOAD_TIMEOUT_BASE +
-                                   BLOCK_DOWNLOAD_TIMEOUT_PER_PEER * nOtherPeersWithValidatedDownloads))
-            {
-                LOGA(
-                    "Timeout downloading block %s from peer=%d, disconnecting\n", queuedBlock.hash.ToString(), pto->id);
-                pto->fDisconnect = true;
-            }
-        }
+
+        // Check for block download timeout and disconnect node if necessary
+        requester.CheckForDownloadTimeout(pto, state, consensusParams, nNow);
+
 
         //
         // Message: getdata (blocks)
         //
-        std::vector<CInv> vGetData;
-        if (!pto->fDisconnect && !pto->fClient && state.nBlocksInFlight < (int)MAX_BLOCKS_IN_TRANSIT_PER_PEER)
+        if (!pto->fDisconnect && !pto->fClient && state.nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
         {
             std::vector<CBlockIndex *> vToDownload;
-            FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload);
+            requester.FindNextBlocksToDownload(
+                pto->GetId(), pto->nMaxBlocksInTransit.load() - state.nBlocksInFlight, vToDownload);
             // LOG(REQ, "IBD AskFor %d blocks from peer=%s\n", vToDownload.size(), pto->GetLogName());
-            BOOST_FOREACH (CBlockIndex *pindex, vToDownload)
+            std::vector<CInv> vGetBlocks;
+            for (CBlockIndex *pindex : vToDownload)
             {
                 CInv inv(MSG_BLOCK, pindex->GetBlockHash());
                 if (!AlreadyHave(inv))
                 {
-                    requester.AskFor(inv, pto);
+                    vGetBlocks.emplace_back(inv);
                     // LOG(REQ, "AskFor block %s (%d) peer=%s\n", pindex->GetBlockHash().ToString(),
-                    //  pindex->nHeight, pto->GetLogName());
+                    //     pindex->nHeight, pto->GetLogName());
                 }
+            }
+            if (!vGetBlocks.empty())
+            {
+                if (!IsInitialBlockDownload())
+                    requester.AskFor(vGetBlocks, pto);
+                else
+                    requester.AskForDuringIBD(vGetBlocks, pto);
             }
         }
 
         //
         // Message: getdata (non-blocks)
         //
+        std::vector<CInv> vGetData;
         while (!pto->fDisconnect && !pto->mapAskFor.empty() && (*pto->mapAskFor.begin()).first <= nNow)
         {
             const CInv &inv = (*pto->mapAskFor.begin()).second;

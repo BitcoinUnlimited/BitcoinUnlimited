@@ -25,6 +25,7 @@
 #include "primitives/block.h"
 #include "requestManager.h"
 #include "rpc/server.h"
+#include "script/standard.h"
 #include "stat.h"
 #include "thinblock.h"
 #include "timedata.h"
@@ -175,10 +176,13 @@ CTweakRef<uint64_t> miningBlockSize("mining.blockSize",
     "mining.coinbaseReserve.",
     &maxGeneratedBlock,
     &MiningBlockSizeValidator);
+CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
+    "Maximum size of OP_RETURN data script in bytes.",
+    &nMaxDatacarrierBytes);
 
 CTweak<uint64_t> miningForkTime("mining.forkMay2018Time",
     "Time in seconds since the epoch to initiate a hard fork scheduled on 15th May 2018.",
-    1526386800); // Tue 15 May 2018 12:20:00 UTC FIXME: use the correct timestamp once the spec will be ready
+    1526400000); // Tue 15 May 2018 16:00:00 UTC
 
 CTweak<bool> unsafeGetBlockTemplate("mining.unsafeGetBlockTemplate",
     "Allow getblocktemplate to succeed even if the chain tip is old or this node is not connected to other nodes",
@@ -186,10 +190,10 @@ CTweak<bool> unsafeGetBlockTemplate("mining.unsafeGetBlockTemplate",
 
 CTweak<uint64_t> miningForkEB("mining.forkExcessiveBlock",
     "Set the excessive block to this value at the time of the fork.",
-    8000000); // 8MB, uahf-technical-spec.md REQ-4-1
+    32000000); // May2018 HF proposed max block size
 CTweak<uint64_t> miningForkMG("mining.forkBlockSize",
     "Set the maximum block generation size to this value at the time of the fork.",
-    2000000); // 2MB, uahf-technical-spec.md REQ-4-2
+    8000000);
 
 CTweak<bool> walletSignWithForkSig("wallet.useNewSig",
     "Once the fork occurs, sign transactions using the new signature scheme so that they will only be valid on the "
@@ -199,7 +203,8 @@ CTweak<bool> walletSignWithForkSig("wallet.useNewSig",
 CTweak<unsigned int> maxTxSize("net.excessiveTx", "Largest transaction size in bytes", DEFAULT_LARGEST_TRANSACTION);
 CTweakRef<unsigned int> eadTweak("net.excessiveAcceptDepth",
     "Excessive block chain acceptance depth in blocks",
-    &excessiveAcceptDepth);
+    &excessiveAcceptDepth,
+    &AcceptDepthValidator);
 CTweakRef<int> maxOutConnectionsTweak("net.maxOutboundConnections",
     "Maximum number of outbound connections",
     &nMaxOutConnections,

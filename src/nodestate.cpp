@@ -9,13 +9,17 @@
 /**
 * Default constructor initializing all local member variables to "null" values
 */
-CNodeState::CNodeState()
+CNodeState::CNodeState(CAddress addrIn, std::string addrNameIn) : address(addrIn), name(addrNameIn)
 {
-    pindexBestKnownBlock = NULL;
+    pindexBestKnownBlock = nullptr;
     hashLastUnknownBlock.SetNull();
-    pindexLastCommonBlock = NULL;
-    pindexBestHeaderSent = NULL;
+    pindexLastCommonBlock = nullptr;
+    pindexBestHeaderSent = nullptr;
     fSyncStarted = false;
+    nSyncStartTime = -1;
+    fFirstHeadersReceived = false;
+    nFirstHeadersExpectedHeight = -1;
+    fRequestedInitialBlockAvailability = false;
     nDownloadingSince = 0;
     nBlocksInFlight = 0;
     nBlocksInFlightValidHeaders = 0;
@@ -27,12 +31,12 @@ CNodeState::CNodeState()
 * Gets the CNodeState for the specified NodeId.
 *
 * @param[in] pnode  The NodeId to return CNodeState* for
-* @return CNodeState* matching the NodeId, or NULL if NodeId is not matched
+* @return CNodeState* matching the NodeId, or nullptr if NodeId is not matched
 */
-CNodeState *State(NodeId pnode)
+CNodeState *State(NodeId nId)
 {
-    std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(pnode);
+    std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(nId);
     if (it == mapNodeState.end())
-        return NULL;
+        return nullptr;
     return &it->second;
 }

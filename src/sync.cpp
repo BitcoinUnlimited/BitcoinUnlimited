@@ -220,6 +220,19 @@ void AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine,
     abort();
 }
 
+void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs)
+{
+    for (const std::pair<void *, CLockLocation> &i : *lockstack)
+    {
+        if (i.first == cs)
+        {
+            fprintf(stderr, "Assertion failed: lock %s held in %s:%i; locks held:\n%s", pszName, pszFile, nLine,
+                LocksHeld().c_str());
+            abort();
+        }
+    }
+}
+
 void AssertWriteLockHeldInternal(const char *pszName, const char *pszFile, int nLine, CSharedCriticalSection *cs)
 {
     if (cs->try_lock()) // It would be better to check that this thread has the lock
@@ -297,7 +310,6 @@ void CSharedCriticalSection::lock_shared()
     {
         boost::unique_lock<boost::mutex> lock(setlock);
         assert(exclusiveOwner != tid);
-        assert(sharedowners.find(tid) == sharedowners.end());
         auto alreadyLocked = sharedowners.find(tid);
         if (alreadyLocked != sharedowners.end())
         {
