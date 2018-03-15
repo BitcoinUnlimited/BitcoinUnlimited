@@ -9,8 +9,7 @@
 #include "util.h"
 #include "utiltime.h"
 
-CTxOrphanPool::CTxOrphanPool() : nLastOrphanCheck(GetTime()), nBytesOrphanPool(0)
-{};
+CTxOrphanPool::CTxOrphanPool() : nLastOrphanCheck(GetTime()), nBytesOrphanPool(0){};
 
 bool CTxOrphanPool::AlreadyHaveOrphan(const uint256 &hash)
 {
@@ -39,14 +38,15 @@ bool CTxOrphanPool::AddOrphanTx(const CTransaction &tx, NodeId peer)
         return false;
     }
 
-    uint64_t txSize = RecursiveDynamicUsage(tx);
-    mapOrphanTransactions.emplace(hash, COrphanTx{MakeTransactionRef(tx), peer, GetTime(), txSize});
+    CTransactionRef ptx = MakeTransactionRef(tx);
+    uint64_t nTxMemoryUsed = RecursiveDynamicUsage(tx) + sizeof(ptx);
+    mapOrphanTransactions.emplace(hash, COrphanTx{ptx, peer, GetTime(), nTxMemoryUsed});
     for (const CTxIn &txin : tx.vin)
         mapOrphanTransactionsByPrev[txin.prevout.hash].insert(hash);
 
-    nBytesOrphanPool += txSize;
-    LOG(MEMPOOL, "stored orphan tx %s bytes:%ld (mapsz %u prevsz %u), orphan pool bytes:%ld\n", hash.ToString(), txSize,
-        mapOrphanTransactions.size(), mapOrphanTransactionsByPrev.size(), nBytesOrphanPool);
+    nBytesOrphanPool += nTxMemoryUsed;
+    LOG(MEMPOOL, "stored orphan tx %s bytes:%ld (mapsz %u prevsz %u), orphan pool bytes:%ld\n", hash.ToString(),
+        nTxMemoryUsed, mapOrphanTransactions.size(), mapOrphanTransactionsByPrev.size(), nBytesOrphanPool);
     return true;
 }
 

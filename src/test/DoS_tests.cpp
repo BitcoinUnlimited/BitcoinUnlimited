@@ -330,7 +330,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
 
     {
         LOCK(orphanpool.cs);
-        orphanpool.LimitOrphanTxSize(50, 8000);
+        orphanpool.LimitOrphanTxSize(50, 8900);
         BOOST_CHECK_EQUAL(orphanpool.mapOrphanTransactions.size(), 50);
         orphanpool.LimitOrphanTxSize(50, 6300);
         BOOST_CHECK(orphanpool.mapOrphanTransactions.size() <= 49);
