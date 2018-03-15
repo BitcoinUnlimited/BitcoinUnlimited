@@ -13,10 +13,7 @@
 #include "uint256.h"
 #include "util.h"
 
-#include <atomic>
-#include <boost/dynamic_bitset.hpp>
 #include <cmath>
-#include <vector>
 
 // c from graphene paper
 const double BLOOM_OVERHEAD_FACTOR = 8 * pow(log(2.0), 2.0);
@@ -25,14 +22,14 @@ const double IBLT_OVERHEAD_FACTOR = 16.5;
 const uint8_t IBLT_CELL_MINIMUM = 3;
 const uint8_t IBLT_VALUE_SIZE = 0;
 const std::vector<uint8_t> IBLT_NULL_VALUE = {};
+const unsigned char WORD_BITS = 8;
 
-template <typename T>
 class CGrapheneSet
 {
 private:
-    std::vector<size_t> ArgSort(const std::vector<uint64_t> &items)
+    std::vector<uint64_t> ArgSort(const std::vector<uint64_t> &items)
     {
-        std::vector<size_t> idxs(items.size());
+        std::vector<uint64_t> idxs(items.size());
         iota(idxs.begin(), idxs.end(), 0);
 
         std::sort(idxs.begin(), idxs.end(), [&items](size_t idx1, size_t idx2) { return items[idx1] < items[idx2]; });
@@ -51,11 +48,12 @@ private:
     }
 
 public:
-    CGrapheneSet(size_t _nReceiverUniverseItems, const std::vector<T> &_items, bool _ordered = false)
+    CGrapheneSet() : pSetFilter(nullptr), pSetIblt(nullptr) {}
+    CGrapheneSet(size_t _nReceiverUniverseItems, const std::vector<uint256> &_itemHashes, bool _ordered = false)
     {
         ordered = _ordered;
         nReceiverUniverseItems = _nReceiverUniverseItems;
-        uint64_t nItems = _items.size();
+        uint64_t nItems = _itemHashes.size();
 
         // Determine constants
         double optSymDiff = OptimalSymDiff(nItems, nReceiverUniverseItems);
@@ -78,40 +76,38 @@ public:
         // Construct IBLT
         uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
         pSetIblt = new CIblt(nIbltCells, IBLT_VALUE_SIZE);
-        std::map<uint64_t, T> mapCheapHashes;
+        std::map<uint64_t, uint256> mapCheapHashes;
 
-        for (const T &item : _items)
+        for (const uint256 &itemHash : _itemHashes)
         {
-            uint256 hash = SerializeHash(item);
-            uint64_t cheapHash = hash.GetCheapHash();
+            uint64_t cheapHash = itemHash.GetCheapHash();
 
-            pSetFilter->insert(hash);
+            pSetFilter->insert(itemHash);
 
             if (mapCheapHashes.count(cheapHash))
                 throw error("Cheap hash collision while encoding graphene set");
 
             pSetIblt->insert(cheapHash, IBLT_NULL_VALUE);
-            mapCheapHashes[cheapHash] = item;
+            mapCheapHashes[cheapHash] = itemHash;
         }
 
         // Record transaction order
         if (ordered)
         {
-            std::map<T, uint64_t> mapItems;
-            for (const std::pair<uint64_t, T> &kv : mapCheapHashes)
-                mapItems[kv.second] = kv.first;
+            std::map<uint256, uint64_t> mapItemHashes;
+            for (const std::pair<uint64_t, uint256> &kv : mapCheapHashes)
+                mapItemHashes[kv.second] = kv.first;
 
             mapCheapHashes.clear();
 
             std::vector<uint64_t> cheapHashes;
-            for (const T &item : _items)
-                cheapHashes.push_back(mapItems[item]);
+            for (const uint256 &itemHash : _itemHashes)
+                cheapHashes.push_back(mapItemHashes[itemHash]);
 
-            std::vector<size_t> sortedIdxs = ArgSort(cheapHashes);
+            std::vector<uint64_t> sortedIdxs = ArgSort(cheapHashes);
             uint8_t nBits = ceil(log2(cheapHashes.size()));
 
-            for (size_t i = 0; i < cheapHashes.size(); i++)
-                itemRank.push_back(boost::dynamic_bitset<>(nBits, sortedIdxs[i]));
+            encodedRank = CGrapheneSet::EncodeRank(sortedIdxs, nBits);
         }
     }
 
@@ -162,12 +158,68 @@ public:
             return receiverSetItems;
 
         // Place items in order
+        uint8_t nBits = ceil(log2(receiverSetItems.size()));
+        std::vector<uint64_t> itemRank = CGrapheneSet::DecodeRank(encodedRank, receiverSetItems.size(), nBits);
         std::sort(receiverSetItems.begin(), receiverSetItems.end(), [](uint64_t i1, uint64_t i2) { return i1 < i2; });
         std::vector<uint64_t> orderedSetItems(itemRank.size(), 0);
         for (size_t i = 0; i < itemRank.size(); i++)
-            orderedSetItems[itemRank[i].to_ulong()] = receiverSetItems[i];
+            orderedSetItems[itemRank[i]] = receiverSetItems[i];
 
         return orderedSetItems;
+    }
+
+    static std::vector<unsigned char> EncodeRank(std::vector<uint64_t> items, uint16_t nBitsPerItem)
+    {
+        size_t nItems = items.size();
+        size_t nEncodedWords = int(ceil(nBitsPerItem * nItems / float(WORD_BITS)));
+        std::vector<unsigned char> encoded(nEncodedWords, 0);
+
+        // form boolean array (low-order first)
+        bool bits[nEncodedWords * WORD_BITS];
+        for (size_t i = 0; i < items.size(); i++)
+        {
+            uint64_t item = items[i];
+
+            assert(ceil(log2(item)) <= nBitsPerItem);
+
+            for (uint16_t j = 0; j < nBitsPerItem; j++)
+                bits[j + i * nBitsPerItem] = (item >> j) & 1;
+        }
+
+        // encode boolean array
+        for (size_t i = 0; i < nEncodedWords; i++)
+        {
+            encoded[i] = 0;
+            for (size_t j = 0; j < WORD_BITS; j++)
+                encoded[i] |= bits[j + i * WORD_BITS] << j;
+        }
+
+        return encoded;
+    }
+
+    static std::vector<uint64_t> DecodeRank(std::vector<unsigned char> encoded, size_t nItems, uint16_t nBitsPerItem)
+    {
+        size_t nEncodedWords = int(ceil(nBitsPerItem * nItems / float(WORD_BITS)));
+
+        // decode into boolean array (low-order first)
+        bool bits[nEncodedWords * WORD_BITS];
+        for (size_t i = 0; i < nEncodedWords; i++)
+        {
+            unsigned char word = encoded[i];
+
+            for (size_t j = 0; j < WORD_BITS; j++)
+                bits[j + i * WORD_BITS] = (word >> j) & 1;
+        }
+
+        // convert boolean to item array
+        std::vector<uint64_t> items(nItems, 0);
+        for (size_t i = 0; i < nItems; i++)
+        {
+            for (size_t j = 0; j < nBitsPerItem; j++)
+                items[i] |= bits[j + i * nBitsPerItem] << j;
+        }
+
+        return items;
     }
 
     ~CGrapheneSet()
@@ -192,7 +244,7 @@ public:
     {
         READWRITE(ordered);
         READWRITE(nReceiverUniverseItems);
-        READWRITE(itemRank);
+        READWRITE(encodedRank);
         if (!pSetFilter)
             pSetFilter = new CBloomFilter();
         READWRITE(*pSetFilter);
@@ -204,7 +256,7 @@ public:
 private:
     bool ordered;
     size_t nReceiverUniverseItems;
-    std::vector<boost::dynamic_bitset<> > itemRank;
+    std::vector<unsigned char> encodedRank;
     CBloomFilter *pSetFilter;
     CIblt *pSetIblt;
 };
