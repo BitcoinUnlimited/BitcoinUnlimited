@@ -339,11 +339,14 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
             if (opcode > OP_16 && ++nOpCount > MAX_OPS_PER_SCRIPT)
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
 
-            if (opcode == OP_CAT || opcode == OP_SUBSTR || opcode == OP_LEFT || opcode == OP_RIGHT ||
+            if (opcode == OP_CAT || opcode == OP_SPLIT || opcode == OP_NUM2BIN || opcode == OP_BIN2NUM ||
                 opcode == OP_INVERT || opcode == OP_AND || opcode == OP_OR || opcode == OP_XOR || opcode == OP_2MUL ||
                 opcode == OP_2DIV || opcode == OP_MUL || opcode == OP_DIV || opcode == OP_MOD || opcode == OP_LSHIFT ||
                 opcode == OP_RSHIFT)
-                return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE); // Disabled opcodes.
+            {
+                // Disabled opcodes.
+                return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE);
+            }
 
             if (fExec && 0 <= opcode && opcode <= OP_PUSHDATA4)
             {

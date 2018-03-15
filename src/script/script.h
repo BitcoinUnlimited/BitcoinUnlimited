@@ -108,9 +108,9 @@ enum opcodetype
 
     // splice ops
     OP_CAT = 0x7e,
-    OP_SUBSTR = 0x7f,
-    OP_LEFT = 0x80,
-    OP_RIGHT = 0x81,
+    OP_SPLIT = 0x7f, // after monolith upgrade (May 2018)
+    OP_NUM2BIN = 0x80, // after monolith upgrade (May 2018)
+    OP_BIN2NUM = 0x81, // after monolith upgrade (May 2018)
     OP_SIZE = 0x82,
 
     // bit logic
@@ -181,6 +181,8 @@ enum opcodetype
     OP_NOP9 = 0xb8,
     OP_NOP10 = 0xb9,
 
+    // the first op_code value after all defined opcodes
+    FIRST_UNDEFINED_OP_VALUE,
 
     // template matching params
     OP_BIGINTEGER = 0xf0,
