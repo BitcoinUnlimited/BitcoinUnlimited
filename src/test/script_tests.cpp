@@ -1449,6 +1449,7 @@ public:
 
 BOOST_AUTO_TEST_CASE(script_datasigverify)
 {
+    bool priorDataSigVerifyValue = enableDataSigVerify;
     QuickAddress dataSigner;
 
     std::vector<unsigned char> data(1);
@@ -1474,8 +1475,13 @@ BOOST_AUTO_TEST_CASE(script_datasigverify)
     vector<vector<unsigned char> > stack;
     ScriptError serror;
     BaseSignatureChecker sigChecker;
+    BOOST_CHECK(condScript.GetSigOpCount(true) == 1);
     BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
-    BOOST_CHECK(EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+    enableDataSigVerify = false;
+    // should fail because datasigverify is off
+    BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+    enableDataSigVerify = true;
+    BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
 
     stack.clear();
     CScript scriptBadSigType = CScript() << data << sigbadtype;
@@ -1499,7 +1505,7 @@ BOOST_AUTO_TEST_CASE(script_datasigverify)
     // about a security.  However, these string instructions are not yet enabled.
     condScript = CScript() << ToByteVector(dataSigner.addr) << OP_DATASIGVERIFY << data << OP_EQUALVERIFY << OP_DUP
                            << OP_HASH160 << ToByteVector(u2.addr) << OP_EQUALVERIFY << OP_CHECKSIG;
-
+    BOOST_CHECK(condScript.GetSigOpCount(true) == 2);
     unsigned int sighashType = SIGHASH_ALL | SIGHASH_FORKID;
     std::vector<unsigned char> txoSig;
     // Since I don't have a tx, I'm going to use a fake tx hash, which is just the hash
@@ -1531,6 +1537,8 @@ BOOST_AUTO_TEST_CASE(script_datasigverify)
     stack.clear();
     BOOST_CHECK(EvalScript(stack, proveScript, 0, pkhChecker, &serror, nullptr));
     BOOST_CHECK(!EvalScript(stack, condScript, 0, pkhChecker, &serror, nullptr));
+
+    enableDataSigVerify = priorDataSigVerifyValue;
 }
 
 static CScript ScriptFromHex(const char *hex)

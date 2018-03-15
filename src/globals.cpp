@@ -227,6 +227,10 @@ CTweakRef<std::string> subverOverrideTweak("net.subversionOverride",
     &subverOverride,
     &SubverValidator);
 
+CTweakRef<bool> enableDataSigVerifyTweak("consensus.enableDataSigVerify",
+    "true if OP_DATASIGVERIFY is enabled.",
+    &enableDataSigVerify);
+
 CTweak<CAmount> maxTxFee("wallet.maxTxFee",
     "Maximum total fees to use in a single wallet transaction or raw transaction; setting this too low may abort large "
     "transactions.",

@@ -103,6 +103,8 @@ enum
     //
     //
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
+
+    SCRIPT_ENABLE_DATASIGVERIFY = (1U << 17),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);
@@ -208,4 +210,8 @@ bool VerifyScript(const CScript &scriptSig,
 // string prefixed to data when validating signed messages either via DATASIGVERIFY or RPC call.  This ensures
 // that the signature was intended for use on this blockchain.
 extern const std::string strMessageMagic;
+
+// Set to true to enable OP_DATASIGVERIFY
+extern bool enableDataSigVerify;
+
 #endif // BITCOIN_SCRIPT_INTERPRETER_H

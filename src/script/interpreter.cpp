@@ -15,6 +15,7 @@
 #include "uint256.h"
 
 const std::string strMessageMagic = "Bitcoin Signed Message:\n";
+bool enableDataSigVerify = false;
 
 using namespace std;
 
@@ -969,6 +970,8 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
 
                 case OP_DATASIGVERIFY:
                 {
+                    if (!enableDataSigVerify)
+                        return set_error(serror, SCRIPT_ERR_VERIFY);
                     if (stack.size() < 3)
                         return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
 
