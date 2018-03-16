@@ -49,11 +49,15 @@ private:
 
 public:
     CGrapheneSet() : pSetFilter(nullptr), pSetIblt(nullptr) {}
-    CGrapheneSet(size_t _nReceiverUniverseItems, const std::vector<uint256> &_itemHashes, bool _ordered = false)
+    CGrapheneSet(size_t _nReceiverUniverseItems,
+        const std::vector<uint256> &_itemHashes,
+        bool _ordered = false,
+        bool fDeterministic = false)
     {
         ordered = _ordered;
         nReceiverUniverseItems = _nReceiverUniverseItems;
         uint64_t nItems = _itemHashes.size();
+        FastRandomContext insecure_rand(fDeterministic);
 
         // Determine constants
         double optSymDiff = OptimalSymDiff(nItems, nReceiverUniverseItems);
@@ -69,8 +73,8 @@ public:
             fpr = optSymDiff / float(sizeDiff);
 
         // Construct Bloom filter
-        pSetFilter =
-            new CBloomFilter(nItems, fpr, insecure_rand(), BLOOM_UPDATE_ALL, std::numeric_limits<uint32_t>::max());
+        pSetFilter = new CBloomFilter(
+            nItems, fpr, insecure_rand.rand32(), BLOOM_UPDATE_ALL, std::numeric_limits<uint32_t>::max());
         LOG(GRAPHENE, "fp rate: %f Num elements in bloom filter: %d\n", fpr, nItems);
 
         // Construct IBLT
