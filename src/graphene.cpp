@@ -2,12 +2,6 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <limits>
-#include <map>
-#include <sstream>
-#include <string>
-#include <vector>
-
 #include "chainparams.h"
 #include "connmgr.h"
 #include "consensus/merkle.h"
@@ -33,71 +27,19 @@ CGrapheneBlock::CGrapheneBlock(const CBlock &block, uint64_t nReceiverMemPoolTx)
     header = block.GetBlockHeader();
     nBlockTxs = block.vtx.size();
 
-    // Determine constants
-    double optSymDiff = OptimalSymDiff(nBlockTxs, nReceiverMemPoolTx);
-    double sizeDiff = nReceiverMemPoolTx - nBlockTxs;
-    double fpr;
-
-    if (sizeDiff <= 0 || optSymDiff > sizeDiff)
-    {
-        // Just use a very small filter and pass almost everything through
-        fpr = 0.99;
-    }
-    else
-        fpr = optSymDiff / float(nReceiverMemPoolTx - nBlockTxs);
-
-    // Construct Bloom filter
-    pGrapheneBlockFilter =
-        new CBloomFilter(nBlockTxs, fpr, insecure_rand(), BLOOM_UPDATE_ALL, std::numeric_limits<uint32_t>::max());
-    LOG(GRAPHENE, "fp rate: %f Num elements in bloom filter: %d\n", fpr, nBlockTxs);
-
+    std::vector<uint256> blockHashes;
     for (const CTransaction &tx : block.vtx)
-        pGrapheneBlockFilter->insert(tx.GetHash());
+        blockHashes.push_back(tx.GetHash());
 
-    // Record transaction order
-    bool collision = true;
-    txOrderSeed = 0;
-    std::map<uint64_t, uint32_t> mapOrder;
-    while (collision)
-    {
-        uint256 salt = GetSalt(txOrderSeed++);
-        for (size_t i = 0; i < block.vtx.size(); ++i)
-        {
-            uint64_t cheapHash = block.vtx[i].GetHash().GetHash(salt);
-            if (mapOrder.count(cheapHash) > 0)
-                break;
-            mapOrder[cheapHash] = i;
-        }
-        collision = false;
-    }
-
-    uint256 salt = GetSalt(txOrderSeed);
-    for (const CTransaction &tx : block.vtx)
-    {
-        uint64_t cheapHash = tx.GetHash().GetHash(salt);
-        txOrder.push_back(cheapHash);
-    }
-
-    // Construct IBLT
-    uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
-    pGrapheneBlockIblt = new CIblt(nIbltCells, IBLT_VALUE_SIZE);
-
-    for (const CTransaction &tx : block.vtx)
-        pGrapheneBlockIblt->insert(tx.GetHash().GetCheapHash(), IBLT_NULL_VALUE);
+    pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, blockHashes, true);
 }
 
 CGrapheneBlock::~CGrapheneBlock()
 {
-    if (pGrapheneBlockFilter)
+    if (pGrapheneSet)
     {
-        delete pGrapheneBlockFilter;
-        pGrapheneBlockFilter = NULL;
-    }
-
-    if (pGrapheneBlockIblt)
-    {
-        delete pGrapheneBlockIblt;
-        pGrapheneBlockIblt = NULL;
+        delete pGrapheneSet;
+        pGrapheneSet = NULL;
     }
 }
 
@@ -159,11 +101,10 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         return true;
     }
 
-    uint256 salt = GetSalt(pfrom->grapheneTxOrderSeed);
     for (const CTransaction &tx : grapheneBlockTx.vMissingTx)
     {
         uint256 hash = tx.GetHash();
-        uint64_t cheapHash = hash.GetHash(salt);
+        uint64_t cheapHash = hash.GetCheapHash();
         pfrom->grapheneBlockHashes[pfrom->grapheneMapHashOrderIndex[cheapHash]] = hash;
     }
 
@@ -477,6 +418,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
     graphenedata.ClearGrapheneBlockData(pfrom);
     pfrom->nSizeGrapheneBlock = nSizeGrapheneBlock;
 
+    uint256 nullhash;
     pfrom->grapheneBlock.nVersion = header.nVersion;
     pfrom->grapheneBlock.nBits = header.nBits;
     pfrom->grapheneBlock.nNonce = header.nNonce;
@@ -484,6 +426,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
     pfrom->grapheneBlock.hashMerkleRoot = header.hashMerkleRoot;
     pfrom->grapheneBlock.hashPrevBlock = header.hashPrevBlock;
     pfrom->grapheneBlockHashes.clear();
+    pfrom->grapheneBlockHashes.resize(nBlockTxs, nullhash);
 
     vTxHashes.reserve(nBlockTxs);
 
@@ -507,9 +450,6 @@ bool CGrapheneBlock::process(CNode *pfrom,
         {
             uint256 hash = kv.first;
 
-            if ((*pGrapheneBlockFilter).contains(hash))
-                passingTxHashes.insert(hash);
-
             uint64_t cheapHash = hash.GetCheapHash();
 
             if (mapPartialTxHash.count(cheapHash)) // Check for collisions
@@ -526,9 +466,6 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
         for (const uint256 &hash : memPoolHashes)
         {
-            if ((*pGrapheneBlockFilter).contains(hash))
-                passingTxHashes.insert(hash);
-
             uint64_t cheapHash = hash.GetCheapHash();
 
             if (mapPartialTxHash.count(cheapHash)) // Check for collisions
@@ -539,75 +476,38 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
         if (!collision)
         {
-            // Determine difference between sender and receiver IBLTs
-            CIblt localIblt((*pGrapheneBlockIblt));
-            localIblt.reset();
-            uint64_t nGrapheneTxsPossessed = passingTxHashes.size();
+            std::vector<uint256> localHashes;
+            for (const std::pair<uint64_t, uint256> &kv : mapPartialTxHash)
+                localHashes.push_back(kv.second);
 
-            for (const uint256 &hash : passingTxHashes)
-                localIblt.insert(hash.GetCheapHash(), IBLT_NULL_VALUE);
-
-            CIblt diffIblt = (*pGrapheneBlockIblt) - localIblt;
-            std::set<std::pair<uint64_t, std::vector<uint8_t> > > senderHas;
-            std::set<std::pair<uint64_t, std::vector<uint8_t> > > weHave;
-
-            if (!((*pGrapheneBlockIblt) - localIblt).listEntries(senderHas, weHave))
+            try
             {
-                std::vector<CInv> vGetData;
-                vGetData.push_back(CInv(MSG_BLOCK, header.GetHash()));
-                pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+                std::vector<uint64_t> blockCheapHashes = pGrapheneSet->Reconcile(localHashes);
 
-                return error("IBLT did not decode for graphene block: requesting a full block");
-            }
-
-            // Remove false positives from passingTxHashes
-            using u64u8_type = std::pair<uint64_t, std::vector<uint8_t> >;
-            for (const u64u8_type &kv : weHave)
-            {
-                passingTxHashes.erase(mapPartialTxHash[kv.first]);
-                nGrapheneTxsPossessed -= 1;
-            }
-
-            // Attempt to locate txs missing from passingTxHashes
-            // If some are not available then add them to setHashesToRequest
-            for (const u64u8_type &kv : senderHas)
-            {
-                if (mapPartialTxHash.count(kv.first) > 0)
+                // Sort out what hashes we have from the complete set of cheapHashes
+                uint64_t nGrapheneTxsPossessed = 0;
+                for (size_t i = 0; i < blockCheapHashes.size(); i++)
                 {
-                    passingTxHashes.insert(mapPartialTxHash[kv.first]);
-                    nGrapheneTxsPossessed += 1;
+                    uint64_t cheapHash = blockCheapHashes[i];
+
+                    if (mapPartialTxHash.count(cheapHash) > 0)
+                    {
+                        pfrom->grapheneBlockHashes[i] = mapPartialTxHash[cheapHash];
+
+                        // Update mapHashOrderIndex so it is available if we later receive missing txs
+                        pfrom->grapheneMapHashOrderIndex[cheapHash] = i;
+                        nGrapheneTxsPossessed++;
+                    }
+                    else
+                        setHashesToRequest.insert(cheapHash);
                 }
-                else
-                    setHashesToRequest.insert(kv.first);
+
+                graphenedata.AddGrapheneBlockBytes(nGrapheneTxsPossessed * sizeof(uint64_t), pfrom);
             }
-
-            graphenedata.AddGrapheneBlockBytes(nGrapheneTxsPossessed * sizeof(uint64_t), pfrom);
-
-            // Populate grapheneBlockHashes with known passingTxHashes
-            uint256 nullhash;
-            for (size_t i = 0; i < nBlockTxs; i++)
-                pfrom->grapheneBlockHashes.push_back(nullhash);
-
-            // Place transactions into grapheneBlockHashes in order
-            std::map<uint64_t, uint256> mapSaltedCheapHash;
-            uint256 salt = GetSalt(txOrderSeed);
-            for (const uint256 &hash : passingTxHashes)
-                mapSaltedCheapHash[hash.GetHash(salt)] = hash;
-
-            for (size_t index = 0; index < txOrder.size(); index++)
+            catch (std::exception &e)
             {
-                uint256 hash = mapSaltedCheapHash[txOrder[index]];
-                pfrom->grapheneBlockHashes[index] = hash;
+                return error("Graphene set could not be reconciled: requesting a full block");
             }
-
-            // update mapHashOrderIndex so it is available if we later receive missing txs
-            for (size_t index = 0; index < txOrder.size(); index++)
-                pfrom->grapheneMapHashOrderIndex[txOrder[index]] = index;
-
-            // We don't need these anymore
-            mapPartialTxHash.clear();
-            mapSaltedCheapHash.clear();
-            passingTxHashes.clear();
 
             // Reconstruct the block if there are no hashes to re-request
             if (setHashesToRequest.empty())

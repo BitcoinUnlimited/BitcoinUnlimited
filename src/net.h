@@ -413,7 +413,6 @@ public:
     int64_t nGrapheneMemPoolTx;
     std::vector<uint256> grapheneBlockHashes;
     std::map<uint64_t, uint32_t> grapheneMapHashOrderIndex;
-    unsigned char grapheneTxOrderSeed;
     std::map<uint64_t, CTransaction> mapGrapheneMissingTx;
     uint64_t nLocalGrapheneBlockBytes; // the bytes used in creating this graphene block, updated dynamically
     int nSizeGrapheneBlock; // Original on-wire size of the block. Just used for reporting

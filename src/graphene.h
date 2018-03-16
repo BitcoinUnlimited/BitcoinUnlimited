@@ -7,6 +7,7 @@
 
 #include "bloom.h"
 #include "consensus/validation.h"
+#include "graphene_set.h"
 #include "iblt.h"
 #include "primitives/block.h"
 #include "protocol.h"
@@ -14,17 +15,6 @@
 #include "stat.h"
 #include "sync.h"
 #include "uint256.h"
-#include <atomic>
-#include <cmath>
-#include <vector>
-
-// c from graphene paper
-const double BLOOM_OVERHEAD_FACTOR = 8 * pow(log(2.0), 2.0);
-// tau from graphene paper
-const double IBLT_OVERHEAD_FACTOR = 16.5;
-const uint8_t IBLT_CELL_MINIMUM = 3;
-const uint8_t IBLT_VALUE_SIZE = 0;
-const std::vector<uint8_t> IBLT_NULL_VALUE = {};
 
 class CDataStream;
 class CNode;
@@ -52,15 +42,12 @@ class CGrapheneBlock
 public:
     CBlockHeader header;
     std::vector<uint256> vTxHashes; // List of all transactions id's in the block
-    std::vector<uint64_t> txOrder;
-    unsigned char txOrderSeed;
     uint64_t nBlockTxs;
-    CBloomFilter *pGrapheneBlockFilter;
-    CIblt *pGrapheneBlockIblt;
+    CGrapheneSet *pGrapheneSet;
 
 public:
     CGrapheneBlock(const CBlock &block, uint64_t nReceiverMemPoolTx);
-    CGrapheneBlock() : pGrapheneBlockFilter(nullptr), pGrapheneBlockIblt(nullptr) {}
+    CGrapheneBlock() : pGrapheneSet(nullptr) {}
     ~CGrapheneBlock();
     /**
      * Handle an incoming Graphene block
@@ -79,15 +66,10 @@ public:
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(header);
-        READWRITE(txOrder);
-        READWRITE(txOrderSeed);
         READWRITE(nBlockTxs);
-        if (!pGrapheneBlockFilter)
-            pGrapheneBlockFilter = new CBloomFilter();
-        READWRITE(*pGrapheneBlockFilter);
-        if (!pGrapheneBlockIblt)
-            pGrapheneBlockIblt = new CIblt();
-        READWRITE(*pGrapheneBlockIblt);
+        if (!pGrapheneSet)
+            pGrapheneSet = new CGrapheneSet();
+        READWRITE(*pGrapheneSet);
     }
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
     bool process(CNode *pfrom, int nSizeGrapheneBlock, std::string strCommand);
