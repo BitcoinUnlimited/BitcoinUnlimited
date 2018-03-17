@@ -339,13 +339,28 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
             if (opcode > OP_16 && ++nOpCount > MAX_OPS_PER_SCRIPT)
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
 
-            if (opcode == OP_CAT || opcode == OP_SPLIT || opcode == OP_NUM2BIN || opcode == OP_BIN2NUM ||
-                opcode == OP_INVERT || opcode == OP_AND || opcode == OP_OR || opcode == OP_XOR || opcode == OP_2MUL ||
-                opcode == OP_2DIV || opcode == OP_MUL || opcode == OP_DIV || opcode == OP_MOD || opcode == OP_LSHIFT ||
-                opcode == OP_RSHIFT)
+            // Some opcodes are disabled.
+            switch (opcode)
             {
-                // Disabled opcodes.
+            case OP_CAT:
+            case OP_SPLIT:
+            case OP_BIN2NUM:
+            case OP_NUM2BIN:
+            case OP_INVERT:
+            case OP_AND:
+            case OP_OR:
+            case OP_XOR:
+            case OP_2MUL:
+            case OP_2DIV:
+            case OP_MUL:
+            case OP_DIV:
+            case OP_MOD:
+            case OP_LSHIFT:
+            case OP_RSHIFT:
                 return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE);
+
+            default:
+                break;
             }
 
             if (fExec && 0 <= opcode && opcode <= OP_PUSHDATA4)
@@ -357,6 +372,7 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                 stack.push_back(vchPushValue);
             }
             else if (fExec || (OP_IF <= opcode && opcode <= OP_ENDIF))
+            {
                 switch (opcode)
                 {
                 //
@@ -387,7 +403,6 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                     // they push, so no need for a CheckMinimalPush here.
                 }
                 break;
-
 
                 //
                 // Control
@@ -1135,6 +1150,7 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                 default:
                     return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
                 }
+            }
 
             // Size limits
             if (stack.size() + altstack.size() > MAX_STACK_SIZE)
