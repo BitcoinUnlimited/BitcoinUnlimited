@@ -201,6 +201,8 @@ enum opcodetype
 const char *GetOpName(opcodetype opcode);
 bool IsMinimalArray(const std::vector<uint8_t> &vch, const size_t nMaxNumSize = DEFAULT_MAX_NUM_BYTES);
 
+std::vector<uint8_t> MinimalizeBigEndianArray(const std::vector<uint8_t> &data);
+
 class scriptnum_error : public std::runtime_error
 {
 public:
