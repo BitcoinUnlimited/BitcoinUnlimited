@@ -34,6 +34,9 @@ static const int MAX_SCRIPT_SIZE = 10000;
 // Maximum number of values on script interpreter stack
 static const int MAX_STACK_SIZE = 1000;
 
+// Default maximum element size for conversion to a CScriptNum
+static const int DEFAULT_MAX_NUM_BYTES = 4;
+
 // Threshold for nLockTime: below this value it is interpreted as block number,
 // otherwise as UNIX timestamp.
 static const unsigned int LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20 1985 UTC
@@ -196,6 +199,7 @@ enum opcodetype
 };
 
 const char *GetOpName(opcodetype opcode);
+bool IsMinimalArray(const std::vector<uint8_t> &vch, const size_t nMaxNumSize = DEFAULT_MAX_NUM_BYTES);
 
 class scriptnum_error : public std::runtime_error
 {
@@ -215,36 +219,17 @@ class CScriptNum
      */
 public:
     explicit CScriptNum(const int64_t &n) { m_value = n; }
-    static const size_t nDefaultMaxNumSize = 4;
-
-    explicit CScriptNum(const std::vector<unsigned char> &vch,
+    explicit CScriptNum(const std::vector<uint8_t> &vch,
         bool fRequireMinimal,
-        const size_t nMaxNumSize = nDefaultMaxNumSize)
+        const size_t nMaxNumSize = DEFAULT_MAX_NUM_BYTES)
     {
         if (vch.size() > nMaxNumSize)
         {
             throw scriptnum_error("script number overflow");
         }
-        if (fRequireMinimal && vch.size() > 0)
+        if (fRequireMinimal && !IsMinimalArray(vch, nMaxNumSize))
         {
-            // Check that the number is encoded with the minimum possible
-            // number of bytes.
-            //
-            // If the most-significant-byte - excluding the sign bit - is zero
-            // then we're not minimal. Note how this test also rejects the
-            // negative-zero encoding, 0x80.
-            if ((vch.back() & 0x7f) == 0)
-            {
-                // One exception: if there's more than one byte and the most
-                // significant bit of the second-most-significant-byte is set
-                // it would conflict with the sign bit. An example of this case
-                // is +-255, which encode to 0xff00 and 0xff80 respectively.
-                // (big-endian).
-                if (vch.size() <= 1 || (vch[vch.size() - 2] & 0x80) == 0)
-                {
-                    throw scriptnum_error("non-minimally encoded script number");
-                }
-            }
+            throw scriptnum_error("non-minimally encoded script number");
         }
         m_value = set_vch(vch);
     }
