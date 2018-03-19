@@ -268,7 +268,7 @@ const char *GetOpName(opcodetype opcode)
     }
 }
 
-bool IsMinimalArray(const std::vector<uint8_t> &vch, const size_t nMaxNumSize)
+bool CScriptNum::IsMinimallyEncoded(const std::vector<uint8_t> &vch, const size_t nMaxNumSize)
 {
     if (vch.size() > nMaxNumSize)
     {
