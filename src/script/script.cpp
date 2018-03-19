@@ -300,64 +300,60 @@ bool CScriptNum::IsMinimallyEncoded(const std::vector<uint8_t> &vch, const size_
     return true;
 }
 
-std::vector<uint8_t> MinimalizeBigEndianArray(const std::vector<uint8_t> &data)
+bool CScriptNum::MinimallyEncode(std::vector<uint8_t> &data)
 {
-    std::vector<uint8_t> res;
-
-    // Can't encode more than this, go ahead and grab as much room as we could
-    // possibly need
-    res.reserve(data.size());
-
-    // Ensure we have a byte to work with.
     if (data.size() == 0)
     {
-        return res;
+        return false;
     }
 
-    // Store the MSB
-    uint8_t neg = data[0] & 0x80;
-    bool havePushed = false;
-    for (size_t i = 0; i < data.size(); ++i)
+    // If the last byte is not 0x00 or 0x80, we are minimally encoded.
+    uint8_t last = data.back();
+    if (last & 0x7f)
     {
-        uint8_t x = data[i];
-
-        // Remove any MSB that might exist
-        if (i == 0)
-        {
-            x &= 0x7f;
-        }
-
-        // If we haven't pushed anything, and the current value is zero, keep
-        // ignoring bytes.
-        if (!havePushed && x == 0)
-        {
-            continue;
-        }
-
-        // Record that we have begun pushing, and store the current value.
-        havePushed = true;
-        res.push_back(x);
+        return false;
     }
 
-    // Give us at least one byte
-    if (res.size() == 0)
+    // If the script is one byte long, then we have a zero, which encodes as an
+    // empty array.
+    if (data.size() == 1)
     {
-        return res;
+        data = {};
+        return true;
     }
 
-    // Only add back the sign if a value has been pushed.  This implies the
-    // result is non-zero.
-    if (havePushed)
+    // If the next byte has it sign bit set, then we are minimaly encoded.
+    if (data[data.size() - 2] & 0x80)
     {
-        // If the MSB is currently occupied, we need one extra byte.
-        if ((res[0] & 0x80) != 0)
-        {
-            res.insert(res.begin(), 0);
-        }
-        res[0] |= neg;
+        return false;
     }
 
-    return res;
+    // We are not minimally encoded, we need to figure out how much to trim.
+    for (size_t i = data.size() - 1; i > 0; i--)
+    {
+        // We found a non zero byte, time to encode.
+        if (data[i - 1] != 0)
+        {
+            if (data[i - 1] & 0x80)
+            {
+                // We found a byte with it sign bit set so we need one more
+                // byte.
+                data[i++] = last;
+            }
+            else
+            {
+                // the sign bit is clear, we can use it.
+                data[i - 1] |= last;
+            }
+
+            data.resize(i);
+            return true;
+        }
+    }
+
+    // If we the whole thing is zeros, then we have a zero.
+    data = {};
+    return true;
 }
 
 unsigned int CScript::GetSigOpCount(bool fAccurate) const
