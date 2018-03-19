@@ -293,47 +293,6 @@ bool static CheckMinimalPush(const valtype &data, opcodetype opcode)
 
 static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
 {
-    bool fEnabledOpCodesMonolith = (flags & SCRIPT_ENABLE_MONOLITH_OPCODES) != 0;
-
-    if (fEnabledOpCodesMonolith)
-    {
-        switch (opcode)
-        {
-        case OP_CAT:
-            return true;
-
-        case OP_SPLIT:
-            return true;
-
-        case OP_BIN2NUM:
-            return true;
-
-        case OP_NUM2BIN:
-            return true;
-
-        case OP_AND:
-            return false;
-
-        case OP_OR:
-            return false;
-
-        case OP_XOR:
-            return false;
-
-        case OP_MUL:
-            return true;
-
-        case OP_DIV:
-            return true;
-
-        case OP_MOD:
-            return true;
-
-        default:
-            break;
-        }
-    }
-
     switch (opcode)
     {
     case OP_CAT:
@@ -341,9 +300,6 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
     case OP_BIN2NUM:
     case OP_NUM2BIN:
     case OP_INVERT:
-    case OP_AND:
-    case OP_OR:
-    case OP_XOR:
     case OP_2MUL:
     case OP_2DIV:
     case OP_MUL:
@@ -351,7 +307,17 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
     case OP_MOD:
     case OP_LSHIFT:
     case OP_RSHIFT:
+        // Disabled opcodes
         return true;
+
+    case OP_AND:
+    case OP_OR:
+    case OP_XOR:
+        // Opcodes that have been reenabled.
+        if ((flags & SCRIPT_ENABLE_MONOLITH_OPCODES) == 0)
+        {
+            return true;
+        }
 
     default:
         break;
