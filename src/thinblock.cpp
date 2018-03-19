@@ -144,8 +144,6 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
     pfrom->thinBlock.hashPrevBlock = header.hashPrevBlock;
     pfrom->thinBlockHashes = vTxHashes;
 
-    thindata.AddThinBlockBytes(vTxHashes.size() * sizeof(uint256), pfrom); // start counting bytes
-
     // Check that the merkleroot matches the merkelroot calculated from the hashes provided.
     bool mutated;
     uint256 merkleroot = ComputeMerkleRoot(vTxHashes, &mutated);
@@ -686,8 +684,6 @@ bool CXThinBlock::process(CNode *pfrom,
     pfrom->thinBlock.hashPrevBlock = header.hashPrevBlock;
     pfrom->xThinBlockHashes = vTxHashes;
 
-    thindata.AddThinBlockBytes(vTxHashes.size() * sizeof(uint64_t), pfrom); // start counting bytes
-
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
     for (const CTransaction &tx : vMissingTx)
         pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
@@ -855,12 +851,6 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
 {
     AssertLockHeld(cs_xval);
 
-    // the total maximum bytes that we can use to create a thinblock. We use shared pointers for
-    // the transactions in the thinblock so we don't need to make so much memory available as we did in
-    // the past. The current excessive block size should be more than enough to accomodate many
-    // concurrent thinblock reconstructions without having a large memory footprint.
-    uint64_t maxAllowedSize = excessiveBlockSize;
-
     // We must have all the full tx hashes by this point.  We first check for any repeating
     // sequences in transaction id's.  This is a possible attack vector and has been used in the past.
     {
@@ -873,6 +863,18 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
             return error("Repeating Transaction Id sequence, peer=%s", pfrom->GetLogName());
         }
     }
+
+    // The total maximum bytes that we can use to create a thinblock. We use shared pointers for
+    // the transactions in the thinblock so we don't need to make as much memory available as we did in
+    // the past. We caluculate the max memory allowed by using the largest block size possible, which is the
+    // (maxMessageSizeMultiplier * excessiveBlockSize), then divide that by the smallest transaction possible
+    // which is 158 bytes on a 32bit system.  That gives us the largest number of transactions possible in a block.
+    // Then we multiply number of possible transactions by the size of a shared pointer.
+    // NOTE * The 158 byte smallest txn possible was found by getting the smallest serialized size of a txn directly
+    //        from the blockchain, on a 32bit system.
+    static CTransactionRef dummyptx = nullptr;
+    static uint64_t nTxSize = sizeof(dummyptx);
+    uint64_t maxAllowedSize = nTxSize * maxMessageSizeMultiplier * excessiveBlockSize / 158;
 
     // Look for each transaction in our various pools and buffers.
     // With xThinBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
@@ -908,11 +910,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
 
         // In order to prevent a memory exhaustion attack we track transaction bytes used to create Block
         // to see if we've exceeded any limits and if so clear out data and return.
-        uint64_t nTxSize = sizeof(ptx);
-        uint64_t nCurrentMax = 0;
-        if (maxAllowedSize >= nTxSize)
-            nCurrentMax = maxAllowedSize - nTxSize;
-        if (thindata.AddThinBlockBytes(nTxSize, pfrom) > nCurrentMax)
+        if (thindata.AddThinBlockBytes(nTxSize, pfrom) > maxAllowedSize)
         {
             LEAVE_CRITICAL_SECTION(cs_xval); // maintain locking order with vNodes
             if (ClearLargestThinBlockAndDisconnect(pfrom))
@@ -925,7 +923,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
             }
             ENTER_CRITICAL_SECTION(cs_xval);
         }
-        if (pfrom->nLocalThinBlockBytes > nCurrentMax)
+        if (pfrom->nLocalThinBlockBytes > maxAllowedSize)
         {
             thindata.ClearThinBlockData(pfrom, pfrom->thinBlock.GetBlockHeader().GetHash());
             pfrom->fDisconnect = true;
