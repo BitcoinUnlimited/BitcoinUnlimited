@@ -845,7 +845,7 @@ void CRequestManager::FindNextBlocksToDownload(NodeId nodeid, unsigned int count
     DbgAssert(state != nullptr, return );
 
     // Make sure pindexBestKnownBlock is up to date, we'll need it.
-    requester.ProcessBlockAvailability(nodeid);
+    ProcessBlockAvailability(nodeid);
 
     if (state->pindexBestKnownBlock == nullptr ||
         state->pindexBestKnownBlock->nChainWork < chainActive.Tip()->nChainWork)
@@ -896,7 +896,7 @@ void CRequestManager::FindNextBlocksToDownload(NodeId nodeid, unsigned int count
         // already part of our chain (and therefore don't need it even if pruned).
         for (CBlockIndex *pindex : vToFetch)
         {
-            if (requester.AlreadyAskedFor(pindex->GetBlockHash()))
+            if (AlreadyAskedFor(pindex->GetBlockHash()))
                 continue;
 
             if (!pindex->IsValid(BLOCK_VALID_TREE))
