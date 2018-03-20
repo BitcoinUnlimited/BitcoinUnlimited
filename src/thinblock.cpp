@@ -872,8 +872,8 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
     // Then we multiply number of possible transactions by the size of a shared pointer.
     // NOTE * The 158 byte smallest txn possible was found by getting the smallest serialized size of a txn directly
     //        from the blockchain, on a 32bit system.
-    static CTransactionRef dummyptx = nullptr;
-    static uint64_t nTxSize = sizeof(dummyptx);
+    CTransactionRef dummyptx = nullptr;
+    uint32_t nTxSize = sizeof(dummyptx);
     uint64_t maxAllowedSize = nTxSize * maxMessageSizeMultiplier * excessiveBlockSize / 158;
 
     // Look for each transaction in our various pools and buffers.
