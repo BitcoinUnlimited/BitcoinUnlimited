@@ -103,6 +103,8 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     for (const CTransaction &tx : grapheneBlockTx.vMissingTx)
     {
+		pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
+
         uint256 hash = tx.GetHash();
         uint64_t cheapHash = hash.GetCheapHash();
         pfrom->grapheneBlockHashes[pfrom->grapheneMapHashOrderIndex[cheapHash]] = hash;
@@ -629,7 +631,11 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         if (!hash.IsNull())
         {
             bool inMemPool = mempool.lookup(hash, tx);
+            bool inMissingTx = pfrom->mapMissingTx.count(hash.GetCheapHash()) > 0;
             bool inOrphanCache = mapOrphanTransactions.count(hash) > 0;
+
+            if ((inMemPool && inMissingTx) || (inOrphanCache && inMissingTx))
+                unnecessaryCount++;
 
             if (inOrphanCache)
             {
@@ -638,6 +644,8 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
             }
             else if (inMemPool && fXVal)
                 setPreVerifiedTxHash.insert(hash);
+            else if (inMissingTx)
+                tx = pfrom->mapMissingTx[hash.GetCheapHash()];
         }
         if (tx.IsNull())
             missingCount++;
