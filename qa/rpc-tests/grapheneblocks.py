@@ -16,8 +16,11 @@ class GrapheneBlockTest(BitcoinTestFramework):
                       "outbound_percent",
                       "response_time",
                       "validation_time",
-                      "outbound_bloom_filters",
-                      "inbound_bloom_filters",
+                      "outbound_mempool_info",
+                      "inbound_mempool_info",
+                      "filter",
+                      "iblt",
+                      "rank",
                       "rerequested"}
     def __init__(self):
         self.rep = False

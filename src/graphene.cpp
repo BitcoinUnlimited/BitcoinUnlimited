@@ -2,12 +2,12 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "graphene.h"
 #include "chainparams.h"
 #include "connmgr.h"
 #include "consensus/merkle.h"
 #include "dosman.h"
 #include "expedited.h"
-#include "graphene.h"
 #include "net.h"
 #include "parallel.h"
 #include "policy/policy.h"
@@ -103,7 +103,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     for (const CTransaction &tx : grapheneBlockTx.vMissingTx)
     {
-		pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
+        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
 
         uint256 hash = tx.GetHash();
         uint64_t cheapHash = hash.GetCheapHash();
@@ -766,6 +766,27 @@ void CGrapheneBlockData::UpdateInBoundMemPoolInfo(uint64_t nMemPoolInfoSize)
     updateStats(mapMemPoolInfoInBound, nMemPoolInfoSize);
 }
 
+void CGrapheneBlockData::UpdateFilter(uint64_t nFilterSize)
+{
+    LOCK(cs_graphenestats);
+    nTotalFilterBytes += nFilterSize;
+    updateStats(mapFilter, nFilterSize);
+}
+
+void CGrapheneBlockData::UpdateIblt(uint64_t nIbltSize)
+{
+    LOCK(cs_graphenestats);
+    nTotalIbltBytes += nIbltSize;
+    updateStats(mapIblt, nIbltSize);
+}
+
+void CGrapheneBlockData::UpdateRank(uint64_t nRankSize)
+{
+    LOCK(cs_graphenestats);
+    nTotalRankBytes += nRankSize;
+    updateStats(mapRank, nRankSize);
+}
+
 void CGrapheneBlockData::UpdateResponseTime(double nResponseTime)
 {
     LOCK(cs_graphenestats);
@@ -893,6 +914,33 @@ std::string CGrapheneBlockData::OutBoundMemPoolInfoToString()
     double avgMemPoolInfoSize = average(mapMemPoolInfoOutBound);
     std::ostringstream ss;
     ss << "Outbound CMemPoolInfo size (last 24hrs) AVG: " << formatInfoUnit(avgMemPoolInfoSize);
+    return ss.str();
+}
+
+std::string CGrapheneBlockData::FilterToString()
+{
+    LOCK(cs_graphenestats);
+    double avgFilterSize = average(mapFilter);
+    std::ostringstream ss;
+    ss << "Bloom filter size (last 24hrs) AVG: " << formatInfoUnit(avgFilterSize);
+    return ss.str();
+}
+
+std::string CGrapheneBlockData::IbltToString()
+{
+    LOCK(cs_graphenestats);
+    double avgIbltSize = average(mapIblt);
+    std::ostringstream ss;
+    ss << "IBLT size (last 24hrs) AVG: " << formatInfoUnit(avgIbltSize);
+    return ss.str();
+}
+
+std::string CGrapheneBlockData::RankToString()
+{
+    LOCK(cs_graphenestats);
+    double avgRankSize = average(mapRank);
+    std::ostringstream ss;
+    ss << "Rank size (last 24hrs) AVG: " << formatInfoUnit(avgRankSize);
     return ss.str();
 }
 
@@ -1284,6 +1332,10 @@ void SendGrapheneBlock(CBlock &block, CNode *pfrom, const CInv &inv)
                 pfrom->PushMessage(NetMsgType::GRAPHENEBLOCK, grapheneBlock);
                 LOG(GRAPHENE, "Sent graphene block - size: %d vs block size: %d => peer: %s\n", nSizeGrapheneBlock,
                     nSizeBlock, pfrom->GetLogName());
+
+                graphenedata.UpdateFilter(grapheneBlock.pGrapheneSet->GetFilterSerializationSize());
+                graphenedata.UpdateIblt(grapheneBlock.pGrapheneSet->GetIbltSerializationSize());
+                graphenedata.UpdateRank(grapheneBlock.pGrapheneSet->GetRankSerializationSize());
             }
         }
         catch (std::exception &e)
@@ -1354,6 +1406,7 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
     CMemPoolInfo receiverMemPoolInfo;
     CInv inv;
     vRecv >> inv >> receiverMemPoolInfo;
+    graphenedata.UpdateInBoundMemPoolInfo(::GetSerializeSize(receiverMemPoolInfo, SER_NETWORK, PROTOCOL_VERSION));
 
     {
         LOCK(pfrom->cs_mempoolsize);

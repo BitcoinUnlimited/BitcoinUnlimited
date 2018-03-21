@@ -6,6 +6,7 @@
 #define BITCOIN_GRAPHENE_H
 
 #include "bloom.h"
+#include "config.h"
 #include "consensus/validation.h"
 #include "graphene_set.h"
 #include "iblt.h"
@@ -153,10 +154,16 @@ private:
     CStatHistory<uint64_t> nBlocks;
     CStatHistory<uint64_t> nMempoolLimiterBytesSaved;
     CStatHistory<uint64_t> nTotalMemPoolInfoBytes;
+    CStatHistory<uint64_t> nTotalFilterBytes;
+    CStatHistory<uint64_t> nTotalIbltBytes;
+    CStatHistory<uint64_t> nTotalRankBytes;
     std::map<int64_t, std::pair<uint64_t, uint64_t> > mapGrapheneBlocksInBound;
     std::map<int64_t, std::pair<uint64_t, uint64_t> > mapGrapheneBlocksOutBound;
     std::map<int64_t, uint64_t> mapMemPoolInfoOutBound;
     std::map<int64_t, uint64_t> mapMemPoolInfoInBound;
+    std::map<int64_t, uint64_t> mapFilter;
+    std::map<int64_t, uint64_t> mapIblt;
+    std::map<int64_t, uint64_t> mapRank;
     std::map<int64_t, double> mapGrapheneBlockResponseTime;
     std::map<int64_t, double> mapGrapheneBlockValidationTime;
     std::map<int64_t, int> mapGrapheneBlocksInBoundReRequestedTx;
@@ -189,6 +196,9 @@ public:
     void UpdateOutBound(uint64_t nGrapheneBlockSize, uint64_t nOriginalBlockSize);
     void UpdateOutBoundMemPoolInfo(uint64_t nMemPoolInfoSize);
     void UpdateInBoundMemPoolInfo(uint64_t nMemPoolInfoSize);
+    void UpdateFilter(uint64_t nFilterSize);
+    void UpdateIblt(uint64_t nIbltSize);
+    void UpdateRank(uint64_t nRankSize);
     void UpdateResponseTime(double nResponseTime);
     void UpdateValidationTime(double nValidationTime);
     void UpdateInBoundReRequestedTx(int nReRequestedTx);
@@ -198,6 +208,9 @@ public:
     std::string OutBoundPercentToString();
     std::string InBoundMemPoolInfoToString();
     std::string OutBoundMemPoolInfoToString();
+    std::string FilterToString();
+    std::string IbltToString();
+    std::string RankToString();
     std::string ResponseTimeToString();
     std::string ValidationTimeToString();
     std::string ReRequestedTxToString();
