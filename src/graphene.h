@@ -17,6 +17,9 @@
 #include "sync.h"
 #include "uint256.h"
 
+#include <atomic>
+#include <vector>
+
 class CDataStream;
 class CNode;
 
