@@ -23,7 +23,7 @@ using namespace std;
 static const unsigned int nScriptCheckQueues = 4;
 std::unique_ptr<CParallelValidation> PV;
 
-static void HandleBlockMessageThread(CNode *pfrom, const string strCommand, shared_ptr<CBlock> block, const CInv inv);
+static void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef pblock, const CInv inv);
 
 static void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck> *pqueue)
 {
@@ -396,7 +396,7 @@ uint32_t CParallelValidation::MaxWorkChainBeingProcessed()
     return nMaxWork;
 }
 
-void CParallelValidation::ClearOrphanCache(const CBlock &block)
+void CParallelValidation::ClearOrphanCache(const CBlockRef pblock)
 {
     if (!IsInitialBlockDownload())
     {
@@ -405,16 +405,16 @@ void CParallelValidation::ClearOrphanCache(const CBlock &block)
             // Erase any orphans that may have been in the previous block and arrived
             // after the previous block had already been processed.
             LOCK(cs_previousblock);
-            for (unsigned int i = 0; i < vPreviousBlock.size(); i++)
+            for (uint256 &hash : vPreviousBlock)
             {
-                orphanpool.EraseOrphanTx(vPreviousBlock[i]);
+                orphanpool.EraseOrphanTx(hash);
             }
             vPreviousBlock.clear();
 
             // Erase orphans from the current block that were already received.
-            for (unsigned int i = 0; i < block.vtx.size(); i++)
+            for (CTransaction &tx : pblock->vtx)
             {
-                uint256 hash = block.vtx[i]->GetHash();
+                uint256 hash = tx.GetHash();
                 vPreviousBlock.push_back(hash);
                 orphanpool.EraseOrphanTx(hash);
             }
@@ -639,7 +639,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     }
 
     // Erase any txns from the orphan cache that are no longer needed
-    PV->ClearOrphanCache(*pblock);
+    PV->ClearOrphanCache(pblock);
 
     // Clear thread data - this must be done before the thread completes or else some other new
     // thread may grab the same thread id and we would end up deleting the entry for the new thread instead.

@@ -169,7 +169,7 @@ public:
     uint32_t MaxWorkChainBeingProcessed();
 
     /* Clear orphans from the orphan cache that are no longer needed*/
-    void ClearOrphanCache(const CBlock &block);
+    void ClearOrphanCache(const CBlockRef pblock);
 
     /* Process a block message */
     void HandleBlockMessage(CNode *pfrom,

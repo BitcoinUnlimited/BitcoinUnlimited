@@ -4981,7 +4981,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         else if (inv.type == MSG_THINBLOCK || inv.type == MSG_XTHINBLOCK)
                         {
                             LOG(THIN, "Sending xthin by INV queue getdata message\n");
-                            SendXThinBlock(block, pfrom, inv);
+                            SendXThinBlock(MakeBlockRef(block), pfrom, inv);
                         }
                         // BUIP010 Xtreme Thinblocks: end section
 
@@ -6191,7 +6191,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
             else
             {
-                SendXThinBlock(block, pfrom, inv);
+                SendXThinBlock(MakeBlockRef(block), pfrom, inv);
             }
         }
     }

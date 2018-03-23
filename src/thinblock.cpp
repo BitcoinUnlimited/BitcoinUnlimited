@@ -1503,16 +1503,16 @@ void AddThinBlockInFlight(CNode *pfrom, uint256 hash)
         std::pair<uint256, CNode::CThinBlockInFlight>(hash, CNode::CThinBlockInFlight()));
 }
 
-void SendXThinBlock(CBlock &block, CNode *pfrom, const CInv &inv)
+void SendXThinBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv)
 {
     if (inv.type == MSG_XTHINBLOCK)
     {
-        CXThinBlock xThinBlock(block, pfrom->pThinBlockFilter);
-        int nSizeBlock = block.GetBlockSize();
+        CXThinBlock xThinBlock(*pblock, pfrom->pThinBlockFilter);
+        int nSizeBlock = pblock->GetBlockSize();
         if (xThinBlock.collision ==
             true) // If there is a cheapHash collision in this block then send a normal thinblock
         {
-            CThinBlock thinBlock(block, *pfrom->pThinBlockFilter);
+            CThinBlock thinBlock(*pblock, *pfrom->pThinBlockFilter);
             int nSizeThinBlock = ::GetSerializeSize(xThinBlock, SER_NETWORK, PROTOCOL_VERSION);
             if (nSizeThinBlock < nSizeBlock)
             {
@@ -1525,7 +1525,7 @@ void SendXThinBlock(CBlock &block, CNode *pfrom, const CInv &inv)
             }
             else
             {
-                pfrom->PushMessage(NetMsgType::BLOCK, block);
+                pfrom->PushMessage(NetMsgType::BLOCK, *pblock);
                 LOG(THIN, "Sent regular block instead - xthinblock size: %d vs block size: %d => tx hashes: %d "
                           "transactions: %d  peer: %s\n",
                     nSizeThinBlock, nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(),
@@ -1546,7 +1546,7 @@ void SendXThinBlock(CBlock &block, CNode *pfrom, const CInv &inv)
             }
             else
             {
-                pfrom->PushMessage(NetMsgType::BLOCK, block);
+                pfrom->PushMessage(NetMsgType::BLOCK, *pblock);
                 LOG(THIN, "Sent regular block instead - xthinblock size: %d vs block size: %d => tx hashes: %d "
                           "transactions: %d  peer: %s\n",
                     nSizeThinBlock, nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(),
@@ -1556,8 +1556,8 @@ void SendXThinBlock(CBlock &block, CNode *pfrom, const CInv &inv)
     }
     else if (inv.type == MSG_THINBLOCK)
     {
-        CThinBlock thinBlock(block, *pfrom->pThinBlockFilter);
-        int nSizeBlock = block.GetBlockSize();
+        CThinBlock thinBlock(*pblock, *pfrom->pThinBlockFilter);
+        int nSizeBlock = pblock->GetBlockSize();
         int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);
         if (nSizeThinBlock < nSizeBlock)
         { // Only send a thinblock if smaller than a regular block
@@ -1569,7 +1569,7 @@ void SendXThinBlock(CBlock &block, CNode *pfrom, const CInv &inv)
         }
         else
         {
-            pfrom->PushMessage(NetMsgType::BLOCK, block);
+            pfrom->PushMessage(NetMsgType::BLOCK, *pblock);
             LOG(THIN, "Sent regular block instead - thinblock size: %d vs block size: %d => tx hashes: %d "
                       "transactions: %d  peer: %s\n",
                 nSizeThinBlock, nSizeBlock, thinBlock.vTxHashes.size(), thinBlock.vMissingTx.size(),
