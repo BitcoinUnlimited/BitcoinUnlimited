@@ -172,10 +172,7 @@ public:
     void ClearOrphanCache(const CBlockRef pblock);
 
     /* Process a block message */
-    void HandleBlockMessage(CNode *pfrom,
-        const std::string &strCommand,
-        CBlockRef pblock,
-        const CInv &inv);
+    void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, CBlockRef pblock, const CInv &inv);
 
     // The number of script validation threads
     unsigned int ThreadCount() { return nThreads; }

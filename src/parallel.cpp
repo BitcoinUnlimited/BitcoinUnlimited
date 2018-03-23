@@ -426,10 +426,7 @@ void CParallelValidation::ClearOrphanCache(const CBlockRef pblock)
 //  HandleBlockMessage launches a HandleBlockMessageThread.  And HandleBlockMessageThread processes each block and
 //  updates the UTXO if the block has been accepted and the tip updated. We cleanup and release the semaphore after
 //  the thread has finished.
-void CParallelValidation::HandleBlockMessage(CNode *pfrom,
-    const string &strCommand,
-    CBlockRef pblock,
-    const CInv &inv)
+void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strCommand, CBlockRef pblock, const CInv &inv)
 {
     uint64_t nBlockSize = pblock->GetBlockSize();
 

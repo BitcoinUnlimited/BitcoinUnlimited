@@ -193,8 +193,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
 
         // create a non-deleting shared pointer to wrap pfrom->thinBlock.  We know that thinBlock will outlast the
         // thread because the thread has a node reference.
-        PV->HandleBlockMessage(pfrom, NetMsgType::THINBLOCK,
-            MakeBlockRef(pfrom->thinBlock), GetInv());
+        PV->HandleBlockMessage(pfrom, NetMsgType::THINBLOCK, MakeBlockRef(pfrom->thinBlock), GetInv());
     }
     else if (pfrom->thinBlockWaitingForTxns > 0)
     {
@@ -424,8 +423,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
         // create a non-deleting shared pointer to wrap pfrom->thinBlock.  We know that thinBlock will outlast the
         // thread because the thread has a node reference.
-        PV->HandleBlockMessage(
-            pfrom, strCommand, MakeBlockRef(pfrom->thinBlock), inv);
+        PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->thinBlock), inv);
     }
 
     return true;
@@ -841,8 +839,7 @@ bool CXThinBlock::process(CNode *pfrom,
     LOG(THIN, "thin block stats: %s\n", thindata.ToString().c_str());
 
     // Process the full block
-    PV->HandleBlockMessage(
-        pfrom, strCommand, MakeBlockRef(pfrom->thinBlock), GetInv());
+    PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->thinBlock), GetInv());
 
     return true;
 }
