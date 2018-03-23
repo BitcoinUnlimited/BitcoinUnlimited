@@ -281,11 +281,11 @@ void CParallelValidation::WaitForAllValidationThreadsToStop()
 bool CParallelValidation::Enabled() { return GetBoolArg("-parallel", true); }
 void CParallelValidation::InitThread(const boost::thread::id this_id,
     const CNode *pfrom,
-    CBlockRef block,
+    CBlockRef pblock,
     const CInv &inv,
     uint64_t blockSize)
 {
-    const CBlockHeader &header = block->GetBlockHeader();
+    const CBlockHeader &header = pblock->GetBlockHeader();
 
     LOCK(cs_blockvalidationthread);
     assert(mapBlockValidationThreads.count(this_id) == 0); // this id should not already be in use
@@ -294,7 +294,7 @@ void CParallelValidation::InitThread(const boost::thread::id this_id,
                      GetTimeMillis(), blockSize, false, pfrom->id, false, false});
 
     LOG(PARALLEL, "Launching validation for %s with number of block validation threads running: %d\n",
-        block->GetHash().ToString(), mapBlockValidationThreads.size());
+        pblock->GetHash().ToString(), mapBlockValidationThreads.size());
 }
 
 void CParallelValidation::Erase(const boost::thread::id this_id)
@@ -428,10 +428,10 @@ void CParallelValidation::ClearOrphanCache(const CBlock &block)
 //  the thread has finished.
 void CParallelValidation::HandleBlockMessage(CNode *pfrom,
     const string &strCommand,
-    CBlockRef block,
+    CBlockRef pblock,
     const CInv &inv)
 {
-    uint64_t nBlockSize = block->GetBlockSize();
+    uint64_t nBlockSize = pblock->GetBlockSize();
 
     // NOTE: You must not have a cs_main lock before you aquire the semaphore grant or you can end up deadlocking
     AssertLockNotHeld(cs_main);
@@ -465,7 +465,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom,
                     {
                         // Find largest block where the previous block hash matches. Meaning this is a new block and
                         // it's a competitor to to your block.
-                        if ((*iter).second.hashPrevBlock == block->GetBlockHeader().hashPrevBlock)
+                        if ((*iter).second.hashPrevBlock == pblock->GetBlockHeader().hashPrevBlock)
                         {
                             if ((*iter).second.nBlockSize > nLargestBlockSize)
                             {
@@ -480,7 +480,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom,
                     if (nLargestBlockSize <= nBlockSize)
                     {
                         LOG(PARALLEL, "Block validation terminated - Too many blocks currently being validated: %s\n",
-                            block->GetHash().ToString());
+                            pblock->GetHash().ToString());
                         return; // new block is rejected and does not enter PV
                     }
                     else if (miLargestBlock != mapBlockValidationThreads.end())
@@ -516,18 +516,18 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom,
     // only launch block validation in a separate thread if PV is enabled.
     if (PV->Enabled())
     {
-        boost::thread thread(boost::bind(&HandleBlockMessageThread, pfrom, strCommand, block, inv));
+        boost::thread thread(boost::bind(&HandleBlockMessageThread, pfrom, strCommand, pblock, inv));
         thread.detach(); // Separate actual thread from the "thread" object so its fine to fall out of scope
     }
     else
     {
-        HandleBlockMessageThread(pfrom, strCommand, block, inv);
+        HandleBlockMessageThread(pfrom, strCommand, pblock, inv);
     }
 }
 
-void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef block, const CInv inv)
+void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef pblock, const CInv inv)
 {
-    uint64_t nSizeBlock = block->GetBlockSize();
+    uint64_t nSizeBlock = pblock->GetBlockSize();
     int64_t startTime = GetTimeMicros();
     CValidationState state;
 
@@ -542,7 +542,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef b
 
 
     boost::thread::id this_id(boost::this_thread::get_id());
-    PV->InitThread(this_id, pfrom, block, inv, nSizeBlock); // initialize the mapBlockValidationThread entries
+    PV->InitThread(this_id, pfrom, pblock, inv, nSizeBlock); // initialize the mapBlockValidationThread entries
 
     // Process all blocks from whitelisted peers, even if not requested,
     // unless we're still syncing with the network.
@@ -552,12 +552,12 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef b
     const CChainParams &chainparams = Params();
     if (PV->Enabled())
     {
-        ProcessNewBlock(state, chainparams, pfrom, block.get(), forceProcessing, nullptr, true);
+        ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, true);
     }
     else
     {
         LOCK(cs_main); // locking cs_main here prevents any other thread from beginning starting a block validation.
-        ProcessNewBlock(state, chainparams, pfrom, block.get(), forceProcessing, nullptr, false);
+        ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, false);
     }
 
     int nDoS;
@@ -639,7 +639,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef b
     }
 
     // Erase any txns from the orphan cache that are no longer needed
-    PV->ClearOrphanCache(*block);
+    PV->ClearOrphanCache(*pblock);
 
     // Clear thread data - this must be done before the thread completes or else some other new
     // thread may grab the same thread id and we would end up deleting the entry for the new thread instead.
