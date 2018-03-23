@@ -288,18 +288,9 @@ void CParallelValidation::InitThread(const boost::thread::id this_id,
 
     LOCK(cs_blockvalidationthread);
     assert(mapBlockValidationThreads.count(this_id) == 0); // this id should not already be in use
-    mapBlockValidationThreads[this_id].pScriptQueue = NULL;
-    mapBlockValidationThreads[this_id].hash = inv.hash;
-    mapBlockValidationThreads[this_id].hashPrevBlock = header.hashPrevBlock;
-    mapBlockValidationThreads[this_id].nChainWork = header.nBits;
-    mapBlockValidationThreads[this_id].nMostWorkOurFork = header.nBits;
-    mapBlockValidationThreads[this_id].nSequenceId = INT_MAX;
-    mapBlockValidationThreads[this_id].nStartTime = GetTimeMillis();
-    mapBlockValidationThreads[this_id].nBlockSize = blockSize;
-    mapBlockValidationThreads[this_id].fQuit = false;
-    mapBlockValidationThreads[this_id].nodeid = pfrom->id;
-    mapBlockValidationThreads[this_id].fIsValidating = false;
-    mapBlockValidationThreads[this_id].fIsReorgInProgress = false;
+    mapBlockValidationThreads.emplace(
+        this_id, CHandleBlockMsgThreads{nullptr, inv.hash, header.hashPrevBlock, header.nBits, header.nBits, INT_MAX,
+                     GetTimeMillis(), blockSize, false, pfrom->id, false, false});
 
     LOG(PARALLEL, "Launching validation for %s with number of block validation threads running: %d\n",
         block->GetHash().ToString(), mapBlockValidationThreads.size());
