@@ -281,7 +281,7 @@ void CParallelValidation::WaitForAllValidationThreadsToStop()
 bool CParallelValidation::Enabled() { return GetBoolArg("-parallel", true); }
 void CParallelValidation::InitThread(const boost::thread::id this_id,
     const CNode *pfrom,
-    shared_ptr<CBlock> block,
+    CBlockRef block,
     const CInv &inv,
     uint64_t blockSize)
 {
@@ -428,7 +428,7 @@ void CParallelValidation::ClearOrphanCache(const CBlock &block)
 //  the thread has finished.
 void CParallelValidation::HandleBlockMessage(CNode *pfrom,
     const string &strCommand,
-    std::shared_ptr<CBlock> block,
+    CBlockRef block,
     const CInv &inv)
 {
     uint64_t nBlockSize = block->GetBlockSize();
@@ -525,7 +525,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom,
     }
 }
 
-void HandleBlockMessageThread(CNode *pfrom, const string strCommand, shared_ptr<CBlock> block, const CInv inv)
+void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef block, const CInv inv)
 {
     uint64_t nSizeBlock = block->GetBlockSize();
     int64_t startTime = GetTimeMicros();

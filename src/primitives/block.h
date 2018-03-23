@@ -207,4 +207,12 @@ struct CBlockLocator
     bool IsNull() const { return vHave.empty(); }
 };
 
+typedef std::shared_ptr<CBlock> CBlockRef;
+static inline CBlockRef MakeBlockRef() { return std::make_shared<CBlock>(); }
+template <typename Blk>
+static inline CBlockRef MakeBlockRef(Blk &&blkIn)
+{
+    return std::make_shared<CBlock>(std::forward<Blk>(blkIn));
+}
+
 #endif // BITCOIN_PRIMITIVES_BLOCK_H

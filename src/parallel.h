@@ -118,7 +118,7 @@ public:
     /* Initialize mapBlockValidationThreads*/
     void InitThread(const boost::thread::id this_id,
         const CNode *pfrom,
-        std::shared_ptr<CBlock> block,
+        CBlockRef block,
         const CInv &inv,
         uint64_t blockSize);
 
@@ -174,7 +174,7 @@ public:
     /* Process a block message */
     void HandleBlockMessage(CNode *pfrom,
         const std::string &strCommand,
-        std::shared_ptr<CBlock> block,
+        CBlockRef block,
         const CInv &inv);
 
     // The number of script validation threads

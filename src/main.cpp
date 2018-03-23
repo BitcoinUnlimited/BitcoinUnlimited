@@ -6288,7 +6288,11 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) // Ignore blocks received while importing
     {
-        std::shared_ptr<CBlock> block(new CBlock);
+<<<<<<< HEAD
+        CBlockRef block;
+=======
+        CBlockRef block(new CBlock());
+>>>>>>> 4fadcaa... fix CBlock
         {
             uint64_t nCheckBlockSize = vRecv.size();
             vRecv >> *block;
