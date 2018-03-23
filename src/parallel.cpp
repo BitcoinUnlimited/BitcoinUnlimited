@@ -185,7 +185,7 @@ void CParallelValidation::QuitCompetingThreads(const uint256 &prevBlockHash)
             //                     be a parallel block validation that was happening.
             if ((*mi).first != this_id && (*mi).second.hashPrevBlock == prevBlockHash)
             {
-                if ((*mi).second.pScriptQueue != NULL)
+                if ((*mi).second.pScriptQueue != nullptr)
                 {
                     LOG(PARALLEL, "Terminating script queue with blockhash %s and previous blockhash %s\n",
                         (*mi).second.hash.ToString(), prevBlockHash.ToString());
@@ -231,7 +231,7 @@ void CParallelValidation::StopAllValidationThreads(const boost::thread::id this_
     {
         if ((*mi).first != this_id) // we don't want to kill our own thread
         {
-            if ((*mi).second.pScriptQueue != NULL)
+            if ((*mi).second.pScriptQueue != nullptr)
                 (*mi).second.pScriptQueue->Quit(); // quit any active script queue threads
             (*mi).second.fQuit = true; // quit the PV thread
         }
@@ -253,7 +253,7 @@ void CParallelValidation::StopAllValidationThreads(const uint32_t nChainWork)
         if (((*mi).first != this_id) && (*mi).second.nChainWork <= nChainWork &&
             (*mi).second.nMostWorkOurFork <= nChainWork)
         {
-            if ((*mi).second.pScriptQueue != NULL)
+            if ((*mi).second.pScriptQueue != nullptr)
                 (*mi).second.pScriptQueue->Quit(); // quit any active script queue threads
             (*mi).second.fQuit = true; // quit the PV thread
         }
@@ -341,7 +341,7 @@ void CParallelValidation::SetLocks(const bool fParallel)
         boost::thread::id this_id(boost::this_thread::get_id());
         LOCK(cs_blockvalidationthread);
         if (mapBlockValidationThreads.count(this_id))
-            mapBlockValidationThreads[this_id].pScriptQueue = NULL;
+            mapBlockValidationThreads[this_id].pScriptQueue = nullptr;
     }
 }
 
@@ -551,12 +551,12 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, shared_ptr<
     const CChainParams &chainparams = Params();
     if (PV->Enabled())
     {
-        ProcessNewBlock(state, chainparams, pfrom, block.get(), forceProcessing, NULL, true);
+        ProcessNewBlock(state, chainparams, pfrom, block.get(), forceProcessing, nullptr, true);
     }
     else
     {
         LOCK(cs_main); // locking cs_main here prevents any other thread from beginning starting a block validation.
-        ProcessNewBlock(state, chainparams, pfrom, block.get(), forceProcessing, NULL, false);
+        ProcessNewBlock(state, chainparams, pfrom, block.get(), forceProcessing, nullptr, false);
     }
 
     int nDoS;
@@ -617,7 +617,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, shared_ptr<
             }
 
             // Count up any other remaining nodes with thinblocks in flight.
-            BOOST_FOREACH (CNode *pnode, vNodes)
+            for (CNode *pnode : vNodes)
             {
                 if (pnode->mapThinBlocksInFlight.size() > 0)
                     nTotalThinBlocksInFlight++;
