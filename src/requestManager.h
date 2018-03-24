@@ -215,7 +215,8 @@ public:
     // Resets the last request time to zero when a node disconnects and has blocks in flight.
     void ResetLastBlockRequestTime(const uint256 &hash);
 
-    void SendRequests();
+    // Sends all message requests for a particular node
+    void SendRequests(CNode *pnode);
 
     // Check whether the limit for thintype object requests has been exceeded
     bool CheckForRequestDOS(CNode *pfrom, const CChainParams &chainparams);

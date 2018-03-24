@@ -643,14 +643,13 @@ void CRequestManager::ResetLastBlockRequestTime(const uint256 &hash)
     }
 }
 
-void CRequestManager::SendRequests()
+void CRequestManager::SendRequests(CNode *pnode)
 {
     int64_t now = 0;
 
     // TODO: if a node goes offline, rerequest txns from someone else and cleanup references right away
     LOCK(cs_objDownloader);
-    if (sendBlkIter == mapBlkInfo.end())
-        sendBlkIter = mapBlkInfo.begin();
+    sendBlkIter = mapBlkInfo.begin();
 
     // Modify retry interval. If we're doing IBD or if Traffic Shaping is ON we want to have a longer interval because
     // those blocks and txns can take much longer to download.
@@ -696,14 +695,15 @@ void CRequestManager::SendRequests()
         {
             if (!item.availableFrom.empty())
             {
+                // Go thru the availableFrom list, looking for our node
                 CNodeRequestData next;
-                // Go thru the availableFrom list, looking for the first node that isn't disconnected
-                while (!item.availableFrom.empty() && (next.node == nullptr))
-                {
-                    next = item.availableFrom.front(); // Grab the next location where we can find this object.
-                    item.availableFrom.pop_front();
-                    if (next.node != nullptr)
+                for (auto iter = item.availableFrom.begin(); iter != item.availableFrom.end(); iter++)
+                {                
+                    if (iter->node == pnode)
                     {
+                        next = std::move(*iter);
+                        iter = item.availableFrom.erase(iter);
+
                         // Do not request from this node if it was disconnected
                         if (next.node->fDisconnect)
                         {
@@ -714,8 +714,9 @@ void CRequestManager::SendRequests()
                             // point, so we don't have to worry that a pnode could be disconnected and no longer exist
                             // before the decrement takes place.
                             next.node->Release();
-                            next.node = nullptr; // force the loop to get another node
+                            next.node = nullptr;
                         }
+                        break;
                     }
                 }
 
@@ -788,11 +789,6 @@ void CRequestManager::SendRequests()
                         item.availableFrom.push_back(next);
                     }
                 }
-                else
-                {
-                    // node should never be null... but if it is then there's nothing to do.
-                    LOG(REQ, "Block %s has no sources\n", item.obj.ToString());
-                }
             }
             else
             {
@@ -832,8 +828,7 @@ void CRequestManager::SendRequests()
     }
 
     // Get Transactions
-    if (sendIter == mapTxnInfo.end())
-        sendIter = mapTxnInfo.begin();
+    sendIter = mapTxnInfo.begin();
     while ((sendIter != mapTxnInfo.end()) && requestPacer.try_leak(1))
     {
         now = GetStopwatchMicros();
@@ -860,9 +855,8 @@ void CRequestManager::SendRequests()
                 {
                     LOG(REQ, "Request timeout for %s.  Retrying\n", item.obj.ToString().c_str());
                     // Not reducing inFlight; it's still outstanding and will be cleaned up when item is removed from
-                    // map
-                    // note we can never be sure its really dropped verses just delayed for a long time so this is not
-                    // authoritative.
+                    // map note we can never be sure its really dropped verses just delayed for a long time so this is
+                    // not authoritative.
                     droppedTxns += 1;
                 }
 
@@ -874,15 +868,16 @@ void CRequestManager::SendRequests()
                 }
                 else // Ok, we have at least one source so request this item.
                 {
+                    // Go thru the availableFrom list, looking for our node
                     CNodeRequestData next;
-                    // Go thru the availableFrom list, looking for the first node that isn't disconnected
-                    while (!item.availableFrom.empty() && (next.node == nullptr))
-                    {
-                        next = item.availableFrom.front(); // Grab the next location where we can find this object.
-                        item.availableFrom.pop_front();
-                        if (next.node != nullptr)
+                    for (auto iter = item.availableFrom.begin(); iter != item.availableFrom.end(); iter++)
+                    {                
+                        if (iter->node == pnode)
                         {
-                            if (next.node->fDisconnect) // Node was disconnected so we can't request from it
+                            next = std::move(*iter);
+                            iter = item.availableFrom.erase(iter);
+
+                            if (next.node->fDisconnect)
                             {
                                 LOG(REQ, "ReqMgr: %s removed tx ref to %d count %d (on disconnect).\n",
                                     item.obj.ToString(), next.node->GetId(), next.node->GetRefCount());
@@ -891,8 +886,9 @@ void CRequestManager::SendRequests()
                                 // point, so we don't have to worry that a pnode could be disconnected and no longer
                                 // exist before the decrement takes place.
                                 next.node->Release();
-                                next.node = nullptr; // force the loop to get another node
+                                next.node = nullptr;
                             }
+                            break;
                         }
                     }
 
