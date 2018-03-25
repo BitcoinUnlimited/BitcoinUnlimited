@@ -289,6 +289,9 @@ void FinalizeNode(NodeId nodeid)
     {
         LOGA("erasing map mapblocksinflight entries\n");
         mapBlocksInFlight.erase(entry.hash);
+
+        // Reset all requests times to zero so that we can immediately re-request these blocks
+        requester.ResetLastRequestTime(entry.hash);
     }
     nPreferredDownload -= state->fPreferredDownload;
     requester.nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);

@@ -157,6 +157,9 @@ public:
     // Indicate that getting this object was rejected
     void Rejected(const CInv &obj, CNode *from, unsigned char reason = 0);
 
+    // Resets the last request time to zero when a node disconnects and has blocks in flight.
+    void ResetLastRequestTime(const uint256 &hash);
+
     void SendRequests();
 
     // Check whether the last unknown block a peer advertised is not yet known.
