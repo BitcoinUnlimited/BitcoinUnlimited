@@ -753,20 +753,24 @@ void CRequestManager::SendRequests()
 
                     if (next.node != nullptr)
                     {
+                        // This commented code skips requesting TX if the node is not synced. The request
+                        // manager should not make this decision but rather the caller should not give us the TX.
                         CInv obj = item.obj;
                         if (1)
                         {
-                            // from->AskFor(item.obj); basically just shoves the req into mapAskFor
-                            // This commented code does skips requesting TX if the node is not synced.  But the req mgr
-                            // should not make this decision, the caller should not give the TX to me...
-                            // if (!item.lastRequestTime || (item.lastRequestTime && IsChainNearlySyncd()))
-
                             item.outstandingReqs++;
                             item.lastRequestTime = now;
-                            LEAVE_CRITICAL_SECTION(cs_objDownloader); // do not use "item" after releasing this
-                            next.node->mapAskFor.insert(std::make_pair(now, obj));
+
+                            // use obj instead of "item.*" after releasing this lock
+                            // since item.* requires cs_objDownloader.
+                            LEAVE_CRITICAL_SECTION(cs_objDownloader);
+                            {
+                                std::vector<CInv> vGetData (1, obj);
+                                next.node->PushMessage(NetMsgType::GETDATA, vGetData);
+                            }
                             ENTER_CRITICAL_SECTION(cs_objDownloader);
                         }
+
                         {
                             LOCK(cs_vNodes);
                             LOG(REQ, "ReqMgr: %s removed tx ref to %d count %d\n", obj.ToString(), next.node->GetId(),

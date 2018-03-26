@@ -108,7 +108,6 @@ std::string strSubVersion;
 // extern CCriticalSection cs_vNodes;
 // map<CInv, CDataStream> mapRelay;
 // CCriticalSection cs_mapRelay;
-// limitedmap<CInv, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
 
 extern deque<string> vOneShots;
 extern CCriticalSection cs_vOneShots;

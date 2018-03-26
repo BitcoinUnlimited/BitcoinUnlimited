@@ -5686,9 +5686,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         bool fMissingInputs = false;
         CValidationState state;
 
-        pfrom->setAskFor.erase(inv.hash);
-        mapAlreadyAskedFor.erase(inv.hash);
-
         // Check for recently rejected (and do other quick existence checks)
         if (!AlreadyHave(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
         {
@@ -7187,35 +7184,6 @@ bool SendMessages(CNode *pto)
                     requester.AskForDuringIBD(vGetBlocks, pto);
             }
         }
-
-        //
-        // Message: getdata (non-blocks)
-        //
-        std::vector<CInv> vGetData;
-        while (!pto->fDisconnect && !pto->mapAskFor.empty() && (*pto->mapAskFor.begin()).first <= nNow)
-        {
-            const CInv &inv = (*pto->mapAskFor.begin()).second;
-            if (!AlreadyHave(inv))
-            {
-                if (fDebug)
-                    LOG(NET, "Requesting %s peer=%d\n", inv.ToString(), pto->id);
-                vGetData.push_back(inv);
-                if (vGetData.size() >= 1000)
-                {
-                    pto->PushMessage(NetMsgType::GETDATA, vGetData);
-                    vGetData.clear();
-                }
-            }
-            else
-            {
-                // If we're not going to ask, don't expect a response.
-                pto->setAskFor.erase(inv.hash);
-                requester.AlreadyReceived(inv); // BU indicate that we already got this item
-            }
-            pto->mapAskFor.erase(pto->mapAskFor.begin());
-        }
-        if (!vGetData.empty())
-            pto->PushMessage(NetMsgType::GETDATA, vGetData);
     }
     return true;
 }
