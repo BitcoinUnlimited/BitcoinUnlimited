@@ -20,6 +20,8 @@
 #include <atomic>
 #include <vector>
 
+const unsigned char MIN_MEMPOOL_INFO_BYTES = 8;
+
 class CDataStream;
 class CNode;
 

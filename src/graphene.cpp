@@ -1319,7 +1319,8 @@ void SendGrapheneBlock(CBlock &block, CNode *pfrom, const CInv &inv)
             int nSizeBlock = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
             int nSizeGrapheneBlock = ::GetSerializeSize(grapheneBlock, SER_NETWORK, PROTOCOL_VERSION);
 
-            if (nSizeGrapheneBlock > nSizeBlock) // If graphene block is larger than a regular block then
+            if (nSizeGrapheneBlock + MIN_MEMPOOL_INFO_BYTES >
+                nSizeBlock) // If graphene block is larger than a regular block then
             // send a regular block instead
             {
                 pfrom->PushMessage(NetMsgType::BLOCK, block);

@@ -39,8 +39,10 @@ private:
 
     double OptimalSymDiff(uint64_t nBlockTxs, uint64_t receiverMemPoolInfo)
     {
+        assert(BLOOM_OVERHEAD_FACTOR > 0 && IBLT_OVERHEAD_FACTOR > 0);
+
         // This is the "a" parameter from the graphene paper
-        double symDiff = nBlockTxs / (BLOOM_OVERHEAD_FACTOR * IBLT_OVERHEAD_FACTOR);
+        double symDiff = nBlockTxs / float(BLOOM_OVERHEAD_FACTOR * IBLT_OVERHEAD_FACTOR);
 
         assert(symDiff > 0.0);
 
@@ -61,7 +63,7 @@ public:
 
         // Determine constants
         double optSymDiff = OptimalSymDiff(nItems, nReceiverUniverseItems);
-        double sizeDiff = nReceiverUniverseItems - nItems;
+        uint64_t sizeDiff = int(abs(nReceiverUniverseItems - nItems));
         double fpr;
 
         if (sizeDiff <= 0 || optSymDiff > sizeDiff)
