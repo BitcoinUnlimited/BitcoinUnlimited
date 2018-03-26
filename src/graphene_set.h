@@ -236,13 +236,13 @@ public:
         if (pSetFilter)
         {
             delete pSetFilter;
-            pSetFilter = NULL;
+            pSetFilter = nullptr;
         }
 
         if (pSetIblt)
         {
             delete pSetIblt;
-            pSetIblt = NULL;
+            pSetIblt = nullptr;
         }
     }
 

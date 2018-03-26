@@ -39,7 +39,7 @@ CGrapheneBlock::~CGrapheneBlock()
     if (pGrapheneSet)
     {
         delete pGrapheneSet;
-        pGrapheneSet = NULL;
+        pGrapheneSet = nullptr;
     }
 }
 
@@ -327,7 +327,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
         }
 
         CValidationState state;
-        CBlockIndex *pIndex = NULL;
+        CBlockIndex *pIndex = nullptr;
         if (!AcceptBlockHeader(grapheneBlock.header, state, Params(), &pIndex))
         {
             int nDoS;
@@ -1237,7 +1237,7 @@ void ConnectToGrapheneBlockNodes()
             // NOTE: Because the only nodes we are connecting to here are the ones the user put in their
             //      bitcoin.conf/commandline args as "-connect-graphene", we don't use the semaphore to limit outbound
             //      connections
-            OpenNetworkConnection(addr, false, NULL, strAddr.c_str());
+            OpenNetworkConnection(addr, false, nullptr, strAddr.c_str());
             MilliSleep(500);
         }
     }
@@ -1263,14 +1263,14 @@ void CheckNodeSupportForGrapheneBlocks()
 
 bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom)
 {
-    CNode *pLargest = NULL;
+    CNode *pLargest = nullptr;
     LOCK(cs_vNodes);
     for (CNode *pnode : vNodes)
     {
-        if ((pLargest == NULL) || (pnode->nLocalGrapheneBlockBytes > pLargest->nLocalGrapheneBlockBytes))
+        if ((pLargest == nullptr) || (pnode->nLocalGrapheneBlockBytes > pLargest->nLocalGrapheneBlockBytes))
             pLargest = pnode;
     }
-    if (pLargest != NULL)
+    if (pLargest != nullptr)
     {
         graphenedata.ClearGrapheneBlockData(pLargest, pLargest->grapheneBlock.GetBlockHeader().GetHash());
         pLargest->fDisconnect = true;
