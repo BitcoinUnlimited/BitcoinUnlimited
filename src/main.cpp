@@ -5502,10 +5502,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                         pfrom->id);
                 }
                 // RE !IsInitialBlockDownload(): during IBD, its a waste of bandwidth to grab transactions, they will
-                // likely be included
-                // in blocks that we IBD download anyway.  This is especially important as transaction volumes increase.
+                // likely be included in blocks that we IBD download anyway.  This is especially important as
+                // transaction volumes increase.
                 else if (!fAlreadyHave && !IsInitialBlockDownload())
-                    requester.AskFor(inv, pfrom); // BU manage outgoing requests.  was: pfrom->AskFor(inv);
+                    requester.AskFor(inv, pfrom);
             }
 
             // Track requests for our stuff

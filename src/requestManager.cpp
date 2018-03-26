@@ -150,6 +150,10 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
     LOCK(cs_objDownloader);
     if (obj.type == MSG_TX)
     {
+        // Don't allow the in flight requests to grow unbounded.
+        if (mapTxnInfo.size() >= (size_t)(MAX_INV_SZ * 2 * GetArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE)))
+            return;
+
         uint256 temp = obj.hash;
         OdMap::value_type v(temp, CUnknownObj());
         std::pair<OdMap::iterator, bool> result = mapTxnInfo.insert(v);

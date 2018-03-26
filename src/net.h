@@ -572,8 +572,6 @@ public:
         vBlockHashesToAnnounce.push_back(hash);
     }
 
-    void AskFor(const CInv &inv);
-
     // TODO: Document the postcondition of this function.  Is cs_vSend locked?
     void BeginMessage(const char *pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend);
 
