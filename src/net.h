@@ -408,9 +408,9 @@ public:
     // BUIP010 Xtreme Thinblocks: end section
 
     // BUIPXXX Graphene blocks: begin section
-    CCriticalSection cs_mempoolsize;
-    CBlock grapheneBlock;
+    CCriticalSection cs_ngraphenemempooltx; // lock nGrapheneMemPoolTx
     int64_t nGrapheneMemPoolTx;
+    CBlock grapheneBlock;
     std::vector<uint256> grapheneBlockHashes;
     std::map<uint64_t, uint32_t> grapheneMapHashOrderIndex;
     std::map<uint64_t, CTransaction> mapGrapheneMissingTx;

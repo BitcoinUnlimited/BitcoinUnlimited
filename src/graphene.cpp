@@ -1410,7 +1410,7 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
     graphenedata.UpdateInBoundMemPoolInfo(::GetSerializeSize(receiverMemPoolInfo, SER_NETWORK, PROTOCOL_VERSION));
 
     {
-        LOCK(pfrom->cs_mempoolsize);
+        LOCK(pfrom->cs_ngraphenemempooltx);
         pfrom->nGrapheneMemPoolTx = receiverMemPoolInfo.nTx;
     }
 
