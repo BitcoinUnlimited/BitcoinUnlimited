@@ -770,6 +770,25 @@ void CRequestManager::SendRequests()
                                 next.node->AddRef();
                             }
                             mapBatchTxnRequests[next.node].emplace_back(item.obj);
+
+                            // If we have 1000 requests for this peer then send them right away.
+                            if (mapBatchTxnRequests[next.node].size() >= 1000)
+                            {
+                                LEAVE_CRITICAL_SECTION(cs_objDownloader);
+                                {
+                                    next.node->PushMessage(NetMsgType::GETDATA, mapBatchTxnRequests[next.node]);
+                                    LOG(REQ, "Sent batched request with %d transations to node %s\n",
+                                        mapBatchTxnRequests[next.node].size(), next.node->GetLogName());
+                                }
+                                ENTER_CRITICAL_SECTION(cs_objDownloader);
+
+                                LOCK(cs_vNodes);
+                                for (size_t i = 0; i < mapBatchTxnRequests[next.node].size(); i++)
+                                {
+                                    next.node->Release();
+                                }
+                                mapBatchTxnRequests[next.node].clear();
+                            }
                         }
 
                         inFlight++;
