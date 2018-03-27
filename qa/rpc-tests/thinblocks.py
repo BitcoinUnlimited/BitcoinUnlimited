@@ -111,6 +111,8 @@ class ThinBlockTest(BitcoinTestFramework):
                             "validation_time",
                             "outbound_bloom_filters",
                             "inbound_bloom_filters",
+                            "thin_block_size",
+                            "thin_full_tx",
                             "rerequested"}
 
 if __name__ == '__main__':

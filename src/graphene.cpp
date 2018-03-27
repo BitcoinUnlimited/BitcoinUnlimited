@@ -787,6 +787,13 @@ void CGrapheneBlockData::UpdateRank(uint64_t nRankSize)
     updateStats(mapRank, nRankSize);
 }
 
+void CGrapheneBlockData::UpdateGrapheneBlock(uint64_t nGrapheneBlockSize)
+{
+    LOCK(cs_graphenestats);
+    nTotalGrapheneBlockBytes += nGrapheneBlockSize;
+    updateStats(mapGrapheneBlock, nGrapheneBlockSize);
+}
+
 void CGrapheneBlockData::UpdateResponseTime(double nResponseTime)
 {
     LOCK(cs_graphenestats);
@@ -941,6 +948,15 @@ std::string CGrapheneBlockData::RankToString()
     double avgRankSize = average(mapRank);
     std::ostringstream ss;
     ss << "Rank size (last 24hrs) AVG: " << formatInfoUnit(avgRankSize);
+    return ss.str();
+}
+
+std::string CGrapheneBlockData::GrapheneBlockToString()
+{
+    LOCK(cs_graphenestats);
+    double avgGrapheneBlockSize = average(mapGrapheneBlock);
+    std::ostringstream ss;
+    ss << "Graphene block size (last 24hrs) AVG: " << formatInfoUnit(avgGrapheneBlockSize);
     return ss.str();
 }
 
@@ -1337,6 +1353,7 @@ void SendGrapheneBlock(CBlock &block, CNode *pfrom, const CInv &inv)
                 graphenedata.UpdateFilter(grapheneBlock.pGrapheneSet->GetFilterSerializationSize());
                 graphenedata.UpdateIblt(grapheneBlock.pGrapheneSet->GetIbltSerializationSize());
                 graphenedata.UpdateRank(grapheneBlock.pGrapheneSet->GetRankSerializationSize());
+                graphenedata.UpdateGrapheneBlock(nSizeGrapheneBlock);
             }
         }
         catch (std::exception &e)

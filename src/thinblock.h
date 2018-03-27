@@ -168,6 +168,8 @@ private:
     CStatHistory<uint64_t> nBlocks;
     CStatHistory<uint64_t> nMempoolLimiterBytesSaved;
     CStatHistory<uint64_t> nTotalBloomFilterBytes;
+    CStatHistory<uint64_t> nTotalThinBlockBytes;
+    CStatHistory<uint64_t> nTotalFullTxBytes;
     std::map<int64_t, std::pair<uint64_t, uint64_t> > mapThinBlocksInBound;
     std::map<int64_t, std::pair<uint64_t, uint64_t> > mapThinBlocksOutBound;
     std::map<int64_t, uint64_t> mapBloomFiltersOutBound;
@@ -175,6 +177,8 @@ private:
     std::map<int64_t, double> mapThinBlockResponseTime;
     std::map<int64_t, double> mapThinBlockValidationTime;
     std::map<int64_t, int> mapThinBlocksInBoundReRequestedTx;
+    std::map<int64_t, uint64_t> mapThinBlock;
+    std::map<int64_t, uint64_t> mapFullTx;
 
     /**
         Add new entry to statistics array; also removes old timestamps
@@ -208,6 +212,8 @@ public:
     void UpdateValidationTime(double nValidationTime);
     void UpdateInBoundReRequestedTx(int nReRequestedTx);
     void UpdateMempoolLimiterBytesSaved(unsigned int nBytesSaved);
+    void UpdateThinBlock(uint64_t nThinBlockSize);
+    void UpdateFullTx(uint64_t nFullTxSize);
     std::string ToString();
     std::string InBoundPercentToString();
     std::string OutBoundPercentToString();
@@ -217,6 +223,8 @@ public:
     std::string ValidationTimeToString();
     std::string ReRequestedTxToString();
     std::string MempoolLimiterBytesSavedToString();
+    std::string ThinBlockToString();
+    std::string FullTxToString();
 
     bool CheckThinblockTimer(uint256 hash);
     void ClearThinBlockTimer(uint256 hash);

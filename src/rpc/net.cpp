@@ -457,6 +457,8 @@ static UniValue GetThinBlockStats()
         obj.push_back(Pair("validation_time", thindata.ValidationTimeToString()));
         obj.push_back(Pair("outbound_bloom_filters", thindata.OutBoundBloomFiltersToString()));
         obj.push_back(Pair("inbound_bloom_filters", thindata.InBoundBloomFiltersToString()));
+        obj.push_back(Pair("thin_block_size", thindata.ThinBlockToString()));
+        obj.push_back(Pair("thin_full_tx", thindata.FullTxToString()));
         obj.push_back(Pair("rerequested", thindata.ReRequestedTxToString()));
     }
     return obj;
@@ -482,6 +484,7 @@ static UniValue GetGrapheneStats()
         obj.push_back(Pair("filter", graphenedata.FilterToString()));
         obj.push_back(Pair("iblt", graphenedata.IbltToString()));
         obj.push_back(Pair("rank", graphenedata.RankToString()));
+        obj.push_back(Pair("graphene_block_size", graphenedata.GrapheneBlockToString()));
         obj.push_back(Pair("rerequested", graphenedata.ReRequestedTxToString()));
     }
     return obj;

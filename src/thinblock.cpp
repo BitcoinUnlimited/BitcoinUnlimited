@@ -1053,6 +1053,20 @@ void CThinBlockData::UpdateMempoolLimiterBytesSaved(unsigned int nBytesSaved)
     nMempoolLimiterBytesSaved += nBytesSaved;
 }
 
+void CThinBlockData::UpdateThinBlock(uint64_t nThinBlockSize)
+{
+    LOCK(cs_thinblockstats);
+    nTotalThinBlockBytes += nThinBlockSize;
+    updateStats(mapThinBlock, nThinBlockSize);
+}
+
+void CThinBlockData::UpdateFullTx(uint64_t nFullTxSize)
+{
+    LOCK(cs_thinblockstats);
+    nTotalThinBlockBytes += nFullTxSize;
+    updateStats(mapFullTx, nFullTxSize);
+}
+
 std::string CThinBlockData::ToString()
 {
     LOCK(cs_thinblockstats);
@@ -1253,6 +1267,26 @@ std::string CThinBlockData::MempoolLimiterBytesSavedToString()
     double size = (double)nMempoolLimiterBytesSaved();
     std::ostringstream ss;
     ss << "Thinblock mempool limiting has saved " << formatInfoUnit(size) << " of bandwidth";
+    return ss.str();
+}
+
+// Calculate the average xthin block size
+std::string CThinBlockData::ThinBlockToString()
+{
+    LOCK(cs_thinblockstats);
+    double avgThinBlockSize = average(mapThinBlock);
+    std::ostringstream ss;
+    ss << "Thinblock size (last 24hrs) AVG: " << formatInfoUnit(avgThinBlockSize);
+    return ss.str();
+}
+
+// Calculate the average size of all full txs sent with block
+std::string CThinBlockData::FullTxToString()
+{
+    LOCK(cs_thinblockstats);
+    double avgFullTxSize = average(mapFullTx);
+    std::ostringstream ss;
+    ss << "Thinblock full transactions size (last 24hrs) AVG: " << formatInfoUnit(avgFullTxSize);
     return ss.str();
 }
 
@@ -1541,6 +1575,8 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
                 LOG(THIN, "Sent xthinblock - size: %d vs block size: %d => tx hashes: %d transactions: %d peer: %s\n",
                     nSizeThinBlock, nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(),
                     pfrom->GetLogName());
+                thindata.UpdateThinBlock(nSizeThinBlock);
+                thindata.UpdateFullTx(::GetSerializeSize(xThinBlock.vMissingTx, SER_NETWORK, PROTOCOL_VERSION));
             }
             else
             {

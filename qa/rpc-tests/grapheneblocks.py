@@ -21,6 +21,7 @@ class GrapheneBlockTest(BitcoinTestFramework):
                       "filter",
                       "iblt",
                       "rank",
+                      "graphene_block_size",
                       "rerequested"}
     def __init__(self):
         self.rep = False

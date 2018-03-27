@@ -162,6 +162,7 @@ private:
     CStatHistory<uint64_t> nTotalFilterBytes;
     CStatHistory<uint64_t> nTotalIbltBytes;
     CStatHistory<uint64_t> nTotalRankBytes;
+    CStatHistory<uint64_t> nTotalGrapheneBlockBytes;
     std::map<int64_t, std::pair<uint64_t, uint64_t> > mapGrapheneBlocksInBound;
     std::map<int64_t, std::pair<uint64_t, uint64_t> > mapGrapheneBlocksOutBound;
     std::map<int64_t, uint64_t> mapMemPoolInfoOutBound;
@@ -169,6 +170,7 @@ private:
     std::map<int64_t, uint64_t> mapFilter;
     std::map<int64_t, uint64_t> mapIblt;
     std::map<int64_t, uint64_t> mapRank;
+    std::map<int64_t, uint64_t> mapGrapheneBlock;
     std::map<int64_t, double> mapGrapheneBlockResponseTime;
     std::map<int64_t, double> mapGrapheneBlockValidationTime;
     std::map<int64_t, int> mapGrapheneBlocksInBoundReRequestedTx;
@@ -204,6 +206,7 @@ public:
     void UpdateFilter(uint64_t nFilterSize);
     void UpdateIblt(uint64_t nIbltSize);
     void UpdateRank(uint64_t nRankSize);
+    void UpdateGrapheneBlock(uint64_t nRankSize);
     void UpdateResponseTime(double nResponseTime);
     void UpdateValidationTime(double nValidationTime);
     void UpdateInBoundReRequestedTx(int nReRequestedTx);
@@ -216,6 +219,7 @@ public:
     std::string FilterToString();
     std::string IbltToString();
     std::string RankToString();
+    std::string GrapheneBlockToString();
     std::string ResponseTimeToString();
     std::string ValidationTimeToString();
     std::string ReRequestedTxToString();
