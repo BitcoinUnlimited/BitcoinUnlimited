@@ -617,6 +617,8 @@ void CRequestManager::SendRequests()
 
                     if (fBatchBlockRequests)
                     {
+                        // Add a node ref if we haven't already added a map entry for this node.
+                        if (mapBatchBlockRequests.find(next.node) == mapBatchBlockRequests.end())
                         {
                             LOCK(cs_vNodes);
                             next.node->AddRef();
@@ -765,6 +767,8 @@ void CRequestManager::SendRequests()
                             item.outstandingReqs++;
                             item.lastRequestTime = now;
 
+                            // Add a node ref if we haven't already added a map entry for this node.
+                            if (mapBatchTxnRequests.find(next.node) == mapBatchTxnRequests.end())
                             {
                                 LOCK(cs_vNodes);
                                 next.node->AddRef();
@@ -782,12 +786,11 @@ void CRequestManager::SendRequests()
                                 }
                                 ENTER_CRITICAL_SECTION(cs_objDownloader);
 
-                                LOCK(cs_vNodes);
-                                for (size_t i = 0; i < mapBatchTxnRequests[next.node].size(); i++)
+                                mapBatchTxnRequests.erase(next.node);
                                 {
+                                    LOCK(cs_vNodes);
                                     next.node->Release();
                                 }
-                                mapBatchTxnRequests[next.node].clear();
                             }
                         }
 
