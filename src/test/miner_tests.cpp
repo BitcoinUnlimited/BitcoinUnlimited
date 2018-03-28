@@ -361,6 +361,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     }
     BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
     delete pblocktemplate;
+
     // Delete the dummy blocks again.
     while (chainActive.Tip()->nHeight > nHeight)
     {

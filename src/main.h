@@ -351,7 +351,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode);
 void PruneAndFlush();
 
 /** Check is Cash HF has activated. */
-bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev);
+bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev);
 
 /**
    Determine whether free transactions are subject to rate limiting. If -limitfreerelay is not zero then rate limiting
