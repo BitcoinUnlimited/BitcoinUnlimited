@@ -295,7 +295,6 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
 {
     switch (opcode)
     {
-    case OP_SPLIT:
     case OP_INVERT:
     case OP_2MUL:
     case OP_2DIV:
@@ -308,6 +307,7 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
         return true;
 
     case OP_CAT:
+    case OP_SPLIT:
     case OP_AND:
     case OP_OR:
     case OP_XOR:
@@ -1212,6 +1212,7 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                 }
                 break;
 
+
                 //
                 // Byte string operations
                 //
@@ -1233,6 +1234,33 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                 }
                 break;
 
+                case OP_SPLIT:
+                {
+                    // (in position -- x1 x2)
+                    if (stack.size() < 2)
+                    {
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                    }
+
+                    const valtype &data = stacktop(-2);
+
+                    // Make sure the split point is apropriate.
+                    uint64_t position = CScriptNum(stacktop(-1), fRequireMinimal).getint();
+                    if (position > data.size())
+                    {
+                        return set_error(serror, SCRIPT_ERR_INVALID_SPLIT_RANGE);
+                    }
+
+                    // Prepare the results in their own buffer as `data`
+                    // will be invalidated.
+                    valtype n1(data.begin(), data.begin() + position);
+                    valtype n2(data.begin() + position, data.end());
+
+                    // Replace existing stack values by the new values.
+                    stacktop(-2) = std::move(n1);
+                    stacktop(-1) = std::move(n2);
+                }
+                break;
 
                 //
                 // Conversion operations
