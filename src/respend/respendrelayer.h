@@ -8,6 +8,8 @@
 
 namespace respend
 {
+static const int64_t DEFAULT_LIMITRESPENDRELAY = 100;
+
 // Relays double spends to other peers so they also may detect the doublespend.
 class RespendRelayer : public RespendAction
 {
