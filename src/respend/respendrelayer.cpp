@@ -26,7 +26,7 @@ class RelayLimiter {
                                                    SER_NETWORK, PROTOCOL_VERSION);
 
             std::lock_guard<std::mutex> lock(cs);
-            int64_t limit = GetArg("-limitrespendrelay", 100);
+            int64_t limit = GetArg("-limitrespendrelay", DEFAULT_LIMITRESPENDRELAY);
             if (RateLimitExceeded(respendCount, lastRespendTime, limit, size)) {
                 LOG(RESPEND, "respend: Double-spend relay rejected by rate limiter\n");
                 return true;
