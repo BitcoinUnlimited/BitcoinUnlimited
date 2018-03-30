@@ -5,6 +5,7 @@
 #include "parallel.h"
 #include "chainparams.h"
 #include "dosman.h"
+#include "graphene.h"
 #include "net.h"
 #include "pow.h"
 #include "timedata.h"
@@ -531,13 +532,21 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     int64_t startTime = GetTimeMicros();
     CValidationState state;
 
-    // Indicate that the thinblock was fully received. At this point we have either a block or a fully reconstructed
-    // thinblock but we still need to maintain a mapThinBlocksInFlight entry so that we don't re-request a full block
+    // Indicate that the block was fully received. At this point we have either a block or a fully reconstructed
+    // graphene
+    // or thinblock but we still need to maintain a map*BlocksInFlight entry so that we don't re-request a full block
     // from the same node while the block is processing.
+    if (IsThinBlocksEnabled())
     {
         LOCK(pfrom->cs_mapthinblocksinflight);
         if (pfrom->mapThinBlocksInFlight.count(inv.hash))
             pfrom->mapThinBlocksInFlight[inv.hash].fReceived = true;
+    }
+    else if (IsGrapheneBlockEnabled())
+    {
+        LOCK(pfrom->cs_mapgrapheneblocksinflight);
+        if (pfrom->mapGrapheneBlocksInFlight.count(inv.hash))
+            pfrom->mapGrapheneBlocksInFlight[inv.hash].fReceived = true;
     }
 
 
@@ -590,21 +599,30 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
         LargestBlockSeen(nSizeBlock); // update largest block seen
 
         double nValidationTime = (double)(GetTimeMicros() - startTime) / 1000000.0;
-        if (strCommand != NetMsgType::BLOCK)
+        if ((strCommand != NetMsgType::BLOCK) && (IsThinBlocksEnabled() || IsGrapheneBlockEnabled()))
         {
-            LOG(THIN, "Processed Block %s reconstructed from (%s) in %.2f seconds, peer=%s\n", inv.hash.ToString(),
-                strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0, pfrom->GetLogName());
-            thindata.UpdateValidationTime(nValidationTime);
+            LOG(THIN | GRAPHENE, "Processed Block %s reconstructed from (%s) in %.2f seconds, peer=%s\n",
+                inv.hash.ToString(), strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0,
+                pfrom->GetLogName());
+
+            if (IsThinBlocksEnabled())
+                thindata.UpdateValidationTime(nValidationTime);
+            else if (IsGrapheneBlockEnabled())
+                graphenedata.UpdateValidationTime(nValidationTime);
         }
         else
-            LOG(THIN, "Processed Regular Block %s in %.2f seconds, peer=%s\n", inv.hash.ToString(),
+        {
+            LOG(THIN | GRAPHENE, "Processed Regular Block %s in %.2f seconds, peer=%s\n", inv.hash.ToString(),
                 (double)(GetTimeMicros() - startTime) / 1000000.0, pfrom->GetLogName());
+        }
     }
 
-    // When we request a thinblock we may get back a regular block if it is smaller than a thinblock
-    // Therefore we have to remove the thinblock in flight if it exists and we also need to check that
-    // the block didn't arrive from some other peer.  This code ALSO cleans up the thin block that
-    // was passed to us (&block), so do not use it after this.
+    // When we request a graphene or thin block we may get back a regular block if it is smaller than
+    // either of the former.  Therefore we have to remove the thin or graphene block in flight if it
+    // exists and we also need to check that the block didn't arrive from some other peer.  This code
+    // ALSO cleans up the graphene or thin block that was passed to us (&block), so do not use it after
+    // this.
+    if (IsThinBlocksEnabled())
     {
         int nTotalThinBlocksInFlight = 0;
         {
@@ -637,6 +655,40 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
             setUnVerifiedOrphanTxHash.clear();
         }
     }
+    else if (IsGrapheneBlockEnabled())
+    {
+        int nTotalGrapheneBlocksInFlight = 0;
+        {
+            LOCK2(cs_vNodes, pfrom->cs_mapgrapheneblocksinflight);
+
+            // Erase this graphene block from the tracking map now that we're done with it.
+            if (pfrom->mapGrapheneBlocksInFlight.count(inv.hash))
+            {
+                // Clear graphene block data and graphene block in flight
+                graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
+            }
+
+            // Count up any other remaining nodes with graphene blocks in flight.
+            BOOST_FOREACH (CNode *pnode, vNodes)
+            {
+                if (pnode->mapGrapheneBlocksInFlight.size() > 0)
+                    nTotalGrapheneBlocksInFlight++;
+            }
+            pfrom->firstBlock += 1; // update statistics, requires cs_vNodes
+        }
+
+        // When we no longer have any graphene blocks in flight then clear our any data
+        // just to make sure we don't somehow get growth over time.
+        if (nTotalGrapheneBlocksInFlight == 0)
+        {
+            graphenedata.ResetGrapheneBlockBytes();
+
+            LOCK(cs_xval);
+            setPreVerifiedTxHash.clear();
+            setUnVerifiedOrphanTxHash.clear();
+        }
+    }
+
 
     // Erase any txns from the orphan cache that are no longer needed
     PV->ClearOrphanCache(pblock);
