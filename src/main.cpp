@@ -534,6 +534,22 @@ bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *p
     return IsDAAEnabled(consensusparams, pindexPrev->nHeight);
 }
 
+static bool IsMonolithEnabled(const Consensus::Params &consensusparams, int64_t nMedianTimePast)
+{
+    return nMedianTimePast >= GetArg("-monolithactivationtime", consensusparams.may2018activationTime);
+}
+
+bool IsMonolithEnabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev)
+{
+    if (pindexPrev == nullptr)
+    {
+        return false;
+    }
+
+    return IsMonolithEnabled(consensusparams, pindexPrev->GetMedianTimePast());
+}
+
+
 bool AreFreeTxnsDisallowed()
 {
     if (GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY) > 0)
@@ -559,6 +575,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     uint64_t start = GetTimeMicros();
     AssertLockHeld(cs_main);
 
+    // After the May, 15 hard fork, we start accepting larger op_return.
+    const CChainParams &chainparams = Params();
+    const bool hasMonolith = IsMonolithEnabled(chainparams.GetConsensus(), chainActive.Tip());
+
     if (!CheckTransaction(tx, state))
         return false;
 
@@ -581,7 +601,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
     std::string reason;
-    const CChainParams &chainparams = Params();
     bool fRequireStandard = chainparams.RequireStandard();
     if (fRequireStandard && !IsStandardTx(tx, reason))
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
@@ -835,12 +854,18 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         size_t nLimitDescendantSize = GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
         std::string errString;
 
+        // Set extraFlags as a set of flags that needs to be activated.
+        uint32_t extraFlags = 0;
+        if (hasMonolith)
+        {
+            extraFlags |= SCRIPT_ENABLE_MONOLITH_OPCODES;
+        }
 
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         unsigned char sighashType = 0;
-        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true, &resourceTracker,
-                NULL, &sighashType))
+        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags | extraFlags, true,
+                &resourceTracker, nullptr, &sighashType))
         {
             LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", tx.GetHash().ToString().c_str());
             return false;
@@ -857,8 +882,8 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true, NULL, NULL,
-                &sighashType2))
+        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | forkVerifyFlags | extraFlags, true,
+                nullptr, nullptr, &sighashType2))
         {
             return error(
                 "%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
@@ -1329,7 +1354,9 @@ bool CheckInputs(const CTransaction &tx,
                 }
                 else if (!check())
                 {
-                    if (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS)
+                    const bool hasNonMandatoryFlags = (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
+                    const bool doesNotHaveMonolith = (flags & SCRIPT_ENABLE_MONOLITH_OPCODES) == 0;
+                    if (hasNonMandatoryFlags || doesNotHaveMonolith)
                     {
                         // Check whether the failure was caused by a
                         // non-mandatory script verification check, such as
@@ -1337,8 +1364,14 @@ bool CheckInputs(const CTransaction &tx,
                         // arguments; if so, don't trigger DoS protection to
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
-                        CScriptCheck check2(NULL, scriptPubKey, amount, tx, i,
-                            flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheStore);
+                        //
+                        // We also check activating the monolith opcodes as it is a
+                        // strictly additive change and we would not like to ban some of
+                        // our peer that are ahead of us and are considering the fork
+                        // as activated.
+                        CScriptCheck check2(nullptr, scriptPubKey, amount, tx, i,
+                            (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS) | SCRIPT_ENABLE_MONOLITH_OPCODES,
+                            cacheStore);
                         if (check2())
                             return state.Invalid(
                                 false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
@@ -1751,6 +1784,13 @@ static uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::
         flags |= SCRIPT_VERIFY_LOW_S;
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
+
+    // The monolith HF enable a set of opcodes.
+    if (IsMonolithEnabled(consensusparams, pindex->pprev))
+    {
+        flags |= SCRIPT_ENABLE_MONOLITH_OPCODES;
+    }
+
 
     return flags;
 }
@@ -2437,6 +2477,13 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     // Write the chain state to disk, if necessary.
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
+
+    // If this block enabled the monolith opcodes, then we need to
+    // clear the mempool of any transaction using them.
+    if (IsMonolithEnabled(consensusParams, pindexDelete) && !IsMonolithEnabled(consensusParams, pindexDelete->pprev))
+    {
+        mempool.clear();
+    }
 
     // Resurrect mempool transactions from the disconnected block but do not do this step if we are
     // rolling back the chain using the "rollbackchain" rpc command.
