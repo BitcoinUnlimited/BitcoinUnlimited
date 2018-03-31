@@ -299,8 +299,6 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
     case OP_2MUL:
     case OP_2DIV:
     case OP_MUL:
-    case OP_DIV:
-    case OP_MOD:
     case OP_LSHIFT:
     case OP_RSHIFT:
         // Disabled opcodes
@@ -313,6 +311,8 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
     case OP_XOR:
     case OP_NUM2BIN:
     case OP_BIN2NUM:
+    case OP_DIV:
+    case OP_MOD:
         // Opcodes that have been reenabled.
         if ((flags & SCRIPT_ENABLE_MONOLITH_OPCODES) == 0)
         {
@@ -916,6 +916,8 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
 
                 case OP_ADD:
                 case OP_SUB:
+                case OP_DIV:
+                case OP_MOD:
                 case OP_BOOLAND:
                 case OP_BOOLOR:
                 case OP_NUMEQUAL:
@@ -930,7 +932,9 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                 {
                     // (x1 x2 -- out)
                     if (stack.size() < 2)
+                    {
                         return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                    }
                     CScriptNum bn1(stacktop(-2), fRequireMinimal);
                     CScriptNum bn2(stacktop(-1), fRequireMinimal);
                     CScriptNum bn(0);
@@ -942,6 +946,24 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
 
                     case OP_SUB:
                         bn = bn1 - bn2;
+                        break;
+
+                    case OP_DIV:
+                        // denominator must not be 0
+                        if (bn2 == 0)
+                        {
+                            return set_error(serror, SCRIPT_ERR_DIV_BY_ZERO);
+                        }
+                        bn = bn1 / bn2;
+                        break;
+
+                    case OP_MOD:
+                        // divisor must not be 0
+                        if (bn2 == 0)
+                        {
+                            return set_error(serror, SCRIPT_ERR_MOD_BY_ZERO);
+                        }
+                        bn = bn1 % bn2;
                         break;
 
                     case OP_BOOLAND:
@@ -1348,7 +1370,6 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
     {
         return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
     }
-
     if (!vfExec.empty())
         return set_error(serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
 
