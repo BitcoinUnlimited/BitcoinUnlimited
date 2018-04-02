@@ -12,6 +12,7 @@
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/sign.h"
+#include "test/scriptflags.h"
 #include "test/test_bitcoin.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -36,9 +37,6 @@ using namespace std;
 // #define UPDATE_JSON_TESTS
 
 static const unsigned int flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID;
-
-unsigned int ParseScriptFlags(string strFlags);
-string FormatScriptFlags(unsigned int flags);
 
 UniValue read_json(const std::string &jsondata)
 {
