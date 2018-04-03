@@ -38,8 +38,7 @@ static void SetMaxOpenFiles(leveldb::Options *options)
         options->max_open_files = 64;
     }
 #endif
-    LogPrint(BCLog::LEVELDB, "LevelDB using max_open_files=%d (default=%d)\n",
-             options->max_open_files, default_open_files);
+    LOGA("LevelDB using max_open_files=%d (default=%d)\n", options->max_open_files, default_open_files);
 }
 
 static leveldb::Options GetOptions(size_t nCacheSize)
