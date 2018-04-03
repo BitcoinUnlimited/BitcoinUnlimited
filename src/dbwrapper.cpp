@@ -33,7 +33,7 @@ static void SetMaxOpenFiles(leveldb::Options *options)
 
     int default_open_files = options->max_open_files;
 #ifndef WIN32
-    if (sizeof(void*) < 8)
+    if (sizeof(void *) < 8)
     {
         options->max_open_files = 64;
     }
