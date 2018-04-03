@@ -58,6 +58,11 @@ class PortSeed:
 #then the mempools will not sync due to IBD.
 MOCKTIME = 0
 
+class NoConfigValue:
+    """ Use to remove the specific configure parameter and value when writing to bitcoin.conf"""
+    def __init__(self):
+        pass
+
 def enable_mocktime():
     # Set the mocktime to be after the Bitcoin Cash fork so
     # in normal tests blockchains the fork is in the past
@@ -176,7 +181,9 @@ def initialize_datadir(dirname, n,bitcoinConfDict=None,wallet=None):
 
     with open(os.path.join(datadir, "bitcoin.conf"), 'w') as f:
         for (key,val) in defaults.items():
-          if type(val) is type([]):
+          if isinstance(val, NoConfigValue):
+            pass
+          elif type(val) is type([]):
             for v in val:
               f.write("%s=%s\n" % (str(key), str(v)))
           else:
