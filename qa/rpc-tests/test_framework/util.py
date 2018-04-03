@@ -330,6 +330,8 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
         binary = os.getenv("BITCOIND", "bitcoind")
     # RPC tests still depend on free transactions
     args = [ binary, "-datadir="+datadir, "-rest", "-mocktime="+str(get_mocktime()) ] # // BU removed, "-keypool=1","-blockprioritysize=50000" ]
+    # need for some client and no harm to include for all; otherwise bitcoind starts on mainnet listening at port 8332
+    args.append("-conf="+ os.path.join(datadir, "bitcoin.conf"))
     if extra_args is not None: args.extend(extra_args)
     bitcoind_processes[i] = subprocess.Popen(args)
     if os.getenv("PYTHON_DEBUG", ""):
