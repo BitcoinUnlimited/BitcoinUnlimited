@@ -305,7 +305,7 @@ void PartitionCheck(bool (*initialDownloadCheck)(),
 std::string GetWarnings(const std::string &strFor);
 /** Retrieve a transaction (from memory pool, or from disk, if possible) */
 bool GetTransaction(const uint256 &hash,
-    CTransaction &tx,
+    CTransactionRef &tx,
     const Consensus::Params &params,
     uint256 &hashBlock,
     bool fAllowSlow = false);

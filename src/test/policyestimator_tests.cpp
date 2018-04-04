@@ -47,7 +47,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
     for (unsigned int i = 0; i < 128; i++)
         garbage.push_back('X');
     CMutableTransaction tx;
-    std::list<CTransaction> dummyConflicted;
+    std::list<CTransactionRef> dummyConflicted;
     tx.vin.resize(1);
     tx.vin[0].scriptSig = garbage;
     tx.vout.resize(1);
@@ -55,7 +55,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
     CFeeRate baseRate(basefee, ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION));
 
     // Create a fake block
-    std::vector<CTransaction> block;
+    std::vector<CTransactionRef> block;
     int blocknum = 0;
 
     // Loop through 200 blocks
@@ -82,12 +82,12 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
         {
             // 10/10 blocks add highest fee/pri transactions
             // 9/10 blocks add 2nd highest and so on until ...
-            // 1/10 blocks add lowest fee/pri transactions
+            // 1/10 blocks add lowest fee transactions
             while (txHashes[9 - h].size())
             {
-                CTransaction btx;
-                if (mpool.lookup(txHashes[9 - h].back(), btx))
-                    block.push_back(btx);
+                CTransactionRef ptx = mpool.get(txHashes[9 - h].back());
+                if (ptx)
+                    block.push_back(ptx);
                 txHashes[9 - h].pop_back();
             }
         }
@@ -186,9 +186,9 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
     {
         while (txHashes[j].size())
         {
-            CTransaction btx;
-            if (mpool.lookup(txHashes[j].back(), btx))
-                block.push_back(btx);
+            CTransactionRef ptx = mpool.get(txHashes[j].back());
+            if (ptx)
+                block.push_back(ptx);
             txHashes[j].pop_back();
         }
     }
@@ -215,9 +215,9 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
                                              .Priority(priV[k / 4][j])
                                              .Height(blocknum)
                                              .FromTx(tx, &mpool));
-                CTransaction btx;
-                if (mpool.lookup(hash, btx))
-                    block.push_back(btx);
+                CTransactionRef ptx = mpool.get(hash);
+                if (ptx)
+                    block.push_back(ptx);
             }
         }
         mpool.removeForBlock(block, ++blocknum, dummyConflicted);

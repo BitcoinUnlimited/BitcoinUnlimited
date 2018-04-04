@@ -90,7 +90,7 @@ TestChain100Setup::TestChain100Setup() : TestingSetup(CBaseChainParams::REGTEST)
     {
         std::vector<CMutableTransaction> noTxns;
         CBlock b = CreateAndProcessBlock(noTxns, scriptPubKey);
-        coinbaseTxns.push_back(b.vtx[0]);
+        coinbaseTxns.push_back(*b.vtx[0]);
     }
 }
 
@@ -107,8 +107,9 @@ CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransa
 
     // Replace mempool-selected txns with just coinbase plus passed-in txns:
     block.vtx.resize(1);
-    BOOST_FOREACH (const CMutableTransaction &tx, txns)
-        block.vtx.push_back(tx);
+    for (const CMutableTransaction &tx : txns)
+        block.vtx.push_back(MakeTransactionRef(tx));
+
     // IncrementExtraNonce creates a valid coinbase and merkleRoot
     unsigned int extraNonce = 0;
     IncrementExtraNonce(&block, extraNonce);
@@ -125,10 +126,15 @@ CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransa
 }
 
 TestChain100Setup::~TestChain100Setup() {}
-CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(CMutableTransaction &tx, CTxMemPool *pool)
+CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CMutableTransaction &tx, CTxMemPool *pool)
 {
     CTransaction txn(tx);
-    bool hasNoDependencies = pool ? pool->HasNoInputsOf(tx) : hadNoDependencies;
+    return FromTx(txn, pool);
+}
+
+CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction &txn, CTxMemPool *pool)
+{
+    bool hasNoDependencies = pool ? pool->HasNoInputsOf(txn) : hadNoDependencies;
     // Hack to assume either its completely dependent on other mempool txs or not at all
     CAmount inChainValue = hasNoDependencies ? txn.GetValueOut() : 0;
 

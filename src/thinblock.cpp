@@ -34,7 +34,7 @@ CThinBlock::CThinBlock(const CBlock &block, CBloomFilter &filter)
     vTxHashes.reserve(nTx);
     for (unsigned int i = 0; i < nTx; i++)
     {
-        const uint256 &hash = block.vtx[i].GetHash();
+        const uint256 &hash = block.vtx[i]->GetHash();
         vTxHashes.push_back(hash);
 
         // Find the transactions that do not match the filter.
@@ -42,7 +42,7 @@ CThinBlock::CThinBlock(const CBlock &block, CBloomFilter &filter)
         // NOTE: We always add the first tx, the coinbase as it is the one
         //       most often missing.
         if (!filter.contains(hash) || i == 0)
-            vMissingTx.push_back(block.vtx[i]);
+            vMissingTx.push_back(*block.vtx[i]);
     }
 }
 
@@ -228,7 +228,7 @@ CXThinBlock::CXThinBlock(const CBlock &block, CBloomFilter *filter)
     std::set<uint64_t> setPartialTxHash;
     for (unsigned int i = 0; i < nTx; i++)
     {
-        const uint256 hash256 = block.vtx[i].GetHash();
+        const uint256 hash256 = block.vtx[i]->GetHash();
         uint64_t cheapHash = hash256.GetCheapHash();
         vTxHashes.push_back(cheapHash);
 
@@ -241,7 +241,7 @@ CXThinBlock::CXThinBlock(const CBlock &block, CBloomFilter *filter)
         // NOTE: We always add the first tx, the coinbase as it is the one
         //       most often missing.
         if ((filter && !filter->contains(hash256)) || i == 0)
-            vMissingTx.push_back(block.vtx[i]);
+            vMissingTx.push_back(*block.vtx[i]);
     }
 }
 
@@ -257,7 +257,7 @@ CXThinBlock::CXThinBlock(const CBlock &block)
     LOCK(cs_orphancache);
     for (unsigned int i = 0; i < nTx; i++)
     {
-        const uint256 hash256 = block.vtx[i].GetHash();
+        const uint256 hash256 = block.vtx[i]->GetHash();
         uint64_t cheapHash = hash256.GetCheapHash();
         vTxHashes.push_back(cheapHash);
 
@@ -268,12 +268,12 @@ CXThinBlock::CXThinBlock(const CBlock &block)
         // if it is missing from this node, then add it to the thin block
         if (!((mempool.exists(hash256)) || (mapOrphanTransactions.find(hash256) != mapOrphanTransactions.end())))
         {
-            vMissingTx.push_back(block.vtx[i]);
+            vMissingTx.push_back(*block.vtx[i]);
         }
         // We always add the first tx, the coinbase as it is the one
         // most often missing.
         else if (i == 0)
-            vMissingTx.push_back(block.vtx[i]);
+            vMissingTx.push_back(*block.vtx[i]);
     }
 }
 
@@ -502,9 +502,9 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             {
                 for (unsigned int i = 0; i < block.vtx.size(); i++)
                 {
-                    uint64_t cheapHash = block.vtx[i].GetHash().GetCheapHash();
+                    uint64_t cheapHash = block.vtx[i]->GetHash().GetCheapHash();
                     if (thinRequestBlockTx.setCheapHashesToRequest.count(cheapHash))
-                        vTx.push_back(block.vtx[i]);
+                        vTx.push_back(*block.vtx[i]);
                 }
             }
         }
@@ -925,7 +925,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         }
 
         // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct ordering.
-        pfrom->thinBlock.vtx.push_back(tx);
+        pfrom->thinBlock.vtx.push_back(MakeTransactionRef(std::move(tx)));
     }
     return true;
 }

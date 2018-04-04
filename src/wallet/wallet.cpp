@@ -1316,9 +1316,9 @@ int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
             CBlock block;
             ReadBlockFromDisk(block, pindex, Params().GetConsensus());
             int txIdx = 0;
-            BOOST_FOREACH (CTransaction &tx, block.vtx)
+            for (const auto &tx : block.vtx)
             {
-                if (AddToWalletIfInvolvingMe(tx, &block, fUpdate, txIdx))
+                if (AddToWalletIfInvolvingMe(*tx, &block, fUpdate, txIdx))
                     ret++;
                 txIdx++;
             }
@@ -3473,7 +3473,7 @@ int CMerkleTx::SetMerkleBranch(const CBlock &block, int txIdx)
     else
     {
         // Locate the transaction
-        nIndex = block.find(((CTransaction *)this)->GetHash());
+        nIndex = block.find(((CTransactionRef) this)->GetHash());
         if (nIndex == -1)
         {
             LOGA("ERROR: SetMerkleBranch(): couldn't find tx in block\n");

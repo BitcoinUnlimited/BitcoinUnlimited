@@ -24,11 +24,11 @@ std::vector<unsigned char> invalidOpReturn =
 bool ValidateUAHFBlock(const CBlock &block, CValidationState &state, int nHeight)
 {
     // Validate transactions are HF compatible
-    for (const CTransaction &tx : block.vtx)
+    for (auto &tx : block.vtx)
     {
         int sunsetHeight =
             (Params().NetworkIDString() == "testnet") ? TESTNET_REQ_6_1_SUNSET_HEIGHT : REQ_6_1_SUNSET_HEIGHT;
-        if ((nHeight <= sunsetHeight) && IsTxOpReturnInvalid(tx))
+        if ((nHeight <= sunsetHeight) && IsTxOpReturnInvalid(*tx))
             return state.DoS(
                 100, error("transaction is invalid on UAHF cash chain"), REJECT_INVALID, "bad-txns-wrong-fork");
     }
