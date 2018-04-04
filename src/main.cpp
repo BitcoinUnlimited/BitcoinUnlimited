@@ -2096,7 +2096,7 @@ bool ConnectBlock(const CBlock &block,
         if (!control.Wait())
         {
             // if we end up here then the signature verification failed and we must re-lock cs_main before returning.
-            return state.DoS(100, false);
+            return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs", false, "parallel script check failed");
         }
         if (PV->QuitReceived(this_id, fParallel))
         {

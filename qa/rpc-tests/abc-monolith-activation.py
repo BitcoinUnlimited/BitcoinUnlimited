@@ -13,7 +13,7 @@ from test_framework.blocktools import *
 from test_framework.script import *
 
 # far into the future
-MONOLITH_START_TIME = 2000000000
+MONOLITH_START_TIME = 1526400000
 
 # Error due to invalid opcodes
 DISABLED_OPCODE_ERROR = b'non-mandatory-script-verify-flag (Attempted to use a disabled opcode)'
@@ -30,8 +30,10 @@ class PreviousSpendableOutput():
 
 class MonolithActivationTest(ComparisonTestFramework):
 
-    def set_test_params(self):
+    def __init__(self):
         self.num_nodes = 1
+
+    def set_test_params(self):
         self.setup_clean_chain = True
         self.extra_args = [['-whitelist=127.0.0.1',
                             "-monolithactivationtime=%d" % MONOLITH_START_TIME,
@@ -49,11 +51,12 @@ class MonolithActivationTest(ComparisonTestFramework):
         tx.vout = []
         for _ in range(count):
             tx.vout.append(CTxOut(value, CScript([OP_1, OP_1, OP_AND])))
-        tx_signed = node.signrawtransaction(ToHex(tx))["hex"]
+        tx_signed = node.signrawtransaction(ToHex(tx),None,None,"ALL|FORKID")["hex"]
         return tx_signed
 
     def run_test(self):
         self.test = TestManager(self, self.options.tmpdir)
+        print ("num nodes is " + str(len(self.nodes)))
         self.test.add_all_connections(self.nodes)
         # Start up network handling in another thread
         NetworkThread().start()
@@ -91,7 +94,7 @@ class MonolithActivationTest(ComparisonTestFramework):
             return tx
 
         # Check that large opreturn are not accepted yet.
-        self.log.info("Try to use the monolith opcodes before activation")
+        print("Try to use the monolith opcodes before activation")
 
         tx0 = spend_and()
         tx0_hex = ToHex(tx0)
@@ -99,7 +102,7 @@ class MonolithActivationTest(ComparisonTestFramework):
                                 node.sendrawtransaction, tx0_hex)
 
         # Push MTP forward just before activation.
-        self.log.info("Pushing MTP just before the activation and check again")
+        print("Pushing MTP just before the activation and check again")
         node.setmocktime(MONOLITH_START_TIME)
 
         # returns a test case that asserts that the current tip was accepted
@@ -145,24 +148,31 @@ class MonolithActivationTest(ComparisonTestFramework):
 
         b = next_block(MONOLITH_START_TIME + 6)
         add_tx(b, tx0)
-        yield rejected(b, RejectResult(16, b'blk-bad-inputs'))
+        # In this next step we don't check the reason code for the expected failure because of timing we
+        # can not be sure whether checking the block will fail on signature validation or validation during
+        # checkinputs. We can only be certain that we must have a failure.
+        yield rejected(b)
 
-        self.log.info("Activates the new opcodes")
+        print("Activates the new opcodes")
         fork_block = next_block(MONOLITH_START_TIME + 6)
         yield accepted(fork_block)
 
         assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'],
                      MONOLITH_START_TIME)
 
-        tx0id = node.sendrawtransaction(tx0_hex)
+        tx_hex = self.create_and_tx(25)
+        tx0id = node.sendrawtransaction(tx_hex)
+
         assert(tx0id in set(node.getrawmempool()))
 
         # Transactions can also be included in blocks.
         monolithblock = next_block(MONOLITH_START_TIME + 7)
+        tx0 = FromHex(CTransaction(), tx_hex)
+        tx0.rehash()
         add_tx(monolithblock, tx0)
         yield accepted(monolithblock)
 
-        self.log.info("Cause a reorg that deactivate the monolith opcodes")
+        print("Cause a reorg that deactivate the monolith opcodes")
 
         # Invalidate the monolith block, ensure tx0 gets back to the mempool.
         assert(tx0id not in set(node.getrawmempool()))
