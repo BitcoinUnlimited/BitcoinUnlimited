@@ -534,19 +534,19 @@ bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *p
     return IsDAAEnabled(consensusparams, pindexPrev->nHeight);
 }
 
-static bool IsMonolithEnabled(const Consensus::Params &consensusparams, int64_t nMedianTimePast)
+static bool IsMay152018Enabled(const Consensus::Params &consensusparams, int64_t nMedianTimePast)
 {
-    return nMedianTimePast >= GetArg("-monolithactivationtime", consensusparams.may2018activationTime);
+    return nMedianTimePast >= (int64_t)miningForkTime.value;
 }
 
-bool IsMonolithEnabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev)
+bool IsMay152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev)
 {
     if (pindexPrev == nullptr)
     {
         return false;
     }
 
-    return IsMonolithEnabled(consensusparams, pindexPrev->GetMedianTimePast());
+    return IsMay152018Enabled(consensusparams, pindexPrev->GetMedianTimePast());
 }
 
 
@@ -577,7 +577,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
     // After the May, 15 hard fork, we start accepting larger op_return.
     const CChainParams &chainparams = Params();
-    const bool hasMonolith = IsMonolithEnabled(chainparams.GetConsensus(), chainActive.Tip());
+    const bool hasMay152018 = IsMay152018Enabled(chainparams.GetConsensus(), chainActive.Tip());
 
     if (!CheckTransaction(tx, state))
         return false;
@@ -856,9 +856,9 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
         // Set extraFlags as a set of flags that needs to be activated.
         uint32_t extraFlags = 0;
-        if (hasMonolith)
+        if (hasMay152018)
         {
-            extraFlags |= SCRIPT_ENABLE_MONOLITH_OPCODES;
+            extraFlags |= SCRIPT_ENABLE_MAY152018_OPCODES;
         }
 
         // Check against previous transactions
@@ -1355,8 +1355,8 @@ bool CheckInputs(const CTransaction &tx,
                 else if (!check())
                 {
                     const bool hasNonMandatoryFlags = (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
-                    const bool doesNotHaveMonolith = (flags & SCRIPT_ENABLE_MONOLITH_OPCODES) == 0;
-                    if (hasNonMandatoryFlags || doesNotHaveMonolith)
+                    const bool doesNotHaveMay152018 = (flags & SCRIPT_ENABLE_MAY152018_OPCODES) == 0;
+                    if (hasNonMandatoryFlags || doesNotHaveMay152018)
                     {
                         // Check whether the failure was caused by a
                         // non-mandatory script verification check, such as
@@ -1365,12 +1365,12 @@ bool CheckInputs(const CTransaction &tx,
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
                         //
-                        // We also check activating the monolith opcodes as it is a
+                        // We also check activating the may152018 opcodes as it is a
                         // strictly additive change and we would not like to ban some of
                         // our peer that are ahead of us and are considering the fork
                         // as activated.
                         CScriptCheck check2(nullptr, scriptPubKey, amount, tx, i,
-                            (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS) | SCRIPT_ENABLE_MONOLITH_OPCODES,
+                            (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS) | SCRIPT_ENABLE_MAY152018_OPCODES,
                             cacheStore);
                         if (check2())
                             return state.Invalid(
@@ -1785,10 +1785,10 @@ static uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
 
-    // The monolith HF enable a set of opcodes.
-    if (IsMonolithEnabled(consensusparams, pindex->pprev))
+    // The May 15, 2018 HF enable a set of opcodes.
+    if (IsMay152018Enabled(consensusparams, pindex->pprev))
     {
-        flags |= SCRIPT_ENABLE_MONOLITH_OPCODES;
+        flags |= SCRIPT_ENABLE_MAY152018_OPCODES;
     }
 
 
@@ -2478,9 +2478,9 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
 
-    // If this block enabled the monolith opcodes, then we need to
+    // If this block enabled the may152018 opcodes, then we need to
     // clear the mempool of any transaction using them.
-    if (IsMonolithEnabled(consensusParams, pindexDelete) && !IsMonolithEnabled(consensusParams, pindexDelete->pprev))
+    if (IsMay152018Enabled(consensusParams, pindexDelete) && !IsMay152018Enabled(consensusParams, pindexDelete->pprev))
     {
         mempool.clear();
     }

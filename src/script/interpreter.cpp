@@ -314,7 +314,7 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
     case OP_DIV:
     case OP_MOD:
         // Opcodes that have been reenabled.
-        if ((flags & SCRIPT_ENABLE_MONOLITH_OPCODES) == 0)
+        if ((flags & SCRIPT_ENABLE_MAY152018_OPCODES) == 0)
         {
             return true;
         }

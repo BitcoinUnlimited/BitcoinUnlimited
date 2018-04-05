@@ -103,7 +103,7 @@ enum
 
     // Enable new opcodes.
     //
-    SCRIPT_ENABLE_MONOLITH_OPCODES = (1U << 18),
+    SCRIPT_ENABLE_MAY152018_OPCODES = (1U << 18),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);

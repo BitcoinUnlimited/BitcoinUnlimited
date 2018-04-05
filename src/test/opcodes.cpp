@@ -17,7 +17,7 @@ typedef std::vector<valtype> stacktype;
 std::array<uint32_t, 3> flagset{0, STANDARD_SCRIPT_VERIFY_FLAGS,
                                 MANDATORY_SCRIPT_VERIFY_FLAGS};
 
-BOOST_FIXTURE_TEST_SUITE(monolith_opcodes_tests, BasicTestingSetup)
+BOOST_FIXTURE_TEST_SUITE(may152018_opcodes_tests, BasicTestingSetup)
 
 /**
  * General utility functions to check for script passing/failing.
@@ -31,12 +31,12 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack,
         ScriptError err = SCRIPT_ERR_OK;
         stacktype stack{original_stack};
         bool r =
-            EvalScript(stack, script, flags | SCRIPT_ENABLE_MONOLITH_OPCODES,
+            EvalScript(stack, script, flags | SCRIPT_ENABLE_MAY152018_OPCODES,
                        sigchecker, &err);
         BOOST_CHECK(r);
         BOOST_CHECK(stack == expected);
 
-        // Make sure that if we do not pass the monolith flag, opcodes are still
+        // Make sure that if we do not pass the may152018 flag, opcodes are still
         // disabled.
         stack = original_stack;
         r = EvalScript(stack, script, flags, sigchecker, &err);
@@ -50,12 +50,12 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
     BaseSignatureChecker sigchecker;
     ScriptError err = SCRIPT_ERR_OK;
     stacktype stack{original_stack};
-    bool r = EvalScript(stack, script, flags | SCRIPT_ENABLE_MONOLITH_OPCODES,
+    bool r = EvalScript(stack, script, flags | SCRIPT_ENABLE_MAY152018_OPCODES,
                         sigchecker, &err);
     BOOST_CHECK(!r);
     BOOST_CHECK_EQUAL(err, expected_error);
 
-    // Make sure that if we do not pass the monolith flag, opcodes are still
+    // Make sure that if we do not pass the may152018 flag, opcodes are still
     // disabled.
     stack = original_stack;
     r = EvalScript(stack, script, flags, sigchecker, &err);
