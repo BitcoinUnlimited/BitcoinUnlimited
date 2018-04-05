@@ -127,6 +127,11 @@ protected:
     bool RequestBlock(CNode *pfrom, CInv obj);
 
 public:
+    // map that tracks current blocks in flight.  Still using cs_main to protect this and is used
+    // in MarkBlockAsInflight and MarkBlockAsReceived.  This is not ideal to still use cs_main here
+    // but is really just temporary as we move more functionality into the request manager.
+    std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
+
     // Number of peers from which we're downloading blocks.
     int nPeersWithValidatedDownloads = 0;
 
@@ -156,6 +161,9 @@ public:
 
     // Indicate that getting this object was rejected
     void Rejected(const CInv &obj, CNode *from, unsigned char reason = 0);
+
+    // Resets the last request time to zero when a node disconnects and has blocks in flight.
+    void ResetLastRequestTime(const uint256 &hash);
 
     void SendRequests();
 

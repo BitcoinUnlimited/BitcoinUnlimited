@@ -81,7 +81,6 @@ proxyType nameProxy;
 CCriticalSection cs_proxyInfos;
 
 // moved from main.cpp (now part of nodestate.h)
-std::map<uint256, pair<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
 std::map<NodeId, CNodeState> mapNodeState;
 
 set<uint256> setPreVerifiedTxHash;
