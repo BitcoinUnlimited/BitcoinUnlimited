@@ -1,3 +1,4 @@
+#include "bloom.h"
 #include "graphene_set.h"
 #include "hash.h"
 #include "serialize.h"
@@ -6,6 +7,7 @@
 
 #include <boost/test/unit_test.hpp>
 #include <cassert>
+#include <cmath>
 #include <iostream>
 
 BOOST_FIXTURE_TEST_SUITE(graphene_tests, BasicTestingSetup)
@@ -48,6 +50,40 @@ BOOST_AUTO_TEST_CASE(graphene_set_encodes_and_decodes)
         BOOST_CHECK_EQUAL_COLLECTIONS(reconciledCheapHashes.begin(), reconciledCheapHashes.end(),
             senderCheapHashes.begin(), senderCheapHashes.end());
     }
+}
+
+BOOST_AUTO_TEST_CASE(graphene_set_finds_optimal_settings)
+{
+    const int SERIALIZATION_OVERHEAD = 10;
+    FastRandomContext insecure_rand(true);
+    CGrapheneSet grapheneSet;
+
+    int m = 5000;
+    int mu = 2999;
+    int n = 3000;
+
+    auto fpr = [m, mu](int a) { return a / float(m - mu); };
+
+    int best_a = 1;
+    size_t best_size = std::numeric_limits<size_t>::max();
+    int a = 1;
+    for (a = 1; a < m - mu; a++)
+    {
+        CBloomFilter filter(n, fpr(a), insecure_rand.rand32(), BLOOM_UPDATE_ALL, std::numeric_limits<uint32_t>::max());
+        CIblt iblt(a, IBLT_VALUE_SIZE);
+
+        size_t filterBytes = ::GetSerializeSize(filter, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
+        size_t ibltBytes = ::GetSerializeSize(iblt, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
+        size_t total = filterBytes + ibltBytes;
+
+        if (total < best_size)
+        {
+            best_size = total;
+            best_a = a;
+        }
+    }
+
+    BOOST_CHECK_EQUAL(grapheneSet.OptimalSymDiff(n, m), best_a);
 }
 
 BOOST_AUTO_TEST_CASE(graphene_set_can_serde)

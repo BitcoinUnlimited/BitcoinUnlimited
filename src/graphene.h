@@ -251,7 +251,6 @@ void AddGrapheneBlockInFlight(CNode *pfrom, uint256 hash);
 void SendGrapheneBlock(CBlock &block, CNode *pfrom, const CInv &inv);
 bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header);
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);
-double OptimalSymDiff(uint64_t nBlockTxs, uint64_t nReceiverMemPoolTx);
 CMemPoolInfo GetGrapheneMempoolInfo();
 uint256 GetSalt(unsigned char seed);
 

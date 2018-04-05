@@ -102,13 +102,20 @@ void CIblt::resize(size_t _expectedNumEntries, size_t _valueSize)
 
     CIblt::valueSize = _valueSize;
 
+    // The actual number of entries, N, must be scaled up by 3/2 (overhead
+    // paramter) and subsequently be divisible by N_HASH. This is equivalent to
+    // requiring that N be divisible by 2*N_HASH as shown below.
+    //
+    // (3/2)*N = 0 (mod N_HASH) <=> 3*N = 0 (mod 2*N_HASH) => N = 0 (mod 2*N_HASH)
+    //
+    // where the last step follows from the fact that 3 and N_HASH are always coprime.
+    size_t divisible = 2 * N_HASH * ceil(_expectedNumEntries / (2.0 * N_HASH));
+
     // 1.5x expectedNumEntries gives very low probability of
     // decoding failure
-    size_t nEntries = _expectedNumEntries + _expectedNumEntries / 2;
-    // ... make nEntries exactly divisible by N_HASH
-    while (N_HASH * (nEntries / N_HASH) != nEntries)
-        ++nEntries;
-    hashTable.resize(nEntries);
+    size_t N = divisible + divisible / 2;
+
+    hashTable.resize(N);
 }
 
 void CIblt::_insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> v)

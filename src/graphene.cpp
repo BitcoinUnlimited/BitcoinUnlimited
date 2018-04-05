@@ -1463,17 +1463,6 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
     return true;
 }
 
-
-double OptimalSymDiff(uint64_t nBlockTxs, uint64_t receiverMemPoolInfo)
-{
-    // This is the "a" parameter from the graphene paper
-    double symDiff = nBlockTxs / (BLOOM_OVERHEAD_FACTOR * IBLT_OVERHEAD_FACTOR);
-
-    assert(symDiff > 0.0);
-
-    return symDiff;
-}
-
 CMemPoolInfo GetGrapheneMempoolInfo()
 {
     LOCK(cs_main);
