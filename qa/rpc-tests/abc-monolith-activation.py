@@ -56,7 +56,6 @@ class MonolithActivationTest(ComparisonTestFramework):
 
     def run_test(self):
         self.test = TestManager(self, self.options.tmpdir)
-        print ("num nodes is " + str(len(self.nodes)))
         self.test.add_all_connections(self.nodes)
         # Start up network handling in another thread
         NetworkThread().start()
@@ -94,7 +93,7 @@ class MonolithActivationTest(ComparisonTestFramework):
             return tx
 
         # Check that large opreturn are not accepted yet.
-        print("Try to use the monolith opcodes before activation")
+        logging.info("Try to use the monolith opcodes before activation")
 
         tx0 = spend_and()
         tx0_hex = ToHex(tx0)
@@ -102,7 +101,7 @@ class MonolithActivationTest(ComparisonTestFramework):
                                 node.sendrawtransaction, tx0_hex)
 
         # Push MTP forward just before activation.
-        print("Pushing MTP just before the activation and check again")
+        logging.info("Pushing MTP just before the activation and check again")
         node.setmocktime(MONOLITH_START_TIME)
 
         # returns a test case that asserts that the current tip was accepted
@@ -153,7 +152,7 @@ class MonolithActivationTest(ComparisonTestFramework):
         # checkinputs. We can only be certain that we must have a failure.
         yield rejected(b)
 
-        print("Activates the new opcodes")
+        logging.info("Activates the new opcodes")
         fork_block = next_block(MONOLITH_START_TIME + 6)
         yield accepted(fork_block)
 
@@ -172,7 +171,7 @@ class MonolithActivationTest(ComparisonTestFramework):
         add_tx(monolithblock, tx0)
         yield accepted(monolithblock)
 
-        print("Cause a reorg that deactivate the monolith opcodes")
+        logging.info("Cause a reorg that deactivate the monolith opcodes")
 
         # Invalidate the monolith block, ensure tx0 gets back to the mempool.
         assert(tx0id not in set(node.getrawmempool()))
