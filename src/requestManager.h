@@ -106,7 +106,8 @@ protected:
     typedef std::map<uint256, CUnknownObj> OdMap;
     OdMap mapTxnInfo;
     OdMap mapBlkInfo;
-    CCriticalSection cs_objDownloader; // protects mapTxnInfo and mapBlkInfo
+    std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
+    CCriticalSection cs_objDownloader; // protects mapTxnInfo, mapBlkInfo and mapBlocksInFlight
 
     OdMap::iterator sendIter;
     OdMap::iterator sendBlkIter;
@@ -127,11 +128,6 @@ protected:
     bool RequestBlock(CNode *pfrom, CInv obj);
 
 public:
-    // map that tracks current blocks in flight.  Still using cs_main to protect this and is used
-    // in MarkBlockAsInflight and MarkBlockAsReceived.  This is not ideal to still use cs_main here
-    // but is really just temporary as we move more functionality into the request manager.
-    std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
-
     // Number of peers from which we're downloading blocks.
     int nPeersWithValidatedDownloads = 0;
 
@@ -185,6 +181,23 @@ public:
 
     // Returns a bool if successful in indicating we received this block.
     bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode);
+
+    // Methods for handling mapBlocksInFlight which is protected.
+    void MapBlocksInFlightErase(const uint256 &hash)
+    {
+        LOCK(cs_objDownloader);
+        mapBlocksInFlight.erase(hash);
+    }
+    bool MapBlocksInFlightEmpty()
+    {
+        LOCK(cs_objDownloader);
+        return mapBlocksInFlight.empty();
+    }
+    void MapBlocksInFlightClear()
+    {
+        LOCK(cs_objDownloader);
+        mapBlocksInFlight.clear();
+    }
 
     // Check for block download timeout and disconnect node if necessary.
     void CheckForDownloadTimeout(CNode *pnode,

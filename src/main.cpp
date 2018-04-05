@@ -270,7 +270,7 @@ void FinalizeNode(NodeId nodeid)
     for (const QueuedBlock &entry : state->vBlocksInFlight)
     {
         LOGA("erasing map mapblocksinflight entries\n");
-        requester.mapBlocksInFlight.erase(entry.hash);
+        requester.MapBlocksInFlightErase(entry.hash);
 
         // Reset all requests times to zero so that we can immediately re-request these blocks
         requester.ResetLastRequestTime(entry.hash);
@@ -284,7 +284,7 @@ void FinalizeNode(NodeId nodeid)
     if (mapNodeState.empty())
     {
         // Do a consistency check after the last peer is removed.  Force consistent state if production code
-        DbgAssert(requester.mapBlocksInFlight.empty(), requester.mapBlocksInFlight.clear());
+        DbgAssert(requester.MapBlocksInFlightEmpty(), requester.MapBlocksInFlightClear());
         DbgAssert(nPreferredDownload == 0, nPreferredDownload = 0);
         DbgAssert(requester.nPeersWithValidatedDownloads == 0, requester.nPeersWithValidatedDownloads = 0);
     }
@@ -4297,7 +4297,7 @@ void UnloadBlockIndex()
     nLastBlockFile = 0;
     nBlockSequenceId = 1;
     mapBlockSource.clear();
-    requester.mapBlocksInFlight.clear();
+    requester.MapBlocksInFlightClear();
     nPreferredDownload = 0;
     setDirtyBlockIndex.clear();
     setDirtyFileInfo.clear();

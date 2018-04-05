@@ -944,6 +944,8 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid,
     const Consensus::Params &consensusParams,
     CBlockIndex *pindex)
 {
+    AssertLockNotHeld(cs_objDownloader);
+
     LOCK(cs_main);
     CNodeState *state = State(nodeid);
     DbgAssert(state != nullptr, return );
@@ -951,8 +953,7 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid,
     // If started then clear the thinblock timer used for preferential downloading
     thindata.ClearThinBlockTimer(hash);
 
-    // BU why mark as received? because this erases it from the inflight list.  Instead we'll check for it
-    // BU removed: MarkBlockAsReceived(hash);
+    LOCK(cs_objDownloader);
     std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
         mapBlocksInFlight.find(hash);
     if (itInFlight == mapBlocksInFlight.end()) // If it hasn't already been marked inflight...
@@ -980,6 +981,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
 {
     AssertLockHeld(cs_main);
 
+    LOCK(cs_objDownloader);
     std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
         mapBlocksInFlight.find(hash);
     if (itInFlight != mapBlocksInFlight.end())
