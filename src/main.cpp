@@ -4981,7 +4981,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         else if (inv.type == MSG_THINBLOCK || inv.type == MSG_XTHINBLOCK)
                         {
                             LOG(THIN, "Sending xthin by INV queue getdata message\n");
-                            SendXThinBlock(block, pfrom, inv);
+                            SendXThinBlock(MakeBlockRef(block), pfrom, inv);
                         }
                         // BUIP010 Xtreme Thinblocks: end section
 
@@ -6191,7 +6191,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
             else
             {
-                SendXThinBlock(block, pfrom, inv);
+                SendXThinBlock(MakeBlockRef(block), pfrom, inv);
             }
         }
     }
@@ -6288,31 +6288,31 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) // Ignore blocks received while importing
     {
-        std::shared_ptr<CBlock> block(new CBlock);
+        CBlockRef pblock(new CBlock());
         {
             uint64_t nCheckBlockSize = vRecv.size();
-            vRecv >> *block;
+            vRecv >> *pblock;
 
             // Sanity check. The serialized block size should match the size that is in our receive queue.  If not
             // this could be an attack block of some kind.
-            DbgAssert(nCheckBlockSize == block->GetBlockSize(), return true);
+            DbgAssert(nCheckBlockSize == pblock->GetBlockSize(), return true);
         }
 
-        CInv inv(MSG_BLOCK, block->GetHash());
+        CInv inv(MSG_BLOCK, pblock->GetHash());
         LOG(BLK, "received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
-        UnlimitedLogBlock(*block, inv.hash.ToString(), receiptTime);
+        UnlimitedLogBlock(*pblock, inv.hash.ToString(), receiptTime);
 
         if (IsChainNearlySyncd()) // BU send the received block out expedited channels quickly
         {
             CValidationState state;
-            if (CheckBlockHeader(*block, state, true)) // block header is fine
-                SendExpeditedBlock(*block, pfrom);
+            if (CheckBlockHeader(*pblock, state, true)) // block header is fine
+                SendExpeditedBlock(*pblock, pfrom);
         }
 
         // Message consistency checking
         // NOTE: consistency checking is handled by checkblock() which is called during
         //       ProcessNewBlock() during HandleBlockMessage.
-        PV->HandleBlockMessage(pfrom, strCommand, block, inv);
+        PV->HandleBlockMessage(pfrom, strCommand, pblock, inv);
     }
 
 

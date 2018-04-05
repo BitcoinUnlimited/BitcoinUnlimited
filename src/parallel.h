@@ -118,7 +118,7 @@ public:
     /* Initialize mapBlockValidationThreads*/
     void InitThread(const boost::thread::id this_id,
         const CNode *pfrom,
-        std::shared_ptr<CBlock> block,
+        CBlockRef pblock,
         const CInv &inv,
         uint64_t blockSize);
 
@@ -169,13 +169,10 @@ public:
     uint32_t MaxWorkChainBeingProcessed();
 
     /* Clear orphans from the orphan cache that are no longer needed*/
-    void ClearOrphanCache(const CBlock &block);
+    void ClearOrphanCache(const CBlockRef pblock);
 
     /* Process a block message */
-    void HandleBlockMessage(CNode *pfrom,
-        const std::string &strCommand,
-        std::shared_ptr<CBlock> block,
-        const CInv &inv);
+    void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, CBlockRef pblock, const CInv &inv);
 
     // The number of script validation threads
     unsigned int ThreadCount() { return nThreads; }
