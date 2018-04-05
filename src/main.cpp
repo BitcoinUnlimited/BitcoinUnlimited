@@ -38,6 +38,7 @@
 #include "tinyformat.h"
 #include "txdb.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "uahf_fork.h"
 #include "ui_interface.h"
 #include "undo.h"
@@ -94,17 +95,6 @@ CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
 
 // BU: Move global objects to a single file
 extern CTxMemPool mempool;
-
-// BU: change locking of orphan map from using cs_main to cs_orphancache.
-// There is too much dependance on cs_main locks which are generally too
-// broad in scope.
-// Move globals to a single file
-extern CCriticalSection cs_orphancache;
-extern std::map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs_orphancache);
-extern std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs_orphancache);
-
-int64_t nLastOrphanCheck = GetTime(); // Used in EraseOrphansByTime()
-static uint64_t nBytesOrphanPool = 0; // Current in memory size of the orphan pool.
 
 extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
 extern CTweak<unsigned int> blockDownloadWindow;
@@ -372,128 +362,6 @@ CBlockIndex *FindForkInGlobalIndex(const CChain &chain, const CBlockLocator &loc
 
 CCoinsViewCache *pcoinsTip = NULL;
 CBlockTreeDB *pblocktree = NULL;
-
-//////////////////////////////////////////////////////////////////////////////
-//
-// mapOrphanTransactions
-//
-static bool AlreadyHaveOrphan(uint256 hash)
-{
-    LOCK(cs_orphancache);
-    if (mapOrphanTransactions.count(hash))
-        return true;
-    return false;
-}
-bool AddOrphanTx(const CTransaction &tx, NodeId peer) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
-{
-    AssertLockHeld(cs_orphancache);
-
-    if (mapOrphanTransactions.empty())
-        DbgAssert(nBytesOrphanPool == 0, nBytesOrphanPool = 0);
-
-    uint256 hash = tx.GetHash();
-    if (mapOrphanTransactions.count(hash))
-        return false;
-
-    // Ignore orphans larger than the largest txn size allowed.
-    unsigned int sz = ::GetSerializeSize(tx, SER_NETWORK, CTransaction::CURRENT_VERSION);
-    if (sz > MAX_STANDARD_TX_SIZE)
-    {
-        LOG(MEMPOOL, "ignoring large orphan tx (size: %u, hash: %s)\n", sz, hash.ToString());
-        return false;
-    }
-
-    uint64_t txSize = RecursiveDynamicUsage(tx);
-    mapOrphanTransactions[hash].tx = tx;
-    mapOrphanTransactions[hash].fromPeer = peer;
-    mapOrphanTransactions[hash].nEntryTime = GetTime(); // BU - Xtreme Thinblocks;
-    mapOrphanTransactions[hash].nOrphanTxSize = txSize;
-    BOOST_FOREACH (const CTxIn &txin, tx.vin)
-        mapOrphanTransactionsByPrev[txin.prevout.hash].insert(hash);
-
-    nBytesOrphanPool += txSize;
-    LOG(MEMPOOL, "stored orphan tx %s bytes:%ld (mapsz %u prevsz %u), orphan pool bytes:%ld\n", hash.ToString(), txSize,
-        mapOrphanTransactions.size(), mapOrphanTransactionsByPrev.size(), nBytesOrphanPool);
-    return true;
-}
-
-void EraseOrphanTx(uint256 hash) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
-{
-    AssertLockHeld(cs_orphancache);
-
-    std::map<uint256, COrphanTx>::iterator it = mapOrphanTransactions.find(hash);
-    if (it == mapOrphanTransactions.end())
-        return;
-    BOOST_FOREACH (const CTxIn &txin, it->second.tx.vin)
-    {
-        std::map<uint256, std::set<uint256> >::iterator itPrev = mapOrphanTransactionsByPrev.find(txin.prevout.hash);
-        if (itPrev == mapOrphanTransactionsByPrev.end())
-            continue;
-        itPrev->second.erase(hash);
-        if (itPrev->second.empty())
-            mapOrphanTransactionsByPrev.erase(itPrev);
-    }
-
-    nBytesOrphanPool -= it->second.nOrphanTxSize;
-    LOG(MEMPOOL, "Erased orphan tx %s of size %ld bytes, orphan pool bytes:%ld\n", it->second.tx.GetHash().ToString(),
-        it->second.nOrphanTxSize, nBytesOrphanPool);
-    mapOrphanTransactions.erase(it);
-}
-
-// BU - Xtreme Thinblocks: begin
-void EraseOrphansByTime() EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
-{
-    AssertLockHeld(cs_orphancache);
-    // Because we have to iterate through the entire orphan cache which can be large we don't want to check this
-    // every time a tx enters the mempool but just once every 5 minutes is good enough.
-    if (GetTime() < nLastOrphanCheck + 5 * 60)
-        return;
-    int64_t nOrphanTxCutoffTime = GetTime() - GetArg("-orphanpoolexpiry", DEFAULT_ORPHANPOOL_EXPIRY) * 60 * 60;
-    std::map<uint256, COrphanTx>::iterator iter = mapOrphanTransactions.begin();
-    while (iter != mapOrphanTransactions.end())
-    {
-        std::map<uint256, COrphanTx>::iterator mi = iter++; // increment to avoid iterator becoming invalid
-        int64_t nEntryTime = mi->second.nEntryTime;
-        if (nEntryTime < nOrphanTxCutoffTime)
-        {
-            uint256 txHash = mi->second.tx.GetHash();
-
-            // Uncache any coins that may exist for orphans that will be erased
-            pcoinsTip->UncacheTx(mi->second.tx);
-
-            LOG(MEMPOOL, "Erased old orphan tx %s of age %d seconds\n", txHash.ToString(), GetTime() - nEntryTime);
-            EraseOrphanTx(txHash);
-        }
-    }
-
-    nLastOrphanCheck = GetTime();
-}
-// BU - Xtreme Thinblocks: end
-
-unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t nMaxBytes) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
-{
-    AssertLockHeld(cs_orphancache);
-
-    // Limit the orphan pool size by either number of transactions or the max orphan pool size allowed.
-    // Limiting by pool size to 1/10th the size of the maxmempool alone is not enough because the total number
-    // of txns in the pool can adversely effect the size of the bloom filter in a get_xthin message.
-    unsigned int nEvicted = 0;
-    while (mapOrphanTransactions.size() > nMaxOrphans || nBytesOrphanPool > nMaxBytes)
-    {
-        // Evict a random orphan:
-        uint256 randomhash = GetRandHash();
-        std::map<uint256, COrphanTx>::iterator it = mapOrphanTransactions.lower_bound(randomhash);
-        if (it == mapOrphanTransactions.end())
-            it = mapOrphanTransactions.begin();
-
-        // Uncache any coins that may exist for orphans that will be erased
-        pcoinsTip->UncacheTx(it->second.tx);
-
-        EraseOrphanTx(it->first);
-        ++nEvicted;
-    }
-    return nEvicted;
-}
 
 bool CheckFinalTx(const CTransaction &tx, int flags)
 {
@@ -4407,10 +4275,10 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
 void UnloadBlockIndex()
 {
     {
-        LOCK(cs_orphancache);
-        mapOrphanTransactions.clear();
-        mapOrphanTransactionsByPrev.clear();
-        nBytesOrphanPool = 0;
+        LOCK(orphanpool.cs);
+        orphanpool.mapOrphanTransactions.clear();
+        orphanpool.mapOrphanTransactionsByPrev.clear();
+        orphanpool.nBytesOrphanPool = 0;
     }
 
     LOCK(cs_main);
@@ -4991,7 +4859,7 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
             }
         }
         bool rrc = recentRejects ? recentRejects->contains(inv.hash) : false;
-        return rrc || mempool.exists(inv.hash) || AlreadyHaveOrphan(inv.hash) ||
+        return rrc || mempool.exists(inv.hash) || orphanpool.AlreadyHaveOrphan(inv.hash) ||
                pcoinsTip->HaveCoinInCache(COutPoint(inv.hash, 0)) || // Best effort: only try output 0 and 1
                pcoinsTip->HaveCoinInCache(COutPoint(inv.hash, 1));
     }
@@ -5832,13 +5700,13 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 tx.GetHash().ToString(), mempool.size(), mempool.DynamicMemoryUsage() / 1000);
 
             // Recursively process any orphan transactions that depended on this one
-            LOCK(cs_orphancache);
+            LOCK(orphanpool.cs);
             std::set<NodeId> setMisbehaving;
             for (unsigned int i = 0; i < vWorkQueue.size(); i++)
             {
                 std::map<uint256, std::set<uint256> >::iterator itByPrev =
-                    mapOrphanTransactionsByPrev.find(vWorkQueue[i]);
-                if (itByPrev == mapOrphanTransactionsByPrev.end())
+                    orphanpool.mapOrphanTransactionsByPrev.find(vWorkQueue[i]);
+                if (itByPrev == orphanpool.mapOrphanTransactionsByPrev.end())
                     continue;
                 for (std::set<uint256>::iterator mi = itByPrev->second.begin(); mi != itByPrev->second.end(); ++mi)
                 {
@@ -5848,12 +5716,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     // we always erase orphans and any mapOrphanTransactionsByPrev at the same time, still we need to
                     // be sure.
                     bool fOk = true;
-                    DbgAssert(mapOrphanTransactions.count(orphanHash), fOk = false);
+                    DbgAssert(orphanpool.mapOrphanTransactions.count(orphanHash), fOk = false);
                     if (!fOk)
                         continue;
 
-                    const CTransaction &orphanTx = mapOrphanTransactions[orphanHash].tx;
-                    NodeId fromPeer = mapOrphanTransactions[orphanHash].fromPeer;
+                    const CTransaction &orphanTx = *orphanpool.mapOrphanTransactions[orphanHash].ptx;
+                    NodeId fromPeer = orphanpool.mapOrphanTransactions[orphanHash].fromPeer;
                     bool fMissingInputs2 = false;
                     // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
                     // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get
@@ -5890,26 +5758,26 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     mempool.check(pcoinsTip);
                 }
             }
-            BOOST_FOREACH (uint256 hash, vEraseQueue)
-                EraseOrphanTx(hash);
+            for (uint256 &hash : vEraseQueue)
+                orphanpool.EraseOrphanTx(hash);
 
             //  BU: Xtreme thinblocks - purge orphans that are too old
-            EraseOrphansByTime();
+            orphanpool.EraseOrphansByTime();
         }
         else if (fMissingInputs)
         {
             // If we've forked and this is probably not a valid tx, then skip adding it to the orphan pool
             if (!IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) || IsTxProbablyNewSigHash(tx))
             {
-                LOCK(cs_orphancache);
-                AddOrphanTx(tx, pfrom->GetId());
+                LOCK(orphanpool.cs);
+                orphanpool.AddOrphanTx(tx, pfrom->GetId());
 
                 // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
                 static unsigned int nMaxOrphanTx =
                     (unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
                 static uint64_t nMaxOrphanPoolSize =
                     (uint64_t)std::max((int64_t)0, (GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000 / 10));
-                unsigned int nEvicted = LimitOrphanTxSize(nMaxOrphanTx, nMaxOrphanPoolSize);
+                unsigned int nEvicted = orphanpool.LimitOrphanTxSize(nMaxOrphanTx, nMaxOrphanPoolSize);
                 if (nEvicted > 0)
                     LOG(MEMPOOL, "mapOrphan overflow, removed %u tx\n", nEvicted);
             }
@@ -7372,9 +7240,9 @@ void MainCleanup()
 
     if (1)
     {
-        LOCK(cs_orphancache); // BU apply the appropriate lock so no contention during destruction
+        LOCK(orphanpool.cs); // BU apply the appropriate lock so no contention during destruction
         // orphan transactions
-        mapOrphanTransactions.clear();
-        mapOrphanTransactionsByPrev.clear();
+        orphanpool.mapOrphanTransactions.clear();
+        orphanpool.mapOrphanTransactionsByPrev.clear();
     }
 }

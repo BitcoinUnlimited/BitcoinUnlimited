@@ -32,6 +32,7 @@
 #include "tinyformat.h"
 #include "tweak.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -130,6 +131,7 @@ int operateSampleCount[] = {30, 12, 24, 30};
 int interruptIntervals[] = {30, 30 * 12, 30 * 12 * 24, 30 * 12 * 24 * 30};
 
 CTxMemPool mempool(::minRelayTxFee);
+CTxOrphanPool orphanpool;
 
 std::chrono::milliseconds statMinInterval(10000);
 boost::asio::io_service stat_io_service;
@@ -150,12 +152,6 @@ CSemaphore *semOutboundAddNode = NULL; // BU: separate semaphore for -addnodes
 CNodeSignals g_signals;
 CAddrMan addrman;
 CDoSManager dosMan;
-
-// BU: change locking of orphan map from using cs_main to cs_orphancache.  There is too much dependance on cs_main locks
-// which are generally too broad in scope.
-CCriticalSection cs_orphancache;
-map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs_orphancache);
-map<uint256, set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs_orphancache);
 
 CTweakRef<uint64_t> ebTweak("net.excessiveBlock",
     "Excessive block size in bytes",

@@ -8,6 +8,7 @@
 #include "net.h"
 #include "pow.h"
 #include "timedata.h"
+#include "txorphanpool.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utiltime.h"
@@ -408,14 +409,14 @@ void CParallelValidation::ClearOrphanCache(const CBlock &block)
 {
     if (!IsInitialBlockDownload())
     {
-        LOCK(cs_orphancache);
+        LOCK(orphanpool.cs);
         {
             // Erase any orphans that may have been in the previous block and arrived
             // after the previous block had already been processed.
             LOCK(cs_previousblock);
             for (unsigned int i = 0; i < vPreviousBlock.size(); i++)
             {
-                EraseOrphanTx(vPreviousBlock[i]);
+                orphanpool.EraseOrphanTx(vPreviousBlock[i]);
             }
             vPreviousBlock.clear();
 
@@ -424,7 +425,7 @@ void CParallelValidation::ClearOrphanCache(const CBlock &block)
             {
                 uint256 hash = block.vtx[i]->GetHash();
                 vPreviousBlock.push_back(hash);
-                EraseOrphanTx(hash);
+                orphanpool.EraseOrphanTx(hash);
             }
         }
     }
@@ -626,7 +627,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, shared_ptr<
             }
 
             // Count up any other remaining nodes with thinblocks in flight.
-            BOOST_FOREACH (CNode *pnode, vNodes)
+            for (CNode *pnode : vNodes)
             {
                 if (pnode->mapThinBlocksInFlight.size() > 0)
                     nTotalThinBlocksInFlight++;

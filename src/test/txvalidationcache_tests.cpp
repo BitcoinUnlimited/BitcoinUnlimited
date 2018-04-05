@@ -13,14 +13,12 @@
 #include "script/standard.h"
 #include "test/test_bitcoin.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "uahf_fork.h"
 #include "utiltime.h"
 
 #include <boost/test/unit_test.hpp>
 
-extern bool AddOrphanTx(const CTransaction &tx, NodeId peer);
-extern void EraseOrphansByTime();
-extern unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t nMaxBytes);
 extern void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);
 
 BOOST_AUTO_TEST_SUITE(txvalidationcache_tests) // BU harmonize suite name with filename
@@ -100,7 +98,7 @@ BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup)
 BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
 {
     int64_t nStartTime = GetTime();
-    nLastOrphanCheck = nStartTime;
+    orphanpool.SetLastOrphanCheck(nStartTime);
     SetMockTime(nStartTime); // Overrides future calls to GetTime()
 
     mempool.clear();
@@ -183,8 +181,8 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
 
     BOOST_CHECK(!ToMemPool(spends[2]));
     {
-        LOCK(cs_orphancache);
-        BOOST_CHECK(AddOrphanTx(spends[2], 1));
+        LOCK(orphanpool.cs);
+        BOOST_CHECK(orphanpool.AddOrphanTx(spends[2], 1));
     }
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout)); // valid coin from previous txn
     BOOST_CHECK(!pcoinsTip->HaveCoinInCache(spends[2].vin[0].prevout));
@@ -193,9 +191,9 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
 
     // Remove valid orphans by time.  The coins should be removed from the coins cache
     {
-        LOCK(cs_orphancache);
+        LOCK(orphanpool.cs);
         SetMockTime(nStartTime + 3600 * DEFAULT_ORPHANPOOL_EXPIRY + 300);
-        EraseOrphansByTime();
+        orphanpool.EraseOrphansByTime();
     }
 
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout)); // valid coin from previous txn
@@ -204,8 +202,8 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     // Remove valid orphans by size.  The coins should be removed from the coins cache
     BOOST_CHECK(!ToMemPool(spends[2]));
     {
-        LOCK(cs_orphancache);
-        BOOST_CHECK(AddOrphanTx(spends[2], 1));
+        LOCK(orphanpool.cs);
+        BOOST_CHECK(orphanpool.AddOrphanTx(spends[2], 1));
     }
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout)); // valid coin from previous txn
     BOOST_CHECK(!pcoinsTip->HaveCoinInCache(spends[2].vin[0].prevout));
@@ -213,8 +211,8 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[2].vin[2].prevout)); // the only valid coin from the orphantx
 
     {
-        LOCK(cs_orphancache);
-        LimitOrphanTxSize(0, 0);
+        LOCK(orphanpool.cs);
+        orphanpool.LimitOrphanTxSize(0, 0);
     }
 
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout)); // valid coin from previous txn
@@ -280,8 +278,8 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
 
     BOOST_CHECK(!ToMemPool(spends[4]));
     {
-        LOCK(cs_orphancache);
-        BOOST_CHECK(AddOrphanTx(spends[4], 1));
+        LOCK(orphanpool.cs);
+        BOOST_CHECK(orphanpool.AddOrphanTx(spends[4], 1));
     }
     BOOST_CHECK(!pcoinsTip->HaveCoinInCache(spends[4].vin[0].prevout));
     BOOST_CHECK(!pcoinsTip->HaveCoinInCache(spends[4].vin[1].prevout));
@@ -291,15 +289,15 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     // would be if the orphan was moved into the mempool.
     // Result: All the coins should still be remaining in the coins cache.
     {
-        LOCK(cs_orphancache);
-        EraseOrphanTx(spends[4].GetHash());
+        LOCK(orphanpool.cs);
+        orphanpool.EraseOrphanTx(spends[4].GetHash());
     }
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[4].vin[2].prevout));
 
 
     // cleanup
     mempool.clear();
-    mapOrphanTransactions.clear();
+    orphanpool.mapOrphanTransactions.clear();
     pcoinsTip->Flush();
     SetMockTime(0);
 }
