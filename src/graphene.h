@@ -52,7 +52,7 @@ public:
     CGrapheneSet *pGrapheneSet;
 
 public:
-    CGrapheneBlock(const CBlock &block, uint64_t nReceiverMemPoolTx);
+    CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx);
     CGrapheneBlock() : pGrapheneSet(nullptr) {}
     ~CGrapheneBlock();
     /**
@@ -248,7 +248,7 @@ void CheckNodeSupportForGrapheneBlocks();
 bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom);
 void ClearGrapheneBlockInFlight(CNode *pfrom, uint256 hash);
 void AddGrapheneBlockInFlight(CNode *pfrom, uint256 hash);
-void SendGrapheneBlock(CBlock &block, CNode *pfrom, const CInv &inv);
+void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv);
 bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header);
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);
 CMemPoolInfo GetGrapheneMempoolInfo();
