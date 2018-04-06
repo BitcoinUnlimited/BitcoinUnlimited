@@ -58,6 +58,11 @@ class PortSeed:
 #then the mempools will not sync due to IBD.
 MOCKTIME = 0
 
+class NoConfigValue:
+    """ Use to remove the specific configure parameter and value when writing to bitcoin.conf"""
+    def __init__(self):
+        pass
+
 def enable_mocktime():
     # Set the mocktime to be after the Bitcoin Cash fork so
     # in normal tests blockchains the fork is in the past
@@ -176,7 +181,9 @@ def initialize_datadir(dirname, n,bitcoinConfDict=None,wallet=None):
 
     with open(os.path.join(datadir, "bitcoin.conf"), 'w') as f:
         for (key,val) in defaults.items():
-          if type(val) is type([]):
+          if isinstance(val, NoConfigValue):
+            pass
+          elif type(val) is type([]):
             for v in val:
               f.write("%s=%s\n" % (str(key), str(v)))
           else:
@@ -323,6 +330,8 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
         binary = os.getenv("BITCOIND", "bitcoind")
     # RPC tests still depend on free transactions
     args = [ binary, "-datadir="+datadir, "-rest", "-mocktime="+str(get_mocktime()) ] # // BU removed, "-keypool=1","-blockprioritysize=50000" ]
+    # need for some client and no harm to include for all; otherwise bitcoind starts on mainnet listening at port 8332
+    args.append("-conf="+ os.path.join(datadir, "bitcoin.conf"))
     if extra_args is not None: args.extend(extra_args)
     bitcoind_processes[i] = subprocess.Popen(args)
     if os.getenv("PYTHON_DEBUG", ""):

@@ -270,7 +270,10 @@ void FinalizeNode(NodeId nodeid)
     for (const QueuedBlock &entry : state->vBlocksInFlight)
     {
         LOGA("erasing map mapblocksinflight entries\n");
-        mapBlocksInFlight.erase(entry.hash);
+        requester.mapBlocksInFlight.erase(entry.hash);
+
+        // Reset all requests times to zero so that we can immediately re-request these blocks
+        requester.ResetLastRequestTime(entry.hash);
     }
     nPreferredDownload -= state->fPreferredDownload;
     requester.nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
@@ -281,7 +284,7 @@ void FinalizeNode(NodeId nodeid)
     if (mapNodeState.empty())
     {
         // Do a consistency check after the last peer is removed.  Force consistent state if production code
-        DbgAssert(mapBlocksInFlight.empty(), mapBlocksInFlight.clear());
+        DbgAssert(requester.mapBlocksInFlight.empty(), requester.mapBlocksInFlight.clear());
         DbgAssert(nPreferredDownload == 0, nPreferredDownload = 0);
         DbgAssert(requester.nPeersWithValidatedDownloads == 0, requester.nPeersWithValidatedDownloads = 0);
     }
@@ -534,11 +537,6 @@ bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *p
     return IsDAAEnabled(consensusparams, pindexPrev->nHeight);
 }
 
-static bool IsMay152018Enabled(const Consensus::Params &consensusparams, int64_t nMedianTimePast)
-{
-    return nMedianTimePast >= (int64_t)miningForkTime.value;
-}
-
 bool IsMay152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev)
 {
     if (pindexPrev == nullptr)
@@ -546,7 +544,7 @@ bool IsMay152018Enabled(const Consensus::Params &consensusparams, const CBlockIn
         return false;
     }
 
-    return IsMay152018Enabled(consensusparams, pindexPrev->GetMedianTimePast());
+    return pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value);
 }
 
 
@@ -2372,7 +2370,7 @@ void static UpdateTip(CBlockIndex *pindexNew)
     chainActive.SetTip(pindexNew);
 
     // Check Activate May 2018 HF rules after each new tip is connected and the blockindex updated.
-    if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
+    if (IsMay152018Enabled(chainParams.GetConsensus(), pindexNew))
     {
         // Bump the accepted block size to 32MB and the default generated size to 8MB
         if (miningForkEB.value > excessiveBlockSize)
@@ -4342,7 +4340,7 @@ void UnloadBlockIndex()
     nLastBlockFile = 0;
     nBlockSequenceId = 1;
     mapBlockSource.clear();
-    mapBlocksInFlight.clear();
+    requester.mapBlocksInFlight.clear();
     nPreferredDownload = 0;
     setDirtyBlockIndex.clear();
     setDirtyFileInfo.clear();
