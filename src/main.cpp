@@ -321,10 +321,16 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)
     stats.nMisbehavior = node->nMisbehavior;
     stats.nSyncHeight = state->pindexBestKnownBlock ? state->pindexBestKnownBlock->nHeight : -1;
     stats.nCommonHeight = state->pindexLastCommonBlock ? state->pindexLastCommonBlock->nHeight : -1;
-    BOOST_FOREACH (const QueuedBlock &queue, state->vBlocksInFlight)
+    for (const QueuedBlock &queue : state->vBlocksInFlight)
     {
-        if (queue.pindex)
-            stats.vHeightInFlight.push_back(queue.pindex->nHeight);
+        // lookup block by hash to find height
+        BlockMap::iterator mi = mapBlockIndex.find(queue.hash);
+        if (mi != mapBlockIndex.end())
+        {
+            CBlockIndex *pindex = (*mi).second;
+            if (pindex)
+                stats.vHeightInFlight.push_back(pindex->nHeight);
+        }
     }
     return true;
 }

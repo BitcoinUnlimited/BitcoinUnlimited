@@ -13,7 +13,6 @@
 struct QueuedBlock
 {
     uint256 hash;
-    CBlockIndex *pindex; //!< Optional.
     int64_t nTime; //! Time of "getdata" request in microseconds.
     bool fValidatedHeaders; //!< Whether this block has validated headers at the time of request.
 };

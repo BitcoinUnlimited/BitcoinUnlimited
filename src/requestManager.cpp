@@ -959,7 +959,7 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid,
     if (itInFlight == mapBlocksInFlight.end()) // If it hasn't already been marked inflight...
     {
         int64_t nNow = GetTimeMicros();
-        QueuedBlock newentry = {hash, pindex, nNow, pindex != nullptr};
+        QueuedBlock newentry = {hash, nNow, pindex != nullptr};
         std::list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
         state->nBlocksInFlight++;
         state->nBlocksInFlightValidHeaders += newentry.fValidatedHeaders;
