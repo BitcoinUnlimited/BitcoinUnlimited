@@ -128,9 +128,6 @@ protected:
     bool RequestBlock(CNode *pfrom, CInv obj);
 
 public:
-    // Number of peers from which we're downloading blocks.
-    int nPeersWithValidatedDownloads = 0;
-
     CRequestManager();
 
     // Get this object from somewhere, asynchronously.

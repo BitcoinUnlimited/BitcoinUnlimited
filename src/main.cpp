@@ -276,17 +276,13 @@ void FinalizeNode(NodeId nodeid)
         requester.ResetLastRequestTime(entry.hash);
     }
     nPreferredDownload -= state->fPreferredDownload;
-    requester.nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
-    DbgAssert(requester.nPeersWithValidatedDownloads >= 0, requester.nPeersWithValidatedDownloads = 0);
 
     mapNodeState.erase(nodeid);
-
     if (mapNodeState.empty())
     {
         // Do a consistency check after the last peer is removed.  Force consistent state if production code
         DbgAssert(requester.MapBlocksInFlightEmpty(), requester.MapBlocksInFlightClear());
         DbgAssert(nPreferredDownload == 0, nPreferredDownload = 0);
-        DbgAssert(requester.nPeersWithValidatedDownloads == 0, requester.nPeersWithValidatedDownloads = 0);
     }
 }
 
