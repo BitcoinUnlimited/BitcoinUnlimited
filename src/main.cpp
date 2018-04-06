@@ -2371,6 +2371,20 @@ void static UpdateTip(CBlockIndex *pindexNew)
     const CChainParams &chainParams = Params();
     chainActive.SetTip(pindexNew);
 
+    // Check Activate May 2018 HF rules after each new tip is connected and the blockindex updated.
+    if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
+    {
+        // Bump the accepted block size to 32MB and the default generated size to 8MB
+        if (miningForkEB.value > excessiveBlockSize)
+            excessiveBlockSize = miningForkEB.value;
+        if (miningForkMG.value > maxGeneratedBlock)
+            maxGeneratedBlock = miningForkMG.value;
+        settingsToUserAgentString();
+        // Bump OP_RETURN size:
+        if (nMaxDatacarrierBytes < MAX_OP_RETURN_MAY2018)
+            nMaxDatacarrierBytes = MAX_OP_RETURN_MAY2018;
+    }
+
     // New best block
     nTimeBestReceived = GetTime();
     mempool.AddTransactionsUpdated(1);
@@ -2847,7 +2861,7 @@ static bool ActivateBestChainStep(CValidationState &state,
             }
 
             if (!ConnectTip(state, chainparams, pindexConnect,
-                    pindexConnect == pindexMostWork && fBlock ? pblock : NULL, fParallel))
+                    pindexConnect == pindexMostWork && fBlock ? pblock : nullptr, fParallel))
             {
                 if (state.IsInvalid())
                 {
@@ -2993,7 +3007,7 @@ static bool ActivateBestChainStep(CValidationState &state,
  */
 bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams, const CBlock *pblock, bool fParallel)
 {
-    CBlockIndex *pindexMostWork = NULL;
+    CBlockIndex *pindexMostWork = nullptr;
     LOCK(cs_main);
 
     bool fOneDone = false;
@@ -3024,7 +3038,7 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
         }
 
         // Whether we have anything to do at all.
-        if (chainActive.Tip() != NULL)
+        if (chainActive.Tip() != nullptr)
         {
             if (pindexMostWork->nChainWork <= chainActive.Tip()->nChainWork)
                 return true;
@@ -3036,7 +3050,7 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
         // their block headers may not represent what is considered the best block as returned by pindexMostWork.
         // Therefore we must supply the blockindex of this block explicitly as being the one with potentially
         // the most work and which will subsequently advance the chain tip if it wins the validation race.
-        if (pblock != NULL && pindexOldTip != NULL && chainActive.Tip() != chainActive.Genesis() && fParallel)
+        if (pblock != nullptr && pindexOldTip != nullptr && chainActive.Tip() != chainActive.Genesis() && fParallel)
         {
             if (pblock->GetBlockHeader().hashPrevBlock == *pindexOldTip->phashBlock)
             {
@@ -3089,24 +3103,11 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
         pindexMostWork = FindMostWorkChain();
         if (!pindexMostWork)
             return false;
-        pblock = NULL;
+        pblock = nullptr;
         fOneDone = true;
     } while (pindexMostWork->nChainWork > chainActive.Tip()->nChainWork);
     CheckBlockIndex(chainparams.GetConsensus());
 
-    // Activate May 2018 HF rules
-    if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
-    {
-        // Bump the accepted block size to 32MB and the default generated size to 8MB
-        if (miningForkEB.value > excessiveBlockSize)
-            excessiveBlockSize = miningForkEB.value;
-        if (miningForkMG.value > maxGeneratedBlock)
-            maxGeneratedBlock = miningForkMG.value;
-        settingsToUserAgentString();
-        // Bump OP_RETURN size:
-        if (nMaxDatacarrierBytes < MAX_OP_RETURN_MAY2018)
-            nMaxDatacarrierBytes = MAX_OP_RETURN_MAY2018;
-    }
     return true;
 }
 

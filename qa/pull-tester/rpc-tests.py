@@ -180,6 +180,7 @@ if ENABLE_ZMQ:
 #Tests
 testScripts = [ RpcTest(t) for t in [
     'may152018-forkactivation',
+    'forkMay2018',
     'bip68-112-113-p2p',
     'validateblocktemplate',
     'parallel',
