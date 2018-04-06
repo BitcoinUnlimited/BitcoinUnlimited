@@ -537,11 +537,6 @@ bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *p
     return IsDAAEnabled(consensusparams, pindexPrev->nHeight);
 }
 
-static bool IsMay152018Enabled(const Consensus::Params &consensusparams, int64_t nMedianTimePast)
-{
-    return nMedianTimePast >= (int64_t)miningForkTime.value;
-}
-
 bool IsMay152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev)
 {
     if (pindexPrev == nullptr)
@@ -549,7 +544,7 @@ bool IsMay152018Enabled(const Consensus::Params &consensusparams, const CBlockIn
         return false;
     }
 
-    return IsMay152018Enabled(consensusparams, pindexPrev->GetMedianTimePast());
+    return pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value);
 }
 
 
@@ -2375,7 +2370,7 @@ void static UpdateTip(CBlockIndex *pindexNew)
     chainActive.SetTip(pindexNew);
 
     // Check Activate May 2018 HF rules after each new tip is connected and the blockindex updated.
-    if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
+    if (IsMay152018Enabled(chainParams.GetConsensus(), pindexNew))
     {
         // Bump the accepted block size to 32MB and the default generated size to 8MB
         if (miningForkEB.value > excessiveBlockSize)
