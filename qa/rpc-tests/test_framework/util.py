@@ -632,6 +632,47 @@ def assert_raises(exc, fun, *args, **kwds):
     else:
         raise AssertionError("No exception raised")
 
+def assert_raises_rpc_error(code, message, fun, *args, **kwds):
+    """Run an RPC and verify that a specific JSONRPC exception code and message is raised.
+
+    Calls function `fun` with arguments `args` and `kwds`. Catches a JSONRPCException
+    and verifies that the error code and message are as expected. Throws AssertionError if
+    no JSONRPCException was raised or if the error code/message are not as expected.
+
+    Args:
+        code (int), optional: the error code returned by the RPC call (defined
+            in src/rpc/protocol.h). Set to None if checking the error code is not required.
+        message (string), optional: [a substring of] the error string returned by the
+            RPC call. Set to None if checking the error string is not required.
+        fun (function): the function to call. This should be the name of an RPC.
+        args*: positional arguments for the function.
+        kwds**: named arguments for the function.
+    """
+    assert try_rpc(code, message, fun, *args, **kwds), "No exception raised"
+
+
+def try_rpc(code, message, fun, *args, **kwds):
+    """Tries to run an rpc command.
+
+    Test against error code and message if the rpc fails.
+    Returns whether a JSONRPCException was raised."""
+    try:
+        fun(*args, **kwds)
+    except JSONRPCException as e:
+        # JSONRPCException was thrown as expected. Check the code and message values are correct.
+        if (code is not None) and (code != e.error["code"]):
+            raise AssertionError(
+                "Unexpected JSONRPC error code %i" % e.error["code"])
+        if (message is not None) and (message not in e.error['message']):
+            raise AssertionError(
+                "Expected substring not found:" + e.error['message'])
+        return True
+    except Exception as e:
+        raise AssertionError(
+            "Unexpected exception raised: " + type(e).__name__)
+    else:
+        return False
+
 def assert_is_hex_string(string):
     try:
         int(string, 16)
