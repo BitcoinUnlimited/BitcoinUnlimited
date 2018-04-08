@@ -537,6 +537,17 @@ bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *p
     return IsDAAEnabled(consensusparams, pindexPrev->nHeight);
 }
 
+bool IsMay152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev)
+{
+    if (pindexPrev == nullptr)
+    {
+        return false;
+    }
+
+    return pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value);
+}
+
+
 bool AreFreeTxnsDisallowed()
 {
     if (GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY) > 0)
@@ -562,6 +573,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     uint64_t start = GetTimeMicros();
     AssertLockHeld(cs_main);
 
+    // After the May, 15 hard fork, we start accepting larger op_return.
+    const CChainParams &chainparams = Params();
+    const bool hasMay152018 = IsMay152018Enabled(chainparams.GetConsensus(), chainActive.Tip());
+
     if (!CheckTransaction(tx, state))
         return false;
 
@@ -584,7 +599,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
     std::string reason;
-    const CChainParams &chainparams = Params();
     bool fRequireStandard = chainparams.RequireStandard();
     if (fRequireStandard && !IsStandardTx(tx, reason))
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
@@ -838,12 +852,18 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         size_t nLimitDescendantSize = GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
         std::string errString;
 
+        // Set extraFlags as a set of flags that needs to be activated.
+        uint32_t extraFlags = 0;
+        if (hasMay152018)
+        {
+            extraFlags |= SCRIPT_ENABLE_MAY152018_OPCODES;
+        }
 
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         unsigned char sighashType = 0;
-        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true, &resourceTracker,
-                NULL, &sighashType))
+        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags | extraFlags, true,
+                &resourceTracker, nullptr, &sighashType))
         {
             LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", tx.GetHash().ToString().c_str());
             return false;
@@ -860,8 +880,8 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true, NULL, NULL,
-                &sighashType2))
+        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | forkVerifyFlags | extraFlags, true,
+                nullptr, nullptr, &sighashType2))
         {
             return error(
                 "%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
@@ -1332,7 +1352,9 @@ bool CheckInputs(const CTransaction &tx,
                 }
                 else if (!check())
                 {
-                    if (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS)
+                    const bool hasNonMandatoryFlags = (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
+                    const bool doesNotHaveMay152018 = (flags & SCRIPT_ENABLE_MAY152018_OPCODES) == 0;
+                    if (hasNonMandatoryFlags || doesNotHaveMay152018)
                     {
                         // Check whether the failure was caused by a
                         // non-mandatory script verification check, such as
@@ -1340,8 +1362,14 @@ bool CheckInputs(const CTransaction &tx,
                         // arguments; if so, don't trigger DoS protection to
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
-                        CScriptCheck check2(NULL, scriptPubKey, amount, tx, i,
-                            flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheStore);
+                        //
+                        // We also check activating the may152018 opcodes as it is a
+                        // strictly additive change and we would not like to ban some of
+                        // our peer that are ahead of us and are considering the fork
+                        // as activated.
+                        CScriptCheck check2(nullptr, scriptPubKey, amount, tx, i,
+                            (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS) | SCRIPT_ENABLE_MAY152018_OPCODES,
+                            cacheStore);
                         if (check2())
                             return state.Invalid(
                                 false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
@@ -1755,6 +1783,13 @@ static uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
 
+    // The May 15, 2018 HF enable a set of opcodes.
+    if (IsMay152018Enabled(consensusparams, pindex->pprev))
+    {
+        flags |= SCRIPT_ENABLE_MAY152018_OPCODES;
+    }
+
+
     return flags;
 }
 
@@ -2059,7 +2094,7 @@ bool ConnectBlock(const CBlock &block,
         if (!control.Wait())
         {
             // if we end up here then the signature verification failed and we must re-lock cs_main before returning.
-            return state.DoS(100, false);
+            return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs", false, "parallel script check failed");
         }
         if (PV->QuitReceived(this_id, fParallel))
         {
@@ -2334,6 +2369,20 @@ void static UpdateTip(CBlockIndex *pindexNew)
     const CChainParams &chainParams = Params();
     chainActive.SetTip(pindexNew);
 
+    // Check Activate May 2018 HF rules after each new tip is connected and the blockindex updated.
+    if (IsMay152018Enabled(chainParams.GetConsensus(), pindexNew))
+    {
+        // Bump the accepted block size to 32MB and the default generated size to 8MB
+        if (miningForkEB.value > excessiveBlockSize)
+            excessiveBlockSize = miningForkEB.value;
+        if (miningForkMG.value > maxGeneratedBlock)
+            maxGeneratedBlock = miningForkMG.value;
+        settingsToUserAgentString();
+        // Bump OP_RETURN size:
+        if (nMaxDatacarrierBytes < MAX_OP_RETURN_MAY2018)
+            nMaxDatacarrierBytes = MAX_OP_RETURN_MAY2018;
+    }
+
     // New best block
     nTimeBestReceived = GetTime();
     mempool.AddTransactionsUpdated(1);
@@ -2440,6 +2489,13 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     // Write the chain state to disk, if necessary.
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
+
+    // If this block enabled the may152018 opcodes, then we need to
+    // clear the mempool of any transaction using them.
+    if (IsMay152018Enabled(consensusParams, pindexDelete) && !IsMay152018Enabled(consensusParams, pindexDelete->pprev))
+    {
+        mempool.clear();
+    }
 
     // Resurrect mempool transactions from the disconnected block but do not do this step if we are
     // rolling back the chain using the "rollbackchain" rpc command.
@@ -2803,7 +2859,7 @@ static bool ActivateBestChainStep(CValidationState &state,
             }
 
             if (!ConnectTip(state, chainparams, pindexConnect,
-                    pindexConnect == pindexMostWork && fBlock ? pblock : NULL, fParallel))
+                    pindexConnect == pindexMostWork && fBlock ? pblock : nullptr, fParallel))
             {
                 if (state.IsInvalid())
                 {
@@ -2949,7 +3005,7 @@ static bool ActivateBestChainStep(CValidationState &state,
  */
 bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams, const CBlock *pblock, bool fParallel)
 {
-    CBlockIndex *pindexMostWork = NULL;
+    CBlockIndex *pindexMostWork = nullptr;
     LOCK(cs_main);
 
     bool fOneDone = false;
@@ -2980,7 +3036,7 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
         }
 
         // Whether we have anything to do at all.
-        if (chainActive.Tip() != NULL)
+        if (chainActive.Tip() != nullptr)
         {
             if (pindexMostWork->nChainWork <= chainActive.Tip()->nChainWork)
                 return true;
@@ -2992,7 +3048,7 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
         // their block headers may not represent what is considered the best block as returned by pindexMostWork.
         // Therefore we must supply the blockindex of this block explicitly as being the one with potentially
         // the most work and which will subsequently advance the chain tip if it wins the validation race.
-        if (pblock != NULL && pindexOldTip != NULL && chainActive.Tip() != chainActive.Genesis() && fParallel)
+        if (pblock != nullptr && pindexOldTip != nullptr && chainActive.Tip() != chainActive.Genesis() && fParallel)
         {
             if (pblock->GetBlockHeader().hashPrevBlock == *pindexOldTip->phashBlock)
             {
@@ -3045,24 +3101,11 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
         pindexMostWork = FindMostWorkChain();
         if (!pindexMostWork)
             return false;
-        pblock = NULL;
+        pblock = nullptr;
         fOneDone = true;
     } while (pindexMostWork->nChainWork > chainActive.Tip()->nChainWork);
     CheckBlockIndex(chainparams.GetConsensus());
 
-    // Activate May 2018 HF rules
-    if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
-    {
-        // Bump the accepted block size to 32MB and the default generated size to 8MB
-        if (miningForkEB.value > excessiveBlockSize)
-            excessiveBlockSize = miningForkEB.value;
-        if (miningForkMG.value > maxGeneratedBlock)
-            maxGeneratedBlock = miningForkMG.value;
-        settingsToUserAgentString();
-        // Bump OP_RETURN size:
-        if (nMaxDatacarrierBytes < MAX_OP_RETURN_MAY2018)
-            nMaxDatacarrierBytes = MAX_OP_RETURN_MAY2018;
-    }
     return true;
 }
 

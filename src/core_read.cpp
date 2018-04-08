@@ -31,9 +31,9 @@ CScript ParseScript(const std::string &s)
 
     if (mapOpNames.empty())
     {
-        for (int op = 0; op <= OP_NOP10; op++)
+        for (int op = 0; op <= FIRST_UNDEFINED_OP_VALUE; op++)
         {
-            // Allow OP_RESERVED to get into mapOpNames
+            // ignore all "PUSHDATA" ops, but dont ignore OP_RESERVED
             if (op < OP_NOP && op != OP_RESERVED)
                 continue;
 

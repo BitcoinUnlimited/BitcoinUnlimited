@@ -416,6 +416,8 @@ public:
         consensus.uahfHeight = 0;
         // Nov, 13 hard fork is always on on regtest.
         consensus.daaHeight = 0;
+        // May, 15 2018 hard fork
+        consensus.may2018activationTime = 1526400000;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;
