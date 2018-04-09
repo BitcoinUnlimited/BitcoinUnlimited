@@ -621,6 +621,8 @@ void CRequestManager::SendRequests()
 
                     if (fBatchBlockRequests)
                     {
+                        // Only add one ref per node with a vector of batched blocks
+                        if (mapBatchBlockRequests.find(next.node) == mapBatchBlockRequests.end())
                         {
                             LOCK(cs_vNodes);
                             next.node->AddRef();
