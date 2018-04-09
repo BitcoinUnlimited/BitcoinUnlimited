@@ -357,30 +357,5 @@ bool DummySignatureCreator::CreateSig(std::vector<unsigned char> &vchSig,
 }
 
 
-std::vector<unsigned char> signmessage(const std::vector<unsigned char> &data, const CKey &key)
-{
-    CHashWriter ss(SER_GETHASH, 0);
-    ss << strMessageMagic << data;
-
-    vector<unsigned char> vchSig;
-    if (!key.SignCompact(ss.GetHash(), vchSig)) // signing will only fail if the key is bogus
-    {
-        DbgAssert(!"bad key", );
-        return std::vector<unsigned char>();
-    }
-    return vchSig;
-}
-
-std::vector<unsigned char> signmessage(const std::string &data, const CKey &key)
-{
-    CHashWriter ss(SER_GETHASH, 0);
-    ss << strMessageMagic << data;
-
-    vector<unsigned char> vchSig;
-    if (!key.SignCompact(ss.GetHash(), vchSig)) // signing will only fail if the key is bogus
-    {
-        DbgAssert(!"bad key", );
-        return std::vector<unsigned char>();
-    }
-    return vchSig;
-}
+template std::vector<unsigned char> signmessage(const std::vector<unsigned char> &data, const CKey &key);
+template std::vector<unsigned char> signmessage(const std::string &data, const CKey &key);

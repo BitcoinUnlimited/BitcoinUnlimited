@@ -1472,28 +1472,71 @@ BOOST_AUTO_TEST_CASE(script_datasigverify)
 
     CScript condScript = CScript() << ToByteVector(dataSigner.addr) << OP_DATASIGVERIFY;
 
+    // Test basic case
     vector<vector<unsigned char> > stack;
     ScriptError serror;
     BaseSignatureChecker sigChecker;
-    BOOST_CHECK(condScript.GetSigOpCount(true) == 1);
     BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+
     enableDataSigVerify = false;
-    // should fail because datasigverify is off
-    BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
-    enableDataSigVerify = true;
+    // Sigop count should be 0 because OP_DATASIGVERIFY is off
+    BOOST_CHECK(condScript.GetSigOpCount(true) == 0);
+    // Test failure when datasigverify is off
     BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
 
+    enableDataSigVerify = true;
+    // Sigop count should be 1 because OP_DATASIGVERIFY is on
+    BOOST_CHECK(condScript.GetSigOpCount(true) == 1);
+    // check basic success case
+    stack.clear();
+    BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+    BOOST_CHECK(EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+
+    // Test bad signature type
     stack.clear();
     CScript scriptBadSigType = CScript() << data << sigbadtype;
     BOOST_CHECK(EvalScript(stack, scriptBadSigType, 0, sigChecker, &serror, nullptr));
     BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
 
+    // Test incorrect signature
     stack.clear();
     sigtype[2] ^= 1; // Screw up the signature
     proveScript = CScript() << data << sigtype;
     BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
     BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
     sigtype[2] ^= 1; // back to correct sigtype
+
+    // Test incorrect signature length
+    {
+    stack.clear();
+    std::vector<unsigned char> sigtype2 = sigtype;
+    sigtype2.resize(65);
+    proveScript = CScript() << data << sigtype2;
+    BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+    BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+    }
+
+    // Test incorrect address length
+    {
+    stack.clear();
+    std::vector<unsigned char> vaddr = ToByteVector(dataSigner.addr);
+    vaddr.resize(19);
+    CScript condScript = CScript() << vaddr << OP_DATASIGVERIFY;
+    proveScript = CScript() << data << sigtype;
+    BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+    BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+    }
+
+    // Test wrong stack size
+    {
+    stack.clear();
+    CScript condScript = CScript() << OP_DATASIGVERIFY;
+    proveScript = CScript() << data << sigtype;
+    BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+    BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+    }
+
+
 
     QuickAddress u2;
 

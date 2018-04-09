@@ -211,7 +211,4 @@ bool VerifyScript(const CScript &scriptSig,
 // that the signature was intended for use on this blockchain.
 extern const std::string strMessageMagic;
 
-// Set to true to enable OP_DATASIGVERIFY
-extern bool enableDataSigVerify;
-
 #endif // BITCOIN_SCRIPT_INTERPRETER_H
