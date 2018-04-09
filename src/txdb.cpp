@@ -579,7 +579,7 @@ void AdjustCoinCacheSize()
 {
     // If the operator has not set a dbcache and initial sync is complete then revert back to the default
     // value for dbcache. This will cause the current coins cache to be immediately trimmed to size.
-    if (IsChainNearlySyncd() && !GetArg("-dbcache", 0))
+    if (!IsInitialBlockDownload() && !GetArg("-dbcache", 0) && chainActive.Tip())
     {
         // Get the default value for nCoinCacheUsage.
         int64_t dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
