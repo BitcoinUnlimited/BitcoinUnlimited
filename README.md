@@ -46,7 +46,7 @@ If you're compiling from source:
 ```sh
 sudo apt-get install git build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils libboost-all-dev
 ## optional: only needed if you want bitcoin-qt
-sudo apt-get install libqt4-dev libprotobuf-dev protobuf-compiler libqrencode-dev
+sudo apt-get install qttools5-dev-tools qttools5-dev libprotobuf-dev protobuf-compiler libqrencode-dev
 ## optional: only needed if your wallet use the old format
 sudo apt-get install software-properties-common
 

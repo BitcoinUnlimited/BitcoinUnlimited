@@ -46,6 +46,8 @@ PORT_MIN = 11000
 # The number of ports to "reserve" for p2p and rpc, each
 PORT_RANGE = 5000
 
+BITCOIND_PROC_WAIT_TIMEOUT = 60
+
 
 class PortSeed:
     # Must be initialized with a unique integer for each process
@@ -57,6 +59,11 @@ class PortSeed:
 #version of the blockchain is used without MOCKTIME
 #then the mempools will not sync due to IBD.
 MOCKTIME = 0
+
+class NoConfigValue:
+    """ Use to remove the specific configure parameter and value when writing to bitcoin.conf"""
+    def __init__(self):
+        pass
 
 def enable_mocktime():
     # Set the mocktime to be after the Bitcoin Cash fork so
@@ -176,7 +183,9 @@ def initialize_datadir(dirname, n,bitcoinConfDict=None,wallet=None):
 
     with open(os.path.join(datadir, "bitcoin.conf"), 'w') as f:
         for (key,val) in defaults.items():
-          if type(val) is type([]):
+          if isinstance(val, NoConfigValue):
+            pass
+          elif type(val) is type([]):
             for v in val:
               f.write("%s=%s\n" % (str(key), str(v)))
           else:
@@ -323,6 +332,8 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
         binary = os.getenv("BITCOIND", "bitcoind")
     # RPC tests still depend on free transactions
     args = [ binary, "-datadir="+datadir, "-rest", "-mocktime="+str(get_mocktime()) ] # // BU removed, "-keypool=1","-blockprioritysize=50000" ]
+    # need for some client and no harm to include for all; otherwise bitcoind starts on mainnet listening at port 8332
+    args.append("-conf="+ os.path.join(datadir, "bitcoin.conf"))
     if extra_args is not None: args.extend(extra_args)
     bitcoind_processes[i] = subprocess.Popen(args)
     if os.getenv("PYTHON_DEBUG", ""):
@@ -361,7 +372,7 @@ def stop_node(node, i):
         node.stop()
     except http.client.CannotSendRequest as e:
         print("WARN: Unable to stop node: " + repr(e))
-    bitcoind_processes[i].wait()
+    bitcoind_processes[i].wait(timeout=BITCOIND_PROC_WAIT_TIMEOUT)
     del bitcoind_processes[i]
 
 def stop_nodes(nodes):
@@ -379,7 +390,7 @@ def set_node_times(nodes, t):
 def wait_bitcoinds():
     # Wait for all bitcoinds to cleanly exit
     for bitcoind in bitcoind_processes.values():
-        bitcoind.wait()
+        bitcoind.wait(timeout=BITCOIND_PROC_WAIT_TIMEOUT)
     bitcoind_processes.clear()
 
 def connect_nodes(from_connection, node_num):
@@ -622,6 +633,47 @@ def assert_raises(exc, fun, *args, **kwds):
         raise AssertionError("Unexpected exception raised: "+type(e).__name__)
     else:
         raise AssertionError("No exception raised")
+
+def assert_raises_rpc_error(code, message, fun, *args, **kwds):
+    """Run an RPC and verify that a specific JSONRPC exception code and message is raised.
+
+    Calls function `fun` with arguments `args` and `kwds`. Catches a JSONRPCException
+    and verifies that the error code and message are as expected. Throws AssertionError if
+    no JSONRPCException was raised or if the error code/message are not as expected.
+
+    Args:
+        code (int), optional: the error code returned by the RPC call (defined
+            in src/rpc/protocol.h). Set to None if checking the error code is not required.
+        message (string), optional: [a substring of] the error string returned by the
+            RPC call. Set to None if checking the error string is not required.
+        fun (function): the function to call. This should be the name of an RPC.
+        args*: positional arguments for the function.
+        kwds**: named arguments for the function.
+    """
+    assert try_rpc(code, message, fun, *args, **kwds), "No exception raised"
+
+
+def try_rpc(code, message, fun, *args, **kwds):
+    """Tries to run an rpc command.
+
+    Test against error code and message if the rpc fails.
+    Returns whether a JSONRPCException was raised."""
+    try:
+        fun(*args, **kwds)
+    except JSONRPCException as e:
+        # JSONRPCException was thrown as expected. Check the code and message values are correct.
+        if (code is not None) and (code != e.error["code"]):
+            raise AssertionError(
+                "Unexpected JSONRPC error code %i" % e.error["code"])
+        if (message is not None) and (message not in e.error['message']):
+            raise AssertionError(
+                "Expected substring not found:" + e.error['message'])
+        return True
+    except Exception as e:
+        raise AssertionError(
+            "Unexpected exception raised: " + type(e).__name__)
+    else:
+        return False
 
 def assert_is_hex_string(string):
     try:

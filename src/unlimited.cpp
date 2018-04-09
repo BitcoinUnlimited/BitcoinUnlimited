@@ -32,6 +32,7 @@
 #include "tinyformat.h"
 #include "tweak.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -533,7 +534,7 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phas
 static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainparams)
 {
     LOGA("%s\n", pblock->ToString());
-    LOGA("generated %s\n", FormatMoney(pblock->vtx[0].vout[0].nValue));
+    LOGA("generated %s\n", FormatMoney(pblock->vtx[0]->vout[0].nValue));
 
     // Found a solution
     {
@@ -1820,8 +1821,8 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.push_back(Pair("vNodes", vNodes.size()));
     ret.push_back(Pair("vNodesDisconnected", vNodesDisconnected.size()));
     // CAddrMan
-    ret.push_back(Pair("mapOrphanTransactions", mapOrphanTransactions.size()));
-    ret.push_back(Pair("mapOrphanTransactionsByPrev", mapOrphanTransactionsByPrev.size()));
+    ret.push_back(Pair("mapOrphanTransactions", orphanpool.mapOrphanTransactions.size()));
+    ret.push_back(Pair("mapOrphanTransactionsByPrev", orphanpool.mapOrphanTransactionsByPrev.size()));
 
     uint32_t nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream;
     connmgr->ExpeditedNodeCounts(nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream);

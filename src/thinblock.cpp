@@ -21,6 +21,7 @@
 #include "thinblock.h"
 #include "timedata.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "util.h"
 #include "utiltime.h"
 
@@ -34,7 +35,7 @@ CThinBlock::CThinBlock(const CBlock &block, CBloomFilter &filter)
     vTxHashes.reserve(nTx);
     for (unsigned int i = 0; i < nTx; i++)
     {
-        const uint256 &hash = block.vtx[i].GetHash();
+        const uint256 &hash = block.vtx[i]->GetHash();
         vTxHashes.push_back(hash);
 
         // Find the transactions that do not match the filter.
@@ -42,7 +43,7 @@ CThinBlock::CThinBlock(const CBlock &block, CBloomFilter &filter)
         // NOTE: We always add the first tx, the coinbase as it is the one
         //       most often missing.
         if (!filter.contains(hash) || i == 0)
-            vMissingTx.push_back(block.vtx[i]);
+            vMissingTx.push_back(*block.vtx[i]);
     }
 }
 
@@ -143,8 +144,6 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
     pfrom->thinBlock.hashPrevBlock = header.hashPrevBlock;
     pfrom->thinBlockHashes = vTxHashes;
 
-    thindata.AddThinBlockBytes(vTxHashes.size() * sizeof(uint256), pfrom); // start counting bytes
-
     // Check that the merkleroot matches the merkelroot calculated from the hashes provided.
     bool mutated;
     uint256 merkleroot = ComputeMerkleRoot(vTxHashes, &mutated);
@@ -158,10 +157,10 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
     for (const CTransaction &tx : vMissingTx)
-        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
+        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     {
-        LOCK(cs_orphancache);
+        LOCK(orphanpool.cs);
         LOCK(cs_xval);
         int missingCount = 0;
         int unnecessaryCount = 0;
@@ -173,7 +172,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
         LOG(THIN, "Thinblock %s waiting for: %d, unnecessary: %d, total txns: %d received txns: %d peer=%s\n",
             pfrom->thinBlock.GetHash().ToString(), pfrom->thinBlockWaitingForTxns, unnecessaryCount,
             pfrom->thinBlock.vtx.size(), pfrom->mapMissingTx.size(), pfrom->GetLogName());
-    } // end lock cs_orphancache, mempool.cs, cs_xval
+    } // end lock orphanpool.cs, mempool.cs, cs_xval
     LOG(THIN, "Total in memory thinblockbytes size is %ld bytes\n", thindata.GetThinBlockBytes());
 
     // Clear out data we no longer need before processing block.
@@ -194,8 +193,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
 
         // create a non-deleting shared pointer to wrap pfrom->thinBlock.  We know that thinBlock will outlast the
         // thread because the thread has a node reference.
-        PV->HandleBlockMessage(pfrom, NetMsgType::THINBLOCK,
-            std::shared_ptr<CBlock>(std::shared_ptr<CBlock>{}, &pfrom->thinBlock), GetInv());
+        PV->HandleBlockMessage(pfrom, NetMsgType::THINBLOCK, MakeBlockRef(pfrom->thinBlock), GetInv());
     }
     else if (pfrom->thinBlockWaitingForTxns > 0)
     {
@@ -228,7 +226,7 @@ CXThinBlock::CXThinBlock(const CBlock &block, CBloomFilter *filter)
     std::set<uint64_t> setPartialTxHash;
     for (unsigned int i = 0; i < nTx; i++)
     {
-        const uint256 hash256 = block.vtx[i].GetHash();
+        const uint256 hash256 = block.vtx[i]->GetHash();
         uint64_t cheapHash = hash256.GetCheapHash();
         vTxHashes.push_back(cheapHash);
 
@@ -241,7 +239,7 @@ CXThinBlock::CXThinBlock(const CBlock &block, CBloomFilter *filter)
         // NOTE: We always add the first tx, the coinbase as it is the one
         //       most often missing.
         if ((filter && !filter->contains(hash256)) || i == 0)
-            vMissingTx.push_back(block.vtx[i]);
+            vMissingTx.push_back(*block.vtx[i]);
     }
 }
 
@@ -254,10 +252,10 @@ CXThinBlock::CXThinBlock(const CBlock &block)
     vTxHashes.reserve(nTx);
     std::set<uint64_t> setPartialTxHash;
 
-    LOCK(cs_orphancache);
+    LOCK(orphanpool.cs);
     for (unsigned int i = 0; i < nTx; i++)
     {
-        const uint256 hash256 = block.vtx[i].GetHash();
+        const uint256 hash256 = block.vtx[i]->GetHash();
         uint64_t cheapHash = hash256.GetCheapHash();
         vTxHashes.push_back(cheapHash);
 
@@ -266,14 +264,15 @@ CXThinBlock::CXThinBlock(const CBlock &block)
         setPartialTxHash.insert(cheapHash);
 
         // if it is missing from this node, then add it to the thin block
-        if (!((mempool.exists(hash256)) || (mapOrphanTransactions.find(hash256) != mapOrphanTransactions.end())))
+        if (!((mempool.exists(hash256)) ||
+                (orphanpool.mapOrphanTransactions.find(hash256) != orphanpool.mapOrphanTransactions.end())))
         {
-            vMissingTx.push_back(block.vtx[i]);
+            vMissingTx.push_back(*block.vtx[i]);
         }
         // We always add the first tx, the coinbase as it is the one
         // most often missing.
         else if (i == 0)
-            vMissingTx.push_back(block.vtx[i]);
+            vMissingTx.push_back(*block.vtx[i]);
     }
 }
 
@@ -337,7 +336,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
     for (const CTransaction &tx : thinBlockTx.vMissingTx)
-        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
+        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     // Get the full hashes from the xblocktx and add them to the thinBlockHashes vector.  These should
     // be all the missing or null hashes that we re-requested.
@@ -346,10 +345,10 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     {
         if (pfrom->thinBlockHashes[i].IsNull())
         {
-            std::map<uint64_t, CTransaction>::iterator val = pfrom->mapMissingTx.find(pfrom->xThinBlockHashes[i]);
+            std::map<uint64_t, CTransactionRef>::iterator val = pfrom->mapMissingTx.find(pfrom->xThinBlockHashes[i]);
             if (val != pfrom->mapMissingTx.end())
             {
-                pfrom->thinBlockHashes[i] = val->second.GetHash();
+                pfrom->thinBlockHashes[i] = val->second->GetHash();
             }
             count++;
         }
@@ -383,7 +382,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Look for each transaction in our various pools and buffers.
     // With xThinBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
     {
-        LOCK(cs_orphancache);
+        LOCK(orphanpool.cs);
         LOCK(cs_xval);
         if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
             return false;
@@ -424,8 +423,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
         // create a non-deleting shared pointer to wrap pfrom->thinBlock.  We know that thinBlock will outlast the
         // thread because the thread has a node reference.
-        PV->HandleBlockMessage(
-            pfrom, strCommand, std::shared_ptr<CBlock>(std::shared_ptr<CBlock>{}, &pfrom->thinBlock), inv);
+        PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->thinBlock), inv);
     }
 
     return true;
@@ -502,9 +500,9 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             {
                 for (unsigned int i = 0; i < block.vtx.size(); i++)
                 {
-                    uint64_t cheapHash = block.vtx[i].GetHash().GetCheapHash();
+                    uint64_t cheapHash = block.vtx[i]->GetHash().GetCheapHash();
                     if (thinRequestBlockTx.setCheapHashesToRequest.count(cheapHash))
-                        vTx.push_back(block.vtx[i]);
+                        vTx.push_back(*block.vtx[i]);
                 }
             }
         }
@@ -684,11 +682,9 @@ bool CXThinBlock::process(CNode *pfrom,
     pfrom->thinBlock.hashPrevBlock = header.hashPrevBlock;
     pfrom->xThinBlockHashes = vTxHashes;
 
-    thindata.AddThinBlockBytes(vTxHashes.size() * sizeof(uint64_t), pfrom); // start counting bytes
-
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
     for (const CTransaction &tx : vMissingTx)
-        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = tx;
+        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
     // We need to check all transaction sources (orphan list, mempool, and new (incoming) transactions in this block)
@@ -703,14 +699,13 @@ bool CXThinBlock::process(CNode *pfrom,
     bool fMerkleRootCorrect = true;
     {
         // Do the orphans first before taking the mempool.cs lock, so that we maintain correct locking order.
-        LOCK(cs_orphancache);
-        for (std::map<uint256, COrphanTx>::iterator mi = mapOrphanTransactions.begin();
-             mi != mapOrphanTransactions.end(); ++mi)
+        LOCK(orphanpool.cs);
+        for (auto &mi : orphanpool.mapOrphanTransactions)
         {
-            uint64_t cheapHash = (*mi).first.GetCheapHash();
+            uint64_t cheapHash = mi.first.GetCheapHash();
             if (mapPartialTxHash.count(cheapHash)) // Check for collisions
                 collision = true;
-            mapPartialTxHash[cheapHash] = (*mi).first;
+            mapPartialTxHash[cheapHash] = mi.first;
         }
 
         LOCK(cs_xval);
@@ -723,23 +718,24 @@ bool CXThinBlock::process(CNode *pfrom,
                 collision = true;
             mapPartialTxHash[cheapHash] = memPoolHashes[i];
         }
-        for (std::map<uint64_t, CTransaction>::iterator mi = pfrom->mapMissingTx.begin();
-             mi != pfrom->mapMissingTx.end(); ++mi)
+        for (auto &mi : pfrom->mapMissingTx)
         {
-            uint64_t cheapHash = (*mi).first;
+            uint64_t cheapHash = mi.first;
             // Check for cheap hash collision. Only mark as collision if the full hash is not the same,
             // because the same tx could have been received into the mempool during the request of the xthinblock.
             // In that case we would have the same transaction twice, so it is not a real cheap hash collision and we
             // continue normally.
             const uint256 existingHash = mapPartialTxHash[cheapHash];
+            // Check if we already have the cheap hash
             if (!existingHash.IsNull())
-            { // Check if we already have the cheap hash
-                if (existingHash != (*mi).second.GetHash())
-                { // Check if it really is a cheap hash collision and not just the same transaction
+            {
+                // Check if it really is a cheap hash collision and not just the same transaction
+                if (existingHash != mi.second->GetHash())
+                {
                     collision = true;
                 }
             }
-            mapPartialTxHash[cheapHash] = (*mi).second.GetHash();
+            mapPartialTxHash[cheapHash] = mi.second->GetHash();
         }
 
         if (!collision)
@@ -776,7 +772,7 @@ bool CXThinBlock::process(CNode *pfrom,
                 }
             }
         }
-    } // End locking cs_orphancache, mempool.cs and cs_xval
+    } // End locking orphanpool.cs, mempool.cs and cs_xval
     LOG(THIN, "Total in memory thinblockbytes size is %ld bytes\n", thindata.GetThinBlockBytes());
 
     // These must be checked outside of the mempool.cs lock or deadlock may occur.
@@ -843,8 +839,7 @@ bool CXThinBlock::process(CNode *pfrom,
     LOG(THIN, "thin block stats: %s\n", thindata.ToString().c_str());
 
     // Process the full block
-    PV->HandleBlockMessage(
-        pfrom, strCommand, std::shared_ptr<CBlock>(std::shared_ptr<CBlock>{}, &pfrom->thinBlock), GetInv());
+    PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->thinBlock), GetInv());
 
     return true;
 }
@@ -852,7 +847,6 @@ bool CXThinBlock::process(CNode *pfrom,
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount)
 {
     AssertLockHeld(cs_xval);
-    uint64_t maxAllowedSize = maxMessageSizeMultiplier * excessiveBlockSize;
 
     // We must have all the full tx hashes by this point.  We first check for any repeating
     // sequences in transaction id's.  This is a possible attack vector and has been used in the past.
@@ -867,41 +861,53 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         }
     }
 
+    // The total maximum bytes that we can use to create a thinblock. We use shared pointers for
+    // the transactions in the thinblock so we don't need to make as much memory available as we did in
+    // the past. We caluculate the max memory allowed by using the largest block size possible, which is the
+    // (maxMessageSizeMultiplier * excessiveBlockSize), then divide that by the smallest transaction possible
+    // which is 158 bytes on a 32bit system.  That gives us the largest number of transactions possible in a block.
+    // Then we multiply number of possible transactions by the size of a shared pointer.
+    // NOTE * The 158 byte smallest txn possible was found by getting the smallest serialized size of a txn directly
+    //        from the blockchain, on a 32bit system.
+    CTransactionRef dummyptx = nullptr;
+    uint32_t nTxSize = sizeof(dummyptx);
+    uint64_t maxAllowedSize = nTxSize * maxMessageSizeMultiplier * excessiveBlockSize / 158;
+
     // Look for each transaction in our various pools and buffers.
     // With xThinBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
     for (const uint256 &hash : pfrom->thinBlockHashes)
     {
         // Replace the truncated hash with the full hash value if it exists
-        CTransaction tx;
+        CTransactionRef ptx = nullptr;
         if (!hash.IsNull())
         {
-            bool inMemPool = mempool.lookup(hash, tx);
+            bool inMemPool = false;
+            ptx = mempool.get(hash);
+            if (ptx)
+                inMemPool = true;
+
             bool inMissingTx = pfrom->mapMissingTx.count(hash.GetCheapHash()) > 0;
-            bool inOrphanCache = mapOrphanTransactions.count(hash) > 0;
+            bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
 
             if ((inMemPool && inMissingTx) || (inOrphanCache && inMissingTx))
                 unnecessaryCount++;
 
             if (inOrphanCache)
             {
-                tx = mapOrphanTransactions[hash].tx;
+                ptx = orphanpool.mapOrphanTransactions[hash].ptx;
                 setUnVerifiedOrphanTxHash.insert(hash);
             }
             else if (inMemPool && fXVal)
                 setPreVerifiedTxHash.insert(hash);
             else if (inMissingTx)
-                tx = pfrom->mapMissingTx[hash.GetCheapHash()];
+                ptx = pfrom->mapMissingTx[hash.GetCheapHash()];
         }
-        if (tx.IsNull())
+        if (!ptx)
             missingCount++;
 
         // In order to prevent a memory exhaustion attack we track transaction bytes used to create Block
         // to see if we've exceeded any limits and if so clear out data and return.
-        uint64_t nTxSize = RecursiveDynamicUsage(tx);
-        uint64_t nCurrentMax = 0;
-        if (maxAllowedSize >= nTxSize)
-            nCurrentMax = maxAllowedSize - nTxSize;
-        if (thindata.AddThinBlockBytes(nTxSize, pfrom) > nCurrentMax)
+        if (thindata.AddThinBlockBytes(nTxSize, pfrom) > maxAllowedSize)
         {
             LEAVE_CRITICAL_SECTION(cs_xval); // maintain locking order with vNodes
             if (ClearLargestThinBlockAndDisconnect(pfrom))
@@ -914,7 +920,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
             }
             ENTER_CRITICAL_SECTION(cs_xval);
         }
-        if (pfrom->nLocalThinBlockBytes > nCurrentMax)
+        if (pfrom->nLocalThinBlockBytes > maxAllowedSize)
         {
             thindata.ClearThinBlockData(pfrom, pfrom->thinBlock.GetBlockHeader().GetHash());
             pfrom->fDisconnect = true;
@@ -925,7 +931,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         }
 
         // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct ordering.
-        pfrom->thinBlock.vtx.push_back(tx);
+        pfrom->thinBlock.vtx.emplace_back(ptx);
     }
     return true;
 }
@@ -1494,16 +1500,16 @@ void AddThinBlockInFlight(CNode *pfrom, uint256 hash)
         std::pair<uint256, CNode::CThinBlockInFlight>(hash, CNode::CThinBlockInFlight()));
 }
 
-void SendXThinBlock(CBlock &block, CNode *pfrom, const CInv &inv)
+void SendXThinBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv)
 {
     if (inv.type == MSG_XTHINBLOCK)
     {
-        CXThinBlock xThinBlock(block, pfrom->pThinBlockFilter);
-        int nSizeBlock = block.GetBlockSize();
+        CXThinBlock xThinBlock(*pblock, pfrom->pThinBlockFilter);
+        int nSizeBlock = pblock->GetBlockSize();
         if (xThinBlock.collision ==
             true) // If there is a cheapHash collision in this block then send a normal thinblock
         {
-            CThinBlock thinBlock(block, *pfrom->pThinBlockFilter);
+            CThinBlock thinBlock(*pblock, *pfrom->pThinBlockFilter);
             int nSizeThinBlock = ::GetSerializeSize(xThinBlock, SER_NETWORK, PROTOCOL_VERSION);
             if (nSizeThinBlock < nSizeBlock)
             {
@@ -1516,7 +1522,7 @@ void SendXThinBlock(CBlock &block, CNode *pfrom, const CInv &inv)
             }
             else
             {
-                pfrom->PushMessage(NetMsgType::BLOCK, block);
+                pfrom->PushMessage(NetMsgType::BLOCK, *pblock);
                 LOG(THIN, "Sent regular block instead - xthinblock size: %d vs block size: %d => tx hashes: %d "
                           "transactions: %d  peer: %s\n",
                     nSizeThinBlock, nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(),
@@ -1537,7 +1543,7 @@ void SendXThinBlock(CBlock &block, CNode *pfrom, const CInv &inv)
             }
             else
             {
-                pfrom->PushMessage(NetMsgType::BLOCK, block);
+                pfrom->PushMessage(NetMsgType::BLOCK, *pblock);
                 LOG(THIN, "Sent regular block instead - xthinblock size: %d vs block size: %d => tx hashes: %d "
                           "transactions: %d  peer: %s\n",
                     nSizeThinBlock, nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(),
@@ -1547,8 +1553,8 @@ void SendXThinBlock(CBlock &block, CNode *pfrom, const CInv &inv)
     }
     else if (inv.type == MSG_THINBLOCK)
     {
-        CThinBlock thinBlock(block, *pfrom->pThinBlockFilter);
-        int nSizeBlock = block.GetBlockSize();
+        CThinBlock thinBlock(*pblock, *pfrom->pThinBlockFilter);
+        int nSizeBlock = pblock->GetBlockSize();
         int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);
         if (nSizeThinBlock < nSizeBlock)
         { // Only send a thinblock if smaller than a regular block
@@ -1560,7 +1566,7 @@ void SendXThinBlock(CBlock &block, CNode *pfrom, const CInv &inv)
         }
         else
         {
-            pfrom->PushMessage(NetMsgType::BLOCK, block);
+            pfrom->PushMessage(NetMsgType::BLOCK, *pblock);
             LOG(THIN, "Sent regular block instead - thinblock size: %d vs block size: %d => tx hashes: %d "
                       "transactions: %d  peer: %s\n",
                 nSizeThinBlock, nSizeBlock, thinBlock.vTxHashes.size(), thinBlock.vMissingTx.size(),
@@ -1612,7 +1618,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
     bool fDeterministic)
 {
     int64_t nStartTimer = GetTimeMillis();
-    seed_insecure_rand(fDeterministic);
+    FastRandomContext insecure_rand(fDeterministic);
     std::set<uint256> setHighScoreMemPoolHashes;
     std::set<uint256> setPriorityMemPoolHashes;
 
@@ -1808,7 +1814,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
         nFPRate = nMaxFalsePositive;
 
     uint32_t nMaxFilterSize = std::max(SMALLEST_MAX_BLOOM_FILTER_SIZE, pfrom->nXthinBloomfilterSize);
-    filterMemPool = CBloomFilter(nElements, nFPRate, insecure_rand(), BLOOM_UPDATE_ALL, nMaxFilterSize);
+    filterMemPool = CBloomFilter(nElements, nFPRate, insecure_rand.rand32(), BLOOM_UPDATE_ALL, nMaxFilterSize);
     LOG(THIN, "FPrate: %f Num elements in bloom filter:%d high priority txs:%d high fee txs:%d orphans:%d total "
               "txs in mempool:%d\n",
         nFPRate, nElements, setPriorityMemPoolHashes.size(), setHighScoreMemPoolHashes.size(), vOrphanHashes.size(),

@@ -12,6 +12,7 @@
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/sign.h"
+#include "test/scriptflags.h"
 #include "test/test_bitcoin.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -37,9 +38,6 @@ using namespace std;
 
 static const unsigned int flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID;
 
-unsigned int ParseScriptFlags(string strFlags);
-string FormatScriptFlags(unsigned int flags);
-
 UniValue read_json(const std::string &jsondata)
 {
     UniValue v;
@@ -62,7 +60,9 @@ static ScriptErrorDesc script_errors[] = {
     {SCRIPT_ERR_OK, "OK"}, {SCRIPT_ERR_UNKNOWN_ERROR, "UNKNOWN_ERROR"}, {SCRIPT_ERR_EVAL_FALSE, "EVAL_FALSE"},
     {SCRIPT_ERR_OP_RETURN, "OP_RETURN"}, {SCRIPT_ERR_SCRIPT_SIZE, "SCRIPT_SIZE"}, {SCRIPT_ERR_PUSH_SIZE, "PUSH_SIZE"},
     {SCRIPT_ERR_OP_COUNT, "OP_COUNT"}, {SCRIPT_ERR_STACK_SIZE, "STACK_SIZE"}, {SCRIPT_ERR_SIG_COUNT, "SIG_COUNT"},
-    {SCRIPT_ERR_PUBKEY_COUNT, "PUBKEY_COUNT"}, {SCRIPT_ERR_VERIFY, "VERIFY"}, {SCRIPT_ERR_EQUALVERIFY, "EQUALVERIFY"},
+    {SCRIPT_ERR_PUBKEY_COUNT, "PUBKEY_COUNT"}, {SCRIPT_ERR_INVALID_OPERAND_SIZE, "OPERAND_SIZE"},
+    {SCRIPT_ERR_INVALID_NUMBER_RANGE, "INVALID_NUMBER_RANGE"}, {SCRIPT_ERR_INVALID_SPLIT_RANGE, "SPLIT_RANGE"},
+    {SCRIPT_ERR_VERIFY, "VERIFY"}, {SCRIPT_ERR_EQUALVERIFY, "EQUALVERIFY"},
     {SCRIPT_ERR_CHECKMULTISIGVERIFY, "CHECKMULTISIGVERIFY"}, {SCRIPT_ERR_CHECKSIGVERIFY, "CHECKSIGVERIFY"},
     {SCRIPT_ERR_NUMEQUALVERIFY, "NUMEQUALVERIFY"}, {SCRIPT_ERR_BAD_OPCODE, "BAD_OPCODE"},
     {SCRIPT_ERR_DISABLED_OPCODE, "DISABLED_OPCODE"}, {SCRIPT_ERR_INVALID_STACK_OPERATION, "INVALID_STACK_OPERATION"},
@@ -72,7 +72,8 @@ static ScriptErrorDesc script_errors[] = {
     {SCRIPT_ERR_SIG_DER, "SIG_DER"}, {SCRIPT_ERR_MINIMALDATA, "MINIMALDATA"}, {SCRIPT_ERR_SIG_PUSHONLY, "SIG_PUSHONLY"},
     {SCRIPT_ERR_SIG_HIGH_S, "SIG_HIGH_S"}, {SCRIPT_ERR_SIG_NULLDUMMY, "SIG_NULLDUMMY"},
     {SCRIPT_ERR_PUBKEYTYPE, "PUBKEYTYPE"}, {SCRIPT_ERR_CLEANSTACK, "CLEANSTACK"}, {SCRIPT_ERR_SIG_NULLFAIL, "NULLFAIL"},
-    {SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS, "DISCOURAGE_UPGRADABLE_NOPS"},
+    {SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS, "DISCOURAGE_UPGRADABLE_NOPS"}, {SCRIPT_ERR_DIV_BY_ZERO, "DIV_BY_ZERO"},
+    {SCRIPT_ERR_MOD_BY_ZERO, "MOD_BY_ZERO"},
 };
 
 const char *FormatScriptError(ScriptError_t err)
@@ -588,6 +589,18 @@ BOOST_AUTO_TEST_CASE(script_build)
     tests.push_back(TestBuilder(CScript() << ToByteVector(keys.pubkey1C) << OP_CHECKSIG << OP_NOT,
                         "BIP66 example 4, with DERSIG", SCRIPT_VERIFY_DERSIG)
                         .Num(0));
+    tests.push_back(TestBuilder(CScript() << ToByteVector(keys.pubkey1C) << OP_CHECKSIG << OP_NOT,
+                        "BIP66 example 4, with DERSIG, non-null DER-compliant signature", SCRIPT_VERIFY_DERSIG)
+                        .Push("300602010102010101"));
+    tests.push_back(TestBuilder(CScript() << ToByteVector(keys.pubkey1C) << OP_CHECKSIG << OP_NOT,
+                        "BIP66 example 4, with DERSIG and NULLFAIL", SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_NULLFAIL)
+                        .Num(0));
+    tests.push_back(TestBuilder(CScript() << ToByteVector(keys.pubkey1C) << OP_CHECKSIG << OP_NOT,
+                        "BIP66 example 4, with DERSIG and NULLFAIL, "
+                        "non-null DER-compliant signature",
+                        SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_NULLFAIL)
+                        .Push("300602010102010101")
+                        .ScriptError(SCRIPT_ERR_SIG_NULLFAIL));
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey1C) << OP_CHECKSIG, "BIP66 example 5, without DERSIG", 0)
             .Num(1)

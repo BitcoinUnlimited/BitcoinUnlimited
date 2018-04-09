@@ -648,13 +648,13 @@ void CTxMemPool::_CalculateDescendants(txiter entryit, setEntries &setDescendant
     }
 }
 
-void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransaction> &removed, bool fRecursive)
+void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransactionRef> &removed, bool fRecursive)
 {
     WRITELOCK(cs);
     _remove(origTx, removed, fRecursive);
 }
 
-void CTxMemPool::_remove(const CTransaction &origTx, std::list<CTransaction> &removed, bool fRecursive)
+void CTxMemPool::_remove(const CTransaction &origTx, std::list<CTransactionRef> &removed, bool fRecursive)
 {
     AssertWriteLockHeld(cs);
     // Remove transaction from memory pool
@@ -683,7 +683,7 @@ void CTxMemPool::_remove(const CTransaction &origTx, std::list<CTransaction> &re
     setEntries setAllRemoves;
     if (fRecursive)
     {
-        BOOST_FOREACH (txiter it, txToRemove)
+        for (txiter it : txToRemove)
         {
             _CalculateDescendants(it, setAllRemoves);
         }
@@ -692,9 +692,9 @@ void CTxMemPool::_remove(const CTransaction &origTx, std::list<CTransaction> &re
     {
         setAllRemoves.swap(txToRemove);
     }
-    BOOST_FOREACH (txiter it, setAllRemoves)
+    for (txiter it : setAllRemoves)
     {
-        removed.push_back(it->GetTx());
+        removed.push_back(it->GetSharedTx());
     }
     _RemoveStaged(setAllRemoves);
 }
@@ -738,24 +738,24 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
             mapTx.modify(it, update_lock_points(lp));
         }
     }
-    BOOST_FOREACH (const CTransaction &tx, transactionsToRemove)
+    for (const CTransaction &tx : transactionsToRemove)
     {
-        list<CTransaction> removed;
+        std::list<CTransactionRef> removed;
         _remove(tx, removed, true);
     }
 }
 
-void CTxMemPool::removeConflicts(const CTransaction &tx, std::list<CTransaction> &removed)
+void CTxMemPool::removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed)
 {
     WRITELOCK(cs);
     _removeConflicts(tx, removed);
 }
 
-void CTxMemPool::_removeConflicts(const CTransaction &tx, std::list<CTransaction> &removed)
+void CTxMemPool::_removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed)
 {
     AssertWriteLockHeld(cs);
     // Remove transactions which depend on inputs of tx, recursively
-    BOOST_FOREACH (const CTxIn &txin, tx.vin)
+    for (const CTxIn &txin : tx.vin)
     {
         std::map<COutPoint, CInPoint>::iterator it = mapNextTx.find(txin.prevout);
         if (it != mapNextTx.end())
@@ -773,27 +773,27 @@ void CTxMemPool::_removeConflicts(const CTransaction &tx, std::list<CTransaction
 /**
  * Called when a block is connected. Removes from mempool and updates the miner fee estimator.
  */
-void CTxMemPool::removeForBlock(const std::vector<CTransaction> &vtx,
+void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
     unsigned int nBlockHeight,
-    std::list<CTransaction> &conflicts,
+    std::list<CTransactionRef> &conflicts,
     bool fCurrentEstimate)
 {
     WRITELOCK(cs);
     std::vector<CTxMemPoolEntry> entries;
-    BOOST_FOREACH (const CTransaction &tx, vtx)
+    for (const auto &tx : vtx)
     {
-        uint256 hash = tx.GetHash();
+        uint256 hash = tx->GetHash();
 
         indexed_transaction_set::iterator i = mapTx.find(hash);
         if (i != mapTx.end())
             entries.push_back(*i);
     }
-    BOOST_FOREACH (const CTransaction &tx, vtx)
+    for (const auto &tx : vtx)
     {
-        std::list<CTransaction> dummy;
-        _remove(tx, dummy, false);
-        _removeConflicts(tx, conflicts);
-        _ClearPrioritisation(tx.GetHash());
+        std::list<CTransactionRef> dummy;
+        _remove(*tx, dummy, false);
+        _removeConflicts(*tx, conflicts);
+        _ClearPrioritisation(tx->GetHash());
     }
     // After the txs in the new block have been removed from the mempool, update policy estimates
     minerPolicyEstimator->processBlock(nBlockHeight, entries, fCurrentEstimate);
@@ -825,7 +825,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
     if (nCheckFrequency == 0)
         return;
 
-    if (insecure_rand() >= nCheckFrequency)
+    if (GetRand(std::numeric_limits<uint32_t>::max()) >= nCheckFrequency)
         return;
 
     uint64_t checkTotal = 0;
@@ -976,6 +976,7 @@ bool CTxMemPool::lookup(const uint256 &hash, CTxMemPoolEntry &result) const
     return _lookup(hash, result);
 }
 
+
 bool CTxMemPool::lookup(const uint256 &hash, CTransaction &result) const
 {
     READLOCK(cs);
@@ -1051,6 +1052,21 @@ bool CTxMemPool::ReadFeeEstimates(CAutoFile &filein)
     return true;
 }
 
+CTransactionRef CTxMemPool::_get(const uint256 &hash) const
+{
+    AssertLockHeld(cs);
+    indexed_transaction_set::const_iterator i = mapTx.find(hash);
+    if (i == mapTx.end())
+        return nullptr;
+    return i->GetSharedTx();
+}
+
+CTransactionRef CTxMemPool::get(const uint256 &hash) const
+{
+    READLOCK(cs);
+    return _get(hash);
+}
+
 void CTxMemPool::PrioritiseTransaction(const uint256 hash,
     const string strHash,
     double dPriorityDelta,
@@ -1120,12 +1136,12 @@ bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const
     // If an entry in the mempool exists, always return that one, as it's guaranteed to never
     // conflict with the underlying cache, and it cannot have pruned entries (as it contains full)
     // transactions. First checking the underlying cache risks returning a pruned entry instead.
-    CTransaction tx;
-    if (mempool._lookup(outpoint.hash, tx))
+    CTransactionRef ptx = mempool._get(outpoint.hash);
+    if (ptx)
     {
-        if (outpoint.n < tx.vout.size())
+        if (outpoint.n < ptx->vout.size())
         {
-            coin = Coin(tx.vout[outpoint.n], MEMPOOL_HEIGHT, false);
+            coin = Coin(ptx->vout[outpoint.n], MEMPOOL_HEIGHT, false);
             return true;
         }
         else

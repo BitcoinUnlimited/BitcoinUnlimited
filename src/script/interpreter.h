@@ -104,7 +104,12 @@ enum
     //
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
 
-    SCRIPT_ENABLE_DATASIGVERIFY = (1U << 17),
+    // Enable Replay protection.
+    SCRIPT_ENABLE_REPLAY_PROTECTION = (1U << 17),
+
+    // Enable new opcodes.
+    //
+    SCRIPT_ENABLE_MAY152018_OPCODES = (1U << 18),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);

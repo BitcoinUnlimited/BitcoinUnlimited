@@ -38,6 +38,7 @@
 #include "tinyformat.h"
 #include "txdb.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "uahf_fork.h"
 #include "ui_interface.h"
 #include "undo.h"
@@ -95,17 +96,6 @@ CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
 // BU: Move global objects to a single file
 extern CTxMemPool mempool;
 
-// BU: change locking of orphan map from using cs_main to cs_orphancache.
-// There is too much dependance on cs_main locks which are generally too
-// broad in scope.
-// Move globals to a single file
-extern CCriticalSection cs_orphancache;
-extern std::map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs_orphancache);
-extern std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs_orphancache);
-
-int64_t nLastOrphanCheck = GetTime(); // Used in EraseOrphansByTime()
-static uint64_t nBytesOrphanPool = 0; // Current in memory size of the orphan pool.
-
 extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
 extern CTweak<unsigned int> blockDownloadWindow;
 extern CTweak<uint64_t> reindexTypicalBlockSize;
@@ -118,14 +108,6 @@ extern CCriticalSection cs_mapInboundConnectionTracker;
 /** A cache to store headers that have arrived but can not yet be connected **/
 std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders;
 
-/**
- * Returns true if there are nRequired or more blocks of minVersion or above
- * in the last Consensus::Params::nMajorityWindow blocks, starting at pstart and going backwards.
- */
-static bool IsSuperMajority(int minVersion,
-    const CBlockIndex *pstart,
-    unsigned nRequired,
-    const Consensus::Params &consensusParams);
 static void CheckBlockIndex(const Consensus::Params &consensusParams);
 
 /** Constant stuff for coinbase transactions we create: */
@@ -286,7 +268,10 @@ void FinalizeNode(NodeId nodeid)
     for (const QueuedBlock &entry : state->vBlocksInFlight)
     {
         LOGA("erasing map mapblocksinflight entries\n");
-        mapBlocksInFlight.erase(entry.hash);
+        requester.mapBlocksInFlight.erase(entry.hash);
+
+        // Reset all requests times to zero so that we can immediately re-request these blocks
+        requester.ResetLastRequestTime(entry.hash);
     }
     nPreferredDownload -= state->fPreferredDownload;
     requester.nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
@@ -297,7 +282,7 @@ void FinalizeNode(NodeId nodeid)
     if (mapNodeState.empty())
     {
         // Do a consistency check after the last peer is removed.  Force consistent state if production code
-        DbgAssert(mapBlocksInFlight.empty(), mapBlocksInFlight.clear());
+        DbgAssert(requester.mapBlocksInFlight.empty(), requester.mapBlocksInFlight.clear());
         DbgAssert(nPreferredDownload == 0, nPreferredDownload = 0);
         DbgAssert(requester.nPeersWithValidatedDownloads == 0, requester.nPeersWithValidatedDownloads = 0);
     }
@@ -378,128 +363,6 @@ CBlockIndex *FindForkInGlobalIndex(const CChain &chain, const CBlockLocator &loc
 
 CCoinsViewCache *pcoinsTip = NULL;
 CBlockTreeDB *pblocktree = NULL;
-
-//////////////////////////////////////////////////////////////////////////////
-//
-// mapOrphanTransactions
-//
-static bool AlreadyHaveOrphan(uint256 hash)
-{
-    LOCK(cs_orphancache);
-    if (mapOrphanTransactions.count(hash))
-        return true;
-    return false;
-}
-bool AddOrphanTx(const CTransaction &tx, NodeId peer) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
-{
-    AssertLockHeld(cs_orphancache);
-
-    if (mapOrphanTransactions.empty())
-        DbgAssert(nBytesOrphanPool == 0, nBytesOrphanPool = 0);
-
-    uint256 hash = tx.GetHash();
-    if (mapOrphanTransactions.count(hash))
-        return false;
-
-    // Ignore orphans larger than the largest txn size allowed.
-    unsigned int sz = ::GetSerializeSize(tx, SER_NETWORK, CTransaction::CURRENT_VERSION);
-    if (sz > MAX_STANDARD_TX_SIZE)
-    {
-        LOG(MEMPOOL, "ignoring large orphan tx (size: %u, hash: %s)\n", sz, hash.ToString());
-        return false;
-    }
-
-    uint64_t txSize = RecursiveDynamicUsage(tx);
-    mapOrphanTransactions[hash].tx = tx;
-    mapOrphanTransactions[hash].fromPeer = peer;
-    mapOrphanTransactions[hash].nEntryTime = GetTime(); // BU - Xtreme Thinblocks;
-    mapOrphanTransactions[hash].nOrphanTxSize = txSize;
-    BOOST_FOREACH (const CTxIn &txin, tx.vin)
-        mapOrphanTransactionsByPrev[txin.prevout.hash].insert(hash);
-
-    nBytesOrphanPool += txSize;
-    LOG(MEMPOOL, "stored orphan tx %s bytes:%ld (mapsz %u prevsz %u), orphan pool bytes:%ld\n", hash.ToString(), txSize,
-        mapOrphanTransactions.size(), mapOrphanTransactionsByPrev.size(), nBytesOrphanPool);
-    return true;
-}
-
-void EraseOrphanTx(uint256 hash) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
-{
-    AssertLockHeld(cs_orphancache);
-
-    std::map<uint256, COrphanTx>::iterator it = mapOrphanTransactions.find(hash);
-    if (it == mapOrphanTransactions.end())
-        return;
-    BOOST_FOREACH (const CTxIn &txin, it->second.tx.vin)
-    {
-        std::map<uint256, std::set<uint256> >::iterator itPrev = mapOrphanTransactionsByPrev.find(txin.prevout.hash);
-        if (itPrev == mapOrphanTransactionsByPrev.end())
-            continue;
-        itPrev->second.erase(hash);
-        if (itPrev->second.empty())
-            mapOrphanTransactionsByPrev.erase(itPrev);
-    }
-
-    nBytesOrphanPool -= it->second.nOrphanTxSize;
-    LOG(MEMPOOL, "Erased orphan tx %s of size %ld bytes, orphan pool bytes:%ld\n", it->second.tx.GetHash().ToString(),
-        it->second.nOrphanTxSize, nBytesOrphanPool);
-    mapOrphanTransactions.erase(it);
-}
-
-// BU - Xtreme Thinblocks: begin
-void EraseOrphansByTime() EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
-{
-    AssertLockHeld(cs_orphancache);
-    // Because we have to iterate through the entire orphan cache which can be large we don't want to check this
-    // every time a tx enters the mempool but just once every 5 minutes is good enough.
-    if (GetTime() < nLastOrphanCheck + 5 * 60)
-        return;
-    int64_t nOrphanTxCutoffTime = GetTime() - GetArg("-orphanpoolexpiry", DEFAULT_ORPHANPOOL_EXPIRY) * 60 * 60;
-    std::map<uint256, COrphanTx>::iterator iter = mapOrphanTransactions.begin();
-    while (iter != mapOrphanTransactions.end())
-    {
-        std::map<uint256, COrphanTx>::iterator mi = iter++; // increment to avoid iterator becoming invalid
-        int64_t nEntryTime = mi->second.nEntryTime;
-        if (nEntryTime < nOrphanTxCutoffTime)
-        {
-            uint256 txHash = mi->second.tx.GetHash();
-
-            // Uncache any coins that may exist for orphans that will be erased
-            pcoinsTip->UncacheTx(mi->second.tx);
-
-            LOG(MEMPOOL, "Erased old orphan tx %s of age %d seconds\n", txHash.ToString(), GetTime() - nEntryTime);
-            EraseOrphanTx(txHash);
-        }
-    }
-
-    nLastOrphanCheck = GetTime();
-}
-// BU - Xtreme Thinblocks: end
-
-unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t nMaxBytes) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache)
-{
-    AssertLockHeld(cs_orphancache);
-
-    // Limit the orphan pool size by either number of transactions or the max orphan pool size allowed.
-    // Limiting by pool size to 1/10th the size of the maxmempool alone is not enough because the total number
-    // of txns in the pool can adversely effect the size of the bloom filter in a get_xthin message.
-    unsigned int nEvicted = 0;
-    while (mapOrphanTransactions.size() > nMaxOrphans || nBytesOrphanPool > nMaxBytes)
-    {
-        // Evict a random orphan:
-        uint256 randomhash = GetRandHash();
-        std::map<uint256, COrphanTx>::iterator it = mapOrphanTransactions.lower_bound(randomhash);
-        if (it == mapOrphanTransactions.end())
-            it = mapOrphanTransactions.begin();
-
-        // Uncache any coins that may exist for orphans that will be erased
-        pcoinsTip->UncacheTx(it->second.tx);
-
-        EraseOrphanTx(it->first);
-        ++nEvicted;
-    }
-    return nEvicted;
-}
 
 bool CheckFinalTx(const CTransaction &tx, int flags)
 {
@@ -632,6 +495,9 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints *lp, bool 
     return EvaluateSequenceLocks(index, lockPair);
 }
 
+// Returns the script flags which should be checked for a given block
+static unsigned int GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &chainparams);
+
 void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
 {
     std::vector<COutPoint> vCoinsToUncache;
@@ -654,20 +520,31 @@ std::string FormatStateMessage(const CValidationState &state)
         state.GetDebugMessage().empty() ? "" : ", " + state.GetDebugMessage(), state.GetRejectCode());
 }
 
-static bool IsDAAEnabled(const CChainParams &chainparams, int nHeight)
+static bool IsDAAEnabled(const Consensus::Params &consensusparams, int nHeight)
 {
-    return nHeight >= chainparams.GetConsensus().daaHeight;
+    return nHeight >= consensusparams.daaHeight;
 }
 
-bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev)
+bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev)
 {
     if (pindexPrev == nullptr)
     {
         return false;
     }
 
-    return IsDAAEnabled(chainparams, pindexPrev->nHeight);
+    return IsDAAEnabled(consensusparams, pindexPrev->nHeight);
 }
+
+bool IsMay152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev)
+{
+    if (pindexPrev == nullptr)
+    {
+        return false;
+    }
+
+    return pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value);
+}
+
 
 bool AreFreeTxnsDisallowed()
 {
@@ -694,6 +571,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     uint64_t start = GetTimeMicros();
     AssertLockHeld(cs_main);
 
+    // After the May, 15 hard fork, we start accepting larger op_return.
+    const CChainParams &chainparams = Params();
+    const bool hasMay152018 = IsMay152018Enabled(chainparams.GetConsensus(), chainActive.Tip());
+
     if (!CheckTransaction(tx, state))
         return false;
 
@@ -716,7 +597,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
     std::string reason;
-    const CChainParams &chainparams = Params();
     bool fRequireStandard = chainparams.RequireStandard();
     if (fRequireStandard && !IsStandardTx(tx, reason))
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
@@ -970,12 +850,18 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         size_t nLimitDescendantSize = GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
         std::string errString;
 
+        // Set extraFlags as a set of flags that needs to be activated.
+        uint32_t extraFlags = 0;
+        if (hasMay152018)
+        {
+            extraFlags |= SCRIPT_ENABLE_MAY152018_OPCODES;
+        }
 
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         unsigned char sighashType = 0;
-        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true, &resourceTracker,
-                NULL, &sighashType))
+        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags | extraFlags, true,
+                &resourceTracker, nullptr, &sighashType))
         {
             LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", tx.GetHash().ToString().c_str());
             return false;
@@ -992,8 +878,8 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true, NULL, NULL,
-                &sighashType2))
+        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | forkVerifyFlags | extraFlags, true,
+                nullptr, nullptr, &sighashType2))
         {
             return error(
                 "%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
@@ -1069,17 +955,19 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
 
 /** Return transaction in tx, and if it was found inside a block, its hash is placed in hashBlock */
 bool GetTransaction(const uint256 &hash,
-    CTransaction &txOut,
+    CTransactionRef &txOut,
     const Consensus::Params &consensusParams,
     uint256 &hashBlock,
     bool fAllowSlow)
 {
-    CBlockIndex *pindexSlow = NULL;
+    CBlockIndex *pindexSlow = nullptr;
 
     LOCK(cs_main);
 
-    if (mempool.lookup(hash, txOut))
+    CTransactionRef ptx = mempool.get(hash);
+    if (ptx)
     {
+        txOut = ptx;
         return true;
     }
 
@@ -1103,7 +991,7 @@ bool GetTransaction(const uint256 &hash,
                 return error("%s: Deserialize or I/O error - %s", __func__, e.what());
             }
             hashBlock = header.GetHash();
-            if (txOut.GetHash() != hash)
+            if (txOut->GetHash() != hash)
                 return error("%s: txid mismatch", __func__);
             return true;
         }
@@ -1122,9 +1010,9 @@ bool GetTransaction(const uint256 &hash,
         CBlock block;
         if (ReadBlockFromDisk(block, pindexSlow, consensusParams))
         {
-            BOOST_FOREACH (const CTransaction &tx, block.vtx)
+            for (const auto &tx : block.vtx)
             {
-                if (tx.GetHash() == hash)
+                if (tx->GetHash() == hash)
                 {
                     txOut = tx;
                     hashBlock = pindexSlow->GetBlockHash();
@@ -1462,7 +1350,9 @@ bool CheckInputs(const CTransaction &tx,
                 }
                 else if (!check())
                 {
-                    if (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS)
+                    const bool hasNonMandatoryFlags = (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
+                    const bool doesNotHaveMay152018 = (flags & SCRIPT_ENABLE_MAY152018_OPCODES) == 0;
+                    if (hasNonMandatoryFlags || doesNotHaveMay152018)
                     {
                         // Check whether the failure was caused by a
                         // non-mandatory script verification check, such as
@@ -1470,8 +1360,14 @@ bool CheckInputs(const CTransaction &tx,
                         // arguments; if so, don't trigger DoS protection to
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
-                        CScriptCheck check2(NULL, scriptPubKey, amount, tx, i,
-                            flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheStore);
+                        //
+                        // We also check activating the may152018 opcodes as it is a
+                        // strictly additive change and we would not like to ban some of
+                        // our peer that are ahead of us and are considering the fork
+                        // as activated.
+                        CScriptCheck check2(nullptr, scriptPubKey, amount, tx, i,
+                            (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS) | SCRIPT_ENABLE_MAY152018_OPCODES,
+                            cacheStore);
                         if (check2())
                             return state.Invalid(
                                 false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
@@ -1648,7 +1544,7 @@ static DisconnectResult DisconnectBlock(const CBlock &block, const CBlockIndex *
     // undo transactions in reverse order
     for (int i = block.vtx.size() - 1; i >= 0; i--)
     {
-        const CTransaction &tx = block.vtx[i];
+        const CTransaction &tx = *(block.vtx[i]);
         uint256 hash = tx.GetHash();
 
         // Check that all outputs are available and match the outputs in the block itself
@@ -1837,6 +1733,64 @@ public:
 // Protected by cs_main
 static ThresholdConditionCache warningcache[VERSIONBITS_NUM_BITS];
 
+static uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &consensusparams)
+{
+    AssertLockHeld(cs_main);
+
+    uint32_t flags = SCRIPT_VERIFY_NONE;
+
+    // Start enforcing P2SH (Bip16)
+    if (pindex->GetBlockTime() >= consensusparams.BIP16Height)
+    {
+        flags |= SCRIPT_VERIFY_P2SH;
+    }
+
+    // Start enforcing the DERSIG (BIP66) rule
+    if (pindex->nHeight >= consensusparams.BIP66Height)
+    {
+        flags |= SCRIPT_VERIFY_DERSIG;
+    }
+
+    // Start enforcing CHECKLOCKTIMEVERIFY (BIP65) rule
+    if (pindex->nHeight >= consensusparams.BIP65Height)
+    {
+        flags |= SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
+    }
+
+    // Start enforcing BIP68 (sequence locks) and BIP112 (CHECKSEQUENCEVERIFY) using versionbits logic.
+    if (VersionBitsState(pindex->pprev, consensusparams, Consensus::DEPLOYMENT_CSV, versionbitscache) ==
+        THRESHOLD_ACTIVE)
+    {
+        flags |= SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
+    }
+
+    // Start enforcing the UAHF fork
+    if (UAHFforkActivated(pindex->nHeight))
+    {
+        flags |= SCRIPT_VERIFY_STRICTENC;
+        flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
+    }
+
+    // If the DAA HF is enabled, we start rejecting transaction that use a high
+    // s in their signature. We also make sure that signature that are supposed
+    // to fail (for instance in multisig or other forms of smart contracts) are
+    // null.
+    if (IsDAAEnabled(consensusparams, pindex->pprev))
+    {
+        flags |= SCRIPT_VERIFY_LOW_S;
+        flags |= SCRIPT_VERIFY_NULLFAIL;
+    }
+
+    // The May 15, 2018 HF enable a set of opcodes.
+    if (IsMay152018Enabled(consensusparams, pindex->pprev))
+    {
+        flags |= SCRIPT_ENABLE_MAY152018_OPCODES;
+    }
+
+
+    return flags;
+}
+
 static int64_t nTimeCheck = 0;
 static int64_t nTimeForks = 0;
 static int64_t nTimeVerify = 0;
@@ -1938,9 +1892,9 @@ bool ConnectBlock(const CBlock &block,
         {
             for (const auto &tx : block.vtx)
             {
-                for (size_t o = 0; o < tx.vout.size(); o++)
+                for (size_t o = 0; o < tx->vout.size(); o++)
                 {
-                    if (view.HaveCoin(COutPoint(tx.GetHash(), o)))
+                    if (view.HaveCoin(COutPoint(tx->GetHash(), o)))
                     {
                         return state.DoS(100, error("ConnectBlock(): tried to overwrite transaction"), REJECT_INVALID,
                             "bad-txns-BIP30");
@@ -1949,52 +1903,19 @@ bool ConnectBlock(const CBlock &block,
             }
         }
     }
-    // BIP16 didn't become active until Apr 1 2012
-    int64_t nBIP16SwitchTime = 1333238400;
-    bool fStrictPayToScriptHash = (pindex->GetBlockTime() >= nBIP16SwitchTime);
-
-    uint32_t flags = fStrictPayToScriptHash ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE;
-
-    if (UAHFforkActivated(pindex->nHeight))
-    {
-        flags |= SCRIPT_VERIFY_STRICTENC;
-        flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
-    }
-
-    // Start enforcing the DERSIG (BIP66) rules, for block.nVersion=3 blocks,
-    // when 75% of the network has upgraded:
-    if (block.nVersion >= 3 && IsSuperMajority(3, pindex->pprev,
-                                   chainparams.GetConsensus().nMajorityEnforceBlockUpgrade, chainparams.GetConsensus()))
-    {
-        flags |= SCRIPT_VERIFY_DERSIG;
-    }
-
-    // Start enforcing CHECKLOCKTIMEVERIFY, (BIP65) for block.nVersion=4
-    // blocks, when 75% of the network has upgraded:
-    if (block.nVersion >= 4 && IsSuperMajority(4, pindex->pprev,
-                                   chainparams.GetConsensus().nMajorityEnforceBlockUpgrade, chainparams.GetConsensus()))
-    {
-        flags |= SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
-    }
 
     // Start enforcing BIP68 (sequence locks) and BIP112 (CHECKSEQUENCEVERIFY) using versionbits logic.
     int nLockTimeFlags = 0;
     if (VersionBitsState(pindex->pprev, chainparams.GetConsensus(), Consensus::DEPLOYMENT_CSV, versionbitscache) ==
         THRESHOLD_ACTIVE)
     {
-        flags |= SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
         nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
     }
 
-    // If the DAA HF is enabled, we start rejecting transaction that use a high
-    // s in their signature. We also make sure that signature that are supposed
-    // to fail (for instance in multisig or other forms of smart contracts) are
-    // null.
-    if (IsDAAEnabled(chainparams, pindex->pprev))
-    {
-        flags |= SCRIPT_VERIFY_LOW_S;
-        flags |= SCRIPT_VERIFY_NULLFAIL;
-    }
+    // Get the script flags for this block
+    uint32_t flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus());
+    bool fStrictPayToScriptHash = flags & SCRIPT_VERIFY_P2SH;
+
 
     int64_t nTime2 = GetTimeMicros();
     nTimeForks += nTime2 - nTime1;
@@ -2056,7 +1977,7 @@ bool ConnectBlock(const CBlock &block,
         //       internally grabs the cs_main lock when needed.
         for (unsigned int i = 0; i < block.vtx.size(); i++)
         {
-            const CTransaction &tx = block.vtx[i];
+            const CTransaction &tx = *(block.vtx[i]);
 
             nInputs += tx.vin.size();
             nSigOps += GetLegacySigOpCount(tx);
@@ -2171,7 +2092,7 @@ bool ConnectBlock(const CBlock &block,
         if (!control.Wait())
         {
             // if we end up here then the signature verification failed and we must re-lock cs_main before returning.
-            return state.DoS(100, false);
+            return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs", false, "parallel script check failed");
         }
         if (PV->QuitReceived(this_id, fParallel))
         {
@@ -2179,9 +2100,9 @@ bool ConnectBlock(const CBlock &block,
         }
 
         CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
-        if (block.vtx[0].GetValueOut() > blockReward)
+        if (block.vtx[0]->GetValueOut() > blockReward)
             return state.DoS(100, error("ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)",
-                                      block.vtx[0].GetValueOut(), blockReward),
+                                      block.vtx[0]->GetValueOut(), blockReward),
                 REJECT_INVALID, "bad-cb-amount");
 
         if (fJustCheck)
@@ -2259,7 +2180,7 @@ bool ConnectBlock(const CBlock &block,
     // Watch for changes to the previous coinbase transaction.
     static uint256 hashPrevBestCoinBase;
     GetMainSignals().UpdatedTransaction(hashPrevBestCoinBase);
-    hashPrevBestCoinBase = block.vtx[0].GetHash();
+    hashPrevBestCoinBase = block.vtx[0]->GetHash();
 
     int64_t nTime6 = GetTimeMicros();
     nTimeCallbacks += nTime6 - nTime5;
@@ -2446,6 +2367,20 @@ void static UpdateTip(CBlockIndex *pindexNew)
     const CChainParams &chainParams = Params();
     chainActive.SetTip(pindexNew);
 
+    // Check Activate May 2018 HF rules after each new tip is connected and the blockindex updated.
+    if (IsMay152018Enabled(chainParams.GetConsensus(), pindexNew))
+    {
+        // Bump the accepted block size to 32MB and the default generated size to 8MB
+        if (miningForkEB.value > excessiveBlockSize)
+            excessiveBlockSize = miningForkEB.value;
+        if (miningForkMG.value > maxGeneratedBlock)
+            maxGeneratedBlock = miningForkMG.value;
+        settingsToUserAgentString();
+        // Bump OP_RETURN size:
+        if (nMaxDatacarrierBytes < MAX_OP_RETURN_MAY2018)
+            nMaxDatacarrierBytes = MAX_OP_RETURN_MAY2018;
+    }
+
     // New best block
     nTimeBestReceived = GetTime();
     mempool.AddTransactionsUpdated(1);
@@ -2553,15 +2488,24 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
 
+    // If this block enabled the may152018 opcodes, then we need to
+    // clear the mempool of any transaction using them.
+    if (IsMay152018Enabled(consensusParams, pindexDelete) && !IsMay152018Enabled(consensusParams, pindexDelete->pprev))
+    {
+        mempool.clear();
+    }
+
     // Resurrect mempool transactions from the disconnected block but do not do this step if we are
     // rolling back the chain using the "rollbackchain" rpc command.
     if (!fRollBack)
     {
         std::vector<uint256> vHashUpdate;
-        for (const CTransaction &tx : block.vtx)
+        for (const auto &it : block.vtx)
         {
+            const CTransaction tx = *it;
+
             // ignore validation errors in resurrected transactions
-            std::list<CTransaction> removed;
+            std::list<CTransactionRef> removed;
             CValidationState stateDummy;
             if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, AreFreeTxnsDisallowed(), nullptr, true))
             {
@@ -2584,9 +2528,9 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     UpdateTip(pindexDelete->pprev);
     // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
-    for (const CTransaction &tx : block.vtx)
+    for (const auto &tx : block.vtx)
     {
-        SyncWithWallets(tx, NULL, -1);
+        SyncWithWallets(*tx, NULL, -1);
     }
 
     return true;
@@ -2674,21 +2618,21 @@ bool static ConnectTip(CValidationState &state,
     LOG(BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
 
     // Remove conflicting transactions from the mempool.
-    std::list<CTransaction> txConflicted;
+    std::list<CTransactionRef> txConflicted;
     mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload());
     // Update chainActive & related variables.
     UpdateTip(pindexNew);
     // Tell wallet about transactions that went from mempool
     // to conflicted:
-    BOOST_FOREACH (const CTransaction &tx, txConflicted)
+    for (const auto &tx : txConflicted)
     {
-        SyncWithWallets(tx, NULL, -1);
+        SyncWithWallets(*tx, nullptr, -1);
     }
     // ... and about transactions that got confirmed:
     int txIdx = 0;
-    BOOST_FOREACH (const CTransaction &tx, pblock->vtx)
+    for (const auto &tx : pblock->vtx)
     {
-        SyncWithWallets(tx, pblock, txIdx);
+        SyncWithWallets(*tx, pblock, txIdx);
         txIdx++;
     }
 
@@ -2913,7 +2857,7 @@ static bool ActivateBestChainStep(CValidationState &state,
             }
 
             if (!ConnectTip(state, chainparams, pindexConnect,
-                    pindexConnect == pindexMostWork && fBlock ? pblock : NULL, fParallel))
+                    pindexConnect == pindexMostWork && fBlock ? pblock : nullptr, fParallel))
             {
                 if (state.IsInvalid())
                 {
@@ -3059,7 +3003,7 @@ static bool ActivateBestChainStep(CValidationState &state,
  */
 bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams, const CBlock *pblock, bool fParallel)
 {
-    CBlockIndex *pindexMostWork = NULL;
+    CBlockIndex *pindexMostWork = nullptr;
     LOCK(cs_main);
 
     bool fOneDone = false;
@@ -3090,7 +3034,7 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
         }
 
         // Whether we have anything to do at all.
-        if (chainActive.Tip() != NULL)
+        if (chainActive.Tip() != nullptr)
         {
             if (pindexMostWork->nChainWork <= chainActive.Tip()->nChainWork)
                 return true;
@@ -3102,7 +3046,7 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
         // their block headers may not represent what is considered the best block as returned by pindexMostWork.
         // Therefore we must supply the blockindex of this block explicitly as being the one with potentially
         // the most work and which will subsequently advance the chain tip if it wins the validation race.
-        if (pblock != NULL && pindexOldTip != NULL && chainActive.Tip() != chainActive.Genesis() && fParallel)
+        if (pblock != nullptr && pindexOldTip != nullptr && chainActive.Tip() != chainActive.Genesis() && fParallel)
         {
             if (pblock->GetBlockHeader().hashPrevBlock == *pindexOldTip->phashBlock)
             {
@@ -3155,24 +3099,11 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
         pindexMostWork = FindMostWorkChain();
         if (!pindexMostWork)
             return false;
-        pblock = NULL;
+        pblock = nullptr;
         fOneDone = true;
     } while (pindexMostWork->nChainWork > chainActive.Tip()->nChainWork);
     CheckBlockIndex(chainparams.GetConsensus());
 
-    // Activate May 2018 HF rules
-    if (chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.value))
-    {
-        // Bump the accepted block size to 32MB and the default generated size to 8MB
-        if (miningForkEB.value > excessiveBlockSize)
-            excessiveBlockSize = miningForkEB.value;
-        if (miningForkMG.value > maxGeneratedBlock)
-            maxGeneratedBlock = miningForkMG.value;
-        settingsToUserAgentString();
-        // Bump OP_RETURN size:
-        if (nMaxDatacarrierBytes < MAX_OP_RETURN_MAY2018)
-            nMaxDatacarrierBytes = MAX_OP_RETURN_MAY2018;
-    }
     return true;
 }
 
@@ -3524,16 +3455,16 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
         return state.DoS(100, error("CheckBlock(): size limits failed"), REJECT_INVALID, "bad-blk-length");
 
     // First transaction must be coinbase, the rest must not be
-    if (block.vtx.empty() || !block.vtx[0].IsCoinBase())
+    if (block.vtx.empty() || !block.vtx[0]->IsCoinBase())
         return state.DoS(100, error("CheckBlock(): first tx is not coinbase"), REJECT_INVALID, "bad-cb-missing");
     for (unsigned int i = 1; i < block.vtx.size(); i++)
-        if (block.vtx[i].IsCoinBase())
+        if (block.vtx[i]->IsCoinBase())
             return state.DoS(100, error("CheckBlock(): more than one coinbase"), REJECT_INVALID, "bad-cb-multiple");
 
     // Check transactions
-    BOOST_FOREACH (const CTransaction &tx, block.vtx)
-        if (!CheckTransaction(tx, state))
-            return error("CheckBlock(): CheckTransaction of %s failed with %s", tx.GetHash().ToString(),
+    for (const auto &tx : block.vtx)
+        if (!CheckTransaction(*tx, state))
+            return error("CheckBlock(): CheckTransaction of %s failed with %s", tx->GetHash().ToString(),
                 FormatStateMessage(state));
 
     uint64_t nSigOps = 0;
@@ -3541,11 +3472,11 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
     uint64_t nTx = 0;
     uint64_t nLargestTx = 0; // BU: track the longest transaction
 
-    BOOST_FOREACH (const CTransaction &tx, block.vtx)
+    for (const auto &tx : block.vtx)
     {
         nTx++;
-        nSigOps += GetLegacySigOpCount(tx);
-        uint64_t nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
+        nSigOps += GetLegacySigOpCount(*tx);
+        uint64_t nTxSize = ::GetSerializeSize(*tx, SER_NETWORK, PROTOCOL_VERSION);
         if (nTxSize > nLargestTx)
             nLargestTx = nTxSize;
     }
@@ -3583,6 +3514,8 @@ bool CheckIndexAgainstCheckpoint(const CBlockIndex *pindexPrev,
 bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex *const pindexPrev)
 {
     const Consensus::Params &consensusParams = Params().GetConsensus();
+    const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
+
     // Check proof of work
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
     {
@@ -3594,27 +3527,22 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
     if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())
         return state.Invalid(error("%s: block's timestamp is too early", __func__), REJECT_INVALID, "time-too-old");
 
-    // Reject block.nVersion=1 blocks when 95% (75% on testnet) of the network has upgraded:
-    if (block.nVersion < 2 &&
-        IsSuperMajority(2, pindexPrev, consensusParams.nMajorityRejectBlockOutdated, consensusParams))
-        return state.Invalid(error("%s: rejected nVersion=1 block", __func__), REJECT_OBSOLETE, "bad-version");
-
-    // Reject block.nVersion=2 blocks when 95% (75% on testnet) of the network has upgraded:
-    if (block.nVersion < 3 &&
-        IsSuperMajority(3, pindexPrev, consensusParams.nMajorityRejectBlockOutdated, consensusParams))
-        return state.Invalid(error("%s: rejected nVersion=2 block", __func__), REJECT_OBSOLETE, "bad-version");
-
-    // Reject block.nVersion=3 blocks when 95% (75% on testnet) of the network has upgraded:
-    if (block.nVersion < 4 &&
-        IsSuperMajority(4, pindexPrev, consensusParams.nMajorityRejectBlockOutdated, consensusParams))
-        return state.Invalid(error("%s : rejected nVersion=3 block", __func__), REJECT_OBSOLETE, "bad-version");
+    // Reject outdated version blocks when 95% (75% on testnet) of the network has upgraded:
+    // check for version 2, 3 and 4 upgrades
+    if ((block.nVersion < 2 && nHeight >= consensusParams.BIP34Height) ||
+        (block.nVersion < 3 && nHeight >= consensusParams.BIP66Height) ||
+        (block.nVersion < 4 && nHeight >= consensusParams.BIP65Height))
+    {
+        return state.Invalid(
+            error("%s: rejected nVersion=0x%08x block", __func__, block.nVersion), REJECT_OBSOLETE, "bad-version");
+    }
 
     return true;
 }
 
 bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIndex *const pindexPrev)
 {
-    const int nHeight = pindexPrev == NULL ? 0 : pindexPrev->nHeight + 1;
+    const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
     const Consensus::Params &consensusParams = Params().GetConsensus();
 
     // Start enforcing BIP113 (Median Time Past) using versionbits logic.
@@ -3625,30 +3553,28 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
     }
 
     int64_t nLockTimeCutoff;
-    if (pindexPrev == NULL)
+    if (pindexPrev == nullptr)
         nLockTimeCutoff = block.GetBlockTime();
     else
         nLockTimeCutoff =
             (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST) ? pindexPrev->GetMedianTimePast() : block.GetBlockTime();
 
     // Check that all transactions are finalized
-    BOOST_FOREACH (const CTransaction &tx, block.vtx)
+    for (const auto &tx : block.vtx)
     {
-        if (!IsFinalTx(tx, nHeight, nLockTimeCutoff))
+        if (!IsFinalTx(*tx, nHeight, nLockTimeCutoff))
         {
             return state.DoS(
                 10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
         }
     }
 
-    // Enforce block.nVersion=2 rule that the coinbase starts with serialized block height
-    // if 750 of the last 1,000 blocks are version 2 or greater (51/100 if testnet):
-    if (block.nVersion >= 2 &&
-        IsSuperMajority(2, pindexPrev, consensusParams.nMajorityEnforceBlockUpgrade, consensusParams))
+    // Enforce block nVersion=2 rule that the coinbase starts with serialized block height
+    if (nHeight >= consensusParams.BIP34Height)
     {
         CScript expect = CScript() << nHeight;
-        if (block.vtx[0].vin[0].scriptSig.size() < expect.size() ||
-            !std::equal(expect.begin(), expect.end(), block.vtx[0].vin[0].scriptSig.begin()))
+        if (block.vtx[0]->vin[0].scriptSig.size() < expect.size() ||
+            !std::equal(expect.begin(), expect.end(), block.vtx[0]->vin[0].scriptSig.begin()))
         {
             int blockCoinbaseHeight = block.GetHeight();
             uint256 hashp = block.hashPrevBlock;
@@ -3826,22 +3752,6 @@ static bool AcceptBlock(const CBlock &block,
     return true;
 }
 
-static bool IsSuperMajority(int minVersion,
-    const CBlockIndex *pstart,
-    unsigned nRequired,
-    const Consensus::Params &consensusParams)
-{
-    unsigned int nFound = 0;
-    for (int i = 0; i < consensusParams.nMajorityWindow && nFound < nRequired && pstart != NULL; i++)
-    {
-        if (pstart->nVersion >= minVersion)
-            ++nFound;
-        pstart = pstart->pprev;
-    }
-    return (nFound >= nRequired);
-}
-
-
 bool ProcessNewBlock(CValidationState &state,
     const CChainParams &chainparams,
     CNode *pfrom,
@@ -3926,21 +3836,21 @@ bool ProcessNewBlock(CValidationState &state,
 
         for (unsigned int i = 0; i < pblock->vtx.size(); i++)
         {
-            if (pblock->vtx[i].vin.size() > maxVin)
+            if (pblock->vtx[i]->vin.size() > maxVin)
             {
-                maxVin = pblock->vtx[i].vin.size();
-                txIn = pblock->vtx[i];
+                maxVin = pblock->vtx[i]->vin.size();
+                txIn = *pblock->vtx[i];
             }
-            if (pblock->vtx[i].vout.size() > maxVout)
+            if (pblock->vtx[i]->vout.size() > maxVout)
             {
-                maxVout = pblock->vtx[i].vout.size();
-                txOut = pblock->vtx[i];
+                maxVout = pblock->vtx[i]->vout.size();
+                txOut = *pblock->vtx[i];
             }
             uint64_t len = ::GetSerializeSize(pblock->vtx[i], SER_NETWORK, PROTOCOL_VERSION);
             if (len > maxTxSize)
             {
                 maxTxSize = len;
-                txLen = pblock->vtx[i];
+                txLen = *pblock->vtx[i];
             }
         }
 
@@ -4409,10 +4319,10 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
 void UnloadBlockIndex()
 {
     {
-        LOCK(cs_orphancache);
-        mapOrphanTransactions.clear();
-        mapOrphanTransactionsByPrev.clear();
-        nBytesOrphanPool = 0;
+        LOCK(orphanpool.cs);
+        orphanpool.mapOrphanTransactions.clear();
+        orphanpool.mapOrphanTransactionsByPrev.clear();
+        orphanpool.nBytesOrphanPool = 0;
     }
 
     LOCK(cs_main);
@@ -4428,7 +4338,7 @@ void UnloadBlockIndex()
     nLastBlockFile = 0;
     nBlockSequenceId = 1;
     mapBlockSource.clear();
-    mapBlocksInFlight.clear();
+    requester.mapBlocksInFlight.clear();
     nPreferredDownload = 0;
     setDirtyBlockIndex.clear();
     setDirtyFileInfo.clear();
@@ -4993,7 +4903,7 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
             }
         }
         bool rrc = recentRejects ? recentRejects->contains(inv.hash) : false;
-        return rrc || mempool.exists(inv.hash) || AlreadyHaveOrphan(inv.hash) ||
+        return rrc || mempool.exists(inv.hash) || orphanpool.AlreadyHaveOrphan(inv.hash) ||
                pcoinsTip->HaveCoinInCache(COutPoint(inv.hash, 0)) || // Best effort: only try output 0 and 1
                pcoinsTip->HaveCoinInCache(COutPoint(inv.hash, 1));
     }
@@ -5115,7 +5025,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         else if (inv.type == MSG_THINBLOCK || inv.type == MSG_XTHINBLOCK)
                         {
                             LOG(THIN, "Sending xthin by INV queue getdata message\n");
-                            SendXThinBlock(block, pfrom, inv);
+                            SendXThinBlock(MakeBlockRef(block), pfrom, inv);
                         }
                         // BUIP010 Xtreme Thinblocks: end section
 
@@ -5344,16 +5254,17 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (fListen && !IsInitialBlockDownload())
             {
                 CAddress addr = GetLocalAddress(&pfrom->addr);
+                FastRandomContext insecure_rand;
                 if (addr.IsRoutable())
                 {
                     LOG(NET, "ProcessMessages: advertising address %s\n", addr.ToString());
-                    pfrom->PushAddress(addr);
+                    pfrom->PushAddress(addr, insecure_rand);
                 }
                 else if (IsPeerAddrLocalGood(pfrom))
                 {
                     addr.SetIP(pfrom->addrLocal);
                     LOG(NET, "ProcessMessages: advertising address %s\n", addr.ToString());
-                    pfrom->PushAddress(addr);
+                    pfrom->PushAddress(addr, insecure_rand);
                 }
             }
 
@@ -5499,6 +5410,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         std::vector<CAddress> vAddrOk;
         int64_t nNow = GetAdjustedTime();
         int64_t nSince = nNow - 10 * 60;
+        FastRandomContext insecure_rand;
         BOOST_FOREACH (CAddress &addr, vAddr)
         {
             boost::this_thread::interruption_point();
@@ -5535,7 +5447,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     int nRelayNodes = fReachable ? 2 : 1; // limited relaying of addresses outside our network(s)
                     for (std::multimap<uint256, CNode *>::iterator mi = mapMix.begin();
                          mi != mapMix.end() && nRelayNodes-- > 0; ++mi)
-                        ((*mi).second)->PushAddress(addr);
+                        ((*mi).second)->PushAddress(addr, insecure_rand);
                 }
             }
             // Do not store addresses outside our network
@@ -5832,13 +5744,13 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 tx.GetHash().ToString(), mempool.size(), mempool.DynamicMemoryUsage() / 1000);
 
             // Recursively process any orphan transactions that depended on this one
-            LOCK(cs_orphancache);
+            LOCK(orphanpool.cs);
             std::set<NodeId> setMisbehaving;
             for (unsigned int i = 0; i < vWorkQueue.size(); i++)
             {
                 std::map<uint256, std::set<uint256> >::iterator itByPrev =
-                    mapOrphanTransactionsByPrev.find(vWorkQueue[i]);
-                if (itByPrev == mapOrphanTransactionsByPrev.end())
+                    orphanpool.mapOrphanTransactionsByPrev.find(vWorkQueue[i]);
+                if (itByPrev == orphanpool.mapOrphanTransactionsByPrev.end())
                     continue;
                 for (std::set<uint256>::iterator mi = itByPrev->second.begin(); mi != itByPrev->second.end(); ++mi)
                 {
@@ -5848,12 +5760,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     // we always erase orphans and any mapOrphanTransactionsByPrev at the same time, still we need to
                     // be sure.
                     bool fOk = true;
-                    DbgAssert(mapOrphanTransactions.count(orphanHash), fOk = false);
+                    DbgAssert(orphanpool.mapOrphanTransactions.count(orphanHash), fOk = false);
                     if (!fOk)
                         continue;
 
-                    const CTransaction &orphanTx = mapOrphanTransactions[orphanHash].tx;
-                    NodeId fromPeer = mapOrphanTransactions[orphanHash].fromPeer;
+                    const CTransaction &orphanTx = *orphanpool.mapOrphanTransactions[orphanHash].ptx;
+                    NodeId fromPeer = orphanpool.mapOrphanTransactions[orphanHash].fromPeer;
                     bool fMissingInputs2 = false;
                     // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
                     // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get
@@ -5890,26 +5802,26 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     mempool.check(pcoinsTip);
                 }
             }
-            BOOST_FOREACH (uint256 hash, vEraseQueue)
-                EraseOrphanTx(hash);
+            for (uint256 &hash : vEraseQueue)
+                orphanpool.EraseOrphanTx(hash);
 
             //  BU: Xtreme thinblocks - purge orphans that are too old
-            EraseOrphansByTime();
+            orphanpool.EraseOrphansByTime();
         }
         else if (fMissingInputs)
         {
             // If we've forked and this is probably not a valid tx, then skip adding it to the orphan pool
             if (!IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) || IsTxProbablyNewSigHash(tx))
             {
-                LOCK(cs_orphancache);
-                AddOrphanTx(tx, pfrom->GetId());
+                LOCK(orphanpool.cs);
+                orphanpool.AddOrphanTx(tx, pfrom->GetId());
 
                 // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
                 static unsigned int nMaxOrphanTx =
                     (unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
                 static uint64_t nMaxOrphanPoolSize =
                     (uint64_t)std::max((int64_t)0, (GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000 / 10));
-                unsigned int nEvicted = LimitOrphanTxSize(nMaxOrphanTx, nMaxOrphanPoolSize);
+                unsigned int nEvicted = orphanpool.LimitOrphanTxSize(nMaxOrphanTx, nMaxOrphanPoolSize);
                 if (nEvicted > 0)
                     LOG(MEMPOOL, "mapOrphan overflow, removed %u tx\n", nEvicted);
             }
@@ -6323,7 +6235,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
             else
             {
-                SendXThinBlock(block, pfrom, inv);
+                SendXThinBlock(MakeBlockRef(block), pfrom, inv);
             }
         }
     }
@@ -6420,31 +6332,31 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) // Ignore blocks received while importing
     {
-        std::shared_ptr<CBlock> block(new CBlock);
+        CBlockRef pblock(new CBlock());
         {
             uint64_t nCheckBlockSize = vRecv.size();
-            vRecv >> *block;
+            vRecv >> *pblock;
 
             // Sanity check. The serialized block size should match the size that is in our receive queue.  If not
             // this could be an attack block of some kind.
-            DbgAssert(nCheckBlockSize == block->GetBlockSize(), return true);
+            DbgAssert(nCheckBlockSize == pblock->GetBlockSize(), return true);
         }
 
-        CInv inv(MSG_BLOCK, block->GetHash());
+        CInv inv(MSG_BLOCK, pblock->GetHash());
         LOG(BLK, "received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
-        UnlimitedLogBlock(*block, inv.hash.ToString(), receiptTime);
+        UnlimitedLogBlock(*pblock, inv.hash.ToString(), receiptTime);
 
         if (IsChainNearlySyncd()) // BU send the received block out expedited channels quickly
         {
             CValidationState state;
-            if (CheckBlockHeader(*block, state, true)) // block header is fine
-                SendExpeditedBlock(*block, pfrom);
+            if (CheckBlockHeader(*pblock, state, true)) // block header is fine
+                SendExpeditedBlock(*pblock, pfrom);
         }
 
         // Message consistency checking
         // NOTE: consistency checking is handled by checkblock() which is called during
         //       ProcessNewBlock() during HandleBlockMessage.
-        PV->HandleBlockMessage(pfrom, strCommand, block, inv);
+        PV->HandleBlockMessage(pfrom, strCommand, pblock, inv);
     }
 
 
@@ -6472,8 +6384,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         pfrom->vAddrToSend.clear();
         std::vector<CAddress> vAddr = addrman.GetAddr();
+        FastRandomContext insecure_rand;
         BOOST_FOREACH (const CAddress &addr, vAddr)
-            pfrom->PushAddress(addr);
+            pfrom->PushAddress(addr, insecure_rand);
     }
 
 
@@ -7216,6 +7129,7 @@ bool SendMessages(CNode *pto)
         // Message: inventory
         //
 
+        FastRandomContext insecure_rand;
         std::vector<CInv> vInvWait;
         std::vector<CInv> vInvSend;
         {
@@ -7255,7 +7169,7 @@ bool SendMessages(CNode *pto)
                         if (fSendTrickle)
                         {
                             // 1/4 of tx invs blast to all immediately
-                            if ((insecure_rand() & 3) != 0)
+                            if ((insecure_rand.rand32() & 3) != 0)
                             {
                                 vInvWait.push_back(inv);
                                 continue;
@@ -7370,9 +7284,9 @@ void MainCleanup()
 
     if (1)
     {
-        LOCK(cs_orphancache); // BU apply the appropriate lock so no contention during destruction
+        LOCK(orphanpool.cs); // BU apply the appropriate lock so no contention during destruction
         // orphan transactions
-        mapOrphanTransactions.clear();
-        mapOrphanTransactionsByPrev.clear();
+        orphanpool.mapOrphanTransactions.clear();
+        orphanpool.mapOrphanTransactionsByPrev.clear();
     }
 }

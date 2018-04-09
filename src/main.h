@@ -304,7 +304,7 @@ void PartitionCheck(bool (*initialDownloadCheck)(),
 std::string GetWarnings(const std::string &strFor);
 /** Retrieve a transaction (from memory pool, or from disk, if possible) */
 bool GetTransaction(const uint256 &hash,
-    CTransaction &tx,
+    CTransactionRef &tx,
     const Consensus::Params &params,
     uint256 &hashBlock,
     bool fAllowSlow = false);
@@ -350,7 +350,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode);
 void PruneAndFlush();
 
 /** Check is Cash HF has activated. */
-bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev);
+bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev);
 
 /**
    Determine whether free transactions are subject to rate limiting. If -limitfreerelay is not zero then rate limiting
@@ -570,21 +570,6 @@ static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 static const unsigned int REJECT_CONFLICT = 0x102;
 /** Transaction cannot be committed on my fork */
 static const unsigned int REJECT_WRONG_FORK = 0x103;
-
-struct COrphanTx
-{
-    CTransaction tx;
-    NodeId fromPeer;
-    int64_t nEntryTime; // BU - Xtreme Thinblocks: used for aging orphans out of the cache
-    uint64_t nOrphanTxSize;
-};
-// BU: begin creating separate critical section for orphan cache and untangling from cs_main.
-extern CCriticalSection cs_orphancache;
-extern std::map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs_orphancache);
-extern std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs_orphancache);
-
-void EraseOrphanTx(uint256 hash) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache);
-// BU: end
 
 CBlockIndex *FindMostWorkChain();
 

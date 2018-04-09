@@ -1316,9 +1316,9 @@ int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
             CBlock block;
             ReadBlockFromDisk(block, pindex, Params().GetConsensus());
             int txIdx = 0;
-            BOOST_FOREACH (CTransaction &tx, block.vtx)
+            for (const auto &tx : block.vtx)
             {
-                if (AddToWalletIfInvolvingMe(tx, &block, fUpdate, txIdx))
+                if (AddToWalletIfInvolvingMe(*tx, &block, fUpdate, txIdx))
                     ret++;
                 txIdx++;
             }
@@ -1819,7 +1819,7 @@ static void ApproximateBestSubset(vector<pair<CAmount, pair<const CWalletTx *, u
     vfBest.assign(vValue.size(), true);
     nBest = nTotalLower;
 
-    seed_insecure_rand();
+    FastRandomContext insecure_rand;
 
     for (int nRep = 0; nRep < iterations && nBest != nTargetValue; nRep++)
     {
@@ -1836,7 +1836,7 @@ static void ApproximateBestSubset(vector<pair<CAmount, pair<const CWalletTx *, u
                 // that the rng is fast. We do not use a constant random sequence,
                 // because there may be some privacy improvement by making
                 // the selection random.
-                if (nPass == 0 ? insecure_rand() & 1 : !vfIncluded[i])
+                if (nPass == 0 ? insecure_rand.rand32() & 1 : !vfIncluded[i])
                 {
                     nTotal += vValue[i].first;
                     vfIncluded[i] = true;
@@ -3473,7 +3473,7 @@ int CMerkleTx::SetMerkleBranch(const CBlock &block, int txIdx)
     else
     {
         // Locate the transaction
-        nIndex = block.find(((CTransaction *)this)->GetHash());
+        nIndex = block.find(((CTransactionRef) this)->GetHash());
         if (nIndex == -1)
         {
             LOGA("ERROR: SetMerkleBranch(): couldn't find tx in block\n");

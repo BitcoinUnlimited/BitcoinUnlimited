@@ -5,11 +5,13 @@
 
 #include "versionbits.h"
 #include "chain.h"
+#include "chain.h"
 #include "chainparams.h"
 #include "consensus/params.h"
 #include "main.h"
 #include "random.h"
 #include "test/test_bitcoin.h"
+#include "test_random.h"
 
 #include <boost/test/unit_test.hpp>
 

@@ -53,9 +53,9 @@ static inline size_t RecursiveDynamicUsage(const CMutableTransaction &tx)
 static inline size_t RecursiveDynamicUsage(const CBlock &block)
 {
     size_t mem = memusage::DynamicUsage(block.vtx);
-    for (std::vector<CTransaction>::const_iterator it = block.vtx.begin(); it != block.vtx.end(); it++)
+    for (const auto &tx : block.vtx)
     {
-        mem += RecursiveDynamicUsage(*it);
+        mem += memusage::DynamicUsage(tx) + RecursiveDynamicUsage(*tx);
     }
     return mem;
 }

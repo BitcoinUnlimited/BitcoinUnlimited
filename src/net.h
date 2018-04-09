@@ -379,7 +379,7 @@ public:
     CBlock thinBlock;
     std::vector<uint256> thinBlockHashes;
     std::vector<uint64_t> xThinBlockHashes;
-    std::map<uint64_t, CTransaction> mapMissingTx;
+    std::map<uint64_t, CTransactionRef> mapMissingTx;
     uint64_t nLocalThinBlockBytes; // the bytes used in creating this thinblock, updated dynamically
     int nSizeThinBlock; // Original on-wire size of the block. Just used for reporting
     int thinBlockWaitingForTxns; // if -1 then not currently waiting
@@ -529,7 +529,7 @@ public:
     }
 
     void AddAddressKnown(const CAddress &addr) { addrKnown.insert(addr.GetKey()); }
-    void PushAddress(const CAddress &addr)
+    void PushAddress(const CAddress &_addr, FastRandomContext &insecure_rand)
     {
         // Known checking here is only to save space from duplicates.
         // SendMessages will filter it again for knowns that were added
@@ -538,7 +538,7 @@ public:
         {
             if (vAddrToSend.size() >= MAX_ADDR_TO_SEND)
             {
-                vAddrToSend[insecure_rand() % vAddrToSend.size()] = addr;
+                vAddrToSend[insecure_rand.rand32() % vAddrToSend.size()] = addr;
             }
             else
             {

@@ -20,6 +20,7 @@
 #include "thinblock.h"
 #include "tinyformat.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -36,8 +37,6 @@
 
 
 using namespace std;
-
-extern CCriticalSection cs_orphancache; // from main.h
 
 extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
 extern CTweak<unsigned int> blockDownloadWindow;
@@ -466,10 +465,9 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                     inv2.type = MSG_XTHINBLOCK;
                     std::vector<uint256> vOrphanHashes;
                     {
-                        LOCK(cs_orphancache);
-                        for (map<uint256, COrphanTx>::iterator mi = mapOrphanTransactions.begin();
-                             mi != mapOrphanTransactions.end(); ++mi)
-                            vOrphanHashes.push_back((*mi).first);
+                        LOCK(orphanpool.cs);
+                        for (auto &mi : orphanpool.mapOrphanTransactions)
+                            vOrphanHashes.emplace_back(mi.first);
                     }
                     BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
                     ss << inv2;
@@ -493,10 +491,9 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                     inv2.type = MSG_XTHINBLOCK;
                     std::vector<uint256> vOrphanHashes;
                     {
-                        LOCK(cs_orphancache);
-                        for (map<uint256, COrphanTx>::iterator mi = mapOrphanTransactions.begin();
-                             mi != mapOrphanTransactions.end(); ++mi)
-                            vOrphanHashes.push_back((*mi).first);
+                        LOCK(orphanpool.cs);
+                        for (auto &mi : orphanpool.mapOrphanTransactions)
+                            vOrphanHashes.emplace_back(mi.first);
                     }
                     BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
                     ss << inv2;
@@ -530,6 +527,19 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         }
         return false; // no block was requested
         // BUIP010 Xtreme Thinblocks: end section
+    }
+}
+
+void CRequestManager::ResetLastRequestTime(const uint256 &hash)
+{
+    LOCK(cs_objDownloader);
+    OdMap::iterator itemIter = sendBlkIter;
+    itemIter = mapBlkInfo.find(hash);
+    if (itemIter != mapBlkInfo.end())
+    {
+        CUnknownObj &item = itemIter->second;
+        item.outstandingReqs--;
+        item.lastRequestTime = 0;
     }
 }
 
@@ -845,7 +855,7 @@ void CRequestManager::FindNextBlocksToDownload(NodeId nodeid, unsigned int count
     DbgAssert(state != nullptr, return );
 
     // Make sure pindexBestKnownBlock is up to date, we'll need it.
-    requester.ProcessBlockAvailability(nodeid);
+    ProcessBlockAvailability(nodeid);
 
     if (state->pindexBestKnownBlock == nullptr ||
         state->pindexBestKnownBlock->nChainWork < chainActive.Tip()->nChainWork)
@@ -896,7 +906,7 @@ void CRequestManager::FindNextBlocksToDownload(NodeId nodeid, unsigned int count
         // already part of our chain (and therefore don't need it even if pruned).
         for (CBlockIndex *pindex : vToFetch)
         {
-            if (requester.AlreadyAskedFor(pindex->GetBlockHash()))
+            if (AlreadyAskedFor(pindex->GetBlockHash()))
                 continue;
 
             if (!pindex->IsValid(BLOCK_VALID_TREE))

@@ -10,6 +10,8 @@
 #include "serialize.h"
 #include "streams.h"
 #include "test/test_bitcoin.h"
+#include "test/test_bitcoin.h"
+#include "test_random.h"
 #include "uint256.h"
 #include "version.h"
 
@@ -39,9 +41,9 @@ BOOST_AUTO_TEST_CASE(pmt_test1)
     seed_insecure_rand(false);
     static const unsigned int nTxCounts[] = {1, 4, 7, 17, 56, 100, 127, 256, 312, 513, 1000, 4095};
 
-    for (int n = 0; n < 12; n++)
+    for (int i = 0; i < 12; i++)
     {
-        unsigned int nTx = nTxCounts[n];
+        unsigned int nTx = nTxCounts[i];
 
         // build a block with some dummy transactions
         CBlock block;
@@ -49,14 +51,14 @@ BOOST_AUTO_TEST_CASE(pmt_test1)
         {
             CMutableTransaction tx;
             tx.nLockTime = j; // actual transaction data doesn't matter; just make the nLockTime's unique
-            block.vtx.push_back(CTransaction(tx));
+            block.vtx.push_back(MakeTransactionRef(std::move(tx)));
         }
 
         // calculate actual merkle root and height
         uint256 merkleRoot1 = BlockMerkleRoot(block);
         std::vector<uint256> vTxid(nTx, uint256());
         for (unsigned int j = 0; j < nTx; j++)
-            vTxid[j] = block.vtx[j].GetHash();
+            vTxid[j] = block.vtx[j]->GetHash();
         int nHeight = 1, nTx_ = nTx;
         while (nTx_ > 1)
         {
