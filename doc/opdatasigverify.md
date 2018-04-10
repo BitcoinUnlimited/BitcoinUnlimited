@@ -25,9 +25,9 @@ When OP_DATASIGVERIFY is executed, the stack should look like:
 * *type and signature*
 * *data*
 
-If there are less then 3 items on the stack, the script fails.  If the pubkeyhash field is not 20 bytes, the script fails.  If the *'type and signature'* field is not 66 bytes, the script fails.  If the first byte of the *'type and signature'* field is not DATASIG_COMPACT_ECDSA (1), the script fails.
+If there are less then 3 items on the stack, the script fails.  If the pubkeyhash field is not 20 bytes, the script fails.  If the *'type and signature'* field is not 66 bytes, the script fails.  If the last byte of the *'type and signature'* field is not DATASIG_COMPACT_ECDSA (1), the script fails.
 
-The first byte of the *'type and signature'* (stack top - 1) field defines the signature type, and subsequent bytes are the actual signature.  Note that this format is different from the OP_CHECKSIG format, and its SIGHASH flag byte has no relationship to this signature type byte.
+The last byte of the *'type and signature'* (stack top - 1) field defines the signature type, and previous bytes are the actual signature.  Note that this format is different from the OP_CHECKSIG format -- its SIGHASH flag byte has no relationship to this signature type byte.
 
 OP_DATASIGVERIFY looks at this signature type byte to determine the signature validation algorithm and then executes that algorithm.  There is currently one defined algorithm:
 
@@ -46,16 +46,16 @@ Otherwise, the top 2 items are popped off the stack (leaving *data* on the top o
   * spend script: `data sig`
 
 * Realistic example: Verify that `data` is signed by `dpubkeyhash` (signature `daddrsig`) and equals `x`.  Also do normal p2pkh transaction verification on `pubkeyhash` (with signature `txSig` and public key `pubkey`):
-  * output script: `dpubkeyhash OP_DATASIGVERIFY x OP_EQUALVERIFY OP_DUP OP_HASH160 pubkeyhash OP_EQUALVERIFY OP_CHECKSIG
+  * output script: `dpubkeyhash OP_DATASIGVERIFY x OP_EQUALVERIFY OP_DUP OP_HASH160 pubkeyhash OP_EQUALVERIFY OP_CHECKSIGVERIFY
   * spend script: `txSig pubkey data daddrsig`
 
 ## Discussion
 
-### Why is the non-verify version (e.g. OP_CHECKDATASIG) unnecessary?
+### Why is the non-verify version unnecessary?
 
-An instruction like OP_CHECKDATASIG would validate the signature on data and push a true/false result on the stack, analguous to OP_CHECKSIG vs OP_CHECKSIGVERIFY.
+OP_DATASIGVERIFY fails the script if signature validation fails.  But one could imagine another opcode, let's call it OP_CHECKDATASIG, that would instead push true or false onto the stack depending on whether signature validation suceeded or failed.  Therefore additional opcode would relate to OP_DATASIGVERIFY in the same way OP_CHECKSIG is to OP_CHECKSIGVERIFY.
 
-A Bitcoin Cash script is not exactly like a normal program.  Its fundamental and only purpose is to encumber spendability -- your input script must meet the output script's requirements in order to spend the coins.  Therefore, any program sequence that does not narrow the group of possible spenders is equivalent to a simple choice.  In the OP_CHECKDATASIG case, any potential spender can create a spend script that fails OP_CHECKDATASIG by pushing random bytes rather than a valid signature, so the "false" result is equivalent to (but less efficient than) an if statement on a pushed constant.
+But, this instruction is not necessary because a Bitcoin Cash script is not exactly like a normal program.  Its fundamental and only purpose is to encumber spendability -- your input script must meet the output script's requirements in order to spend the coins.  Therefore, any program sequence that does not narrow the group of possible spenders is equivalent to a simple choice.  In the OP_CHECKDATASIG case, any potential spender can create a spend script that fails OP_CHECKDATASIG by pushing random bytes rather than a valid signature, so the "false" result is equivalent to (but less efficient than) an if statement on a pushed constant.
 
 Formally, any script with encumberances x, y, z and solutions x', y', and z', of the form:
 
@@ -80,39 +80,6 @@ Please refer to [this github branch](https://github.com/gandrewstone/BitcoinUnli
 
 The opcode implementation is short enough to include here:
 ```c++
-// This code sits inside the interpreter's opcode processing case statement
-case OP_DATASIGVERIFY:
-{
-    if (stack.size() < 3)
-        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
 
-    valtype &data = stacktop(-3);
-    valtype &vchSigAndType = stacktop(-2);
-    valtype &vchAddr = stacktop(-1);
-
-    if (vchAddr.size() != 20)
-        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-
-    if (vchSigAndType[0] == DATASIG_COMPACT_ECDSA)
-    {
-        std::vector<unsigned char> vchSig(vchSigAndType.begin() + 1, vchSigAndType.end());
-        CHashWriter ss(SER_GETHASH, 0);
-        ss << strMessageMagic << data;
-
-        CPubKey pubkey;
-        if (!pubkey.RecoverCompact(ss.GetHash(), vchSig))
-            return set_error(serror, SCRIPT_ERR_VERIFY);
-        CKeyID id = pubkey.GetID();
-        if (id != uint160(vchAddr))
-            return set_error(serror, SCRIPT_ERR_VERIFY);
-    }
-    else // No other signature types currently supported
-    {
-        return set_error(serror, SCRIPT_ERR_VERIFY);
-    }
-    popstack(stack);
-    popstack(stack);
-}
-break;
 ```
 

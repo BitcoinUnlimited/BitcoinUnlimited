@@ -1089,14 +1089,14 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                     if (vchSigAndType.size() != 66)
                         return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
 
-                    if (vchSigAndType[0] == DATASIG_COMPACT_ECDSA)
+                    if (vchSigAndType[65] == DATASIG_COMPACT_ECDSA)
                     {
-                        std::vector<unsigned char> vchSig(vchSigAndType.begin() + 1, vchSigAndType.end());
+                        vchSigAndType.resize(65); // chop off the type byte
                         CHashWriter ss(SER_GETHASH, 0);
                         ss << strMessageMagic << data;
 
                         CPubKey pubkey;
-                        if (!pubkey.RecoverCompact(ss.GetHash(), vchSig))
+                        if (!pubkey.RecoverCompact(ss.GetHash(), vchSigAndType))
                             return set_error(serror, SCRIPT_ERR_VERIFY);
                         CKeyID id = pubkey.GetID();
                         if (id != uint160(vchAddr))

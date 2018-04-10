@@ -1454,8 +1454,8 @@ public:
         return true;
     }
 
-    virtual bool CheckLockTime(const CScriptNum &nLockTime) const { return false; }
-    virtual bool CheckSequence(const CScriptNum &nSequence) const { return false; }
+    bool CheckLockTime(const CScriptNum &nLockTime) const override { return false; }
+    bool CheckSequence(const CScriptNum &nSequence) const override { return false; }
     virtual ~SigPubkeyHashChecker() {}
 };
 
@@ -1468,16 +1468,15 @@ BOOST_AUTO_TEST_CASE(script_datasigverify)
     std::vector<unsigned char> data(1);
     data[0] = 123;
 
-    std::vector<unsigned char> sigtype(1);
-    std::vector<unsigned char> sigbadtype(1);
+    std::vector<unsigned char> sigtype(66);
+    std::vector<unsigned char> sigbadtype(66);
 
     {
-        std::vector<unsigned char> sig = signmessage(data, dataSigner.secret);
-        sigtype[0] = DATASIG_COMPACT_ECDSA;
-        sigtype.insert(sigtype.end(), sig.begin(), sig.end());
+        sigtype = signmessage(data, dataSigner.secret);
+        sigbadtype = sigtype;
+        sigtype.push_back(DATASIG_COMPACT_ECDSA);
 
-        sigbadtype[0] = 0xff;
-        sigbadtype.insert(sigbadtype.end(), sig.begin(), sig.end());
+        sigbadtype.push_back(0xff);
     }
 
 
@@ -1496,7 +1495,7 @@ BOOST_AUTO_TEST_CASE(script_datasigverify)
     BOOST_CHECK(condScript.GetSigOpCount(true) == 0);
     // Test failure when datasigverify is off
     BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
-
+    BOOST_CHECK(serror == SCRIPT_ERR_BAD_OPCODE);
     enableDataSigVerify = true;
     // Sigop count should be 1 because OP_DATASIGVERIFY is on
     BOOST_CHECK(condScript.GetSigOpCount(true) == 1);
@@ -1510,6 +1509,7 @@ BOOST_AUTO_TEST_CASE(script_datasigverify)
     CScript scriptBadSigType = CScript() << data << sigbadtype;
     BOOST_CHECK(EvalScript(stack, scriptBadSigType, 0, sigChecker, &serror, nullptr));
     BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+    BOOST_CHECK(serror == SCRIPT_ERR_VERIFY);
 
     // Test incorrect signature
     stack.clear();
@@ -1517,38 +1517,64 @@ BOOST_AUTO_TEST_CASE(script_datasigverify)
     proveScript = CScript() << data << sigtype;
     BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
     BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+    BOOST_CHECK(serror == SCRIPT_ERR_VERIFY);
     sigtype[2] ^= 1; // back to correct sigtype
 
-    // Test incorrect signature length
+    // Test incorrect signature length too small
     {
-    stack.clear();
-    std::vector<unsigned char> sigtype2 = sigtype;
-    sigtype2.resize(65);
-    proveScript = CScript() << data << sigtype2;
-    BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
-    BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        stack.clear();
+        std::vector<unsigned char> sigtype2 = sigtype;
+        sigtype2.resize(65);
+        proveScript = CScript() << data << sigtype2;
+        BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(serror == SCRIPT_ERR_INVALID_STACK_OPERATION);
     }
 
-    // Test incorrect address length
+    // Test incorrect signature length too big
     {
-    stack.clear();
-    std::vector<unsigned char> vaddr = ToByteVector(dataSigner.addr);
-    vaddr.resize(19);
-    CScript condScript = CScript() << vaddr << OP_DATASIGVERIFY;
-    proveScript = CScript() << data << sigtype;
-    BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
-    BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        stack.clear();
+        std::vector<unsigned char> sigtype2 = sigtype;
+        sigtype2.push_back(1);
+        proveScript = CScript() << data << sigtype2;
+        BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(serror == SCRIPT_ERR_INVALID_STACK_OPERATION);
+    }
+
+    // Test incorrect address length too small
+    {
+        stack.clear();
+        std::vector<unsigned char> vaddr = ToByteVector(dataSigner.addr);
+        vaddr.resize(19);
+        CScript condScript = CScript() << vaddr << OP_DATASIGVERIFY;
+        proveScript = CScript() << data << sigtype;
+        BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(serror == SCRIPT_ERR_INVALID_STACK_OPERATION);
+    }
+
+    // Test incorrect address length too big
+    {
+        stack.clear();
+        std::vector<unsigned char> vaddr = ToByteVector(dataSigner.addr);
+        vaddr.push_back(1);
+        CScript condScript = CScript() << vaddr << OP_DATASIGVERIFY;
+        proveScript = CScript() << data << sigtype;
+        BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(serror == SCRIPT_ERR_INVALID_STACK_OPERATION);
     }
 
     // Test wrong stack size
     {
-    stack.clear();
-    CScript condScript = CScript() << OP_DATASIGVERIFY;
-    proveScript = CScript() << data << sigtype;
-    BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
-    BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        stack.clear();
+        CScript condScript = CScript() << OP_DATASIGVERIFY;
+        proveScript = CScript() << data << sigtype;
+        BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(serror == SCRIPT_ERR_INVALID_STACK_OPERATION);
     }
-
 
 
     QuickAddress u2;
@@ -1560,7 +1586,7 @@ BOOST_AUTO_TEST_CASE(script_datasigverify)
     // to break the data into pieces, such as <ticker>, <date>, and <price> if importing information
     // about a security.  However, these string instructions are not yet enabled.
     condScript = CScript() << ToByteVector(dataSigner.addr) << OP_DATASIGVERIFY << data << OP_EQUALVERIFY << OP_DUP
-                           << OP_HASH160 << ToByteVector(u2.addr) << OP_EQUALVERIFY << OP_CHECKSIG;
+                           << OP_HASH160 << ToByteVector(u2.addr) << OP_EQUALVERIFY << OP_CHECKSIGVERIFY;
     BOOST_CHECK(condScript.GetSigOpCount(true) == 2);
     unsigned int sighashType = SIGHASH_ALL | SIGHASH_FORKID;
     std::vector<unsigned char> txoSig;
@@ -1578,21 +1604,27 @@ BOOST_AUTO_TEST_CASE(script_datasigverify)
 
     proveScript = CScript() << txoSig << ToByteVector(u2.secret.GetPubKey()) << data << sigtype;
 
+    // Success case
     stack.clear();
     BOOST_CHECK(EvalScript(stack, proveScript, 0, pkhChecker, &serror, nullptr));
     BOOST_CHECK(EvalScript(stack, condScript, 0, pkhChecker, &serror, nullptr));
 
+    // Screw up the data signature
     stack.clear();
-    sigtype[3] ^= 1; // Screw up the data signature
-    proveScript = CScript() << data << sigtype << ToByteVector(u2.pubkey);
+    sigtype[3] ^= 1;
+    proveScript = CScript() << txoSig << ToByteVector(u2.secret.GetPubKey()) << data << sigtype;
     BOOST_CHECK(EvalScript(stack, proveScript, 0, pkhChecker, &serror, nullptr));
     BOOST_CHECK(!EvalScript(stack, condScript, 0, pkhChecker, &serror, nullptr));
+    BOOST_CHECK(serror == SCRIPT_ERR_VERIFY);
     sigtype[3] ^= 1; // back to correct data sig
+
     // provide the wrong utxo pubkey
-    proveScript = CScript() << data << sigtype << ToByteVector(dataSigner.pubkey);
+    txoSig[2] ^= 1;
+    proveScript = CScript() << txoSig << ToByteVector(u2.secret.GetPubKey()) << data << sigtype;
     stack.clear();
     BOOST_CHECK(EvalScript(stack, proveScript, 0, pkhChecker, &serror, nullptr));
     BOOST_CHECK(!EvalScript(stack, condScript, 0, pkhChecker, &serror, nullptr));
+    BOOST_CHECK(serror == SCRIPT_ERR_CHECKSIGVERIFY);
 
     enableDataSigVerify = priorDataSigVerifyValue;
 }

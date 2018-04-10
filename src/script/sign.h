@@ -7,9 +7,9 @@
 #ifndef BITCOIN_SCRIPT_SIGN_H
 #define BITCOIN_SCRIPT_SIGN_H
 
-#include "script/interpreter.h"
 #include "hash.h"
 #include "key.h"
+#include "script/interpreter.h"
 
 #include <vector>
 
@@ -89,7 +89,7 @@ CScript CombineSignatures(const CScript &scriptPubKey,
     const CScript &scriptSig1,
     const CScript &scriptSig2);
 
-template<typename BYTEARRAY>
+template <typename BYTEARRAY>
 std::vector<unsigned char> signmessage(const BYTEARRAY &data, const CKey &key)
 {
     CHashWriter ss(SER_GETHASH, 0);
