@@ -268,23 +268,19 @@ void FinalizeNode(NodeId nodeid)
     for (const QueuedBlock &entry : state->vBlocksInFlight)
     {
         LOGA("erasing map mapblocksinflight entries\n");
-        requester.mapBlocksInFlight.erase(entry.hash);
+        requester.MapBlocksInFlightErase(entry.hash);
 
         // Reset all requests times to zero so that we can immediately re-request these blocks
         requester.ResetLastRequestTime(entry.hash);
     }
     nPreferredDownload -= state->fPreferredDownload;
-    requester.nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
-    DbgAssert(requester.nPeersWithValidatedDownloads >= 0, requester.nPeersWithValidatedDownloads = 0);
 
     mapNodeState.erase(nodeid);
-
     if (mapNodeState.empty())
     {
         // Do a consistency check after the last peer is removed.  Force consistent state if production code
-        DbgAssert(requester.mapBlocksInFlight.empty(), requester.mapBlocksInFlight.clear());
+        DbgAssert(requester.MapBlocksInFlightEmpty(), requester.MapBlocksInFlightClear());
         DbgAssert(nPreferredDownload == 0, nPreferredDownload = 0);
-        DbgAssert(requester.nPeersWithValidatedDownloads == 0, requester.nPeersWithValidatedDownloads = 0);
     }
 }
 
@@ -319,10 +315,16 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)
     stats.nMisbehavior = node->nMisbehavior;
     stats.nSyncHeight = state->pindexBestKnownBlock ? state->pindexBestKnownBlock->nHeight : -1;
     stats.nCommonHeight = state->pindexLastCommonBlock ? state->pindexLastCommonBlock->nHeight : -1;
-    BOOST_FOREACH (const QueuedBlock &queue, state->vBlocksInFlight)
+    for (const QueuedBlock &queue : state->vBlocksInFlight)
     {
-        if (queue.pindex)
-            stats.vHeightInFlight.push_back(queue.pindex->nHeight);
+        // lookup block by hash to find height
+        BlockMap::iterator mi = mapBlockIndex.find(queue.hash);
+        if (mi != mapBlockIndex.end())
+        {
+            CBlockIndex *pindex = (*mi).second;
+            if (pindex)
+                stats.vHeightInFlight.push_back(pindex->nHeight);
+        }
     }
     return true;
 }
@@ -4338,7 +4340,7 @@ void UnloadBlockIndex()
     nLastBlockFile = 0;
     nBlockSequenceId = 1;
     mapBlockSource.clear();
-    requester.mapBlocksInFlight.clear();
+    requester.MapBlocksInFlightClear();
     nPreferredDownload = 0;
     setDirtyBlockIndex.clear();
     setDirtyFileInfo.clear();

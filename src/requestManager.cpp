@@ -944,6 +944,8 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid,
     const Consensus::Params &consensusParams,
     CBlockIndex *pindex)
 {
+    AssertLockNotHeld(cs_objDownloader);
+
     LOCK(cs_main);
     CNodeState *state = State(nodeid);
     DbgAssert(state != nullptr, return );
@@ -951,25 +953,19 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid,
     // If started then clear the thinblock timer used for preferential downloading
     thindata.ClearThinBlockTimer(hash);
 
-    // BU why mark as received? because this erases it from the inflight list.  Instead we'll check for it
-    // BU removed: MarkBlockAsReceived(hash);
+    LOCK(cs_objDownloader);
     std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
         mapBlocksInFlight.find(hash);
     if (itInFlight == mapBlocksInFlight.end()) // If it hasn't already been marked inflight...
     {
         int64_t nNow = GetTimeMicros();
-        QueuedBlock newentry = {hash, pindex, nNow, pindex != nullptr};
+        QueuedBlock newentry = {hash, nNow};
         std::list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
         state->nBlocksInFlight++;
-        state->nBlocksInFlightValidHeaders += newentry.fValidatedHeaders;
         if (state->nBlocksInFlight == 1)
         {
             // We're starting a block download (batch) from this peer.
             state->nDownloadingSince = GetTimeMicros();
-        }
-        if (state->nBlocksInFlightValidHeaders == 1 && pindex != nullptr)
-        {
-            nPeersWithValidatedDownloads++;
         }
         mapBlocksInFlight[hash] = std::make_pair(nodeid, it);
     }
@@ -980,6 +976,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
 {
     AssertLockHeld(cs_main);
 
+    LOCK(cs_objDownloader);
     std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
         mapBlocksInFlight.find(hash);
     if (itInFlight != mapBlocksInFlight.end())
@@ -1064,12 +1061,6 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
             }
         }
         // BUIP010 Xtreme Thinblocks: end section
-        state->nBlocksInFlightValidHeaders -= itInFlight->second.second->fValidatedHeaders;
-        if (state->nBlocksInFlightValidHeaders == 0 && itInFlight->second.second->fValidatedHeaders)
-        {
-            // Last validated block on the queue was received.
-            nPeersWithValidatedDownloads--;
-        }
         if (state->vBlocksInFlight.begin() == itInFlight->second.second)
         {
             // First block on the queue was received, update the start download time for the next one
@@ -1098,11 +1089,9 @@ void CRequestManager::CheckForDownloadTimeout(CNode *pnode,
     // to unreasonably increase our timeout.
     if (!pnode->fDisconnect && state.vBlocksInFlight.size() > 0)
     {
-        int nOtherPeersWithValidatedDownloads = nPeersWithValidatedDownloads - (state.nBlocksInFlightValidHeaders > 0);
         if (nNow >
             state.nDownloadingSince +
-                consensusParams.nPowTargetSpacing *
-                    (BLOCK_DOWNLOAD_TIMEOUT_BASE + BLOCK_DOWNLOAD_TIMEOUT_PER_PEER * nOtherPeersWithValidatedDownloads))
+                consensusParams.nPowTargetSpacing * (BLOCK_DOWNLOAD_TIMEOUT_BASE + BLOCK_DOWNLOAD_TIMEOUT_PER_PEER))
         {
             LOGA("Timeout downloading block %s from peer=%d, disconnecting\n",
                 state.vBlocksInFlight.front().hash.ToString(), pnode->id);

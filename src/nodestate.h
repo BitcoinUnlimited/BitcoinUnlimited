@@ -13,9 +13,7 @@
 struct QueuedBlock
 {
     uint256 hash;
-    CBlockIndex *pindex; //!< Optional.
     int64_t nTime; //! Time of "getdata" request in microseconds.
-    bool fValidatedHeaders; //!< Whether this block has validated headers at the time of request.
 };
 
 /**
@@ -54,7 +52,6 @@ struct CNodeState
     //! When the first entry in vBlocksInFlight started downloading. Don't care when vBlocksInFlight is empty.
     int64_t nDownloadingSince;
     int nBlocksInFlight;
-    int nBlocksInFlightValidHeaders;
     //! Whether we consider this a preferred download peer.
     bool fPreferredDownload;
     //! Whether this peer wants invs or headers (when possible) for block announcements.
