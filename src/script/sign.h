@@ -7,8 +7,13 @@
 #ifndef BITCOIN_SCRIPT_SIGN_H
 #define BITCOIN_SCRIPT_SIGN_H
 
+#include "hash.h"
+#include "key.h"
 #include "script/interpreter.h"
 
+#include <vector>
+
+class CKey;
 class CKeyID;
 class CKeyStore;
 class CScript;
@@ -83,5 +88,24 @@ CScript CombineSignatures(const CScript &scriptPubKey,
     const BaseSignatureChecker &checker,
     const CScript &scriptSig1,
     const CScript &scriptSig2);
+
+template <typename BYTEARRAY>
+std::vector<unsigned char> signmessage(const BYTEARRAY &data, const CKey &key)
+{
+    CHashWriter ss(SER_GETHASH, 0);
+    ss << strMessageMagic << data;
+
+    std::vector<unsigned char> vchSig;
+    if (!key.SignCompact(ss.GetHash(), vchSig)) // signing will only fail if the key is bogus
+    {
+        return std::vector<unsigned char>();
+    }
+    return vchSig;
+}
+
+/** sign arbitrary data using the same algorithm as the signmessage/verifymessage RPCs and OP_DATASIGVERIFY */
+extern template std::vector<unsigned char> signmessage(const std::vector<unsigned char> &data, const CKey &key);
+extern template std::vector<unsigned char> signmessage(const std::string &data, const CKey &key);
+
 
 #endif // BITCOIN_SCRIPT_SIGN_H

@@ -355,3 +355,7 @@ bool DummySignatureCreator::CreateSig(std::vector<unsigned char> &vchSig,
     vchSig[6 + 33 + 32] = SIGHASH_ALL;
     return true;
 }
+
+
+template std::vector<unsigned char> signmessage(const std::vector<unsigned char> &data, const CKey &key);
+template std::vector<unsigned char> signmessage(const std::string &data, const CKey &key);

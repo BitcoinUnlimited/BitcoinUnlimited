@@ -1368,6 +1368,267 @@ BOOST_AUTO_TEST_CASE(script_GetScriptAsm)
         derSig + "83 " + pubKey, ScriptToAsmStr(CScript() << ToByteVector(ParseHex(derSig + "83")) << vchPubKey));
 }
 
+
+class QuickAddress
+{
+public:
+    QuickAddress()
+    {
+        secret.MakeNewKey(true);
+        pubkey = secret.GetPubKey();
+        addr = pubkey.GetID();
+    }
+    QuickAddress(const CKey &k)
+    {
+        secret = k;
+        pubkey = secret.GetPubKey();
+        addr = pubkey.GetID();
+    }
+    QuickAddress(unsigned char key) // make a very simple key for testing only
+    {
+        secret.MakeNewKey(true);
+        unsigned char *c = (unsigned char *)secret.begin();
+        *c = key;
+        c++;
+        for (int i = 1; i < 32; i++, c++)
+        {
+            *c = 0;
+        }
+        pubkey = secret.GetPubKey();
+        addr = pubkey.GetID();
+    }
+
+    CKey secret;
+    CPubKey pubkey;
+    CKeyID addr; // 160 bit normal address
+};
+
+CTransaction tx1x1(const COutPoint &utxo,
+    const CScript &txo,
+    CAmount amt,
+    const CKey &key,
+    const CScript &prevOutScript,
+    bool p2pkh = true)
+{
+    CMutableTransaction tx;
+    tx.vin.resize(1);
+    tx.vin[0].prevout = utxo;
+    tx.vout.resize(1);
+    tx.vout[0].scriptPubKey = txo;
+    tx.vout[0].nValue = amt;
+    tx.vin[0].scriptSig = CScript();
+    tx.nLockTime = 0;
+
+    unsigned int sighashType = SIGHASH_ALL | SIGHASH_FORKID;
+    std::vector<unsigned char> vchSig;
+    uint256 hash = SignatureHash(prevOutScript, tx, 0, sighashType, amt, 0);
+    if (!key.Sign(hash, vchSig))
+    {
+        assert(0);
+    }
+    vchSig.push_back((unsigned char)sighashType);
+    tx.vin[0].scriptSig << vchSig;
+    if (p2pkh)
+    {
+        tx.vin[0].scriptSig << ToByteVector(key.GetPubKey());
+    }
+
+    return tx;
+}
+
+
+// I want to create a script test that includes some CHECKSIGVERIFY instructions,
+// however I don't have a transaction to verify.  So instead of signing the hash of the
+// tx, I sign the hash of the public key.
+class SigPubkeyHashChecker : public BaseSignatureChecker
+{
+public:
+    virtual bool CheckSig(const std::vector<unsigned char> &scriptSig,
+        const std::vector<unsigned char> &vchPubKey,
+        const CScript &scriptCode) const
+    {
+        CPubKey pub = CPubKey(vchPubKey);
+        uint256 hash = pub.GetHash();
+        if (!pub.Verify(hash, scriptSig))
+            return false;
+        return true;
+    }
+
+    bool CheckLockTime(const CScriptNum &nLockTime) const override { return false; }
+    bool CheckSequence(const CScriptNum &nSequence) const override { return false; }
+    virtual ~SigPubkeyHashChecker() {}
+};
+
+
+BOOST_AUTO_TEST_CASE(script_datasigverify)
+{
+    bool priorDataSigVerifyValue = enableDataSigVerify;
+    QuickAddress dataSigner;
+
+    std::vector<unsigned char> data(1);
+    data[0] = 123;
+
+    std::vector<unsigned char> sigtype(66);
+    std::vector<unsigned char> sigbadtype(66);
+
+    {
+        sigtype = signmessage(data, dataSigner.secret);
+        sigbadtype = sigtype;
+        sigtype.push_back(DATASIG_COMPACT_ECDSA);
+
+        sigbadtype.push_back(0xff);
+    }
+
+
+    CScript proveScript = CScript() << data << sigtype;
+
+    CScript condScript = CScript() << ToByteVector(dataSigner.addr) << OP_DATASIGVERIFY;
+
+    // Test basic case
+    vector<vector<unsigned char> > stack;
+    ScriptError serror;
+    BaseSignatureChecker sigChecker;
+    BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+
+    enableDataSigVerify = false;
+    // Sigop count should be 0 because OP_DATASIGVERIFY is off
+    BOOST_CHECK(condScript.GetSigOpCount(true) == 0);
+    // Test failure when datasigverify is off
+    BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+    BOOST_CHECK(serror == SCRIPT_ERR_BAD_OPCODE);
+    enableDataSigVerify = true;
+    // Sigop count should be 1 because OP_DATASIGVERIFY is on
+    BOOST_CHECK(condScript.GetSigOpCount(true) == 1);
+    // check basic success case
+    stack.clear();
+    BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+    BOOST_CHECK(EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+
+    // Test bad signature type
+    stack.clear();
+    CScript scriptBadSigType = CScript() << data << sigbadtype;
+    BOOST_CHECK(EvalScript(stack, scriptBadSigType, 0, sigChecker, &serror, nullptr));
+    BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+    BOOST_CHECK(serror == SCRIPT_ERR_VERIFY);
+
+    // Test incorrect signature
+    stack.clear();
+    sigtype[2] ^= 1; // Screw up the signature
+    proveScript = CScript() << data << sigtype;
+    BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+    BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+    BOOST_CHECK(serror == SCRIPT_ERR_VERIFY);
+    sigtype[2] ^= 1; // back to correct sigtype
+
+    // Test incorrect signature length too small
+    {
+        stack.clear();
+        std::vector<unsigned char> sigtype2 = sigtype;
+        sigtype2.resize(65);
+        proveScript = CScript() << data << sigtype2;
+        BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(serror == SCRIPT_ERR_INVALID_STACK_OPERATION);
+    }
+
+    // Test incorrect signature length too big
+    {
+        stack.clear();
+        std::vector<unsigned char> sigtype2 = sigtype;
+        sigtype2.push_back(1);
+        proveScript = CScript() << data << sigtype2;
+        BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(serror == SCRIPT_ERR_INVALID_STACK_OPERATION);
+    }
+
+    // Test incorrect address length too small
+    {
+        stack.clear();
+        std::vector<unsigned char> vaddr = ToByteVector(dataSigner.addr);
+        vaddr.resize(19);
+        CScript condScript = CScript() << vaddr << OP_DATASIGVERIFY;
+        proveScript = CScript() << data << sigtype;
+        BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(serror == SCRIPT_ERR_INVALID_STACK_OPERATION);
+    }
+
+    // Test incorrect address length too big
+    {
+        stack.clear();
+        std::vector<unsigned char> vaddr = ToByteVector(dataSigner.addr);
+        vaddr.push_back(1);
+        CScript condScript = CScript() << vaddr << OP_DATASIGVERIFY;
+        proveScript = CScript() << data << sigtype;
+        BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(serror == SCRIPT_ERR_INVALID_STACK_OPERATION);
+    }
+
+    // Test wrong stack size
+    {
+        stack.clear();
+        CScript condScript = CScript() << OP_DATASIGVERIFY;
+        proveScript = CScript() << data << sigtype;
+        BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(serror == SCRIPT_ERR_INVALID_STACK_OPERATION);
+    }
+
+
+    QuickAddress u2;
+
+    // Now try a more realistic script
+    // Here I am validating that "dataSigner" signed a piece of data that is equal a
+    // particular value, and that that transaction is signed by the txo address in the
+    // normal p2pkh fashion.  In a real transaction, you would likely use string instructions
+    // to break the data into pieces, such as <ticker>, <date>, and <price> if importing information
+    // about a security.  However, these string instructions are not yet enabled.
+    condScript = CScript() << ToByteVector(dataSigner.addr) << OP_DATASIGVERIFY << data << OP_EQUALVERIFY << OP_DUP
+                           << OP_HASH160 << ToByteVector(u2.addr) << OP_EQUALVERIFY << OP_CHECKSIGVERIFY;
+    BOOST_CHECK(condScript.GetSigOpCount(true) == 2);
+    unsigned int sighashType = SIGHASH_ALL | SIGHASH_FORKID;
+    std::vector<unsigned char> txoSig;
+    // Since I don't have a tx, I'm going to use a fake tx hash, which is just the hash
+    // of the public key.
+    // uint256 hash = SignatureHash(prevtx.vout[prevout].scriptPubKey, tx, 0, sighashType, prevtx.vout[prevout].nValue,
+    // 0);
+    uint256 hash = u2.pubkey.GetHash();
+    if (!u2.secret.Sign(hash, txoSig))
+    {
+        assert(0);
+    }
+    txoSig.push_back((unsigned char)sighashType);
+    SigPubkeyHashChecker pkhChecker;
+
+    proveScript = CScript() << txoSig << ToByteVector(u2.secret.GetPubKey()) << data << sigtype;
+
+    // Success case
+    stack.clear();
+    BOOST_CHECK(EvalScript(stack, proveScript, 0, pkhChecker, &serror, nullptr));
+    BOOST_CHECK(EvalScript(stack, condScript, 0, pkhChecker, &serror, nullptr));
+
+    // Screw up the data signature
+    stack.clear();
+    sigtype[3] ^= 1;
+    proveScript = CScript() << txoSig << ToByteVector(u2.secret.GetPubKey()) << data << sigtype;
+    BOOST_CHECK(EvalScript(stack, proveScript, 0, pkhChecker, &serror, nullptr));
+    BOOST_CHECK(!EvalScript(stack, condScript, 0, pkhChecker, &serror, nullptr));
+    BOOST_CHECK(serror == SCRIPT_ERR_VERIFY);
+    sigtype[3] ^= 1; // back to correct data sig
+
+    // provide the wrong utxo pubkey
+    txoSig[2] ^= 1;
+    proveScript = CScript() << txoSig << ToByteVector(u2.secret.GetPubKey()) << data << sigtype;
+    stack.clear();
+    BOOST_CHECK(EvalScript(stack, proveScript, 0, pkhChecker, &serror, nullptr));
+    BOOST_CHECK(!EvalScript(stack, condScript, 0, pkhChecker, &serror, nullptr));
+    BOOST_CHECK(serror == SCRIPT_ERR_CHECKSIGVERIFY);
+
+    enableDataSigVerify = priorDataSigVerifyValue;
+}
+
 static CScript ScriptFromHex(const char *hex)
 {
     std::vector<unsigned char> data = ParseHex(hex);

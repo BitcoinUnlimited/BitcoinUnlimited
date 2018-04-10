@@ -19,6 +19,9 @@
 #include <string>
 #include <vector>
 
+// Set to true to enable OP_DATASIGVERIFY
+extern bool enableDataSigVerify;
+
 // Maximum number of bytes pushable to the stack
 static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520;
 
@@ -166,6 +169,7 @@ enum opcodetype
     OP_CHECKSIGVERIFY = 0xad,
     OP_CHECKMULTISIG = 0xae,
     OP_CHECKMULTISIGVERIFY = 0xaf,
+    OP_DATASIGVERIFY = 0xbb,
 
     // expansion
     OP_NOP1 = 0xb0,

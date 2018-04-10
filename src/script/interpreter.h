@@ -30,6 +30,12 @@ enum
     SIGHASH_ANYONECANPAY = 0x80,
 };
 
+/** Data signature types (for OP_DATASIGVERIFY) */
+enum
+{
+    DATASIG_COMPACT_ECDSA = 1,
+};
+
 /** Script verification flags */
 enum
 {
@@ -205,5 +211,9 @@ bool VerifyScript(const CScript &scriptSig,
     const BaseSignatureChecker &checker,
     ScriptError *error = NULL,
     unsigned char *sighashtype = NULL);
+
+// string prefixed to data when validating signed messages either via DATASIGVERIFY or RPC call.  This ensures
+// that the signature was intended for use on this blockchain.
+extern const std::string strMessageMagic;
 
 #endif // BITCOIN_SCRIPT_INTERPRETER_H
