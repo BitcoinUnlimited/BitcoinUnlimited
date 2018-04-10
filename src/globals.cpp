@@ -142,7 +142,6 @@ CTweakMap tweaks;
 map<CInv, CDataStream> mapRelay;
 deque<pair<int64_t, CInv> > vRelayExpiration;
 CCriticalSection cs_mapRelay;
-limitedmap<uint256, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
 
 vector<CNode *> vNodes;
 list<CNode *> vNodesDisconnected;

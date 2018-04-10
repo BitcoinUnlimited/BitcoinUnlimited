@@ -150,6 +150,10 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
     LOCK(cs_objDownloader);
     if (obj.type == MSG_TX)
     {
+        // Don't allow the in flight requests to grow unbounded.
+        if (mapTxnInfo.size() >= (size_t)(MAX_INV_SZ * 2 * GetArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE)))
+            return;
+
         uint256 temp = obj.hash;
         OdMap::value_type v(temp, CUnknownObj());
         std::pair<OdMap::iterator, bool> result = mapTxnInfo.insert(v);
@@ -570,6 +574,11 @@ void CRequestManager::SendRequests()
     bool fBatchBlockRequests = IsInitialBlockDownload();
     std::map<CNode *, std::vector<CInv> > mapBatchBlockRequests;
 
+    // Batch any transaction reqeusts when possible. The process of batching and requesting batched transactions
+    // is simlilar to batched block requests, however, we don't make the distinction of whether we're in the process
+    // of syncing the chain, as we do with block requests.
+    std::map<CNode *, std::vector<CInv> > mapBatchTxnRequests;
+
     // Get Blocks
     while (sendBlkIter != mapBlkInfo.end())
     {
@@ -621,11 +630,13 @@ void CRequestManager::SendRequests()
 
                     if (fBatchBlockRequests)
                     {
+                        // Add a node ref if we haven't already added a map entry for this node.
+                        if (mapBatchBlockRequests.find(next.node) == mapBatchBlockRequests.end())
                         {
                             LOCK(cs_vNodes);
                             next.node->AddRef();
                         }
-                        mapBatchBlockRequests[next.node].push_back(obj);
+                        mapBatchBlockRequests[next.node].emplace_back(obj);
                     }
                     else
                     {
@@ -762,33 +773,67 @@ void CRequestManager::SendRequests()
 
                     if (next.node != nullptr)
                     {
-                        CInv obj = item.obj;
+                        // This commented code skips requesting TX if the node is not synced. The request
+                        // manager should not make this decision but rather the caller should not give us the TX.
                         if (1)
                         {
-                            // from->AskFor(item.obj); basically just shoves the req into mapAskFor
-                            // This commented code does skips requesting TX if the node is not synced.  But the req mgr
-                            // should not make this decision, the caller should not give the TX to me...
-                            // if (!item.lastRequestTime || (item.lastRequestTime && IsChainNearlySyncd()))
-
                             item.outstandingReqs++;
                             item.lastRequestTime = now;
-                            LEAVE_CRITICAL_SECTION(cs_objDownloader); // do not use "item" after releasing this
-                            next.node->mapAskFor.insert(std::make_pair(now, obj));
-                            ENTER_CRITICAL_SECTION(cs_objDownloader);
+
+                            // Add a node ref if we haven't already added a map entry for this node.
+                            if (mapBatchTxnRequests.find(next.node) == mapBatchTxnRequests.end())
+                            {
+                                LOCK(cs_vNodes);
+                                next.node->AddRef();
+                            }
+                            mapBatchTxnRequests[next.node].emplace_back(item.obj);
+
+                            // If we have 1000 requests for this peer then send them right away.
+                            if (mapBatchTxnRequests[next.node].size() >= 1000)
+                            {
+                                LEAVE_CRITICAL_SECTION(cs_objDownloader);
+                                {
+                                    next.node->PushMessage(NetMsgType::GETDATA, mapBatchTxnRequests[next.node]);
+                                    LOG(REQ, "Sent batched request with %d transations to node %s\n",
+                                        mapBatchTxnRequests[next.node].size(), next.node->GetLogName());
+                                }
+                                ENTER_CRITICAL_SECTION(cs_objDownloader);
+
+                                mapBatchTxnRequests.erase(next.node);
+                                {
+                                    LOCK(cs_vNodes);
+                                    next.node->Release();
+                                }
+                            }
                         }
-                        {
-                            LOCK(cs_vNodes);
-                            LOG(REQ, "ReqMgr: %s removed tx ref to %d count %d\n", obj.ToString(), next.node->GetId(),
-                                next.node->GetRefCount());
-                            next.node->Release();
-                            next.node = nullptr;
-                        }
+
                         inFlight++;
                         inFlightTxns << inFlight;
                     }
                 }
             }
         }
+    }
+    // send batched requests if any.
+    if (!mapBatchTxnRequests.empty())
+    {
+        LEAVE_CRITICAL_SECTION(cs_objDownloader);
+        {
+            for (auto iter : mapBatchTxnRequests)
+            {
+                iter.first->PushMessage(NetMsgType::GETDATA, iter.second);
+                LOG(REQ, "Sent batched request with %d transations to node %s\n", iter.second.size(),
+                    iter.first->GetLogName());
+            }
+        }
+        ENTER_CRITICAL_SECTION(cs_objDownloader);
+
+        LOCK(cs_vNodes);
+        for (auto iter : mapBatchTxnRequests)
+        {
+            iter.first->Release();
+        }
+        mapBatchTxnRequests.clear();
     }
 }
 
