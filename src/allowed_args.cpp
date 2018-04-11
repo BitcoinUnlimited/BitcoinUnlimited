@@ -235,10 +235,9 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addArg("checkblocks=<n>", requiredInt,
             strprintf(_("How many blocks to check at startup (default: %u, 0 = all)"), DEFAULT_CHECKBLOCKS))
         .addArg("checklevel=<n>", requiredInt,
-            strprintf(_("How thorough the block verification of -checkblocks is (0-4, default: %u)"),
-                    DEFAULT_CHECKLEVEL))
-        .addDebugArg("dumpforks", optionalBool,
-            _("Dump built-in fork deployment data in CSV format and exit"));
+            strprintf(
+                    _("How thorough the block verification of -checkblocks is (0-4, default: %u)"), DEFAULT_CHECKLEVEL))
+        .addDebugArg("dumpforks", optionalBool, _("Dump built-in fork deployment data in CSV format and exit"));
 
 #ifndef WIN32
     if (mode == HMM_BITCOIND)

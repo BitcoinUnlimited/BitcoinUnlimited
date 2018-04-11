@@ -176,7 +176,7 @@ void LogInit()
 
 const char *const BITCOIN_CONF_FILENAME = "bitcoin.conf";
 const char *const BITCOIN_PID_FILENAME = "bitcoind.pid";
-const char *const FORKS_CSV_FILENAME = "forks.csv";  // bip135 added
+const char *const FORKS_CSV_FILENAME = "forks.csv"; // bip135 added
 
 map<string, string> mapArgs;
 map<string, vector<string> > mapMultiArgs;

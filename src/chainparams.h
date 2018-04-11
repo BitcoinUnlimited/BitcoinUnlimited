@@ -152,13 +152,13 @@ CChainParams &ModifiableParams();
  * Returns true if a deployment is considered active on a particular network
  */
 
-bool isConfiguredDeployment(const Consensus::Params& consensusParams, const int bit);
+bool isConfiguredDeployment(const Consensus::Params &consensusParams, const int bit);
 
 /**
  * Dump the fork deployment parameters for the given BIP70 chain name.
  * @throws std::runtime_error when the chain is not supported.
  */
-const std::string NetworkDeploymentInfoCSV(const std::string& chain);
+const std::string NetworkDeploymentInfoCSV(const std::string &chain);
 // bip135 end
 
 #endif // BITCOIN_CHAINPARAMS_H

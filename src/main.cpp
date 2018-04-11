@@ -2484,8 +2484,8 @@ void static CheckAndAlertUnknownVersionbits(const CChainParams &chainParams, con
                          unknownFork[bit].UnknownForkSignalStrength > 0)
                 {
                     // report a newly detected signal
-                    LOGA("%s: new signal detected for unknown fork (versionbit %i) - strength %d/%d\n", __func__,
-                        bit, unknownFork[bit].UnknownForkSignalStrength, BIT_WARNING_WINDOW);
+                    LOGA("%s: new signal detected for unknown fork (versionbit %i) - strength %d/%d\n", __func__, bit,
+                        unknownFork[bit].UnknownForkSignalStrength, BIT_WARNING_WINDOW);
                     // set it so that we don't report on it again
                     unknownFork[bit].UnknownForkSignalFirstDetected = true;
                     unknownFork[bit].UnknownForkSignalLost = false;

@@ -10,122 +10,121 @@
 // bip135 begin fill out entire table
 struct ForkDeploymentInfo VersionBitsDeploymentInfo[Consensus::MAX_VERSION_BITS_DEPLOYMENTS] = {
     {
-        /*.name =*/ (char *) "csv",
-        /*.gbt_force =*/ true,
+        /*.name =*/(char *)"csv",
+        /*.gbt_force =*/true,
     },
     {
-        /*.name =*/ (char *) "segwit",    // bit 1, known, active but not implemented in this client
-        /*.gbt_force =*/ true,
+        /*.name =*/(char *)"segwit", // bit 1, known, active but not implemented in this client
+        /*.gbt_force =*/true,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 2
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 2
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 3
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 3
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 4
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 4
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 5
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 5
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 6
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 6
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 7
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 7
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 8
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 8
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 9
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 9
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 10
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 10
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 11
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 11
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 12
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 12
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 13
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 13
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 14
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 14
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 15
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 15
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 16
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 16
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 17
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 17
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 18
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 18
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 19
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 19
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 20
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 20
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 21
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 21
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 22
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 22
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 23
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 23
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 24
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 24
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 25
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 25
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 26
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 26
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "",          // unallocated bit 27
-        /*.gbt_force =*/ false,
+        /*.name =*/(char *)"", // unallocated bit 27
+        /*.gbt_force =*/false,
     },
     {
-        /*.name =*/ (char *) "testdummy", // unallocated bit 28
-        /*.gbt_force =*/ false,
-    }
-};
+        /*.name =*/(char *)"testdummy", // unallocated bit 28
+        /*.gbt_force =*/false,
+    }};
 // bip135 end
 
 
@@ -158,21 +157,25 @@ ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex 
 
     // A block's state is always the same as that of the first of its period, so it is computed based on a pindexPrev
     // whose height equals a multiple of nPeriod - 1.
-    if (pindexPrev != NULL) {
+    if (pindexPrev != NULL)
+    {
         assert(nPeriod);
         pindexPrev = pindexPrev->GetAncestor(pindexPrev->nHeight - ((pindexPrev->nHeight + 1) % nPeriod));
     }
 
     // Walk backwards in steps of nPeriod to find a pindexPrev which was DEFINED
-    std::vector<const CBlockIndex*> vToCompute;
+    std::vector<const CBlockIndex *> vToCompute;
 
-    while (!backAtDefined(cache, (const CBlockIndex *) pindexPrev)) {
-        if (pindexPrev == NULL) {
+    while (!backAtDefined(cache, (const CBlockIndex *)pindexPrev))
+    {
+        if (pindexPrev == NULL)
+        {
             // The genesis block is by definition defined.
             cache[pindexPrev] = THRESHOLD_DEFINED;
             break;
         }
-        if (pindexPrev->GetMedianTimePast() < nTimeStart) {
+        if (pindexPrev->GetMedianTimePast() < nTimeStart)
+        {
             // Optimizaton: don't recompute down further, as we know every
             // earlier block will be before the start time
             cache[pindexPrev] = THRESHOLD_DEFINED;
@@ -214,20 +217,24 @@ ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex 
         }
         case THRESHOLD_STARTED:
         {
-            if (pindexPrev->GetMedianTimePast() >= nTimeTimeout) {
+            if (pindexPrev->GetMedianTimePast() >= nTimeTimeout)
+            {
                 stateNext = THRESHOLD_FAILED;
                 break;
             }
             // We need to count
-            const CBlockIndex* pindexCount = pindexPrev;
+            const CBlockIndex *pindexCount = pindexPrev;
             int count = 0;
-            for (int i = 0; i < nPeriod; i++) {
-                if (Condition(pindexCount, params)) {
+            for (int i = 0; i < nPeriod; i++)
+            {
+                if (Condition(pindexCount, params))
+                {
                     count++;
                 }
                 pindexCount = pindexCount->pprev;
             }
-            if (count >= nThreshold) {
+            if (count >= nThreshold)
+            {
                 stateNext = THRESHOLD_LOCKED_IN;
                 // bip135: make a note of lock-in time & height
                 // this will be used for assessing grace period conditions.
@@ -239,11 +246,13 @@ ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex 
         case THRESHOLD_LOCKED_IN:
         {
             // bip135: Progress to ACTIVE only once all grace conditions are met.
-            if (pindexPrev->GetMedianTimePast() >= nActualLockinTime + nMinLockedTime
-                    && pindexPrev->nHeight >= nActualLockinBlock + nMinLockedBlocks) {
+            if (pindexPrev->GetMedianTimePast() >= nActualLockinTime + nMinLockedTime &&
+                pindexPrev->nHeight >= nActualLockinBlock + nMinLockedBlocks)
+            {
                 stateNext = THRESHOLD_ACTIVE;
             }
-            else {
+            else
+            {
                 // bip135: if grace not yet met, remain in LOCKED_IN
                 stateNext = THRESHOLD_LOCKED_IN;
             }
@@ -281,7 +290,6 @@ protected:
     int Threshold(const Consensus::Params &params) const { return params.vDeployments[id].threshold; }
     int MinLockedBlocks(const Consensus::Params &params) const { return params.vDeployments[id].minlockedblocks; }
     int64_t MinLockedTime(const Consensus::Params &params) const { return params.vDeployments[id].minlockedtime; }
-
     bool Condition(const CBlockIndex *pindex, const Consensus::Params &params) const
     {
         return (((pindex->nVersion & VERSIONBITS_TOP_MASK) == VERSIONBITS_TOP_BITS) &&

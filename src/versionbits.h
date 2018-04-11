@@ -22,7 +22,8 @@ static const int BIT_WARNING_WINDOW = 100;
 /** Threshold to use for assessing warning of unknown bits */
 static const int BIT_WARNING_THRESHOLD = 50;
 
-enum ThresholdState {
+enum ThresholdState
+{
     THRESHOLD_DEFINED,
     THRESHOLD_STARTED,
     THRESHOLD_LOCKED_IN,
@@ -38,7 +39,7 @@ typedef std::map<const CBlockIndex *, ThresholdState> ThresholdConditionCache;
 struct ForkDeploymentInfo
 {
     /** Deployment name */
-    char *name;   // bip135: removed const to allow update from CSV
+    char *name; // bip135: removed const to allow update from CSV
     /** Whether GBT clients can safely ignore this rule in simplified usage */
     bool gbt_force;
 };
