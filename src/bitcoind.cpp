@@ -10,6 +10,7 @@
 #include "chainparams.h"
 #include "clientversion.h"
 #include "config.h"
+#include "forks_csv.h"
 #include "fs.h"
 #include "httprpc.h"
 #include "httpserver.h"
@@ -18,10 +19,9 @@
 #include "rpc/server.h"
 #include "scheduler.h"
 #include "unlimited.h"
+#include "unlimited.h"
 #include "util.h"
 #include "utilstrencodings.h"
-#include "unlimited.h"
-#include "forks_csv.h"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/thread.hpp>
@@ -117,7 +117,8 @@ bool AppInit(int argc, char *argv[])
 
     // bip135 begin
     // dump default deployment info and exit, if requested
-    if (GetBoolArg("-dumpforks", false)) {
+    if (GetBoolArg("-dumpforks", false))
+    {
         std::stringstream ss;
         ss << "# " << strprintf(_("%s Daemon"), _(PACKAGE_NAME)) << " " << _("version") << " " << FormatFullVersion();
         ss << "\n" << FORKS_CSV_FILE_HEADER;

@@ -6,7 +6,7 @@
 
 #include "chainparams.h"
 #include "consensus/merkle.h"
-#include "versionbits.h"  // bip135 added
+#include "versionbits.h" // bip135 added
 
 #include "tinyformat.h"
 #include "util.h"
@@ -507,10 +507,10 @@ void SelectParams(const std::string &network)
  * Unconfigured deployments can be ignored to save processing time, e.g.
  * in ComputeBlockVersion() when computing the default block version to emit.
  */
-bool isConfiguredDeployment(const Consensus::Params& consensusParams, const int bit)
+bool isConfiguredDeployment(const Consensus::Params &consensusParams, const int bit)
 {
     const Consensus::ForkDeployment *vdeployments = consensusParams.vDeployments;
-    const struct ForkDeploymentInfo& vbinfo = VersionBitsDeploymentInfo[bit];
+    const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[bit];
 
     if (strlen(vbinfo.name) == 0)
         return false;
@@ -522,9 +522,10 @@ bool isConfiguredDeployment(const Consensus::Params& consensusParams, const int 
  * Return a string representing CSV-formatted deployments for the network.
  * Only configured deployments satisfying isConfiguredDeployment() are included.
  */
-const std::string NetworkDeploymentInfoCSV(const std::string& network)
+const std::string NetworkDeploymentInfoCSV(const std::string &network)
 {
-    const Consensus::Params& consensusParams = Params(network).GetConsensus();;
+    const Consensus::Params &consensusParams = Params(network).GetConsensus();
+    ;
     const Consensus::ForkDeployment *vdeployments = consensusParams.vDeployments;
 
     std::string networkInfoStr;
@@ -532,8 +533,9 @@ const std::string NetworkDeploymentInfoCSV(const std::string& network)
 
     for (int bit = 0; bit < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; bit++)
     {
-        const struct ForkDeploymentInfo& vbinfo = VersionBitsDeploymentInfo[bit];
-        if (isConfiguredDeployment(consensusParams, bit)) {
+        const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[bit];
+        if (isConfiguredDeployment(consensusParams, bit))
+        {
             networkInfoStr += network + ",";
             networkInfoStr += std::to_string(bit) + ",";
             networkInfoStr += std::string(vbinfo.name) + ",";
@@ -554,7 +556,8 @@ const std::string NetworkDeploymentInfoCSV(const std::string& network)
  * Return a modifiable reference to the chain params, to be updated by the
  * CSV deployment data reading routine.
  */
-CChainParams &ModifiableParams() {
+CChainParams &ModifiableParams()
+{
     assert(pCurrentParams);
     return *pCurrentParams;
 }

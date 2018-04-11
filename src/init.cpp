@@ -20,10 +20,10 @@
 #include "connmgr.h"
 #include "consensus/validation.h"
 #include "dosman.h"
-#include "fs.h"
 #include "forks_csv.h"
-#include "httpserver.h"
+#include "fs.h"
 #include "httprpc.h"
+#include "httpserver.h"
 #include "httpserver.h"
 #include "key.h"
 #include "main.h"
@@ -903,7 +903,8 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         try
         {
             csvFile.open(ForksCsvFile.c_str(), ios::in);
-            if ( csvFile.fail()) {
+            if (csvFile.fail())
+            {
                 throw std::runtime_error("unable to open deployment file for reading");
             }
 
@@ -912,19 +913,23 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
             CsvReadOk = ReadForksCsv(chainparams.NetworkIDString(), csvFile, chainparams.GetModifiableConsensus());
             csvFile.close();
         }
-        catch (const std::exception& e)
+        catch (const std::exception &e)
         {
             LOGA("Unable to read '%s'\n", ForksCsvFile);
             // if unable to read file which is present: abort
-            return InitError(strprintf(_("Warning: Could not open deployment configuration CSV file '%s' for reading"), ForksCsvFile));
+            return InitError(strprintf(
+                _("Warning: Could not open deployment configuration CSV file '%s' for reading"), ForksCsvFile));
         }
         // if the deployments data doesn't validate correctly, shut down for safety reasons.
-        if (!CsvReadOk) {
+        if (!CsvReadOk)
+        {
             LOGA("Validation of '%s' failed\n", ForksCsvFile);
-            return InitError(strprintf(_("Deployment configuration file '%s' contained invalid data - see debug.log"), ForksCsvFile));
+            return InitError(strprintf(
+                _("Deployment configuration file '%s' contained invalid data - see debug.log"), ForksCsvFile));
         }
     }
-    else {
+    else
+    {
         // be noisy, but don't fail if file is absent - use built-in defaults
         LOGA("No deployment configuration found at '%s' - using defaults\n", ForksCsvFile);
     }

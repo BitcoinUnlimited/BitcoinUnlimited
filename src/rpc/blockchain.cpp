@@ -749,12 +749,23 @@ static UniValue BIP135ForkDesc(const Consensus::Params &consensusParams, Consens
     UniValue rv(UniValue::VOBJ);
     rv.push_back(Pair("bit", (int)id));
     const ThresholdState thresholdState = VersionBitsTipState(consensusParams, id);
-    switch (thresholdState) {
-    case THRESHOLD_DEFINED: rv.push_back(Pair("status", "defined")); break;
-    case THRESHOLD_STARTED: rv.push_back(Pair("status", "started")); break;
-    case THRESHOLD_LOCKED_IN: rv.push_back(Pair("status", "locked_in")); break;
-    case THRESHOLD_ACTIVE: rv.push_back(Pair("status", "active")); break;
-    case THRESHOLD_FAILED: rv.push_back(Pair("status", "failed")); break;
+    switch (thresholdState)
+    {
+    case THRESHOLD_DEFINED:
+        rv.push_back(Pair("status", "defined"));
+        break;
+    case THRESHOLD_STARTED:
+        rv.push_back(Pair("status", "started"));
+        break;
+    case THRESHOLD_LOCKED_IN:
+        rv.push_back(Pair("status", "locked_in"));
+        break;
+    case THRESHOLD_ACTIVE:
+        rv.push_back(Pair("status", "active"));
+        break;
+    case THRESHOLD_FAILED:
+        rv.push_back(Pair("status", "failed"));
+        break;
     }
     rv.push_back(Pair("startTime", consensusParams.vDeployments[id].nStartTime));
     rv.push_back(Pair("timeout", consensusParams.vDeployments[id].nTimeout));
@@ -808,13 +819,19 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
             // bip135 begin
             "  \"bip135_forks\": {            (object) status of BIP135 forks in progress\n"
             "     \"xxxx\" : {                (string) name of the fork\n"
-            "        \"status\": \"xxxx\",      (string) one of \"defined\", \"started\", \"locked_in\", \"active\", \"failed\"\n"
-            "        \"bit\": xx,             (numeric) the bit (0-28) in the block version field used to signal this fork (only for \"started\" status)\n"
-            "        \"startTime\": xx,       (numeric) the minimum median time past of a block at which the bit gains its meaning\n"
+            "        \"status\": \"xxxx\",      (string) one of \"defined\", \"started\", \"locked_in\", \"active\", "
+            "\"failed\"\n"
+            "        \"bit\": xx,             (numeric) the bit (0-28) in the block version field used to signal this "
+            "fork (only for \"started\" status)\n"
+            "        \"startTime\": xx,       (numeric) the minimum median time past of a block at which the bit gains "
+            "its meaning\n"
             "        \"windowsize\": xx,      (numeric) the number of blocks over which the fork status is tallied\n"
-            "        \"threshold\": xx,       (numeric) the number of blocks in a window that must signal for fork to lock in\n"
-            "        \"minlockedblocks\": xx, (numeric) the minimum number of blocks to elapse after lock-in and before activation\n"
-            "        \"minlockedtime\": xx,   (numeric) the minimum number of seconds to elapse after median time past of lock-in until activation\n"
+            "        \"threshold\": xx,       (numeric) the number of blocks in a window that must signal for fork to "
+            "lock in\n"
+            "        \"minlockedblocks\": xx, (numeric) the minimum number of blocks to elapse after lock-in and "
+            "before activation\n"
+            "        \"minlockedtime\": xx,   (numeric) the minimum number of seconds to elapse after median time past "
+            "of lock-in until activation\n"
             "     }\n"
             "  }\n"
             // bip135 end
@@ -840,17 +857,18 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     CBlockIndex *tip = chainActive.Tip();
     UniValue softforks(UniValue::VARR);
     UniValue bip9_softforks(UniValue::VOBJ);
-    UniValue bip135_forks(UniValue::VOBJ);  // bip135 added
+    UniValue bip135_forks(UniValue::VOBJ); // bip135 added
     softforks.push_back(SoftForkDesc("bip34", 2, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip66", 3, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip65", 4, tip, consensusParams));
     // bip135 begin : add all the configured forks
-    assert (Consensus::MAX_VERSION_BITS_DEPLOYMENTS <= VERSIONBITS_NUM_BITS);
+    assert(Consensus::MAX_VERSION_BITS_DEPLOYMENTS <= VERSIONBITS_NUM_BITS);
     for (int i = 0; i < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++)
     {
         Consensus::DeploymentPos bit = static_cast<Consensus::DeploymentPos>(i);
-        const struct ForkDeploymentInfo& vbinfo = VersionBitsDeploymentInfo[bit];
-        if (isConfiguredDeployment(consensusParams, bit)) {
+        const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[bit];
+        if (isConfiguredDeployment(consensusParams, bit))
+        {
             bip9_softforks.push_back(Pair(vbinfo.name, BIP9SoftForkDesc(consensusParams, bit)));
             bip135_forks.push_back(Pair(vbinfo.name, BIP135ForkDesc(consensusParams, bit)));
         }
