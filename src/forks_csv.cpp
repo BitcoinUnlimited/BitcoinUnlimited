@@ -237,5 +237,5 @@ bool ValidateOverallParams(const string& checkNetworkID)
 
 void LineValidationError(string errmsg)
 {
-    LogPrintf("%s\n", errmsg);
+    LOGA("%s\n", errmsg);
 }
