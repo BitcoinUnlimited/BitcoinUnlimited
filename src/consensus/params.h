@@ -53,7 +53,7 @@ enum DeploymentPos
     DEPLOYMENT_UNASSIGNED_BIT_25,
     DEPLOYMENT_UNASSIGNED_BIT_26,
     DEPLOYMENT_UNASSIGNED_BIT_27,
-    DEPLOYMENT_TESTDUMMY,  // bit 28 - used for deployment testing purposes
+    DEPLOYMENT_TESTDUMMY, // bit 28 - used for deployment testing purposes
     // bip135 end
     MAX_VERSION_BITS_DEPLOYMENTS
 };
@@ -103,35 +103,35 @@ struct Params
     // bip135 begin
     // fully initialize array
     ForkDeployment vDeployments[MAX_VERSION_BITS_DEPLOYMENTS] = {
-            { 0, 0LL, 0LL, 0, 0, 0, 0LL },  // deployment on bit 0
-            { 1, 0LL, 0LL, 0, 0, 0, 0LL },  // deployment on bit 1
-            { 2, 0LL, 0LL, 0, 0, 0, 0LL },  // deployment on bit 2
-            { 3, 0LL, 0LL, 0, 0, 0, 0LL },  // deployment on bit 3
-            { 4, 0LL, 0LL, 0, 0, 0, 0LL },  // deployment on bit 4
-            { 5, 0LL, 0LL, 0, 0, 0, 0LL },  // deployment on bit 5
-            { 6, 0LL, 0LL, 0, 0, 0, 0LL },  // deployment on bit 6
-            { 7, 0LL, 0LL, 0, 0, 0, 0LL },  // deployment on bit 7
-            { 8, 0LL, 0LL, 0, 0, 0, 0LL },  // deployment on bit 8
-            { 9, 0LL, 0LL, 0, 0, 0, 0LL },  // deployment on bit 9
-            { 10, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 10
-            { 11, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 11
-            { 12, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 12
-            { 13, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 13
-            { 14, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 14
-            { 15, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 15
-            { 16, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 16
-            { 17, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 17
-            { 18, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 18
-            { 19, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 19
-            { 20, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 20
-            { 21, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 21
-            { 22, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 22
-            { 23, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 23
-            { 24, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 24
-            { 25, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 25
-            { 26, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 26
-            { 27, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 27
-            { 28, 0LL, 0LL, 0, 0, 0, 0LL }, // deployment on bit 28
+        {0, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 0
+        {1, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 1
+        {2, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 2
+        {3, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 3
+        {4, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 4
+        {5, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 5
+        {6, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 6
+        {7, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 7
+        {8, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 8
+        {9, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 9
+        {10, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 10
+        {11, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 11
+        {12, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 12
+        {13, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 13
+        {14, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 14
+        {15, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 15
+        {16, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 16
+        {17, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 17
+        {18, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 18
+        {19, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 19
+        {20, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 20
+        {21, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 21
+        {22, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 22
+        {23, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 23
+        {24, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 24
+        {25, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 25
+        {26, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 26
+        {27, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 27
+        {28, 0LL, 0LL, 0, 0, 0, 0LL}, // deployment on bit 28
     };
     // bip135 end
     /** Proof of work parameters */
