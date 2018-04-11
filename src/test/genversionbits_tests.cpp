@@ -10,6 +10,7 @@
 #include "chainparamsbase.h"
 #include "main.h"
 #include "consensus/params.h"
+#include "test_random.h"
 
 #include <boost/test/unit_test.hpp>
 
