@@ -3496,7 +3496,7 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
     return true;
 }
 
-bool CheckAgainstCheckpoint(unsigned int height,  const uint256 &hash, const CChainParams &chainparams)
+bool CheckAgainstCheckpoint(unsigned int height, const uint256 &hash, const CChainParams &chainparams)
 {
     const CCheckpointData &ckpt = chainparams.Checkpoints();
     const auto &lkup = ckpt.mapCheckpoints.find(height);
@@ -4158,10 +4158,10 @@ bool static LoadBlockIndexDB()
         }
         if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindex->nHeight, *pindex->phashBlock, chainparams))
         {
-            pindex->nStatus |= BLOCK_FAILED_VALID;  // block doesn't match checkpoints so invalid
+            pindex->nStatus |= BLOCK_FAILED_VALID; // block doesn't match checkpoints so invalid
             pindex->nStatus &= ~BLOCK_VALID_CHAIN;
         }
-        if ((pindex->pprev)&&(pindex->pprev-> nStatus & BLOCK_FAILED_MASK))
+        if ((pindex->pprev) && (pindex->pprev->nStatus & BLOCK_FAILED_MASK))
         {
             // if the parent is invalid I am too
             pindex->nStatus |= BLOCK_FAILED_CHILD;

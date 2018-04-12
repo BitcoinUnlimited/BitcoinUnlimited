@@ -508,7 +508,7 @@ bool TestBlockValidity(CValidationState &state,
     bool fCheckMerkleRoot = true);
 
 // Checks that the provided block is consistent with the chainparam's checkpoints
-bool CheckAgainstCheckpoint(unsigned int height,  const uint256 &hash, const CChainParams &chainparams);
+bool CheckAgainstCheckpoint(unsigned int height, const uint256 &hash, const CChainParams &chainparams);
 
 // BU needed in unlimited.cpp
 bool CheckIndexAgainstCheckpoint(const CBlockIndex *pindexPrev,
