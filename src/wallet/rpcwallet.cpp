@@ -1628,7 +1628,7 @@ UniValue listtransactionsfrom(const UniValue &params, bool fHelp)
 
     if (fHelp || params.size() > 4)
         throw runtime_error(
-            "listtransactions ( \"account\" count from includeWatchonly)\n"
+            "listtransactionsfrom ( \"account\" count from includeWatchonly)\n"
             "\nReturns up to 'count' most recent transactions skipping the first (oldest) 'from' transactions for "
             "account 'account'.\n"
             "\nArguments:\n"
@@ -1699,9 +1699,9 @@ UniValue listtransactionsfrom(const UniValue &params, bool fHelp)
 
             "\nExamples:\n"
             "\nList the most recent 10 transactions in the systems\n" +
-            HelpExampleCli("listtransactions", "") + "\nList transactions 100 to 120\n" +
-            HelpExampleCli("listtransactions", "\"*\" 20 100") + "\nAs a json rpc call\n" +
-            HelpExampleRpc("listtransactions", "\"*\", 20, 100"));
+            HelpExampleCli("listtransactionsfrom", "") + "\nList transactions 100 to 120\n" +
+            HelpExampleCli("listtransactionsfrom", "\"*\" 20 100") + "\nAs a json rpc call\n" +
+            HelpExampleRpc("listtransactionsfrom", "\"*\", 20, 100"));
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
 
