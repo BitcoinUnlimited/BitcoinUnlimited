@@ -3496,6 +3496,19 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
     return true;
 }
 
+bool CheckAgainstCheckpoint(unsigned int height,  const uint256 &hash, const CChainParams &chainparams)
+{
+    const CCheckpointData &ckpt = chainparams.Checkpoints();
+    const auto &lkup = ckpt.mapCheckpoints.find(height);
+    if (lkup != ckpt.mapCheckpoints.end()) // this block height is checkpointed
+    {
+        if (hash != lkup->second) // This block does not match the checkpoint
+            return false;
+    }
+    return true;
+}
+
+
 bool CheckIndexAgainstCheckpoint(const CBlockIndex *pindexPrev,
     CValidationState &state,
     const CChainParams &chainparams,
@@ -3663,6 +3676,12 @@ bool AcceptBlockHeader(const CBlockHeader &block,
     }
     if (pindex == NULL)
         pindex = AddToBlockIndex(block);
+
+    if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindex->nHeight, *pindex->phashBlock, chainparams))
+    {
+        pindex->nStatus |= BLOCK_FAILED_VALID; // block doesn't match checkpoints so invalid
+        pindex->nStatus &= ~BLOCK_VALID_CHAIN;
+    }
 
     if (ppindex)
         *ppindex = pindex;
@@ -3883,6 +3902,8 @@ bool TestBlockValidity(CValidationState &state,
     AssertLockHeld(cs_main);
     assert(pindexPrev && pindexPrev == chainActive.Tip());
     if (fCheckpointsEnabled && !CheckIndexAgainstCheckpoint(pindexPrev, state, chainparams, block.GetHash()))
+        return error("%s: CheckIndexAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
+    if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindexPrev->nHeight + 1, block.GetHash(), chainparams))
         return error("%s: CheckIndexAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
 
     CCoinsViewCache viewNew(pcoinsTip);
@@ -4134,6 +4155,16 @@ bool static LoadBlockIndexDB()
             {
                 pindex->nChainTx = pindex->nTx;
             }
+        }
+        if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindex->nHeight, *pindex->phashBlock, chainparams))
+        {
+            pindex->nStatus |= BLOCK_FAILED_VALID;  // block doesn't match checkpoints so invalid
+            pindex->nStatus &= ~BLOCK_VALID_CHAIN;
+        }
+        if ((pindex->pprev)&&(pindex->pprev-> nStatus & BLOCK_FAILED_MASK))
+        {
+            // if the parent is invalid I am too
+            pindex->nStatus |= BLOCK_FAILED_CHILD;
         }
         if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->pprev == nullptr))
             setBlockIndexCandidates.insert(pindex);
