@@ -510,11 +510,6 @@ bool TestBlockValidity(CValidationState &state,
 // Checks that the provided block is consistent with the chainparam's checkpoints
 bool CheckAgainstCheckpoint(unsigned int height, const uint256 &hash, const CChainParams &chainparams);
 
-// BU needed in unlimited.cpp
-bool CheckIndexAgainstCheckpoint(const CBlockIndex *pindexPrev,
-    CValidationState &state,
-    const CChainParams &chainparams,
-    const uint256 &hash);
 /** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
 bool AcceptBlock(CBlock &block, CValidationState &state, CBlockIndex **pindex, bool fRequested, CDiskBlockPos *dbp);
 bool AcceptBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex **ppindex = NULL);
