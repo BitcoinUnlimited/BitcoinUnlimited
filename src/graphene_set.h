@@ -33,7 +33,7 @@ private:
     std::vector<uint64_t> ArgSort(const std::vector<uint64_t> &items)
     {
         std::vector<uint64_t> idxs(items.size());
-        iota(idxs.begin(), idxs.end(), 0);
+        std::iota(idxs.begin(), idxs.end(), 0);
 
         std::sort(idxs.begin(), idxs.end(), [&items](size_t idx1, size_t idx2) { return items[idx1] < items[idx2]; });
 
@@ -132,7 +132,7 @@ public:
         double optSymDiff = 1;
         if (nItems < nReceiverUniverseItems + 1)
             optSymDiff = OptimalSymDiff(nItems, nReceiverUniverseItems);
-        uint64_t sizeDiff = int(abs(nReceiverUniverseItems - nItems));
+        uint64_t sizeDiff = int(std::abs(nReceiverUniverseItems - nItems));
         double fpr;
 
         if (sizeDiff <= 0 || optSymDiff > sizeDiff)
