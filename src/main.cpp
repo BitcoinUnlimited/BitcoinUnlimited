@@ -3649,7 +3649,8 @@ bool AcceptBlockHeader(const CBlockHeader &block,
         if (pindexPrev->nStatus & BLOCK_FAILED_MASK)
             return state.DoS(100, error("%s: previous block invalid", __func__), REJECT_INVALID, "bad-prevblk");
 
-        // If the parent block is not the checkpointed block, then we are on the wrong fork so ignore.
+        // If the parent block belongs to the set of checkpointed blocks but it has a mismatched hash,
+        // then we are on the wrong fork so ignore
         assert(pindexPrev);
         if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindexPrev->nHeight, *pindexPrev->phashBlock, chainparams))
             return error("%s: CheckAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
@@ -3660,7 +3661,8 @@ bool AcceptBlockHeader(const CBlockHeader &block,
     if (pindex == NULL)
         pindex = AddToBlockIndex(block);
 
-    // If this block is on a non-checkpointed fork, remember the fork but mark it as invalid.
+    // If the block belongs to the set of check-pointed blocks but it has a mismatched hash,
+    // then we are on the wrong fork so ignore
     if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindex->nHeight, *pindex->phashBlock, chainparams))
     {
         pindex->nStatus |= BLOCK_FAILED_VALID; // block doesn't match checkpoints so invalid
