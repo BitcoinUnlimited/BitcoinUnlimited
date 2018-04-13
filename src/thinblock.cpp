@@ -1355,6 +1355,28 @@ void CThinBlockData::ClearThinBlockData(CNode *pnode, uint256 hash)
     ClearThinBlockData(pnode);
     ClearThinBlockInFlight(pnode, hash);
 }
+
+void CThinBlockData::ClearThinBlockStats()
+{
+    nOriginalSize.Clear();
+    nThinSize.Clear();
+    nBlocks.Clear();
+    nMempoolLimiterBytesSaved.Clear();
+    nTotalBloomFilterBytes.Clear();
+    nTotalThinBlockBytes.Clear();
+    nTotalFullTxBytes.Clear();
+
+    mapThinBlocksInBound.clear();
+    mapThinBlocksOutBound.clear();
+    mapBloomFiltersOutBound.clear();
+    mapBloomFiltersInBound.clear();
+    mapThinBlockResponseTime.clear();
+    mapThinBlockValidationTime.clear();
+    mapThinBlocksInBoundReRequestedTx.clear();
+    mapThinBlock.clear();
+    mapFullTx.clear();
+}
+
 uint64_t CThinBlockData::AddThinBlockBytes(uint64_t bytes, CNode *pfrom)
 {
     pfrom->nLocalThinBlockBytes += bytes;

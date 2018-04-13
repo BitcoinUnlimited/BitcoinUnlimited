@@ -230,6 +230,7 @@ public:
 
     void ClearGrapheneBlockData(CNode *pfrom);
     void ClearGrapheneBlockData(CNode *pfrom, uint256 hash);
+    void ClearGrapheneBlockStats();
 
     uint64_t AddGrapheneBlockBytes(uint64_t, CNode *pfrom);
     void DeleteGrapheneBlockBytes(uint64_t, CNode *pfrom);

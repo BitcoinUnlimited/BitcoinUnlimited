@@ -231,6 +231,7 @@ public:
 
     void ClearThinBlockData(CNode *pfrom);
     void ClearThinBlockData(CNode *pfrom, uint256 hash);
+    void ClearThinBlockStats();
 
     uint64_t AddThinBlockBytes(uint64_t, CNode *pfrom);
     void DeleteThinBlockBytes(uint64_t, CNode *pfrom);

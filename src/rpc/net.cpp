@@ -567,6 +567,25 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
     return obj;
 }
 
+
+UniValue clearblockstats(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() > 0)
+        throw runtime_error("clearblockstats\n"
+                            "\nClears statistics related to compression blocks such as xthin or graphene.\n"
+                            "\nArguments: None\n"
+                            "\nExample:\n" +
+                            HelpExampleCli("clearblockstats", ""));
+
+    if (IsThinBlocksEnabled())
+        thindata.ClearThinBlockStats();
+    else if (IsGrapheneBlockEnabled())
+        graphenedata.ClearGrapheneBlockStats();
+
+    return NullUniValue;
+}
+
+
 UniValue setban(const UniValue &params, bool fHelp)
 {
     string strCommand;
@@ -683,7 +702,7 @@ static const CRPCCommand commands[] = {
     {"network", "disconnectnode", &disconnectnode, true}, {"network", "getaddednodeinfo", &getaddednodeinfo, true},
     {"network", "getnettotals", &getnettotals, true}, {"network", "getnetworkinfo", &getnetworkinfo, true},
     {"network", "setban", &setban, true}, {"network", "listbanned", &listbanned, true},
-    {"network", "clearbanned", &clearbanned, true},
+    {"network", "clearblockstats", &clearblockstats, true}, {"network", "clearbanned", &clearbanned, true},
 };
 
 void RegisterNetRPCCommands(CRPCTable &table)

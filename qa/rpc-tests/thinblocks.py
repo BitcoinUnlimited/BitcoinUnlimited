@@ -115,5 +115,12 @@ class ThinBlockTest(BitcoinTestFramework):
                             "thin_full_tx",
                             "rerequested"}
 
+        # test clear block stats function
+        self.nodes[0].clearblockstats()
+        gni = self.nodes[0].getnetworkinfo()
+        tbs = gni["thinblockstats"]
+
+        assert tbs['summary'] == '0 thin block has saved 0.00B of bandwidth'
+
 if __name__ == '__main__':
     ThinBlockTest().main()

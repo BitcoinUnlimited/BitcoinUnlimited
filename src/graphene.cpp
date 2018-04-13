@@ -1139,6 +1139,34 @@ void CGrapheneBlockData::ClearGrapheneBlockData(CNode *pnode, uint256 hash)
     ClearGrapheneBlockData(pnode);
     ClearGrapheneBlockInFlight(pnode, hash);
 }
+
+void CGrapheneBlockData::ClearGrapheneBlockStats()
+{
+    LOCK(cs_graphenestats);
+
+    nOriginalSize.Clear();
+    nGrapheneSize.Clear();
+    nBlocks.Clear();
+    nMempoolLimiterBytesSaved.Clear();
+    nTotalMemPoolInfoBytes.Clear();
+    nTotalFilterBytes.Clear();
+    nTotalIbltBytes.Clear();
+    nTotalRankBytes.Clear();
+    nTotalGrapheneBlockBytes.Clear();
+
+    mapGrapheneBlocksInBound.clear();
+    mapGrapheneBlocksOutBound.clear();
+    mapMemPoolInfoOutBound.clear();
+    mapMemPoolInfoInBound.clear();
+    mapFilter.clear();
+    mapIblt.clear();
+    mapRank.clear();
+    mapGrapheneBlock.clear();
+    mapGrapheneBlockResponseTime.clear();
+    mapGrapheneBlockValidationTime.clear();
+    mapGrapheneBlocksInBoundReRequestedTx.clear();
+}
+
 uint64_t CGrapheneBlockData::AddGrapheneBlockBytes(uint64_t bytes, CNode *pfrom)
 {
     pfrom->nLocalGrapheneBlockBytes += bytes;
