@@ -3496,20 +3496,15 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
     return true;
 }
 
-bool CheckIndexAgainstCheckpoint(const CBlockIndex *pindexPrev,
-    CValidationState &state,
-    const CChainParams &chainparams,
-    const uint256 &hash)
+bool CheckAgainstCheckpoint(unsigned int height, const uint256 &hash, const CChainParams &chainparams)
 {
-    if (*pindexPrev->phashBlock == chainparams.GetConsensus().hashGenesisBlock)
-        return true;
-
-    int nHeight = pindexPrev->nHeight + 1;
-    // Don't accept any forks from the main chain prior to last checkpoint
-    CBlockIndex *pcheckpoint = Checkpoints::GetLastCheckpoint(chainparams.Checkpoints());
-    if (pcheckpoint && nHeight < pcheckpoint->nHeight)
-        return state.DoS(100, error("%s: forked chain older than last checkpoint (height %d)", __func__, nHeight));
-
+    const CCheckpointData &ckpt = chainparams.Checkpoints();
+    const auto &lkup = ckpt.mapCheckpoints.find(height);
+    if (lkup != ckpt.mapCheckpoints.end()) // this block height is checkpointed
+    {
+        if (hash != lkup->second) // This block does not match the checkpoint
+            return false;
+    }
     return true;
 }
 
@@ -3654,15 +3649,25 @@ bool AcceptBlockHeader(const CBlockHeader &block,
         if (pindexPrev->nStatus & BLOCK_FAILED_MASK)
             return state.DoS(100, error("%s: previous block invalid", __func__), REJECT_INVALID, "bad-prevblk");
 
+        // If the parent block belongs to the set of checkpointed blocks but it has a mismatched hash,
+        // then we are on the wrong fork so ignore
         assert(pindexPrev);
-        if (fCheckpointsEnabled && !CheckIndexAgainstCheckpoint(pindexPrev, state, chainparams, hash))
-            return error("%s: CheckIndexAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
+        if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindexPrev->nHeight, *pindexPrev->phashBlock, chainparams))
+            return error("%s: CheckAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
 
         if (!ContextualCheckBlockHeader(block, state, pindexPrev))
             return false;
     }
     if (pindex == NULL)
         pindex = AddToBlockIndex(block);
+
+    // If the block belongs to the set of check-pointed blocks but it has a mismatched hash,
+    // then we are on the wrong fork so ignore
+    if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindex->nHeight, *pindex->phashBlock, chainparams))
+    {
+        pindex->nStatus |= BLOCK_FAILED_VALID; // block doesn't match checkpoints so invalid
+        pindex->nStatus &= ~BLOCK_VALID_CHAIN;
+    }
 
     if (ppindex)
         *ppindex = pindex;
@@ -3882,8 +3887,9 @@ bool TestBlockValidity(CValidationState &state,
 {
     AssertLockHeld(cs_main);
     assert(pindexPrev && pindexPrev == chainActive.Tip());
-    if (fCheckpointsEnabled && !CheckIndexAgainstCheckpoint(pindexPrev, state, chainparams, block.GetHash()))
-        return error("%s: CheckIndexAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
+    // Ensure that if there is a checkpoint on this height, that this block is the one.
+    if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindexPrev->nHeight + 1, block.GetHash(), chainparams))
+        return error("%s: CheckAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
 
     CCoinsViewCache viewNew(pcoinsTip);
     CBlockIndex indexDummy(block);
@@ -4134,6 +4140,16 @@ bool static LoadBlockIndexDB()
             {
                 pindex->nChainTx = pindex->nTx;
             }
+        }
+        if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindex->nHeight, *pindex->phashBlock, chainparams))
+        {
+            pindex->nStatus |= BLOCK_FAILED_VALID; // block doesn't match checkpoints so invalid
+            pindex->nStatus &= ~BLOCK_VALID_CHAIN;
+        }
+        if ((pindex->pprev) && (pindex->pprev->nStatus & BLOCK_FAILED_MASK))
+        {
+            // if the parent is invalid I am too
+            pindex->nStatus |= BLOCK_FAILED_CHILD;
         }
         if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->pprev == nullptr))
             setBlockIndexCandidates.insert(pindex);
