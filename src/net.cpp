@@ -2091,11 +2091,8 @@ void ThreadMessageHandler()
     boost::mutex condition_mutex;
     boost::unique_lock<boost::mutex> lock(condition_mutex);
 
-    // SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
     while (true)
     {
-        requester.SendRequests(); // BU send out any requests for tx or blks that I don't know about yet
-
         vector<CNode *> vNodesCopy;
         {
             LOCK(cs_vNodes);
@@ -2125,7 +2122,7 @@ void ThreadMessageHandler()
             if (pnode->fDisconnect)
                 continue;
 
-            // Receive messages
+            // Receive messages from the net layer and put them into the receive queue.
             {
                 TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
                 if (lockRecv)
@@ -2144,10 +2141,9 @@ void ThreadMessageHandler()
             }
             boost::this_thread::interruption_point();
 
-            // Send messages
+            // Put transaction and block requests into the request manager
+            // and all other requests into the send queue.
             {
-                // TRY_LOCK(pnode->cs_vSend, lockSend);
-                //  if (lockSend)
                 g_signals.SendMessages(pnode);
             }
             boost::this_thread::interruption_point();
@@ -2158,6 +2154,10 @@ void ThreadMessageHandler()
             for (CNode *pnode : vNodesCopy)
                 pnode->Release();
         }
+
+        // From the request manager, make requests for transactions and blocks. We do this before potentially
+        // sleeping in the step below so as to allow requests to return during the sleep time.
+        requester.SendRequests();
 
         if (fSleep)
             messageHandlerCondition.timed_wait(
