@@ -1167,12 +1167,9 @@ void CRequestManager::GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, N
 }
 
 void CRequestManager::CheckForDownloadTimeout(CNode *pnode,
-    const CNodeState &state,
     const Consensus::Params &consensusParams,
     int64_t nNow)
 {
-    AssertLockHeld(cs_main);
-
     // In case there is a block that has been in flight from this peer for 2 + 0.5 * N times the block interval
     // (with N the number of peers from which we're downloading validated blocks), disconnect due to timeout.
     // We compensate for other peers to prevent killing off peers due to our own downstream link

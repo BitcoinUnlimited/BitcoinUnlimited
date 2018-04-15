@@ -6888,6 +6888,10 @@ bool SendMessages(CNode *pto)
             }
         }
 
+        // Check for block download timeout and disconnect node if necessary. Does not require cs_main.
+        int64_t nNow = GetTimeMicros();
+        requester.CheckForDownloadTimeout(pto, consensusParams, nNow);
+
         TRY_LOCK(cs_main, lockMain); // Acquire cs_main for IsInitialBlockDownload() and CNodeState()
         if (!lockMain)
         {
@@ -6902,7 +6906,6 @@ bool SendMessages(CNode *pto)
         }
 
         // Address refresh broadcast
-        int64_t nNow = GetTimeMicros();
         if (!IsInitialBlockDownload() && pto->nNextLocalAddrSend < nNow)
         {
             AdvertiseLocal(pto);
@@ -7218,11 +7221,6 @@ bool SendMessages(CNode *pto)
                 }
             }
         }
-
-
-        // Check for block download timeout and disconnect node if necessary
-        requester.CheckForDownloadTimeout(pto, state, consensusParams, nNow);
-
 
         //
         // Message: getdata (blocks)
