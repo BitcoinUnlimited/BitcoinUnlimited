@@ -266,8 +266,8 @@ void FinalizeNode(NodeId nodeid)
 
     for (const QueuedBlock &entry : state->vBlocksInFlight)
     {
-        LOGA("erasing map mapblocksinflight entries\n");
-        requester.MapBlocksInFlightErase(entry.hash);
+        // Erase mapblocksinflight entries for this node.
+        requester.MapBlocksInFlightErase(entry.hash, nodeid);
 
         // Reset all requests times to zero so that we can immediately re-request these blocks
         requester.ResetLastRequestTime(entry.hash);

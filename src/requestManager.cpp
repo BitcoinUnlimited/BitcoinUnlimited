@@ -999,9 +999,10 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid,
     thindata.ClearThinBlockTimer(hash);
 
     LOCK(cs_objDownloader);
-    std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
+    std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
         mapBlocksInFlight.find(hash);
-    if (itInFlight == mapBlocksInFlight.end()) // If it hasn't already been marked inflight...
+    // Add to inflight, if it hasn't already been marked inflight for this node id.
+    if (itInFlight == mapBlocksInFlight.end() || !mapBlocksInFlight[hash].count(nodeid))
     {
         int64_t nNow = GetTimeMicros();
         QueuedBlock newentry = {hash, nNow};
@@ -1012,7 +1013,7 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid,
             // We're starting a block download (batch) from this peer.
             state->nDownloadingSince = GetTimeMicros();
         }
-        mapBlocksInFlight[hash] = std::make_pair(nodeid, it);
+        mapBlocksInFlight[hash][nodeid] =  it;
     }
 }
 
@@ -1022,14 +1023,15 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
     AssertLockHeld(cs_main);
 
     LOCK(cs_objDownloader);
-    std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
+    NodeId nodeid = pnode->GetId();
+    std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
         mapBlocksInFlight.find(hash);
-    if (itInFlight != mapBlocksInFlight.end())
+    if (itInFlight != mapBlocksInFlight.end() && mapBlocksInFlight[hash].count(nodeid))
     {
-        CNodeState *state = State(itInFlight->second.first);
+        CNodeState *state = State(nodeid);
         DbgAssert(state != nullptr, return false);
 
-        int64_t getdataTime = itInFlight->second.second->nTime;
+        int64_t getdataTime = mapBlocksInFlight[hash][nodeid]->nTime;
         int64_t now = GetTimeMicros();
         double nResponseTime = (double)(now - getdataTime) / 1000000.0;
 
@@ -1106,14 +1108,15 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
             }
         }
         // BUIP010 Xtreme Thinblocks: end section
-        if (state->vBlocksInFlight.begin() == itInFlight->second.second)
+        if (state->vBlocksInFlight.begin() == mapBlocksInFlight[hash][nodeid])
         {
             // First block on the queue was received, update the start download time for the next one
             state->nDownloadingSince = std::max(state->nDownloadingSince, GetTimeMicros());
         }
-        state->vBlocksInFlight.erase(itInFlight->second.second);
+        state->vBlocksInFlight.erase(mapBlocksInFlight[hash][nodeid]);
         state->nBlocksInFlight--;
-        mapBlocksInFlight.erase(itInFlight);
+        MapBlocksInFlightErase(hash, nodeid);
+
         return true;
     }
     return false;

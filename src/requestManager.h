@@ -106,7 +106,7 @@ protected:
     typedef std::map<uint256, CUnknownObj> OdMap;
     OdMap mapTxnInfo;
     OdMap mapBlkInfo;
-    std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
+    std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
     CCriticalSection cs_objDownloader; // protects mapTxnInfo, mapBlkInfo and mapBlocksInFlight
 
     OdMap::iterator sendIter;
@@ -180,10 +180,19 @@ public:
     bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode);
 
     // Methods for handling mapBlocksInFlight which is protected.
-    void MapBlocksInFlightErase(const uint256 &hash)
+    void MapBlocksInFlightErase(const uint256 &hash, NodeId nodeid)
     {
+        // If there are more than one block in flight for the same block hash then we only remove
+        // the entry for this particular node, otherwise entirely remove the hash from mapBlocksInFlight.
         LOCK(cs_objDownloader);
-        mapBlocksInFlight.erase(hash);
+        if (mapBlocksInFlight.count(hash) && mapBlocksInFlight[hash].size() > 1)
+        {
+            mapBlocksInFlight[hash].erase(nodeid);
+        }
+        else
+        {
+            mapBlocksInFlight.erase(hash);
+        }
     }
     bool MapBlocksInFlightEmpty()
     {
