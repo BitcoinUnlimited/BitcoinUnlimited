@@ -264,13 +264,15 @@ void FinalizeNode(NodeId nodeid)
     if (state->fSyncStarted)
         nSyncStarted--;
 
-    for (const QueuedBlock &entry : state->vBlocksInFlight)
+    std::vector<uint256> vBlocksInFlight;
+    requester.GetBlocksInFlight(vBlocksInFlight, nodeid);
+    for (const uint256 &hash : vBlocksInFlight)
     {
         // Erase mapblocksinflight entries for this node.
-        requester.MapBlocksInFlightErase(entry.hash, nodeid);
+        requester.MapBlocksInFlightErase(hash, nodeid);
 
         // Reset all requests times to zero so that we can immediately re-request these blocks
-        requester.ResetLastRequestTime(entry.hash);
+        requester.ResetLastRequestTime(hash);
     }
     nPreferredDownload -= state->fPreferredDownload;
 
