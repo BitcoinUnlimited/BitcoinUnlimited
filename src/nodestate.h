@@ -44,8 +44,6 @@ struct CNodeState
     bool fPreferredDownload;
     //! Whether this peer wants invs or headers (when possible) for block announcements.
     bool fPreferHeaders;
-    //! How many blocks are currently in flight and requested by this node.
-    int nBlocksInFlight;
 
     CNodeState(CAddress addrIn, std::string addrNameIn);
 };

@@ -7222,34 +7222,9 @@ bool SendMessages(CNode *pto)
             }
         }
 
-        //
-        // Message: getdata (blocks)
-        //
-        if (!pto->fDisconnect && !pto->fClient && state.nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
-        {
-            std::vector<CBlockIndex *> vToDownload;
-            requester.FindNextBlocksToDownload(
-                pto->GetId(), pto->nMaxBlocksInTransit.load() - state.nBlocksInFlight, vToDownload);
-            // LOG(REQ, "IBD AskFor %d blocks from peer=%s\n", vToDownload.size(), pto->GetLogName());
-            std::vector<CInv> vGetBlocks;
-            for (CBlockIndex *pindex : vToDownload)
-            {
-                CInv inv(MSG_BLOCK, pindex->GetBlockHash());
-                if (!AlreadyHave(inv))
-                {
-                    vGetBlocks.emplace_back(inv);
-                    // LOG(REQ, "AskFor block %s (%d) peer=%s\n", pindex->GetBlockHash().ToString(),
-                    //     pindex->nHeight, pto->GetLogName());
-                }
-            }
-            if (!vGetBlocks.empty())
-            {
-                if (!IsInitialBlockDownload())
-                    requester.AskFor(vGetBlocks, pto);
-                else
-                    requester.AskForDuringIBD(vGetBlocks, pto);
-            }
-        }
+        // Request the next blocks. Mostly this will get exucuted during IBD but sometimes even
+        // when the chain is syncd a block will get request via this method.
+        requester.RequestNextBlocksToDownload(pto);
     }
     return true;
 }

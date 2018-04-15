@@ -107,6 +107,9 @@ struct CRequestManagerNodeState
     // When the first entry in vBlocksInFlight started downloading. Don't care when vBlocksInFlight is empty.
     int64_t nDownloadingSince;
 
+    // How many blocks are currently in flight and requested by this node.
+    int nBlocksInFlight;
+
     CRequestManagerNodeState();
 };
 
@@ -185,8 +188,11 @@ public:
     // Update tracking information about which blocks a peer is assumed to have.
     void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash);
 
-    // Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
-    // at most count entries.
+    // Request the next blocks. Mostly this will get exucuted during IBD but sometimes even
+    // when the chain is syncd a block will get request via this method.
+    void RequestNextBlocksToDownload(CNode *pto);
+
+    // This gets called from RequestNextBlocksToDownload
     void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex *> &vBlocks);
 
     // Returns a bool indicating whether we requested this block.
