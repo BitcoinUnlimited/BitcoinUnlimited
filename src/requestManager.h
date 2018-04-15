@@ -180,30 +180,9 @@ public:
     bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode);
 
     // Methods for handling mapBlocksInFlight which is protected.
-    void MapBlocksInFlightErase(const uint256 &hash, NodeId nodeid)
-    {
-        // If there are more than one block in flight for the same block hash then we only remove
-        // the entry for this particular node, otherwise entirely remove the hash from mapBlocksInFlight.
-        LOCK(cs_objDownloader);
-        if (mapBlocksInFlight.count(hash) && mapBlocksInFlight[hash].size() > 1)
-        {
-            mapBlocksInFlight[hash].erase(nodeid);
-        }
-        else
-        {
-            mapBlocksInFlight.erase(hash);
-        }
-    }
-    bool MapBlocksInFlightEmpty()
-    {
-        LOCK(cs_objDownloader);
-        return mapBlocksInFlight.empty();
-    }
-    void MapBlocksInFlightClear()
-    {
-        LOCK(cs_objDownloader);
-        mapBlocksInFlight.clear();
-    }
+    void MapBlocksInFlightErase(const uint256 &hash, NodeId nodeid);
+    bool MapBlocksInFlightEmpty();
+    void MapBlocksInFlightClear();
 
     // Check for block download timeout and disconnect node if necessary.
     void CheckForDownloadTimeout(CNode *pnode,
