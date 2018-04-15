@@ -20,10 +20,9 @@ CNodeState::CNodeState(CAddress addrIn, std::string addrNameIn) : address(addrIn
     fFirstHeadersReceived = false;
     nFirstHeadersExpectedHeight = -1;
     fRequestedInitialBlockAvailability = false;
-    nDownloadingSince = 0;
-    nBlocksInFlight = 0;
     fPreferredDownload = false;
     fPreferHeaders = false;
+    nBlocksInFlight = 0;
 }
 
 /**

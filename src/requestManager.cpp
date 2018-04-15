@@ -87,7 +87,8 @@ static CBlockIndex *LastCommonAncestor(CBlockIndex *pa, CBlockIndex *pb)
     return pa;
 }
 
-
+// Constructor for CRequestManagerNodeState struct
+CRequestManagerNodeState::CRequestManagerNodeState() { nDownloadingSince = 0; }
 CRequestManager::CRequestManager()
     : inFlightTxns("reqMgr/inFlight", STAT_OP_MAX), receivedTxns("reqMgr/received"), rejectedTxns("reqMgr/rejected"),
       droppedTxns("reqMgr/dropped", STAT_KEEP), pendingTxns("reqMgr/pending", STAT_KEEP),
@@ -1006,14 +1007,15 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid,
     {
         int64_t nNow = GetTimeMicros();
         QueuedBlock newentry = {hash, nNow};
-        std::list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
+        std::list<QueuedBlock>::iterator it = mapRequestManagerNodeState[nodeid].vBlocksInFlight.insert(
+            mapRequestManagerNodeState[nodeid].vBlocksInFlight.end(), newentry);
         state->nBlocksInFlight++;
         if (state->nBlocksInFlight == 1)
         {
             // We're starting a block download (batch) from this peer.
-            state->nDownloadingSince = GetTimeMicros();
+            mapRequestManagerNodeState[nodeid].nDownloadingSince = GetTimeMicros();
         }
-        mapBlocksInFlight[hash][nodeid] =  it;
+        mapBlocksInFlight[hash][nodeid] = it;
     }
 }
 
@@ -1107,13 +1109,14 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 }
             }
         }
-        // BUIP010 Xtreme Thinblocks: end section
-        if (state->vBlocksInFlight.begin() == mapBlocksInFlight[hash][nodeid])
+
+        if (mapRequestManagerNodeState[nodeid].vBlocksInFlight.begin() == mapBlocksInFlight[hash][nodeid])
         {
             // First block on the queue was received, update the start download time for the next one
-            state->nDownloadingSince = std::max(state->nDownloadingSince, GetTimeMicros());
+            mapRequestManagerNodeState[nodeid].nDownloadingSince =
+                std::max(mapRequestManagerNodeState[nodeid].nDownloadingSince, GetTimeMicros());
         }
-        state->vBlocksInFlight.erase(mapBlocksInFlight[hash][nodeid]);
+        mapRequestManagerNodeState[nodeid].vBlocksInFlight.erase(mapBlocksInFlight[hash][nodeid]);
         state->nBlocksInFlight--;
         MapBlocksInFlightErase(hash, nodeid);
 
@@ -1175,14 +1178,15 @@ void CRequestManager::CheckForDownloadTimeout(CNode *pnode,
     // We compensate for other peers to prevent killing off peers due to our own downstream link
     // being saturated. We only count validated in-flight blocks so peers can't advertise non-existing block hashes
     // to unreasonably increase our timeout.
-    if (!pnode->fDisconnect && state.vBlocksInFlight.size() > 0)
+    NodeId nodeid = pnode->GetId();
+    if (!pnode->fDisconnect && mapRequestManagerNodeState[nodeid].vBlocksInFlight.size() > 0)
     {
         if (nNow >
-            state.nDownloadingSince +
+            mapRequestManagerNodeState[nodeid].nDownloadingSince +
                 consensusParams.nPowTargetSpacing * (BLOCK_DOWNLOAD_TIMEOUT_BASE + BLOCK_DOWNLOAD_TIMEOUT_PER_PEER))
         {
             LOGA("Timeout downloading block %s from peer=%d, disconnecting\n",
-                state.vBlocksInFlight.front().hash.ToString(), pnode->id);
+                mapRequestManagerNodeState[nodeid].vBlocksInFlight.front().hash.ToString(), nodeid);
             pnode->fDisconnect = true;
         }
     }
