@@ -210,6 +210,8 @@ public:
     void MapBlocksInFlightClear();
     void GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, NodeId nodeid);
 
+    // Remove a request manager node from the nodestate map.
+    void RemoveNodeState(NodeId nodeid) { mapRequestManagerNodeState.erase(nodeid); }
     // Check for block download timeout and disconnect node if necessary.
     void CheckForDownloadTimeout(CNode *pnode,
         const Consensus::Params &consensusParams,

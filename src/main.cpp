@@ -277,6 +277,7 @@ void FinalizeNode(NodeId nodeid)
     nPreferredDownload -= state->fPreferredDownload;
 
     mapNodeState.erase(nodeid);
+    requester.RemoveNodeState(nodeid);
     if (mapNodeState.empty())
     {
         // Do a consistency check after the last peer is removed.  Force consistent state if production code
