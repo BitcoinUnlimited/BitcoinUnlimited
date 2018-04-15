@@ -183,6 +183,7 @@ public:
     void MapBlocksInFlightErase(const uint256 &hash, NodeId nodeid);
     bool MapBlocksInFlightEmpty();
     void MapBlocksInFlightClear();
+    void GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, NodeId nodeid);
 
     // Check for block download timeout and disconnect node if necessary.
     void CheckForDownloadTimeout(CNode *pnode,

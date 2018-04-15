@@ -314,10 +314,13 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)
     stats.nMisbehavior = node->nMisbehavior;
     stats.nSyncHeight = state->pindexBestKnownBlock ? state->pindexBestKnownBlock->nHeight : -1;
     stats.nCommonHeight = state->pindexLastCommonBlock ? state->pindexLastCommonBlock->nHeight : -1;
-    for (const QueuedBlock &queue : state->vBlocksInFlight)
+
+    std::vector<uint256> vBlocksInFlight;
+    requester.GetBlocksInFlight(vBlocksInFlight, nodeid);
+    for (const uint256 &hash : vBlocksInFlight)
     {
         // lookup block by hash to find height
-        BlockMap::iterator mi = mapBlockIndex.find(queue.hash);
+        BlockMap::iterator mi = mapBlockIndex.find(hash);
         if (mi != mapBlockIndex.end())
         {
             CBlockIndex *pindex = (*mi).second;

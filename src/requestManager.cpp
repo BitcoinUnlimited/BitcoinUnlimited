@@ -1149,6 +1149,20 @@ void CRequestManager::MapBlocksInFlightClear()
     mapBlocksInFlight.clear();
 }
 
+void CRequestManager::GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, NodeId nodeid)
+{
+    LOCK(cs_objDownloader);
+    for (auto iter : mapBlocksInFlight)
+    {
+        for (auto &iter2 : iter.second)
+        {
+            // Get blocks in flight for this peer only.
+            if (nodeid == iter2.first)
+                vBlocksInFlight.emplace_back(iter.first);
+        }
+    }
+}
+
 void CRequestManager::CheckForDownloadTimeout(CNode *pnode,
     const CNodeState &state,
     const Consensus::Params &consensusParams,
