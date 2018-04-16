@@ -215,9 +215,7 @@ public:
     }
 
     // Check for block download timeout and disconnect node if necessary.
-    void CheckForDownloadTimeout(CNode *pnode,
-        const Consensus::Params &consensusParams,
-        int64_t nNow);
+    void CheckForDownloadTimeout(CNode *pnode, const Consensus::Params &consensusParams, int64_t nNow);
 };
 
 

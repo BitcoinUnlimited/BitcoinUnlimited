@@ -1068,7 +1068,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         std::map<NodeId, CRequestManagerNodeState>::iterator it = mapRequestManagerNodeState.find(nodeid);
         DbgAssert(it != mapRequestManagerNodeState.end(), return false);
         CRequestManagerNodeState *state = &it->second;
-        
+
         int64_t getdataTime = mapBlocksInFlight[hash][nodeid]->nTime;
         int64_t now = GetTimeMicros();
         double nResponseTime = (double)(now - getdataTime) / 1000000.0;
@@ -1196,9 +1196,7 @@ void CRequestManager::GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, N
     }
 }
 
-void CRequestManager::CheckForDownloadTimeout(CNode *pnode,
-    const Consensus::Params &consensusParams,
-    int64_t nNow)
+void CRequestManager::CheckForDownloadTimeout(CNode *pnode, const Consensus::Params &consensusParams, int64_t nNow)
 {
     // In case there is a block that has been in flight from this peer for 2 + 0.5 * N times the block interval
     // (with N the number of peers from which we're downloading validated blocks), disconnect due to timeout.
