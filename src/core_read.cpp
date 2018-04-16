@@ -48,55 +48,62 @@ CScript ParseScript(const std::string &s)
         }
     }
 
-    vector<string> words;
+    std::vector<std::string> words;
     boost::algorithm::split(words, s, boost::algorithm::is_any_of(" \t\n"), boost::algorithm::token_compress_on);
 
-    for (std::vector<std::string>::const_iterator w = words.begin(); w != words.end(); ++w)
+    for (const auto &w : words)
     {
-        if (w->empty())
+        if (w.empty())
         {
-            // Empty string, ignore. (boost::split given '' will return one word)
+            // Empty string, ignore. (boost::split given '' will return one
+            // word)
+            continue;
         }
-        else if (all(*w, boost::algorithm::is_digit()) ||
-                 (boost::algorithm::starts_with(*w, "-") &&
-                     all(string(w->begin() + 1, w->end()), boost::algorithm::is_digit())))
+
+        if (all(w, boost::algorithm::is_digit()) ||
+            (boost::algorithm::starts_with(w, "-") &&
+                all(std::string(w.begin() + 1, w.end()), boost::algorithm::is_digit())))
         {
             // Number
-            int64_t n = atoi64(*w);
+            int64_t n = atoi64(w);
             result << n;
+            continue;
         }
-        else if (boost::algorithm::starts_with(*w, "0x") && (w->begin() + 2 != w->end()))
+
+        if (boost::algorithm::starts_with(w, "0x") && (w.begin() + 2 != w.end()))
         {
-            if (IsHex(std::string(w->begin() + 2, w->end())))
-            {
-                // Raw hex data, inserted NOT pushed onto stack:
-                std::vector<uint8_t> raw = ParseHex(std::string(w->begin() + 2, w->end()));
-                result.insert(result.end(), raw.begin(), raw.end());
-            }
-            else
+            if (!IsHex(std::string(w.begin() + 2, w.end())))
             {
                 // Should only arrive here for improperly formatted hex values
                 throw std::runtime_error("Hex numbers expected to be formatted "
                                          "in full-byte chunks (ex: 0x00 "
                                          "instead of 0x0)");
             }
+
+            // Raw hex data, inserted NOT pushed onto stack:
+            std::vector<uint8_t> raw = ParseHex(std::string(w.begin() + 2, w.end()));
+            result.insert(result.end(), raw.begin(), raw.end());
+            continue;
         }
-        else if (w->size() >= 2 && boost::algorithm::starts_with(*w, "'") && boost::algorithm::ends_with(*w, "'"))
+
+        if (w.size() >= 2 && boost::algorithm::starts_with(w, "'") && boost::algorithm::ends_with(w, "'"))
         {
             // Single-quoted string, pushed as data. NOTE: this is poor-man's
-            // parsing, spaces/tabs/newlines in single-quoted strings won't work.
-            std::vector<uint8_t> value(w->begin() + 1, w->end() - 1);
+            // parsing, spaces/tabs/newlines in single-quoted strings won't
+            // work.
+            std::vector<uint8_t> value(w.begin() + 1, w.end() - 1);
             result << value;
+            continue;
         }
-        else if (mapOpNames.count(*w))
+
+        if (mapOpNames.count(w))
         {
             // opcode, e.g. OP_ADD or ADD:
-            result << mapOpNames[*w];
+            result << mapOpNames[w];
+            continue;
         }
-        else
-        {
-            throw runtime_error("script parse error");
-        }
+
+        throw std::runtime_error("Error parsing script: " + s);
     }
 
     return result;
