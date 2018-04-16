@@ -1205,6 +1205,7 @@ void CRequestManager::CheckForDownloadTimeout(CNode *pnode,
     // We compensate for other peers to prevent killing off peers due to our own downstream link
     // being saturated. We only count validated in-flight blocks so peers can't advertise non-existing block hashes
     // to unreasonably increase our timeout.
+    LOCK(cs_objDownloader);
     NodeId nodeid = pnode->GetId();
     if (!pnode->fDisconnect && mapRequestManagerNodeState[nodeid].vBlocksInFlight.size() > 0)
     {
