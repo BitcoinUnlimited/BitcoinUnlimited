@@ -482,7 +482,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                     BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
                     ss << inv2;
                     ss << filterMemPool;
-                    MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
+                    MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
                     pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
                     LOG(THIN, "Requesting xthinblock %s from peer %s (%d)\n", inv2.hash.ToString(),
                         pfrom->addrName.c_str(), pfrom->id);
@@ -493,7 +493,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
             {
                 // Try to download a thinblock if possible otherwise just download a regular block.
                 // We can only request one xthinblock per peer at a time.
-                MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
+                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
                 if (pfrom->mapThinBlocksInFlight.size() < 1 && CanThinBlockBeDownloaded(pfrom))
                 {
                     AddThinBlockInFlight(pfrom, inv2.hash);
@@ -529,7 +529,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
             std::vector<CInv> vToFetch;
             inv2.type = MSG_BLOCK;
             vToFetch.push_back(inv2);
-            MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
+            MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
             pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
             LOG(THIN, "Requesting Regular Block %s from peer %s (%d)\n", inv2.hash.ToString(), pfrom->addrName.c_str(),
                 pfrom->id);
@@ -703,7 +703,7 @@ void CRequestManager::SendRequests()
             {
                 for (auto &inv : iter.second)
                 {
-                    MarkBlockAsInFlight(iter.first->GetId(), inv.hash, Params().GetConsensus());
+                    MarkBlockAsInFlight(iter.first->GetId(), inv.hash);
                 }
                 iter.first->PushMessage(NetMsgType::GETDATA, iter.second);
                 LOG(REQ, "Sent batched request with %d blocks to node %s\n", iter.second.size(),
@@ -1020,33 +1020,35 @@ void CRequestManager::FindNextBlocksToDownload(NodeId nodeid, unsigned int count
 }
 
 // indicate whether we requested this block.
-void CRequestManager::MarkBlockAsInFlight(NodeId nodeid,
-    const uint256 &hash,
-    const Consensus::Params &consensusParams,
-    CBlockIndex *pindex)
+void CRequestManager::MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash)
 {
-    AssertLockNotHeld(cs_objDownloader);
-
     // If started then clear the thinblock timer used for preferential downloading
     thindata.ClearThinBlockTimer(hash);
 
+    // Add to inflight, if it hasn't already been marked inflight for this node id.
     LOCK(cs_objDownloader);
     std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
         mapBlocksInFlight.find(hash);
-    // Add to inflight, if it hasn't already been marked inflight for this node id.
     if (itInFlight == mapBlocksInFlight.end() || !mapBlocksInFlight[hash].count(nodeid))
     {
+        // Get a request manager nodestate pointer.
+        std::map<NodeId, CRequestManagerNodeState>::iterator it = mapRequestManagerNodeState.find(nodeid);
+        DbgAssert(it != mapRequestManagerNodeState.end(), return );
+        CRequestManagerNodeState *state = &it->second;
+
+        // Add queued block to nodestate and add iterator for queued block to mapBlocksInFlight
         int64_t nNow = GetTimeMicros();
         QueuedBlock newentry = {hash, nNow};
-        std::list<QueuedBlock>::iterator it = mapRequestManagerNodeState[nodeid].vBlocksInFlight.insert(
-            mapRequestManagerNodeState[nodeid].vBlocksInFlight.end(), newentry);
-        mapRequestManagerNodeState[nodeid].nBlocksInFlight++;
-        if (mapRequestManagerNodeState[nodeid].nBlocksInFlight == 1)
+        std::list<QueuedBlock>::iterator it2 = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
+        mapBlocksInFlight[hash][nodeid] = it2;
+
+        // Increment blocks in flight for this node and if applicable the time we started downloading.
+        state->nBlocksInFlight++;
+        if (state->nBlocksInFlight == 1)
         {
             // We're starting a block download (batch) from this peer.
-            mapRequestManagerNodeState[nodeid].nDownloadingSince = GetTimeMicros();
+            state->nDownloadingSince = GetTimeMicros();
         }
-        mapBlocksInFlight[hash][nodeid] = it;
     }
 }
 
@@ -1059,6 +1061,11 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         mapBlocksInFlight.find(hash);
     if (itInFlight != mapBlocksInFlight.end() && mapBlocksInFlight[hash].count(nodeid))
     {
+        // Get a request manager nodestate pointer.
+        std::map<NodeId, CRequestManagerNodeState>::iterator it = mapRequestManagerNodeState.find(nodeid);
+        DbgAssert(it != mapRequestManagerNodeState.end(), return false);
+        CRequestManagerNodeState *state = &it->second;
+        
         int64_t getdataTime = mapBlocksInFlight[hash][nodeid]->nTime;
         int64_t now = GetTimeMicros();
         double nResponseTime = (double)(now - getdataTime) / 1000000.0;
@@ -1102,7 +1109,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         }
 
         // if there are no blocks in flight then ask for a few more blocks
-        if (mapRequestManagerNodeState[nodeid].nBlocksInFlight <= 0)
+        if (state->nBlocksInFlight <= 0)
             pnode->nMaxBlocksInTransit.fetch_add(4);
 
         if (maxBlocksInTransitPerPeer.value != 0)
@@ -1136,14 +1143,13 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
             }
         }
 
-        if (mapRequestManagerNodeState[nodeid].vBlocksInFlight.begin() == mapBlocksInFlight[hash][nodeid])
+        if (state->vBlocksInFlight.begin() == mapBlocksInFlight[hash][nodeid])
         {
             // First block on the queue was received, update the start download time for the next one
-            mapRequestManagerNodeState[nodeid].nDownloadingSince =
-                std::max(mapRequestManagerNodeState[nodeid].nDownloadingSince, GetTimeMicros());
+            state->nDownloadingSince = std::max(state->nDownloadingSince, GetTimeMicros());
         }
-        mapRequestManagerNodeState[nodeid].vBlocksInFlight.erase(mapBlocksInFlight[hash][nodeid]);
-        mapRequestManagerNodeState[nodeid].nBlocksInFlight--;
+        state->vBlocksInFlight.erase(mapBlocksInFlight[hash][nodeid]);
+        state->nBlocksInFlight--;
         MapBlocksInFlightErase(hash, nodeid);
 
         return true;

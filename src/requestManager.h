@@ -196,10 +196,7 @@ public:
     void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex *> &vBlocks);
 
     // Returns a bool indicating whether we requested this block.
-    void MarkBlockAsInFlight(NodeId nodeid,
-        const uint256 &hash,
-        const Consensus::Params &consensusParams,
-        CBlockIndex *pindex = nullptr);
+    void MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash);
 
     // Returns a bool if successful in indicating we received this block.
     bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode);
