@@ -1055,6 +1055,9 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash)
 // Returns a bool if successful in indicating we received this block.
 bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
 {
+    if (!pnode)
+        return false;
+
     LOCK(cs_objDownloader);
     NodeId nodeid = pnode->GetId();
     std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
