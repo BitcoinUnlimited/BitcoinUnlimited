@@ -2898,7 +2898,7 @@ static bool ActivateBestChainStep(CValidationState &state,
                 static std::atomic<int64_t> nLastUpdate = {GetTime()};
                 if (nLastUpdate.load() < GetTime() - 5)
                 {
-                    uiInterface.NotifyBlockTip(true, pindexNewTip);
+                    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip);
                     nLastUpdate.store(GetTime());
                 }
 
@@ -2921,7 +2921,7 @@ static bool ActivateBestChainStep(CValidationState &state,
 
         // Notify the UI with the new block tip information.
         if (pindexMostWork->nHeight >= nHeight && pindexNewTip != nullptr)
-            uiInterface.NotifyBlockTip(true, pindexNewTip);
+            uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip);
 
         if (fContinue)
         {
