@@ -179,6 +179,7 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
+    'notify',
     'may152018-forkactivation_1',
     'may152018-forkactivation_2',
     'bip68-112-113-p2p',
@@ -238,7 +239,6 @@ testScriptsExt = [ RpcTest(t) for t in [
     'txn_doublespend',
     'txn_clone --mineblock',
     Disabled('pruning', "too much disk"),
-    'forknotify',
     'invalidateblock',
     Disabled('rpcbind_test', "temporary, bug in libevent, see #6655"),
     'smartfees',
