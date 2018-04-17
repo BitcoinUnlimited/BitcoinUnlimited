@@ -847,17 +847,14 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
             "[\n"
             "  {\n"
             "    \"height\": xxxx,         (numeric) height of the chain tip\n"
+            "    \"chainwork\": \"xxxx\"     (string) total amount of work in this chain, in hexadecimal\n"
             "    \"hash\": \"xxxx\",         (string) block hash of the tip\n"
-            "    \"branchlen\": 0          (numeric) zero for main chain\n"
-            "    \"status\": \"active\"      (string) \"active\" for the main chain\n"
-            "  },\n"
-            "  {\n"
-            "    \"height\": xxxx,\n"
-            "    \"hash\": \"xxxx\",\n"
-            "    \"branchlen\": 1          (numeric) length of branch connecting the tip to the main chain\n"
+            "    \"branchlen\": 0          (numeric) length of branch connecting the tip to the main chain (zero for "
+            "main chain)\n"
             "    \"status\": \"xxxx\"        (string) status of the chain (active, valid-fork, valid-headers, "
             "headers-only, invalid)\n"
-            "  }\n"
+            "  },\n"
+            "  ...\n"
             "]\n"
             "Possible values for status:\n"
             "1.  \"invalid\"               This branch contains at least one invalid block\n"
@@ -910,6 +907,7 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
     {
         UniValue obj(UniValue::VOBJ);
         obj.push_back(Pair("height", block->nHeight));
+        obj.push_back(Pair("chainwork", block->nChainWork.GetHex()));
         obj.push_back(Pair("hash", block->phashBlock->GetHex()));
 
         const int branchLen = block->nHeight - chainActive.FindFork(block)->nHeight;
