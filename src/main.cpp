@@ -2843,6 +2843,7 @@ static bool ActivateBestChainStep(CValidationState &state,
 
         // Connect new blocks.
         CBlockIndex *pindexNewTip = nullptr;
+        CBlockIndex *pindexLastNotify = nullptr;
         BOOST_REVERSE_FOREACH (CBlockIndex *pindexConnect, vpindexToConnect)
         {
             // Check if the best chain has changed while we were disconnecting or processing blocks.
@@ -2897,7 +2898,8 @@ static bool ActivateBestChainStep(CValidationState &state,
                 static std::atomic<int64_t> nLastUpdate = {GetTime()};
                 if (nLastUpdate.load() < GetTime() - 5)
                 {
-                    uiInterface.NotifyBlockTip(true, pindexNewTip);
+                    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip);
+                    pindexLastNotify = pindexNewTip;
                     nLastUpdate.store(GetTime());
                 }
 
@@ -2919,8 +2921,8 @@ static bool ActivateBestChainStep(CValidationState &state,
             break; // stop processing more blocks if the last one was invalid.
 
         // Notify the UI with the new block tip information.
-        if (pindexMostWork->nHeight >= nHeight && pindexNewTip != nullptr)
-            uiInterface.NotifyBlockTip(true, pindexNewTip);
+        if (pindexMostWork->nHeight >= nHeight && pindexNewTip != nullptr && pindexLastNotify != pindexNewTip)
+            uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip);
 
         if (fContinue)
         {
