@@ -48,6 +48,13 @@ PORT_RANGE = 5000
 
 BITCOIND_PROC_WAIT_TIMEOUT = 60
 
+# Const for Floweethehub integration
+FLOWEE_CONF = "flowee.conf"  # bitcoin.conf is used by clients
+HUB_LOG = "hub.log"          # debug.log is used by other clients
+BCD_HUB_PATH = "/hub/debug/src/bitcoind"
+NODE_NUM = 3                # node3 is for Hub
+CONF_IN_CACHE = "cache/node" + str(NODE_NUM) + "/" + FLOWEE_CONF
+FILTER_PARAM_KEYS = ['usecashaddr', 'maxlimitertxfee', 'debug']
 
 class PortSeed:
     # Must be initialized with a unique integer for each process
@@ -170,18 +177,38 @@ def sync_mempools(rpc_connections, wait=1,verbose=1):
             break
         time.sleep(wait)
 
+def filterUnsupportedParams(defaults, param_keys=FILTER_PARAM_KEYS):
+    """
+    Method to filter out the unrecoginized parameters by setting NoConfiValue 
+    obj as the value of the parameter as key of the dict. 
+    """
+    file = FLOWEE_CONF   #see SettingsDefaults.h
+    removeParams = {}
+    removeParams = {el:NoConfigValue() for el in param_keys}
+    defaults.update(removeParams)
+    return file, defaults
+
 bitcoind_processes = {}
 
-def initialize_datadir(dirname, n,bitcoinConfDict=None,wallet=None):
+def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None):
     datadir = os.path.join(dirname, "node"+str(n))
     if not os.path.isdir(datadir):
         os.makedirs(datadir)
 
     defaults = {"server":1, "discover":0, "regtest":1,"rpcuser":"rt","rpcpassword":"rt",
                 "port":p2p_port(n),"rpcport":str(rpc_port(n)),"listenonion":0,"maxlimitertxfee":0,"usecashaddr":1}
+
     if bitcoinConfDict: defaults.update(bitcoinConfDict)
 
-    with open(os.path.join(datadir, "bitcoin.conf"), 'w') as f:
+    file = "bitcoin.conf"
+    if bins:
+        if BCD_HUB_PATH in bins[n]:
+            file, defaults = filterUnsupportedParams(defaults)
+    else:
+        if n == NODE_NUM and os.path.isfile(os.path.join(os.getcwd(), CONF_IN_CACHE)):
+            file, defaults = filterUnsupportedParams(defaults)
+
+    with open(os.path.join(datadir, file), 'w') as f:
         for (key,val) in defaults.items():
           if isinstance(val, NoConfigValue):
             pass
@@ -241,7 +268,7 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
 
         # Create cache directories, run bitcoinds:
         for i in range(4):
-            datadir=initialize_datadir("cache", i,bitcoinConfDict)
+            datadir=initialize_datadir("cache", i, bitcoinConfDict, wallets, bins)
             if bins:
                 args = [ bins[i], "-keypool=1", "-datadir="+datadir ]
             else:
@@ -273,7 +300,11 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
             for peer in range(4):
                 for j in range(25):
                     set_node_times(rpcs, block_time)
-                    rpcs[peer].generate(1)
+                    try:
+                        rpcs[peer].generate(1)
+                    except Exception as e:
+                        #print(e)
+                        pass
                     block_time += 10*60
                 # Must sync before next peer starts generating blocks
                 sync_blocks(rpcs)
@@ -283,7 +314,11 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
         wait_bitcoinds()
         disable_mocktime()
         for i in range(4):
-            os.remove(log_filename("cache", i, "debug.log"))
+            if bins:
+                if BCD_HUB_PATH in bins[i]:
+                    os.remove(log_filename("cache", i, HUB_LOG))
+                else:
+                    os.remove(log_filename("cache", i, "debug.log"))
             os.remove(log_filename("cache", i, "db.log"))
             os.remove(log_filename("cache", i, "peers.dat"))
             os.remove(log_filename("cache", i, "fee_estimates.dat"))
@@ -332,8 +367,6 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
         binary = os.getenv("BITCOIND", "bitcoind")
     # RPC tests still depend on free transactions
     args = [ binary, "-datadir="+datadir, "-rest", "-mocktime="+str(get_mocktime()) ] # // BU removed, "-keypool=1","-blockprioritysize=50000" ]
-    # need for some client and no harm to include for all; otherwise bitcoind starts on mainnet listening at port 8332
-    args.append("-conf="+ os.path.join(datadir, "bitcoin.conf"))
     if extra_args is not None: args.extend(extra_args)
     bitcoind_processes[i] = subprocess.Popen(args)
     if os.getenv("PYTHON_DEBUG", ""):
