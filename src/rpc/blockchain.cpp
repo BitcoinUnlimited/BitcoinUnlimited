@@ -1,6 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -109,17 +109,17 @@ UniValue blockToJSON(const CBlock &block, const CBlockIndex *blockindex, bool tx
     UniValue txs(UniValue::VARR);
     if (listTxns)
     {
-        for (const CTransaction &tx : block.vtx)
+        for (const auto &tx : block.vtx)
         {
             if (txDetails)
             {
                 UniValue objTx(UniValue::VOBJ);
-                TxToJSON(tx, uint256(), objTx);
+                TxToJSON(*tx, uint256(), objTx);
                 txs.push_back(objTx);
             }
             else
             {
-                txs.push_back(tx.GetHash().GetHex());
+                txs.push_back(tx->GetHash().GetHex());
             }
         }
         result.push_back(Pair("tx", txs));
@@ -189,7 +189,7 @@ UniValue mempoolToJSON(bool fVerbose = false)
 {
     if (fVerbose)
     {
-        LOCK(mempool.cs);
+        READLOCK(mempool.cs);
         UniValue o(UniValue::VOBJ);
         BOOST_FOREACH (const CTxMemPoolEntry &e, mempool.mapTx)
         {
@@ -209,7 +209,7 @@ UniValue mempoolToJSON(bool fVerbose = false)
             set<string> setDepends;
             BOOST_FOREACH (const CTxIn &txin, tx.vin)
             {
-                if (mempool.exists(txin.prevout.hash))
+                if (mempool._exists(txin.prevout.hash))
                     setDepends.insert(txin.prevout.hash.ToString());
             }
 
@@ -615,7 +615,7 @@ UniValue gettxout(const UniValue &params, bool fHelp)
     Coin coin;
     if (fMempool)
     {
-        LOCK(mempool.cs);
+        READLOCK(mempool.cs);
         CCoinsViewMemPool view(pcoinsTip, mempool);
         // TODO: filtering spent coins should be done by the CCoinsViewMemPool
         if (!view.GetCoin(out, coin) || mempool.isSpent(out))
@@ -679,25 +679,23 @@ UniValue verifychain(const UniValue &params, bool fHelp)
 }
 
 /** Implementation of IsSuperMajority with better feedback */
-static UniValue SoftForkMajorityDesc(int minVersion,
-    CBlockIndex *pindex,
-    int nRequired,
-    const Consensus::Params &consensusParams)
+static UniValue SoftForkMajorityDesc(int version, CBlockIndex *pindex, const Consensus::Params &consensusParams)
 {
-    int nFound = 0;
-    CBlockIndex *pstart = pindex;
-    for (int i = 0; i < consensusParams.nMajorityWindow && pstart != NULL; i++)
-    {
-        if (pstart->nVersion >= minVersion)
-            ++nFound;
-        pstart = pstart->pprev;
-    }
-
     UniValue rv(UniValue::VOBJ);
-    rv.push_back(Pair("status", nFound >= nRequired));
-    rv.push_back(Pair("found", nFound));
-    rv.push_back(Pair("required", nRequired));
-    rv.push_back(Pair("window", consensusParams.nMajorityWindow));
+    bool activated = false;
+    switch (version)
+    {
+    case 2:
+        activated = pindex->nHeight >= consensusParams.BIP34Height;
+        break;
+    case 3:
+        activated = pindex->nHeight >= consensusParams.BIP66Height;
+        break;
+    case 4:
+        activated = pindex->nHeight >= consensusParams.BIP65Height;
+        break;
+    }
+    rv.push_back(Pair("status", activated));
     return rv;
 }
 
@@ -709,10 +707,7 @@ static UniValue SoftForkDesc(const std::string &name,
     UniValue rv(UniValue::VOBJ);
     rv.push_back(Pair("id", name));
     rv.push_back(Pair("version", version));
-    rv.push_back(Pair("enforce",
-        SoftForkMajorityDesc(version, pindex, consensusParams.nMajorityEnforceBlockUpgrade, consensusParams)));
-    rv.push_back(Pair("reject",
-        SoftForkMajorityDesc(version, pindex, consensusParams.nMajorityRejectBlockOutdated, consensusParams)));
+    rv.push_back(Pair("reject", SoftForkMajorityDesc(version, pindex, consensusParams)));
     return rv;
 }
 
@@ -769,15 +764,9 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
             "     {\n"
             "        \"id\": \"xxxx\",        (string) name of softfork\n"
             "        \"version\": xx,         (numeric) block version\n"
-            "        \"enforce\": {           (object) progress toward enforcing the softfork rules for new-version "
-            "blocks\n"
+            "        \"reject\": {            (object) progress toward rejecting pre-softfork blocks\n"
             "           \"status\": xx,       (boolean) true if threshold reached\n"
-            "           \"found\": xx,        (numeric) number of blocks with the new version found\n"
-            "           \"required\": xx,     (numeric) number of blocks required to trigger\n"
-            "           \"window\": xx,       (numeric) maximum size of examined window of recent blocks\n"
             "        },\n"
-            "        \"reject\": { ... }      (object) progress toward rejecting pre-softfork blocks (same fields as "
-            "\"enforce\")\n"
             "     }, ...\n"
             "  ],\n"
             "  \"bip9_softforks\": {          (object) status of BIP9 softforks in progress\n"
@@ -858,17 +847,14 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
             "[\n"
             "  {\n"
             "    \"height\": xxxx,         (numeric) height of the chain tip\n"
+            "    \"chainwork\": \"xxxx\"     (string) total amount of work in this chain, in hexadecimal\n"
             "    \"hash\": \"xxxx\",         (string) block hash of the tip\n"
-            "    \"branchlen\": 0          (numeric) zero for main chain\n"
-            "    \"status\": \"active\"      (string) \"active\" for the main chain\n"
-            "  },\n"
-            "  {\n"
-            "    \"height\": xxxx,\n"
-            "    \"hash\": \"xxxx\",\n"
-            "    \"branchlen\": 1          (numeric) length of branch connecting the tip to the main chain\n"
+            "    \"branchlen\": 0          (numeric) length of branch connecting the tip to the main chain (zero for "
+            "main chain)\n"
             "    \"status\": \"xxxx\"        (string) status of the chain (active, valid-fork, valid-headers, "
             "headers-only, invalid)\n"
-            "  }\n"
+            "  },\n"
+            "  ...\n"
             "]\n"
             "Possible values for status:\n"
             "1.  \"invalid\"               This branch contains at least one invalid block\n"
@@ -921,6 +907,7 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
     {
         UniValue obj(UniValue::VOBJ);
         obj.push_back(Pair("height", block->nHeight));
+        obj.push_back(Pair("chainwork", block->nChainWork.GetHex()));
         obj.push_back(Pair("hash", block->phashBlock->GetHex()));
 
         const int branchLen = block->nHeight - chainActive.FindFork(block)->nHeight;
@@ -1083,29 +1070,39 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
     // In case of operator error, limit the rollback to 100 blocks
     uint32_t nLimit = 100;
 
-    if (fHelp || params.size() != 1)
-        throw runtime_error("rollbackchain \"blockheight\"\n"
-                            "\nRolls back the blockchain to the height indicated.\n"
-                            "\nArguments:\n"
-                            "1. blockheight   (int, required) the height that you want to roll the chain \
+    if (fHelp || params.size() < 1 || params.size() > 2)
+        throw runtime_error(
+            "rollbackchain \"blockheight\"\n"
+            "\nRolls back the blockchain to the height indicated.\n"
+            "\nArguments:\n"
+            "1. blockheight   (int, required) the height that you want to roll the chain \
                             back to (only maxiumum rollback of " +
-                            std::to_string(nLimit) + " blocks allowed)\n"
-                                                     "\nResult:\n"
-                                                     "\nExamples:\n" +
-                            HelpExampleCli("rollbackchain", "\"blockheight\"") +
-                            HelpExampleRpc("rollbackchain", "\"blockheight\""));
+            std::to_string(nLimit) + " blocks allowed)\n"
+                                     "2. override      (boolean, optional, default=false) rollback more than the \
+                            allowed default limit of " +
+            std::to_string(nLimit) + " blocks)\n"
+                                     "\nResult:\n"
+                                     "\nExamples:\n" +
+            HelpExampleCli("rollbackchain", "\"501245\"") + HelpExampleCli("rollbackchain", "\"495623 true\"") +
+            HelpExampleRpc("rollbackchain", "\"blockheight\""));
 
-    std::string strHeight = params[0].get_str();
-    uint64_t nRollBackHeight = boost::lexical_cast<uint64_t>(strHeight);
+    int nRollBackHeight = params[0].get_int();
+    bool fOverride = false;
+    if (params.size() > 1)
+        fOverride = params[1].get_bool();
 
     LOCK(cs_main);
     uint32_t nRollBack = chainActive.Height() - nRollBackHeight;
-    if (nRollBack > nLimit)
+    if (nRollBack > nLimit && !fOverride)
         throw runtime_error("You are attempting to rollback the chain by " + std::to_string(nRollBack) +
-                            " blocks, however the limit is " + std::to_string(nLimit) + " blocks.");
+                            " blocks, however the limit is " + std::to_string(nLimit) + " blocks. Set " +
+                            "the override to true if you want rollback more than the default");
 
-    while ((uint64_t)chainActive.Height() > nRollBackHeight)
+    while (chainActive.Height() > nRollBackHeight)
     {
+        // save the current tip
+        CBlockIndex *pindex = chainActive.Tip();
+
         CValidationState state;
         // Disconnect the tip and by setting the third param (fRollBack) to true we avoid having to resurrect
         // the transactions from the block back into the mempool, which saves a great deal of time.
@@ -1114,6 +1111,14 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
 
         if (!state.IsValid())
             throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+
+        // Invalidate the now previous block tip after it was diconnected so that the chain will not reconnect
+        // if another block arrives.
+        InvalidateBlock(state, Params().GetConsensus(), pindex);
+        if (!state.IsValid())
+        {
+            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+        }
 
         uiInterface.NotifyBlockTip(false, chainActive.Tip());
     }

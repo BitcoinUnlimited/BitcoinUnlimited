@@ -22,7 +22,7 @@ In case you want to build the disk image with `make deploy` (.dmg / optional), y
 
     brew install librsvg
 
-NOTE: Building with Qt4 is still supported, however, could result in a broken UI. Building with Qt5 is recommended.
+NOTE: Must build with QT 5.3 or higher. Building with Qt4 is not supported.
 
 Build Bitcoin Unlimited
 ------------------------

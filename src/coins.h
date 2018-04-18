@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -269,6 +269,10 @@ public:
      */
     bool Flush();
 
+    /**
+     * Empty the coins cache. Used primarily when we're shutting down and want to release memory
+     */
+    void Clear() { cacheCoins.clear(); }
     /**
      * Remove excess entries from this cache.
      * Entries are trimmed starting from the beginning of the map.  In this way if those entries

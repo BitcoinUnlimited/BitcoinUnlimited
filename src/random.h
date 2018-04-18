@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -24,12 +24,6 @@ void GetRandBytes(unsigned char *buf, int num);
 uint64_t GetRand(uint64_t nMax);
 int GetRandInt(int nMax);
 uint256 GetRandHash();
-
-/**
- * Seed insecure_rand using the random pool.
- * @param Deterministic Use a deterministic seed
- */
-void seed_insecure_rand(bool fDeterministic = false);
 
 /**
  * Fast randomness source. This is seeded once with secure random data, but
@@ -103,17 +97,5 @@ static const ssize_t NUM_OS_RANDOM_BYTES = 32;
  * GetStrongRandBytes instead.
  */
 void GetOSRand(unsigned char *ent32);
-
-/** Check that OS randomness is available and returning the requested number
- * of bytes.
- */
-extern uint32_t insecure_rand_Rz;
-extern uint32_t insecure_rand_Rw;
-static inline uint32_t insecure_rand(void)
-{
-    insecure_rand_Rz = 36969 * (insecure_rand_Rz & 65535) + (insecure_rand_Rz >> 16);
-    insecure_rand_Rw = 18000 * (insecure_rand_Rw & 65535) + (insecure_rand_Rw >> 16);
-    return (insecure_rand_Rw << 16) + insecure_rand_Rz;
-}
 
 #endif // BITCOIN_RANDOM_H

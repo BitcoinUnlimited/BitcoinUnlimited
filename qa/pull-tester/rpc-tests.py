@@ -143,7 +143,7 @@ bad_opts_found = []
 bad_opt_str="Unrecognized option: %s"
 for o in opts | double_opts:
     if o.startswith('--'):
-        if o not in framework_opts + test_script_opts + private_double_opts:
+        if o.split("=")[0] not in framework_opts + test_script_opts + private_double_opts:
             print(bad_opt_str % o)
             bad_opts_found.append(o)
     elif o.startswith('-'):
@@ -179,6 +179,9 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
+    'notify',
+    'may152018-forkactivation_1',
+    'may152018-forkactivation_2',
     'bip68-112-113-p2p',
     'validateblocktemplate',
     'parallel',
@@ -236,7 +239,6 @@ testScriptsExt = [ RpcTest(t) for t in [
     'txn_doublespend',
     'txn_clone --mineblock',
     Disabled('pruning', "too much disk"),
-    'forknotify',
     'invalidateblock',
     Disabled('rpcbind_test', "temporary, bug in libevent, see #6655"),
     'smartfees',

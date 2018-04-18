@@ -1,5 +1,5 @@
 // Copyright (c) 2017 Stephen McCarthy
-// Copyright (c) 2017 The Bitcoin Unlimited developers
+// Copyright (c) 2017-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -630,7 +630,10 @@ static void addRpcServerOptions(AllowedArgs &allowedArgs)
         .addDebugArg("rpcworkqueue=<n>", requiredInt,
             strprintf("Set the depth of the work queue to service RPC calls (default: %d)", DEFAULT_HTTP_WORKQUEUE))
         .addDebugArg("rpcservertimeout=<n>", requiredInt,
-            strprintf("Timeout during HTTP requests (default: %d)", DEFAULT_HTTP_SERVER_TIMEOUT));
+            strprintf("Timeout during HTTP requests (default: %d)", DEFAULT_HTTP_SERVER_TIMEOUT))
+        // Although a node does not use rpcconnect it must be allowed because BitcoinCli also uses the same config file
+        .addDebugArg("rpcconnect=<ip>", requiredStr,
+            strprintf(_("Send commands to node running on <ip> (default: %s)"), DEFAULT_RPCCONNECT));
 }
 
 static void addUiOptions(AllowedArgs &allowedArgs)

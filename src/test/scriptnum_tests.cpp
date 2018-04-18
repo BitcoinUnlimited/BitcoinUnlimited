@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -153,8 +153,10 @@ static void RunCreate(const int64_t &num)
 {
     CheckCreateInt(num);
     CScriptNum scriptnum(num);
-    if (scriptnum.getvch().size() <= CScriptNum::nDefaultMaxNumSize)
+    if (scriptnum.getvch().size() <= CScriptNum::MAXIMUM_ELEMENT_SIZE)
+    {
         CheckCreateVch(num);
+    }
     else
     {
         BOOST_CHECK_THROW(CheckCreateVch(num), scriptnum10_error);
@@ -201,6 +203,59 @@ BOOST_AUTO_TEST_CASE(operators)
             RunOperators(values[i] - values[j], values[i] + values[j]);
             RunOperators(values[i] - values[j], values[i] - values[j]);
         }
+    }
+}
+
+static void CheckMinimalyEncode(std::vector<uint8_t> data, const std::vector<uint8_t> &expected)
+{
+    bool alreadyEncoded = CScriptNum::IsMinimallyEncoded(data, data.size());
+    bool hasEncoded = CScriptNum::MinimallyEncode(data);
+    BOOST_CHECK_EQUAL(hasEncoded, !alreadyEncoded);
+    BOOST_CHECK(data == expected);
+}
+
+BOOST_AUTO_TEST_CASE(minimize_encoding_test)
+{
+    CheckMinimalyEncode({}, {});
+
+    // Check that positive and negative zeros encode to nothing.
+    std::vector<uint8_t> zero, negZero;
+    for (size_t i = 0; i < MAX_SCRIPT_ELEMENT_SIZE; i++)
+    {
+        zero.push_back(0x00);
+        CheckMinimalyEncode(zero, {});
+
+        negZero.push_back(0x80);
+        CheckMinimalyEncode(negZero, {});
+
+        // prepare for next round.
+        negZero[negZero.size() - 1] = 0x00;
+    }
+
+    // Keep one leading zero when sign bit is used.
+    std::vector<uint8_t> n{0x80, 0x00}, negn{0x80, 0x80};
+    std::vector<uint8_t> npadded = n, negnpadded = negn;
+    for (size_t i = 0; i < MAX_SCRIPT_ELEMENT_SIZE; i++)
+    {
+        CheckMinimalyEncode(npadded, n);
+        npadded.push_back(0x00);
+
+        CheckMinimalyEncode(negnpadded, negn);
+        negnpadded[negnpadded.size() - 1] = 0x00;
+        negnpadded.push_back(0x80);
+    }
+
+    // Mege leading byte when sign bit isn't used.
+    std::vector<uint8_t> k{0x7f}, negk{0xff};
+    std::vector<uint8_t> kpadded = k, negkpadded = negk;
+    for (size_t i = 0; i < MAX_SCRIPT_ELEMENT_SIZE; i++)
+    {
+        CheckMinimalyEncode(kpadded, k);
+        kpadded.push_back(0x00);
+
+        CheckMinimalyEncode(negkpadded, negk);
+        negkpadded[negkpadded.size() - 1] &= 0x7f;
+        negkpadded.push_back(0x80);
     }
 }
 

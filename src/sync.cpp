@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -220,6 +220,19 @@ void AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine,
     abort();
 }
 
+void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs)
+{
+    for (const std::pair<void *, CLockLocation> &i : *lockstack)
+    {
+        if (i.first == cs)
+        {
+            fprintf(stderr, "Assertion failed: lock %s held in %s:%i; locks held:\n%s", pszName, pszFile, nLine,
+                LocksHeld().c_str());
+            abort();
+        }
+    }
+}
+
 void AssertWriteLockHeldInternal(const char *pszName, const char *pszFile, int nLine, CSharedCriticalSection *cs)
 {
     if (cs->try_lock()) // It would be better to check that this thread has the lock
@@ -297,7 +310,6 @@ void CSharedCriticalSection::lock_shared()
     {
         boost::unique_lock<boost::mutex> lock(setlock);
         assert(exclusiveOwner != tid);
-        assert(sharedowners.find(tid) == sharedowners.end());
         auto alreadyLocked = sharedowners.find(tid);
         if (alreadyLocked != sharedowners.end())
         {

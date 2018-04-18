@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,6 +10,8 @@
 #include "sync.h"
 #include "util.h"
 #include "utilstrencodings.h"
+
+#include <atomic>
 
 #ifdef HAVE_GETADDRINFO_A
 #include <netdb.h>
@@ -24,7 +26,6 @@
 
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 #include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
-#include <boost/thread.hpp>
 
 #if !defined(HAVE_MSG_NOSIGNAL) && !defined(MSG_NOSIGNAL)
 #define MSG_NOSIGNAL 0
@@ -667,9 +668,10 @@ static bool ConnectThroughProxy(const proxyType &proxy,
     // do socks negotiation
     if (proxy.randomize_credentials)
     {
+        FastRandomContext insecure_rand;
         ProxyCredentials random_auth;
-        random_auth.username = strprintf("%i", insecure_rand());
-        random_auth.password = strprintf("%i", insecure_rand());
+        static std::atomic_int counter = {(int)insecure_rand.rand32()};
+        random_auth.username = random_auth.password = strprintf("%i", counter++);
         if (!Socks5(strDest, (unsigned short)port, &random_auth, hSocket))
             return false;
     }
@@ -773,6 +775,10 @@ bool CloseSocket(SOCKET &hSocket)
 #else
     int ret = close(hSocket);
 #endif
+    if (ret)
+    {
+        LOG(NET, "Socket close failed: %d. Error: %s\n", hSocket, NetworkErrorString(WSAGetLastError()));
+    }
     hSocket = INVALID_SOCKET;
     return ret != SOCKET_ERROR;
 }

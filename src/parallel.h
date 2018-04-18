@@ -1,4 +1,4 @@
-// Copyright (c) 2016 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -116,7 +116,11 @@ public:
     ~CParallelValidation();
 
     /* Initialize mapBlockValidationThreads*/
-    void InitThread(const boost::thread::id this_id, const CNode *pfrom, const CBlock &block, const CInv &inv);
+    void InitThread(const boost::thread::id this_id,
+        const CNode *pfrom,
+        CBlockRef pblock,
+        const CInv &inv,
+        uint64_t blockSize);
 
     /* Initialize a PV session */
     bool Initialize(const boost::thread::id this_id, const CBlockIndex *pindex, const bool fParallel);
@@ -165,10 +169,10 @@ public:
     uint32_t MaxWorkChainBeingProcessed();
 
     /* Clear orphans from the orphan cache that are no longer needed*/
-    void ClearOrphanCache(const CBlock &block);
+    void ClearOrphanCache(const CBlockRef pblock);
 
     /* Process a block message */
-    void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, const CBlock &block, const CInv &inv);
+    void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, CBlockRef pblock, const CInv &inv);
 
     // The number of script validation threads
     unsigned int ThreadCount() { return nThreads; }
