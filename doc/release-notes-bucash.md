@@ -33,7 +33,7 @@ on the performance of the hardware you are using.
 Downgrade
 ---------
 
-In case you decide to downgrade from BUcash 1.2.0.1 to a version older than 1.1.2.0
+In case you decide to downgrade from BUcash 1.2.0.1, or greater, to a version older than 1.1.2.0
 will need to run the old release using `-reindex` option so that the
 UTXO will be rebuild using the previous format. Mind you that downgrading to version
 lower than 1.1.2.0 you will be split from the rest of the network that are following
