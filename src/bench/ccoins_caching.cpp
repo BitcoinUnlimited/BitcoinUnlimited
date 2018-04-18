@@ -55,6 +55,9 @@ static std::vector<CMutableTransaction> SetupDummyInputs(CBasicKeyStore &keystor
 // (https://github.com/bitcoin/bitcoin/issues/7883#issuecomment-224807484)
 static void CCoinsCaching(benchmark::State &state)
 {
+    const ECCVerifyHandle verify_handle;
+    ECC_Start();
+
     CBasicKeyStore keystore;
     CCoinsView coinsDummy;
     CCoinsViewCache coins(&coinsDummy);
@@ -83,6 +86,7 @@ static void CCoinsCaching(benchmark::State &state)
         CAmount value = coins.GetValueIn(t1);
         assert(value == (50 + 21 + 22) * CENT);
     }
+    ECC_Stop();
 }
 
 BENCHMARK(CCoinsCaching, 170 * 1000);

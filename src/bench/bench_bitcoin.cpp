@@ -73,12 +73,6 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    SHA256AutoDetect();
-    RandomInit();
-    ECC_Start();
-    SetupEnvironment();
-    fPrintToDebugLog = false; // don't want to write to debug.log file
-
     int64_t evaluations = GetArg("-evals", DEFAULT_BENCH_EVALUATIONS);
     std::string regex_filter = GetArg("-filter", DEFAULT_BENCH_FILTER);
     std::string scaling_str = GetArg("-scaling", DEFAULT_BENCH_SCALING);
@@ -96,6 +90,4 @@ int main(int argc, char *argv[])
     }
 
     benchmark::BenchRunner::RunAll(*printer, evaluations, scaling_factor, regex_filter, is_list_only);
-
-    ECC_Stop();
 }

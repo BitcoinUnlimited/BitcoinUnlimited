@@ -4,7 +4,9 @@
 
 #include "checkqueue.h"
 #include "bench.h"
+#include "key.h"
 #include "prevector.h"
+#include "pubkey.h"
 #include "random.h"
 #include "util.h"
 #include "validation/validation.h"
@@ -24,6 +26,9 @@ static const int QUEUE_BATCH_SIZE = 128;
 // and there is a little bit of work done between calls to Add.
 static void CCheckQueueSpeedPrevectorJob(benchmark::State &state)
 {
+    const ECCVerifyHandle verify_handle;
+    ECC_Start();
+
     struct PrevectorJob
     {
         prevector<PREVECTOR_SIZE, uint8_t> p;
@@ -60,5 +65,6 @@ static void CCheckQueueSpeedPrevectorJob(benchmark::State &state)
     }
     tg.interrupt_all();
     tg.join_all();
+    ECC_Stop();
 }
 BENCHMARK(CCheckQueueSpeedPrevectorJob, 1400);

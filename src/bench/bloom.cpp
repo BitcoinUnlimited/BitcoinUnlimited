@@ -7,6 +7,8 @@
 #include "bench.h"
 #include "bloom.h"
 #include "fastfilter.h"
+#include "key.h"
+#include "pubkey.h"
 #include "utiltime.h"
 
 
@@ -25,6 +27,8 @@ public:
 
     ALotOfSHA256() : bloom(1000000, 0.000001, 0x49393, BLOOM_UPDATE_NONE, 100000000)
     {
+        const ECCVerifyHandle verify_handle;
+        ECC_Start();
         data.reserve(amt);
         for (int i = 0; i < amt; i++)
         {
@@ -37,6 +41,7 @@ public:
                 bloom.insert(num);
             }
         }
+        ECC_Stop();
     }
 };
 

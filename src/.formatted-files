@@ -455,6 +455,7 @@ bench/base58.cpp
 bench/bench_bitcoin.cpp
 bench/bench.cpp
 bench/bench.h
+bench/block_assemble.cpp
 bench/bloom.cpp
 bench/ccoins_caching.cpp
 bench/checkqueue.cpp
