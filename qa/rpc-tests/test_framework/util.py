@@ -324,7 +324,6 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
         for i in range(4):
             if bins:
                 if BCD_HUB_PATH in bins[i]:
-                    print("logfilename = ", log_filename("cache", i, HUB_LOG))
                     os.remove(log_filename("cache", i, HUB_LOG))
                 else:
                     os.remove(log_filename("cache", i, "debug.log"))
