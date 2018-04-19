@@ -73,6 +73,7 @@ BITCOIN_TESTS =\
   test/multisig_tests.cpp \
   test/net_tests.cpp \
   test/netbase_tests.cpp \
+  test/opcodes.cpp \
   test/pmt_tests.cpp \
   test/policyestimator_tests.cpp \
   test/pow_tests.cpp \
@@ -83,6 +84,8 @@ BITCOIN_TESTS =\
   test/scheduler_tests.cpp \
   test/script_P2SH_tests.cpp \
   test/script_tests.cpp \
+  test/scriptflags.cpp \
+  test/scriptflags.h \
   test/scriptnum_tests.cpp \
   test/serialize_tests.cpp \
   test/sighash_tests.cpp \
@@ -91,6 +94,7 @@ BITCOIN_TESTS =\
   test/streams_tests.cpp \
   test/test_bitcoin.cpp \
   test/test_bitcoin.h \
+  test/test_random.h \
   test/thinblock_tests.cpp \
   test/thinblock_data_tests.cpp \
   test/thinblock_util_tests.cpp \

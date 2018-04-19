@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -72,13 +72,13 @@ class CBlock : public CBlockHeader
 {
 public:
     // network and disk
-    std::vector<CTransaction> vtx;
+    std::vector<CTransactionRef> vtx;
 
     // memory only
     // 0.11: mutable std::vector<uint256> vMerkleTree;
     mutable bool fChecked;
     mutable bool fExcessive; // BU: is the block "excessive" (bigger than this node prefers to accept)
-    mutable uint64_t nBlockSize; // BU: length of this block in bytes
+    mutable uint64_t nBlockSize; // Serialized block size in bytes
 
     CBlock() { SetNull(); }
     CBlock(const CBlockHeader &header)
@@ -92,7 +92,7 @@ public:
     {
         int nIndex;
         for (nIndex = 0; nIndex < (int)vtx.size(); nIndex++)
-            if (vtx[nIndex] == *(CTransaction *)this)
+            if (vtx[nIndex] == *(CTransactionRef *)this)
                 break;
         if (nIndex == (int)vtx.size())
         {
@@ -140,7 +140,7 @@ public:
 
     uint64_t GetHeight() const // Returns the block's height as specified in its coinbase transaction
     {
-        const CScript &sig = vtx[0].vin[0].scriptSig;
+        const CScript &sig = vtx[0]->vin[0].scriptSig;
         int numlen = sig[0];
         if (numlen == OP_0)
             return 0;
@@ -175,6 +175,10 @@ public:
     }
 
     std::string ToString() const;
+
+    // Return the serialized block size in bytes. This is only done once and then the result stored
+    // in nBlockSize for future reference, saving unncessary and expensive serializations.
+    uint64_t GetBlockSize() const;
 };
 
 
@@ -202,5 +206,13 @@ struct CBlockLocator
     void SetNull() { vHave.clear(); }
     bool IsNull() const { return vHave.empty(); }
 };
+
+typedef std::shared_ptr<CBlock> CBlockRef;
+static inline CBlockRef MakeBlockRef() { return std::make_shared<CBlock>(); }
+template <typename Blk>
+static inline CBlockRef MakeBlockRef(Blk &&blkIn)
+{
+    return std::make_shared<CBlock>(std::forward<Blk>(blkIn));
+}
 
 #endif // BITCOIN_PRIMITIVES_BLOCK_H

@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -107,7 +107,6 @@ std::string strSubVersion;
 // extern CCriticalSection cs_vNodes;
 // map<CInv, CDataStream> mapRelay;
 // CCriticalSection cs_mapRelay;
-// limitedmap<CInv, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
 
 extern deque<string> vOneShots;
 extern CCriticalSection cs_vOneShots;
@@ -236,7 +235,8 @@ void AdvertiseLocal(CNode *pnode)
         if (addrLocal.IsRoutable())
         {
             // BU logs too often: LOGA("AdvertiseLocal: advertising address %s\n", addrLocal.ToString());
-            pnode->PushAddress(addrLocal);
+            FastRandomContext insecure_rand;
+            pnode->PushAddress(addrLocal, insecure_rand);
         }
     }
 }
@@ -421,7 +421,7 @@ CNode *ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure
         pszDest ? 0.0 : (double)(GetAdjustedTime() - addrConnect.nTime) / 3600.0);
 
     // Connect
-    SOCKET hSocket;
+    SOCKET hSocket = INVALID_SOCKET;
     bool proxyConnectionFailed = false;
     if (pszDest ? ConnectSocketByName(addrConnect, hSocket, pszDest, Params().GetDefaultPort(), nConnectTimeout,
                       &proxyConnectionFailed) :
@@ -1744,7 +1744,8 @@ void ThreadOpenConnections()
         int nOutbound = 0;
         int nThinBlockCapable = 0;
         set<vector<unsigned char> > setConnected;
-        CNode *ptemp = nullptr;
+        CNode *pNonXthinNode = nullptr;
+        CNode *pNonNodeNetwork = nullptr;
         bool fDisconnected = false;
         {
             LOCK(cs_vNodes);
@@ -1758,7 +1759,11 @@ void ThreadOpenConnections()
                     if (pnode->ThinBlockCapable())
                         nThinBlockCapable++;
                     else
-                        ptemp = pnode;
+                        pNonXthinNode = pnode;
+
+                    // If sync is not yet complete then disconnect any pruned outbound connections
+                    if (IsInitialBlockDownload() && !(pnode->nServices & NODE_NETWORK))
+                        pNonNodeNetwork = pnode;
                 }
             }
             // Disconnect a node that is not XTHIN capable if all outbound slots are full and we
@@ -1767,9 +1772,18 @@ void ThreadOpenConnections()
             if (nOutbound >= nMaxOutConnections && nThinBlockCapable <= min(nMinXthinNodes, nMaxOutConnections) &&
                 nDisconnects < MAX_DISCONNECTS && IsThinBlocksEnabled() && IsChainNearlySyncd())
             {
-                if (ptemp != nullptr)
+                if (pNonXthinNode != nullptr)
                 {
-                    ptemp->fDisconnect = true;
+                    pNonXthinNode->fDisconnect = true;
+                    fDisconnected = true;
+                    nDisconnects++;
+                }
+            }
+            else if (IsInitialBlockDownload())
+            {
+                if (pNonNodeNetwork != nullptr)
+                {
+                    pNonNodeNetwork->fDisconnect = true;
                     fDisconnected = true;
                     nDisconnects++;
                 }
@@ -1792,8 +1806,12 @@ void ThreadOpenConnections()
                 MilliSleep(500);
                 {
                     LOCK(cs_vNodes);
-                    if (find(vNodes.begin(), vNodes.end(), ptemp) == vNodes.end())
+                    if (find(vNodes.begin(), vNodes.end(), pNonXthinNode) == vNodes.end() ||
+                        find(vNodes.begin(), vNodes.end(), pNonNodeNetwork) == vNodes.end())
+                    {
+                        nOutbound--;
                         break;
+                    }
                 }
             }
         }
@@ -2072,31 +2090,27 @@ void ThreadMessageHandler()
     boost::mutex condition_mutex;
     boost::unique_lock<boost::mutex> lock(condition_mutex);
 
-    // SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
     while (true)
     {
-        requester.SendRequests(); // BU send out any requests for tx or blks that I don't know about yet
-
         vector<CNode *> vNodesCopy;
         {
             LOCK(cs_vNodes);
-            vNodesCopy.reserve(vNodes.size());
-            // Prefer thinBlockCapable nodes when doing communications.
-            for (CNode *pnode : vNodes)
+
+            // During IBD and because of the multithreading of PV we end up favoring the first peer that
+            // connected and end up downloading a disproportionate amount of data from that first peer.
+            // By rotating vNodes evertime we send messages we can alleviate this problem.
+            // Rotate every 60 seconds so we don't do this too often.
+            static int64_t nLastRotation = GetTime();
+            if (IsInitialBlockDownload() && vNodes.size() > 0 && GetTime() - nLastRotation > 60)
             {
-                if (pnode->ThinBlockCapable())
-                {
-                    vNodesCopy.push_back(pnode);
-                    pnode->AddRef();
-                }
+                std::rotate(vNodes.begin(), vNodes.end() - 1, vNodes.end());
+                nLastRotation = GetTime();
             }
+
+            vNodesCopy = vNodes;
             for (CNode *pnode : vNodes)
             {
-                if (!pnode->ThinBlockCapable())
-                {
-                    vNodesCopy.push_back(pnode);
-                    pnode->AddRef();
-                }
+                pnode->AddRef();
             }
         }
 
@@ -2107,7 +2121,7 @@ void ThreadMessageHandler()
             if (pnode->fDisconnect)
                 continue;
 
-            // Receive messages
+            // Receive messages from the net layer and put them into the receive queue.
             {
                 TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
                 if (lockRecv)
@@ -2126,10 +2140,9 @@ void ThreadMessageHandler()
             }
             boost::this_thread::interruption_point();
 
-            // Send messages
+            // Put transaction and block requests into the request manager
+            // and all other requests into the send queue.
             {
-                // TRY_LOCK(pnode->cs_vSend, lockSend);
-                //  if (lockSend)
                 g_signals.SendMessages(pnode);
             }
             boost::this_thread::interruption_point();
@@ -2140,6 +2153,10 @@ void ThreadMessageHandler()
             for (CNode *pnode : vNodesCopy)
                 pnode->Release();
         }
+
+        // From the request manager, make requests for transactions and blocks. We do this before potentially
+        // sleeping in the step below so as to allow requests to return during the sleep time.
+        requester.SendRequests();
 
         if (fSleep)
             messageHandlerCondition.timed_wait(
@@ -2806,6 +2823,8 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nXthinBloomfilterSize = 0;
     addrFromPort = 0; // BU
     nLocalThinBlockBytes = 0;
+    nAvgBlkResponseTime = -1.0;
+    nMaxBlocksInTransit = 16;
 
     nMisbehavior = 0;
     fShouldBan = false;
@@ -2843,7 +2862,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     if (hSocket != INVALID_SOCKET && !fInbound)
         PushVersion();
 
-    GetNodeSignals().InitializeNode(GetId(), this);
+    GetNodeSignals().InitializeNode(this);
 }
 
 CNode::~CNode()
@@ -2881,41 +2900,6 @@ CNode::~CNode()
         addrman.Connected(addr);
 
     GetNodeSignals().FinalizeNode(GetId());
-}
-
-void CNode::AskFor(const CInv &inv)
-{
-    if (mapAskFor.size() > MAPASKFOR_MAX_SZ || setAskFor.size() > SETASKFOR_MAX_SZ)
-        return;
-    // a peer may not have multiple non-responded queue positions for a single inv item
-    if (!setAskFor.insert(inv.hash).second)
-        return;
-
-    // We're using mapAskFor as a priority queue,
-    // the key is the earliest time the request can be sent
-    int64_t nRequestTime;
-    limitedmap<uint256, int64_t>::const_iterator it = mapAlreadyAskedFor.find(inv.hash);
-    if (it != mapAlreadyAskedFor.end())
-        nRequestTime = it->second;
-    else
-        nRequestTime = 0;
-    LOG(NET, "askfor %s  %d (%s) peer=%d\n", inv.ToString(), nRequestTime,
-        DateTimeStrFormat("%H:%M:%S", nRequestTime / 1000000), id);
-
-    // Make sure not to reuse time indexes to keep things in the same order
-    int64_t nNow = GetTimeMicros() - 1000000;
-    static int64_t nLastTime;
-    ++nLastTime;
-    nNow = std::max(nNow, nLastTime);
-    nLastTime = nNow;
-
-    // Each retry is 2 minutes after the last
-    nRequestTime = std::max(nRequestTime + 2 * 60 * 1000000, nNow);
-    if (it != mapAlreadyAskedFor.end())
-        mapAlreadyAskedFor.update(it, nRequestTime);
-    else
-        mapAlreadyAskedFor.insert(std::make_pair(inv.hash, nRequestTime));
-    mapAskFor.insert(std::make_pair(nRequestTime, inv));
 }
 
 void CNode::BeginMessage(const char *pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend)

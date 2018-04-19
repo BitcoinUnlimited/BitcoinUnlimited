@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Copyright (c) 2016 Bitcoin Unlimited Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -105,12 +105,6 @@ static const unsigned int VERACK_TIMEOUT = 60;
 /** Number of headers sent in one getheaders result. We rely on the assumption that if a peer sends
  *  less than this number, we reached its tip. Changing this value is a protocol upgrade. */
 static const unsigned int MAX_HEADERS_RESULTS = 2000;
-/** Size of the "block download window": how far ahead of our current height do we fetch?
- *  Larger windows tolerate larger download speed differences between peer, but increase the potential
- *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
- *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
-// static const unsigned int BLOCK_DOWNLOAD_WINDOW = 1024;
-/** Time to wait (in seconds) between writing blocks/block index to disk. */
 static const unsigned int DATABASE_WRITE_INTERVAL = 60 * 60;
 /** Time to wait (in seconds) between flushing chainstate to disk. */
 static const unsigned int DATABASE_FLUSH_INTERVAL = 24 * 60 * 60;
@@ -147,7 +141,6 @@ static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 static const bool DEFAULT_PERMIT_BAREMULTISIG = true;
 static const unsigned int DEFAULT_BYTES_PER_SIGOP = 20;
 static const bool DEFAULT_CHECKPOINTS_ENABLED = true;
-static const bool DEFAULT_TXINDEX = false;
 
 static const bool DEFAULT_TESTSAFEMODE = false;
 
@@ -173,18 +166,16 @@ typedef boost::unordered_map<uint256, CBlockIndex *, BlockHasher> BlockMap;
 extern BlockMap mapBlockIndex;
 extern uint64_t nLastBlockTx;
 extern uint64_t nLastBlockSize;
-extern const std::string strMessageMagic;
 extern CWaitableCriticalSection csBestBlock;
 extern CConditionVariable cvBlockChange;
 extern bool fImporting;
 extern bool fReindex;
 extern bool fTxIndex;
 extern bool fIsBareMultisigStd;
-extern bool fRequireStandard;
 extern unsigned int nBytesPerSigOp;
 extern bool fCheckBlockIndex;
 extern bool fCheckpointsEnabled;
-extern size_t nCoinCacheUsage;
+extern int64_t nCoinCacheUsage;
 /** A fee rate smaller than this is considered zero fee (for relaying, mining and transaction creation) */
 extern CFeeRate minRelayTxFee;
 /** Absolute maximum transaction fee (in satoshis) used by wallet and mempool (rejects high fee in sendrawtransaction)
@@ -313,7 +304,7 @@ void PartitionCheck(bool (*initialDownloadCheck)(),
 std::string GetWarnings(const std::string &strFor);
 /** Retrieve a transaction (from memory pool, or from disk, if possible) */
 bool GetTransaction(const uint256 &hash,
-    CTransaction &tx,
+    CTransactionRef &tx,
     const Consensus::Params &params,
     uint256 &hashBlock,
     bool fAllowSlow = false);
@@ -359,7 +350,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode);
 void PruneAndFlush();
 
 /** Check is Cash HF has activated. */
-bool IsDAAEnabled(const CChainParams &chainparams, const CBlockIndex *pindexPrev);
+bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev);
 
 /**
    Determine whether free transactions are subject to rate limiting. If -limitfreerelay is not zero then rate limiting
@@ -435,9 +426,6 @@ bool TestLockPointValidity(const LockPoints *lp);
  * See consensus/consensus.h for flag definitions.
  */
 bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints *lp = NULL, bool useExistingLockPoints = false);
-
-/** Update tracking information about which blocks a peer is assumed to have. */
-void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash);
 
 /**
  * Class that keeps track of number of signature operations
@@ -519,11 +507,9 @@ bool TestBlockValidity(CValidationState &state,
     bool fCheckPOW = true,
     bool fCheckMerkleRoot = true);
 
-// BU needed in unlimited.cpp
-bool CheckIndexAgainstCheckpoint(const CBlockIndex *pindexPrev,
-    CValidationState &state,
-    const CChainParams &chainparams,
-    const uint256 &hash);
+// Checks that the provided block is consistent with the chainparam's checkpoints
+bool CheckAgainstCheckpoint(unsigned int height, const uint256 &hash, const CChainParams &chainparams);
+
 /** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
 bool AcceptBlock(CBlock &block, CValidationState &state, CBlockIndex **pindex, bool fRequested, CDiskBlockPos *dbp);
 bool AcceptBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex **ppindex = NULL);
@@ -582,21 +568,6 @@ static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 static const unsigned int REJECT_CONFLICT = 0x102;
 /** Transaction cannot be committed on my fork */
 static const unsigned int REJECT_WRONG_FORK = 0x103;
-
-struct COrphanTx
-{
-    CTransaction tx;
-    NodeId fromPeer;
-    int64_t nEntryTime; // BU - Xtreme Thinblocks: used for aging orphans out of the cache
-    uint64_t nOrphanTxSize;
-};
-// BU: begin creating separate critical section for orphan cache and untangling from cs_main.
-extern CCriticalSection cs_orphancache;
-extern std::map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs_orphancache);
-extern std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs_orphancache);
-
-void EraseOrphanTx(uint256 hash) EXCLUSIVE_LOCKS_REQUIRED(cs_orphancache);
-// BU: end
 
 CBlockIndex *FindMostWorkChain();
 

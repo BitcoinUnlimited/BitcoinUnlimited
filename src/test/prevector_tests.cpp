@@ -4,7 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "prevector.h"
-#include "random.h"
+#include "test/test_random.h"
 #include <vector>
 
 #include "serialize.h"
@@ -21,9 +21,11 @@ class prevector_tester
 {
     typedef std::vector<T> realtype;
     realtype real_vector;
+    realtype real_vector_alt;
 
     typedef prevector<N, T> pretype;
     pretype pre_vector;
+    pretype pre_vector_alt;
 
     typedef typename pretype::size_type Size;
 
@@ -174,6 +176,13 @@ public:
         pre_vector.shrink_to_fit();
         test();
     }
+
+    void swap()
+    {
+        real_vector.swap(real_vector_alt);
+        pre_vector.swap(pre_vector_alt);
+        test();
+    }
 };
 
 BOOST_AUTO_TEST_CASE(PrevectorTestInt)
@@ -219,9 +228,9 @@ BOOST_AUTO_TEST_CASE(PrevectorTestInt)
             {
                 int values[4];
                 int num = 1 + (insecure_rand() % 4);
-                for (int i = 0; i < num; i++)
+                for (int k = 0; k < num; k++)
                 {
-                    values[i] = insecure_rand();
+                    values[k] = insecure_rand();
                 }
                 test.insert_range(insecure_rand() % (test.size() + 1), values, values + num);
             }
@@ -244,13 +253,17 @@ BOOST_AUTO_TEST_CASE(PrevectorTestInt)
             {
                 test.update(insecure_rand() % test.size(), insecure_rand());
             }
-            if (((r >> 11) & 1024) == 11)
+            if (((r >> 11) % 1024) == 11)
             {
                 test.clear();
             }
-            if (((r >> 21) & 512) == 12)
+            if (((r >> 21) % 512) == 12)
             {
                 test.assign(insecure_rand() % 32, insecure_rand());
+            }
+            if (((r >> 15) % 64) == 3)
+            {
+                test.swap();
             }
         }
     }

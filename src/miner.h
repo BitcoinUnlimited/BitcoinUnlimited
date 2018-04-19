@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -89,7 +89,7 @@ private:
     /** Internal method to construct a new block template */
     CBlockTemplate *CreateNewBlock(const CScript &scriptPubKeyIn, bool blockstreamCoreCompatible);
     /** Constructs a coinbase transaction */
-    CMutableTransaction coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue);
+    CTransactionRef coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue);
 };
 
 /** Modify the extranonce in a block */

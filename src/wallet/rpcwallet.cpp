@@ -1,6 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,6 +12,7 @@
 #include "main.h"
 #include "net.h"
 #include "rpc/server.h"
+#include "script/sign.h"
 #include "timedata.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -545,12 +546,8 @@ UniValue signmessage(const UniValue &params, bool fHelp)
     if (!pwalletMain->GetKey(*keyID, key))
         throw JSONRPCError(RPC_WALLET_ERROR, "Private key not available");
 
-    CHashWriter ss(SER_GETHASH, 0);
-    ss << strMessageMagic;
-    ss << strMessage;
-
-    vector<unsigned char> vchSig;
-    if (!key.SignCompact(ss.GetHash(), vchSig))
+    vector<unsigned char> vchSig = signmessage(strMessage, key);
+    if (vchSig.empty())
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Sign failed");
 
     return EncodeBase64(&vchSig[0], vchSig.size());
@@ -1484,7 +1481,7 @@ UniValue listtransactions(const UniValue &params, bool fHelp)
     if (fHelp || params.size() > 4)
         throw runtime_error(
             "listtransactions ( \"account\" count from includeWatchonly)\n"
-            "\nReturns up to 'count' most recent transactions skipping the first 'from' transactions for account "
+            "\nReturns up to 'count' most recent transactions skipping the most recent 'from' transactions for account "
             "'account'.\n"
             "\nArguments:\n"
             "1. \"account\"    (string, optional) DEPRECATED. The account name. Should be \"*\".\n"
@@ -1623,6 +1620,131 @@ UniValue listtransactions(const UniValue &params, bool fHelp)
 
     return ret;
 }
+
+UniValue listtransactionsfrom(const UniValue &params, bool fHelp)
+{
+    if (!EnsureWalletIsAvailable(fHelp))
+        return NullUniValue;
+
+    if (fHelp || params.size() > 4)
+        throw runtime_error(
+            "listtransactionsfrom ( \"account\" count from includeWatchonly)\n"
+            "\nReturns up to 'count' most recent transactions skipping the first (oldest) 'from' transactions for "
+            "account 'account'.\n"
+            "\nArguments:\n"
+            "1. \"account\"    (string, optional) DEPRECATED. The account name. Should be \"*\".\n"
+            "2. count          (numeric, optional, default=10) The number of transactions to return\n"
+            "3. from           (numeric, optional, default=0) The number of transactions to skip\n"
+            "4. includeWatchonly (bool, optional, default=false) Include transactions to watchonly addresses (see "
+            "'importaddress')\n"
+            "\nResult:\n"
+            "[\n"
+            "  {\n"
+            "    \"account\":\"accountname\",       (string) DEPRECATED. The account name associated with the "
+            "transaction. \n"
+            "                                                It will be \"\" for the default account.\n"
+            "    \"address\":\"bitcoinaddress\",    (string) The bitcoin address of the transaction. Not present for \n"
+            "                                                move transactions (category = move).\n"
+            "    \"category\":\"send|receive|move\", (string) The transaction category. 'move' is a local (off "
+            "blockchain)\n"
+            "                                                transaction between accounts, and not associated with an "
+            "address,\n"
+            "                                                transaction id or block. 'send' and 'receive' "
+            "transactions are \n"
+            "                                                associated with an address, transaction id and block "
+            "details\n"
+            "    \"amount\": x.xxx,          (numeric) The amount in " +
+            CURRENCY_UNIT + ". This is negative for the 'send' category, and for the\n"
+                            "                                         'move' category for moves outbound. It is "
+                            "positive for the 'receive' category,\n"
+                            "                                         and for the 'move' category for inbound funds.\n"
+                            "    \"vout\": n,                (numeric) the vout value\n"
+                            "    \"fee\": x.xxx,             (numeric) The amount of the fee in " +
+            CURRENCY_UNIT +
+            ". This is negative and only available for the \n"
+            "                                         'send' category of transactions.\n"
+            "    \"confirmations\": n,       (numeric) The number of confirmations for the transaction. Available for "
+            "'send' and \n"
+            "                                         'receive' category of transactions. Negative confirmations "
+            "indicate the\n"
+            "                                         transaction conflicts with the block chain\n"
+            "    \"trusted\": xxx            (bool) Whether we consider the outputs of this unconfirmed transaction "
+            "safe to spend.\n"
+            "    \"blockhash\": \"hashvalue\", (string) The block hash containing the transaction. Available for "
+            "'send' and 'receive'\n"
+            "                                          category of transactions.\n"
+            "    \"blockindex\": n,          (numeric) The index of the transaction in the block that includes it. "
+            "Available for 'send' and 'receive'\n"
+            "                                          category of transactions.\n"
+            "    \"blocktime\": xxx,         (numeric) The block time in seconds since epoch (1 Jan 1970 GMT).\n"
+            "    \"txid\": \"transactionid\", (string) The transaction id. Available for 'send' and 'receive' category "
+            "of transactions.\n"
+            "    \"time\": xxx,              (numeric) The transaction time in seconds since epoch (midnight Jan 1 "
+            "1970 GMT).\n"
+            "    \"timereceived\": xxx,      (numeric) The time received in seconds since epoch (midnight Jan 1 1970 "
+            "GMT). Available \n"
+            "                                          for 'send' and 'receive' category of transactions.\n"
+            "    \"comment\": \"...\",       (string) If a comment is associated with the transaction.\n"
+            "    \"label\": \"label\"        (string) A comment for the address/transaction, if any\n"
+            "    \"otheraccount\": \"accountname\",  (string) For the 'move' category of transactions, the account the "
+            "funds came \n"
+            "                                          from (for receiving funds, positive amounts), or went to (for "
+            "sending funds,\n"
+            "                                          negative amounts).\n"
+            "    \"abandoned\": xxx          (bool) 'true' if the transaction has been abandoned (inputs are "
+            "respendable). Only available for the \n"
+            "                                         'send' category of transactions.\n"
+            "  }\n"
+            "]\n"
+
+            "\nExamples:\n"
+            "\nList the most recent 10 transactions in the systems\n" +
+            HelpExampleCli("listtransactionsfrom", "") + "\nList transactions 100 to 120\n" +
+            HelpExampleCli("listtransactionsfrom", "\"*\" 20 100") + "\nAs a json rpc call\n" +
+            HelpExampleRpc("listtransactionsfrom", "\"*\", 20, 100"));
+
+    LOCK2(cs_main, pwalletMain->cs_wallet);
+
+    string strAccount = "*";
+    if (params.size() > 0)
+        strAccount = params[0].get_str();
+    int nCount = 10;
+    if (params.size() > 1)
+        nCount = params[1].get_int();
+    int nFrom = 0;
+    if (params.size() > 2)
+        nFrom = params[2].get_int();
+    isminefilter filter = ISMINE_SPENDABLE;
+    if (params.size() > 3)
+        if (params[3].get_bool())
+            filter = filter | ISMINE_WATCH_ONLY;
+
+    if (nCount < 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative count");
+    if (nFrom < 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative from");
+
+    UniValue ret(UniValue::VARR);
+
+    const CWallet::TxItems &txOrdered = pwalletMain->wtxOrdered;
+    if (txOrdered.size() < (unsigned int)nFrom)
+        return ret;
+    CWallet::TxItems::const_iterator it = txOrdered.begin();
+    std::advance(it, nFrom);
+
+    for (int cnt = 0; (it != txOrdered.end()) && (cnt < nCount); ++it, ++cnt)
+    {
+        CWalletTx *const pwtx = (*it).second.first;
+        if (pwtx != 0)
+            ListTransactions(*pwtx, strAccount, 0, true, ret, filter);
+        CAccountingEntry *const pacentry = (*it).second.second;
+        if (pacentry != 0)
+            AcentryToJSON(*pacentry, strAccount, ret);
+    }
+
+    return ret;
+}
+
 
 UniValue listaccounts(const UniValue &params, bool fHelp)
 {
@@ -2638,40 +2760,60 @@ extern UniValue importwallet(const UniValue &params, bool fHelp);
 extern UniValue importprunedfunds(const UniValue &params, bool fHelp);
 extern UniValue removeprunedfunds(const UniValue &params, bool fHelp);
 
+/* clang-format off */
 static const CRPCCommand commands[] = {
     //  category              name                        actor (function)           okSafeMode
     //  --------------------- ------------------------    -----------------------    ----------
-    {"rawtransactions", "fundrawtransaction", &fundrawtransaction, false},
-    {"hidden", "resendwallettransactions", &resendwallettransactions, true},
-    {"wallet", "abandontransaction", &abandontransaction, false},
-    {"wallet", "addmultisigaddress", &addmultisigaddress, true}, {"wallet", "backupwallet", &backupwallet, true},
-    {"wallet", "dumpprivkey", &dumpprivkey, true}, {"wallet", "dumpwallet", &dumpwallet, true},
-    {"wallet", "encryptwallet", &encryptwallet, true}, {"wallet", "getaccountaddress", &getaccountaddress, true},
-    {"wallet", "getaccount", &getaccount, true}, {"wallet", "getaddressesbyaccount", &getaddressesbyaccount, true},
-    {"wallet", "getbalance", &getbalance, false}, {"wallet", "getnewaddress", &getnewaddress, true},
-    {"wallet", "getrawchangeaddress", &getrawchangeaddress, true},
-    {"wallet", "getreceivedbyaccount", &getreceivedbyaccount, false},
-    {"wallet", "getreceivedbyaddress", &getreceivedbyaddress, false},
-    {"wallet", "gettransaction", &gettransaction, false},
-    {"wallet", "getunconfirmedbalance", &getunconfirmedbalance, false},
-    {"wallet", "getwalletinfo", &getwalletinfo, false}, {"wallet", "importprivkey", &importprivkey, true},
-    {"wallet", "importprivatekeys", &importprivatekeys, true}, {"wallet", "importwallet", &importwallet, true},
-    {"wallet", "importaddress", &importaddress, true}, {"wallet", "importaddresses", &importaddresses, true},
-    {"wallet", "importprunedfunds", &importprunedfunds, true}, {"wallet", "importpubkey", &importpubkey, true},
-    {"wallet", "keypoolrefill", &keypoolrefill, true}, {"wallet", "listaccounts", &listaccounts, false},
-    {"wallet", "listaddressgroupings", &listaddressgroupings, false},
-    {"wallet", "listlockunspent", &listlockunspent, false},
-    {"wallet", "listreceivedbyaccount", &listreceivedbyaccount, false},
-    {"wallet", "listreceivedbyaddress", &listreceivedbyaddress, false},
-    {"wallet", "listsinceblock", &listsinceblock, false}, {"wallet", "listtransactions", &listtransactions, false},
-    {"wallet", "listunspent", &listunspent, false}, {"wallet", "lockunspent", &lockunspent, true},
-    {"wallet", "move", &movecmd, false}, {"wallet", "sendfrom", &sendfrom, false},
-    {"wallet", "sendmany", &sendmany, false}, {"wallet", "sendtoaddress", &sendtoaddress, false},
-    {"wallet", "setaccount", &setaccount, true}, {"wallet", "settxfee", &settxfee, true},
-    {"wallet", "signmessage", &signmessage, true}, {"wallet", "walletlock", &walletlock, true},
-    {"wallet", "walletpassphrasechange", &walletpassphrasechange, true},
-    {"wallet", "walletpassphrase", &walletpassphrase, true}, {"wallet", "removeprunedfunds", &removeprunedfunds, true},
+    {"rawtransactions",       "fundrawtransaction",       &fundrawtransaction,       false},
+    {"hidden",                "resendwallettransactions", &resendwallettransactions, true},
+    {"wallet",                "abandontransaction",       &abandontransaction,       false},
+    {"wallet",                "addmultisigaddress",       &addmultisigaddress,       true},
+    {"wallet",                "backupwallet",             &backupwallet,             true},
+    {"wallet",                "dumpprivkey",              &dumpprivkey,              true},
+    {"wallet",                "dumpwallet",               &dumpwallet,               true},
+    {"wallet",                "encryptwallet",            &encryptwallet,            true},
+    {"wallet",                "getaccountaddress",        &getaccountaddress,        true},
+    {"wallet",                "getaccount",               &getaccount,               true},
+    {"wallet",                "getaddressesbyaccount",    &getaddressesbyaccount,    true},
+    {"wallet",                "getbalance",               &getbalance,               false},
+    {"wallet",                "getnewaddress",            &getnewaddress,            true},
+    {"wallet",                "getrawchangeaddress",      &getrawchangeaddress,      true},
+    {"wallet",                "getreceivedbyaccount",     &getreceivedbyaccount,     false},
+    {"wallet",                "getreceivedbyaddress",     &getreceivedbyaddress,     false},
+    {"wallet",                "gettransaction",           &gettransaction,           false},
+    {"wallet",                "getunconfirmedbalance",    &getunconfirmedbalance,    false},
+    {"wallet",                "getwalletinfo",            &getwalletinfo,            false},
+    {"wallet",                "importprivkey",            &importprivkey,            true},
+    {"wallet",                "importprivatekeys",        &importprivatekeys,        true},
+    {"wallet",                "importwallet",             &importwallet,             true},
+    {"wallet",                "importaddress",            &importaddress,            true},
+    {"wallet",                "importaddresses",          &importaddresses,          true},
+    {"wallet",                "importprunedfunds",        &importprunedfunds,        true},
+    {"wallet",                "importpubkey",             &importpubkey,             true},
+    {"wallet",                "keypoolrefill",            &keypoolrefill,            true},
+    {"wallet",                "listaccounts",             &listaccounts,             false},
+    {"wallet",                "listaddressgroupings",     &listaddressgroupings,     false},
+    {"wallet",                "listlockunspent",          &listlockunspent,          false},
+    {"wallet",                "listreceivedbyaccount",    &listreceivedbyaccount,    false},
+    {"wallet",                "listreceivedbyaddress",    &listreceivedbyaddress,    false},
+    {"wallet",                "listsinceblock",           &listsinceblock,           false},
+    {"wallet",                "listtransactions",         &listtransactions,         false},
+    {"wallet",                "listtransactionsfrom",     &listtransactionsfrom,     false},
+    {"wallet",                "listunspent",              &listunspent,              false},
+    {"wallet",                "lockunspent",              &lockunspent,              true},
+    {"wallet",                "move",                     &movecmd,                  false},
+    {"wallet",                "sendfrom",                 &sendfrom,                 false},
+    {"wallet",                "sendmany",                 &sendmany,                 false},
+    {"wallet",                "sendtoaddress",            &sendtoaddress,            false},
+    {"wallet",                "setaccount",               &setaccount,               true},
+    {"wallet",                "settxfee",                 &settxfee,                 true},
+    {"wallet",                "signmessage",              &signmessage,              true},
+    {"wallet",                "walletlock",               &walletlock,               true},
+    {"wallet",                "walletpassphrasechange",   &walletpassphrasechange,   true},
+    {"wallet",                "walletpassphrase",         &walletpassphrase,         true},
+    {"wallet",                "removeprunedfunds",        &removeprunedfunds,        true},
 };
+/* clang-format on */
 
 void RegisterWalletRPCCommands(CRPCTable &tableRPC)
 {

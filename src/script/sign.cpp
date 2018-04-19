@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -355,3 +355,7 @@ bool DummySignatureCreator::CreateSig(std::vector<unsigned char> &vchSig,
     vchSig[6 + 33 + 32] = SIGHASH_ALL;
     return true;
 }
+
+
+template std::vector<unsigned char> signmessage(const std::vector<unsigned char> &data, const CKey &key);
+template std::vector<unsigned char> signmessage(const std::string &data, const CKey &key);

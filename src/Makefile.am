@@ -166,6 +166,7 @@ BITCOIN_CORE_H = \
   torcontrol.h \
   txdb.h \
   txmempool.h \
+  txorphanpool.h \
   ui_interface.h \
   uahf_fork.h \
   undo.h \
@@ -239,6 +240,7 @@ libbitcoin_server_a_SOURCES = \
   torcontrol.cpp \
   txdb.cpp \
   txmempool.cpp \
+  txorphanpool.cpp \
   tweak.cpp \
   uahf_fork.cpp \
   unlimited.cpp \

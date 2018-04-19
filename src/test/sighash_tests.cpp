@@ -8,12 +8,12 @@
 #include "data/sighash.json.h"
 #include "hash.h"
 #include "main.h" // For CheckTransaction
-#include "random.h"
 #include "script/interpreter.h"
 #include "script/script.h"
 #include "serialize.h"
 #include "streams.h"
 #include "test/test_bitcoin.h"
+#include "test/test_random.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "version.h"

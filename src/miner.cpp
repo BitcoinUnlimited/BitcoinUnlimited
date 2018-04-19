@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -126,7 +126,7 @@ uint64_t BlockAssembler::reserveBlockSize(const CScript &scriptPubKeyIn)
     return nHeaderSize + std::max(nCoinbaseSize, coinbaseReserve.value);
 }
 
-CMutableTransaction BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue)
+CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue)
 {
     CMutableTransaction tx;
 
@@ -150,7 +150,8 @@ CMutableTransaction BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, in
     }
     tx.vin[0].scriptSig = tx.vin[0].scriptSig + COINBASE_FLAGS;
 
-    return tx;
+
+    return MakeTransactionRef(std::move(tx));
 }
 
 CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn)
@@ -179,47 +180,52 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
     CBlock *pblock = &pblocktemplate->block;
 
     // Add dummy coinbase tx as first transaction
-    pblock->vtx.push_back(CTransaction());
+    pblock->vtx.emplace_back();
     pblocktemplate->vTxFees.push_back(-1); // updated at end
     pblocktemplate->vTxSigOps.push_back(-1); // updated at end
 
-    LOCK2(cs_main, mempool.cs);
+    LOCK(cs_main);
     CBlockIndex *pindexPrev = chainActive.Tip();
     assert(pindexPrev); // can't make a new block if we don't even have the genesis block
-    nHeight = pindexPrev->nHeight + 1;
 
-    uahfChainBlock = IsUAHFforkActiveOnNextBlock(pindexPrev->nHeight);
+    {
+        READLOCK(mempool.cs);
+        nHeight = pindexPrev->nHeight + 1;
 
-    pblock->nTime = GetAdjustedTime();
-    pblock->nVersion = UnlimitedComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), pblock->nTime);
-    // -regtest only: allow overriding block.nVersion with
-    // -blockversion=N to test forking scenarios
-    if (chainparams.MineBlocksOnDemand())
-        pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
+        uahfChainBlock = IsUAHFforkActiveOnNextBlock(pindexPrev->nHeight);
 
-    const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
+        pblock->nTime = GetAdjustedTime();
+        pblock->nVersion = UnlimitedComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), pblock->nTime);
+        // -regtest only: allow overriding block.nVersion with
+        // -blockversion=N to test forking scenarios
+        if (chainparams.MineBlocksOnDemand())
+            pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
 
-    nLockTimeCutoff =
-        (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
+        const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
 
-    addPriorityTxs(pblocktemplate.get());
-    addScoreTxs(pblocktemplate.get());
+        nLockTimeCutoff =
+            (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
 
-    nLastBlockTx = nBlockTx;
-    nLastBlockSize = nBlockSize;
-    LOGA("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
-        nBlockSigOps);
+        addPriorityTxs(pblocktemplate.get());
+        addScoreTxs(pblocktemplate.get());
 
-    // Create coinbase transaction.
-    pblock->vtx[0] = coinbaseTx(scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
-    pblocktemplate->vTxFees[0] = -nFees;
+        nLastBlockTx = nBlockTx;
+        nLastBlockSize = nBlockSize;
+        LOGA("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
+            nBlockSigOps);
 
-    // Fill in header
-    pblock->hashPrevBlock = pindexPrev->GetBlockHash();
-    UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
-    pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
-    pblock->nNonce = 0;
-    pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
+        // Create coinbase transaction.
+        pblock->vtx[0] =
+            coinbaseTx(scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
+        pblocktemplate->vTxFees[0] = -nFees;
+
+        // Fill in header
+        pblock->hashPrevBlock = pindexPrev->GetBlockHash();
+        UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
+        pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
+        pblock->nNonce = 0;
+        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(*pblock->vtx[0]);
+    }
 
     CValidationState state;
     if (blockstreamCoreCompatible)
@@ -326,7 +332,7 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
 
 void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, CTxMemPool::txiter iter)
 {
-    pblocktemplate->block.vtx.push_back(iter->GetTx());
+    pblocktemplate->block.vtx.push_back(iter->GetSharedTx());
     pblocktemplate->vTxFees.push_back(iter->GetFee());
     pblocktemplate->vTxSigOps.push_back(iter->GetSigOpCount());
     nBlockSize += iter->GetTxSize();
@@ -340,7 +346,7 @@ void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, CTxMemPool::txit
     {
         double dPriority = iter->GetPriority(nHeight);
         CAmount dummy;
-        mempool.ApplyDeltas(iter->GetTx().GetHash(), dPriority, dummy);
+        mempool._ApplyDeltas(iter->GetTx().GetHash(), dPriority, dummy);
         LOGA("priority %.1f fee %s txid %s\n", dPriority,
             CFeeRate(iter->GetModifiedFee(), iter->GetTxSize()).ToString().c_str(),
             iter->GetTx().GetHash().ToString().c_str());
@@ -451,7 +457,7 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
     {
         double dPriority = mi->GetPriority(nHeight);
         CAmount dummy;
-        mempool.ApplyDeltas(mi->GetTx().GetHash(), dPriority, dummy);
+        mempool._ApplyDeltas(mi->GetTx().GetHash(), dPriority, dummy);
         vecPriority.push_back(TxCoinAgePriority(dPriority, mi));
     }
     std::make_heap(vecPriority.begin(), vecPriority.end(), pricomparer);
@@ -534,7 +540,7 @@ void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce)
     }
     ++nExtraNonce;
     unsigned int nHeight = pblock->GetHeight(); // Height first in coinbase required for block.version=2
-    CMutableTransaction txCoinbase(pblock->vtx[0]);
+    CMutableTransaction txCoinbase(*pblock->vtx[0]);
 
     CScript script = (CScript() << nHeight << CScriptNum(nExtraNonce));
     if (script.size() + COINBASE_FLAGS.size() > MAX_COINBASE_SCRIPTSIG_SIZE)
@@ -544,6 +550,6 @@ void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce)
     txCoinbase.vin[0].scriptSig = script + COINBASE_FLAGS;
     assert(txCoinbase.vin[0].scriptSig.size() <= MAX_COINBASE_SCRIPTSIG_SIZE);
 
-    pblock->vtx[0] = txCoinbase;
+    pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
     pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
 }

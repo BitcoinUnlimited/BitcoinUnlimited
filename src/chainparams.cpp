@@ -1,6 +1,6 @@
 ﻿// Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -42,7 +42,7 @@ CBlock CreateGenesisBlock(CScript prefix,
     genesis.nBits = nBits;
     genesis.nNonce = nNonce;
     genesis.nVersion = nVersion;
-    genesis.vtx.push_back(txNew);
+    genesis.vtx.push_back(MakeTransactionRef(std::move(txNew)));
     genesis.hashPrevBlock.SetNull();
     genesis.hashMerkleRoot = BlockMerkleRoot(genesis);
     return genesis;
@@ -76,6 +76,13 @@ static CBlock CreateGenesisBlock(uint32_t nTime,
         nBits, nVersion, genesisReward);
 }
 
+bool CChainParams::RequireStandard() const
+{
+    // the acceptnonstdtxn flag can only be used to narrow the behavior.
+    // A blockchain whose default is to allow nonstandard txns can be configured to disallow them.
+    return fRequireStandard || !GetBoolArg("-acceptnonstdtxn", true);
+}
+
 /**
  * Main network
  */
@@ -94,11 +101,12 @@ public:
     {
         strNetworkID = "main";
         consensus.nSubsidyHalvingInterval = 210000;
-        consensus.nMajorityEnforceBlockUpgrade = 750;
-        consensus.nMajorityRejectBlockOutdated = 950;
-        consensus.nMajorityWindow = 1000;
+        // 00000000000000ce80a7e057163a4db1d5ad7b20fb6f598c9597b9665c8fb0d4 - April 1, 2012
+        consensus.BIP16Height = 173805;
         consensus.BIP34Height = 227931;
         consensus.BIP34Hash = uint256S("0x000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8");
+        consensus.BIP65Height = 388381; // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
+        consensus.BIP66Height = 363725; // 00000000000000000379eaa19dce8c9b722d46ae6a57c2f1a988119488b50931
         consensus.powLimit = uint256S("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 10 * 60;
@@ -117,8 +125,10 @@ public:
 
         // Aug, 1 2017 hard fork
         consensus.uahfHeight = 478559;
-        // Nov, 13 hard fork
+        // Nov, 13 2017 hard fork
         consensus.daaHeight = 504031;
+        // May, 15 2018 hard fork
+        consensus.may2018activationTime = 1526400000;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -211,11 +221,10 @@ public:
             2301659837, 0x1d00ffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
         consensus.nSubsidyHalvingInterval = 210000;
-        consensus.nMajorityEnforceBlockUpgrade = 750;
-        consensus.nMajorityRejectBlockOutdated = 950;
-        consensus.nMajorityWindow = 1000;
         consensus.BIP34Height = 0;
         consensus.BIP34Hash = consensus.hashGenesisBlock;
+        consensus.BIP65Height = 0;
+        consensus.BIP66Height = 0;
         consensus.powLimit = uint256S("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 10 * 60;
@@ -243,6 +252,8 @@ public:
         consensus.uahfHeight = 0;
         // Nov, 13 hard fork
         consensus.daaHeight = 0;
+        // May, 15 2018 hard fork
+        consensus.may2018activationTime = 1526400000;
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -283,11 +294,11 @@ public:
     {
         strNetworkID = "test";
         consensus.nSubsidyHalvingInterval = 210000;
-        consensus.nMajorityEnforceBlockUpgrade = 51;
-        consensus.nMajorityRejectBlockOutdated = 75;
-        consensus.nMajorityWindow = 100;
+        consensus.BIP16Height = 514; // 00000000040b4e986385315e14bee30ad876d8b47f748025b26683116d21aa65
         consensus.BIP34Height = 21111;
         consensus.BIP34Hash = uint256S("0x0000000023b3a96d3484e5abb3755c413e7d41500f8e2a5c3f0dd01299cd8ef8");
+        consensus.BIP65Height = 581885; // 00000000007f6655f22f98e72ed80d8b06dc761d5da09df0fa1dc4be4f861eb6
+        consensus.BIP66Height = 330776; // 000000002104c8c45e99a8853285a3b592602a3ccde2b832481da85e9e4ba182
         consensus.powLimit = uint256S("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 10 * 60;
@@ -308,6 +319,8 @@ public:
         consensus.uahfHeight = 1155876;
         // Nov, 13 hard fork
         consensus.daaHeight = 1188697;
+        // May, 15 2018 hard fork
+        consensus.may2018activationTime = 1526400000;
 
         pchMessageStart[0] = 0x0b;
         pchMessageStart[1] = 0x11;
@@ -379,11 +392,11 @@ public:
     {
         strNetworkID = "regtest";
         consensus.nSubsidyHalvingInterval = 150;
-        consensus.nMajorityEnforceBlockUpgrade = 750;
-        consensus.nMajorityRejectBlockOutdated = 950;
-        consensus.nMajorityWindow = 1000;
-        consensus.BIP34Height = -1; // BIP34 has not necessarily activated on regtest
+        consensus.BIP16Height = 0; // always enforce P2SH BIP16 on regtest
+        consensus.BIP34Height = 1000; // BIP34 has activated on regtest (Used in rpc activation tests)
         consensus.BIP34Hash = uint256();
+        consensus.BIP65Height = 1351; // BIP65 activated on regtest (Used in rpc activation tests)
+        consensus.BIP66Height = 1251; // BIP66 activated on regtest (Used in rpc activation tests)
         consensus.powLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 10 * 60;
@@ -402,6 +415,8 @@ public:
         consensus.uahfHeight = 0;
         // Nov, 13 hard fork is always on on regtest.
         consensus.daaHeight = 0;
+        // May, 15 2018 hard fork
+        consensus.may2018activationTime = 1526400000;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;

@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -17,6 +17,7 @@
 #include "policy/policy.h"
 #include "script/script.h"
 #include "script/script_error.h"
+#include "test/scriptflags.h"
 #include "utilstrencodings.h"
 
 #include <map>
@@ -35,58 +36,6 @@ using namespace std;
 // In script_tests.cpp
 extern UniValue read_json(const std::string &jsondata);
 
-static std::map<string, unsigned int> mapFlagNames =
-    boost::assign::map_list_of(string("NONE"), (unsigned int)SCRIPT_VERIFY_NONE)(string("P2SH"),
-        (unsigned int)SCRIPT_VERIFY_P2SH)(string("STRICTENC"), (unsigned int)SCRIPT_VERIFY_STRICTENC)(string("DERSIG"),
-        (unsigned int)SCRIPT_VERIFY_DERSIG)(string("LOW_S"), (unsigned int)SCRIPT_VERIFY_LOW_S)(string("SIGPUSHONLY"),
-        (unsigned int)SCRIPT_VERIFY_SIGPUSHONLY)(string("MINIMALDATA"),
-        (unsigned int)SCRIPT_VERIFY_MINIMALDATA)(string("NULLDUMMY"), (unsigned int)SCRIPT_VERIFY_NULLDUMMY)(
-        string("DISCOURAGE_UPGRADABLE_NOPS"),
-        (unsigned int)SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)(string("CLEANSTACK"),
-        (unsigned int)SCRIPT_VERIFY_CLEANSTACK)(string("NULLFAIL"), (unsigned int)SCRIPT_VERIFY_NULLFAIL)(
-        string("CHECKLOCKTIMEVERIFY"),
-        (unsigned int)SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY)(string("CHECKSEQUENCEVERIFY"),
-        (unsigned int)SCRIPT_VERIFY_CHECKSEQUENCEVERIFY)(std::string("SIGHASH_FORKID"),
-        (unsigned int)SCRIPT_ENABLE_SIGHASH_FORKID);
-
-unsigned int ParseScriptFlags(string strFlags)
-{
-    if (strFlags.empty())
-    {
-        return 0;
-    }
-    unsigned int flags = 0;
-    vector<string> words;
-    boost::algorithm::split(words, strFlags, boost::algorithm::is_any_of(","));
-
-    BOOST_FOREACH (string word, words)
-    {
-        if (!mapFlagNames.count(word))
-            BOOST_ERROR("Bad test: unknown verification flag '" << word << "'");
-        flags |= mapFlagNames[word];
-    }
-
-    return flags;
-}
-
-string FormatScriptFlags(unsigned int flags)
-{
-    if (flags == 0)
-    {
-        return "";
-    }
-    string ret;
-    std::map<string, unsigned int>::const_iterator it = mapFlagNames.begin();
-    while (it != mapFlagNames.end())
-    {
-        if (flags & it->second)
-        {
-            ret += it->first + ",";
-        }
-        it++;
-    }
-    return ret.substr(0, ret.size() - 1);
-}
 
 BOOST_FIXTURE_TEST_SUITE(transaction_tests, BasicTestingSetup)
 

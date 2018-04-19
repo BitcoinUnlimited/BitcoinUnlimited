@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -79,7 +79,7 @@ static const size_t SETASKFOR_MAX_SZ = 2 * MAX_INV_SZ;
 /** The maximum number of peer connections to maintain. */
 static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
 /** BU: The maximum numer of outbound peer connections */
-static const unsigned int DEFAULT_MAX_OUTBOUND_CONNECTIONS = 12;
+static const unsigned int DEFAULT_MAX_OUTBOUND_CONNECTIONS = 16;
 /** BU: The minimum number of xthin nodes to connect */
 static const uint8_t MIN_XTHIN_NODES = 8;
 /** BU: The daily maximum disconnects while searching for xthin nodes to connect */
@@ -143,7 +143,7 @@ struct CNodeSignals
     boost::signals2::signal<int()> GetHeight;
     boost::signals2::signal<bool(CNode *), CombinerAll> ProcessMessages;
     boost::signals2::signal<bool(CNode *), CombinerAll> SendMessages;
-    boost::signals2::signal<void(NodeId, const CNode *)> InitializeNode;
+    boost::signals2::signal<void(const CNode *)> InitializeNode;
     boost::signals2::signal<void(NodeId)> FinalizeNode;
 };
 
@@ -193,7 +193,6 @@ extern CCriticalSection cs_vNodes;
 extern std::map<CInv, CDataStream> mapRelay;
 extern std::deque<std::pair<int64_t, CInv> > vRelayExpiration;
 extern CCriticalSection cs_mapRelay;
-extern limitedmap<uint256, int64_t> mapAlreadyAskedFor;
 
 extern std::vector<std::string> vAddedNodes;
 extern CCriticalSection cs_vAddedNodes;
@@ -379,7 +378,7 @@ public:
     CBlock thinBlock;
     std::vector<uint256> thinBlockHashes;
     std::vector<uint64_t> xThinBlockHashes;
-    std::map<uint64_t, CTransaction> mapMissingTx;
+    std::map<uint64_t, CTransactionRef> mapMissingTx;
     uint64_t nLocalThinBlockBytes; // the bytes used in creating this thinblock, updated dynamically
     int nSizeThinBlock; // Original on-wire size of the block. Just used for reporting
     int thinBlockWaitingForTxns; // if -1 then not currently waiting
@@ -391,6 +390,10 @@ public:
     uint64_t nGetXthinLastTime; // The last time a get_xthin request was made
     uint32_t nXthinBloomfilterSize; // The maximum xthin bloom filter size (in bytes) that our peer will accept.
     // BUIP010 Xtreme Thinblocks: end section
+
+    CCriticalSection cs_nAvgBlkResponseTime;
+    double nAvgBlkResponseTime;
+    std::atomic<int64_t> nMaxBlocksInTransit;
 
     unsigned short addrFromPort;
 
@@ -417,8 +420,6 @@ public:
     CRollingBloomFilter filterInventoryKnown;
     std::vector<CInv> vInventoryToSend;
     CCriticalSection cs_inventory;
-    std::set<uint256> setAskFor;
-    std::multimap<int64_t, CInv> mapAskFor;
     int64_t nNextInvSend;
     // Used for headers announcements - unfiltered blocks to relay
     // Also protected by cs_inventory
@@ -525,7 +526,7 @@ public:
     }
 
     void AddAddressKnown(const CAddress &addr) { addrKnown.insert(addr.GetKey()); }
-    void PushAddress(const CAddress &addr)
+    void PushAddress(const CAddress &_addr, FastRandomContext &insecure_rand)
     {
         // Known checking here is only to save space from duplicates.
         // SendMessages will filter it again for knowns that were added
@@ -534,7 +535,7 @@ public:
         {
             if (vAddrToSend.size() >= MAX_ADDR_TO_SEND)
             {
-                vAddrToSend[insecure_rand() % vAddrToSend.size()] = addr;
+                vAddrToSend[insecure_rand.rand32() % vAddrToSend.size()] = addr;
             }
             else
             {
@@ -567,8 +568,6 @@ public:
         LOCK(cs_inventory);
         vBlockHashesToAnnounce.push_back(hash);
     }
-
-    void AskFor(const CInv &inv);
 
     // TODO: Document the postcondition of this function.  Is cs_vSend locked?
     void BeginMessage(const char *pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend);

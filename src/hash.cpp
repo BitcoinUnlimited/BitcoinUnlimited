@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -48,8 +48,10 @@ unsigned int MurmurHash3(unsigned int nHashSeed, const std::vector<unsigned char
         {
         case 3:
             k1 ^= tail[2] << 16;
+        // FALLTHROUGH
         case 2:
             k1 ^= tail[1] << 8;
+        // FALLTHROUGH
         case 1:
             k1 ^= tail[0];
             k1 *= c1;

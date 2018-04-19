@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -388,13 +388,13 @@ static bool rest_tx(HTTPRequest *req, const std::string &strURIPart)
     if (!ParseHashStr(hashStr, hash))
         return RESTERR(req, HTTP_BAD_REQUEST, "Invalid hash: " + hashStr);
 
-    CTransaction tx;
+    CTransactionRef tx;
     uint256 hashBlock = uint256();
     if (!GetTransaction(hash, tx, Params().GetConsensus(), hashBlock, true))
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
 
     CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
-    ssTx << tx;
+    ssTx << *tx;
 
     switch (rf)
     {
@@ -417,7 +417,7 @@ static bool rest_tx(HTTPRequest *req, const std::string &strURIPart)
     case RF_JSON:
     {
         UniValue objTx(UniValue::VOBJ);
-        TxToJSON(tx, hashBlock, objTx);
+        TxToJSON(*tx, hashBlock, objTx);
         string strJSON = objTx.write() + "\n";
         req->WriteHeader("Content-Type", "application/json");
         req->WriteReply(HTTP_OK, strJSON);
@@ -495,7 +495,7 @@ static bool rest_getutxos(HTTPRequest *req, const std::string &strURIPart)
         std::vector<unsigned char> strRequestV = ParseHex(strRequestMutable);
         strRequestMutable.assign(strRequestV.begin(), strRequestV.end());
     }
-
+    // FALLTHROUGH
     case RF_BINARY:
     {
         try
@@ -546,7 +546,8 @@ static bool rest_getutxos(HTTPRequest *req, const std::string &strURIPart)
     std::vector<bool> hits;
     bitmap.resize((vOutPoints.size() + 7) / 8);
     {
-        LOCK2(cs_main, mempool.cs);
+        LOCK(cs_main);
+        READLOCK(mempool.cs);
 
         CCoinsView viewDummy;
         CCoinsViewCache view(&viewDummy);

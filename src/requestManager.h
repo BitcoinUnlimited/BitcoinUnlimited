@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -26,8 +26,11 @@ successful receipt, "requester.Rejected(...)" to indicate a bad object (request 
 
 #ifndef REQUEST_MANAGER_H
 #define REQUEST_MANAGER_H
+
 #include "net.h"
+#include "nodestate.h"
 #include "stat.h"
+
 // When should I request a tx from someone else (in microseconds). cmdline/bitcoin.conf: -txretryinterval
 extern unsigned int txReqRetryInterval;
 extern unsigned int MIN_TX_REQUEST_RETRY_INTERVAL;
@@ -103,7 +106,8 @@ protected:
     typedef std::map<uint256, CUnknownObj> OdMap;
     OdMap mapTxnInfo;
     OdMap mapBlkInfo;
-    CCriticalSection cs_objDownloader; // protects mapTxnInfo and mapBlkInfo
+    std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
+    CCriticalSection cs_objDownloader; // protects mapTxnInfo, mapBlkInfo and mapBlocksInFlight
 
     OdMap::iterator sendIter;
     OdMap::iterator sendBlkIter;
@@ -120,6 +124,9 @@ protected:
     CLeakyBucket requestPacer;
     CLeakyBucket blockPacer;
 
+    // Request a single block.
+    bool RequestBlock(CNode *pfrom, CInv obj);
+
 public:
     CRequestManager();
 
@@ -128,6 +135,16 @@ public:
 
     // Get these objects from somewhere, asynchronously.
     void AskFor(const std::vector<CInv> &objArray, CNode *from, unsigned int priority = 0);
+
+    // Get these objects from somewhere, asynchronously during IBD. During IBD we must assume every peer connected
+    // can give us the blocks we need and so we tell the request manager about these sources. Otherwise the request
+    // manager may not be able to re-request blocks from anyone after a timeout and we also need to be able to not
+    // request another group of blocks that are already in flight.
+    void AskForDuringIBD(const std::vector<CInv> &objArray, CNode *from, unsigned int priority = 0);
+
+    // Did we already ask for this block. We need to do this during IBD to make sure we don't ask for another set
+    // of the same blocks.
+    bool AlreadyAskedFor(const uint256 &hash);
 
     // Indicate that we got this object, from and bytes are optional (for node performance tracking)
     void Received(const CInv &obj, CNode *from, int bytes = 0);
@@ -138,10 +155,52 @@ public:
     // Indicate that getting this object was rejected
     void Rejected(const CInv &obj, CNode *from, unsigned char reason = 0);
 
+    // Resets the last request time to zero when a node disconnects and has blocks in flight.
+    void ResetLastRequestTime(const uint256 &hash);
+
     void SendRequests();
 
-    // Indicates whether a node ping time is acceptable relative to the overall average of all nodes.
-    bool IsNodePingAcceptable(CNode *pnode);
+    // Check whether the last unknown block a peer advertised is not yet known.
+    void ProcessBlockAvailability(NodeId nodeid);
+
+    // Update tracking information about which blocks a peer is assumed to have.
+    void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash);
+
+    // Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
+    // at most count entries.
+    void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex *> &vBlocks);
+
+    // Returns a bool indicating whether we requested this block.
+    void MarkBlockAsInFlight(NodeId nodeid,
+        const uint256 &hash,
+        const Consensus::Params &consensusParams,
+        CBlockIndex *pindex = nullptr);
+
+    // Returns a bool if successful in indicating we received this block.
+    bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode);
+
+    // Methods for handling mapBlocksInFlight which is protected.
+    void MapBlocksInFlightErase(const uint256 &hash)
+    {
+        LOCK(cs_objDownloader);
+        mapBlocksInFlight.erase(hash);
+    }
+    bool MapBlocksInFlightEmpty()
+    {
+        LOCK(cs_objDownloader);
+        return mapBlocksInFlight.empty();
+    }
+    void MapBlocksInFlightClear()
+    {
+        LOCK(cs_objDownloader);
+        mapBlocksInFlight.clear();
+    }
+
+    // Check for block download timeout and disconnect node if necessary.
+    void CheckForDownloadTimeout(CNode *pnode,
+        const CNodeState &state,
+        const Consensus::Params &consensusParams,
+        int64_t nNow);
 };
 
 

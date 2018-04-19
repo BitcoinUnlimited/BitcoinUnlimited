@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -191,12 +191,14 @@ void DeleteCritical(const void *cs);
 std::string LocksHeld();
 /** Asserts in debug builds if a critical section is not held. */
 void AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs);
+void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs);
 /** Asserts in debug builds if a shared critical section is not exclusively held. */
 void AssertWriteLockHeldInternal(const char *pszName, const char *pszFile, int nLine, CSharedCriticalSection *cs);
 #else
 void static inline EnterCritical(const char *pszName, const char *pszFile, int nLine, void *cs, bool fTry = false) {}
 void static inline LeaveCritical() {}
 void static inline AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs) {}
+void static inline AssertLockNotHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs) {}
 void static inline AssertWriteLockHeldInternal(const char *pszName,
     const char *pszFile,
     int nLine,
@@ -205,6 +207,7 @@ void static inline AssertWriteLockHeldInternal(const char *pszName,
 }
 #endif
 #define AssertLockHeld(cs) AssertLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
+#define AssertLockNotHeld(cs) AssertLockNotHeldInternal(#cs, __FILE__, __LINE__, &cs)
 #define AssertWriteLockHeld(cs) AssertWriteLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
 
 #ifdef DEBUG_LOCKCONTENTION

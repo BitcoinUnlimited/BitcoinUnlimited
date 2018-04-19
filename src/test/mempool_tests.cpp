@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -55,7 +55,7 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest)
 
 
     CTxMemPool testPool(CFeeRate(0));
-    std::list<CTransaction> removed;
+    std::list<CTransactionRef> removed;
 
     // Nothing in pool, remove should do nothing:
     testPool.remove(txParent, removed, true);
@@ -107,6 +107,18 @@ template <typename name>
 void CheckSort(CTxMemPool &pool, std::vector<std::string> &sortedOrder)
 {
     BOOST_CHECK_EQUAL(pool.size(), sortedOrder.size());
+    typename CTxMemPool::indexed_transaction_set::index<name>::type::iterator it = pool.mapTx.get<name>().begin();
+    int count = 0;
+    for (; it != pool.mapTx.get<name>().end(); ++it, ++count)
+    {
+        BOOST_CHECK_EQUAL(it->GetTx().GetHash().ToString(), sortedOrder[count]);
+    }
+}
+
+template <typename name>
+void _CheckSort(CTxMemPool &pool, std::vector<std::string> &sortedOrder)
+{
+    BOOST_CHECK_EQUAL(pool._size(), sortedOrder.size());
     typename CTxMemPool::indexed_transaction_set::index<name>::type::iterator it = pool.mapTx.get<name>().begin();
     int count = 0;
     for (; it != pool.mapTx.get<name>().end(); ++it, ++count)
@@ -192,74 +204,79 @@ BOOST_AUTO_TEST_CASE(MempoolIndexingTest)
     tx7.vout[1].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx7.vout[1].nValue = 1 * COIN;
 
-    CTxMemPool::setEntries setAncestorsCalculated;
     std::string dummy;
-    BOOST_CHECK_EQUAL(pool.CalculateMemPoolAncestors(
-                          entry.Fee(2000000LL).FromTx(tx7), setAncestorsCalculated, 100, 1000000, 1000, 1000000, dummy),
-        true);
-    BOOST_CHECK(setAncestorsCalculated == setAncestors);
-
-    pool.addUnchecked(tx7.GetHash(), entry.FromTx(tx7), setAncestors);
-    BOOST_CHECK_EQUAL(pool.size(), 7);
-
-    // Now tx6 should be sorted higher (high fee child): tx7, tx6, tx2, ...
-    sortedOrder.erase(sortedOrder.begin());
-    sortedOrder.push_back(tx6.GetHash().ToString());
-    sortedOrder.push_back(tx7.GetHash().ToString());
-    CheckSort<descendant_score>(pool, sortedOrder);
-
-    /* low fee child of tx7 */
-    CMutableTransaction tx8 = CMutableTransaction();
-    tx8.vin.resize(1);
-    tx8.vin[0].prevout = COutPoint(tx7.GetHash(), 0);
-    tx8.vin[0].scriptSig = CScript() << OP_11;
-    tx8.vout.resize(1);
-    tx8.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-    tx8.vout[0].nValue = 10 * COIN;
-    setAncestors.insert(pool.mapTx.find(tx7.GetHash()));
-    pool.addUnchecked(tx8.GetHash(), entry.Fee(0LL).Time(2).FromTx(tx8), setAncestors);
-
-    // Now tx8 should be sorted low, but tx6/tx both high
-    sortedOrder.insert(sortedOrder.begin(), tx8.GetHash().ToString());
-    CheckSort<descendant_score>(pool, sortedOrder);
-
-    /* low fee child of tx7 */
-    CMutableTransaction tx9 = CMutableTransaction();
-    tx9.vin.resize(1);
-    tx9.vin[0].prevout = COutPoint(tx7.GetHash(), 1);
-    tx9.vin[0].scriptSig = CScript() << OP_11;
-    tx9.vout.resize(1);
-    tx9.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-    tx9.vout[0].nValue = 1 * COIN;
-    pool.addUnchecked(tx9.GetHash(), entry.Fee(0LL).Time(3).FromTx(tx9), setAncestors);
-
-    // tx9 should be sorted low
-    BOOST_CHECK_EQUAL(pool.size(), 9);
-    sortedOrder.insert(sortedOrder.begin(), tx9.GetHash().ToString());
-    CheckSort<descendant_score>(pool, sortedOrder);
-
-    std::vector<std::string> snapshotOrder = sortedOrder;
-
-    setAncestors.insert(pool.mapTx.find(tx8.GetHash()));
-    setAncestors.insert(pool.mapTx.find(tx9.GetHash()));
-    /* tx10 depends on tx8 and tx9 and has a high fee*/
     CMutableTransaction tx10 = CMutableTransaction();
-    tx10.vin.resize(2);
-    tx10.vin[0].prevout = COutPoint(tx8.GetHash(), 0);
-    tx10.vin[0].scriptSig = CScript() << OP_11;
-    tx10.vin[1].prevout = COutPoint(tx9.GetHash(), 0);
-    tx10.vin[1].scriptSig = CScript() << OP_11;
-    tx10.vout.resize(1);
-    tx10.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-    tx10.vout[0].nValue = 10 * COIN;
+    CMutableTransaction tx9 = CMutableTransaction();
+    CMutableTransaction tx8 = CMutableTransaction();
+    std::vector<std::string> snapshotOrder;
+    {
+        CTxMemPool::setEntries setAncestorsCalculated;
+        WRITELOCK(pool.cs);
+        BOOST_CHECK_EQUAL(pool._CalculateMemPoolAncestors(entry.Fee(2000000LL).FromTx(tx7), setAncestorsCalculated, 100,
+                              1000000, 1000, 1000000, dummy),
+            true);
+        BOOST_CHECK(setAncestorsCalculated == setAncestors);
 
-    setAncestorsCalculated.clear();
-    BOOST_CHECK_EQUAL(pool.CalculateMemPoolAncestors(entry.Fee(200000LL).Time(4).FromTx(tx10), setAncestorsCalculated,
-                          100, 1000000, 1000, 1000000, dummy),
-        true);
-    BOOST_CHECK(setAncestorsCalculated == setAncestors);
+        pool.addUnchecked(tx7.GetHash(), entry.FromTx(tx7), setAncestors);
 
-    pool.addUnchecked(tx10.GetHash(), entry.FromTx(tx10), setAncestors);
+        BOOST_CHECK_EQUAL(pool._size(), 7);
+
+        // Now tx6 should be sorted higher (high fee child): tx7, tx6, tx2, ...
+        sortedOrder.erase(sortedOrder.begin());
+        sortedOrder.push_back(tx6.GetHash().ToString());
+        sortedOrder.push_back(tx7.GetHash().ToString());
+        _CheckSort<descendant_score>(pool, sortedOrder);
+
+        /* low fee child of tx7 */
+        tx8.vin.resize(1);
+        tx8.vin[0].prevout = COutPoint(tx7.GetHash(), 0);
+        tx8.vin[0].scriptSig = CScript() << OP_11;
+        tx8.vout.resize(1);
+        tx8.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+        tx8.vout[0].nValue = 10 * COIN;
+        setAncestors.insert(pool.mapTx.find(tx7.GetHash()));
+        pool.addUnchecked(tx8.GetHash(), entry.Fee(0LL).Time(2).FromTx(tx8), setAncestors);
+
+        // Now tx8 should be sorted low, but tx6/tx both high
+        sortedOrder.insert(sortedOrder.begin(), tx8.GetHash().ToString());
+        _CheckSort<descendant_score>(pool, sortedOrder);
+
+        /* low fee child of tx7 */
+        tx9.vin.resize(1);
+        tx9.vin[0].prevout = COutPoint(tx7.GetHash(), 1);
+        tx9.vin[0].scriptSig = CScript() << OP_11;
+        tx9.vout.resize(1);
+        tx9.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+        tx9.vout[0].nValue = 1 * COIN;
+        pool.addUnchecked(tx9.GetHash(), entry.Fee(0LL).Time(3).FromTx(tx9), setAncestors);
+
+        // tx9 should be sorted low
+        BOOST_CHECK_EQUAL(pool._size(), 9);
+        sortedOrder.insert(sortedOrder.begin(), tx9.GetHash().ToString());
+        _CheckSort<descendant_score>(pool, sortedOrder);
+
+        snapshotOrder = sortedOrder;
+
+        setAncestors.insert(pool.mapTx.find(tx8.GetHash()));
+        setAncestors.insert(pool.mapTx.find(tx9.GetHash()));
+        /* tx10 depends on tx8 and tx9 and has a high fee*/
+        tx10.vin.resize(2);
+        tx10.vin[0].prevout = COutPoint(tx8.GetHash(), 0);
+        tx10.vin[0].scriptSig = CScript() << OP_11;
+        tx10.vin[1].prevout = COutPoint(tx9.GetHash(), 0);
+        tx10.vin[1].scriptSig = CScript() << OP_11;
+        tx10.vout.resize(1);
+        tx10.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+        tx10.vout[0].nValue = 10 * COIN;
+
+        setAncestorsCalculated.clear();
+        BOOST_CHECK_EQUAL(pool._CalculateMemPoolAncestors(entry.Fee(200000LL).Time(4).FromTx(tx10),
+                              setAncestorsCalculated, 100, 1000000, 1000, 1000000, dummy),
+            true);
+        BOOST_CHECK(setAncestorsCalculated == setAncestors);
+
+        pool.addUnchecked(tx10.GetHash(), entry.FromTx(tx10), setAncestors);
+    }
 
     /**
      *  tx8 and tx9 should both now be sorted higher
@@ -286,7 +303,7 @@ BOOST_AUTO_TEST_CASE(MempoolIndexingTest)
     BOOST_CHECK_EQUAL(pool.size(), 10);
 
     // Now try removing tx10 and verify the sort order returns to normal
-    std::list<CTransaction> removed;
+    std::list<std::shared_ptr<const CTransaction> > removed;
     pool.remove(pool.mapTx.find(tx10.GetHash())->GetTx(), removed, true);
     CheckSort<descendant_score>(pool, snapshotOrder);
 
@@ -458,8 +475,8 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest)
     pool.addUnchecked(tx5.GetHash(), entry.Fee(1000LL).FromTx(tx5, &pool));
     pool.addUnchecked(tx7.GetHash(), entry.Fee(9000LL).FromTx(tx7, &pool));
 
-    std::vector<CTransaction> vtx;
-    std::list<CTransaction> conflicts;
+    std::vector<CTransactionRef> vtx;
+    std::list<CTransactionRef> conflicts;
     SetMockTime(42);
     SetMockTime(42 + CTxMemPool::ROLLING_FEE_HALFLIFE);
     BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(), maxFeeRateRemoved.GetFeePerK() + 1000);

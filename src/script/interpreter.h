@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -27,6 +27,12 @@ enum
     SIGHASH_SINGLE = 3,
     SIGHASH_FORKID = 0x40,
     SIGHASH_ANYONECANPAY = 0x80,
+};
+
+/** Data signature types (for OP_DATASIGVERIFY) */
+enum
+{
+    DATASIG_COMPACT_ECDSA = 1,
 };
 
 /** Script verification flags */
@@ -96,6 +102,13 @@ enum
     //
     //
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
+
+    // Enable Replay protection.
+    SCRIPT_ENABLE_REPLAY_PROTECTION = (1U << 17),
+
+    // Enable new opcodes.
+    //
+    SCRIPT_ENABLE_MAY152018_OPCODES = (1U << 18),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);
@@ -197,5 +210,9 @@ bool VerifyScript(const CScript &scriptSig,
     const BaseSignatureChecker &checker,
     ScriptError *error = NULL,
     unsigned char *sighashtype = NULL);
+
+// string prefixed to data when validating signed messages either via DATASIGVERIFY or RPC call.  This ensures
+// that the signature was intended for use on this blockchain.
+extern const std::string strMessageMagic;
 
 #endif // BITCOIN_SCRIPT_INTERPRETER_H

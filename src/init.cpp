@@ -1,7 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
-// Copyright (c) 2016 Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -192,6 +191,16 @@ void Shutdown()
     /// module was initialized.
     RenameThread("bitcoin-shutoff");
     mempool.AddTransactionsUpdated(1);
+
+    {
+        LOCK(cs_main);
+        if (pcoinsTip != nullptr)
+        {
+            // Flush state and clear cache completely to release as much memory as possible before continuing.
+            FlushStateToDisk();
+            pcoinsTip->Clear();
+        }
+    }
 
     StopHTTPRPC();
     StopREST();
@@ -792,8 +801,9 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     }
 
 
-    fRequireStandard = !GetBoolArg("-acceptnonstdtxn", !Params().RequireStandard());
-    if (Params().RequireStandard() && !fRequireStandard)
+    bool fStandard = !GetBoolArg("-acceptnonstdtxn", !Params().RequireStandard());
+    // If we specified an override but that override was not accepted then its an error
+    if (fStandard != Params().RequireStandard())
         return InitError(
             strprintf("acceptnonstdtxn is not currently supported for %s chain", chainparams.NetworkIDString()));
     nBytesPerSigOp = GetArg("-bytespersigop", nBytesPerSigOp);
@@ -954,18 +964,10 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         }
     }
 
-    // cache size calculations
-    int64_t nTotalCache = (GetArg("-dbcache", nDefaultDbCache) << 20);
-    nTotalCache = std::max(nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache
-    nTotalCache = std::min(nTotalCache, nMaxDbCache << 20); // total cache cannot be greated than nMaxDbcache
-    int64_t nBlockTreeDBCache = nTotalCache / 8;
-    if (nBlockTreeDBCache > (1 << 21) && !GetBoolArg("-txindex", DEFAULT_TXINDEX))
-        nBlockTreeDBCache = (1 << 21); // block tree db cache shouldn't be larger than 2 MiB
-    nTotalCache -= nBlockTreeDBCache;
-    // use 25%-50% of the remainder for disk cache
-    int64_t nCoinDBCache = std::min(nTotalCache / 2, (nTotalCache / 4) + (1 << 23));
-    nTotalCache -= nCoinDBCache;
-    nCoinCacheUsage = nTotalCache; // the rest goes to in-memory cache
+    // Return the initial values for the various in memory caches.
+    int64_t nBlockTreeDBCache = 0;
+    int64_t nCoinDBCache = 0;
+    GetCacheConfiguration(nBlockTreeDBCache, nCoinDBCache, nCoinCacheUsage);
     LOGA("Cache configuration:\n");
     LOGA("* Using %.1fMiB for block index database\n", nBlockTreeDBCache * (1.0 / 1024 / 1024));
     LOGA("* Using %.1fMiB for chain state database\n", nCoinDBCache * (1.0 / 1024 / 1024));
@@ -976,8 +978,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     {
         bool fReset = fReindex;
         std::string strLoadError;
-
-        uiInterface.InitMessage(_("Loading block index..."));
 
         nStart = GetTimeMillis();
         do
@@ -990,9 +990,12 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 delete pcoinscatcher;
                 delete pblocktree;
 
+                uiInterface.InitMessage(_("Opening Block database..."));
                 pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
+                uiInterface.InitMessage(_("Opening UTXO database..."));
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
+                uiInterface.InitMessage(_("Opening Coins Cache database..."));
                 pcoinsTip = new CCoinsViewCache(pcoinscatcher);
 
                 if (fReindex)
@@ -1012,6 +1015,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                     }
                 }
 
+                uiInterface.InitMessage(_("Loading block index..."));
                 if (!LoadBlockIndex())
                 {
                     strLoadError = _("Error loading block database");

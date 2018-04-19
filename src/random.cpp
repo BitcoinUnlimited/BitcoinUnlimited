@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -120,31 +120,6 @@ uint256 GetRandHash()
     uint256 hash;
     GetRandBytes((unsigned char *)&hash, sizeof(hash));
     return hash;
-}
-
-uint32_t insecure_rand_Rz = 11;
-uint32_t insecure_rand_Rw = 11;
-void seed_insecure_rand(bool fDeterministic)
-{
-    // The seed values have some unlikely fixed points which we avoid.
-    if (fDeterministic)
-    {
-        insecure_rand_Rz = insecure_rand_Rw = 11;
-    }
-    else
-    {
-        uint32_t tmp;
-        do
-        {
-            GetRandBytes((unsigned char *)&tmp, 4);
-        } while (tmp == 0 || tmp == 0x9068ffffU);
-        insecure_rand_Rz = tmp;
-        do
-        {
-            GetRandBytes((unsigned char *)&tmp, 4);
-        } while (tmp == 0 || tmp == 0x464fffffU);
-        insecure_rand_Rw = tmp;
-    }
 }
 
 FastRandomContext::FastRandomContext(bool fDeterministic)

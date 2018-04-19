@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -144,7 +144,7 @@ void CBlockIndex::BuildSkip()
 
 /** return true for every block from fork block and forward [x,+inf)
  * state: fork activated */
-bool CBlockIndex::forkActivated(int time)
+bool CBlockIndex::forkActivated(int time) const
 {
     if (time == 0)
         return false;
@@ -158,7 +158,7 @@ bool CBlockIndex::forkActivated(int time)
 
 /** return true only if we are exactly on the fork block [x,x]
  * state: fork activated */
-bool CBlockIndex::forkActivateNow(int time)
+bool CBlockIndex::forkActivateNow(int time) const
 {
     if (time == 0)
         return false;
@@ -168,7 +168,7 @@ bool CBlockIndex::forkActivateNow(int time)
 /** This will check if the Fork will be enabled at the next block
  * i.e. we are at block x - 1, [x-1, +inf]
  * state fork: enabled or activated */
-bool CBlockIndex::IsforkActiveOnNextBlock(int time)
+bool CBlockIndex::IsforkActiveOnNextBlock(int time) const
 {
     if (time == 0)
         return false;
@@ -183,7 +183,7 @@ bool CBlockIndex::IsforkActiveOnNextBlock(int time)
 /* return true only if 1st condition is true (Median past time > UAHF time)
  * and not the 2nd, i.e. we are at precisely [x-1,x-1]
  * state: fork enabled but not activateda */
-bool CBlockIndex::forkAtNextBlock(int time)
+bool CBlockIndex::forkAtNextBlock(int time) const
 {
     if (time == 0)
         return false;
