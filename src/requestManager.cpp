@@ -1081,14 +1081,45 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         double nResponseTime = (double)(now - getdataTime) / 1000000.0;
 
         // calculate avg block response time over a range of blocks to be used for IBD tuning.
-        static uint8_t blockRange = 50;
+        uint8_t blockRange = 50;
         {
             LOCK(pnode->cs_nAvgBlkResponseTime);
             if (pnode->nAvgBlkResponseTime < 0)
-                pnode->nAvgBlkResponseTime = 2.0;
+                pnode->nAvgBlkResponseTime = 0.0;
             if (pnode->nAvgBlkResponseTime > 0)
                 pnode->nAvgBlkResponseTime -= (pnode->nAvgBlkResponseTime / blockRange);
             pnode->nAvgBlkResponseTime += nResponseTime / blockRange;
+
+            // Protect nOverallAverageResponseTime and nIterations with cs_overallaverage.
+            static CCriticalSection cs_overallaverage;
+            static double nOverallAverageResponseTime = 00.0;
+            static uint32_t nIterations = 0;
+
+            // Get the average value for overall average response time (s) of all nodes.
+            {
+                LOCK(cs_overallaverage);
+                int nOverallRange = blockRange * nMaxOutConnections;
+                if (nIterations <= nOverallRange)
+                    nIterations++;
+                if (nIterations > nOverallRange)
+                {
+                    nOverallAverageResponseTime -= (nOverallAverageResponseTime / nOverallRange);
+                }
+                nOverallAverageResponseTime += nResponseTime / nOverallRange;
+
+                // Request for a disconnect if over the response time limit.  We don't do an fDisconnect = true here
+                // because we want
+                // to drain the queue for any blocks that are still returning.  This prevents us from having to
+                // re-request all those blocks
+                // again.
+                if (vNodes.size() >= nMaxOutConnections - 1 && IsInitialBlockDownload() &&
+                    nIterations > nOverallRange && pnode->nAvgBlkResponseTime > nOverallAverageResponseTime * 4)
+                {
+                    LOGA("disconnecting %s because too slow , overall avg %d peer avg %d\n", pnode->GetLogName(),
+                        nOverallAverageResponseTime, pnode->nAvgBlkResponseTime);
+                    pnode->fDisconnect = true;
+                }
+            }
 
             if (pnode->nAvgBlkResponseTime < 0.2)
             {
@@ -1115,7 +1146,8 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 pnode->nMaxBlocksInTransit.store(16);
             }
 
-            LOG(THIN | BLK, "Average block response time is %.2f seconds\n", pnode->nAvgBlkResponseTime);
+            LOG(THIN | BLK, "Average block response time is %.2f seconds for %s\n", pnode->nAvgBlkResponseTime,
+                pnode->GetLogName());
         }
 
         // if there are no blocks in flight then ask for a few more blocks
