@@ -1122,7 +1122,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 if (requester.nOutbound >= nMaxOutConnections - 1 && IsInitialBlockDownload() &&
                     nIterations > nOverallRange && pnode->nAvgBlkResponseTime > nOverallAverageResponseTime * 4)
                 {
-                    LOGA("disconnecting %s because too slow , overall avg %d peer avg %d\n", pnode->GetLogName(),
+                    LOG(IBD, "disconnecting %s because too slow , overall avg %d peer avg %d\n", pnode->GetLogName(),
                         nOverallAverageResponseTime, pnode->nAvgBlkResponseTime);
                     pnode->fDisconnectRequest = true;
                     // We must not return here but continue in order

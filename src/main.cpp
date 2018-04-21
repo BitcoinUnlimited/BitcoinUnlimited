@@ -6851,11 +6851,11 @@ bool SendMessages(CNode *pto)
         {
             NodeId nodeid = pto->GetId();
             int nInFlight = requester.GetNumBlocksInFlight(nodeid);
-            LOGA("peer=%d, checking disconnect request with %d in flight blocks\n", nodeid, nInFlight);
+            LOG(IBD, "peer=%d, checking disconnect request with %d in flight blocks\n", nodeid, nInFlight);
             if (nInFlight == 0)
             {
                 pto->fDisconnect = true;
-                LOGA("peer=%d, disconnected\n", nodeid);
+                LOG(IBD, "peer=%d, disconnected\n", nodeid);
             }
         }
 
