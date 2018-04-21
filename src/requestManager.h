@@ -135,7 +135,6 @@ protected:
     OdMap::iterator sendBlkIter;
 
     int inFlight;
-    // int maxInFlight;
     CStatHistory<int> inFlightTxns;
     CStatHistory<int> receivedTxns;
     CStatHistory<int> rejectedTxns;
@@ -151,6 +150,9 @@ protected:
 
 public:
     CRequestManager();
+
+    // How many outbound nodes are we connected to.
+    std::atomic<int32_t> nOutbound;
 
     // Get this object from somewhere, asynchronously.
     void AskFor(const CInv &obj, CNode *from, unsigned int priority = 0);

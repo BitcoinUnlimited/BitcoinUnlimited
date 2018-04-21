@@ -102,7 +102,7 @@ CRequestManager::CRequestManager()
       blockPacer(64, 32) // Max and average # of block requests that can be made per second
 {
     inFlight = 0;
-    // maxInFlight = 256;
+    nOutbound = 0;
 
     sendIter = mapTxnInfo.end();
     sendBlkIter = mapBlkInfo.end();
@@ -1112,7 +1112,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 // to drain the queue for any blocks that are still returning.  This prevents us from having to
                 // re-request all those blocks
                 // again.
-                if (vNodes.size() >= nMaxOutConnections - 1 && IsInitialBlockDownload() &&
+                if (requester.nOutbound >= nMaxOutConnections - 1 && IsInitialBlockDownload() &&
                     nIterations > nOverallRange && pnode->nAvgBlkResponseTime > nOverallAverageResponseTime * 4)
                 {
                     LOGA("disconnecting %s because too slow , overall avg %d peer avg %d\n", pnode->GetLogName(),

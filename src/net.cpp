@@ -466,6 +466,10 @@ CNode *ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure
 
 void CNode::CloseSocketDisconnect()
 {
+    // if this is an outbound node that was not added via addenode then decrement the counter.
+    if (fAutoOutbound)
+        requester.nOutbound--;
+
     fDisconnect = true;
     if (hSocket != INVALID_SOCKET)
     {
@@ -1932,7 +1936,11 @@ void ThreadOpenConnections()
                 // We need to use a separate outbound flag so as not to differentiate these outbound
                 // nodes with ones that were added using -addnode -connect-thinblock or -connect.
                 if (pnode)
+                {
                     pnode->fAutoOutbound = true;
+                    requester.nOutbound++;
+                }
+
             }
         }
     }
