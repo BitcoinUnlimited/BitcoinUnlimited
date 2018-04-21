@@ -3647,12 +3647,12 @@ bool AcceptBlockHeader(const CBlockHeader &block,
                                      block.hashPrevBlock.ToString(), hash.ToString()),
                 0, "bad-prevblk");
         pindexPrev = (*mi).second;
+        assert(pindexPrev);
         if (pindexPrev->nStatus & BLOCK_FAILED_MASK)
             return state.DoS(100, error("%s: previous block invalid", __func__), REJECT_INVALID, "bad-prevblk");
 
         // If the parent block belongs to the set of checkpointed blocks but it has a mismatched hash,
         // then we are on the wrong fork so ignore
-        assert(pindexPrev);
         if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindexPrev->nHeight, *pindexPrev->phashBlock, chainparams))
             return error("%s: CheckAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
 
