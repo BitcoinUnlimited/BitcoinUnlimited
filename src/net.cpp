@@ -1940,7 +1940,6 @@ void ThreadOpenConnections()
                     pnode->fAutoOutbound = true;
                     requester.nOutbound++;
                 }
-
             }
         }
     }

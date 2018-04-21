@@ -1119,8 +1119,8 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 // disconnecting.
                 //
                 // We disconnect a peer only if their average response time is more than 4 times the overall average.
-                if (requester.nOutbound >= nMaxOutConnections - 1 && IsInitialBlockDownload() &&
-                    nIterations > nOverallRange && pnode->nAvgBlkResponseTime > nOverallAverageResponseTime * 4)
+                if (nOutbound >= nMaxOutConnections - 1 && IsInitialBlockDownload() && nIterations > nOverallRange &&
+                    pnode->nAvgBlkResponseTime > nOverallAverageResponseTime * 4)
                 {
                     LOG(IBD, "disconnecting %s because too slow , overall avg %d peer avg %d\n", pnode->GetLogName(),
                         nOverallAverageResponseTime, pnode->nAvgBlkResponseTime);
