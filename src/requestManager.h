@@ -207,7 +207,10 @@ public:
     void MapBlocksInFlightErase(const uint256 &hash, NodeId nodeid);
     bool MapBlocksInFlightEmpty();
     void MapBlocksInFlightClear();
+
+    // Methods for handling mapRequestManagerNodeState which is protected.
     void GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, NodeId nodeid);
+    int GetNumBlocksInFlight(NodeId nodeid);
 
     // Remove a request manager node from the nodestate map.
     void RemoveNodeState(NodeId nodeid)

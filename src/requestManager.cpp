@@ -896,7 +896,8 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
     AssertLockHeld(cs_main);
 
     int nBlocksInFlight = mapRequestManagerNodeState[pto->GetId()].nBlocksInFlight;
-    if (!pto->fDisconnect && !pto->fClient && nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
+    if (!pto->fDisconnectRequest && !pto->fDisconnect && !pto->fClient &&
+        nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
     {
         std::vector<CBlockIndex *> vToDownload;
         FindNextBlocksToDownload(pto->GetId(), pto->nMaxBlocksInTransit.load() - nBlocksInFlight, vToDownload);
@@ -1108,16 +1109,24 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 nOverallAverageResponseTime += nResponseTime / nOverallRange;
 
                 // Request for a disconnect if over the response time limit.  We don't do an fDisconnect = true here
-                // because we want
-                // to drain the queue for any blocks that are still returning.  This prevents us from having to
-                // re-request all those blocks
-                // again.
+                // because we want to drain the queue for any blocks that are still returning.  This prevents us from
+                // having to re-request all those blocks again.
+                //
+                // We only check wether to issue a disconnect during initial sync and we only disconnect up to two
+                // peers at a time if and only if all our outbound slots have been used to prevent any sudden loss of
+                // all peers. We do this for two peers and not one in the event that one of the peers is hung and their
+                // block queue does not drain; in that event we would end up waiting for 10 minutes before finally
+                // disconnecting.
+                //
+                // We disconnect a peer only if their average response time is more than 4 times the overall average.
                 if (requester.nOutbound >= nMaxOutConnections - 1 && IsInitialBlockDownload() &&
                     nIterations > nOverallRange && pnode->nAvgBlkResponseTime > nOverallAverageResponseTime * 4)
                 {
                     LOGA("disconnecting %s because too slow , overall avg %d peer avg %d\n", pnode->GetLogName(),
                         nOverallAverageResponseTime, pnode->nAvgBlkResponseTime);
-                    pnode->fDisconnect = true;
+                    pnode->fDisconnectRequest = true;
+                    // We must not return here but continue in order
+                    // to update the vBlocksInFlight stats.
                 }
             }
 
@@ -1234,6 +1243,12 @@ void CRequestManager::GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, N
     {
         vBlocksInFlight.emplace_back(iter.hash);
     }
+}
+
+int CRequestManager::GetNumBlocksInFlight(NodeId nodeid)
+{
+    LOCK(cs_objDownloader);
+    return mapRequestManagerNodeState[nodeid].nBlocksInFlight;
 }
 
 void CRequestManager::CheckForDownloadTimeout(CNode *pnode, const Consensus::Params &consensusParams, int64_t nNow)

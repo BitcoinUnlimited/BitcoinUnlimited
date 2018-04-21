@@ -6844,6 +6844,21 @@ bool SendMessages(CNode *pto)
 {
     const Consensus::Params &consensusParams = Params().GetConsensus();
     {
+        // Check for an internal disconnect request and if true then set fDisconnect. This would typically happen
+        // during initial sync when a peer has a slow connection and we want to disconnect them.  We want to then
+        // wait for any blocks that are still in flight before disconnecting, rather than re-requesting them again.
+        if (pto->fDisconnectRequest)
+        {
+            NodeId nodeid = pto->GetId();
+            int nInFlight = requester.GetNumBlocksInFlight(nodeid);
+            LOGA("peer=%d, checking disconnect request with %d in flight blocks\n", nodeid, nInFlight);
+            if (nInFlight == 0)
+            {
+                pto->fDisconnect = true;
+                LOGA("peer=%d, disconnected\n", nodeid);
+            }
+        }
+
         // First set fDisconnect if appropriate.
         pto->DisconnectIfBanned();
 
