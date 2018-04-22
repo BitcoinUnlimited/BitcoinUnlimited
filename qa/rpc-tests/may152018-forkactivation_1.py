@@ -34,7 +34,8 @@ class ForkTest (BitcoinTestFramework):
     def run_test(self):
 
         # Advance the time beyond the timeout value
-        cur_time = int(time.time())
+        #cur_time = int(time.time())
+        cur_time = 1526400000 - 10
         self.nodes[0].setmocktime(cur_time)
         self.nodes[1].setmocktime(cur_time)
 
@@ -81,6 +82,36 @@ class ForkTest (BitcoinTestFramework):
         # check that the datacarrier size is updated
         assert(self.nodes[0].get("mining.dataCarrierSize")["mining.dataCarrierSize"] == 223)
 
+
+        ###############################################################
+        # Stop nodes and restart with the forktime in the past
+        # - check that the EB/MG setting are now the new fork settings.
+
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+
+        # Start nodes and set the mocktime to the fork activation time.
+        self.nodes = []
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-mocktime=%d" % (cur_time + 10)]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-mocktime=%d" % (cur_time + 10)]))
+ 
+        # Now interconnect the nodes
+        connect_nodes_bi(self.nodes, 0, 1)
+        self.is_network_split = False
+        self.sync_all()
+
+        # Forked, check that the EB is still updated
+        assert(self.nodes[0].get("net.excessiveBlock")["net.excessiveBlock"] == 32000000)
+        assert(self.nodes[1].get("net.excessiveBlock")["net.excessiveBlock"] == 32000000)
+
+        # check that the block size is still updated
+        d = self.nodes[0].get("mining.*lockSize")
+        assert(d["mining.blockSize"] >= d["mining.forkBlockSize"])
+        d = self.nodes[1].get("mining.*lockSize")
+        assert(d["mining.blockSize"] >= d["mining.forkBlockSize"])
+
+        # check that the datacarrier size is still updated
+        assert(self.nodes[0].get("mining.dataCarrierSize")["mining.dataCarrierSize"] == 223)
 
 if __name__ == '__main__':
     ForkTest().main()
