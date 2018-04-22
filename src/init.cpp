@@ -1138,8 +1138,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         // Bump the accepted block size to 32MB and the default generated size to 8MB
         if (miningForkEB.value > excessiveBlockSize)
             excessiveBlockSize = miningForkEB.value;
-        if (miningForkMG.value > maxGeneratedBlock)
-            maxGeneratedBlock = miningForkMG.value;
         settingsToUserAgentString();
         // Bump OP_RETURN size:
         if (nMaxDatacarrierBytes < MAX_OP_RETURN_MAY2018)

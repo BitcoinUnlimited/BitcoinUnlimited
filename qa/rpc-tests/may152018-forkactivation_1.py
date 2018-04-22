@@ -104,11 +104,11 @@ class ForkTest (BitcoinTestFramework):
         assert(self.nodes[0].get("net.excessiveBlock")["net.excessiveBlock"] == 32000000)
         assert(self.nodes[1].get("net.excessiveBlock")["net.excessiveBlock"] == 32000000)
 
-        # check that the block size is still updated
+        # check that the block size did NOT get updated.
         d = self.nodes[0].get("mining.*lockSize")
-        assert(d["mining.blockSize"] >= d["mining.forkBlockSize"])
+        assert(d["mining.blockSize"] == 2000000)
         d = self.nodes[1].get("mining.*lockSize")
-        assert(d["mining.blockSize"] >= d["mining.forkBlockSize"])
+        assert(d["mining.blockSize"] == 2000000)
 
         # check that the datacarrier size is still updated
         assert(self.nodes[0].get("mining.dataCarrierSize")["mining.dataCarrierSize"] == 223)
