@@ -1131,11 +1131,11 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
 
-    // Set the EB/MG and datacarrier size if we have restarted after the fork has already happened.
+    // Set the EB and datacarrier size if we have restarted after the fork has already happened.
     // It is possible that we need to override the old settings in QT and bitcoin.conf.
     if (IsMay152018Enabled(chainparams.GetConsensus(), chainActive.Tip()))
     {
-        // Bump the accepted block size to 32MB and the default generated size to 8MB
+        // Bump the accepted block size to 32MB
         if (miningForkEB.value > excessiveBlockSize)
             excessiveBlockSize = miningForkEB.value;
         settingsToUserAgentString();
