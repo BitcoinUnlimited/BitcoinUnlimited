@@ -19,7 +19,8 @@
 
 const uint8_t FILTER_CELL_SIZE = 1;
 const uint8_t IBLT_CELL_SIZE = 17;
-const uint8_t N_IBLT_HASH = 4; // This should match N_HASH from iblt.cpp
+const uint32_t LARGE_MEM_POOL_SIZE = 10000000;
+const uint8_t N_IBLT_HASH = 3; // This should match N_HASH from iblt.cpp
 const float FILTER_FPR_MAX = 0.999;
 const uint8_t IBLT_CELL_MINIMUM = 3;
 const uint8_t IBLT_VALUE_SIZE = 0;
@@ -47,72 +48,52 @@ public:
          * though filter to use for IBLT.
          *
          * Let a be defined as the size of the symmetric difference between items in the
-         * sender and receiver IBLTs. It is shown in iblt.cpp that a must be divisible by
-         * c = 2 * N_IBLT_HASH. So let b = a / c.
+         * sender and receiver IBLTs.
          *
-         * We use the following continuous approximations for filter and IBLT bytes in terms
-         * of b. (Note that meta parameters for the Bloom Filter and IBLT are ignored).
-         *
-         * Filter:  fpr(b) = c * b / (nReceiverPoolTx - nBlockAndReceiverPoolTx)
-         *          F(b) = FILTER_CELL_SIZE * (-1 / LN2SQUARED * nBlockTxs * log(fpr(b)) / 8)
-         * IBLT:    L(b) = IBLT_CELL_SIZE * (3/2) * c * b
-         * Total:   T(b) = F(b) + L(b)
-         *
-         * L(b) is discrete, but F(b) is generally continuous and will differ from the actual
-         * Bloom filter size by at most 1. Therefore, T(b) will also differ from the total
-         * combined size by at most 1.
-         *
-         * Let B = 2 * FILTER_CELL_SIZE * nBlockTxs / (3 * c^2 * IBLT_CELL_SIZE * LN2SQUARED)
-         * It can be shown that d/(db) T(B) = 0
-         * Thus B is a critical point of T(b)
+         * The total size in bytes of a graphene block is given by T(a) = F(a) + L(a) as defined
+         * in the code below. (Note that meta parameters for the Bloom Filter and IBLT are ignored).
          */
-        assert(nReceiverPoolTx >= nBlockTxs - 1); // Assume reciever is missing only the coinbase
+        assert(nReceiverPoolTx >= nBlockTxs - 1); // Assume reciever is missing only one tx
 
-        uint8_t c = 2 * N_IBLT_HASH;
+        if (nReceiverPoolTx > LARGE_MEM_POOL_SIZE)
+            throw error("Receiver mempool is too large for optimization");
 
-        // Best to make difference as small as possible in this case, but it needs to be at
-        // least size c, otherwise the Bloom filter must have fpr = 0.
-        if (nBlockTxs <= c)
-            return c;
-
-        // Because we assumed the receiver is only missing the coinbase
+        // Because we assumed the receiver is only missing only one tx
         uint64_t nBlockAndReceiverPoolTx = nBlockTxs - 1;
 
-        auto fpr = [c, nReceiverPoolTx, nBlockAndReceiverPoolTx](uint64_t b) {
-            float fpr = c * b / float(nReceiverPoolTx - nBlockAndReceiverPoolTx);
+        // Techinically there should be no symdiff here, but we need to have at least one entry in
+        // the IBLT, otherwise the Bloom filter must have fpr = 0
+        if (nReceiverPoolTx == nBlockAndReceiverPoolTx)
+            return 1;
+
+        auto fpr = [nReceiverPoolTx, nBlockAndReceiverPoolTx](uint64_t a) {
+            float fpr = a / float(nReceiverPoolTx - nBlockAndReceiverPoolTx);
 
             return fpr < 1.0 ? fpr : FILTER_FPR_MAX;
         };
 
         auto F = [nBlockTxs, fpr](
-            uint64_t b) { return floor(FILTER_CELL_SIZE * (-1 / LN2SQUARED * nBlockTxs * log(fpr(b)) / 8)); };
+            uint64_t a) { return floor(FILTER_CELL_SIZE * (-1 / LN2SQUARED * nBlockTxs * log(fpr(a)) / 8)); };
 
-        auto L = [c](uint64_t b) { return IBLT_CELL_SIZE * (3 / 2.0) * c * b; };
+        auto L = [](uint64_t a) {
+            uint64_t padded_cells = a + a / 2;
+            uint64_t cells = N_IBLT_HASH * int(ceil(padded_cells / float(N_IBLT_HASH)));
 
-        auto B = 2 * FILTER_CELL_SIZE * nBlockTxs / (3 * pow(c, 2) * IBLT_CELL_SIZE * LN2SQUARED);
+            return IBLT_CELL_SIZE * cells;
+        };
 
-        std::vector<uint64_t> critical_points;
-        critical_points.push_back((uint64_t)ceil(B)); // test over-approximation
-        critical_points.push_back((uint64_t)floor(B)); // test under-approximation
-        critical_points.push_back(1); // test lower endpoint
-
-        uint64_t optB = 1;
+        uint64_t optSymDiff = 1;
         double optT = std::numeric_limits<double>::max();
-        for (uint64_t cp : critical_points)
+        for (uint64_t a = 1; a < nReceiverPoolTx; a++)
         {
-            if (cp < 1)
-                continue;
-
-            double T = F(cp) + L(cp);
+            double T = F(a) + L(a);
 
             if (T < optT)
             {
-                optB = cp;
+                optSymDiff = a;
                 optT = T;
             }
         }
-
-        uint64_t optSymDiff = optB * c;
 
         return optSymDiff;
     }
@@ -124,24 +105,36 @@ public:
         bool fDeterministic = false)
     {
         ordered = _ordered;
+        // Below is the parameter "m" from the graphene paper
         nReceiverUniverseItems = _nReceiverUniverseItems;
+        // Below is the parameter "n" from the graphene paper
         uint64_t nItems = _itemHashes.size();
         FastRandomContext insecure_rand(fDeterministic);
 
-        // Determine constants
+        // Optimal symmetric differences between receiver and sender IBLTs
+        // This is the parameter "a" from the graphene paper
         double optSymDiff = 1;
-        if (nItems < nReceiverUniverseItems + 1)
-            optSymDiff = OptimalSymDiff(nItems, nReceiverUniverseItems);
-        uint64_t sizeDiff = int(std::abs(nReceiverUniverseItems - nItems));
-        double fpr;
-
-        if (sizeDiff <= 0 || optSymDiff > sizeDiff)
+        try
         {
-            // Just use a very small filter and pass almost everything through
-            fpr = 0.99;
+            if (nItems < nReceiverUniverseItems + 1)
+                optSymDiff = OptimalSymDiff(nItems, nReceiverUniverseItems);
         }
+        catch (std::exception &e)
+        {
+            LOG(GRAPHENE, "failed to optimize symmetric difference for graphene\n");
+        }
+
+        // Sender's estimate of number of items in both block and receiver mempool
+        // This is the parameter "mu" from the graphene paper
+        uint64_t nItemIntersect = std::min(nItems, (uint64_t) nReceiverUniverseItems) - 1;
+
+        // Set false positive rate for Bloom filter based on optSymDiff
+        double fpr;
+        uint64_t nReceiverExcessItems = nReceiverUniverseItems - nItemIntersect;
+        if (optSymDiff >= nReceiverExcessItems)
+            fpr = FILTER_FPR_MAX;
         else
-            fpr = optSymDiff / float(sizeDiff);
+            fpr = optSymDiff / float(nReceiverExcessItems);
 
         // Construct Bloom filter
         pSetFilter = new CBloomFilter(
