@@ -48,6 +48,7 @@ class CGrapheneBlock
 public:
     CBlockHeader header;
     std::vector<uint256> vTxHashes; // List of all transactions id's in the block
+    std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
     uint64_t nBlockTxs;
     CGrapheneSet *pGrapheneSet;
 
@@ -72,10 +73,15 @@ public:
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(header);
+        READWRITE(vAdditionalTxs);
         READWRITE(nBlockTxs);
         if (!pGrapheneSet)
             pGrapheneSet = new CGrapheneSet();
         READWRITE(*pGrapheneSet);
+    }
+    uint64_t GetAdditionalTxSerializationSize()
+    {
+        return ::GetSerializeSize(vAdditionalTxs, SER_NETWORK, PROTOCOL_VERSION);
     }
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
     bool process(CNode *pfrom, int nSizeGrapheneBlock, std::string strCommand);
@@ -163,6 +169,7 @@ private:
     CStatHistory<uint64_t> nTotalIbltBytes;
     CStatHistory<uint64_t> nTotalRankBytes;
     CStatHistory<uint64_t> nTotalGrapheneBlockBytes;
+    CStatHistory<uint64_t> nTotalAdditionalTxBytes;
     std::map<int64_t, std::pair<uint64_t, uint64_t> > mapGrapheneBlocksInBound;
     std::map<int64_t, std::pair<uint64_t, uint64_t> > mapGrapheneBlocksOutBound;
     std::map<int64_t, uint64_t> mapMemPoolInfoOutBound;
@@ -171,6 +178,7 @@ private:
     std::map<int64_t, uint64_t> mapIblt;
     std::map<int64_t, uint64_t> mapRank;
     std::map<int64_t, uint64_t> mapGrapheneBlock;
+    std::map<int64_t, uint64_t> mapAdditionalTx;
     std::map<int64_t, double> mapGrapheneBlockResponseTime;
     std::map<int64_t, double> mapGrapheneBlockValidationTime;
     std::map<int64_t, int> mapGrapheneBlocksInBoundReRequestedTx;
@@ -207,6 +215,7 @@ public:
     void UpdateIblt(uint64_t nIbltSize);
     void UpdateRank(uint64_t nRankSize);
     void UpdateGrapheneBlock(uint64_t nRankSize);
+    void UpdateAdditionalTx(uint64_t nAdditionalTxSize);
     void UpdateResponseTime(double nResponseTime);
     void UpdateValidationTime(double nValidationTime);
     void UpdateInBoundReRequestedTx(int nReRequestedTx);
@@ -220,6 +229,7 @@ public:
     std::string IbltToString();
     std::string RankToString();
     std::string GrapheneBlockToString();
+    std::string AdditionalTxToString();
     std::string ResponseTimeToString();
     std::string ValidationTimeToString();
     std::string ReRequestedTxToString();

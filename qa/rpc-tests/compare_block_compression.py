@@ -158,8 +158,9 @@ class BlockTest(BitcoinTestFramework):
             self.stats['rank'] = self.extract_bytes(self.extract_stats(self.nodes[0])['rank'])
             self.stats['filter'] = self.extract_bytes(self.extract_stats(self.nodes[0])['filter'])
             self.stats['iblt'] = self.extract_bytes(self.extract_stats(self.nodes[0])['iblt'])
+            self.stats['full_tx_size'] = self.extract_bytes(self.extract_stats(self.nodes[0])['graphene_additional_tx_size'])
 
-            self.stats['total_size'] = self.stats['block_size'] + self.stats['mempool_info_size']
+            self.stats['total_size'] = self.stats['block_size'] + self.stats['mempool_info_size'] - self.stats['full_tx_size']
         elif self.block_type == 'thin':
             self.stats['block_size'] = self.extract_bytes(self.extract_stats(self.nodes[0])['thin_block_size'])
             self.stats['filter_size'] = self.extract_bytes(self.extract_stats(self.nodes[0])['inbound_bloom_filters'])
@@ -173,7 +174,7 @@ if __name__ == '__main__':
 
     fd = open(OUT_FILE, 'w')
     print('Test results being written to: %s' % OUT_FILE)
-    fd.write('n_txs total_gr block_gr mempool_gr filter_gr iblt_gr rank_gr total_tn block_tn filter_tn tx_tn\n')
+    fd.write('n_txs total_gr block_gr mempool_gr filter_gr iblt_gr rank_gr tx_gr total_tn block_tn filter_tn tx_tn\n')
 
     for n_txs in n_txs_list:
         try:
@@ -192,6 +193,7 @@ if __name__ == '__main__':
                         graphene_stats['filter'], 
                         graphene_stats['iblt'], 
                         graphene_stats['rank'], 
+                        graphene_stats['full_tx_size'], 
                         thin_stats['total_size'],
                         thin_stats['block_size'],
                         thin_stats['filter_size'],

@@ -485,6 +485,7 @@ static UniValue GetGrapheneStats()
         obj.push_back(Pair("iblt", graphenedata.IbltToString()));
         obj.push_back(Pair("rank", graphenedata.RankToString()));
         obj.push_back(Pair("graphene_block_size", graphenedata.GrapheneBlockToString()));
+        obj.push_back(Pair("graphene_additional_tx_size", graphenedata.AdditionalTxToString()));
         obj.push_back(Pair("rerequested", graphenedata.ReRequestedTxToString()));
     }
     return obj;

@@ -417,6 +417,8 @@ public:
     uint64_t nLocalGrapheneBlockBytes; // the bytes used in creating this graphene block, updated dynamically
     int nSizeGrapheneBlock; // Original on-wire size of the block. Just used for reporting
     int grapheneBlockWaitingForTxns; // if -1 then not currently waiting
+    CCriticalSection cs_grapheneadditionaltxs; // lock grapheneAdditionalTxs
+    std::vector<CTransactionRef> grapheneAdditionalTxs; // entire transactions included in graphene block
     CCriticalSection cs_mapgrapheneblocksinflight; // lock mapGraheneBlocksInFlight
     std::map<uint256, CGrapheneBlockInFlight>
         mapGrapheneBlocksInFlight; // graphene blocks in flight and the time requested.

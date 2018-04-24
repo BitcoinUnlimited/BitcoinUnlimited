@@ -30,7 +30,12 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPool
 
     std::vector<uint256> blockHashes;
     for (auto &tx : pblock->vtx)
+    {
         blockHashes.push_back(tx->GetHash());
+
+        if (tx->IsCoinBase())
+            vAdditionalTxs.push_back(tx);
+    }
 
     pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, blockHashes, true);
 }
@@ -430,6 +435,14 @@ bool CGrapheneBlock::process(CNode *pfrom,
     pfrom->grapheneBlockHashes.clear();
     pfrom->grapheneBlockHashes.resize(nBlockTxs, nullhash);
 
+    {
+        LOCK(pfrom->cs_grapheneadditionaltxs);
+
+        pfrom->grapheneAdditionalTxs.clear();
+        for (auto tx : vAdditionalTxs)
+            pfrom->grapheneAdditionalTxs.push_back(tx);
+    }
+
     vTxHashes.reserve(nBlockTxs);
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
@@ -480,6 +493,10 @@ bool CGrapheneBlock::process(CNode *pfrom,
             std::vector<uint256> localHashes;
             for (const std::pair<uint64_t, uint256> &kv : mapPartialTxHash)
                 localHashes.push_back(kv.second);
+
+            // Add full transactions included in the block
+            for (auto tx : vAdditionalTxs)
+                localHashes.push_back(tx->GetHash());
 
             try
             {
@@ -631,6 +648,14 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
     uint32_t nTxSize = sizeof(dummyptx);
     uint64_t maxAllowedSize = nTxSize * maxMessageSizeMultiplier * excessiveBlockSize / 158;
 
+    std::map<uint256, CTransactionRef> mapAdditionalTxs;
+    {
+        LOCK(pfrom->cs_grapheneadditionaltxs);
+
+        for (auto tx : pfrom->grapheneAdditionalTxs)
+            mapAdditionalTxs[tx->GetHash()] = tx;
+    }
+
     // Look for each transaction in our various pools and buffers.
     // With grapheneBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
     for (const uint256 &hash : pfrom->grapheneBlockHashes)
@@ -645,12 +670,15 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
                 inMemPool = true;
 
             bool inMissingTx = pfrom->mapMissingTx.count(hash.GetCheapHash()) > 0;
+            bool inAdditionalTxs = mapAdditionalTxs.count(hash) > 0;
             bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
 
-            if ((inMemPool && inMissingTx) || (inOrphanCache && inMissingTx))
+            if ((inMemPool && inMissingTx) || (inOrphanCache && inMissingTx) || (inAdditionalTxs && inMissingTx))
                 unnecessaryCount++;
 
-            if (inOrphanCache)
+            if (inAdditionalTxs)
+                ptx = mapAdditionalTxs[hash];
+            else if (inOrphanCache)
             {
                 ptx = orphanpool.mapOrphanTransactions[hash].ptx;
                 setUnVerifiedOrphanTxHash.insert(hash);
@@ -801,6 +829,13 @@ void CGrapheneBlockData::UpdateGrapheneBlock(uint64_t nGrapheneBlockSize)
     LOCK(cs_graphenestats);
     nTotalGrapheneBlockBytes += nGrapheneBlockSize;
     updateStats(mapGrapheneBlock, nGrapheneBlockSize);
+}
+
+void CGrapheneBlockData::UpdateAdditionalTx(uint64_t nAdditionalTxSize)
+{
+    LOCK(cs_graphenestats);
+    nTotalAdditionalTxBytes += nAdditionalTxSize;
+    updateStats(mapAdditionalTx, nAdditionalTxSize);
 }
 
 void CGrapheneBlockData::UpdateResponseTime(double nResponseTime)
@@ -966,6 +1001,15 @@ std::string CGrapheneBlockData::GrapheneBlockToString()
     double avgGrapheneBlockSize = average(mapGrapheneBlock);
     std::ostringstream ss;
     ss << "Graphene block size (last 24hrs) AVG: " << formatInfoUnit(avgGrapheneBlockSize);
+    return ss.str();
+}
+
+std::string CGrapheneBlockData::AdditionalTxToString()
+{
+    LOCK(cs_graphenestats);
+    double avgAdditionalTxSize = average(mapAdditionalTx);
+    std::ostringstream ss;
+    ss << "Graphene size additional txs (last 24hrs) AVG: " << formatInfoUnit(avgAdditionalTxSize);
     return ss.str();
 }
 
@@ -1391,6 +1435,7 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv)
                 graphenedata.UpdateIblt(grapheneBlock.pGrapheneSet->GetIbltSerializationSize());
                 graphenedata.UpdateRank(grapheneBlock.pGrapheneSet->GetRankSerializationSize());
                 graphenedata.UpdateGrapheneBlock(nSizeGrapheneBlock);
+                graphenedata.UpdateAdditionalTx(grapheneBlock.GetAdditionalTxSerializationSize());
             }
         }
         catch (std::exception &e)
