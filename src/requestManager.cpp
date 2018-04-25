@@ -428,29 +428,6 @@ bool CUnknownObj::AddSource(CNode *from)
 bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
 {
     const CChainParams &chainParams = Params();
-
-    // First request the headers preceding the announced block. In the normal fully-synced
-    // case where a new block is announced that succeeds the current tip (no reorganization),
-    // there are no such headers.
-    // Secondly, and only when we are close to being synced, we request the announced block directly,
-    // to avoid an extra round-trip. Note that we must *first* ask for the headers, so by the
-    // time the block arrives, the header chain leading up to it is already validated. Not
-    // doing this will result in the received block being rejected as an orphan in case it is
-    // not a direct successor.
-    //  NOTE: only download headers if we're not doing IBD.  The IBD process will take care of it's own headers.
-    //        Also, we need to always download headers for "regtest". TODO: we need to redesign how IBD is initiated
-    //        here.
-    if (IsChainNearlySyncd() || chainParams.NetworkIDString() == "regtest")
-    {
-        LOCK(cs_main);
-        BlockMap::iterator idxIt = mapBlockIndex.find(obj.hash);
-        if (idxIt == mapBlockIndex.end()) // only request if we don't already have the header
-        {
-            LOG(NET, "getheaders (%d) %s to peer=%d\n", pindexBestHeader->nHeight, obj.hash.ToString(), pfrom->id);
-            pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexBestHeader), obj.hash);
-        }
-    }
-
     {
         // BUIP010 Xtreme Thinblocks: begin section
         CInv inv2(obj);
