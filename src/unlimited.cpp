@@ -561,8 +561,11 @@ static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainpar
 
         // Process this block the same as if we had received it from another node
         CValidationState state;
-        if (!ProcessNewBlock(state, chainparams, nullptr, pblock, true, nullptr, false))
+        if (!ProcessNewBlock(state, chainparams, nullptr, MakeBlockRef(*pblock), true, nullptr, false))
+{
+printf("block not accepted\n");
             return error("BitcoinMiner: ProcessNewBlock, block not accepted");
+}
     }
 
     return true;
@@ -1349,7 +1352,7 @@ bool TestConservativeBlockValidity(CValidationState &state,
         return false;
     if (!ContextualCheckBlock(block, state, pindexPrev))
         return false;
-    if (!ConnectBlock(block, state, &indexDummy, viewNew, true))
+    if (!ConnectBlock(MakeBlockRef(block), state, &indexDummy, viewNew, true))
         return false;
     assert(state.IsValid());
 

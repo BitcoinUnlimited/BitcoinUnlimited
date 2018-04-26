@@ -7,10 +7,10 @@
 #ifndef BITCOIN_VALIDATIONINTERFACE_H
 #define BITCOIN_VALIDATIONINTERFACE_H
 
-#include <boost/shared_ptr.hpp>
+#include "primitives/block.h"
+
 #include <boost/signals2/signal.hpp>
 
-class CBlock;
 struct CBlockLocator;
 class CBlockIndex;
 class CReserveScript;
@@ -28,13 +28,13 @@ void UnregisterValidationInterface(CValidationInterface *pwalletIn);
 /** Unregister all wallets from core */
 void UnregisterAllValidationInterfaces();
 /** Push an updated transaction to all registered wallets, pass NULL if block not known, pass -1 if txIdx not known */
-void SyncWithWallets(const CTransaction &tx, const CBlock *pblock, int txIdx);
+void SyncWithWallets(const CTransaction &tx, const CBlockRef pblock, int txIdx);
 
 class CValidationInterface
 {
 protected:
     virtual void UpdatedBlockTip(const CBlockIndex *pindex) {}
-    virtual void SyncTransaction(const CTransaction &tx, const CBlock *pblock, int txIdx) {}
+    virtual void SyncTransaction(const CTransaction &tx, const CBlockRef pblock, int txIdx) {}
     virtual void SetBestChain(const CBlockLocator &locator) {}
     virtual void UpdatedTransaction(const uint256 &hash) {}
     virtual void Inventory(const uint256 &hash) {}
@@ -52,7 +52,7 @@ struct CMainSignals
     /** Notifies listeners of updated block chain tip */
     boost::signals2::signal<void(const CBlockIndex *)> UpdatedBlockTip;
     /** Notifies listeners of updated transaction data (transaction, and optionally the block it is found in. */
-    boost::signals2::signal<void(const CTransaction &, const CBlock *, int txIndex)> SyncTransaction;
+    boost::signals2::signal<void(const CTransaction &, const CBlockRef, int txIndex)> SyncTransaction;
     /** Notifies listeners of an updated transaction without new data (for now: a coinbase potentially becoming
      * visible). */
     boost::signals2::signal<void(const uint256 &)> UpdatedTransaction;

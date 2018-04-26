@@ -733,8 +733,8 @@ public:
 
     void MarkDirty();
     bool AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletDB *pwalletdb);
-    void SyncTransaction(const CTransaction &tx, const CBlock *pblock, int txIndex = -1);
-    bool AddToWalletIfInvolvingMe(const CTransaction &tx, const CBlock *pblock, bool fUpdate, int txIndex = -1);
+    void SyncTransaction(const CTransaction &tx, const CBlockRef pblock, int txIndex = -1);
+    bool AddToWalletIfInvolvingMe(const CTransaction &tx, const CBlockRef pblock, bool fUpdate, int txIndex = -1);
     int ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate = false);
     void ReacceptWalletTransactions();
     void ResendWalletTransactions(int64_t nBestBlockTime);

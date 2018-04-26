@@ -126,7 +126,7 @@ public:
     bool Initialize(const boost::thread::id this_id, const CBlockIndex *pindex, const bool fParallel);
 
     /* Cleanup PV threads after one has finished and won the validation race */
-    void Cleanup(const CBlock &block, CBlockIndex *pindex);
+    void Cleanup(const CBlockRef block, CBlockIndex *pindex);
 
     /* Send quit to competing threads */
     void QuitCompetingThreads(const uint256 &prevBlockHash);
