@@ -3677,7 +3677,7 @@ bool AcceptBlockHeader(const CBlockHeader &block,
 }
 
 /** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
-static bool AcceptBlock(const CBlock &block,
+static bool AcceptBlock(const CBlockRef pblock,
     CValidationState &state,
     const CChainParams &chainparams,
     CBlockIndex **ppindex,
@@ -3688,7 +3688,7 @@ static bool AcceptBlock(const CBlock &block,
 
     CBlockIndex *&pindex = *ppindex;
 
-    if (!AcceptBlockHeader(block, state, chainparams, &pindex))
+    if (!AcceptBlockHeader(*pblock, state, chainparams, &pindex))
         return false;
 
     LOG(PARALLEL, "Check Block %s with chain work %s block height %d\n", pindex->phashBlock->ToString(),
@@ -3720,7 +3720,7 @@ static bool AcceptBlock(const CBlock &block,
             return true; // Block height is too high
     }
 
-    if ((!CheckBlock(block, state)) || !ContextualCheckBlock(block, state, pindex->pprev))
+    if ((!CheckBlock(*pblock, state)) || !ContextualCheckBlock(*pblock, state, pindex->pprev))
     {
         if (state.IsInvalid() && !state.CorruptionPossible())
         {
@@ -3737,16 +3737,16 @@ static bool AcceptBlock(const CBlock &block,
     // Write block to history file
     try
     {
-        unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
+        unsigned int nBlockSize = ::GetSerializeSize(*pblock, SER_DISK, CLIENT_VERSION);
         CDiskBlockPos blockPos;
-        if (dbp != NULL)
+        if (dbp != nullptr)
             blockPos = *dbp;
-        if (!FindBlockPos(state, blockPos, nBlockSize + 8, nHeight, block.GetBlockTime(), dbp != NULL))
+        if (!FindBlockPos(state, blockPos, nBlockSize + 8, nHeight, pblock->GetBlockTime(), dbp != nullptr))
             return error("AcceptBlock(): FindBlockPos failed");
-        if (dbp == NULL)
-            if (!WriteBlockToDisk(block, blockPos, chainparams.MessageStart()))
+        if (dbp == nullptr)
+            if (!WriteBlockToDisk(*pblock, blockPos, chainparams.MessageStart()))
                 AbortNode(state, "Failed to write block");
-        if (!ReceivedBlockTransactions(block, state, pindex, blockPos))
+        if (!ReceivedBlockTransactions(*pblock, state, pindex, blockPos))
             return error("AcceptBlock(): ReceivedBlockTransactions failed");
     }
     catch (const std::runtime_error &e)
@@ -3803,8 +3803,8 @@ bool ProcessNewBlock(CValidationState &state,
         }
 
         // Store to disk
-        CBlockIndex *pindex = NULL;
-        bool ret = AcceptBlock(*pblock, state, chainparams, &pindex, fRequested, dbp);
+        CBlockIndex *pindex = nullptr;
+        bool ret = AcceptBlock(pblock, state, chainparams, &pindex, fRequested, dbp);
         if (pindex && pfrom)
         {
             mapBlockSource[pindex->GetBlockHash()] = pfrom->GetId();
