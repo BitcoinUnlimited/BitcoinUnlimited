@@ -136,10 +136,11 @@ void CBlockIndex::BuildSkip()
  * on e.g. block size in the UAHF case.
  *
  * The following helper will check if a given block belongs to 4 different intervals, namely:
- * - [x,+inf)
- * - [x,x]
- * - [x-1,+inf)
- * - [x-1,x-1]
+ *
+ * - forkActivated: [x,+inf)
+ * - forkActivateNow: [x,x]
+ * - forkActiveOnNextBlock: [x-1,+inf)
+ * - forkAtNextBlock: [x-1,x-1]
  */
 
 /** return true for every block from fork block and forward [x,+inf)
@@ -180,9 +181,9 @@ bool CBlockIndex::IsforkActiveOnNextBlock(int time) const
     return false;
 }
 
-/* return true only if 1st condition is true (Median past time > UAHF time)
+/* return true only if 1st condition is true (Median past time >= fork time)
  * and not the 2nd, i.e. we are at precisely [x-1,x-1]
- * state: fork enabled but not activateda */
+ * state: fork enabled but not activated */
 bool CBlockIndex::forkAtNextBlock(int time) const
 {
     if (time == 0)
