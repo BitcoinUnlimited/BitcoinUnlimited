@@ -42,7 +42,7 @@ the rules activated Nov 13th 2017 protocol upgrade.
 Main Changes
 ------------
 
-- May 15th 2018 protocol upgrade, at the median time past (MTP) time of 1526400000 (Tue May 15 12:00:00 UTC, 2018) this new features will introduced:
+- May 15th 2018 protocol upgrade, at the median time past (MTP) time of 1526400000 (Tue May 15 16:00:00 UTC, 2018) this new features will introduced:
 	- OP_RETURN data carrier size increases to 220 bytes
 	- Increase the maximum blocksize (EB) to 32,000,000 bytes
 	- Re-activate the following opcodes: OP_CAT, OP_AND, OP_OR, OP_XOR, OP_DIV, OP_MOD
@@ -211,7 +211,6 @@ Thanks to everyone who directly contributed to this release:
 - awemany
 - Justaphf
 - Peter Tschipper
-- Pieter Wuille
 - Samuel Kwok
 - Tom Harding
 
@@ -230,3 +229,4 @@ Following all the indirect contributors whose work has been imported via the abo
 - Jason B. Cox
 - John Newbery
 - joshuayabut
+- Pieter Wuille
