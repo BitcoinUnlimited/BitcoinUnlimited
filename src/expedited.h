@@ -26,7 +26,7 @@ extern bool CheckAndRequestExpeditedBlocks(CNode *pfrom);
 
 // be an expedited block source and if so, request them.
 extern void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *skip = NULL);
-extern void SendExpeditedBlock(const CBlock &block, const CNode *skip = NULL);
+extern void SendExpeditedBlock(const CBlockRef pblock, const CNode *skip = nullptr);
 extern bool HandleExpeditedRequest(CDataStream &vRecv, CNode *pfrom);
 
 // process incoming unsolicited block

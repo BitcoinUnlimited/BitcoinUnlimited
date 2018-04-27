@@ -146,12 +146,12 @@ void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode 
     }
 }
 
-void SendExpeditedBlock(const CBlock &block, const CNode *skip)
+void SendExpeditedBlock(const CBlockRef pblock, const CNode *skip)
 {
     LOCK(connmgr->cs_expedited);
-    if (!IsRecentlyExpeditedAndStore(block.GetHash()))
+    if (!IsRecentlyExpeditedAndStore(pblock->GetHash()))
     {
-        CXThinBlock thinBlock(block);
+        CXThinBlock thinBlock(*pblock);
         ActuallySendExpreditedBlock(thinBlock, 0, skip);
     }
     // else, nothing to do

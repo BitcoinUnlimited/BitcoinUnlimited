@@ -3778,7 +3778,7 @@ bool ProcessNewBlock(CValidationState &state,
         return error("%s: CheckBlockHeader FAILED", __func__);
     }
     if (IsChainNearlySyncd() && !fImporting && !fReindex)
-        SendExpeditedBlock(*pblock, pfrom);
+        SendExpeditedBlock(pblock, pfrom);
 
     bool checked = CheckBlock(*pblock, state);
     if (!checked)
@@ -6367,7 +6367,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         {
             CValidationState state;
             if (CheckBlockHeader(*pblock, state, true)) // block header is fine
-                SendExpeditedBlock(*pblock, pfrom);
+                SendExpeditedBlock(pblock, pfrom);
         }
 
         // Message consistency checking
