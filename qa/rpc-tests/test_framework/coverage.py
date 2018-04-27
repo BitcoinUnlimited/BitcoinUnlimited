@@ -59,6 +59,9 @@ class AuthServiceProxyWrapper(object):
     def url(self):
         return self.auth_service_proxy_instance.url
 
+    @property
+    def miningCapable(self):
+        return self.auth_service_proxy_instance.miningCapable
 
 def get_filename(dirname, n_node):
     """
