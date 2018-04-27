@@ -57,6 +57,7 @@ BITCOIN_TESTS =\
   test/cashaddrenc_tests.cpp \
   test/coins_tests.cpp \
   test/compress_tests.cpp \
+  test/core_io_tests.cpp \
   test/crypto_tests.cpp \
   test/DoS_tests.cpp \
   test/exploit_tests.cpp \
