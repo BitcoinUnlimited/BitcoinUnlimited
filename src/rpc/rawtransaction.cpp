@@ -904,14 +904,16 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
 
 UniValue sendrawtransaction(const UniValue &params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)
+    if (fHelp || params.size() < 1 || params.size() > 3)
         throw runtime_error(
-            "sendrawtransaction \"hexstring\" ( allowhighfees )\n"
+            "sendrawtransaction \"hexstring\" ( allowhighfees, allownonstandard )\n"
             "\nSubmits raw transaction (serialized, hex-encoded) to local node and network.\n"
             "\nAlso see createrawtransaction and signrawtransaction calls.\n"
             "\nArguments:\n"
             "1. \"hexstring\"    (string, required) The hex string of the raw transaction)\n"
             "2. allowhighfees    (boolean, optional, default=false) Allow high fees\n"
+            "3. allownonstandard (string 'standard', 'nonstandard', 'default', optional, default='default')\n"
+            "                    Force standard or nonstandard transaction check\n"
             "\nResult:\n"
             "\"hex\"             (string) The transaction hash in hex\n"
             "\nExamples:\n"
@@ -923,7 +925,7 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
             "\nAs a json rpc call\n" + HelpExampleRpc("sendrawtransaction", "\"signedhex\""));
 
     LOCK(cs_main);
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VBOOL));
+    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VBOOL)(UniValue::VSTR));
 
     // parse hex string from parameter
     CTransaction tx;
@@ -932,8 +934,20 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
     uint256 hashTx = tx.GetHash();
 
     bool fOverrideFees = false;
+    TransactionClass txClass = TransactionClass::DEFAULT;
+
+    // 2nd parameter allows high fees
     if (params.size() > 1)
+    {
         fOverrideFees = params[1].get_bool();
+    }
+    // 3rd parameter must be the transaction class
+    if (params.size() > 2)
+    {
+        txClass = ParseTransactionClass(params[2].get_str());
+        if (txClass == TransactionClass::INVALID)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid transaction class");
+    }
 
     CCoinsViewCache &view = *pcoinsTip;
     bool fHaveChain = false;
@@ -948,7 +962,7 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
         // push to local node and sync with wallets
         CValidationState state;
         bool fMissingInputs;
-        if (!AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, false, !fOverrideFees))
+        if (!AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, false, !fOverrideFees, txClass))
         {
             if (state.IsInvalid())
             {

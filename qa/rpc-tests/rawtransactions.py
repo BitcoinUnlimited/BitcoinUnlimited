@@ -11,6 +11,7 @@
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
+from test_framework.blocktools import *
 
 # Create one-input, one-output, no-fee transaction:
 class RawTransactionsTest(BitcoinTestFramework):
@@ -63,7 +64,6 @@ class RawTransactionsTest(BitcoinTestFramework):
             assert("Missing inputs" in e.error['message'])
         else:
             assert(False)
-
 
         #########################
         # RAW TX MULTISIG TESTS #
@@ -137,6 +137,96 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.sync_all()
         assert_equal(self.nodes[0].getbalance(), bal+Decimal('50.00000000')+Decimal('2.19000000')) #block reward + tx
 
+        #########################################
+        # standard/nonstandard sendrawtransaction
+        #########################################
+
+        wallet = self.nodes[0].listunspent()
+        wallet.sort(key=lambda x: x["amount"], reverse=False)
+        utxo = wallet.pop()
+        amt = utxo["amount"]
+        addr = self.nodes[0].getaddressforms(self.nodes[0].getnewaddress())["legacy"]
+        outp = {addr: amt-decimal.Decimal(.0001)}  # give some fee
+        txn = createrawtransaction([utxo], outp, createWastefulOutput)  # create a nonstandard tx
+        signedtxn = self.nodes[0].signrawtransaction(txn)
+        mempool = self.nodes[0].getmempoolinfo()
+        try:
+            self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "STANDARD")
+            assert 0 # should have failed because I'm insisting on a standard tx
+        except JSONRPCException as e:
+            assert(e.error["code"] == -26)
+
+        try:
+            self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "standard")
+            assert 0 # should have failed, check case insensitivity
+        except JSONRPCException as e:
+            assert(e.error["code"] == -26)
+
+        ret = self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "NONstandard")
+        assert(len(ret) == 64)  # should succeed and return a txid
+
+        ret2 = self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "default")
+        assert ret == ret2  # I'm sending the same tx so it should work with the same result
+
+        mempool2 = self.nodes[0].getmempoolinfo()
+        assert mempool["size"] + 1 == mempool2["size"]  # one tx should have been added to the mempool
+
+        self.nodes[0].generate(1)  # clean it up
+        mempool3 = self.nodes[0].getmempoolinfo()
+        assert mempool3["size"] == 0  # Check that the nonstandard tx in the mempool got mined
+
+        # Now try it as if we were on mainnet (rejecting nonstandard transactions)
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+        self.nodes = start_nodes(3, self.options.tmpdir, [ ["--acceptnonstdtxn=0"], [], [], []])
+        connect_nodes_bi(self.nodes,0,1)
+        connect_nodes_bi(self.nodes,1,2)
+        connect_nodes_bi(self.nodes,0,2)
+
+        wallet = self.nodes[0].listunspent()
+        wallet.sort(key=lambda x: x["amount"], reverse=False)
+        utxo = wallet.pop()
+        amt = utxo["amount"]
+        addr = self.nodes[0].getaddressforms(self.nodes[0].getnewaddress())["legacy"]
+        outp = {addr: amt-decimal.Decimal(.0001)}  # give some fee
+        txn = createrawtransaction([utxo], outp, createWastefulOutput)  # create a nonstandard tx
+        signedtxn = self.nodes[0].signrawtransaction(txn)
+        mempool = self.nodes[0].getmempoolinfo()
+        try:
+            self.nodes[0].sendrawtransaction(signedtxn["hex"])
+            assert 0 # should have failed because I'm insisting on a standard tx
+        except JSONRPCException as e:
+            assert(e.error["code"] == -26)
+        try:
+            self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "STANDARD")
+            assert 0 # should have failed because I'm insisting on a standard tx
+        except JSONRPCException as e:
+            assert(e.error["code"] == -26)
+        try:
+            self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "default")
+            assert 0 # should have failed because I'm insisting on a standard tx
+        except JSONRPCException as e:
+            assert(e.error["code"] == -26)
+
+        ret = self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "nonstandard")
+        assert(len(ret) == 64)  # should succeed and return a txid
+        mempool2 = self.nodes[0].getmempoolinfo()
+        assert mempool["size"] + 1 == mempool2["size"]  # one tx should have been added to the mempool
+
+        self.nodes[0].generate(1)  # clean it up
+        mempool3 = self.nodes[0].getmempoolinfo()
+        assert mempool3["size"] == 0  # Check that the nonstandard tx in the mempool got mined
+
+        # finally, let's make sure that a standard tx works with the standard flag set
+        utxo = wallet.pop()
+        amt = utxo["amount"]
+        addr = self.nodes[0].getaddressforms(self.nodes[0].getnewaddress())["legacy"]
+        outp = {addr: amt-decimal.Decimal(.0001)}  # give some fee
+        txn = createrawtransaction([utxo], outp, p2pkh)  # create a standard tx
+        signedtxn = self.nodes[0].signrawtransaction(txn)
+        txid = self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "STANDARD")
+        assert(len(txid) == 64)
+
 if __name__ == '__main__':
     RawTransactionsTest().main()
 
@@ -147,4 +237,11 @@ def Test():
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],  # "lck"
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
-    t.main(["--tmpdir=/ramdisk/test","--nocleanup","--noshutdown"], bitcoinConf, None)  # , "--tracerpc"])
+
+    flags = []
+    # you may want these additional flags:
+    # "--srcdir=<out-of-source-build-dir>/debug/src"
+    # "--nocleanup", "--noshutdown"
+    if os.path.isdir("/ramdisk/test"):  # execution is much faster if a ramdisk is used
+        flags.append("--tmpdir=/ramdisk/test")
+    t.main(flags, bitcoinConf, None)
