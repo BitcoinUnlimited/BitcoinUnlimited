@@ -13,7 +13,7 @@
 #include "serialize.h"
 #include "streams.h"
 #include "test/test_bitcoin.h"
-#include "test_random.h"
+#include "test/test_random.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "version.h"
