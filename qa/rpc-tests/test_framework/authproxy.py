@@ -70,12 +70,13 @@ class AuthServiceProxy(object):
     __id_count = 0
 
     # ensure_ascii: escape unicode as \uXXXX, passed to json.dumps
-    def __init__(self, service_url, service_name=None, timeout=HTTP_TIMEOUT, connection=None, ensure_ascii=True):
+    def __init__(self, service_url, service_name=None, timeout=HTTP_TIMEOUT, connection=None, ensure_ascii=True, miningCapable=None):
         self.__timeout = timeout
         self.__service_url = service_url
         self._service_name = service_name
         self.ensure_ascii = ensure_ascii # can be toggled on the fly by tests
         self.__url = urlparse.urlparse(service_url)
+        self.miningCapable = miningCapable
         if self.__url.port is None:
             port = 80
         else:
