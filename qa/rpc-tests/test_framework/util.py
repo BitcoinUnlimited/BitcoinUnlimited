@@ -31,6 +31,8 @@ import logging
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
+# Constants for floweethehub (see floweeconst.py)
+from .floweeconst import *
 
 COVERAGE_DIR = None
 
@@ -47,14 +49,6 @@ PORT_MIN = 11000
 PORT_RANGE = 5000
 
 BITCOIND_PROC_WAIT_TIMEOUT = 60
-
-# Const for Floweethehub integration
-FLOWEE_CONF = "flowee.conf"  # bitcoin.conf is used by clients
-HUB_LOG = "hub.log"          # debug.log is used by other clients
-BCD_HUB_PATH = "/hub/debug/src/bitcoind"
-NODE_NUM = 3                # node3 is for Hub
-CONF_IN_CACHE = "cache/node" + str(NODE_NUM) + "/" + FLOWEE_CONF
-FILTER_PARAM_KEYS = ['usecashaddr', 'maxlimitertxfee', 'debug']
 
 class PortSeed:
     # Must be initialized with a unique integer for each process
@@ -91,7 +85,7 @@ def enable_coverage(dirname):
     COVERAGE_DIR = dirname
 
 
-def get_rpc_proxy(url, node_number, timeout=None):
+def get_rpc_proxy(url, node_number, timeout=None, miningCapable=True):
     """
     Args:
         url (str): URL of the RPC server to call
@@ -99,6 +93,7 @@ def get_rpc_proxy(url, node_number, timeout=None):
 
     Kwargs:
         timeout (int): HTTP timeout in seconds
+        miningCapable (bool): mining Capability (all client are True, except Floweethehub or "hub")
 
     Returns:
         AuthServiceProxy. convenience object for making RPC calls.
@@ -107,6 +102,10 @@ def get_rpc_proxy(url, node_number, timeout=None):
     proxy_kwargs = {}
     if timeout is not None:
         proxy_kwargs['timeout'] = timeout
+    if miningCapable is not None:
+        if hub_is_running(node_number):  # node 3
+            miningCapable = False
+        proxy_kwargs['miningCapable'] = miningCapable
 
     proxy = AuthServiceProxy(url, **proxy_kwargs)
     proxy.url = url  # store URL on proxy for info
@@ -155,6 +154,14 @@ def sync_blocks(rpc_connections, wait=1,verbose=1):
             break
         time.sleep(wait)
 
+def hub_is_running(node_num):
+    """
+    Check if hub is running
+    INPUT:
+        node_num : node number of the self.bins
+    """
+    return node_num == NODE_NUM and os.path.isfile(os.path.join(os.getcwd(), CONF_IN_CACHE))
+
 def sync_mempools(rpc_connections, wait=1,verbose=1):
     """
     Wait until everybody has the same transactions in their memory
@@ -179,14 +186,16 @@ def sync_mempools(rpc_connections, wait=1,verbose=1):
 
 def filterUnsupportedParams(defaults, param_keys=FILTER_PARAM_KEYS):
     """
-    Method to filter out the unrecoginized parameters by setting NoConfiValue 
+    Method to filter out the unrecognized parameters by setting NoConfigValue
     obj as the value of the parameter as key of the dict. 
+    Input:
+        defaults : default list containing unrecognized parameter(s)
+        param_keys : parameter(s) to be removed from the default list
     """
-    file = FLOWEE_CONF   #see SettingsDefaults.h
     removeParams = {}
     removeParams = {el:NoConfigValue() for el in param_keys}
     defaults.update(removeParams)
-    return file, defaults
+    return defaults
 
 bitcoind_processes = {}
 
@@ -203,10 +212,12 @@ def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None)
     file = "bitcoin.conf"
     if bins:
         if BCD_HUB_PATH in bins[n]:
-            file, defaults = filterUnsupportedParams(defaults)
+            defaults = filterUnsupportedParams(defaults)
+            file = BITCOIN_CONF
     else:
-        if n == NODE_NUM and os.path.isfile(os.path.join(os.getcwd(), CONF_IN_CACHE)):
-            file, defaults = filterUnsupportedParams(defaults)
+        if hub_is_running(n):
+            defaults = filterUnsupportedParams(defaults)
+            file = BITCOIN_CONF
 
     with open(os.path.join(datadir, file), 'w') as f:
         for (key,val) in defaults.items():
@@ -298,16 +309,13 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
         block_time = get_mocktime() - (201 * 10 * 60)
         for i in range(2):
             for peer in range(4):
-                for j in range(25):
-                    set_node_times(rpcs, block_time)
-                    try:
+                if rpcs[peer].miningCapable:   # if generate needs two parameters, then skip calling generate(1)
+                    for j in range(25):
+                        set_node_times(rpcs, block_time)
                         rpcs[peer].generate(1)
-                    except Exception as e:
-                        #print(e)
-                        pass
-                    block_time += 10*60
-                # Must sync before next peer starts generating blocks
-                sync_blocks(rpcs)
+                        block_time += 10*60
+                    # Must sync before next peer starts generating blocks
+                    sync_blocks(rpcs)
 
         # Shut them down, and clean up cache directories:
         stop_nodes(rpcs)
@@ -376,7 +384,6 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
     if os.getenv("PYTHON_DEBUG", ""):
         print("start_node: RPC succesfully started")
     proxy = get_rpc_proxy(url, i, timeout=timewait)
-
     if COVERAGE_DIR:
         coverage.write_all_rpc_commands(COVERAGE_DIR, proxy)
 
