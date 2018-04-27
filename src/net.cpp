@@ -8,6 +8,10 @@
 #include "config/bitcoin-config.h"
 #endif
 
+// must include first to ensure FD_SETSIZE is correctly set
+// otherwise the default of 64 may be used on Windows
+#include "compat.h"
+
 #include "net.h"
 
 #include "addrman.h"
