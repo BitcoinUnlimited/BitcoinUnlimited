@@ -6844,6 +6844,9 @@ bool SendMessages(CNode *pto)
 {
     const Consensus::Params &consensusParams = Params().GetConsensus();
     {
+        // First set fDisconnect if appropriate.
+        pto->DisconnectIfBanned();
+
         // Check for an internal disconnect request and if true then set fDisconnect. This would typically happen
         // during initial sync when a peer has a slow connection and we want to disconnect them.  We want to then
         // wait for any blocks that are still in flight before disconnecting, rather than re-requesting them again.
@@ -6858,9 +6861,6 @@ bool SendMessages(CNode *pto)
                 LOG(IBD, "peer=%d, disconnected\n", nodeid);
             }
         }
-
-        // First set fDisconnect if appropriate.
-        pto->DisconnectIfBanned();
 
         // Now exit early if disconnecting or the version handshake is not complete.  We must not send PING or other
         // connection maintenance messages before the handshake is done.
