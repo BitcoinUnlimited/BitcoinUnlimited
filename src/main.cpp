@@ -6933,7 +6933,7 @@ bool SendMessages(CNode *pto)
 
         // Check for block download timeout and disconnect node if necessary. Does not require cs_main.
         int64_t nNow = GetTimeMicros();
-        requester.CheckForDownloadTimeout(pto, consensusParams, nNow);
+        requester.DisconnectOnDownloadTimeout(pto, consensusParams, nNow);
 
         TRY_LOCK(cs_main, lockMain); // Acquire cs_main for IsInitialBlockDownload() and CNodeState()
         if (!lockMain)

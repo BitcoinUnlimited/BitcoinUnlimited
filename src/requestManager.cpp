@@ -1251,7 +1251,7 @@ int CRequestManager::GetNumBlocksInFlight(NodeId nodeid)
     return mapRequestManagerNodeState[nodeid].nBlocksInFlight;
 }
 
-void CRequestManager::CheckForDownloadTimeout(CNode *pnode, const Consensus::Params &consensusParams, int64_t nNow)
+void CRequestManager::DisconnectOnDownloadTimeout(CNode *pnode, const Consensus::Params &consensusParams, int64_t nNow)
 {
     // In case there is a block that has been in flight from this peer for 2 + 0.5 * N times the block interval
     // (with N the number of peers from which we're downloading validated blocks), disconnect due to timeout.
