@@ -1099,7 +1099,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
             // Get the average value for overall average response time (s) of all nodes.
             {
                 LOCK(cs_overallaverage);
-                int nOverallRange = blockRange * nMaxOutConnections;
+                uint32_t nOverallRange = blockRange * nMaxOutConnections;
                 if (nIterations <= nOverallRange)
                     nIterations++;
                 if (nIterations > nOverallRange)
