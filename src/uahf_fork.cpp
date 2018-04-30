@@ -64,7 +64,7 @@ bool IsTxProbablyNewSigHash(const CTransaction &tx)
 
 bool IsTxUAHFOnly(const CTxMemPoolEntry &txentry)
 {
-    if (txentry.sighashType & SIGHASH_FORKID)
+    if ((txentry.sighashType & SIGHASH_FORKID)||(txentry.sighashType == 0))
     {
         // LOGA("txn is UAHF-specific\n");
         return true;
