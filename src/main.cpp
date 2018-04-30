@@ -264,17 +264,20 @@ void FinalizeNode(NodeId nodeid)
     if (state->fSyncStarted)
         nSyncStarted--;
 
-    for (const QueuedBlock &entry : state->vBlocksInFlight)
+    std::vector<uint256> vBlocksInFlight;
+    requester.GetBlocksInFlight(vBlocksInFlight, nodeid);
+    for (const uint256 &hash : vBlocksInFlight)
     {
-        LOGA("erasing map mapblocksinflight entries\n");
-        requester.MapBlocksInFlightErase(entry.hash);
+        // Erase mapblocksinflight entries for this node.
+        requester.MapBlocksInFlightErase(hash, nodeid);
 
         // Reset all requests times to zero so that we can immediately re-request these blocks
-        requester.ResetLastRequestTime(entry.hash);
+        requester.ResetLastRequestTime(hash);
     }
     nPreferredDownload -= state->fPreferredDownload;
 
     mapNodeState.erase(nodeid);
+    requester.RemoveNodeState(nodeid);
     if (mapNodeState.empty())
     {
         // Do a consistency check after the last peer is removed.  Force consistent state if production code
@@ -314,10 +317,13 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)
     stats.nMisbehavior = node->nMisbehavior;
     stats.nSyncHeight = state->pindexBestKnownBlock ? state->pindexBestKnownBlock->nHeight : -1;
     stats.nCommonHeight = state->pindexLastCommonBlock ? state->pindexLastCommonBlock->nHeight : -1;
-    for (const QueuedBlock &queue : state->vBlocksInFlight)
+
+    std::vector<uint256> vBlocksInFlight;
+    requester.GetBlocksInFlight(vBlocksInFlight, nodeid);
+    for (const uint256 &hash : vBlocksInFlight)
     {
         // lookup block by hash to find height
-        BlockMap::iterator mi = mapBlockIndex.find(queue.hash);
+        BlockMap::iterator mi = mapBlockIndex.find(hash);
         if (mi != mapBlockIndex.end())
         {
             CBlockIndex *pindex = (*mi).second;
@@ -6910,6 +6916,10 @@ bool SendMessages(CNode *pto)
             }
         }
 
+        // Check for block download timeout and disconnect node if necessary. Does not require cs_main.
+        int64_t nNow = GetTimeMicros();
+        requester.CheckForDownloadTimeout(pto, consensusParams, nNow);
+
         TRY_LOCK(cs_main, lockMain); // Acquire cs_main for IsInitialBlockDownload() and CNodeState()
         if (!lockMain)
         {
@@ -6924,7 +6934,6 @@ bool SendMessages(CNode *pto)
         }
 
         // Address refresh broadcast
-        int64_t nNow = GetTimeMicros();
         if (!IsInitialBlockDownload() && pto->nNextLocalAddrSend < nNow)
         {
             AdvertiseLocal(pto);
@@ -7241,39 +7250,9 @@ bool SendMessages(CNode *pto)
             }
         }
 
-
-        // Check for block download timeout and disconnect node if necessary
-        requester.CheckForDownloadTimeout(pto, state, consensusParams, nNow);
-
-
-        //
-        // Message: getdata (blocks)
-        //
-        if (!pto->fDisconnect && !pto->fClient && state.nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
-        {
-            std::vector<CBlockIndex *> vToDownload;
-            requester.FindNextBlocksToDownload(
-                pto->GetId(), pto->nMaxBlocksInTransit.load() - state.nBlocksInFlight, vToDownload);
-            // LOG(REQ, "IBD AskFor %d blocks from peer=%s\n", vToDownload.size(), pto->GetLogName());
-            std::vector<CInv> vGetBlocks;
-            for (CBlockIndex *pindex : vToDownload)
-            {
-                CInv inv(MSG_BLOCK, pindex->GetBlockHash());
-                if (!AlreadyHave(inv))
-                {
-                    vGetBlocks.emplace_back(inv);
-                    // LOG(REQ, "AskFor block %s (%d) peer=%s\n", pindex->GetBlockHash().ToString(),
-                    //     pindex->nHeight, pto->GetLogName());
-                }
-            }
-            if (!vGetBlocks.empty())
-            {
-                if (!IsInitialBlockDownload())
-                    requester.AskFor(vGetBlocks, pto);
-                else
-                    requester.AskForDuringIBD(vGetBlocks, pto);
-            }
-        }
+        // Request the next blocks. Mostly this will get exucuted during IBD but sometimes even
+        // when the chain is syncd a block will get request via this method.
+        requester.RequestNextBlocksToDownload(pto);
     }
     return true;
 }

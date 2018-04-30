@@ -92,6 +92,27 @@ public:
     bool AddSource(CNode *from); // returns true if the source did not already exist
 };
 
+// The following structs are used for tracking the internal requestmanager nodestate.
+struct QueuedBlock
+{
+    uint256 hash;
+    int64_t nTime; //! Time of "getdata" request in microseconds.
+};
+struct CRequestManagerNodeState
+{
+    // An ordered list of blocks currently in flight.  We could use mapBlocksInFlight to get the same
+    // data but then we'd have to iterate through the entire map to find what we're looking for.
+    std::list<QueuedBlock> vBlocksInFlight;
+
+    // When the first entry in vBlocksInFlight started downloading. Don't care when vBlocksInFlight is empty.
+    int64_t nDownloadingSince;
+
+    // How many blocks are currently in flight and requested by this node.
+    int nBlocksInFlight;
+
+    CRequestManagerNodeState();
+};
+
 class CRequestManager
 {
 protected:
@@ -106,7 +127,8 @@ protected:
     typedef std::map<uint256, CUnknownObj> OdMap;
     OdMap mapTxnInfo;
     OdMap mapBlkInfo;
-    std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
+    std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
+    std::map<NodeId, CRequestManagerNodeState> mapRequestManagerNodeState;
     CCriticalSection cs_objDownloader; // protects mapTxnInfo, mapBlkInfo and mapBlocksInFlight
 
     OdMap::iterator sendIter;
@@ -166,41 +188,34 @@ public:
     // Update tracking information about which blocks a peer is assumed to have.
     void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash);
 
-    // Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
-    // at most count entries.
+    // Request the next blocks. Mostly this will get exucuted during IBD but sometimes even
+    // when the chain is syncd a block will get request via this method.
+    void RequestNextBlocksToDownload(CNode *pto);
+
+    // This gets called from RequestNextBlocksToDownload
     void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex *> &vBlocks);
 
     // Returns a bool indicating whether we requested this block.
-    void MarkBlockAsInFlight(NodeId nodeid,
-        const uint256 &hash,
-        const Consensus::Params &consensusParams,
-        CBlockIndex *pindex = nullptr);
+    void MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash);
 
     // Returns a bool if successful in indicating we received this block.
     bool MarkBlockAsReceived(const uint256 &hash, CNode *pnode);
 
     // Methods for handling mapBlocksInFlight which is protected.
-    void MapBlocksInFlightErase(const uint256 &hash)
+    void MapBlocksInFlightErase(const uint256 &hash, NodeId nodeid);
+    bool MapBlocksInFlightEmpty();
+    void MapBlocksInFlightClear();
+    void GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, NodeId nodeid);
+
+    // Remove a request manager node from the nodestate map.
+    void RemoveNodeState(NodeId nodeid)
     {
         LOCK(cs_objDownloader);
-        mapBlocksInFlight.erase(hash);
-    }
-    bool MapBlocksInFlightEmpty()
-    {
-        LOCK(cs_objDownloader);
-        return mapBlocksInFlight.empty();
-    }
-    void MapBlocksInFlightClear()
-    {
-        LOCK(cs_objDownloader);
-        mapBlocksInFlight.clear();
+        mapRequestManagerNodeState.erase(nodeid);
     }
 
     // Check for block download timeout and disconnect node if necessary.
-    void CheckForDownloadTimeout(CNode *pnode,
-        const CNodeState &state,
-        const Consensus::Params &consensusParams,
-        int64_t nNow);
+    void CheckForDownloadTimeout(CNode *pnode, const Consensus::Params &consensusParams, int64_t nNow);
 };
 
 
