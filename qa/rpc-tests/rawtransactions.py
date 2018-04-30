@@ -165,6 +165,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         ret = self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "NONstandard")
         assert(len(ret) == 64)  # should succeed and return a txid
 
+        # In regtest mode, nonstandard transactions are allowed by default
         ret2 = self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "default")
         assert ret == ret2  # I'm sending the same tx so it should work with the same result
 
@@ -178,6 +179,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         # Now try it as if we were on mainnet (rejecting nonstandard transactions)
         stop_nodes(self.nodes)
         wait_bitcoinds()
+        # restart the node with a flag that forces the behavior to be more like mainnet -- don't accept nonstandard tx
         self.nodes = start_nodes(3, self.options.tmpdir, [ ["--acceptnonstdtxn=0"], [], [], []])
         connect_nodes_bi(self.nodes,0,1)
         connect_nodes_bi(self.nodes,1,2)
@@ -196,17 +198,26 @@ class RawTransactionsTest(BitcoinTestFramework):
             self.nodes[0].sendrawtransaction(signedtxn["hex"])
             assert 0 # should have failed because I'm insisting on a standard tx
         except JSONRPCException as e:
-            assert(e.error["code"] == -26)
+            assert e.error["code"] == -26
         try:
             self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "STANDARD")
             assert 0 # should have failed because I'm insisting on a standard tx
         except JSONRPCException as e:
-            assert(e.error["code"] == -26)
+            assert e.error["code"] == -26
         try:
             self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "default")
-            assert 0 # should have failed because I'm insisting on a standard tx
+            assert 0 # should have failed because I'm insisting on a standard tx via the --acceptnonstdtxn flag
         except JSONRPCException as e:
-            assert(e.error["code"] == -26)
+            assert e.error["code"] == -26
+
+        try:
+            self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "somebadvalue")
+            assert 0 # should have failed because I'm insisting on a standard tx via the --acceptnonstdtxn flag
+        except JSONRPCException as e:
+            assert e.error["code"] == -8
+            assert e.error["message"] == 'Invalid transaction class'
+        mempool4 = self.nodes[0].getmempoolinfo()
+        assert mempool["size"] == mempool4["size"]  # all of these failures should have added nothing to mempool
 
         ret = self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "nonstandard")
         assert(len(ret) == 64)  # should succeed and return a txid
