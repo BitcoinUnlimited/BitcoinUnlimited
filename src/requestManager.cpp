@@ -1173,13 +1173,11 @@ void CRequestManager::MapBlocksInFlightErase(const uint256 &hash, NodeId nodeid)
     // If there are more than one block in flight for the same block hash then we only remove
     // the entry for this particular node, otherwise entirely remove the hash from mapBlocksInFlight.
     LOCK(cs_objDownloader);
-    if (mapBlocksInFlight.count(hash) && mapBlocksInFlight[hash].size() > 1)
+    std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> >::iterator itHash =
+        mapBlocksInFlight.find(hash);
+    if (itHash != mapBlocksInFlight.end())
     {
-        mapBlocksInFlight[hash].erase(nodeid);
-    }
-    else
-    {
-        mapBlocksInFlight.erase(hash);
+        itHash->second.erase(nodeid);
     }
 }
 
