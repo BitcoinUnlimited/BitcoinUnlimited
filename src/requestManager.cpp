@@ -1068,8 +1068,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         return false;
 
     // Lookup this block for this nodeid and if we have one in flight then mark it as received.
-    std::map<NodeId, std::list<QueuedBlock>::iterator>::iterator itInFlight =
-        itHash->second.find(nodeid);
+    std::map<NodeId, std::list<QueuedBlock>::iterator>::iterator itInFlight = itHash->second.find(nodeid);
     if (itInFlight != itHash->second.end())
     {
         // Get a request manager nodestate pointer.
@@ -1159,9 +1158,12 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
             // First block on the queue was received, update the start download time for the next one
             state->nDownloadingSince = std::max(state->nDownloadingSince, GetTimeMicros());
         }
-        state->vBlocksInFlight.erase(itInFlight->second);
+        // In order to prevent a dangling iterator we must erase from vBlocksInFlight after mapBlockInFlight
+        // however that will invalidate the iterator held by mapBlocksInFlight. Use a temporary to work around this.
+        std::list<QueuedBlock>::iterator tmp = itInFlight->second;
         state->nBlocksInFlight--;
         MapBlocksInFlightErase(hash, nodeid);
+        state->vBlocksInFlight.erase(tmp);
 
         return true;
     }
