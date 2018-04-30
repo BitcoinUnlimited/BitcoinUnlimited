@@ -1029,7 +1029,7 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash)
     LOCK(cs_objDownloader);
     std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
         mapBlocksInFlight.find(hash);
-    if (itInFlight == mapBlocksInFlight.end() || !mapBlocksInFlight[hash].count(nodeid))
+    if (itInFlight == mapBlocksInFlight.end() || !itInFlight->second.count(nodeid))
     {
         // Get a request manager nodestate pointer.
         std::map<NodeId, CRequestManagerNodeState>::iterator it = mapRequestManagerNodeState.find(nodeid);
@@ -1060,16 +1060,24 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
 
     LOCK(cs_objDownloader);
     NodeId nodeid = pnode->GetId();
-    std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
+
+    // Check if we have any block in flight, for this hash, that we asked for.
+    std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> >::iterator itHash =
         mapBlocksInFlight.find(hash);
-    if (itInFlight != mapBlocksInFlight.end() && mapBlocksInFlight[hash].count(nodeid))
+    if (itHash == mapBlocksInFlight.end())
+        return false;
+
+    // Lookup this block for this nodeid and if we have one in flight then mark it as received.
+    std::map<NodeId, std::list<QueuedBlock>::iterator>::iterator itInFlight =
+        itHash->second.find(nodeid);
+    if (itInFlight != itHash->second.end())
     {
         // Get a request manager nodestate pointer.
         std::map<NodeId, CRequestManagerNodeState>::iterator it = mapRequestManagerNodeState.find(nodeid);
         DbgAssert(it != mapRequestManagerNodeState.end(), return false);
         CRequestManagerNodeState *state = &it->second;
 
-        int64_t getdataTime = mapBlocksInFlight[hash][nodeid]->nTime;
+        int64_t getdataTime = itInFlight->second->nTime;
         int64_t now = GetTimeMicros();
         double nResponseTime = (double)(now - getdataTime) / 1000000.0;
 
@@ -1146,12 +1154,12 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
             }
         }
 
-        if (state->vBlocksInFlight.begin() == mapBlocksInFlight[hash][nodeid])
+        if (state->vBlocksInFlight.begin() == itInFlight->second)
         {
             // First block on the queue was received, update the start download time for the next one
             state->nDownloadingSince = std::max(state->nDownloadingSince, GetTimeMicros());
         }
-        state->vBlocksInFlight.erase(mapBlocksInFlight[hash][nodeid]);
+        state->vBlocksInFlight.erase(itInFlight->second);
         state->nBlocksInFlight--;
         MapBlocksInFlightErase(hash, nodeid);
 
