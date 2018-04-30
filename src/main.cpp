@@ -562,6 +562,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
+    TransactionClass allowedTx,
     std::vector<COutPoint> &vCoinsToUncache)
 {
     unsigned int forkVerifyFlags = 0;
@@ -596,9 +597,15 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             return state.DoS(0, false, REJECT_WRONG_FORK, "wrong-fork");
     }
 
-    // Rather not work on nonstandard transactions (unless -testnet/-regtest)
+    // Reject nonstandard transactions if so configured.
+    // (-testnet/-regtest allow nonstandard, and explicit submission via RPC)
     std::string reason;
     bool fRequireStandard = chainparams.RequireStandard();
+    ;
+    if (allowedTx == TransactionClass::STANDARD)
+        fRequireStandard = true;
+    else if (allowedTx == TransactionClass::NONSTANDARD)
+        fRequireStandard = false;
     if (fRequireStandard && !IsStandardTx(tx, reason))
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
 
@@ -933,17 +940,37 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     return true;
 }
 
+TransactionClass ParseTransactionClass(const std::string &s)
+{
+    std::string low = boost::algorithm::to_lower_copy(s);
+    if (low == "nonstandard")
+    {
+        return TransactionClass::NONSTANDARD;
+    }
+    if (low == "standard")
+    {
+        return TransactionClass::STANDARD;
+    }
+    if (low == "default")
+    {
+        return TransactionClass::DEFAULT;
+    }
+
+    return TransactionClass::INVALID;
+}
+
 bool AcceptToMemoryPool(CTxMemPool &pool,
     CValidationState &state,
     const CTransaction &tx,
     bool fLimitFree,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit,
-    bool fRejectAbsurdFee)
+    bool fRejectAbsurdFee,
+    TransactionClass allowedTx)
 {
     std::vector<COutPoint> vCoinsToUncache;
-    bool res = AcceptToMemoryPoolWorker(
-        pool, state, tx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit, fRejectAbsurdFee, vCoinsToUncache);
+    bool res = AcceptToMemoryPoolWorker(pool, state, tx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit,
+        fRejectAbsurdFee, allowedTx, vCoinsToUncache);
 
     // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
     if (pfMissingInputs && !res && !*pfMissingInputs)

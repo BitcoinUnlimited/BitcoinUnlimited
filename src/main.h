@@ -358,6 +358,18 @@ bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *p
  */
 bool AreFreeTxnsDisallowed();
 
+/** Communicate what class of transaction is acceptable to add to the memory pool
+ */
+enum class TransactionClass
+{
+    INVALID,
+    DEFAULT,
+    STANDARD,
+    NONSTANDARD
+};
+
+TransactionClass ParseTransactionClass(const std::string &s);
+
 /** (try to) add transaction to memory pool **/
 bool AcceptToMemoryPool(CTxMemPool &pool,
     CValidationState &state,
@@ -365,7 +377,8 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     bool fLimitFree,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit = false,
-    bool fRejectAbsurdFee = false);
+    bool fRejectAbsurdFee = false,
+    TransactionClass allowedTx = TransactionClass::DEFAULT);
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);
