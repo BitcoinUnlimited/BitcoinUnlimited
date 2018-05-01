@@ -138,8 +138,10 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction &txn, CTxMemPo
     // Hack to assume either its completely dependent on other mempool txs or not at all
     CAmount inChainValue = hasNoDependencies ? txn.GetValueOut() : 0;
 
-    return CTxMemPoolEntry(
+    CTxMemPoolEntry ret(
         txn, nFee, nTime, dPriority, nHeight, hasNoDependencies, inChainValue, spendsCoinbase, sigOpCount, lp);
+    ret.sighashType = SIGHASH_ALL; // For testing, give the transaction any valid sighashtype
+    return ret;
 }
 
 void Shutdown(void *parg) { exit(0); }
