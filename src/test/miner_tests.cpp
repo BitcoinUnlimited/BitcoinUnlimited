@@ -177,11 +177,11 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey);
         BOOST_CHECK(pblocktemplate);
         BOOST_CHECK(pblocktemplate->block.fExcessive == false);
-        BOOST_CHECK(pblocktemplate->block.nBlockSize <= maxGeneratedBlock);
+        BOOST_CHECK(pblocktemplate->block.GetBlockSize() <= maxGeneratedBlock);
         unsigned int blockSize = ::GetSerializeSize(pblocktemplate->block, SER_NETWORK, CBlock::CURRENT_VERSION);
         BOOST_CHECK(blockSize <= maxGeneratedBlock);
         // printf("%lu %lu <= %lu\n", (long unsigned int) blockSize, (long unsigned int)
-        // pblocktemplate->block.nBlockSize, (long unsigned int) maxGeneratedBlock);
+        // pblocktemplate->block.GetBlockSize(), (long unsigned int) maxGeneratedBlock);
         delete pblocktemplate;
     }
 
@@ -200,12 +200,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey);
         BOOST_CHECK(pblocktemplate);
         BOOST_CHECK(pblocktemplate->block.fExcessive == false);
-        BOOST_CHECK(pblocktemplate->block.nBlockSize <= maxGeneratedBlock - 4);
+        BOOST_CHECK(pblocktemplate->block.GetBlockSize() <= maxGeneratedBlock - 4);
         unsigned int blockSize = ::GetSerializeSize(pblocktemplate->block, SER_NETWORK, CBlock::CURRENT_VERSION);
         BOOST_CHECK(blockSize <= maxGeneratedBlock - 4);
         minRoom = std::min(minRoom, maxGeneratedBlock - blockSize);
         // printf("%lu %lu <= %lu\n", (long unsigned int) blockSize, (long unsigned int)
-        // pblocktemplate->block.nBlockSize, (long unsigned int) maxGeneratedBlock);
+        // pblocktemplate->block.GetBlockSize(), (long unsigned int) maxGeneratedBlock);
         delete pblocktemplate;
     }
 
@@ -229,12 +229,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey);
         BOOST_CHECK(pblocktemplate);
         BOOST_CHECK(pblocktemplate->block.fExcessive == false);
-        BOOST_CHECK(pblocktemplate->block.nBlockSize <= maxGeneratedBlock - 2);
+        BOOST_CHECK(pblocktemplate->block.GetBlockSize() <= maxGeneratedBlock - 2);
         unsigned int blockSize = ::GetSerializeSize(pblocktemplate->block, SER_NETWORK, CBlock::CURRENT_VERSION);
         BOOST_CHECK(blockSize <= maxGeneratedBlock - 2);
         minRoom = std::min(minRoom, maxGeneratedBlock - blockSize);
         // printf("%lu %lu (miner comment is %d) <= %lu\n", (long unsigned int) blockSize, (long unsigned int)
-        // pblocktemplate->block.nBlockSize, i%100, (long unsigned int) maxGeneratedBlock);
+        // pblocktemplate->block.GetBlockSize(), i%100, (long unsigned int) maxGeneratedBlock);
         delete pblocktemplate;
     }
 
