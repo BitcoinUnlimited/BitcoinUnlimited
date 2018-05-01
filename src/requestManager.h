@@ -135,7 +135,6 @@ protected:
     OdMap::iterator sendBlkIter;
 
     int inFlight;
-    // int maxInFlight;
     CStatHistory<int> inFlightTxns;
     CStatHistory<int> receivedTxns;
     CStatHistory<int> rejectedTxns;
@@ -151,6 +150,9 @@ protected:
 
 public:
     CRequestManager();
+
+    // How many outbound nodes are we connected to.
+    std::atomic<int32_t> nOutbound;
 
     // Get this object from somewhere, asynchronously.
     void AskFor(const CInv &obj, CNode *from, unsigned int priority = 0);
@@ -205,7 +207,10 @@ public:
     void MapBlocksInFlightErase(const uint256 &hash, NodeId nodeid);
     bool MapBlocksInFlightEmpty();
     void MapBlocksInFlightClear();
+
+    // Methods for handling mapRequestManagerNodeState which is protected.
     void GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, NodeId nodeid);
+    int GetNumBlocksInFlight(NodeId nodeid);
 
     // Remove a request manager node from the nodestate map.
     void RemoveNodeState(NodeId nodeid)
@@ -215,7 +220,7 @@ public:
     }
 
     // Check for block download timeout and disconnect node if necessary.
-    void CheckForDownloadTimeout(CNode *pnode, const Consensus::Params &consensusParams, int64_t nNow);
+    void DisconnectOnDownloadTimeout(CNode *pnode, const Consensus::Params &consensusParams, int64_t nNow);
 };
 
 

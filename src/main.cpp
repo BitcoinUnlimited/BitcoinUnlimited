@@ -6847,6 +6847,21 @@ bool SendMessages(CNode *pto)
         // First set fDisconnect if appropriate.
         pto->DisconnectIfBanned();
 
+        // Check for an internal disconnect request and if true then set fDisconnect. This would typically happen
+        // during initial sync when a peer has a slow connection and we want to disconnect them.  We want to then
+        // wait for any blocks that are still in flight before disconnecting, rather than re-requesting them again.
+        if (pto->fDisconnectRequest)
+        {
+            NodeId nodeid = pto->GetId();
+            int nInFlight = requester.GetNumBlocksInFlight(nodeid);
+            LOG(IBD, "peer=%d, checking disconnect request with %d in flight blocks\n", nodeid, nInFlight);
+            if (nInFlight == 0)
+            {
+                pto->fDisconnect = true;
+                LOG(IBD, "peer=%d, disconnected\n", nodeid);
+            }
+        }
+
         // Now exit early if disconnecting or the version handshake is not complete.  We must not send PING or other
         // connection maintenance messages before the handshake is done.
         if (pto->fDisconnect || !pto->fSuccessfullyConnected)
@@ -6918,7 +6933,7 @@ bool SendMessages(CNode *pto)
 
         // Check for block download timeout and disconnect node if necessary. Does not require cs_main.
         int64_t nNow = GetTimeMicros();
-        requester.CheckForDownloadTimeout(pto, consensusParams, nNow);
+        requester.DisconnectOnDownloadTimeout(pto, consensusParams, nNow);
 
         TRY_LOCK(cs_main, lockMain); // Acquire cs_main for IsInitialBlockDownload() and CNodeState()
         if (!lockMain)

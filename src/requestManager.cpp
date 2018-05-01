@@ -102,7 +102,7 @@ CRequestManager::CRequestManager()
       blockPacer(64, 32) // Max and average # of block requests that can be made per second
 {
     inFlight = 0;
-    // maxInFlight = 256;
+    nOutbound = 0;
 
     sendIter = mapTxnInfo.end();
     sendBlkIter = mapBlkInfo.end();
@@ -896,7 +896,8 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
     AssertLockHeld(cs_main);
 
     int nBlocksInFlight = mapRequestManagerNodeState[pto->GetId()].nBlocksInFlight;
-    if (!pto->fDisconnect && !pto->fClient && nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
+    if (!pto->fDisconnectRequest && !pto->fDisconnect && !pto->fClient &&
+        nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
     {
         std::vector<CBlockIndex *> vToDownload;
         FindNextBlocksToDownload(pto->GetId(), pto->nMaxBlocksInTransit.load() - nBlocksInFlight, vToDownload);
@@ -1081,14 +1082,53 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         double nResponseTime = (double)(now - getdataTime) / 1000000.0;
 
         // calculate avg block response time over a range of blocks to be used for IBD tuning.
-        static uint8_t blockRange = 50;
+        uint8_t blockRange = 50;
         {
             LOCK(pnode->cs_nAvgBlkResponseTime);
             if (pnode->nAvgBlkResponseTime < 0)
-                pnode->nAvgBlkResponseTime = 2.0;
+                pnode->nAvgBlkResponseTime = 0.0;
             if (pnode->nAvgBlkResponseTime > 0)
                 pnode->nAvgBlkResponseTime -= (pnode->nAvgBlkResponseTime / blockRange);
             pnode->nAvgBlkResponseTime += nResponseTime / blockRange;
+
+            // Protect nOverallAverageResponseTime and nIterations with cs_overallaverage.
+            static CCriticalSection cs_overallaverage;
+            static double nOverallAverageResponseTime = 00.0;
+            static uint32_t nIterations = 0;
+
+            // Get the average value for overall average response time (s) of all nodes.
+            {
+                LOCK(cs_overallaverage);
+                uint32_t nOverallRange = blockRange * nMaxOutConnections;
+                if (nIterations <= nOverallRange)
+                    nIterations++;
+                if (nIterations > nOverallRange)
+                {
+                    nOverallAverageResponseTime -= (nOverallAverageResponseTime / nOverallRange);
+                }
+                nOverallAverageResponseTime += nResponseTime / nOverallRange;
+
+                // Request for a disconnect if over the response time limit.  We don't do an fDisconnect = true here
+                // because we want to drain the queue for any blocks that are still returning.  This prevents us from
+                // having to re-request all those blocks again.
+                //
+                // We only check wether to issue a disconnect during initial sync and we only disconnect up to two
+                // peers at a time if and only if all our outbound slots have been used to prevent any sudden loss of
+                // all peers. We do this for two peers and not one in the event that one of the peers is hung and their
+                // block queue does not drain; in that event we would end up waiting for 10 minutes before finally
+                // disconnecting.
+                //
+                // We disconnect a peer only if their average response time is more than 4 times the overall average.
+                if (nOutbound >= nMaxOutConnections - 1 && IsInitialBlockDownload() && nIterations > nOverallRange &&
+                    pnode->nAvgBlkResponseTime > nOverallAverageResponseTime * 4)
+                {
+                    LOG(IBD, "disconnecting %s because too slow , overall avg %d peer avg %d\n", pnode->GetLogName(),
+                        nOverallAverageResponseTime, pnode->nAvgBlkResponseTime);
+                    pnode->fDisconnectRequest = true;
+                    // We must not return here but continue in order
+                    // to update the vBlocksInFlight stats.
+                }
+            }
 
             if (pnode->nAvgBlkResponseTime < 0.2)
             {
@@ -1115,7 +1155,8 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 pnode->nMaxBlocksInTransit.store(16);
             }
 
-            LOG(THIN | BLK, "Average block response time is %.2f seconds\n", pnode->nAvgBlkResponseTime);
+            LOG(THIN | BLK, "Average block response time is %.2f seconds for %s\n", pnode->nAvgBlkResponseTime,
+                pnode->GetLogName());
         }
 
         // if there are no blocks in flight then ask for a few more blocks
@@ -1204,7 +1245,13 @@ void CRequestManager::GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, N
     }
 }
 
-void CRequestManager::CheckForDownloadTimeout(CNode *pnode, const Consensus::Params &consensusParams, int64_t nNow)
+int CRequestManager::GetNumBlocksInFlight(NodeId nodeid)
+{
+    LOCK(cs_objDownloader);
+    return mapRequestManagerNodeState[nodeid].nBlocksInFlight;
+}
+
+void CRequestManager::DisconnectOnDownloadTimeout(CNode *pnode, const Consensus::Params &consensusParams, int64_t nNow)
 {
     // In case there is a block that has been in flight from this peer for 2 + 0.5 * N times the block interval
     // (with N the number of peers from which we're downloading validated blocks), disconnect due to timeout.
