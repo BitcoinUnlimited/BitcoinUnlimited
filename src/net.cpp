@@ -1368,7 +1368,6 @@ void ThreadSocketHandler()
             }
         }
         {
-            LOCK(cs_vNodes);
             for (CNode *pnode : vNodesCopy)
                 pnode->Release();
         }
@@ -2172,7 +2171,6 @@ void ThreadMessageHandler()
         // Release refs as a last step. We need to keep the node refs all the way through so that we don't
         // have to take so many vNodes locks during requester.SendRequests().
         {
-            LOCK(cs_vNodes);
             for (CNode *pnode : vNodesCopy)
                 pnode->Release();
         }

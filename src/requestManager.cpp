@@ -111,8 +111,6 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
     droppedTxns -= (item.outstandingReqs - 1);
     pendingTxns -= 1;
 
-    LOCK(cs_vNodes);
-
     // remove all the source nodes
     for (CUnknownObj::ObjectSourceList::iterator i = item.availableFrom.begin(); i != item.availableFrom.end(); ++i)
     {
@@ -406,7 +404,8 @@ bool CUnknownObj::AddSource(CNode *from)
     {
         LOG(REQ, "AddSource %s is available at %s.\n", obj.ToString(), from->GetLogName());
         {
-            LOCK(cs_vNodes); // This lock is needed to ensure that AddRef happens atomically
+            // We do not have to take a vNodes lock here as would usually be the case because at this point there
+            // will be at least one ref already and we therefore don't have to worry about getting disconnected.
             from->AddRef();
         }
         CNodeRequestData req(from);
@@ -575,7 +574,6 @@ void CRequestManager::SendRequests()
                         // Do not request from this node if it was disconnected
                         if (next.node->fDisconnect)
                         {
-                            LOCK(cs_vNodes);
                             LOG(REQ, "ReqMgr: %s removed block ref to %s count %d (on disconnect).\n",
                                 item.obj.ToString(), next.node->GetLogName(), next.node->GetRefCount());
                             next.node->Release();
@@ -602,7 +600,9 @@ void CRequestManager::SendRequests()
                         // Add a node ref if we haven't already added a map entry for this node.
                         if (mapBatchBlockRequests.find(next.node) == mapBatchBlockRequests.end())
                         {
-                            LOCK(cs_vNodes);
+                            // We do not have to take a vNodes lock here as would usually be the case because at this
+                            // point there will be at least one ref already and we therefore don't have to worry about
+                            // getting disconnected.
                             next.node->AddRef();
                         }
                         mapBatchBlockRequests[next.node].emplace_back(obj);
@@ -636,7 +636,6 @@ void CRequestManager::SendRequests()
 
                     // Instead we'll forget about it -- the node is already popped of of the available list so now we'll
                     // release our reference.
-                    LOCK(cs_vNodes);
                     // LOG(REQ, "ReqMgr: %s removed block ref to %d count %d\n", obj.ToString(),
                     //     next.node->GetId(), next.node->GetRefCount());
                     next.node->Release();
@@ -675,7 +674,6 @@ void CRequestManager::SendRequests()
         }
         ENTER_CRITICAL_SECTION(cs_objDownloader);
 
-        LOCK(cs_vNodes);
         for (auto iter : mapBatchBlockRequests)
         {
             iter.first->Release();
@@ -730,7 +728,6 @@ void CRequestManager::SendRequests()
                         {
                             if (next.node->fDisconnect) // Node was disconnected so we can't request from it
                             {
-                                LOCK(cs_vNodes);
                                 LOG(REQ, "ReqMgr: %s removed tx ref to %d count %d (on disconnect).\n",
                                     item.obj.ToString(), next.node->GetId(), next.node->GetRefCount());
                                 next.node->Release();
@@ -751,7 +748,9 @@ void CRequestManager::SendRequests()
                             // Add a node ref if we haven't already added a map entry for this node.
                             if (mapBatchTxnRequests.find(next.node) == mapBatchTxnRequests.end())
                             {
-                                LOCK(cs_vNodes);
+                                // We do not have to take a vNodes lock here as would usually be the case because
+                                // at this point there will be at least one ref already and we therefore don't
+                                // have to worry about getting disconnected.
                                 next.node->AddRef();
                             }
                             mapBatchTxnRequests[next.node].emplace_back(item.obj);
@@ -769,7 +768,6 @@ void CRequestManager::SendRequests()
 
                                 mapBatchTxnRequests.erase(next.node);
                                 {
-                                    LOCK(cs_vNodes);
                                     next.node->Release();
                                 }
                             }
@@ -796,7 +794,6 @@ void CRequestManager::SendRequests()
         }
         ENTER_CRITICAL_SECTION(cs_objDownloader);
 
-        LOCK(cs_vNodes);
         for (auto iter : mapBatchTxnRequests)
         {
             iter.first->Release();
