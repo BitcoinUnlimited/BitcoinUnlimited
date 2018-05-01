@@ -2165,15 +2165,17 @@ void ThreadMessageHandler()
             boost::this_thread::interruption_point();
         }
 
+        // From the request manager, make requests for transactions and blocks. We do this before potentially
+        // sleeping in the step below so as to allow requests to return during the sleep time.
+        requester.SendRequests();
+
+        // Release refs as a last step. We need to keep the node refs all the way through so that we don't
+        // have to take so many vNodes locks during requester.SendRequests().
         {
             LOCK(cs_vNodes);
             for (CNode *pnode : vNodesCopy)
                 pnode->Release();
         }
-
-        // From the request manager, make requests for transactions and blocks. We do this before potentially
-        // sleeping in the step below so as to allow requests to return during the sleep time.
-        requester.SendRequests();
 
         if (fSleep)
             messageHandlerCondition.timed_wait(
