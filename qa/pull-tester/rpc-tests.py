@@ -226,6 +226,7 @@ testScripts = [ RpcTest(t) for t in [
 
 testScriptsExt = [ RpcTest(t) for t in [
     'limits',
+    'weirdtx',
     'txPerf',
     'excessive --extensive',
     'parallel --extensive',
