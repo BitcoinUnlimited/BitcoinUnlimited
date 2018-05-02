@@ -75,7 +75,20 @@ UniValue gettweak(const UniValue &params, bool fHelp)
 
     UniValue ret(UniValue::VOBJ);
     bool help = false;
-    for (unsigned int i = 0; i < params.size(); i++)
+    unsigned int psize = params.size();
+
+    if (psize == 0) // No arguments should return all tweaks
+    {
+        for (CTweakMap::iterator item = tweaks.begin(); item != tweaks.end(); ++item)
+        {
+            if (help)
+                ret.push_back(Pair(item->second->GetName(), item->second->GetHelp()));
+            else
+                ret.push_back(Pair(item->second->GetName(), item->second->Get()));
+        }
+    }
+
+    for (unsigned int i = 0; i < psize; i++)
     {
         string name = params[i].get_str();
         if (name == "help")
