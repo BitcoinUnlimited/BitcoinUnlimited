@@ -552,6 +552,16 @@ bool IsMay152018Enabled(const Consensus::Params &consensusparams, const CBlockIn
     return pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value);
 }
 
+bool IsMay152018Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev)
+{
+    if (pindexPrev == nullptr)
+    {
+        return false;
+    }
+
+    return pindexPrev->forkAtNextBlock(miningForkTime.value);
+}
+
 
 bool AreFreeTxnsDisallowed()
 {
@@ -2402,17 +2412,26 @@ void static UpdateTip(CBlockIndex *pindexNew)
     chainActive.SetTip(pindexNew);
 
     // Check Activate May 2018 HF rules after each new tip is connected and the blockindex updated.
-    if (IsMay152018Enabled(chainParams.GetConsensus(), pindexNew))
+
+    // First check if the next block is the fork block and set non-consensus parameters appropriately
+    if (IsMay152018Next(chainParams.GetConsensus(), pindexNew))
     {
-        // Bump the accepted block size to 32MB and the default generated size to 8MB
-        if (miningForkEB.value > excessiveBlockSize)
-            excessiveBlockSize = miningForkEB.value;
+        // Bump the default generated size to 8MB
         if (miningForkMG.value > maxGeneratedBlock)
             maxGeneratedBlock = miningForkMG.value;
-        settingsToUserAgentString();
+    }
+
+    // Next, check every on every block for EB < 32MB and force this as the minimum because this is a consensus issue
+    // Although OP_RETURN size is not consensus, enforce the new minimum size on every block so that the expectation
+    // of relay for any tx < 220 bytes is met by this node.
+    if (IsMay152018Enabled(chainParams.GetConsensus(), pindexNew))
+    {
+        if (miningForkEB.value > excessiveBlockSize)
+            excessiveBlockSize = miningForkEB.value;
         // Bump OP_RETURN size:
         if (nMaxDatacarrierBytes < MAX_OP_RETURN_MAY2018)
             nMaxDatacarrierBytes = MAX_OP_RETURN_MAY2018;
+        settingsToUserAgentString();
     }
 
     // New best block

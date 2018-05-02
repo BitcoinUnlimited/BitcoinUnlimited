@@ -82,6 +82,27 @@ class ForkTest (BitcoinTestFramework):
         # check that the datacarrier size is updated
         assert(self.nodes[0].get("mining.dataCarrierSize")["mining.dataCarrierSize"] == 223)
 
+        self.nodes[0].set("net.excessiveBlock=20000000")
+        self.nodes[0].set("mining.blockSize=2000000")
+        self.nodes[0].set("mining.dataCarrierSize=400")
+
+        self.nodes[1].generate(1)
+        self.sync_blocks()
+
+        # check that in subsequent blocks, some stuff is not changed, and some is held to a min
+        d = self.nodes[0].get("*")
+        assert d["mining.blockSize"] == 2000000  # shouldn't be changed because not consensus
+        assert d["net.excessiveBlock"] == 32000000  # Should be changed because the setting we made was < the min
+        assert d["mining.dataCarrierSize"] == 400  # Shouldn't be changed because > the min
+
+        self.nodes[0].set("net.excessiveBlock=64000000")
+        self.nodes[0].set("mining.dataCarrierSize=100")
+        self.nodes[1].generate(1)
+        self.sync_blocks()
+
+        d = self.nodes[0].get("*")
+        assert d["net.excessiveBlock"] == 64000000  # Shouldn't be changed because the setting we made was > the min
+        assert d["mining.dataCarrierSize"] == 223  # Should be changed because < the min
 
         ###############################################################
         # Stop nodes and restart with the forktime in the past
@@ -127,5 +148,17 @@ def Test():
 
     # you may want these additional flags:
     # "--srcdir=<out-of-source-build-dir>/debug/src"
-    # "--tmpdir=/ramdisk/test"
-    t.main(["--nocleanup", "--noshutdown"], bitcoinConf, None)
+    flags = []
+    if os.path.isdir("/ramdisk/test"):  # execution is much faster if a ramdisk is used
+        flags.append("--tmpdir=/ramdisk/test")
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    if not os.path.exists(os.path.abspath(here + "/../../src/bitcoind")):
+        dbg = os.path.abspath(here + "/../../debug/src/bitcoind")
+        rel = os.path.abspath(here + "/../../release/src/bitcoind")
+        if os.path.exists(dbg):
+            flags.append("--srcdir=%s" % os.path.dirname(dbg))
+        elif os.path.exists(rel):
+            flags.append("--srcdir=%s" % os.path.dirname(rel))
+
+    t.main(flags , bitcoinConf, None)
