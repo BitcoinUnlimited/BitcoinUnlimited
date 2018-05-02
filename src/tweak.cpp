@@ -81,10 +81,7 @@ UniValue gettweak(const UniValue &params, bool fHelp)
     {
         for (CTweakMap::iterator item = tweaks.begin(); item != tweaks.end(); ++item)
         {
-            if (help)
-                ret.push_back(Pair(item->second->GetName(), item->second->GetHelp()));
-            else
-                ret.push_back(Pair(item->second->GetName(), item->second->Get()));
+            ret.push_back(Pair(item->second->GetName(), item->second->Get()));
         }
     }
 
