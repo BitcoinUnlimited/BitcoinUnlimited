@@ -252,7 +252,7 @@ void InitializeNode(const CNode *pnode)
     // Add an entry to the nodestate map
     LOCK(cs_main);
     mapNodeState.emplace_hint(mapNodeState.end(), std::piecewise_construct, std::forward_as_tuple(pnode->GetId()),
-        std::forward_as_tuple(pnode->addr, std::move(pnode->addrName)));
+        std::forward_as_tuple(pnode->addr, pnode->addrName));
 }
 
 void FinalizeNode(NodeId nodeid)
