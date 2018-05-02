@@ -179,6 +179,7 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
+    'tweak',
     'notify',
     'may152018-forkactivation_1',
     'may152018-forkactivation_2',
