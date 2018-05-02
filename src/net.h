@@ -526,21 +526,21 @@ public:
         return false;
     }
 
-    void AddAddressKnown(const CAddress &addr) { addrKnown.insert(addr.GetKey()); }
+    void AddAddressKnown(const CAddress &_addr) { addrKnown.insert(_addr.GetKey()); }
     void PushAddress(const CAddress &_addr, FastRandomContext &insecure_rand)
     {
         // Known checking here is only to save space from duplicates.
         // SendMessages will filter it again for knowns that were added
         // after addresses were pushed.
-        if (addr.IsValid() && !addrKnown.contains(addr.GetKey()))
+        if (_addr.IsValid() && !addrKnown.contains(_addr.GetKey()))
         {
             if (vAddrToSend.size() >= MAX_ADDR_TO_SEND)
             {
-                vAddrToSend[insecure_rand.rand32() % vAddrToSend.size()] = addr;
+                vAddrToSend[insecure_rand.rand32() % vAddrToSend.size()] = _addr;
             }
             else
             {
-                vAddrToSend.push_back(addr);
+                vAddrToSend.push_back(_addr);
             }
         }
     }
