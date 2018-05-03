@@ -162,7 +162,7 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn)
         tmpl = CreateNewBlock(scriptPubKeyIn, false);
 
     // If the block is too small we need to drop back to the 1MB ruleset
-    if ((!tmpl) || (tmpl->block.nBlockSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
+    if ((!tmpl) || (tmpl->block.GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
     {
         tmpl = CreateNewBlock(scriptPubKeyIn, true);
     }

@@ -8,6 +8,10 @@
 #include "config/bitcoin-config.h"
 #endif
 
+// must include first to ensure FD_SETSIZE is correctly set
+// otherwise the default of 64 may be used on Windows
+#include "compat.h"
+
 #include "net.h"
 
 #include "addrman.h"
@@ -461,6 +465,10 @@ CNode *ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure
 
 void CNode::CloseSocketDisconnect()
 {
+    // if this is an outbound node that was not added via addenode then decrement the counter.
+    if (fAutoOutbound)
+        requester.nOutbound--;
+
     fDisconnect = true;
     if (hSocket != INVALID_SOCKET)
     {
@@ -1927,7 +1935,10 @@ void ThreadOpenConnections()
                 // We need to use a separate outbound flag so as not to differentiate these outbound
                 // nodes with ones that were added using -addnode -connect-thinblock or -connect.
                 if (pnode)
+                {
                     pnode->fAutoOutbound = true;
+                    requester.nOutbound++;
+                }
             }
         }
     }
@@ -2800,6 +2811,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     fBUVersionSent = false;
     fSuccessfullyConnected = false;
     fDisconnect = false;
+    fDisconnectRequest = false;
     nRefCount = 0;
     nSendSize = 0;
     nSendOffset = 0;

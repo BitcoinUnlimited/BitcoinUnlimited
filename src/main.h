@@ -358,6 +358,18 @@ bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *p
  */
 bool AreFreeTxnsDisallowed();
 
+/** Communicate what class of transaction is acceptable to add to the memory pool
+ */
+enum class TransactionClass
+{
+    INVALID,
+    DEFAULT,
+    STANDARD,
+    NONSTANDARD
+};
+
+TransactionClass ParseTransactionClass(const std::string &s);
+
 /** (try to) add transaction to memory pool **/
 bool AcceptToMemoryPool(CTxMemPool &pool,
     CValidationState &state,
@@ -365,7 +377,8 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     bool fLimitFree,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit = false,
-    bool fRejectAbsurdFee = false);
+    bool fRejectAbsurdFee = false,
+    TransactionClass allowedTx = TransactionClass::DEFAULT);
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);
@@ -570,6 +583,9 @@ static const unsigned int REJECT_CONFLICT = 0x102;
 static const unsigned int REJECT_WRONG_FORK = 0x103;
 
 CBlockIndex *FindMostWorkChain();
+
+/** Test if fork is active */
+bool IsMay152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev);
 
 // BU cleaning up at destuction time creates many global variable dependencies.  Instead clean up in a function called
 // in main()

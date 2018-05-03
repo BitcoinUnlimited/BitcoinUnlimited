@@ -70,6 +70,10 @@ public:
 
 class CBlock : public CBlockHeader
 {
+private:
+    // memory only
+    mutable uint64_t nBlockSize; // Serialized block size in bytes
+
 public:
     // network and disk
     std::vector<CTransactionRef> vtx;
@@ -78,7 +82,6 @@ public:
     // 0.11: mutable std::vector<uint256> vMerkleTree;
     mutable bool fChecked;
     mutable bool fExcessive; // BU: is the block "excessive" (bigger than this node prefers to accept)
-    mutable uint64_t nBlockSize; // Serialized block size in bytes
 
     CBlock() { SetNull(); }
     CBlock(const CBlockHeader &header)
