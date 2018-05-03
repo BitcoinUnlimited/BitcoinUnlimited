@@ -8,7 +8,6 @@
 #include "chain.h"
 #include "chainparams.h"
 #include "checkpoints.h"
-#include "clientversion.h"
 #include "connmgr.h"
 #include "consensus/consensus.h"
 #include "consensus/params.h"

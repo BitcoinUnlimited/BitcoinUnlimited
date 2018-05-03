@@ -7,7 +7,6 @@
 
 #include "bitcoinaddressvalidator.h"
 #include "bitcoinunits.h"
-#include "clientversion.h"
 #include "qvalidatedlineedit.h"
 #include "walletmodel.h"
 

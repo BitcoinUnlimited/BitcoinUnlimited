@@ -5,7 +5,6 @@
 #include "requestManager.h"
 #include "chain.h"
 #include "chainparams.h"
-#include "clientversion.h"
 #include "consensus/consensus.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
