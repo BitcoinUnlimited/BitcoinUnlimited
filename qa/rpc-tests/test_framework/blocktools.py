@@ -135,15 +135,32 @@ def createrawtransaction(inputs, outputs, outScriptGenerator=p2pkh):
     Create a transaction with the exact input and output syntax as the bitcoin-cli "createrawtransaction" command.
     If you use the default outScriptGenerator, this function will return a hex string that exactly matches the
     output of bitcoin-cli createrawtransaction.
+
+    But this function is extended beyond bitcoin-cli in the following ways:
+    inputs can have a "sig" field which is a binary hex string of the signature script
+    outputs can be a list of tuples rather than a dictionary.  In that format, they can pass complex objects to
+    the outputScriptGenerator (use a tuple or an object), be a list (that is passed to CScript()), or a callable
     """
     if not type(inputs) is list:
         inputs = [inputs]
 
     tx = CTransaction()
     for i in inputs:
-        tx.vin.append(CTxIn(COutPoint(i["txid"], i["vout"]), b"", 0xffffffff))
-    for addr, amount in outputs.items():
-        if addr == "data":
+        sigScript = i.get("sig", b"")
+        tx.vin.append(CTxIn(COutPoint(i["txid"], i["vout"]), sigScript, 0xffffffff))
+    pairs = []
+    if type(outputs) is dict:
+        for addr, amount in outputs.items():
+            pairs.append((addr,amount))
+    else:
+        pairs = outputs
+
+    for addr, amount in pairs:
+        if callable(addr):
+            tx.vout.append(CTxOut(amount * BTC, addr()))
+        elif type(addr) is list:
+            tx.vout.append(CTxOut(amount * BTC, CScript(addr)))
+        elif addr == "data":
             tx.vout.append(CTxOut(0, CScript([OP_RETURN, unhexlify(amount)])))
         else:
             tx.vout.append(CTxOut(amount * BTC, outScriptGenerator(addr)))

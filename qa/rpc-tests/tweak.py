@@ -20,56 +20,45 @@ class MyTest (BitcoinTestFramework):
 
     def setup_chain(self,bitcoinConfDict=None, wallets=None):
         print("Initializing test directory "+self.options.tmpdir)
-        # pick this one to start from the cached 4 node 100 blocks mined configuration
-        # initialize_chain(self.options.tmpdir)
-        # pick this one to start at 0 mined blocks
-        initialize_chain_clean(self.options.tmpdir, 4, bitcoinConfDict, wallets)
-        # Number of nodes to initialize ----------> ^
+        initialize_chain(self.options.tmpdir)
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(2, self.options.tmpdir)
-        # Nodes to start --------^
-        # Note for this template I readied 4 nodes but only started 2
-
-        # Now interconnect the nodes
-        connect_nodes_bi(self.nodes,0,1)
-        # Let the framework know if the network is fully connected.
-        # If not, the framework assumes this partition: (0,1) and (2,3)
-        # For more complex partitions, you can't use the self.sync* member functions
+        self.nodes = start_nodes(1, self.options.tmpdir)
         self.is_network_split=False
-        self.sync_all()
 
     def run_test (self):
+        # note that these tests rely on tweaks that may be changed or removed.
 
-        logging.info("This is a template for you to use when making new tests")
+        node = self.nodes[0]
 
-        # generate enough blocks so that nodes[0] has a balance
-        self.sync_blocks()
-        self.nodes[0].generate(101)
-        self.sync_blocks()
+        # check basic set/get access
+        node.set("mining.blockSize=100000")
+        assert node.get("mining.blockSize")["mining.blockSize"] == 100000
 
-        assert_equal(self.nodes[0].getbalance(), 50)
+        # check double set and then double get
+        node.set("mining.blockSize=200000","mining.comment=slartibartfast dug here")
+        data = node.get("mining.blockSize", "mining.comment")
+        assert data["mining.blockSize"] == 200000
+        assert data["mining.comment"] == "slartibartfast dug here"
 
-        # Check that only first and second nodes have UTXOs
-        assert_equal(len(self.nodes[0].listunspent()), 1)
-        assert_equal(len(self.nodes[1].listunspent()), 0)
-
-        # Send 1 BTC from 0 to 2 using sendtoaddress call.
+        # check incompatible double set
         try:
-            self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
-        except JSONRPCException as e: # an exception you don't catch is a testing error
-            raise
+            node.set("mining.blockSize=300000","net.excessiveBlock=10000")
+            assert 0 # the 2nd param is inconsistent with the current state of mining.blockSize
+        except JSONRPCException as e:
+            # if one set fails, no changes should be made (set is atomic)
+            assert node.get("mining.blockSize")["mining.blockSize"] == 200000
 
-        # example of stopping and restarting the nodes
-        stop_nodes(self.nodes)
-        wait_bitcoinds()
-        # start 4 nodes this time with some different configuration
-        self.nodes = start_nodes(4, self.options.tmpdir, [ ["-net.txRetryInterval=5000000"], [], [], []])
-        connect_nodes_bi(self.nodes,0,1)
-        connect_nodes_bi(self.nodes,1,2)
-        connect_nodes_bi(self.nodes,0,2)
-        connect_nodes_bi(self.nodes,2,3)
-        self.sync_blocks()
+        # check wildcard
+        netTweaks = node.get("net.*")
+        for n,val in netTweaks.items():
+            assert n.startswith("net.")
+
+        # check equivalence of no args and *
+        data = node.get()
+        data1 = node.get("*")
+        assert data == data1
+
 
 
 if __name__ == '__main__':
@@ -82,7 +71,6 @@ def Test():
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
-
 
     flags = []
     # you may want these additional flags:

@@ -34,7 +34,8 @@ class ForkTest (BitcoinTestFramework):
     def run_test(self):
 
         # Advance the time beyond the timeout value
-        cur_time = int(time.time())
+        #cur_time = int(time.time())
+        cur_time = 1526400000 - 10
         self.nodes[0].setmocktime(cur_time)
         self.nodes[1].setmocktime(cur_time)
 
@@ -81,6 +82,57 @@ class ForkTest (BitcoinTestFramework):
         # check that the datacarrier size is updated
         assert(self.nodes[0].get("mining.dataCarrierSize")["mining.dataCarrierSize"] == 223)
 
+        self.nodes[0].set("net.excessiveBlock=20000000")
+        self.nodes[0].set("mining.blockSize=2000000")
+        self.nodes[0].set("mining.dataCarrierSize=400")
+
+        self.nodes[1].generate(1)
+        self.sync_blocks()
+
+        # check that in subsequent blocks, some stuff is not changed, and some is held to a min
+        d = self.nodes[0].get("*")
+        assert d["mining.blockSize"] == 2000000  # shouldn't be changed because not consensus
+        assert d["net.excessiveBlock"] == 32000000  # Should be changed because the setting we made was < the min
+        assert d["mining.dataCarrierSize"] == 400  # Shouldn't be changed because > the min
+
+        self.nodes[0].set("net.excessiveBlock=64000000")
+        self.nodes[0].set("mining.dataCarrierSize=100")
+        self.nodes[1].generate(1)
+        self.sync_blocks()
+
+        d = self.nodes[0].get("*")
+        assert d["net.excessiveBlock"] == 64000000  # Shouldn't be changed because the setting we made was > the min
+        assert d["mining.dataCarrierSize"] == 223  # Should be changed because < the min
+
+        ###############################################################
+        # Stop nodes and restart with the forktime in the past
+        # - check that the EB/MG setting are now the new fork settings.
+
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+
+        # Start nodes and set the mocktime to the fork activation time.
+        self.nodes = []
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-mocktime=%d" % (cur_time + 10)]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-mocktime=%d" % (cur_time + 10)]))
+ 
+        # Now interconnect the nodes
+        connect_nodes_bi(self.nodes, 0, 1)
+        self.is_network_split = False
+        self.sync_all()
+
+        # Forked, check that the EB is still updated
+        assert(self.nodes[0].get("net.excessiveBlock")["net.excessiveBlock"] == 32000000)
+        assert(self.nodes[1].get("net.excessiveBlock")["net.excessiveBlock"] == 32000000)
+
+        # check that the block size did NOT get updated.
+        d = self.nodes[0].get("mining.*lockSize")
+        assert(d["mining.blockSize"] == 2000000)
+        d = self.nodes[1].get("mining.*lockSize")
+        assert(d["mining.blockSize"] == 2000000)
+
+        # check that the datacarrier size is still updated
+        assert(self.nodes[0].get("mining.dataCarrierSize")["mining.dataCarrierSize"] == 223)
 
 if __name__ == '__main__':
     ForkTest().main()
@@ -96,5 +148,17 @@ def Test():
 
     # you may want these additional flags:
     # "--srcdir=<out-of-source-build-dir>/debug/src"
-    # "--tmpdir=/ramdisk/test"
-    t.main(["--nocleanup", "--noshutdown"], bitcoinConf, None)
+    flags = []
+    if os.path.isdir("/ramdisk/test"):  # execution is much faster if a ramdisk is used
+        flags.append("--tmpdir=/ramdisk/test")
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    if not os.path.exists(os.path.abspath(here + "/../../src/bitcoind")):
+        dbg = os.path.abspath(here + "/../../debug/src/bitcoind")
+        rel = os.path.abspath(here + "/../../release/src/bitcoind")
+        if os.path.exists(dbg):
+            flags.append("--srcdir=%s" % os.path.dirname(dbg))
+        elif os.path.exists(rel):
+            flags.append("--srcdir=%s" % os.path.dirname(rel))
+
+    t.main(flags , bitcoinConf, None)
