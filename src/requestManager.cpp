@@ -460,8 +460,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                 ss << filterMemPool;
                 MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
                 pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                LOG(THIN, "Requesting xthinblock %s from peer %s (%d)\n", inv2.hash.ToString(), pfrom->addrName.c_str(),
-                    pfrom->id);
+                LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
                 return true;
             }
         }
@@ -485,12 +484,12 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                 ss << inv2;
                 ss << filterMemPool;
                 pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                LOG(THIN, "Requesting xthinblock %s from peer %s (%d)\n", inv2.hash.ToString(), pfrom->GetLogName());
+                LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
             }
             else
             {
-                LOG(THIN, "Requesting Regular Block %s from peer %s (%d)\n", inv2.hash.ToString(),
-                    pfrom->addrName.c_str(), pfrom->id);
+                LOG(THIN, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(),
+                    pfrom->GetLogName());
                 std::vector<CInv> vToFetch;
                 inv2.type = MSG_BLOCK;
                 vToFetch.push_back(inv2);
@@ -506,8 +505,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         vToFetch.push_back(inv2);
         MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
         pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
-        LOG(THIN, "Requesting Regular Block %s from peer %s (%d)\n", inv2.hash.ToString(), pfrom->addrName.c_str(),
-            pfrom->id);
+        LOG(THIN, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
         return true;
     }
     return false; // no block was requested
