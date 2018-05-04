@@ -281,8 +281,8 @@ void CRequestManager::Received(const CInv &obj, CNode *from, int bytes)
         OdMap::iterator item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
             return; // item has already been removed
-        LOG(BLK, "%s removed from request queue (received from %s (%d)).\n", item->second.obj.ToString().c_str(),
-            from->addrName.c_str(), from->id);
+        LOG(BLK, "%s removed from request queue (received from %s).\n", item->second.obj.ToString().c_str(),
+            from->GetLogName());
         // from->blkReqLatency << (now - item->second.lastRequestTime);  // keep track of response latency of this node
         cleanup(item); // remove the item
         // receivedTxns += 1;
@@ -485,8 +485,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                 ss << inv2;
                 ss << filterMemPool;
                 pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                LOG(THIN, "Requesting xthinblock %s from peer %s (%d)\n", inv2.hash.ToString(), pfrom->addrName.c_str(),
-                    pfrom->id);
+                LOG(THIN, "Requesting xthinblock %s from peer %s (%d)\n", inv2.hash.ToString(), pfrom->GetLogName());
             }
             else
             {
