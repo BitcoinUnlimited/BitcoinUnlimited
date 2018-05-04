@@ -5064,7 +5064,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         inv.type == MSG_FILTERED_BLOCK) &&
                     !pfrom->fWhitelisted)
                 {
-                    LOG(NET, "historical block serving limit reached, disconnect peer=%d\n", pfrom->GetId());
+                    LOG(NET, "historical block serving limit reached, disconnect peer %s\n", pfrom->GetLogName());
 
                     // disconnect node
                     pfrom->fDisconnect = true;
@@ -5236,6 +5236,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
         else
         {
+            LOG(NET, "Inconsistent bloom filter settings peer %s\n", pfrom->GetLogName());
             pfrom->fDisconnect = true;
             return false;
         }
@@ -5369,7 +5370,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             // We can't have an inbound "feeler" connection, so the value must be improperly set.
             DbgAssert(pfrom->fInbound == false, pfrom->fFeeler = false);
             if (pfrom->fInbound == false)
+            {
+                LOG(NET, "Disconnecting feeler to peer %s\n", pfrom->GetLogName());
                 pfrom->fDisconnect = true;
+            }
         }
     }
 
@@ -5524,7 +5528,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (vAddr.size() < 1000)
             pfrom->fGetAddr = false;
         if (pfrom->fOneShot)
+        {
+            LOG(NET, "Disconnecting %s: one shot\n", pfrom->GetLogName());
             pfrom->fDisconnect = true;
+        }
     }
 
     else if (strCommand == NetMsgType::SENDHEADERS)
@@ -6103,10 +6110,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 pfrom->GetLogName(), pfrom->nStartingHeight);
             pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexLast), uint256());
 
-            CNodeState *state = State(pfrom->GetId());
-            DbgAssert(state != nullptr, );
-            if (state)
-                state->nSyncStartTime = GetTime(); // reset the time because more headers needed
+            {
+                CNodeState *state = State(pfrom->GetId());
+                DbgAssert(state != nullptr, );
+                if (state)
+                    state->nSyncStartTime = GetTime(); // reset the time because more headers needed
+            }
 
             // During the process of IBD we need to update block availability for every connected peer. To do that we
             // request, from each NODE_NETWORK peer, a header that matches the last blockhash found in this recent set
@@ -6470,7 +6479,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     {
         if (CNode::OutboundTargetReached(false) && !pfrom->fWhitelisted)
         {
-            LOG(NET, "mempool request with bandwidth limit reached, disconnect peer=%d\n", pfrom->GetId());
+            LOG(NET, "mempool request with bandwidth limit reached, disconnect peer %s\n", pfrom->GetLogName());
             pfrom->fDisconnect = true;
             return true;
         }
@@ -6656,6 +6665,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             {
                 pfrom->PushMessage(
                     NetMsgType::REJECT, strCommand, REJECT_INVALID, std::string("filter size was too small"));
+                LOG(NET, "Disconnecting %s: bloom filter size too small\n", pfrom->GetLogName());
                 pfrom->fDisconnect = true;
                 return false;
             }
@@ -6855,7 +6865,8 @@ bool ProcessMessages(CNode *pfrom)
         }
 
         if (!fRet)
-            LOGA("%s(%s, %u bytes) FAILED peer=%d\n", __func__, SanitizeString(strCommand), nMessageSize, pfrom->id);
+            LOGA("%s(%s, %u bytes) FAILED peer %s\n", __func__, SanitizeString(strCommand), nMessageSize,
+                pfrom->GetLogName());
 
         break;
     }
@@ -6882,11 +6893,11 @@ bool SendMessages(CNode *pto)
         {
             NodeId nodeid = pto->GetId();
             int nInFlight = requester.GetNumBlocksInFlight(nodeid);
-            LOG(IBD, "peer=%d, checking disconnect request with %d in flight blocks\n", nodeid, nInFlight);
+            LOG(IBD, "peer %s, checking disconnect request with %d in flight blocks\n", pto->GetLogName(), nInFlight);
             if (nInFlight == 0)
             {
                 pto->fDisconnect = true;
-                LOG(IBD, "peer=%d, disconnected\n", nodeid);
+                LOG(IBD, "peer %s, disconnect request was set, so disconnected\n", pto->GetLogName());
             }
         }
 
@@ -6948,9 +6959,9 @@ bool SendMessages(CNode *pto)
                 {
                     if (!pto->fWhitelisted && Params().NetworkIDString() != "regtest")
                     {
-                        LOG(THIN, "ERROR: Disconnecting peer=%d due to thinblock download timeout exceeded "
+                        LOG(THIN, "ERROR: Disconnecting peer %s due to thinblock download timeout exceeded "
                                   "(%d secs)\n",
-                            pto->GetId(), (GetTime() - (*iter).second.nRequestTime));
+                            pto->GetLogName(), (GetTime() - (*iter).second.nRequestTime));
                         pto->fDisconnect = true;
                         break;
                     }

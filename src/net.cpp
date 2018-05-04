@@ -743,8 +743,7 @@ int SocketSendData(CNode *pnode)
                 int nErr = WSAGetLastError();
                 if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
                 {
-                    LOG(NET, "socket send error '%s' to %s (%d)\n", NetworkErrorString(nErr), pnode->GetLogName(),
-                        pnode->id);
+                    LOG(NET, "socket send error '%s' to %s\n", NetworkErrorString(nErr), pnode->GetLogName());
                     pnode->fDisconnect = true;
                 }
             }
@@ -847,6 +846,7 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
             // and will therefore be the lowest priority connection and disconnected first.
             if (node->nPingNonceSent > 0 && node->nPingUsecTime == 0 && ((GetTime() - node->nTimeConnected) > 60))
             {
+                LOG(NET, "node %s evicted, slow ping\n", node->GetLogName());
                 node->fDisconnect = true;
                 return true;
             }
@@ -2861,7 +2861,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
 
     if (fLogIPs)
     {
-        LOG(NET, "Added connection to %s peer=%d\n", addrName, id);
+        LOG(NET, "Added connection to %s (%d)\n", addrName, id);
     }
     else
     {
