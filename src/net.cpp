@@ -1351,14 +1351,12 @@ void ThreadSocketHandler()
                 }
                 else if (nTime - pnode->nLastSend > TIMEOUT_INTERVAL)
                 {
-                    LOG(NET, "Node %s socket sending timeout: %is\n", pnode->GetLogName(),
-                        nTime - pnode->nLastSend);
+                    LOG(NET, "Node %s socket sending timeout: %is\n", pnode->GetLogName(), nTime - pnode->nLastSend);
                     pnode->fDisconnect = true;
                 }
                 else if (nTime - pnode->nLastRecv > (pnode->nVersion > BIP0031_VERSION ? TIMEOUT_INTERVAL : 90 * 60))
                 {
-                    LOG(NET, "Node %s socket receive timeout: %is\n", pnode->GetLogName(),
-                        nTime - pnode->nLastRecv);
+                    LOG(NET, "Node %s socket receive timeout: %is\n", pnode->GetLogName(), nTime - pnode->nLastRecv);
                     pnode->fDisconnect = true;
                 }
                 else if (pnode->nPingNonceSent && pnode->nPingUsecStart + TIMEOUT_INTERVAL * 1000000 < GetTimeMicros())

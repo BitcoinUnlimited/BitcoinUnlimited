@@ -5355,12 +5355,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
         }
 
-        std::string remoteAddr;
-        if (fLogIPs)
-            remoteAddr = ", peeraddr=" + pfrom->addr.ToString();
-
-        LOG(NET, "receive version message: %s: version %d, blocks=%d, us=%s, peer=%d%s\n", pfrom->cleanSubVer,
-            pfrom->nVersion, pfrom->nStartingHeight, addrMe.ToString(), pfrom->id, remoteAddr);
+        LOG(NET, "receive version message: %s: version %d, blocks=%d, us=%s, peer=%s\n", pfrom->cleanSubVer,
+            pfrom->nVersion, pfrom->nStartingHeight, addrMe.ToString(), pfrom->GetLogName());
 
         int64_t nTimeOffset = nTime - GetTime();
         pfrom->nTimeOffset = nTimeOffset;
@@ -6106,8 +6102,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             LOG(NET, "more getheaders (%d) to end to peer=%s (startheight:%d)\n", pindexLast->nHeight,
                 pfrom->GetLogName(), pfrom->nStartingHeight);
             pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexLast), uint256());
-            CNodeState* state = State(pfrom->GetId());
-            if (state) state->nSyncStartTime = GetTime();  // reset the time because more headers needed
+
+            CNodeState *state = State(pfrom->GetId());
+            DbgAssert(state != nullptr, );
+            if (state)
+                state->nSyncStartTime = GetTime(); // reset the time because more headers needed
+
             // During the process of IBD we need to update block availability for every connected peer. To do that we
             // request, from each NODE_NETWORK peer, a header that matches the last blockhash found in this recent set
             // of headers. Once the reqeusted header is received then the block availability for this peer will get
@@ -6297,8 +6297,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
             {
                 // We don't have the block yet, although we know about it.
-                return error("Peer %s requested block %s that cannot be read", pfrom->GetLogName(),
-                             inv.hash.ToString());
+                return error(
+                    "Peer %s requested block %s that cannot be read", pfrom->GetLogName(), inv.hash.ToString());
             }
             else
             {
@@ -6420,8 +6420,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 SendExpeditedBlock(*pblock, pfrom);
         }
 
-        CNodeState* state = State(pfrom->GetId());
-        if (state) state->nSyncStartTime = GetTime();  // reset the time because more headers needed
+        {
+            LOCK(cs_main);
+            CNodeState *state = State(pfrom->GetId());
+            DbgAssert(state != nullptr, );
+            if (state)
+                state->nSyncStartTime = GetTime(); // reset the getheaders time because block can consume all bandwidth
+        }
+        pfrom->nPingUsecStart = GetTimeMicros(); // Reset ping time because block can consume all bandwidth
 
         // Message consistency checking
         // NOTE: consistency checking is handled by checkblock() which is called during
@@ -6787,7 +6793,8 @@ bool ProcessMessages(CNode *pfrom)
         CMessageHeader &hdr = msg.hdr;
         if (!hdr.IsValid(pfrom->GetMagic(chainparams)))
         {
-            LOGA("PROCESSMESSAGE: ERRORS IN HEADER %s peer=%s\n", SanitizeString(hdr.GetCommand()), pfrom->GetLogName());
+            LOGA(
+                "PROCESSMESSAGE: ERRORS IN HEADER %s peer=%s\n", SanitizeString(hdr.GetCommand()), pfrom->GetLogName());
             continue;
         }
         std::string strCommand = hdr.GetCommand();
@@ -7043,9 +7050,8 @@ bool SendMessages(CNode *pto)
                 {
                     state.fSyncStarted = true;
                     state.nSyncStartTime = GetTime();
-                    // state.fFirstHeadersReceived = false;  // Only require headers within some time the first time
                     state.fRequestedInitialBlockAvailability = true;
-                    state.nFirstHeadersExpectedHeight = pindexBestHeader->nHeight-2;  // -2 to give room for slow sync
+                    state.nFirstHeadersExpectedHeight = pindexBestHeader->nHeight - 2; // -2 to give room for slow sync
                     nSyncStarted++;
 
                     LOG(NET, "initial getheaders (%d) to peer=%s (startheight:%d)\n", pindexStart->nHeight,
