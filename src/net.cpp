@@ -743,7 +743,7 @@ int SocketSendData(CNode *pnode)
                 int nErr = WSAGetLastError();
                 if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
                 {
-                    LOG(NET, "socket send error '%s' to %s (%d)\n", NetworkErrorString(nErr), pnode->addrName.c_str(),
+                    LOG(NET, "socket send error '%s' to %s (%d)\n", NetworkErrorString(nErr), pnode->GetLogName(),
                         pnode->id);
                     pnode->fDisconnect = true;
                 }
@@ -1300,7 +1300,7 @@ void ThreadSocketHandler()
                         {
                             // socket closed gracefully
                             if (!pnode->fDisconnect)
-                                LOG(NET, "Node %s socket closed\n", pnode->addrName.c_str());
+                                LOG(NET, "Node %s socket closed\n", pnode->GetLogName());
                             pnode->fDisconnect = true;
                             continue;
                         }
@@ -1312,7 +1312,7 @@ void ThreadSocketHandler()
                                 nErr != WSAEINPROGRESS)
                             {
                                 if (!pnode->fDisconnect)
-                                    LOG(NET, "Node %s socket recv error '%s'\n", pnode->addrName.c_str(),
+                                    LOG(NET, "Node %s socket recv error '%s'\n", pnode->GetLogName(),
                                         NetworkErrorString(nErr));
                                 pnode->fDisconnect = true;
                                 continue;
@@ -1345,25 +1345,25 @@ void ThreadSocketHandler()
             {
                 if (pnode->nLastRecv == 0 || pnode->nLastSend == 0)
                 {
-                    LOG(NET, "Node %s socket no message in first 60 seconds, %d %d from %d\n", pnode->addrName.c_str(),
+                    LOG(NET, "Node %s socket no message in first 60 seconds, %d %d from %d\n", pnode->GetLogName(),
                         pnode->nLastRecv != 0, pnode->nLastSend != 0, pnode->id);
                     pnode->fDisconnect = true;
                 }
                 else if (nTime - pnode->nLastSend > TIMEOUT_INTERVAL)
                 {
-                    LOG(NET, "Node %s socket sending timeout: %is\n", pnode->addrName.c_str(),
+                    LOG(NET, "Node %s socket sending timeout: %is\n", pnode->GetLogName(),
                         nTime - pnode->nLastSend);
                     pnode->fDisconnect = true;
                 }
                 else if (nTime - pnode->nLastRecv > (pnode->nVersion > BIP0031_VERSION ? TIMEOUT_INTERVAL : 90 * 60))
                 {
-                    LOG(NET, "Node %s socket receive timeout: %is\n", pnode->addrName.c_str(),
+                    LOG(NET, "Node %s socket receive timeout: %is\n", pnode->GetLogName(),
                         nTime - pnode->nLastRecv);
                     pnode->fDisconnect = true;
                 }
                 else if (pnode->nPingNonceSent && pnode->nPingUsecStart + TIMEOUT_INTERVAL * 1000000 < GetTimeMicros())
                 {
-                    LOG(NET, "Node %s ping timeout: %fs\n", pnode->addrName.c_str(),
+                    LOG(NET, "Node %s ping timeout: %fs\n", pnode->GetLogName(),
                         0.000001 * (GetTimeMicros() - pnode->nPingUsecStart));
                     pnode->fDisconnect = true;
                 }
@@ -2919,7 +2919,7 @@ void CNode::BeginMessage(const char *pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSen
     ENTER_CRITICAL_SECTION(cs_vSend);
     assert(ssSend.size() == 0);
     ssSend << CMessageHeader(GetMagic(Params()), pszCommand, 0);
-    LOG(NET, "sending: %s ", SanitizeString(pszCommand));
+    LOG(NET, "sending msg: %s ", SanitizeString(pszCommand));
     currentCommand = pszCommand;
 }
 

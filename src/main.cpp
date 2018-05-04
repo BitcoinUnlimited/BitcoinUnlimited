@@ -3820,8 +3820,8 @@ bool ProcessNewBlock(CValidationState &state,
     bool fParallel)
 {
     int64_t start = GetTimeMicros();
-    LOG(THIN, "Processing new block %s from peer %s (%d).\n", pblock->GetHash().ToString(),
-        pfrom ? pfrom->addrName.c_str() : "myself", pfrom ? pfrom->id : 0);
+    LOG(THIN, "Processing new block %s from peer %s.\n", pblock->GetHash().ToString(),
+        pfrom ? pfrom->GetLogName() : "myself");
     // Preliminary checks
     if (!CheckBlockHeader(*pblock, state, true))
     { // block header is bad
@@ -5218,7 +5218,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     RandAddSeedPerfmon();
     unsigned int msgSize = vRecv.size(); // BU for statistics
     UpdateRecvStats(pfrom, strCommand, msgSize, nTimeReceived);
-    LOG(NET, "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), msgSize, pfrom->id);
+    LOG(NET, "received: %s (%u bytes) peer=%s\n", SanitizeString(strCommand), msgSize, pfrom->GetLogName());
     if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
     {
         LOGA("dropmessagestest DROPPING RECV MESSAGE\n");
@@ -5268,8 +5268,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             pfrom->PushMessage(NetMsgType::REJECT, strCommand, REJECT_OBSOLETE,
                 strprintf("Protocol Version must be %d or greater", MIN_PEER_PROTO_VERSION));
             dosMan.Misbehaving(pfrom, 100);
-            return error("Using obsolete protocol version %i - banning peer=%d version=%s ip=%s", pfrom->nVersion,
-                pfrom->GetId(), pfrom->cleanSubVer, pfrom->addrName.c_str());
+            return error("Using obsolete protocol version %i - banning peer=%s version=%s", pfrom->nVersion,
+                pfrom->GetLogName(), pfrom->cleanSubVer);
         }
 
         if (pfrom->nVersion == 10300)
@@ -6106,7 +6106,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             LOG(NET, "more getheaders (%d) to end to peer=%s (startheight:%d)\n", pindexLast->nHeight,
                 pfrom->GetLogName(), pfrom->nStartingHeight);
             pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexLast), uint256());
-
+            CNodeState* state = State(pfrom->GetId());
+            if (state) state->nSyncStartTime = GetTime();  // reset the time because more headers needed
             // During the process of IBD we need to update block availability for every connected peer. To do that we
             // request, from each NODE_NETWORK peer, a header that matches the last blockhash found in this recent set
             // of headers. Once the reqeusted header is received then the block availability for this peer will get
@@ -6288,8 +6289,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (mi == mapBlockIndex.end())
             {
                 dosMan.Misbehaving(pfrom, 100);
-                return error("Peer %s (%d) requested nonexistent block %s", pfrom->addrName.c_str(), pfrom->id,
-                    inv.hash.ToString());
+                return error("Peer %srequested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
             }
 
             CBlock block;
@@ -6297,8 +6297,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
             {
                 // We don't have the block yet, although we know about it.
-                return error("Peer %s (%d) requested block %s that cannot be read", pfrom->addrName.c_str(), pfrom->id,
-                    inv.hash.ToString());
+                return error("Peer %s requested block %s that cannot be read", pfrom->GetLogName(),
+                             inv.hash.ToString());
             }
             else
             {
@@ -6336,8 +6336,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!pfrom->fVerackSent)
         {
             dosMan.Misbehaving(pfrom, 100);
-            return error("BUVERSION received but we never sent a VERACK message - banning peer=%d version=%s ip=%s",
-                pfrom->GetId(), pfrom->cleanSubVer, pfrom->addrName.c_str());
+            return error("BUVERSION received but we never sent a VERACK message - banning peer=%s version=%s",
+                pfrom->GetLogName(), pfrom->cleanSubVer);
         }
         // Each connection can only send one version message
         if (pfrom->addrFromPort != 0)
@@ -6345,8 +6345,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             pfrom->PushMessage(
                 NetMsgType::REJECT, strCommand, REJECT_DUPLICATE, std::string("Duplicate BU version message"));
             dosMan.Misbehaving(pfrom, 100);
-            return error("Duplicate BU version message received from peer=%d version=%s ip=%s", pfrom->GetId(),
-                pfrom->cleanSubVer, pfrom->addrName.c_str());
+            return error("Duplicate BU version message received from peer=%s version=%s", pfrom->GetLogName(),
+                pfrom->cleanSubVer);
         }
 
         // addrFromPort is needed for connecting and initializing Xpedited forwarding.
@@ -6360,8 +6360,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!pfrom->fBUVersionSent)
         {
             dosMan.Misbehaving(pfrom, 100);
-            return error("BUVERACK received but we never sent a BUVERSION message - banning peer=%d version=%s ip=%s",
-                pfrom->GetId(), pfrom->cleanSubVer, pfrom->addrName.c_str());
+            return error("BUVERACK received but we never sent a BUVERSION message - banning peer=%s version=%s",
+                pfrom->GetLogName(), pfrom->cleanSubVer);
         }
 
         // This step done after final handshake
@@ -6419,6 +6419,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (CheckBlockHeader(*pblock, state, true)) // block header is fine
                 SendExpeditedBlock(*pblock, pfrom);
         }
+
+        CNodeState* state = State(pfrom->GetId());
+        if (state) state->nSyncStartTime = GetTime();  // reset the time because more headers needed
 
         // Message consistency checking
         // NOTE: consistency checking is handled by checkblock() which is called during
@@ -6770,8 +6773,8 @@ bool ProcessMessages(CNode *pfrom)
         // Scan for message start
         if (memcmp(msg.hdr.pchMessageStart, pfrom->GetMagic(chainparams), MESSAGE_START_SIZE) != 0)
         {
-            LOGA("PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%d ip=%s\n", SanitizeString(msg.hdr.GetCommand()),
-                pfrom->id, pfrom->addrName.c_str());
+            LOGA("PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%s\n", SanitizeString(msg.hdr.GetCommand()),
+                pfrom->GetLogName());
             if (!pfrom->fWhitelisted)
             {
                 dosMan.Ban(pfrom->addr, BanReasonNodeMisbehaving, 4 * 60 * 60); // ban for 4 hours
@@ -6784,7 +6787,7 @@ bool ProcessMessages(CNode *pfrom)
         CMessageHeader &hdr = msg.hdr;
         if (!hdr.IsValid(pfrom->GetMagic(chainparams)))
         {
-            LOGA("PROCESSMESSAGE: ERRORS IN HEADER %s peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
+            LOGA("PROCESSMESSAGE: ERRORS IN HEADER %s peer=%s\n", SanitizeString(hdr.GetCommand()), pfrom->GetLogName());
             continue;
         }
         std::string strCommand = hdr.GetCommand();
@@ -7040,9 +7043,9 @@ bool SendMessages(CNode *pto)
                 {
                     state.fSyncStarted = true;
                     state.nSyncStartTime = GetTime();
-                    state.fFirstHeadersReceived = false;
+                    // state.fFirstHeadersReceived = false;  // Only require headers within some time the first time
                     state.fRequestedInitialBlockAvailability = true;
-                    state.nFirstHeadersExpectedHeight = pindexBestHeader->nHeight;
+                    state.nFirstHeadersExpectedHeight = pindexBestHeader->nHeight-2;  // -2 to give room for slow sync
                     nSyncStarted++;
 
                     LOG(NET, "initial getheaders (%d) to peer=%s (startheight:%d)\n", pindexStart->nHeight,
