@@ -56,13 +56,6 @@ std::map<std::pair<void *, void *>, LockStack> lockorders;
 boost::thread_specific_ptr<LockStack> lockstack;
 #endif
 
-
-// We always start with true so that when ActivateBestChain is called during the startup (init.cpp)
-// and we havn't finished initial sync then we don't accidentally trigger the auto-dbcache
-// resize. After ActivateBestChain the fIsInitialBlockDownload flag is set to true or false depending
-// on whether we really have finished sync or not.
-std::atomic<bool> fIsInitialBlockDownload{true};
-
 // this flag is set to true when a wallet rescan has been invoked.
 std::atomic<bool> fRescan{false};
 
