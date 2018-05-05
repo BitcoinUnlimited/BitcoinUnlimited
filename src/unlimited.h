@@ -209,7 +209,7 @@ extern bool IsTrafficShapingEnabled();
 
 // Check whether we are doing an initial block download (synchronizing from disk or network)
 extern bool IsInitialBlockDownload();
-extern void IsInitialBlockDownloadInit();
+extern void IsInitialBlockDownloadInit(bool *fInit = nullptr);
 
 // Check whether we are nearly sync'd.  Used primarily to determine whether an xthin can be retrieved.
 extern bool IsChainNearlySyncd();

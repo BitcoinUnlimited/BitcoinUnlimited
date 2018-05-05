@@ -1222,8 +1222,15 @@ UniValue settrafficshaping(const UniValue &params, bool fHelp)
 
 // fIsInitialBlockDownload is updated only during startup and whenever we receive a header.
 // This way we avoid having to lock cs_main so often which tends to be a bottleneck.
-void IsInitialBlockDownloadInit()
+void IsInitialBlockDownloadInit(bool *fInit)
 {
+    // For unit testing purposes, this step allows us to explicitly set the state of block sync.
+    if (fInit)
+    {
+        fIsInitialBlockDownload.store(*fInit);
+        return;
+    }
+
     const CChainParams &chainParams = Params();
     LOCK(cs_main);
     if (!pindexBestHeader)
