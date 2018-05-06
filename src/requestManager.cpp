@@ -517,7 +517,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                 ss << receiverMemPoolInfo;
                 graphenedata.UpdateOutBoundMemPoolInfo(
                     ::GetSerializeSize(receiverMemPoolInfo, SER_NETWORK, PROTOCOL_VERSION));
-                MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
+                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
                 pfrom->PushMessage(NetMsgType::GET_GRAPHENE, ss);
                 LOG(GRAPHENE, "Requesting graphene block %s from peer %s (%d)\n", inv2.hash.ToString(),
                     pfrom->addrName.c_str(), pfrom->id);
@@ -528,7 +528,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         {
             // Try to download a graphene block if possible otherwise just download a regular block.
             // We can only request one graphene block per peer at a time.
-            MarkBlockAsInFlight(pfrom->GetId(), obj.hash, chainParams.GetConsensus());
+            MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
             if (pfrom->mapGrapheneBlocksInFlight.size() < 1 && CanGrapheneBlockBeDownloaded(pfrom))
             {
                 AddGrapheneBlockInFlight(pfrom, inv2.hash);

@@ -152,7 +152,7 @@ enum
     SELECTCOINS = 0x1000000,
     ZMQ = 0x2000000,
     QT = 0x4000000,
-    IBD = 0x8000000
+    IBD = 0x8000000,
 
     GRAPHENE = 0x10000000
 };

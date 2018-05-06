@@ -568,7 +568,6 @@ public:
         return false;
     }
 
-    void AddAddressKnown(const CAddress &_addr) { addrKnown.insert(_addr.GetKey()); }
     // BUIPXXX:
     bool GrapheneCapable()
     {
