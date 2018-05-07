@@ -787,6 +787,10 @@ BOOST_AUTO_TEST_CASE(util_wildmatch)
     BOOST_CHECK(wildmatch("123*", "123456"));
     BOOST_CHECK(wildmatch("123*456", "123acdef456"));
     BOOST_CHECK(wildmatch("*123", "abcdef123"));
+
+    // length limit check
+    BOOST_CHECK(!wildmatch(std::string("*", 10000), ""));
+    BOOST_CHECK(!wildmatch("*", std::string("x", 10000)));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
