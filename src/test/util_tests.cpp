@@ -154,7 +154,17 @@ BOOST_AUTO_TEST_CASE(util_DbgAssert)
     fPrintToConsole = true;
     DbgAssert(1, i = 1);
     BOOST_CHECK(i == 0);
+
+    // prevent debug output for this failing (on purpose) DbgAssert
+    bool fPrintToConsole_bak = fPrintToConsole;
+    bool fPrintToDebugLog_bak = fPrintToDebugLog;
+    fPrintToConsole = fPrintToDebugLog = false;
+
     DbgAssert(0, i = 1);
+
+    fPrintToDebugLog = fPrintToDebugLog_bak;
+    fPrintToConsole = fPrintToConsole_bak;
+
     BOOST_CHECK(i == 1);
     fPrintToConsole = savedVal;
 #endif
