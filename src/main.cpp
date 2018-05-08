@@ -3820,8 +3820,8 @@ bool ProcessNewBlock(CValidationState &state,
     bool fParallel)
 {
     int64_t start = GetTimeMicros();
-    LOG(THIN, "Processing new block %s from peer %s (%d).\n", pblock->GetHash().ToString(),
-        pfrom ? pfrom->addrName.c_str() : "myself", pfrom ? pfrom->id : 0);
+    LOG(THIN, "Processing new block %s from peer %s.\n", pblock->GetHash().ToString(),
+        pfrom ? pfrom->GetLogName() : "myself");
     // Preliminary checks
     if (!CheckBlockHeader(*pblock, state, true))
     { // block header is bad
@@ -5064,7 +5064,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         inv.type == MSG_FILTERED_BLOCK) &&
                     !pfrom->fWhitelisted)
                 {
-                    LOG(NET, "historical block serving limit reached, disconnect peer=%d\n", pfrom->GetId());
+                    LOG(NET, "historical block serving limit reached, disconnect peer %s\n", pfrom->GetLogName());
 
                     // disconnect node
                     pfrom->fDisconnect = true;
@@ -5218,7 +5218,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     RandAddSeedPerfmon();
     unsigned int msgSize = vRecv.size(); // BU for statistics
     UpdateRecvStats(pfrom, strCommand, msgSize, nTimeReceived);
-    LOG(NET, "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), msgSize, pfrom->id);
+    LOG(NET, "received: %s (%u bytes) peer=%s\n", SanitizeString(strCommand), msgSize, pfrom->GetLogName());
     if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
     {
         LOGA("dropmessagestest DROPPING RECV MESSAGE\n");
@@ -5236,6 +5236,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
         else
         {
+            LOG(NET, "Inconsistent bloom filter settings peer %s\n", pfrom->GetLogName());
             pfrom->fDisconnect = true;
             return false;
         }
@@ -5268,8 +5269,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             pfrom->PushMessage(NetMsgType::REJECT, strCommand, REJECT_OBSOLETE,
                 strprintf("Protocol Version must be %d or greater", MIN_PEER_PROTO_VERSION));
             dosMan.Misbehaving(pfrom, 100);
-            return error("Using obsolete protocol version %i - banning peer=%d version=%s ip=%s", pfrom->nVersion,
-                pfrom->GetId(), pfrom->cleanSubVer, pfrom->addrName.c_str());
+            return error("Using obsolete protocol version %i - banning peer=%s version=%s", pfrom->nVersion,
+                pfrom->GetLogName(), pfrom->cleanSubVer);
         }
 
         if (pfrom->nVersion == 10300)
@@ -5355,12 +5356,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
         }
 
-        std::string remoteAddr;
-        if (fLogIPs)
-            remoteAddr = ", peeraddr=" + pfrom->addr.ToString();
-
-        LOG(NET, "receive version message: %s: version %d, blocks=%d, us=%s, peer=%d%s\n", pfrom->cleanSubVer,
-            pfrom->nVersion, pfrom->nStartingHeight, addrMe.ToString(), pfrom->id, remoteAddr);
+        LOG(NET, "receive version message: %s: version %d, blocks=%d, us=%s, peer=%s\n", pfrom->cleanSubVer,
+            pfrom->nVersion, pfrom->nStartingHeight, addrMe.ToString(), pfrom->GetLogName());
 
         int64_t nTimeOffset = nTime - GetTime();
         pfrom->nTimeOffset = nTimeOffset;
@@ -5373,7 +5370,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             // We can't have an inbound "feeler" connection, so the value must be improperly set.
             DbgAssert(pfrom->fInbound == false, pfrom->fFeeler = false);
             if (pfrom->fInbound == false)
+            {
+                LOG(NET, "Disconnecting feeler to peer %s\n", pfrom->GetLogName());
                 pfrom->fDisconnect = true;
+            }
         }
     }
 
@@ -5528,7 +5528,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (vAddr.size() < 1000)
             pfrom->fGetAddr = false;
         if (pfrom->fOneShot)
+        {
+            LOG(NET, "Disconnecting %s: one shot\n", pfrom->GetLogName());
             pfrom->fDisconnect = true;
+        }
     }
 
     else if (strCommand == NetMsgType::SENDHEADERS)
@@ -6107,6 +6110,13 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 pfrom->GetLogName(), pfrom->nStartingHeight);
             pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexLast), uint256());
 
+            {
+                CNodeState *state = State(pfrom->GetId());
+                DbgAssert(state != nullptr, );
+                if (state)
+                    state->nSyncStartTime = GetTime(); // reset the time because more headers needed
+            }
+
             // During the process of IBD we need to update block availability for every connected peer. To do that we
             // request, from each NODE_NETWORK peer, a header that matches the last blockhash found in this recent set
             // of headers. Once the reqeusted header is received then the block availability for this peer will get
@@ -6288,8 +6298,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (mi == mapBlockIndex.end())
             {
                 dosMan.Misbehaving(pfrom, 100);
-                return error("Peer %s (%d) requested nonexistent block %s", pfrom->addrName.c_str(), pfrom->id,
-                    inv.hash.ToString());
+                return error("Peer %srequested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
             }
 
             CBlock block;
@@ -6297,8 +6306,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
             {
                 // We don't have the block yet, although we know about it.
-                return error("Peer %s (%d) requested block %s that cannot be read", pfrom->addrName.c_str(), pfrom->id,
-                    inv.hash.ToString());
+                return error(
+                    "Peer %s requested block %s that cannot be read", pfrom->GetLogName(), inv.hash.ToString());
             }
             else
             {
@@ -6336,8 +6345,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!pfrom->fVerackSent)
         {
             dosMan.Misbehaving(pfrom, 100);
-            return error("BUVERSION received but we never sent a VERACK message - banning peer=%d version=%s ip=%s",
-                pfrom->GetId(), pfrom->cleanSubVer, pfrom->addrName.c_str());
+            return error("BUVERSION received but we never sent a VERACK message - banning peer=%s version=%s",
+                pfrom->GetLogName(), pfrom->cleanSubVer);
         }
         // Each connection can only send one version message
         if (pfrom->addrFromPort != 0)
@@ -6345,8 +6354,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             pfrom->PushMessage(
                 NetMsgType::REJECT, strCommand, REJECT_DUPLICATE, std::string("Duplicate BU version message"));
             dosMan.Misbehaving(pfrom, 100);
-            return error("Duplicate BU version message received from peer=%d version=%s ip=%s", pfrom->GetId(),
-                pfrom->cleanSubVer, pfrom->addrName.c_str());
+            return error("Duplicate BU version message received from peer=%s version=%s", pfrom->GetLogName(),
+                pfrom->cleanSubVer);
         }
 
         // addrFromPort is needed for connecting and initializing Xpedited forwarding.
@@ -6360,8 +6369,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!pfrom->fBUVersionSent)
         {
             dosMan.Misbehaving(pfrom, 100);
-            return error("BUVERACK received but we never sent a BUVERSION message - banning peer=%d version=%s ip=%s",
-                pfrom->GetId(), pfrom->cleanSubVer, pfrom->addrName.c_str());
+            return error("BUVERACK received but we never sent a BUVERSION message - banning peer=%s version=%s",
+                pfrom->GetLogName(), pfrom->cleanSubVer);
         }
 
         // This step done after final handshake
@@ -6420,6 +6429,15 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 SendExpeditedBlock(*pblock, pfrom);
         }
 
+        {
+            LOCK(cs_main);
+            CNodeState *state = State(pfrom->GetId());
+            DbgAssert(state != nullptr, );
+            if (state)
+                state->nSyncStartTime = GetTime(); // reset the getheaders time because block can consume all bandwidth
+        }
+        pfrom->nPingUsecStart = GetTimeMicros(); // Reset ping time because block can consume all bandwidth
+
         // Message consistency checking
         // NOTE: consistency checking is handled by checkblock() which is called during
         //       ProcessNewBlock() during HandleBlockMessage.
@@ -6461,7 +6479,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     {
         if (CNode::OutboundTargetReached(false) && !pfrom->fWhitelisted)
         {
-            LOG(NET, "mempool request with bandwidth limit reached, disconnect peer=%d\n", pfrom->GetId());
+            LOG(NET, "mempool request with bandwidth limit reached, disconnect peer %s\n", pfrom->GetLogName());
             pfrom->fDisconnect = true;
             return true;
         }
@@ -6647,6 +6665,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             {
                 pfrom->PushMessage(
                     NetMsgType::REJECT, strCommand, REJECT_INVALID, std::string("filter size was too small"));
+                LOG(NET, "Disconnecting %s: bloom filter size too small\n", pfrom->GetLogName());
                 pfrom->fDisconnect = true;
                 return false;
             }
@@ -6770,8 +6789,8 @@ bool ProcessMessages(CNode *pfrom)
         // Scan for message start
         if (memcmp(msg.hdr.pchMessageStart, pfrom->GetMagic(chainparams), MESSAGE_START_SIZE) != 0)
         {
-            LOGA("PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%d ip=%s\n", SanitizeString(msg.hdr.GetCommand()),
-                pfrom->id, pfrom->addrName.c_str());
+            LOGA("PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%s\n", SanitizeString(msg.hdr.GetCommand()),
+                pfrom->GetLogName());
             if (!pfrom->fWhitelisted)
             {
                 dosMan.Ban(pfrom->addr, BanReasonNodeMisbehaving, 4 * 60 * 60); // ban for 4 hours
@@ -6784,7 +6803,8 @@ bool ProcessMessages(CNode *pfrom)
         CMessageHeader &hdr = msg.hdr;
         if (!hdr.IsValid(pfrom->GetMagic(chainparams)))
         {
-            LOGA("PROCESSMESSAGE: ERRORS IN HEADER %s peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
+            LOGA(
+                "PROCESSMESSAGE: ERRORS IN HEADER %s peer=%s\n", SanitizeString(hdr.GetCommand()), pfrom->GetLogName());
             continue;
         }
         std::string strCommand = hdr.GetCommand();
@@ -6845,7 +6865,8 @@ bool ProcessMessages(CNode *pfrom)
         }
 
         if (!fRet)
-            LOGA("%s(%s, %u bytes) FAILED peer=%d\n", __func__, SanitizeString(strCommand), nMessageSize, pfrom->id);
+            LOGA("%s(%s, %u bytes) FAILED peer %s\n", __func__, SanitizeString(strCommand), nMessageSize,
+                pfrom->GetLogName());
 
         break;
     }
@@ -6872,11 +6893,11 @@ bool SendMessages(CNode *pto)
         {
             NodeId nodeid = pto->GetId();
             int nInFlight = requester.GetNumBlocksInFlight(nodeid);
-            LOG(IBD, "peer=%d, checking disconnect request with %d in flight blocks\n", nodeid, nInFlight);
+            LOG(IBD, "peer %s, checking disconnect request with %d in flight blocks\n", pto->GetLogName(), nInFlight);
             if (nInFlight == 0)
             {
                 pto->fDisconnect = true;
-                LOG(IBD, "peer=%d, disconnected\n", nodeid);
+                LOG(IBD, "peer %s, disconnect request was set, so disconnected\n", pto->GetLogName());
             }
         }
 
@@ -6938,9 +6959,9 @@ bool SendMessages(CNode *pto)
                 {
                     if (!pto->fWhitelisted && Params().NetworkIDString() != "regtest")
                     {
-                        LOG(THIN, "ERROR: Disconnecting peer=%d due to thinblock download timeout exceeded "
+                        LOG(THIN, "ERROR: Disconnecting peer %s due to thinblock download timeout exceeded "
                                   "(%d secs)\n",
-                            pto->GetId(), (GetTime() - (*iter).second.nRequestTime));
+                            pto->GetLogName(), (GetTime() - (*iter).second.nRequestTime));
                         pto->fDisconnect = true;
                         break;
                     }
@@ -7040,9 +7061,8 @@ bool SendMessages(CNode *pto)
                 {
                     state.fSyncStarted = true;
                     state.nSyncStartTime = GetTime();
-                    state.fFirstHeadersReceived = false;
                     state.fRequestedInitialBlockAvailability = true;
-                    state.nFirstHeadersExpectedHeight = pindexBestHeader->nHeight;
+                    state.nFirstHeadersExpectedHeight = pindexBestHeader->nHeight - 2; // -2 to give room for slow sync
                     nSyncStarted++;
 
                     LOG(NET, "initial getheaders (%d) to peer=%s (startheight:%d)\n", pindexStart->nHeight,
