@@ -53,7 +53,13 @@ using namespace std;
 extern CTxMemPool mempool; // from main.cpp
 static atomic<uint64_t> nLargestBlockSeen{BLOCKSTREAM_CORE_MAX_BLOCK_SIZE}; // track the largest block we've seen
 static atomic<bool> fIsChainNearlySyncd{false};
-extern atomic<bool> fIsInitialBlockDownload;
+
+// We always start with true so that when ActivateBestChain is called during the startup (init.cpp)
+// and we havn't finished initial sync then we don't accidentally trigger the auto-dbcache
+// resize. After ActivateBestChain the fIsInitialBlockDownload flag is set to true or false depending
+// on whether we really have finished sync or not.
+static std::atomic<bool> fIsInitialBlockDownload{true};
+
 extern CTweakRef<uint64_t> miningBlockSize;
 extern CTweakRef<uint64_t> ebTweak;
 
@@ -1216,8 +1222,15 @@ UniValue settrafficshaping(const UniValue &params, bool fHelp)
 
 // fIsInitialBlockDownload is updated only during startup and whenever we receive a header.
 // This way we avoid having to lock cs_main so often which tends to be a bottleneck.
-void IsInitialBlockDownloadInit()
+void IsInitialBlockDownloadInit(bool *fInit)
 {
+    // For unit testing purposes, this step allows us to explicitly set the state of block sync.
+    if (fInit)
+    {
+        fIsInitialBlockDownload.store(*fInit);
+        return;
+    }
+
     const CChainParams &chainParams = Params();
     LOCK(cs_main);
     if (!pindexBestHeader)
