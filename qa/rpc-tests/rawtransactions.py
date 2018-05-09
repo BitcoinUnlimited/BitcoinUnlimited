@@ -252,6 +252,10 @@ class RawTransactionsTest(BitcoinTestFramework):
         outputs = { self.nodes[0].getnewaddress() : 1 }
         assert_raises(JSONRPCException, self.nodes[0].createrawtransaction, inputs, outputs)
 
+        inputs  = [ {'txid' : "1d1d4e24ed99057e84c3f80fd8fbec79ed9e1acee37da269356ecea000000000", 'vout' : 1, 'sequence' : 'notanumber'}]
+        outputs = { self.nodes[0].getnewaddress() : 1 }
+        assert_raises(JSONRPCException, self.nodes[0].createrawtransaction, inputs, outputs)
+
         inputs  = [ {'txid' : "1d1d4e24ed99057e84c3f80fd8fbec79ed9e1acee37da269356ecea000000000", 'vout' : 1, 'sequence' : 4294967294}]
         outputs = { self.nodes[0].getnewaddress() : 1 }
         rawtx   = self.nodes[0].createrawtransaction(inputs, outputs)

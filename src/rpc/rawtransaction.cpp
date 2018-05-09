@@ -428,6 +428,10 @@ UniValue createrawtransaction(const UniValue &params, bool fHelp)
             else
                 nSequence = (uint32_t)seqNr64;
         }
+        else if (!sequenceObj.isNull())
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, sequence parameter is not a number");
+        }
 
         CTxIn in(COutPoint(txid, nOutput), CScript(), nSequence);
 
