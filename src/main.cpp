@@ -4980,28 +4980,34 @@ std::string GetWarnings(const std::string &strFor)
 
 bool AlreadyHaveTx(const CInv &inv)
 {
-    LOCK(cs_recentRejects);
-    DbgAssert(recentRejects, return false);
-    if (chainActive.Tip()->GetBlockHash() != hashRecentRejectsChainTip)
+    // Make checks for anything that requires cs_recentRejects
     {
-        // If the chain tip has changed previously rejected transactions
-        // might be now valid, e.g. due to a nLockTime'd tx becoming valid,
-        // or a double-spend. Reset the rejects filter and give those
-        // txs a second chance.
-        hashRecentRejectsChainTip = chainActive.Tip()->GetBlockHash();
-        if (recentRejects)
+        LOCK(cs_recentRejects);
+        DbgAssert(recentRejects, return false);
+        if (chainActive.Tip()->GetBlockHash() != hashRecentRejectsChainTip)
         {
-            recentRejects->reset();
+            // If the chain tip has changed previously rejected transactions
+            // might be now valid, e.g. due to a nLockTime'd tx becoming valid,
+            // or a double-spend. Reset the rejects filter and give those
+            // txs a second chance.
+            hashRecentRejectsChainTip = chainActive.Tip()->GetBlockHash();
+            if (recentRejects)
+            {
+                recentRejects->reset();
+            }
+            else
+            {
+                recentRejects.reset(new CRollingBloomFilter(120000, 0.000001));
+            }
         }
-        else
-        {
-            recentRejects.reset(new CRollingBloomFilter(120000, 0.000001));
-        }
+        if (txn_recently_in_block->contains(inv.hash))
+            return true;
+        if (recentRejects->contains(inv.hash))
+            return true;
     }
-    if (txn_recently_in_block->contains(inv.hash))
-        return true;
-    if (recentRejects->contains(inv.hash))
-        return true;
+
+    // Both these require either the mempool.cs or orphanpool.cs locks so we do them outside the scope
+    // of cs_recentRejects so we don't have to worry about locking orders.
     return mempool.exists(inv.hash) || orphanpool.AlreadyHaveOrphan(inv.hash);
 }
 
