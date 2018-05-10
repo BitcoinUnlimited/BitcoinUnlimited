@@ -183,6 +183,7 @@ uint32_t nBlockSequenceId = 1;
  */
 std::map<uint256, NodeId> mapBlockSource;
 
+CCriticalSection cs_recentRejects;
 /**
  * Filter for transactions that were recently rejected by
  * AcceptToMemoryPool. These are not rerequested until the chain tip
@@ -203,8 +204,22 @@ std::map<uint256, NodeId> mapBlockSource;
  *
  * Memory used: 1.7MB
  */
-boost::scoped_ptr<CRollingBloomFilter> recentRejects;
+boost::scoped_ptr<CRollingBloomFilter> recentRejects GUARDED_BY(cs_recentRejects);
 uint256 hashRecentRejectsChainTip;
+
+/**
+ * Keep track of transaction which were recently in a block and don't
+ * request those again.
+ *
+ * Note that we dont actually ever clear this - in cases of reorgs where
+ * transactions dropped out they were either added back to our mempool
+ * or fell out due to size limitations (in which case we'll get them again
+ * if the user really cares and re-sends).
+ *
+ * Protected by cs_recentRejects.
+ */
+std::unique_ptr<CRollingBloomFilter> txn_recently_in_block GUARDED_BY(cs_recentRejects);
+
 
 /** Number of preferable block download peers. */
 int nPreferredDownload = 0;
@@ -2231,10 +2246,20 @@ bool ConnectBlock(const CBlock &block,
 
     PV->Cleanup(block, pindex); // NOTE: this must be run whether in fParallel or not!
 
+    // Track all recent txns in a block so we don't re-request them again. This can happen a txn announcement
+    // arrives just after the block is received.
+    {
+        LOCK(cs_recentRejects);
+        for (const CTransactionRef &ptx : block.vtx)
+        {
+            txn_recently_in_block->insert(ptx->GetHash());
+        }
+    }
+
     // Delete hashes from unverified and preverified sets that will no longer be needed after the block is accepted.
     {
         LOCK(cs_xval);
-        BOOST_FOREACH (const uint256 hash, vHashesToDelete)
+        for (const uint256 &hash : vHashesToDelete)
         {
             setPreVerifiedTxHash.erase(hash);
             setUnVerifiedOrphanTxHash.erase(hash);
@@ -4398,9 +4423,9 @@ void UnloadBlockIndex()
     LOCK(cs_main);
     mapUnConnectedHeaders.clear();
     setBlockIndexCandidates.clear();
-    chainActive.SetTip(NULL);
-    pindexBestInvalid = NULL;
-    pindexBestHeader = NULL;
+    chainActive.SetTip(nullptr);
+    pindexBestInvalid = nullptr;
+    pindexBestHeader = nullptr;
     mempool.clear();
     nSyncStarted = 0;
     mapBlocksUnlinked.clear();
@@ -4413,19 +4438,21 @@ void UnloadBlockIndex()
     setDirtyBlockIndex.clear();
     setDirtyFileInfo.clear();
     mapNodeState.clear();
-    recentRejects.reset(NULL);
     versionbitscache.Clear();
     for (int b = 0; b < VERSIONBITS_NUM_BITS; b++)
     {
         warningcache[b].clear();
     }
 
-    BOOST_FOREACH (BlockMap::value_type &entry, mapBlockIndex)
+    for (BlockMap::value_type &entry : mapBlockIndex)
     {
         delete entry.second;
     }
     mapBlockIndex.clear();
     fHavePruned = false;
+
+    LOCK(cs_recentRejects);
+    recentRejects.reset(nullptr);
 }
 
 bool LoadBlockIndex()
@@ -4441,10 +4468,14 @@ bool InitBlockIndex(const CChainParams &chainparams)
     LOCK(cs_main);
 
     // Initialize global variables that cannot be constructed at startup.
-    recentRejects.reset(new CRollingBloomFilter(120000, 0.000001));
+    {
+        LOCK(cs_recentRejects);
+        recentRejects.reset(new CRollingBloomFilter(120000, 0.000001));
+        txn_recently_in_block.reset(new CRollingBloomFilter(16000 /* just a few block's worth */, 0.000001));
+    }
 
     // Check whether we're already initialized
-    if (chainActive.Genesis() != NULL)
+    if (chainActive.Genesis() != nullptr)
         return true;
 
     // Use the provided setting for -txindex in the new database
@@ -4955,6 +4986,7 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
     {
     case MSG_TX:
     {
+        LOCK(cs_recentRejects);
         // remove assertions from P2P code, but this should hold: assert(recentRejects);
         if (chainActive.Tip()->GetBlockHash() != hashRecentRejectsChainTip)
         {
@@ -4972,10 +5004,9 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
                 recentRejects.reset(new CRollingBloomFilter(120000, 0.000001));
             }
         }
+        if (txn_recently_in_block->contains(inv.hash)) return true;
         bool rrc = recentRejects ? recentRejects->contains(inv.hash) : false;
-        return rrc || mempool.exists(inv.hash) || orphanpool.AlreadyHaveOrphan(inv.hash) ||
-               pcoinsTip->HaveCoinInCache(COutPoint(inv.hash, 0)) || // Best effort: only try output 0 and 1
-               pcoinsTip->HaveCoinInCache(COutPoint(inv.hash, 1));
+        return rrc || mempool.exists(inv.hash) || orphanpool.AlreadyHaveOrphan(inv.hash);
     }
     case MSG_BLOCK:
     case MSG_XTHINBLOCK:
