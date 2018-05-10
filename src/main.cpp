@@ -4987,7 +4987,7 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
     case MSG_TX:
     {
         LOCK(cs_recentRejects);
-        // remove assertions from P2P code, but this should hold: assert(recentRejects);
+        DbgAssert(recentRejects, return false);
         if (chainActive.Tip()->GetBlockHash() != hashRecentRejectsChainTip)
         {
             // If the chain tip has changed previously rejected transactions
