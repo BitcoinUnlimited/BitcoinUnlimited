@@ -5594,8 +5594,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (pfrom->fWhitelisted && GetBoolArg("-whitelistrelay", DEFAULT_WHITELISTRELAY))
             fBlocksOnly = false;
 
-        LOCK(cs_main);
-
         for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
         {
             boost::this_thread::interruption_point();
@@ -5603,6 +5601,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             const CInv &inv = vInv[nInv];
             if (inv.type == MSG_BLOCK)
             {
+                LOCK(cs_main);
                 bool fAlreadyHaveBlock = AlreadyHaveBlock(inv);
                 LOG(NET, "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHaveBlock ? "have" : "new", pfrom->id);
 
@@ -5649,7 +5648,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     requester.AskFor(inv, pfrom);
             }
 
-            // Track requests for our stuff
+            // Track requests for our stuff.
             GetMainSignals().Inventory(inv.hash);
 
             if (pfrom->nSendSize > (SendBufferSize() * 2))
