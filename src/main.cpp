@@ -5004,9 +5004,11 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
                 recentRejects.reset(new CRollingBloomFilter(120000, 0.000001));
             }
         }
-        if (txn_recently_in_block->contains(inv.hash)) return true;
-        bool rrc = recentRejects ? recentRejects->contains(inv.hash) : false;
-        return rrc || mempool.exists(inv.hash) || orphanpool.AlreadyHaveOrphan(inv.hash);
+        if (txn_recently_in_block->contains(inv.hash))
+            return true;
+        if (recentRejects->contains(inv.hash))
+            return true;
+        return mempool.exists(inv.hash) || orphanpool.AlreadyHaveOrphan(inv.hash);
     }
     case MSG_BLOCK:
     case MSG_XTHINBLOCK:
