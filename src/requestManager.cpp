@@ -875,7 +875,7 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
         for (CBlockIndex *pindex : vToDownload)
         {
             CInv inv(MSG_BLOCK, pindex->GetBlockHash());
-            if (!AlreadyHave(inv))
+            if (!AlreadyHaveBlock(inv))
             {
                 vGetBlocks.emplace_back(inv);
                 // LOG(REQ, "AskFor block %s (%d) peer=%s\n", pindex->GetBlockHash().ToString(),

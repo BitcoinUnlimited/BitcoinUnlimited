@@ -4978,54 +4978,43 @@ std::string GetWarnings(const std::string &strFor)
 //
 
 
-bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+bool AlreadyHaveTx(const CInv &inv)
 {
-    AssertLockHeld(cs_main);
-
-    switch (inv.type)
+    LOCK(cs_recentRejects);
+    DbgAssert(recentRejects, return false);
+    if (chainActive.Tip()->GetBlockHash() != hashRecentRejectsChainTip)
     {
-    case MSG_TX:
-    {
-        LOCK(cs_recentRejects);
-        DbgAssert(recentRejects, return false);
-        if (chainActive.Tip()->GetBlockHash() != hashRecentRejectsChainTip)
+        // If the chain tip has changed previously rejected transactions
+        // might be now valid, e.g. due to a nLockTime'd tx becoming valid,
+        // or a double-spend. Reset the rejects filter and give those
+        // txs a second chance.
+        hashRecentRejectsChainTip = chainActive.Tip()->GetBlockHash();
+        if (recentRejects)
         {
-            // If the chain tip has changed previously rejected transactions
-            // might be now valid, e.g. due to a nLockTime'd tx becoming valid,
-            // or a double-spend. Reset the rejects filter and give those
-            // txs a second chance.
-            hashRecentRejectsChainTip = chainActive.Tip()->GetBlockHash();
-            if (recentRejects)
-            {
-                recentRejects->reset();
-            }
-            else
-            {
-                recentRejects.reset(new CRollingBloomFilter(120000, 0.000001));
-            }
+            recentRejects->reset();
         }
-        if (txn_recently_in_block->contains(inv.hash))
-            return true;
-        if (recentRejects->contains(inv.hash))
-            return true;
-        return mempool.exists(inv.hash) || orphanpool.AlreadyHaveOrphan(inv.hash);
+        else
+        {
+            recentRejects.reset(new CRollingBloomFilter(120000, 0.000001));
+        }
     }
-    case MSG_BLOCK:
-    case MSG_XTHINBLOCK:
-    case MSG_THINBLOCK:
-    {
-        // The Request Manager functionality requires that we return true only when we actually have received
-        // the block and not when we have received the header only.  Otherwise the request manager may not
-        // be able to update its block source in order to make re-requests.
-        BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
-        if (mi == mapBlockIndex.end())
-            return false;
-        if (!(mi->second->nStatus & BLOCK_HAVE_DATA))
-            return false;
+    if (txn_recently_in_block->contains(inv.hash))
         return true;
-    }
-    }
-    // Don't know what it is, just say we already got one
+    if (recentRejects->contains(inv.hash))
+        return true;
+    return mempool.exists(inv.hash) || orphanpool.AlreadyHaveOrphan(inv.hash);
+}
+
+bool AlreadyHaveBlock(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+{
+    // The Request Manager functionality requires that we return true only when we actually have received
+    // the block and not when we have received the header only.  Otherwise the request manager may not
+    // be able to update its block source in order to make re-requests.
+    BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
+    if (mi == mapBlockIndex.end())
+        return false;
+    if (!(mi->second->nStatus & BLOCK_HAVE_DATA))
+        return false;
     return true;
 }
 
@@ -5609,15 +5598,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
         {
-            const CInv &inv = vInv[nInv];
-
             boost::this_thread::interruption_point();
 
-            bool fAlreadyHave = AlreadyHave(inv);
-            LOG(NET, "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHave ? "have" : "new", pfrom->id);
-
+            const CInv &inv = vInv[nInv];
             if (inv.type == MSG_BLOCK)
             {
+                bool fAlreadyHaveBlock = AlreadyHaveBlock(inv);
+                LOG(NET, "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHaveBlock ? "have" : "new", pfrom->id);
+
                 requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
                 // RE !IsInitialBlockDownload(): We do not want to get the block if the system is executing the initial
                 // block download because
@@ -5626,8 +5614,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 // throughout older block files.  This will stop those files from being pruned.
                 // !IsInitialBlockDownload() can be removed if
                 // a better block storage system is devised.
-                if ((!fAlreadyHave && !IsInitialBlockDownload()) ||
-                    (!fAlreadyHave && Params().NetworkIDString() == "regtest"))
+                if ((!fAlreadyHaveBlock && !IsInitialBlockDownload()) ||
+                    (!fAlreadyHaveBlock && Params().NetworkIDString() == "regtest"))
                 {
                     // Since we now only rely on headers for block requests, if we get an INV from an older node or
                     // if there was a very large re-org which resulted in a revert to block announcements via INV,
@@ -5640,11 +5628,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 {
                     LOG(NET, "skipping request of block %s.  already have: %d  importing: %d  reindex: %d  "
                              "isChainNearlySyncd: %d\n",
-                        inv.hash.ToString(), fAlreadyHave, fImporting, fReindex, IsChainNearlySyncd());
+                        inv.hash.ToString(), fAlreadyHaveBlock, fImporting, fReindex, IsChainNearlySyncd());
                 }
             }
             else
             {
+                bool fAlreadyHaveTx = AlreadyHaveTx(inv);
+                LOG(NET, "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHaveTx ? "have" : "new", pfrom->id);
+
                 pfrom->AddInventoryKnown(inv);
                 if (fBlocksOnly)
                 {
@@ -5654,7 +5645,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 // RE !IsInitialBlockDownload(): during IBD, its a waste of bandwidth to grab transactions, they will
                 // likely be included in blocks that we IBD download anyway.  This is especially important as
                 // transaction volumes increase.
-                else if (!fAlreadyHave && !IsInitialBlockDownload())
+                else if (!fAlreadyHaveTx && !IsInitialBlockDownload())
                     requester.AskFor(inv, pfrom);
             }
 
@@ -5837,7 +5828,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CValidationState state;
 
         // Check for recently rejected (and do other quick existence checks)
-        if (!AlreadyHave(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
+        if (!AlreadyHaveTx(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
         {
             mempool.check(pcoinsTip);
             RelayTransaction(tx);
@@ -6250,7 +6241,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             {
                 // pindex must be nonnull because we populated vToFetch a few lines above
                 CInv inv(MSG_BLOCK, pindex->GetBlockHash());
-                if (!AlreadyHave(inv))
+                if (!AlreadyHaveBlock(inv))
                 {
                     requester.AskFor(inv, pfrom);
                     LOG(REQ, "AskFor block via headers direct fetch %s (%d) peer=%d\n",
