@@ -596,7 +596,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     std::vector<COutPoint> &vCoinsToUncache)
 {
     unsigned int forkVerifyFlags = 0;
-    const CTransaction &tx = *ptx;
     unsigned int nSigOps = 0;
     ValidationResourceTracker resourceTracker;
     unsigned int nSize = 0;
@@ -607,11 +606,11 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     const CChainParams &chainparams = Params();
     const bool hasMay152018 = IsMay152018Enabled(chainparams.GetConsensus(), chainActive.Tip());
 
-    if (!CheckTransaction(tx, state))
+    if (!CheckTransaction(*ptx, state))
         return false;
 
     // Coinbase is only valid in a block, not as a loose transaction
-    if (tx.IsCoinBase())
+    if (ptx->IsCoinBase())
         return state.DoS(100, false, REJECT_INVALID, "coinbase");
 
     // UAHF: reject transactions that won't work on the fork, starting 2 hours (~12 blocks) before the fork
@@ -623,7 +622,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     if (IsUAHFforkActiveOnNextBlock((chainActive.Tip()->nHeight) - 12))
     {
         forkVerifyFlags = SCRIPT_ENABLE_SIGHASH_FORKID;
-        if (IsTxOpReturnInvalid(tx))
+        if (IsTxOpReturnInvalid(*ptx))
             return state.DoS(0, false, REJECT_WRONG_FORK, "wrong-fork");
     }
 
@@ -642,7 +641,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     // Don't relay version 2 transactions until CSV is active, and we can be
     // sure that such transactions will be mined (unless we're on
     // -testnet/-regtest).
-    if (fRequireStandard && tx.nVersion >= 2 &&
+    if (fRequireStandard && ptx->nVersion >= 2 &&
         VersionBitsTipState(chainparams.GetConsensus(), Consensus::DEPLOYMENT_CSV) != THRESHOLD_ACTIVE)
     {
         return state.DoS(0, false, REJECT_NONSTANDARD, "premature-version2-tx");
@@ -655,7 +654,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
 
     // is it already in the memory pool?
-    uint256 hash = tx.GetHash();
+    uint256 hash = ptx->GetHash();
     if (pool.exists(hash))
         return state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
 
@@ -718,7 +717,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             // Bring the best block into scope
             view.GetBestBlock();
 
-            nValueIn = view.GetValueIn(tx);
+            nValueIn = view.GetValueIn(*ptx);
 
             // we have all inputs cached now, so switch back to dummy, so we don't need to keep lock on mempool
             view.SetBackend(dummy);
@@ -728,18 +727,18 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             // be mined yet.
             // Must keep pool.cs for this unless we change CheckSequenceLocks to take a
             // CoinsViewCache instead of create its own
-            if (!CheckSequenceLocks(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp))
+            if (!CheckSequenceLocks(*ptx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp))
                 return state.DoS(0, false, REJECT_NONSTANDARD, "non-BIP68-final");
         }
 
         // Check for non-standard pay-to-script-hash in inputs
-        if (fRequireStandard && !AreInputsStandard(tx, view))
+        if (fRequireStandard && !AreInputsStandard(*ptx, view))
             return state.Invalid(false, REJECT_NONSTANDARD, "bad-txns-nonstandard-inputs");
 
-        nSigOps = GetLegacySigOpCount(tx);
-        nSigOps += GetP2SHSigOpCount(tx, view);
+        nSigOps = GetLegacySigOpCount(*ptx);
+        nSigOps += GetP2SHSigOpCount(*ptx, view);
 
-        CAmount nValueOut = tx.GetValueOut();
+        CAmount nValueOut = ptx->GetValueOut();
         CAmount nFees = nValueIn - nValueOut;
         // nModifiedFees includes any fee deltas from PrioritiseTransaction
         CAmount nModifiedFees = nFees;
@@ -747,12 +746,12 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         pool.ApplyDeltas(hash, nPriorityDummy, nModifiedFees);
 
         CAmount inChainInputValue;
-        double dPriority = view.GetPriority(tx, chainActive.Height(), inChainInputValue);
+        double dPriority = view.GetPriority(*ptx, chainActive.Height(), inChainInputValue);
 
         // Keep track of transactions that spend a coinbase, which we re-scan
         // during reorgs to ensure COINBASE_MATURITY is still met.
         bool fSpendsCoinbase = false;
-        for (const CTxIn &txin : tx.vin)
+        for (const CTxIn &txin : ptx->vin)
         {
             const Coin &coin = view.AccessCoin(txin.prevout);
             if (coin.IsCoinBase())
@@ -762,7 +761,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             }
         }
 
-        CTxMemPoolEntry entry(ptx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(tx),
+        CTxMemPoolEntry entry(ptx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(*ptx),
             inChainInputValue, fSpendsCoinbase, nSigOps, lp);
         nSize = entry.GetTxSize();
 
@@ -898,10 +897,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         unsigned char sighashType = 0;
-        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags | extraFlags, true,
+        if (!CheckInputs(*ptx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags | extraFlags, true,
                 &resourceTracker, nullptr, &sighashType))
         {
-            LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", tx.GetHash().ToString().c_str());
+            LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", ptx->GetHash().ToString().c_str());
             return false;
         }
         entry.UpdateRuntimeSigOps(resourceTracker.GetSigOps(), resourceTracker.GetSighashBytes());
@@ -916,7 +915,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | forkVerifyFlags | extraFlags, true,
+        if (!CheckInputs(*ptx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | forkVerifyFlags | extraFlags, true,
                 nullptr, nullptr, &sighashType2))
         {
             return error(
@@ -957,14 +956,14 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     }
 
     if (!fRejectAbsurdFee)
-        SyncWithWallets(tx, NULL, -1);
+        SyncWithWallets(*ptx, nullptr, -1);
 
     int64_t end = GetTimeMicros();
 
     LOG(BENCH, "ValidateTransaction, time: %d, tx: %s, len: %d, sigops: %llu (legacy: %u), sighash: %llu, Vin: "
                "%llu, Vout: %llu\n",
-        end - start, tx.GetHash().ToString(), nSize, resourceTracker.GetSigOps(), (unsigned int)nSigOps,
-        resourceTracker.GetSighashBytes(), tx.vin.size(), tx.vout.size());
+        end - start, ptx->GetHash().ToString(), nSize, resourceTracker.GetSigOps(), (unsigned int)nSigOps,
+        resourceTracker.GetSighashBytes(), ptx->vin.size(), ptx->vout.size());
     nTxValidationTime << (end - start);
 
     return true;
