@@ -548,7 +548,7 @@ bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex);
 /** The currently-connected chain of blocks (protected by cs_main). */
 extern CChain chainActive;
 
-/** Global variable that points to the active CCoinsView (protected by cs_main) */
+/** Global variable that points to the active CCoinsView (protected by cs_utxo) */
 extern CCoinsViewCache *pcoinsTip;
 
 /** Global variable that points to the active block tree (protected by cs_main) */
