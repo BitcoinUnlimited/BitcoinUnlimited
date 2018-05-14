@@ -678,6 +678,8 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     {
         if (GetBoolArg("-txindex", DEFAULT_TXINDEX))
             return InitError(_("Prune mode is incompatible with -txindex."));
+        if (GetBoolArg("-addrindex", DEFAULT_ADDRINDEX))
+            return InitError(_("Prune mode is incompatible with -addrindex."));
 #ifdef ENABLE_WALLET
         if (GetBoolArg("-rescan", false))
         {
@@ -1104,6 +1106,12 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 if (fTxIndex != GetBoolArg("-txindex", DEFAULT_TXINDEX))
                 {
                     strLoadError = _("You need to rebuild the database using -reindex to change -txindex");
+                    break;
+                }
+                // Check for changed -txindex state
+                if (fAddrIndex != GetBoolArg("-addrindex", DEFAULT_ADDRINDEX))
+                {
+                    strLoadError = _("You need to rebuild the database using -reindex to change -addrindex");
                     break;
                 }
 
