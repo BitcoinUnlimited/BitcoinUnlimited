@@ -613,17 +613,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     if (ptx->IsCoinBase())
         return state.DoS(100, false, REJECT_INVALID, "coinbase");
 
-    // UAHF: reject transactions that won't work on the fork, starting 2 hours (~12 blocks) before the fork
-    // based on op_return.
-    // But accept both sighashtypes because we will need all the tx types during the transition.
-    // This code uses the system time to determine when to start rejecting which is inaccurate relative to the
-    // actual activation time (defined by times in the blocks).
-    // But its ok to reject these transactions from the mempool a little early (or late).
+    // UAHF: accept both sighashtypes because we will need all the tx types during the transition.
     if (IsUAHFforkActiveOnNextBlock((chainActive.Tip()->nHeight) - 12))
     {
         forkVerifyFlags = SCRIPT_ENABLE_SIGHASH_FORKID;
-        if (IsTxOpReturnInvalid(*ptx))
-            return state.DoS(0, false, REJECT_WRONG_FORK, "wrong-fork");
     }
 
     // Reject nonstandard transactions if so configured.
@@ -3675,11 +3668,6 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
                                  hash.ToString(), nHeight, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, block.GetBlockSize()),
                 REJECT_INVALID, "bad-blk-too-small");
         }
-    }
-    // UAHF check soft-fork items, such as tx targeted to the 1MB chain
-    if (pindexPrev && IsUAHFforkActiveOnNextBlock(pindexPrev->nHeight))
-    {
-        return ValidateUAHFBlock(block, state, nHeight);
     }
 
     return true;
