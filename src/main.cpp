@@ -4471,7 +4471,13 @@ bool InitBlockIndex(const CChainParams &chainparams)
     {
         LOCK(cs_recentRejects);
         recentRejects.reset(new CRollingBloomFilter(120000, 0.000001));
-        txn_recently_in_block.reset(new CRollingBloomFilter(16000 /* just a few block's worth */, 0.000001));
+
+        // Using an average 500 bytes per transaction to calculate number of bloom filter elements.
+        //
+        // We hold a maximum of two blocks worth of data in the event that two blocks
+        // are mined very close in time. But in general we only need one block of data.
+        uint32_t nElements = 2 * excessiveBlockSize / 500;
+        txn_recently_in_block.reset(new CRollingBloomFilter(nElements, 0.000001));
     }
 
     // Check whether we're already initialized
