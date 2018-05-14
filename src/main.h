@@ -246,7 +246,7 @@ void UnregisterNodeSignals(CNodeSignals &nodeSignals);
 bool ProcessNewBlock(CValidationState &state,
     const CChainParams &chainparams,
     CNode *pfrom,
-    const CBlock *pblock,
+    const CBlockRef pblock,
     bool fForceProcessing,
     CDiskBlockPos *dbp,
     bool fParallel);
@@ -311,7 +311,7 @@ bool GetTransaction(const uint256 &hash,
 /** Find the best known block, and make it the tip of the block chain */
 bool ActivateBestChain(CValidationState &state,
     const CChainParams &chainparams,
-    const CBlock *pblock = NULL,
+    CBlockRef pblock = nullptr,
     bool fParallel = false);
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
 
@@ -484,14 +484,14 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex, const Consensus
  *  In case pfClean is provided, operation will try to be tolerant about errors, and *pfClean
  *  will be true if no problems were found. Otherwise, the return value will be false in case
  *  of problems. Note that in any case, coins may be modified. */
-bool DisconnectBlock(const CBlock &block,
+bool DisconnectBlock(const CBlockRef pblock,
     CValidationState &state,
     const CBlockIndex *pindex,
     CCoinsViewCache &coins,
-    bool *pfClean = NULL);
+    bool *pfClean = nullptr);
 
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins */
-bool ConnectBlock(const CBlock &block,
+bool ConnectBlock(const CBlockRef block,
     CValidationState &state,
     CBlockIndex *pindex,
     CCoinsViewCache &coins,

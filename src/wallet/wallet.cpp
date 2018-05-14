@@ -813,14 +813,14 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
  * pblock is optional, but should be provided if the transaction is known to be in a block.
  * If fUpdate is true, existing transactions will be updated.
  */
-bool CWallet::AddToWalletIfInvolvingMe(const CTransaction &tx, const CBlock *pblock, bool fUpdate, int txIndex)
+bool CWallet::AddToWalletIfInvolvingMe(const CTransaction &tx, const CBlockRef pblock, bool fUpdate, int txIndex)
 {
     {
         AssertLockHeld(cs_wallet);
 
         if (pblock)
         {
-            BOOST_FOREACH (const CTxIn &txin, tx.vin)
+            for (const CTxIn &txin : tx.vin)
             {
                 std::pair<TxSpends::const_iterator, TxSpends::const_iterator> range =
                     mapTxSpends.equal_range(txin.prevout);
@@ -988,7 +988,7 @@ void CWallet::MarkConflicted(const uint256 &hashBlock, const uint256 &hashTx)
     }
 }
 
-void CWallet::SyncTransaction(const CTransaction &tx, const CBlock *pblock, int txIdx)
+void CWallet::SyncTransaction(const CTransaction &tx, const CBlockRef pblock, int txIdx)
 {
     LOCK2(cs_main, cs_wallet);
 
@@ -998,7 +998,7 @@ void CWallet::SyncTransaction(const CTransaction &tx, const CBlock *pblock, int 
     // If a transaction changes 'conflicted' state, that changes the balance
     // available of the outputs it spends. So force those to be
     // recomputed, also:
-    BOOST_FOREACH (const CTxIn &txin, tx.vin)
+    for (const CTxIn &txin : tx.vin)
     {
         if (mapWallet.count(txin.prevout.hash))
             mapWallet[txin.prevout.hash].MarkDirty();
@@ -1318,7 +1318,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
             int txIdx = 0;
             for (const auto &tx : block.vtx)
             {
-                if (AddToWalletIfInvolvingMe(*tx, &block, fUpdate, txIdx))
+                if (AddToWalletIfInvolvingMe(*tx, MakeBlockRef(block), fUpdate, txIdx))
                     ret++;
                 txIdx++;
             }

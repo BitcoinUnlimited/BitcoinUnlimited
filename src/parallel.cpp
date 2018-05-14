@@ -123,8 +123,11 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
     return true;
 }
 
-void CParallelValidation::Cleanup(const CBlock &block, CBlockIndex *pindex)
+void CParallelValidation::Cleanup(const CBlockRef pblock, CBlockIndex *pindex)
 {
+    assert(pblock);
+    assert(pindex);
+
     // Swap the block index sequence id's such that the winning block has the lowest id and all other id's
     // are still in their same order relative to each other.
     LOCK(cs_blockvalidationthread);
@@ -137,7 +140,7 @@ void CParallelValidation::Cleanup(const CBlock &block, CBlockIndex *pindex)
         map<boost::thread::id, CHandleBlockMsgThreads>::iterator mi = mapBlockValidationThreads.begin();
         while (mi != mapBlockValidationThreads.end())
         {
-            if ((*mi).first != this_id && (*mi).second.hashPrevBlock == block.GetBlockHeader().hashPrevBlock)
+            if ((*mi).first != this_id && (*mi).second.hashPrevBlock == pblock->GetBlockHeader().hashPrevBlock)
                 vSequenceId.push_back(make_pair((*mi).second.nSequenceId, (*mi).second.hash));
             mi++;
         }
@@ -155,7 +158,7 @@ void CParallelValidation::Cleanup(const CBlock &block, CBlockIndex *pindex)
                     nId = 1;
                 if ((*riter).first == 0)
                     (*riter).first = 1;
-                LOG(PARALLEL, "swapping sequence id for block %s before %d after %d\n", block.GetHash().ToString(),
+                LOG(PARALLEL, "swapping sequence id for block %s before %d after %d\n", pblock->GetHash().ToString(),
                     pindex->nSequenceId, (*riter).first);
                 pindex->nSequenceId = (*riter).first;
                 (*riter).first = nId;
@@ -549,12 +552,12 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     const CChainParams &chainparams = Params();
     if (PV->Enabled())
     {
-        ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, true);
+        ProcessNewBlock(state, chainparams, pfrom, pblock, forceProcessing, nullptr, true);
     }
     else
     {
         LOCK(cs_main); // locking cs_main here prevents any other thread from beginning starting a block validation.
-        ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, false);
+        ProcessNewBlock(state, chainparams, pfrom, pblock, forceProcessing, nullptr, false);
     }
 
     int nDoS;
