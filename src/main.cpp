@@ -204,7 +204,7 @@ CCriticalSection cs_recentRejects;
  *
  * Memory used: 1.7MB
  */
-boost::scoped_ptr<CRollingBloomFilter> recentRejects GUARDED_BY(cs_recentRejects);
+std::unique_ptr<CRollingBloomFilter> recentRejects GUARDED_BY(cs_recentRejects);
 uint256 hashRecentRejectsChainTip;
 
 /**
