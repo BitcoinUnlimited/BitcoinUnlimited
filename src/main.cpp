@@ -8,6 +8,7 @@
 
 #include "addrman.h"
 #include "arith_uint256.h"
+#include "base58.h"
 #include "blockrelay/graphene.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
@@ -77,6 +78,7 @@ std::atomic<int64_t> nTimeBestReceived{0};
 bool fImporting = false;
 bool fReindex = false;
 bool fTxIndex = false;
+bool fAddrIndex = false;
 bool fHavePruned = false;
 bool fPruneMode = false;
 bool fIsBareMultisigStd = DEFAULT_PERMIT_BAREMULTISIG;
@@ -504,6 +506,49 @@ bool AreFreeTxnsDisallowed()
     if (GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY) > 0)
         return false;
 
+    return true;
+}
+
+bool ReadTransaction(CTransaction &tx, const CDiskTxPos &pos, uint256 &hashBlock)
+{
+    CAutoFile file(OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION);
+    CBlockHeader header;
+    try
+    {
+        file >> header;
+        fseek(file.Get(), pos.nTxOffset, SEEK_CUR);
+        file >> tx;
+    }
+    catch (std::exception &e)
+    {
+        return error("%s() : deserialize or I/O error", __PRETTY_FUNCTION__);
+    }
+    hashBlock = header.GetHash();
+    return true;
+}
+
+bool FindTransactionsByDestination(const CTxDestination &dest, std::set<CExtDiskTxPos> &setpos)
+{
+    uint160 addrid;
+    const CKeyID *pkeyid = boost::get<CKeyID>(&dest);
+    if (pkeyid)
+        addrid = static_cast<uint160>(*pkeyid);
+    if (addrid.IsNull())
+    {
+        const CScriptID *pscriptid = boost::get<CScriptID>(&dest);
+        if (pscriptid)
+            addrid = static_cast<uint160>(*pscriptid);
+    }
+    if (addrid.IsNull())
+        return false;
+
+    LOCK(cs_main);
+    if (!fAddrIndex)
+        return false;
+    std::vector<CExtDiskTxPos> vPos;
+    if (!pblocktree->ReadAddrIndex(addrid, vPos))
+        return false;
+    setpos.insert(vPos.begin(), vPos.end());
     return true;
 }
 
@@ -1182,6 +1227,41 @@ static int64_t nTimeIndex = 0;
 static int64_t nTimeCallbacks = 0;
 static int64_t nTimeTotal = 0;
 
+// Index either: a) every data push >=8 bytes,  b) if no such pushes, the entire script
+void static BuildAddrIndex(const CScript &script,
+    const CExtDiskTxPos &pos,
+    std::vector<std::pair<uint160, CExtDiskTxPos> > &out)
+{
+    CScript::const_iterator pc = script.begin();
+    CScript::const_iterator pend = script.end();
+    std::vector<unsigned char> data;
+    opcodetype opcode;
+    bool fHaveData = false;
+    while (pc < pend)
+    {
+        script.GetOp(pc, opcode, data);
+        if (0 <= opcode && opcode <= OP_PUSHDATA4 && data.size() >= 8)
+        { // data element
+            uint160 addrid;
+            if (data.size() <= 20)
+            {
+                memcpy(&addrid, &data[0], data.size());
+            }
+            else
+            {
+                addrid = Hash160(data);
+            }
+            out.push_back(std::make_pair(addrid, pos));
+            fHaveData = true;
+        }
+    }
+    if (!fHaveData)
+    {
+        uint160 addrid = Hash160(script);
+        out.push_back(std::make_pair(addrid, pos));
+    }
+}
+
 bool ConnectBlock(const CBlock &block,
     CValidationState &state,
     CBlockIndex *pindex,
@@ -1313,9 +1393,19 @@ bool ConnectBlock(const CBlock &block,
     CAmount nFees = 0;
     int nInputs = 0;
     unsigned int nSigOps = 0;
-    CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
-    std::vector<std::pair<uint256, CDiskTxPos> > vPos;
-    vPos.reserve(block.vtx.size());
+
+    // CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
+    // std::vector<std::pair<uint256, CDiskTxPos> > vPos;
+    // vPos.reserve(block.vtx.size());
+
+    CExtDiskTxPos pos(CDiskTxPos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size())), pindex->nHeight);
+    std::vector<std::pair<uint256, CDiskTxPos> > vPosTxid;
+    std::vector<std::pair<uint160, CExtDiskTxPos> > vPosAddrid;
+    if (fTxIndex)
+        vPosTxid.reserve(block.vtx.size());
+    if (fAddrIndex)
+        vPosAddrid.reserve(4 * block.vtx.size());
+
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
     int nChecked = 0;
     int nOrphansChecked = 0;
@@ -1453,13 +1543,37 @@ bool ConnectBlock(const CBlock &block,
                 }
             }
 
+            if (fTxIndex)
+                vPosTxid.push_back(std::make_pair(tx.GetHash(), pos));
+            if (fAddrIndex)
+            {
+                if (!tx.IsCoinBase())
+                {
+                    for (const auto &txin : tx.vin)
+                    {
+                        Coin coin;
+                        if (!view.GetCoin(txin.prevout, coin))
+                        {
+                            LOGA("%s: error: no coins found for: %s\n\tfor block: %d, vtx.size=%d\n", __func__,
+                                txin.prevout.hash.ToString(), pindex->nHeight, block.vtx.size());
+                            return AbortNode(state, "Failed to write AddrIndex");
+                        }
+                        BuildAddrIndex(coin.out.scriptPubKey, pos, vPosAddrid);
+                    }
+                }
+                for (const CTxOut &txout : tx.vout)
+                {
+                    BuildAddrIndex(txout.scriptPubKey, pos, vPosAddrid);
+                }
+            }
+
             CTxUndo undoDummy;
             if (i > 0)
             {
                 blockundo.vtxundo.push_back(CTxUndo());
             }
             UpdateCoins(tx, state, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
-            vPos.push_back(std::make_pair(tx.GetHash(), pos));
+            // vPos.push_back(std::make_pair(tx.GetHash(), pos));
             pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
 
             if (PV->QuitReceived(this_id, fParallel))
@@ -1549,8 +1663,12 @@ bool ConnectBlock(const CBlock &block,
     }
 
     if (fTxIndex)
-        if (!pblocktree->WriteTxIndex(vPos))
+        if (!pblocktree->WriteTxIndex(vPosTxid))
             return AbortNode(state, "Failed to write transaction index");
+
+    if (fAddrIndex)
+        if (!pblocktree->AddAddrIndex(vPosAddrid))
+            return AbortNode(state, "Failed to write address index");
 
     // add this block to the view's block chain (the main UTXO in memory cache)
     view.SetBestBlock(pindex->GetBlockHash());
@@ -3456,6 +3574,9 @@ bool static LoadBlockIndexDB()
     pblocktree->ReadFlag("txindex", fTxIndex);
     LOGA("%s: transaction index %s\n", __func__, fTxIndex ? "enabled" : "disabled");
 
+    pblocktree->ReadFlag("addrindex", fAddrIndex);
+    LOGA("%s: address index %s\n", __func__, fAddrIndex ? "enabled" : "disabled");
+
     // Load pointer to end of best chain
     uint256 bestblockhash = pcoinsdbview->GetBestBlock();
     BlockMap::iterator it = mapBlockIndex.find(bestblockhash);
@@ -3650,6 +3771,8 @@ bool InitBlockIndex(const CChainParams &chainparams)
     // Use the provided setting for -txindex in the new database
     fTxIndex = GetBoolArg("-txindex", DEFAULT_TXINDEX);
     pblocktree->WriteFlag("txindex", fTxIndex);
+    fAddrIndex = GetBoolArg("-addrindex", DEFAULT_ADDRINDEX);
+    pblocktree->WriteFlag("addrindex", fAddrIndex);
     LOGA("Initializing databases...\n");
 
     // Only add the genesis block if not reindexing (in which case we reuse the one already on disk)

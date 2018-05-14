@@ -282,7 +282,10 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addArg("reindex", optionalBool, _("Rebuild block chain index from current blk000??.dat files on startup"))
         .addArg("txindex", optionalBool,
             strprintf(_("Maintain a full transaction index, used by the getrawtransaction rpc call (default: %u)"),
-                    DEFAULT_TXINDEX));
+                    DEFAULT_TXINDEX))
+        .addArg("addrindex", optionalBool,
+            strprintf(_("Maintain a full address index, used by the searchrawtransactions rpc call (default: %u)"),
+                    DEFAULT_ADDRINDEX));
 }
 
 static void addConnectionOptions(AllowedArgs &allowedArgs)

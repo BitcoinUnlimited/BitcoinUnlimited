@@ -182,6 +182,7 @@ extern CConditionVariable cvBlockChange;
 extern bool fImporting;
 extern bool fReindex;
 extern bool fTxIndex;
+extern bool fAddrIndex;
 extern bool fIsBareMultisigStd;
 extern unsigned int nBytesPerSigOp;
 extern bool fCheckBlockIndex;
@@ -436,6 +437,9 @@ public:
     }
 };
 
+
+bool ReadTransaction(CTransaction &tx, const CDiskTxPos &pos, uint256 &hashBlock);
+bool FindTransactionsByDestination(const CTxDestination &dest, std::set<CExtDiskTxPos> &setpos);
 
 /** Functions for validating blocks and updating the block tree */
 
