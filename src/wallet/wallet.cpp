@@ -817,47 +817,44 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
  */
 bool CWallet::AddToWalletIfInvolvingMe(const CTransaction &tx, const CBlock *pblock, bool fUpdate, int txIndex)
 {
-    {
-        AssertLockHeld(cs_wallet);
+    AssertLockHeld(cs_wallet);
 
-        if (pblock)
+    if (pblock)
+    {
+        for (const CTxIn &txin : tx.vin)
         {
-            for (const CTxIn &txin : tx.vin)
+            std::pair<TxSpends::const_iterator, TxSpends::const_iterator> range = mapTxSpends.equal_range(txin.prevout);
+            while (range.first != range.second)
             {
-                std::pair<TxSpends::const_iterator, TxSpends::const_iterator> range =
-                    mapTxSpends.equal_range(txin.prevout);
-                while (range.first != range.second)
+                if (range.first->second != tx.GetHash())
                 {
-                    if (range.first->second != tx.GetHash())
-                    {
-                        LOGA("Transaction %s (in block %s) conflicts with wallet transaction %s (both spend %s:%i)\n",
-                            tx.GetHash().ToString(), pblock->GetHash().ToString(), range.first->second.ToString(),
-                            range.first->first.hash.ToString(), range.first->first.n);
-                        MarkConflicted(pblock->GetHash(), range.first->second);
-                    }
-                    range.first++;
+                    LOGA("Transaction %s (in block %s) conflicts with wallet transaction %s (both spend %s:%i)\n",
+                        tx.GetHash().ToString(), pblock->GetHash().ToString(), range.first->second.ToString(),
+                        range.first->first.hash.ToString(), range.first->first.n);
+                    MarkConflicted(pblock->GetHash(), range.first->second);
                 }
+                range.first++;
             }
         }
+    }
 
-        bool fExisted = mapWallet.count(tx.GetHash()) != 0;
-        if (fExisted && !fUpdate)
-            return false;
-        if (fExisted || IsMine(tx) || IsFromMe(tx))
-        {
-            CWalletTx wtx(this, tx);
+    bool fExisted = mapWallet.count(tx.GetHash()) != 0;
+    if (fExisted && !fUpdate)
+        return false;
+    if (fExisted || IsMine(tx) || IsFromMe(tx))
+    {
+        CWalletTx wtx(this, tx);
 
-            // Get merkle branch if transaction was found in a block
-            if (pblock)
-                wtx.SetMerkleBranch(*pblock, txIndex);
+        // Get merkle branch if transaction was found in a block
+        if (pblock)
+            wtx.SetMerkleBranch(*pblock, txIndex);
 
-            // Do not flush the wallet here for performance reasons
-            // this is safe, as in case of a crash, we rescan the necessary blocks on startup through our
-            // SetBestChain-mechanism
-            CWalletDB walletdb(strWalletFile, "r+", false);
+        // Do not flush the wallet here for performance reasons
+        // this is safe, as in case of a crash, we rescan the necessary blocks on startup through our
+        // SetBestChain-mechanism
+        CWalletDB walletdb(strWalletFile, "r+", false);
 
-            return AddToWallet(wtx, false, &walletdb);
-        }
+        return AddToWallet(wtx, false, &walletdb);
     }
     return false;
 }
@@ -1009,16 +1006,14 @@ void CWallet::SyncTransaction(const CTransaction &tx, const CBlock *pblock, int 
 
 CAmount CWallet::GetDebit(const CTxIn &txin, const isminefilter &filter) const
 {
+    LOCK(cs_wallet);
+    map<uint256, CWalletTx>::const_iterator mi = mapWallet.find(txin.prevout.hash);
+    if (mi != mapWallet.end())
     {
-        LOCK(cs_wallet);
-        map<uint256, CWalletTx>::const_iterator mi = mapWallet.find(txin.prevout.hash);
-        if (mi != mapWallet.end())
-        {
-            const CWalletTx &prev = (*mi).second;
-            if (txin.prevout.n < prev.vout.size())
-                if (IsMine(prev.vout[txin.prevout.n]) & filter)
-                    return prev.vout[txin.prevout.n].nValue;
-        }
+        const CWalletTx &prev = (*mi).second;
+        if (txin.prevout.n < prev.vout.size())
+            if (IsMine(prev.vout[txin.prevout.n]) & filter)
+                return prev.vout[txin.prevout.n].nValue;
     }
     return 0;
 }
@@ -1027,15 +1022,13 @@ isminetype CWallet::IsMine(const CTxDestination &dest) const { return ::IsMine(*
 isminetype CWallet::IsMine(const CTxOut &txout) const { return ::IsMine(*this, txout.scriptPubKey, chainActive.Tip()); }
 isminetype CWallet::IsMine(const CTxIn &txin) const
 {
+    LOCK(cs_wallet);
+    map<uint256, CWalletTx>::const_iterator mi = mapWallet.find(txin.prevout.hash);
+    if (mi != mapWallet.end())
     {
-        LOCK(cs_wallet);
-        map<uint256, CWalletTx>::const_iterator mi = mapWallet.find(txin.prevout.hash);
-        if (mi != mapWallet.end())
-        {
-            const CWalletTx &prev = (*mi).second;
-            if (txin.prevout.n < prev.vout.size())
-                return IsMine(prev.vout[txin.prevout.n]);
-        }
+        const CWalletTx &prev = (*mi).second;
+        if (txin.prevout.n < prev.vout.size())
+            return IsMine(prev.vout[txin.prevout.n]);
     }
     return ISMINE_NO;
 }
@@ -2699,57 +2692,53 @@ bool CWallet::SetDefaultKey(const CPubKey &vchPubKey)
  */
 bool CWallet::NewKeyPool()
 {
+    LOCK(cs_wallet);
+    CWalletDB walletdb(strWalletFile);
+    for (int64_t nIndex : setKeyPool)
     {
-        LOCK(cs_wallet);
-        CWalletDB walletdb(strWalletFile);
-        for (int64_t nIndex : setKeyPool)
-        {
-            walletdb.ErasePool(nIndex);
-        }
-        setKeyPool.clear();
-
-        if (IsLocked())
-            return false;
-
-        int64_t nKeys = max(GetArg("-keypool", DEFAULT_KEYPOOL_SIZE), (int64_t)0);
-        for (int i = 0; i < nKeys; i++)
-        {
-            int64_t nIndex = i + 1;
-            walletdb.WritePool(nIndex, CKeyPool(GenerateNewKey()));
-            setKeyPool.insert(nIndex);
-        }
-        LOGA("CWallet::NewKeyPool wrote %d new keys\n", nKeys);
+        walletdb.ErasePool(nIndex);
     }
+    setKeyPool.clear();
+
+    if (IsLocked())
+        return false;
+
+    int64_t nKeys = max(GetArg("-keypool", DEFAULT_KEYPOOL_SIZE), (int64_t)0);
+    for (int i = 0; i < nKeys; i++)
+    {
+        int64_t nIndex = i + 1;
+        walletdb.WritePool(nIndex, CKeyPool(GenerateNewKey()));
+        setKeyPool.insert(nIndex);
+    }
+    LOGA("CWallet::NewKeyPool wrote %d new keys\n", nKeys);
     return true;
 }
 
 bool CWallet::TopUpKeyPool(unsigned int kpSize)
 {
+    LOCK(cs_wallet);
+
+    if (IsLocked())
+        return false;
+
+    CWalletDB walletdb(strWalletFile);
+
+    // Top up key pool
+    unsigned int nTargetSize;
+    if (kpSize > 0)
+        nTargetSize = kpSize;
+    else
+        nTargetSize = max(GetArg("-keypool", DEFAULT_KEYPOOL_SIZE), (int64_t)0);
+
+    while (setKeyPool.size() < (nTargetSize + 1))
     {
-        LOCK(cs_wallet);
-
-        if (IsLocked())
-            return false;
-
-        CWalletDB walletdb(strWalletFile);
-
-        // Top up key pool
-        unsigned int nTargetSize;
-        if (kpSize > 0)
-            nTargetSize = kpSize;
-        else
-            nTargetSize = max(GetArg("-keypool", DEFAULT_KEYPOOL_SIZE), (int64_t)0);
-
-        while (setKeyPool.size() < (nTargetSize + 1))
-        {
-            int64_t nEnd = 1;
-            if (!setKeyPool.empty())
-                nEnd = *(--setKeyPool.end()) + 1;
-            if (!walletdb.WritePool(nEnd, CKeyPool(GenerateNewKey())))
-                throw runtime_error("TopUpKeyPool(): writing generated key failed");
-            setKeyPool.insert(nEnd);
-            LOGA("keypool added key %d, size=%u\n", nEnd, setKeyPool.size());
-        }
+        int64_t nEnd = 1;
+        if (!setKeyPool.empty())
+            nEnd = *(--setKeyPool.end()) + 1;
+        if (!walletdb.WritePool(nEnd, CKeyPool(GenerateNewKey())))
+            throw runtime_error("TopUpKeyPool(): writing generated key failed");
+        setKeyPool.insert(nEnd);
+        LOGA("keypool added key %d, size=%u\n", nEnd, setKeyPool.size());
     }
     return true;
 }
