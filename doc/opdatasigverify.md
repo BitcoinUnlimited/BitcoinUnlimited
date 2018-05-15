@@ -8,7 +8,7 @@ OP_DATASIGVERIFY allows signed data to be imported into a script.  This data can
 
 ## Requirements on miners, full nodes, and clients
 
-Miners, full nodes, and clients will implement the OP_DATASIGVERIFY opcode and activate it during the May 2018 hard fork.
+Miners, full nodes, and clients will probably implement the OP_DATASIGVERIFY opcode and activate it during the Nov 2018 hard fork.
 
 ## OP_DATASIGVERIFY Specification
 
@@ -76,7 +76,7 @@ else-branch spend: `z' y' 0`
 
 ## Reference Implementation
 
-Please refer to [this github branch](https://github.com/gandrewstone/BitcoinUnlimited/tree/op_datasigverify) for a complete implementation.  Implementation is in src/test/interpreter.cpp/h and unit tests are located at src/test/script_tests.cpp.
+Please refer to [this github commit](https://github.com/BitcoinUnlimited/BitcoinUnlimited/commit/1bf53307cab5d96076721ef5a238a63b03aca07d) for a complete implementation.  Implementation is in src/test/interpreter.{cpp,h} and unit tests are located at src/test/script_tests.cpp.
 
 The opcode implementation is short enough to include here:
 ```c++
