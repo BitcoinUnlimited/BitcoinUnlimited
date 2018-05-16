@@ -270,7 +270,10 @@ bool LoadBlockIndex();
 void UnloadBlockIndex();
 /** Process protocol messages received from a given node */
 bool ProcessMessages(CNode *pfrom);
-bool AlreadyHave(const CInv &);
+/** Do we already have this transaction or has it been seen in a block */
+bool AlreadyHaveTx(const CInv &inv);
+/** Do we already have this block on disk */
+bool AlreadyHaveBlock(const CInv &inv);
 bool AcceptBlockHeader(const CBlockHeader &block,
     CValidationState &state,
     const CChainParams &chainparams,

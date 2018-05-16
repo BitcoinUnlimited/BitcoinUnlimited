@@ -109,7 +109,7 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     bool fAlreadyHave = false;
     {
         LOCK(cs_main);
-        fAlreadyHave = AlreadyHave(inv);
+        fAlreadyHave = AlreadyHaveBlock(inv);
     }
     if (fAlreadyHave)
     {
@@ -322,7 +322,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     bool fAlreadyHave = false;
     {
         LOCK(cs_main);
-        fAlreadyHave = AlreadyHave(inv);
+        fAlreadyHave = AlreadyHaveBlock(inv);
     }
     if (fAlreadyHave)
     {
