@@ -10,6 +10,7 @@
 #include "checkpoints.h"
 #include "connmgr.h"
 #include "consensus/consensus.h"
+#include "consensus/merkle.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "core_io.h"
@@ -39,6 +40,7 @@
 #include "utilstrencodings.h"
 #include "validationinterface.h"
 #include "version.h"
+
 
 #include <atomic>
 #include <boost/foreach.hpp>
@@ -1615,6 +1617,426 @@ UniValue setlog(const UniValue &params, bool fHelp)
 
     return ret;
 }
+
+/** Stratum Protocol - begin */
+
+
+/** Oustanding transactions are removed after 30 sec */
+static void RmOldStratumTransactions()
+{
+    // NOT thread safe.
+    // Protect with critical sections in the RPC functions.
+    int64_t now = GetTime();
+    int64_t tdiff;
+    const int64_t old = 30 * 1000; // sec
+
+    for (auto it = gStratumTransactionMap.begin(); it != gStratumTransactionMap.end();)
+    {
+        tdiff = now - it->second.timeStamp;
+        if (tdiff > old || tdiff < 0) // Too old. Or if (<0) time messed up.
+        {
+            it = gStratumTransactionMap.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
+
+std::vector<uint256> GetStratumMerkleBranches(CBlock *pblock)
+{
+    /*
+    TODO: Only works for "full branches", such as:
+    H(1) size 1
+    H(2,3) size 2
+    H(4,7) size 4
+    */
+    std::vector<uint256> ret;
+    int len = pblock->vtx.size();
+    // LOGA("---- %d ----\n", len);
+
+    if (len < 2)
+    {
+        return ret; // H(0) first element not used. Return empty vector.
+    }
+
+    std::vector<uint256> leaves;
+    for (int i = 0; i < len; i++)
+    {
+        leaves.push_back(pblock->vtx[i].get()->GetHash());
+    }
+
+    // H(1):
+    std::vector<uint256> vecslice(leaves.begin() + 1, leaves.begin() + 2);
+    ret.push_back(ComputeMerkleRoot(vecslice));
+
+    // All the other leaves:
+    int nprocessed = 2; // 2 since H(0), H(1) done
+    // 2^x -1:
+    // H(2,3), H(4,7), ...
+    int x = 1, y = 0; // H(x,y)
+    int indx;
+    while (nprocessed < len)
+    {
+        x = x * 2;
+        y = x * 2 - 1;
+        // LOGA("H(%d,%d) ", x, y);
+        indx = y + 1;
+        if (indx >= len)
+            indx = len;
+
+        std::vector<uint256> vecslice(leaves.begin() + x, leaves.begin() + indx);
+        // LOGA("size %d\n", vecslice.size());
+
+        ret.push_back(ComputeMerkleRoot(vecslice));
+        nprocessed += vecslice.size();
+    }
+
+    return ret;
+}
+
+/** Create JSON to send to miner */
+static UniValue GetStratumJson(CStratumTransaction &trans)
+{
+    UniValue ret(UniValue::VOBJ);
+    CBlock &block = trans.block;
+
+    RmOldStratumTransactions(); // Not threadsafe
+
+    // Save transaction so can be looked up:
+    trans.timeStamp = GetTime();
+    int64_t id = GetRand(~0x0L);
+    gStratumTransactionMap[id] = trans; // Caller must ensure thread safe.
+    ret.push_back(Pair("id", id));
+
+    // Stratum protocol:
+    // https://slushpool.com/help/manual/stratum-protocol
+    ret.push_back(Pair("prevhash", block.hashPrevBlock.GetHex()));
+
+    {
+        const CTransaction *tran = block.vtx[0].get();
+        ret.push_back(Pair("coinbase", EncodeHexTx(*tran)));
+    }
+
+    // like getblocktemplate send an int not a string:
+    // ret.push_back(Pair("version",to_string(block.nVersion))); //stratum string
+    ret.push_back(Pair("version", block.nVersion));
+    ret.push_back(Pair("nBits", strprintf("%08x", block.nBits)));
+    ret.push_back(Pair("time", block.GetBlockTime()));
+
+    // merklebranches:
+    {
+        std::vector<uint256> brancharr = GetStratumMerkleBranches(&block);
+        // LOGA("merklebranches len %d\n",brancharr.size());
+        UniValue merklebranches(UniValue::VARR);
+        for (unsigned int i = 0; i < brancharr.size(); i++)
+        {
+            merklebranches.push_back(UniValue(brancharr[i].ToString()));
+        }
+        ret.push_back(Pair("merklebranches", merklebranches));
+    }
+
+    return ret;
+}
+
+// TBD Move to tests:
+UniValue testCpuStratumMinerClient(CStratumTransaction &trans);
+
+UniValue getstratum(const UniValue &params, bool fHelp)
+{
+    UniValue ret(UniValue::VOBJ);
+    UniValue paramsArr(UniValue::VARR);
+    UniValue stratum(UniValue::VOBJ);
+    LOCK(cs_main);
+
+    if (fHelp || params.size() > 0)
+    {
+        throw runtime_error("getstratum"
+                            "\nReturns Stratum protocol data needed to do mining.\n"
+                            "\nArguments: None\n");
+    }
+
+    CStratumTransaction trans;
+    mkblocktemplate(params, &trans.block);
+
+#if 1 // Set to 0 to test for development.
+    ret = GetStratumJson(trans);
+#else
+    // TEST:
+    fPrintToConsole = true;
+    ret = testCpuStratumMinerClient(trans);
+    fPrintToConsole = false;
+#endif
+
+    return ret;
+}
+
+
+/** Submit a solved block in Stratum format.*/
+UniValue submitstratum(const UniValue &params, bool fHelp)
+{
+    UniValue ret(UniValue::VOBJ);
+    UniValue rcvd;
+    CTransaction *coinbase = new CTransaction();
+    CBlock block;
+    LOCK(cs_main);
+
+    if (fHelp || params.size() != 1)
+    {
+        throw runtime_error("submitstratum \"Stratum data\" ( \"jsonparametersobject\" )\n"
+                            "\nAttempts to submit a new block to the network.\n"
+                            "\nArguments\n"
+                            "1. \"stratumdata\"    (string, required) the Stratum (JSON encoded) data to submit\n"
+
+                            "\nResult:\n"
+                            "{\n"
+                            "  \"error\": true|false,\n"
+                            "  \"message\": \"a message\"\"\n"
+                            "}\n"
+
+                            "\nExamples:\n" +
+                            HelpExampleCli("submitstratum", "\"mystratumdata\""));
+    }
+
+    if (!rcvd.read(params[0].get_str()))
+    {
+        throw JSONRPCError(RPC_PARSE_ERROR, "[0] (first) argument is not valid JSON");
+    }
+
+    int64_t id = rcvd["id"].get_int64();
+
+    RmOldStratumTransactions();
+
+    if (gStratumTransactionMap.count(id) == 1)
+    {
+        block = gStratumTransactionMap[id].block;
+        gStratumTransactionMap.erase(id);
+    }
+    else
+    {
+        ret.push_back(Pair("error", UniValue(true)));
+        ret.push_back(Pair("message", "Id not found."));
+        return ret; // Leave if no id
+    }
+
+    block.nNonce = rcvd["nonce"].get_int();
+
+    UniValue time = rcvd["time"];
+    if (!time.isNull())
+    {
+        block.nTime = time.get_int();
+    }
+
+    // Coinbase:
+    {
+        DecodeHexTx(*coinbase, rcvd["coinbase"].get_str());
+        block.vtx[0].reset(coinbase);
+    }
+
+    // MerkleRoot:
+    {
+        std::vector<uint256> merklebranches = GetStratumMerkleBranches(&block);
+        uint256 t = coinbase->GetHash();
+        block.hashMerkleRoot = StratumMerkleRoot(t, merklebranches);
+    }
+
+    UniValue uvsub = SubmitBlock(block); // returns string on failure
+
+    if (!uvsub.isStr())
+    {
+        // Good
+        ret.push_back(Pair("error", UniValue(false)));
+        ret.push_back(Pair("message", "success"));
+    }
+    else
+    {
+        // Error
+        ret.push_back(Pair("error", UniValue(true)));
+        ret.push_back(Pair("message", "rejected"));
+    }
+
+    return ret;
+}
+
+void NextMerkleRoot(uint256 &merkle_root, uint256 &merkle_branch)
+{
+    // Append a branch to the root. Double SHA256 the whole thing:
+    uint256 hash;
+    CHash256()
+        .Write(merkle_root.begin(), merkle_root.size())
+        .Write(merkle_branch.begin(), merkle_branch.size())
+        .Finalize(hash.begin());
+    merkle_root = hash;
+}
+
+uint256 StratumMerkleRoot(uint256 &coinbase_hash, std::vector<uint256> merklebranches)
+{
+    uint256 merkle_root = coinbase_hash;
+    for (unsigned int i = 0; i < merklebranches.size(); i++)
+    {
+        NextMerkleRoot(merkle_root, merklebranches[i]);
+    }
+    return merkle_root;
+}
+
+/////////////////
+// Stratum CPU miner test code
+// TODO move
+void CpuMineStratumSetExtraNonce(CTransaction &coinbase, unsigned int &nExtraNonce)
+{
+    // Update nExtraNonce
+
+    CHash256 hasher;
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    ss << coinbase;
+
+    unsigned char *pbytes = (unsigned char *)&ss[0];
+    *(unsigned int *)(pbytes + 84) = nExtraNonce; // 84 -start of script
+}
+
+bool CpuMineStratum(CBlockHeader *pblock, CTransaction &coinbase, std::vector<uint256> merklebranches)
+{
+    LOGA("CpuMineStratum started\n");
+    unsigned int nExtraNonce = 0;
+    bool found = false;
+    int ntries = 10;
+    uint256 t;
+
+    while (!found)
+    {
+        ++nExtraNonce;
+        CpuMineStratumSetExtraNonce(coinbase, nExtraNonce);
+        t = coinbase.GetHash();
+        pblock->hashMerkleRoot = StratumMerkleRoot(t, merklebranches);
+        //
+        // Search
+        //
+        arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
+        uint256 hash;
+        uint32_t nNonce = 0;
+        while (!found)
+        {
+            // Check if something found
+            if (ScanHash(pblock, nNonce, &hash))
+            {
+                if (UintToArith256(hash) <= hashTarget)
+                {
+                    // Found a solution
+                    pblock->nNonce = nNonce;
+                    assert(hash == pblock->GetHash());
+                    found = true;
+                    LOGA("proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(), hashTarget.GetHex());
+
+                    break;
+                }
+                else
+                {
+                    if (ntries-- < 1)
+                    {
+                        LOGA("CpuMineStratum Gave up\n");
+                        return false; // Give up leave
+                    }
+                }
+            }
+        }
+    }
+
+    return found;
+}
+
+CBlockHeader mkStratumBlockHeader(const UniValue &params)
+{
+    // Does not set hashMerkleRoot (Does not exist in Stratum params).
+
+    CBlockHeader blockheader;
+
+    // nVersion
+    blockheader.nVersion = params["version"].get_int();
+
+    // hashPrevBlock
+    string tmpstr = params["prevhash"].get_str();
+    std::vector<unsigned char> vec = ParseHex(tmpstr);
+    std::reverse(vec.begin(), vec.end()); // sent reversed
+    blockheader.hashPrevBlock = uint256(vec);
+
+    // nTime:
+    blockheader.nTime = params["time"].get_int();
+
+    // nBits
+    {
+        std::stringstream ss;
+        ss << std::hex << params["nBits"].get_str();
+        ss >> blockheader.nBits;
+    }
+
+    return blockheader;
+}
+
+// TODO put in client "cpuminer" program
+UniValue CpuStratumMinerClient(const UniValue &params, bool &found)
+{
+    UniValue tmp(UniValue::VOBJ);
+    UniValue ret(UniValue::VARR);
+    CTransaction coinbase;
+    string tmpstr;
+    std::vector<uint256> merklebranches;
+    CBlockHeader header;
+
+    found = false;
+
+    // coinbase:
+    DecodeHexTx(coinbase, params["coinbase"].get_str());
+
+    // re-create merkle branches:
+    {
+        UniValue uvMerklebranches = params["merklebranches"];
+        // uint256 branch;
+        for (unsigned int i = 0; i < uvMerklebranches.size(); i++)
+        {
+            tmpstr = uvMerklebranches[i].get_str();
+            std::vector<unsigned char> mbr = ParseHex(tmpstr);
+            std::reverse(mbr.begin(), mbr.end());
+            merklebranches.push_back(uint256(mbr));
+        }
+    }
+
+    header = mkStratumBlockHeader(params);
+    found = CpuMineStratum(&header, coinbase, merklebranches);
+
+    // Leave if not found:
+    if (!found)
+        return ret;
+
+    tmp.push_back(Pair("coinbase", EncodeHexTx(coinbase)));
+    tmp.push_back(Pair("id", params["id"]));
+    // tmp.push_back(Pair("time",GetTime()));
+
+    tmp.push_back(Pair("nonce", UniValue(header.nNonce)));
+    ret.push_back(UniValue(tmp.write()));
+    return ret;
+}
+
+UniValue testCpuStratumMinerClient(CStratumTransaction &trans)
+{
+    UniValue ret(UniValue::VARR);
+    bool found = false;
+    // bitcoind sends json:
+    UniValue params = GetStratumJson(trans);
+    // miner mines:
+    ret = CpuStratumMinerClient(params, found);
+    // if found sends to bitcoind:
+    if (found)
+        ret = submitstratum(ret, false);
+    return ret;
+}
+
+// End
+// Stratum CPU miner test code
+// TODO move ^^^
+/////////////////
+
+
 /* clang-format off */
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafeMode
@@ -1635,6 +2057,8 @@ static const CRPCCommand commands[] =
     { "mining",             "getblockversion",        &getblockversion,        true  },
     { "mining",             "setblockversion",        &setblockversion,        true  },
     { "mining",             "validateblocktemplate",  &validateblocktemplate,  true  },
+    { "mining",             "getstratum",             &getstratum,             true  },
+    { "mining",             "submitstratum",          &submitstratum,          true  },
 
     /* Utility functions */
     { "util",               "getstatlist",            &getstatlist,            true  },

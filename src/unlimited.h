@@ -289,4 +289,19 @@ extern CTweak<uint64_t> miningForkEB;
 /** This specifies the minimum max block size at the fork point */
 extern CTweak<uint64_t> miningForkMG;
 
+// Stratum Protocol
+/** Return a Merkle root given a Coinbase and Merkle branches */
+uint256 StratumMerkleRoot(uint256 &coinbase_hash, std::vector<uint256> merklebranches);
+/** Return Stratum Merkle branches for a Block */
+std::vector<uint256> GetStratumMerkleBranches(CBlock *pblock);
+
+/** Keep track of outstanding Stratum transactions */
+class CStratumTransaction
+{
+public:
+    int64_t timeStamp;
+    CBlock block;
+};
+
+extern std::map<int64_t, CStratumTransaction> gStratumTransactionMap;
 #endif
