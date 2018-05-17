@@ -3635,3 +3635,9 @@ bool ProcessNewBlock(CValidationState &state,
     nBlockValidationTime << (end - start);
     return true;
 }
+
+bool IsBlockPruned(const CBlockIndex *pblockindex)
+{
+    READLOCK(cs_mapBlockIndex); // for nStatus
+    return (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0);
+}

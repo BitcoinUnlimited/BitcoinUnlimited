@@ -613,14 +613,10 @@ static bool is_param_trueish(const UniValue &param)
 
 static CBlock GetBlockChecked(const CBlockIndex *pblockindex)
 {
+    if (IsBlockPruned(pblockindex))
+        throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
+
     CBlock block;
-    {
-        READLOCK(cs_mapBlockIndex);
-        if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
-        {
-            throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
-        }
-    }
     if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
     {
         // Block not found on disk. This could be because we have the block
