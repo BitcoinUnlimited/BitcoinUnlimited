@@ -197,9 +197,11 @@ public:
                 // August 1st 2017 CASH fork (UAHF)
                 478559, uint256S("0x000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec"))(
                 // November 13th 2017 new DAA fork
-                504031, uint256S("0x0000000000000000011ebf65b60d0a3de80b8175be709d653b4c1a1beeb6ab9c")),
-            1483472411, // * UNIX timestamp of last checkpoint block
-            184495391, // * total number of transactions between genesis and last checkpoint
+                504031, uint256S("0x0000000000000000011ebf65b60d0a3de80b8175be709d653b4c1a1beeb6ab9c"))(
+                // May 15th 2018 re-enable op_codes and 32 MB max block size
+                530359, uint256S("0x0000000000000000011ada8bd08f46074f44a8f155396f43e38acf9501c49103")),
+            1526410186, // * UNIX timestamp of last checkpoint block
+            249416375, // * total number of transactions between genesis and last checkpoint
             //   (the tx=... number in the SetBestChain debug.log lines)
             280000.0 // * estimated number of transactions per day after checkpoint (~3.5 TPS)
         };
