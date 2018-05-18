@@ -20,6 +20,7 @@ BOOST_AUTO_TEST_CASE(rpc_excessive)
 
     BOOST_CHECK_NO_THROW(CallRPC("getminingmaxblock"));
 
+    BOOST_CHECK_NO_THROW(CallRPC("setminingmaxblock 2000"));
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock not_uint"), runtime_error);
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock 4000000 not_uint"), boost::bad_lexical_cast);
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock 4000000 -1"), boost::bad_lexical_cast);
