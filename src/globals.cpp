@@ -276,7 +276,7 @@ CThinBlockData thindata; // Singleton class
 
 uint256 bitcoinCashForkBlockHash = uint256S("000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec");
 
-map<int64_t, CStratumTransaction> gStratumTransactionMap;
+map<int64_t, CMiningCandidate> miningCandidatesMap;
 
 #ifdef ENABLE_MUTRACE
 class CPrintSomePointers

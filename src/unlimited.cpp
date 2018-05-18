@@ -1618,11 +1618,10 @@ UniValue setlog(const UniValue &params, bool fHelp)
     return ret;
 }
 
-/** Stratum Protocol - begin */
+/** Mining-Candidate Protocol - begin */
 
-
-/** Oustanding transactions are removed after 30 sec */
-static void RmOldStratumTransactions()
+/** Oustanding candidates are removed after 30 sec */
+static void RmOldMiningCandidates()
 {
     // NOT thread safe.
     // Protect with critical sections in the RPC functions.
@@ -1630,12 +1629,12 @@ static void RmOldStratumTransactions()
     int64_t tdiff;
     const int64_t old = 30 * 1000; // sec
 
-    for (auto it = gStratumTransactionMap.begin(); it != gStratumTransactionMap.end();)
+    for (auto it = miningCandidatesMap.begin(); it != miningCandidatesMap.end();)
     {
         tdiff = now - it->second.timeStamp;
         if (tdiff > old || tdiff < 0) // Too old. Or if (<0) time messed up.
         {
-            it = gStratumTransactionMap.erase(it);
+            it = miningCandidatesMap.erase(it);
         }
         else
         {
@@ -1644,7 +1643,7 @@ static void RmOldStratumTransactions()
     }
 }
 
-std::vector<uint256> GetStratumMerkleBranches(CBlock *pblock)
+std::vector<uint256> GetMerkleProofBranches(CBlock *pblock)
 {
     /*
     TODO: Only works for "full branches", such as:
@@ -1696,22 +1695,21 @@ std::vector<uint256> GetStratumMerkleBranches(CBlock *pblock)
     return ret;
 }
 
-/** Create JSON to send to miner */
-static UniValue GetStratumJson(CStratumTransaction &trans)
+/** Create Mining-Candidate JSON to send to miner */
+static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
 {
+    // Caller must ensure thread safe.
     UniValue ret(UniValue::VOBJ);
-    CBlock &block = trans.block;
+    CBlock &block = candid.block;
 
-    RmOldStratumTransactions(); // Not threadsafe
+    RmOldMiningCandidates(); // Not threadsafe
 
-    // Save transaction so can be looked up:
-    trans.timeStamp = GetTime();
+    // Save candidate so can be looked up:
+    candid.timeStamp = GetTime();
     int64_t id = GetRand(~0x0L);
-    gStratumTransactionMap[id] = trans; // Caller must ensure thread safe.
+    miningCandidatesMap[id] = candid; // Not threadsafe
     ret.push_back(Pair("id", id));
 
-    // Stratum protocol:
-    // https://slushpool.com/help/manual/stratum-protocol
     ret.push_back(Pair("prevhash", block.hashPrevBlock.GetHex()));
 
     {
@@ -1720,14 +1718,14 @@ static UniValue GetStratumJson(CStratumTransaction &trans)
     }
 
     // like getblocktemplate send an int not a string:
-    // ret.push_back(Pair("version",to_string(block.nVersion))); //stratum string
+    // ret.push_back(Pair("version",to_string(block.nVersion))); //FIX USE this string
     ret.push_back(Pair("version", block.nVersion));
     ret.push_back(Pair("nBits", strprintf("%08x", block.nBits)));
     ret.push_back(Pair("time", block.GetBlockTime()));
 
     // merklebranches:
     {
-        std::vector<uint256> brancharr = GetStratumMerkleBranches(&block);
+        std::vector<uint256> brancharr = GetMerkleProofBranches(&block);
         // LOGA("merklebranches len %d\n",brancharr.size());
         UniValue merklebranches(UniValue::VARR);
         for (unsigned int i = 0; i < brancharr.size(); i++)
@@ -1741,40 +1739,37 @@ static UniValue GetStratumJson(CStratumTransaction &trans)
 }
 
 // TBD Move to tests:
-UniValue testCpuStratumMinerClient(CStratumTransaction &trans);
+UniValue TestCpuMiner(CMiningCandidate &candid);
 
-UniValue getstratum(const UniValue &params, bool fHelp)
+UniValue getminingcandidate(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
-    UniValue paramsArr(UniValue::VARR);
-    UniValue stratum(UniValue::VOBJ);
+    CMiningCandidate candid;
     LOCK(cs_main);
 
     if (fHelp || params.size() > 0)
     {
-        throw runtime_error("getstratum"
-                            "\nReturns Stratum protocol data needed to do mining.\n"
+        throw runtime_error("getminingcandidate"
+                            "\nReturns Mining-Candidate protocol data.\n"
                             "\nArguments: None\n");
     }
 
-    CStratumTransaction trans;
-    mkblocktemplate(params, &trans.block);
+    mkblocktemplate(params, &candid.block);
 
 #if 1 // Set to 0 to test for development.
-    ret = GetStratumJson(trans);
+    ret = MkMiningCandidateJson(candid);
 #else
     // TEST:
     fPrintToConsole = true;
-    ret = testCpuStratumMinerClient(trans);
+    ret = TestCpuMiner(candid);
     fPrintToConsole = false;
 #endif
 
     return ret;
 }
 
-
-/** Submit a solved block in Stratum format.*/
-UniValue submitstratum(const UniValue &params, bool fHelp)
+/** Submit a solved block*/
+UniValue submitminingsolution(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
     UniValue rcvd;
@@ -1784,19 +1779,20 @@ UniValue submitstratum(const UniValue &params, bool fHelp)
 
     if (fHelp || params.size() != 1)
     {
-        throw runtime_error("submitstratum \"Stratum data\" ( \"jsonparametersobject\" )\n"
-                            "\nAttempts to submit a new block to the network.\n"
-                            "\nArguments\n"
-                            "1. \"stratumdata\"    (string, required) the Stratum (JSON encoded) data to submit\n"
+        throw runtime_error(
+            "submitminingsolution \"Mining-Candidate data\" ( \"jsonparametersobject\" )\n"
+            "\nAttempts to submit a new block to the network.\n"
+            "\nArguments\n"
+            "1. \"submitminingsolutiondata\"    (string, required) the mining solution (JSON encoded) data to submit\n"
 
-                            "\nResult:\n"
-                            "{\n"
-                            "  \"error\": true|false,\n"
-                            "  \"message\": \"a message\"\"\n"
-                            "}\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"error\": true|false,\n"
+            "  \"message\": \"a message\"\"\n"
+            "}\n"
 
-                            "\nExamples:\n" +
-                            HelpExampleCli("submitstratum", "\"mystratumdata\""));
+            "\nExamples:\n" +
+            HelpExampleCli("submitminingsolution", "\"myminingsolutiondadata\""));
     }
 
     if (!rcvd.read(params[0].get_str()))
@@ -1806,12 +1802,12 @@ UniValue submitstratum(const UniValue &params, bool fHelp)
 
     int64_t id = rcvd["id"].get_int64();
 
-    RmOldStratumTransactions();
+    RmOldMiningCandidates();
 
-    if (gStratumTransactionMap.count(id) == 1)
+    if (miningCandidatesMap.count(id) == 1)
     {
-        block = gStratumTransactionMap[id].block;
-        gStratumTransactionMap.erase(id);
+        block = miningCandidatesMap[id].block;
+        miningCandidatesMap.erase(id);
     }
     else
     {
@@ -1836,9 +1832,9 @@ UniValue submitstratum(const UniValue &params, bool fHelp)
 
     // MerkleRoot:
     {
-        std::vector<uint256> merklebranches = GetStratumMerkleBranches(&block);
+        std::vector<uint256> merklebranches = GetMerkleProofBranches(&block);
         uint256 t = coinbase->GetHash();
-        block.hashMerkleRoot = StratumMerkleRoot(t, merklebranches);
+        block.hashMerkleRoot = CalculateMerkleRoot(t, merklebranches);
     }
 
     UniValue uvsub = SubmitBlock(block); // returns string on failure
@@ -1859,7 +1855,7 @@ UniValue submitstratum(const UniValue &params, bool fHelp)
     return ret;
 }
 
-void NextMerkleRoot(uint256 &merkle_root, uint256 &merkle_branch)
+void CalculateNextMerkleRoot(uint256 &merkle_root, uint256 &merkle_branch)
 {
     // Append a branch to the root. Double SHA256 the whole thing:
     uint256 hash;
@@ -1870,20 +1866,20 @@ void NextMerkleRoot(uint256 &merkle_root, uint256 &merkle_branch)
     merkle_root = hash;
 }
 
-uint256 StratumMerkleRoot(uint256 &coinbase_hash, std::vector<uint256> merklebranches)
+uint256 CalculateMerkleRoot(uint256 &coinbase_hash, std::vector<uint256> merklebranches)
 {
     uint256 merkle_root = coinbase_hash;
     for (unsigned int i = 0; i < merklebranches.size(); i++)
     {
-        NextMerkleRoot(merkle_root, merklebranches[i]);
+        CalculateNextMerkleRoot(merkle_root, merklebranches[i]);
     }
     return merkle_root;
 }
 
 /////////////////
-// Stratum CPU miner test code
+// Mining-Candidate CPU miner test code
 // TODO move
-void CpuMineStratumSetExtraNonce(CTransaction &coinbase, unsigned int &nExtraNonce)
+void CpuMineSetExtraNonce(CTransaction &coinbase, unsigned int &nExtraNonce)
 {
     // Update nExtraNonce
 
@@ -1895,9 +1891,9 @@ void CpuMineStratumSetExtraNonce(CTransaction &coinbase, unsigned int &nExtraNon
     *(unsigned int *)(pbytes + 84) = nExtraNonce; // 84 -start of script
 }
 
-bool CpuMineStratum(CBlockHeader *pblock, CTransaction &coinbase, std::vector<uint256> merklebranches)
+bool CpuMine(CBlockHeader *pblock, CTransaction &coinbase, std::vector<uint256> merklebranches)
 {
-    LOGA("CpuMineStratum started\n");
+    LOGA("CpuMine started\n");
     unsigned int nExtraNonce = 0;
     bool found = false;
     int ntries = 10;
@@ -1906,9 +1902,9 @@ bool CpuMineStratum(CBlockHeader *pblock, CTransaction &coinbase, std::vector<ui
     while (!found)
     {
         ++nExtraNonce;
-        CpuMineStratumSetExtraNonce(coinbase, nExtraNonce);
+        CpuMineSetExtraNonce(coinbase, nExtraNonce);
         t = coinbase.GetHash();
-        pblock->hashMerkleRoot = StratumMerkleRoot(t, merklebranches);
+        pblock->hashMerkleRoot = CalculateMerkleRoot(t, merklebranches);
         //
         // Search
         //
@@ -1934,7 +1930,7 @@ bool CpuMineStratum(CBlockHeader *pblock, CTransaction &coinbase, std::vector<ui
                 {
                     if (ntries-- < 1)
                     {
-                        LOGA("CpuMineStratum Gave up\n");
+                        LOGA("CpuMine Gave up\n");
                         return false; // Give up leave
                     }
                 }
@@ -1945,9 +1941,9 @@ bool CpuMineStratum(CBlockHeader *pblock, CTransaction &coinbase, std::vector<ui
     return found;
 }
 
-CBlockHeader mkStratumBlockHeader(const UniValue &params)
+CBlockHeader CpuMinerJsonToHeader(const UniValue &params)
 {
-    // Does not set hashMerkleRoot (Does not exist in Stratum params).
+    // Does not set hashMerkleRoot (Does not exist in Mining-Candidate params).
 
     CBlockHeader blockheader;
 
@@ -1974,7 +1970,7 @@ CBlockHeader mkStratumBlockHeader(const UniValue &params)
 }
 
 // TODO put in client "cpuminer" program
-UniValue CpuStratumMinerClient(const UniValue &params, bool &found)
+UniValue CpuMiner(const UniValue &params, bool &found)
 {
     UniValue tmp(UniValue::VOBJ);
     UniValue ret(UniValue::VARR);
@@ -2001,8 +1997,8 @@ UniValue CpuStratumMinerClient(const UniValue &params, bool &found)
         }
     }
 
-    header = mkStratumBlockHeader(params);
-    found = CpuMineStratum(&header, coinbase, merklebranches);
+    header = CpuMinerJsonToHeader(params);
+    found = CpuMine(&header, coinbase, merklebranches);
 
     // Leave if not found:
     if (!found)
@@ -2017,22 +2013,22 @@ UniValue CpuStratumMinerClient(const UniValue &params, bool &found)
     return ret;
 }
 
-UniValue testCpuStratumMinerClient(CStratumTransaction &trans)
+UniValue TestCpuMiner(CMiningCandidate &candid)
 {
     UniValue ret(UniValue::VARR);
     bool found = false;
     // bitcoind sends json:
-    UniValue params = GetStratumJson(trans);
+    UniValue params = MkMiningCandidateJson(candid);
     // miner mines:
-    ret = CpuStratumMinerClient(params, found);
+    ret = CpuMiner(params, found);
     // if found sends to bitcoind:
     if (found)
-        ret = submitstratum(ret, false);
+        ret = submitminingsolution(ret, false);
     return ret;
 }
 
 // End
-// Stratum CPU miner test code
+// Mining-Candidate CPU miner test code
 // TODO move ^^^
 /////////////////
 
@@ -2057,8 +2053,8 @@ static const CRPCCommand commands[] =
     { "mining",             "getblockversion",        &getblockversion,        true  },
     { "mining",             "setblockversion",        &setblockversion,        true  },
     { "mining",             "validateblocktemplate",  &validateblocktemplate,  true  },
-    { "mining",             "getstratum",             &getstratum,             true  },
-    { "mining",             "submitstratum",          &submitstratum,          true  },
+    { "mining",             "getminingcandidate",     &getminingcandidate,     true  },
+    { "mining",             "submitminingsolution",   &submitminingsolution,   true  },
 
     /* Utility functions */
     { "util",               "getstatlist",            &getstatlist,            true  },
