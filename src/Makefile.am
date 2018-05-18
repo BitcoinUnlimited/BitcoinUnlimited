@@ -122,9 +122,10 @@ BITCOIN_CORE_H = \
   core_io.h \
   core_memusage.h \
   dosman.h \
-  expedited.h \
-  fs.h \
   dstencode.h \
+  expedited.h \
+  forks_csv.h \
+  fs.h \
   httprpc.h \
   httpserver.h \
   init.h \
@@ -216,6 +217,7 @@ libbitcoin_server_a_SOURCES = \
   consensus/tx_verify.cpp \
   dosman.cpp \
   expedited.cpp \
+  forks_csv.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
@@ -358,6 +360,8 @@ libbitcoin_common_a_SOURCES = \
   scheduler.cpp \
   script/sign.cpp \
   script/standard.cpp \
+  versionbits.cpp \
+  chain.cpp \
   $(BITCOIN_CORE_H)
 
 # util: shared between all executables.

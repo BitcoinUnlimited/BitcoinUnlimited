@@ -29,6 +29,10 @@ public:
     int64_t EndTime(const Consensus::Params &params) const { return TestTime(20000); }
     int Period(const Consensus::Params &params) const { return 1000; }
     int Threshold(const Consensus::Params &params) const { return 900; }
+    // bip135 begin
+    int MinLockedBlocks(const Consensus::Params &params) const { return 0; }
+    int64_t MinLockedTime(const Consensus::Params &params) const { return 0; }
+    // bip135 end
     bool Condition(const CBlockIndex *pindex, const Consensus::Params &params) const
     {
         return (pindex->nVersion & 0x100);
@@ -280,14 +284,25 @@ BOOST_AUTO_TEST_CASE(versionbits_test)
         // end time of that soft fork.  (Alternatively, the end time of that
         // activated soft fork could be later changed to be earlier to avoid
         // overlap.)
-        for (int j = i + 1; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; j++)
+        // bip135 begin fix disjointness check
+        if (isConfiguredDeployment(mainnetParams, i))
         {
-            if (VersionBitsMask(mainnetParams, (Consensus::DeploymentPos)j) == bitmask)
+            BOOST_CHECK(mainnetParams.vDeployments[i].nStartTime <= mainnetParams.vDeployments[i].nTimeout);
+            for (int j = 0; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; j++)
             {
-                BOOST_CHECK(mainnetParams.vDeployments[j].nStartTime > mainnetParams.vDeployments[i].nTimeout ||
-                            mainnetParams.vDeployments[i].nStartTime > mainnetParams.vDeployments[j].nTimeout);
+                // only check a bit for disjointness if it is in use
+                if (i != j && isConfiguredDeployment(mainnetParams, j) &&
+                    VersionBitsMask(mainnetParams, (Consensus::DeploymentPos)j) == bitmask)
+                {
+                    BOOST_CHECK(mainnetParams.vDeployments[j].nStartTime <= mainnetParams.vDeployments[j].nTimeout);
+                    BOOST_CHECK((mainnetParams.vDeployments[i].nStartTime < mainnetParams.vDeployments[j].nStartTime &&
+                                    mainnetParams.vDeployments[i].nTimeout < mainnetParams.vDeployments[j].nTimeout) ||
+                                (mainnetParams.vDeployments[j].nStartTime < mainnetParams.vDeployments[i].nStartTime &&
+                                    mainnetParams.vDeployments[j].nTimeout < mainnetParams.vDeployments[i].nTimeout));
+                }
             }
         }
+        // bip135 end
     }
 }
 

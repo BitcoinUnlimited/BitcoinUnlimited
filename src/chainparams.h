@@ -70,6 +70,8 @@ public:
     };
 
     const Consensus::Params &GetConsensus() const { return consensus; }
+    /** Modifiable consensus parameters added by bip135 */
+    Consensus::Params &GetModifiableConsensus() { return consensus; }
     const CMessageHeader::MessageStartChars &MessageStart() const { return pchMessageStart; }
     const CMessageHeader::MessageStartChars &CashMessageStart() const { return pchCashMessageStart; }
     int GetDefaultPort() const { return nDefaultPort; }
@@ -138,5 +140,25 @@ CBlock CreateGenesisBlock(CScript prefix,
     uint32_t nBits,
     int32_t nVersion,
     const CAmount &genesisReward);
+
+// bip135 begin
+/**
+ * Return the currently selected parameters. Can be changed by reading in
+ * some additional config files (e.g. CSV deployment data)
+ */
+CChainParams &ModifiableParams();
+
+/**
+ * Returns true if a deployment is considered active on a particular network
+ */
+
+bool isConfiguredDeployment(const Consensus::Params &consensusParams, const int bit);
+
+/**
+ * Dump the fork deployment parameters for the given BIP70 chain name.
+ * @throws std::runtime_error when the chain is not supported.
+ */
+const std::string NetworkDeploymentInfoCSV(const std::string &chain);
+// bip135 end
 
 #endif // BITCOIN_CHAINPARAMS_H
