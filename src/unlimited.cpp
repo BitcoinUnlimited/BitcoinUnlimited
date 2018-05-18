@@ -1655,43 +1655,13 @@ std::vector<uint256> GetMerkleProofBranches(CBlock *pblock)
     int len = pblock->vtx.size();
     // LOGA("---- %d ----\n", len);
 
-    if (len < 2)
-    {
-        return ret; // H(0) first element not used. Return empty vector.
-    }
-
     std::vector<uint256> leaves;
     for (int i = 0; i < len; i++)
     {
         leaves.push_back(pblock->vtx[i].get()->GetHash());
     }
 
-    // H(1):
-    std::vector<uint256> vecslice(leaves.begin() + 1, leaves.begin() + 2);
-    ret.push_back(ComputeMerkleRoot(vecslice));
-
-    // All the other leaves:
-    int nprocessed = 2; // 2 since H(0), H(1) done
-    // 2^x -1:
-    // H(2,3), H(4,7), ...
-    int x = 1, y = 0; // H(x,y)
-    int indx;
-    while (nprocessed < len)
-    {
-        x = x * 2;
-        y = x * 2 - 1;
-        // LOGA("H(%d,%d) ", x, y);
-        indx = y + 1;
-        if (indx >= len)
-            indx = len;
-
-        std::vector<uint256> vecslice(leaves.begin() + x, leaves.begin() + indx);
-        // LOGA("size %d\n", vecslice.size());
-
-        ret.push_back(ComputeMerkleRoot(vecslice));
-        nprocessed += vecslice.size();
-    }
-
+    ret = ComputeMerkleBranch(leaves, 0);
     return ret;
 }
 
@@ -1728,11 +1698,11 @@ static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
         std::vector<uint256> brancharr = GetMerkleProofBranches(&block);
         // LOGA("merklebranches len %d\n",brancharr.size());
         UniValue merklebranches(UniValue::VARR);
-        for (unsigned int i = 0; i < brancharr.size(); i++)
+        for (const auto &i: brancharr)
         {
-            merklebranches.push_back(UniValue(brancharr[i].ToString()));
+            merklebranches.push_back(i.GetHex());
         }
-        ret.push_back(Pair("merklebranches", merklebranches));
+        ret.push_back(Pair("merklebranch", merklebranches));
     }
 
     return ret;
