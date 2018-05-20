@@ -1420,25 +1420,32 @@ bool UndoWriteToDisk(const CBlockUndo &blockundo,
             return error("%s: OpenUndoFile failed", __func__);
         }
 
-        // Write index header
-        unsigned int nSize = GetSerializeSize(fileout, blockundo);
-        fileout << FLATDATA(messageStart) << nSize;
-
-        // Write undo data
-        long fileOutPos = ftell(fileout.Get());
-        if (fileOutPos < 0)
-        {
-            return error("%s: ftell failed", __func__);
-        }
-        pos.nPos = (unsigned int)fileOutPos;
-        fileout << blockundo;
-
-        // calculate & write checksum
-        CHashWriter hasher(SER_GETHASH, PROTOCOL_VERSION);
-        hasher << hashBlock;
-        hasher << blockundo;
-        fileout << hasher.GetHash();
+    // Open history file to append
+    CAutoFile fileout(OpenUndoFile(pos), SER_DISK, CLIENT_VERSION);
+    if (fileout.IsNull())
+    {
+        return error("%s: OpenUndoFile failed", __func__);
     }
+
+    // Write index header
+    unsigned int nSize = GetSerializeSize(fileout, blockundo);
+    fileout << FLATDATA(messageStart) << nSize;
+
+    // Write undo data
+    long fileOutPos = ftell(fileout.Get());
+    if (fileOutPos < 0)
+    {
+        return error("%s: ftell failed", __func__);
+    }
+    pos.nPos = (unsigned int)fileOutPos;
+    fileout << blockundo;
+
+    // calculate & write checksum
+    CHashWriter hasher(SER_GETHASH, PROTOCOL_VERSION);
+    hasher << hashBlock;
+    hasher << blockundo;
+    fileout << hasher.GetHash();
+
     return true;
 }
 
@@ -1452,33 +1459,29 @@ bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const uin
     CAutoFile filein(OpenUndoFile(pos, true), SER_DISK, CLIENT_VERSION);
     if (filein.IsNull())
     {
-        // Open history file to read
-        CAutoFile filein(OpenUndoFile(pos, true), SER_DISK, CLIENT_VERSION);
-        if (filein.IsNull())
-        {
-            return error("%s: OpenUndoFile failed", __func__);
-        }
-
-        // Read block
-        uint256 hashChecksum;
-        CHashVerifier<CAutoFile> verifier(&filein); // We need a CHashVerifier as reserializing may lose data
-        try
-        {
-            verifier << hashBlock;
-            verifier >> blockundo;
-            filein >> hashChecksum;
-        }
-        catch (const std::exception &e)
-        {
-            return error("%s: Deserialize or I/O error - %s", __func__, e.what());
-        }
-
-        // Verify checksum
-        if (hashChecksum != verifier.GetHash())
-        {
-            return error("%s: Checksum mismatch", __func__);
-        }
+        return error("%s: OpenUndoFile failed", __func__);
     }
+
+    // Read block
+    uint256 hashChecksum;
+    CHashVerifier<CAutoFile> verifier(&filein); // We need a CHashVerifier as reserializing may lose data
+    try
+    {
+        verifier << hashBlock;
+        verifier >> blockundo;
+        filein >> hashChecksum;
+    }
+    catch (const std::exception &e)
+    {
+        return error("%s: Deserialize or I/O error - %s", __func__, e.what());
+    }
+
+    // Verify checksum
+    if (hashChecksum != verifier.GetHash())
+    {
+        return error("%s: Checksum mismatch", __func__);
+    }
+
     return true;
 }
 
@@ -2157,7 +2160,7 @@ bool ConnectBlock(const CBlock &block,
     // Write undo information to disk
     if (pindex->GetUndoPos().IsNull() || !pindex->IsValid(BLOCK_VALID_SCRIPTS))
     {
-        if (pindex->GetUndoPos().IsNull())
+        if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES || BLOCK_DB_MODE == LEVELDB_AND_SEQUENTIAL)
         {
             CDiskBlockPos _pos;
             if (!FindUndoPos(state, pindex->nFile, _pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
@@ -3303,17 +3306,13 @@ bool FindBlockPos(CValidationState &state,
             }
             if (CheckDiskSpace(nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos))
             {
-                /// dont actually open and allocate file space if we are running levelDB
-                if(BLOCK_DB_MODE != LEVELDB_BLOCK_STORAGE)
+                FILE *file = OpenBlockFile(pos);
+                if (file)
                 {
-                    FILE *file = OpenBlockFile(pos);
-                    if (file)
-                    {
-                        LOGA("Pre-allocating up to position 0x%x in blk%05u.dat\n", nNewChunks * BLOCKFILE_CHUNK_SIZE,
-                            pos.nFile);
-                        AllocateFileRange(file, pos.nPos, nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos);
-                        fclose(file);
-                    }
+                    LOGA("Pre-allocating up to position 0x%x in blk%05u.dat\n", nNewChunks * BLOCKFILE_CHUNK_SIZE,
+                        pos.nFile);
+                    AllocateFileRange(file, pos.nPos, nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos);
+                    fclose(file);
                 }
             }
             else
@@ -3992,7 +3991,7 @@ bool static LoadBlockIndexDB()
     if (BLOCK_DB_MODE != DB_BLOCK_STORAGE)
     {
         // Check presence of blk files
-        
+
         LOGA("Checking all blk files are present...\n");
         for (std::set<int>::iterator it = setBlkDataFiles.begin(); it != setBlkDataFiles.end(); it++)
         {
@@ -4003,7 +4002,7 @@ bool static LoadBlockIndexDB()
                 return false;
             }
         }
-            // Load block file info
+        // Load block file info
         pblocktree->ReadLastBlockFile(nLastBlockFile);
         vinfoBlockFile.resize(nLastBlockFile + 1);
         LOGA("%s: last block file = %i\n", __func__, nLastBlockFile);
