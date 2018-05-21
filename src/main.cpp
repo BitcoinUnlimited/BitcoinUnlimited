@@ -111,7 +111,6 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams);
 CScript COINBASE_FLAGS;
 
 extern CCriticalSection cs_LastBlockFile;
-extern CCriticalSection cs_nBlockSequenceId;
 
 
 // Internal stuff
@@ -173,7 +172,7 @@ bool fCheckForPruning = false;
  * know which one to give priority in case of a fork.
  */
 /** Blocks loaded from disk are assigned id 0, so start the counter at 1. */
-uint32_t nBlockSequenceId = 1;
+uint64_t nBlockSequenceId = 1 GUARDED_BY(cs_main);
 
 /**
  * Sources of received blocks, saved to be able to send them reject
@@ -3340,9 +3339,8 @@ bool ReceivedBlockTransactions(const CBlock &block,
             CBlockIndex *pindex = queue.front();
             queue.pop_front();
             pindex->nChainTx = (pindex->pprev ? pindex->pprev->nChainTx : 0) + pindex->nTx;
-            {
-                LOCK(cs_nBlockSequenceId);
-                pindex->nSequenceId = nBlockSequenceId++;
+            { 
+                pindex->nSequenceId = ++nBlockSequenceId;
             }
             if (chainActive.Tip() == NULL || !setBlockIndexCandidates.value_comp()(pindex, chainActive.Tip()))
             {
@@ -4418,20 +4416,20 @@ void UnloadBlockIndex()
     }
 
     LOCK(cs_main);
+    nBlockSequenceId = 1;
+    nSyncStarted = 0;
+    nLastBlockFile = 0;
+    nPreferredDownload = 0;
     mapUnConnectedHeaders.clear();
     setBlockIndexCandidates.clear();
     chainActive.SetTip(nullptr);
     pindexBestInvalid = nullptr;
     pindexBestHeader = nullptr;
     mempool.clear();
-    nSyncStarted = 0;
     mapBlocksUnlinked.clear();
     vinfoBlockFile.clear();
-    nLastBlockFile = 0;
-    nBlockSequenceId = 1;
     mapBlockSource.clear();
     requester.MapBlocksInFlightClear();
-    nPreferredDownload = 0;
     setDirtyBlockIndex.clear();
     setDirtyFileInfo.clear();
     mapNodeState.clear();
