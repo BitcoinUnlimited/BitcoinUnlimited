@@ -72,7 +72,9 @@ CBlockIndex *pindexBestHeader = nullptr GUARDED_BY(cs_main);
 
 CCoinsViewDB *pcoinsdbview = nullptr;
 
-int64_t nTimeBestReceived = 0;
+// Last time the block tip was updated
+std::atomic<int64_t> nTimeBestReceived{0};
+
 // BU moved CWaitableCriticalSection csBestBlock;
 // BU moved CConditionVariable cvBlockChange;
 bool fImporting = false;
@@ -2455,7 +2457,7 @@ void static UpdateTip(CBlockIndex *pindexNew)
     }
 
     // New best block
-    nTimeBestReceived = GetTime();
+    nTimeBestReceived.store(GetTime());
     mempool.AddTransactionsUpdated(1);
 
     LOGA("%s: new best=%s  height=%d bits=%d log2_work=%.8g  tx=%lu  date=%s progress=%f  cache=%.1fMiB(%utxo)\n",
@@ -7123,7 +7125,7 @@ bool SendMessages(CNode *pto)
         // transactions become unconfirmed and spams other nodes.
         if (!fReindex && !fImporting && !IsInitialBlockDownload())
         {
-            GetMainSignals().Broadcast(nTimeBestReceived);
+            GetMainSignals().Broadcast(nTimeBestReceived.load());
         }
 
         //
