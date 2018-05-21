@@ -5588,15 +5588,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             dosMan.Misbehaving(pfrom, 20);
             return error("message inv size() = %u", vInv.size());
         }
-        for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
-        {
-            const CInv &inv = vInv[nInv];
-            if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK)) || inv.hash.IsNull())
-            {
-                dosMan.Misbehaving(pfrom, 20);
-                return error("message inv invalid type = %u or is null hash %s", inv.type, inv.hash.ToString());
-            }
-        }
 
         bool fBlocksOnly = GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY);
 
@@ -5609,6 +5600,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             boost::this_thread::interruption_point();
 
             const CInv &inv = vInv[nInv];
+            if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK)) || inv.hash.IsNull())
+            {
+                dosMan.Misbehaving(pfrom, 20);
+                return error("message inv invalid type = %u or is null hash %s", inv.type, inv.hash.ToString());
+            }
+
             if (inv.type == MSG_BLOCK)
             {
                 LOCK(cs_main);
@@ -5640,7 +5637,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                         inv.hash.ToString(), fAlreadyHaveBlock, fImporting, fReindex, IsChainNearlySyncd());
                 }
             }
-            else
+            else // If we get here then inv.type must == MSG_TX.
             {
                 bool fAlreadyHaveTx = AlreadyHaveTx(inv);
                 LOG(NET, "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHaveTx ? "have" : "new", pfrom->id);
