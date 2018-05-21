@@ -3340,7 +3340,7 @@ bool ReceivedBlockTransactions(const CBlock &block,
             CBlockIndex *pindex = queue.front();
             queue.pop_front();
             pindex->nChainTx = (pindex->pprev ? pindex->pprev->nChainTx : 0) + pindex->nTx;
-            { 
+            {
                 pindex->nSequenceId = ++nBlockSequenceId;
             }
             if (chainActive.Tip() == NULL || !setBlockIndexCandidates.value_comp()(pindex, chainActive.Tip()))
