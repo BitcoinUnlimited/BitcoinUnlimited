@@ -170,4 +170,7 @@ public:
     bool LoadBlockIndexGuts();
 };
 
+/** Global variable that points to the coins database */
+extern CCoinsViewDB *pcoinsdbview;
+
 #endif // BITCOIN_TXDB_H
