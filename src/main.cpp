@@ -65,11 +65,10 @@
  */
 
 // BU variables moved to globals.cpp
-// BU moved CCriticalSection cs_main;
-
-// BU moved BlockMap mapBlockIndex;
-// BU movedCChain chainActive;
-CBlockIndex *pindexBestHeader = NULL;
+// - moved CCriticalSection cs_main;
+// - moved BlockMap mapBlockIndex;
+// - movedCChain chainActive;
+CBlockIndex *pindexBestHeader = nullptr GUARDED_BY(cs_main);
 
 CCoinsViewDB *pcoinsdbview = nullptr;
 
@@ -89,7 +88,7 @@ int64_t nCoinCacheUsage = 0;
 uint64_t nPruneTarget = 0;
 uint32_t nXthinBloomFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE;
 
-CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
+CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE) GUARDED_BY(cs_main);
 
 // BU: Move global objects to a single file
 extern CTxMemPool mempool;
@@ -104,7 +103,7 @@ extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
 extern CCriticalSection cs_mapInboundConnectionTracker;
 
 /** A cache to store headers that have arrived but can not yet be connected **/
-std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders;
+std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders GUARDED_BY(cs_main);
 
 static void CheckBlockIndex(const Consensus::Params &consensusParams);
 
@@ -146,22 +145,22 @@ struct CBlockIndexWorkComparator
     }
 };
 
-CBlockIndex *pindexBestInvalid;
+CBlockIndex *pindexBestInvalid = nullptr GUARDED_BY(cs_main);
 
 /**
  * The set of all CBlockIndex entries with BLOCK_VALID_TRANSACTIONS (for itself and all ancestors) and
  * as good as our current tip or better. Entries may be failed, though, and pruning nodes may be
  * missing the data for the block.
  */
-std::set<CBlockIndex *, CBlockIndexWorkComparator> setBlockIndexCandidates;
+std::set<CBlockIndex *, CBlockIndexWorkComparator> setBlockIndexCandidates GUARDED_BY(cs_main);
 /** Number of nodes with fSyncStarted. */
 int nSyncStarted = 0;
 /** All pairs A->B, where A (or one of its ancestors) misses transactions, but B has transactions.
  * Pruned nodes may have entries where B is missing data.
  */
-std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
+std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked GUARDED_BY(cs_main);
 
-std::vector<CBlockFileInfo> vinfoBlockFile;
+std::vector<CBlockFileInfo> vinfoBlockFile GUARDED_BY(cs_main);
 int nLastBlockFile = 0;
 /** Global flag to indicate we should check to see if there are
  *  block/undo files that should be deleted.  Set on startup
@@ -181,7 +180,7 @@ uint32_t nBlockSequenceId = 1;
  * messages or ban them when processing happens afterwards. Protected by
  * cs_main.
  */
-std::map<uint256, NodeId> mapBlockSource;
+std::map<uint256, NodeId> mapBlockSource GUARDED_BY(cs_main);
 
 CCriticalSection cs_recentRejects;
 /**
@@ -225,12 +224,12 @@ std::unique_ptr<CRollingBloomFilter> txn_recently_in_block GUARDED_BY(cs_recentR
 int nPreferredDownload = 0;
 
 /** Dirty block file entries. */
-std::set<int> setDirtyFileInfo;
+std::set<int> setDirtyFileInfo GUARDED_BY(cs_main);
 
 } // anon namespace
 
 /** Dirty block index entries. */
-std::set<CBlockIndex *> setDirtyBlockIndex;
+std::set<CBlockIndex *> setDirtyBlockIndex GUARDED_BY(cs_main);
 
 //////////////////////////////////////////////////////////////////////////////
 //

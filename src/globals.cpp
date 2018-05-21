@@ -70,8 +70,9 @@ int64_t nTimeOffset = 0;
 CCriticalSection cs_rpcWarmup;
 
 CCriticalSection cs_main;
-BlockMap mapBlockIndex;
-CChain chainActive;
+BlockMap mapBlockIndex GUARDED_BY(cs_main);
+CChain chainActive GUARDED_BY(cs_main);
+
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
 
