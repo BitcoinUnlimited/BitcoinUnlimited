@@ -53,12 +53,6 @@ unsigned int txReqRetryInterval = MIN_TX_REQUEST_RETRY_INTERVAL;
 unsigned int MIN_BLK_REQUEST_RETRY_INTERVAL = DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL;
 unsigned int blkReqRetryInterval = MIN_BLK_REQUEST_RETRY_INTERVAL;
 
-/** Size of the "block download window": how far ahead of our current height do we fetch?
- *  Larger windows tolerate larger download speed differences between peer, but increase the potential
- *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
- *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
-unsigned int BLOCK_DOWNLOAD_WINDOW = 1024;
-
 // defined in main.cpp.  should be moved into a utilities file but want to make rebasing easier
 extern bool CanDirectFetch(const Consensus::Params &consensusParams);
 
@@ -934,7 +928,7 @@ void CRequestManager::FindNextBlocksToDownload(NodeId nodeid, unsigned int count
     // Never fetch further than the current chain tip + the block download window.  We need to ensure
     // the if running in pruning mode we don't download too many blocks ahead and as a result use to
     // much disk space to store unconnected blocks.
-    int nWindowEnd = chainActive.Height() + BLOCK_DOWNLOAD_WINDOW;
+    int nWindowEnd = chainActive.Height() + BLOCK_DOWNLOAD_WINDOW.load();
 
     int nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
     while (pindexWalk->nHeight < nMaxHeight)
@@ -1138,9 +1132,9 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         }
         if (blockDownloadWindow.value != 0)
         {
-            BLOCK_DOWNLOAD_WINDOW = blockDownloadWindow.value;
+            BLOCK_DOWNLOAD_WINDOW.store(blockDownloadWindow.value);
         }
-        LOG(THIN | BLK, "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %d\n", BLOCK_DOWNLOAD_WINDOW,
+        LOG(THIN | BLK, "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %d\n", BLOCK_DOWNLOAD_WINDOW.load(),
             pnode->nMaxBlocksInTransit.load());
 
         if (IsChainNearlySyncd())
