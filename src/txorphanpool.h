@@ -43,7 +43,7 @@ public:
     bool AlreadyHaveOrphan(const uint256 &hash);
 
     //! Add a transaction to the orphan pool
-    bool AddOrphanTx(const CTransaction &tx, NodeId peer);
+    bool AddOrphanTx(const CTransactionRef &ptx, NodeId peer);
 
     //! Erase an ophan tx from the orphan pool
     void EraseOrphanTx(uint256 hash);

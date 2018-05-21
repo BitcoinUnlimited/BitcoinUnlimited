@@ -949,7 +949,8 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
     CTransaction tx;
     if (!DecodeHexTx(tx, params[0].get_str()))
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
-    uint256 hashTx = tx.GetHash();
+    CTransactionRef ptx(MakeTransactionRef(std::move(tx)));
+    const uint256 &hashTx = ptx->GetHash();
 
     bool fOverrideFees = false;
     TransactionClass txClass = TransactionClass::DEFAULT;
@@ -980,7 +981,7 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
         // push to local node and sync with wallets
         CValidationState state;
         bool fMissingInputs;
-        if (!AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, false, !fOverrideFees, txClass))
+        if (!AcceptToMemoryPool(mempool, state, std::move(ptx), false, &fMissingInputs, false, !fOverrideFees, txClass))
         {
             if (state.IsInvalid())
             {
@@ -998,14 +999,14 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
         }
 #ifdef ENABLE_WALLET
         else
-            SyncWithWallets(tx, NULL, -1);
+            SyncWithWallets(*ptx, nullptr, -1);
 #endif
     }
     else if (fHaveChain)
     {
         throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "transaction already in block chain");
     }
-    RelayTransaction(tx);
+    RelayTransaction(*ptx);
 
     return hashTx.GetHex();
 }

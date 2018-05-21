@@ -73,7 +73,7 @@ class CTxMemPool;
 class CTxMemPoolEntry
 {
 private:
-    CTransaction tx;
+    CTransactionRef tx;
     CAmount nFee; //! Cached to avoid expensive parent-transaction lookups
     size_t nTxSize; //! ... and avoid recomputing tx size
     size_t nModSize; //! ... and modified size for priority
@@ -102,7 +102,7 @@ private:
 public:
     unsigned char sighashType;
     CTxMemPoolEntry();
-    CTxMemPoolEntry(const CTransaction &_tx,
+    CTxMemPoolEntry(const CTransactionRef &_tx,
         const CAmount &_nFee,
         int64_t _nTime,
         double _entryPriority,
@@ -114,8 +114,8 @@ public:
         LockPoints lp);
     CTxMemPoolEntry(const CTxMemPoolEntry &other);
 
-    const CTransaction &GetTx() const { return this->tx; }
-    CTransactionRef GetSharedTx() const { return MakeTransactionRef(std::move(this->tx)); }
+    const CTransaction &GetTx() const { return *this->tx; }
+    CTransactionRef GetSharedTx() const { return this->tx; }
     /**
      * Fast calculation of lower bound of current priority as update
      * from entry priority. Only inputs that were originally in-chain will age.

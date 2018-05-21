@@ -291,6 +291,4 @@ static inline CTransactionRef MakeTransactionRef(Tx &&txIn)
 {
     return std::make_shared<const CTransaction>(std::forward<Tx>(txIn));
 }
-static inline CTransactionRef MakeTransactionRef(const CTransactionRef &txIn) { return txIn; }
-static inline CTransactionRef MakeTransactionRef(CTransactionRef &&txIn) { return std::move(txIn); }
 #endif // BITCOIN_PRIMITIVES_TRANSACTION_H

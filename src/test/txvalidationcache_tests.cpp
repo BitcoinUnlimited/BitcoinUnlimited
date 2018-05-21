@@ -29,7 +29,7 @@ static bool ToMemPool(CMutableTransaction &tx)
 
     CValidationState state;
     bool fMissingInputs = false;
-    return AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, true, false);
+    return AcceptToMemoryPool(mempool, state, MakeTransactionRef(tx), false, &fMissingInputs, true, false);
 }
 
 BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup)
@@ -182,7 +182,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     BOOST_CHECK(!ToMemPool(spends[2]));
     {
         LOCK(orphanpool.cs);
-        BOOST_CHECK(orphanpool.AddOrphanTx(spends[2], 1));
+        BOOST_CHECK(orphanpool.AddOrphanTx(MakeTransactionRef(spends[2]), 1));
     }
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout)); // valid coin from previous txn
     BOOST_CHECK(!pcoinsTip->HaveCoinInCache(spends[2].vin[0].prevout));
@@ -203,7 +203,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     BOOST_CHECK(!ToMemPool(spends[2]));
     {
         LOCK(orphanpool.cs);
-        BOOST_CHECK(orphanpool.AddOrphanTx(spends[2], 1));
+        BOOST_CHECK(orphanpool.AddOrphanTx(MakeTransactionRef(spends[2]), 1));
     }
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout)); // valid coin from previous txn
     BOOST_CHECK(!pcoinsTip->HaveCoinInCache(spends[2].vin[0].prevout));
@@ -279,7 +279,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     BOOST_CHECK(!ToMemPool(spends[4]));
     {
         LOCK(orphanpool.cs);
-        BOOST_CHECK(orphanpool.AddOrphanTx(spends[4], 1));
+        BOOST_CHECK(orphanpool.AddOrphanTx(MakeTransactionRef(spends[4]), 1));
     }
     BOOST_CHECK(!pcoinsTip->HaveCoinInCache(spends[4].vin[0].prevout));
     BOOST_CHECK(!pcoinsTip->HaveCoinInCache(spends[4].vin[1].prevout));

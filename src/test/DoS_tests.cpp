@@ -325,7 +325,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
         LOCK(orphanpool.cs);
-        orphanpool.AddOrphanTx(tx, i);
+        orphanpool.AddOrphanTx(MakeTransactionRef(tx), i);
     }
 
     {
@@ -353,7 +353,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
         LOCK(orphanpool.cs);
-        orphanpool.AddOrphanTx(tx, i);
+        orphanpool.AddOrphanTx(MakeTransactionRef(tx), i);
     }
 
     // ... and 50 that depend on other orphans:
@@ -371,7 +371,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         SignSignature(keystore, txPrev, tx, 0);
 
         LOCK(orphanpool.cs);
-        orphanpool.AddOrphanTx(tx, i);
+        orphanpool.AddOrphanTx(MakeTransactionRef(tx), i);
     }
 
     // This really-big orphan should be ignored:
@@ -398,7 +398,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         LOCK(orphanpool.cs);
         // BU, we keep orphans up to the configured memory limit to help xthin compression so this should succeed
         // whereas it fails in other clients
-        BOOST_CHECK(orphanpool.AddOrphanTx(tx, i));
+        BOOST_CHECK(orphanpool.AddOrphanTx(MakeTransactionRef(tx), i));
     }
 
     // Test LimitOrphanTxSize() function: limit by number of txns
@@ -430,7 +430,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
             tx.vout[0].nValue = 1 * CENT;
             tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
-            orphanpool.AddOrphanTx(tx, i);
+            orphanpool.AddOrphanTx(MakeTransactionRef(tx), i);
         }
         BOOST_CHECK(orphanpool.mapOrphanTransactions.size() == 50);
         orphanpool.EraseOrphansByTime();
