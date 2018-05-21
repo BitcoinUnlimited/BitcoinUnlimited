@@ -220,7 +220,7 @@ std::unique_ptr<CRollingBloomFilter> txn_recently_in_block GUARDED_BY(cs_recentR
 
 
 /** Number of preferable block download peers. */
-int nPreferredDownload = 0;
+int nPreferredDownload = 0 GUARDED_BY(cs_main);
 
 /** Dirty block file entries. */
 std::set<int> setDirtyFileInfo GUARDED_BY(cs_main);
@@ -245,6 +245,7 @@ int GetHeight()
 
 void UpdatePreferredDownload(CNode *node, CNodeState *state)
 {
+    LOCK(cs_main);
     nPreferredDownload -= state->fPreferredDownload;
 
     // Whether this node should be marked as a preferred download node.
