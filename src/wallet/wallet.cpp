@@ -815,22 +815,22 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
  * pblock is optional, but should be provided if the transaction is known to be in a block.
  * If fUpdate is true, existing transactions will be updated.
  */
-bool CWallet::AddToWalletIfInvolvingMe(const CTransaction &tx, const CBlock *pblock, bool fUpdate, int txIndex)
+bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef &ptx, const CBlock *pblock, bool fUpdate, int txIndex)
 {
     AssertLockHeld(cs_main);
     AssertLockHeld(cs_wallet);
 
     if (pblock)
     {
-        for (const CTxIn &txin : tx.vin)
+        for (const CTxIn &txin : ptx->vin)
         {
             std::pair<TxSpends::const_iterator, TxSpends::const_iterator> range = mapTxSpends.equal_range(txin.prevout);
             while (range.first != range.second)
             {
-                if (range.first->second != tx.GetHash())
+                if (range.first->second != ptx->GetHash())
                 {
                     LOGA("Transaction %s (in block %s) conflicts with wallet transaction %s (both spend %s:%i)\n",
-                        tx.GetHash().ToString(), pblock->GetHash().ToString(), range.first->second.ToString(),
+                        ptx->GetHash().ToString(), pblock->GetHash().ToString(), range.first->second.ToString(),
                         range.first->first.hash.ToString(), range.first->first.n);
                     MarkConflicted(pblock->GetHash(), range.first->second);
                 }
@@ -839,12 +839,12 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransaction &tx, const CBlock *pbl
         }
     }
 
-    bool fExisted = mapWallet.count(tx.GetHash()) != 0;
+    bool fExisted = mapWallet.count(ptx->GetHash()) != 0;
     if (fExisted && !fUpdate)
         return false;
-    if (fExisted || IsMine(tx) || IsFromMe(tx))
+    if (fExisted || IsMine(*ptx) || IsFromMe(*ptx))
     {
-        CWalletTx wtx(this, tx);
+        CWalletTx wtx(this, *ptx);
 
         // Get merkle branch if transaction was found in a block
         if (pblock)
@@ -988,17 +988,17 @@ void CWallet::MarkConflicted(const uint256 &hashBlock, const uint256 &hashTx)
     }
 }
 
-void CWallet::SyncTransaction(const CTransaction &tx, const CBlock *pblock, int txIdx)
+void CWallet::SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIdx)
 {
     LOCK2(cs_main, cs_wallet);
 
-    if (!AddToWalletIfInvolvingMe(tx, pblock, true, txIdx))
+    if (!AddToWalletIfInvolvingMe(ptx, pblock, true, txIdx))
         return; // Not one of ours
 
     // If a transaction changes 'conflicted' state, that changes the balance
     // available of the outputs it spends. So force those to be
     // recomputed, also:
-    for (const CTxIn &txin : tx.vin)
+    for (const CTxIn &txin : ptx->vin)
     {
         if (mapWallet.count(txin.prevout.hash))
             mapWallet[txin.prevout.hash].MarkDirty();
@@ -1314,9 +1314,9 @@ int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
             CBlock block;
             ReadBlockFromDisk(block, pindex, Params().GetConsensus());
             int txIdx = 0;
-            for (const auto &tx : block.vtx)
+            for (const auto &ptx : block.vtx)
             {
-                if (AddToWalletIfInvolvingMe(*tx, &block, fUpdate, txIdx))
+                if (AddToWalletIfInvolvingMe(ptx, &block, fUpdate, txIdx))
                     ret++;
                 txIdx++;
             }
@@ -1365,7 +1365,7 @@ void CWallet::ReacceptWalletTransactions()
         CWalletTx &wtx = *(item.second);
 
         wtx.AcceptToMemoryPool(false);
-        SyncWithWallets(wtx, nullptr, -1);
+        SyncWithWallets(MakeTransactionRef(wtx), nullptr, -1);
     }
 }
 
@@ -2502,7 +2502,7 @@ bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey)
                 return false;
             }
 #else
-            SyncWithWallets(wtxNew, nullptr, -1);
+            SyncWithWallets(MakeTransactionRef(wtxNew), nullptr, -1);
 #endif
             wtxNew.RelayWalletTransaction();
         }

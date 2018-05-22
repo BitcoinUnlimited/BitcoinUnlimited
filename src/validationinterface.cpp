@@ -48,7 +48,7 @@ void UnregisterAllValidationInterfaces()
     g_signals.UpdatedBlockTip.disconnect_all_slots();
 }
 
-void SyncWithWallets(const CTransaction &tx, const CBlock *pblock, int txIdx)
+void SyncWithWallets(const CTransactionRef &ptx, const CBlock *pblock, int txIdx)
 {
-    g_signals.SyncTransaction(tx, pblock, txIdx);
+    g_signals.SyncTransaction(ptx, pblock, txIdx);
 }
