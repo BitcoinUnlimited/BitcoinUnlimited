@@ -677,7 +677,7 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
 {
     uint256 hash = wtxIn.GetHash();
 
-    LOCK(cs_wallet);
+    LOCK2(cs_main, cs_wallet);
     if (fFromLoadWallet)
     {
         mapWallet[hash] = wtxIn;
@@ -817,6 +817,7 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
  */
 bool CWallet::AddToWalletIfInvolvingMe(const CTransaction &tx, const CBlock *pblock, bool fUpdate, int txIndex)
 {
+    AssertLockHeld(cs_main);
     AssertLockHeld(cs_wallet);
 
     if (pblock)
