@@ -25,6 +25,7 @@
 #include "primitives/block.h"
 #include "requestManager.h"
 #include "rpc/server.h"
+#include "script/standard.h"
 #include "stat.h"
 #include "thinblock.h"
 #include "timedata.h"
@@ -146,6 +147,22 @@ std::string OutboundConnectionValidator(const int &value, int *item, bool valida
                 for (int i = 0; i < diff; i++)
                     semOutboundAddNode->post();
         }
+    }
+    return std::string();
+}
+
+std::string MaxDataCarrierValidator(const unsigned int &value, unsigned int *item, bool validate)
+{
+    if (validate)
+    {
+        if (value < MAX_OP_RETURN_RELAY) // sanity check
+        {
+            return "Invalid Value. Data Carrier minimum size has to be greater of equal to 223 bytes";
+        }
+    }
+    else // Do anything to "take" the new value
+    {
+        // nothing needed
     }
     return std::string();
 }

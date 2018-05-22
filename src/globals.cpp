@@ -171,7 +171,8 @@ CTweakRef<uint64_t> miningBlockSize("mining.blockSize",
     &MiningBlockSizeValidator);
 CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
     "Maximum size of OP_RETURN data script in bytes.",
-    &nMaxDatacarrierBytes);
+    &nMaxDatacarrierBytes,
+    &MaxDataCarrierValidator);
 
 CTweak<uint64_t> miningForkTime("mining.forkMay2018Time",
     "Time in seconds since the epoch to initiate a hard fork scheduled on 15th May 2018.",

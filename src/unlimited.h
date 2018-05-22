@@ -265,6 +265,7 @@ bool MiningAndExcessiveBlockValidatorRule(const uint64_t newExcessiveBlockSize, 
 std::string AcceptDepthValidator(const unsigned int &value, unsigned int *item, bool validate);
 std::string ExcessiveBlockValidator(const uint64_t &value, uint64_t *item, bool validate);
 std::string OutboundConnectionValidator(const int &value, int *item, bool validate);
+std::string MaxDataCarrierValidator(const unsigned int &value, unsigned int *item, bool validate);
 std::string SubverValidator(const std::string &value, std::string *item, bool validate);
 std::string MiningBlockSizeValidator(const uint64_t &value, uint64_t *item, bool validate);
 
