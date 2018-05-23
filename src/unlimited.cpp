@@ -67,6 +67,7 @@ extern CTweakRef<uint64_t> miningBlockSize;
 extern CTweakRef<uint64_t> ebTweak;
 
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
+static const int NEW_CANDIDATE_INTERVAL = 30; // seconds
 
 bool IsTrafficShapingEnabled();
 UniValue validateblocktemplate(const UniValue &params, bool fHelp);
@@ -1618,44 +1619,40 @@ UniValue setlog(const UniValue &params, bool fHelp)
     return ret;
 }
 
-/** Mining-Candidate Protocol - begin */
+/** Mining-Candidate begin */
 
-/** Oustanding candidates are removed after 30 sec */
+/** Oustanding candidates are removed 30 sec after a new block has been found*/
 static void RmOldMiningCandidates()
 {
-    // NOT thread safe.
-    // Protect with critical sections in the RPC functions.
-    int64_t now = GetTime();
-    int64_t tdiff;
-    const int64_t old = 30 * 1000; // sec
+    LOCK(cs_main);
+    static int prevheight = -1;
+    int height = GetBlockchainHeight();
 
-    for (auto it = miningCandidatesMap.begin(); it != miningCandidatesMap.end();)
+    if (height <= prevheight)
+        return;
+
+    // New block has been found:
+    int64_t tdiff = GetTime() - (chainActive.Tip()->nTime + (NEW_CANDIDATE_INTERVAL * 1000));
+    if (tdiff >= 0)
     {
-        tdiff = now - it->second.timeStamp;
-        if (tdiff > old || tdiff < 0) // Too old. Or if (<0) time messed up.
-        {
-            it = miningCandidatesMap.erase(it);
-        }
-        else
-        {
-            ++it;
-        }
+        miningCandidatesMap.clear();
+        prevheight = height;
     }
+}
+
+static void AddMiningCandidate(CMiningCandidate &candid, int64_t id)
+{
+    // Save candidate so can be looked up:
+    LOCK(cs_main);
+    miningCandidatesMap[id] = candid;
 }
 
 std::vector<uint256> GetMerkleProofBranches(CBlock *pblock)
 {
-    /*
-    TODO: Only works for "full branches", such as:
-    H(1) size 1
-    H(2,3) size 2
-    H(4,7) size 4
-    */
     std::vector<uint256> ret;
-    int len = pblock->vtx.size();
-    // LOGA("---- %d ----\n", len);
-
     std::vector<uint256> leaves;
+    int len = pblock->vtx.size();
+
     for (int i = 0; i < len; i++)
     {
         leaves.push_back(pblock->vtx[i].get()->GetHash());
@@ -1668,16 +1665,14 @@ std::vector<uint256> GetMerkleProofBranches(CBlock *pblock)
 /** Create Mining-Candidate JSON to send to miner */
 static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
 {
-    // Caller must ensure thread safe.
     UniValue ret(UniValue::VOBJ);
     CBlock &block = candid.block;
 
-    RmOldMiningCandidates(); // Not threadsafe
+    RmOldMiningCandidates();
 
     // Save candidate so can be looked up:
-    candid.timeStamp = GetTime();
     int64_t id = GetRand(~0x0L);
-    miningCandidatesMap[id] = candid; // Not threadsafe
+    AddMiningCandidate(candid, id);
     ret.push_back(Pair("id", id));
 
     ret.push_back(Pair("prevhash", block.hashPrevBlock.GetHex()));
@@ -1687,30 +1682,27 @@ static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
         ret.push_back(Pair("coinbase", EncodeHexTx(*tran)));
     }
 
-    // like getblocktemplate send an int not a string:
-    // ret.push_back(Pair("version",to_string(block.nVersion))); //FIX USE this string
-    ret.push_back(Pair("version", block.nVersion));
+    ret.push_back(Pair("version", to_string(block.nVersion)));
     ret.push_back(Pair("nBits", strprintf("%08x", block.nBits)));
     ret.push_back(Pair("time", block.GetBlockTime()));
 
     // merklebranches:
     {
         std::vector<uint256> brancharr = GetMerkleProofBranches(&block);
-        // LOGA("merklebranches len %d\n",brancharr.size());
+        // LOGA("mbran brancharr.size() %d\n",brancharr.size());
         UniValue merklebranches(UniValue::VARR);
-        for (const auto &i: brancharr)
+        for (const auto &i : brancharr)
         {
             merklebranches.push_back(i.GetHex());
         }
-        ret.push_back(Pair("merklebranch", merklebranches));
+        // LOGA("mbran merklebranches.size() %d\n",merklebranches.size());
+        ret.push_back(Pair("merklebranches", merklebranches));
     }
 
     return ret;
 }
 
-// TBD Move to tests:
-UniValue TestCpuMiner(CMiningCandidate &candid);
-
+/** RPC Get a block candidate*/
 UniValue getminingcandidate(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
@@ -1723,22 +1715,12 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
                             "\nReturns Mining-Candidate protocol data.\n"
                             "\nArguments: None\n");
     }
-
     mkblocktemplate(params, &candid.block);
-
-#if 1 // Set to 0 to test for development.
     ret = MkMiningCandidateJson(candid);
-#else
-    // TEST:
-    fPrintToConsole = true;
-    ret = TestCpuMiner(candid);
-    fPrintToConsole = false;
-#endif
-
     return ret;
 }
 
-/** Submit a solved block*/
+/** RPC Submit a solved block candidate*/
 UniValue submitminingsolution(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
@@ -1757,7 +1739,7 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
 
             "\nResult:\n"
             "{\n"
-            "  \"error\": true|false,\n"
+            "  \"accepted\": true|false,\n"
             "  \"message\": \"a message\"\"\n"
             "}\n"
 
@@ -1774,6 +1756,7 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
 
     RmOldMiningCandidates();
 
+    // Needs LOCK(cs_main); above:
     if (miningCandidatesMap.count(id) == 1)
     {
         block = miningCandidatesMap[id].block;
@@ -1781,7 +1764,7 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
     }
     else
     {
-        ret.push_back(Pair("error", UniValue(true)));
+        ret.push_back(Pair("accepted", UniValue(false)));
         ret.push_back(Pair("message", "Id not found."));
         return ret; // Leave if no id
     }
@@ -1812,20 +1795,20 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
     if (!uvsub.isStr())
     {
         // Good
-        ret.push_back(Pair("error", UniValue(false)));
+        ret.push_back(Pair("accepted", UniValue(true)));
         ret.push_back(Pair("message", "success"));
     }
     else
     {
         // Error
-        ret.push_back(Pair("error", UniValue(true)));
-        ret.push_back(Pair("message", "rejected"));
+        ret.push_back(Pair("accepted", UniValue(false)));
+        ret.push_back(Pair("message", uvsub.get_str()));
     }
 
     return ret;
 }
 
-void CalculateNextMerkleRoot(uint256 &merkle_root, uint256 &merkle_branch)
+static void CalculateNextMerkleRoot(uint256 &merkle_root, uint256 &merkle_branch)
 {
     // Append a branch to the root. Double SHA256 the whole thing:
     uint256 hash;
@@ -1846,162 +1829,7 @@ uint256 CalculateMerkleRoot(uint256 &coinbase_hash, std::vector<uint256> merkleb
     return merkle_root;
 }
 
-/////////////////
-// Mining-Candidate CPU miner test code
-// TODO move
-void CpuMineSetExtraNonce(CTransaction &coinbase, unsigned int &nExtraNonce)
-{
-    // Update nExtraNonce
-
-    CHash256 hasher;
-    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-    ss << coinbase;
-
-    unsigned char *pbytes = (unsigned char *)&ss[0];
-    *(unsigned int *)(pbytes + 84) = nExtraNonce; // 84 -start of script
-}
-
-bool CpuMine(CBlockHeader *pblock, CTransaction &coinbase, std::vector<uint256> merklebranches)
-{
-    LOGA("CpuMine started\n");
-    unsigned int nExtraNonce = 0;
-    bool found = false;
-    int ntries = 10;
-    uint256 t;
-
-    while (!found)
-    {
-        ++nExtraNonce;
-        CpuMineSetExtraNonce(coinbase, nExtraNonce);
-        t = coinbase.GetHash();
-        pblock->hashMerkleRoot = CalculateMerkleRoot(t, merklebranches);
-        //
-        // Search
-        //
-        arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
-        uint256 hash;
-        uint32_t nNonce = 0;
-        while (!found)
-        {
-            // Check if something found
-            if (ScanHash(pblock, nNonce, &hash))
-            {
-                if (UintToArith256(hash) <= hashTarget)
-                {
-                    // Found a solution
-                    pblock->nNonce = nNonce;
-                    assert(hash == pblock->GetHash());
-                    found = true;
-                    LOGA("proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(), hashTarget.GetHex());
-
-                    break;
-                }
-                else
-                {
-                    if (ntries-- < 1)
-                    {
-                        LOGA("CpuMine Gave up\n");
-                        return false; // Give up leave
-                    }
-                }
-            }
-        }
-    }
-
-    return found;
-}
-
-CBlockHeader CpuMinerJsonToHeader(const UniValue &params)
-{
-    // Does not set hashMerkleRoot (Does not exist in Mining-Candidate params).
-
-    CBlockHeader blockheader;
-
-    // nVersion
-    blockheader.nVersion = params["version"].get_int();
-
-    // hashPrevBlock
-    string tmpstr = params["prevhash"].get_str();
-    std::vector<unsigned char> vec = ParseHex(tmpstr);
-    std::reverse(vec.begin(), vec.end()); // sent reversed
-    blockheader.hashPrevBlock = uint256(vec);
-
-    // nTime:
-    blockheader.nTime = params["time"].get_int();
-
-    // nBits
-    {
-        std::stringstream ss;
-        ss << std::hex << params["nBits"].get_str();
-        ss >> blockheader.nBits;
-    }
-
-    return blockheader;
-}
-
-// TODO put in client "cpuminer" program
-UniValue CpuMiner(const UniValue &params, bool &found)
-{
-    UniValue tmp(UniValue::VOBJ);
-    UniValue ret(UniValue::VARR);
-    CTransaction coinbase;
-    string tmpstr;
-    std::vector<uint256> merklebranches;
-    CBlockHeader header;
-
-    found = false;
-
-    // coinbase:
-    DecodeHexTx(coinbase, params["coinbase"].get_str());
-
-    // re-create merkle branches:
-    {
-        UniValue uvMerklebranches = params["merklebranches"];
-        // uint256 branch;
-        for (unsigned int i = 0; i < uvMerklebranches.size(); i++)
-        {
-            tmpstr = uvMerklebranches[i].get_str();
-            std::vector<unsigned char> mbr = ParseHex(tmpstr);
-            std::reverse(mbr.begin(), mbr.end());
-            merklebranches.push_back(uint256(mbr));
-        }
-    }
-
-    header = CpuMinerJsonToHeader(params);
-    found = CpuMine(&header, coinbase, merklebranches);
-
-    // Leave if not found:
-    if (!found)
-        return ret;
-
-    tmp.push_back(Pair("coinbase", EncodeHexTx(coinbase)));
-    tmp.push_back(Pair("id", params["id"]));
-    // tmp.push_back(Pair("time",GetTime()));
-
-    tmp.push_back(Pair("nonce", UniValue(header.nNonce)));
-    ret.push_back(UniValue(tmp.write()));
-    return ret;
-}
-
-UniValue TestCpuMiner(CMiningCandidate &candid)
-{
-    UniValue ret(UniValue::VARR);
-    bool found = false;
-    // bitcoind sends json:
-    UniValue params = MkMiningCandidateJson(candid);
-    // miner mines:
-    ret = CpuMiner(params, found);
-    // if found sends to bitcoind:
-    if (found)
-        ret = submitminingsolution(ret, false);
-    return ret;
-}
-
-// End
-// Mining-Candidate CPU miner test code
-// TODO move ^^^
-/////////////////
-
+/** Mining-Candidate end */
 
 /* clang-format off */
 static const CRPCCommand commands[] =

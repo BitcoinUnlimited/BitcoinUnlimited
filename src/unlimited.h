@@ -289,7 +289,7 @@ extern CTweak<uint64_t> miningForkEB;
 /** This specifies the minimum max block size at the fork point */
 extern CTweak<uint64_t> miningForkMG;
 
-
+// Mining-Candidate start
 /** Return a Merkle root given a Coinbase hash and Merkle branches */
 uint256 CalculateMerkleRoot(uint256 &coinbase_hash, std::vector<uint256> merklebranches);
 /** Return Merkle branches for a Block */
@@ -299,9 +299,7 @@ std::vector<uint256> GetMerkleProofBranches(CBlock *pblock);
 class CMiningCandidate
 {
 public:
-    int64_t timeStamp;
     CBlock block;
 };
-
 extern std::map<int64_t, CMiningCandidate> miningCandidatesMap;
 #endif
