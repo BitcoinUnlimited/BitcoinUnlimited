@@ -247,6 +247,9 @@ public:
     friend bool operator==(const CTransaction &a, const CTransaction &b) { return a.hash == b.hash; }
     friend bool operator!=(const CTransaction &a, const CTransaction &b) { return a.hash != b.hash; }
     std::string ToString() const;
+
+    // Return the size the transaction in bytes.
+    uint32_t GetTxSize() const;
 };
 
 /** A mutable version of CTransaction. */
