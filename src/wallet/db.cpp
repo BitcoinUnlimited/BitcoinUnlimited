@@ -119,9 +119,9 @@ void CDBEnv::MakeMock()
     dbenv->set_lk_max_objects(10000);
     dbenv->set_flags(DB_AUTO_COMMIT, 1);
     dbenv->log_set_config(DB_LOG_IN_MEMORY, 1);
-    int ret =
-        dbenv->open(nullptr, DB_CREATE | DB_INIT_LOCK | DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN | DB_THREAD | DB_PRIVATE,
-            S_IRUSR | S_IWUSR);
+    int ret = dbenv->open(nullptr,
+        DB_CREATE | DB_INIT_LOCK | DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN | DB_THREAD | DB_PRIVATE,
+        S_IRUSR | S_IWUSR);
     if (ret > 0)
         throw runtime_error(strprintf("CDBEnv::MakeMock: Error %d opening database environment.", ret));
 
