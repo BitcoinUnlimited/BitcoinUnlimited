@@ -59,7 +59,7 @@ public:
     {
         BCH,
         mBCH,
-        uBCH
+        XCH
     };
 
     enum SeparatorStyle
