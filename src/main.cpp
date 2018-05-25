@@ -2445,16 +2445,13 @@ void static UpdateTip(CBlockIndex *pindexNew)
     }
 
     // Next, check every on every block for EB < 32MB and force this as the minimum because this is a consensus issue
-    // Although OP_RETURN size is not consensus, enforce the new minimum size on every block so that the expectation
-    // of relay for any tx < 220 bytes is met by this node.
     if (IsMay152018Enabled(chainParams.GetConsensus(), pindexNew))
     {
         if (miningForkEB.value > excessiveBlockSize)
+        {
             excessiveBlockSize = miningForkEB.value;
-        // Bump OP_RETURN size:
-        if (nMaxDatacarrierBytes < MAX_OP_RETURN_MAY2018)
-            nMaxDatacarrierBytes = MAX_OP_RETURN_MAY2018;
-        settingsToUserAgentString();
+            settingsToUserAgentString();
+        }
     }
 
     // New best block

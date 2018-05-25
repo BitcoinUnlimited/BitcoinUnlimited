@@ -35,22 +35,6 @@ def create_broken_transaction(prevtx, n, sig, value):
     tx.calc_sha256()
     return tx
 
-
-def expectException(fn, ExcType, comparison=None):
-    try:
-        fn()
-    except ExcType as exc:
-        if comparison:
-            if comparison in str(exc):  # exception matchs
-                return
-            else:
-                print("Incorrect error.  Was: " + str(exc) + " Expecting: " + comparison)
-                assert(0)
-        else:
-            return
-    assert(0)  # an exception should have happened
-
-
 class ValidateblocktemplateTest(BitcoinTestFramework):
 
     def setup_network(self):

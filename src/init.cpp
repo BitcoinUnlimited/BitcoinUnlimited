@@ -816,6 +816,12 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     fIsBareMultisigStd = GetBoolArg("-permitbaremultisig", DEFAULT_PERMIT_BAREMULTISIG);
     fAcceptDatacarrier = GetBoolArg("-datacarrier", DEFAULT_ACCEPT_DATACARRIER);
     nMaxDatacarrierBytes = GetArg("-datacarriersize", nMaxDatacarrierBytes);
+    if (nMaxDatacarrierBytes < MAX_OP_RETURN_RELAY)
+    {
+        InitWarning(strprintf(_("Increasing -datacarriersize from %d to %d due to new May 15th OP_RETURN size policy."),
+            nMaxDatacarrierBytes, MAX_OP_RETURN_RELAY));
+        nMaxDatacarrierBytes = MAX_OP_RETURN_RELAY;
+    }
 
     // Option to startup with mocktime set (used for regression testing):
     SetMockTime(GetArg("-mocktime", 0)); // SetMockTime(0) is a no-op
@@ -1139,9 +1145,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         if (miningForkEB.value > excessiveBlockSize)
             excessiveBlockSize = miningForkEB.value;
         settingsToUserAgentString();
-        // Bump OP_RETURN size:
-        if (nMaxDatacarrierBytes < MAX_OP_RETURN_MAY2018)
-            nMaxDatacarrierBytes = MAX_OP_RETURN_MAY2018;
     }
 
 // ********************************************************* Step 7: load wallet

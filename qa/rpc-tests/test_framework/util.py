@@ -66,6 +66,20 @@ class NoConfigValue:
     def __init__(self):
         pass
 
+def expectException(fn, ExcType, comparison=None):
+    try:
+        fn()
+    except ExcType as exc:
+        if comparison:
+            if comparison in str(exc):  # exception matchs
+                return
+            else:
+                print("Incorrect error.  Was: " + str(exc) + " Expecting: " + comparison)
+                assert(0)
+        else:
+            return
+    assert(0)  # an exception should have happened
+
 def enable_mocktime():
     # Set the mocktime to be after the Bitcoin Cash fork so
     # in normal tests blockchains the fork is in the past
