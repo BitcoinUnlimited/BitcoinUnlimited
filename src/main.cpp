@@ -220,7 +220,7 @@ std::unique_ptr<CRollingBloomFilter> txn_recently_in_block GUARDED_BY(cs_recentR
 
 
 /** Number of preferable block download peers. */
-int nPreferredDownload = 0 GUARDED_BY(cs_main);
+std::atomic<int> nPreferredDownload{0};
 
 /** Dirty block file entries. */
 std::set<int> setDirtyFileInfo GUARDED_BY(cs_main);
@@ -245,8 +245,7 @@ int GetHeight()
 
 void UpdatePreferredDownload(CNode *node, CNodeState *state)
 {
-    LOCK(cs_main);
-    nPreferredDownload -= state->fPreferredDownload;
+    nPreferredDownload.fetch_sub(state->fPreferredDownload);
 
     // Whether this node should be marked as a preferred download node.
     state->fPreferredDownload = !node->fOneShot && !node->fClient;
@@ -257,7 +256,7 @@ void UpdatePreferredDownload(CNode *node, CNodeState *state)
     // LOG(NET, "node %s preferred DL: %d because (%d || %d) && %d && %d\n", node->GetLogName(),
     //   state->fPreferredDownload, !node->fInbound, node->fWhitelisted, !node->fOneShot, !node->fClient);
 
-    nPreferredDownload += state->fPreferredDownload;
+    nPreferredDownload.fetch_add(state->fPreferredDownload);
 }
 
 void InitializeNode(const CNode *pnode)
@@ -287,7 +286,7 @@ void FinalizeNode(NodeId nodeid)
         // Reset all requests times to zero so that we can immediately re-request these blocks
         requester.ResetLastRequestTime(hash);
     }
-    nPreferredDownload -= state->fPreferredDownload;
+    nPreferredDownload.fetch_sub(state->fPreferredDownload);
 
     mapNodeState.erase(nodeid);
     requester.RemoveNodeState(nodeid);
@@ -295,7 +294,7 @@ void FinalizeNode(NodeId nodeid)
     {
         // Do a consistency check after the last peer is removed.  Force consistent state if production code
         DbgAssert(requester.MapBlocksInFlightEmpty(), requester.MapBlocksInFlightClear());
-        DbgAssert(nPreferredDownload == 0, nPreferredDownload = 0);
+        DbgAssert(nPreferredDownload.load() == 0, nPreferredDownload.store(0));
     }
 }
 
@@ -4416,11 +4415,12 @@ void UnloadBlockIndex()
         orphanpool.nBytesOrphanPool = 0;
     }
 
+    nPreferredDownload.store(0);
+
     LOCK(cs_main);
     nBlockSequenceId = 1;
     nSyncStarted = 0;
     nLastBlockFile = 0;
-    nPreferredDownload = 0;
     mapUnConnectedHeaders.clear();
     setBlockIndexCandidates.clear();
     chainActive.SetTip(nullptr);
@@ -7068,7 +7068,7 @@ bool SendMessages(CNode *pto)
         if (pindexBestHeader == nullptr)
             pindexBestHeader = chainActive.Tip();
         // Download if this is a nice peer, or we have no nice peers and this one might do.
-        bool fFetch = state.fPreferredDownload || (nPreferredDownload == 0 && !pto->fClient && !pto->fOneShot);
+        bool fFetch = state.fPreferredDownload || (nPreferredDownload.load() == 0 && !pto->fClient && !pto->fOneShot);
         if (!state.fSyncStarted && !pto->fClient && !fImporting && !fReindex)
         {
             // Only actively request headers from a single peer, unless we're close to today.
