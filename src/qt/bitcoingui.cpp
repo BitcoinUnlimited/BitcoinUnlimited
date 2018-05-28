@@ -66,13 +66,14 @@ BitcoinGUI::BitcoinGUI(const Config *cfg,
     const NetworkStyle *networkStyle,
     QWidget *parent)
     : QMainWindow(parent), clientModel(0), walletFrame(0), unitDisplayControl(0), labelWalletEncryptionIcon(0),
-       labelWalletHDStatusIcon(0), labelConnectionsIcon(0), labelBlocksIcon(0), progressBarLabel(0), progressBar(0), progressDialog(0),
-      appMenuBar(0), overviewAction(0), historyAction(0), quitAction(0), sendCoinsAction(0), sendCoinsMenuAction(0),
-      usedSendingAddressesAction(0), usedReceivingAddressesAction(0), signMessageAction(0), verifyMessageAction(0),
-      aboutAction(0), receiveCoinsAction(0), receiveCoinsMenuAction(0), optionsAction(0), unlimitedAction(0),
-      toggleHideAction(0), encryptWalletAction(0), backupWalletAction(0), changePassphraseAction(0), aboutQtAction(0),
-      openRPCConsoleAction(0), openAction(0), showHelpMessageAction(0), trayIcon(0), trayIconMenu(0), notificator(0),
-      rpcConsole(0), helpMessageDialog(0), prevBlocks(0), spinnerFrame(0), platformStyle(platformStyle), cfg(cfg)
+      labelWalletHDStatusIcon(0), labelConnectionsIcon(0), labelBlocksIcon(0), progressBarLabel(0), progressBar(0),
+      progressDialog(0), appMenuBar(0), overviewAction(0), historyAction(0), quitAction(0), sendCoinsAction(0),
+      sendCoinsMenuAction(0), usedSendingAddressesAction(0), usedReceivingAddressesAction(0), signMessageAction(0),
+      verifyMessageAction(0), aboutAction(0), receiveCoinsAction(0), receiveCoinsMenuAction(0), optionsAction(0),
+      unlimitedAction(0), toggleHideAction(0), encryptWalletAction(0), backupWalletAction(0), changePassphraseAction(0),
+      aboutQtAction(0), openRPCConsoleAction(0), openAction(0), showHelpMessageAction(0), trayIcon(0), trayIconMenu(0),
+      notificator(0), rpcConsole(0), helpMessageDialog(0), prevBlocks(0), spinnerFrame(0), platformStyle(platformStyle),
+      cfg(cfg)
 {
     GUIUtil::restoreWindowGeometry("nWindow", QSize(850, 550), this);
 
@@ -992,10 +993,13 @@ bool BitcoinGUI::handlePaymentRequest(const SendCoinsRecipient &recipient)
 
 void BitcoinGUI::setHDStatus(int hdEnabled)
 {
-    labelWalletHDStatusIcon->setPixmap(platformStyle->SingleColorIcon(hdEnabled ? ":/icons/hd_enabled" : ":/icons/hd_disabled").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
-    labelWalletHDStatusIcon->setToolTip(hdEnabled ? tr("HD key generation is <b>enabled</b>") : tr("HD key generation is <b>disabled</b>"));
+    labelWalletHDStatusIcon->setPixmap(
+        platformStyle->SingleColorIcon(hdEnabled ? ":/icons/hd_enabled" : ":/icons/hd_disabled")
+            .pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
+    labelWalletHDStatusIcon->setToolTip(
+        hdEnabled ? tr("HD key generation is <b>enabled</b>") : tr("HD key generation is <b>disabled</b>"));
 
-    // eventually disable the QLabel to set its opacity to 50% 
+    // eventually disable the QLabel to set its opacity to 50%
     labelWalletHDStatusIcon->setEnabled(hdEnabled);
 }
 
@@ -1010,15 +1014,16 @@ void BitcoinGUI::setEncryptionStatus(int status)
         encryptWalletAction->setEnabled(true);
         break;
     case WalletModel::Unlocked:
-/*
-        labelEncryptionIcon->show();
-        labelEncryptionIcon->setPixmap(
-            platformStyle->SingleColorIcon(":/icons/lock_open").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
-        labelEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>unlocked</b>"));
-*/
+        /*
+                labelEncryptionIcon->show();
+                labelEncryptionIcon->setPixmap(
+                    platformStyle->SingleColorIcon(":/icons/lock_open").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
+                labelEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>unlocked</b>"));
+        */
 
         labelWalletEncryptionIcon->show();
-        labelWalletEncryptionIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/lock_open").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
+        labelWalletEncryptionIcon->setPixmap(
+            platformStyle->SingleColorIcon(":/icons/lock_open").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
         labelWalletEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>unlocked</b>"));
 
         encryptWalletAction->setChecked(true);
@@ -1026,15 +1031,17 @@ void BitcoinGUI::setEncryptionStatus(int status)
         encryptWalletAction->setEnabled(false); // TODO: decrypt currently not supported
         break;
     case WalletModel::Locked:
-/*
-        labelEncryptionIcon->show();
-        labelEncryptionIcon->setPixmap(
-            platformStyle->SingleColorIcon(":/icons/lock_closed").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
-        labelEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>locked</b>"));
-*/
+        /*
+                labelEncryptionIcon->show();
+                labelEncryptionIcon->setPixmap(
+                    platformStyle->SingleColorIcon(":/icons/lock_closed").pixmap(STATUSBAR_ICONSIZE,
+           STATUSBAR_ICONSIZE));
+                labelEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>locked</b>"));
+        */
 
         labelWalletEncryptionIcon->show();
-        labelWalletEncryptionIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/lock_closed").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
+        labelWalletEncryptionIcon->setPixmap(
+            platformStyle->SingleColorIcon(":/icons/lock_closed").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
         labelWalletEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>locked</b>"));
 
         encryptWalletAction->setChecked(true);

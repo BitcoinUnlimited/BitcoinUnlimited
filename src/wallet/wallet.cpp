@@ -1181,11 +1181,7 @@ bool CWallet::SetHDChain(const CHDChain &chain, bool memonly)
     return true;
 }
 
-bool CWallet::IsHDEnabled()
-{
-    return !hdChain.masterKeyID.IsNull();
-}
-
+bool CWallet::IsHDEnabled() { return !hdChain.masterKeyID.IsNull(); }
 int64_t CWalletTx::GetTxTime() const
 {
     int64_t n = nTimeSmart;
