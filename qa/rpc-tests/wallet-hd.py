@@ -6,11 +6,11 @@
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     start_nodes,
-    stop_nodes,
+    stop_node,
     start_node,
     assert_equal,
     connect_nodes_bi,
-    wait_bitcoinds,
+    initialize_chain_clean,
 )
 import os
 import shutil
@@ -20,9 +20,12 @@ class WalletHDTest(BitcoinTestFramework):
 
     def __init__(self):
         super().__init__()
-        self.setup_clean_chain = True
         self.num_nodes = 2
         self.node_args = [['-usehd=0'], ['-usehd=1', '-keypool=0']]
+
+    def setup_chain(self,bitcoinConfDict=None, wallets=None):
+        print ("Initializing test directory "+self.options.tmpdir)
+        initialize_chain_clean(self.options.tmpdir, 2)
 
     def setup_network(self):
         self.nodes = start_nodes(self.num_nodes, self.options.tmpdir, self.node_args)
@@ -42,6 +45,7 @@ class WalletHDTest(BitcoinTestFramework):
 
         # Derive some HD addresses and remember the last
         # Also send funds to each add
+        print("Derive HD addresses ...")
         self.nodes[0].generate(101)
         hd_add = None
         num_hd_adds = 300
@@ -56,13 +60,13 @@ class WalletHDTest(BitcoinTestFramework):
         assert_equal(self.nodes[1].getbalance(), num_hd_adds + 1)
 
         print("Restore backup ...")
-        stop_nodes(self.nodes)
-        wait_bitcoinds()
+        stop_node(self.nodes[1], 1)
         os.remove(self.options.tmpdir + "/node1/regtest/wallet.dat")
         shutil.copyfile(tmpdir + "hd.bak", tmpdir + "/node1/regtest/wallet.dat")
         self.nodes[1] = start_node(1, self.options.tmpdir, self.node_args[1])
 
         # Assert that derivation is deterministic
+        print ("Check derivation...")
         hd_add_2 = None
         for _ in range(num_hd_adds):
             hd_add_2 = self.nodes[1].getnewaddress()
@@ -70,8 +74,7 @@ class WalletHDTest(BitcoinTestFramework):
 
         # Needs rescan
         print("Rescan ...")
-        stop_nodes(self.nodes)
-        wait_bitcoinds()
+        stop_node(self.nodes[1], 1)
         self.nodes[1] = start_node(1, self.options.tmpdir, self.node_args[1] + ['-rescan'])
         assert_equal(self.nodes[1].getbalance(), num_hd_adds + 1)
 
