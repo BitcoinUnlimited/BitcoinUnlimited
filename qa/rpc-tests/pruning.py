@@ -67,7 +67,8 @@ class PruneTest(BitcoinTestFramework):
         # Then mine enough full blocks to create more than 550MiB of data
         for i in range(645):
             mine_large_block(self.nodes[0], self.utxo_cache_0)
-            sync_blocks(self.nodes[0:3])
+
+        sync_blocks(self.nodes[0:3])
 
     def test_height_min(self):
         if not os.path.isfile(self.prunedir+"blk00000.dat"):
