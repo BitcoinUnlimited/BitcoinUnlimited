@@ -3398,10 +3398,10 @@ bool CWallet::InitLoadWallet()
     else if (mapArgs.count("-usehd"))
     {
         bool useHD = GetBoolArg("-usehd", DEFAULT_USE_HD_WALLET);
-        if (!walletInstance->IsHDEnabled() && !useHD)
+        if (walletInstance->IsHDEnabled() && !useHD)
             return InitError(
                 strprintf(_("Error loading %s: You can't disable HD on a already existing HD wallet"), walletFile));
-        if (walletInstance->IsHDEnabled() && useHD)
+        if (!walletInstance->IsHDEnabled() && useHD)
             return InitError(
                 strprintf(_("Error loading %s: You can't enable HD on a already existing non-HD wallet"), walletFile));
     }
