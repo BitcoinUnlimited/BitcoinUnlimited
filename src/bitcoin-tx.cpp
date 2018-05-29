@@ -496,6 +496,7 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
+                LOCK(view.cs_utxo);
                 const Coin &coin = view.AccessCoin(out);
                 if (!coin.IsSpent() && coin.out.scriptPubKey != scriptPubKey)
                 {
@@ -533,6 +534,8 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
     {
+        LOCK(view.cs_utxo);
+
         CTxIn &txin = mergedTx.vin[i];
         const Coin &coin = view.AccessCoin(txin.prevout);
         if (coin.IsSpent())
@@ -549,7 +552,7 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
             SignSignature(keystore, prevPubKey, mergedTx, i, amount, nHashType);
 
         // ... and merge in other signatures:
-        BOOST_FOREACH (const CTransaction &txv, txVariants)
+        for (const CTransaction &txv : txVariants)
         {
             txin.scriptSig = CombineSignatures(prevPubKey, MutableTransactionSignatureChecker(&mergedTx, i, amount),
                 txin.scriptSig, txv.vin[i].scriptSig);
