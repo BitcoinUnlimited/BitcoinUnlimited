@@ -14,6 +14,9 @@
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
+import time
+import os
+
 
 def calc_usage(blockdir):
     return sum(os.path.getsize(blockdir+f) for f in os.listdir(blockdir) if os.path.isfile(blockdir+f)) / (1024. * 1024.)
@@ -28,6 +31,10 @@ class PruneTest(BitcoinTestFramework):
     def setup_chain(self):
         print("Initializing test directory "+self.options.tmpdir)
         initialize_chain_clean(self.options.tmpdir, 4)
+
+        # Cache for utxos, as the listunspent may take a long time later in the test
+        self.utxo_cache_0 = []
+        self.utxo_cache_1 = []
 
     def setup_network(self):
         self.nodes = []
@@ -59,8 +66,9 @@ class PruneTest(BitcoinTestFramework):
         self.nodes[0].generate(150)
         # Then mine enough full blocks to create more than 550MiB of data
         for i in range(645):
-            self.mine_full_block(self.nodes[0], self.address[0])
-            sync_blocks(self.nodes[0:3])
+            mine_large_block(self.nodes[0], self.utxo_cache_0)
+
+        sync_blocks(self.nodes[0:3])
 
     def test_height_min(self):
         if not os.path.isfile(self.prunedir+"blk00000.dat"):
@@ -136,14 +144,14 @@ class PruneTest(BitcoinTestFramework):
             self.utxo = self.nodes[1].listunspent()
             for i in range(24):
                 if j == 0:
-                    self.mine_full_block(self.nodes[1],self.address[1])
+                    mine_large_block(self.nodes[1], self.utxo_cache_1)
                 else:
                     self.nodes[1].generate(1) #tx's already in mempool from previous disconnects
 
             # Reorg back with 25 block chain from node 0
             self.utxo = self.nodes[0].listunspent()
             for i in range(25):
-                self.mine_full_block(self.nodes[0],self.address[0])
+                mine_large_block(self.nodes[0], self.utxo_cache_0)
 
             # Create connections in the order so both nodes can see the reorg at the same time
             connect_nodes(self.nodes[1], 0)
@@ -253,32 +261,6 @@ class PruneTest(BitcoinTestFramework):
         assert(self.nodes[2].getbestblockhash() == goalbesthash)
         # Verify we can now have the data for a block previously pruned
         assert(self.nodes[2].getblock(self.forkhash)["height"] == self.forkheight)
-
-    def mine_full_block(self, node, address):
-        # Want to create a full block
-        # We'll generate a 66k transaction below, and 14 of them is close to the 1MB block limit
-        for j in range(14):
-            if len(self.utxo) < 14:
-                self.utxo = node.listunspent()
-            inputs=[]
-            outputs = {}
-            t = self.utxo.pop()
-            inputs.append({ "txid" : t["txid"], "vout" : t["vout"]})
-            remchange = t["amount"] - 100*self.relayfee # Fee must be above min relay rate for 66kb tx
-            outputs[address]=remchange
-            # Create a basic transaction that will send change back to ourself after account for a fee
-            # And then insert the 128 generated transaction outs in the middle rawtx[92] is where the #
-            # of txouts is stored and is the only thing we overwrite from the original transaction
-            rawtx = node.createrawtransaction(inputs, outputs)
-            newtx = rawtx[0:92]
-            newtx = newtx + self.txouts
-            newtx = newtx + rawtx[94:]
-            # Appears to be ever so slightly faster to sign with SIGHASH_NONE
-            signresult = node.signrawtransaction(newtx,None,None,"NONE")
-            txid = node.sendrawtransaction(signresult["hex"], True)
-        # Mine a full sized block which will be these transactions we just created
-        node.generate(1)
-
 
     def run_test(self):
         print("Warning! This test requires 4GB of disk space and takes over 30 mins (up to 2 hours)")

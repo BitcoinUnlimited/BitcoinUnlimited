@@ -199,7 +199,7 @@ testScripts = [ RpcTest(t) for t in [
     'rest',
     'mempool_spendcoinbase',
     'mempool_reorg',
-    Disabled('mempool_limit', "mempool priority changes causes create_lots_of_big_transactions to fail"),
+    'mempool_limit',
     'httpbasics',
     'multi_rpc',
     'zapwallettxes',
