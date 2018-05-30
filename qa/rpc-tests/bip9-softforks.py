@@ -3,7 +3,8 @@
 # Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#
+
+from test_framework.blockstore import BlockStore
 from test_framework.util import sync_blocks
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import *
@@ -191,12 +192,15 @@ class BIP9SoftForksTest(ComparisonTestFramework):
         block.solve()
         self.last_block_time += 1
         yield TestInstance([[block, False]])
+
         # Restart all
+        self.test.block_store.close()
         stop_nodes(self.nodes)
         wait_bitcoinds()
         shutil.rmtree(self.options.tmpdir)
         self.setup_chain()
         self.setup_network()
+        self.test.block_store = BlockStore(self.options.tmpdir)
         self.test.clear_all_connections()
         self.test.add_all_connections(self.nodes)
         NetworkThread().start() # Start up network handling in another thread
