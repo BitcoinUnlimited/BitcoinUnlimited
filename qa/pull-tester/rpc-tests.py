@@ -248,8 +248,7 @@ testScriptsExt = [ RpcTest(t) for t in [
     'maxblocksinflight',
     'p2p-acceptblock',
     'mempool_packages',
-    'maxuploadtarget',
-    Disabled('replace-by-fee', "disabled while Replace By Fee is disabled in code")
+    'maxuploadtarget'
 ] ]
 
 #Enable ZMQ tests
