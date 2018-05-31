@@ -164,12 +164,12 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
         {
             uint256 txid = txids[insecure_rand() % txids.size()]; // txid we're going to modify in this iteration.
             Coin &coin = result[COutPoint(txid, 0)];
-{
-            LOCK(stack.back()->cs_utxo);
-            const Coin &entry = (insecure_rand() % 500 == 0) ? AccessByTxid(*stack.back(), txid) :
-                                                            stack.back()->AccessCoin(COutPoint(txid, 0));
-            BOOST_CHECK(coin == entry);
-}
+            {
+                LOCK(stack.back()->cs_utxo);
+                const Coin &entry = (insecure_rand() % 500 == 0) ? AccessByTxid(*stack.back(), txid) :
+                                                                   stack.back()->AccessCoin(COutPoint(txid, 0));
+                BOOST_CHECK(coin == entry);
+            }
 
             if (insecure_rand() % 5 == 0 || coin.IsSpent())
             {
@@ -221,21 +221,21 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
             for (auto it = result.begin(); it != result.end(); it++)
             {
                 bool have = stack.back()->HaveCoin(it->first);
-{
-            LOCK(stack.back()->cs_utxo);
-                const Coin &coin = stack.back()->AccessCoin(it->first);
-                BOOST_CHECK(have == !coin.IsSpent());
-                BOOST_CHECK(coin == it->second);
-                if (coin.IsSpent())
                 {
-                    missed_an_entry = true;
+                    LOCK(stack.back()->cs_utxo);
+                    const Coin &coin = stack.back()->AccessCoin(it->first);
+                    BOOST_CHECK(have == !coin.IsSpent());
+                    BOOST_CHECK(coin == it->second);
+                    if (coin.IsSpent())
+                    {
+                        missed_an_entry = true;
+                    }
+                    else
+                    {
+                        BOOST_CHECK(stack.back()->HaveCoinInCache(it->first));
+                        found_an_entry = true;
+                    }
                 }
-                else
-                {
-                    BOOST_CHECK(stack.back()->HaveCoinInCache(it->first));
-                    found_an_entry = true;
-                }
-}
             }
             BOOST_FOREACH (const CCoinsViewCacheTest *test, stack)
             {
