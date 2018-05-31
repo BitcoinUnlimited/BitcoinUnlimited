@@ -217,9 +217,10 @@ def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None)
     datadir = os.path.join(dirname, "node"+str(n))
     if not os.path.isdir(datadir):
         os.makedirs(datadir)
-
+    rpc_u, rpc_p = rpc_auth_pair(n)
     defaults = {"server":1, "discover":0, "regtest":1,"rpcuser":"rt","rpcpassword":"rt",
-                "port":p2p_port(n),"rpcport":str(rpc_port(n)),"listenonion":0,"maxlimitertxfee":0,"usecashaddr":1}
+                "port":p2p_port(n),"rpcport":str(rpc_port(n)),"listenonion":0,"maxlimitertxfee":0,"usecashaddr":1,
+                "rpcuser":rpc_u, "rpcpassword":rpc_p}
 
     if bitcoinConfDict: defaults.update(bitcoinConfDict)
 
@@ -249,11 +250,15 @@ def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None)
           os.makedirs(regtestdir)
       print(regtestdir, os.path.join(regtestdir, "wallet.dat"))
       shutil.copyfile(wallet,os.path.join(regtestdir, "wallet.dat"))
-      
+
     return datadir
 
+def rpc_auth_pair(n):
+    return 'rpcuser💻' + str(n), 'rpcpass🔑' + str(n)
+
 def rpc_url(i, rpchost=None):
-    return "http://rt:rt@%s:%d" % (rpchost or '127.0.0.1', rpc_port(i))
+    rpc_u, rpc_p = rpc_auth_pair(i)
+    return "http://%s:%s@%s:%d" % (rpc_u, rpc_p, rpchost or '127.0.0.1', rpc_port(i))
 
 def wait_for_bitcoind_start(process, url, i):
     '''
