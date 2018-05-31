@@ -266,7 +266,6 @@ struct CMutableTransaction
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(this->nVersion);
-        nVersion = this->nVersion;
         READWRITE(vin);
         READWRITE(vout);
         READWRITE(nLockTime);

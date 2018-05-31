@@ -1445,7 +1445,7 @@ class SigPubkeyHashChecker : public BaseSignatureChecker
 public:
     virtual bool CheckSig(const std::vector<unsigned char> &scriptSig,
         const std::vector<unsigned char> &vchPubKey,
-        const CScript &scriptCode) const
+        const CScript &scriptCode) const override
     {
         CPubKey pub = CPubKey(vchPubKey);
         uint256 hash = pub.GetHash();
