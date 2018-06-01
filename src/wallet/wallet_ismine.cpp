@@ -12,7 +12,6 @@
 #include "script/sign.h"
 #include "script/standard.h"
 
-#include <boost/foreach.hpp>
 
 using namespace std;
 

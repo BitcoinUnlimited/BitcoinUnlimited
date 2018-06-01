@@ -27,7 +27,6 @@
 
 #include <univalue.h>
 
-#include <boost/foreach.hpp>
 
 using namespace std;
 
