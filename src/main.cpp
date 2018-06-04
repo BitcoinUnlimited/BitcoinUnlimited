@@ -84,6 +84,7 @@ bool fIsBareMultisigStd = DEFAULT_PERMIT_BAREMULTISIG;
 unsigned int nBytesPerSigOp = DEFAULT_BYTES_PER_SIGOP;
 bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
+int64_t nCoinCacheMaxSize = 0;
 uint64_t nPruneTarget = 0;
 uint32_t nXthinBloomFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE;
 
@@ -2305,15 +2306,15 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
             nLastSetChain = nNow;
         }
 
-        // If possible adjust the max size of the coin cache (nCoinCacheUsage) based on current available memory. Do
+        // If possible adjust the max size of the coin cache (nCoinCacheMaxSize) based on current available memory. Do
         // this before determinining whether to flush the cache or not in the steps that follow.
         AdjustCoinCacheSize();
 
-        int64_t cacheSize = pcoinsTip->DynamicMemoryUsage();
+        int64_t nCurrentCacheUsage = pcoinsTip->DynamicMemoryUsage();
         static int64_t nSizeAfterLastFlush = 0;
         // The cache is close to the limit. Try to flush and trim.
-        bool fCacheCritical = ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > nCoinCacheUsage * 0.995)) ||
-                              (cacheSize - nSizeAfterLastFlush > nMaxCacheIncreaseSinceLastFlush);
+        bool fCacheCritical = ((mode == FLUSH_STATE_IF_NEEDED) && (nCurrentCacheUsage > nCoinCacheMaxSize * 0.995)) ||
+                              (nCurrentCacheUsage - nSizeAfterLastFlush > nMaxCacheIncreaseSinceLastFlush);
         // It's been a while since we wrote the block index to disk. Do this frequently, so we don't need to redownload
         // after a crash.
         bool fPeriodicWrite =
@@ -2374,13 +2375,13 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
             // Trim any excess entries from the cache if needed.  If chain is not syncd then
             // trim extra so that we don't flush as often during IBD.
             if (IsChainNearlySyncd() && !fReindex && !fImporting)
-                pcoinsTip->Trim(nCoinCacheUsage);
+                pcoinsTip->Trim(nCoinCacheMaxSize);
             else
             {
                 // Trim, but never trim more than nMaxCacheIncreaseSinceLastFlush
-                int64_t nTrimSize = nCoinCacheUsage * .90;
-                if (nCoinCacheUsage - nMaxCacheIncreaseSinceLastFlush > nTrimSize)
-                    nTrimSize = nCoinCacheUsage - nMaxCacheIncreaseSinceLastFlush;
+                int64_t nTrimSize = nCoinCacheMaxSize * .90;
+                if (nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush > nTrimSize)
+                    nTrimSize = nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush;
                 pcoinsTip->Trim(nTrimSize);
             }
             nSizeAfterLastFlush = pcoinsTip->DynamicMemoryUsage();
@@ -2396,7 +2397,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
         // As a safeguard, periodically check and correct any drift in the value of cachedCoinsUsage.  While a
         // correction should never be needed, resetting the value allows the node to continue operating, and only
         // an error is reported if the new and old values do not match.
-        if (fPeriodicFlush || nCoinCacheUsage < 0)
+        if (fPeriodicFlush || nCoinCacheMaxSize < 0)
             pcoinsTip->ResetCachedCoinUsage();
     }
     catch (const std::runtime_error &e)
@@ -4338,7 +4339,7 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
         }
         // check level 3: check for inconsistencies during memory-only disconnect of tip blocks
         if (nCheckLevel >= 3 && pindex == pindexState &&
-            (int64_t)(coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheUsage)
+            (int64_t)(coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheMaxSize)
         {
             bool fClean = true;
             DisconnectResult res = DisconnectBlock(block, pindex, coins);
@@ -5954,7 +5955,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
 
         // The flush to disk above is only periodic therefore we need to continuously trim any excess from the cache.
-        pcoinsTip->Trim(nCoinCacheUsage);
+        pcoinsTip->Trim(nCoinCacheMaxSize);
     }
 
 
