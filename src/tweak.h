@@ -9,7 +9,7 @@
 #include <boost/bind.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 // c++11 #include <type_traits>
-#include <univalue.h>
+#include "univalue/include/univalue.h"
 
 class CTweakBase;
 
@@ -17,21 +17,18 @@ typedef std::string CTweakKey;
 typedef std::map<CTweakKey, CTweakBase *> CTweakMap;
 extern CTweakMap tweaks;
 
-// Create a help string for all the ctweaks entries, as they would be used as command line options
-std::string TweakCmdLineHelp();
-
 class CTweakBase
 {
 public:
     CTweakBase(){};
     virtual std::string GetName() const = 0; // Returns the name of this statistic
     virtual std::string GetHelp() const = 0; // Returns the help for this statistic
-    // Returns the current value of this statistic
-    virtual UniValue Get() const = 0;
-    // Returns NullUnivalue or an error string
-    virtual UniValue Set(const UniValue &val) = 0;
-    // Returns NullUnivalue or an error string
-    virtual std::string Validate(const UniValue &val) { return std::string(); };
+    virtual UniValue Get() const = 0; // Returns the current value of this statistic
+    virtual UniValue Set(const UniValue &val) = 0; // Returns NullUnivalue or an error string
+    virtual std::string Validate(const UniValue &val)
+    {
+        return std::string();
+    }; // Returns NullUnivalue or an error string
 };
 
 

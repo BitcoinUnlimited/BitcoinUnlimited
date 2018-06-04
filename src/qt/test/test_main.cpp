@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,8 +7,11 @@
 #include "config/bitcoin-config.h"
 #endif
 
+#include "bitcoinaddressvalidatortests.h"
+#include "guiutiltests.h"
 #include "util.h"
 #include "uritests.h"
+#include "compattests.h"
 
 #ifdef ENABLE_WALLET
 #include "paymentservertests.h"
@@ -49,6 +52,10 @@ int main(int argc, char *argv[])
     if (QTest::qExec(&test2) != 0)
         fInvalid = true;
 #endif
+    GUIUtilTests test5;
+    if (QTest::qExec(&test5) != 0) fInvalid = true;
+    BitcoinAddressValidatorTests test6;
+    if (QTest::qExec(&test6) != 0) fInvalid = true;
 
     return fInvalid;
 }

@@ -1,7 +1,11 @@
+// Copyright (c) 2016-2017 The Bitcoin Unlimited developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "tweak.h"
 #include "main.h"
 #include "net.h"
-#include "rpcserver.h"
+#include "rpc/server.h"
 
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
@@ -71,7 +75,17 @@ UniValue gettweak(const UniValue &params, bool fHelp)
 
     UniValue ret(UniValue::VOBJ);
     bool help = false;
-    for (unsigned int i = 0; i < params.size(); i++)
+    unsigned int psize = params.size();
+
+    if (psize == 0) // No arguments should return all tweaks
+    {
+        for (CTweakMap::iterator item = tweaks.begin(); item != tweaks.end(); ++item)
+        {
+            ret.push_back(Pair(item->second->GetName(), item->second->Get()));
+        }
+    }
+
+    for (unsigned int i = 0; i < psize; i++)
     {
         string name = params[i].get_str();
         if (name == "help")
@@ -174,18 +188,4 @@ UniValue settweak(const UniValue &params, bool fHelp)
         return ret;
     }
     return NullUniValue;
-}
-
-std::string TweakCmdLineHelp()
-{
-    std::string ret;
-    CTweakMap::iterator i;
-    for (i = tweaks.begin(); i != tweaks.end(); ++i)
-    {
-        std::string optname("-");
-        optname += i->second->GetName();
-        optname += "=<val>";
-        ret += HelpMessageOpt(optname, i->second->GetHelp());
-    }
-    return ret;
 }

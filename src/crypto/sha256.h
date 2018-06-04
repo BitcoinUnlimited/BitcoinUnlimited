@@ -8,6 +8,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string>
 
 /** A hasher class for SHA-256. */
 class CSHA256
@@ -15,7 +16,7 @@ class CSHA256
 private:
     uint32_t s[8];
     unsigned char buf[64];
-    size_t bytes;
+    uint64_t bytes;
 
 public:
     static const size_t OUTPUT_SIZE = 32;
@@ -26,5 +27,10 @@ public:
     CSHA256& Reset();
     size_t GetNumBytesHashed() const { return bytes; }
 };
+
+/** Autodetect the best available SHA256 implementation.
+ *  Returns the name of the implementation.
+ */
+std::string SHA256AutoDetect();
 
 #endif // BITCOIN_CRYPTO_SHA256_H

@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,9 +23,18 @@ private:
     bool store;
 
 public:
-    CachingTransactionSignatureChecker(const CTransaction* txToIn, unsigned int nInIn, bool storeIn=true) : TransactionSignatureChecker(txToIn, nInIn), store(storeIn) {}
+    CachingTransactionSignatureChecker(const CTransaction *txToIn,
+        unsigned int nInIn,
+        const CAmount &amount,
+        unsigned int flags,
+        bool storeIn = true)
+        : TransactionSignatureChecker(txToIn, nInIn, amount, flags), store(storeIn)
+    {
+    }
 
-    bool VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& vchPubKey, const uint256& sighash) const;
+    bool VerifySignature(const std::vector<unsigned char> &vchSig,
+        const CPubKey &vchPubKey,
+        const uint256 &sighash) const;
 };
 
 #endif // BITCOIN_SCRIPT_SIGCACHE_H

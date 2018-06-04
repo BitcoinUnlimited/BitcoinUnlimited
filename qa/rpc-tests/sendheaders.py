@@ -283,8 +283,10 @@ class SendHeadersTest(BitcoinTestFramework):
     def setup_network(self):
         # TODO: currently mininode does not have support for thinblocks so we can not sync a get_xthin request and must
         #       therefore have thinblocks turned off during testing.
+        # Currently there are mininode syncronization issues when Parallel Validation is turned on
+        # and therefore have -parallel=0 when running these tests.
         self.nodes = []
-        self.nodes = start_nodes(2, self.options.tmpdir, [["-debug", "-logtimemicros=1", "-use-thinblocks=0"]]*2)
+        self.nodes = start_nodes(2, self.options.tmpdir, [["-debug", "-logtimemicros=1", "-parallel=0", "-use-thinblocks=0"]]*2)
         connect_nodes(self.nodes[0], 1)
 
     # mine count blocks and return the new tip
@@ -312,6 +314,12 @@ class SendHeadersTest(BitcoinTestFramework):
         return [int(x, 16) for x in all_hashes]
 
     def run_test(self):
+
+        # Set the forktime to be far into the future.  Running the sript after forktime will cause a failure since
+        # we will be expecting a > 1MB block to begin with.
+        self.nodes[0].set("mining.forkTime=1901590000")
+        self.nodes[1].set("mining.forkTime=1901590000")
+
         # Setup the p2p connections and start up the network thread.
         inv_node = InvNode()
         test_node = TestNode()
@@ -400,6 +408,8 @@ class SendHeadersTest(BitcoinTestFramework):
                 if j == 0:
                     # Announce via inv
                     test_node.send_block_inv(tip)
+                    test_node.wait_for_getheaders()
+                    test_node.send_header_for_blocks(blocks)
                     test_node.wait_for_getdata([tip], timeout=5)
                     # Test that duplicate inv's won't result in duplicate
                     # getdata requests, or duplicate headers announcements
@@ -765,6 +775,7 @@ class SendHeadersTest(BitcoinTestFramework):
             test_node.sync_with_ping()
             assert_not_equal(int(self.nodes[0].getbestblockhash(), 16), blocks[1].sha256)
 
+            # Advance the time beyond the timeout value
             cur_time = int(time.time())
             self.nodes[0].setmocktime(cur_time + 120)
             self.nodes[1].setmocktime(cur_time + 120)

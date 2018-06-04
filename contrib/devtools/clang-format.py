@@ -17,7 +17,10 @@ import StringIO
 import pdb
 import tempfile
 
-tested_versions = ['3.6.0', '3.6.1', '3.6.2', '3.8.0'] # A set of versions known to produce the same output
+# A set of versions known to produce the same output
+tested_versions = ['3.8.0',
+                   '3.8.1',  # 3.8.1-12ubuntu1 on yakkety works
+                  ]
 accepted_file_extensions = ('.h', '.cpp') # Files to format
 trailing_comment_exe = "trailing-comment.py"
 max_col_len = 120
@@ -27,7 +30,7 @@ def check_clang_format_version(clang_format_exe):
         output = subprocess.check_output([clang_format_exe, '-version'])
         for ver in tested_versions:
             if ver in output:
-                print "Detected clang-format version " + ver
+                #print>>sys.stderr, "Detected clang-format version " + ver
                 return
         raise RuntimeError("Untested version: " + output)
     except Exception as e:
@@ -68,31 +71,46 @@ def run_clang_check(clang_format_exe, files):
             formattedContents = formattedFile.readlines()
             for l in difflib.unified_diff(inputContents,formattedContents, target, target+"_formatted"):
                 sys.stdout.write(l)
-                changed.add(target)            
+                changed.add(target)
         else:
             print "Skip " + target
     if nonexistent:
         print("\nNonexistent files: " + ",".join(nonexistent))
     if changed:
         print("\nImproper formatting found in: " + ",".join(list(changed)))
-        print("To properly format these files run: " + sys.argv[0] + " format clang-format " + " ".join(list(changed)))
+        print("To properly format these files run: " + sys.argv[0] + " format " + clang_format_exe + " " + " ".join(list(changed)))
         return 1
     else:
         print("All existing files are properly formatted")
 
     if nonexistent:
-        return 2        
+        return 2
     return 0
-        
-def run_clang_format(clang_format_exe, files):
+
+def run_clang_format(clang_format_exe, files, stdout=False):
     for target in files:
         if os.path.isdir(target):
             for path, dirs, files in os.walk(target):
                 run_clang_format(clang_format_exe, (os.path.join(path, f) for f in files))
         elif target.endswith(accepted_file_extensions):
-            print "Format " + target
-            subprocess.check_call([trailing_comment_exe, str(max_col_len), target])
-            subprocess.check_call([clang_format_exe, '-i', '-style=file', target], stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+            if  stdout:
+                tce_pipe = subprocess.Popen([trailing_comment_exe, str(max_col_len)],
+                                            stdin=open(target, "rb"),
+                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                cfe_pipe = subprocess.Popen([clang_format_exe, '-assume-filename='+target, '-style=file'],
+                                            stdin =tce_pipe.stdout,
+                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                sout, serr = cfe_pipe.communicate()
+                sys.stdout.write(sout)
+                sys.stderr.write(serr)
+            else:
+                print "Format " + target
+                subprocess.check_call([trailing_comment_exe, str(max_col_len), target])
+                subprocess.check_call([clang_format_exe, '-i', '-style=file', target],
+                                      stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+
         else:
             print "Skip " + target
 
@@ -101,20 +119,34 @@ def main(argv):
     check_command_line_args(argv)
     mypath = os.path.realpath(__file__)
     trailing_comment_exe = os.path.join(os.path.dirname(mypath), trailing_comment_exe)
-    print trailing_comment_exe
     operation = argv[1]
     clang_format_exe = argv[2]
     files = argv[3:]
     check_clang_format_version(clang_format_exe)
     if operation == "check":
         return run_clang_check(clang_format_exe, files)
-    if operation == "format":
+    elif operation == "format":
         run_clang_format(clang_format_exe, files)
+    elif operation == "format-stdout":
+        run_clang_format(clang_format_exe, files, stdout=True)
+    elif operation == "format-stdout-if-wanted":
+        formatted_files_fn = os.path.join(
+            os.path.dirname(mypath), "..", "..", "src", ".formatted-files")
+        formatted_files = [
+            os.path.join("src/", x.replace("\n", "")) for x in open(formatted_files_fn).readlines()]
+
+        for fn in files:
+            if fn in formatted_files:
+                run_clang_format(clang_format_exe, [fn], stdout=True)
+            else:
+                sys.stdout.write(open(fn).read())
+    else:
+        raise RuntimeError("Invalid operation '%s'." % operation)
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
         print("clang-format.py: helper wrapper for clang-format")
-        check_command_line_args(sys.argv)   
-        
+        check_command_line_args(sys.argv)
+
     result = main(sys.argv)
-    sys.exit(result)    
+    sys.exit(result)

@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,7 +10,9 @@
 #endif
 
 #include <boost/chrono/chrono.hpp>
+#include <limits>
 
+// Variables for traffic shaping
 extern const int64_t DEFAULT_MAX_RECV_BURST;
 extern const int64_t DEFAULT_AVE_RECV;
 extern const int64_t DEFAULT_MAX_SEND_BURST;

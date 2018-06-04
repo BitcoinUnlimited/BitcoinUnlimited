@@ -19,6 +19,7 @@ from base64 import b64encode
 from decimal import Decimal, ROUND_DOWN
 import decimal
 import json
+import http.client
 import random
 import shutil
 import subprocess
@@ -26,9 +27,12 @@ import time
 import re
 import urllib.parse as urlparse
 import errno
+import logging
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
+# Constants for floweethehub (see floweeconst.py)
+from .floweeconst import *
 
 COVERAGE_DIR = None
 
@@ -37,6 +41,18 @@ PerfectFractions = True
 BTC = 100000000
 mBTC = 100000
 uBTC = 100
+# The maximum number of nodes a single test can spawn
+MAX_NODES = 8
+# Don't assign rpc or p2p ports lower than this
+PORT_MIN = 11000
+# The number of ports to "reserve" for p2p and rpc, each
+PORT_RANGE = 5000
+
+BITCOIND_PROC_WAIT_TIMEOUT = 60
+
+class PortSeed:
+    # Must be initialized with a unique integer for each process
+    n = None
 
 #Set Mocktime default to OFF.
 #MOCKTIME is only needed for scripts that use the
@@ -45,12 +61,16 @@ uBTC = 100
 #then the mempools will not sync due to IBD.
 MOCKTIME = 0
 
+class NoConfigValue:
+    """ Use to remove the specific configure parameter and value when writing to bitcoin.conf"""
+    def __init__(self):
+        pass
+
 def enable_mocktime():
-    #For backwared compatibility of the python scripts
-    #with previous versions of the cache, set MOCKTIME 
-    #to Jan 1, 2014 + (201 * 10 * 60)
+    # Set the mocktime to be after the Bitcoin Cash fork so
+    # in normal tests blockchains the fork is in the past
     global MOCKTIME
-    MOCKTIME = 1388534400 + (201 * 10 * 60)
+    MOCKTIME = 1501600000 + (201 * 10 * 60)
 
 def disable_mocktime():
     global MOCKTIME
@@ -65,7 +85,7 @@ def enable_coverage(dirname):
     COVERAGE_DIR = dirname
 
 
-def get_rpc_proxy(url, node_number, timeout=None):
+def get_rpc_proxy(url, node_number, timeout=None, miningCapable=True):
     """
     Args:
         url (str): URL of the RPC server to call
@@ -73,6 +93,7 @@ def get_rpc_proxy(url, node_number, timeout=None):
 
     Kwargs:
         timeout (int): HTTP timeout in seconds
+        miningCapable (bool): mining Capability (all client are True, except Floweethehub or "hub")
 
     Returns:
         AuthServiceProxy. convenience object for making RPC calls.
@@ -81,6 +102,10 @@ def get_rpc_proxy(url, node_number, timeout=None):
     proxy_kwargs = {}
     if timeout is not None:
         proxy_kwargs['timeout'] = timeout
+    if miningCapable is not None:
+        if hub_is_running(node_number):  # node 3
+            miningCapable = False
+        proxy_kwargs['miningCapable'] = miningCapable
 
     proxy = AuthServiceProxy(url, **proxy_kwargs)
     proxy.url = url  # store URL on proxy for info
@@ -92,44 +117,11 @@ def get_rpc_proxy(url, node_number, timeout=None):
 
 
 def p2p_port(n):
-    #If port is already defined then return port
-    if os.getenv("node" + str(n)):
-        return int(os.getenv("node" + str(n)))
-    #If no port defined then find an available port
-    if n == 0:
-        port = 11000 + n + os.getpid()%990
-    else:
-        port = int(os.getenv("node" + str(n-1))) + 1
-    from subprocess import check_output
-    netStatOut = check_output(["netstat", "-n"])
-    for portInUse in re.findall(b"tcp.*?:(11\d\d\d)",netStatOut.lower()):
-        #print portInUse
-        if port == int(portInUse):
-            port += 1
-    os.environ["node" + str(n)] = str(port)
-
-    #print "port node " + str(n) + " is " + str(port)
-    return int(port)
+    assert(n <= MAX_NODES)
+    return PORT_MIN + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
 
 def rpc_port(n):
-    #If port is already defined then return port
-    if os.getenv("rpcnode" + str(n)):
-        return int(os.getenv("rpcnode" + str(n)))
-    #If no port defined then find an available port
-    if n == 0:
-        port = 12000 + n + os.getpid()%990
-    else:
-        port = int(os.getenv("rpcnode" + str(n-1))) + 1
-    from subprocess import check_output
-    netStatOut = check_output(["netstat", "-n"])
-    for portInUse in re.findall(b"tcp.*?:(12\d\d\d)",netStatOut.lower()):
-        #print portInUse
-        if port == int(portInUse):
-            port += 1
-    os.environ["rpcnode" + str(n)] = str(port)
-
-    #print "port rpcnode " + str(n) + " is " + str(port)
-    return int(port)
+    return PORT_MIN + PORT_RANGE + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
 
 def check_json_precision():
     """Make sure json library being used does not lose precision converting BTC values"""
@@ -150,46 +142,88 @@ def hex_str_to_bytes(hex_str):
 def str_to_b64str(string):
     return b64encode(string.encode('utf-8')).decode('ascii')
 
-def sync_blocks(rpc_connections, wait=1):
+def sync_blocks(rpc_connections, wait=1,verbose=1):
     """
     Wait until everybody has the same block count
     """
     while True:
         counts = [ x.getblockcount() for x in rpc_connections ]
-        print(counts)
+        if verbose:
+            logging.info("sync blocks: " + str(counts))
         if counts == [ counts[0] ]*len(counts):
             break
         time.sleep(wait)
 
-def sync_mempools(rpc_connections, wait=1):
+def hub_is_running(node_num):
+    """
+    Check if hub is running
+    INPUT:
+        node_num : node number of the self.bins
+    """
+    return node_num == NODE_NUM and os.path.isfile(os.path.join(os.getcwd(), CONF_IN_CACHE))
+
+def sync_mempools(rpc_connections, wait=1,verbose=1):
     """
     Wait until everybody has the same transactions in their memory
     pools
     """
+    count = 0
     while True:
+        count += 1
         pool = set(rpc_connections[0].getrawmempool())
         num_match = 1
+        pool_len = [len(pool)]
         for i in range(1, len(rpc_connections)):
-            if set(rpc_connections[i].getrawmempool()) == pool:
+            tmp = set(rpc_connections[i].getrawmempool())
+            if tmp == pool:
                 num_match = num_match+1
+            pool_len.append(len(tmp))
+        if verbose and count%30==0:
+            logging.info("sync mempool: " + str(pool_len))
         if num_match == len(rpc_connections):
             break
         time.sleep(wait)
 
+def filterUnsupportedParams(defaults, param_keys=FILTER_PARAM_KEYS):
+    """
+    Method to filter out the unrecognized parameters by setting NoConfigValue
+    obj as the value of the parameter as key of the dict. 
+    Input:
+        defaults : default list containing unrecognized parameter(s)
+        param_keys : parameter(s) to be removed from the default list
+    """
+    removeParams = {}
+    removeParams = {el:NoConfigValue() for el in param_keys}
+    defaults.update(removeParams)
+    return defaults
+
 bitcoind_processes = {}
 
-def initialize_datadir(dirname, n,bitcoinConfDict=None,wallet=None):
+def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None):
     datadir = os.path.join(dirname, "node"+str(n))
     if not os.path.isdir(datadir):
         os.makedirs(datadir)
-    
+
     defaults = {"server":1, "discover":0, "regtest":1,"rpcuser":"rt","rpcpassword":"rt",
-                "port":p2p_port(n),"rpcport":str(rpc_port(n)),"listenonion":0,"maxlimitertxfee":0}
+                "port":p2p_port(n),"rpcport":str(rpc_port(n)),"listenonion":0,"maxlimitertxfee":0,"usecashaddr":1}
+
     if bitcoinConfDict: defaults.update(bitcoinConfDict)
 
-    with open(os.path.join(datadir, "bitcoin.conf"), 'w') as f:
+    file = "bitcoin.conf"
+    if bins:
+        if BCD_HUB_PATH in bins[n]:
+            defaults = filterUnsupportedParams(defaults)
+            file = BITCOIN_CONF
+    else:
+        if hub_is_running(n):
+            defaults = filterUnsupportedParams(defaults)
+            file = BITCOIN_CONF
+
+    with open(os.path.join(datadir, file), 'w') as f:
         for (key,val) in defaults.items():
-          if type(val) is type([]):
+          if isinstance(val, NoConfigValue):
+            pass
+          elif type(val) is type([]):
             for v in val:
               f.write("%s=%s\n" % (str(key), str(v)))
           else:
@@ -227,7 +261,7 @@ def wait_for_bitcoind_start(process, url, i):
                 raise # unkown JSON RPC exception
         time.sleep(0.25)
 
-def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None):
+def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
     """
     Create (or copy from cache) a 200-block-long chain and
     4 wallets.
@@ -245,8 +279,11 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None):
 
         # Create cache directories, run bitcoinds:
         for i in range(4):
-            datadir=initialize_datadir("cache", i,bitcoinConfDict)
-            args = [ os.getenv("BITCOIND", "bitcoind"), "-keypool=1", "-datadir="+datadir ]
+            datadir=initialize_datadir("cache", i, bitcoinConfDict, wallets, bins)
+            if bins:
+                args = [ bins[i], "-keypool=1", "-datadir="+datadir ]
+            else:
+                args = [ os.getenv("BITCOIND", "bitcoind"), "-keypool=1", "-datadir="+datadir ]
             if i > 0:
                 args.append("-connect=127.0.0.1:"+str(p2p_port(0)))
             bitcoind_processes[i] = subprocess.Popen(args)
@@ -272,19 +309,24 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None):
         block_time = get_mocktime() - (201 * 10 * 60)
         for i in range(2):
             for peer in range(4):
-                for j in range(25):
-                    set_node_times(rpcs, block_time)
-                    rpcs[peer].generate(1)
-                    block_time += 10*60
-                # Must sync before next peer starts generating blocks
-                sync_blocks(rpcs)
+                if rpcs[peer].miningCapable:   # if generate needs two parameters, then skip calling generate(1)
+                    for j in range(25):
+                        set_node_times(rpcs, block_time)
+                        rpcs[peer].generate(1)
+                        block_time += 10*60
+                    # Must sync before next peer starts generating blocks
+                    sync_blocks(rpcs)
 
         # Shut them down, and clean up cache directories:
         stop_nodes(rpcs)
         wait_bitcoinds()
         disable_mocktime()
         for i in range(4):
-            os.remove(log_filename("cache", i, "debug.log"))
+            if bins:
+                if BCD_HUB_PATH in bins[i]:
+                    os.remove(log_filename("cache", i, HUB_LOG))
+                else:
+                    os.remove(log_filename("cache", i, "debug.log"))
             os.remove(log_filename("cache", i, "db.log"))
             os.remove(log_filename("cache", i, "peers.dat"))
             os.remove(log_filename("cache", i, "fee_estimates.dat"))
@@ -342,7 +384,6 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
     if os.getenv("PYTHON_DEBUG", ""):
         print("start_node: RPC succesfully started")
     proxy = get_rpc_proxy(url, i, timeout=timewait)
-
     if COVERAGE_DIR:
         coverage.write_all_rpc_commands(COVERAGE_DIR, proxy)
 
@@ -352,8 +393,8 @@ def start_nodes(num_nodes, dirname, extra_args=None, rpchost=None, binary=None,t
     """
     Start multiple bitcoinds, return RPC connections to them
     """
-    if extra_args is None: extra_args = [ None for i in range(num_nodes) ]
-    if binary is None: binary = [ None for i in range(num_nodes) ]
+    if extra_args is None: extra_args = [ None for _ in range(num_nodes) ]
+    if binary is None: binary = [ None for _ in range(num_nodes) ]
     rpcs = []
     try:
         for i in range(num_nodes):
@@ -367,13 +408,19 @@ def log_filename(dirname, n_node, logname):
     return os.path.join(dirname, "node"+str(n_node), "regtest", logname)
 
 def stop_node(node, i):
-    node.stop()
-    bitcoind_processes[i].wait()
+    try:
+        node.stop()
+    except http.client.CannotSendRequest as e:
+        print("WARN: Unable to stop node: " + repr(e))
+    bitcoind_processes[i].wait(timeout=BITCOIND_PROC_WAIT_TIMEOUT)
     del bitcoind_processes[i]
 
 def stop_nodes(nodes):
     for node in nodes:
-        node.stop()
+        try:
+            node.stop()
+        except http.client.CannotSendRequest as e:
+            print("WARN: Unable to stop node: " + repr(e))
     del nodes[:] # Emptying array closes connections as a side effect
 
 def set_node_times(nodes, t):
@@ -383,7 +430,7 @@ def set_node_times(nodes, t):
 def wait_bitcoinds():
     # Wait for all bitcoinds to cleanly exit
     for bitcoind in bitcoind_processes.values():
-        bitcoind.wait()
+        bitcoind.wait(timeout=BITCOIND_PROC_WAIT_TIMEOUT)
     bitcoind_processes.clear()
 
 def connect_nodes(from_connection, node_num):
@@ -404,7 +451,7 @@ def interconnect_nodes(nodes):
       for to in nodes:
         if frm == to: continue
         up = urlparse.urlparse(to.url)
-        ip_port = up.hostname + ":" + str(up.port-1000)  # this is the RPC port but we want the p2p port so -1000
+        ip_port = up.hostname + ":" + str(up.port - PORT_RANGE)  # this is the RPC port but we want the p2p port so -1000
         frm.addnode(ip_port, "onetry")
 
 def find_output(node, txid, amount):
@@ -545,7 +592,7 @@ def split_transaction(node, prevouts, toAddrs, txfeePer=DEFAULT_TX_FEE_PER_BYTE,
           outp = {}
           if amount - Decimal(txfeePer*txLen) < 0:  # fee too big, find something smaller
             txfeePer = (float(amount)/txLen)/1.5
-          
+
           txfee = int(math.ceil(txfeePer*txLen))
           amtPer = (Decimal(amount-txfee)/len(toAddrs)).to_integral_value()
           # print "amount: ", amount, " amount per: ", amtPer, "from :", len(prevouts), "to: ", len(toAddrs), "tx fee: ", txfeePer, txfee
@@ -585,12 +632,14 @@ def split_transaction(node, prevouts, toAddrs, txfeePer=DEFAULT_TX_FEE_PER_BYTE,
                   except JSONRPCException as e:
                       tmp = e.error["message"]
                       (code, msg) = tmp.split(":")
-                      if code == 64: raise # bad transaction
+                      if int(code) == 64: raise # bad transaction
+                      if int(code) == 258: # txn-mempool-conflict
+                          # we are reusing inputs so this is all the splitting we can do
+                          return (txn,inp,outp,txid)
                       # print tmp
                       if e.error["code"] == -26:  # insufficient priority
                           txfeePer = txfeePer * 2
                           print(str(e))
-                          pdb.set_trace()
                           print("Insufficient priority, raising tx fee per byte to: ", txfeePer)
                           continue
                       else:
@@ -603,12 +652,12 @@ def split_transaction(node, prevouts, toAddrs, txfeePer=DEFAULT_TX_FEE_PER_BYTE,
     finally:
       decimal.getcontext().prec = decContext
 
-def assert_equal(thing1, thing2):
-    if thing1 != thing2:
-        raise AssertionError("%s != %s"%(str(thing1),str(thing2)))
-
 def assert_not_equal(thing1, thing2):
     if thing1 == thing2:
+        raise AssertionError("%s != %s"%(str(thing1),str(thing2)))
+
+def assert_equal(thing1, thing2):
+    if thing1 != thing2:
         raise AssertionError("%s != %s"%(str(thing1),str(thing2)))
 
 def assert_greater_than(thing1, thing2):
@@ -624,6 +673,47 @@ def assert_raises(exc, fun, *args, **kwds):
         raise AssertionError("Unexpected exception raised: "+type(e).__name__)
     else:
         raise AssertionError("No exception raised")
+
+def assert_raises_rpc_error(code, message, fun, *args, **kwds):
+    """Run an RPC and verify that a specific JSONRPC exception code and message is raised.
+
+    Calls function `fun` with arguments `args` and `kwds`. Catches a JSONRPCException
+    and verifies that the error code and message are as expected. Throws AssertionError if
+    no JSONRPCException was raised or if the error code/message are not as expected.
+
+    Args:
+        code (int), optional: the error code returned by the RPC call (defined
+            in src/rpc/protocol.h). Set to None if checking the error code is not required.
+        message (string), optional: [a substring of] the error string returned by the
+            RPC call. Set to None if checking the error string is not required.
+        fun (function): the function to call. This should be the name of an RPC.
+        args*: positional arguments for the function.
+        kwds**: named arguments for the function.
+    """
+    assert try_rpc(code, message, fun, *args, **kwds), "No exception raised"
+
+
+def try_rpc(code, message, fun, *args, **kwds):
+    """Tries to run an rpc command.
+
+    Test against error code and message if the rpc fails.
+    Returns whether a JSONRPCException was raised."""
+    try:
+        fun(*args, **kwds)
+    except JSONRPCException as e:
+        # JSONRPCException was thrown as expected. Check the code and message values are correct.
+        if (code is not None) and (code != e.error["code"]):
+            raise AssertionError(
+                "Unexpected JSONRPC error code %i" % e.error["code"])
+        if (message is not None) and (message not in e.error['message']):
+            raise AssertionError(
+                "Expected substring not found:" + e.error['message'])
+        return True
+    except Exception as e:
+        raise AssertionError(
+            "Unexpected exception raised: " + type(e).__name__)
+    else:
+        return False
 
 def assert_is_hex_string(string):
     try:
@@ -754,7 +844,4 @@ def create_lots_of_big_transactions(node, txouts, utxos, fee):
 
 def get_bip9_status(node, key):
     info = node.getblockchaininfo()
-    for row in info['bip9_softforks']:
-        if row['id'] == key:
-            return row
-    raise IndexError ('key:"%s" not found' % key)
+    return info['bip9_softforks'][key]

@@ -22,32 +22,24 @@ public:
     static const std::string TESTNET;
     static const std::string REGTEST;
 
-    const std::string& DataDir() const { return strDataDir; }
+    const std::string &DataDir() const { return strDataDir; }
     int RPCPort() const { return nRPCPort; }
-
 protected:
     CBaseChainParams() {}
-
     int nRPCPort;
     std::string strDataDir;
 };
 
 /**
- * Append the help messages for the chainparams options to the
- * parameter string.
- */
-void AppendParamsHelpMessages(std::string& strUsage, bool debugHelp=true);
-
-/**
  * Return the currently selected parameters. This won't change after app
  * startup, except for unit tests.
  */
-const CBaseChainParams& BaseParams();
+const CBaseChainParams &BaseParams();
 
-CBaseChainParams& BaseParams(const std::string& chain);
+CBaseChainParams &BaseParams(const std::string &chain);
 
 /** Sets the params returned by Params() to those for the given network. */
-void SelectBaseParams(const std::string& chain);
+void SelectBaseParams(const std::string &chain);
 
 /**
  * Looks for -regtest, -testnet and returns the appropriate BIP70 chain name.

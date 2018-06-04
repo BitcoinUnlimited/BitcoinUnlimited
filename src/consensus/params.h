@@ -1,18 +1,20 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef BITCOIN_CONSENSUS_PARAMS_H
 #define BITCOIN_CONSENSUS_PARAMS_H
 
+#include "clientversion.h"
 #include "uint256.h"
+
 #include <map>
 #include <string>
 
-namespace Consensus {
-
+namespace Consensus
+{
 enum DeploymentPos
 {
     DEPLOYMENT_TESTDUMMY,
@@ -24,7 +26,8 @@ enum DeploymentPos
 /**
  * Struct for each individual consensus rule change using BIP9.
  */
-struct BIP9Deployment {
+struct BIP9Deployment
+{
     /** Bit position to select the particular bit in nVersion. */
     int bit;
     /** Start MedianTime for version bits miner confirmation. Can be a date in the past */
@@ -36,16 +39,19 @@ struct BIP9Deployment {
 /**
  * Parameters that influence chain consensus.
  */
-struct Params {
+struct Params
+{
     uint256 hashGenesisBlock;
     int nSubsidyHalvingInterval;
-    /** Used to check majorities for block version upgrade */
-    int nMajorityEnforceBlockUpgrade;
-    int nMajorityRejectBlockOutdated;
-    int nMajorityWindow;
+    /** Block height at which BIP16 becomes active */
+    int BIP16Height;
     /** Block height and hash at which BIP34 becomes active */
     int BIP34Height;
     uint256 BIP34Hash;
+    /** Block height at which BIP65 becomes active */
+    int BIP65Height;
+    /** Block height at which BIP66 becomes active */
+    int BIP66Height;
     /**
      * Minimum blocks including miner confirmation of the total of 2016 blocks in a retargetting period,
      * (nPowTargetTimespan / nPowTargetSpacing) which is also used for BIP9 deployments.
@@ -61,7 +67,12 @@ struct Params {
     int64_t nPowTargetSpacing;
     int64_t nPowTargetTimespan;
     int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
-    int64_t SizeForkExpiration() const { return 1514764800; } // BU (classic compatibility) 2018-01-01 00:00:00 GMT
+    /** UAHF Aug 1st 2017 block height */
+    int uahfHeight;
+    /** Block height at which the new DAA becomes active */
+    int daaHeight;
+    /** May 15, 2018 Activation time */
+    int may2018activationTime;
 };
 } // namespace Consensus
 

@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-#include "test/test_bitcoin.h"
+#include "wallet/test/wallet_test_fixture.h"
 
 #include <boost/foreach.hpp>
 #include <boost/test/unit_test.hpp>
@@ -24,9 +24,11 @@
 
 using namespace std;
 
+std::vector<std::unique_ptr<CWalletTx>> wtxn;
+
 typedef set<pair<const CWalletTx*,unsigned int> > CoinSet;
 
-BOOST_FIXTURE_TEST_SUITE(wallet_tests, TestingSetup)
+BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
 
 //BU this should be a local variable so we don't have global ctor/dtor issues: static CWallet* wallet=NULL;
 static vector<COutput> vCoins;
@@ -43,21 +45,22 @@ static void add_coin(CWallet& wallet, const CAmount& nValue, int nAge = 6*24, bo
         // so stop vin being empty, and cache a non-zero Debit to fake out IsFromMe()
         tx.vin.resize(1);
     }
-    CWalletTx* wtx = new CWalletTx(&wallet, tx);
+
+    std::unique_ptr<CWalletTx> wtx(new CWalletTx(&wallet, tx));
     if (fIsFromMe)
     {
         wtx->fDebitCached = true;
         wtx->nDebitCached = 1;
     }
-    COutput output(wtx, nInput, nAge, true);
+    COutput output(wtx.get(), nInput, nAge, true);
     vCoins.push_back(output);
+    wtxn.emplace_back(std::move(wtx));
 }
 
 static void empty_wallet(void)
 {
-    BOOST_FOREACH(COutput output, vCoins)
-        delete output.tx;
     vCoins.clear();
+    wtxn.clear();
 }
 
 static bool equal_sets(CoinSet a, CoinSet b)
@@ -71,7 +74,7 @@ BOOST_AUTO_TEST_CASE(coin_selection_tests)
     CoinSet setCoinsRet, setCoinsRet2;
     CAmount nValueRet;
     CWallet wallet;
-    
+
     LOCK(wallet.cs_wallet);
 
     // test multiple times to allow for differences in the shuffle order
@@ -180,11 +183,11 @@ BOOST_AUTO_TEST_CASE(coin_selection_tests)
         add_coin(wallet, 3*COIN);
         add_coin(wallet, 4*COIN); // now we have 5+6+7+8+18+20+30+100+200+300+400 = 1094 cents
         BOOST_CHECK( wallet.SelectCoinsMinConf(95 * CENT, 1, 1, vCoins, setCoinsRet, nValueRet));
-        BOOST_CHECK_EQUAL(nValueRet, 1 * COIN);  // we should get 1 BTC in 1 coin
+        BOOST_CHECK_EQUAL(nValueRet, 1 * COIN);  // we should get 1 BCH in 1 coin
         BOOST_CHECK_EQUAL(setCoinsRet.size(), 1U);
 
         BOOST_CHECK( wallet.SelectCoinsMinConf(195 * CENT, 1, 1, vCoins, setCoinsRet, nValueRet));
-        BOOST_CHECK_EQUAL(nValueRet, 2 * COIN);  // we should get 2 BTC in 1 coin
+        BOOST_CHECK_EQUAL(nValueRet, 2 * COIN);  // we should get 2 BCH in 1 coin
         BOOST_CHECK_EQUAL(setCoinsRet.size(), 1U);
 
         // empty the wallet and start again, now with fractions of a cent, to test small change avoidance
