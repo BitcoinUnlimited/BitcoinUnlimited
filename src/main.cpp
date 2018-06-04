@@ -2397,7 +2397,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
         // As a safeguard, periodically check and correct any drift in the value of cachedCoinsUsage.  While a
         // correction should never be needed, resetting the value allows the node to continue operating, and only
         // an error is reported if the new and old values do not match.
-        if (fPeriodicFlush || nCoinCacheMaxSize < 0)
+        if (fPeriodicFlush || nCurrentCacheUsage < 0)
             pcoinsTip->ResetCachedCoinUsage();
     }
     catch (const std::runtime_error &e)
