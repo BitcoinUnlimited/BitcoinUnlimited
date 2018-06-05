@@ -220,15 +220,14 @@ UniValue validateaddress(const UniValue &params, bool fHelp)
         if (pwalletMain && pwalletMain->mapAddressBook.count(dest))
             ret.push_back(Pair("account", pwalletMain->mapAddressBook[dest].name));
         const CKeyID *keyID = boost::get<CKeyID>(&dest);
-        if (!keyID)
+        if (keyID)
         {
-            throw std::runtime_error(strprintf("%s does not refer to a key", params[0].get_str()));
-        }
-        if (pwalletMain && pwalletMain->mapKeyMetadata.count(*keyID) &&
-            !pwalletMain->mapKeyMetadata[*keyID].hdKeypath.empty())
-        {
-            ret.push_back(Pair("hdkeypath", pwalletMain->mapKeyMetadata[*keyID].hdKeypath));
-            ret.push_back(Pair("hdmasterkeyid", pwalletMain->mapKeyMetadata[*keyID].hdMasterKeyID.GetHex()));
+            if (pwalletMain && pwalletMain->mapKeyMetadata.count(*keyID) &&
+                !pwalletMain->mapKeyMetadata[*keyID].hdKeypath.empty())
+            {
+                ret.push_back(Pair("hdkeypath", pwalletMain->mapKeyMetadata[*keyID].hdKeypath));
+                ret.push_back(Pair("hdmasterkeyid", pwalletMain->mapKeyMetadata[*keyID].hdMasterKeyID.GetHex()));
+            }
         }
 #endif
     }
