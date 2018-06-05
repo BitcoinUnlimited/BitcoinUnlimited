@@ -169,21 +169,20 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
     }
     else if (nNet > 0)
     {
-       // Include in description public label if it exists. If there are multiple outputs then
-       // only show the public label associated with this output we are viewing.
-       std::string labelPublic;
-       CTxDestination address = DecodeDestination(rec->addresses.begin()->first);
-       for (const CTxOut &txout : wtx.vout)
-       {
-           std::string tmp_labelPublic = getLabelPublic(txout.scriptPubKey);
-           if (!tmp_labelPublic.empty())
-               labelPublic = tmp_labelPublic;
+        // Include in description public label if it exists. If there are multiple outputs then
+        // only show the public label associated with this output we are viewing.
+        std::string labelPublic;
+        CTxDestination address = DecodeDestination(rec->addresses.begin()->first);
+        for (const CTxOut &txout : wtx.vout)
+        {
+            std::string tmp_labelPublic = getLabelPublic(txout.scriptPubKey);
+            if (!tmp_labelPublic.empty())
+                labelPublic = tmp_labelPublic;
 
             CTxDestination txout_address;
             if (ExtractDestination(txout.scriptPubKey, txout_address))
             {
-                //  if (txout_address == address)
-                if (EncodeDestination(address) == EncodeDestination(txout_address))
+                if (address == txout_address)
                 {
                     // Include in description public label if it exists
                     if (!labelPublic.empty())
