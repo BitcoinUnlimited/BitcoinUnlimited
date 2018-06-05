@@ -125,7 +125,7 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
     {
         // Include in description public label if it exists
         std::string labelPublic = getLabelPublic(wtx.vout[0].scriptPubKey);
-        if (labelPublic != "")
+        if (!labelPublic.empty())
             strHTML += "<b>" + tr("Public label:") + "</b> " + labelPublic.c_str() + "<br>";
 
         // Online transaction
@@ -167,6 +167,32 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
     }
     else if (nNet > 0)
     {
+       // Include in description public label if it exists. If there are multiple outputs then
+       // only show the public label associated with this output we are viewing.
+       std::string labelPublic;
+       CTxDestination address = DecodeDestination(rec->addresses.begin()->first);
+       for (const CTxOut &txout : wtx.vout)
+       {
+           std::string tmp_labelPublic = getLabelPublic(txout.scriptPubKey);
+           if (!tmp_labelPublic.empty())
+               labelPublic = tmp_labelPublic;
+
+            CTxDestination txout_address;
+            if (ExtractDestination(txout.scriptPubKey, txout_address))
+            {
+                //  if (txout_address == address)
+                if (EncodeDestination(address) == EncodeDestination(txout_address))
+                {
+                    // Include in description public label if it exists
+                    if (!labelPublic.empty())
+                    {
+                        strHTML += "<b>" + tr("Public label:") + "</b> " + labelPublic.c_str() + "<br>";
+                        labelPublic.clear();
+                    }
+                }
+            }
+        }
+
         //
         // Credit
         //
@@ -264,13 +290,26 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
             // Mixed debit transaction
             //
             BOOST_FOREACH (const CTxIn &txin, wtx.vin)
+            {
                 if (wallet->IsMine(txin))
+                {
                     strHTML += "<b>" + tr("Debit") + ":</b> " +
                                BitcoinUnits::formatHtmlWithUnit(unit, -wallet->GetDebit(txin, ISMINE_ALL)) + "<br>";
+                }
+            }
             BOOST_FOREACH (const CTxOut &txout, wtx.vout)
+            {
                 if (wallet->IsMine(txout))
+                {
+                    // Include in description public label if it exists
+                    std::string labelPublic = getLabelPublic(txout.scriptPubKey);
+                    if (!labelPublic.empty())
+                        strHTML += "<b>" + tr("Public label:") + "</b> " + labelPublic.c_str() + "<br>";
+
                     strHTML += "<b>" + tr("Credit") + ":</b> " +
                                BitcoinUnits::formatHtmlWithUnit(unit, wallet->GetCredit(txout, ISMINE_ALL)) + "<br>";
+                }
+            }
         }
     }
 
@@ -354,6 +393,7 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
             {
                 {
                     strHTML += "<li>";
+
                     const CTxOut &vout = prev.out;
                     CTxDestination address;
                     if (ExtractDestination(vout.scriptPubKey, address))
