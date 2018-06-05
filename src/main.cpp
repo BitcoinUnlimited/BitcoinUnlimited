@@ -84,12 +84,11 @@ bool fIsBareMultisigStd = DEFAULT_PERMIT_BAREMULTISIG;
 unsigned int nBytesPerSigOp = DEFAULT_BYTES_PER_SIGOP;
 bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
-int64_t nCoinCacheMaxSize = 0;
 uint64_t nPruneTarget = 0;
 uint32_t nXthinBloomFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE;
 
 // The allowed size of the in memory UTXO cache
-int64_t nCoinCacheUsage GUARDED_BY(cs_main) = 0;
+int64_t nCoinCacheMaxSize GUARDED_BY(cs_main) = 0;
 
 CFeeRate minRelayTxFee GUARDED_BY(cs_main) = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
 
