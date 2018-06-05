@@ -25,6 +25,7 @@
 #include "utilstrencodings.h"
 #include "version.h"
 
+#include <cstdio>
 #include <stdint.h>
 #include <unistd.h>
 
@@ -41,7 +42,8 @@ static std::vector<FuzzTest *> registry_seq;
 class FuzzTest
 {
 public:
-    FuzzTest(const std::string &name)
+    std::string name;
+    FuzzTest(const std::string &_name) : name(_name)
     {
         assert(registry.count(name) == 0);
         registry[name] = this;
@@ -49,18 +51,26 @@ public:
     }
     ~FuzzTest() {}
     //! initialize with input data before testing
-    virtual void init(const std::vector<char> &_buffer) { buffer = _buffer; }
-    //! run the fuzz test once - calls internal virtual method run()
-    virtual int operator()()
+    virtual bool init(const std::vector<char> &_buffer)
     {
-        run();
+        buffer = _buffer;
+        output.clear();
+        return true;
+    }
+    //! run the fuzz test once - calls internal virtual method run()
+    virtual int operator()(const bool produce_output)
+    {
+        run(produce_output);
         return 0;
     }
 
+    std::vector<char> output;
+
 protected:
     std::vector<char> buffer;
+
     //! override this with the actual test
-    virtual void run() = 0;
+    virtual void run(bool produce_output) = 0;
 };
 
 /*! fuzz test that uses network message decoding
@@ -69,26 +79,35 @@ class FuzzTestNet : public FuzzTest
 {
 public:
     FuzzTestNet(const std::string &name) : FuzzTest(name), ds(nullptr) {}
-    void init(const std::vector<char> &buffer)
+    bool init(const std::vector<char> &buffer)
     {
         FuzzTest::init(buffer);
         if (ds != nullptr)
             delete ds;
         ds = new CDataStream(buffer, SER_NETWORK, INIT_PROTO_VERSION);
-        int nVersion;
-        *ds >> nVersion;
-        ds->SetVersion(nVersion);
+        try
+        {
+            int nVersion;
+            *ds >> nVersion;
+            ds->SetVersion(nVersion);
+        }
+        catch (const std::ios_base::failure &e)
+        {
+            // ignore test case
+            return false;
+        }
+        return true;
     }
     ~FuzzTestNet()
     {
         delete ds;
         ds = nullptr;
     }
-    virtual int operator()()
+    virtual int operator()(const bool produce_output)
     {
         try
         {
-            run();
+            run(produce_output);
             return 0;
         }
         catch (const std::ios_base::failure &e)
@@ -107,11 +126,17 @@ class FuzzDeserNet : public FuzzTestNet
 public:
     FuzzDeserNet(std::string classname) : FuzzTestNet(classname + "_deser") {}
 protected:
-    void run()
+    void run(const bool produce_output)
     {
         T value;
         *ds >> value;
         // FIXME: trying reserialization here, as well
+        if (produce_output)
+        {
+            CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
+            out << value;
+            output.insert(output.begin(), out.begin(), out.end());
+        }
     }
 };
 
@@ -120,12 +145,18 @@ class FuzzBlockMerkleRoot : FuzzTestNet
 public:
     FuzzBlockMerkleRoot() : FuzzTestNet("cblockmerkleroot_deser") {}
 protected:
-    void run()
+    void run(const bool produce_output)
     {
         CBlock block;
         *ds >> block;
         bool mutated;
-        BlockMerkleRoot(block, &mutated);
+        const uint256 result = BlockMerkleRoot(block, &mutated);
+        if (produce_output)
+        {
+            CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
+            out << result;
+            output.insert(output.begin(), out.begin(), out.end());
+        }
     }
 };
 
@@ -135,12 +166,19 @@ class FuzzCMessageHeader : FuzzTestNet
 public:
     FuzzCMessageHeader() : FuzzTestNet("cmessageheader_deser") {}
 protected:
-    void run()
+    void run(const bool produce_output)
     {
         CMessageHeader::MessageStartChars pchMessageStart = {0x00, 0x00, 0x00, 0x00};
         CMessageHeader mh(pchMessageStart);
         *ds >> mh;
         mh.IsValid(pchMessageStart);
+
+        if (produce_output)
+        {
+            CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
+            out << mh;
+            output.insert(output.begin(), out.begin(), out.end());
+        }
     }
 };
 
@@ -149,11 +187,19 @@ class FuzzCTxOutCompressor : FuzzTestNet
 public:
     FuzzCTxOutCompressor() : FuzzTestNet("ctxoutcompressor_deser") {}
 protected:
-    void run()
+    void run(const bool produce_output)
     {
         CTxOut to;
         CTxOutCompressor toc(to);
         *ds >> toc;
+
+        if (produce_output)
+        {
+            CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
+            out << to;
+            out << toc;
+            output.insert(output.begin(), out.begin(), out.end());
+        }
     }
 };
 
@@ -162,14 +208,20 @@ class FuzzWildmatch : FuzzTest
 public:
     FuzzWildmatch() : FuzzTest("wildmatch") {}
 protected:
-    void run()
+    void run(const bool produce_output)
     {
         std::vector<char>::iterator splitpoint = std::find(buffer.begin(), buffer.end(), '\0');
         std::string pattern(buffer.begin(), splitpoint);
         std::string test;
         if (splitpoint + 1 <= buffer.end())
             test = std::string(splitpoint + 1, buffer.end());
-        wildmatch(pattern, test);
+        bool result = wildmatch(pattern, test);
+        if (produce_output)
+        {
+            CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
+            out << result;
+            output.insert(output.begin(), out.begin(), out.end());
+        }
     }
 };
 
@@ -178,7 +230,7 @@ class FuzzCashAddrEncDec : FuzzTest
 public:
     FuzzCashAddrEncDec() : FuzzTest("cashaddr_encdec") {}
 protected:
-    void run()
+    void run(const bool produce_output)
     {
         std::vector<char>::iterator splitpoint = std::find(buffer.begin(), buffer.end(), '\0');
         std::string prefix(buffer.begin(), splitpoint);
@@ -186,10 +238,16 @@ protected:
         if (splitpoint + 1 <= buffer.end())
             values = std::vector<uint8_t>(splitpoint + 1, buffer.end());
         std::string encoded = cashaddr::Encode(prefix, values);
-        // FIXME: this is a quite special test and needs to be made more geneal
+
         std::pair<std::string, std::vector<uint8_t> > dec = cashaddr::Decode(encoded, prefix);
-        // assert(dec.first == prefix);
-        // assert(dec.second == values);
+
+        if (produce_output)
+        {
+            CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
+            out << dec.first;
+            out << dec.second;
+            output.insert(output.begin(), out.begin(), out.end());
+        }
     }
 };
 
@@ -198,7 +256,7 @@ class FuzzCashAddrDecode : FuzzTest
 public:
     FuzzCashAddrDecode() : FuzzTest("cashaddr_decode") {}
 protected:
-    void run()
+    void run(const bool produce_output)
     {
         std::vector<char>::iterator splitpoint = std::find(buffer.begin(), buffer.end(), '\0');
         std::string prefix(buffer.begin(), splitpoint);
@@ -206,6 +264,14 @@ protected:
         if (splitpoint + 1 <= buffer.end())
             test = std::string(splitpoint + 1, buffer.end());
         std::pair<std::string, std::vector<uint8_t> > dec = cashaddr::Decode(test, prefix);
+
+        if (produce_output)
+        {
+            CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
+            out << dec.first;
+            out << dec.second;
+            output.insert(output.begin(), out.begin(), out.end());
+        }
     }
 };
 
@@ -214,11 +280,21 @@ class FuzzParseMoney : FuzzTest
 public:
     FuzzParseMoney() : FuzzTest("parsemoney") {}
 protected:
-    void run()
+    void run(const bool produce_output)
     {
         std::string test(buffer.begin(), buffer.end());
         CAmount nRet;
-        ParseMoney(test, nRet);
+        bool success = ParseMoney(test, nRet);
+
+        if (produce_output)
+        {
+            CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
+            if (success)
+                out << nRet;
+            else
+                out << std::string("failure");
+            output.insert(output.begin(), out.begin(), out.end());
+        }
     }
 };
 
@@ -228,12 +304,24 @@ class FuzzParseFixedPoint : FuzzTest
 public:
     FuzzParseFixedPoint() : FuzzTest("parsefixedpoint") {}
 protected:
-    void run()
+    void run(const bool produce_output)
     {
+        if (buffer.begin() == buffer.end())
+            return;
         int decimals = buffer[0];
         std::string test(buffer.begin() + 1, buffer.end());
         int64_t amount_out;
-        ParseFixedPoint(test, decimals, &amount_out);
+        bool success = ParseFixedPoint(test, decimals, &amount_out);
+
+        if (produce_output)
+        {
+            CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
+            if (success)
+                out << amount_out;
+            else
+                out << std::string("failure");
+            output.insert(output.begin(), out.begin(), out.end());
+        }
     }
 };
 
@@ -243,7 +331,7 @@ class FuzzVerifyScript : FuzzTestNet
 public:
     FuzzVerifyScript() : FuzzTestNet("verifyscript") {}
 protected:
-    void run()
+    void run(const bool produce_output)
     {
         std::vector<std::vector<unsigned char> > stack;
         std::vector<unsigned char> scriptsig_raw, scriptpubkey_raw;
@@ -260,7 +348,18 @@ protected:
         ScriptError error;
         unsigned char sighashtype;
         CScript script_sig(scriptsig_raw), script_pubkey(scriptpubkey_raw);
-        VerifyScript(script_sig, script_pubkey, flags, BaseSignatureChecker(), &error, &sighashtype);
+        const bool result =
+            VerifyScript(script_sig, script_pubkey, flags, BaseSignatureChecker(), &error, &sighashtype);
+
+        if (produce_output)
+        {
+            CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
+            out << result;
+            out << sighashtype;
+            out << scriptsig_raw;
+            out << scriptpubkey_raw;
+            output.insert(output.begin(), out.begin(), out.end());
+        }
     }
 };
 
@@ -279,12 +378,12 @@ bool read_stdin(std::vector<char> &data)
     return length == 0;
 }
 
-class FuzzTester : FuzzTest
+class FuzzTester : public FuzzTest
 {
 public:
     FuzzTester() : FuzzTest("tester") {}
 protected:
-    void run()
+    void run(const bool produce_output)
     {
         // Just a very simple test to make sure that the AFL
         // drill down heuristics works for the given Build
@@ -296,6 +395,9 @@ protected:
         if (test[0] == 'd' && test[1] == 'e' && test[2] == 'f')
             while (1)
                 ;
+
+        if (produce_output)
+            throw std::exception();
     }
 };
 
@@ -338,24 +440,38 @@ int main(int argc, char **argv)
 
     bool specific = false;
 
+    bool produce_output = false;
+
     if (argn < argc)
     {
         std::string testname = argv[argn];
-        specific = true;
-        if (testname == "list_tests")
+
+        // produce output also if first character of test name is a plus sign
+        if (testname[0] == '+')
         {
-            for (const auto &entry : registry)
+            testname = testname.substr(1);
+            produce_output = true;
+        }
+        if (testname.size() > 1)
+        { // single +? -> then just non-specific test with output
+            if (testname == "list_tests")
             {
-                printf("%s\n", entry.first.c_str());
+                int idx = 0;
+                for (const auto &ft : registry_seq)
+                {
+                    printf("%4d %s\n", idx, ft->name.c_str());
+                    idx++;
+                }
+                return 0;
             }
-            return 0;
+            if (registry.count(testname) == 0)
+            {
+                printf("Test %s not known.\n", testname.c_str());
+                return 1;
+            }
+            ft = registry[testname];
+            specific = true;
         }
-        if (registry.count(testname) == 0)
-        {
-            printf("Test %s not known.\n", testname.c_str());
-            return 1;
-        }
-        ft = registry[testname];
         argn++;
     }
 
@@ -379,13 +495,13 @@ int main(int argc, char **argv)
             continue;
         }
 
-        if (buffer.size() < sizeof(uint32_t))
-        {
-            continue;
-        }
-
         if (!specific)
         {
+            if (buffer.size() < sizeof(uint32_t))
+            {
+                continue;
+            }
+
             // no test id given, get it from the stream
             uint32_t test_id = 0xffffffff;
             memcpy(&test_id, &buffer[0], sizeof(uint32_t));
@@ -397,10 +513,21 @@ int main(int argc, char **argv)
                 printf("Test no. %d not available.\n", test_id);
                 continue;
             }
+            if (registry_seq[test_id] == &fuzz_tester)
+            {
+                printf("Test that breaks on purpose is disabled for fuzz-all mode.\n");
+                continue;
+            }
             ft = registry_seq[test_id];
         }
-        ft->init(buffer);
-        (*ft)();
+        if (ft->init(buffer))
+            (*ft)(produce_output);
+
+        if (produce_output)
+        {
+            fwrite(ft->output.data(), 1, ft->output.size(), stdout);
+            fflush(stdout);
+        }
     }
     return 0;
 }
