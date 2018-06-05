@@ -62,7 +62,6 @@ std::atomic<bool> fRescan{false};
 CStatusString statusStrings;
 // main.cpp CriticalSections:
 CCriticalSection cs_LastBlockFile;
-CCriticalSection cs_nBlockSequenceId;
 
 CCriticalSection cs_nTimeOffset;
 int64_t nTimeOffset = 0;
@@ -70,8 +69,9 @@ int64_t nTimeOffset = 0;
 CCriticalSection cs_rpcWarmup;
 
 CCriticalSection cs_main;
-BlockMap mapBlockIndex;
-CChain chainActive;
+BlockMap mapBlockIndex GUARDED_BY(cs_main);
+CChain chainActive GUARDED_BY(cs_main);
+
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
 
@@ -286,7 +286,6 @@ public:
         printf("csBestBlock %p\n", &csBestBlock);
         printf("cvBlockChange %p\n", &cvBlockChange);
         printf("cs_LastBlockFile %p\n", &cs_LastBlockFile);
-        printf("cs_nBlockSequenceId %p\n", &cs_nBlockSequenceId);
         printf("cs_nTimeOffset %p\n", &cs_nTimeOffset);
         printf("cs_rpcWarmup %p\n", &cs_rpcWarmup);
         printf("cs_main %p\n", &cs_main);

@@ -50,9 +50,6 @@ class CValidationState;
 struct CNodeStateStats;
 struct LockPoints;
 
-/** Global variable that points to the coins database */
-extern CCoinsViewDB *pcoinsdbview;
-
 enum FlushStateMode
 {
     FLUSH_STATE_NONE,

@@ -65,15 +65,14 @@
  */
 
 // BU variables moved to globals.cpp
-// BU moved CCriticalSection cs_main;
+// - moved CCriticalSection cs_main;
+// - moved BlockMap mapBlockIndex;
+// - movedCChain chainActive;
+CBlockIndex *pindexBestHeader = nullptr GUARDED_BY(cs_main);
 
-// BU moved BlockMap mapBlockIndex;
-// BU movedCChain chainActive;
-CBlockIndex *pindexBestHeader = NULL;
+// Last time the block tip was updated
+std::atomic<int64_t> nTimeBestReceived{0};
 
-CCoinsViewDB *pcoinsdbview = nullptr;
-
-int64_t nTimeBestReceived = 0;
 // BU moved CWaitableCriticalSection csBestBlock;
 // BU moved CConditionVariable cvBlockChange;
 bool fImporting = false;
@@ -85,11 +84,13 @@ bool fIsBareMultisigStd = DEFAULT_PERMIT_BAREMULTISIG;
 unsigned int nBytesPerSigOp = DEFAULT_BYTES_PER_SIGOP;
 bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
-int64_t nCoinCacheUsage = 0;
 uint64_t nPruneTarget = 0;
 uint32_t nXthinBloomFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE;
 
-CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
+// The allowed size of the in memory UTXO cache
+int64_t nCoinCacheUsage = 0 GUARDED_BY(cs_main);
+
+CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE) GUARDED_BY(cs_main);
 
 // BU: Move global objects to a single file
 extern CTxMemPool mempool;
@@ -98,13 +99,11 @@ extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
 extern CTweak<unsigned int> blockDownloadWindow;
 extern CTweak<uint64_t> reindexTypicalBlockSize;
 
-extern unsigned int BLOCK_DOWNLOAD_WINDOW;
-
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
 extern CCriticalSection cs_mapInboundConnectionTracker;
 
 /** A cache to store headers that have arrived but can not yet be connected **/
-std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders;
+std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders GUARDED_BY(cs_main);
 
 static void CheckBlockIndex(const Consensus::Params &consensusParams);
 
@@ -112,7 +111,6 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams);
 CScript COINBASE_FLAGS;
 
 extern CCriticalSection cs_LastBlockFile;
-extern CCriticalSection cs_nBlockSequenceId;
 
 
 // Internal stuff
@@ -146,22 +144,22 @@ struct CBlockIndexWorkComparator
     }
 };
 
-CBlockIndex *pindexBestInvalid;
+CBlockIndex *pindexBestInvalid = nullptr GUARDED_BY(cs_main);
 
 /**
  * The set of all CBlockIndex entries with BLOCK_VALID_TRANSACTIONS (for itself and all ancestors) and
  * as good as our current tip or better. Entries may be failed, though, and pruning nodes may be
  * missing the data for the block.
  */
-std::set<CBlockIndex *, CBlockIndexWorkComparator> setBlockIndexCandidates;
+std::set<CBlockIndex *, CBlockIndexWorkComparator> setBlockIndexCandidates GUARDED_BY(cs_main);
 /** Number of nodes with fSyncStarted. */
 int nSyncStarted = 0;
 /** All pairs A->B, where A (or one of its ancestors) misses transactions, but B has transactions.
  * Pruned nodes may have entries where B is missing data.
  */
-std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
+std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked GUARDED_BY(cs_main);
 
-std::vector<CBlockFileInfo> vinfoBlockFile;
+std::vector<CBlockFileInfo> vinfoBlockFile GUARDED_BY(cs_main);
 int nLastBlockFile = 0;
 /** Global flag to indicate we should check to see if there are
  *  block/undo files that should be deleted.  Set on startup
@@ -174,14 +172,14 @@ bool fCheckForPruning = false;
  * know which one to give priority in case of a fork.
  */
 /** Blocks loaded from disk are assigned id 0, so start the counter at 1. */
-uint32_t nBlockSequenceId = 1;
+uint64_t nBlockSequenceId = 1 GUARDED_BY(cs_main);
 
 /**
  * Sources of received blocks, saved to be able to send them reject
  * messages or ban them when processing happens afterwards. Protected by
  * cs_main.
  */
-std::map<uint256, NodeId> mapBlockSource;
+std::map<uint256, NodeId> mapBlockSource GUARDED_BY(cs_main);
 
 CCriticalSection cs_recentRejects;
 /**
@@ -222,15 +220,15 @@ std::unique_ptr<CRollingBloomFilter> txn_recently_in_block GUARDED_BY(cs_recentR
 
 
 /** Number of preferable block download peers. */
-int nPreferredDownload = 0;
+std::atomic<int> nPreferredDownload{0};
 
 /** Dirty block file entries. */
-std::set<int> setDirtyFileInfo;
+std::set<int> setDirtyFileInfo GUARDED_BY(cs_main);
 
 } // anon namespace
 
 /** Dirty block index entries. */
-std::set<CBlockIndex *> setDirtyBlockIndex;
+std::set<CBlockIndex *> setDirtyBlockIndex GUARDED_BY(cs_main);
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -247,7 +245,7 @@ int GetHeight()
 
 void UpdatePreferredDownload(CNode *node, CNodeState *state)
 {
-    nPreferredDownload -= state->fPreferredDownload;
+    nPreferredDownload.fetch_sub(state->fPreferredDownload);
 
     // Whether this node should be marked as a preferred download node.
     state->fPreferredDownload = !node->fOneShot && !node->fClient;
@@ -258,7 +256,7 @@ void UpdatePreferredDownload(CNode *node, CNodeState *state)
     // LOG(NET, "node %s preferred DL: %d because (%d || %d) && %d && %d\n", node->GetLogName(),
     //   state->fPreferredDownload, !node->fInbound, node->fWhitelisted, !node->fOneShot, !node->fClient);
 
-    nPreferredDownload += state->fPreferredDownload;
+    nPreferredDownload.fetch_add(state->fPreferredDownload);
 }
 
 void InitializeNode(const CNode *pnode)
@@ -288,7 +286,7 @@ void FinalizeNode(NodeId nodeid)
         // Reset all requests times to zero so that we can immediately re-request these blocks
         requester.ResetLastRequestTime(hash);
     }
-    nPreferredDownload -= state->fPreferredDownload;
+    nPreferredDownload.fetch_sub(state->fPreferredDownload);
 
     mapNodeState.erase(nodeid);
     requester.RemoveNodeState(nodeid);
@@ -296,7 +294,7 @@ void FinalizeNode(NodeId nodeid)
     {
         // Do a consistency check after the last peer is removed.  Force consistent state if production code
         DbgAssert(requester.MapBlocksInFlightEmpty(), requester.MapBlocksInFlightClear());
-        DbgAssert(nPreferredDownload == 0, nPreferredDownload = 0);
+        DbgAssert(nPreferredDownload.load() == 0, nPreferredDownload.store(0));
     }
 }
 
@@ -2455,7 +2453,7 @@ void static UpdateTip(CBlockIndex *pindexNew)
     }
 
     // New best block
-    nTimeBestReceived = GetTime();
+    nTimeBestReceived.store(GetTime());
     mempool.AddTransactionsUpdated(1);
 
     LOGA("%s: new best=%s  height=%d bits=%d log2_work=%.8g  tx=%lu  date=%s progress=%f  cache=%.1fMiB(%utxo)\n",
@@ -2902,7 +2900,7 @@ static bool ActivateBestChainStep(CValidationState &state,
     {
         // Don't iterate the entire list of potential improvements toward the best tip, as we likely only need
         // a few blocks along the way.
-        int nTargetHeight = std::min(nHeight + (int)BLOCK_DOWNLOAD_WINDOW, pindexMostWork->nHeight);
+        int nTargetHeight = std::min(nHeight + (int)requester.BLOCK_DOWNLOAD_WINDOW.load(), pindexMostWork->nHeight);
         vpindexToConnect.clear();
         CBlockIndex *pindexIter = pindexMostWork->GetAncestor(nTargetHeight);
         while (pindexIter && pindexIter->nHeight != nHeight)
@@ -3339,8 +3337,7 @@ bool ReceivedBlockTransactions(const CBlock &block,
             queue.pop_front();
             pindex->nChainTx = (pindex->pprev ? pindex->pprev->nChainTx : 0) + pindex->nTx;
             {
-                LOCK(cs_nBlockSequenceId);
-                pindex->nSequenceId = nBlockSequenceId++;
+                pindex->nSequenceId = ++nBlockSequenceId;
             }
             if (chainActive.Tip() == NULL || !setBlockIndexCandidates.value_comp()(pindex, chainActive.Tip()))
             {
@@ -4415,21 +4412,22 @@ void UnloadBlockIndex()
         orphanpool.nBytesOrphanPool = 0;
     }
 
+    nPreferredDownload.store(0);
+
     LOCK(cs_main);
+    nBlockSequenceId = 1;
+    nSyncStarted = 0;
+    nLastBlockFile = 0;
     mapUnConnectedHeaders.clear();
     setBlockIndexCandidates.clear();
     chainActive.SetTip(nullptr);
     pindexBestInvalid = nullptr;
     pindexBestHeader = nullptr;
     mempool.clear();
-    nSyncStarted = 0;
     mapBlocksUnlinked.clear();
     vinfoBlockFile.clear();
-    nLastBlockFile = 0;
-    nBlockSequenceId = 1;
     mapBlockSource.clear();
     requester.MapBlocksInFlightClear();
-    nPreferredDownload = 0;
     setDirtyBlockIndex.clear();
     setDirtyFileInfo.clear();
     mapNodeState.clear();
@@ -7067,7 +7065,7 @@ bool SendMessages(CNode *pto)
         if (pindexBestHeader == nullptr)
             pindexBestHeader = chainActive.Tip();
         // Download if this is a nice peer, or we have no nice peers and this one might do.
-        bool fFetch = state.fPreferredDownload || (nPreferredDownload == 0 && !pto->fClient && !pto->fOneShot);
+        bool fFetch = state.fPreferredDownload || (nPreferredDownload.load() == 0 && !pto->fClient && !pto->fOneShot);
         if (!state.fSyncStarted && !pto->fClient && !fImporting && !fReindex)
         {
             // Only actively request headers from a single peer, unless we're close to today.
@@ -7123,7 +7121,7 @@ bool SendMessages(CNode *pto)
         // transactions become unconfirmed and spams other nodes.
         if (!fReindex && !fImporting && !IsInitialBlockDownload())
         {
-            GetMainSignals().Broadcast(nTimeBestReceived);
+            GetMainSignals().Broadcast(nTimeBestReceived.load());
         }
 
         //
