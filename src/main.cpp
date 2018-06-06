@@ -68,7 +68,7 @@
 // - moved CCriticalSection cs_main;
 // - moved BlockMap mapBlockIndex;
 // - movedCChain chainActive;
-CBlockIndex *pindexBestHeader = nullptr GUARDED_BY(cs_main);
+CBlockIndex *pindexBestHeader GUARDED_BY(cs_main) = nullptr;
 
 // Last time the block tip was updated
 std::atomic<int64_t> nTimeBestReceived{0};
@@ -88,9 +88,9 @@ uint64_t nPruneTarget = 0;
 uint32_t nXthinBloomFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE;
 
 // The allowed size of the in memory UTXO cache
-int64_t nCoinCacheUsage = 0 GUARDED_BY(cs_main);
+int64_t nCoinCacheUsage  GUARDED_BY(cs_main) = 0;
 
-CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE) GUARDED_BY(cs_main);
+CFeeRate minRelayTxFee  GUARDED_BY(cs_main) = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
 
 // BU: Move global objects to a single file
 extern CTxMemPool mempool;
@@ -144,7 +144,7 @@ struct CBlockIndexWorkComparator
     }
 };
 
-CBlockIndex *pindexBestInvalid = nullptr GUARDED_BY(cs_main);
+CBlockIndex *pindexBestInvalid  GUARDED_BY(cs_main) = nullptr;
 
 /**
  * The set of all CBlockIndex entries with BLOCK_VALID_TRANSACTIONS (for itself and all ancestors) and
@@ -172,7 +172,7 @@ bool fCheckForPruning = false;
  * know which one to give priority in case of a fork.
  */
 /** Blocks loaded from disk are assigned id 0, so start the counter at 1. */
-uint64_t nBlockSequenceId = 1 GUARDED_BY(cs_main);
+uint64_t nBlockSequenceId  GUARDED_BY(cs_main) = 1;
 
 /**
  * Sources of received blocks, saved to be able to send them reject
