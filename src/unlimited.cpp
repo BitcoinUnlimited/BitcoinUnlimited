@@ -1625,17 +1625,27 @@ UniValue setlog(const UniValue &params, bool fHelp)
 static void RmOldMiningCandidates()
 {
     LOCK(cs_main);
-    static int prevheight = -1;
-    int height = GetBlockchainHeight();
+    static unsigned int prevheight = 0;
+    unsigned int height = GetBlockchainHeight();
 
     if (height <= prevheight)
         return;
 
-    // New block has been found:
-    int64_t tdiff = GetTime() - (chainActive.Tip()->nTime + (NEW_CANDIDATE_INTERVAL * 1000));
+    int64_t tdiff = GetTime() - (chainActive.Tip()->nTime + NEW_CANDIDATE_INTERVAL);
     if (tdiff >= 0)
     {
-        miningCandidatesMap.clear();
+        // Clean out mining candidates that are the same height as a discovered block.
+        for (auto it = miningCandidatesMap.cbegin(); it != miningCandidatesMap.cend();)
+        {
+            if (it->second.block.GetHeight() <= prevheight)
+            {
+                it = miningCandidatesMap.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
         prevheight = height;
     }
 }
@@ -1665,13 +1675,14 @@ std::vector<uint256> GetMerkleProofBranches(CBlock *pblock)
 /** Create Mining-Candidate JSON to send to miner */
 static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
 {
+    static int64_t id = 0;
     UniValue ret(UniValue::VOBJ);
     CBlock &block = candid.block;
 
     RmOldMiningCandidates();
 
     // Save candidate so can be looked up:
-    int64_t id = GetRand(~0x0L);
+    id++;
     AddMiningCandidate(candid, id);
     ret.push_back(Pair("id", id));
 
@@ -1754,8 +1765,6 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
 
     int64_t id = rcvd["id"].get_int64();
 
-    RmOldMiningCandidates();
-
     // Needs LOCK(cs_main); above:
     if (miningCandidatesMap.count(id) == 1)
     {
@@ -1805,6 +1814,7 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
         ret.push_back(Pair("message", uvsub.get_str()));
     }
 
+    RmOldMiningCandidates();
     return ret;
 }
 
