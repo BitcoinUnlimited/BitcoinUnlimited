@@ -73,10 +73,10 @@ static inline int ctz(uint32_t i)
 }
 
 
-static uint256 ComputeRootFromCoinbaseProof(const uint256& elem, const std::vector<uint256> &leaves)
+static uint256 ComputeRootFromCoinbaseProof(const uint256 &elem, const std::vector<uint256> &leaves)
 {
     uint256 running = elem;
-    for (auto i: leaves)
+    for (auto i : leaves)
     {
         uint256 result;
         CHash256().Write(running.begin(), 32).Write(i.begin(), 32).Finalize(result.begin());
@@ -88,31 +88,30 @@ static uint256 ComputeRootFromCoinbaseProof(const uint256& elem, const std::vect
 
 BOOST_AUTO_TEST_CASE(merkle_test)
 {
-
     // Test the merkle proof code exhaustively for element 0 (coinbase), since this is used when communicating
     // mining block headers to mining pools.
-    unsigned int MAX_LEAVES=100000;
-    unsigned int MAX_TRIES=20;
+    unsigned int MAX_LEAVES = 100000;
+    unsigned int MAX_TRIES = 20;
 
     std::vector<uint256> leafData;
     leafData.reserve(MAX_LEAVES);
 
-    for (unsigned int i=0;i < MAX_LEAVES; i++)
+    for (unsigned int i = 0; i < MAX_LEAVES; i++)
     {
         // add a random leaf
         uint256 temp;
-        for (uint j = 0; j<32;j++)
-            *(temp.begin()+j) = insecure_rand()&255;
+        for (uint j = 0; j < 32; j++)
+            *(temp.begin() + j) = insecure_rand() & 255;
         leafData.push_back(temp);
     }
 
     for (unsigned int i = 0; i < MAX_TRIES; i++)
     {
-        uint size = insecure_rand()%MAX_LEAVES;
+        uint size = insecure_rand() % MAX_LEAVES;
         std::vector<uint256> leaves = leafData;
         leaves.resize(size);
 
-        //printf("leaves: %u\n", (unsigned int) leaves.size());
+        // printf("leaves: %u\n", (unsigned int) leaves.size());
         uint256 root = ComputeMerkleRoot(leaves);
         std::vector<uint256> mklProof = ComputeMerkleBranch(leaves, 0);
 
@@ -122,7 +121,6 @@ BOOST_AUTO_TEST_CASE(merkle_test)
 
         BOOST_CHECK(root == r1);
         BOOST_CHECK(root == r2);
-
     }
 
     for (int i = 0; i < 32; i++)

@@ -38,7 +38,7 @@
        root.
 */
 
-/* This implements a constant-space merkle root/path calculator, limited to 2^32 leaves. 
+/* This implements a constant-space merkle root/path calculator, limited to 2^32 leaves.
 
 To compute a merkle root, pass -1 as the branchpos.
 
