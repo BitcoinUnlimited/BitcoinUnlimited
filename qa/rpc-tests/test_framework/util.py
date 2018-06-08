@@ -234,7 +234,7 @@ def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None)
             defaults = filterUnsupportedParams(defaults)
             file = BITCOIN_CONF
 
-    with open(os.path.join(datadir, file), 'w') as f:
+    with open(os.path.join(datadir, file), 'w', encoding='utf-8') as f:
         for (key,val) in defaults.items():
           if isinstance(val, NoConfigValue):
             pass
