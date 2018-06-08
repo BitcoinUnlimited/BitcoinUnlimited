@@ -71,6 +71,7 @@ CCriticalSection cs_rpcWarmup;
 CCriticalSection cs_main;
 BlockMap mapBlockIndex GUARDED_BY(cs_main);
 CChain chainActive GUARDED_BY(cs_main);
+std::map<NodeId, CNodeState> mapNodeState GUARDED_BY(cs_main); // nodestate.h
 
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
@@ -79,8 +80,6 @@ proxyType proxyInfo[NET_MAX];
 proxyType nameProxy;
 CCriticalSection cs_proxyInfos;
 
-// moved from main.cpp (now part of nodestate.h)
-std::map<NodeId, CNodeState> mapNodeState;
 
 set<uint256> setPreVerifiedTxHash;
 set<uint256> setUnVerifiedOrphanTxHash;
