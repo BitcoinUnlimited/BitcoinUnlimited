@@ -4,10 +4,10 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "blockdb_wrapper.h"
+#include "wrapper.h"
 
-#include "blockdb_leveldb.h"
-#include "blockdb_sequential.h"
+#include "blockdb.h"
+#include "sequential_files.h"
 #include "chainparams.h"
 #include "dbwrapper.h"
 #include "main.h"
@@ -23,6 +23,214 @@ extern std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
   */
 BlockDBMode BLOCK_DB_MODE = DEFAULT_BLOCK_DB_MODE;
 
+bool DetermineStorageSync()
+{
+    uint256 bestHashSeq = pcoinsdbview->GetBestBlockSeq();
+    LOGA("bestHashSeq = %s \n", bestHashSeq.GetHex().c_str());
+    uint256 bestHashLev = pcoinsdbview->GetBestBlockDb();
+    LOGA("bestHashLev = %s \n", bestHashLev.GetHex().c_str());
+    // if we are using method X and method Y doesnt have any sync progress, assume nothing to sync
+
+    LOGA("check1\n");
+    if(bestHashSeq.IsNull() && BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    {
+        LOGA("false1\n");
+        return false;
+    }
+    LOGA("check2\n");
+    if(bestHashLev.IsNull() && BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+    {
+        LOGA("false2\n");
+        return false;
+    }
+    CBlockIndex bestIndexSeq;
+    LOGA("check3\n");
+    pblocktree->FindBlockIndex(bestHashSeq, bestIndexSeq);
+    LOGA("check4\n");
+    CBlockIndex bestIndexLev;
+    pblocktree->FindBlockIndex(bestHashLev, bestIndexLev);
+
+    LOGA("bestIndexSeq info = %i %i %u %u %i %s %u %u %u %u %u \n",
+         bestIndexSeq.nHeight,
+         bestIndexSeq.nFile,
+         bestIndexSeq.nDataPos,
+         bestIndexSeq.nUndoPos,
+         bestIndexSeq.nVersion,
+         bestIndexSeq.hashMerkleRoot.GetHex().c_str(),
+         bestIndexSeq.nTime,
+         bestIndexSeq.nBits,
+         bestIndexSeq.nNonce,
+         bestIndexSeq.nStatus,
+         bestIndexSeq.nTx
+         );
+
+    LOGA("bestIndexLev info = %i %i %u %u %i %s %u %u %u %u %u \n",
+         bestIndexLev.nHeight,
+         bestIndexLev.nFile,
+         bestIndexLev.nDataPos,
+         bestIndexLev.nUndoPos,
+         bestIndexLev.nVersion,
+         bestIndexLev.hashMerkleRoot.GetHex().c_str(),
+         bestIndexLev.nTime,
+         bestIndexLev.nBits,
+         bestIndexLev.nNonce,
+         bestIndexLev.nStatus,
+         bestIndexLev.nTx
+         );
+
+    LOGA("check5\n");
+    // if the best height of the storage type we are using is higher than any other type, return false
+    if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES && bestIndexSeq.nHeight > bestIndexLev.nHeight)
+    {
+        LOGA("false3\n");
+        return false;
+    }
+    LOGA("check6\n");
+    if(BLOCK_DB_MODE == DB_BLOCK_STORAGE && bestIndexLev.nHeight > bestIndexSeq.nHeight)
+    {
+        LOGA("false4\n");
+        return false;
+    }
+    LOGA("check7\n");
+    return true;
+}
+
+// use this sparingly, this function will be very disk intensive
+void SyncStorage(const CChainParams &chainparams)
+{
+    if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+    {
+        CValidationState state; // not used, just added for compatability
+        // get the best block and go to it. we can sync the blocks in reverse to save time once we hit our best
+        uint256 bestHashSeq = pcoinsdbview->GetBestBlockSeq();
+        uint256 bestHashDb = pcoinsdbview->GetBestBlockDb();
+
+        BlockMap::iterator iter;
+        iter = mapBlockIndex.find(bestHashDb);
+        if(iter == mapBlockIndex.end())
+        {
+            LOGA("couldnt find best hash in mapblockindex when attempting to sync storage types \n");
+            return;
+        }
+        /** we dont have the same problem with finding best block in db mode because of the way it is written */
+        CBlockIndex* pindex = iter->second;
+        LOGA("best seq block we before syncing is %s \n", bestHashSeq.GetHex().c_str());
+        LOGA("best db block we have is %s \n", bestHashDb.GetHex().c_str());
+
+        //we should be good to use this data structure, by block 3M it should only consume about 96MB of memory
+        // we use a vector because order is guarenteed and sequential files rely on that
+        std::vector<uint256> hashesToSync;
+        while(pindex->GetBlockHash() != bestHashSeq)
+        {
+            // we will have what we want in reverse order
+            hashesToSync.emplace_back(pindex->GetBlockHash());
+        }
+
+        boost::scoped_ptr<CDBIterator> pcursor(pblockdb->NewIterator());
+        pcursor->Seek(uint256());
+        // Load mapBlockIndex
+        std::vector<uint256>::reverse_iterator hashiter;
+        for (hashiter = hashesToSync.rbegin(); hashiter != hashesToSync.rend(); ++hashiter)
+        {
+            BlockDBValue blockValue;
+            pblockdb->Read(*hashiter, blockValue);
+            CBlock block_lev = blockValue.block;
+            uint256 checkBlockHash = block_lev.GetHash();
+            BlockMap::iterator it;
+            it = mapBlockIndex.find(checkBlockHash);
+            // we should never have more blocks than headers
+            if(it == mapBlockIndex.end())
+            {
+                LOGA("something is very wrong somewhere \n");
+                assert(false);
+            }
+            //write the block to the disk if we dont have its data
+            if(!(it->second->nStatus & BLOCK_HAVE_DATA))
+            {
+                unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
+                CDiskBlockPos blockPos;
+                if (!FindBlockPos(state, blockPos, nBlockSize + 8, blockValue.blockHeight, block_lev.GetBlockTime(), false))
+                {
+                    LOGA("couldnt find block pos when syncing sequential with info stored in db, asserting false \n");
+                    assert(false);
+                }
+                if (!WriteBlockToDiskSequential(block_lev, blockPos, chainparams.MessageStart()))
+                {
+                    AbortNode(state, "Failed to sync block from db to sequential files");
+                }
+                // we dont need to call ReceivedBlockTransactions because this was already done when we added the blocks index during db sync
+
+                // undo data will be missing but this might be ok as we may write it when activating chain step
+            }
+        }
+    }
+    if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    {
+        // get the best block and go to it. we can sync the blocks in reverse to save time once we hit our best
+        uint256 bestHashSeq = pcoinsTip->GetBestBlock();
+        uint256 bestHashDb = pcoinsdbview->GetBestBlockDb();
+        BlockMap::iterator iter;
+        iter = mapBlockIndex.find(bestHashSeq);
+        if(iter == mapBlockIndex.end())
+        {
+            LOGA("couldnt find best hash in mapblockindex when attempting to sync storage types \n");
+            return;
+        }
+        CBlockIndex* pindex = iter->second;
+        // some initial testing has revealed that the best block returned isnt always the actual best block, so try to go from there
+        int curBestHeight = pindex->nHeight;
+        // this is very messy but should work, we only ever call this function once so i guess its ok
+        for(iter = mapBlockIndex.begin(); iter != mapBlockIndex.end(); ++iter)
+        {
+            // update the index if we have the data and the height is better
+            if(iter->second->nHeight > curBestHeight && (iter->second->nStatus & BLOCK_HAVE_DATA))
+            {
+                curBestHeight = iter->second->nHeight;
+                // set pindex to the better height so we start from there when syncing
+                pindex = iter->second;
+            }
+        }
+        // validate we have all block data for ancestors
+        CBlockIndex* pindexValidate = pindex;
+        CBlockIndex* pindexValid = pindex;
+        while(pindexValidate->GetBlockHash() != chainparams.GetConsensus().hashGenesisBlock)
+        {
+            // if we dont have the block data we set the best valid index to our prev
+            if(!(pindexValidate->nStatus & BLOCK_HAVE_DATA))
+            {
+                pindexValid = pindexValidate->pprev;
+            }
+            pindexValidate = pindexValidate->pprev;
+        }
+        pindex = pindexValid;
+        LOGA("best seq block we will load from is %s at height %i \n", pindex->GetBlockHash().GetHex().c_str(), pindex->nHeight);
+        LOGA("best db block we have before syncing is %s \n", bestHashDb.GetHex().c_str());
+        while(pindex->GetBlockHash() != bestHashDb)
+        {
+            if(pindex->GetBlockHash() == chainparams.GetConsensus().hashGenesisBlock)
+            {
+                /** we are done*/
+                LOGA("returning because pindex has hit genesis block \n");
+                return;
+            }
+            CBlock block_seq;
+            //printf("opening for hash %s \n", iter->second->GetBlockHash().GetHex().c_str());
+            if(!ReadBlockFromDiskSequential(block_seq, pindex->GetBlockPos(), chainparams.GetConsensus()))
+            {
+                LOGA("FAILED to read from sequential for hash %s \n", pindex->GetBlockHash().GetHex().c_str());
+                continue;
+            }
+            if(!WriteBlockToDiskLevelDB(block_seq))
+            {
+                LOGA("critical error, failed to write block to leveldb, asserting false \n");
+                assert(false);
+            }
+            pindex = pindex->pprev;
+        }
+        pcoinsdbview->WriteBestBlockDb(pindexValid->GetBlockHash());
+        LOGA("we have synced all missing blocks \n");
+    }
+}
 
 bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHeader::MessageStartChars &messageStart)
 {
@@ -36,13 +244,6 @@ bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHea
 
     	return WriteBlockToDiskLevelDB(block);
     }
-    else if(BLOCK_DB_MODE == HYBRID_STORAGE)
-    {
-    	bool seq = WriteBlockToDiskSequential(block, pos, messageStart);
-    	bool lev = WriteBlockToDiskLevelDB(block);
-    	return (seq & lev);
-    }
-
     // default return of false
     return false;
 }
@@ -59,6 +260,7 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex, const Consensus
         {
             return error("ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() doesn't match index for %s at %s", pindex->ToString(), pindex->GetBlockPos().ToString());
         }
+        return true;
     }
     else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
@@ -66,6 +268,7 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex, const Consensus
         block.SetNull();
         if(!ReadBlockFromDiskLevelDB(pindex, value))
         {
+            LOGA("failed to read block with hash %s from leveldb \n", pindex->GetBlockHash().GetHex().c_str());
             return false;
         }
         block = value.block;
@@ -73,37 +276,36 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex, const Consensus
         {
             return error("ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() doesn't match index for %s at %s", pindex->ToString(), pindex->GetBlockPos().ToString());
         }
+        return true;
     }
-    else if (BLOCK_DB_MODE == HYBRID_STORAGE)
+    return false;
+}
+
+bool UndoWriteToDisk(const CBlockUndo &blockundo, CDiskBlockPos &pos, const uint256 &hashBlock, const CMessageHeader::MessageStartChars &messageStart)
+{
+    if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
-    	CBlock blockSeq;
-    	CBlock blockLev;
-    	BlockDBValue value;
-        /// run both to verify both databases match, we will only return
-        if (!ReadBlockFromDiskSequential(blockSeq, pindex->GetBlockPos(), consensusParams))
-        {
-            return false;
-        }
-        blockLev.SetNull();
-        if(!ReadBlockFromDiskLevelDB(pindex, value))
-        {
-            return false;
-        }
-        blockLev = value.block;
-        if(blockSeq.GetHash() != pindex->GetBlockHash())
-        {
-            return error("ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() doesn't match index for %s at %s", pindex->ToString(), pindex->GetBlockPos().ToString());
-        }
-        if(blockLev.GetHash() != pindex->GetBlockHash())
-        {
-            return error("ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() doesn't match index for %s at %s", pindex->ToString(), pindex->GetBlockPos().ToString());
-        }
-        if(blockSeq.GetHash() != blockLev.GetHash())
-        {
-            return error("ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() doesn't match for both database types. THERE IS A CRITICAL ERROR SOMEWHERE \n");
-        }
-        block = blockLev;
+        return UndoWriteToDiskSequenatial(blockundo, pos, hashBlock, messageStart);
     }
+    else if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    {
+        return UndoWriteToDB(blockundo, hashBlock);
+    }
+    // default return of false
+    return false;
+}
+
+bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const uint256 &hashBlock)
+{
+    if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+    {
+        return UndoReadFromDiskSequential(blockundo, pos, hashBlock);
+    }
+    else if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    {
+        return UndoReadFromDB(blockundo, hashBlock);
+    }
+    // default return of false
     return true;
 }
 
@@ -123,11 +325,11 @@ void FindFilesToPrune(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight
     }
     uint64_t nLastBlockWeCanPrune = chainActive.Tip()->nHeight - MIN_BLOCKS_TO_KEEP;
 
-    if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES || BLOCK_DB_MODE == HYBRID_STORAGE)
+    if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
     	FindFilesToPruneSequential(setFilesToPrune, nLastBlockWeCanPrune);
     }
-    else if(BLOCK_DB_MODE == DB_BLOCK_STORAGE || BLOCK_DB_MODE == HYBRID_STORAGE)
+    else if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
     	uint64_t amntPruned = FindFilesToPruneLevelDB(nLastBlockWeCanPrune);
         // because we just prune the DB here and dont have a file set to return, we need to set prune triggers here
@@ -241,14 +443,14 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
 
 
                 // we write different info depending on block storage system
-                if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES || BLOCK_DB_MODE == HYBRID_STORAGE)
+                if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
                 {
                     if (!pblocktree->WriteBatchSync(vFiles, nLastBlockFile, vBlocks))
                     {
                         return AbortNode(state, "Files to write to block index database");
                     }
                 }
-                else if(BLOCK_DB_MODE == DB_BLOCK_STORAGE || BLOCK_DB_MODE == HYBRID_STORAGE)
+                else if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
                 {
                     // vFiles should be empty for a LEVELDB call so insert a blank vector instead
                     std::vector<std::pair<int, const CBlockFileInfo *> > vFilesEmpty;

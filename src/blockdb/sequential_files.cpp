@@ -4,7 +4,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "blockdb_sequential.h"
+#include "sequential_files.h"
 
 #include "main.h"
 
@@ -241,3 +241,4 @@ void FindFilesToPruneSequential(std::set<int> &setFilesToPrune, uint64_t nLastBl
         nPruneTarget / 1024 / 1024, nCurrentUsage / 1024 / 1024,
         ((int64_t)nPruneTarget - (int64_t)nCurrentUsage) / 1024 / 1024, nLastBlockWeCanPrune, count);
 }
+

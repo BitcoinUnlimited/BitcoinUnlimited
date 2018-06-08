@@ -1,31 +1,20 @@
-// Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "blockdb_leveldb.h"
 
-#include "blockdb_sequential.h"
-#include "chain.h"
-#include "chainparams.h"
+#include "blockdb.h"
 #include "hash.h"
-#include "main.h"
-#include "pow.h"
-#include "ui_interface.h"
-#include "uint256.h"
-#include "validationinterface.h"
 
-#include <stdint.h>
+CBlockDB *pblockdb = NULL;
+CBlockDB *pblockundodb = NULL;
 
-CFullBlockDB *pblockfull = NULL;
-
-CFullBlockDB::CFullBlockDB(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "blocks" / "blockdb", nCacheSize, fMemory, fWipe)
+CBlockDB::CBlockDB(std::string folder, size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "blocksdb" / folder.c_str(), nCacheSize, fMemory, fWipe)
 {
 }
 
 // Writes a whole array of blocks, at some point a rename of this method should be considered
-bool CFullBlockDB::WriteBatchSync(const std::vector<CBlock> &blocks)
+bool CBlockDB::WriteBatchSync(const std::vector<CBlock> &blocks)
 {
     CDBBatch batch(*this);
     for (std::vector<CBlock>::const_iterator it = blocks.begin(); it != blocks.end(); it++)
@@ -35,40 +24,23 @@ bool CFullBlockDB::WriteBatchSync(const std::vector<CBlock> &blocks)
     return WriteBatch(batch, true);
 }
 
-// hash is key, value is {version, height, block}
-bool CFullBlockDB::ReadBlock(const uint256 &hash, BlockDBValue &value)
-{
-    return Read(hash, value);
-}
-
-bool CFullBlockDB::WriteBlock(const uint256 &hash, const BlockDBValue &value)
-{
-    return Write(hash, value);
-}
-
-bool CFullBlockDB::EraseBlock(const uint256 &hash)
-{
-    return Erase(hash);
-}
-
-
-
-bool WriteBlockToDiskLevelDB(const CBlock &block)
+bool WriteBlockToDB(const CBlock &block)
 {
     BlockDBValue value(block);
-    return pblockfull->Write(block.GetHash(), value);
+    return pblockdb->Write(block.GetHash(), value);
 }
 
-bool ReadBlockFromDiskLevelDB(const CBlockIndex *pindex, BlockDBValue &value)
+bool ReadBlockFromDB(const CBlockIndex *pindex, BlockDBValue &value)
 {
-    return pblockfull->ReadBlock(pindex->GetBlockHash(), value);
+    return pblockdb->Read(pindex->GetBlockHash(), value);
 }
+
 
 uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
 {
     std::vector<uint256> hashesToPrune;
     /// just remove the to be pruned blocks here in the case of leveldb storage
-    boost::scoped_ptr<CDBIterator> pcursor(pblockfull->NewIterator());
+    boost::scoped_ptr<CDBIterator> pcursor(pblockdb->NewIterator());
     pcursor->Seek(uint256());
     // Load mapBlockIndex
     while (pcursor->Valid())
@@ -100,7 +72,7 @@ uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
     /// this should prune all blocks from the DB that are old enough to prune
     for(std::vector<uint256>::iterator iter = hashesToPrune.begin(); iter != hashesToPrune.end(); ++iter)
     {
-        pblockfull->EraseBlock(*iter);
+        pblockdb->Erase(*iter);
     }
     return hashesToPrune.size();
 }
