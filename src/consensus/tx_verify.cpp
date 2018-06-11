@@ -226,6 +226,8 @@ bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, c
             // If prev is coinbase, check that it's matured
             if (coin.IsCoinBase())
             {
+                // Copy these values here because once we unlock and re-lock cs_utxo we can't count on "coin"
+                // still being valid.
                 CAmount nCoinOutValue = coin.out.nValue;
                 int nCoinHeight = coin.nHeight;
 
