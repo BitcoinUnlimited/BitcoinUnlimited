@@ -6,7 +6,7 @@
 #include <set>
 
 #include "allowed_args.h"
-#include "blockdb/blockdb_wrapper.h"
+#include "blockdb/wrapper.h"
 #include "chainparams.h"
 #include "dosman.h"
 #include "httpserver.h"

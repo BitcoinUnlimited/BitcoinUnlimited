@@ -521,6 +521,8 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
 /** Remove invalidity status from a block and its descendants. */
 bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex);
 
+bool FindBlockPos(CValidationState &state, CDiskBlockPos &pos, unsigned int nAddSize, unsigned int nHeight, uint64_t nTime, bool fKnown);
+
 /** The currently-connected chain of blocks (protected by cs_main). */
 extern CChain chainActive;
 

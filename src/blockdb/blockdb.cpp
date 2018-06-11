@@ -35,6 +35,35 @@ bool ReadBlockFromDB(const CBlockIndex *pindex, BlockDBValue &value)
     return pblockdb->Read(pindex->GetBlockHash(), value);
 }
 
+bool UndoWriteToDB(const CBlockUndo &blockundo, const uint256 &hashBlock)
+{
+    // calculate & write checksum
+    CHashWriter hasher(SER_GETHASH, PROTOCOL_VERSION);
+    hasher << hashBlock;
+    hasher << blockundo;
+    UndoDBValue value(hasher.GetHash(), hashBlock, blockundo);
+    return pblockundodb->Write(hashBlock, value);
+}
+
+bool UndoReadFromDB(CBlockUndo &blockundo, const uint256 &hashBlock)
+{
+    // Read block
+    UndoDBValue value;
+    if(!pblockundodb->Read(hashBlock, value))
+    {
+        return error("%s: Deserialize or I/O error - %s", __func__, e.what());
+    }
+    CHashWriter hasher(SER_GETHASH, PROTOCOL_VERSION);
+    hasher << value.hashBlock;
+    hasher << value.blockundo;
+    // Verify checksum
+    if (value.hashChecksum != hasher.GetHash())
+    {
+        return error("%s: Checksum mismatch", __func__);
+    }
+    blockundo = value.blockundo;
+    return true;
+}
 
 uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
 {

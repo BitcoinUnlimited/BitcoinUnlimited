@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "blockdb/blockdb_wrapper.h"
+#include "blockdb/wrapper.h"
 #include "chainparams.h"
 #include "connmgr.h"
 #include "consensus/merkle.h"

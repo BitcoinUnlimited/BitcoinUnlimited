@@ -8,8 +8,8 @@
 
 #include "addrman.h"
 #include "arith_uint256.h"
-#include "blockdb/blockdb_sequential.h"
-#include "blockdb/blockdb_wrapper.h"
+#include "blockdb/sequential_files.h"
+#include "blockdb/wrapper.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "checkqueue.h"
@@ -1400,91 +1400,6 @@ bool CheckInputs(const CTransaction &tx,
     return true;
 }
 
-bool UndoWriteToDisk(const CBlockUndo &blockundo,
-    CDiskBlockPos &pos,
-    const uint256 &hashBlock,
-    const CMessageHeader::MessageStartChars &messageStart)
-{
-    // No need for writing undo to disk of we are only using leveldb for block storage.
-    if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
-        return true;
-
-    // Open history file to append
-    CAutoFile fileout(OpenUndoFile(pos), SER_DISK, CLIENT_VERSION);
-    if (fileout.IsNull())
-    {
-        // Open history file to append
-        CAutoFile fileout(OpenUndoFile(pos), SER_DISK, CLIENT_VERSION);
-        if (fileout.IsNull())
-        {
-            return error("%s: OpenUndoFile failed", __func__);
-        }
-
-    // Open history file to append
-    CAutoFile fileout(OpenUndoFile(pos), SER_DISK, CLIENT_VERSION);
-    if (fileout.IsNull())
-    {
-        return error("%s: OpenUndoFile failed", __func__);
-    }
-
-    // Write index header
-    unsigned int nSize = GetSerializeSize(fileout, blockundo);
-    fileout << FLATDATA(messageStart) << nSize;
-
-    // Write undo data
-    long fileOutPos = ftell(fileout.Get());
-    if (fileOutPos < 0)
-    {
-        return error("%s: ftell failed", __func__);
-    }
-    pos.nPos = (unsigned int)fileOutPos;
-    fileout << blockundo;
-
-    // calculate & write checksum
-    CHashWriter hasher(SER_GETHASH, PROTOCOL_VERSION);
-    hasher << hashBlock;
-    hasher << blockundo;
-    fileout << hasher.GetHash();
-
-    return true;
-}
-
-bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const uint256 &hashBlock)
-{
-    // No need for reading undo from disk of we are only using leveldb for block storage.
-    if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
-        return true;
-
-    // Open history file to read
-    CAutoFile filein(OpenUndoFile(pos, true), SER_DISK, CLIENT_VERSION);
-    if (filein.IsNull())
-    {
-        return error("%s: OpenUndoFile failed", __func__);
-    }
-
-    // Read block
-    uint256 hashChecksum;
-    CHashVerifier<CAutoFile> verifier(&filein); // We need a CHashVerifier as reserializing may lose data
-    try
-    {
-        verifier << hashBlock;
-        verifier >> blockundo;
-        filein >> hashChecksum;
-    }
-    catch (const std::exception &e)
-    {
-        return error("%s: Deserialize or I/O error - %s", __func__, e.what());
-    }
-
-    // Verify checksum
-    if (hashChecksum != verifier.GetHash())
-    {
-        return error("%s: Checksum mismatch", __func__);
-    }
-
-    return true;
-}
-
 /** Abort with a message */
 bool AbortNode(const std::string &strMessage, const std::string &userMessage = "")
 {
@@ -1566,13 +1481,11 @@ static DisconnectResult DisconnectBlock(const CBlock &block, const CBlockIndex *
         error("DisconnectBlock(): failure reading undo data");
         return DISCONNECT_FAILED;
     }
-
     if (blockUndo.vtxundo.size() + 1 != block.vtx.size())
     {
         error("DisconnectBlock(): block and undo data inconsistent");
         return DISCONNECT_FAILED;
     }
-
     // undo transactions in reverse order
     for (int i = block.vtx.size() - 1; i >= 0; i--)
     {
@@ -2160,7 +2073,7 @@ bool ConnectBlock(const CBlock &block,
     // Write undo information to disk
     if (pindex->GetUndoPos().IsNull() || !pindex->IsValid(BLOCK_VALID_SCRIPTS))
     {
-        if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES || BLOCK_DB_MODE == LEVELDB_AND_SEQUENTIAL)
+        if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
         {
             CDiskBlockPos _pos;
             if (!FindUndoPos(state, pindex->nFile, _pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
@@ -2415,7 +2328,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     // Read block from disk.
     CBlock block;
     if (!ReadBlockFromDisk(block, pindexDelete, consensusParams))
-        return AbortNode(state, "Failed to read block");
+        return AbortNode(state, "DisconnectTip(): Failed to read block");
     // Apply the block atomically to the chain state.
     int64_t nStart = GetTimeMicros();
     {
@@ -2515,7 +2428,7 @@ bool static ConnectTip(CValidationState &state,
     if (!pblock)
     {
         if (!ReadBlockFromDisk(block, pindexNew, chainparams.GetConsensus()))
-            return AbortNode(state, "Failed to read block");
+            return AbortNode(state, "ConnectTip(): Failed to read block");
         pblock = &block;
     }
     // Apply the block atomically to the chain state.
@@ -3922,6 +3835,34 @@ bool static LoadBlockIndexDB()
         return false;
     }
 
+    LOGA("loaded block index guts \n");
+
+    /** This sync method will break on pruned nodes so we cant use if pruned*/
+    // Check whether we have ever pruned block & undo files
+    pblocktree->ReadFlag("prunedblockfiles", fHavePruned);
+
+    if(!fHavePruned)
+    {
+        LOGA("blocks arent pruned, trying to sync between storage methods\n");
+        // by default we want to sync off disk instead of network if possible
+        bool syncBlocks = true;
+        // we should always sync if we are using hybrid mode
+        LOGA("about to determine storage sync \n");
+        if(!DetermineStorageSync())
+        {
+            syncBlocks = false;
+        }
+        if(syncBlocks)
+        {
+            // run a db sync here to sync storage methods
+            // may increase startup time significantly but is faster than network sync
+            LOGA("about to sync storage \n");
+            SyncStorage(chainparams);
+        }
+    }
+
+    LOGA("done syncing between storage methods\n");
+
     boost::this_thread::interruption_point();
 
     // Gather data necessary to perform the following checks
@@ -3999,6 +3940,8 @@ bool static LoadBlockIndexDB()
             fs::path path = GetBlockPosFilename(pos, "blk");
             if (!fs::exists(path))
             {
+                LOGA("missing path = %s \n", path.string().c_str());
+                /** We fail here when switching from db to seq */
                 return false;
             }
         }
@@ -4025,8 +3968,6 @@ bool static LoadBlockIndexDB()
         }
     }
 
-    // Check whether we have ever pruned block & undo files
-    pblocktree->ReadFlag("prunedblockfiles", fHavePruned);
     if (fHavePruned)
     {
         LOGA("LoadBlockIndexDB(): Block files have previously been pruned\n");
@@ -4042,9 +3983,39 @@ bool static LoadBlockIndexDB()
     LOGA("%s: transaction index %s\n", __func__, fTxIndex ? "enabled" : "disabled");
 
     // Load pointer to end of best chain
-    BlockMap::iterator it = mapBlockIndex.find(pcoinsTip->GetBestBlock());
+    uint256 bestblockhash;
+    uint256 bestHashSeq = pcoinsTip->GetBestBlock();
+    uint256 bestHashLev = pcoinsdbview->GetBestBlockDb();
+
+    CBlockIndex bestIndexSeq;
+    pblocktree->FindBlockIndex(bestHashSeq, bestIndexSeq);
+    CBlockIndex bestIndexLev;
+    pblocktree->FindBlockIndex(bestHashLev, bestIndexLev);
+
+    if(!bestHashSeq.IsNull() && bestHashLev.IsNull())
+    {
+        bestblockhash = bestHashSeq;
+    }
+    else if(bestHashSeq.IsNull() && !bestHashLev.IsNull())
+    {
+        bestblockhash = bestHashLev;
+    }
+    else if(bestIndexSeq.nHeight > bestIndexLev.nHeight)
+    {
+        bestblockhash = bestHashSeq;
+    }
+    else
+    {
+        bestblockhash = bestHashLev;
+    }
+
+    BlockMap::iterator it = mapBlockIndex.find(bestblockhash);
+    LOGA("height of best seq block = %i \n", bestIndexSeq.nHeight);
+    LOGA("height of best db block = %i \n", bestIndexLev.nHeight);
+    LOGA("best block hash of %s was found \n", bestblockhash.GetHex().c_str());
     if (it == mapBlockIndex.end())
     {
+        LOGA("couldnt find the best block hash in mapblockindex, returning true \n");
         return true;
     }
     chainActive.SetTip(it->second);

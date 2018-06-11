@@ -6,6 +6,7 @@
 
 #include "txdb.h"
 
+#include "blockdb/wrapper.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "hash.h"

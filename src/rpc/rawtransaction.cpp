@@ -5,7 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "base58.h"
-#include "blockdb/blockdb_wrapper.h"
+#include "blockdb/wrapper.h"
 #include "chain.h"
 #include "coins.h"
 #include "consensus/validation.h"
