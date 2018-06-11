@@ -5,7 +5,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "txdb.h"
-
 #include "blockdb/wrapper.h"
 #include "chain.h"
 #include "chainparams.h"
@@ -33,7 +32,7 @@ static const char DB_REINDEX_FLAG = 'R';
 static const char DB_LAST_BLOCK = 'l';
 
 // to distinguish best block for a specific DB type, values correspond to enum vaue (blockdb_wrapper.h)
-static const char DB_BEST_BLOCK_LEV = 'D';
+static const char DB_BEST_BLOCK_BLOCKDB = 'D';
 
 
 namespace
@@ -68,7 +67,27 @@ CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe)
 
 bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const { return db.Read(CoinEntry(&outpoint), coin); }
 bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const { return db.Exists(CoinEntry(&outpoint)); }
+
 uint256 CCoinsViewDB::GetBestBlock() const
+{
+    LOCK(cs_utxo);
+    uint256 hashBestChain;
+    if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+    {
+        hashBestChain = GetBestBlockSeq();
+    }
+    else if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    {
+        hashBestChain = GetBestBlockDb();
+    }
+    else
+    {
+        return uint256();
+    }
+    return hashBestChain;
+}
+
+uint256 CCoinsViewDB::GetBestBlockSeq() const
 {
     LOCK(cs_utxo);
     uint256 hashBestChain;
@@ -77,11 +96,20 @@ uint256 CCoinsViewDB::GetBestBlock() const
     return hashBestChain;
 }
 
+void CCoinsViewDB::WriteBestBlockSeq(const uint256 &hashBlock)
+{
+    LOCK(cs_utxo);
+    if (!hashBlock.IsNull())
+    {
+        db.Write(DB_BEST_BLOCK, hashBlock);
+    }
+}
+
 uint256 CCoinsViewDB::GetBestBlockDb() const
 {
     LOCK(cs_utxo);
     uint256 hashBestChain;
-    if (!db.Read(DB_BEST_BLOCK_LEV, hashBestChain))
+    if (!db.Read(DB_BEST_BLOCK_BLOCKDB, hashBestChain))
         return uint256();
     return hashBestChain;
 }
@@ -89,10 +117,9 @@ uint256 CCoinsViewDB::GetBestBlockDb() const
 void CCoinsViewDB::WriteBestBlockDb(const uint256 &hashBlock)
 {
     LOCK(cs_utxo);
-    CDBBatch batch(db);
     if (!hashBlock.IsNull())
     {
-        batch.Write(DB_BEST_BLOCK, hashBlock);
+        db.Write(DB_BEST_BLOCK_BLOCKDB, hashBlock);
     }
 }
 
@@ -158,7 +185,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
             it++;
         count++;
     }
-    if (!hashBlock.IsNull())
+    if (!hashBlock.IsNull() && BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
         batch.Write(DB_BEST_BLOCK, hashBlock);
 
     bool ret = db.WriteBatch(batch);
@@ -253,7 +280,6 @@ bool CBlockTreeDB::WriteBatchSync(const std::vector<std::pair<int, const CBlockF
     {
         batch.Write(make_pair(DB_BLOCK_FILES, it->first), *it->second);
     }
-    batch.Write(DB_LAST_BLOCK, nLastFile);
     for (std::vector<const CBlockIndex *>::const_iterator it = blockinfo.begin(); it != blockinfo.end(); it++)
     {
         batch.Write(make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()), CDiskBlockIndex(*it));

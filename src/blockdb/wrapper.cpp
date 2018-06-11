@@ -220,7 +220,7 @@ void SyncStorage(const CChainParams &chainparams)
                 LOGA("FAILED to read from sequential for hash %s \n", pindex->GetBlockHash().GetHex().c_str());
                 continue;
             }
-            if(!WriteBlockToDiskLevelDB(block_seq))
+            if(!WriteBlockToDB(block_seq))
             {
                 LOGA("critical error, failed to write block to leveldb, asserting false \n");
                 assert(false);
@@ -242,7 +242,7 @@ bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHea
     {
         // we want to set nFile inside pos here to -1 so we know its in levelDB block storage, dont do this within dual most since it also uses sequential
 
-    	return WriteBlockToDiskLevelDB(block);
+        return WriteBlockToDB(block);
     }
     // default return of false
     return false;
@@ -266,7 +266,7 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex, const Consensus
     {
         BlockDBValue value;
         block.SetNull();
-        if(!ReadBlockFromDiskLevelDB(pindex, value))
+        if(!ReadBlockFromDB(pindex, value))
         {
             LOGA("failed to read block with hash %s from leveldb \n", pindex->GetBlockHash().GetHex().c_str());
             return false;

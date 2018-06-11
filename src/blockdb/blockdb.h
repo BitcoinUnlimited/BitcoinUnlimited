@@ -75,16 +75,16 @@ struct UndoDBValue
     template <typename Stream>
     void Serialize(Stream &s) const
     {
-        s << VARINT(hashChecksum);
-        s << VARINT(hashBlock);
+        s << FLATDATA(hashChecksum);
+        s << FLATDATA(hashBlock);
         s << blockundo;
     }
 
     template <typename Stream>
     void Unserialize(Stream &s)
     {
-        s >> VARINT(hashChecksum);
-        s >> VARINT(hashBlock);
+        s >> FLATDATA(hashChecksum);
+        s >> FLATDATA(hashBlock);
         s >> blockundo;
     }
 
@@ -96,7 +96,7 @@ struct UndoDBValue
     }
 };
 
-/** Access to the block database (blocks/blockdb/) */
+/** Access to the block database (blocks/ * /) */
 class CBlockDB : public CDBWrapper
 {
 public:

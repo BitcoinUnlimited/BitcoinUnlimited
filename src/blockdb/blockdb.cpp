@@ -51,7 +51,7 @@ bool UndoReadFromDB(CBlockUndo &blockundo, const uint256 &hashBlock)
     UndoDBValue value;
     if(!pblockundodb->Read(hashBlock, value))
     {
-        return error("%s: Deserialize or I/O error - %s", __func__, e.what());
+        return error("%s: failure to read undoblock from db", __func__);
     }
     CHashWriter hasher(SER_GETHASH, PROTOCOL_VERSION);
     hasher << value.hashBlock;
