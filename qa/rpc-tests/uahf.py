@@ -235,29 +235,34 @@ class BUIP055Test (BitcoinTestFramework):
 
         logging.info("Building > 1MB block...")
 
+        ######
+        # DONT delete, just comment sicne we could use this as a template for
+        # future similar requirements.
+        #######
+
         # TEST that the client refuses to include invalid op return txns in the first block
-        self.generateTx(node, 950000, addrs, data='54686973206973203830206279746573206f6620746573742064617461206372656174656420746f20757365207570207472616e73616374696f6e20737061636520666173746572202e2e2e2e2e2e2e')
-        try:
-            self.generateTx(node,100000, addrs,data=invalidOpReturn)
-            assert(0)  # should have raised exception
-        except JSONRPCException as e:
-            assert("wrong-fork" in e.error["message"])
+        #self.generateTx(node, 950000, addrs, data='54686973206973203830206279746573206f6620746573742064617461206372656174656420746f20757365207570207472616e73616374696f6e20737061636520666173746572202e2e2e2e2e2e2e')
+        #try:
+        #    self.generateTx(node,100000, addrs,data=invalidOpReturn)
+        #    assert(0)  # should have raised exception
+        #except JSONRPCException as e:
+        #    assert("wrong-fork" in e.error["message"])
 
         # temporarily turn off forking so we can inject some bad tx into the mempool
-        node.set("mining.forkTime=0")
-        unspendableTx, unspendableTxSize = self.generateTx(node,100000, addrs,data=invalidOpReturn)
-        node.set("mining.forkTime=%d" % forkTime)
+        #node.set("mining.forkTime=0")
+        #unspendableTx, unspendableTxSize = self.generateTx(node,100000, addrs,data=invalidOpReturn)
+        #node.set("mining.forkTime=%d" % forkTime)
 
-        # node 3 is not forking so these tx are allowed
-        self.generateTx(self.nodes[3],100000,addrs,data=invalidOpReturn)
+        ## node 3 is not forking so these tx are allowed
+        #self.generateTx(self.nodes[3],100000,addrs,data=invalidOpReturn)
 
-        try:
-            ret = node.generate(1)
-            logging.info(ret)
-            assert(0)  # should have raised exception
-        except JSONRPCException as e:
-            assert("bad-blk-too-small" in e.error["message"])
-            logging.info("PASS: Invalid OP return transactions were not used when attempting to make the fork block")
+        #try:
+        #    ret = node.generate(1)
+        #    logging.info(ret)
+        #    assert(0)  # should have raised exception
+        #except JSONRPCException as e:
+        #    assert("bad-blk-too-small" in e.error["message"])
+        #    logging.info("PASS: Invalid OP return transactions were not used when attempting to make the fork block")
 
         # TEST REQ-3: generate a large block
         self.generateTx(node, 100000, addrs)

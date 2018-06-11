@@ -13,28 +13,6 @@
 #include <inttypes.h>
 #include <vector>
 
-const int REQ_6_1_SUNSET_HEIGHT = 530000;
-const int TESTNET_REQ_6_1_SUNSET_HEIGHT = 1250000;
-
-static const std::string ANTI_REPLAY_MAGIC_VALUE = "Bitcoin: A Peer-to-Peer Electronic Cash System";
-
-std::vector<unsigned char> invalidOpReturn =
-    std::vector<unsigned char>(std::begin(ANTI_REPLAY_MAGIC_VALUE), std::end(ANTI_REPLAY_MAGIC_VALUE));
-
-bool ValidateUAHFBlock(const CBlock &block, CValidationState &state, int nHeight)
-{
-    // Validate transactions are HF compatible
-    for (auto &tx : block.vtx)
-    {
-        int sunsetHeight =
-            (Params().NetworkIDString() == "testnet") ? TESTNET_REQ_6_1_SUNSET_HEIGHT : REQ_6_1_SUNSET_HEIGHT;
-        if ((nHeight <= sunsetHeight) && IsTxOpReturnInvalid(*tx))
-            return state.DoS(
-                100, error("transaction is invalid on UAHF cash chain"), REJECT_INVALID, "bad-txns-wrong-fork");
-    }
-    return true;
-}
-
 bool IsTxProbablyNewSigHash(const CTransaction &tx)
 {
     // bool newsighash = false;
@@ -68,48 +46,6 @@ bool IsTxUAHFOnly(const CTxMemPoolEntry &txentry)
     {
         // LOGA("txn is UAHF-specific\n");
         return true;
-    }
-    return false;
-}
-
-bool IsTxOpReturnInvalid(const CTransaction &tx)
-{
-    for (auto txout : tx.vout)
-    {
-        int idx = txout.scriptPubKey.Find(OP_RETURN);
-        if (idx)
-        {
-            CScript::const_iterator pc(txout.scriptPubKey.begin());
-            opcodetype op;
-#if 0 // Allow OP_RETURN anywhere
-            for (;pc != txout.scriptPubKey.end();)
-            {
-                if (txout.scriptPubKey.GetOp(pc, op))
-                {
-                    if (op == OP_RETURN) break;
-                }
-            }
-#else // OP_RETURN must be the first instruction
-            if (txout.scriptPubKey.GetOp(pc, op))
-            {
-                if (op != OP_RETURN)
-                    return false;
-            }
-#endif
-            if (pc != txout.scriptPubKey.end())
-            {
-                std::vector<unsigned char> data;
-                if (txout.scriptPubKey.GetOp(pc, op, data))
-                {
-                    // Note this code only works if the size <= 75 (or we'd have OP_PUSHDATAn instead)
-                    if (op == invalidOpReturn.size())
-                    {
-                        if (data == invalidOpReturn)
-                            return true;
-                    }
-                }
-            }
-        }
     }
     return false;
 }
