@@ -283,6 +283,8 @@ bool AcceptBlockHeader(const CBlockHeader &block,
     const CChainParams &chainparams,
     CBlockIndex **ppindex = nullptr);
 
+bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigned int nAddSize);
+
 /** Process a single protocol messages received from a given node */
 bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived);
 

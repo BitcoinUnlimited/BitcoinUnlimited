@@ -1535,10 +1535,6 @@ static DisconnectResult DisconnectBlock(const CBlock &block, const CBlockIndex *
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
 
-
-bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigned int nAddSize);
-
-
 //
 // Called periodically asynchronously; alerts if it smells like
 // we're being fed a bad chain (blocks being generated much
@@ -2073,7 +2069,7 @@ bool ConnectBlock(const CBlock &block,
     // Write undo information to disk
     if (pindex->GetUndoPos().IsNull() || !pindex->IsValid(BLOCK_VALID_SCRIPTS))
     {
-        if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+        if (pindex->GetUndoPos().IsNull())
         {
             CDiskBlockPos _pos;
             if (!FindUndoPos(state, pindex->nFile, _pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
@@ -3239,6 +3235,11 @@ bool FindBlockPos(CValidationState &state,
 
 bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigned int nAddSize)
 {
+    if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    {
+        return true;
+    }
+
     pos.nFile = nFile;
 
     LOCK(cs_LastBlockFile);
@@ -3984,7 +3985,7 @@ bool static LoadBlockIndexDB()
 
     // Load pointer to end of best chain
     uint256 bestblockhash;
-    uint256 bestHashSeq = pcoinsTip->GetBestBlock();
+    uint256 bestHashSeq = pcoinsdbview->GetBestBlockSeq();
     uint256 bestHashLev = pcoinsdbview->GetBestBlockDb();
 
     CBlockIndex bestIndexSeq;

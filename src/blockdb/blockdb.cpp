@@ -6,10 +6,10 @@
 #include "blockdb.h"
 #include "hash.h"
 
-CBlockDB *pblockdb = NULL;
-CBlockDB *pblockundodb = NULL;
+CBlockDB *pblockdb = nullptr;
+CBlockDB *pblockundodb = nullptr;
 
-CBlockDB::CBlockDB(std::string folder, size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "blocksdb" / folder.c_str(), nCacheSize, fMemory, fWipe)
+CBlockDB::CBlockDB(std::string folder, size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "blockdb" / folder.c_str(), nCacheSize, fMemory, fWipe)
 {
 }
 
