@@ -1390,19 +1390,23 @@ bool CheckInputs(const CTransaction &tx,
             {
                 const COutPoint &prevout = tx.vin[i].prevout;
 
-                LOCK(inputs.cs_utxo);
-                const Coin &coin = inputs.AccessCoin(prevout);
-                if (coin.IsSpent())
-                    LOGA("ASSERTION: no inputs available\n");
-                assert(!coin.IsSpent());
+                CScript scriptPubKey;
+                CAmount amount;
+                {
+                    LOCK(inputs.cs_utxo);
+                    const Coin &coin = inputs.AccessCoin(prevout);
+                    if (coin.IsSpent())
+                        LOGA("ASSERTION: no inputs available\n");
+                    assert(!coin.IsSpent());
 
-                // We very carefully only pass in things to CScriptCheck which
-                // are clearly committed. This provides
-                // a sanity check that our caching is not introducing consensus
-                // failures through additional data in, eg, the coins being
-                // spent being checked as a part of CScriptCheck.
-                const CScript &scriptPubKey = coin.out.scriptPubKey;
-                const CAmount &amount = coin.out.nValue;
+                    // We very carefully only pass in things to CScriptCheck which
+                    // are clearly committed. This provides
+                    // a sanity check that our caching is not introducing consensus
+                    // failures through additional data in, eg, the coins being
+                    // spent being checked as a part of CScriptCheck.
+                    scriptPubKey = coin.out.scriptPubKey;
+                    amount = coin.out.nValue;
+                }
 
                 // Verify signature
                 CScriptCheck check(resourceTracker, scriptPubKey, amount, tx, i, flags, cacheStore);
