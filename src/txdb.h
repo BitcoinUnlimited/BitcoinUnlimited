@@ -54,7 +54,7 @@ uint64_t GetTotalSystemMemory();
  */
 void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
-    int64_t &_nCoinCacheUsage,
+    int64_t &_nCoinCacheMaxSize,
     bool fDefault = false);
 /** Calculate the various cache sizes. This is primarily used in GetCacheConfiguration() however during
  *  dynamic sizing of the coins cache we also need to use this function directly.
@@ -62,7 +62,7 @@ void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
 void CacheSizeCalculations(int64_t _nTotalCache,
     int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
-    int64_t &_nCoinCacheUsage);
+    int64_t &_nCoinCacheMaxSize);
 /** This function is called during FlushStateToDisk.  The coins cache is dynamically sized before any
  *  checking is done for cache flushing and trimming
  */
