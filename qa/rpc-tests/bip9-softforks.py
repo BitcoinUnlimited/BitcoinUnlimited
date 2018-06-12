@@ -194,17 +194,16 @@ class BIP9SoftForksTest(ComparisonTestFramework):
         yield TestInstance([[block, False]])
 
         # Restart all
-        self.test.block_store.close()
+        self.test.clear_all_connections()
         stop_nodes(self.nodes)
         wait_bitcoinds()
-        shutil.rmtree(self.options.tmpdir)
+        shutil.rmtree(self.options.tmpdir + "/node0")
         self.setup_chain()
         self.setup_network()
-        self.test.block_store = BlockStore(self.options.tmpdir)
-        self.test.clear_all_connections()
         self.test.add_all_connections(self.nodes)
-        NetworkThread().start() # Start up network handling in another thread
 
+        NetworkThread().start() # Start up network handling in another thread
+        self.test.test_nodes[0].wait_for_verack()
 
     def get_tests(self):
         for test in itertools.chain(
