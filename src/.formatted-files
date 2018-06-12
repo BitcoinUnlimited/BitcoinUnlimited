@@ -55,7 +55,6 @@ dosman.cpp
 dosman.h
 dstencode.cpp
 dstencode.h
-ecwrapper.cpp
 expedited.cpp
 expedited.h
 globals.cpp
