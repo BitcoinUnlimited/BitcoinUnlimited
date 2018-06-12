@@ -174,7 +174,10 @@ static const Coin coinEmpty;
 
 const Coin &CCoinsViewCache::AccessCoin(const COutPoint &outpoint) const
 {
-    LOCK(cs_utxo);
+    // We may return a reference to a coin cache entry so therefore we must make sure the caller
+    // has taken a lock on cs_utxo.
+    AssertLockHeld(cs_utxo);
+
     CCoinsMap::const_iterator it = FetchCoin(outpoint);
     if (it == cacheCoins.end())
     {
@@ -467,7 +470,7 @@ double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight, CAmount
     if (tx.IsCoinBase())
         return 0.0;
     double dResult = 0.0;
-    BOOST_FOREACH (const CTxIn &txin, tx.vin)
+    for (const CTxIn &txin : tx.vin)
     {
         const Coin &coin = AccessCoin(txin.prevout);
         if (coin.IsSpent())
@@ -487,6 +490,10 @@ static const size_t nMaxOutputsPerBlock =
     DEFAULT_LARGEST_TRANSACTION / ::GetSerializeSize(CTxOut(), SER_NETWORK, PROTOCOL_VERSION);
 const Coin &AccessByTxid(const CCoinsViewCache &view, const uint256 &txid)
 {
+    // We may return a reference to a coin cache entry so therefore we must make sure the caller
+    // has taken a lock on cs_utxo.
+    AssertLockHeld(view.cs_utxo);
+
     COutPoint iter(txid, 0);
     while (iter.n < nMaxOutputsPerBlock)
     {

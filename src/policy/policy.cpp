@@ -141,14 +141,17 @@ bool AreInputsStandard(const CTransaction &tx, const CCoinsViewCache &mapInputs)
 
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        const CTxOut &prev = mapInputs.AccessCoin(tx.vin[i].prevout).out;
-
-        std::vector<std::vector<unsigned char> > vSolutions;
         txnouttype whichType;
-        // get the scriptPubKey corresponding to this input:
-        const CScript &prevScript = prev.scriptPubKey;
-        if (!Solver(prevScript, whichType, vSolutions))
-            return false;
+        {
+            LOCK(mapInputs.cs_utxo);
+            const CTxOut &prev = mapInputs.AccessCoin(tx.vin[i].prevout).out;
+
+            std::vector<std::vector<unsigned char> > vSolutions;
+            // get the scriptPubKey corresponding to this input:
+            const CScript &prevScript = prev.scriptPubKey;
+            if (!Solver(prevScript, whichType, vSolutions))
+                return false;
+        }
 
         if (whichType == TX_SCRIPTHASH)
         {

@@ -716,7 +716,8 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
         }
         else if (it->GetSpendsCoinbase())
         {
-            BOOST_FOREACH (const CTxIn &txin, tx.vin)
+            LOCK(pcoins->cs_utxo);
+            for (const CTxIn &txin : tx.vin)
             {
                 indexed_transaction_set::const_iterator it2 = mapTx.find(txin.prevout.hash);
                 if (it2 != mapTx.end())

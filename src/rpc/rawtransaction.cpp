@@ -266,6 +266,7 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
     }
     else
     {
+        LOCK(pcoinsTip->cs_utxo);
         const Coin &coin = AccessByTxid(*pcoinsTip, oneTxid);
         if (!coin.IsSpent() && coin.nHeight > 0 && coin.nHeight <= chainActive.Height())
         {
@@ -706,9 +707,13 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         CCoinsViewMemPool viewMempool(&viewChain, mempool);
         view.SetBackend(viewMempool); // temporarily switch cache backend to db+mempool view
 
-        BOOST_FOREACH (const CTxIn &txin, mergedTx.vin)
         {
-            view.AccessCoin(txin.prevout); // Load entries from viewChain into view; can fail.
+            LOCK(view.cs_utxo);
+            for (const CTxIn &txin : mergedTx.vin)
+            {
+                // Load entries from viewChain into view; can fail.
+                view.AccessCoin(txin.prevout);
+            }
         }
 
         view.SetBackend(viewDummy); // switch back to avoid locking mempool for too long
@@ -765,6 +770,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
+                LOCK(view.cs_utxo);
                 const Coin &coin = view.AccessCoin(out);
                 if (!coin.IsSpent() && coin.out.scriptPubKey != scriptPubKey)
                 {
@@ -862,6 +868,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
     {
+        LOCK(view.cs_utxo);
         CTxIn &txin = mergedTx.vin[i];
         const Coin &coin = view.AccessCoin(txin.prevout);
         if (coin.IsSpent())
@@ -879,7 +886,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         // ... and merge in other signatures:
         if (pickedForkId)
         {
-            BOOST_FOREACH (const CMutableTransaction &txv, txVariants)
+            for (const CMutableTransaction &txv : txVariants)
             {
                 txin.scriptSig = CombineSignatures(prevPubKey,
                     TransactionSignatureChecker(&txConst, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID), txin.scriptSig,
@@ -894,7 +901,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         }
         else
         {
-            BOOST_FOREACH (const CMutableTransaction &txv, txVariants)
+            for (const CMutableTransaction &txv : txVariants)
             {
                 txin.scriptSig = CombineSignatures(prevPubKey, TransactionSignatureChecker(&txConst, i, amount, 0),
                     txin.scriptSig, txv.vin[i].scriptSig);
@@ -970,10 +977,13 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
 
     CCoinsViewCache &view = *pcoinsTip;
     bool fHaveChain = false;
-    for (size_t o = 0; !fHaveChain && o < tx.vout.size(); o++)
     {
-        const Coin &existingCoin = view.AccessCoin(COutPoint(hashTx, o));
-        fHaveChain = !existingCoin.IsSpent();
+        LOCK(view.cs_utxo);
+        for (size_t o = 0; !fHaveChain && o < tx.vout.size(); o++)
+        {
+            const Coin &existingCoin = view.AccessCoin(COutPoint(hashTx, o));
+            fHaveChain = !existingCoin.IsSpent();
+        }
     }
     bool fHaveMempool = mempool.exists(hashTx);
     if (!fHaveMempool && !fHaveChain)
