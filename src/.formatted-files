@@ -351,6 +351,7 @@ script/script_error.h
 script/script.h
 script/sigcache.cpp
 script/sigcache.h
+script/sigcommon.cpp
 script/sign.cpp
 script/sign.h
 script/standard.cpp
@@ -395,3 +396,4 @@ consensus/params.h
 consensus/tx_verify.cpp
 consensus/tx_verify.h
 consensus/validation.h
+cashlib/cashlib.cpp

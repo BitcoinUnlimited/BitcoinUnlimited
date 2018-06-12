@@ -215,7 +215,8 @@ class BitcoinTestFramework(object):
 
         if not self.options.noshutdown:
             print("Stopping nodes")
-            stop_nodes(self.nodes)
+            if hasattr(self, "nodes"):  # nodes may not exist if there's a startup error
+                stop_nodes(self.nodes)
             wait_bitcoinds()
         else:
             print("Note: bitcoinds were not stopped and may still be running")
