@@ -1,8 +1,14 @@
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include <openssl/rand.h>
 #include <string>
 #include <vector>
-
+/* clang-format off */
+// must be first for windows
 #include "compat.h"
+/* clang-format on */
 #include "base58.h"
 #include "random.h"
 #include "streams.h"
@@ -14,7 +20,7 @@ static bool sigInited = false;
 int LogPrintStr(const std::string &str) { return str.size(); }
 namespace Logging
 {
-    uint64_t categoriesEnabled = 0; // 64 bit log id mask.
+uint64_t categoriesEnabled = 0; // 64 bit log id mask.
 };
 
 // helper functions
