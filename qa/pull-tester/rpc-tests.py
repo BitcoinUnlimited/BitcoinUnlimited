@@ -179,6 +179,7 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
+    'cashlibtest',
     'tweak',
     'notify',
     'may152018_forkactivation_1',
