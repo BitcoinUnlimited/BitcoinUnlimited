@@ -609,7 +609,7 @@ int CpuMiner(void)
             if(nRet!=0)
                 fprintf(stderr, "%s\n", strPrint.c_str());
             // Actually do some mining
-            if (1)
+            if (result.isNull())
             {
                 MilliSleep(1000);
             }
