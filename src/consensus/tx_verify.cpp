@@ -143,11 +143,14 @@ unsigned int GetP2SHSigOpCount(const CTransaction &tx, const CCoinsViewCache &in
         return 0;
 
     unsigned int nSigOps = 0;
-    for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        const CTxOut &prevout = inputs.AccessCoin(tx.vin[i].prevout).out;
-        if (prevout.scriptPubKey.IsPayToScriptHash())
-            nSigOps += prevout.scriptPubKey.GetSigOpCount(tx.vin[i].scriptSig);
+        LOCK(inputs.cs_utxo);
+        for (unsigned int i = 0; i < tx.vin.size(); i++)
+        {
+            const CTxOut &prevout = inputs.AccessCoin(tx.vin[i].prevout).out;
+            if (prevout.scriptPubKey.IsPayToScriptHash())
+                nSigOps += prevout.scriptPubKey.GetSigOpCount(tx.vin[i].scriptSig);
+        }
     }
     return nSigOps;
 }
@@ -212,26 +215,50 @@ bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, c
     CAmount nValueIn = 0;
     CAmount nFees = 0;
     int nSpendHeight = -1;
-    for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        const COutPoint &prevout = tx.vin[i].prevout;
-        const Coin &coin = inputs.AccessCoin(prevout);
-        assert(!coin.IsSpent());
-
-        // If prev is coinbase, check that it's matured
-        if (coin.IsCoinBase())
+        LOCK(inputs.cs_utxo);
+        for (unsigned int i = 0; i < tx.vin.size(); i++)
         {
-            if (nSpendHeight == -1)
-                nSpendHeight = GetSpendHeight(inputs);
-            if (nSpendHeight - coin.nHeight < COINBASE_MATURITY)
-                return state.Invalid(false, REJECT_INVALID, "bad-txns-premature-spend-of-coinbase",
-                    strprintf("tried to spend coinbase at depth %d", nSpendHeight - coin.nHeight));
-        }
+            const COutPoint &prevout = tx.vin[i].prevout;
+            const Coin &coin = inputs.AccessCoin(prevout);
+            assert(!coin.IsSpent());
 
-        // Check for negative or overflow input values
-        nValueIn += coin.out.nValue;
-        if (!MoneyRange(coin.out.nValue) || !MoneyRange(nValueIn))
-            return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputvalues-outofrange");
+            // If prev is coinbase, check that it's matured
+            if (coin.IsCoinBase())
+            {
+                // Copy these values here because once we unlock and re-lock cs_utxo we can't count on "coin"
+                // still being valid.
+                CAmount nCoinOutValue = coin.out.nValue;
+                int nCoinHeight = coin.nHeight;
+
+                // If there are multiple coinbase spends we still only need to get the spend height once.
+                if (nSpendHeight == -1)
+                {
+                    // GetSpendHeight requires cs_main but in order to maintain proper locking order cs_utxo
+                    // must be taken after cs_main.
+                    LEAVE_CRITICAL_SECTION(inputs.cs_utxo);
+                    nSpendHeight = GetSpendHeight(inputs);
+                    ENTER_CRITICAL_SECTION(inputs.cs_utxo);
+                }
+                if (nSpendHeight - nCoinHeight < COINBASE_MATURITY)
+                    return state.Invalid(false, REJECT_INVALID, "bad-txns-premature-spend-of-coinbase",
+                        strprintf("tried to spend coinbase at depth %d", nSpendHeight - nCoinHeight));
+
+                // Check for negative or overflow input values.  We use nCoinOutValue which was copied before
+                // we released cs_utxo, because we can't be certain the value didn't change during the time
+                // cs_utxo was unlocked.
+                nValueIn += nCoinOutValue;
+                if (!MoneyRange(nCoinOutValue) || !MoneyRange(nValueIn))
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputvalues-outofrange");
+            }
+            else
+            {
+                // Check for negative or overflow input values
+                nValueIn += coin.out.nValue;
+                if (!MoneyRange(coin.out.nValue) || !MoneyRange(nValueIn))
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputvalues-outofrange");
+            }
+        }
     }
 
     if (nValueIn < tx.GetValueOut())
