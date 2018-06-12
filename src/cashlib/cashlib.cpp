@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 
+#include "compat.h"
 #include "base58.h"
 #include "random.h"
 #include "streams.h"
@@ -11,6 +12,11 @@ static bool sigInited = false;
 
 // stop the logging
 int LogPrintStr(const std::string &str) { return str.size(); }
+namespace Logging
+{
+    uint64_t categoriesEnabled = 0; // 64 bit log id mask.
+};
+
 // helper functions
 namespace
 {

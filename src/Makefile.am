@@ -303,7 +303,9 @@ libbitcoincash_a_SOURCES = \
   uint256.cpp \
   uint256.h \
   utilstrencodings.cpp \
-  utilstrencodings.h
+  utilstrencodings.h \
+  utiltime.cpp \
+  utiltime.h
 
 # crypto primitives library
 crypto_libbitcoin_crypto_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_CONFIG_INCLUDES)

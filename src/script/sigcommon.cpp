@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 
+#include "compat.h"
 #include "base58.h"
 #include "primitives/transaction.h"
 #include "script/sign.h"

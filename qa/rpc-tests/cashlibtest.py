@@ -114,8 +114,11 @@ if __name__ == '__main__':
         env = env + os.sep + ".." + os.sep + ".." + os.sep + "src" + os.sep + "bitcoind"
         env = os.path.abspath(env)
     path = os.path.dirname(env)
-    cashlib.init(path + os.sep + ".libs" + os.sep + "libbitcoincash.so")
-    MyTest ().main ()
+    try:
+        cashlib.init(path + os.sep + ".libs" + os.sep + "libbitcoincash.so")
+        MyTest ().main ()
+    except OSError as e:
+        print("Issue loading shared library.  This is expected during cross compilation since the native python will not load the .so: %s" % str(e))
 
 # Create a convenient function for an interactive python debugging session
 def Test():
