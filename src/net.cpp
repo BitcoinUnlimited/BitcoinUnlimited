@@ -2173,9 +2173,6 @@ void ThreadMessageHandler()
         // sleeping in the step below so as to allow requests to return during the sleep time.
         requester.SendRequests();
 
-        // Release refs as a last step. We need to keep the node refs all the way through so that we don't
-        // have to take so many vNodes locks during requester.SendRequests().
-        //
         // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this only decrements
         // an atomic counter, and two, the counter will always be > 0 at this point, so we don't have to worry
         // that a pnode could be disconnected and no longer exist before the decrement takes place.
