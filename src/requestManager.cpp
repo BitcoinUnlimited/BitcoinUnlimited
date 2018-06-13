@@ -407,12 +407,13 @@ bool CUnknownObj::AddSource(CNode *from)
     if (std::find_if(availableFrom.begin(), availableFrom.end(), MatchCNodeRequestData(from)) == availableFrom.end())
     {
         LOG(REQ, "AddSource %s is available at %s.\n", obj.ToString(), from->GetLogName());
-        {
-            // We do not have to take a vNodes lock here as would usually be the case because the counter is
-            // atomic, and also at this point there will be at least one ref already and we therefore don't
-            // have to worry about the node getting disconnected and no longer existing.
-            from->AddRef();
-        }
+
+        // We do not have to take a vNodes lock here as would usually be the case because the counter is
+        // atomic, and also at this point there will be at least one ref already and we therefore don't
+        // have to worry about the node getting disconnected and no longer existing.
+        DbgAssert(from->GetRefCount() > 0, );
+        from->AddRef();
+
         CNodeRequestData req(from);
         for (ObjectSourceList::iterator i = availableFrom.begin(); i != availableFrom.end(); ++i)
         {
@@ -613,6 +614,7 @@ void CRequestManager::SendRequests()
                             // counter is atomic, and also at this point there will be at least one ref already and
                             // we therefore don't have to worry about the node getting disconnected and no longer
                             // existing.
+                            DbgAssert(next.node->GetRefCount() > 0, );
                             next.node->AddRef();
                         }
                         mapBatchBlockRequests[next.node].emplace_back(obj);
@@ -774,6 +776,7 @@ void CRequestManager::SendRequests()
                                 // counter is atomic, and also at this point there will be at least one ref already and
                                 // we therefore don't have to worry about the node getting disconnected and no longer
                                 // existing.
+                                DbgAssert(next.node->GetRefCount() > 0, );
                                 next.node->AddRef();
                             }
                             mapBatchTxnRequests[next.node].emplace_back(item.obj);

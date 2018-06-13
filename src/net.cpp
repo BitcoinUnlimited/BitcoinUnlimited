@@ -1372,7 +1372,7 @@ void ThreadSocketHandler()
         // that a pnode could be disconnected and no longer exist before the decrement takes place.
         for (CNode *pnode : vNodesCopy)
         {
-                pnode->Release();
+            pnode->Release();
         }
 
         // BU: Nothing happened even though select did not block.  So slow us down.
