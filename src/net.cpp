@@ -1367,8 +1367,11 @@ void ThreadSocketHandler()
                 }
             }
         }
+        // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this only decrements
+        // an atomic counter, and two, the counter will always be > 0 at this point, so we don't have to worry
+        // that a pnode could be disconnected and no longer exist before the decrement takes place.
+        for (CNode *pnode : vNodesCopy)
         {
-            for (CNode *pnode : vNodesCopy)
                 pnode->Release();
         }
 
@@ -2110,6 +2113,9 @@ void ThreadMessageHandler()
     {
         vector<CNode *> vNodesCopy;
         {
+            // We require the vNodes lock here, throughout, even though we are only incrementing
+            // an atomic counter when we AddRef(). We have to be aware that a socket disconnection
+            // could occur if we don't take the lock.
             LOCK(cs_vNodes);
 
             // During IBD and because of the multithreading of PV we end up favoring the first peer that
@@ -2158,9 +2164,8 @@ void ThreadMessageHandler()
 
             // Put transaction and block requests into the request manager
             // and all other requests into the send queue.
-            {
-                g_signals.SendMessages(pnode);
-            }
+            g_signals.SendMessages(pnode);
+
             boost::this_thread::interruption_point();
         }
 
@@ -2170,14 +2175,20 @@ void ThreadMessageHandler()
 
         // Release refs as a last step. We need to keep the node refs all the way through so that we don't
         // have to take so many vNodes locks during requester.SendRequests().
+        //
+        // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this only decrements
+        // an atomic counter, and two, the counter will always be > 0 at this point, so we don't have to worry
+        // that a pnode could be disconnected and no longer exist before the decrement takes place.
+        for (CNode *pnode : vNodesCopy)
         {
-            for (CNode *pnode : vNodesCopy)
-                pnode->Release();
+            pnode->Release();
         }
 
         if (fSleep)
+        {
             messageHandlerCondition.timed_wait(
                 lock, boost::posix_time::microsec_clock::universal_time() + boost::posix_time::milliseconds(50));
+        }
     }
 }
 
