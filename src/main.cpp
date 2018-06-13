@@ -593,7 +593,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     TransactionClass allowedTx,
     std::vector<COutPoint> &vCoinsToUncache)
 {
-    unsigned int forkVerifyFlags = 0;
     unsigned int nSigOps = 0;
     ValidationResourceTracker resourceTracker;
     unsigned int nSize = 0;
@@ -610,12 +609,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     // Coinbase is only valid in a block, not as a loose transaction
     if (ptx->IsCoinBase())
         return state.DoS(100, false, REJECT_INVALID, "coinbase");
-
-    // UAHF: accept both sighashtypes because we will need all the tx types during the transition.
-    if (IsUAHFforkActiveOnNextBlock((chainActive.Tip()->nHeight) - 12))
-    {
-        forkVerifyFlags = SCRIPT_ENABLE_SIGHASH_FORKID;
-    }
 
     // Reject nonstandard transactions if so configured.
     // (-testnet/-regtest allow nonstandard, and explicit submission via RPC)
@@ -891,8 +884,8 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         unsigned char sighashType = 0;
-        if (!CheckInputs(*ptx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags | extraFlags, true,
-                &resourceTracker, nullptr, &sighashType))
+        if (!CheckInputs(*ptx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | extraFlags, true, &resourceTracker,
+                nullptr, &sighashType))
         {
             LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", ptx->GetHash().ToString().c_str());
             return false;
@@ -909,8 +902,8 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(*ptx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | forkVerifyFlags | extraFlags, true,
-                nullptr, nullptr, &sighashType2))
+        if (!CheckInputs(*ptx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | extraFlags, true, nullptr, nullptr,
+                &sighashType2))
         {
             return error(
                 "%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
