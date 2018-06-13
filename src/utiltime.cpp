@@ -46,7 +46,9 @@ int64_t GetTimeMicros()
     return now;
 }
 
-#ifdef MAC_OSX
+#ifdef WIN32
+uint64_t GetStopwatch() { return 1000 * GetTimeMicros(); }
+#elif MAC_OSX
 uint64_t GetStopwatch() { return 1000 * GetTimeMicros(); }
 #else
 uint64_t GetStopwatch()
