@@ -2,13 +2,10 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <openssl/rand.h>
-#include <string>
-#include <vector>
-
 /* clang-format off */
 // must be first for windows
 #include "compat.h"
+
 /* clang-format on */
 #include "base58.h"
 #include "primitives/transaction.h"
@@ -18,6 +15,11 @@
 #include "utilstrencodings.h"
 
 #include "stdio.h"
+
+#include <openssl/rand.h>
+#include <string>
+#include <vector>
+
 
 namespace
 {
