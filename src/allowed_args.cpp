@@ -699,7 +699,7 @@ static void addAllNodeOptions(AllowedArgs &allowedArgs, HelpMessageMode mode, CT
 }
 
 // bitcoin-cli does not know about tweaks so we have to silently ignore unknown options
-BitcoinCli::BitcoinCli(): AllowedArgs(true)
+BitcoinCli::BitcoinCli() : AllowedArgs(true)
 {
     addHelpOptions(*this);
     addChainSelectionOptions(*this);

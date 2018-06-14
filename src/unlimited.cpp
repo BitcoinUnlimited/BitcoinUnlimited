@@ -1693,7 +1693,7 @@ static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
         ret.push_back(Pair("coinbase", EncodeHexTx(*tran)));
     }
 
-    ret.push_back(Pair("version", to_string(block.nVersion)));
+    ret.push_back(Pair("version", block.nVersion));
     ret.push_back(Pair("nBits", strprintf("%08x", block.nBits)));
     ret.push_back(Pair("time", block.GetBlockTime()));
 
@@ -1734,9 +1734,7 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
 /** RPC Submit a solved block candidate*/
 UniValue submitminingsolution(const UniValue &params, bool fHelp)
 {
-    UniValue ret(UniValue::VOBJ);
     UniValue rcvd;
-    CTransaction *coinbase = nullptr;
     CBlock block;
     LOCK(cs_main);
 
@@ -1758,10 +1756,7 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
             HelpExampleCli("submitminingsolution", "\"myminingsolutiondadata\""));
     }
 
-    if (!rcvd.read(params[0].get_str()))
-    {
-        throw JSONRPCError(RPC_PARSE_ERROR, "[0] (first) argument is not valid JSON");
-    }
+    rcvd = params[0].get_obj();
 
     int64_t id = rcvd["id"].get_int64();
 
@@ -1773,12 +1768,15 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
     }
     else
     {
-        ret.push_back(Pair("accepted", UniValue(false)));
-        ret.push_back(Pair("message", "Id not found."));
-        return ret; // Leave if no id
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "id not found");
     }
 
-    block.nNonce = rcvd["nonce"].get_int();
+    UniValue nonce = rcvd["nonce"];
+    if (nonce.isNull())
+    {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "nonce not found");
+    }
+    block.nNonce = nonce.get_int();
 
     UniValue time = rcvd["time"];
     if (!time.isNull())
@@ -1786,49 +1784,35 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
         block.nTime = time.get_int();
     }
 
-    UniValue version = rcvd["blockversion"];
+    UniValue version = rcvd["version"];
     if (!version.isNull())
     {
         block.nVersion = version.get_int();
     }
 
     // Coinbase:
-    try
+    CTransaction coinbase;
+    UniValue cbhex = rcvd["coinbase"];
+    if (!cbhex.isNull())
     {
-        coinbase = new CTransaction();
-        DecodeHexTx(*coinbase, rcvd["coinbase"].get_str());
-        block.vtx[0].reset(coinbase);
-    }
-    catch (const std::exception &e)
-    {
-        delete coinbase;
-        throw;
+        if (DecodeHexTx(coinbase, cbhex.get_str()))
+            block.vtx[0] = MakeTransactionRef(std::move(coinbase));
+        else
+        {
+            throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "coinbase decode failed");
+        }
     }
 
     // MerkleRoot:
     {
         std::vector<uint256> merklebranches = GetMerkleProofBranches(&block);
-        uint256 t = coinbase->GetHash();
+        uint256 t = block.vtx[0]->GetHash();
         block.hashMerkleRoot = CalculateMerkleRoot(t, merklebranches);
     }
 
     UniValue uvsub = SubmitBlock(block); // returns string on failure
-
-    if (!uvsub.isStr())
-    {
-        // Good
-        ret.push_back(Pair("accepted", UniValue(true)));
-        ret.push_back(Pair("message", "success"));
-    }
-    else
-    {
-        // Error
-        ret.push_back(Pair("accepted", UniValue(false)));
-        ret.push_back(Pair("message", uvsub.get_str()));
-    }
-
     RmOldMiningCandidates();
-    return ret;
+    return uvsub;
 }
 
 static void CalculateNextMerkleRoot(uint256 &merkle_root, uint256 &merkle_branch)

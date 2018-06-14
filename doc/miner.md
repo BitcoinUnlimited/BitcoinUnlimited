@@ -31,6 +31,9 @@ bitcoin-miner
 
 Of course, given current and foreseeable mining difficulties this program will not find any blocks on mainnet.  However, it will find blocks on testnet or regtest.
 
+### miningtest.py
+
+A python based test of these interfaces is located at qa/rpc-tests/miningtest.py.  This example may be of more use for people accessing these RPCs in higher level languages.
 
 ### Function documentation:
 
@@ -40,25 +43,25 @@ Of course, given current and foreseeable mining difficulties this program will n
 ##### Returns:
 ```
 {
-  # candidate identifier for submitminingsolution:
+  # candidate identifier for submitminingsolution (integer):
   "id": 14,
   
-  # Hash of the previous block:
+  # Hash of the previous block (hex string):
   "prevhash": "0000316517e048ab283a41df3c0ba125345a5c56ef3f76db901b0ede65e2f0e5",
   
-  # Coinbase transaction
+  # Coinbase transaction (hex string encoded binary transaction)
   "coinbase": "...00ffffffff10028122000b2f454233322f414431322ffff..."
 
-  # Block version:
-  "version": "536870912",
+  # Block version (integer):
+  "version": 536870912,
   
-  # Difficulty:
+  # Difficulty (hex string):
   "nBits": "207fffff",
   
-  # Block time:
+  # Block time (integer):
   "time": 1528925409,
   
-  # Merkle branches for the block:
+  # Merkle branches for the block (list of hex strings):
   "merklebranches": [
    "ff12771afd8b7c5f11b499897c27454a869a01c2863567e0fc92308f01fd2552",
    "d7fa501d5bc94d9ae9fdab9984fd955c08fedbfe02637ac2384844eb52688f45"
@@ -72,33 +75,26 @@ Of course, given current and foreseeable mining difficulties this program will n
 ##### Arguments:
 ```
 {
-  # Modified Coinbase transaction: 
-  "coinbase": "...00ffffffff10028122000b2fc7237b322f414431322ffff...",
-  
-  # ID from RPC getminingcandidate: (Must match the one from getminingcandidate)
+  # ID from getminingcandidate RPC (integer):
   "id": 14,
 
-  # Block time:
-  "time": 1528925410,
-
-  # Miner generated nonce:
+  # Miner generated nonce (integer):
   "nonce": 1804358173,
+
+  # Modified Coinbase transaction (hex string encoded binary transaction, optional): 
+  "coinbase": "...00ffffffff10028122000b2fc7237b322f414431322ffff...",
   
-  # Block version:
-  "blockversion": 536870912
+  # Block time (integer, optional):
+  "time": 1528925410,
+  
+  # Block version (integer, optional):
+  "version": 536870912
 }
 ```
 
 ##### Returns:
-```
-{
-  # Accepted:
-  "accepted": true|false,
-  
-  # Message:
-  "message": "success"|"error message"
-}
-```
+
+Exactly the same as ***submitblock***.  None means successful, error string or JSONRPCException if there is a problem.
 
 
 Setting your excessive block size and accept depth
