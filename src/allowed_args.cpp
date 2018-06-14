@@ -698,10 +698,24 @@ static void addAllNodeOptions(AllowedArgs &allowedArgs, HelpMessageMode mode, CT
         addUiOptions(allowedArgs);
 }
 
+// Used by bitcoin-miner client only:
+static void addBitcoinMinerOptions(AllowedArgs &allowedArgs)
+{
+    allowedArgs.addHeader(_("Mining options:"))
+        .addArg("blockversion=<n>", requiredInt,
+            _("Set the block version number. For testing only.  Value must be an integer"))
+        .addArg("cpus=<n>", requiredInt, _("Number of cpus to use for mining (default: 1).  Value must be an integer"))
+        .addArg("duration=<n>", requiredInt, _("Number of seconds to mine (default: 30). Value must be an integer"))
+        .addArg("nblocks=<n>", requiredInt,
+            _("Number of blocks to mine (default: mine forever / -1). Value must be an integer"));
+}
+
 // bitcoin-cli does not know about tweaks so we have to silently ignore unknown options
-BitcoinCli::BitcoinCli() : AllowedArgs(true)
+BitcoinCli::BitcoinCli(bool miner) : AllowedArgs(true)
 {
     addHelpOptions(*this);
+    if (miner)
+        addBitcoinMinerOptions(*this);
     addChainSelectionOptions(*this);
     addConfigurationLocationOptions(*this);
 
