@@ -100,6 +100,13 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
         isminetype fAllToMe = ISMINE_SPENDABLE;
         for (const CTxOut &txout : wtx.vout)
         {
+            // Skip any outputs with public labels as they have no bearing
+            // on wallet balances and will only cause us to set the "mine"
+            // return value incorrectly.
+            std::string labelPublic = getLabelPublic(txout.scriptPubKey);
+            if (labelPublic != "")
+                continue;
+
             isminetype mine = wallet->IsMine(txout);
             if (mine & ISMINE_WATCH_ONLY)
                 involvesWatchAddress = true;
