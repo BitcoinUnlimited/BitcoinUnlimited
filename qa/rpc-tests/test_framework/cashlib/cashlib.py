@@ -1,3 +1,6 @@
+# Copyright (c) 2018 The Bitcoin Unlimited developers
+# Distributed under the MIT software license, see the accompanying
+# file COPYING or http://www.opensource.org/licenses/mit-license.php.
 from ctypes import *
 from binascii import hexlify, unhexlify
 import pdb
@@ -14,8 +17,10 @@ BCH = 100000000
 
 cashlib = None
 
+
 class Error(BaseException):
     pass
+
 
 def init(libbitcoincashfile=None):
     global cashlib
@@ -51,22 +56,25 @@ def hash256(s):
     """
     return sha256(sha256(s))
 
+
 def hash160(msg):
-    """RIPEME160(SHA256(msg)) -> bytes"""
+    """RIPEMD160(SHA256(msg)) -> bytes"""
     h = hashlib.new('ripemd160')
     h.update(hashlib.sha256(msg).digest())
     return h.digest()
+
 
 def bin2hex(data):
     """convert the passed binary data to hex"""
     assert type(data) is bytes, "cashlib.bintohex requires parameter of type bytes"
     l = len(data)
-    result = create_string_buffer(2*l + 1)
-    if cashlib.Bin2Hex(data, l, result, 2*l + 1):
+    result = create_string_buffer(2 * l + 1)
+    if cashlib.Bin2Hex(data, l, result, 2 * l + 1):
         return result.value.decode("utf-8")
     raise Error("cashlib bin2hex error")
 
-def signTxInput(tx, inputIdx, inputAmount, prevoutScript, key, sigHashType = SIGHASH_FORKID | SIGHASH_ALL):
+
+def signTxInput(tx, inputIdx, inputAmount, prevoutScript, key, sigHashType=SIGHASH_FORKID | SIGHASH_ALL):
     """Signs one input of a transaction.  Signature is returned.  You must use this signature to construct the spend script
     Parameters:
     tx: Transaction in object, hex or binary format
@@ -84,13 +92,15 @@ def signTxInput(tx, inputIdx, inputAmount, prevoutScript, key, sigHashType = SIG
     if type(prevoutScript) == str:
         prevoutScript = unhexlify(prevoutScript)
     if type(inputAmount) is decimal.Decimal:
-        inputAmount = int(inputAmount*BCH)
+        inputAmount = int(inputAmount * BCH)
 
     result = create_string_buffer(100)
-    siglen = cashlib.SignTx(tx, len(tx), inputIdx, c_longlong(inputAmount), prevoutScript, len(prevoutScript), sigHashType, key, result, 100)
-    if siglen==0:
+    siglen = cashlib.SignTx(tx, len(tx), inputIdx, c_longlong(inputAmount), prevoutScript,
+                            len(prevoutScript), sigHashType, key, result, 100)
+    if siglen == 0:
         raise Error("cashlib signtx error")
     return result.raw[0:siglen]
+
 
 def randombytes(length):
     """Get cryptographically acceptable pseudorandom bytes from the OS"""
@@ -100,17 +110,20 @@ def randombytes(length):
         raise Error("cashlib randombytes error")
     return result.value
 
+
 def pubkey(key):
     """Given a private key, return its public key"""
     result = create_string_buffer(65)
     l = cashlib.GetPubKey(key, result, 65)
     return result.raw[0:l]
 
+
 def addrbin(pubkey):
     """Given a public key, in binary format, return its binary form address (just the bytes, no type or checksum)"""
     h = hashlib.new('ripemd160')
     h.update(hashlib.sha256(pubkey).digest())
     return h.digest()
+
 
 def txid(txbin):
     """Return a transaction id, given a transaction in hex, object or binary form.
@@ -122,6 +135,7 @@ def txid(txbin):
     elif type(txbin) != bytes:
         txbin = txbin.serialize()
     return sha256(sha256(txbin))
+
 
 def spendscript(*data):
     """Take binary data as parameters and return a spend script containing that data"""
@@ -135,16 +149,17 @@ def spendscript(*data):
             ret.append(bytes([l]))  # 1-75 bytes push # of bytes as the opcode
             ret.append(d)
         elif l < 256:
-            ret.append(bytes([76])) # PUSHDATA1
+            ret.append(bytes([76]))  # PUSHDATA1
             ret.append(bytes([l]))
             ret.append(d)
         elif l < 65536:
-            ret.append(bytes([77])) # PUSHDATA2
-            ret.append(bytes([l&255,l>>8])) # little endian
+            ret.append(bytes([77]))  # PUSHDATA2
+            ret.append(bytes([l & 255, l >> 8]))  # little endian
             ret.append(d)
         else:  # bigger values won't fit on the stack anyway
             assert 0, "cannot push %d bytes" % l
     return b"".join(ret)
+
 
 def Test():
     assert bin2hex(b"123") == "313233"

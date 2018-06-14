@@ -495,9 +495,9 @@ bitcoin_tx_LDADD = \
 bitcoin_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
 #
 
-# bitcoinconsensus library #
+# bitcoincash library #
 if BUILD_BITCOIN_LIBS
-libbitcoincash_la_SOURCES = $(libbitcoincash_a_SOURCES) $(crypto_libbitcoin_crypto_a_SOURCES) 
+libbitcoincash_la_SOURCES = $(libbitcoincash_a_SOURCES) $(crypto_libbitcoin_crypto_a_SOURCES)
 
 if GLIBC_BACK_COMPAT
   libbitcoincash_la_SOURCES += compat/glibc_compat.cpp

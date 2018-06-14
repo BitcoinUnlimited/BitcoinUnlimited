@@ -11,7 +11,7 @@ import sys
 if sys.version_info[0] < 3:
     raise "Use Python 3"
 import logging
-logging.basicConfig(format='%(asctime)s.%(levelname)s: %(message)s', level=logging.INFO,stream=sys.stdout)
+logging.basicConfig(format='%(asctime)s.%(levelname)s: %(message)s', level=logging.INFO, stream=sys.stdout)
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
@@ -21,10 +21,11 @@ from test_framework.script import *
 
 BCH = 100000000
 
+
 class MyTest (BitcoinTestFramework):
 
-    def setup_chain(self,bitcoinConfDict=None, wallets=None):
-        print("Initializing test directory "+self.options.tmpdir)
+    def setup_chain(self, bitcoinConfDict=None, wallets=None):
+        print("Initializing test directory " + self.options.tmpdir)
         # pick this one to start from the cached 4 node 100 blocks mined configuration
         initialize_chain(self.options.tmpdir)
 
@@ -34,14 +35,14 @@ class MyTest (BitcoinTestFramework):
         # Note for this template I readied 4 nodes but only started 2
 
         # Now interconnect the nodes
-        connect_nodes_bi(self.nodes,0,1)
+        connect_nodes_bi(self.nodes, 0, 1)
         # Let the framework know if the network is fully connected.
         # If not, the framework assumes this partition: (0,1) and (2,3)
         # For more complex partitions, you can't use the self.sync* member functions
-        self.is_network_split=False
+        self.is_network_split = False
         self.sync_all()
 
-    def run_test (self):
+    def run_test(self):
 
         faulted = False
         try:
@@ -52,7 +53,7 @@ class MyTest (BitcoinTestFramework):
         assert faulted, "only data in spend scripts"
 
         try:
-            cashlib.signTxInput(b"",0, 5, b"", b"", cashlib.SIGHASH_ALL)
+            cashlib.signTxInput(b"", 0, 5, b"", b"", cashlib.SIGHASH_ALL)
         except AssertionError:
             faulted = True
             pass
@@ -61,10 +62,10 @@ class MyTest (BitcoinTestFramework):
         # grab inputs from 2 different full nodes and sign a single tx that spends them both
         wallets = [self.nodes[0].listunspent(), self.nodes[1].listunspent()]
         inputs = [x[0] for x in wallets]
-        privb58 = [ self.nodes[0].dumpprivkey(inputs[0]["address"]), self.nodes[1].dumpprivkey(inputs[1]["address"])]
+        privb58 = [self.nodes[0].dumpprivkey(inputs[0]["address"]), self.nodes[1].dumpprivkey(inputs[1]["address"])]
 
-        privkeys =  [decodeBase58(x)[1:-5] for x in privb58]
-        pubkeys = [ cashlib.pubkey(x) for x in privkeys]
+        privkeys = [decodeBase58(x)[1:-5] for x in privb58]
+        pubkeys = [cashlib.pubkey(x) for x in privkeys]
 
         tx = CTransaction()
         for i in inputs:
@@ -76,12 +77,12 @@ class MyTest (BitcoinTestFramework):
 
         output = CScript([OP_DUP, OP_HASH160, destHash, OP_EQUALVERIFY, OP_CHECKSIG])
 
-        amt = int(sum([x["amount"] for x in inputs])*BCH)
+        amt = int(sum([x["amount"] for x in inputs]) * BCH)
         tx.vout.append(CTxOut(amt, output))
 
         sighashtype = 0x41
         n = 0
-        for i,priv in zip(inputs,privkeys):
+        for i, priv in zip(inputs, privkeys):
             sig = cashlib.signTxInput(tx, n, i["amount"], i["scriptPubKey"], priv, sighashtype)
             tx.vin[n].scriptSig = cashlib.spendscript(sig)  # P2PK
             n += 1
@@ -93,18 +94,16 @@ class MyTest (BitcoinTestFramework):
 
         # Now spend the created output to an anyone can spend address
         tx2 = CTransaction()
-        tx2.vin.append(CTxIn(COutPoint(cashlib.txid(txhex), 0),b"", 0xffffffff))
+        tx2.vin.append(CTxIn(COutPoint(cashlib.txid(txhex), 0), b"", 0xffffffff))
         tx2.vout.append(CTxOut(amt, CScript([OP_1])))
         sig2 = cashlib.signTxInput(tx2, 0, amt, output, destPrivKey, sighashtype)
         tx2.vin[0].scriptSig = cashlib.spendscript(sig2, destPubKey)
 
         tx2id = self.nodes[0].sendrawtransaction(hexlify(tx2.serialize()).decode("utf-8"))
 
-
         # Check that all tx were created, and commit them
         assert self.nodes[0].getmempoolinfo()["size"] == 2
         self.nodes[0].generate(1)
-
 
 
 if __name__ == '__main__':
@@ -116,18 +115,19 @@ if __name__ == '__main__':
     path = os.path.dirname(env)
     try:
         cashlib.init(path + os.sep + ".libs" + os.sep + "libbitcoincash.so")
-        MyTest ().main ()
+        MyTest().main()
     except OSError as e:
         print("Issue loading shared library.  This is expected during cross compilation since the native python will not load the .so: %s" % str(e))
 
 # Create a convenient function for an interactive python debugging session
+
+
 def Test():
     t = MyTest()
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
-
 
     flags = []
     # you may want these additional flags:
@@ -155,5 +155,7 @@ def Test():
             flags.append("--srcdir=%s" % os.path.dirname(rel))
             objpath = os.path.dirname(rel)
         cashlib.init(objpath + os.sep + ".libs" + os.sep + "libbitcoincash.so")
+    else:
+        cashlib.init(os.path.abspath(here + "/../../src/.libs/libbitcoincash.so"))
 
     t.main(flags, bitcoinConf, None)

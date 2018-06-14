@@ -26,16 +26,6 @@ uint64_t categoriesEnabled = 0; // 64 bit log id mask.
 // helper functions
 namespace
 {
-#if 0
-CKey LoadKey(uint256 val)
-{
-    CKey secret;
-    unsigned char *src = val.begin();
-    secret.Set(src, src+32, true);
-    return secret;
-}
-#endif
-
 CKey LoadKey(unsigned char *src)
 {
     CKey secret;
@@ -63,32 +53,6 @@ bool DecodeHexTx(CTransaction &tx, const std::string &strHexTx)
     return true;
 }
 
-#if 0
-bool DecodeHexTx(CTransaction &tx, const char* cHexTx)
-{
-    std::string strHexTx(cHexTx);
-    return DecodeHexTx(tx, strHexTx);
-}
-
-std::string GetHexReversed(const std::vector<unsigned char>& data)
-{
-    unsigned int len = data.size();
-    char psz[len * 2 + 1];
-    for (unsigned int i = 0; i < len; i++)
-        sprintf(psz + i * 2, "%02x", data[len - i - 1]);
-    return std::string(psz, psz + len * 2);
-}
-
-std::string GetHex(const std::vector<unsigned char>& data)
-{
-    unsigned int len = data.size();
-    char psz[len * 2 + 1];
-    for (unsigned int i = 0; i < len; i++)
-        sprintf(psz + i * 2, "%02x", data[i]);
-    return std::string(psz, psz + len * 2);
-}
-#endif
-
 static const char *hexxlat = "0123456789ABCDEF";
 std::string GetHex(unsigned char *data, unsigned int len)
 {
@@ -103,19 +67,6 @@ std::string GetHex(unsigned char *data, unsigned int len)
     return ret;
 }
 }
-
-#if 0
-extern "C" int Base58Key2Bin(char* b58key, unsigned char* result)
-{
-    CBitcoinSecret s;
-    s.SetString(b58key);
-    CKey key = s.GetKey();
-
-    unsigned char *src = (unsigned char *)key.begin();
-    memcpy(result, src, 32);
-    return 32;
-}
-#endif
 
 /** Convert binary data to a hex string.  The provided result buffer must be 2*length+1 bytes.
  */
