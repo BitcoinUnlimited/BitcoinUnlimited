@@ -113,6 +113,13 @@ enum
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);
 
+// WARNING:
+// SIGNATURE_HASH_ERROR represents the special value of uint256(1) that is used by the legacy SignatureHash
+// function to signal errors in calculating the signature hash. This export is ONLY meant to check for the
+// consensus-critical oddities of the legacy signature validation code and SHOULD NOT be used to signal
+// problems during signature hash calculations for any current BCH signature hash functions!
+extern const uint256 SIGNATURE_HASH_ERROR;
+
 // If you are signing you may call this function and the BitcoinCash or Legacy method will be chosen based on nHashType
 uint256 SignatureHash(const CScript &scriptCode,
     const CTransaction &txTo,

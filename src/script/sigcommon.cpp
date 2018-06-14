@@ -161,6 +161,9 @@ public:
 
 } // end anon namespace
 
+// WARNING: Never use this to signal errors in a signature hash function. This is here solely for legacy reasons!
+const uint256 SIGNATURE_HASH_ERROR(uint256S("0000000000000000000000000000000000000000000000000000000000000001"));
+
 uint256 SignatureHashLegacy(const CScript &scriptCode,
     const CTransaction &txTo,
     unsigned int nIn,
@@ -168,7 +171,6 @@ uint256 SignatureHashLegacy(const CScript &scriptCode,
     const CAmount &amount,
     size_t *nHashedOut)
 {
-    static const uint256 one(uint256S("0000000000000000000000000000000000000000000000000000000000000001"));
     if (nIn >= txTo.vin.size())
     {
         //  nIn out of range
@@ -178,7 +180,7 @@ uint256 SignatureHashLegacy(const CScript &scriptCode,
         // returned here is, however, due to further omissions in CheckSig, part of the pre-BCH
         // consensus rule set and needs to be left as-is.
         // See also: https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2014-November/006878.html
-        return one;
+        return SIGNATURE_HASH_ERROR;
     }
 
     // Check for invalid use of SIGHASH_SINGLE
@@ -193,7 +195,7 @@ uint256 SignatureHashLegacy(const CScript &scriptCode,
             // returned here is, however, due to further omissions in CheckSig, part of the pre-BCH
             // consensus rule set and needs to be left as-is.
             // See also: https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2014-November/006878.html
-            return one;
+            return SIGNATURE_HASH_ERROR;
         }
     }
 
