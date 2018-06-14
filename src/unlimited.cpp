@@ -1736,7 +1736,7 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
     UniValue rcvd;
-    CTransaction *coinbase = new CTransaction();
+    CTransaction *coinbase = nullptr;
     CBlock block;
     LOCK(cs_main);
 
@@ -1786,10 +1786,23 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
         block.nTime = time.get_int();
     }
 
-    // Coinbase:
+    UniValue version = rcvd["blockversion"];
+    if (!version.isNull())
     {
+        block.nVersion = version.get_int();
+    }
+
+    // Coinbase:
+    try
+    {
+        coinbase = new CTransaction();
         DecodeHexTx(*coinbase, rcvd["coinbase"].get_str());
         block.vtx[0].reset(coinbase);
+    }
+    catch (const std::exception &e)
+    {
+        delete coinbase;
+        throw;
     }
 
     // MerkleRoot:

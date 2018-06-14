@@ -34,7 +34,7 @@
 
 using namespace std;
 
-// BU add lockstack stuff here for bitcoin-cli, because I need to carefully
+// BU add lockstack stuff here for bitcoin-miner, because I need to carefully
 // order it in globals.cpp for bitcoind and bitcoin-qt
 boost::mutex dd_mutex;
 std::map<std::pair<void *, void *>, LockStack> lockorders;
@@ -104,7 +104,8 @@ static int AppInitRPC(int argc, char *argv[])
     //
     // Parameters
     //
-    AllowedArgs::BitcoinCli allowedArgs;
+    AllowedArgs::BitcoinCli allowedArgs(true);
+
     try
     {
         ParseParameters(argc, argv, allowedArgs);
@@ -122,8 +123,8 @@ static int AppInitRPC(int argc, char *argv[])
         {
             strUsage += "\n" + _("Usage:") + "\n" + "  bitcoin-miner [options] " +
                         strprintf(_("Send command to %s"), _(PACKAGE_NAME)) + "\n" +
-                        "  bitcoin-cli [options] help                " + _("List commands") + "\n" +
-                        "  bitcoin-cli [options] help <command>      " + _("Get help for a command") + "\n";
+                        "  bitcoin-miner [options] help                " + _("List commands") + "\n" +
+                        "  bitcoin-miner [options] help <command>      " + _("Get help for a command") + "\n";
 
             strUsage += "\n" + allowedArgs.helpMessage();
         }
@@ -431,6 +432,15 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
     }
 
     header = CpuMinerJsonToHeader(params);
+ 
+    // Set the version (only to test):
+    {
+        int blockversion = GetArg("-blockversion", header.nVersion);
+        if(blockversion!= header.nVersion)
+            printf("Force header.nVersion to %d\n",blockversion);
+        header.nVersion = blockversion;
+    }
+
     uint32_t startNonce = header.nNonce = std::rand();
  
     //printf("searching...target: %s\n",arith_uint256().SetCompact(header.nBits).GetHex().c_str());
@@ -439,6 +449,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
     int64_t start = GetTime(); 
     while ((GetTime() < start + searchDuration)&&!found)
     {
+        header.nTime = (header.nTime < GetTime()) ? GetTime(): header.nTime;
         found = CpuMineBlockHasher(&header, coinbaseBytes, merklebranches);
     }
 
@@ -454,8 +465,9 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
     tmpstr = HexStr(coinbaseBytes.begin(), coinbaseBytes.end());
     tmp.push_back(Pair("coinbase", tmpstr));
     tmp.push_back(Pair("id", params["id"]));
-    tmp.push_back(Pair("time",UniValue(header.nTime))); //Using 'bitcoind' time. 
+    tmp.push_back(Pair("time",UniValue(header.nTime))); //Optional. We have changed so must send.
     tmp.push_back(Pair("nonce", UniValue(header.nNonce)));
+    tmp.push_back(Pair("blockversion", UniValue(header.nVersion))); //Optional. We may have changed so sending.
     ret.push_back(UniValue(tmp.write()));
 
     return ret;
@@ -500,7 +512,6 @@ static UniValue RPCSubmitSolution(UniValue& solution,int& nblocks)
 int CpuMiner(void)
 {
     int searchDuration = GetArg("-duration", 30);
-    //TODO add -nblocks to help msg
     int nblocks = GetArg("-nblocks", -1); //-1 mine forever
 
     UniValue mineresult;
@@ -633,12 +644,12 @@ int CpuMiner(void)
 
 void static MinerThread()
 {
-    int ret = EXIT_FAILURE;
+
     while (1)
     {
         try
         {
-            ret = CpuMiner();
+            CpuMiner();
         }
         catch (const std::exception &e)
         {
