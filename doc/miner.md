@@ -7,6 +7,99 @@ Bitcoin Unlimited is based on the Satoshi codebase, so it is a drop in replaceme
 
 But Bitcoin Unlimited has specific features to facilitate mining.
 
+***getminingcandidate*** and ***submitminingsolution***
+----------------------------------
+*efficient protocol to access block candidates and submit block solutions*
+
+
+Bitcoin Unlimited provides 2 additional mining RPC functions that can be used instead of "getblocktemplate" and "submitblock".  These RPCs do not pass the entire block to mining pools.  Instead, the candidate block header, proposed coinbase transaction, and coinbase merkle proof are passed.  This is the approximately the same data that is passed to hashing hardware via the Stratum protocol, so if you are familiar with Stratum, you are familiar with how this is possible.
+
+A mining pool uses ***getminingcandidate*** to receive the previously described block information and a tracking identifier.  It then may modify or completely replace the coinbase transaction and many block header fields, to create different candidates for hashing hardware.  It then forwards these candidates to the hashing hardware via Stratum.  When a solution is found, the mining pool can submit the solution back to bitcoind via submitminingsolution.
+
+A few of the benefits when using RPC getminingcandidate and RPC submitminingsolution are:
+* Massively reduced bandwidth and latency, especially for large blocks.  This RPC requires log2(blocksize) data. 
+* Faster JSON parsing and creation
+* Concise JSON
+
+### bitcoin-miner
+
+An example CPU-miner program is provided that shows a proof-of-concept use of these functions.
+The source code is located at bitcoin-miner.cpp.  To try it out, run
+```sh
+bitcoin-miner
+```
+
+Of course, given current and foreseeable mining difficulties this program will not find any blocks on mainnet.  However, it will find blocks on testnet or regtest.
+
+
+### Function documentation:
+
+#### RPC getminingcandidate
+
+##### Arguments: -none
+##### Returns:
+```
+{
+  # candidate identifier for submitminingsolution:
+  "id": 14,
+  
+  # Hash of the previous block:
+  "prevhash": "0000316517e048ab283a41df3c0ba125345a5c56ef3f76db901b0ede65e2f0e5",
+  
+  # Coinbase transaction
+  "coinbase": "...00ffffffff10028122000b2f454233322f414431322ffff..."
+
+  # Block version:
+  "version": "536870912",
+  
+  # Difficulty:
+  "nBits": "207fffff",
+  
+  # Block time:
+  "time": 1528925409,
+  
+  # Merkle branches for the block:
+  "merklebranches": [
+   "ff12771afd8b7c5f11b499897c27454a869a01c2863567e0fc92308f01fd2552",
+   "d7fa501d5bc94d9ae9fdab9984fd955c08fedbfe02637ac2384844eb52688f45"
+  ]
+ }
+```
+
+
+#### RPC submitminingsolution
+
+##### Arguments:
+```
+{
+  # Modified Coinbase transaction: 
+  "coinbase": "...00ffffffff10028122000b2fc7237b322f414431322ffff...",
+  
+  # ID from RPC getminingcandidate: (Must match the one from getminingcandidate)
+  "id": 14,
+
+  # Block time:
+  "time": 1528925410,
+
+  # Miner generated nonce:
+  "nonce": 1804358173,
+  
+  # Block version:
+  "blockversion": 536870912
+}
+```
+
+##### Returns:
+```
+{
+  # Accepted:
+  "accepted": true|false,
+  
+  # Message:
+  "message": "success"|"error message"
+}
+```
+
 
 Setting your excessive block size and accept depth
 --------------------------------------------------
@@ -191,86 +284,3 @@ The block validation RPC uses the same call syntax as the "submitblock" RPC, and
 `bitcoin-cli validateblocktemplate <hex encoded block>`
 ```
 
-Additional mining functions
---------------------------
-
-Bitcoin Unlimited can be used with:
-RPC getminingcandidate
-RPC submitminingsolution
-
-These can be used in stead of:
-RPC getblocktemplate
-RPC submitblock
-
-A few of the benefits when using RPC getminingcandidate and RPC submitminingsolution are:
-* Reduced bandwidth
-* Faster JSON parsing and creation
-* Concise JSON
-
-Function documentation:
-
-RPC getminingcandidate
-
-Arguments: -none
-Returns:
-{
-# ID for submitminingsolution:
-  "id": 14,
-  
-# Hash of the previous block:
-  "prevhash": "0000316517e048ab283a41df3c0ba125345a5c56ef3f76db901b0ede65e2f0e5",
-  
-# Coinbase transaction
-  "coinbase": "...00ffffffff10028122000b2f454233322f414431322ffff..."
-
-# Block version:
-  "version": "536870912",
-  
-# Difficulty:
-  "nBits": "207fffff",
-  
-# Block time:
-  "time": 1528925409,
-  
-# Merkle branches for the block:
-  "merklebranches": [
-   "ff12771afd8b7c5f11b499897c27454a869a01c2863567e0fc92308f01fd2552",
-   "d7fa501d5bc94d9ae9fdab9984fd955c08fedbfe02637ac2384844eb52688f45"
-  ]
- }
-
-RPC submitminingsolution
-
-Arguments:
-{
-# Modified Coinbase transaction: 
-  "coinbase": "...00ffffffff10028122000b2fc7237b322f414431322ffff...",
-  
-# ID from RPC getminingcandidate: (Must match the one from getminingcandidate)
-  "id": 14,
-
-# Block time:
-  "time": 1528925410,
-
-# Miner generated nonce:
-  "nonce": 1804358173,
-  
-# Block version:
-  "blockversion": 536870912
-}
-
-Returns:
-{
-# Accepted:
-  "accepted": true|false,
-  
-# Message:
-  "message": "success"|"error message"
-}
-
-An example of a CPU miner using the functions: bitcoin-miner.cpp 
-
-Note: bitcoin-miner not bitcoin-cli:
-```sh
-`bitcoin-miner`
-```

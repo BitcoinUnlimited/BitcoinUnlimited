@@ -10,6 +10,7 @@
 #include <list>
 #include <map>
 #include <string>
+#include <set>
 
 namespace AllowedArgs
 {
@@ -116,7 +117,7 @@ public:
 class BitcoinCli : public AllowedArgs
 {
 public:
-    BitcoinCli(bool miner = false); // use true if bitcoin-miner program
+    BitcoinCli();
 };
 
 class Bitcoind : public AllowedArgs
@@ -142,6 +143,16 @@ class ConfigFile : public AllowedArgs
 public:
     ConfigFile(CTweakMap *pTweaks);
 };
+
+
+/** These APIs validate the parameter and are typically used in .addArg */
+bool validateString(const std::string &str, const std::set<char> &validChars);
+bool optionalBool(const std::string &str);
+bool requiredStr(const std::string &str);
+bool optionalStr(const std::string &str);
+bool requiredInt(const std::string &str);
+bool optionalInt(const std::string &str);
+bool requiredAmount(const std::string &str);
 
 } // namespace AllowedArgs
 

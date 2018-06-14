@@ -147,11 +147,11 @@ std::string AllowedArgs::helpMessage() const
 // CheckValueFunc functions
 //
 
-static const std::set<std::string> boolStrings{"", "1", "0", "t", "f", "y", "n", "true", "false", "yes", "no"};
-static const std::set<char> intChars{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
-static const std::set<char> amountChars{'.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
+const std::set<std::string> boolStrings{"", "1", "0", "t", "f", "y", "n", "true", "false", "yes", "no"};
+const std::set<char> intChars{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
+const std::set<char> amountChars{'.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
 
-static bool validateString(const std::string &str, const std::set<char> &validChars)
+bool validateString(const std::string &str, const std::set<char> &validChars)
 {
     for (const char &c : str)
         if (!validChars.count(c))
@@ -159,10 +159,10 @@ static bool validateString(const std::string &str, const std::set<char> &validCh
     return true;
 }
 
-static bool optionalBool(const std::string &str) { return (boolStrings.count(str) != 0); }
-static bool requiredStr(const std::string &str) { return !str.empty(); }
-static bool optionalStr(const std::string &str) { return true; }
-static bool requiredInt(const std::string &str)
+bool optionalBool(const std::string &str) { return (boolStrings.count(str) != 0); }
+bool requiredStr(const std::string &str) { return !str.empty(); }
+bool optionalStr(const std::string &str) { return true; }
+bool requiredInt(const std::string &str)
 {
     if (str.empty() || str == "-")
         return false;
@@ -171,14 +171,14 @@ static bool requiredInt(const std::string &str)
     return validateString(str[0] == '-' ? str.substr(1) : str, intChars);
 }
 
-static bool optionalInt(const std::string &str)
+bool optionalInt(const std::string &str)
 {
     if (str.empty())
         return true;
     return requiredInt(str);
 }
 
-static bool requiredAmount(const std::string &str)
+bool requiredAmount(const std::string &str)
 {
     if (str.empty())
         return false;
@@ -698,24 +698,10 @@ static void addAllNodeOptions(AllowedArgs &allowedArgs, HelpMessageMode mode, CT
         addUiOptions(allowedArgs);
 }
 
-// Used by bitcoin-miner client only:
-static void addBitcoinMinerOptions(AllowedArgs &allowedArgs)
-{
-    allowedArgs.addHeader(_("Mining options:"))
-        .addArg("blockversion=<n>", requiredInt,
-            _("Set the block version number. For testing only.  Value must be an integer"))
-        .addArg("cpus=<n>", requiredInt, _("Number of cpus to use for mining (default: 1).  Value must be an integer"))
-        .addArg("duration=<n>", requiredInt, _("Number of seconds to mine (default: 30). Value must be an integer"))
-        .addArg("nblocks=<n>", requiredInt,
-            _("Number of blocks to mine (default: mine forever / -1). Value must be an integer"));
-}
-
 // bitcoin-cli does not know about tweaks so we have to silently ignore unknown options
-BitcoinCli::BitcoinCli(bool miner) : AllowedArgs(true)
+BitcoinCli::BitcoinCli(): AllowedArgs(true)
 {
     addHelpOptions(*this);
-    if (miner)
-        addBitcoinMinerOptions(*this);
     addChainSelectionOptions(*this);
     addConfigurationLocationOptions(*this);
 

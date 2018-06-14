@@ -19,6 +19,7 @@
 #include "hash.h"
 #include "streams.h"
 #include "arith_uint256.h"
+#include "allowed_args.h"
 
 #include <boost/thread.hpp>
 
@@ -95,6 +96,22 @@ public:
     explicit inline CConnectionFailed(const std::string &msg) : std::runtime_error(msg) {}
 };
 
+class BitcoinMinerArgs : public AllowedArgs::BitcoinCli
+{
+public:
+    BitcoinMinerArgs(CTweakMap *pTweaks = nullptr)
+    {
+    addHeader(_("Mining options:"))
+        .addArg("blockversion=<n>", ::AllowedArgs::requiredInt,
+            _("Set the block version number. For testing only.  Value must be an integer"))
+        .addArg("cpus=<n>", ::AllowedArgs::requiredInt, _("Number of cpus to use for mining (default: 1).  Value must be an integer"))
+        .addArg("duration=<n>", ::AllowedArgs::requiredInt, _("Number of seconds to mine a particular block candidate (default: 30). Value must be an integer"))
+        .addArg("nblocks=<n>", ::AllowedArgs::requiredInt,
+            _("Number of blocks to mine (default: mine forever / -1). Value must be an integer"));
+    }
+};
+
+
 //
 // This function returns either one of EXIT_ codes when it's expected to stop the process or
 // CONTINUE_EXECUTION when it's expected to continue further.
@@ -104,7 +121,7 @@ static int AppInitRPC(int argc, char *argv[])
     //
     // Parameters
     //
-    AllowedArgs::BitcoinCli allowedArgs(true);
+    BitcoinMinerArgs allowedArgs;
 
     try
     {
