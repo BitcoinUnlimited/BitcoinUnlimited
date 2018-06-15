@@ -62,39 +62,43 @@ static void SHA512(benchmark::State &state)
         CSHA512().Write(in.data(), in.size()).Finalize(hash);
 }
 
-#if 0
-static void SipHash_32b(benchmark::State& state)
+static void SipHash_32b(benchmark::State &state)
 {
     uint256 x;
-    while (state.KeepRunning()) {
-        for (int i = 0; i < 1000000; i++) {
-            *((uint64_t*)x.begin()) = SipHashUint256(0, i, x);
+    while (state.KeepRunning())
+    {
+        for (int i = 0; i < 1000000; i++)
+        {
+            *((uint64_t *)x.begin()) = SipHashUint256(0, i, x);
         }
     }
 }
 
-static void FastRandom_32bit(benchmark::State& state)
+static void FastRandom_32bit(benchmark::State &state)
 {
     FastRandomContext rng(true);
     uint32_t x = 0;
-    while (state.KeepRunning()) {
-        for (int i = 0; i < 1000000; i++) {
+    while (state.KeepRunning())
+    {
+        for (int i = 0; i < 1000000; i++)
+        {
             x += rng.rand32();
         }
     }
 }
 
-static void FastRandom_1bit(benchmark::State& state)
+static void FastRandom_1bit(benchmark::State &state)
 {
     FastRandomContext rng(true);
     uint32_t x = 0;
-    while (state.KeepRunning()) {
-        for (int i = 0; i < 1000000; i++) {
+    while (state.KeepRunning())
+    {
+        for (int i = 0; i < 1000000; i++)
+        {
             x += rng.randbool();
         }
     }
 }
-#endif
 
 BENCHMARK(RIPEMD160);
 BENCHMARK(SHA1);
@@ -102,6 +106,6 @@ BENCHMARK(SHA256);
 BENCHMARK(SHA512);
 
 BENCHMARK(SHA256_32b);
-// BENCHMARK(SipHash_32b);
-// BENCHMARK(FastRandom_32bit);
-// BENCHMARK(FastRandom_1bit);
+BENCHMARK(SipHash_32b);
+BENCHMARK(FastRandom_32bit);
+BENCHMARK(FastRandom_1bit);
