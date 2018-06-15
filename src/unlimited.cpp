@@ -1745,15 +1745,9 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
             "\nAttempts to submit a new block to the network.\n"
             "\nArguments\n"
             "1. \"submitminingsolutiondata\"    (string, required) the mining solution (JSON encoded) data to submit\n"
-
             "\nResult:\n"
-            "{\n"
-            "  \"accepted\": true|false,\n"
-            "  \"message\": \"a message\"\"\n"
-            "}\n"
-
             "\nExamples:\n" +
-            HelpExampleCli("submitminingsolution", "\"myminingsolutiondadata\""));
+            HelpExampleRpc("submitminingsolution", "\"mydata\""));
     }
 
     rcvd = params[0].get_obj();
