@@ -487,7 +487,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
     tmp.push_back(Pair("coinbase", tmpstr));
     tmp.push_back(Pair("id", params["id"]));
     tmp.push_back(Pair("time", UniValue(header.nTime))); // Optional. We have changed so must send.
-    // tmp.push_back(Pair("nonce", UniValue(header.nNonce)));
+    tmp.push_back(Pair("nonce", UniValue(header.nNonce)));
     tmp.push_back(Pair("version", UniValue(header.nVersion))); // Optional. We may have changed so sending.
     ret.push_back(tmp);
 
