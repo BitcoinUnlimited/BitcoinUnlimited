@@ -489,7 +489,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
     tmp.push_back(Pair("time", UniValue(header.nTime))); // Optional. We have changed so must send.
     tmp.push_back(Pair("nonce", UniValue(header.nNonce)));
     tmp.push_back(Pair("version", UniValue(header.nVersion))); // Optional. We may have changed so sending.
-    ret.push_back(UniValue(tmp.write()));
+    ret.push_back(tmp);
 
     return ret;
 }
@@ -507,26 +507,15 @@ static UniValue RPCSubmitSolution(UniValue &solution, int &nblocks)
     UniValue result = find_value(reply, "result");
 
     if (result.isNull())
-        return reply; // Error
-
-    bool accepted = result["accepted"].get_bool();
-    string message = result["message"].get_str();
-
-    if (!accepted)
     {
-        fprintf(stderr, "Block Candidate rejected. Error: %s\n", message.c_str());
-    }
-    else
-    {
-        printf("Block Candidate accepted.\n");
+        // Will not get here if Exceptions above:
+        if (nblocks > 0)
+            nblocks--; // Processed a block
+        return reply; // worked
     }
 
-    // Will not get here if Exceptions above:
-    if (nblocks > 0)
-        nblocks--; // Processed a block
-
-    solution.setNull();
-
+    string message = result.get_str();
+    fprintf(stderr, "Block Candidate rejected. Error: %s\n", message.c_str());
     return reply;
 }
 
