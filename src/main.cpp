@@ -1471,7 +1471,8 @@ static DisconnectResult DisconnectBlock(const CBlock &block, const CBlockIndex *
 
     CBlockUndo blockUndo;
     CDiskBlockPos pos = pindex->GetUndoPos();
-    if (pos.IsNull())
+    // blockdb mode does not use the file pos system
+    if (pos.IsNull() && BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
         error("DisconnectBlock(): no undo data available");
         return DISCONNECT_FAILED;
@@ -3095,8 +3096,13 @@ CBlockIndex *AddToBlockIndex(const CBlockHeader &block)
 bool ReceivedBlockTransactions(const CBlock &block,
     CValidationState &state,
     CBlockIndex *pindexNew,
-    const CDiskBlockPos &pos)
+    CDiskBlockPos &pos)
 {
+    if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    {
+        pos.SetNull();
+    }
+
     pindexNew->nTx = block.vtx.size();
     pindexNew->nChainTx = 0;
     pindexNew->nFile = pos.nFile;
@@ -3709,12 +3715,6 @@ bool ProcessNewBlock(CValidationState &state,
             return false;
     }
 
-    // if we arent set to sequential, update the best block using the tip for leveldb storage after activating it
-    if(BLOCK_DB_MODE != SEQUENTIAL_BLOCK_FILES)
-    {
-        pcoinsdbview->WriteBestBlockDb(chainActive.Tip()->GetBlockHash());
-    }
-
     int64_t end = GetTimeMicros();
 
     if (Logging::LogAcceptCategory(Logging::BENCH))
@@ -3937,6 +3937,12 @@ bool static LoadBlockIndexDB()
         LOGA("Checking all blk files are present...\n");
         for (std::set<int>::iterator it = setBlkDataFiles.begin(); it != setBlkDataFiles.end(); it++)
         {
+            if((*it) < 0 )
+            {
+                // a negative file means the block is in the blockdb not a sequential file
+                // contineu to prevent checking for a file we know doesnt exist
+                continue;
+            }
             CDiskBlockPos pos(*it, 0);
             fs::path path = GetBlockPosFilename(pos, "blk");
             if (!fs::exists(path))
@@ -3985,34 +3991,15 @@ bool static LoadBlockIndexDB()
 
     // Load pointer to end of best chain
     uint256 bestblockhash;
-    uint256 bestHashSeq = pcoinsdbview->GetBestBlockSeq();
-    uint256 bestHashLev = pcoinsdbview->GetBestBlockDb();
-
-    CBlockIndex bestIndexSeq;
-    pblocktree->FindBlockIndex(bestHashSeq, bestIndexSeq);
-    CBlockIndex bestIndexLev;
-    pblocktree->FindBlockIndex(bestHashLev, bestIndexLev);
-
-    if(!bestHashSeq.IsNull() && bestHashLev.IsNull())
+    if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
-        bestblockhash = bestHashSeq;
+        bestblockhash = pcoinsdbview->GetBestBlockSeq();
     }
-    else if(bestHashSeq.IsNull() && !bestHashLev.IsNull())
+    if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        bestblockhash = bestHashLev;
+        bestblockhash = pcoinsdbview->GetBestBlockDb();
     }
-    else if(bestIndexSeq.nHeight > bestIndexLev.nHeight)
-    {
-        bestblockhash = bestHashSeq;
-    }
-    else
-    {
-        bestblockhash = bestHashLev;
-    }
-
     BlockMap::iterator it = mapBlockIndex.find(bestblockhash);
-    LOGA("height of best seq block = %i \n", bestIndexSeq.nHeight);
-    LOGA("height of best db block = %i \n", bestIndexLev.nHeight);
     LOGA("best block hash of %s was found \n", bestblockhash.GetHex().c_str());
     if (it == mapBlockIndex.end())
     {

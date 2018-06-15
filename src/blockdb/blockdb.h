@@ -30,20 +30,14 @@ struct BlockDBValue
         this->blockHeight = this->block.GetHeight();
     }
 
-    template <typename Stream>
-    void Serialize(Stream &s) const
-    {
-        s << VARINT(blockVersion);
-        s << VARINT(blockHeight);
-        s << block;
-    }
+    ADD_SERIALIZE_METHODS;
 
-    template <typename Stream>
-    void Unserialize(Stream &s)
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream &s, Operation ser_action)
     {
-        s >> VARINT(blockVersion);
-        s >> VARINT(blockHeight);
-        s >> block;
+        READWRITE(blockVersion);
+        READWRITE(blockHeight);
+        READWRITE(block);
     }
 
     void SetNull()

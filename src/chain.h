@@ -99,10 +99,13 @@ struct CDiskBlockPos
     friend bool operator!=(const CDiskBlockPos &a, const CDiskBlockPos &b) { return !(a == b); }
     void SetNull()
     {
-        nFile = -1;
+        nFile = 0;
         nPos = 0;
     }
-    bool IsNull() const { return (nFile == -1); }
+    bool IsNull() const
+    {
+        return (nFile == -1);
+    }
     std::string ToString() const { return strprintf("CBlockDiskPos(nFile=%i, nPos=%i)", nFile, nPos); }
 };
 
@@ -190,6 +193,9 @@ public:
     //! Verification status of this block. See enum BlockStatus
     unsigned int nStatus;
 
+    bool storeFile;
+    bool storeDb;
+
     //! block header
     int nVersion;
     uint256 hashMerkleRoot;
@@ -199,6 +205,8 @@ public:
 
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
+
+
 
     void SetNull()
     {
@@ -214,6 +222,8 @@ public:
         nChainTx = 0;
         nStatus = 0;
         nSequenceId = 0;
+        storeFile = false;
+        storeDb = false;
 
         nVersion = 0;
         hashMerkleRoot = uint256();
@@ -385,9 +395,9 @@ public:
         if (nStatus & (BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO))
             READWRITE(VARINT(nFile, VarIntMode::NONNEGATIVE_SIGNED));
         if (nStatus & BLOCK_HAVE_DATA)
-            READWRITE(VARINT(nDataPos));
+            READWRITE(nDataPos);
         if (nStatus & BLOCK_HAVE_UNDO)
-            READWRITE(VARINT(nUndoPos));
+            READWRITE(nUndoPos);
 
         // block header
         READWRITE(this->nVersion);

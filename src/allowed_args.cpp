@@ -234,8 +234,8 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
             _("Execute command when the best block changes (%s in cmd is replaced by block hash)"))
         .addDebugArg("blocksonly", optionalBool,
             strprintf(_("Whether to operate in a blocks only mode (default: %u)"), DEFAULT_BLOCKSONLY))
-        .addArg("blockdbtype=<n>", requiredInt,
-            strprintf(_("Which method to store blocks on disk (default: %u) 0 = sequential files, 1 = leveldb, 2 = both"), DEFAULT_BLOCK_DB_MODE))
+        .addArg("useblockdb", optionalBool,
+            strprintf(_("Which method to store blocks on disk (default: %u) 0 = sequential files, 1 = blockdb"), DEFAULT_BLOCK_DB_MODE))
         .addArg("checkblocks=<n>", requiredInt,
             strprintf(_("How many blocks to check at startup (default: %u, 0 = all)"), DEFAULT_CHECKBLOCKS))
         .addArg("checklevel=<n>", requiredInt,

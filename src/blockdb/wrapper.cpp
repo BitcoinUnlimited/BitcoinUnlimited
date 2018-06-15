@@ -81,13 +81,13 @@ bool DetermineStorageSync()
 
     LOGA("check5\n");
     // if the best height of the storage type we are using is higher than any other type, return false
-    if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES && bestIndexSeq.nHeight > bestIndexLev.nHeight)
+    if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES && bestIndexSeq.nHeight >= bestIndexLev.nHeight)
     {
         LOGA("false3\n");
         return false;
     }
     LOGA("check6\n");
-    if(BLOCK_DB_MODE == DB_BLOCK_STORAGE && bestIndexLev.nHeight > bestIndexSeq.nHeight)
+    if(BLOCK_DB_MODE == DB_BLOCK_STORAGE && bestIndexLev.nHeight >= bestIndexSeq.nHeight)
     {
         LOGA("false4\n");
         return false;
@@ -102,39 +102,25 @@ void SyncStorage(const CChainParams &chainparams)
     if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
         CValidationState state;
-        // this best block method does not work when going from files to DB but it should work for DB to files
-        // due to the way the best block being written for db compared to for files
+        std::vector<std::pair<int, CBlockIndex *> > vSortedByHeight;
+        vSortedByHeight.reserve(mapBlockIndex.size());
+        int bestHeight = 0;
+        CBlockIndex* pindexBest;
 
-        // get the best block and go to it. we can sync the blocks in reverse to save time once we hit our best
-        uint256 bestHashSeq = pcoinsdbview->GetBestBlockSeq();
-        uint256 bestHashDb = pcoinsdbview->GetBestBlockDb();
-
-        BlockMap::iterator iter;
-        iter = mapBlockIndex.find(bestHashDb);
-        if(iter == mapBlockIndex.end())
+        for (const std::pair<uint256, CBlockIndex *> &item : mapBlockIndex)
         {
-            LOGA("couldnt find best hash in mapblockindex when attempting to sync storage types \n");
-            return;
+            CBlockIndex *pindex = item.second;
+            vSortedByHeight.push_back(std::make_pair(pindex->nHeight, pindex));
         }
-        CBlockIndex* pindex = iter->second;
-        LOGA("best seq block we before syncing is %s \n", bestHashSeq.GetHex().c_str());
-        LOGA("best db block we have is %s \n", bestHashDb.GetHex().c_str());
 
-        //we should be good to use this data structure, by block 3M it should only consume about 96MB of memory
-        // we use a vector because order is guarenteed and sequential files rely on that
-        std::vector<uint256> hashesToSync;
-        while(pindex->GetBlockHash() != bestHashSeq)
+        // Calculate nChainWork
+        std::sort(vSortedByHeight.begin(), vSortedByHeight.end());
+        for (const std::pair<int, CBlockIndex *> &item : vSortedByHeight)
         {
-            // we will have what we want in reverse order
-            hashesToSync.emplace_back(pindex->GetBlockHash());
-            pindex = pindex->pprev;
-        }
-        std::vector<uint256>::reverse_iterator hashiter;
-        // use reverse iterator because blocks are in reverse order
-        for (hashiter = hashesToSync.rbegin(); hashiter != hashesToSync.rend(); ++hashiter)
-        {
+            CBlockIndex *pindex = item.second;
+            // we search for the index in mapblockindex again so we can update nFile, nDataPos, and nUndoPos
             BlockMap::iterator it;
-            it = mapBlockIndex.find(*hashiter);
+            it = mapBlockIndex.find(pindex->GetBlockHash());
             if(it == mapBlockIndex.end())
             {
                 /** should never happen */
@@ -145,7 +131,7 @@ void SyncStorage(const CChainParams &chainparams)
             if(it->second->nStatus & BLOCK_HAVE_DATA && it->second->GetBlockPos().IsNull())
             {
                 BlockDBValue blockValue;
-                pblockdb->Read(*hashiter, blockValue);
+                pblockdb->Read(it->second->GetBlockHash(), blockValue);
                 CBlock block_lev = blockValue.block;
                 unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
                 CDiskBlockPos blockPos;
@@ -161,34 +147,55 @@ void SyncStorage(const CChainParams &chainparams)
                 // set this blocks file and data pos
                 it->second->nFile = blockPos.nFile;
                 it->second->nDataPos = blockPos.nPos;
+
+                // we preform this check inside block data because all undo data requires nfile be set first which is selected when
+                // we write block data.
+                if(it->second->nStatus & BLOCK_HAVE_UNDO && !it->second->GetBlockPos().IsNull())
+                {
+                    CBlockUndo blockundo;
+                    if(!UndoReadFromDB(blockundo, it->second->GetBlockHash()))
+                    {
+                        LOGA("failed to read undo data for block with hash %s \n", it->second->GetBlockHash().GetHex().c_str());
+                        continue;
+                    }
+                    CDiskBlockPos pos;
+                    if (!FindUndoPos(state, it->second->nFile, pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
+                    {
+                        LOGA("ConnectBlock(): FindUndoPos failed");
+                        assert(false);
+                    }
+                    uint256 prevHash;
+                    if (it->second->pprev) // genesis block prev hash is 0
+                    {
+                        prevHash = it->second->pprev->GetBlockHash();
+                    }
+                    else
+                    {
+                        prevHash.SetNull();
+                    }
+                    if (!UndoWriteToDisk(blockundo, pos, prevHash, chainparams.MessageStart()))
+                    {
+                        LOGA("Failed to write undo data");
+                        assert(false);
+                    }
+                    // update nUndoPos in block index
+                    it->second->nUndoPos = pos.nPos;
+                }
             }
-            if(it->second->nStatus & BLOCK_HAVE_UNDO && !it->second->GetBlockPos().IsNull())
+            if(!it->second->GetBlockPos().IsNull() && !it->second->GetUndoPos().IsNull())
             {
-                CBlockUndo blockundo;
-                UndoReadFromDB(blockundo, it->second->GetBlockHash());
-                CDiskBlockPos pos;
-                if (!FindUndoPos(state, it->second->nFile, pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
+                if(it->second->nHeight > bestHeight)
                 {
-                    LOGA("ConnectBlock(): FindUndoPos failed");
-                    assert(false);
+                    bestHeight = it->second->nHeight;
+                    // set pindex to the better height so we start from there when syncing
+                    pindexBest = it->second;
                 }
-                uint256 prevHash;
-                if (it->second->pprev) // genesis block prev hash is 0
-                {
-                    prevHash = it->second->pprev->GetBlockHash();
-                }
-                else
-                {
-                    prevHash.SetNull();
-                }
-                if (!UndoWriteToDisk(blockundo, pos, prevHash, chainparams.MessageStart()))
-                {
-                    LOGA("Failed to write undo data");
-                    assert(false);
-                }
-                // update nUndoPos in block index
-                it->second->nUndoPos = pos.nPos;
             }
+        }
+        // if bestHeight != 0 then pindexBest has been initialized, otherwise no promises
+        if(bestHeight != 0)
+        {
+            pcoinsdbview->WriteBestBlockSeq(pindexBest->GetBlockHash());
         }
     }
     if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)

@@ -153,7 +153,7 @@ private:
 class CBlockTreeDB : public CDBWrapper
 {
 public:
-    CBlockTreeDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
+    CBlockTreeDB(size_t nCacheSize, std::string folder, bool fMemory = false, bool fWipe = false);
 
 private:
     CBlockTreeDB(const CBlockTreeDB &);
@@ -173,6 +173,8 @@ public:
     bool ReadFlag(const std::string &name, bool &fValue);
     bool FindBlockIndex(uint256 blockhash, CBlockIndex& index);
     bool LoadBlockIndexGuts();
+    bool LoadBlockIndexGutsCompatible();
+    bool ImportForCompatibility();
 };
 
 /** Global variable that points to the coins database */
