@@ -62,10 +62,6 @@ uint256 SignatureHashBitcoinCash(const CScript &scriptCode,
     const CAmount &amount,
     size_t *nHashedOut)
 {
-    // printf("sighash: scriptSize %d, nIn %d, nHashType %d, amount %lld\n", scriptCode.size(), nIn, nHashType, amount);
-    // for(unsigned int i=0;i<scriptCode.size(); i++)
-    //    printf("%02x",scriptCode[i]);
-    // printf("\n");
     static const uint256 one(uint256S("0000000000000000000000000000000000000000000000000000000000000001"));
 
     if (nHashType & SIGHASH_FORKID)
