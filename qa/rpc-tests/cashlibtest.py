@@ -3,9 +3,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-# This is a template to make creating new QA tests easy.
-# You can also use this template to quickly start and connect a few regtest nodes.
-
 import time
 import sys
 if sys.version_info[0] < 3:
@@ -26,19 +23,11 @@ class MyTest (BitcoinTestFramework):
 
     def setup_chain(self, bitcoinConfDict=None, wallets=None):
         print("Initializing test directory " + self.options.tmpdir)
-        # pick this one to start from the cached 4 node 100 blocks mined configuration
         initialize_chain(self.options.tmpdir)
 
     def setup_network(self, split=False):
         self.nodes = start_nodes(2, self.options.tmpdir)
-        # Nodes to start --------^
-        # Note for this template I readied 4 nodes but only started 2
-
-        # Now interconnect the nodes
         connect_nodes_bi(self.nodes, 0, 1)
-        # Let the framework know if the network is fully connected.
-        # If not, the framework assumes this partition: (0,1) and (2,3)
-        # For more complex partitions, you can't use the self.sync* member functions
         self.is_network_split = False
         self.sync_all()
 
@@ -104,6 +93,10 @@ class MyTest (BitcoinTestFramework):
         # Check that all tx were created, and commit them
         assert self.nodes[0].getmempoolinfo()["size"] == 2
         self.nodes[0].generate(1)
+
+        self.sync_blocks()
+        assert self.nodes[0].getmempoolinfo()["size"] == 0
+        assert self.nodes[1].getmempoolinfo()["size"] == 0
 
 
 if __name__ == '__main__':
