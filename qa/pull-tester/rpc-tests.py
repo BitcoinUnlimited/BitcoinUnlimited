@@ -179,7 +179,7 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
-    'minertest.py',
+    'miningtest',
     'tweak',
     'notify',
     'may152018_forkactivation_1',
