@@ -487,35 +487,46 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
     tmp.push_back(Pair("coinbase", tmpstr));
     tmp.push_back(Pair("id", params["id"]));
     tmp.push_back(Pair("time", UniValue(header.nTime))); // Optional. We have changed so must send.
-    tmp.push_back(Pair("nonce", UniValue(header.nNonce)));
+    // tmp.push_back(Pair("nonce", UniValue(header.nNonce)));
     tmp.push_back(Pair("version", UniValue(header.nVersion))); // Optional. We may have changed so sending.
     ret.push_back(tmp);
 
     return ret;
 }
 
-
-static UniValue RPCSubmitSolution(UniValue &solution, int &nblocks)
+static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
 {
-    // Throws exceptions
     UniValue reply = CallRPC("submitminingsolution", solution);
+
     const UniValue &error = find_value(reply, "error");
 
     if (!error.isNull())
-        return reply; // Error
-
-    UniValue result = find_value(reply, "result");
-
-    if (result.isNull())
     {
-        // Will not get here if Exceptions above:
-        if (nblocks > 0)
-            nblocks--; // Processed a block
-        return reply; // worked
+        fprintf(stderr, "Block candidate submission error: %d %s\n", error["code"].get_int(),
+            error["message"].get_str().c_str());
+        return reply;
     }
 
-    string message = result.get_str();
-    fprintf(stderr, "Block Candidate rejected. Error: %s\n", message.c_str());
+    const UniValue &result = find_value(reply, "result");
+
+    if (result.isStr())
+    {
+        fprintf(stderr, "Block Candidate rejected. Error: %s\n", result.get_str().c_str());
+    }
+    else
+    {
+        if (result.isNull())
+        {
+            printf("Block Candidate accepted.\n");
+            if (nblocks > 0)
+                nblocks--; // Processed a block
+        }
+        else
+        {
+            fprintf(stderr, "Unknown \"submitminingsolution\" Error.\n");
+        }
+    }
+
     return reply;
 }
 
