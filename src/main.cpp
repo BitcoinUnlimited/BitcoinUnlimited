@@ -593,6 +593,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     TransactionClass allowedTx,
     std::vector<COutPoint> &vCoinsToUncache)
 {
+    const CTransaction& tx = *ptx;
     unsigned int nSigOps = 0;
     ValidationResourceTracker resourceTracker;
     unsigned int nSize = 0;
