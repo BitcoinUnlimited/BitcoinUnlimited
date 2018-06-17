@@ -631,6 +631,11 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         return state.DoS(0, false, REJECT_NONSTANDARD, "premature-version2-tx");
     }
 
+    // Do not work on transactions that are too small.
+    // Transactions smaller than this are not relayed to reduce unnecessary malloc overhead.
+    if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) < MIN_STANDARD_TX_SIZE)
+        return state.DoS(0, false, REJECT_NONSTANDARD, "tx-size-small");
+
     // Only accept nLockTime-using transactions that can be mined in the next
     // block; we don't want our mempool filled up with transactions that can't
     // be mined yet.
