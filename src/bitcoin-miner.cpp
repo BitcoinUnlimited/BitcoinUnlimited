@@ -514,8 +514,8 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
         fprintf(stderr, "Block Candidate rejected. Error: %s\n", result.get_str().c_str());
         // Debug:
         UniValue dbg = solution[0].get_obj();
-        fprintf(stderr, "id: %d  time: %d  nonce: %d  version: 0x%x\n", dbg["id"].get_int(), dbg["time"].get_int(),
-            dbg["nonce"].get_int(), dbg["version"].get_int());
+        fprintf(stderr, "id: %ld  time: %d  nonce: %d  version: 0x%x\n", dbg["id"].get_int64(),
+            (uint32_t)dbg["time"].get_int64(), (uint32_t)dbg["nonce"].get_int64(), (uint32_t)dbg["version"].get_int());
         fprintf(stderr, "coinbase: %s\n", dbg["coinbase"].get_str().c_str());
     }
     else
