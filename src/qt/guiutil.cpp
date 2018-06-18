@@ -58,7 +58,7 @@
 #include <QThread>
 #include <QUrlQuery>
 
-#if QT_VERSION >= 0x50200
+#if QT_VERSION >= 0x050200
 #include <QFontDatabase>
 #endif
 
@@ -84,7 +84,7 @@ QString dateTimeStr(const QDateTime &date)
 QString dateTimeStr(qint64 nTime) { return dateTimeStr(QDateTime::fromTime_t((qint32)nTime)); }
 QFont fixedPitchFont()
 {
-#if QT_VERSION >= 0x50200
+#if QT_VERSION >= 0x050200
     return QFontDatabase::systemFont(QFontDatabase::FixedFont);
 #else
     QFont font("Monospace");
