@@ -47,6 +47,7 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
     def run_test(self):
         # Generate enough blocks to trigger certain block votes
         self.nodes[0].generate(1150)
+        self.sync_all()
 
         logging.info("not on chain tip")
         badtip = int(self.nodes[0].getblockhash(self.nodes[0].getblockcount() - 1), 16)
