@@ -19,6 +19,8 @@ class CReserveKey;
 class CScript;
 class CWallet;
 
+extern CScript COINBASE_FLAGS;
+
 namespace Consensus
 {
 struct Params;

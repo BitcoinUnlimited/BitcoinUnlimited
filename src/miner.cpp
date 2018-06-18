@@ -50,6 +50,9 @@ using namespace std;
 uint64_t nLastBlockTx = 0;
 uint64_t nLastBlockSize = 0;
 
+/** Coinbase transactions we create: */
+CScript COINBASE_FLAGS;
+
 class ScoreCompare
 {
 public:
