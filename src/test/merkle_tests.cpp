@@ -100,14 +100,14 @@ BOOST_AUTO_TEST_CASE(merkle_test)
     {
         // add a random leaf
         uint256 temp;
-        for (uint j = 0; j < 32; j++)
+        for (uint32_t j = 0; j < 32; j++)
             *(temp.begin() + j) = insecure_rand() & 255;
         leafData.push_back(temp);
     }
 
     for (unsigned int i = 0; i < MAX_TRIES; i++)
     {
-        uint size = insecure_rand() % MAX_LEAVES;
+        uint32_t size = insecure_rand() % MAX_LEAVES;
         std::vector<uint256> leaves = leafData;
         leaves.resize(size);
 

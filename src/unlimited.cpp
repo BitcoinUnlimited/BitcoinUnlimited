@@ -1764,7 +1764,7 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
     }
     else
     {
-        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "id not found");
+        return UniValue("id not found");
     }
 
     UniValue nonce = rcvd["nonce"];
@@ -1772,18 +1772,18 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
     {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "nonce not found");
     }
-    block.nNonce = nonce.get_int();
+    block.nNonce = (uint32_t)nonce.get_int64(); // 64 bit to deal with sign bit in 32 bit unsigned int
 
     UniValue time = rcvd["time"];
     if (!time.isNull())
     {
-        block.nTime = time.get_int();
+        block.nTime = (uint32_t)time.get_int64();
     }
 
     UniValue version = rcvd["version"];
     if (!version.isNull())
     {
-        block.nVersion = version.get_int();
+        block.nVersion = version.get_int(); // version signed 32 bit int
     }
 
     // Coinbase:

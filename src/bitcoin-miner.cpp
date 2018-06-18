@@ -502,7 +502,7 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
 
     if (!error.isNull())
     {
-        fprintf(stderr, "Block candidate submission error: %d %s\n", error["code"].get_int(),
+        fprintf(stderr, "Block Candidate submission error: %d %s\n", error["code"].get_int(),
             error["message"].get_str().c_str());
         return reply;
     }
@@ -512,6 +512,11 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
     if (result.isStr())
     {
         fprintf(stderr, "Block Candidate rejected. Error: %s\n", result.get_str().c_str());
+        // Debug:
+        UniValue dbg = solution[0].get_obj();
+        fprintf(stderr, "id: %d  time: %d  nonce: %d  version: 0x%x\n", dbg["id"].get_int(), dbg["time"].get_int(),
+            dbg["nonce"].get_int(), dbg["version"].get_int());
+        fprintf(stderr, "coinbase: %s\n", dbg["coinbase"].get_str().c_str());
     }
     else
     {
