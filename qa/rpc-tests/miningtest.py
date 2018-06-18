@@ -44,7 +44,8 @@ class MyTest (BitcoinTestFramework):
         del c["prevhash"]
         id = c["id"]
         c["id"] = 100000  # bad ID
-        expectException(lambda: node.submitminingsolution(c), JSONRPCException)
+        ret = node.submitminingsolution(c)
+        assert ret == "id not found"
 
         # didn't provide a nonce
         c = node.getminingcandidate()
