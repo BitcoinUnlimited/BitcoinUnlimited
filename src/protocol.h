@@ -311,12 +311,10 @@ enum
     // BU: Bitcoin Unlimitd does not support this (added to display connected node services correctly)
     NODE_WITNESS = (1 << 3),
 
-    // BUIP010 - Xtreme Thinblocks - begin section
     // NODE_XTHIN means the node supports Xtreme Thinblocks
     // If this is turned off then the node will not service xthin requests nor
     // make xthin requests
     NODE_XTHIN = (1 << 4),
-    // BUIP010 - Xtreme Thinblocks - end section
 
     // UAHF
     // NODE_BITCOIN_CASH means the node supports the UAHF hard fork.  This is intended to be just
@@ -325,21 +323,18 @@ enum
     // If this is turned off then the node will not follow the UAHF hardfork
     NODE_BITCOIN_CASH = (1 << 5),
 
-    // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
-    // isn't getting used, or one not being used much, and notify the
-    // bitcoin-development mailing list. Remember that service bits are just
-    // unauthenticated advertisements, so your code must be robust against
-    // collisions and other cases where nodes may be advertising a service they
-    // do not actually support. Other service bits should be allocated via the
-    // BIP process.
-
-    // BUIPXXX - Graphene blocks - begin section
     // NODE_GRAPHENE means the node supports Graphene blocks
     // If this is turned off then the node will not service graphene requests nor
     // make graphene requests
     NODE_GRAPHENE = (1 << 6),
-    // BUIPXXX - Graphene blocks - end section
 
+    // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
+    // isn't getting used, or one not being used much, and notify the
+    // Bitcoin Unlimited devevelopement team. Remember that service bits are just
+    // unauthenticated advertisements, so your code must be robust against
+    // collisions and other cases where nodes may be advertising a service they
+    // do not actually support. Other service bits should be allocated via the
+    // BUIP process.
 };
 
 /** A CService with information about it as peer */
