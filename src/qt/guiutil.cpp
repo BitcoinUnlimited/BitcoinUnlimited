@@ -964,7 +964,7 @@ QString formatServicesStr(quint64 mask)
                 break;
             case NODE_GRAPHENE:
                 strList.append("GRAPH");
-                break;               
+                break;
             default:
                 strList.append(QString("%1[%2]").arg("UNKNOWN").arg(check));
             }
