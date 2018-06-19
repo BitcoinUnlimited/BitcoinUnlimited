@@ -5505,7 +5505,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
 
         // Tell the peer what maximum xthin bloom filter size we will consider acceptable.
-        if (pfrom->ThinBlockCapable())
+        if (pfrom->ThinBlockCapable() && IsThinBlocksEnabled())
         {
             pfrom->PushMessage(NetMsgType::FILTERSIZEXTHIN, nXthinBloomFilterSize);
         }
