@@ -160,19 +160,19 @@ extern const char *GET_XBLOCKTX;
  */
 extern const char *GET_XTHIN;
 /**
- * BUIPXXX Graphene: The grapheneblock message transmits a single serialized graphene block.
+ * The grapheneblock message transmits a single serialized graphene block.
  */
 extern const char *GRAPHENEBLOCK;
 /**
- * BUIPXXX Graphene: The graphenetx message transmits a single serialized grblktx.
+ * The graphenetx message transmits a single serialized grblktx.
  */
 extern const char *GRAPHENETX;
 /**
- * BUIPXXX Graphene: The get_graphenetx message transmits a single serialized get_grblktx.
+ * The get_graphenetx message transmits a single serialized get_grblktx.
  */
 extern const char *GET_GRAPHENETX;
 /**
- * BUIPXXX Graphene: The get_graphene message transmits a single serialized get_grblk.
+ * The get_graphene message transmits a single serialized get_grblk.
  */
 extern const char *GET_GRAPHENE;
 
