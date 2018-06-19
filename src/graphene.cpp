@@ -1309,10 +1309,8 @@ bool CanGrapheneBlockBeDownloaded(CNode *pto)
         // When -connect-graphene-force is true we will only download graphene blocks from a peer or peers that
         // are using -connect-graphene=<ip>.  This is an undocumented setting used for setting up performance testing
         // of graphene blocks, such as, going over the GFC and needing to have graphene blocks always come from the same
-        // peer or
-        // group of peers.  Also, this is a one way street.  Graphene blocks will flow ONLY from the remote peer to the
-        // peer
-        // that has invoked -connect-graphene.
+        // peer or group of peers.  Also, this is a one way street.  Graphene blocks will flow ONLY from the remote peer
+        // to the peer that has invoked -connect-graphene.
 
         // Check if this node is also a connect-graphene node
         for (const std::string &strAddrNode : mapMultiArgs["-connect-graphene"])
