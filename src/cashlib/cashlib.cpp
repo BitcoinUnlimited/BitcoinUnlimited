@@ -8,7 +8,6 @@
 
 /* clang-format on */
 #include "base58.h"
-#include "random.h"
 #include "streams.h"
 #include "utilstrencodings.h"
 
