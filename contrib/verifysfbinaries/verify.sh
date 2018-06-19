@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright (c) 2016 The Bitcoin Core developers
+# Distributed under the MIT software license, see the accompanying
+# file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 ###   This script attempts to download the signature file SHA256SUMS.asc from bitcoin.org
 ###   It first checks if the signature passes, and then downloads the files specified in
@@ -50,8 +53,6 @@ if [ -n "$1" ]; then
    else
       BASEDIR="$BASEDIR$VERSION/"
    fi
-
-   SIGNATUREFILE="$BASEDIR$SIGNATUREFILENAME"
 else
    BASEDIR="${SIGNATUREFILE%/*}/"
 fi
