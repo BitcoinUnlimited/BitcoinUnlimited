@@ -43,15 +43,13 @@ boost::thread_specific_ptr<LockStack> lockstack;
 
 static const int CONTINUE_EXECUTION = -1;
 
-//////////////////////////////////////////////////////////////////////////////
-//
+
 // Internal miner
 //
 // ScanHash scans nonces looking for a hash with at least some zero bits.
 // The nonce is usually preserved between calls, but periodically or if the
 // nonce is 0xffff0000 or above, the block is rebuilt and nNonce starts over at
 // zero.
-//
 bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phash)
 {
     // Write the first 76 bytes of the block header to a double-SHA256 state.
@@ -81,15 +79,8 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phas
 }
 
 
-//////////////////////////////////////////////////////////////////////////////
-//
-// Start
-//
-
-//
 // Exception thrown on connection error.  This error is used to determine
 // when to wait if -rpcwait is given.
-//
 class CConnectionFailed : public std::runtime_error
 {
 public:
@@ -114,10 +105,8 @@ public:
 };
 
 
-//
 // This function returns either one of EXIT_ codes when it's expected to stop the process or
 // CONTINUE_EXECUTION when it's expected to continue further.
-//
 static int AppInitRPC(int argc, char *argv[])
 {
     //
@@ -185,7 +174,7 @@ static int AppInitRPC(int argc, char *argv[])
 }
 
 
-/** Reply structure for request_done to fill in */
+// Reply structure for request_done to fill in
 struct HTTPReply
 {
     int status;
@@ -463,7 +452,6 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
 
     uint32_t startNonce = header.nNonce = std::rand();
 
-    // printf("searching...target: %s\n",arith_uint256().SetCompact(header.nBits).GetHex().c_str());
     printf("Mining: id: %lx parent: %s bits: %x difficulty: %3.2f time: %d\n", (uint64_t)params["id"].get_int64(),
         header.hashPrevBlock.ToString().c_str(), header.nBits, GetDifficulty(header.nBits), header.nTime);
 
@@ -512,7 +500,7 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
     if (result.isStr())
     {
         fprintf(stderr, "Block Candidate rejected. Error: %s\n", result.get_str().c_str());
-        // Debug:
+        // Print some debug info if the block is rejected
         UniValue dbg = solution[0].get_obj();
         fprintf(stderr, "id: %ld  time: %d  nonce: %d  version: 0x%x\n", dbg["id"].get_int64(),
             (uint32_t)dbg["time"].get_int64(), (uint32_t)dbg["nonce"].get_int64(), (uint32_t)dbg["version"].get_int());
