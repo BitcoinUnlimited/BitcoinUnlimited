@@ -387,6 +387,7 @@ CBlockIndex *FindForkInGlobalIndex(const CChain &chain, const CBlockLocator &loc
 
 CCoinsViewCache *pcoinsTip = NULL;
 CBlockTreeDB *pblocktree = NULL;
+CBlockTreeDB *pblocktreeother = NULL;
 
 bool CheckFinalTx(const CTransaction &tx, int flags)
 {
@@ -3098,11 +3099,6 @@ bool ReceivedBlockTransactions(const CBlock &block,
     CBlockIndex *pindexNew,
     CDiskBlockPos &pos)
 {
-    if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
-    {
-        pos.SetNull();
-    }
-
     pindexNew->nTx = block.vtx.size();
     pindexNew->nChainTx = 0;
     pindexNew->nFile = pos.nFile;

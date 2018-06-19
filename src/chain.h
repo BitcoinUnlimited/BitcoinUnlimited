@@ -390,9 +390,9 @@ public:
         if (nStatus & (BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO))
             READWRITE(VARINT(nFile, VarIntMode::NONNEGATIVE_SIGNED));
         if (nStatus & BLOCK_HAVE_DATA)
-            READWRITE(nDataPos);
+            READWRITE(VARINT(nDataPos));
         if (nStatus & BLOCK_HAVE_UNDO)
-            READWRITE(nUndoPos);
+            READWRITE(VARINT(nUndoPos));
 
         // block header
         READWRITE(this->nVersion);

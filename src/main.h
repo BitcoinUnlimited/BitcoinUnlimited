@@ -533,6 +533,9 @@ extern CCoinsViewCache *pcoinsTip;
 
 /** Global variable that points to the active block tree (protected by cs_main) */
 extern CBlockTreeDB *pblocktree;
+/** Global variable that points to the block tree on the inactive storage method (protected by cs_main) */
+extern CBlockTreeDB *pblocktreeother;
+
 extern std::vector<CBlockFileInfo> vinfoBlockFile;
 extern int nLastBlockFile;
 

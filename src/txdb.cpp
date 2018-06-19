@@ -311,7 +311,7 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue)
     return true;
 }
 
-bool CBlockTreeDB::FindBlockIndex(uint256 blockhash, CBlockIndex* pindex)
+bool CBlockTreeDB::FindBlockIndex(uint256 blockhash, CDiskBlockIndex* pindex)
 {
     boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
     pcursor->Seek(make_pair(DB_BLOCK_INDEX, uint256()));
@@ -324,23 +324,8 @@ bool CBlockTreeDB::FindBlockIndex(uint256 blockhash, CBlockIndex* pindex)
         {
             if(key.second == blockhash)
             {
-                CDiskBlockIndex diskindex;
-                if (pcursor->GetValue(diskindex))
+                if (pcursor->GetValue(*pindex))
                 {
-                    // Construct block index object
-                    // dont store the phash or pprev in pindex because we dont have pointers to them
-                    uint256 blockhash = diskindex.GetBlockHash();
-                    pindex->nHeight = diskindex.nHeight;
-                    pindex->nFile = diskindex.nFile;
-                    pindex->nDataPos = diskindex.nDataPos;
-                    pindex->nUndoPos = diskindex.nUndoPos;
-                    pindex->nVersion = diskindex.nVersion;
-                    pindex->hashMerkleRoot = diskindex.hashMerkleRoot;
-                    pindex->nTime = diskindex.nTime;
-                    pindex->nBits = diskindex.nBits;
-                    pindex->nNonce = diskindex.nNonce;
-                    pindex->nStatus = diskindex.nStatus;
-                    pindex->nTx = diskindex.nTx;
                     if (!CheckProofOfWork(blockhash, pindex->nBits, Params().GetConsensus()))
                     {
                         return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindex->ToString());

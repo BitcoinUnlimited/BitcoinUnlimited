@@ -44,12 +44,24 @@ bool DetermineStorageSync()
         LOGA("false2\n");
         return false;
     }
-    CBlockIndex bestIndexSeq;
-    LOGA("check3\n");
-    pblocktree->FindBlockIndex(bestHashSeq, &bestIndexSeq);
-    LOGA("check4\n");
-    CBlockIndex bestIndexLev;
-    pblocktree->FindBlockIndex(bestHashLev, &bestIndexLev);
+
+    CDiskBlockIndex bestIndexSeq;
+    CDiskBlockIndex bestIndexLev;
+
+    if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+    {
+        LOGA("check3\n");
+        pblocktree->FindBlockIndex(bestHashSeq, &bestIndexSeq);
+        LOGA("check4\n");
+        pblocktreeother->FindBlockIndex(bestHashLev, &bestIndexLev);
+    }
+    else
+    {
+        LOGA("check3\n");
+        pblocktreeother->FindBlockIndex(bestHashSeq, &bestIndexSeq);
+        LOGA("check4\n");
+        pblocktree->FindBlockIndex(bestHashLev, &bestIndexLev);
+    }
 
     LOGA("bestIndexSeq info = %i %i %u %u %i %s %u %u %u %u %u \n",
          bestIndexSeq.nHeight,
@@ -101,16 +113,11 @@ void SyncStorage(const CChainParams &chainparams)
 {
     if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
-        int64_t cache = 0;
-        int64_t temp1 = 0;
-        int64_t temp2 = 0;
-        GetCacheConfiguration(cache, temp1, temp2);
-        CBlockTreeDB *ptreetemp = new CBlockTreeDB(cache, "blockdb", false, fReindex);
         std::vector<std::pair<int, uint256> > hashesByHeight;
-        ptreetemp->GetSortedHashIndex(hashesByHeight);
+        pblocktreeother->GetSortedHashIndex(hashesByHeight);
         CValidationState state;
         int bestHeight = 0;
-        CBlockIndex* pindexBest;
+        CBlockIndex* pindexBest = new CBlockIndex();
         if(mapBlockIndex.size() > hashesByHeight.size())
         {
             // we dont need to sync
@@ -118,14 +125,18 @@ void SyncStorage(const CChainParams &chainparams)
         }
         for (const std::pair<int, uint256> &item : hashesByHeight)
         {
+            if(item.second == chainparams.GetConsensus().hashGenesisBlock)
+            {
+                continue;
+            }
             BlockMap::iterator it;
             it = mapBlockIndex.find(item.second);
             if(it == mapBlockIndex.end())
             {
-                CBlockIndex* tempindex;
-                ptreetemp->FindBlockIndex(item.second, tempindex);
+                CDiskBlockIndex* tempindex = new CDiskBlockIndex();
+                pblocktreeother->FindBlockIndex(item.second, tempindex);
                 CBlockIndex* pindexNew =    InsertBlockIndex(tempindex->GetBlockHash());
-                pindexNew->pprev =          InsertBlockIndex(tempindex->pprev->GetBlockHash());
+                pindexNew->pprev =          InsertBlockIndex(tempindex->hashPrev);
                 pindexNew->nHeight =        tempindex->nHeight;
                 pindexNew->nFile =          0;
                 pindexNew->nDataPos =       0;
@@ -203,8 +214,8 @@ void SyncStorage(const CChainParams &chainparams)
                 // conditional for undo data inside block data because we need to have block data to have undo data
                 if((it->second->nStatus & BLOCK_HAVE_DATA) == false)
                 {
-                    CBlockIndex* tempindex;
-                    ptreetemp->FindBlockIndex(it->second->GetBlockHash(), tempindex);
+                    CDiskBlockIndex* tempindex = new CDiskBlockIndex();
+                    pblocktreeother->FindBlockIndex(it->second->GetBlockHash(), tempindex);
                     if(tempindex->nStatus & BLOCK_HAVE_DATA && tempindex->nDataPos != 0)
                     {
                         BlockDBValue blockValue;
@@ -278,26 +289,25 @@ void SyncStorage(const CChainParams &chainparams)
     }
     if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        int64_t cache = 0;
-        int64_t temp1 = 0;
-        int64_t temp2 = 0;
-        GetCacheConfiguration(cache, temp1, temp2);
-        CBlockTreeDB *ptreetemp = new CBlockTreeDB(cache, "blocks", false, fReindex);
         std::vector<std::pair<int, uint256> > hashesByHeight;
-        ptreetemp->GetSortedHashIndex(hashesByHeight);
+        pblocktreeother->GetSortedHashIndex(hashesByHeight);
         int64_t bestHeight = 0;
-        CBlockIndex* pindexBest;
+        CBlockIndex* pindexBest = new CBlockIndex();
         for (const std::pair<int, uint256> &item : hashesByHeight)
         {
+            if(item.second == chainparams.GetConsensus().hashGenesisBlock)
+            {
+                continue;
+            }
             BlockMap::iterator iter;
             iter = mapBlockIndex.find(item.second);
             CBlockIndex* index;
             if(iter == mapBlockIndex.end())
             {
-                CBlockIndex* tempindex;
-                ptreetemp->FindBlockIndex(item.second, tempindex);
+                CDiskBlockIndex* tempindex = new CDiskBlockIndex();
+                pblocktreeother->FindBlockIndex(item.second, tempindex);
                 CBlockIndex* pindexNew =    InsertBlockIndex(tempindex->GetBlockHash());
-                pindexNew->pprev =          InsertBlockIndex(tempindex->pprev->GetBlockHash());
+                pindexNew->pprev =          InsertBlockIndex(tempindex->hashPrev);
                 pindexNew->nHeight =        tempindex->nHeight;
                 // for blockdb nFile, nDataPos, and nUndoPos are switches, 0 is dont have. !0 is have. actual value irrelevant
                 pindexNew->nFile =          tempindex->nFile;
