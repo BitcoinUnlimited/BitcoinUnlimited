@@ -69,12 +69,8 @@ NetworkStyle::NetworkStyle(const QString &appName,
             }
         }
 
-// convert back to QPixmap
-#if QT_VERSION >= 0x040700
+        // convert back to QPixmap
         pixmap.convertFromImage(img);
-#else
-        pixmap = QPixmap::fromImage(img);
-#endif
     }
 
     appIcon = QIcon(pixmap);
