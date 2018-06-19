@@ -20,6 +20,7 @@
 #include "consensus/consensus.h"
 #include "crypto/common.h"
 #include "dosman.h"
+#include "graphene.h"
 #include "hash.h"
 #include "iblt.h"
 #include "primitives/transaction.h"
@@ -1732,10 +1733,8 @@ void static ProcessOneShot()
 
 void ThreadOpenConnections()
 {
-    // Connect to specific addresses
-    if ((mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0) ||
-        // BUIP010 Xtreme Thinblocks
-        (mapArgs.count("-connect-thinblock") && mapMultiArgs["-connect-thinblock"].size() > 0))
+    // Connect to all "connect" peers
+    if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0)
     {
         for (int64_t nLoop = 0;; nLoop++)
         {
@@ -1753,15 +1752,17 @@ void ThreadOpenConnections()
                 }
             }
             MilliSleep(500);
-
-            // BUIP010 Xtreme Thinblocks: begin section
-            ConnectToThinBlockNodes();
-            // BUIP010 Xtreme Thinblocks: end section
         }
-
-        // NOTE: If we are in this block, then no seeding should occur as both "-connect" and
-        //      "-connect-thinblock" are intended as "only make outbound connections to the configured nodes".
     }
+
+    // Connect to all "connect-thinblock" peers
+    ConnectToThinBlockNodes();
+
+    // Connect to all "connect-graphene" peers
+    ConnectToGrapheneBlockNodes();
+
+    // NOTE: If we are in the block above, then no seeding should occur as "-connect", "-connect-thinblock"
+    // and "connect-graphene" are intended as "only make outbound connections to the configured nodes".
 
     // Initiate network connections
     int64_t nStart = GetTime();

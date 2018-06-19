@@ -303,7 +303,7 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
             _("Connect to a thinblock node(s). Blocks will only be downloaded from a thinblock peer.  If no "
               "connections "
               "are possible then regular blocks will then be downloaded form any other connected peers"))
-        .addArg("connect-grapheneblock=<ip:port>", requiredStr,
+        .addArg("connect-graphene=<ip:port>", requiredStr,
             _("Connect to graphene node(s). Blocks will only be downloaded from a graphene capable peer.  If no "
               "connections are possible then regular blocks will then be downloaded form any other connected peers"))
         .addArg("discover", optionalBool,
