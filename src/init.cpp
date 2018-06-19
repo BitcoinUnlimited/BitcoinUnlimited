@@ -1048,10 +1048,9 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 delete pblockundodb;
 
                 uiInterface.InitMessage(_("Opening Block database..."));
-                if(BLOCK_DB_MODE == DB_BLOCK_STORAGE || fs::exists(GetDataDir() / "blockdb" / "index"))
+                if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
                 {
                     pblocktree = new CBlockTreeDB(nBlockTreeDBCache, "blockdb", false, fReindex);
-                    pblocktree->ImportForCompatibility();
                 }
                 else
                 {

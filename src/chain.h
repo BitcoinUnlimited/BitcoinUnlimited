@@ -99,7 +99,7 @@ struct CDiskBlockPos
     friend bool operator!=(const CDiskBlockPos &a, const CDiskBlockPos &b) { return !(a == b); }
     void SetNull()
     {
-        nFile = 0;
+        nFile = -1;
         nPos = 0;
     }
     bool IsNull() const
@@ -193,9 +193,6 @@ public:
     //! Verification status of this block. See enum BlockStatus
     unsigned int nStatus;
 
-    bool storeFile;
-    bool storeDb;
-
     //! block header
     int nVersion;
     uint256 hashMerkleRoot;
@@ -222,8 +219,6 @@ public:
         nChainTx = 0;
         nStatus = 0;
         nSequenceId = 0;
-        storeFile = false;
-        storeDb = false;
 
         nVersion = 0;
         hashMerkleRoot = uint256();

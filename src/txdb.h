@@ -171,10 +171,9 @@ public:
     bool WriteTxIndex(const std::vector<std::pair<uint256, CDiskTxPos> > &list);
     bool WriteFlag(const std::string &name, bool fValue);
     bool ReadFlag(const std::string &name, bool &fValue);
-    bool FindBlockIndex(uint256 blockhash, CBlockIndex& index);
+    bool FindBlockIndex(uint256 blockhash, CBlockIndex* index);
     bool LoadBlockIndexGuts();
-    bool LoadBlockIndexGutsCompatible();
-    bool ImportForCompatibility();
+    bool GetSortedHashIndex(std::vector<std::pair<int, uint256> >& hashesByHeight);
 };
 
 /** Global variable that points to the coins database */

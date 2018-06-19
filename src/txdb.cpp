@@ -5,7 +5,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "txdb.h"
-#include "blockdb/index.h"
 #include "blockdb/wrapper.h"
 #include "chainparams.h"
 #include "hash.h"
@@ -30,8 +29,6 @@ static const char DB_BEST_BLOCK = 'B';
 static const char DB_FLAG = 'F';
 static const char DB_REINDEX_FLAG = 'R';
 static const char DB_LAST_BLOCK = 'l';
-
-static const char DB_IMPORTED = 'I';
 
 // to distinguish best block for a specific DB type, values correspond to enum vaue (blockdb_wrapper.h)
 static const char DB_BEST_BLOCK_BLOCKDB = 'D';
@@ -314,7 +311,7 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue)
     return true;
 }
 
-bool CBlockTreeDB::FindBlockIndex(uint256 blockhash, CBlockIndex& pindex)
+bool CBlockTreeDB::FindBlockIndex(uint256 blockhash, CBlockIndex* pindex)
 {
     boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
     pcursor->Seek(make_pair(DB_BLOCK_INDEX, uint256()));
@@ -333,20 +330,20 @@ bool CBlockTreeDB::FindBlockIndex(uint256 blockhash, CBlockIndex& pindex)
                     // Construct block index object
                     // dont store the phash or pprev in pindex because we dont have pointers to them
                     uint256 blockhash = diskindex.GetBlockHash();
-                    pindex.nHeight = diskindex.nHeight;
-                    pindex.nFile = diskindex.nFile;
-                    pindex.nDataPos = diskindex.nDataPos;
-                    pindex.nUndoPos = diskindex.nUndoPos;
-                    pindex.nVersion = diskindex.nVersion;
-                    pindex.hashMerkleRoot = diskindex.hashMerkleRoot;
-                    pindex.nTime = diskindex.nTime;
-                    pindex.nBits = diskindex.nBits;
-                    pindex.nNonce = diskindex.nNonce;
-                    pindex.nStatus = diskindex.nStatus;
-                    pindex.nTx = diskindex.nTx;
-                    if (!CheckProofOfWork(blockhash, pindex.nBits, Params().GetConsensus()))
+                    pindex->nHeight = diskindex.nHeight;
+                    pindex->nFile = diskindex.nFile;
+                    pindex->nDataPos = diskindex.nDataPos;
+                    pindex->nUndoPos = diskindex.nUndoPos;
+                    pindex->nVersion = diskindex.nVersion;
+                    pindex->hashMerkleRoot = diskindex.hashMerkleRoot;
+                    pindex->nTime = diskindex.nTime;
+                    pindex->nBits = diskindex.nBits;
+                    pindex->nNonce = diskindex.nNonce;
+                    pindex->nStatus = diskindex.nStatus;
+                    pindex->nTx = diskindex.nTx;
+                    if (!CheckProofOfWork(blockhash, pindex->nBits, Params().GetConsensus()))
                     {
-                        return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindex.ToString());
+                        return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindex->ToString());
                     }
                     return true;
                 }
@@ -414,17 +411,13 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
             break;
         }
     }
-
     return true;
 }
 
-
-bool CBlockTreeDB::LoadBlockIndexGutsCompatible()
+bool CBlockTreeDB::GetSortedHashIndex(std::vector<std::pair<int, uint256> >& hashesByHeight)
 {
     boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
-
     pcursor->Seek(make_pair(DB_BLOCK_INDEX, uint256()));
-
     // Load mapBlockIndex
     while (pcursor->Valid())
     {
@@ -432,29 +425,11 @@ bool CBlockTreeDB::LoadBlockIndexGutsCompatible()
         std::pair<char, uint256> key;
         if (pcursor->GetKey(key) && key.first == DB_BLOCK_INDEX)
         {
-            CDbBlockIndex diskindex;
+            CDiskBlockIndex diskindex;
             if (pcursor->GetValue(diskindex))
             {
                 // Construct block index object
-                CBlockIndex *pindexNew = InsertBlockIndex(diskindex.GetBlockHash());
-                pindexNew->pprev = InsertBlockIndex(diskindex.hashPrev);
-                pindexNew->nHeight = diskindex.nHeight;
-                pindexNew->nFile = diskindex.nFile;
-                pindexNew->nDataPos = diskindex.nDataPos;
-                pindexNew->nUndoPos = diskindex.nUndoPos;
-                pindexNew->nVersion = diskindex.nVersion;
-                pindexNew->hashMerkleRoot = diskindex.hashMerkleRoot;
-                pindexNew->nTime = diskindex.nTime;
-                pindexNew->nBits = diskindex.nBits;
-                pindexNew->nNonce = diskindex.nNonce;
-                pindexNew->nStatus = diskindex.nStatus;
-                pindexNew->nTx = diskindex.nTx;
-                pindexNew->storeFile = diskindex.storeFile;
-                pindexNew->storeDb = diskindex.storeDb;
-
-                if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, Params().GetConsensus()))
-                    return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
-
+                hashesByHeight.push_back(std::make_pair(diskindex.nHeight, diskindex.GetBlockHash()));
                 pcursor->Next();
             }
             else
@@ -467,118 +442,9 @@ bool CBlockTreeDB::LoadBlockIndexGutsCompatible()
             break;
         }
     }
-
+    std::sort(hashesByHeight.begin(), hashesByHeight.end());
     return true;
 }
-
-bool CBlockTreeDB::ImportForCompatibility()
-{
-    bool imported = false;
-    this->Read(DB_IMPORTED, imported);
-    if(imported)
-    {
-        return true;
-    }
-
-    int64_t cache = 0;
-    int64_t temp1 = 0;
-    int64_t temp2 = 0;
-    GetCacheConfiguration(cache, temp1, temp2);
-
-    CBlockTreeDB *ptreetemp = new CBlockTreeDB(cache, "blocks", false, fReindex);
-
-    boost::scoped_ptr<CDBIterator> pcursor(ptreetemp->NewIterator());
-
-    pcursor->Seek(make_pair(DB_BLOCK_INDEX, uint256()));
-
-    // Load mapBlockIndex
-    while (pcursor->Valid())
-    {
-        boost::this_thread::interruption_point();
-        std::pair<char, uint256> key;
-        if (pcursor->GetKey(key) && key.first == DB_BLOCK_INDEX)
-        {
-            CDiskBlockIndex diskindex;
-            CDbBlockIndex newdiskindex;
-            if (pcursor->GetValue(diskindex))
-            {
-                // Construct block index object
-                newdiskindex.hashPrev = diskindex.hashPrev;
-                newdiskindex.nHeight = diskindex.nHeight;
-                newdiskindex.nFile = diskindex.nFile;
-                newdiskindex.nDataPos = diskindex.nDataPos;
-                newdiskindex.nUndoPos = diskindex.nUndoPos;
-                newdiskindex.nVersion = diskindex.nVersion;
-                newdiskindex.hashMerkleRoot = diskindex.hashMerkleRoot;
-                newdiskindex.nTime = diskindex.nTime;
-                newdiskindex.nBits = diskindex.nBits;
-                newdiskindex.nNonce = diskindex.nNonce;
-                newdiskindex.nStatus = diskindex.nStatus;
-                newdiskindex.nTx = diskindex.nTx;
-                if(!diskindex.GetBlockPos().IsNull())
-                {
-                    newdiskindex.storeFile = true;
-                }
-                else
-                {
-                    newdiskindex.storeFile = false;
-                }
-                newdiskindex.storeDb = false;
-
-                if (!CheckProofOfWork(newdiskindex.GetBlockHash(), newdiskindex.nBits, Params().GetConsensus()))
-                {
-                    LOGA("error with check proof of work, retrying... \n");
-                    continue;
-                }
-                if(newdiskindex.GetBlockHash() != diskindex.GetBlockHash())
-                {
-                    LOGA("error copying data. retrying... \n");
-                    continue;
-                }
-                if(!Write(make_pair(DB_BLOCK_INDEX, newdiskindex.GetBlockHash()), newdiskindex))
-                {
-                    LOGA("error writing new data. retrying... \n");
-                }
-                else
-                {
-                    pcursor->Next();
-                }
-            }
-            else
-            {
-                return error("ImportForCompatibility() : failed to read value");
-            }
-        }
-        else
-        {
-            break;
-        }
-    }
-    // import flags
-    bool txindex;
-    ptreetemp->ReadFlag("txindex", txindex);
-    this->WriteFlag("txindex", txindex);
-    bool pruned;
-    ptreetemp->ReadFlag("prunedblockfiles", pruned);
-    this->WriteFlag("prunedblockfiles", pruned);
-
-    //import last block file
-    int lastfile = 0;
-    ptreetemp->ReadLastBlockFile(lastfile);
-    this->Write(DB_LAST_BLOCK, lastfile);
-
-    for (int nFile = 0; nFile <= lastfile; nFile++)
-    {
-        CBlockFileInfo tempfile;
-        ptreetemp->ReadBlockFileInfo(nFile, tempfile);
-        this->Write(make_pair(DB_BLOCK_FILES, nFile), tempfile);
-    }
-    imported = true;
-    this->Write(DB_IMPORTED, imported);
-
-    return true;
-}
-
 
 namespace
 {
