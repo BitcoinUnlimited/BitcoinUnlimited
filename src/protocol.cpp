@@ -61,8 +61,7 @@ static const char *ppszTypeName[] = {
     "ERROR", // Should never occur
     NetMsgType::TX, NetMsgType::BLOCK,
     "filtered block", // Should never occur
-    NetMsgType::THINBLOCK, NetMsgType::XTHINBLOCK,
-    NetMsgType::GRAPHENEBLOCK,
+    NetMsgType::THINBLOCK, NetMsgType::XTHINBLOCK, NetMsgType::GRAPHENEBLOCK,
 };
 
 /** All known message types. Keep this in the same order as the list of
@@ -73,9 +72,8 @@ const static std::string allNetMessageTypes[] = {
     NetMsgType::MERKLEBLOCK, NetMsgType::GETBLOCKS, NetMsgType::GETHEADERS, NetMsgType::TX, NetMsgType::HEADERS,
     NetMsgType::BLOCK, NetMsgType::GETADDR, NetMsgType::MEMPOOL, NetMsgType::PING, NetMsgType::PONG,
     NetMsgType::NOTFOUND, NetMsgType::FILTERLOAD, NetMsgType::FILTERADD, NetMsgType::FILTERCLEAR,
-    NetMsgType::FILTERSIZEXTHIN, NetMsgType::REJECT, NetMsgType::SENDHEADERS,
-    NetMsgType::THINBLOCK, NetMsgType::XTHINBLOCK, NetMsgType::XBLOCKTX, NetMsgType::GET_XBLOCKTX,
-    NetMsgType::GET_XTHIN,
+    NetMsgType::FILTERSIZEXTHIN, NetMsgType::REJECT, NetMsgType::SENDHEADERS, NetMsgType::THINBLOCK,
+    NetMsgType::XTHINBLOCK, NetMsgType::XBLOCKTX, NetMsgType::GET_XBLOCKTX, NetMsgType::GET_XTHIN,
     NetMsgType::GRAPHENEBLOCK, NetMsgType::GRAPHENETX, NetMsgType::GET_GRAPHENETX, NetMsgType::GET_GRAPHENE,
     NetMsgType::XPEDITEDREQUEST, NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTxn, NetMsgType::BUVERSION,
     NetMsgType::BUVERACK,
