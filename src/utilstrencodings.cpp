@@ -556,7 +556,8 @@ bool ParseFixedPoint(const std::string &val, int decimals, int64_t *amount_out)
     int ptr = 0;
     int end = val.size();
     int point_ofs = 0;
-
+    if (amount_out != nullptr)
+        *amount_out = 0;
     if (ptr < end && val[ptr] == '-')
     {
         mantissa_sign = true;
@@ -650,7 +651,7 @@ bool ParseFixedPoint(const std::string &val, int decimals, int64_t *amount_out)
     if (mantissa > UPPER_BOUND || mantissa < -UPPER_BOUND)
         return false; /* overflow */
 
-    if (amount_out)
+    if (amount_out != nullptr)
         *amount_out = mantissa;
 
     return true;
