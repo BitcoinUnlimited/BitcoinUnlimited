@@ -962,6 +962,9 @@ QString formatServicesStr(quint64 mask)
             case NODE_BITCOIN_CASH:
                 strList.append("CASH");
                 break;
+            case NODE_GRAPHENE:
+                strList.append("GRAPH");
+                break;               
             default:
                 strList.append(QString("%1[%2]").arg("UNKNOWN").arg(check));
             }
