@@ -1999,7 +1999,7 @@ UniValue getaddressforms(const UniValue &params, bool fHelp)
 
     std::string cashAddr = EncodeCashAddr(dest, Params());
     std::string legacyAddr = EncodeLegacyAddr(dest, Params());
-    std::string bitpayAddr = EncodeBitpayAddr(dest, Params());
+    std::string bitpayAddr = EncodeBitpayAddr(dest);
 
     UniValue node(UniValue::VOBJ);
     node.push_back(Pair("legacy", legacyAddr));

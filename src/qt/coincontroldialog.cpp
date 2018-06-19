@@ -108,12 +108,8 @@ CoinControlDialog::CoinControlDialog(const PlatformStyle *platformStyle, QWidget
     connect(ui->treeWidget, SIGNAL(itemChanged(QTreeWidgetItem *, int)), this,
         SLOT(viewItemChanged(QTreeWidgetItem *, int)));
 
-// click on header
-#if QT_VERSION < 0x050000
-    ui->treeWidget->header()->setClickable(true);
-#else
+    // click on header
     ui->treeWidget->header()->setSectionsClickable(true);
-#endif
     connect(ui->treeWidget->header(), SIGNAL(sectionClicked(int)), this, SLOT(headerSectionClicked(int)));
 
     // ok button
@@ -413,18 +409,16 @@ void CoinControlDialog::viewItemChanged(QTreeWidgetItem *item, int column)
             CoinControlDialog::updateLabels(model, this);
     }
 
-// todo: this is a temporary qt5 fix: when clicking a parent node in tree mode, the parent node
-//       including all children are partially selected. But the parent node should be fully selected
-//       as well as the children. Children should never be partially selected in the first place.
-//       Please remove this ugly fix, once the bug is solved upstream.
-#if QT_VERSION >= 0x050000
+    // todo: this is a temporary qt5 fix: when clicking a parent node in tree mode, the parent node
+    //       including all children are partially selected. But the parent node should be fully selected
+    //       as well as the children. Children should never be partially selected in the first place.
+    //       Please remove this ugly fix, once the bug is solved upstream.
     else if (column == COLUMN_CHECKBOX && item->childCount() > 0)
     {
         if (item->checkState(COLUMN_CHECKBOX) == Qt::PartiallyChecked &&
             item->child(0)->checkState(COLUMN_CHECKBOX) == Qt::PartiallyChecked)
             item->setCheckState(COLUMN_CHECKBOX, Qt::Checked);
     }
-#endif
 }
 
 // return human readable label for priority number

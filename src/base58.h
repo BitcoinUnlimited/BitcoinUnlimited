@@ -154,5 +154,5 @@ std::string EncodeLegacyAddr(const CTxDestination &dest, const CChainParams &);
 CTxDestination DecodeLegacyAddr(const std::string &str, const CChainParams &);
 
 /// Encode a bitpay address
-std::string EncodeBitpayAddr(const CTxDestination &dest, const CChainParams &params);
+std::string EncodeBitpayAddr(const CTxDestination &dest);
 #endif // BITCOIN_BASE58_H
