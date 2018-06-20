@@ -1145,6 +1145,7 @@ bool CGrapheneBlockData::CheckGrapheneBlockTimer(uint256 hash)
             return false;
         }
     }
+    return true;
 }
 
 // The timer is cleared as soon as we request a block or graphene block.
