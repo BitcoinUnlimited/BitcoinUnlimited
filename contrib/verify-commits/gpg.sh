@@ -30,8 +30,8 @@ if ! $VALID; then
   exit 1
 fi
 if $VALID && $REVSIG; then
-  echo "$INPUT" | gpg --trust-model always "$@" | grep "\[GNUPG:\] \(NEWSIG\|SIG_ID\|VALIDSIG\)" 2>/dev/null
-  echo "$GOODREVSIG"
+	echo "$INPUT" | gpg --trust-model always "$@" | grep "^\[GNUPG:\] \(NEWSIG\|SIG_ID\|VALIDSIG\)" 2>/dev/null
+	echo "$GOODREVSIG"
 else
   echo "$INPUT" | gpg --trust-model always "$@" 2>/dev/null
 fi
