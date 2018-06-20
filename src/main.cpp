@@ -6988,6 +6988,22 @@ bool ProcessMessages(CNode *pfrom)
     return fOk;
 }
 
+static bool CheckForDownloadTimeout(CNode *pto, bool fReceived, int64_t &nRequestTime)
+{
+    // Use a timeout of 6 times the retry inverval before disconnecting.  This way only a max of 6
+    // re-requested thinblocks or graphene blocks could be in memory at any one time.
+    if (!fReceived && (GetTime() - nRequestTime) > 6 * blkReqRetryInterval / 1000000)
+    {
+        if (!pto->fWhitelisted && Params().NetworkIDString() != "regtest")
+        {
+            LOG(THIN, "ERROR: Disconnecting peer %s due to thinblock download timeout exceeded (%d secs)\n",
+                pto->GetLogName(), (GetTime() - nRequestTime));
+            pto->fDisconnect = true;
+            return true;
+        }
+    }
+    return false;
+}
 
 bool SendMessages(CNode *pto)
 {
@@ -7056,50 +7072,22 @@ bool SendMessages(CNode *pto)
         // timeout interval. If so then we need to disconnect them so that the thinblock data is nullified.
         // We could null the associated data here but that would possibly cause a node to be banned later if
         // the thinblock or graphene block finally did show up, so instead we just disconnect this slow node.
-        if (pto->mapThinBlocksInFlight.size() > 0)
+        if (!pto->mapThinBlocksInFlight.empty())
         {
             LOCK(pto->cs_mapthinblocksinflight);
-            std::map<uint256, CNode::CThinBlockInFlight>::iterator iter = pto->mapThinBlocksInFlight.begin();
-            while (iter != pto->mapThinBlocksInFlight.end())
+            for (auto &item : pto->mapThinBlocksInFlight)
             {
-                // Use a timeout of 6 times the retry inverval before disconnecting.  This way only a max of 6
-                // re-requested thinblocks could be in memory at any one time.
-                if (!(*iter).second.fReceived &&
-                    (GetTime() - (*iter).second.nRequestTime) > 6 * blkReqRetryInterval / 1000000)
-                {
-                    if (!pto->fWhitelisted && Params().NetworkIDString() != "regtest")
-                    {
-                        LOG(THIN, "ERROR: Disconnecting peer %s due to thinblock download timeout exceeded "
-                                  "(%d secs)\n",
-                            pto->GetLogName(), (GetTime() - (*iter).second.nRequestTime));
-                        pto->fDisconnect = true;
-                        break;
-                    }
-                }
-                iter++;
+                if (CheckForDownloadTimeout(pto, item.second.fReceived, item.second.nRequestTime))
+                    break;
             }
         }
-        if (pto->mapGrapheneBlocksInFlight.size() > 0)
+        if (!pto->mapGrapheneBlocksInFlight.empty())
         {
             LOCK(pto->cs_mapgrapheneblocksinflight);
-            std::map<uint256, CNode::CGrapheneBlockInFlight>::iterator iter = pto->mapGrapheneBlocksInFlight.begin();
-            while (iter != pto->mapGrapheneBlocksInFlight.end())
+            for (auto &item : pto->mapGrapheneBlocksInFlight)
             {
-                // Use a timeout of 6 times the retry inverval before disconnecting.  This way only a max of 6
-                // re-requested thinblocks could be in memory at any one time.
-                if (!(*iter).second.fReceived &&
-                    (GetTime() - (*iter).second.nRequestTime) > 6 * blkReqRetryInterval / 1000000)
-                {
-                    if (!pto->fWhitelisted && Params().NetworkIDString() != "regtest")
-                    {
-                        LOG(THIN, "ERROR: Disconnecting peer %s due to thinblock download timeout exceeded "
-                                  "(%d secs)\n",
-                            pto->GetLogName(), (GetTime() - (*iter).second.nRequestTime));
-                        pto->fDisconnect = true;
-                        break;
-                    }
-                }
-                iter++;
+                if (CheckForDownloadTimeout(pto, item.second.fReceived, item.second.nRequestTime))
+                    break;
             }
         }
 
