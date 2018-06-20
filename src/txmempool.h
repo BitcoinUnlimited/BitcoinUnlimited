@@ -624,12 +624,12 @@ public:
         return totalTxSize;
     }
 
-    bool exists(uint256 hash) const
+    bool exists(const uint256 &hash) const
     {
         READLOCK(cs);
         return (mapTx.count(hash) != 0);
     }
-    bool _exists(uint256 hash) const { return (mapTx.count(hash) != 0); }
+    bool _exists(const uint256 &hash) const { return (mapTx.count(hash) != 0); }
     double TransactionsPerSecond()
     {
         boost::mutex::scoped_lock lock(cs_txPerSec);
