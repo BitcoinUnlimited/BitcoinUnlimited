@@ -669,7 +669,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
             }
 
             // Count up any other remaining nodes with graphene blocks in flight.
-            BOOST_FOREACH (CNode *pnode, vNodes)
+            for (CNode *pnode : vNodes)
             {
                 if (pnode->mapGrapheneBlocksInFlight.size() > 0)
                     nTotalGrapheneBlocksInFlight++;
