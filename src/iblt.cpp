@@ -28,7 +28,6 @@ SOFTWARE.
 #include <sstream>
 #include <utility>
 
-static const size_t N_HASH = 3;
 static const size_t N_HASHCHECK = 11;
 
 template <typename T>
@@ -73,6 +72,7 @@ void HashTableEntry::addValue(const std::vector<uint8_t> v)
 CIblt::CIblt()
 {
     valueSize = 0;
+    n_hash = 1;
     is_modified = false;
 }
 
@@ -84,6 +84,7 @@ CIblt::CIblt(size_t _expectedNumEntries, size_t _valueSize) : is_modified(false)
 CIblt::CIblt(const CIblt &other) : is_modified(false)
 {
     valueSize = other.valueSize;
+    n_hash = other.n_hash;
     hashTable = other.hashTable;
 }
 
@@ -101,12 +102,12 @@ void CIblt::resize(size_t _expectedNumEntries, size_t _valueSize)
     assert(is_modified == false);
 
     CIblt::valueSize = _valueSize;
+    CIblt::n_hash = OptimalNHash(_expectedNumEntries);
 
-    // 1.5x expectedNumEntries gives very low probability of
-    // decoding failure
-    size_t nEntries = _expectedNumEntries + _expectedNumEntries / 2;
-    // ... make nEntries exactly divisible by N_HASH
-    while (N_HASH * (nEntries / N_HASH) != nEntries)
+    // reduce probability of failure by increasing by overhead factor
+    size_t nEntries = (size_t) (_expectedNumEntries * OptimalOverhead(_expectedNumEntries));
+    // ... make nEntries exactly divisible by n_hash
+    while (n_hash * (nEntries / n_hash) != nEntries)
         ++nEntries;
     hashTable.resize(nEntries);
 }
@@ -117,8 +118,8 @@ void CIblt::_insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> v)
 
     std::vector<uint8_t> kvec = ToVec(k);
 
-    size_t bucketsPerHash = hashTable.size() / N_HASH;
-    for (size_t i = 0; i < N_HASH; i++)
+    size_t bucketsPerHash = hashTable.size() / n_hash;
+    for (size_t i = 0; i < n_hash; i++)
     {
         size_t startEntry = i * bucketsPerHash;
 
@@ -148,8 +149,8 @@ bool CIblt::get(uint64_t k, std::vector<uint8_t> &result) const
 
     std::vector<uint8_t> kvec = ToVec(k);
 
-    size_t bucketsPerHash = hashTable.size() / N_HASH;
-    for (size_t i = 0; i < N_HASH; i++)
+    size_t bucketsPerHash = hashTable.size() / n_hash;
+    for (size_t i = 0; i < n_hash; i++)
     {
         size_t startEntry = i * bucketsPerHash;
 
@@ -235,7 +236,7 @@ bool CIblt::listEntries(std::set<std::pair<uint64_t, std::vector<uint8_t> > > &p
 
     // If any buckets for one of the hash functions is not empty,
     // then we didn't peel them all:
-    for (size_t i = 0; i < peeled.hashTable.size() / N_HASH; i++)
+    for (size_t i = 0; i < peeled.hashTable.size() / n_hash; i++)
     {
         if (peeled.hashTable.at(i).empty() != true)
             return false;
@@ -285,4 +286,14 @@ std::string CIblt::DumpTable() const
     }
 
     return result.str();
+}
+
+size_t CIblt::OptimalNHash(size_t expectedNumEntries)
+{
+    return 3;
+}
+
+float CIblt::OptimalOverhead(size_t expectedNumEntries)
+{
+    return 1.5;
 }

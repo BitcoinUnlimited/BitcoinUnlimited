@@ -20,7 +20,6 @@
 const uint8_t FILTER_CELL_SIZE = 1;
 const uint8_t IBLT_CELL_SIZE = 17;
 const uint32_t LARGE_MEM_POOL_SIZE = 10000000;
-const uint8_t N_IBLT_HASH = 3; // This should match N_HASH from iblt.cpp
 const float FILTER_FPR_MAX = 0.999;
 const uint8_t IBLT_CELL_MINIMUM = 3;
 const uint8_t IBLT_VALUE_SIZE = 0;
@@ -76,8 +75,10 @@ public:
             uint64_t a) { return floor(FILTER_CELL_SIZE * (-1 / LN2SQUARED * nBlockTxs * log(fpr(a)) / 8)); };
 
         auto L = [](uint64_t a) {
-            uint64_t padded_cells = a + a / 2;
-            uint64_t cells = N_IBLT_HASH * int(ceil(padded_cells / float(N_IBLT_HASH)));
+            uint8_t n_iblt_hash = CIblt::OptimalNHash(a);
+            float iblt_overhead = CIblt::OptimalOverhead(a);
+            uint64_t padded_cells = (int) (iblt_overhead * a);
+            uint64_t cells = n_iblt_hash * int(ceil(padded_cells / float(n_iblt_hash)));
 
             return IBLT_CELL_SIZE * cells;
         };
