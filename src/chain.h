@@ -375,6 +375,16 @@ public:
         hashPrev = (pprev ? pprev->GetBlockHash() : uint256());
     }
 
+    friend bool operator<(const CDiskBlockIndex& a, const CDiskBlockIndex& b)
+    {
+        return a.nHeight < b.nHeight;
+    }
+
+    friend bool operator>(const CDiskBlockIndex& a, const CDiskBlockIndex& b)
+    {
+        return a.nHeight > b.nHeight;
+    }
+
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>

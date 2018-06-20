@@ -3163,9 +3163,12 @@ bool FindBlockPos(CValidationState &state,
     uint64_t nTime,
     bool fKnown = false)
 {
-    // No need for finding block pos if we're only using leveldb for block storage.
+    // nDataPos for blockdb is a flag, just set to 1 to indicate we have that data. nFile is unused.
     if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    {
+        pos.nPos = 1;
         return true;
+    }
 
     LOCK(cs_LastBlockFile);
 
@@ -3237,8 +3240,10 @@ bool FindBlockPos(CValidationState &state,
 
 bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigned int nAddSize)
 {
+    // nUndoPos for blockdb is a flag, set it to 1 to inidicate we have the data
     if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
+        pos.nPos = 1;
         return true;
     }
 
@@ -3936,15 +3941,15 @@ bool static LoadBlockIndexDB()
             if((*it) < 0 )
             {
                 // a negative file means the block is in the blockdb not a sequential file
-                // contineu to prevent checking for a file we know doesnt exist
+                // continue to prevent checking for a file we know doesnt exist
                 continue;
             }
             CDiskBlockPos pos(*it, 0);
             fs::path path = GetBlockPosFilename(pos, "blk");
             if (!fs::exists(path))
             {
-                LOGA("missing path = %s \n", path.string().c_str());
-                /** We fail here when switching from db to seq */
+                fs::file_status s = fs::status(path);
+                LOGA("missing path = %s which has status of %u \n", path.string().c_str(), s.type());
                 return false;
             }
         }

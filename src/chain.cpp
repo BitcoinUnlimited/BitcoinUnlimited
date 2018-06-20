@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "chain.h"
+#include "main.h"
 
 using namespace std;
 
@@ -107,6 +108,19 @@ CBlockIndex *CBlockIndex::GetAncestor(int height)
         }
         else
         {
+            // this can happen sometimes with syncing from db to sequential files, so try this fix before asserting
+            if(pindexWalk->pprev == nullptr)
+            {
+                CDiskBlockIndex tempdisk;
+                // using pblocktree or pblocktreeother right here shouldnt matter
+                pblocktreeother->FindBlockIndex(pindexWalk->GetBlockHash(), &tempdisk);
+                BlockMap::iterator it;
+                it = mapBlockIndex.find(tempdisk.hashPrev);
+                if(it != mapBlockIndex.end())
+                {
+                    pindexWalk->pprev = it->second;
+                }
+            }
             assert(pindexWalk->pprev);
             pindexWalk = pindexWalk->pprev;
             heightWalk--;

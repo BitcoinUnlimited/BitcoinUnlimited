@@ -173,7 +173,7 @@ public:
     bool ReadFlag(const std::string &name, bool &fValue);
     bool FindBlockIndex(uint256 blockhash, CDiskBlockIndex* index);
     bool LoadBlockIndexGuts();
-    bool GetSortedHashIndex(std::vector<std::pair<int, uint256> >& hashesByHeight);
+    bool GetSortedHashIndex(std::vector<std::pair<int, CDiskBlockIndex> >& hashesByHeight);
 };
 
 /** Global variable that points to the coins database */

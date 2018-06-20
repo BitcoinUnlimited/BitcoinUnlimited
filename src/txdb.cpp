@@ -399,7 +399,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
     return true;
 }
 
-bool CBlockTreeDB::GetSortedHashIndex(std::vector<std::pair<int, uint256> >& hashesByHeight)
+bool CBlockTreeDB::GetSortedHashIndex(std::vector<std::pair<int, CDiskBlockIndex> >& hashesByHeight)
 {
     boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
     pcursor->Seek(make_pair(DB_BLOCK_INDEX, uint256()));
@@ -414,7 +414,7 @@ bool CBlockTreeDB::GetSortedHashIndex(std::vector<std::pair<int, uint256> >& has
             if (pcursor->GetValue(diskindex))
             {
                 // Construct block index object
-                hashesByHeight.push_back(std::make_pair(diskindex.nHeight, diskindex.GetBlockHash()));
+                hashesByHeight.push_back(std::make_pair(diskindex.nHeight, diskindex));
                 pcursor->Next();
             }
             else
