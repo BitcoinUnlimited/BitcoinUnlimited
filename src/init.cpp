@@ -1309,6 +1309,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     fDiscover = GetBoolArg("-discover", DEFAULT_DISCOVER);
     fNameLookup = GetBoolArg("-dns", DEFAULT_NAME_LOOKUP);
 
+    bool fBindFailure = false; // will be set true for any failure to bind to a P2P port
     bool fBound = false;
     if (fListen)
     {
@@ -1319,7 +1320,10 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 CService addrBind;
                 if (!Lookup(strBind.c_str(), addrBind, GetListenPort(), false))
                     return InitError(strprintf(_("Cannot resolve -bind address: '%s'"), strBind));
-                fBound |= Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR));
+
+                bool bound = Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR));
+                fBindFailure |= !bound;
+                fBound |= bound;
             }
             BOOST_FOREACH (const std::string &strBind, mapMultiArgs["-whitebind"])
             {
@@ -1328,18 +1332,28 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                     return InitError(strprintf(_("Cannot resolve -whitebind address: '%s'"), strBind));
                 if (addrBind.GetPort() == 0)
                     return InitError(strprintf(_("Need to specify a port with -whitebind: '%s'"), strBind));
-                fBound |= Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR | BF_WHITELIST));
+                bool bound = Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR | BF_WHITELIST));
+                fBindFailure |= !bound;
+                fBound |= bound;
             }
         }
         else
         {
             struct in_addr inaddr_any;
             inaddr_any.s_addr = INADDR_ANY;
-            fBound |= Bind(CService(in6addr_any, GetListenPort()), BF_NONE);
-            fBound |= Bind(CService(inaddr_any, GetListenPort()), !fBound ? BF_REPORT_ERROR : BF_NONE);
+            bool bound = Bind(CService(in6addr_any, GetListenPort()), BF_NONE);
+            fBindFailure |= !bound;
+            fBound |= bound;
+
+            bound = Bind(CService(inaddr_any, GetListenPort()), !fBound ? BF_REPORT_ERROR : BF_NONE);
+            fBindFailure |= !bound;
+            fBound |= bound;
         }
         if (!fBound)
             return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
+
+        if (fBindFailure && GetBoolArg("-bindallorfail", false))
+            return InitError(_("Failed to listen on all P2P ports. Failing as requested by -bindallorfail."));
     }
 
     if (mapArgs.count("-externalip"))

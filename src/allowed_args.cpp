@@ -287,6 +287,8 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
                     DEFAULT_MISBEHAVING_BANTIME))
         .addArg("bind=<addr>", requiredStr,
             _("Bind to given address and always listen on it. Use [host]:port notation for IPv6"))
+        .addArg("bindallorfail", optionalBool, strprintf(_("Bind all ports (P2P as well RPC) or fail to start. This is "
+                                                           "used for RPC testing, but might find other uses.")))
         .addArg("bitnodes", optionalBool,
             _("Query for peer addresses via Bitnodes API, if low on addresses (default: 1 unless -connect)"))
         .addArg("blkretryinterval", requiredInt,

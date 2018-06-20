@@ -367,7 +367,18 @@ static bool HTTPBindAddresses(struct evhttp *http)
             LOGA("Binding RPC on address %s port %i failed.\n", i->first, i->second);
         }
     }
-    return !boundSockets.empty();
+    const bool fBoundAll = boundSockets.size() == endpoints.size();
+    const bool fBoundAny = boundSockets.size();
+    if (GetBoolArg("-bindallorfail", false))
+    {
+        if (!fBoundAll)
+        {
+            LOGA("Binding to all RPC sockets failed. Failing as -bindallorfail is set.\n");
+        }
+        return fBoundAll;
+    }
+    else
+        return fBoundAny;
 }
 
 /** Simple wrapper to set thread name and run work queue */
