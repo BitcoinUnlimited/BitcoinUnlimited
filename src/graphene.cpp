@@ -1400,11 +1400,7 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv)
     // Use the size of your own mempool if receiver did not send hers
     if (nReceiverMemPoolTx == -1)
     {
-        {
-            LOCK(cs_main);
-
-            nReceiverMemPoolTx = mempool.size();
-        }
+        nReceiverMemPoolTx = mempool.size();
     }
 
     if (inv.type == MSG_GRAPHENEBLOCK)
@@ -1546,8 +1542,6 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
 
 CMemPoolInfo GetGrapheneMempoolInfo()
 {
-    LOCK(cs_main);
-
     return CMemPoolInfo(mempool.size());
 }
 
