@@ -27,42 +27,29 @@ BlockDBMode BLOCK_DB_MODE = DEFAULT_BLOCK_DB_MODE;
 bool DetermineStorageSync()
 {
     uint256 bestHashSeq = pcoinsdbview->GetBestBlockSeq();
-    LOGA("bestHashSeq = %s \n", bestHashSeq.GetHex().c_str());
     uint256 bestHashLev = pcoinsdbview->GetBestBlockDb();
-    LOGA("bestHashLev = %s \n", bestHashLev.GetHex().c_str());
     // if we are using method X and method Y doesnt have any sync progress, assume nothing to sync
-
-    LOGA("check1\n");
     if(bestHashSeq.IsNull() && BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        LOGA("false1\n");
         return false;
     }
-    LOGA("check2\n");
     if(bestHashLev.IsNull() && BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
-        LOGA("false2\n");
         return false;
     }
-
     CDiskBlockIndex bestIndexSeq;
     CDiskBlockIndex bestIndexLev;
-
     if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
-        LOGA("check3\n");
         pblocktree->FindBlockIndex(bestHashSeq, &bestIndexSeq);
-        LOGA("check4\n");
         pblocktreeother->FindBlockIndex(bestHashLev, &bestIndexLev);
     }
     else
     {
-        LOGA("check3\n");
         pblocktreeother->FindBlockIndex(bestHashSeq, &bestIndexSeq);
-        LOGA("check4\n");
         pblocktree->FindBlockIndex(bestHashLev, &bestIndexLev);
     }
-
+/*
     LOGA("bestIndexSeq info = %i %i %u %u %i %s %u %u %u %u %u \n",
          bestIndexSeq.nHeight,
          bestIndexSeq.nFile,
@@ -90,21 +77,16 @@ bool DetermineStorageSync()
          bestIndexLev.nStatus,
          bestIndexLev.nTx
          );
-
-    LOGA("check5\n");
+*/
     // if the best height of the storage type we are using is higher than any other type, return false
     if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES && bestIndexSeq.nHeight >= bestIndexLev.nHeight)
     {
-        LOGA("false3\n");
         return false;
     }
-    LOGA("check6\n");
     if(BLOCK_DB_MODE == DB_BLOCK_STORAGE && bestIndexLev.nHeight >= bestIndexSeq.nHeight)
     {
-        LOGA("false4\n");
         return false;
     }
-    LOGA("check7\n");
     return true;
 }
 
@@ -426,7 +408,7 @@ bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHea
 {
     if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
-    	return WriteBlockToDiskSequential(block, pos, messageStart);
+        return WriteBlockToDiskSequential(block, pos, messageStart);
     }
     else if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
@@ -517,11 +499,11 @@ void FindFilesToPrune(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight
 
     if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
-    	FindFilesToPruneSequential(setFilesToPrune, nLastBlockWeCanPrune);
+        FindFilesToPruneSequential(setFilesToPrune, nLastBlockWeCanPrune);
     }
     else if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-    	uint64_t amntPruned = FindFilesToPruneLevelDB(nLastBlockWeCanPrune);
+        uint64_t amntPruned = FindFilesToPruneLevelDB(nLastBlockWeCanPrune);
         // because we just prune the DB here and dont have a file set to return, we need to set prune triggers here
         // otherwise they will check for the fileset and incorrectly never be set
 

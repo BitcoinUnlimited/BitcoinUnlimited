@@ -526,7 +526,7 @@ bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex);
 bool FindBlockPos(CValidationState &state, CDiskBlockPos &pos, unsigned int nAddSize, unsigned int nHeight, uint64_t nTime, bool fKnown);
 
 /** Mark a block as having its data received and checked (up to BLOCK_VALID_TRANSACTIONS). */
-bool ReceivedBlockTransactions(const CBlock &block, CValidationState &state, CBlockIndex *pindexNew, CDiskBlockPos &pos);
+bool ReceivedBlockTransactions(const CBlock &block, CValidationState &state, CBlockIndex *pindexNew, const CDiskBlockPos &pos);
 
 CBlockIndex *AddToBlockIndex(const CBlockHeader &block);
 

@@ -17,9 +17,9 @@ CBlockDB::CBlockDB(std::string folder, size_t nCacheSize, bool fMemory, bool fWi
 bool CBlockDB::WriteBatchSync(const std::vector<CBlock> &blocks)
 {
     CDBBatch batch(*this);
-    for (std::vector<CBlock>::const_iterator it = blocks.begin(); it != blocks.end(); it++)
+    for (const CBlock &it : blocks)
     {
-        batch.Write(it->GetHash(), BlockDBValue(*it));
+        batch.Write(it.GetHash(), BlockDBValue(it));
     }
     return WriteBatch(batch, true);
 }

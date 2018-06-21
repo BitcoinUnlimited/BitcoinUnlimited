@@ -89,7 +89,7 @@ void UnlinkPrunedFiles(std::set<int> &setFilesToPrune)
         CDiskBlockPos pos(*it, 0);
         fs::remove(GetBlockPosFilename(pos, "blk"));
         fs::remove(GetBlockPosFilename(pos, "rev"));
-        LOGA("Prune: %s deleted blk/rev (%05u)\n", __func__, *it);
+        LOG(PRUNE, "Prune: %s deleted blk/rev (%05u)\n", __func__, *it);
     }
 }
 
@@ -150,7 +150,7 @@ bool ReadBlockFromDiskSequential(CBlock &block, const CDiskBlockPos &pos, const 
 uint64_t CalculateCurrentUsage()
 {
     uint64_t retval = 0;
-    BOOST_FOREACH (const CBlockFileInfo &file, vinfoBlockFile)
+    for (const CBlockFileInfo &file : vinfoBlockFile)
     {
         retval += file.nSize + file.nUndoSize;
     }
