@@ -107,9 +107,6 @@ std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders GUARD
 
 static void CheckBlockIndex(const Consensus::Params &consensusParams);
 
-/** Constant stuff for coinbase transactions we create: */
-CScript COINBASE_FLAGS;
-
 extern CCriticalSection cs_LastBlockFile;
 
 

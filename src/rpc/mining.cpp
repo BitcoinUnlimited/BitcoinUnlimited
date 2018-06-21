@@ -643,6 +643,7 @@ UniValue getblocktemplate(const UniValue &params, bool fHelp)
     }
 
     UniValue aux(UniValue::VOBJ);
+    // COINBASE_FLAGS were assigned in CreateNewBlock() in the steps above.  Now we can use it here.
     aux.push_back(Pair("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end())));
 
     arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
