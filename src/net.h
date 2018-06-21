@@ -517,7 +517,12 @@ public:
         return this;
     }
 
-    void Release() { nRefCount--; }
+    void Release()
+    {
+        DbgAssert(nRefCount > 0, );
+        nRefCount--;
+    }
+
     // BUIP010:
     bool ThinBlockCapable()
     {
