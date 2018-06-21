@@ -291,7 +291,7 @@ extern CTweak<uint64_t> miningForkMG;
 
 // Mining-Candidate start
 /** Return a Merkle root given a Coinbase hash and Merkle branches */
-uint256 CalculateMerkleRoot(uint256 &coinbase_hash, std::vector<uint256> merklebranches);
+uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &merklebranches);
 /** Return Merkle branches for a Block */
 std::vector<uint256> GetMerkleProofBranches(CBlock *pblock);
 

@@ -76,10 +76,10 @@ static inline int ctz(uint32_t i)
 static uint256 ComputeRootFromCoinbaseProof(const uint256 &elem, const std::vector<uint256> &leaves)
 {
     uint256 running = elem;
-    for (auto i : leaves)
+    for (auto &hash : leaves)
     {
         uint256 result;
-        CHash256().Write(running.begin(), 32).Write(i.begin(), 32).Finalize(result.begin());
+        CHash256().Write(running.begin(), 32).Write(hash.begin(), 32).Finalize(result.begin());
         running = result;
     }
     return running;
@@ -111,7 +111,6 @@ BOOST_AUTO_TEST_CASE(merkle_test)
         std::vector<uint256> leaves = leafData;
         leaves.resize(size);
 
-        // printf("leaves: %u\n", (unsigned int) leaves.size());
         uint256 root = ComputeMerkleRoot(leaves);
         std::vector<uint256> mklProof = ComputeMerkleBranch(leaves, 0);
 
