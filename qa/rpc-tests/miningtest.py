@@ -94,8 +94,6 @@ class MyTest (BitcoinTestFramework):
         tx = CTransaction()
         tx.deserialize(BytesIO(unhexlify(c["coinbase"])))
         tx.vout[0].scriptPubKey = CScript([OP_1])
-        #tx.vout.append(CTxOut(5000000000, CScript(["OP_1"])))
-        # tx.vin.append(
 
         nonce = 0
         c["id"] = id
