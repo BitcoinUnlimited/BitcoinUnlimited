@@ -78,15 +78,15 @@ def remap_ports(n):
     new_port_rpc = random.randint(PORT_MIN, PORT_MIN+PORT_RANGE - 1)
     new_port_p2p = random.randint(PORT_MIN, PORT_MIN+PORT_RANGE - 1)
 
-    print("Remapping RPC for node %d to new random port %d" % (n, new_port_rpc))
-    print("Remapping P2P for node %d to new random port %d" % (n, new_port_p2p))
+    logging.warn("Remapping RPC for node %d to new random port %d", n, new_port_rpc)
+    logging.warn("Remapping P2P for node %d to new random port %d", n, new_port_p2p)
     PortSeed.port_changes_rpc[n] = new_port_rpc
     PortSeed.port_changes_p2p[n] = new_port_p2p
 
 def fixup_ports_in_configfile(i):
     assert(i in PortSeed.config_file)
 
-    print("Tweaking ports in configuration file %s for node %d" % (PortSeed.config_file[i], i))
+    logging.warn("Tweaking ports in configuration file %s for node %d", PortSeed.config_file[i], i)
     cfg_data = open(PortSeed.config_file[i], "r", encoding="utf-8").read()
 
     cfg_data = re.sub(r"^port=[0-9]+", r"port=%d" % p2p_port(i),
@@ -178,7 +178,7 @@ def p2p_port(n):
     else:
         result = PORT_MIN + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
     if debug_port_assignments:
-        print ("Current P2P port for node %d: %d" % (n, result))
+        logging.info("Current P2P port for node %d: %d", n, result)
     return result
 
 def rpc_port(n):
@@ -188,7 +188,7 @@ def rpc_port(n):
     else:
         result = PORT_MIN + PORT_RANGE + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
     if debug_port_assignments:
-        print ("Current RPC port for node %d: %d" % (n, result))
+        logging.info("Current RPC port for node %d: %d", n, result)
     return result
 
 def check_json_precision():
@@ -373,7 +373,7 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
                         print("initialize_chain: RPC succesfully started")
                     break
                 except Exception as exc:
-                    print("Error bringing up bitcoind #%d (initialize_chain, directory %s), this might be retried. Problem is:" % (i, test_dir))
+                    logging.error("Error bringing up bitcoind #%d (initialize_chain, directory %s), this might be retried. Problem is:", i, test_dir)
                     do_and_ignore_failure(bitcoind_processes[i].kill)
                     traceback.print_exc(file=sys.stdout)
                     remap_ports(i)
@@ -474,7 +474,7 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
                 print("start_node: RPC succesfully started")
             break
         except Exception as exc:
-            print("Error bringing up bitcoind #%d (start_node, directory %s), this might be retried. Problem is:" % (i, dirname))
+            logging.error("Error bringing up bitcoind #%d (start_node, directory %s), this might be retried. Problem is:", i, dirname)
             do_and_ignore_failure(bitcoind_processes[i].kill)
             traceback.print_exc(file=sys.stdout)
             remap_ports(i)
