@@ -495,7 +495,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
                 localHashes.push_back(kv.second);
 
             // Add full transactions included in the block
-            for (auto tx : vAdditionalTxs)
+            for (auto &tx : vAdditionalTxs)
                 localHashes.push_back(tx->GetHash());
 
             try
