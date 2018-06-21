@@ -77,7 +77,7 @@ public:
         auto L = [](uint64_t a) {
             uint8_t n_iblt_hash = CIblt::OptimalNHash(a);
             float iblt_overhead = CIblt::OptimalOverhead(a);
-            uint64_t padded_cells = (int) (iblt_overhead * a);
+            uint64_t padded_cells = (int)(iblt_overhead * a);
             uint64_t cells = n_iblt_hash * int(ceil(padded_cells / float(n_iblt_hash)));
 
             return IBLT_CELL_SIZE * cells;
@@ -127,7 +127,7 @@ public:
 
         // Sender's estimate of number of items in both block and receiver mempool
         // This is the parameter "mu" from the graphene paper
-        uint64_t nItemIntersect = std::min(nItems, (uint64_t) nReceiverUniverseItems) - 1;
+        uint64_t nItemIntersect = std::min(nItems, (uint64_t)nReceiverUniverseItems) - 1;
 
         // Set false positive rate for Bloom filter based on optSymDiff
         double fpr;

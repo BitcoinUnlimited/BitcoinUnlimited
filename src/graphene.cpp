@@ -1540,11 +1540,7 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
     return true;
 }
 
-CMemPoolInfo GetGrapheneMempoolInfo()
-{
-    return CMemPoolInfo(mempool.size());
-}
-
+CMemPoolInfo GetGrapheneMempoolInfo() { return CMemPoolInfo(mempool.size()); }
 uint256 GetSalt(unsigned char seed)
 {
     std::vector<unsigned char> vec(32);
