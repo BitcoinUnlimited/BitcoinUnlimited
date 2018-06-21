@@ -546,23 +546,22 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
     // These must be checked outside of the mempool.cs lock or deadlock may occur.
     // A merkle root mismatch here does not cause a ban because and expedited node will forward an graphene
-    // without checking the merkle root, therefore we don't want to ban our expedited nodes. Just re-request
-    // a full graphene block if a mismatch occurs.
-    // Also, there is a remote possiblity of a Tx hash collision therefore if it occurs we re-request a normal
-    // graphene block which has the full Tx hash data rather than just the truncated hash.
+    // without checking the merkle root, therefore we don't want to ban our expedited nodes. Just request
+    // a full block if a mismatch occurs.
+    // Also, there is a remote possiblity of a Tx hash collision therefore if it occurs we request a full
+    // block.
     //////////////// Maybe this should raise a ban in graphene? /////////////
     if (collision || !fMerkleRootCorrect)
     {
         std::vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_GRAPHENEBLOCK, header.GetHash()));
+        vGetData.push_back(CInv(MSG_BLOCK, header.GetHash()));
         pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
 
         if (!fMerkleRootCorrect)
             return error(
-                "Mismatched merkle root on grapheneblock: rerequesting a graphene block, peer=%s", pfrom->GetLogName());
+                "Mismatched merkle root on grapheneblock: requesting a full block, peer=%s", pfrom->GetLogName());
         else
-            return error(
-                "TX HASH COLLISION for grapheneblock: re-requesting a graphene block, peer=%s", pfrom->GetLogName());
+            return error("TX HASH COLLISION for grapheneblock: requesting a full block, peer=%s", pfrom->GetLogName());
 
         graphenedata.ClearGrapheneBlockData(pfrom, header.GetHash());
         return true;
