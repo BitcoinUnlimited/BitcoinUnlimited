@@ -105,7 +105,7 @@ void CIblt::resize(size_t _expectedNumEntries, size_t _valueSize)
     CIblt::n_hash = OptimalNHash(_expectedNumEntries);
 
     // reduce probability of failure by increasing by overhead factor
-    size_t nEntries = (size_t) (_expectedNumEntries * OptimalOverhead(_expectedNumEntries));
+    size_t nEntries = (size_t)(_expectedNumEntries * OptimalOverhead(_expectedNumEntries));
     // ... make nEntries exactly divisible by n_hash
     while (n_hash * (nEntries / n_hash) != nEntries)
         ++nEntries;
@@ -288,12 +288,5 @@ std::string CIblt::DumpTable() const
     return result.str();
 }
 
-size_t CIblt::OptimalNHash(size_t expectedNumEntries)
-{
-    return 3;
-}
-
-float CIblt::OptimalOverhead(size_t expectedNumEntries)
-{
-    return 1.5;
-}
+size_t CIblt::OptimalNHash(size_t expectedNumEntries) { return 3; }
+float CIblt::OptimalOverhead(size_t expectedNumEntries) { return 1.5; }
