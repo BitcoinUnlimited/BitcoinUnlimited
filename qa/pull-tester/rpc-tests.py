@@ -377,7 +377,7 @@ def runtests():
         all_passed = True
 
         for _ in range(len(tests_to_run)):
-            (name, stdout, stderr, passed, duration) = job_queue.get_next()
+            (name, stdout, stderr, stderr_filtered, passed, duration) = job_queue.get_next()
             test_passed.append(passed)
             all_passed = all_passed and passed
             time_sum += duration
@@ -386,6 +386,7 @@ def runtests():
             print(BOLD[1] + name + BOLD[0] + ":")
             print("-"*50+'\nstdout:\n' if not stdout == '' else '', stdout)
             print("-"*50+'\nstderr:\n' if not stderr == '' else '', stderr)
+            #print('stderr_filtered:\n' if not stderr_filtered == '' else '', repr(stderr_filtered))
             if stderr!="" or stdout!="":
                 print("-"*50)
             results += "%s | %s | %s s\n" % (name.ljust(max_len_name), str(passed).ljust(6), duration)
@@ -494,9 +495,21 @@ class RPCTestHandler:
                     stdout = log_stdout.read()
                     stderr = log_stderr.read()
                     passed = stderr == "" and proc.returncode == 0
+
+                    # This is a list of expected messages on stderr. If they appear, they do not
+                    # necessarily indicate final failure of a test.
+                    stderr_filtered = stderr.replace("Error: Unable to start HTTP server. See debug log for details.", "")
+                    stderr_filtered = re.sub(r"Error: Unable to bind to 0.0.0.0:[0-9]+ on this computer\. Bitcoin Unlimited Cash Edition is probably already running\.",
+                                             "", stderr_filtered)
+                    stderr_filtered = stderr_filtered.replace("Error: Failed to listen on any port. Use -listen=0 if you want this.", "")
+
+                    stderr_filtered = stderr_filtered.replace(" ", "")
+                    stderr_filtered = stderr_filtered.replace("\n", "")
+
+                    passed = stderr_filtered == "" and proc.returncode == 0
                     self.num_running -= 1
                     self.jobs.remove(j)
-                    return name, stdout, stderr, passed, int(time.time() - time0)
+                    return name, stdout, stderr, stderr_filtered, passed, int(time.time() - time0)
             print('.', end='', flush=True)
 
 class RPCCoverage(object):
