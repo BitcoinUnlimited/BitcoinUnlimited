@@ -3,7 +3,7 @@
 # Copyright (c) 2014-2016 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 # wait for py3.6: from enum import Enum,Flag
 
 from test_framework.mininode import *

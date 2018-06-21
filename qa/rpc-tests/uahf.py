@@ -2,7 +2,7 @@
 # Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 import time
 import shutil
 import random
@@ -19,7 +19,6 @@ import sys
 if sys.version_info[0] < 3:
     raise "Use Python 3"
 import logging
-logging.basicConfig(format='%(asctime)s.%(levelname)s: %(message)s', level=logging.INFO, stream=sys.stdout)
 
 NODE_BITCOIN_CASH = (1 << 5)
 invalidOpReturn = hexlify(b'Bitcoin: A Peer-to-Peer Electronic Cash System')

@@ -3,7 +3,7 @@
 # Copyright (c) 2014-2015 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 # Test emergent consensus scenarios
 
 import time
@@ -18,7 +18,6 @@ import sys
 if sys.version_info[0] < 3:
     raise "Use Python 3"
 import logging
-logging.basicConfig(format='%(asctime)s.%(levelname)s: %(message)s', level=logging.INFO, stream=sys.stdout)
 
 
 def mostly_sync_mempools(rpc_connections, difference=50, wait=1, verbose=1):
