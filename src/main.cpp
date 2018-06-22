@@ -3583,10 +3583,12 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
     const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
 
     // Check proof of work
-    if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
+    uint32_t expectedNbits = GetNextWorkRequired(pindexPrev, &block, consensusParams);
+    if (block.nBits != expectedNbits)
     {
-        LOGA("bad bits after height: %d\n", pindexPrev->nHeight);
-        return state.DoS(100, error("%s: incorrect proof of work", __func__), REJECT_INVALID, "bad-diffbits");
+        return state.DoS(100, error("%s: incorrect proof of work. Height %d, Block nBits 0x%x, expected 0x%x", __func__,
+                                  pindexPrev->nHeight, block.nBits, expectedNbits),
+            REJECT_INVALID, "bad-diffbits");
     }
 
     // Check timestamp against prev

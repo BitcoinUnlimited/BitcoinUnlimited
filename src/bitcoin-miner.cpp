@@ -259,7 +259,12 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
     int64_t start = GetTime();
     while ((GetTime() < start + searchDuration) && !found)
     {
-        header.nTime = (header.nTime < GetTime()) ? GetTime() : header.nTime;
+        // When mining mainnet, you would normally want to advance the time to keep the block time as close to the
+        // real time as possible.  However, this CPU miner is only useful on testnet and in testnet the block difficulty
+        // resets to 1 after 20 minutes.  This will cause the block's difficulty to mismatch the expected difficulty
+        // and the block will be rejected.  So do not advance time (let it be advanced by bitcoind every time we
+        // request a new block).
+        // header.nTime = (header.nTime < GetTime()) ? GetTime() : header.nTime;
         found = CpuMineBlockHasher(&header, coinbaseBytes, merklebranches);
     }
 
