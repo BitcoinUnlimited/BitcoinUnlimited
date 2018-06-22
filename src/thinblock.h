@@ -226,11 +226,11 @@ public:
     std::string ThinBlockToString();
     std::string FullTxToString();
 
-    bool CheckThinblockTimer(uint256 hash);
-    void ClearThinBlockTimer(uint256 hash);
+    bool CheckThinblockTimer(const uint256 &hash);
+    void ClearThinBlockTimer(const uint256 &hash);
 
     void ClearThinBlockData(CNode *pfrom);
-    void ClearThinBlockData(CNode *pfrom, uint256 hash);
+    void ClearThinBlockData(CNode *pfrom, const uint256 &hash);
     void ClearThinBlockStats();
 
     uint64_t AddThinBlockBytes(uint64_t, CNode *pfrom);
@@ -248,9 +248,9 @@ bool CanThinBlockBeDownloaded(CNode *pto);
 void ConnectToThinBlockNodes();
 void CheckNodeSupportForThinBlocks();
 bool ClearLargestThinBlockAndDisconnect(CNode *pfrom);
-void ClearThinBlockInFlight(CNode *pfrom, uint256 hash);
-void AddThinBlockInFlight(CNode *pfrom, uint256 hash);
-void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
+void ClearThinBlockInFlight(CNode *pfrom, const uint256 &hash);
+void AddThinBlockInFlight(CNode *pfrom, const uint256 &hash);
+void SendXThinBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv);
 bool IsThinBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header);
 void BuildSeededBloomFilter(CBloomFilter &memPoolFilter,
     std::vector<uint256> &vOrphanHashes,

@@ -1123,7 +1123,7 @@ std::string CGrapheneBlockData::MempoolLimiterBytesSavedToString()
 // block inventory is from a non GRAPHENE node then we will continue to wait for block announcements until either we
 // get one from an GRAPHENE capable node or the timer is exceeded.  If the timer is exceeded before receiving an
 // announcement from an GRAPHENE node then we just download a full block instead of a graphene block.
-bool CGrapheneBlockData::CheckGrapheneBlockTimer(uint256 hash)
+bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
 {
     LOCK(cs_mapGrapheneBlockTimer);
     if (!mapGrapheneBlockTimer.count(hash))
@@ -1148,7 +1148,7 @@ bool CGrapheneBlockData::CheckGrapheneBlockTimer(uint256 hash)
 }
 
 // The timer is cleared as soon as we request a block or graphene block.
-void CGrapheneBlockData::ClearGrapheneBlockTimer(uint256 hash)
+void CGrapheneBlockData::ClearGrapheneBlockTimer(const uint256 &hash)
 {
     LOCK(cs_mapGrapheneBlockTimer);
     if (mapGrapheneBlockTimer.count(hash))
@@ -1177,7 +1177,7 @@ void CGrapheneBlockData::ClearGrapheneBlockData(CNode *pnode)
         graphenedata.GetGrapheneBlockBytes());
 }
 
-void CGrapheneBlockData::ClearGrapheneBlockData(CNode *pnode, uint256 hash)
+void CGrapheneBlockData::ClearGrapheneBlockData(CNode *pnode, const uint256 &hash)
 {
     // We must make sure to clear the graphene block data first before clearing the graphene block in flight.
     ClearGrapheneBlockData(pnode);
@@ -1379,13 +1379,13 @@ bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom)
     return false;
 }
 
-void ClearGrapheneBlockInFlight(CNode *pfrom, uint256 hash)
+void ClearGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash)
 {
     LOCK(pfrom->cs_mapgrapheneblocksinflight);
     pfrom->mapGrapheneBlocksInFlight.erase(hash);
 }
 
-void AddGrapheneBlockInFlight(CNode *pfrom, uint256 hash)
+void AddGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash)
 {
     LOCK(pfrom->cs_mapgrapheneblocksinflight);
     pfrom->mapGrapheneBlocksInFlight.insert(

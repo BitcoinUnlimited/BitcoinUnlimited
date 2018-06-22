@@ -235,11 +235,11 @@ public:
     std::string ReRequestedTxToString();
     std::string MempoolLimiterBytesSavedToString();
 
-    bool CheckGrapheneBlockTimer(uint256 hash);
-    void ClearGrapheneBlockTimer(uint256 hash);
+    bool CheckGrapheneBlockTimer(const uint256 &hash);
+    void ClearGrapheneBlockTimer(const uint256 &hash);
 
     void ClearGrapheneBlockData(CNode *pfrom);
-    void ClearGrapheneBlockData(CNode *pfrom, uint256 hash);
+    void ClearGrapheneBlockData(CNode *pfrom, const uint256 &hash);
     void ClearGrapheneBlockStats();
 
     uint64_t AddGrapheneBlockBytes(uint64_t, CNode *pfrom);
@@ -257,8 +257,8 @@ bool CanGrapheneBlockBeDownloaded(CNode *pto);
 void ConnectToGrapheneBlockNodes();
 void CheckNodeSupportForGrapheneBlocks();
 bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom);
-void ClearGrapheneBlockInFlight(CNode *pfrom, uint256 hash);
-void AddGrapheneBlockInFlight(CNode *pfrom, uint256 hash);
+void ClearGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash);
+void AddGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash);
 void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv);
 bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header);
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);

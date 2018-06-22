@@ -1296,7 +1296,7 @@ std::string CThinBlockData::FullTxToString()
 // block inventory is from a non XTHIN node then we will continue to wait for block announcements until either we
 // get one from an XTHIN capable node or the timer is exceeded.  If the timer is exceeded before receiving an
 // announcement from an XTHIN node then we just download a full block instead of an xthin.
-bool CThinBlockData::CheckThinblockTimer(uint256 hash)
+bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
 {
     LOCK(cs_mapThinBlockTimer);
     if (!mapThinBlockTimer.count(hash))
@@ -1320,7 +1320,7 @@ bool CThinBlockData::CheckThinblockTimer(uint256 hash)
 }
 
 // The timer is cleared as soon as we request a block or thinblock.
-void CThinBlockData::ClearThinBlockTimer(uint256 hash)
+void CThinBlockData::ClearThinBlockTimer(const uint256 &hash)
 {
     LOCK(cs_mapThinBlockTimer);
     if (mapThinBlockTimer.count(hash))
@@ -1349,7 +1349,7 @@ void CThinBlockData::ClearThinBlockData(CNode *pnode)
         thindata.GetThinBlockBytes());
 }
 
-void CThinBlockData::ClearThinBlockData(CNode *pnode, uint256 hash)
+void CThinBlockData::ClearThinBlockData(CNode *pnode, const uint256 &hash)
 {
     // We must make sure to clear the thinblock data first before clearing the thinblock in flight.
     ClearThinBlockData(pnode);
@@ -1546,13 +1546,13 @@ bool ClearLargestThinBlockAndDisconnect(CNode *pfrom)
     return false;
 }
 
-void ClearThinBlockInFlight(CNode *pfrom, uint256 hash)
+void ClearThinBlockInFlight(CNode *pfrom, const uint256 &hash)
 {
     LOCK(pfrom->cs_mapthinblocksinflight);
     pfrom->mapThinBlocksInFlight.erase(hash);
 }
 
-void AddThinBlockInFlight(CNode *pfrom, uint256 hash)
+void AddThinBlockInFlight(CNode *pfrom, const uint256 &hash)
 {
     LOCK(pfrom->cs_mapthinblocksinflight);
     pfrom->mapThinBlocksInFlight.insert(
