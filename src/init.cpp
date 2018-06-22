@@ -1065,8 +1065,8 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                     pblocktree = new CBlockTreeDB(nBlockTreeDBCache, "blocks", false, fReindex);
                     pblocktreeother = new CBlockTreeDB(nBlockTreeDBCache, "blockdb", false, fReindex);
                 }
-                pblockdb = new CBlockDB("blocks", nBlockTreeDBCache, false, false);
-                pblockundodb = new CBlockDB("undo", nBlockTreeDBCache, false, false);
+                pblockdb = new CBlockDB("blocks", nBlockDBCache, false, false);
+                pblockundodb = new CBlockDB("undo", nBlockUndoDBCache, false, false);
                 uiInterface.InitMessage(_("Opening UTXO database..."));
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);

@@ -693,8 +693,29 @@ void CacheSizeCalculations(int64_t _nTotalCache,
     if (_nBlockTreeDBCache > (1 << 21) && !GetBoolArg("-txindex", DEFAULT_TXINDEX))
         _nBlockTreeDBCache = (1 << 21);
 
-    // use 25%-50% of the remainder for the utxo leveldb disk cache
+    // If we are in block db storage mode then calculated the level db cache size for the block and undo caches.
+    // As a safeguard make them at least as large as the _nBlockTreeDBCache;
     _nTotalCache -= _nBlockTreeDBCache;
+    if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    {
+        // use up to 5% for the level db block cache but no bigger than 200MB
+       _nBlockDBCache = _nTotalCache * 0.05;
+       if (_nBlockDBCache < _nBlockTreeDBCache)
+           _nBlockDBCache = _nBlockTreeDBCache;
+       else if (_nBlockDBCache > 200 << 20)
+           _nBlockDBCache = 200 << 20;
+
+        // use up to 1% for the level db undo cache but no bigger than 20MB
+       _nBlockUndoDBcache = _nTotalCache * 0.01;
+       if (_nBlockUndoDBcache < _nBlockTreeDBCache)
+           _nBlockUndoDBcache = _nBlockTreeDBCache;
+       else if (_nBlockUndoDBcache > 20 << 20)
+           _nBlockUndoDBcache = 20 << 20;
+    }
+
+    // use 25%-50% of the remainder for the utxo leveldb disk cache
+    _nTotalCache -= _nBlockDBCache;
+    _nTotalCache -= _nBlockUndoDBcache;
     _nCoinDBCache = std::min(_nTotalCache / 2, (_nTotalCache / 4) + (1 << 23));
 
     // the remainder goes to the in-memory utxo coins cache
