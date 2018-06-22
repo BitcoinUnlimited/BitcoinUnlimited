@@ -208,6 +208,7 @@ uint256 SignatureHashLegacy(const CScript &scriptCode,
     return ss.GetHash();
 }
 
+// ONLY to be called with SIGHASH_FORKID set in nHashType!
 uint256 SignatureHashBitcoinCash(const CScript &scriptCode,
     const CTransaction &txTo,
     unsigned int nIn,
@@ -215,61 +216,55 @@ uint256 SignatureHashBitcoinCash(const CScript &scriptCode,
     const CAmount &amount,
     size_t *nHashedOut)
 {
-    static const uint256 one(uint256S("0000000000000000000000000000000000000000000000000000000000000001"));
+    uint256 hashPrevouts;
+    uint256 hashSequence;
+    uint256 hashOutputs;
 
-    if (nHashType & SIGHASH_FORKID)
+    if (!(nHashType & SIGHASH_ANYONECANPAY))
     {
-        uint256 hashPrevouts;
-        uint256 hashSequence;
-        uint256 hashOutputs;
-
-        if (!(nHashType & SIGHASH_ANYONECANPAY))
-        {
-            hashPrevouts = GetPrevoutHash(txTo);
-        }
-
-        if (!(nHashType & SIGHASH_ANYONECANPAY) && (nHashType & 0x1f) != SIGHASH_SINGLE &&
-            (nHashType & 0x1f) != SIGHASH_NONE)
-        {
-            hashSequence = GetSequenceHash(txTo);
-        }
-
-        if ((nHashType & 0x1f) != SIGHASH_SINGLE && (nHashType & 0x1f) != SIGHASH_NONE)
-        {
-            hashOutputs = GetOutputsHash(txTo);
-        }
-        else if ((nHashType & 0x1f) == SIGHASH_SINGLE && nIn < txTo.vout.size())
-        {
-            CHashWriter ss(SER_GETHASH, 0);
-            ss << txTo.vout[nIn];
-            hashOutputs = ss.GetHash();
-        }
-
-        CHashWriter ss(SER_GETHASH, 0);
-        // Version
-        ss << txTo.nVersion;
-        // Input prevouts/nSequence (none/all, depending on flags)
-        ss << hashPrevouts;
-        ss << hashSequence;
-        // The input being signed (replacing the scriptSig with scriptCode +
-        // amount). The prevout may already be contained in hashPrevout, and the
-        // nSequence may already be contain in hashSequence.
-        ss << txTo.vin[nIn].prevout;
-        ss << static_cast<const CScriptBase &>(scriptCode);
-        ss << amount;
-        ss << txTo.vin[nIn].nSequence;
-        // Outputs (none/one/all, depending on flags)
-        ss << hashOutputs;
-        // Locktime
-        ss << txTo.nLockTime;
-        // Sighash type
-        ss << nHashType;
-
-        uint256 sighash = ss.GetHash();
-        // printf("SigHash: %s\n", sighash.GetHex().c_str());
-        return sighash;
+        hashPrevouts = GetPrevoutHash(txTo);
     }
-    return one;
+
+    if (!(nHashType & SIGHASH_ANYONECANPAY) && (nHashType & 0x1f) != SIGHASH_SINGLE &&
+        (nHashType & 0x1f) != SIGHASH_NONE)
+    {
+        hashSequence = GetSequenceHash(txTo);
+    }
+
+    if ((nHashType & 0x1f) != SIGHASH_SINGLE && (nHashType & 0x1f) != SIGHASH_NONE)
+    {
+        hashOutputs = GetOutputsHash(txTo);
+    }
+    else if ((nHashType & 0x1f) == SIGHASH_SINGLE && nIn < txTo.vout.size())
+    {
+        CHashWriter ss(SER_GETHASH, 0);
+        ss << txTo.vout[nIn];
+        hashOutputs = ss.GetHash();
+    }
+
+    CHashWriter ss(SER_GETHASH, 0);
+    // Version
+    ss << txTo.nVersion;
+    // Input prevouts/nSequence (none/all, depending on flags)
+    ss << hashPrevouts;
+    ss << hashSequence;
+    // The input being signed (replacing the scriptSig with scriptCode +
+    // amount). The prevout may already be contained in hashPrevout, and the
+    // nSequence may already be contain in hashSequence.
+    ss << txTo.vin[nIn].prevout;
+    ss << static_cast<const CScriptBase &>(scriptCode);
+    ss << amount;
+    ss << txTo.vin[nIn].nSequence;
+    // Outputs (none/one/all, depending on flags)
+    ss << hashOutputs;
+    // Locktime
+    ss << txTo.nLockTime;
+    // Sighash type
+    ss << nHashType;
+
+    uint256 sighash = ss.GetHash();
+    // printf("SigHash: %s\n", sighash.GetHex().c_str());
+    return sighash;
 }
 
 
