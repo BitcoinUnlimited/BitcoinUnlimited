@@ -377,7 +377,8 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit = false,
     bool fRejectAbsurdFee = false,
-    TransactionClass allowedTx = TransactionClass::DEFAULT);
+    TransactionClass allowedTx = TransactionClass::DEFAULT,
+    bool test_accept = false);
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);

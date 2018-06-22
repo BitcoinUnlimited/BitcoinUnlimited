@@ -588,7 +588,8 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
     TransactionClass allowedTx,
-    std::vector<COutPoint> &vCoinsToUncache)
+    std::vector<COutPoint> &vCoinsToUncache,
+    bool test_accept)
 {
     unsigned int nSigOps = 0;
     ValidationResourceTracker resourceTracker;
@@ -922,6 +923,13 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             {
                 return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
             }
+
+            if (test_accept)
+            {
+                // Tx was accepted, but not added
+                return true;
+            }
+
             // Store transaction in memory
             pool.addUnchecked(hash, entry, setAncestors, !IsInitialBlockDownload());
         }
@@ -979,11 +987,12 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
-    TransactionClass allowedTx)
+    TransactionClass allowedTx,
+    bool test_accept)
 {
     std::vector<COutPoint> vCoinsToUncache;
     bool res = AcceptToMemoryPoolWorker(pool, state, ptx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit,
-        fRejectAbsurdFee, allowedTx, vCoinsToUncache);
+        fRejectAbsurdFee, allowedTx, vCoinsToUncache, test_accept);
 
     // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
     if (pfMissingInputs && !res && !*pfMissingInputs)
