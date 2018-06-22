@@ -462,19 +462,16 @@ bool CGrapheneBlock::process(CNode *pfrom,
         LOCK(orphanpool.cs);
         for (auto &kv : orphanpool.mapOrphanTransactions)
         {
-            uint256 hash = kv.first;
-
-            uint64_t cheapHash = hash.GetCheapHash();
+            uint64_t cheapHash = kv.first.GetCheapHash();
 
             if (mapPartialTxHash.count(cheapHash)) // Check for collisions
                 collision = true;
 
-            mapPartialTxHash[cheapHash] = hash;
+            mapPartialTxHash[cheapHash] = kv.first;
         }
 
         // We don't have to keep the lock on mempool.cs here to do mempool.queryHashes
         // but we take the lock anyway so we don't have to re-lock again later.
-        ////////////////////// What is cs_xval for?
         LOCK(cs_xval);
         mempool.queryHashes(memPoolHashes);
 
