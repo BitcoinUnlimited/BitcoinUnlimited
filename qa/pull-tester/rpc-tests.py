@@ -99,6 +99,7 @@ framework_opts = ('--tracerpc',
                   '--help',
                   '--noshutdown',
                   '--nocleanup',
+                  '--no-ipv6-rpc-listen',
                   '--srcdir',
                   '--tmpdir',
                   '--coveragedir',
@@ -366,7 +367,8 @@ def runtests():
 
         if len(tests_to_run) > 1 and run_parallel:
             # Populate cache
-            subprocess.check_output([RPC_TESTS_DIR + 'create_cache.py'] + [flags])
+            subprocess.check_output([RPC_TESTS_DIR + 'create_cache.py'] + [flags]+
+                                    (["--no-ipv6-rpc-listen"] if option_passed("no-ipv6-rpc-listen") else []))
 
         tests_to_run = list(map(str,tests_to_run))
         max_len_name = len(max(tests_to_run, key=len))

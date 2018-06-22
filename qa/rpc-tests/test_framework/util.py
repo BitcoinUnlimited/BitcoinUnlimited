@@ -51,6 +51,10 @@ PORT_RANGE = 5000
 
 debug_port_assignments = False
 
+class UtilOptions:
+    # this module-wide var is set from test_framework.py
+    no_ipv6_rpc_listen = False
+
 BITCOIND_PROC_WAIT_TIMEOUT = 60
 
 class PortSeed:
@@ -275,6 +279,13 @@ def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None)
     defaults = {"server":1, "discover":0, "regtest":1,"rpcuser":"rt","rpcpassword":"rt",
                 "port":p2p_port(n),"rpcport":str(rpc_port(n)),"listenonion":0,"maxlimitertxfee":0,"usecashaddr":1,
                 "rpcuser":rpc_u, "rpcpassword":rpc_p, "bindallorfail" : 1}
+
+    # switch off default IPv6 listening port (for travis)
+    if UtilOptions.no_ipv6_rpc_listen:
+        defaults.update({
+            "rpcbind": "127.0.0.1",
+            "rpcallowip" : "127.0.0.1"
+            })
 
     if bitcoinConfDict: defaults.update(bitcoinConfDict)
 

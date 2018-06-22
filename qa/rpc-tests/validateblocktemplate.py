@@ -340,4 +340,7 @@ if __name__ == '__main__':
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"]
     }
-    ValidateblocktemplateTest().main([],bitcoinConf)
+    args = []
+    if "--no-ipv6-rpc-listen":
+        args.append("--no-ipv6-rpc-listen")
+    ValidateblocktemplateTest().main(args,bitcoinConf)
