@@ -82,9 +82,10 @@ proxyType nameProxy;
 CCriticalSection cs_proxyInfos;
 
 
-set<uint256> setPreVerifiedTxHash;
-set<uint256> setUnVerifiedOrphanTxHash;
 CCriticalSection cs_xval;
+set<uint256> setPreVerifiedTxHash GUARDED_BY(cs_xval);
+set<uint256> setUnVerifiedOrphanTxHash GUARDED_BY(cs_xval);
+
 CCriticalSection cs_vNodes;
 CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
