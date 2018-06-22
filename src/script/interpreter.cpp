@@ -1423,13 +1423,6 @@ bool TransactionSignatureChecker::VerifySignature(const std::vector<unsigned cha
     return pubkey.Verify(sighash, vchSig);
 }
 
-extern uint256 SignatureHashBitcoinCash(const CScript &scriptCode,
-    const CTransaction &txTo,
-    unsigned int nIn,
-    uint32_t nHashType,
-    const CAmount &amount,
-    size_t *nHashedOut);
-
 extern uint256 SignatureHashLegacy(const CScript &scriptCode,
     const CTransaction &txTo,
     unsigned int nIn,
@@ -1460,7 +1453,7 @@ bool TransactionSignatureChecker::CheckSig(const vector<unsigned char> &vchSigIn
     if (nFlags & SCRIPT_ENABLE_SIGHASH_FORKID)
     {
         if (nHashType & SIGHASH_FORKID)
-            sighash = SignatureHashBitcoinCash(scriptCode, *txTo, nIn, nHashType, amount, &nHashed);
+            sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, &nHashed);
         else
             return false;
     }

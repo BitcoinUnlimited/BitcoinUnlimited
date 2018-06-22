@@ -211,7 +211,7 @@ uint256 SignatureHashLegacy(const CScript &scriptCode,
 }
 
 // ONLY to be called with SIGHASH_FORKID set in nHashType!
-uint256 SignatureHashBitcoinCash(const CScript &scriptCode,
+static uint256 SignatureHashBitcoinCash(const CScript &scriptCode,
     const CTransaction &txTo,
     unsigned int nIn,
     uint32_t nHashType,
