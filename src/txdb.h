@@ -52,7 +52,9 @@ uint64_t GetTotalSystemMemory();
 /** Get the sizes for each of the caches. This is done during init.cpp on startup but also
  *  later, during dynamic sizing of the coins cache, when need to know the initial startup values.
  */
-void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
+void GetCacheConfiguration(int64_t &_nBlockDBCache,
+    int64_t &_nBlockUndoDBcache,
+    int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
     int64_t &_nCoinCacheMaxSize,
     bool fDefault = false);
@@ -60,6 +62,8 @@ void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
  *  dynamic sizing of the coins cache we also need to use this function directly.
  */
 void CacheSizeCalculations(int64_t _nTotalCache,
+    int64_t &_nBlockDBCache,
+    int64_t &_nBlockUndoDBcache,
     int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
     int64_t &_nCoinCacheMaxSize);
