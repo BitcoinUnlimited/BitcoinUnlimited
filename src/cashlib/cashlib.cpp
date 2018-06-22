@@ -10,6 +10,7 @@
 #include "base58.h"
 #include "random.h"
 #include "streams.h"
+#include "util.h"
 #include "utilstrencodings.h"
 
 #include <openssl/rand.h>
@@ -128,6 +129,8 @@ extern "C" int SignTx(unsigned char *txData,
     unsigned char *result,
     unsigned int resultLen)
 {
+    DbgAssert(nHashType & SIGHASH_FORKID, return 0);
+
     if (!sigInited)
     {
         sigInited = true;
@@ -154,7 +157,7 @@ extern "C" int SignTx(unsigned char *txData,
     CKey key = LoadKey(keyData);
 
     size_t nHashedOut = 0;
-    uint256 sighash = SignatureHashBitcoinCash(priorScript, tx, inputIdx, nHashType, inputAmount, &nHashedOut);
+    uint256 sighash = SignatureHash(priorScript, tx, inputIdx, nHashType, inputAmount, &nHashedOut);
     std::vector<unsigned char> sig;
     if (!key.Sign(sighash, sig))
     {
