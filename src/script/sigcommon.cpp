@@ -172,6 +172,12 @@ uint256 SignatureHashLegacy(const CScript &scriptCode,
     if (nIn >= txTo.vin.size())
     {
         //  nIn out of range
+        // IMPORTANT NOTICE:
+        // Returning one from SignatureHash..() to signal error conditions is a kludge that
+        // is also breaking the ECDSA assumption that only cryptographic hashes are signed. The special value
+        // returned here is, however, due to further omissions in CheckSig, part of the pre-BCH
+        // consensus rule set and needs to be left as-is.
+        // See also: https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2014-November/006878.html
         return one;
     }
 
@@ -181,6 +187,12 @@ uint256 SignatureHashLegacy(const CScript &scriptCode,
         if (nIn >= txTo.vout.size())
         {
             //  nOut out of range
+            // IMPORTANT NOTICE:
+            // Returning one from SignatureHash..() to signal error conditions is a kludge that
+            // is also breaking the ECDSA assumption that only cryptographic hashes are signed. The special value
+            // returned here is, however, due to further omissions in CheckSig, part of the pre-BCH
+            // consensus rule set and needs to be left as-is.
+            // See also: https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2014-November/006878.html
             return one;
         }
     }
