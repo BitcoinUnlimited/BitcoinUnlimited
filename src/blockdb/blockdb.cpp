@@ -26,13 +26,25 @@ bool CBlockDB::WriteBatchSync(const std::vector<CBlock> &blocks)
 
 bool WriteBlockToDB(const CBlock &block)
 {
+    // Create a key which will sort the database by the blocktime.  This is needed to prevent unnecessary
+    // compactions which hamper performance. Will a key sorted by time the only files that need to undergo
+    // compaction are the most recent files only.
+    std::ostringstream key;
+    key << block.GetBlockTime() << ":" << block.GetHash().ToString();
+
     BlockDBValue value(block);
-    return pblockdb->Write(block.GetHash(), value);
+    return pblockdb->Write(key.str(), value);
 }
 
 bool ReadBlockFromDB(const CBlockIndex *pindex, BlockDBValue &value)
 {
-    return pblockdb->Read(pindex->GetBlockHash(), value);
+    // Create a key which will sort the database by the blocktime.  This is needed to prevent unnecessary
+    // compactions which hamper performance. Will a key sorted by time the only files that need to undergo
+    // compaction are the most recent files only.
+    std::ostringstream key;
+    key << pindex->GetBlockTime() << ":" << pindex->GetBlockHash().ToString();
+
+    return pblockdb->Read(key.str(), value);
 }
 
 bool UndoWriteToDB(const CBlockUndo &blockundo, const uint256 &hashBlock)
