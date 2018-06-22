@@ -1358,6 +1358,8 @@ void CThinBlockData::ClearThinBlockData(CNode *pnode, uint256 hash)
 
 void CThinBlockData::ClearThinBlockStats()
 {
+    LOCK(cs_thinblockstats);
+
     nOriginalSize.Clear();
     nThinSize.Clear();
     nBlocks.Clear();
