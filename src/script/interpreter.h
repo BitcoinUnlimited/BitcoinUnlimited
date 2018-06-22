@@ -120,21 +120,6 @@ uint256 SignatureHash(const CScript &scriptCode,
     uint32_t nHashType,
     const CAmount &amount,
     size_t *nHashedOut = NULL);
-// If you are validating signatures, you must call the appropriate function based on what fork you are on, because
-// the nHashType SIGHASH_FORKID bit is undefined in Legacy mode -- that is, it is valid to set it to one but still
-// sign using the legacy method
-uint256 SignatureHashBitcoinCash(const CScript &scriptCode,
-    const CTransaction &txTo,
-    unsigned int nIn,
-    uint32_t nHashType,
-    const CAmount &amount,
-    size_t *nHashedOut = NULL);
-uint256 SignatureHashLegacy(const CScript &scriptCode,
-    const CTransaction &txTo,
-    unsigned int nIn,
-    uint32_t nHashType,
-    const CAmount &amount,
-    size_t *nHashedOut);
 
 class BaseSignatureChecker
 {
