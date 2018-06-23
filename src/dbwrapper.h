@@ -19,6 +19,21 @@
 static const size_t DBWRAPPER_PREALLOC_KEY_SIZE = 64;
 static const size_t DBWRAPPER_PREALLOC_VALUE_SIZE = 1024;
 
+// DBWrapper leveldb options that can be modified rather than using the defaults defined in GetDefaultOptions().
+struct COverrideOptions
+{
+    size_t max_file_size;
+    size_t block_size;
+    size_t write_buffer_size;
+
+    COverrideOptions()
+    {
+        max_file_size = 0;
+        block_size = 0;
+        write_buffer_size = 0;
+    }
+};
+
 class dbwrapper_error : public std::runtime_error
 {
 public:
@@ -230,7 +245,8 @@ public:
         size_t nCacheSize,
         bool fMemory = false,
         bool fWipe = false,
-        bool obfuscate = false);
+        bool obfuscate = false,
+        COverrideOptions *pOverride = nullptr);
     ~CDBWrapper();
 
     template <typename K, typename V>

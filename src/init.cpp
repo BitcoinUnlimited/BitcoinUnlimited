@@ -1065,8 +1065,13 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                     pblocktree = new CBlockTreeDB(nBlockTreeDBCache, "blocks", false, fReindex);
                     pblocktreeother = new CBlockTreeDB(nBlockTreeDBCache, "blockdb", false, fReindex);
                 }
-                pblockdb = new CBlockDB("blocks", nBlockDBCache, false, false);
+
+                // we want to have much larger file sizes for the blocks db so override the default.
+                COverrideOptions override;
+                override.max_file_size = 128 << 20;
+                pblockdb = new CBlockDB("blocks", nBlockDBCache, false, false, false, &override);
                 pblockundodb = new CBlockDB("undo", nBlockUndoDBCache, false, false);
+
                 uiInterface.InitMessage(_("Opening UTXO database..."));
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);

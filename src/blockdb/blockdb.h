@@ -94,7 +94,7 @@ struct UndoDBValue
 class CBlockDB : public CDBWrapper
 {
 public:
-    CBlockDB(std::string folder, size_t nCacheSize, bool fMemory = false, bool fWipe = false);
+    CBlockDB(std::string folder, size_t nCacheSize, bool fMemory = false, bool fWipe = false, bool obfuscate = false, COverrideOptions *override = nullptr);
 
 private:
     CBlockDB(const CBlockDB &);

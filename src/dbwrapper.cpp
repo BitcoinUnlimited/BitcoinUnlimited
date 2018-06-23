@@ -60,7 +60,28 @@ static leveldb::Options GetDefaultOptions(size_t nCacheSize)
     return options;
 }
 
-CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize, bool fMemory, bool fWipe, bool obfuscate)
+static void OverrideOptions(leveldb::Options &_options, COverrideOptions *_pOverride)
+{
+    if (_pOverride == nullptr)
+        return;
+
+    // If an ovverride option was defined and is valid then modify the corresponding level db option.
+    if (_pOverride->max_file_size > 0)
+        _options.max_file_size = _pOverride->max_file_size;
+
+    if (_pOverride->block_size  > 0)
+        _options.block_size = _pOverride->block_size;
+
+    if (_pOverride->write_buffer_size > 0)
+        _options.write_buffer_size = _pOverride->write_buffer_size;
+}
+
+CDBWrapper::CDBWrapper(const fs::path &path,
+    size_t nCacheSize,
+    bool fMemory,
+    bool fWipe,
+    bool obfuscate,
+    COverrideOptions *pOverride)
 {
     penv = nullptr;
     readoptions.verify_checksums = true;
@@ -68,6 +89,10 @@ CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize, bool fMemory, bo
     iteroptions.fill_cache = false;
     syncoptions.sync = true;
     options = GetDefaultOptions(nCacheSize);
+
+    // Modify default database options
+    OverrideOptions(options, pOverride);
+
     if (fMemory)
     {
         penv = leveldb::NewMemEnv(leveldb::Env::Default());

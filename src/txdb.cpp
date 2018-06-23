@@ -702,8 +702,8 @@ void CacheSizeCalculations(int64_t _nTotalCache,
        _nBlockDBCache = _nTotalCache * 0.05;
        if (_nBlockDBCache < _nBlockTreeDBCache)
            _nBlockDBCache = _nBlockTreeDBCache;
-       else if (_nBlockDBCache > 200 << 20)
-           _nBlockDBCache = 200 << 20;
+       else if (_nBlockDBCache > 256 << 20)
+           _nBlockDBCache = 256 << 20;
 
         // use up to 1% for the level db undo cache but no bigger than 20MB
        _nBlockUndoDBcache = _nTotalCache * 0.01;
