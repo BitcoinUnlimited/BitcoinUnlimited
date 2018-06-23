@@ -41,7 +41,7 @@ static void SetMaxOpenFiles(leveldb::Options *options)
     LOGA("LevelDB using max_open_files=%d (default=%d)\n", options->max_open_files, default_open_files);
 }
 
-static leveldb::Options GetOptions(size_t nCacheSize)
+static leveldb::Options GetDefaultOptions(size_t nCacheSize)
 {
     leveldb::Options options;
     options.block_cache = leveldb::NewLRUCache(nCacheSize / 2);
@@ -54,19 +54,20 @@ static leveldb::Options GetOptions(size_t nCacheSize)
         // on corruption in later versions.
         options.paranoid_checks = true;
     }
+    options.create_if_missing = true;
+
     SetMaxOpenFiles(&options);
     return options;
 }
 
 CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize, bool fMemory, bool fWipe, bool obfuscate)
 {
-    penv = NULL;
+    penv = nullptr;
     readoptions.verify_checksums = true;
     iteroptions.verify_checksums = true;
     iteroptions.fill_cache = false;
     syncoptions.sync = true;
-    options = GetOptions(nCacheSize);
-    options.create_if_missing = true;
+    options = GetDefaultOptions(nCacheSize);
     if (fMemory)
     {
         penv = leveldb::NewMemEnv(leveldb::Env::Default());
@@ -111,13 +112,13 @@ CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize, bool fMemory, bo
 CDBWrapper::~CDBWrapper()
 {
     delete pdb;
-    pdb = NULL;
+    pdb = nullptr;
     delete options.filter_policy;
-    options.filter_policy = NULL;
+    options.filter_policy = nullptr;
     delete options.block_cache;
-    options.block_cache = NULL;
+    options.block_cache = nullptr;
     delete penv;
-    options.env = NULL;
+    options.env = nullptr;
 }
 
 bool CDBWrapper::WriteBatch(CDBBatch &batch, bool fSync)
