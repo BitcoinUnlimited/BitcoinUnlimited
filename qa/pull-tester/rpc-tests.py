@@ -438,27 +438,61 @@ class RPCTestHandler:
             self.num_running += 1
             t = self.test_list.pop(0)
             port_seed = ["--portseed={}".format(len(self.test_list) + self.portseed_offset)]
-            log_stdout = tempfile.SpooledTemporaryFile(max_size=2**16)
-            log_stderr = tempfile.SpooledTemporaryFile(max_size=2**16)
+            log_stdout = tempfile.SpooledTemporaryFile(max_size=2**16, mode="w+")
+            log_stderr = tempfile.SpooledTemporaryFile(max_size=2**16, mode="w+")
+            got_outputs = [False]
             self.jobs.append((t,
                               time.time(),
                               subprocess.Popen((RPC_TESTS_DIR + t).split() + self.flags.split() + port_seed,
                                                universal_newlines=True,
                                                stdout=subprocess.PIPE,
-                                               stderr=subprocess.PIPE)))
+                                               stderr=subprocess.PIPE),
+                              log_stdout, log_stderr, got_outputs))
         if not self.jobs:
             raise IndexError('pop from empty list')
         while True:
             # Return first proc that finishes
             time.sleep(.5)
             for j in self.jobs:
-                (name, time0, proc) = j
+                (name, time0, proc, log_stdout, log_stderr, got_outputs) = j
                 if os.getenv('TRAVIS') == 'true' and int(time.time() - time0) > 20 * 60:
                     # In travis, timeout individual tests after 20 minutes (to stop tests hanging and not
                     # providing useful output.
                     proc.send_signal(signal.SIGINT)
+
+                def comms(timeout):
+                    stdout_data, stderr_data = proc.communicate(timeout=timeout)
+                    log_stdout.write(stdout_data)
+                    log_stderr.write(stderr_data)
+
+
+                # Poll for new data on stdout and stderr. This is also necessary as to not block
+                # the subprocess when the stdout or stderr pipe is full.
+                try:
+                    # WARNING: There seems to be a bug in python handling of .join() so that
+                    # when you do a .join() with a zero or negative timeout, it will not even try
+                    # joining the thread. This is for the handling of the stdout/stderr reader threads
+                    # in subprocess.py. A sufficiently positive value (and 0.1s seems to be enough)
+                    # seems to make the .join() logic to work, and in turn communicate() not to fail
+                    # with a timeout, even though the thread is done reading (which was another cause
+                    # of a hang)
+                    comms(0.1)
+
+                    # .communicate() can only be called once and we have to keep in mind now that
+                    # communication happened properly (and the files are closed). It _has_ to be called with a non-None
+                    # timeout initially, however, to start the communication threads internal to subprocess.Popen(..)
+                    # that are necessary to not block on more output than what fits into the OS' pipe buffer.
+                    # Note that end-of-communication does not necessarily indicate a finished subprocess.
+                    got_outputs[0] = True
+                except subprocess.TimeoutExpired:
+                    pass
+
                 if proc.poll() is not None:
-                    (stdout, stderr) = proc.communicate(timeout=3)
+                    if not got_outputs[0]:
+                        comms(3)
+                    log_stdout.seek(0), log_stderr.seek(0)
+                    stdout = log_stdout.read()
+                    stderr = log_stderr.read()
                     passed = stderr == "" and proc.returncode == 0
                     self.num_running -= 1
                     self.jobs.remove(j)
