@@ -382,9 +382,12 @@ def runtests():
             all_passed = all_passed and passed
             time_sum += duration
 
-            print('\n' + BOLD[1] + name + BOLD[0] + ":")
-            print(stdout)
-            print('stderr:\n' if not stderr == '' else '', stderr)
+            print("\n"+"#"*50)
+            print(BOLD[1] + name + BOLD[0] + ":")
+            print("-"*50+'\nstdout:\n' if not stdout == '' else '', stdout)
+            print("-"*50+'\nstderr:\n' if not stderr == '' else '', stderr)
+            if stderr!="" or stdout!="":
+                print("-"*50)
             results += "%s | %s | %s s\n" % (name.ljust(max_len_name), str(passed).ljust(6), duration)
             print("Pass: %s%s%s, Duration: %s s\n" % (BOLD[1], passed, BOLD[0], duration))
 
