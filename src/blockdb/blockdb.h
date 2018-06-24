@@ -110,8 +110,8 @@ extern CBlockDB *pblockundodb;
 bool WriteBlockToDB(const CBlock &block);
 bool ReadBlockFromDB(const CBlockIndex *pindex, BlockDBValue &value);
 
-bool UndoWriteToDB(const CBlockUndo &blockundo, const uint256 &hashBlock);
-bool UndoReadFromDB(CBlockUndo &blockundo, const uint256 &hashBlock);
+bool UndoWriteToDB(const CBlockUndo &blockundo, const uint256 &hashBlock, const int64_t nBlockTime);
+bool UndoReadFromDB(CBlockUndo &blockundo, const uint256 &hashBlock, const int64_t nBlockTime);
 
 uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune);
 

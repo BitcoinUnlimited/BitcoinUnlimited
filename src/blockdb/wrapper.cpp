@@ -171,7 +171,7 @@ void SyncStorage(const CChainParams &chainparams)
                 if(pindexNew->nStatus & BLOCK_HAVE_UNDO && item.second.nUndoPos != 0)
                 {
                     CBlockUndo blockundo;
-                    if(UndoReadFromDB(blockundo, pindexNew->GetBlockHash()))
+                    if(UndoReadFromDB(blockundo, pindexNew->GetBlockHash(), pindexNew->GetBlockTime()))
                     {
                         CDiskBlockPos pos;
                         if (!FindUndoPos(state, pindexNew->nFile, pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
@@ -188,7 +188,7 @@ void SyncStorage(const CChainParams &chainparams)
                         {
                             prevHash.SetNull();
                         }
-                        if (!UndoWriteToDisk(blockundo, pos, prevHash, chainparams.MessageStart()))
+                        if (!UndoWriteToDisk(blockundo, pos, prevHash, pindexNew->GetBlockTime(), chainparams.MessageStart()))
                         {
                             LOGA("SyncStorage(): Failed to write undo data");
                             assert(false);
@@ -246,7 +246,7 @@ void SyncStorage(const CChainParams &chainparams)
                         if(tempindex->nStatus & BLOCK_HAVE_UNDO && tempindex->nUndoPos != 0)
                         {
                             CBlockUndo blockundo;
-                            if(!UndoReadFromDB(blockundo, it->second->GetBlockHash()))
+                            if(!UndoReadFromDB(blockundo, it->second->GetBlockHash(), it->second->GetBlockTime()))
                             {
                                 LOGA("SyncStorage(): failed to read undo data for block with hash %s \n", it->second->GetBlockHash().GetHex().c_str());
                                 continue;
@@ -266,7 +266,7 @@ void SyncStorage(const CChainParams &chainparams)
                             {
                                 prevHash.SetNull();
                             }
-                            if (!UndoWriteToDisk(blockundo, pos, prevHash, chainparams.MessageStart()))
+                            if (!UndoWriteToDisk(blockundo, pos, prevHash, it->second->GetBlockTime(), chainparams.MessageStart()))
                             {
                                 LOGA("SyncStorage(): Failed to write undo data");
                                 assert(false);
@@ -379,7 +379,7 @@ void SyncStorage(const CChainParams &chainparams)
                     LOGA("SyncStorage(): critical error, failure to read undo data from sequential files \n");
                     assert(false);
                 }
-                if(!UndoWriteToDB(blockundo, index->pprev->GetBlockHash()))
+                if(!UndoWriteToDB(blockundo, index->pprev->GetBlockHash(), index->GetBlockTime()))
                 {
                     LOGA("critical error, failed to write undo to db, asserting false \n");
                     assert(false);
@@ -453,7 +453,7 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex, const Consensus
     return false;
 }
 
-bool UndoWriteToDisk(const CBlockUndo &blockundo, CDiskBlockPos &pos, const uint256 &hashBlock, const CMessageHeader::MessageStartChars &messageStart)
+bool UndoWriteToDisk(const CBlockUndo &blockundo, CDiskBlockPos &pos, const uint256 &hashBlock, const int64_t nBlockTime, const CMessageHeader::MessageStartChars &messageStart)
 {
     if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
@@ -461,13 +461,13 @@ bool UndoWriteToDisk(const CBlockUndo &blockundo, CDiskBlockPos &pos, const uint
     }
     else if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        return UndoWriteToDB(blockundo, hashBlock);
+        return UndoWriteToDB(blockundo, hashBlock, nBlockTime);
     }
     // default return of false
     return false;
 }
 
-bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const uint256 &hashBlock)
+bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const uint256 &hashBlock, const int64_t nBlockTime)
 {
     if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
@@ -475,7 +475,7 @@ bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const uin
     }
     else if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        return UndoReadFromDB(blockundo, hashBlock);
+        return UndoReadFromDB(blockundo, hashBlock, nBlockTime);
     }
     // default return of false
     return true;
