@@ -698,19 +698,19 @@ void CacheSizeCalculations(int64_t _nTotalCache,
     _nTotalCache -= _nBlockTreeDBCache;
     if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        // use up to 5% for the level db block cache but no bigger than 200MB
+        // use up to 5% for the level db block cache but no bigger than 256MB
        _nBlockDBCache = _nTotalCache * 0.05;
        if (_nBlockDBCache < _nBlockTreeDBCache)
            _nBlockDBCache = _nBlockTreeDBCache;
        else if (_nBlockDBCache > 256 << 20)
            _nBlockDBCache = 256 << 20;
 
-        // use up to 1% for the level db undo cache but no bigger than 20MB
+        // use up to 1% for the level db undo cache but no bigger than 64MB
        _nBlockUndoDBcache = _nTotalCache * 0.01;
        if (_nBlockUndoDBcache < _nBlockTreeDBCache)
            _nBlockUndoDBcache = _nBlockTreeDBCache;
-       else if (_nBlockUndoDBcache > 20 << 20)
-           _nBlockUndoDBcache = 20 << 20;
+       else if (_nBlockUndoDBcache > 64 << 20)
+           _nBlockUndoDBcache = 64 << 20;
     }
 
     // use 25%-50% of the remainder for the utxo leveldb disk cache

@@ -1070,7 +1070,13 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 COverrideOptions override;
                 override.max_file_size = 128 << 20;
                 pblockdb = new CBlockDB("blocks", nBlockDBCache, false, false, false, &override);
-                pblockundodb = new CBlockDB("undo", nBlockUndoDBCache, false, false);
+
+                // Make the undo file max size larger than the default and also configure the write buffer
+                // to be a larger proportion of the overall cache since we don't really need a big read buffer
+                // for undo files.
+                override.max_file_size = 64 << 20;
+                override.write_buffer_size = override.max_file_size / 1.8;
+                pblockundodb = new CBlockDB("undo", nBlockUndoDBCache, false, false, false, &override);
 
                 uiInterface.InitMessage(_("Opening UTXO database..."));
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
