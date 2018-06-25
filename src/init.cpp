@@ -1068,14 +1068,14 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 
                 // we want to have much larger file sizes for the blocks db so override the default.
                 COverrideOptions override;
-                override.max_file_size = 128 << 20;
+                override.max_file_size = nBlockDBCache / 2;
                 pblockdb = new CBlockDB("blocks", nBlockDBCache, false, false, false, &override);
 
                 // Make the undo file max size larger than the default and also configure the write buffer
                 // to be a larger proportion of the overall cache since we don't really need a big read buffer
                 // for undo files.
-                override.max_file_size = 64 << 20;
-                override.write_buffer_size = override.max_file_size / 1.8;
+                override.max_file_size = nBlockUndoDBCache;
+                override.write_buffer_size = nBlockUndoDBCache / 1.8;
                 pblockundodb = new CBlockDB("undo", nBlockUndoDBCache, false, false, false, &override);
 
                 uiInterface.InitMessage(_("Opening UTXO database..."));
