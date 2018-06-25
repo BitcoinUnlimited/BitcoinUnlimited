@@ -55,7 +55,7 @@ public:
         assert(nReceiverPoolTx >= nBlockTxs - 1); // Assume reciever is missing only one tx
 
         if (nReceiverPoolTx > LARGE_MEM_POOL_SIZE)
-            throw error("Receiver mempool is too large for optimization");
+            throw std::runtime_error("Receiver mempool is too large for optimization");
 
         // Because we assumed the receiver is only missing only one tx
         uint64_t nBlockAndReceiverPoolTx = nBlockTxs - 1;
@@ -120,9 +120,9 @@ public:
             if (nItems < nReceiverUniverseItems + 1)
                 optSymDiff = OptimalSymDiff(nItems, nReceiverUniverseItems);
         }
-        catch (std::exception &e)
+        catch (const std::runtime_error &e)
         {
-            LOG(GRAPHENE, "failed to optimize symmetric difference for graphene\n");
+            LOG(GRAPHENE, "failed to optimize symmetric difference for graphene: %s\n", e.what());
         }
 
         // Sender's estimate of number of items in both block and receiver mempool
@@ -154,7 +154,7 @@ public:
             pSetFilter->insert(itemHash);
 
             if (mapCheapHashes.count(cheapHash))
-                throw error("Cheap hash collision while encoding graphene set");
+                throw std::runtime_error("Cheap hash collision while encoding graphene set");
 
             pSetIblt->insert(cheapHash, IBLT_NULL_VALUE);
             mapCheapHashes[cheapHash] = itemHash;
@@ -192,7 +192,7 @@ public:
             uint64_t cheapHash = itemHash.GetCheapHash();
 
             if (mapCheapHashes.count(cheapHash))
-                throw error("Cheap hash collision while decoding graphene set");
+                throw std::runtime_error("Cheap hash collision while decoding graphene set");
 
             if ((*pSetFilter).contains(itemHash))
             {
@@ -211,7 +211,7 @@ public:
         std::set<std::pair<uint64_t, std::vector<uint8_t> > > receiverHas;
 
         if (!((*pSetIblt) - localIblt).listEntries(senderHas, receiverHas))
-            throw error("Graphene set IBLT did not decode");
+            throw std::runtime_error("Graphene set IBLT did not decode");
 
         // Remove false positives from receiverSet
         for (const std::pair<uint64_t, std::vector<uint8_t> > &kv : receiverHas)

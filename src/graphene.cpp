@@ -519,9 +519,18 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
                 graphenedata.AddGrapheneBlockBytes(nGrapheneTxsPossessed * sizeof(uint64_t), pfrom);
             }
-            catch (std::exception &e)
+            catch (const std::runtime_error &e)
             {
-                return error("Graphene set could not be reconciled: requesting a full block");
+                std::vector<CInv> vGetData;
+                vGetData.push_back(CInv(MSG_BLOCK, header.GetHash()));
+                pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+
+                LOG(GRAPHENE, "Graphene set could not be reconciled; requesting a full block for peer %s: %s\n",
+                    pfrom->GetLogName(), e.what());
+
+                graphenedata.ClearGrapheneBlockData(pfrom, header.GetHash());
+
+                return true;
             }
 
             // Reconstruct the block if there are no hashes to re-request
@@ -1429,7 +1438,7 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv)
                 graphenedata.UpdateAdditionalTx(grapheneBlock.GetAdditionalTxSerializationSize());
             }
         }
-        catch (std::exception &e)
+        catch (const std::runtime_error &e)
         {
             pfrom->PushMessage(NetMsgType::BLOCK, *pblock);
             LOG(GRAPHENE,
