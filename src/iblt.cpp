@@ -22,6 +22,7 @@ SOFTWARE.
 */
 #include "iblt.h"
 #include "hash.h"
+#include "iblt_params.h"
 #include <cassert>
 #include <iostream>
 #include <list>
@@ -288,5 +289,5 @@ std::string CIblt::DumpTable() const
     return result.str();
 }
 
-size_t CIblt::OptimalNHash(size_t expectedNumEntries) { return 3; }
-float CIblt::OptimalOverhead(size_t expectedNumEntries) { return 1.5; }
+size_t CIblt::OptimalNHash(size_t expectedNumEntries) { return CIbltParams::Lookup(expectedNumEntries).numhashes; }
+float CIblt::OptimalOverhead(size_t expectedNumEntries) { return CIbltParams::Lookup(expectedNumEntries).overhead; }

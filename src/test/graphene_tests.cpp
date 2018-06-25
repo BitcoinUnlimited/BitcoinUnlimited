@@ -52,6 +52,52 @@ BOOST_AUTO_TEST_CASE(graphene_set_encodes_and_decodes)
     }
 }
 
+BOOST_AUTO_TEST_CASE(graphene_set_decodes_multiple_sizes)
+{
+    int SEED = 13;
+    size_t nItemList[] = {1, 10, 50, 500, 5000, 10000};
+    for (size_t nItems : nItemList)
+    {
+        std::vector<uint256> senderItems;
+        std::vector<uint64_t> senderCheapHashes;
+        std::vector<uint256> baseReceiverItems;
+        for (size_t i=1;i <= nItems;i++)
+        {
+            auto hash = SerializeHash(i-SEED);
+            senderItems.push_back(hash);
+            senderCheapHashes.push_back(hash.GetCheapHash());
+            baseReceiverItems.push_back(hash);
+        }
+
+        // Add 10 more items to receiver mempool
+        {
+            std::vector<uint256> receiverItems = baseReceiverItems;
+            for (size_t j=1;j < 11;j++)
+                receiverItems.push_back(SerializeHash(nItems+j+SEED));
+
+            CGrapheneSet senderGrapheneSet(receiverItems.size(), senderItems, true, true);
+            std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
+
+            BOOST_CHECK_EQUAL_COLLECTIONS(reconciledCheapHashes.begin(), reconciledCheapHashes.end(),
+                senderCheapHashes.begin(), senderCheapHashes.end());
+        }
+
+        // Add 100 more items to receiver mempool
+        {
+            std::vector<uint256> receiverItems = baseReceiverItems;
+            for (size_t j=1;j < 101;j++)
+                receiverItems.push_back(SerializeHash(nItems+j+SEED));
+
+            CGrapheneSet senderGrapheneSet(receiverItems.size(), senderItems, true, true);
+            std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
+
+            BOOST_CHECK_EQUAL_COLLECTIONS(reconciledCheapHashes.begin(), reconciledCheapHashes.end(),
+                senderCheapHashes.begin(), senderCheapHashes.end());
+        }
+
+    }
+}
+
 BOOST_AUTO_TEST_CASE(graphene_set_finds_optimal_settings)
 {
     const int SERIALIZATION_OVERHEAD = 10;

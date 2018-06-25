@@ -7,6 +7,9 @@
 #include "test/test_bitcoin.h"
 #include "utilstrencodings.h"
 
+const std::vector<uint8_t> IBLT_NULL_VALUE = {};
+const uint8_t IBLT_NULL_VALUE_SIZE = 0;
+
 std::vector<uint8_t> PseudoRandomValue(uint32_t n)
 {
     std::vector<uint8_t> result;
@@ -18,6 +21,23 @@ std::vector<uint8_t> PseudoRandomValue(uint32_t n)
 }
 
 BOOST_FIXTURE_TEST_SUITE(iblt_tests, BasicTestingSetup)
+
+BOOST_AUTO_TEST_CASE(iblt_handles_small_quantities)
+{
+	bool allPassed = true;
+	for (size_t nItems=1;nItems < 100;nItems++)
+	{
+		CIblt t(nItems, IBLT_NULL_VALUE_SIZE);
+
+		for (size_t i=0;i < nItems;i++)
+			t.insert(i, IBLT_NULL_VALUE);
+
+		std::set<std::pair<uint64_t, std::vector<uint8_t> > > entries;
+		allPassed = allPassed && t.listEntries(entries, entries);
+	}
+
+	BOOST_CHECK(allPassed);
+}
 
 BOOST_AUTO_TEST_CASE(iblt_erases_properly)
 {
