@@ -4,13 +4,12 @@
 #
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 import pdb
 import sys
 if sys.version_info[0] < 3:
     raise "Use Python 3"
 import logging
-logging.basicConfig(format='%(asctime)s.%(levelname)s: %(message)s', level=logging.INFO, stream=sys.stdout)
 
 # Test validateblocktemplate RPC call
 from test_framework.key import CECKey
@@ -341,4 +340,7 @@ if __name__ == '__main__':
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"]
     }
-    ValidateblocktemplateTest().main([],bitcoinConf)
+    args = []
+    if "--no-ipv6-rpc-listen":
+        args.append("--no-ipv6-rpc-listen")
+    ValidateblocktemplateTest().main(args,bitcoinConf)

@@ -2,13 +2,12 @@
 # Copyright (c) 2018 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 import time
 import sys
 if sys.version_info[0] < 3:
     raise "Use Python 3"
 import logging
-logging.basicConfig(format='%(asctime)s.%(levelname)s: %(message)s', level=logging.INFO, stream=sys.stdout)
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *

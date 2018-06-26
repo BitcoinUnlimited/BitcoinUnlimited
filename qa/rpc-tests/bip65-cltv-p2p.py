@@ -2,7 +2,7 @@
 # Copyright (c) 2015-2016 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import *
 from test_framework.mininode import CTransaction, NetworkThread

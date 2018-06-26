@@ -3,7 +3,7 @@
 # Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 """
 Exercise the wallet backup code.  Ported from walletbackup.sh.
 
@@ -39,7 +39,6 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 from random import randint
 import logging
-logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO, stream=sys.stdout)
 
 class WalletBackupTest(BitcoinTestFramework):
 

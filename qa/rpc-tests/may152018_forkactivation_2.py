@@ -5,7 +5,7 @@
 """
 This test checks activation of may152018 opcodes
 """
-
+import test_framework.loginit
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import satoshi_round, assert_equal, assert_raises_rpc_error
 from test_framework.comptool import TestManager, TestInstance, RejectResult

@@ -3,7 +3,7 @@
 # Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 # Exercise the getchaintips API.  We introduce a network split, work
 # on chains of different lengths, and join the network together again.
 # This gives us two tips, verify that it works.
