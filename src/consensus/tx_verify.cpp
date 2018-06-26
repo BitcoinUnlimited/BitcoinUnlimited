@@ -5,6 +5,7 @@
 #include "tx_verify.h"
 
 #include "consensus.h"
+#include "main.h"
 #include "primitives/transaction.h"
 #include "script/interpreter.h"
 #include "unlimited.h"
@@ -15,7 +16,8 @@
 #include "coins.h"
 #include "utilmoneystr.h"
 
-int GetSpendHeight(const CCoinsViewCache &inputs);
+#include <boost/scope_exit.hpp>
+
 
 bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
 {
@@ -205,6 +207,38 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
     return true;
 }
 
+/**
+ * Return the spend height, which is one more than the inputs.GetBestBlock().
+ * While checking, GetBestBlock() refers to the parent block. (protected by cs_main)
+ * This is also true for mempool checks.
+ */
+static int GetSpendHeight(const CCoinsViewCache &inputs)
+{
+    AssertLockHeld(inputs.cs_utxo);
+
+    // Must leave cs_utxo in order to maintain correct locking order with cs_main. We re-aquire
+    // cs_utxo when we leave this scope.
+    LEAVE_CRITICAL_SECTION(inputs.cs_utxo);
+
+    // Scope guard to make sure cs_utxo gets locked upon leaving ths scope whether or not we throw an exception.
+    BOOST_SCOPE_EXIT(&inputs) { ENTER_CRITICAL_SECTION(inputs.cs_utxo); }
+    BOOST_SCOPE_EXIT_END
+
+    LOCK(cs_main);
+    BlockMap::iterator i = mapBlockIndex.find(inputs.GetBestBlock());
+    if (i != mapBlockIndex.end())
+    {
+        CBlockIndex *pindexPrev = i->second;
+        if (pindexPrev)
+            return pindexPrev->nHeight + 1;
+        else
+        {
+            throw std::runtime_error("GetSpendHeight(): mapBlockIndex contains null block");
+        }
+    }
+    throw std::runtime_error("GetSpendHeight(): best block does not exist");
+}
+
 bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, const CCoinsViewCache &inputs)
 {
     // This doesn't trigger the DoS code on purpose; if it did, it would make it easier
@@ -234,11 +268,7 @@ bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, c
                 // If there are multiple coinbase spends we still only need to get the spend height once.
                 if (nSpendHeight == -1)
                 {
-                    // GetSpendHeight requires cs_main but in order to maintain proper locking order cs_utxo
-                    // must be taken after cs_main.
-                    LEAVE_CRITICAL_SECTION(inputs.cs_utxo);
                     nSpendHeight = GetSpendHeight(inputs);
-                    ENTER_CRITICAL_SECTION(inputs.cs_utxo);
                 }
                 if (nSpendHeight - nCoinHeight < COINBASE_MATURITY)
                     return state.Invalid(false, REJECT_INVALID, "bad-txns-premature-spend-of-coinbase",
