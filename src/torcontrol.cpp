@@ -306,7 +306,7 @@ static std::map<std::string, std::string> ParseTorReplyMapping(const std::string
                 return std::map<std::string, std::string>();
             ++ptr; // skip closing '"'
             /* TODO: unescape value - according to the spec this depends on the
-             * context, some strings use C-LogPrintf style escape codes, some
+             * context, some strings use C-LOG style escape codes, some
              * don't. So may be better handled at the call site.
              */
         }
