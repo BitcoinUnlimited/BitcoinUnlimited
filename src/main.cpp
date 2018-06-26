@@ -1321,22 +1321,6 @@ bool CScriptCheck::operator()()
     return true;
 }
 
-int GetSpendHeight(const CCoinsViewCache &inputs)
-{
-    LOCK(cs_main);
-    BlockMap::iterator i = mapBlockIndex.find(inputs.GetBestBlock());
-    if (i != mapBlockIndex.end())
-    {
-        CBlockIndex *pindexPrev = i->second;
-        if (pindexPrev)
-            return pindexPrev->nHeight + 1;
-        else
-        {
-            throw std::runtime_error("GetSpendHeight(): mapBlockIndex contains null block");
-        }
-    }
-    throw std::runtime_error("GetSpendHeight(): best block does not exist");
-}
 
 bool CheckInputs(const CTransaction &tx,
     CValidationState &state,
@@ -2146,6 +2130,7 @@ bool ConnectBlock(const CBlock &block,
             // if we end up here then the signature verification failed and we must re-lock cs_main before returning.
             return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs", false, "parallel script check failed");
         }
+
         if (PV->QuitReceived(this_id, fParallel))
         {
             return false;
