@@ -132,3 +132,9 @@ script:
 after_script:
     - echo $TRAVIS_COMMIT_RANGE
     - echo $TRAVIS_COMMIT_LOG
+
+after_failure:
+    - for i in `find /home/travis/ -name debug.log`; do echo $i; echo "-----"; cat $i; done
+    - for i in `find /tmp/ -name debug.log`; do echo $i; echo "-----"; cat $i; done
+    - for i in `find /home/travis/ -name bitcoin.conf`; do echo $i; echo "-----"; cat $i; done
+    - for i in `find /tmp/ -name bitcoin.conf`; do echo $i; echo "-----"; cat $i; done
