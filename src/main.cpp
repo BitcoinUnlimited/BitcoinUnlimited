@@ -1773,7 +1773,7 @@ static uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::
     uint32_t flags = SCRIPT_VERIFY_NONE;
 
     // Start enforcing P2SH (Bip16)
-    if (pindex->GetBlockTime() >= consensusparams.BIP16Height)
+    if (pindex->nHeight >= consensusparams.BIP16Height)
     {
         flags |= SCRIPT_VERIFY_P2SH;
     }
