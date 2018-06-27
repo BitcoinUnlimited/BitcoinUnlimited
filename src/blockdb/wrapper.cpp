@@ -147,8 +147,8 @@ void SyncStorage(const CChainParams &chainparams)
                 if(pindexNew->nStatus & BLOCK_HAVE_DATA && item.second.nDataPos != 0)
                 {
                     BlockDBValue blockValue;
-                    pblockdb->Read(pindexNew->GetBlockHash(), blockValue);
-                    CBlock block_lev = blockValue.block;
+                    CBlock block_lev;
+                    pblockdb->ReadBlock(pindexNew->GetBlockHash(), blockValue, block_lev);
                     unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
                     CDiskBlockPos blockPos;
                     if (!FindBlockPos(state, blockPos, nBlockSize + 8, blockValue.blockHeight, block_lev.GetBlockTime(), false))
@@ -224,8 +224,8 @@ void SyncStorage(const CChainParams &chainparams)
                     if(tempindex->nStatus & BLOCK_HAVE_DATA && tempindex->nDataPos != 0)
                     {
                         BlockDBValue blockValue;
-                        pblockdb->Read(it->second->GetBlockHash(), blockValue);
-                        CBlock block_lev = blockValue.block;
+                        CBlock block_lev;
+                        pblockdb->ReadBlock(it->second->GetBlockHash(), blockValue, block_lev);
                         unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
                         CDiskBlockPos blockPos;
                         if (!FindBlockPos(state, blockPos, nBlockSize + 8, blockValue.blockHeight, block_lev.GetBlockTime(), false))
@@ -438,12 +438,11 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex, const Consensus
     {
         BlockDBValue value;
         block.SetNull();
-        if(!ReadBlockFromDB(pindex, value))
+        if(!ReadBlockFromDB(pindex, value, block))
         {
             LOGA("failed to read block with hash %s from leveldb \n", pindex->GetBlockHash().GetHex().c_str());
             return false;
         }
-        block = value.block;
         if(block.GetHash() != pindex->GetBlockHash())
         {
             return error("ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() doesn't match index for %s at %s", pindex->ToString(), pindex->GetBlockPos().ToString());
