@@ -1836,14 +1836,13 @@ bool ConnectBlock(const CBlock &block,
     CValidationState &state,
     CBlockIndex *pindex,
     CCoinsViewCache &view,
+    const CChainParams &chainparams,
     bool fJustCheck,
     bool fParallel)
 {
     /** BU: Start Section to validate inputs - if there are parallel blocks being checked
      *      then the winner of this race will get to update the UTXO.
      */
-
-    const CChainParams &chainparams = Params();
     AssertLockHeld(cs_main);
 
     int64_t nTimeStart = GetTimeMicros();
@@ -2636,7 +2635,7 @@ bool static ConnectTip(CValidationState &state,
     LOG(BENCH, "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
     {
         CCoinsViewCache view(pcoinsTip);
-        bool rv = ConnectBlock(*pblock, state, pindexNew, view, false, fParallel);
+        bool rv = ConnectBlock(*pblock, state, pindexNew, view, chainparams, false, fParallel);
         GetMainSignals().BlockChecked(*pblock, state);
         if (!rv)
         {
@@ -3949,7 +3948,7 @@ bool TestBlockValidity(CValidationState &state,
         return false;
     if (!ContextualCheckBlock(block, state, pindexPrev))
         return false;
-    if (!ConnectBlock(block, state, &indexDummy, viewNew, true))
+    if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true))
         return false;
     assert(state.IsValid());
 
@@ -4368,7 +4367,7 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
             if (!ReadBlockFromDisk(block, pindex, chainparams.GetConsensus()))
                 return error("VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s", pindex->nHeight,
                     pindex->GetBlockHash().ToString());
-            if (!ConnectBlock(block, state, pindex, coins))
+            if (!ConnectBlock(block, state, pindex, coins, chainparams))
                 return error("VerifyDB(): *** found unconnectable block at %d, hash=%s", pindex->nHeight,
                     pindex->GetBlockHash().ToString());
         }
