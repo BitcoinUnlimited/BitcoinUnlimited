@@ -148,21 +148,29 @@ void SyncStorage(const CChainParams &chainparams)
                 {
                     BlockDBValue blockValue;
                     CBlock block_lev;
-                    pblockdb->ReadBlock(pindexNew->GetBlockHash(), blockValue, block_lev);
-                    unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
-                    CDiskBlockPos blockPos;
-                    if (!FindBlockPos(state, blockPos, nBlockSize + 8, blockValue.blockHeight, block_lev.GetBlockTime(), false))
+                    std::ostringstream key;
+                    key << pindexNew->GetBlockTime() << ":" << pindexNew->GetBlockHash().ToString();
+                    if(pblockdb->ReadBlock(key.str(), blockValue, block_lev))
                     {
-                        LOGA("SyncStorage(): couldnt find block pos when syncing sequential with info stored in db, asserting false \n");
-                        assert(false);
+                        unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
+                        CDiskBlockPos blockPos;
+                        if (!FindBlockPos(state, blockPos, nBlockSize + 8, blockValue.blockHeight, block_lev.GetBlockTime(), false))
+                        {
+                            LOGA("SyncStorage(): couldnt find block pos when syncing sequential with info stored in db, asserting false \n");
+                            assert(false);
+                        }
+                        if (!WriteBlockToDiskSequential(block_lev, blockPos, chainparams.MessageStart()))
+                        {
+                            AbortNode(state, "Failed to sync block from db to sequential files");
+                        }
+                        // set this blocks file and data pos
+                        pindexNew->nFile = blockPos.nFile;
+                        pindexNew->nDataPos = blockPos.nPos;
                     }
-                    if (!WriteBlockToDiskSequential(block_lev, blockPos, chainparams.MessageStart()))
+                    else
                     {
-                        AbortNode(state, "Failed to sync block from db to sequential files");
+                        pindexNew->nStatus &= BLOCK_HAVE_DATA;
                     }
-                    // set this blocks file and data pos
-                    pindexNew->nFile = blockPos.nFile;
-                    pindexNew->nDataPos = blockPos.nPos;
                 }
                 else
                 {
@@ -216,54 +224,64 @@ void SyncStorage(const CChainParams &chainparams)
                     {
                         BlockDBValue blockValue;
                         CBlock block_lev;
-                        pblockdb->ReadBlock(it->second->GetBlockHash(), blockValue, block_lev);
-                        unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
-                        CDiskBlockPos blockPos;
-                        if (!FindBlockPos(state, blockPos, nBlockSize + 8, blockValue.blockHeight, block_lev.GetBlockTime(), false))
+                        std::ostringstream key;
+                        key << it->second->GetBlockTime() << ":" << it->second->GetBlockHash().ToString();
+                        if(pblockdb->ReadBlock(key.str(), blockValue, block_lev))
                         {
-                            LOGA("SyncStorage(): couldnt find block pos when syncing sequential with info stored in db, asserting false \n");
-                            assert(false);
+                            unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
+                            CDiskBlockPos blockPos;
+                            if (!FindBlockPos(state, blockPos, nBlockSize + 8, blockValue.blockHeight, block_lev.GetBlockTime(), false))
+                            {
+                                LOGA("SyncStorage(): couldnt find block pos when syncing sequential with info stored in db, asserting false \n");
+                                assert(false);
+                            }
+                            if (!WriteBlockToDiskSequential(block_lev, blockPos, chainparams.MessageStart()))
+                            {
+                                LOGA("Failed to sync block from db to sequential files");
+                                assert(false);
+                            }
+                            // set this blocks file and data pos
+                            it->second->nFile = blockPos.nFile;
+                            it->second->nDataPos = blockPos.nPos;
                         }
-                        if (!WriteBlockToDiskSequential(block_lev, blockPos, chainparams.MessageStart()))
+                        else
                         {
-                            AbortNode(state, "Failed to sync block from db to sequential files");
+                            it->second->nStatus &= BLOCK_HAVE_DATA;
                         }
-                        // set this blocks file and data pos
-                        it->second->nFile = blockPos.nFile;
-                        it->second->nDataPos = blockPos.nPos;
+                    }
+                    else
+                    {
+                        it->second->nStatus &= BLOCK_HAVE_DATA;
                     }
                     if((it->second->nStatus & BLOCK_HAVE_UNDO) == false)
                     {
                         if(tempindex->nStatus & BLOCK_HAVE_UNDO && tempindex->nUndoPos != 0)
                         {
                             CBlockUndo blockundo;
-                            if(!UndoReadFromDB(blockundo, it->second))
+                            if(UndoReadFromDB(blockundo, it->second))
                             {
-                                LOGA("SyncStorage(): failed to read undo data for block with hash %s \n", it->second->GetBlockHash().GetHex().c_str());
-                                continue;
-                            }
-                            CDiskBlockPos pos;
-                            if (!FindUndoPos(state, it->second->nFile, pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
-                            {
-                                LOGA("SyncStorage(): FindUndoPos failed");
-                                assert(false);
-                            }
-                            uint256 prevHash;
-                            if (it->second->pprev) // genesis block prev hash is 0
-                            {
-                                prevHash = it->second->pprev->GetBlockHash();
+                                CDiskBlockPos pos;
+                                if (!FindUndoPos(state, it->second->nFile, pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
+                                {
+                                    LOGA("SyncStorage(): FindUndoPos failed");
+                                    assert(false);
+                                }
+                                if (!UndoWriteToDisk(blockundo, pos, it->second, chainparams.MessageStart()))
+                                {
+                                    LOGA("SyncStorage(): Failed to write undo data");
+                                    assert(false);
+                                }
+                                // update nUndoPos in block index
+                                it->second->nUndoPos = pos.nPos;
                             }
                             else
                             {
-                                prevHash.SetNull();
+                                it->second->nStatus &= BLOCK_HAVE_UNDO;
                             }
-                            if (!UndoWriteToDisk(blockundo, pos, it->second, chainparams.MessageStart()))
-                            {
-                                LOGA("SyncStorage(): Failed to write undo data");
-                                assert(false);
-                            }
-                            // update nUndoPos in block index
-                            it->second->nUndoPos = pos.nPos;
+                        }
+                        else
+                        {
+                            it->second->nStatus &= BLOCK_HAVE_UNDO;
                         }
                     }
                 }
