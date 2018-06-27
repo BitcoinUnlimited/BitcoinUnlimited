@@ -470,17 +470,18 @@ static void ApplyStats(CCoinsStats &stats,
 {
     assert(!outputs.empty());
     ss << hash;
-    ss << VARINT(outputs.begin()->second.nHeight * 2 + outputs.begin()->second.fCoinBase);
+    ss << VARINT(
+        outputs.begin()->second.nHeight * 2 + outputs.begin()->second.fCoinBase, VarIntMode::NONNEGATIVE_SIGNED);
     stats.nTransactions++;
     for (const auto output : outputs)
     {
         ss << VARINT(output.first + 1);
         ss << *(const CScriptBase *)(&output.second.out.scriptPubKey);
-        ss << VARINT(output.second.out.nValue);
+        ss << VARINT(output.second.out.nValue, VarIntMode::NONNEGATIVE_SIGNED);
         stats.nTransactionOutputs++;
         stats.nTotalAmount += output.second.out.nValue;
     }
-    ss << VARINT(0);
+    ss << VARINT(0u);
 }
 
 //! Calculate statistics about the unspent transaction output set
