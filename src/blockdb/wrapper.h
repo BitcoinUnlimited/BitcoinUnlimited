@@ -35,8 +35,8 @@ void SyncStorage(const CChainParams &chainparams);
 bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex, const Consensus::Params &consensusParams);
 bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHeader::MessageStartChars &messageStart);
 
-bool UndoWriteToDisk(const CBlockUndo &blockundo, CDiskBlockPos &pos, const uint256 &hashBlock, const int64_t nBlockTime, const CMessageHeader::MessageStartChars &messageStart);
-bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const uint256 &hashBlock, const int64_t nBlockTime);
+bool UndoWriteToDisk(const CBlockUndo &blockundo, CDiskBlockPos &pos, const CBlockIndex* pindex, const CMessageHeader::MessageStartChars &messageStart);
+bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const CBlockIndex* pindex);
 
 /**
  * Prune block and undo files (blk???.dat and undo???.dat) so that the disk space used is less than a user-defined

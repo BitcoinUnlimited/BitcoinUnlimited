@@ -48,12 +48,23 @@ bool ReadBlockFromDB(const CBlockIndex *pindex, BlockDBValue &value, CBlock &blo
     return pblockdb->ReadBlock(key.str(), value, block);
 }
 
-bool UndoWriteToDB(const CBlockUndo &blockundo, const uint256 &hashBlock, const int64_t nBlockTime)
+bool UndoWriteToDB(const CBlockUndo &blockundo, const CBlockIndex* pindex)
 {
     // Create a key which will sort the database by the blocktime.  This is needed to prevent unnecessary
     // compactions which hamper performance. Will a key sorted by time the only files that need to undergo
     // compaction are the most recent files only.
     std::ostringstream key;
+    uint256 hashBlock;
+    int64_t nBlockTime = 0;
+    if(pindex)
+    {
+        hashBlock = pindex->GetBlockHash();
+        nBlockTime = pindex->GetBlockTime();
+    }
+    else
+    {
+        hashBlock.SetNull();
+    }
     key << nBlockTime << ":" << hashBlock.ToString();
 
     // calculate & write checksum
@@ -64,12 +75,23 @@ bool UndoWriteToDB(const CBlockUndo &blockundo, const uint256 &hashBlock, const 
     return pblockundodb->Write(key.str(), value);
 }
 
-bool UndoReadFromDB(CBlockUndo &blockundo, const uint256 &hashBlock, const int64_t nBlockTime)
+bool UndoReadFromDB(CBlockUndo &blockundo, const CBlockIndex* pindex)
 {
     // Create a key which will sort the database by the blocktime.  This is needed to prevent unnecessary
     // compactions which hamper performance. Will a key sorted by time the only files that need to undergo
     // compaction are the most recent files only.
     std::ostringstream key;
+    uint256 hashBlock;
+    int64_t nBlockTime = 0;
+    if(pindex)
+    {
+        hashBlock = pindex->GetBlockHash();
+        nBlockTime = pindex->GetBlockTime();
+    }
+    else
+    {
+        hashBlock.SetNull();
+    }
     key << nBlockTime << ":" << hashBlock.ToString();
 
     // Read block
