@@ -1237,10 +1237,10 @@ UniValue ListReceived(const UniValue &params, bool fByAccounts)
 
         if (fByAccounts)
         {
-            tallyitem &item = mapAccountTally[strAccount];
-            item.nAmount += nAmount;
-            item.nConf = min(item.nConf, nConf);
-            item.fIsWatchonly = fIsWatchonly;
+            tallyitem &item2 = mapAccountTally[strAccount];
+            item2.nAmount += nAmount;
+            item2.nConf = min(item2.nConf, nConf);
+            item2.fIsWatchonly = fIsWatchonly;
         }
         else
         {
@@ -1261,9 +1261,9 @@ UniValue ListReceived(const UniValue &params, bool fByAccounts)
             UniValue transactions(UniValue::VARR);
             if (it != mapTally.end())
             {
-                for (const uint256 &item : (*it).second.txids)
+                for (const uint256 &item3 : (*it).second.txids)
                 {
-                    transactions.push_back(item.GetHex());
+                    transactions.push_back(item3.GetHex());
                 }
             }
             obj.push_back(Pair("txids", transactions));
@@ -2686,10 +2686,10 @@ UniValue listunspent(const UniValue &params, bool fHelp)
         entry.push_back(Pair("scriptPubKey", HexStr(pk.begin(), pk.end())));
         if (pk.IsPayToScriptHash())
         {
-            CTxDestination address;
-            if (ExtractDestination(pk, address))
+            CTxDestination address2;
+            if (ExtractDestination(pk, address2))
             {
-                const CScriptID &hash = boost::get<CScriptID>(address);
+                const CScriptID &hash = boost::get<CScriptID>(address2);
                 CScript redeemScript;
                 if (pwalletMain->GetCScript(hash, redeemScript))
                     entry.push_back(Pair("redeemScript", HexStr(redeemScript.begin(), redeemScript.end())));
