@@ -496,7 +496,8 @@ bool DisconnectBlock(const CBlock &block,
 bool ConnectBlock(const CBlock &block,
     CValidationState &state,
     CBlockIndex *pindex,
-    CCoinsViewCache &coins,
+    CCoinsViewCache &view,
+    const CChainParams &chainparams,
     bool fJustCheck = false,
     bool fParallel = false);
 
