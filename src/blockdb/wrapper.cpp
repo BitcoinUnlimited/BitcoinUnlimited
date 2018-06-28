@@ -154,7 +154,7 @@ void SyncStorage(const CChainParams &chainparams)
                     {
                         unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
                         CDiskBlockPos blockPos;
-                        if (!FindBlockPos(state, blockPos, nBlockSize + 8, blockValue.blockHeight, block_lev.GetBlockTime(), false))
+                        if (!FindBlockPos(state, blockPos, nBlockSize + 8, pindexNew->nHeight, block_lev.GetBlockTime(), false))
                         {
                             LOGA("SyncStorage(): couldnt find block pos when syncing sequential with info stored in db, asserting false \n");
                             assert(false);
@@ -230,7 +230,7 @@ void SyncStorage(const CChainParams &chainparams)
                         {
                             unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
                             CDiskBlockPos blockPos;
-                            if (!FindBlockPos(state, blockPos, nBlockSize + 8, blockValue.blockHeight, block_lev.GetBlockTime(), false))
+                            if (!FindBlockPos(state, blockPos, nBlockSize + 8, it->second->nHeight, block_lev.GetBlockTime(), false))
                             {
                                 LOGA("SyncStorage(): couldnt find block pos when syncing sequential with info stored in db, asserting false \n");
                                 assert(false);

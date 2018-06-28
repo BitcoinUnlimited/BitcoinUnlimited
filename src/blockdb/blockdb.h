@@ -24,32 +24,25 @@ const int32_t CURRENT_VERSION = 1;
 struct BlockDBValue
 {
     int32_t nVersion;
-    uint64_t blockHeight;
     const CBlock* block;
-    // only used for pruning
-    CBlock blocktemp;
 
     BlockDBValue()
     {
-        nVersion = 0;
-        blockHeight = 0;
+        nVersion = CURRENT_VERSION;
         block = nullptr;
     }
 
     BlockDBValue(const CBlock* _block)
     {
         assert(_block->IsNull() == false);
-        this->block = _block;
         this->nVersion = CURRENT_VERSION;
-        this->blockHeight = this->block->GetHeight();
+        this->block = _block;
     }
 
     template <typename Stream>
     void Serialize(Stream &s) const
     {
-        // CSerActionSerialize() ser_action();
         ::SerReadWriteMany(s, CSerActionSerialize(), nVersion);
-        ::SerReadWriteMany(s, CSerActionSerialize(), blockHeight);
         s << *block;
     }
 
@@ -134,7 +127,6 @@ public:
             CDataStream ssValue(strValue.data(), strValue.data() + strValue.size(), SER_DISK, CLIENT_VERSION);
             ssValue.Xor(obfuscate_key);
             ssValue.read((char *)&value.nVersion, sizeof(uint32_t));
-            ssValue.read((char *)&value.blockHeight, sizeof(uint64_t));
             value.Unserialize(ssValue, block);
         }
         catch (const std::exception &)
