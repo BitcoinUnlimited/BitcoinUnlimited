@@ -150,6 +150,7 @@ cd "%BITCOIN_GIT_ROOT%\src"
 copy bitcoin-tx.exe "%BUILD_OUTPUT%\bitcoin-tx.exe"
 copy bitcoin-cli.exe "%BUILD_OUTPUT%\bitcoin-cli.exe"
 copy bitcoind.exe "%BUILD_OUTPUT%\bitcoind.exe"
+copy bitcoin-miner.exe "%BUILD_OUTPUT%\bitcoin-miner.exe"
 
 REM cd to src\qt to copy bitcoin-qt.exe
 cd qt
