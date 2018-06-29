@@ -405,7 +405,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     else
     {
         // We have all the transactions now that are in this block: try to reassemble and process.
-        CInv inv(CInv(MSG_BLOCK, thinBlockTx.blockhash));
+        CInv inv2(CInv(MSG_BLOCK, thinBlockTx.blockhash));
 
         // for compression statistics, we have to add up the size of xthinblock and the re-requested thinBlockTx.
         int nSizeThinBlockTx = msgSize;
@@ -423,7 +423,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
         // create a non-deleting shared pointer to wrap pfrom->thinBlock.  We know that thinBlock will outlast the
         // thread because the thread has a node reference.
-        PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->thinBlock), inv);
+        PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->thinBlock), inv2);
     }
 
     return true;
@@ -691,7 +691,7 @@ bool CXThinBlock::process(CNode *pfrom,
     // for a collision.
     int missingCount = 0;
     int unnecessaryCount = 0;
-    bool collision = false;
+    bool _collision = false;
     std::map<uint64_t, uint256> mapPartialTxHash;
     std::vector<uint256> memPoolHashes;
     std::set<uint64_t> setHashesToRequest;
@@ -704,7 +704,7 @@ bool CXThinBlock::process(CNode *pfrom,
         {
             uint64_t cheapHash = mi.first.GetCheapHash();
             if (mapPartialTxHash.count(cheapHash)) // Check for collisions
-                collision = true;
+                _collision = true;
             mapPartialTxHash[cheapHash] = mi.first;
         }
 
@@ -715,7 +715,7 @@ bool CXThinBlock::process(CNode *pfrom,
         {
             uint64_t cheapHash = memPoolHashes[i].GetCheapHash();
             if (mapPartialTxHash.count(cheapHash)) // Check for collisions
-                collision = true;
+                _collision = true;
             mapPartialTxHash[cheapHash] = memPoolHashes[i];
         }
         for (auto &mi : pfrom->mapMissingTx)
@@ -732,13 +732,13 @@ bool CXThinBlock::process(CNode *pfrom,
                 // Check if it really is a cheap hash collision and not just the same transaction
                 if (existingHash != mi.second->GetHash())
                 {
-                    collision = true;
+                    _collision = true;
                 }
             }
             mapPartialTxHash[cheapHash] = mi.second->GetHash();
         }
 
-        if (!collision)
+        if (!_collision)
         {
             // Start gathering the full tx hashes. If some are not available then add them to setHashesToRequest.
             uint256 nullhash;
@@ -781,7 +781,7 @@ bool CXThinBlock::process(CNode *pfrom,
     // a full thinblock if a mismatch occurs.
     // Also, there is a remote possiblity of a Tx hash collision therefore if it occurs we re-request a normal
     // thinblock which has the full Tx hash data rather than just the truncated hash.
-    if (collision || !fMerkleRootCorrect)
+    if (_collision || !fMerkleRootCorrect)
     {
         std::vector<CInv> vGetData;
         vGetData.push_back(CInv(MSG_THINBLOCK, header.GetHash()));
