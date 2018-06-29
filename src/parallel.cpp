@@ -20,7 +20,9 @@
 
 using namespace std;
 
+// see at doc/bu-parallel-validation.md to get the details
 static const unsigned int nScriptCheckQueues = 4;
+
 std::unique_ptr<CParallelValidation> PV;
 
 static void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef pblock, const CInv inv);

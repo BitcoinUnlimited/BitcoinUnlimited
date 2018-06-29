@@ -260,7 +260,8 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addArg("par=<n>", requiredInt, strprintf(_("Set the number of script verification threads (%u to %d, 0 = "
                                                     "auto, <0 = leave that many cores free, default: %d)"),
                                             -GetNumCores(), MAX_SCRIPTCHECK_THREADS, DEFAULT_SCRIPTCHECK_THREADS))
-        .addArg("parallel=<n>", optionalBool, strprintf(_("Turn Parallel Block Validation on or off (default: %u)"), 1))
+        .addArg("parallel={true,false,0,1}", optionalBool,
+            strprintf(_("Turn Parallel Block Validation on or off (default: %u)"), true))
 #ifndef WIN32
         .addArg("pid=<file>", requiredStr, strprintf(_("Specify pid file (default: %s)"), BITCOIN_PID_FILENAME))
 #endif
