@@ -129,7 +129,7 @@ uint64_t BlockAssembler::reserveBlockSize(const CScript &scriptPubKeyIn)
     return nHeaderSize + std::max(nCoinbaseSize, coinbaseReserve.value);
 }
 
-CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue)
+CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _nHeight, CAmount nValue)
 {
     CMutableTransaction tx;
 
@@ -138,7 +138,7 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int nH
     tx.vout.resize(1);
     tx.vout[0].scriptPubKey = scriptPubKeyIn;
     tx.vout[0].nValue = nValue;
-    tx.vin[0].scriptSig = CScript() << nHeight << OP_0;
+    tx.vin[0].scriptSig = CScript() << _nHeight << OP_0;
 
     // BU005 add block size settings to the coinbase
     std::string cbmsg = FormatCoinbaseMessage(BUComments, minerComment);
