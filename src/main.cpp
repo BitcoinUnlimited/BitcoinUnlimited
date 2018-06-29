@@ -2181,8 +2181,8 @@ bool ConnectBlock(const CBlock &block,
     {
         if (pindex->GetUndoPos().IsNull())
         {
-            CDiskBlockPos pos;
-            if (!FindUndoPos(state, pindex->nFile, pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
+            CDiskBlockPos _pos;
+            if (!FindUndoPos(state, pindex->nFile, _pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
                 return error("ConnectBlock(): FindUndoPos failed");
 
 
@@ -2191,12 +2191,12 @@ bool ConnectBlock(const CBlock &block,
                 prevHash = pindex->pprev->GetBlockHash();
             else
                 prevHash.SetNull();
-            if (!UndoWriteToDisk(blockundo, pos, prevHash, chainparams.MessageStart()))
+            if (!UndoWriteToDisk(blockundo, _pos, prevHash, chainparams.MessageStart()))
                 return AbortNode(state, "Failed to write undo data");
 
 
             // update nUndoPos in block index
-            pindex->nUndoPos = pos.nPos;
+            pindex->nUndoPos = _pos.nPos;
             pindex->nStatus |= BLOCK_HAVE_UNDO;
         }
 
@@ -3883,7 +3883,7 @@ bool ProcessNewBlock(CValidationState &state,
 
     if (Logging::LogAcceptCategory(Logging::BENCH))
     {
-        uint64_t maxTxSize = 0;
+        uint64_t maxTxSizeLocal = 0;
         uint64_t maxVin = 0;
         uint64_t maxVout = 0;
         CTransaction txIn;
@@ -3903,9 +3903,9 @@ bool ProcessNewBlock(CValidationState &state,
                 txOut = *pblock->vtx[i];
             }
             uint64_t len = ::GetSerializeSize(pblock->vtx[i], SER_NETWORK, PROTOCOL_VERSION);
-            if (len > maxTxSize)
+            if (len > maxTxSizeLocal)
             {
-                maxTxSize = len;
+                maxTxSizeLocal = len;
                 txLen = *pblock->vtx[i];
             }
         }
@@ -3913,7 +3913,7 @@ bool ProcessNewBlock(CValidationState &state,
         LOG(BENCH,
             "ProcessNewBlock, time: %d, block: %s, len: %d, numTx: %d, maxVin: %llu, maxVout: %llu, maxTx:%llu\n",
             end - start, pblock->GetHash().ToString(), pblock->GetBlockSize(), pblock->vtx.size(), maxVin, maxVout,
-            maxTxSize);
+            maxTxSizeLocal);
         LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txIn.GetHash().ToString(), txIn.vin.size(),
             txIn.vout.size(), ::GetSerializeSize(txIn, SER_NETWORK, PROTOCOL_VERSION));
         LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txOut.GetHash().ToString(), txOut.vin.size(),
@@ -3998,11 +3998,11 @@ void PruneOneBlockFile(const int fileNumber)
                 range = mapBlocksUnlinked.equal_range(pindex->pprev);
             while (range.first != range.second)
             {
-                std::multimap<CBlockIndex *, CBlockIndex *>::iterator it = range.first;
+                std::multimap<CBlockIndex *, CBlockIndex *>::iterator it2 = range.first;
                 range.first++;
-                if (it->second == pindex)
+                if (it2->second == pindex)
                 {
-                    mapBlocksUnlinked.erase(it);
+                    mapBlocksUnlinked.erase(it2);
                 }
             }
         }
