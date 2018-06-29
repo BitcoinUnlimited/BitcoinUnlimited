@@ -180,6 +180,7 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
+    'miningtest',
     'cashlibtest',
     'tweak',
     'notify',

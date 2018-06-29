@@ -10,6 +10,7 @@
 #include "checkpoints.h"
 #include "connmgr.h"
 #include "consensus/consensus.h"
+#include "consensus/merkle.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "core_io.h"
@@ -65,6 +66,7 @@ extern CTweakRef<uint64_t> miningBlockSize;
 extern CTweakRef<uint64_t> ebTweak;
 
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
+static const int NEW_CANDIDATE_INTERVAL = 30; // seconds
 
 bool IsTrafficShapingEnabled();
 UniValue validateblocktemplate(const UniValue &params, bool fHelp);
@@ -1615,6 +1617,230 @@ UniValue setlog(const UniValue &params, bool fHelp)
 
     return ret;
 }
+
+/** Mining-Candidate begin */
+
+/** Oustanding candidates are removed 30 sec after a new block has been found*/
+static void RmOldMiningCandidates()
+{
+    LOCK(cs_main);
+    static unsigned int prevheight = 0;
+    unsigned int height = GetBlockchainHeight();
+
+    if (height <= prevheight)
+        return;
+
+    int64_t tdiff = GetTime() - (chainActive.Tip()->nTime + NEW_CANDIDATE_INTERVAL);
+    if (tdiff >= 0)
+    {
+        // Clean out mining candidates that are the same height as a discovered block.
+        for (auto it = miningCandidatesMap.cbegin(); it != miningCandidatesMap.cend();)
+        {
+            if (it->second.block.GetHeight() <= prevheight)
+            {
+                it = miningCandidatesMap.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+        prevheight = height;
+    }
+}
+
+static void AddMiningCandidate(CMiningCandidate &candid, int64_t id)
+{
+    // Save candidate so can be looked up:
+    LOCK(cs_main);
+    miningCandidatesMap[id] = candid;
+}
+
+std::vector<uint256> GetMerkleProofBranches(CBlock *pblock)
+{
+    std::vector<uint256> ret;
+    std::vector<uint256> leaves;
+    int len = pblock->vtx.size();
+
+    for (int i = 0; i < len; i++)
+    {
+        leaves.push_back(pblock->vtx[i].get()->GetHash());
+    }
+
+    ret = ComputeMerkleBranch(leaves, 0);
+    return ret;
+}
+
+/** Create Mining-Candidate JSON to send to miner */
+static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
+{
+    static int64_t id = 0;
+    UniValue ret(UniValue::VOBJ);
+    CBlock &block = candid.block;
+
+    RmOldMiningCandidates();
+
+    // Save candidate so can be looked up:
+    id++;
+    AddMiningCandidate(candid, id);
+    ret.push_back(Pair("id", id));
+
+    ret.push_back(Pair("prevhash", block.hashPrevBlock.GetHex()));
+
+    {
+        const CTransaction *tran = block.vtx[0].get();
+        ret.push_back(Pair("coinbase", EncodeHexTx(*tran)));
+    }
+
+    ret.push_back(Pair("version", block.nVersion));
+    ret.push_back(Pair("nBits", strprintf("%08x", block.nBits)));
+    ret.push_back(Pair("time", block.GetBlockTime()));
+
+    // merkleProof:
+    {
+        std::vector<uint256> brancharr = GetMerkleProofBranches(&block);
+        UniValue merkleProof(UniValue::VARR);
+        for (const auto &i : brancharr)
+        {
+            merkleProof.push_back(i.GetHex());
+        }
+        ret.push_back(Pair("merkleProof", merkleProof));
+
+        // merklePath parameter:
+        // If the coinbase is ever allowed to be anywhere in the hash tree via a hard fork, we will need to communicate
+        // how to calculate the merkleProof by supplying a bit for every level in the proof.
+        // This bit tells the calculator whether the next hash is on the left or right side of the tree.
+        // In other words, whether to do cat(A,B) or cat(B,A).  Specifically, if the bit is 0,the proof calcuation uses
+        // Hash256(concatentate(running hash, next hash in proof)), if the bit is 1, the proof calculates
+        // Hash256(concatentate(next hash in proof, running hash))
+
+        // ret.push_back(Pair("merklePath", 0));
+    }
+
+    return ret;
+}
+
+/** RPC Get a block candidate*/
+UniValue getminingcandidate(const UniValue &params, bool fHelp)
+{
+    UniValue ret(UniValue::VOBJ);
+    CMiningCandidate candid;
+    LOCK(cs_main);
+
+    if (fHelp || params.size() > 0)
+    {
+        throw runtime_error("getminingcandidate"
+                            "\nReturns Mining-Candidate protocol data.\n"
+                            "\nArguments: None\n");
+    }
+    mkblocktemplate(params, &candid.block);
+    ret = MkMiningCandidateJson(candid);
+    return ret;
+}
+
+/** RPC Submit a solved block candidate*/
+UniValue submitminingsolution(const UniValue &params, bool fHelp)
+{
+    UniValue rcvd;
+    CBlock block;
+    LOCK(cs_main);
+
+    if (fHelp || params.size() != 1)
+    {
+        throw runtime_error(
+            "submitminingsolution \"Mining-Candidate data\" ( \"jsonparametersobject\" )\n"
+            "\nAttempts to submit a new block to the network.\n"
+            "\nArguments\n"
+            "1. \"submitminingsolutiondata\"    (string, required) the mining solution (JSON encoded) data to submit\n"
+            "\nResult:\n"
+            "\nNothing on success, error string if block was rejected.\n"
+            "Identical to \"submitblock\".\n"
+            "\nExamples:\n" +
+            HelpExampleRpc("submitminingsolution", "\"mydata\""));
+    }
+
+    rcvd = params[0].get_obj();
+
+    int64_t id = rcvd["id"].get_int64();
+
+    // Needs LOCK(cs_main); above:
+    if (miningCandidatesMap.count(id) == 1)
+    {
+        block = miningCandidatesMap[id].block;
+        miningCandidatesMap.erase(id);
+    }
+    else
+    {
+        return UniValue("id not found");
+    }
+
+    UniValue nonce = rcvd["nonce"];
+    if (nonce.isNull())
+    {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "nonce not found");
+    }
+    block.nNonce = (uint32_t)nonce.get_int64(); // 64 bit to deal with sign bit in 32 bit unsigned int
+
+    UniValue time = rcvd["time"];
+    if (!time.isNull())
+    {
+        block.nTime = (uint32_t)time.get_int64();
+    }
+
+    UniValue version = rcvd["version"];
+    if (!version.isNull())
+    {
+        block.nVersion = version.get_int(); // version signed 32 bit int
+    }
+
+    // Coinbase:
+    CTransaction coinbase;
+    UniValue cbhex = rcvd["coinbase"];
+    if (!cbhex.isNull())
+    {
+        if (DecodeHexTx(coinbase, cbhex.get_str()))
+            block.vtx[0] = MakeTransactionRef(std::move(coinbase));
+        else
+        {
+            throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "coinbase decode failed");
+        }
+    }
+
+    // MerkleRoot:
+    {
+        std::vector<uint256> merkleProof = GetMerkleProofBranches(&block);
+        uint256 t = block.vtx[0]->GetHash();
+        block.hashMerkleRoot = CalculateMerkleRoot(t, merkleProof);
+    }
+
+    UniValue uvsub = SubmitBlock(block); // returns string on failure
+    RmOldMiningCandidates();
+    return uvsub;
+}
+
+static void CalculateNextMerkleRoot(uint256 &merkle_root, const uint256 &merkle_branch)
+{
+    // Append a branch to the root. Double SHA256 the whole thing:
+    uint256 hash;
+    CHash256()
+        .Write(merkle_root.begin(), merkle_root.size())
+        .Write(merkle_branch.begin(), merkle_branch.size())
+        .Finalize(hash.begin());
+    merkle_root = hash;
+}
+
+uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &merkleProof)
+{
+    uint256 merkle_root = coinbase_hash;
+    for (unsigned int i = 0; i < merkleProof.size(); i++)
+    {
+        CalculateNextMerkleRoot(merkle_root, merkleProof[i]);
+    }
+    return merkle_root;
+}
+
+/** Mining-Candidate end */
+
 /* clang-format off */
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafeMode
@@ -1635,6 +1861,8 @@ static const CRPCCommand commands[] =
     { "mining",             "getblockversion",        &getblockversion,        true  },
     { "mining",             "setblockversion",        &setblockversion,        true  },
     { "mining",             "validateblocktemplate",  &validateblocktemplate,  true  },
+    { "mining",             "getminingcandidate",     &getminingcandidate,     true  },
+    { "mining",             "submitminingsolution",   &submitminingsolution,   true  },
 
     /* Utility functions */
     { "util",               "getstatlist",            &getstatlist,            true  },

@@ -87,7 +87,7 @@ if BUILD_BITCOIND
 endif
 
 if BUILD_BITCOIN_UTILS
-  bin_PROGRAMS += bitcoin-cli bitcoin-tx
+  bin_PROGRAMS += bitcoin-cli bitcoin-tx bitcoin-miner
 endif
 
 .PHONY: FORCE check-symbols check-security check-formatting
@@ -421,7 +421,7 @@ libbitcoin_util_a_SOURCES += compat/glibc_compat.cpp
 endif
 
 # cli: shared between bitcoin-cli and bitcoin-qt
-libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
+libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(EVENT_CFLAGS)
 libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
   rpc/client.cpp \
@@ -493,6 +493,31 @@ bitcoin_tx_LDADD = \
   $(LIBSECP256K1)
 
 bitcoin_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
+#
+
+# bitcoin-miner binary #
+bitcoin_miner_SOURCES = bitcoin-miner.cpp \
+  arith_uint256.cpp \
+  arith_uint256.h \
+  uint256.cpp \
+  uint256.h
+
+
+bitcoin_miner_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(EVENT_CFLAGS)
+bitcoin_miner_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+bitcoin_miner_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+
+if TARGET_WINDOWS
+bitcoin_miner_SOURCES += bitcoin-miner-res.rc
+endif
+
+bitcoin_miner_LDADD = \
+  $(LIBBITCOIN_CLI) \
+  $(LIBBITCOIN_CRYPTO) \
+  $(LIBUNIVALUE) \
+  $(LIBBITCOIN_UTIL)
+
+bitcoin_miner_LDADD += $(BOOST_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_LIBS)
 #
 
 # bitcoincash library #

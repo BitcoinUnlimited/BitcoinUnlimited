@@ -98,4 +98,12 @@ private:
 void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce);
 int64_t UpdateTime(CBlockHeader *pblock, const Consensus::Params &consensusParams, const CBlockIndex *pindexPrev);
 
+// TODO: There is no mining.h
+// Create mining.h (The next two functions are in mining.cpp) or leave them here ?
+
+/** Submit a mined block */
+UniValue SubmitBlock(CBlock &block);
+/** Make a block template to send to miners. */
+UniValue mkblocktemplate(const UniValue &params, CBlock *pblockOut);
+
 #endif // BITCOIN_MINER_H
