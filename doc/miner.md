@@ -61,8 +61,8 @@ A python based test of these interfaces is located at qa/rpc-tests/miningtest.py
   # Block time (integer):
   "time": 1528925409,
   
-  # Merkle branches for the block (list of hex strings):
-  "merklebranches": [
+  # Merkle branch for the block, proving that this coinbase is part of the block (list of hex strings):
+  "merkleProof": [
    "ff12771afd8b7c5f11b499897c27454a869a01c2863567e0fc92308f01fd2552",
    "d7fa501d5bc94d9ae9fdab9984fd955c08fedbfe02637ac2384844eb52688f45"
   ]

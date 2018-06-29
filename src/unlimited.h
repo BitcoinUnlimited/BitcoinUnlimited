@@ -290,8 +290,8 @@ extern CTweak<uint64_t> miningForkEB;
 extern CTweak<uint64_t> miningForkMG;
 
 // Mining-Candidate start
-/** Return a Merkle root given a Coinbase hash and Merkle branches */
-uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &merklebranches);
+/** Return a Merkle root given a Coinbase hash and Merkle proof */
+uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &merkleProof);
 /** Return Merkle branches for a Block */
 std::vector<uint256> GetMerkleProofBranches(CBlock *pblock);
 

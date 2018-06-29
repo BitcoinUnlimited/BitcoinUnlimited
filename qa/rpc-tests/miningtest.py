@@ -40,7 +40,7 @@ class MyTest (BitcoinTestFramework):
 
         # test basic failure
         c = node.getminingcandidate()
-        del c["merklebranches"]
+        del c["merkleProof"]
         del c["prevhash"]
         id = c["id"]
         c["id"] = 100000  # bad ID
@@ -49,7 +49,7 @@ class MyTest (BitcoinTestFramework):
 
         # didn't provide a nonce
         c = node.getminingcandidate()
-        del c["merklebranches"]
+        del c["merkleProof"]
         del c["prevhash"]
         expectException(lambda: node.submitminingsolution(c), JSONRPCException)
 
@@ -60,7 +60,7 @@ class MyTest (BitcoinTestFramework):
         while 1:
             nonce += 1
             c = node.getminingcandidate()
-            del c["merklebranches"]
+            del c["merkleProof"]
             del c["prevhash"]
             c["nonce"] = nonce
             ret = node.submitminingsolution(c)
@@ -75,7 +75,7 @@ class MyTest (BitcoinTestFramework):
         while 1:
             nonce += 1
             c = node.getminingcandidate()
-            del c["merklebranches"]
+            del c["merkleProof"]
             del c["prevhash"]
             del c["nBits"]
             chosentime = c["time"] = c["time"] + 1
@@ -100,7 +100,7 @@ class MyTest (BitcoinTestFramework):
         while 1:
             nonce += 1
             c = node.getminingcandidate()
-            del c["merklebranches"]
+            del c["merkleProof"]
             del c["prevhash"]
             del c["nBits"]
             c["nonce"] = nonce

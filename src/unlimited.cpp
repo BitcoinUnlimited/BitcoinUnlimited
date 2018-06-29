@@ -1696,17 +1696,25 @@ static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
     ret.push_back(Pair("nBits", strprintf("%08x", block.nBits)));
     ret.push_back(Pair("time", block.GetBlockTime()));
 
-    // merklebranches:
+    // merkleProof:
     {
         std::vector<uint256> brancharr = GetMerkleProofBranches(&block);
-        // LOGA("mbran brancharr.size() %d\n",brancharr.size());
-        UniValue merklebranches(UniValue::VARR);
+        UniValue merkleProof(UniValue::VARR);
         for (const auto &i : brancharr)
         {
-            merklebranches.push_back(i.GetHex());
+            merkleProof.push_back(i.GetHex());
         }
-        // LOGA("mbran merklebranches.size() %d\n",merklebranches.size());
-        ret.push_back(Pair("merklebranches", merklebranches));
+        ret.push_back(Pair("merkleProof", merkleProof));
+
+        // merklePath parameter:
+        // If the coinbase is ever allowed to be anywhere in the hash tree via a hard fork, we will need to communicate
+        // how to calculate the merkleProof by supplying a bit for every level in the proof.
+        // This bit tells the calculator whether the next hash is on the left or right side of the tree.
+        // In other words, whether to do cat(A,B) or cat(B,A).  Specifically, if the bit is 0,the proof calcuation uses
+        // Hash256(concatentate(running hash, next hash in proof)), if the bit is 1, the proof calculates
+        // Hash256(concatentate(next hash in proof, running hash))
+
+        // ret.push_back(Pair("merklePath", 0));
     }
 
     return ret;
@@ -1800,9 +1808,9 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
 
     // MerkleRoot:
     {
-        std::vector<uint256> merklebranches = GetMerkleProofBranches(&block);
+        std::vector<uint256> merkleProof = GetMerkleProofBranches(&block);
         uint256 t = block.vtx[0]->GetHash();
-        block.hashMerkleRoot = CalculateMerkleRoot(t, merklebranches);
+        block.hashMerkleRoot = CalculateMerkleRoot(t, merkleProof);
     }
 
     UniValue uvsub = SubmitBlock(block); // returns string on failure
@@ -1821,12 +1829,12 @@ static void CalculateNextMerkleRoot(uint256 &merkle_root, const uint256 &merkle_
     merkle_root = hash;
 }
 
-uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &merklebranches)
+uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &merkleProof)
 {
     uint256 merkle_root = coinbase_hash;
-    for (unsigned int i = 0; i < merklebranches.size(); i++)
+    for (unsigned int i = 0; i < merkleProof.size(); i++)
     {
-        CalculateNextMerkleRoot(merkle_root, merklebranches[i]);
+        CalculateNextMerkleRoot(merkle_root, merkleProof[i]);
     }
     return merkle_root;
 }
