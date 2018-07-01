@@ -484,7 +484,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
             mapPartialTxHash[cheapHash] = hash;
         }
-        
+
         // Add full transactions included in the block
         for (auto &tx : vAdditionalTxs)
         {
