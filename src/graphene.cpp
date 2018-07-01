@@ -484,16 +484,24 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
             mapPartialTxHash[cheapHash] = hash;
         }
+        
+        // Add full transactions included in the block
+        for (auto &tx : vAdditionalTxs)
+        {
+            const uint256 &hash = tx->GetHash();
+            uint64_t cheapHash = hash.GetCheapHash();
+
+            if (mapPartialTxHash.count(cheapHash)) // Check for collisions
+                collision = true;
+
+            mapPartialTxHash[cheapHash] = hash;
+        }
 
         if (!collision)
         {
             std::vector<uint256> localHashes;
             for (const std::pair<uint64_t, uint256> &kv : mapPartialTxHash)
                 localHashes.push_back(kv.second);
-
-            // Add full transactions included in the block
-            for (auto &tx : vAdditionalTxs)
-                localHashes.push_back(tx->GetHash());
 
             try
             {
