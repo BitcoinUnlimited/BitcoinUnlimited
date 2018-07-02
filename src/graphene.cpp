@@ -433,7 +433,6 @@ bool CGrapheneBlock::process(CNode *pfrom,
     pfrom->grapheneBlock.hashMerkleRoot = header.hashMerkleRoot;
     pfrom->grapheneBlock.hashPrevBlock = header.hashPrevBlock;
     pfrom->grapheneBlockHashes.clear();
-    pfrom->grapheneBlockHashes.resize(nBlockTxs, nullhash);
 
     {
         LOCK(pfrom->cs_grapheneadditionaltxs);
@@ -513,16 +512,19 @@ bool CGrapheneBlock::process(CNode *pfrom,
                 {
                     uint64_t cheapHash = blockCheapHashes[i];
 
+                    // Update mapHashOrderIndex so it is available if we later receive missing txs
+                    pfrom->grapheneMapHashOrderIndex[cheapHash] = i;
+
                     if (mapPartialTxHash.count(cheapHash) > 0)
                     {
-                        pfrom->grapheneBlockHashes[i] = mapPartialTxHash[cheapHash];
+                        pfrom->grapheneBlockHashes.push_back(mapPartialTxHash[cheapHash]);
 
-                        // Update mapHashOrderIndex so it is available if we later receive missing txs
-                        pfrom->grapheneMapHashOrderIndex[cheapHash] = i;
                         nGrapheneTxsPossessed++;
                     }
-                    else
+                    else {
+                        pfrom->grapheneBlockHashes.push_back(nullhash);
                         setHashesToRequest.insert(cheapHash);
+                    }
                 }
 
                 graphenedata.AddGrapheneBlockBytes(nGrapheneTxsPossessed * sizeof(uint64_t), pfrom);
