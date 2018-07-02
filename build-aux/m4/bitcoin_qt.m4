@@ -154,17 +154,6 @@ AC_DEFUN([BITCOIN_QT_CONFIGURE],[
     fi
   fi
 
-  if test "x$TARGET_OS" = xwindows; then
-    AC_DEFINE(QT_STATICPLUGIN, 1, [Define this symbol if qt plugins are static])
-    _BITCOIN_QT_CHECK_STATIC_PLUGINS([
-       Q_IMPORT_PLUGIN(qcncodecs)
-       Q_IMPORT_PLUGIN(qjpcodecs)
-       Q_IMPORT_PLUGIN(qtwcodecs)
-       Q_IMPORT_PLUGIN(qkrcodecs)
-       Q_IMPORT_PLUGIN(AccessibleFactory)],
-       [-lqcncodecs -lqjpcodecs -lqtwcodecs -lqkrcodecs -lqtaccessiblewidgets])
-  fi
-
   CPPFLAGS=$TEMP_CPPFLAGS
   CXXFLAGS=$TEMP_CXXFLAGS
   ])
