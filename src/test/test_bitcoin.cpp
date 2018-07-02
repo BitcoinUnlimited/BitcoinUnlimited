@@ -58,7 +58,7 @@ TestingSetup::TestingSetup(const std::string &chainName) : BasicTestingSetup(cha
     ClearDatadirCache();
     pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i", (unsigned long)GetTime(), (int)(GetRand(1 << 30)));
     fs::create_directories(pathTemp);
-    pblocktree = new CBlockTreeDB(1 << 20, true);
+    pblocktree = new CBlockTreeDB(1 << 20, "", true);
     pcoinsdbview = new CCoinsViewDB(1 << 23, true);
     pcoinsTip = new CCoinsViewCache(pcoinsdbview);
     bool worked = InitBlockIndex(chainparams);

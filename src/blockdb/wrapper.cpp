@@ -584,14 +584,14 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
             nLastSetChain = nNow;
         }
 
-        // If possible adjust the max size of the coin cache (nCoinCacheUsage) based on current available memory. Do
+        // If possible adjust the max size of the coin cache (nCoinCacheMaxSize) based on current available memory. Do
         // this before determinining whether to flush the cache or not in the steps that follow.
         AdjustCoinCacheSize();
 
         size_t cacheSize = pcoinsTip->DynamicMemoryUsage();
         static int64_t nSizeAfterLastFlush = 0;
         // The cache is close to the limit. Try to flush and trim.
-        bool fCacheCritical = ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > nCoinCacheUsage * 0.995)) ||
+        bool fCacheCritical = ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > nCoinCacheMaxSize * 0.995)) ||
                               (cacheSize - nSizeAfterLastFlush > nMaxCacheIncreaseSinceLastFlush);
         // It's been a while since we wrote the block index to disk. Do this frequently, so we don't need to redownload
         // after a crash.
@@ -686,15 +686,15 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
             // trim extra so that we don't flush as often during IBD.
             if (IsChainNearlySyncd() && !fReindex && !fImporting)
             {
-                pcoinsTip->Trim(nCoinCacheUsage);
+                pcoinsTip->Trim(nCoinCacheMaxSize);
             }
             else
             {
                 // Trim, but never trim more than nMaxCacheIncreaseSinceLastFlush
-                size_t nTrimSize = nCoinCacheUsage * .90;
-                if (nCoinCacheUsage - nMaxCacheIncreaseSinceLastFlush > nTrimSize)
+                size_t nTrimSize = nCoinCacheMaxSize * .90;
+                if (nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush > nTrimSize)
                 {
-                    nTrimSize = nCoinCacheUsage - nMaxCacheIncreaseSinceLastFlush;
+                    nTrimSize = nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush;
                 }
                 pcoinsTip->Trim(nTrimSize);
             }
