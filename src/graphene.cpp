@@ -521,7 +521,8 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
                         nGrapheneTxsPossessed++;
                     }
-                    else {
+                    else
+                    {
                         pfrom->grapheneBlockHashes.push_back(nullhash);
                         setHashesToRequest.insert(cheapHash);
                     }
