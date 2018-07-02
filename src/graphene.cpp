@@ -432,7 +432,6 @@ bool CGrapheneBlock::process(CNode *pfrom,
     pfrom->grapheneBlock.nTime = header.nTime;
     pfrom->grapheneBlock.hashMerkleRoot = header.hashMerkleRoot;
     pfrom->grapheneBlock.hashPrevBlock = header.hashPrevBlock;
-    pfrom->grapheneBlockHashes.clear();
 
     {
         LOCK(pfrom->cs_grapheneadditionaltxs);
