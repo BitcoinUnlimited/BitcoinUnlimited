@@ -112,8 +112,14 @@ CBlockIndex *CBlockIndex::GetAncestor(int height)
             if(pindexWalk->pprev == nullptr)
             {
                 CDiskBlockIndex tempdisk;
-                // using pblocktree or pblocktreeother right here shouldnt matter
-                pblocktreeother->FindBlockIndex(pindexWalk->GetBlockHash(), &tempdisk);
+                tempdisk.SetNull();
+                // if we have the index in our tree, but it isnt linked for some
+                // reason, try an on the fly quick repair
+                if(!pblocktree->FindBlockIndex(pindexWalk->GetBlockHash(), &tempdisk))
+                {
+                    pblocktreeother->FindBlockIndex(pindexWalk->GetBlockHash(), &tempdisk);
+                }
+                
                 BlockMap::iterator it;
                 it = mapBlockIndex.find(tempdisk.hashPrev);
                 if(it != mapBlockIndex.end())
