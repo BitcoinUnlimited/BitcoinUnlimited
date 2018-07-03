@@ -319,6 +319,7 @@ public:
         CAmount amount = 0)
     {
         uint256 hash = SignatureHash(script, spendTx, 0, nHashType, amount);
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
         std::vector<unsigned char> vchSig, r, s;
         uint32_t iter = 0;
         do
@@ -1010,6 +1011,7 @@ CScript sign_multisig(const CScript &scriptPubKey, std::vector<CKey> keys, const
     unsigned char sighashType = SIGHASH_ALL | SIGHASH_FORKID;
 
     uint256 hash = SignatureHash(scriptPubKey, transaction, 0, sighashType, amt, 0);
+    assert(hash != SIGNATURE_HASH_ERROR);
 
     CScript result;
     //
@@ -1234,14 +1236,17 @@ BOOST_AUTO_TEST_CASE(script_combineSigs)
     // A couple of partially-signed versions:
     vector<unsigned char> sig1;
     uint256 hash1 = SignatureHash(scriptPubKey, txTo, 0, SIGHASH_ALL | SIGHASH_FORKID, 0);
+    BOOST_CHECK(hash1 != SIGNATURE_HASH_ERROR);
     BOOST_CHECK(keys[0].Sign(hash1, sig1));
     sig1.push_back(SIGHASH_ALL | SIGHASH_FORKID);
     vector<unsigned char> sig2;
     uint256 hash2 = SignatureHash(scriptPubKey, txTo, 0, SIGHASH_NONE | SIGHASH_FORKID, 0);
+    BOOST_CHECK(hash2 != SIGNATURE_HASH_ERROR);
     BOOST_CHECK(keys[1].Sign(hash2, sig2));
     sig2.push_back(SIGHASH_NONE | SIGHASH_FORKID);
     vector<unsigned char> sig3;
     uint256 hash3 = SignatureHash(scriptPubKey, txTo, 0, SIGHASH_SINGLE | SIGHASH_FORKID, 0);
+    BOOST_CHECK(hash3 != SIGNATURE_HASH_ERROR);
     BOOST_CHECK(keys[2].Sign(hash3, sig3));
     sig3.push_back(SIGHASH_SINGLE | SIGHASH_FORKID);
 
@@ -1422,6 +1427,7 @@ CTransaction tx1x1(const COutPoint &utxo,
     unsigned int sighashType = SIGHASH_ALL | SIGHASH_FORKID;
     std::vector<unsigned char> vchSig;
     uint256 hash = SignatureHash(prevOutScript, tx, 0, sighashType, amt, 0);
+    BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
     if (!key.Sign(hash, vchSig))
     {
         assert(0);
