@@ -146,11 +146,10 @@ void SyncStorage(const CChainParams &chainparams)
 
                 if(pindexNew->nStatus & BLOCK_HAVE_DATA && item.second.nDataPos != 0)
                 {
-                    BlockDBValue blockValue;
                     CBlock block_lev;
                     std::ostringstream key;
                     key << pindexNew->GetBlockTime() << ":" << pindexNew->GetBlockHash().ToString();
-                    if(pblockdb->ReadBlock(key.str(), blockValue, block_lev))
+                    if(pblockdb->Read(key.str(), block_lev))
                     {
                         unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
                         CDiskBlockPos blockPos;
@@ -222,11 +221,10 @@ void SyncStorage(const CChainParams &chainparams)
                     pblocktreeother->FindBlockIndex(it->second->GetBlockHash(), tempindex);
                     if(tempindex->nStatus & BLOCK_HAVE_DATA && tempindex->nDataPos != 0)
                     {
-                        BlockDBValue blockValue;
                         CBlock block_lev;
                         std::ostringstream key;
                         key << it->second->GetBlockTime() << ":" << it->second->GetBlockHash().ToString();
-                        if(pblockdb->ReadBlock(key.str(), blockValue, block_lev))
+                        if(pblockdb->Read(key.str(), block_lev))
                         {
                             unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
                             CDiskBlockPos blockPos;
@@ -445,9 +443,8 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex, const Consensus
     }
     else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        BlockDBValue value;
         block.SetNull();
-        if(!ReadBlockFromDB(pindex, value, block))
+        if(!ReadBlockFromDB(pindex, block))
         {
             LOGA("failed to read block with hash %s from leveldb \n", pindex->GetBlockHash().GetHex().c_str());
             return false;
