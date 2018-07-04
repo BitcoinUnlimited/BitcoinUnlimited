@@ -3515,7 +3515,7 @@ bool AcceptBlockHeader(const CBlockHeader &block,
         pindexPrev = (*mi).second;
         assert(pindexPrev);
         if (pindexPrev->nStatus & BLOCK_FAILED_MASK)
-            return state.DoS(100, error("%s: previous block invalid", __func__), REJECT_INVALID, "bad-prevblk");
+            return state.DoS(100, error("%s: previous block %s is invalid", __func__, pindexPrev->GetBlockHash().GetHex().c_str()), REJECT_INVALID, "bad-prevblk");
 
         // If the parent block belongs to the set of checkpointed blocks but it has a mismatched hash,
         // then we are on the wrong fork so ignore
@@ -3847,6 +3847,46 @@ bool static LoadBlockIndexDB()
             SyncStorage(chainparams);
         }
     }
+
+    // sometimes after a storage sync, the blockindex can get a little funky,
+    // so we should run a quick repair
+    // this can happen sometimes with syncing from db to sequential files
+    CBlockIndex* pindexRepair = nullptr;
+    int64_t bestHeight = 0;
+    for(BlockMap::iterator iter = mapBlockIndex.begin(); iter != mapBlockIndex.end(); iter++)
+    {
+        if(iter->second->nHeight > bestHeight)
+        {
+            bestHeight = iter->second->nHeight;
+            pindexRepair = iter->second;
+        }
+    }
+    uint256 hashgenesis = chainparams.GetConsensus().hashGenesisBlock;
+    if(pindexRepair != nullptr)
+    {
+        while(pindexRepair->GetBlockHash() != hashgenesis)
+        {
+            if(pindexRepair->pprev == nullptr)
+            {
+                CDiskBlockIndex tempdisk;
+                tempdisk.SetNull();
+                // if we have the index in our tree, but it isnt linked for some
+                // reason, try an on the fly quick repair
+                if(!pblocktree->FindBlockIndex(pindexRepair->GetBlockHash(), &tempdisk))
+                {
+                    pblocktreeother->FindBlockIndex(pindexRepair->GetBlockHash(), &tempdisk);
+                }
+                BlockMap::iterator it;
+                it = mapBlockIndex.find(tempdisk.hashPrev);
+                if(it != mapBlockIndex.end())
+                {
+                    pindexRepair->pprev = it->second;
+                }
+            }
+            pindexRepair = pindexRepair->pprev;
+        }
+    }
+
 
     boost::this_thread::interruption_point();
 

@@ -108,25 +108,6 @@ CBlockIndex *CBlockIndex::GetAncestor(int height)
         }
         else
         {
-            // this can happen sometimes with syncing from db to sequential files, so try this fix before asserting
-            if(pindexWalk->pprev == nullptr)
-            {
-                CDiskBlockIndex tempdisk;
-                tempdisk.SetNull();
-                // if we have the index in our tree, but it isnt linked for some
-                // reason, try an on the fly quick repair
-                if(!pblocktree->FindBlockIndex(pindexWalk->GetBlockHash(), &tempdisk))
-                {
-                    pblocktreeother->FindBlockIndex(pindexWalk->GetBlockHash(), &tempdisk);
-                }
-                
-                BlockMap::iterator it;
-                it = mapBlockIndex.find(tempdisk.hashPrev);
-                if(it != mapBlockIndex.end())
-                {
-                    pindexWalk->pprev = it->second;
-                }
-            }
             assert(pindexWalk->pprev);
             pindexWalk = pindexWalk->pprev;
             heightWalk--;

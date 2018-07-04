@@ -334,7 +334,7 @@ bool CBlockTreeDB::FindBlockIndex(uint256 blockhash, CDiskBlockIndex* pindex)
                 }
                 else
                 {
-                    return error("LoadBlockIndex() : failed to read value");
+                    return error("FindBlockIndex() : failed to read value");
                 }
             }
             else
@@ -347,7 +347,7 @@ bool CBlockTreeDB::FindBlockIndex(uint256 blockhash, CDiskBlockIndex* pindex)
             break;
         }
     }
-    return false;
+    return error("FindBlockIndex(): couldnt find index with requested hash %s", blockhash.GetHex().c_str());
 }
 
 bool CBlockTreeDB::LoadBlockIndexGuts()
