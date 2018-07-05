@@ -20,6 +20,7 @@
 
 #define LN2SQUARED 0.4804530139182014246671025263266649717305529515945455
 #define LN2 0.6931471805599453094172321214581765680755001343602552
+#define MIN_N_HASH_FUNC 1
 
 using namespace std;
 
@@ -53,6 +54,33 @@ void CBloomFilter::setup(unsigned int nElements,
     nFlags = nFlagsIn;
 }
 
+void CBloomFilter::setup_guaranteeFPR(unsigned int nElements,
+    double nFPRate,
+    unsigned int nTweakIn,
+    unsigned char nFlagsIn,
+    bool size_constrained,
+    uint32_t nMaxFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE)
+{
+    if (nElements == 0)
+    {
+        LOGA("Construction of empty CBloomFilter attempted.\n");
+        nElements = 1;
+    }
+    unsigned desired_vdata_size = (unsigned int)(ceil(-1 / LN2SQUARED * nElements * log(nFPRate) / 8));
+
+    vData.resize(desired_vdata_size, 0);
+    isFull = vData.size() == 0;
+    isEmpty = true;
+
+    nHashFuncs = (unsigned int)max(MIN_N_HASH_FUNC, int(vData.size() * 8 / nElements * LN2));
+
+    if (size_constrained)
+        nHashFuncs = min(nHashFuncs, MAX_HASH_FUNCS);
+
+    nTweak = nTweakIn;
+    nFlags = nFlagsIn;
+}
+
 CBloomFilter::CBloomFilter(unsigned int nElements,
     double nFPRate,
     unsigned int nTweakIn,
@@ -60,6 +88,19 @@ CBloomFilter::CBloomFilter(unsigned int nElements,
     uint32_t nMaxFilterSize)
 {
     setup(nElements, nFPRate, nTweakIn, nFlagsIn, true, nMaxFilterSize);
+}
+
+CBloomFilter::CBloomFilter(unsigned int nElements,
+    double nFPRate,
+    unsigned int nTweakIn,
+    unsigned char nFlagsIn,
+    bool guaranteeFPR,
+    uint32_t nMaxFilterSize)
+{
+    if (guaranteeFPR)
+        setup_guaranteeFPR(nElements, nFPRate, nTweakIn, nFlagsIn, true, nMaxFilterSize);
+    else
+        setup(nElements, nFPRate, nTweakIn, nFlagsIn, true, nMaxFilterSize);
 }
 
 // Private constructor used by CRollingBloomFilter

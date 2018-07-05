@@ -139,7 +139,7 @@ public:
 
         // Construct Bloom filter
         pSetFilter = new CBloomFilter(
-            nItems, fpr, insecure_rand.rand32(), BLOOM_UPDATE_ALL, std::numeric_limits<uint32_t>::max());
+            nItems, fpr, insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
         LOG(GRAPHENE, "fp rate: %f Num elements in bloom filter: %d\n", fpr, nItems);
 
         // Construct IBLT
