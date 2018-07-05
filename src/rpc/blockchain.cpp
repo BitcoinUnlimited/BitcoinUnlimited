@@ -817,7 +817,8 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
         while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
             block = block->pprev;
 
-        obj.push_back(Pair("pruneheight", block->nHeight));
+        if (block != nullptr)
+            obj.push_back(Pair("pruneheight", block->nHeight));
     }
     return obj;
 }
