@@ -42,6 +42,8 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         #            = 2 bytes * minRelayTxFeePerByte
         feeTolerance = 2 * min_relay_tx_fee/1000
+        if feeTolerance < 0.00000001:
+            feeTolerance = 0.00000001
 
         self.nodes[2].generate(1)
         self.sync_all()
