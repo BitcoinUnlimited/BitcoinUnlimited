@@ -1092,11 +1092,20 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 uint32_t nOverallRange = blockRange * nMaxOutConnections;
                 if (nIterations <= nOverallRange)
                     nIterations++;
-                if (nIterations > nOverallRange)
+
+                if (nOverallRange > 0)
                 {
-                    nOverallAverageResponseTime -= (nOverallAverageResponseTime / nOverallRange);
+                    if (nIterations > nOverallRange)
+                    {
+                        nOverallAverageResponseTime -= (nOverallAverageResponseTime / nOverallRange);
+                    }
+                    nOverallAverageResponseTime += nResponseTime / nOverallRange;
                 }
-                nOverallAverageResponseTime += nResponseTime / nOverallRange;
+                else
+                {
+                    LOG(IBD, "Calculation of average response time failed and will be inaccurate due to division by "
+                             "zero.\n");
+                }
 
                 // Request for a disconnect if over the response time limit.  We don't do an fDisconnect = true here
                 // because we want to drain the queue for any blocks that are still returning.  This prevents us from
