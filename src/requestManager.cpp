@@ -360,9 +360,6 @@ void CRequestManager::Rejected(const CInv &obj, CNode *from, unsigned char reaso
     else if (reason == REJECT_DUST)
     {
     }
-    else if (reason == REJECT_NONSTANDARD)
-    {
-    }
     else
     {
         LOG(REQ, "ReqMgr: Unknown TX rejection code [0x%x].\n", reason);
