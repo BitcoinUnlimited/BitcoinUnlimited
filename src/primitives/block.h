@@ -210,6 +210,8 @@ struct CBlockLocator
 };
 
 typedef std::shared_ptr<CBlock> CBlockRef;
+typedef std::shared_ptr<const CBlock> ConstCBlockRef;
+
 static inline CBlockRef MakeBlockRef() { return std::make_shared<CBlock>(); }
 template <typename Blk>
 static inline CBlockRef MakeBlockRef(Blk &&blkIn)
