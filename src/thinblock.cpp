@@ -1638,16 +1638,28 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
     std::vector<TxCoinAgePriority> vPriority;
     TxCoinAgePriorityCompare pricomparer;
     {
-        LOCK(cs_main);
-        READLOCK(mempool.cs);
-        if (mempool.mapTx.size() > 0)
+        uint64_t nMapTxSize = 0;
         {
-            CBlockIndex *pindexPrev = chainActive.Tip();
-            const int nHeight = pindexPrev->nHeight + 1;
-            const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
+            READLOCK(mempool.cs);
+            nMapTxSize = mempool.mapTx.size();
+        }
 
-            int64_t nLockTimeCutoff =
-                (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : GetAdjustedTime();
+        if (nMapTxSize > 0)
+        {
+            int nHeight = 0;
+            int64_t nMedianTimePast = 0;
+            int64_t nLockTimeCutoff = 0;
+            {
+                LOCK(cs_main);
+                CBlockIndex *pindexPrev = chainActive.Tip();
+                nHeight = pindexPrev->nHeight + 1;
+                nMedianTimePast = pindexPrev->GetMedianTimePast();
+
+                nLockTimeCutoff =
+                    (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : GetAdjustedTime();
+            }
+
+            READLOCK(mempool.cs);
 
             // Create a sorted list of transactions and their updated priorities.  This will be used to fill
             // the mempoolhashes with the expected priority area of the next block.  We will multiply this by
