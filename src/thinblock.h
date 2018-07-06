@@ -23,7 +23,7 @@ class CThinBlock
 {
 public:
     CBlockHeader header;
-    std::vector<uint256> vTxHashes; // List of all transactions id's in the block
+    std::vector<uint256> vTxHashes; // List of all transaction ids in the block
     std::vector<CTransaction> vMissingTx; // vector of transactions that did not match the bloom filter
 
 public:
@@ -56,7 +56,7 @@ class CXThinBlock
 {
 public:
     CBlockHeader header;
-    std::vector<uint64_t> vTxHashes; // List of all transactions id's in the block
+    std::vector<uint64_t> vTxHashes; // List of all transaction ids in the block
     std::vector<CTransaction> vMissingTx; // vector of transactions that did not match the bloom filter
     bool collision;
 
@@ -98,7 +98,7 @@ class CXThinBlockTx
 public:
     /** Public only for unit testing */
     uint256 blockhash;
-    std::vector<CTransaction> vMissingTx; // map of missing transactions
+    std::vector<CTransaction> vMissingTx; // array of missing transactions
 
 public:
     CXThinBlockTx(uint256 blockHash, std::vector<CTransaction> &vTx);
@@ -129,7 +129,7 @@ class CXRequestThinBlockTx
 public:
     /** Public only for unit testing */
     uint256 blockhash;
-    std::set<uint64_t> setCheapHashesToRequest; // map of missing transactions
+    std::set<uint64_t> setCheapHashesToRequest; // set of missing transactions
 
 public:
     CXRequestThinBlockTx(uint256 blockHash, std::set<uint64_t> &setHashesToRequest);
