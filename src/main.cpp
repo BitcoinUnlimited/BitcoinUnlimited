@@ -776,8 +776,9 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
          * This mitigates 'penny-flooding' -- sending thousands of free transactions just to
          * be annoying or make others' transactions take longer to confirm. */
         // maximum feeCutoff in satoshi per byte
+        static std::string default_maxlimitertxfee = std::to_string((double)DEFAULT_MAXLIMITERTXFEE / 1000);
         static const double maxFeeCutoff =
-            boost::lexical_cast<double>(GetArg("-maxlimitertxfee", DEFAULT_MAXLIMITERTXFEE));
+            boost::lexical_cast<double>(GetArg("-maxlimitertxfee", default_maxlimitertxfee.c_str()));
         // starting value for feeCutoff in satoshi per byte
         static const double initFeeCutoff =
             boost::lexical_cast<double>(GetArg("-minlimitertxfee", DEFAULT_MINLIMITERTXFEE));

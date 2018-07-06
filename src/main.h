@@ -156,7 +156,7 @@ static const bool DEFAULT_PRINTTOCONSOLE = false;
 /** The default value for -minrelaytxfee */
 static const char DEFAULT_MINLIMITERTXFEE[] = "0.000";
 /** The default value for -maxrelaytxfee */
-static const char DEFAULT_MAXLIMITERTXFEE[] = "3.000";
+static const unsigned int DEFAULT_MAXLIMITERTXFEE = DEFAULT_MIN_RELAY_TX_FEE;
 /** The number of block heights to gradually choke spam transactions over */
 static const unsigned int MAX_BLOCK_SIZE_MULTIPLIER = 3;
 /** The minimum value possible for -limitfreerelay when rate limiting */
