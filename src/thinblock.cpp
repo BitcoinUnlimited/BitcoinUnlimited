@@ -1629,12 +1629,12 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
         // by including a full blocks worth of high priority tx's we cover every scenario.  And when we
         // go on to add the high fee tx's there will be an intersection between the two which then makes
         // the total number of tx's that go into the bloom filter smaller than just the sum of the two.
-        uint64_t nBlockPrioritySize = LargestBlockSeen() * 1.5;
+        uint64_t nBlockPrioritySize = excessiveBlockSize * 1.5;
 
         // Largest projected block size used to add the high fee transactions.  We multiply it by an
         // additional factor to take into account that miners may have slighty different policies when selecting
         // high fee tx's from the pool.
-        uint64_t nBlockMaxProjectedSize = LargestBlockSeen() * 1.5;
+        uint64_t nBlockMaxProjectedSize = excessiveBlockSize * 1.5;
 
         std::vector<TxCoinAgePriority> vPriority;
         TxCoinAgePriorityCompare pricomparer;
