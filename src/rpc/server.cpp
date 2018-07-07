@@ -163,15 +163,16 @@ std::string CRPCTable::help(const std::string &strCommand) const
     string strRet;
     string category;
     set<rpcfn_type> setDone;
-    vector<pair<string, const CRPCCommand *> > vCommands;
+    typedef pair<string, CRPCCommand> rpc_pair;
+    vector<rpc_pair> vCommands;
 
-    for (map<string, const CRPCCommand *>::const_iterator mi = mapCommands.begin(); mi != mapCommands.end(); ++mi)
-        vCommands.push_back(make_pair(mi->second->category + mi->first, mi->second));
-    sort(vCommands.begin(), vCommands.end());
-
-    BOOST_FOREACH (const PAIRTYPE(string, const CRPCCommand *) & command, vCommands)
+    for (rpc_pair p : mapCommands)
+        // sort by command category first, then by command name
+        vCommands.push_back(rpc_pair(p.second.category + p.first, p.second));
+    sort(vCommands.begin(), vCommands.end(), [](rpc_pair a, rpc_pair b) { return a.first < b.first; });
+    for (rpc_pair command : vCommands)
     {
-        const CRPCCommand *pcmd = command.second;
+        const CRPCCommand *pcmd = &(command.second);
         string strMethod = pcmd->name;
         // We already filter duplicates, but these deprecated screw up the sort order
         if (strMethod.find("label") != string::npos)
@@ -255,35 +256,29 @@ static const CRPCCommand vRPCCommands[] = {
 
 CRPCTable::CRPCTable()
 {
-    unsigned int vcidx;
-    for (vcidx = 0; vcidx < (sizeof(vRPCCommands) / sizeof(vRPCCommands[0])); vcidx++)
-    {
-        const CRPCCommand *pcmd;
-
-        pcmd = &vRPCCommands[vcidx];
-        mapCommands[pcmd->name] = pcmd;
-    }
+    for (auto cmd : vRPCCommands)
+        appendCommand(cmd);
 }
 
 const CRPCCommand *CRPCTable::operator[](const std::string &name) const
 {
-    map<string, const CRPCCommand *>::const_iterator it = mapCommands.find(name);
+    map<string, CRPCCommand>::const_iterator it = mapCommands.find(name);
     if (it == mapCommands.end())
-        return NULL;
-    return (*it).second;
+        return nullptr;
+    return &(it->second);
 }
 
-bool CRPCTable::appendCommand(const std::string &name, const CRPCCommand *pcmd)
+bool CRPCTable::appendCommand(const CRPCCommand &cmd)
 {
     if (IsRPCRunning())
         return false;
 
     // don't allow overwriting for now
-    map<string, const CRPCCommand *>::const_iterator it = mapCommands.find(name);
+    map<string, CRPCCommand>::const_iterator it = mapCommands.find(cmd.name);
     if (it != mapCommands.end())
         return false;
 
-    mapCommands[name] = pcmd;
+    mapCommands[cmd.name] = cmd;
     return true;
 }
 
@@ -426,7 +421,7 @@ UniValue CRPCTable::execute(const std::string &strMethod, const UniValue &params
 std::vector<std::string> CRPCTable::listCommands() const
 {
     std::vector<std::string> commandList;
-    typedef std::map<std::string, const CRPCCommand *> commandMap;
+    typedef std::map<std::string, CRPCCommand> commandMap;
 
     std::transform(mapCommands.begin(), mapCommands.end(), std::back_inserter(commandList),
         boost::bind(&commandMap::value_type::first, _1));

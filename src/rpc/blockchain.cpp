@@ -1141,8 +1141,8 @@ static const CRPCCommand commands[] = {
     {"hidden", "rollbackchain", &rollbackchain, true},
 };
 
-void RegisterBlockchainRPCCommands(CRPCTable &tableRPC)
+void RegisterBlockchainRPCCommands(CRPCTable &table)
 {
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
-        tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
+    for (auto cmd : commands)
+        table.appendCommand(cmd);
 }
