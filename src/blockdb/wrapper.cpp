@@ -175,17 +175,17 @@ void SyncStorage(const CChainParams &chainparams)
                 }
                 else
                 {
-                    index->nStatus &= BLOCK_HAVE_DATA;
+                    index->nStatus &= ~BLOCK_HAVE_DATA;
                 }
             }
             else
             {
-                index->nStatus &= BLOCK_HAVE_DATA;
+                index->nStatus &= ~BLOCK_HAVE_DATA;
             }
             if(index->nStatus & BLOCK_HAVE_UNDO && item.second.nUndoPos != 0)
             {
                 CBlockUndo blockundo;
-                if(UndoReadFromDB(blockundo, index))
+                if(UndoReadFromDB(blockundo, index->pprev))
                 {
                     CDiskBlockPos pos;
                     if (!FindUndoPos(state, index->nFile, pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
@@ -203,12 +203,12 @@ void SyncStorage(const CChainParams &chainparams)
                 }
                 else
                 {
-                    index->nStatus &= BLOCK_HAVE_UNDO;
+                    index->nStatus &= ~BLOCK_HAVE_UNDO;
                 }
             }
             else
             {
-                index->nStatus &= BLOCK_HAVE_UNDO;
+                index->nStatus &= ~BLOCK_HAVE_UNDO;
             }
             setDirtyBlockIndex.insert(index);
             if(!index->GetBlockPos().IsNull() && !index->GetUndoPos().IsNull())
