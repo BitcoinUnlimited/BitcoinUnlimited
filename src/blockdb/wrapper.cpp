@@ -191,7 +191,7 @@ void SyncStorage(const CChainParams &chainparams)
             {
                 index->nStatus &= ~BLOCK_HAVE_UNDO;
             }
-            setDirtyBlockIndex.insert(index);
+
             if (!index->GetBlockPos().IsNull() && !index->GetUndoPos().IsNull())
             {
                 if (index->nHeight > bestHeight)
@@ -200,6 +200,7 @@ void SyncStorage(const CChainParams &chainparams)
                     pindexBest = index;
                 }
             }
+            setDirtyBlockIndex.insert(index);
         }
 
         // if bestHeight != 0 then pindexBest has been initialized and we can update the best block.
@@ -327,6 +328,8 @@ void SyncStorage(const CChainParams &chainparams)
             pcoinsdbview->WriteBestBlockDb(pindexBest->GetBlockHash());
         }
     }
+
+    FlushStateToDisk();
     LOGA("we have synced all missing blocks \n");
 }
 
