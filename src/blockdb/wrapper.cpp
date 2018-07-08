@@ -209,7 +209,8 @@ void SyncStorage(const CChainParams &chainparams)
             pcoinsdbview->WriteBestBlockSeq(pindexBest->GetBlockHash());
         }
     }
-    if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+
+    else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
         std::vector<std::pair<int, CDiskBlockIndex> > indexByHeight;
         pblocktreeother->GetSortedHashIndex(indexByHeight);

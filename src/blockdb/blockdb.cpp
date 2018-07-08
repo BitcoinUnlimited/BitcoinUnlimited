@@ -96,6 +96,7 @@ bool UndoReadFromDB(CBlockUndo &blockundo, const CBlockIndex *pindex)
     CHashWriter hasher(SER_GETHASH, PROTOCOL_VERSION);
     hasher << value.hashBlock;
     hasher << blockundo;
+
     // Verify checksum
     if (value.hashChecksum != hasher.GetHash())
     {
@@ -122,7 +123,8 @@ uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
         }
         pindex = pindex->pprev;
     }
-    /// this should prune all blocks from the DB that are old enough to prune
+
+    // this should prune all blocks from the DB that are old enough to prune
     for (std::vector<uint256>::iterator iter = hashesToPrune.begin(); iter != hashesToPrune.end(); ++iter)
     {
         pblockdb->Erase(*iter);
