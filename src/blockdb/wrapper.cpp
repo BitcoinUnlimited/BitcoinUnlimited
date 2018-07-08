@@ -331,7 +331,7 @@ void SyncStorage(const CChainParams &chainparams)
     }
 
     FlushStateToDisk();
-    LOGA("we have synced all missing blocks \n");
+    LOGA("Block database upgrade completed.\n");
 }
 
 bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHeader::MessageStartChars &messageStart)
