@@ -28,6 +28,7 @@ bool DetermineStorageSync()
 {
     uint256 bestHashSeq = pcoinsdbview->GetBestBlockSeq();
     uint256 bestHashLev = pcoinsdbview->GetBestBlockDb();
+
     // if we are using method X and method Y doesnt have any sync progress, assume nothing to sync
     if (bestHashSeq.IsNull() && BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
@@ -37,6 +38,7 @@ bool DetermineStorageSync()
     {
         return false;
     }
+
     CDiskBlockIndex bestIndexSeq;
     CDiskBlockIndex bestIndexLev;
     if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
@@ -49,35 +51,7 @@ bool DetermineStorageSync()
         pblocktreeother->FindBlockIndex(bestHashSeq, &bestIndexSeq);
         pblocktree->FindBlockIndex(bestHashLev, &bestIndexLev);
     }
-    /*
-        LOGA("bestIndexSeq info = %i %i %u %u %i %s %u %u %u %u %u \n",
-             bestIndexSeq.nHeight,
-             bestIndexSeq.nFile,
-             bestIndexSeq.nDataPos,
-             bestIndexSeq.nUndoPos,
-             bestIndexSeq.nVersion,
-             bestIndexSeq.hashMerkleRoot.GetHex().c_str(),
-             bestIndexSeq.nTime,
-             bestIndexSeq.nBits,
-             bestIndexSeq.nNonce,
-             bestIndexSeq.nStatus,
-             bestIndexSeq.nTx
-             );
 
-        LOGA("bestIndexLev info = %i %i %u %u %i %s %u %u %u %u %u \n",
-             bestIndexLev.nHeight,
-             bestIndexLev.nFile,
-             bestIndexLev.nDataPos,
-             bestIndexLev.nUndoPos,
-             bestIndexLev.nVersion,
-             bestIndexLev.hashMerkleRoot.GetHex().c_str(),
-             bestIndexLev.nTime,
-             bestIndexLev.nBits,
-             bestIndexLev.nNonce,
-             bestIndexLev.nStatus,
-             bestIndexLev.nTx
-             );
-    */
     // if the best height of the storage type we are using is higher than any other type, return false
     if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES && bestIndexSeq.nHeight >= bestIndexLev.nHeight)
     {
@@ -150,6 +124,8 @@ void SyncStorage(const CChainParams &chainparams)
             {
                 index = it->second;
             }
+
+            // Update the block data
             if (index->nStatus & BLOCK_HAVE_DATA && item.second.nDataPos != 0)
             {
                 CBlock block_lev;
@@ -183,6 +159,8 @@ void SyncStorage(const CChainParams &chainparams)
             {
                 index->nStatus &= ~BLOCK_HAVE_DATA;
             }
+
+            // Update the undo data
             if (index->nStatus & BLOCK_HAVE_UNDO && item.second.nUndoPos != 0)
             {
                 CBlockUndo blockundo;
@@ -200,6 +178,7 @@ void SyncStorage(const CChainParams &chainparams)
                         LOGA("SyncStorage(): Failed to write undo data");
                         assert(false);
                     }
+
                     // update nUndoPos in block index
                     index->nUndoPos = pos.nPos;
                 }
@@ -222,7 +201,8 @@ void SyncStorage(const CChainParams &chainparams)
                 }
             }
         }
-        // if bestHeight != 0 then pindexBest has been initialized, otherwise no promises
+
+        // if bestHeight != 0 then pindexBest has been initialized and we can update the best block.
         if (bestHeight != 0)
         {
             pcoinsdbview->WriteBestBlockSeq(pindexBest->GetBlockHash());
@@ -287,6 +267,8 @@ void SyncStorage(const CChainParams &chainparams)
             {
                 index = iter->second;
             }
+
+            // Update the block data
             if (index->nStatus & BLOCK_HAVE_DATA && !index->GetBlockPos().IsNull())
             {
                 CBlock block_seq;
@@ -301,9 +283,12 @@ void SyncStorage(const CChainParams &chainparams)
                     assert(false);
                 }
             }
+
+            // Update the undo data
             if (index->nStatus & BLOCK_HAVE_UNDO && !index->GetUndoPos().IsNull())
             {
                 CBlockUndo blockundo;
+
                 // get the undo data from the sequential undo file
                 CDiskBlockPos pos = index->GetUndoPos();
                 if (pos.IsNull())
@@ -323,6 +308,7 @@ void SyncStorage(const CChainParams &chainparams)
                     assert(false);
                 }
             }
+
             if (!index->GetUndoPos().IsNull() && !index->GetBlockPos().IsNull())
             {
                 if (index->nHeight > bestHeight)
@@ -334,7 +320,8 @@ void SyncStorage(const CChainParams &chainparams)
             }
             setDirtyBlockIndex.insert(index);
         }
-        // if bestHeight != 0 then pindexBest has been initialized, otherwise no promises
+
+        // if bestHeight != 0 then pindexBest has been initialized and we can update the best block.
         if (bestHeight != 0)
         {
             pcoinsdbview->WriteBestBlockDb(pindexBest->GetBlockHash());
@@ -353,10 +340,8 @@ bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHea
     {
         // we want to set nFile inside pos here to -1 so we know its in levelDB block storage, dont do this within dual
         // most since it also uses sequential
-
         return WriteBlockToDB(block);
     }
-    // default return of false
     return false;
 }
 
@@ -415,7 +400,6 @@ bool UndoWriteToDisk(const CBlockUndo &blockundo,
     {
         return UndoWriteToDB(blockundo, pindex);
     }
-    // default return of false
     return false;
 }
 
@@ -429,8 +413,7 @@ bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const CBl
     {
         return UndoReadFromDB(blockundo, pindex);
     }
-    // default return of false
-    return true;
+    return false;
 }
 
 
