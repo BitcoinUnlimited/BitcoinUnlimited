@@ -5,10 +5,10 @@
 #ifndef BLOCKDB_H
 #define BLOCKDB_H
 
-#include "uint256.h"
-#include "dbwrapper.h"
 #include "chain.h"
+#include "dbwrapper.h"
 #include "primitives/block.h"
+#include "uint256.h"
 #include "undo.h"
 
 // current version of the blockdb data structure
@@ -25,7 +25,7 @@ struct UndoDBValue
 {
     uint256 hashChecksum;
     uint256 hashBlock;
-    const CBlockUndo* blockundo;
+    const CBlockUndo *blockundo;
 
     UndoDBValue()
     {
@@ -34,7 +34,7 @@ struct UndoDBValue
         blockundo = nullptr;
     }
 
-    UndoDBValue(const uint256 &_hashChecksum, const uint256 &_hashBlock, const CBlockUndo* _blockundo)
+    UndoDBValue(const uint256 &_hashChecksum, const uint256 &_hashBlock, const CBlockUndo *_blockundo)
     {
         this->hashChecksum = _hashChecksum;
         this->hashBlock = _hashBlock;
@@ -50,7 +50,7 @@ struct UndoDBValue
     }
 
     template <typename Stream>
-    void Unserialize(Stream &s, CBlockUndo& _block) const
+    void Unserialize(Stream &s, CBlockUndo &_block) const
     {
         s >> FLATDATA(hashChecksum);
         s >> FLATDATA(hashBlock);
@@ -62,7 +62,12 @@ struct UndoDBValue
 class CBlockDB : public CDBWrapper
 {
 public:
-    CBlockDB(std::string folder, size_t nCacheSize, bool fMemory = false, bool fWipe = false, bool obfuscate = false, COverrideOptions *override = nullptr);
+    CBlockDB(std::string folder,
+        size_t nCacheSize,
+        bool fMemory = false,
+        bool fWipe = false,
+        bool obfuscate = false,
+        COverrideOptions * override = nullptr);
 
 private:
     CBlockDB(const CBlockDB &);
@@ -71,7 +76,7 @@ private:
 public:
     // we need a custom read function to account for the way we want to deserialize undodbvalue
     template <typename K>
-    bool ReadUndo(const K &key, UndoDBValue &value, CBlockUndo& blockundo) const
+    bool ReadUndo(const K &key, UndoDBValue &value, CBlockUndo &blockundo) const
     {
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
         ssKey.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
@@ -107,8 +112,8 @@ extern CBlockDB *pblockundodb;
 bool WriteBlockToDB(const CBlock &block);
 bool ReadBlockFromDB(const CBlockIndex *pindex, CBlock &block);
 
-bool UndoWriteToDB(const CBlockUndo &blockundo, const CBlockIndex* pindex);
-bool UndoReadFromDB(CBlockUndo &blockundo, const CBlockIndex* pindex);
+bool UndoWriteToDB(const CBlockUndo &blockundo, const CBlockIndex *pindex);
+bool UndoReadFromDB(CBlockUndo &blockundo, const CBlockIndex *pindex);
 
 uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune);
 

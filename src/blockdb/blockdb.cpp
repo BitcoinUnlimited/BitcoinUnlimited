@@ -4,13 +4,19 @@
 
 
 #include "blockdb.h"
-#include "main.h"
 #include "hash.h"
+#include "main.h"
 
 CBlockDB *pblockdb = nullptr;
 CBlockDB *pblockundodb = nullptr;
 
-CBlockDB::CBlockDB(std::string folder, size_t nCacheSize, bool fMemory, bool fWipe, bool obfuscate, COverrideOptions *pOverride) : CDBWrapper(GetDataDir() / "blockdb" / folder.c_str(), nCacheSize, fMemory, fWipe, obfuscate, pOverride)
+CBlockDB::CBlockDB(std::string folder,
+    size_t nCacheSize,
+    bool fMemory,
+    bool fWipe,
+    bool obfuscate,
+    COverrideOptions *pOverride)
+    : CDBWrapper(GetDataDir() / "blockdb" / folder.c_str(), nCacheSize, fMemory, fWipe, obfuscate, pOverride)
 {
 }
 
@@ -35,7 +41,7 @@ bool ReadBlockFromDB(const CBlockIndex *pindex, CBlock &block)
     return pblockdb->Read(key.str(), block);
 }
 
-bool UndoWriteToDB(const CBlockUndo &blockundo, const CBlockIndex* pindex)
+bool UndoWriteToDB(const CBlockUndo &blockundo, const CBlockIndex *pindex)
 {
     // Create a key which will sort the database by the blocktime.  This is needed to prevent unnecessary
     // compactions which hamper performance. Will a key sorted by time the only files that need to undergo
@@ -43,7 +49,7 @@ bool UndoWriteToDB(const CBlockUndo &blockundo, const CBlockIndex* pindex)
     std::ostringstream key;
     uint256 hashBlock;
     int64_t nBlockTime = 0;
-    if(pindex)
+    if (pindex)
     {
         hashBlock = pindex->GetBlockHash();
         nBlockTime = pindex->GetBlockTime();
@@ -62,7 +68,7 @@ bool UndoWriteToDB(const CBlockUndo &blockundo, const CBlockIndex* pindex)
     return pblockundodb->Write(key.str(), value);
 }
 
-bool UndoReadFromDB(CBlockUndo &blockundo, const CBlockIndex* pindex)
+bool UndoReadFromDB(CBlockUndo &blockundo, const CBlockIndex *pindex)
 {
     // Create a key which will sort the database by the blocktime.  This is needed to prevent unnecessary
     // compactions which hamper performance. Will a key sorted by time the only files that need to undergo
@@ -70,7 +76,7 @@ bool UndoReadFromDB(CBlockUndo &blockundo, const CBlockIndex* pindex)
     std::ostringstream key;
     uint256 hashBlock;
     int64_t nBlockTime = 0;
-    if(pindex)
+    if (pindex)
     {
         hashBlock = pindex->GetBlockHash();
         nBlockTime = pindex->GetBlockTime();
@@ -83,7 +89,7 @@ bool UndoReadFromDB(CBlockUndo &blockundo, const CBlockIndex* pindex)
 
     // Read block
     UndoDBValue value;
-    if(!pblockundodb->ReadUndo(key.str(), value, blockundo))
+    if (!pblockundodb->ReadUndo(key.str(), value, blockundo))
     {
         return error("%s: failure to read undoblock from db", __func__);
     }
@@ -103,21 +109,21 @@ uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
     std::vector<uint256> hashesToPrune;
     BlockMap::iterator iter;
     iter = mapBlockIndex.find(chainActive.Tip()->GetBlockHash());
-    if(iter == mapBlockIndex.end())
+    if (iter == mapBlockIndex.end())
     {
         return 0;
     }
-    CBlockIndex* pindex = iter->second;
-    while(pindex->pprev)
+    CBlockIndex *pindex = iter->second;
+    while (pindex->pprev)
     {
-        if(pindex->nHeight < nLastBlockWeCanPrune)
+        if (pindex->nHeight < nLastBlockWeCanPrune)
         {
             hashesToPrune.push_back(pindex->GetBlockHash());
         }
         pindex = pindex->pprev;
     }
     /// this should prune all blocks from the DB that are old enough to prune
-    for(std::vector<uint256>::iterator iter = hashesToPrune.begin(); iter != hashesToPrune.end(); ++iter)
+    for (std::vector<uint256>::iterator iter = hashesToPrune.begin(); iter != hashesToPrune.end(); ++iter)
     {
         pblockdb->Erase(*iter);
     }

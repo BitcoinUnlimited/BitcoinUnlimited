@@ -46,17 +46,8 @@ FILE *OpenDiskFile(const CDiskBlockPos &pos, const char *prefix, bool fReadOnly)
     return file;
 }
 
-FILE *OpenBlockFile(const CDiskBlockPos &pos, bool fReadOnly)
-{
-    return OpenDiskFile(pos, "blk", fReadOnly);
-}
-
-FILE *OpenUndoFile(const CDiskBlockPos &pos, bool fReadOnly)
-{
-    return OpenDiskFile(pos, "rev", fReadOnly);
-}
-
-
+FILE *OpenBlockFile(const CDiskBlockPos &pos, bool fReadOnly) { return OpenDiskFile(pos, "blk", fReadOnly); }
+FILE *OpenUndoFile(const CDiskBlockPos &pos, bool fReadOnly) { return OpenDiskFile(pos, "rev", fReadOnly); }
 void FlushBlockFile(bool fFinalize)
 {
     LOCK(cs_LastBlockFile);
@@ -94,7 +85,9 @@ void UnlinkPrunedFiles(std::set<int> &setFilesToPrune)
 }
 
 
-bool WriteBlockToDiskSequential(const CBlock &block, CDiskBlockPos &pos, const CMessageHeader::MessageStartChars &messageStart)
+bool WriteBlockToDiskSequential(const CBlock &block,
+    CDiskBlockPos &pos,
+    const CMessageHeader::MessageStartChars &messageStart)
 {
     // Open history file to append
     CAutoFile fileout(OpenBlockFile(pos), SER_DISK, CLIENT_VERSION);
@@ -156,7 +149,6 @@ uint64_t CalculateCurrentUsage()
     }
     return retval;
 }
-
 
 
 /* Prune a block file (modify associated database entries)*/
@@ -242,7 +234,10 @@ void FindFilesToPruneSequential(std::set<int> &setFilesToPrune, uint64_t nLastBl
         ((int64_t)nPruneTarget - (int64_t)nCurrentUsage) / 1024 / 1024, nLastBlockWeCanPrune, count);
 }
 
-bool UndoWriteToDiskSequenatial(const CBlockUndo &blockundo, CDiskBlockPos &pos, const uint256 &hashBlock, const CMessageHeader::MessageStartChars &messageStart)
+bool UndoWriteToDiskSequenatial(const CBlockUndo &blockundo,
+    CDiskBlockPos &pos,
+    const uint256 &hashBlock,
+    const CMessageHeader::MessageStartChars &messageStart)
 {
     // Open history file to append
     CAutoFile fileout(OpenUndoFile(pos), SER_DISK, CLIENT_VERSION);
