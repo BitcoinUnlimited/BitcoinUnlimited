@@ -158,8 +158,10 @@ enum
     ZMQ = 0x2000000,
     QT = 0x4000000,
     IBD = 0x8000000,
+
     GRAPHENE = 0x10000000,
-    RESPEND = 0x20000000
+    RESPEND = 0x20000000,
+    WB = 0x40000000 // weak blocks
 };
 
 // Add corresponding lower case string for the category:
@@ -171,7 +173,7 @@ enum
             {MEMPOOLREJ, "mempoolrej"}, {BLK, "blk"}, {EVICT, "evict"}, {PARALLEL, "parallel"}, {RAND, "rand"}, \
             {REQ, "req"}, {BLOOM, "bloom"}, {LCK, "lck"}, {PROXY, "proxy"}, {DBASE, "dbase"},                   \
             {SELECTCOINS, "selectcoins"}, {ESTIMATEFEE, "estimatefee"}, {QT, "qt"}, {IBD, "ibd"},               \
-            {GRAPHENE, "graphene"}, {RESPEND, "respend"},                                                       \
+            {GRAPHENE, "graphene"}, {RESPEND, "respend"}, {WB, "weakblocks"},                                   \
         {                                                                                                       \
             ZMQ, "zmq"                                                                                          \
         }                                                                                                       \
