@@ -1014,13 +1014,6 @@ void BitcoinGUI::setEncryptionStatus(int status)
         encryptWalletAction->setEnabled(true);
         break;
     case WalletModel::Unlocked:
-        /*
-                labelEncryptionIcon->show();
-                labelEncryptionIcon->setPixmap(
-                    platformStyle->SingleColorIcon(":/icons/lock_open").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
-                labelEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>unlocked</b>"));
-        */
-
         labelWalletEncryptionIcon->show();
         labelWalletEncryptionIcon->setPixmap(
             platformStyle->SingleColorIcon(":/icons/lock_open").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
@@ -1031,14 +1024,6 @@ void BitcoinGUI::setEncryptionStatus(int status)
         encryptWalletAction->setEnabled(false); // TODO: decrypt currently not supported
         break;
     case WalletModel::Locked:
-        /*
-                labelEncryptionIcon->show();
-                labelEncryptionIcon->setPixmap(
-                    platformStyle->SingleColorIcon(":/icons/lock_closed").pixmap(STATUSBAR_ICONSIZE,
-           STATUSBAR_ICONSIZE));
-                labelEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>locked</b>"));
-        */
-
         labelWalletEncryptionIcon->show();
         labelWalletEncryptionIcon->setPixmap(
             platformStyle->SingleColorIcon(":/icons/lock_closed").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
