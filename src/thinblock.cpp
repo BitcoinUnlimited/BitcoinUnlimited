@@ -1695,11 +1695,12 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
             uint64_t nBlockSize = 0;
             while (mi != mempool.mapTx.get<3>().end())
             {
-                CTransaction tx = mi->GetTx();
+                const CTransaction &tx = mi->GetTx();
+                const uint256 &txHash = tx.GetHash();
 
                 if (!IsFinalTx(tx, nHeight, nLockTimeCutoff))
                 {
-                    LOG(BLOOM, "tx %s is not final\n", tx.GetHash().ToString());
+                    LOG(BLOOM, "tx %s is not final\n", txHash.ToString());
                     mi++;
                     continue;
                 }
@@ -1708,7 +1709,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
                 // it to the high score set if it can be and also add any parents or children.  Also add
                 // children and parents to the priority set tx's if they have any.
                 iter = mempool.mapTx.project<0>(mi);
-                if (!setHighScoreMemPoolHashes.count(tx.GetHash()))
+                if (!setHighScoreMemPoolHashes.count(txHash))
                 {
                     LOG(BLOOM,
                         "next tx is %s blocksize %d fee %d modified fee %d size %d clearatentry %d priority %f\n",
@@ -1716,14 +1717,14 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
                         mi->GetTxSize(), mi->WasClearAtEntry(), mi->GetPriority(nHeight));
 
                     // add tx to the set: we don't know if this is a parent or child yet.
-                    setHighScoreMemPoolHashes.insert(tx.GetHash());
+                    setHighScoreMemPoolHashes.insert(txHash);
 
                     // Add any parent tx's
                     bool fChild = false;
                     for (CTxMemPool::txiter parent : mempool.GetMemPoolParents(iter))
                     {
                         fChild = true;
-                        uint256 parentHash = parent->GetTx().GetHash();
+                        const uint256 &parentHash = parent->GetTx().GetHash();
                         if (!setHighScoreMemPoolHashes.count(parentHash))
                         {
                             setHighScoreMemPoolHashes.insert(parentHash);
@@ -1740,7 +1741,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
                     for (CTxMemPool::txiter child : mempool.GetMemPoolChildren(iter))
                     {
                         fHasChildren = true;
-                        uint256 childHash = child->GetTx().GetHash();
+                        const uint256 &childHash = child->GetTx().GetHash();
                         if (!setHighScoreMemPoolHashes.count(childHash))
                         {
                             setHighScoreMemPoolHashes.insert(childHash);
