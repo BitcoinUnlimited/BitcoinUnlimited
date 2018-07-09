@@ -200,6 +200,7 @@ BITCOIN_CORE_H = \
   wallet/rpcwallet.h \
   wallet/wallet.h \
   wallet/walletdb.h \
+  weakblock.h \
   zmq/zmqabstractnotifier.h \
   zmq/zmqconfig.h\
   zmq/zmqnotificationinterface.h \
@@ -272,6 +273,7 @@ libbitcoin_server_a_SOURCES = \
   requestManager.cpp \
   validationinterface.cpp \
   versionbits.cpp \
+  weakblock.cpp \
   $(BITCOIN_CORE_H)
 
 if ENABLE_ZMQ
