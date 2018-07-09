@@ -39,6 +39,7 @@
 #include "utilstrencodings.h"
 #include "validationinterface.h"
 #include "version.h"
+#include "weakblock.h"
 
 #include <atomic>
 #include <boost/lexical_cast.hpp>
@@ -345,6 +346,14 @@ CTweak<double> dMinLimiterTxFee("minlimitertxfee",
               "zero fee and subject to -limitfreerelay (default: %.4f)",
                                     DEFAULT_MINLIMITERTXFEE),
     DEFAULT_MINLIMITERTXFEE);
+
+CTweak<bool> wbEnable("weakblocks.enable", "Enable weakblocks support", DEFAULT_WEAKBLOCKS_ENABLE);
+
+CTweak<uint32_t> wbConsiderPOWratio("weakblocks.considerPOW",
+    "The factor to be applied to the current strong blocks target value which will be the maximum target value where a "
+    "weak block will be stored and forwarded",
+    DEFAULT_WEAKBLOCKS_CONSIDER_POW_RATIO);
+
 
 CRequestManager requester; // after the maps nodes and tweaks
 
