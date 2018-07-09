@@ -269,7 +269,6 @@ CNodeRef FindLikelyNode(const std::string &addrName)
 
 UniValue expedited(const UniValue &params, bool fHelp)
 {
-    std::string strCommand;
     if (fHelp || params.size() < 2)
         throw runtime_error("expedited block|tx \"node IP addr\" on|off\n"
                             "\nRequest expedited forwarding of blocks and/or transactions from a node.\nExpedited "
@@ -324,7 +323,6 @@ UniValue expedited(const UniValue &params, bool fHelp)
 
 UniValue pushtx(const UniValue &params, bool fHelp)
 {
-    string strCommand;
     if (fHelp || params.size() != 1)
         throw runtime_error("pushtx \"node\"\n"
                             "\nPush uncommitted transactions to a node.\n"
@@ -1120,12 +1118,6 @@ bool IsTrafficShapingEnabled()
 
 UniValue gettrafficshaping(const UniValue &params, bool fHelp)
 {
-    string strCommand;
-    if (params.size() == 1)
-    {
-        strCommand = params[0].get_str();
-    }
-
     if (fHelp || (params.size() != 0))
         throw runtime_error(
             "gettrafficshaping"
@@ -1164,11 +1156,10 @@ UniValue settrafficshaping(const UniValue &params, bool fHelp)
 {
     bool disable = false;
     bool badArg = false;
-    string strCommand;
     CLeakyBucket *bucket = nullptr;
     if (params.size() >= 2)
     {
-        strCommand = params[0].get_str();
+        const string strCommand = params[0].get_str();
         if (strCommand == "send")
             bucket = &sendShaper;
         if (strCommand == "receive")
