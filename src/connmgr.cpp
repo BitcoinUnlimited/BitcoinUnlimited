@@ -11,9 +11,9 @@ std::unique_ptr<CConnMgr> connmgr(new CConnMgr);
  * Find a node in a vector.  Just calls std::find.  Split out for cleanliness and also because std:find won't be
  * enough if we switch to vectors of noderefs.  Requires any lock for vector traversal to be held.
  */
-static std::vector<CNode *>::iterator FindNode(std::vector<CNode *> &vNodes, CNode *pNode)
+static std::vector<CNode *>::iterator FindNode(std::vector<CNode *> &nodes, CNode *pNode)
 {
-    return std::find(vNodes.begin(), vNodes.end(), pNode);
+    return std::find(nodes.begin(), nodes.end(), pNode);
 }
 
 /**
@@ -22,10 +22,10 @@ static std::vector<CNode *>::iterator FindNode(std::vector<CNode *> &vNodes, CNo
  * @param[in] vNodes      The vector of nodes.
  * @param[in] pNode       The node to add.
  */
-static void AddNode(std::vector<CNode *> &vNodes, CNode *pNode)
+static void AddNode(std::vector<CNode *> &nodes, CNode *pNode)
 {
     pNode->AddRef();
-    vNodes.push_back(pNode);
+    nodes.push_back(pNode);
 }
 
 /**
@@ -35,14 +35,14 @@ static void AddNode(std::vector<CNode *> &vNodes, CNode *pNode)
  * @param[in] pNode       The node to remove.
  * @return  True if the node was originally present, false if not.
  */
-static bool RemoveNode(std::vector<CNode *> &vNodes, CNode *pNode)
+static bool RemoveNode(std::vector<CNode *> &nodes, CNode *pNode)
 {
-    auto Node = FindNode(vNodes, pNode);
+    auto Node = FindNode(nodes, pNode);
 
-    if (Node != vNodes.end())
+    if (Node != nodes.end())
     {
         pNode->Release();
-        vNodes.erase(Node);
+        nodes.erase(Node);
         return true;
     }
 

@@ -25,10 +25,10 @@ private:
 public:
     CachingTransactionSignatureChecker(const CTransaction *txToIn,
         unsigned int nInIn,
-        const CAmount &amount,
+        const CAmount &amt,
         unsigned int flags,
         bool storeIn = true)
-        : TransactionSignatureChecker(txToIn, nInIn, amount, flags), store(storeIn)
+        : TransactionSignatureChecker(txToIn, nInIn, amt, flags), store(storeIn)
     {
     }
 

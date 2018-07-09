@@ -305,10 +305,10 @@ bool GetLeaderboardFromBitnodes(vector<string> &vIPs)
             for (std::vector<UniValue>::iterator it = v.begin(); it != v.end(); ++it)
             {
                 const UniValue &o = *it;
-                const UniValue &result = find_value(o, "node");
-                if (result.isStr())
+                const UniValue &findresult = find_value(o, "node");
+                if (findresult.isStr())
                 {
-                    string s = result.get_str();
+                    string s = findresult.get_str();
                     vIPs.push_back(s);
                     count++;
                 }

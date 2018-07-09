@@ -43,13 +43,13 @@ public:
     {
     }
     explicit SendCoinsRecipient(const QString &addr,
-        const QString &label,
-        const CAmount &amount,
-        const QString &message,
-        const QString &freezeLockTime,
-        const QString &labelPublic)
-        : address(addr), label(label), labelPublic(labelPublic), amount(amount), message(message),
-          freezeLockTime(freezeLockTime), fSubtractFeeFromAmount(false), nVersion(SendCoinsRecipient::CURRENT_VERSION)
+        const QString &labelp,
+        const CAmount &amt,
+        const QString &msg,
+        const QString &freezeLockTimep,
+        const QString &labelPublicp)
+        : address(addr), label(labelp), labelPublic(labelPublicp), amount(amt), message(msg),
+          freezeLockTime(freezeLockTimep), fSubtractFeeFromAmount(false), nVersion(SendCoinsRecipient::CURRENT_VERSION)
     {
     }
 
@@ -169,7 +169,7 @@ public:
     // Return status record for SendCoins, contains error id + information
     struct SendCoinsReturn
     {
-        SendCoinsReturn(StatusCode status = OK) : status(status) {}
+        SendCoinsReturn(StatusCode statusp = OK) : status(statusp) {}
         StatusCode status;
     };
 

@@ -11,7 +11,8 @@
 
 #include <QUrl>
 
-OpenURIDialog::OpenURIDialog(const Config *cfg, QWidget *parent) : QDialog(parent), ui(new Ui::OpenURIDialog), cfg(cfg)
+OpenURIDialog::OpenURIDialog(const Config *cfgp, QWidget *parent)
+    : QDialog(parent), ui(new Ui::OpenURIDialog), cfg(cfgp)
 {
     ui->setupUi(this);
     ui->uriEdit->setPlaceholderText(GUIUtil::bitcoinURIScheme(*cfg) + ":");
