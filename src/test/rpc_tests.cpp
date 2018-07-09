@@ -406,4 +406,12 @@ BOOST_AUTO_TEST_CASE(rpc_convert_values_generatetoaddress)
     BOOST_CHECK_EQUAL(result[2].get_int(), 9);
 }
 
+BOOST_AUTO_TEST_CASE(rpc_help)
+{
+    const string s = tableRPC.help("");
+    // check sorting by category (exactly one entry named 'Mining')
+    size_t p = s.find("== Mining ==");
+    BOOST_CHECK(p != string::npos);
+    BOOST_CHECK(s.substr(p + 1).find("== Mining ==") == string::npos);
+}
 BOOST_AUTO_TEST_SUITE_END()

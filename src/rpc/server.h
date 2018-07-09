@@ -142,7 +142,7 @@ public:
 class CRPCTable
 {
 private:
-    std::map<std::string, const CRPCCommand *> mapCommands;
+    std::map<std::string, CRPCCommand> mapCommands;
 
 public:
     CRPCTable();
@@ -169,8 +169,9 @@ public:
      * Appends a CRPCCommand to the dispatch table.
      * Returns false if RPC server is already running (dump concurrency protection).
      * Commands cannot be overwritten (returns false).
+     * WARNING: The passed reference must be sufficiently long-lived
      */
-    bool appendCommand(const std::string &name, const CRPCCommand *pcmd);
+    bool appendCommand(const CRPCCommand &ccmd);
 };
 
 extern CRPCTable tableRPC;
