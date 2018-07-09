@@ -2531,7 +2531,7 @@ UniValue getwalletinfo(const UniValue &params, bool fHelp)
                             "Jan 1 1970 GMT) that the wallet is unlocked for transfers, or 0 if the wallet is locked\n"
                             "  \"paytxfee\": x.xxxx,         (numeric) the transaction fee configuration, set in " +
             CURRENCY_UNIT + "/kB\n"
-                            "  \"hdmasterkeyid\": \"<hash160>\", (string) the Hash160 of the hd master pubkey\n"
+                            "  \"hdmasterkeyid\": \"<hash160>\", (hex string) the Hash160 of the hd master pubkey\n"
                             "}\n"
                             "\nExamples:\n" +
             HelpExampleCli("getwalletinfo", "") + HelpExampleRpc("getwalletinfo", ""));

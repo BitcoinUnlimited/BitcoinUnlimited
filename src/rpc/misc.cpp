@@ -186,7 +186,7 @@ UniValue validateaddress(const UniValue &params, bool fHelp)
             "  \"account\" : \"account\"         (string) DEPRECATED. The account associated with the address, \"\" is "
             "the default account\n"
             "  \"hdkeypath\" : \"keypath\"       (string, optional) The HD keypath if the key is HD and available\n"
-            "  \"hdmasterkeyid\" : \"<hash160>\" (string, optional) The Hash160 of the HD master pubkey\n"
+            "  \"hdmasterkeyid\" : \"<hash160>\" (hex string, optional) The Hash160 of the HD master pubkey\n"
             "}\n"
             "\nExamples:\n" +
             HelpExampleCli("validateaddress", "\"1PSSGeFHDnKNxiEyFrD1wcEaHr9hrQDDWc\"") +
