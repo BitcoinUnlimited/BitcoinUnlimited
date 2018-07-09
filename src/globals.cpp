@@ -56,14 +56,12 @@ std::map<std::pair<void *, void *>, LockStack> lockorders;
 boost::thread_specific_ptr<LockStack> lockstack;
 #endif
 
-
-std::atomic<bool> fIsInitialBlockDownload{false};
-std::atomic<bool> fRescan{false}; // this flag is set to true when a wallet rescan has been invoked.
+// this flag is set to true when a wallet rescan has been invoked.
+std::atomic<bool> fRescan{false};
 
 CStatusString statusStrings;
 // main.cpp CriticalSections:
 CCriticalSection cs_LastBlockFile;
-CCriticalSection cs_nBlockSequenceId;
 
 CCriticalSection cs_nTimeOffset;
 int64_t nTimeOffset = 0;
@@ -71,8 +69,10 @@ int64_t nTimeOffset = 0;
 CCriticalSection cs_rpcWarmup;
 
 CCriticalSection cs_main;
-BlockMap mapBlockIndex;
-CChain chainActive;
+BlockMap mapBlockIndex GUARDED_BY(cs_main);
+CChain chainActive GUARDED_BY(cs_main);
+std::map<NodeId, CNodeState> mapNodeState GUARDED_BY(cs_main); // nodestate.h
+
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
 
@@ -80,8 +80,6 @@ proxyType proxyInfo[NET_MAX];
 proxyType nameProxy;
 CCriticalSection cs_proxyInfos;
 
-// moved from main.cpp (now part of nodestate.h)
-std::map<NodeId, CNodeState> mapNodeState;
 
 set<uint256> setPreVerifiedTxHash;
 set<uint256> setUnVerifiedOrphanTxHash;
@@ -172,7 +170,8 @@ CTweakRef<uint64_t> miningBlockSize("mining.blockSize",
     &MiningBlockSizeValidator);
 CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
     "Maximum size of OP_RETURN data script in bytes.",
-    &nMaxDatacarrierBytes);
+    &nMaxDatacarrierBytes,
+    &MaxDataCarrierValidator);
 
 CTweak<uint64_t> miningForkTime("mining.forkMay2018Time",
     "Time in seconds since the epoch to initiate a hard fork scheduled on 15th May 2018.",
@@ -277,6 +276,8 @@ CThinBlockData thindata; // Singleton class
 
 uint256 bitcoinCashForkBlockHash = uint256S("000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec");
 
+map<int64_t, CMiningCandidate> miningCandidatesMap GUARDED_BY(cs_main);
+
 #ifdef ENABLE_MUTRACE
 class CPrintSomePointers
 {
@@ -286,7 +287,6 @@ public:
         printf("csBestBlock %p\n", &csBestBlock);
         printf("cvBlockChange %p\n", &cvBlockChange);
         printf("cs_LastBlockFile %p\n", &cs_LastBlockFile);
-        printf("cs_nBlockSequenceId %p\n", &cs_nBlockSequenceId);
         printf("cs_nTimeOffset %p\n", &cs_nTimeOffset);
         printf("cs_rpcWarmup %p\n", &cs_rpcWarmup);
         printf("cs_main %p\n", &cs_main);

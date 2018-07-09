@@ -147,11 +147,11 @@ std::string AllowedArgs::helpMessage() const
 // CheckValueFunc functions
 //
 
-static const std::set<std::string> boolStrings{"", "1", "0", "t", "f", "y", "n", "true", "false", "yes", "no"};
-static const std::set<char> intChars{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
-static const std::set<char> amountChars{'.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
+const std::set<std::string> boolStrings{"", "1", "0", "t", "f", "y", "n", "true", "false", "yes", "no"};
+const std::set<char> intChars{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
+const std::set<char> amountChars{'.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
 
-static bool validateString(const std::string &str, const std::set<char> &validChars)
+bool validateString(const std::string &str, const std::set<char> &validChars)
 {
     for (const char &c : str)
         if (!validChars.count(c))
@@ -159,10 +159,10 @@ static bool validateString(const std::string &str, const std::set<char> &validCh
     return true;
 }
 
-static bool optionalBool(const std::string &str) { return (boolStrings.count(str) != 0); }
-static bool requiredStr(const std::string &str) { return !str.empty(); }
-static bool optionalStr(const std::string &str) { return true; }
-static bool requiredInt(const std::string &str)
+bool optionalBool(const std::string &str) { return (boolStrings.count(str) != 0); }
+bool requiredStr(const std::string &str) { return !str.empty(); }
+bool optionalStr(const std::string &str) { return true; }
+bool requiredInt(const std::string &str)
 {
     if (str.empty() || str == "-")
         return false;
@@ -171,14 +171,14 @@ static bool requiredInt(const std::string &str)
     return validateString(str[0] == '-' ? str.substr(1) : str, intChars);
 }
 
-static bool optionalInt(const std::string &str)
+bool optionalInt(const std::string &str)
 {
     if (str.empty())
         return true;
     return requiredInt(str);
 }
 
-static bool requiredAmount(const std::string &str)
+bool requiredAmount(const std::string &str)
 {
     if (str.empty())
         return false;
@@ -260,7 +260,8 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addArg("par=<n>", requiredInt, strprintf(_("Set the number of script verification threads (%u to %d, 0 = "
                                                     "auto, <0 = leave that many cores free, default: %d)"),
                                             -GetNumCores(), MAX_SCRIPTCHECK_THREADS, DEFAULT_SCRIPTCHECK_THREADS))
-        .addArg("parallel=<n>", optionalBool, strprintf(_("Turn Parallel Block Validation on or off (default: %u)"), 1))
+        .addArg("parallel={true,false,0,1}", optionalBool,
+            strprintf(_("Turn Parallel Block Validation on or off (default: %u)"), true))
 #ifndef WIN32
         .addArg("pid=<file>", requiredStr, strprintf(_("Specify pid file (default: %s)"), BITCOIN_PID_FILENAME))
 #endif
@@ -287,6 +288,8 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
                     DEFAULT_MISBEHAVING_BANTIME))
         .addArg("bind=<addr>", requiredStr,
             _("Bind to given address and always listen on it. Use [host]:port notation for IPv6"))
+        .addArg("bindallorfail", optionalBool, strprintf(_("Bind all ports (P2P as well RPC) or fail to start. This is "
+                                                           "used for RPC testing, but might find other uses.")))
         .addArg("bitnodes", optionalBool,
             _("Query for peer addresses via Bitnodes API, if low on addresses (default: 1 unless -connect)"))
         .addArg("blkretryinterval", requiredInt,

@@ -928,3 +928,76 @@ bool IsStringTrue(const std::string &str)
 
     return false;
 }
+
+static const int wildmatch_max_length = 1024;
+
+bool wildmatch(string pattern, string test)
+{
+    // stack overflow prevention
+    if (test.size() > wildmatch_max_length || pattern.size() > wildmatch_max_length)
+    {
+        return false;
+    }
+
+    while (true)
+    {
+        // handle empty strings
+        if (!test.size() && !pattern.size())
+            return true;
+
+        // handle trailing chars in test str
+        if (test.size() && !pattern.size())
+            return false;
+
+        // handle trailing chars in  pattern str. Needs to be a single asterisk to match.
+        if (!test.size() && pattern.size())
+        {
+            return pattern == "*";
+        }
+
+        // test.size() && pattern.size() holds when reaching here
+
+        if (pattern[0] == '?')
+        {
+            pattern = pattern.substr(1);
+            test = test.substr(1);
+            continue;
+        }
+
+        if (pattern[0] == '*')
+        {
+            if (pattern.size() > 1)
+            {
+                // Will not try multiple ways to match to avoid the potential
+                // for path explosion, like matching "*-*-*-*" to "------------" and the like
+                // Just eat up the test string until the first char mismatches
+                if (pattern[1] == '?' || pattern[1] == '*')
+                {
+                    // ** or *? patterns are disallowed in the midst of a matching expression
+                    return false;
+                }
+                size_t i = 0;
+                while (i < test.size())
+                {
+                    if (test[i] != pattern[1])
+                        i++;
+                    else
+                        break;
+                }
+                if (i == test.size())
+                    return true;
+
+                pattern = pattern.substr(1);
+                test = test.substr(i);
+                continue;
+            }
+            else
+                return true;
+        }
+        if (test[0] != pattern[0])
+            return false;
+
+        pattern = pattern.substr(1);
+        test = test.substr(1);
+    }
+}

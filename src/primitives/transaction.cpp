@@ -134,3 +134,5 @@ std::string CTransaction::ToString() const
         str += "    " + vout[i].ToString() + "\n";
     return str;
 }
+
+uint32_t CTransaction::GetTxSize() const { return ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION); }

@@ -50,6 +50,9 @@ using namespace std;
 uint64_t nLastBlockTx = 0;
 uint64_t nLastBlockSize = 0;
 
+/** Coinbase transactions we create: */
+CScript COINBASE_FLAGS;
+
 class ScoreCompare
 {
 public:
@@ -383,11 +386,6 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
             continue;
         }
 
-        // If tx is not applicable to this (forked) chain, skip it
-        if (uahfChainBlock && IsTxOpReturnInvalid(iter->GetTx()))
-        {
-            continue;
-        }
         // Reject the tx if we are on the fork, but the tx is not fork-signed
         if (uahfChainBlock && !IsTxUAHFOnly(*iter))
         {
@@ -485,11 +483,6 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
             continue;
         }
 
-        // If tx is not applicable to this (forked) chain, skip it
-        if (uahfChainBlock && IsTxOpReturnInvalid(iter->GetTx()))
-        {
-            continue;
-        }
         // Reject the tx if we are on the fork, but the tx is not fork-signed
         if (uahfChainBlock && !IsTxUAHFOnly(*iter))
         {

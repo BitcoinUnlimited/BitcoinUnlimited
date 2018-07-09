@@ -2,7 +2,7 @@
 # Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 #
 # Test re-org scenarios with a mempool that contains transactions
 # that spend (directly or indirectly) coinbase transactions.
@@ -13,7 +13,6 @@ import time
 import math
 import json
 import logging
-logging.basicConfig(format='%(asctime)s.%(levelname)s: %(message)s', level=logging.INFO)
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *

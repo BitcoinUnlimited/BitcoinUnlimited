@@ -209,7 +209,7 @@ extern bool IsTrafficShapingEnabled();
 
 // Check whether we are doing an initial block download (synchronizing from disk or network)
 extern bool IsInitialBlockDownload();
-extern void IsInitialBlockDownloadInit();
+extern void IsInitialBlockDownloadInit(bool *fInit = nullptr);
 
 // Check whether we are nearly sync'd.  Used primarily to determine whether an xthin can be retrieved.
 extern bool IsChainNearlySyncd();
@@ -265,6 +265,7 @@ bool MiningAndExcessiveBlockValidatorRule(const uint64_t newExcessiveBlockSize, 
 std::string AcceptDepthValidator(const unsigned int &value, unsigned int *item, bool validate);
 std::string ExcessiveBlockValidator(const uint64_t &value, uint64_t *item, bool validate);
 std::string OutboundConnectionValidator(const int &value, int *item, bool validate);
+std::string MaxDataCarrierValidator(const unsigned int &value, unsigned int *item, bool validate);
 std::string SubverValidator(const std::string &value, std::string *item, bool validate);
 std::string MiningBlockSizeValidator(const uint64_t &value, uint64_t *item, bool validate);
 
@@ -288,4 +289,17 @@ extern CTweak<uint64_t> miningForkEB;
 /** This specifies the minimum max block size at the fork point */
 extern CTweak<uint64_t> miningForkMG;
 
+// Mining-Candidate start
+/** Return a Merkle root given a Coinbase hash and Merkle proof */
+uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &merkleProof);
+/** Return Merkle branches for a Block */
+std::vector<uint256> GetMerkleProofBranches(CBlock *pblock);
+
+/** Keep track of mining candidates */
+class CMiningCandidate
+{
+public:
+    CBlock block;
+};
+extern std::map<int64_t, CMiningCandidate> miningCandidatesMap;
 #endif

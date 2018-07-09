@@ -55,8 +55,8 @@ BOOST_AUTO_TEST_CASE(test_addresses) {
     BOOST_CHECK_EQUAL(base58_pubkey, EncodeDestination(dstKey, params, cfg));
     BOOST_CHECK_EQUAL(base58_script, EncodeDestination(dstScript, params, cfg));
 
-    BOOST_CHECK_EQUAL(bitpay_pubkey, EncodeBitpayAddr(dstKey, params));
-    BOOST_CHECK_EQUAL(bitpay_script, EncodeBitpayAddr(dstScript, params));
+    BOOST_CHECK_EQUAL(bitpay_pubkey, EncodeBitpayAddr(dstKey));
+    BOOST_CHECK_EQUAL(bitpay_script, EncodeBitpayAddr(dstScript));
 
     // Check decoding
     BOOST_CHECK(dstKey == DecodeDestination(cashaddr_pubkey, params));

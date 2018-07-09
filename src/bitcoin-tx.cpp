@@ -222,13 +222,15 @@ static void MutateTxLocktime(CMutableTransaction &tx, const string &cmdVal)
 
 static void MutateTxAddInput(CMutableTransaction &tx, const string &strInput)
 {
+    std::vector<std::string> vStrInputParts;
+    boost::split(vStrInputParts, strInput, boost::is_any_of(":"));
+
     // separate TXID:VOUT in string
-    size_t pos = strInput.find(':');
-    if ((pos == string::npos) || (pos == 0) || (pos == (strInput.size() - 1)))
+    if (vStrInputParts.size() < 2)
         throw runtime_error("TX input missing separator");
 
     // extract and validate TXID
-    string strTxid = strInput.substr(0, pos);
+    string strTxid = vStrInputParts[0];
     if ((strTxid.size() != 64) || !IsHex(strTxid))
         throw runtime_error("invalid TX input txid");
     uint256 txid(uint256S(strTxid));
@@ -237,15 +239,20 @@ static void MutateTxAddInput(CMutableTransaction &tx, const string &strInput)
     static const unsigned int maxVout = BLOCKSTREAM_CORE_MAX_BLOCK_SIZE / minTxOutSz;
 
     // extract and validate vout
-    string strVout = strInput.substr(pos + 1, string::npos);
+    string strVout = vStrInputParts[1];
     int vout = atoi(strVout);
     // BU: be strict about what is generated.  TODO: BLOCKSTREAM_CORE_MAX_BLOCK_SIZE should be converted to a cmd line
     // parameter
     if ((vout < 0) || (vout > (int)maxVout))
         throw runtime_error("invalid TX input vout");
 
+    // extract the optional sequence number
+    uint32_t nSequenceIn = std::numeric_limits<unsigned int>::max();
+    if (vStrInputParts.size() > 2)
+        nSequenceIn = std::stoul(vStrInputParts[2]);
+
     // append to transaction input list
-    CTxIn txin(txid, vout);
+    CTxIn txin(txid, vout, CScript(), nSequenceIn);
     tx.vin.push_back(txin);
 }
 
@@ -489,6 +496,7 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
+                LOCK(view.cs_utxo);
                 const Coin &coin = view.AccessCoin(out);
                 if (!coin.IsSpent() && coin.out.scriptPubKey != scriptPubKey)
                 {
@@ -526,6 +534,8 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
     {
+        LOCK(view.cs_utxo);
+
         CTxIn &txin = mergedTx.vin[i];
         const Coin &coin = view.AccessCoin(txin.prevout);
         if (coin.IsSpent())
@@ -542,7 +552,7 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
             SignSignature(keystore, prevPubKey, mergedTx, i, amount, nHashType);
 
         // ... and merge in other signatures:
-        BOOST_FOREACH (const CTransaction &txv, txVariants)
+        for (const CTransaction &txv : txVariants)
         {
             txin.scriptSig = CombineSignatures(prevPubKey, MutableTransactionSignatureChecker(&mergedTx, i, amount),
                 txin.scriptSig, txv.vin[i].scriptSig);

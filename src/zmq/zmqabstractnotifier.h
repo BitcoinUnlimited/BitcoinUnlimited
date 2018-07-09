@@ -33,7 +33,7 @@ public:
     virtual void Shutdown() = 0;
 
     virtual bool NotifyBlock(const CBlockIndex *pindex);
-    virtual bool NotifyTransaction(const CTransaction &transaction);
+    virtual bool NotifyTransaction(const CTransactionRef &ptx);
 
 protected:
     void *psocket;

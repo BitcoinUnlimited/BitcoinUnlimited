@@ -28,6 +28,7 @@ import re
 import urllib.parse as urlparse
 import errno
 import logging
+import traceback
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
@@ -48,11 +49,26 @@ PORT_MIN = 11000
 # The number of ports to "reserve" for p2p and rpc, each
 PORT_RANGE = 5000
 
+debug_port_assignments = False
+
+class UtilOptions:
+    # this module-wide var is set from test_framework.py
+    no_ipv6_rpc_listen = False
+
 BITCOIND_PROC_WAIT_TIMEOUT = 60
 
 class PortSeed:
     # Must be initialized with a unique integer for each process
     n = None
+
+    # these map <node-n> to newly assigned port in case any
+    # errors happened during startup.
+    port_changes_p2p = {}
+    port_changes_rpc = {}
+
+    # map node number to full initialized config file path for later fixup in case
+    # the RPC or P2P port needs to be changed due to port collisions.
+    config_file = {}
 
 #Set Mocktime default to OFF.
 #MOCKTIME is only needed for scripts that use the
@@ -61,10 +77,48 @@ class PortSeed:
 #then the mempools will not sync due to IBD.
 MOCKTIME = 0
 
+
+def remap_ports(n):
+    new_port_rpc = random.randint(PORT_MIN, PORT_MIN+PORT_RANGE - 1)
+    new_port_p2p = random.randint(PORT_MIN, PORT_MIN+PORT_RANGE - 1)
+
+    logging.warn("Remapping RPC for node %d to new random port %d", n, new_port_rpc)
+    logging.warn("Remapping P2P for node %d to new random port %d", n, new_port_p2p)
+    PortSeed.port_changes_rpc[n] = new_port_rpc
+    PortSeed.port_changes_p2p[n] = new_port_p2p
+
+def fixup_ports_in_configfile(i):
+    assert(i in PortSeed.config_file)
+
+    logging.warn("Tweaking ports in configuration file %s for node %d", PortSeed.config_file[i], i)
+    cfg_data = open(PortSeed.config_file[i], "r", encoding="utf-8").read()
+
+    cfg_data = re.sub(r"^port=[0-9]+", r"port=%d" % p2p_port(i),
+                      cfg_data, flags=re.MULTILINE)
+    cfg_data = re.sub(r"^rpcport=[0-9]+", r"rpcport=%d" % rpc_port(i),
+                      cfg_data, flags=re.MULTILINE)
+
+    with open(PortSeed.config_file[i], "w", encoding="utf-8") as outf:
+        outf.write(cfg_data)
+
 class NoConfigValue:
     """ Use to remove the specific configure parameter and value when writing to bitcoin.conf"""
     def __init__(self):
         pass
+
+def expectException(fn, ExcType, comparison=None):
+    try:
+        fn()
+    except ExcType as exc:
+        if comparison:
+            if comparison in str(exc):  # exception matchs
+                return
+            else:
+                print("Incorrect error.  Was: " + str(exc) + " Expecting: " + comparison)
+                assert(0)
+        else:
+            return
+    assert(0)  # an exception should have happened
 
 def enable_mocktime():
     # Set the mocktime to be after the Bitcoin Cash fork so
@@ -115,13 +169,31 @@ def get_rpc_proxy(url, node_number, timeout=None, miningCapable=True):
 
     return coverage.AuthServiceProxyWrapper(proxy, coverage_logfile)
 
+def do_and_ignore_failure(fn):
+    try:
+        fn()
+    except:
+        pass
 
 def p2p_port(n):
     assert(n <= MAX_NODES)
-    return PORT_MIN + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
+    if n in PortSeed.port_changes_p2p:
+        result = PortSeed.port_changes_p2p[n]
+    else:
+        result = PORT_MIN + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
+    if debug_port_assignments:
+        logging.info("Current P2P port for node %d: %d", n, result)
+    return result
 
 def rpc_port(n):
-    return PORT_MIN + PORT_RANGE + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
+    assert(n <= MAX_NODES)
+    if n in PortSeed.port_changes_rpc:
+        result = PortSeed.port_changes_rpc[n]
+    else:
+        result = PORT_MIN + PORT_RANGE + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
+    if debug_port_assignments:
+        logging.info("Current RPC port for node %d: %d", n, result)
+    return result
 
 def check_json_precision():
     """Make sure json library being used does not lose precision converting BTC values"""
@@ -187,7 +259,7 @@ def sync_mempools(rpc_connections, wait=1,verbose=1):
 def filterUnsupportedParams(defaults, param_keys=FILTER_PARAM_KEYS):
     """
     Method to filter out the unrecognized parameters by setting NoConfigValue
-    obj as the value of the parameter as key of the dict. 
+    obj as the value of the parameter as key of the dict.
     Input:
         defaults : default list containing unrecognized parameter(s)
         param_keys : parameter(s) to be removed from the default list
@@ -203,9 +275,17 @@ def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None)
     datadir = os.path.join(dirname, "node"+str(n))
     if not os.path.isdir(datadir):
         os.makedirs(datadir)
-
+    rpc_u, rpc_p = rpc_auth_pair(n)
     defaults = {"server":1, "discover":0, "regtest":1,"rpcuser":"rt","rpcpassword":"rt",
-                "port":p2p_port(n),"rpcport":str(rpc_port(n)),"listenonion":0,"maxlimitertxfee":0,"usecashaddr":1}
+                "port":p2p_port(n),"rpcport":str(rpc_port(n)),"listenonion":0,"maxlimitertxfee":0,"usecashaddr":1,
+                "rpcuser":rpc_u, "rpcpassword":rpc_p, "bindallorfail" : 1}
+
+    # switch off default IPv6 listening port (for travis)
+    if UtilOptions.no_ipv6_rpc_listen:
+        defaults.update({
+            "rpcbind": "127.0.0.1",
+            "rpcallowip" : "127.0.0.1"
+            })
 
     if bitcoinConfDict: defaults.update(bitcoinConfDict)
 
@@ -219,7 +299,11 @@ def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None)
             defaults = filterUnsupportedParams(defaults)
             file = BITCOIN_CONF
 
-    with open(os.path.join(datadir, file), 'w') as f:
+    config_file_path = os.path.join(datadir, file)
+
+    PortSeed.config_file[n] = config_file_path
+
+    with open(config_file_path, 'w', encoding='utf-8') as f:
         for (key,val) in defaults.items():
           if isinstance(val, NoConfigValue):
             pass
@@ -235,11 +319,15 @@ def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None)
           os.makedirs(regtestdir)
       print(regtestdir, os.path.join(regtestdir, "wallet.dat"))
       shutil.copyfile(wallet,os.path.join(regtestdir, "wallet.dat"))
-      
+
     return datadir
 
+def rpc_auth_pair(n):
+    return 'rpcuser💻' + str(n), 'rpcpass🔑' + str(n)
+
 def rpc_url(i, rpchost=None):
-    return "http://rt:rt@%s:%d" % (rpchost or '127.0.0.1', rpc_port(i))
+    rpc_u, rpc_p = rpc_auth_pair(i)
+    return "http://%s:%s@%s:%d" % (rpc_u, rpc_p, rpchost or '127.0.0.1', rpc_port(i))
 
 def wait_for_bitcoind_start(process, url, i):
     '''
@@ -279,19 +367,29 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
 
         # Create cache directories, run bitcoinds:
         for i in range(4):
-            datadir=initialize_datadir("cache", i, bitcoinConfDict, wallets, bins)
-            if bins:
-                args = [ bins[i], "-keypool=1", "-datadir="+datadir ]
+            for retry in range(4):
+                try:
+                    datadir=initialize_datadir("cache", i, bitcoinConfDict, wallets, bins)
+                    if bins:
+                        args = [ bins[i], "-keypool=1", "-datadir="+datadir ]
+                    else:
+                        args = [ os.getenv("BITCOIND", "bitcoind"), "-keypool=1", "-datadir="+datadir ]
+                    if i > 0:
+                        args.append("-connect=127.0.0.1:"+str(p2p_port(0)))
+                    bitcoind_processes[i] = subprocess.Popen(args)
+                    if os.getenv("PYTHON_DEBUG", ""):
+                        print("initialize_chain: bitcoind started, waiting for RPC to come up")
+                    wait_for_bitcoind_start(bitcoind_processes[i], rpc_url(i), i)
+                    if os.getenv("PYTHON_DEBUG", ""):
+                        print("initialize_chain: RPC succesfully started")
+                    break
+                except Exception as exc:
+                    logging.error("Error bringing up bitcoind #%d (initialize_chain, directory %s), this might be retried. Problem is:", i, test_dir)
+                    do_and_ignore_failure(bitcoind_processes[i].kill)
+                    traceback.print_exc(file=sys.stdout)
+                    remap_ports(i)
             else:
-                args = [ os.getenv("BITCOIND", "bitcoind"), "-keypool=1", "-datadir="+datadir ]
-            if i > 0:
-                args.append("-connect=127.0.0.1:"+str(p2p_port(0)))
-            bitcoind_processes[i] = subprocess.Popen(args)
-            if os.getenv("PYTHON_DEBUG", ""):
-                print("initialize_chain: bitcoind started, waiting for RPC to come up")
-            wait_for_bitcoind_start(bitcoind_processes[i], rpc_url(i), i)
-            if os.getenv("PYTHON_DEBUG", ""):
-                print("initialize_chain: RPC succesfully started")
+                raise Exception("Couldn't start bitcoind even with retries on different ports (initialize_chain).")
 
         rpcs = []
         for i in range(4):
@@ -376,13 +474,25 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
     # RPC tests still depend on free transactions
     args = [ binary, "-datadir="+datadir, "-rest", "-mocktime="+str(get_mocktime()) ] # // BU removed, "-keypool=1","-blockprioritysize=50000" ]
     if extra_args is not None: args.extend(extra_args)
-    bitcoind_processes[i] = subprocess.Popen(args)
-    if os.getenv("PYTHON_DEBUG", ""):
-        print("start_node: bitcoind started, waiting for RPC to come up")
-    url = rpc_url(i, rpchost)
-    wait_for_bitcoind_start(bitcoind_processes[i], url, i)
-    if os.getenv("PYTHON_DEBUG", ""):
-        print("start_node: RPC succesfully started")
+    for retry in range(4):
+        try:
+            bitcoind_processes[i] = subprocess.Popen(args)
+            if os.getenv("PYTHON_DEBUG", ""):
+                print("start_node: bitcoind started, waiting for RPC to come up")
+            url = rpc_url(i, rpchost)
+            wait_for_bitcoind_start(bitcoind_processes[i], url, i)
+            if os.getenv("PYTHON_DEBUG", ""):
+                print("start_node: RPC succesfully started")
+            break
+        except Exception as exc:
+            logging.error("Error bringing up bitcoind #%d (start_node, directory %s), this might be retried. Problem is:", i, dirname)
+            do_and_ignore_failure(bitcoind_processes[i].kill)
+            traceback.print_exc(file=sys.stdout)
+            remap_ports(i)
+            fixup_ports_in_configfile(i)
+    else:
+        raise Exception("Couldn't start bitcoind even with retries on different ports (start_node).")
+
     proxy = get_rpc_proxy(url, i, timeout=timewait)
     if COVERAGE_DIR:
         coverage.write_all_rpc_commands(COVERAGE_DIR, proxy)
@@ -564,13 +674,13 @@ def split_transaction(node, prevouts, toAddrs, txfeePer=DEFAULT_TX_FEE_PER_BYTE,
     """
       Create a transaction that divides the sum of all the passed utxos into all the destination addresses
       pass:
-           node: (node object) where to send the RPC calls 
+           node: (node object) where to send the RPC calls
            prevouts: a single UTXO description dictionary, or a list of them
            toAddrs: a list of strings specifying the output addresses
            "sendtx=False" if you don't want to transaction to be submitted.
       Returns (transaction in hex, Vin list, Vout list)
     """
-    if type(prevouts) == type({}): prevouts = [prevouts]  # If the user passes just one transaction then put a list around it 
+    if type(prevouts) == type({}): prevouts = [prevouts]  # If the user passes just one transaction then put a list around it
     txid = None
     inp = []
     decContext = decimal.getcontext().prec
@@ -823,7 +933,7 @@ def create_tx(node, coinbase, to_address, amount):
 
 # Create a spend of each passed-in utxo, splicing in "txouts" to each raw
 # transaction to make it large.  See gen_return_txouts() above.
-def create_lots_of_big_transactions(node, txouts, utxos, fee):
+def create_lots_of_big_transactions(node, txouts, utxos, num, fee):
     addr = node.getnewaddress()
     txids = []
     for i in range(len(utxos)):
@@ -841,6 +951,19 @@ def create_lots_of_big_transactions(node, txouts, utxos, fee):
         txid = node.sendrawtransaction(signresult["hex"], True)
         txids.append(txid)
     return txids
+
+def mine_large_block(node, utxos=None):
+    # generate a 66k transaction,
+    # and 14 of them is close to the 1MB block limit
+    num = 14
+    txouts = gen_return_txouts()
+    utxos = utxos if utxos is not None else []
+    if len(utxos) < num:
+        utxos.clear()
+        utxos.extend(node.listunspent())
+    fee = 100 * node.getnetworkinfo()["relayfee"]
+    create_lots_of_big_transactions(node, txouts, utxos, num, fee=fee)
+    node.generate(1)
 
 def get_bip9_status(node, key):
     info = node.getblockchaininfo()

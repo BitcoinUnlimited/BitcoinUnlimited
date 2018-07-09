@@ -353,91 +353,14 @@ std::string gbt_vb_name(const Consensus::DeploymentPos pos)
     return s;
 }
 
-UniValue getblocktemplate(const UniValue &params, bool fHelp)
+
+/*
+Outputs:
+JSON -returns UniValue
+pblockOut a copy of the block if not NULL
+*/
+UniValue mkblocktemplate(const UniValue &params, CBlock *pblockOut)
 {
-    if (fHelp || params.size() > 1)
-        throw runtime_error(
-            "getblocktemplate ( \"jsonrequestobject\" )\n"
-            "\nIf the request parameters include a 'mode' key, that is used to explicitly select between the default "
-            "'template' request or a 'proposal'.\n"
-            "It returns data needed to construct a block to work on.\n"
-            "For full specification, see BIPs 22 and 9:\n"
-            "    https://github.com/bitcoin/bips/blob/master/bip-0022.mediawiki\n"
-            "    https://github.com/bitcoin/bips/blob/master/bip-0009.mediawiki#getblocktemplate_changes\n"
-
-            "\nArguments:\n"
-            "1. \"jsonrequestobject\"       (string, optional) A json object in the following spec\n"
-            "     {\n"
-            "       \"mode\":\"template\"    (string, optional) This must be set to \"template\" or omitted\n"
-            "       \"capabilities\":[       (array, optional) A list of strings\n"
-            "           \"support\"           (string) client side supported feature, 'longpoll', 'coinbasetxn', "
-            "'coinbasevalue', 'proposal', 'serverlist', 'workid'\n"
-            "           ,...\n"
-            "         ]\n"
-            "     }\n"
-            "\n"
-
-            "\nResult:\n"
-            "{\n"
-            "  \"version\" : n,                    (numeric) The block version\n"
-            "  \"rules\" : [ \"rulename\", ... ],    (array of strings) specific block rules that are to be enforced\n"
-            "  \"vbavailable\" : {                 (json object) set of pending, supported versionbit (BIP 9) softfork "
-            "deployments\n"
-            "      \"rulename\" : bitnumber        (numeric) identifies the bit number as indicating acceptance and "
-            "readiness for the named softfork rule\n"
-            "      ,...\n"
-            "  },\n"
-            "  \"vbrequired\" : n,                 (numeric) bit mask of versionbits the server requires set in "
-            "submissions\n"
-            "  \"previousblockhash\" : \"xxxx\",    (string) The hash of current highest block\n"
-            "  \"transactions\" : [                (array) contents of non-coinbase transactions that should be "
-            "included in the next block\n"
-            "      {\n"
-            "         \"data\" : \"xxxx\",          (string) transaction data encoded in hexadecimal (byte-for-byte)\n"
-            "         \"hash\" : \"xxxx\",          (string) hash/id encoded in little-endian hexadecimal\n"
-            "         \"depends\" : [              (array) array of numbers \n"
-            "             n                        (numeric) transactions before this one (by 1-based index in "
-            "'transactions' list) that must be present in the final block if this one is\n"
-            "             ,...\n"
-            "         ],\n"
-            "         \"fee\": n,                   (numeric) difference in value between transaction inputs and "
-            "outputs (in Satoshis); for coinbase transactions, this is a negative Number of the total collected block "
-            "fees (ie, not including the block subsidy); if key is not present, fee is unknown and clients MUST NOT "
-            "assume there isn't one\n"
-            "         \"sigops\" : n,               (numeric) total number of SigOps, as counted for purposes of block "
-            "limits; if key is not present, sigop count is unknown and clients MUST NOT assume there aren't any\n"
-            "         \"required\" : true|false     (boolean) if provided and true, this transaction must be in the "
-            "final block\n"
-            "      }\n"
-            "      ,...\n"
-            "  ],\n"
-            "  \"coinbaseaux\" : {                  (json object) data that should be included in the coinbase's "
-            "scriptSig content\n"
-            "      \"flags\" : \"flags\"            (string) \n"
-            "  },\n"
-            "  \"coinbasevalue\" : n,               (numeric) maximum allowable input to coinbase transaction, "
-            "including the generation award and transaction fees (in Satoshis)\n"
-            "  \"coinbasetxn\" : { ... },           (json object) information for coinbase transaction\n"
-            "  \"target\" : \"xxxx\",               (string) The hash target\n"
-            "  \"mintime\" : xxx,                   (numeric) The minimum timestamp appropriate for next block time in "
-            "seconds since epoch (Jan 1 1970 GMT)\n"
-            "  \"mutable\" : [                      (array of string) list of ways the block template may be changed \n"
-            "     \"value\"                         (string) A way the block template may be changed, e.g. 'time', "
-            "'transactions', 'prevblock'\n"
-            "     ,...\n"
-            "  ],\n"
-            "  \"noncerange\" : \"00000000ffffffff\",   (string) A range of valid nonces\n"
-            "  \"sigoplimit\" : n,                 (numeric) limit of sigops in blocks\n"
-            "  \"sizelimit\" : n,                  (numeric) limit of block size\n"
-            "  \"curtime\" : ttt,                  (numeric) current timestamp in seconds since epoch (Jan 1 1970 "
-            "GMT)\n"
-            "  \"bits\" : \"xxx\",                 (string) compressed target of next block\n"
-            "  \"height\" : n                      (numeric) The height of the next block\n"
-            "}\n"
-
-            "\nExamples:\n" +
-            HelpExampleCli("getblocktemplate", "") + HelpExampleRpc("getblocktemplate", ""));
-
     LOCK(cs_main);
 
     std::string strMode = "template";
@@ -591,8 +514,19 @@ UniValue getblocktemplate(const UniValue &params, bool fHelp)
             delete pblocktemplate;
             pblocktemplate = NULL;
         }
-        CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = BlockAssembler(Params()).CreateNewBlock(scriptDummy);
+
+        boost::shared_ptr<CReserveScript> coinbaseScript;
+        GetMainSignals().ScriptForMining(coinbaseScript);
+
+        // If the keypool is exhausted, no script is returned at all.  Catch this.
+        if (!coinbaseScript)
+            throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
+
+        // throw an error if no script was provided
+        if (coinbaseScript->reserveScript.empty())
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
+
+        pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -643,6 +577,7 @@ UniValue getblocktemplate(const UniValue &params, bool fHelp)
     }
 
     UniValue aux(UniValue::VOBJ);
+    // COINBASE_FLAGS were assigned in CreateNewBlock() in the steps above.  Now we can use it here.
     aux.push_back(Pair("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end())));
 
     arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
@@ -740,7 +675,97 @@ UniValue getblocktemplate(const UniValue &params, bool fHelp)
     // BU get the height directly from the block because pindexPrev could change if another block has come in.
     result.push_back(Pair("height", (int64_t)(pblock->GetHeight())));
 
+    if (pblockOut != nullptr)
+        *pblockOut = *pblock;
     return result;
+}
+
+UniValue getblocktemplate(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() > 1)
+        throw runtime_error(
+            "getblocktemplate ( \"jsonrequestobject\" )\n"
+            "\nIf the request parameters include a 'mode' key, that is used to explicitly select between the default "
+            "'template' request or a 'proposal'.\n"
+            "It returns data needed to construct a block to work on.\n"
+            "For full specification, see BIPs 22 and 9:\n"
+            "    https://github.com/bitcoin/bips/blob/master/bip-0022.mediawiki\n"
+            "    https://github.com/bitcoin/bips/blob/master/bip-0009.mediawiki#getblocktemplate_changes\n"
+
+            "\nArguments:\n"
+            "1. \"jsonrequestobject\"       (string, optional) A json object in the following spec\n"
+            "     {\n"
+            "       \"mode\":\"template\"    (string, optional) This must be set to \"template\" or omitted\n"
+            "       \"capabilities\":[       (array, optional) A list of strings\n"
+            "           \"support\"           (string) client side supported feature, 'longpoll', 'coinbasetxn', "
+            "'coinbasevalue', 'proposal', 'serverlist', 'workid'\n"
+            "           ,...\n"
+            "         ]\n"
+            "     }\n"
+            "\n"
+
+            "\nResult:\n"
+            "{\n"
+            "  \"version\" : n,                    (numeric) The block version\n"
+            "  \"rules\" : [ \"rulename\", ... ],    (array of strings) specific block rules that are to be enforced\n"
+            "  \"vbavailable\" : {                 (json object) set of pending, supported versionbit (BIP 9) softfork "
+            "deployments\n"
+            "      \"rulename\" : bitnumber        (numeric) identifies the bit number as indicating acceptance and "
+            "readiness for the named softfork rule\n"
+            "      ,...\n"
+            "  },\n"
+            "  \"vbrequired\" : n,                 (numeric) bit mask of versionbits the server requires set in "
+            "submissions\n"
+            "  \"previousblockhash\" : \"xxxx\",    (string) The hash of current highest block\n"
+            "  \"transactions\" : [                (array) contents of non-coinbase transactions that should be "
+            "included in the next block\n"
+            "      {\n"
+            "         \"data\" : \"xxxx\",          (string) transaction data encoded in hexadecimal (byte-for-byte)\n"
+            "         \"hash\" : \"xxxx\",          (string) hash/id encoded in little-endian hexadecimal\n"
+            "         \"depends\" : [              (array) array of numbers \n"
+            "             n                        (numeric) transactions before this one (by 1-based index in "
+            "'transactions' list) that must be present in the final block if this one is\n"
+            "             ,...\n"
+            "         ],\n"
+            "         \"fee\": n,                   (numeric) difference in value between transaction inputs and "
+            "outputs (in Satoshis); for coinbase transactions, this is a negative Number of the total collected block "
+            "fees (ie, not including the block subsidy); if key is not present, fee is unknown and clients MUST NOT "
+            "assume there isn't one\n"
+            "         \"sigops\" : n,               (numeric) total number of SigOps, as counted for purposes of block "
+            "limits; if key is not present, sigop count is unknown and clients MUST NOT assume there aren't any\n"
+            "         \"required\" : true|false     (boolean) if provided and true, this transaction must be in the "
+            "final block\n"
+            "      }\n"
+            "      ,...\n"
+            "  ],\n"
+            "  \"coinbaseaux\" : {                  (json object) data that should be included in the coinbase's "
+            "scriptSig content\n"
+            "      \"flags\" : \"flags\"            (string) \n"
+            "  },\n"
+            "  \"coinbasevalue\" : n,               (numeric) maximum allowable input to coinbase transaction, "
+            "including the generation award and transaction fees (in Satoshis)\n"
+            "  \"coinbasetxn\" : { ... },           (json object) information for coinbase transaction\n"
+            "  \"target\" : \"xxxx\",               (string) The hash target\n"
+            "  \"mintime\" : xxx,                   (numeric) The minimum timestamp appropriate for next block time in "
+            "seconds since epoch (Jan 1 1970 GMT)\n"
+            "  \"mutable\" : [                      (array of string) list of ways the block template may be changed \n"
+            "     \"value\"                         (string) A way the block template may be changed, e.g. 'time', "
+            "'transactions', 'prevblock'\n"
+            "     ,...\n"
+            "  ],\n"
+            "  \"noncerange\" : \"00000000ffffffff\",   (string) A range of valid nonces\n"
+            "  \"sigoplimit\" : n,                 (numeric) limit of sigops in blocks\n"
+            "  \"sizelimit\" : n,                  (numeric) limit of block size\n"
+            "  \"curtime\" : ttt,                  (numeric) current timestamp in seconds since epoch (Jan 1 1970 "
+            "GMT)\n"
+            "  \"bits\" : \"xxx\",                 (string) compressed target of next block\n"
+            "  \"height\" : n                      (numeric) The height of the next block\n"
+            "}\n"
+
+            "\nExamples:\n" +
+            HelpExampleCli("getblocktemplate", "") + HelpExampleRpc("getblocktemplate", ""));
+
+    return mkblocktemplate(params, nullptr);
 }
 
 class submitblock_StateCatcher : public CValidationInterface
@@ -762,29 +787,8 @@ protected:
     };
 };
 
-UniValue submitblock(const UniValue &params, bool fHelp)
+UniValue SubmitBlock(CBlock &block)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)
-        throw runtime_error("submitblock \"hexdata\" ( \"jsonparametersobject\" )\n"
-                            "\nAttempts to submit new block to network.\n"
-                            "The 'jsonparametersobject' parameter is currently ignored.\n"
-                            "See https://en.bitcoin.it/wiki/BIP_0022 for full specification.\n"
-
-                            "\nArguments\n"
-                            "1. \"hexdata\"    (string, required) the hex-encoded block data to submit\n"
-                            "2. \"jsonparametersobject\"     (string, optional) object of optional parameters\n"
-                            "    {\n"
-                            "      \"workid\" : \"id\"    (string, optional) if the server provided a workid, it MUST "
-                            "be included with submissions\n"
-                            "    }\n"
-                            "\nResult:\n"
-                            "\nExamples:\n" +
-                            HelpExampleCli("submitblock", "\"mydata\"") + HelpExampleRpc("submitblock", "\"mydata\""));
-
-    CBlock block;
-    if (!DecodeHexBlk(block, params[0].get_str()))
-        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
-
     uint256 hash = block.GetHash();
     bool fBlockPresent = false;
     {
@@ -834,6 +838,32 @@ UniValue submitblock(const UniValue &params, bool fHelp)
         state = sc.state;
     }
     return BIP22ValidationResult(state);
+}
+
+UniValue submitblock(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)
+        throw runtime_error("submitblock \"hexdata\" ( \"jsonparametersobject\" )\n"
+                            "\nAttempts to submit new block to network.\n"
+                            "The 'jsonparametersobject' parameter is currently ignored.\n"
+                            "See https://en.bitcoin.it/wiki/BIP_0022 for full specification.\n"
+
+                            "\nArguments\n"
+                            "1. \"hexdata\"    (string, required) the hex-encoded block data to submit\n"
+                            "2. \"jsonparametersobject\"     (string, optional) object of optional parameters\n"
+                            "    {\n"
+                            "      \"workid\" : \"id\"    (string, optional) if the server provided a workid, it MUST "
+                            "be included with submissions\n"
+                            "    }\n"
+                            "\nResult:\n"
+                            "\nExamples:\n" +
+                            HelpExampleCli("submitblock", "\"mydata\"") + HelpExampleRpc("submitblock", "\"mydata\""));
+
+    CBlock block;
+    if (!DecodeHexBlk(block, params[0].get_str()))
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
+
+    return SubmitBlock(block);
 }
 
 UniValue estimatefee(const UniValue &params, bool fHelp)
@@ -972,8 +1002,8 @@ static const CRPCCommand commands[] = {
     {"util", "estimatesmartpriority", &estimatesmartpriority, true},
 };
 
-void RegisterMiningRPCCommands(CRPCTable &tableRPC)
+void RegisterMiningRPCCommands(CRPCTable &table)
 {
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
-        tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
+    for (auto cmd : commands)
+        table.appendCommand(cmd);
 }

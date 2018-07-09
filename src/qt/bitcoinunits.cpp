@@ -14,7 +14,7 @@ QList<BitcoinUnits::Unit> BitcoinUnits::availableUnits()
     QList<BitcoinUnits::Unit> unitlist;
     unitlist.append(BCH);
     unitlist.append(mBCH);
-    unitlist.append(uBCH);
+    unitlist.append(XCH);
     return unitlist;
 }
 
@@ -24,7 +24,7 @@ bool BitcoinUnits::valid(int unit)
     {
     case BCH:
     case mBCH:
-    case uBCH:
+    case XCH:
         return true;
     default:
         return false;
@@ -39,8 +39,8 @@ QString BitcoinUnits::name(int unit)
         return QString("BCH");
     case mBCH:
         return QString("mBCH");
-    case uBCH:
-        return QString::fromUtf8("μBCH");
+    case XCH:
+        return QString("cash");
     default:
         return QString("???");
     }
@@ -54,8 +54,8 @@ QString BitcoinUnits::description(int unit)
         return QString("Bitcoins");
     case mBCH:
         return QString("Milli-Bitcoins (1 / 1" THIN_SP_UTF8 "000)");
-    case uBCH:
-        return QString("Micro-Bitcoins (1 / 1" THIN_SP_UTF8 "000" THIN_SP_UTF8 "000)");
+    case XCH:
+        return QString("Cash (1 / 1" THIN_SP_UTF8 "000" THIN_SP_UTF8 "000)");
     default:
         return QString("???");
     }
@@ -69,7 +69,7 @@ qint64 BitcoinUnits::factor(int unit)
         return 100000000;
     case mBCH:
         return 100000;
-    case uBCH:
+    case XCH:
         return 100;
     default:
         return 100000000;
@@ -84,7 +84,7 @@ int BitcoinUnits::decimals(int unit)
         return 8;
     case mBCH:
         return 5;
-    case uBCH:
+    case XCH:
         return 2;
     default:
         return 0;

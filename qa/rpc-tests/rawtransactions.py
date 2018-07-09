@@ -3,7 +3,7 @@
 # Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 #
 # Test re-org scenarios with a mempool that contains transactions
 # that spend (directly or indirectly) coinbase transactions.
@@ -237,6 +237,31 @@ class RawTransactionsTest(BitcoinTestFramework):
         signedtxn = self.nodes[0].signrawtransaction(txn)
         txid = self.nodes[0].sendrawtransaction(signedtxn["hex"], False, "STANDARD")
         assert(len(txid) == 64)
+
+        inputs  = [ {'txid' : "1d1d4e24ed99057e84c3f80fd8fbec79ed9e1acee37da269356ecea000000000", 'vout' : 1, 'sequence' : 1000}]
+        outputs = { self.nodes[0].getnewaddress() : 1 }
+        rawtx   = self.nodes[0].createrawtransaction(inputs, outputs)
+        decrawtx= self.nodes[0].decoderawtransaction(rawtx)
+        assert_equal(decrawtx['vin'][0]['sequence'], 1000)
+
+        inputs  = [ {'txid' : "1d1d4e24ed99057e84c3f80fd8fbec79ed9e1acee37da269356ecea000000000", 'vout' : 1, 'sequence' : -1}]
+        outputs = { self.nodes[0].getnewaddress() : 1 }
+        assert_raises(JSONRPCException, self.nodes[0].createrawtransaction, inputs, outputs)
+
+        inputs  = [ {'txid' : "1d1d4e24ed99057e84c3f80fd8fbec79ed9e1acee37da269356ecea000000000", 'vout' : 1, 'sequence' : 4294967296}]
+        outputs = { self.nodes[0].getnewaddress() : 1 }
+        assert_raises(JSONRPCException, self.nodes[0].createrawtransaction, inputs, outputs)
+
+        inputs  = [ {'txid' : "1d1d4e24ed99057e84c3f80fd8fbec79ed9e1acee37da269356ecea000000000", 'vout' : 1, 'sequence' : 'notanumber'}]
+        outputs = { self.nodes[0].getnewaddress() : 1 }
+        assert_raises(JSONRPCException, self.nodes[0].createrawtransaction, inputs, outputs)
+
+        inputs  = [ {'txid' : "1d1d4e24ed99057e84c3f80fd8fbec79ed9e1acee37da269356ecea000000000", 'vout' : 1, 'sequence' : 4294967294}]
+        outputs = { self.nodes[0].getnewaddress() : 1 }
+        rawtx   = self.nodes[0].createrawtransaction(inputs, outputs)
+        decrawtx= self.nodes[0].decoderawtransaction(rawtx)
+        assert_equal(decrawtx['vin'][0]['sequence'], 4294967294)
+
 
 if __name__ == '__main__':
     RawTransactionsTest().main()

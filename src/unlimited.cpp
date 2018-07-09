@@ -10,6 +10,7 @@
 #include "checkpoints.h"
 #include "connmgr.h"
 #include "consensus/consensus.h"
+#include "consensus/merkle.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "core_io.h"
@@ -25,6 +26,7 @@
 #include "primitives/block.h"
 #include "requestManager.h"
 #include "rpc/server.h"
+#include "script/standard.h"
 #include "stat.h"
 #include "thinblock.h"
 #include "timedata.h"
@@ -53,11 +55,18 @@ using namespace std;
 extern CTxMemPool mempool; // from main.cpp
 static atomic<uint64_t> nLargestBlockSeen{BLOCKSTREAM_CORE_MAX_BLOCK_SIZE}; // track the largest block we've seen
 static atomic<bool> fIsChainNearlySyncd{false};
-extern atomic<bool> fIsInitialBlockDownload;
+
+// We always start with true so that when ActivateBestChain is called during the startup (init.cpp)
+// and we havn't finished initial sync then we don't accidentally trigger the auto-dbcache
+// resize. After ActivateBestChain the fIsInitialBlockDownload flag is set to true or false depending
+// on whether we really have finished sync or not.
+static std::atomic<bool> fIsInitialBlockDownload{true};
+
 extern CTweakRef<uint64_t> miningBlockSize;
 extern CTweakRef<uint64_t> ebTweak;
 
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
+static const int NEW_CANDIDATE_INTERVAL = 30; // seconds
 
 bool IsTrafficShapingEnabled();
 UniValue validateblocktemplate(const UniValue &params, bool fHelp);
@@ -140,6 +149,22 @@ std::string OutboundConnectionValidator(const int &value, int *item, bool valida
                 for (int i = 0; i < diff; i++)
                     semOutboundAddNode->post();
         }
+    }
+    return std::string();
+}
+
+std::string MaxDataCarrierValidator(const unsigned int &value, unsigned int *item, bool validate)
+{
+    if (validate)
+    {
+        if (value < MAX_OP_RETURN_RELAY) // sanity check
+        {
+            return "Invalid Value. Data Carrier minimum size has to be greater of equal to 223 bytes";
+        }
+    }
+    else // Do anything to "take" the new value
+    {
+        // nothing needed
     }
     return std::string();
 }
@@ -231,24 +256,19 @@ std::string FormatCoinbaseMessage(const std::vector<std::string> &comments, cons
 CNodeRef FindLikelyNode(const std::string &addrName)
 {
     LOCK(cs_vNodes);
-    bool wildcard = (addrName.find_first_of("*?") != std::string::npos);
-
+    // always match any beginning part of string to be
+    // compatible with old implementation of FindLikelyNode(..)
+    std::string match_str = (addrName[addrName.size() - 1] == '*') ? addrName : addrName + "*";
     for (CNode *pnode : vNodes)
     {
-        if (wildcard)
-        {
-            if (match(addrName.c_str(), pnode->addrName.c_str()))
-                return (pnode);
-        }
-        else if (pnode->addrName.find(addrName) != std::string::npos)
-            return (pnode);
+        if (wildmatch(match_str, pnode->addrName))
+            return pnode;
     }
     return nullptr;
 }
 
 UniValue expedited(const UniValue &params, bool fHelp)
 {
-    std::string strCommand;
     if (fHelp || params.size() < 2)
         throw runtime_error("expedited block|tx \"node IP addr\" on|off\n"
                             "\nRequest expedited forwarding of blocks and/or transactions from a node.\nExpedited "
@@ -303,7 +323,6 @@ UniValue expedited(const UniValue &params, bool fHelp)
 
 UniValue pushtx(const UniValue &params, bool fHelp)
 {
-    string strCommand;
     if (fHelp || params.size() != 1)
         throw runtime_error("pushtx \"node\"\n"
                             "\nPush uncommitted transactions to a node.\n"
@@ -1099,12 +1118,6 @@ bool IsTrafficShapingEnabled()
 
 UniValue gettrafficshaping(const UniValue &params, bool fHelp)
 {
-    string strCommand;
-    if (params.size() == 1)
-    {
-        strCommand = params[0].get_str();
-    }
-
     if (fHelp || (params.size() != 0))
         throw runtime_error(
             "gettrafficshaping"
@@ -1143,11 +1156,10 @@ UniValue settrafficshaping(const UniValue &params, bool fHelp)
 {
     bool disable = false;
     bool badArg = false;
-    string strCommand;
     CLeakyBucket *bucket = nullptr;
     if (params.size() >= 2)
     {
-        strCommand = params[0].get_str();
+        const string strCommand = params[0].get_str();
         if (strCommand == "send")
             bucket = &sendShaper;
         if (strCommand == "receive")
@@ -1216,8 +1228,15 @@ UniValue settrafficshaping(const UniValue &params, bool fHelp)
 
 // fIsInitialBlockDownload is updated only during startup and whenever we receive a header.
 // This way we avoid having to lock cs_main so often which tends to be a bottleneck.
-void IsInitialBlockDownloadInit()
+void IsInitialBlockDownloadInit(bool *fInit)
 {
+    // For unit testing purposes, this step allows us to explicitly set the state of block sync.
+    if (fInit)
+    {
+        fIsInitialBlockDownload.store(*fInit);
+        return;
+    }
+
     const CChainParams &chainParams = Params();
     LOCK(cs_main);
     if (!pindexBestHeader)
@@ -1348,7 +1367,7 @@ bool TestConservativeBlockValidity(CValidationState &state,
         return false;
     if (!ContextualCheckBlock(block, state, pindexPrev))
         return false;
-    if (!ConnectBlock(block, state, &indexDummy, viewNew, true))
+    if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true))
         return false;
     assert(state.IsValid());
 
@@ -1589,6 +1608,230 @@ UniValue setlog(const UniValue &params, bool fHelp)
 
     return ret;
 }
+
+/** Mining-Candidate begin */
+
+/** Oustanding candidates are removed 30 sec after a new block has been found*/
+static void RmOldMiningCandidates()
+{
+    LOCK(cs_main);
+    static unsigned int prevheight = 0;
+    unsigned int height = GetBlockchainHeight();
+
+    if (height <= prevheight)
+        return;
+
+    int64_t tdiff = GetTime() - (chainActive.Tip()->nTime + NEW_CANDIDATE_INTERVAL);
+    if (tdiff >= 0)
+    {
+        // Clean out mining candidates that are the same height as a discovered block.
+        for (auto it = miningCandidatesMap.cbegin(); it != miningCandidatesMap.cend();)
+        {
+            if (it->second.block.GetHeight() <= prevheight)
+            {
+                it = miningCandidatesMap.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+        prevheight = height;
+    }
+}
+
+static void AddMiningCandidate(CMiningCandidate &candid, int64_t id)
+{
+    // Save candidate so can be looked up:
+    LOCK(cs_main);
+    miningCandidatesMap[id] = candid;
+}
+
+std::vector<uint256> GetMerkleProofBranches(CBlock *pblock)
+{
+    std::vector<uint256> ret;
+    std::vector<uint256> leaves;
+    int len = pblock->vtx.size();
+
+    for (int i = 0; i < len; i++)
+    {
+        leaves.push_back(pblock->vtx[i].get()->GetHash());
+    }
+
+    ret = ComputeMerkleBranch(leaves, 0);
+    return ret;
+}
+
+/** Create Mining-Candidate JSON to send to miner */
+static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
+{
+    static int64_t id = 0;
+    UniValue ret(UniValue::VOBJ);
+    CBlock &block = candid.block;
+
+    RmOldMiningCandidates();
+
+    // Save candidate so can be looked up:
+    id++;
+    AddMiningCandidate(candid, id);
+    ret.push_back(Pair("id", id));
+
+    ret.push_back(Pair("prevhash", block.hashPrevBlock.GetHex()));
+
+    {
+        const CTransaction *tran = block.vtx[0].get();
+        ret.push_back(Pair("coinbase", EncodeHexTx(*tran)));
+    }
+
+    ret.push_back(Pair("version", block.nVersion));
+    ret.push_back(Pair("nBits", strprintf("%08x", block.nBits)));
+    ret.push_back(Pair("time", block.GetBlockTime()));
+
+    // merkleProof:
+    {
+        std::vector<uint256> brancharr = GetMerkleProofBranches(&block);
+        UniValue merkleProof(UniValue::VARR);
+        for (const auto &i : brancharr)
+        {
+            merkleProof.push_back(i.GetHex());
+        }
+        ret.push_back(Pair("merkleProof", merkleProof));
+
+        // merklePath parameter:
+        // If the coinbase is ever allowed to be anywhere in the hash tree via a hard fork, we will need to communicate
+        // how to calculate the merkleProof by supplying a bit for every level in the proof.
+        // This bit tells the calculator whether the next hash is on the left or right side of the tree.
+        // In other words, whether to do cat(A,B) or cat(B,A).  Specifically, if the bit is 0,the proof calcuation uses
+        // Hash256(concatentate(running hash, next hash in proof)), if the bit is 1, the proof calculates
+        // Hash256(concatentate(next hash in proof, running hash))
+
+        // ret.push_back(Pair("merklePath", 0));
+    }
+
+    return ret;
+}
+
+/** RPC Get a block candidate*/
+UniValue getminingcandidate(const UniValue &params, bool fHelp)
+{
+    UniValue ret(UniValue::VOBJ);
+    CMiningCandidate candid;
+    LOCK(cs_main);
+
+    if (fHelp || params.size() > 0)
+    {
+        throw runtime_error("getminingcandidate"
+                            "\nReturns Mining-Candidate protocol data.\n"
+                            "\nArguments: None\n");
+    }
+    mkblocktemplate(params, &candid.block);
+    ret = MkMiningCandidateJson(candid);
+    return ret;
+}
+
+/** RPC Submit a solved block candidate*/
+UniValue submitminingsolution(const UniValue &params, bool fHelp)
+{
+    UniValue rcvd;
+    CBlock block;
+    LOCK(cs_main);
+
+    if (fHelp || params.size() != 1)
+    {
+        throw runtime_error(
+            "submitminingsolution \"Mining-Candidate data\" ( \"jsonparametersobject\" )\n"
+            "\nAttempts to submit a new block to the network.\n"
+            "\nArguments\n"
+            "1. \"submitminingsolutiondata\"    (string, required) the mining solution (JSON encoded) data to submit\n"
+            "\nResult:\n"
+            "\nNothing on success, error string if block was rejected.\n"
+            "Identical to \"submitblock\".\n"
+            "\nExamples:\n" +
+            HelpExampleRpc("submitminingsolution", "\"mydata\""));
+    }
+
+    rcvd = params[0].get_obj();
+
+    int64_t id = rcvd["id"].get_int64();
+
+    // Needs LOCK(cs_main); above:
+    if (miningCandidatesMap.count(id) == 1)
+    {
+        block = miningCandidatesMap[id].block;
+        miningCandidatesMap.erase(id);
+    }
+    else
+    {
+        return UniValue("id not found");
+    }
+
+    UniValue nonce = rcvd["nonce"];
+    if (nonce.isNull())
+    {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "nonce not found");
+    }
+    block.nNonce = (uint32_t)nonce.get_int64(); // 64 bit to deal with sign bit in 32 bit unsigned int
+
+    UniValue time = rcvd["time"];
+    if (!time.isNull())
+    {
+        block.nTime = (uint32_t)time.get_int64();
+    }
+
+    UniValue version = rcvd["version"];
+    if (!version.isNull())
+    {
+        block.nVersion = version.get_int(); // version signed 32 bit int
+    }
+
+    // Coinbase:
+    CTransaction coinbase;
+    UniValue cbhex = rcvd["coinbase"];
+    if (!cbhex.isNull())
+    {
+        if (DecodeHexTx(coinbase, cbhex.get_str()))
+            block.vtx[0] = MakeTransactionRef(std::move(coinbase));
+        else
+        {
+            throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "coinbase decode failed");
+        }
+    }
+
+    // MerkleRoot:
+    {
+        std::vector<uint256> merkleProof = GetMerkleProofBranches(&block);
+        uint256 t = block.vtx[0]->GetHash();
+        block.hashMerkleRoot = CalculateMerkleRoot(t, merkleProof);
+    }
+
+    UniValue uvsub = SubmitBlock(block); // returns string on failure
+    RmOldMiningCandidates();
+    return uvsub;
+}
+
+static void CalculateNextMerkleRoot(uint256 &merkle_root, const uint256 &merkle_branch)
+{
+    // Append a branch to the root. Double SHA256 the whole thing:
+    uint256 hash;
+    CHash256()
+        .Write(merkle_root.begin(), merkle_root.size())
+        .Write(merkle_branch.begin(), merkle_branch.size())
+        .Finalize(hash.begin());
+    merkle_root = hash;
+}
+
+uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &merkleProof)
+{
+    uint256 merkle_root = coinbase_hash;
+    for (unsigned int i = 0; i < merkleProof.size(); i++)
+    {
+        CalculateNextMerkleRoot(merkle_root, merkleProof[i]);
+    }
+    return merkle_root;
+}
+
+/** Mining-Candidate end */
+
 /* clang-format off */
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafeMode
@@ -1609,6 +1852,8 @@ static const CRPCCommand commands[] =
     { "mining",             "getblockversion",        &getblockversion,        true  },
     { "mining",             "setblockversion",        &setblockversion,        true  },
     { "mining",             "validateblocktemplate",  &validateblocktemplate,  true  },
+    { "mining",             "getminingcandidate",     &getminingcandidate,     true  },
+    { "mining",             "submitminingsolution",   &submitminingsolution,   true  },
 
     /* Utility functions */
     { "util",               "getstatlist",            &getstatlist,            true  },
@@ -1627,10 +1872,10 @@ static const CRPCCommand commands[] =
 };
 /* clang-format on */
 
-void RegisterUnlimitedRPCCommands(CRPCTable &tableRPC)
+void RegisterUnlimitedRPCCommands(CRPCTable &table)
 {
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
-        tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
+    for (auto cmd : commands)
+        table.appendCommand(cmd);
 }
 
 
@@ -1835,7 +2080,6 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 #endif
 
     LOCK(cs_vNodes);
-    std::vector<CNode *>::iterator n;
     uint64_t totalThinBlockSize = 0;
     int disconnected = 0; // watch # of disconnected nodes to ensure they are being cleaned up
     for (std::vector<CNode *>::iterator it = vNodes.begin(); it != vNodes.end(); ++it)
@@ -1973,7 +2217,7 @@ UniValue getaddressforms(const UniValue &params, bool fHelp)
 
     std::string cashAddr = EncodeCashAddr(dest, Params());
     std::string legacyAddr = EncodeLegacyAddr(dest, Params());
-    std::string bitpayAddr = EncodeBitpayAddr(dest, Params());
+    std::string bitpayAddr = EncodeBitpayAddr(dest);
 
     UniValue node(UniValue::VOBJ);
     node.push_back(Pair("legacy", legacyAddr));

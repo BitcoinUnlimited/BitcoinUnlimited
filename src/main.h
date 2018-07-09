@@ -50,9 +50,6 @@ class CValidationState;
 struct CNodeStateStats;
 struct LockPoints;
 
-/** Global variable that points to the coins database */
-extern CCoinsViewDB *pcoinsdbview;
-
 enum FlushStateMode
 {
     FLUSH_STATE_NONE,
@@ -159,7 +156,6 @@ struct BlockHasher
     size_t operator()(const uint256 &hash) const { return hash.GetCheapHash(); }
 };
 
-extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
 typedef boost::unordered_map<uint256, CBlockIndex *, BlockHasher> BlockMap;
@@ -175,7 +171,7 @@ extern bool fIsBareMultisigStd;
 extern unsigned int nBytesPerSigOp;
 extern bool fCheckBlockIndex;
 extern bool fCheckpointsEnabled;
-extern int64_t nCoinCacheUsage;
+extern int64_t nCoinCacheMaxSize;
 /** A fee rate smaller than this is considered zero fee (for relaying, mining and transaction creation) */
 extern CFeeRate minRelayTxFee;
 /** Absolute maximum transaction fee (in satoshis) used by wallet and mempool (rejects high fee in sendrawtransaction)
@@ -261,7 +257,7 @@ FILE *OpenUndoFile(const CDiskBlockPos &pos, bool fReadOnly = false);
 /** Translation to a filesystem path */
 fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
 /** Import blocks from an external file */
-bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskBlockPos *dbp = NULL);
+bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskBlockPos *dbp = nullptr);
 /** Initialize a new block tree database + block data on disk */
 bool InitBlockIndex(const CChainParams &chainparams);
 /** Load the block tree and coins database from disk */
@@ -270,11 +266,14 @@ bool LoadBlockIndex();
 void UnloadBlockIndex();
 /** Process protocol messages received from a given node */
 bool ProcessMessages(CNode *pfrom);
-bool AlreadyHave(const CInv &);
+/** Do we already have this transaction or has it been seen in a block */
+bool AlreadyHaveTx(const CInv &inv);
+/** Do we already have this block on disk */
+bool AlreadyHaveBlock(const CInv &inv);
 bool AcceptBlockHeader(const CBlockHeader &block,
     CValidationState &state,
     const CChainParams &chainparams,
-    CBlockIndex **ppindex = NULL);
+    CBlockIndex **ppindex = nullptr);
 
 /** Process a single protocol messages received from a given node */
 bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived);
@@ -311,7 +310,7 @@ bool GetTransaction(const uint256 &hash,
 /** Find the best known block, and make it the tip of the block chain */
 bool ActivateBestChain(CValidationState &state,
     const CChainParams &chainparams,
-    const CBlock *pblock = NULL,
+    const CBlock *pblock = nullptr,
     bool fParallel = false);
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
 
@@ -373,7 +372,7 @@ TransactionClass ParseTransactionClass(const std::string &s);
 /** (try to) add transaction to memory pool **/
 bool AcceptToMemoryPool(CTxMemPool &pool,
     CValidationState &state,
-    const CTransaction &tx,
+    const CTransactionRef &ptx,
     bool fLimitFree,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit = false,
@@ -406,8 +405,8 @@ bool CheckInputs(const CTransaction &tx,
     unsigned int flags,
     bool cacheStore,
     ValidationResourceTracker *resourceTracker,
-    std::vector<CScriptCheck> *pvChecks = NULL,
-    unsigned char *sighashType = NULL);
+    std::vector<CScriptCheck> *pvChecks = nullptr,
+    unsigned char *sighashType = nullptr);
 
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
@@ -438,7 +437,10 @@ bool TestLockPointValidity(const LockPoints *lp);
  *
  * See consensus/consensus.h for flag definitions.
  */
-bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints *lp = NULL, bool useExistingLockPoints = false);
+bool CheckSequenceLocks(const CTransaction &tx,
+    int flags,
+    LockPoints *lp = nullptr,
+    bool useExistingLockPoints = false);
 
 /**
  * Class that keeps track of number of signature operations
@@ -488,13 +490,14 @@ bool DisconnectBlock(const CBlock &block,
     CValidationState &state,
     const CBlockIndex *pindex,
     CCoinsViewCache &coins,
-    bool *pfClean = NULL);
+    bool *pfClean = nullptr);
 
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins */
 bool ConnectBlock(const CBlock &block,
     CValidationState &state,
     CBlockIndex *pindex,
-    CCoinsViewCache &coins,
+    CCoinsViewCache &view,
+    const CChainParams &chainparams,
     bool fJustCheck = false,
     bool fParallel = false);
 
@@ -525,7 +528,6 @@ bool CheckAgainstCheckpoint(unsigned int height, const uint256 &hash, const CCha
 
 /** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
 bool AcceptBlock(CBlock &block, CValidationState &state, CBlockIndex **pindex, bool fRequested, CDiskBlockPos *dbp);
-bool AcceptBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex **ppindex = NULL);
 
 /** RAII wrapper for VerifyDB: Verify consistency of the block and coin databases */
 class CVerifyDB
@@ -548,18 +550,11 @@ bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex);
 /** The currently-connected chain of blocks (protected by cs_main). */
 extern CChain chainActive;
 
-/** Global variable that points to the active CCoinsView (protected by cs_main) */
+/** Global variable that points to the active CCoinsView (protected by cs_utxo) */
 extern CCoinsViewCache *pcoinsTip;
 
 /** Global variable that points to the active block tree (protected by cs_main) */
 extern CBlockTreeDB *pblocktree;
-
-/**
- * Return the spend height, which is one more than the inputs.GetBestBlock().
- * While checking, GetBestBlock() refers to the parent block. (protected by cs_main)
- * This is also true for mempool checks.
- */
-int GetSpendHeight(const CCoinsViewCache &inputs);
 
 extern VersionBitsCache versionbitscache;
 

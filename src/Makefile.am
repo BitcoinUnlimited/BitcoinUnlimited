@@ -9,7 +9,7 @@ if ENABLE_GPERF
 AM_CXXFLAGS = -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free $(HARDENED_CXXFLAGS)
 AM_CPPFLAGS = -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free $(HARDENED_CPPFLAGS)
 else
-AM_CXXFLAGS = $(HARDENED_CXXFLAGS)
+AM_CXXFLAGS = $(HARDENED_CXXFLAGS) $(ERROR_CXXFLAGS)
 AM_CPPFLAGS = $(HARDENED_CPPFLAGS)
 endif
 if ENABLE_GPERF
@@ -51,6 +51,7 @@ LIBBITCOIN_ZMQ=libbitcoin_zmq.a
 endif
 if BUILD_BITCOIN_LIBS
 LIBBITCOINCONSENSUS=libbitcoinconsensus.la
+LIBBITCOINCASH=libbitcoincash.la
 endif
 if ENABLE_WALLET
 LIBBITCOIN_WALLET=libbitcoin_wallet.a
@@ -74,7 +75,7 @@ EXTRA_LIBRARIES += \
   $(LIBBITCOIN_WALLET) \
   $(LIBBITCOIN_ZMQ)
 
-lib_LTLIBRARIES = $(LIBBITCOINCONSENSUS)
+lib_LTLIBRARIES = $(LIBBITCOINCASH) $(LIBBITCOINCONSENSUS)
 
 bin_PROGRAMS =
 noinst_PROGRAMS =
@@ -86,7 +87,7 @@ if BUILD_BITCOIND
 endif
 
 if BUILD_BITCOIN_UTILS
-  bin_PROGRAMS += bitcoin-cli bitcoin-tx
+  bin_PROGRAMS += bitcoin-cli bitcoin-tx bitcoin-miner
 endif
 
 .PHONY: FORCE check-symbols check-security check-formatting
@@ -276,6 +277,36 @@ libbitcoin_wallet_a_SOURCES = \
   wallet/walletdb.cpp \
   $(BITCOIN_CORE_H)
 
+libbitcoincash_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
+libbitcoincash_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+
+# base58.cpp
+#  base58.h
+
+libbitcoincash_a_SOURCES = \
+  cashlib/cashlib.cpp \
+  script/sigcommon.cpp \
+  hash.cpp \
+  hash.h \
+  key.cpp \
+  key.h \
+  primitives/transaction.cpp \
+  primitives/transaction.h \
+  pubkey.cpp \
+  pubkey.h \
+  random.cpp \
+  random.h \
+  support/pagelocker.cpp \
+  support/pagelocker.h \
+  support/cleanse.cpp \
+  support/cleanse.h \
+  uint256.cpp \
+  uint256.h \
+  utilstrencodings.cpp \
+  utilstrencodings.h \
+  utiltime.cpp \
+  utiltime.h
+
 # crypto primitives library
 crypto_libbitcoin_crypto_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_CONFIG_INCLUDES)
 crypto_libbitcoin_crypto_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
@@ -323,6 +354,7 @@ libbitcoin_consensus_a_SOURCES = \
   script/bitcoinconsensus.cpp \
   script/interpreter.cpp \
   script/interpreter.h \
+  script/sigcommon.cpp \
   script/script.cpp \
   script/script.h \
   script/script_error.cpp \
@@ -389,7 +421,7 @@ libbitcoin_util_a_SOURCES += compat/glibc_compat.cpp
 endif
 
 # cli: shared between bitcoin-cli and bitcoin-qt
-libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
+libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(EVENT_CFLAGS)
 libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
   rpc/client.cpp \
@@ -461,6 +493,47 @@ bitcoin_tx_LDADD = \
   $(LIBSECP256K1)
 
 bitcoin_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
+#
+
+# bitcoin-miner binary #
+bitcoin_miner_SOURCES = bitcoin-miner.cpp \
+  arith_uint256.cpp \
+  arith_uint256.h \
+  uint256.cpp \
+  uint256.h
+
+
+bitcoin_miner_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(EVENT_CFLAGS)
+bitcoin_miner_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+bitcoin_miner_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+
+if TARGET_WINDOWS
+bitcoin_miner_SOURCES += bitcoin-miner-res.rc
+endif
+
+bitcoin_miner_LDADD = \
+  $(LIBBITCOIN_CLI) \
+  $(LIBBITCOIN_CRYPTO) \
+  $(LIBUNIVALUE) \
+  $(LIBBITCOIN_UTIL)
+
+bitcoin_miner_LDADD += $(BOOST_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_LIBS)
+#
+
+# bitcoincash library #
+if BUILD_BITCOIN_LIBS
+libbitcoincash_la_SOURCES = $(libbitcoincash_a_SOURCES) $(crypto_libbitcoin_crypto_a_SOURCES)
+
+if GLIBC_BACK_COMPAT
+  libbitcoincash_la_SOURCES += compat/glibc_compat.cpp
+endif
+
+libbitcoincash_la_LDFLAGS = $(AM_LDFLAGS) $(SSL_LIBS) $(CRYPTO_LIBS) $(BOOST_LIBS) -no-undefined $(RELDFLAGS)
+libbitcoincash_la_LIBADD = $(LIBSECP256K1)
+libbitcoincash_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(BOOST_CPPFLAGS) -I$(builddir)/obj -I$(srcdir)/secp256k1/include -DBUILD_BITCOIN_INTERNAL
+libbitcoincash_la_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+
+endif
 #
 
 # bitcoinconsensus library #

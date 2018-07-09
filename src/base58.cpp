@@ -236,11 +236,8 @@ const std::vector<uint8_t> &bitpay_script_prefix = std::vector<unsigned char>(1,
 
 class BitpayDestinationEncoder : public boost::static_visitor<std::string>
 {
-private:
-    const CChainParams &m_params;
-
 public:
-    BitpayDestinationEncoder(const CChainParams &params) : m_params(params) {}
+    BitpayDestinationEncoder() {}
     std::string operator()(const CKeyID &id) const
     {
         std::vector<uint8_t> data = bitpay_pubkey_prefix;
@@ -335,7 +332,7 @@ CTxDestination DecodeLegacyAddr(const std::string &str, const CChainParams &para
     return DecodeDestination(str, params);
 }
 
-std::string EncodeBitpayAddr(const CTxDestination &dest, const CChainParams &params)
+std::string EncodeBitpayAddr(const CTxDestination &dest)
 {
-    return boost::apply_visitor(BitpayDestinationEncoder(params), dest);
+    return boost::apply_visitor(BitpayDestinationEncoder(), dest);
 }

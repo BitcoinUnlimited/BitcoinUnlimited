@@ -247,6 +247,9 @@ public:
     friend bool operator==(const CTransaction &a, const CTransaction &b) { return a.hash == b.hash; }
     friend bool operator!=(const CTransaction &a, const CTransaction &b) { return a.hash != b.hash; }
     std::string ToString() const;
+
+    // Return the size the transaction in bytes.
+    uint32_t GetTxSize() const;
 };
 
 /** A mutable version of CTransaction. */
@@ -266,7 +269,6 @@ struct CMutableTransaction
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(this->nVersion);
-        nVersion = this->nVersion;
         READWRITE(vin);
         READWRITE(vout);
         READWRITE(nLockTime);
@@ -291,6 +293,4 @@ static inline CTransactionRef MakeTransactionRef(Tx &&txIn)
 {
     return std::make_shared<const CTransaction>(std::forward<Tx>(txIn));
 }
-static inline CTransactionRef MakeTransactionRef(const CTransactionRef &txIn) { return txIn; }
-static inline CTransactionRef MakeTransactionRef(CTransactionRef &&txIn) { return std::move(txIn); }
 #endif // BITCOIN_PRIMITIVES_TRANSACTION_H

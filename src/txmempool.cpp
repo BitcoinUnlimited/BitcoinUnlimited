@@ -32,7 +32,7 @@ CTxMemPoolEntry::CTxMemPoolEntry()
     sighashType = 0;
 }
 
-CTxMemPoolEntry::CTxMemPoolEntry(const CTransaction &_tx,
+CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx,
     const CAmount &_nFee,
     int64_t _nTime,
     double _entryPriority,
@@ -46,14 +46,14 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransaction &_tx,
       hadNoDependencies(poolHasNoInputsOf), inChainInputValue(_inChainInputValue), spendsCoinbase(_spendsCoinbase),
       sigOpCount(_sigOps), lockPoints(lp)
 {
-    nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-    nModSize = tx.CalculateModifiedSize(nTxSize);
-    nUsageSize = RecursiveDynamicUsage(tx);
+    nTxSize = ::GetSerializeSize(*tx, SER_NETWORK, PROTOCOL_VERSION);
+    nModSize = tx->CalculateModifiedSize(nTxSize);
+    nUsageSize = RecursiveDynamicUsage(*tx);
 
     nCountWithDescendants = 1;
     nSizeWithDescendants = nTxSize;
     nModFeesWithDescendants = nFee;
-    CAmount nValueIn = tx.GetValueOut() + nFee;
+    CAmount nValueIn = tx->GetValueOut() + nFee;
     assert(inChainInputValue <= nValueIn);
     sighashType = 0;
     feeDelta = 0;
@@ -539,7 +539,6 @@ bool CTxMemPool::addUnchecked(const uint256 &hash,
     AssertWriteLockHeld(cs);
     if (mapTx.find(hash) != mapTx.end()) // already inserted
     {
-        // LogPrintf("WARNING: transaction already in mempool\n");
         return true;
     }
     indexed_transaction_set::iterator newit = mapTx.insert(entry).first;
@@ -716,7 +715,8 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
         }
         else if (it->GetSpendsCoinbase())
         {
-            BOOST_FOREACH (const CTxIn &txin, tx.vin)
+            LOCK(pcoins->cs_utxo);
+            for (const CTxIn &txin : tx.vin)
             {
                 indexed_transaction_set::const_iterator it2 = mapTx.find(txin.prevout.hash);
                 if (it2 != mapTx.end())

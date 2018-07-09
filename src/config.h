@@ -23,7 +23,7 @@ class GlobalConfig final : public Config
 {
 public:
     GlobalConfig();
-    const CChainParams &GetChainParams() const;
+    const CChainParams &GetChainParams() const override;
     void SetCashAddrEncoding(bool) override;
     bool UseCashAddrEncoding() const override;
 

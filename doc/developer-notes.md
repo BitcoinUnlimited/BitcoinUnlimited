@@ -401,7 +401,7 @@ C++ data structures
 Strings and formatting
 ------------------------
 
-- Be careful of `LogPrint` versus `LogPrintf`. `LogPrint` takes a `category` argument, `LogPrintf` does not.
+- Be careful of `LOG` versus `LOGA`. `LOG` takes a `category` argument, `LOGA` does not.
 
   - *Rationale*: Confusion of these can result in runtime exceptions due to
     formatting mismatch, and it is easy to get wrong because of subtly similar naming
@@ -416,7 +416,7 @@ Strings and formatting
 
   - *Rationale*: These functions do overflow checking, and avoid pesky locale issues
 
-- For `strprintf`, `LogPrint`, `LogPrintf` formatting characters don't need size specifiers
+- For `strprintf`, `LOG`, `LOGA` formatting characters don't need size specifiers
 
   - *Rationale*: Bitcoin Unlimited uses tinyformat, which is type safe. Leave them out to avoid confusion
 

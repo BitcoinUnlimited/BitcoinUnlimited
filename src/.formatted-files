@@ -14,6 +14,7 @@ base58.cpp
 base58.h
 bitcoin-cli.cpp
 bitcoind.cpp
+bitcoin-miner.cpp
 bitcoin-tx.cpp
 bitnodes.cpp
 bitnodes.h
@@ -55,7 +56,6 @@ dosman.cpp
 dosman.h
 dstencode.cpp
 dstencode.h
-ecwrapper.cpp
 expedited.cpp
 expedited.h
 globals.cpp
@@ -352,6 +352,7 @@ script/script_error.h
 script/script.h
 script/sigcache.cpp
 script/sigcache.h
+script/sigcommon.cpp
 script/sign.cpp
 script/sign.h
 script/standard.cpp
@@ -378,6 +379,7 @@ bench/bench.h
 bench/crypto_hash.cpp
 bench/Examples.cpp
 bench/verify_script.cpp
+bench/murmur_hash.cpp
 compat/byteswap.h
 compat/endian.h
 compat/glibc_compat.cpp
@@ -396,3 +398,4 @@ consensus/params.h
 consensus/tx_verify.cpp
 consensus/tx_verify.h
 consensus/validation.h
+cashlib/cashlib.cpp

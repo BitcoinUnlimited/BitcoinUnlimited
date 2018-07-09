@@ -16,6 +16,8 @@
 
 #include <stdint.h>
 
+CCoinsViewDB *pcoinsdbview = nullptr;
+
 using namespace std;
 
 static const char DB_COIN = 'C';
@@ -330,7 +332,7 @@ public:
     {
         unsigned int nCode = 0;
         // version
-        int nVersionDummy;
+        unsigned int nVersionDummy;
         ::Unserialize(s, VARINT(nVersionDummy));
         // header code
         ::Unserialize(s, VARINT(nCode));
@@ -360,7 +362,7 @@ public:
                 ::Unserialize(s, REF(CTxOutCompressor(vout[i])));
         }
         // coinbase height
-        ::Unserialize(s, VARINT(nHeight));
+        ::Unserialize(s, VARINT(nHeight, VarIntMode::NONNEGATIVE_SIGNED));
     }
 };
 }
@@ -508,7 +510,7 @@ uint64_t GetTotalSystemMemory()
 
 void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
-    int64_t &_nCoinCacheUsage,
+    int64_t &_nCoinCacheMaxSize,
     bool fDefault)
 {
 #ifdef WIN32
@@ -548,13 +550,13 @@ void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
     }
 
     // Now that we have the nTotalCache we can calculate all the various cache sizes.
-    CacheSizeCalculations(nTotalCache, _nBlockTreeDBCache, _nCoinDBCache, _nCoinCacheUsage);
+    CacheSizeCalculations(nTotalCache, _nBlockTreeDBCache, _nCoinDBCache, _nCoinCacheMaxSize);
 }
 
 void CacheSizeCalculations(int64_t _nTotalCache,
     int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
-    int64_t &_nCoinCacheUsage)
+    int64_t &_nCoinCacheMaxSize)
 {
     // make sure total cache is within limits
     _nTotalCache = std::max(_nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache
@@ -572,19 +574,21 @@ void CacheSizeCalculations(int64_t _nTotalCache,
 
     // the remainder goes to the in-memory utxo coins cache
     _nTotalCache -= _nCoinDBCache;
-    _nCoinCacheUsage = _nTotalCache;
+    _nCoinCacheMaxSize = _nTotalCache;
 }
 
 void AdjustCoinCacheSize()
 {
+    AssertLockHeld(cs_main);
+
     // If the operator has not set a dbcache and initial sync is complete then revert back to the default
     // value for dbcache. This will cause the current coins cache to be immediately trimmed to size.
     if (!IsInitialBlockDownload() && !GetArg("-dbcache", 0) && chainActive.Tip())
     {
-        // Get the default value for nCoinCacheUsage.
+        // Get the default value for nCoinCacheMaxSize.
         int64_t dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
         CacheSizeCalculations(nDefaultDbCache, dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
-        nCoinCacheUsage = nMaxCoinCache;
+        nCoinCacheMaxSize = nMaxCoinCache;
 
         return;
     }
@@ -598,8 +602,8 @@ void AdjustCoinCacheSize()
         nLastDbAdjustment = nNow;
     }
 
-    // used to determine if we had previously reduced the nCoinCacheUsage and also to tell us what the last
-    // mem available was when we modified the nCoinCacheUsage.
+    // used to determine if we had previously reduced the nCoinCacheMaxSize and also to tell us what the last
+    // mem available was when we modified the nCoinCacheMaxSize.
     static int64_t nLastMemAvailable = 0;
 
     // If there is no dbcache setting specified by the node operator then float the dbache setting down or up
@@ -617,23 +621,23 @@ void AdjustCoinCacheSize()
             nUnusedMem = pcoinsdbview->TotalWriteBufferSize();
         }
 
-        // Reduce nCoinCacheUsage if mem available gets near the threshold. We have to be more strict about flushing
+        // Reduce nCoinCacheMaxSize if mem available gets near the threshold. We have to be more strict about flushing
         // if we're running low on mem because on marginal systems with smaller RAM we have very little wiggle room.
         if (nMemAvailable < nUnusedMem * 1.05)
         {
             // Get the lowest possible default coins cache configuration possible and use this value as a limiter
-            // to prevent the nCoinCacheUsage from falling below this value.
+            // to prevent the nCoinCacheMaxSize from falling below this value.
             int64_t dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache = 0;
             GetCacheConfiguration(dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache, true);
 
-            nCoinCacheUsage = std::max(nDefaultCoinCache, nCoinCacheUsage - (nUnusedMem - nMemAvailable));
-            LOG(COINDB, "Current cache size: %ld MB, nCoinCacheUsage was reduced by %u MB\n", nCoinCacheUsage / 1000000,
-                (nUnusedMem - nMemAvailable) / 1000000);
+            nCoinCacheMaxSize = std::max(nDefaultCoinCache, nCoinCacheMaxSize - (nUnusedMem - nMemAvailable));
+            LOG(COINDB, "Current cache size: %ld MB, nCoinCacheMaxSize was reduced by %u MB\n",
+                nCoinCacheMaxSize / 1000000, (nUnusedMem - nMemAvailable) / 1000000);
             nLastDbAdjustment = nNow;
             nLastMemAvailable = nMemAvailable;
         }
 
-        // Increase nCoinCacheUsage if mem available increases. We don't want to constantly be
+        // Increase nCoinCacheMaxSize if mem available increases. We don't want to constantly be
         // triggering an increase whenever the nMemAvailable crosses the threshold by just a
         // few bytes, so we'll dampen the increases by triggering only when the threshold is crossed by 5%.
         else if (nLastMemAvailable > 0 && nMemAvailable * 0.95 >= nLastMemAvailable)
@@ -644,9 +648,9 @@ void AdjustCoinCacheSize()
             CacheSizeCalculations(
                 std::numeric_limits<long long>::max(), dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
 
-            nCoinCacheUsage = std::min(nMaxCoinCache, nCoinCacheUsage + (nMemAvailable - nLastMemAvailable));
-            LOG(COINDB, "Current cache size: %ld MB, nCoinCacheUsage was increased by %u MB\n",
-                nCoinCacheUsage / 1000000, (nMemAvailable - nLastMemAvailable) / 1000000);
+            nCoinCacheMaxSize = std::min(nMaxCoinCache, nCoinCacheMaxSize + (nMemAvailable - nLastMemAvailable));
+            LOG(COINDB, "Current cache size: %ld MB, nCoinCacheMaxSize was increased by %u MB\n",
+                nCoinCacheMaxSize / 1000000, (nMemAvailable - nLastMemAvailable) / 1000000);
             nLastDbAdjustment = nNow;
             nLastMemAvailable = nMemAvailable;
         }

@@ -154,6 +154,12 @@ public:
     // How many outbound nodes are we connected to.
     std::atomic<int32_t> nOutbound;
 
+    /** Size of the "block download window": how far ahead of our current height do we fetch?
+     *  Larger windows tolerate larger download speed differences between peer, but increase the potential
+     *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
+     *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
+    std::atomic<unsigned int> BLOCK_DOWNLOAD_WINDOW{1024};
+
     // Get this object from somewhere, asynchronously.
     void AskFor(const CInv &obj, CNode *from, unsigned int priority = 0);
 

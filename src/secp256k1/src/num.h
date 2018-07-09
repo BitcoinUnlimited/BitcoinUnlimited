@@ -4,14 +4,14 @@
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
 
-#ifndef _SECP256K1_NUM_
-#define _SECP256K1_NUM_
-
-#ifndef USE_NUM_NONE
+#ifndef SECP256K1_NUM_H
+#define SECP256K1_NUM_H
 
 #if defined HAVE_CONFIG_H
 #include "libsecp256k1-config.h"
 #endif
+
+#ifndef USE_NUM_NONE
 
 #if defined(USE_NUM_GMP)
 #include "num_gmp.h"
@@ -71,4 +71,4 @@ static void secp256k1_num_negate(secp256k1_num *r);
 
 #endif
 
-#endif
+#endif /* SECP256K1_NUM_H */

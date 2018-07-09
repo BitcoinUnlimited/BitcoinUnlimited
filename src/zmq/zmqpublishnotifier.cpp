@@ -129,9 +129,9 @@ bool CZMQPublishHashBlockNotifier::NotifyBlock(const CBlockIndex *pindex)
     return rc == 0;
 }
 
-bool CZMQPublishHashTransactionNotifier::NotifyTransaction(const CTransaction &transaction)
+bool CZMQPublishHashTransactionNotifier::NotifyTransaction(const CTransactionRef &ptx)
 {
-    uint256 hash = transaction.GetHash();
+    uint256 hash = ptx->GetHash();
     LOG(ZMQ, "zmq: Publish hashtx %s\n", hash.GetHex());
     char data[32];
     for (unsigned int i = 0; i < 32; i++)
@@ -162,12 +162,12 @@ bool CZMQPublishRawBlockNotifier::NotifyBlock(const CBlockIndex *pindex)
     return rc == 0;
 }
 
-bool CZMQPublishRawTransactionNotifier::NotifyTransaction(const CTransaction &transaction)
+bool CZMQPublishRawTransactionNotifier::NotifyTransaction(const CTransactionRef &ptx)
 {
-    uint256 hash = transaction.GetHash();
+    uint256 hash = ptx->GetHash();
     LOG(ZMQ, "zmq: Publish rawtx %s\n", hash.GetHex());
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-    ss << transaction;
+    ss << *ptx;
     int rc = zmq_send_multipart(psocket, "rawtx", 5, &(*ss.begin()), ss.size(), 0);
     return rc == 0;
 }

@@ -3,7 +3,7 @@
 # Copyright (c) 2014-2015 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 # Test emergent consensus scenarios
 
 import time
@@ -18,7 +18,6 @@ import sys
 if sys.version_info[0] < 3:
     raise "Use Python 3"
 import logging
-logging.basicConfig(format='%(asctime)s.%(levelname)s: %(message)s', level=logging.INFO, stream=sys.stdout)
 
 
 def mostly_sync_mempools(rpc_connections, difference=50, wait=1, verbose=1):
@@ -58,6 +57,7 @@ class ExcessiveBlockTest (BitcoinTestFramework):
         self.nodes.append(start_node(1, self.options.tmpdir, ["-rpcservertimeout=0"], timewait=60 * 10))
         self.nodes.append(start_node(2, self.options.tmpdir, ["-rpcservertimeout=0"], timewait=60 * 10))
         self.nodes.append(start_node(3, self.options.tmpdir, ["-rpcservertimeout=0"], timewait=60 * 10))
+
         interconnect_nodes(self.nodes)
         self.is_network_split = False
         self.sync_all()
@@ -74,6 +74,15 @@ class ExcessiveBlockTest (BitcoinTestFramework):
                 pdb.set_trace()
 
     def run_test(self):
+        # Temporary workaround for the may15th hardfork. These tests will not work if the fork is enabled
+        # because we are forcing an EB of 32MB after each block is mined which invalidates many of these tests.
+        # So we set the mocktime to sometime far in advance of the fork.
+        MAY152018_START_TIME = 1526400000;
+        self.nodes[0].setmocktime(MAY152018_START_TIME - 10000)
+        self.nodes[1].setmocktime(MAY152018_START_TIME - 10000)
+        self.nodes[2].setmocktime(MAY152018_START_TIME - 10000)
+        self.nodes[3].setmocktime(MAY152018_START_TIME - 10000)
+
         BitcoinTestFramework.run_test(self)
         self.testCli()
         self.testExcessiveSigops()

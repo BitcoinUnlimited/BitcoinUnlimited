@@ -17,7 +17,6 @@
 
 #include "allowed_args.h"
 #include "compat.h"
-#include "fs.h"
 #include "tinyformat.h"
 #include "utiltime.h"
 
@@ -357,22 +356,9 @@ void FileCommit(FILE *fileout);
 bool TruncateFile(FILE *file, unsigned int length);
 int RaiseFileDescriptorLimit(int nMinFD);
 void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length);
-bool RenameOver(fs::path src, fs::path dest);
-bool TryCreateDirectories(const fs::path &p);
-fs::path GetDefaultDataDir();
-const fs::path &GetDataDir(bool fNetSpecific = true);
-void ClearDatadirCache();
-fs::path GetConfigFile(const std::string &confPath);
-#ifndef WIN32
-fs::path GetPidFile();
-void CreatePidFile(const fs::path &path, pid_t pid);
-#endif
 void ReadConfigFile(std::map<std::string, std::string> &mapSettingsRet,
     std::map<std::string, std::vector<std::string> > &mapMultiSettingsRet,
     const AllowedArgs::AllowedArgs &allowedArgs);
-#ifdef WIN32
-fs::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
-#endif
 void OpenDebugLog();
 void ShrinkDebugFile();
 void runCommand(const std::string &strCommand);
@@ -473,5 +459,11 @@ void TraceThread(const char *name, Callable func)
 }
 
 std::string CopyrightHolders(const std::string &strPrefix);
+
+/** Wildcard matching of strings
+The first argument (the pattern) might contain '?' and '*' wildcards and
+the second argument will be matched to this pattern. Returns true iff the string
+matches pattern. */
+bool wildmatch(std::string pattern, std::string test);
 
 #endif // BITCOIN_UTIL_H

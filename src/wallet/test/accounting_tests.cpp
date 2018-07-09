@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "main.h"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 
@@ -39,7 +40,7 @@ BOOST_AUTO_TEST_CASE(acc_orderupgrade)
     CAccountingEntry ae;
     std::map<CAmount, CAccountingEntry> results;
 
-    LOCK(pwalletMain->cs_wallet);
+    LOCK2(cs_main, pwalletMain->cs_wallet);
 
     ae.strAccount = "";
     ae.nCreditDebit = 1;

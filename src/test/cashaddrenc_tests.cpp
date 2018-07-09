@@ -139,8 +139,8 @@ BOOST_AUTO_TEST_CASE(invalid_on_wrong_network)
                 continue;
 
             std::string encoded = EncodeCashAddr(dst, Params(net));
-            CTxDestination decoded = DecodeCashAddr(encoded, Params(otherNet));
-            BOOST_CHECK(decoded != dst);
+            const CTxDestination decoded = DecodeCashAddr(encoded, Params(otherNet));
+            BOOST_CHECK(!(decoded == dst));
             BOOST_CHECK(decoded == invalidDst);
         }
     }
@@ -199,7 +199,7 @@ BOOST_AUTO_TEST_CASE(check_padding)
     {
         data[data.size() - 1] = i;
         std::string fake = cashaddr::Encode(params.CashAddrPrefix(), data);
-        CTxDestination dst = DecodeCashAddr(fake, params);
+        const CTxDestination dst = DecodeCashAddr(fake, params);
 
         // We have 168 bits of payload encoded as 170 bits in 5 bits nimbles. As
         // a result, we must have 2 zeros.
@@ -209,7 +209,7 @@ BOOST_AUTO_TEST_CASE(check_padding)
         }
         else
         {
-            BOOST_CHECK(dst != nodst);
+            BOOST_CHECK(!(dst == nodst));
         }
     }
 }

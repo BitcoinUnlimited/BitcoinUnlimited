@@ -4,13 +4,12 @@
 #
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 import pdb
 import sys
 if sys.version_info[0] < 3:
     raise "Use Python 3"
 import logging
-logging.basicConfig(format='%(asctime)s.%(levelname)s: %(message)s', level=logging.INFO, stream=sys.stdout)
 
 # Test validateblocktemplate RPC call
 from test_framework.key import CECKey
@@ -35,22 +34,6 @@ def create_broken_transaction(prevtx, n, sig, value):
     tx.calc_sha256()
     return tx
 
-
-def expectException(fn, ExcType, comparison=None):
-    try:
-        fn()
-    except ExcType as exc:
-        if comparison:
-            if comparison in str(exc):  # exception matchs
-                return
-            else:
-                print("Incorrect error.  Was: " + str(exc) + " Expecting: " + comparison)
-                assert(0)
-        else:
-            return
-    assert(0)  # an exception should have happened
-
-
 class ValidateblocktemplateTest(BitcoinTestFramework):
 
     def setup_network(self):
@@ -63,6 +46,7 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
     def run_test(self):
         # Generate enough blocks to trigger certain block votes
         self.nodes[0].generate(1150)
+        self.sync_all()
 
         logging.info("not on chain tip")
         badtip = int(self.nodes[0].getblockhash(self.nodes[0].getblockcount() - 1), 16)
@@ -356,4 +340,7 @@ if __name__ == '__main__':
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"]
     }
-    ValidateblocktemplateTest().main([],bitcoinConf)
+    args = []
+    if "--no-ipv6-rpc-listen":
+        args.append("--no-ipv6-rpc-listen")
+    ValidateblocktemplateTest().main(args,bitcoinConf)

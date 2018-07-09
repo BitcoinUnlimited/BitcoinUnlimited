@@ -99,6 +99,7 @@ framework_opts = ('--tracerpc',
                   '--help',
                   '--noshutdown',
                   '--nocleanup',
+                  '--no-ipv6-rpc-listen',
                   '--srcdir',
                   '--tmpdir',
                   '--coveragedir',
@@ -179,6 +180,8 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
+    'miningtest',
+    'cashlibtest',
     'tweak',
     'notify',
     'may152018_forkactivation_1',
@@ -199,7 +202,7 @@ testScripts = [ RpcTest(t) for t in [
     'rest',
     'mempool_spendcoinbase',
     'mempool_reorg',
-    Disabled('mempool_limit', "mempool priority changes causes create_lots_of_big_transactions to fail"),
+    'mempool_limit',
     'httpbasics',
     'multi_rpc',
     'zapwallettxes',
@@ -248,8 +251,7 @@ testScriptsExt = [ RpcTest(t) for t in [
     'maxblocksinflight',
     'p2p-acceptblock',
     'mempool_packages',
-    'maxuploadtarget',
-    Disabled('replace-by-fee', "disabled while Replace By Fee is disabled in code")
+    'maxuploadtarget'
 ] ]
 
 #Enable ZMQ tests
@@ -366,7 +368,8 @@ def runtests():
 
         if len(tests_to_run) > 1 and run_parallel:
             # Populate cache
-            subprocess.check_output([RPC_TESTS_DIR + 'create_cache.py'] + [flags])
+            subprocess.check_output([RPC_TESTS_DIR + 'create_cache.py'] + [flags]+
+                                    (["--no-ipv6-rpc-listen"] if option_passed("no-ipv6-rpc-listen") else []))
 
         tests_to_run = list(map(str,tests_to_run))
         max_len_name = len(max(tests_to_run, key=len))
@@ -377,14 +380,18 @@ def runtests():
         all_passed = True
 
         for _ in range(len(tests_to_run)):
-            (name, stdout, stderr, passed, duration) = job_queue.get_next()
+            (name, stdout, stderr, stderr_filtered, passed, duration) = job_queue.get_next()
             test_passed.append(passed)
             all_passed = all_passed and passed
             time_sum += duration
 
-            print('\n' + BOLD[1] + name + BOLD[0] + ":")
-            print(stdout)
-            print('stderr:\n' if not stderr == '' else '', stderr)
+            print("\n"+"#"*50)
+            print(BOLD[1] + name + BOLD[0] + ":")
+            print("-"*50+'\nstdout:\n' if not stdout == '' else '', stdout)
+            print("-"*50+'\nstderr:\n' if not stderr == '' else '', stderr)
+            #print('stderr_filtered:\n' if not stderr_filtered == '' else '', repr(stderr_filtered))
+            if stderr!="" or stdout!="":
+                print("-"*50)
             results += "%s | %s | %s s\n" % (name.ljust(max_len_name), str(passed).ljust(6), duration)
             print("Pass: %s%s%s, Duration: %s s\n" % (BOLD[1], passed, BOLD[0], duration))
 
@@ -435,31 +442,77 @@ class RPCTestHandler:
             self.num_running += 1
             t = self.test_list.pop(0)
             port_seed = ["--portseed={}".format(len(self.test_list) + self.portseed_offset)]
-            log_stdout = tempfile.SpooledTemporaryFile(max_size=2**16)
-            log_stderr = tempfile.SpooledTemporaryFile(max_size=2**16)
+            log_stdout = tempfile.SpooledTemporaryFile(max_size=2**16, mode="w+")
+            log_stderr = tempfile.SpooledTemporaryFile(max_size=2**16, mode="w+")
+            got_outputs = [False]
             self.jobs.append((t,
                               time.time(),
                               subprocess.Popen((RPC_TESTS_DIR + t).split() + self.flags.split() + port_seed,
                                                universal_newlines=True,
                                                stdout=subprocess.PIPE,
-                                               stderr=subprocess.PIPE)))
+                                               stderr=subprocess.PIPE),
+                              log_stdout, log_stderr, got_outputs))
         if not self.jobs:
             raise IndexError('pop from empty list')
         while True:
             # Return first proc that finishes
             time.sleep(.5)
             for j in self.jobs:
-                (name, time0, proc) = j
+                (name, time0, proc, log_stdout, log_stderr, got_outputs) = j
                 if os.getenv('TRAVIS') == 'true' and int(time.time() - time0) > 20 * 60:
                     # In travis, timeout individual tests after 20 minutes (to stop tests hanging and not
                     # providing useful output.
                     proc.send_signal(signal.SIGINT)
+
+                def comms(timeout):
+                    stdout_data, stderr_data = proc.communicate(timeout=timeout)
+                    log_stdout.write(stdout_data)
+                    log_stderr.write(stderr_data)
+
+
+                # Poll for new data on stdout and stderr. This is also necessary as to not block
+                # the subprocess when the stdout or stderr pipe is full.
+                try:
+                    # WARNING: There seems to be a bug in python handling of .join() so that
+                    # when you do a .join() with a zero or negative timeout, it will not even try
+                    # joining the thread. This is for the handling of the stdout/stderr reader threads
+                    # in subprocess.py. A sufficiently positive value (and 0.1s seems to be enough)
+                    # seems to make the .join() logic to work, and in turn communicate() not to fail
+                    # with a timeout, even though the thread is done reading (which was another cause
+                    # of a hang)
+                    comms(0.1)
+
+                    # .communicate() can only be called once and we have to keep in mind now that
+                    # communication happened properly (and the files are closed). It _has_ to be called with a non-None
+                    # timeout initially, however, to start the communication threads internal to subprocess.Popen(..)
+                    # that are necessary to not block on more output than what fits into the OS' pipe buffer.
+                    # Note that end-of-communication does not necessarily indicate a finished subprocess.
+                    got_outputs[0] = True
+                except subprocess.TimeoutExpired:
+                    pass
+
                 if proc.poll() is not None:
-                    (stdout, stderr) = proc.communicate(timeout=3)
+                    if not got_outputs[0]:
+                        comms(3)
+                    log_stdout.seek(0), log_stderr.seek(0)
+                    stdout = log_stdout.read()
+                    stderr = log_stderr.read()
                     passed = stderr == "" and proc.returncode == 0
+
+                    # This is a list of expected messages on stderr. If they appear, they do not
+                    # necessarily indicate final failure of a test.
+                    stderr_filtered = stderr.replace("Error: Unable to start HTTP server. See debug log for details.", "")
+                    stderr_filtered = re.sub(r"Error: Unable to bind to 0.0.0.0:[0-9]+ on this computer\. Bitcoin Unlimited Cash Edition is probably already running\.",
+                                             "", stderr_filtered)
+                    stderr_filtered = stderr_filtered.replace("Error: Failed to listen on any port. Use -listen=0 if you want this.", "")
+                    stderr_filtered = stderr_filtered.replace("Error: Failed to listen on all P2P ports. Failing as requested by -bindallorfail.", "")
+                    stderr_filtered = stderr_filtered.replace(" ", "")
+                    stderr_filtered = stderr_filtered.replace("\n", "")
+
+                    passed = stderr_filtered == "" and proc.returncode == 0
                     self.num_running -= 1
                     self.jobs.remove(j)
-                    return name, stdout, stderr, passed, int(time.time() - time0)
+                    return name, stdout, stderr, stderr_filtered, passed, int(time.time() - time0)
             print('.', end='', flush=True)
 
 class RPCCoverage(object):

@@ -20,8 +20,8 @@ class proxyType
 {
 public:
     proxyType() : randomize_credentials(false) {}
-    proxyType(const CService &proxy, bool randomize_credentials = false)
-        : proxy(proxy), randomize_credentials(randomize_credentials)
+    proxyType(const CService &proxyp, bool randomize_credentialsp = false)
+        : proxy(proxyp), randomize_credentials(randomize_credentialsp)
     {
     }
 

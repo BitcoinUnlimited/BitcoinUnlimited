@@ -5,11 +5,8 @@
 #ifndef TWEAK_H
 #define TWEAK_H
 
-#include <boost/asio.hpp>
-#include <boost/bind.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
-// c++11 #include <type_traits>
 #include "univalue/include/univalue.h"
+#include <string>
 
 class CTweakBase;
 
@@ -35,21 +32,21 @@ public:
 inline void fill(const UniValue &v, double &output)
 {
     if (v.isStr())
-        output = boost::lexical_cast<double>(v.get_str());
+        output = std::stod(v.get_str());
     else
         output = v.get_real();
 }
 inline void fill(const UniValue &v, float &output)
 {
     if (v.isStr())
-        output = boost::lexical_cast<float>(v.get_str());
+        output = std::stof(v.get_str());
     else
         output = v.get_real();
 }
 inline void fill(const UniValue &v, int &output)
 {
     if (v.isStr())
-        output = boost::lexical_cast<int>(v.get_str());
+        output = std::stoi(v.get_str());
     else
         output = v.get_int();
 }
@@ -57,7 +54,7 @@ inline void fill(const UniValue &v, int &output)
 inline void fill(const UniValue &v, unsigned int &output)
 {
     if (v.isStr())
-        output = boost::lexical_cast<unsigned int>(v.get_str());
+        output = std::stoul(v.get_str());
     else
         output = v.get_int();
 }
@@ -65,7 +62,7 @@ inline void fill(const UniValue &v, unsigned int &output)
 inline void fill(const UniValue &v, uint64_t &output)
 {
     if (v.isStr())
-        output = boost::lexical_cast<uint64_t>(v.get_str());
+        output = std::stoull(v.get_str());
     else
         output = v.get_int64();
 }
@@ -73,7 +70,7 @@ inline void fill(const UniValue &v, uint64_t &output)
 inline void fill(const UniValue &v, int64_t &output)
 {
     if (v.isStr())
-        output = boost::lexical_cast<int64_t>(v.get_str());
+        output = std::stoll(v.get_str());
     else
         output = v.get_int64();
 }
@@ -89,9 +86,6 @@ inline void fill(const UniValue &v, bool &output)
     else
         output = v.get_bool();
 }
-
-// Checks if two given strings match. The first string may contain wildcard characters
-bool match(const char *first, const char *second);
 
 /** A configuration parameter that is automatically hooked up to
  * bitcoin.conf, bitcoin-cli, and is available as a command line argument

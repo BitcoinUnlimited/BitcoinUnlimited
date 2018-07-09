@@ -1367,10 +1367,12 @@ void ThreadSocketHandler()
                 }
             }
         }
+        // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this only decrements
+        // an atomic counter, and two, the counter will always be > 0 at this point, so we don't have to worry
+        // that a pnode could be disconnected and no longer exist before the decrement takes place.
+        for (CNode *pnode : vNodesCopy)
         {
-            LOCK(cs_vNodes);
-            for (CNode *pnode : vNodesCopy)
-                pnode->Release();
+            pnode->Release();
         }
 
         // BU: Nothing happened even though select did not block.  So slow us down.
@@ -1882,11 +1884,19 @@ void ThreadOpenConnections()
             }
         }
 
+        addrman.ResolveCollisions();
+
         int64_t nANow = GetAdjustedTime();
         int nTries = 0;
         while (true)
         {
-            CAddrInfo addr = addrman.Select(fFeeler);
+            CAddrInfo addr = addrman.SelectTriedCollision();
+
+            // SelectTriedCollision returns an invalid address if it is empty.
+            if (!fFeeler || !addr.IsValid())
+            {
+                addr = addrman.Select(fFeeler);
+            }
 
             // if we selected an invalid address, restart
             if (!addr.IsValid() || setConnected.count(addr.GetGroup()) || IsLocal(addr))
@@ -2103,6 +2113,9 @@ void ThreadMessageHandler()
     {
         vector<CNode *> vNodesCopy;
         {
+            // We require the vNodes lock here, throughout, even though we are only incrementing
+            // an atomic counter when we AddRef(). We have to be aware that a socket disconnection
+            // could occur if we don't take the lock.
             LOCK(cs_vNodes);
 
             // During IBD and because of the multithreading of PV we end up favoring the first peer that
@@ -2151,25 +2164,28 @@ void ThreadMessageHandler()
 
             // Put transaction and block requests into the request manager
             // and all other requests into the send queue.
-            {
-                g_signals.SendMessages(pnode);
-            }
-            boost::this_thread::interruption_point();
-        }
+            g_signals.SendMessages(pnode);
 
-        {
-            LOCK(cs_vNodes);
-            for (CNode *pnode : vNodesCopy)
-                pnode->Release();
+            boost::this_thread::interruption_point();
         }
 
         // From the request manager, make requests for transactions and blocks. We do this before potentially
         // sleeping in the step below so as to allow requests to return during the sleep time.
         requester.SendRequests();
 
+        // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this only decrements
+        // an atomic counter, and two, the counter will always be > 0 at this point, so we don't have to worry
+        // that a pnode could be disconnected and no longer exist before the decrement takes place.
+        for (CNode *pnode : vNodesCopy)
+        {
+            pnode->Release();
+        }
+
         if (fSleep)
+        {
             messageHandlerCondition.timed_wait(
                 lock, boost::posix_time::microsec_clock::universal_time() + boost::posix_time::milliseconds(50));
+        }
     }
 }
 

@@ -5,7 +5,7 @@
 """
 This test checks activation of may152018 opcodes
 """
-
+import test_framework.loginit
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import satoshi_round, assert_equal, assert_raises_rpc_error
 from test_framework.comptool import TestManager, TestInstance, RejectResult
@@ -66,6 +66,7 @@ class May152018ActivationTest(ComparisonTestFramework):
         self.relayfee = self.nodes[0].getnetworkinfo()["relayfee"]
 
         # First, we generate some coins to spend.
+        node.setmocktime(MAY152018_START_TIME - 1000)
         node.generate(125)
 
         # Create various outputs using the OP_AND to check for activation.
@@ -163,7 +164,6 @@ class May152018ActivationTest(ComparisonTestFramework):
         tx0id = node.sendrawtransaction(tx_hex)
 
         assert(tx0id in set(node.getrawmempool()))
-
         # Transactions can also be included in blocks.
         may152018block = next_block(MAY152018_START_TIME + 7)
         tx0 = FromHex(CTransaction(), tx_hex)
