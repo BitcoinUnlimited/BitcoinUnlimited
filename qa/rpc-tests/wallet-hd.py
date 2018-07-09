@@ -12,6 +12,7 @@ from test_framework.util import (
     connect_nodes_bi,
     initialize_chain_clean,
 )
+import logging
 import os
 import shutil
 
@@ -24,7 +25,7 @@ class WalletHDTest(BitcoinTestFramework):
         self.node_args = [['-usehd=0'], ['-usehd=1', '-keypool=0']]
 
     def setup_chain(self,bitcoinConfDict=None, wallets=None):
-        print ("Initializing test directory "+self.options.tmpdir)
+        logging.info ("Initializing test directory "+self.options.tmpdir)
         initialize_chain_clean(self.options.tmpdir, 2)
 
     def setup_network(self):
@@ -45,7 +46,7 @@ class WalletHDTest(BitcoinTestFramework):
 
         # Derive some HD addresses and remember the last
         # Also send funds to each add
-        print("Derive HD addresses ...")
+        logging.info("Derive HD addresses ...")
         self.nodes[0].generate(101)
         hd_add = None
         num_hd_adds = 300
@@ -59,21 +60,21 @@ class WalletHDTest(BitcoinTestFramework):
         self.sync_all()
         assert_equal(self.nodes[1].getbalance(), num_hd_adds + 1)
 
-        print("Restore backup ...")
+        logging.info("Restore backup ...")
         stop_node(self.nodes[1], 1)
         os.remove(self.options.tmpdir + "/node1/regtest/wallet.dat")
         shutil.copyfile(tmpdir + "hd.bak", tmpdir + "/node1/regtest/wallet.dat")
         self.nodes[1] = start_node(1, self.options.tmpdir, self.node_args[1])
 
         # Assert that derivation is deterministic
-        print ("Check derivation...")
+        logging.info ("Check derivation...")
         hd_add_2 = None
         for _ in range(num_hd_adds):
             hd_add_2 = self.nodes[1].getnewaddress()
         assert_equal(hd_add, hd_add_2)
 
         # Needs rescan
-        print("Rescan ...")
+        logging.info("Rescan ...")
         stop_node(self.nodes[1], 1)
         self.nodes[1] = start_node(1, self.options.tmpdir, self.node_args[1] + ['-rescan'])
         assert_equal(self.nodes[1].getbalance(), num_hd_adds + 1)
