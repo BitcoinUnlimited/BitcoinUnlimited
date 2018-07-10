@@ -6,6 +6,7 @@
 
 #include "bandb.h"
 #include "chainparams.h"
+#include "fs.h"
 #include "hash.h"
 #include "random.h"
 #include "streams.h"

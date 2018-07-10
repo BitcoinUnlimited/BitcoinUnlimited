@@ -2080,7 +2080,6 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 #endif
 
     LOCK(cs_vNodes);
-    std::vector<CNode *>::iterator n;
     uint64_t totalThinBlockSize = 0;
     int disconnected = 0; // watch # of disconnected nodes to ensure they are being cleaned up
     for (std::vector<CNode *>::iterator it = vNodes.begin(); it != vNodes.end(); ++it)

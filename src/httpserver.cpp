@@ -45,8 +45,8 @@ static const size_t MAX_HEADERS_SIZE = 8192;
 class HTTPWorkItem : public HTTPClosure
 {
 public:
-    HTTPWorkItem(std::unique_ptr<HTTPRequest> req, const std::string &path, const HTTPRequestHandler &func)
-        : req(std::move(req)), path(path), func(func)
+    HTTPWorkItem(std::unique_ptr<HTTPRequest> reqp, const std::string &pathp, const HTTPRequestHandler &funcp)
+        : req(std::move(reqp)), path(pathp), func(funcp)
     {
     }
     void operator()() { func(req.get(), path); }
@@ -91,7 +91,7 @@ private:
     };
 
 public:
-    WorkQueue(size_t maxDepth) : running(true), maxDepth(maxDepth), numThreads(0) {}
+    WorkQueue(size_t maxDepthp) : running(true), maxDepth(maxDepthp), numThreads(0) {}
     /** Precondition: worker threads have all stopped
      */
     ~WorkQueue() {}
@@ -138,8 +138,8 @@ public:
 struct HTTPPathHandler
 {
     HTTPPathHandler() {}
-    HTTPPathHandler(std::string prefix, bool exactMatch, HTTPRequestHandler handler)
-        : prefix(prefix), exactMatch(exactMatch), handler(handler)
+    HTTPPathHandler(std::string prefixp, bool exactMatchp, HTTPRequestHandler handlerp)
+        : prefix(prefixp), exactMatch(exactMatchp), handler(handlerp)
     {
     }
     std::string prefix;
@@ -559,8 +559,8 @@ static void httpevent_callback_fn(evutil_socket_t, short, void *data)
         delete self;
 }
 
-HTTPEvent::HTTPEvent(struct event_base *base, bool deleteWhenTriggered, const std::function<void(void)> &handler)
-    : deleteWhenTriggered(deleteWhenTriggered), handler(handler)
+HTTPEvent::HTTPEvent(struct event_base *base, bool delWhenTriggered, const std::function<void(void)> &handlerp)
+    : deleteWhenTriggered(delWhenTriggered), handler(handlerp)
 {
     ev = event_new(base, -1, 0, httpevent_callback_fn, this);
     assert(ev);
@@ -573,7 +573,7 @@ void HTTPEvent::trigger(struct timeval *tv)
     else
         evtimer_add(ev, tv); // trigger after timeval passed
 }
-HTTPRequest::HTTPRequest(struct evhttp_request *req) : req(req), replySent(false) {}
+HTTPRequest::HTTPRequest(struct evhttp_request *reqp) : req(reqp), replySent(false) {}
 HTTPRequest::~HTTPRequest()
 {
     if (!replySent)
