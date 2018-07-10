@@ -34,8 +34,6 @@
  *   DUP CHECKSIG DROP ... repeated 100 times... OP_1
  */
 
-CFeeRate dustRelayFee = CFeeRate(DUST_RELAY_TX_FEE);
-
 bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType)
 {
     std::vector<std::vector<unsigned char> > vSolutions;
@@ -119,7 +117,7 @@ bool IsStandardTx(const CTransaction &tx, std::string &reason)
             reason = "bare-multisig";
             return false;
         }
-        else if (txout.IsDust(dustRelayFee))
+        else if (txout.IsDust())
         {
             reason = "dust";
             return false;

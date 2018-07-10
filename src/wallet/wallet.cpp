@@ -2307,7 +2307,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
                         }
                     }
 
-                    if (txout.IsDust(dustRelayFee))
+                    if (txout.IsDust())
                     {
                         if (recipient.fSubtractFeeFromAmount && nFeeRet > 0)
                         {
@@ -2386,16 +2386,16 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
                     // We do not move dust-change to fees, because the sender would end up paying more than requested.
                     // This would be against the purpose of the all-inclusive feature.
                     // So instead we raise the change and deduct from the recipient.
-                    if (nSubtractFeeFromAmount > 0 && newTxOut.IsDust(dustRelayFee))
+                    if (nSubtractFeeFromAmount > 0 && newTxOut.IsDust())
                     {
-                        CAmount nDust = newTxOut.GetDustThreshold(dustRelayFee) - newTxOut.nValue;
+                        CAmount nDust = newTxOut.GetDustThreshold() - newTxOut.nValue;
                         newTxOut.nValue += nDust; // raise change until no more dust
                         for (unsigned int i = 0; i < vecSend.size(); i++) // subtract from first recipient
                         {
                             if (vecSend[i].fSubtractFeeFromAmount)
                             {
                                 txNew.vout[i].nValue -= nDust;
-                                if (txNew.vout[i].IsDust(dustRelayFee))
+                                if (txNew.vout[i].IsDust())
                                 {
                                     strFailReason = _(
                                         "The transaction amount is too small to send after the fee has been deducted");
@@ -2408,7 +2408,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
 
                     // Never create dust outputs; if we would, just
                     // add the dust to the fee.
-                    if (newTxOut.IsDust(dustRelayFee))
+                    if (newTxOut.IsDust())
                     {
                         nFeeRet += nChange;
                         reservekey.ReturnKey();

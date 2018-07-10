@@ -656,7 +656,7 @@ bool PaymentServer::processPaymentRequest(const PaymentRequestPlus &request, Sen
 
         // Extract and check amounts
         CTxOut txOut(sendingTo.second, sendingTo.first);
-        if (txOut.IsDust(dustRelayFee))
+        if (txOut.IsDust())
         {
             Q_EMIT message(tr("Payment request error"),
                 tr("Requested payment amount of %1 is too small (considered dust).")

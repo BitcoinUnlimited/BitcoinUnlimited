@@ -288,7 +288,7 @@ bool isDust(const QString &address, const CAmount &amount)
     CTxDestination dest = DecodeDestination(address.toStdString());
     CScript script = GetScriptForDestination(dest);
     CTxOut txOut(amount, script);
-    return txOut.IsDust(dustRelayFee);
+    return txOut.IsDust();
 }
 
 QString HtmlEscape(const QString &str, bool fMultiLine)
