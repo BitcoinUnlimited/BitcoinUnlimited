@@ -31,7 +31,6 @@
 
 #include <boost/thread.hpp>
 
-CClientUIInterface uiInterface; // Declared but not defined in ui_interface.h
 FastRandomContext insecure_rand_ctx(true);
 
 extern bool fPrintToConsole;

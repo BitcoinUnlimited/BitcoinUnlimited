@@ -96,7 +96,6 @@ enum BindFlags
 };
 
 static const char *FEE_ESTIMATES_FILENAME = "fee_estimates.dat";
-CClientUIInterface uiInterface; // Declared but not defined in ui_interface.h
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -284,18 +283,6 @@ void Shutdown()
  */
 void HandleSIGTERM(int) { fRequestShutdown = true; }
 void HandleSIGHUP(int) { fReopenDebugLog = true; }
-bool static InitError(const std::string &str)
-{
-    uiInterface.ThreadSafeMessageBox(str, "", CClientUIInterface::MSG_ERROR);
-    return false;
-}
-
-bool static InitWarning(const std::string &str)
-{
-    uiInterface.ThreadSafeMessageBox(str, "", CClientUIInterface::MSG_WARNING);
-    return true;
-}
-
 bool static Bind(const CService &addr, unsigned int flags)
 {
     if (!(flags & BF_EXPLICIT) && IsLimited(addr))

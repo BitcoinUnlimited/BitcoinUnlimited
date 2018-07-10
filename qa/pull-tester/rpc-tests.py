@@ -190,6 +190,7 @@ testScripts = [ RpcTest(t) for t in [
     'validateblocktemplate',
     'parallel',
     'wallet',
+    'wallet-hd',
     'excessive',
     Disabled('uahf', 'temporary disable while waiting, to use as a template for future tests'),
     'listtransactions',

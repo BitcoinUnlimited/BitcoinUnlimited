@@ -410,6 +410,7 @@ libbitcoin_util_a_SOURCES = \
   rpc/protocol.cpp \
   support/cleanse.cpp \
   sync.cpp \
+  ui_interface.cpp \
   util.cpp \
   utilmoneystr.cpp \
   utilstrencodings.cpp \
