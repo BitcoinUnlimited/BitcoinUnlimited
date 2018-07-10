@@ -45,7 +45,7 @@ enum DBErrors
     DB_NEED_REWRITE
 };
 
-/* simple hd chain data model */
+/* simple HD chain data model */
 class CHDChain
 {
 public:
@@ -77,14 +77,19 @@ public:
 class CKeyMetadata
 {
 public:
-    static const int CURRENT_VERSION = 1;
+    static const int VERSION_BASIC = 1;
+    static const int VERSION_WITH_HDDATA = 10;
+    static const int CURRENT_VERSION = VERSION_WITH_HDDATA;
+
     int nVersion;
     int64_t nCreateTime; // 0 means unknown
+    std::string hdKeypath; // optional HD/bip32 keypath
+    CKeyID hdMasterKeyID; // id of the hd masterkey used to derive this key
 
     CKeyMetadata() { SetNull(); }
     CKeyMetadata(int64_t nCreateTime_)
     {
-        nVersion = CKeyMetadata::CURRENT_VERSION;
+        SetNull();
         nCreateTime = nCreateTime_;
     }
 
@@ -95,12 +100,19 @@ public:
     {
         READWRITE(this->nVersion);
         READWRITE(nCreateTime);
+        if (this->nVersion >= VERSION_WITH_HDDATA)
+        {
+            READWRITE(hdKeypath);
+            READWRITE(hdMasterKeyID);
+        }
     }
 
     void SetNull()
     {
         nVersion = CKeyMetadata::CURRENT_VERSION;
         nCreateTime = 0;
+        hdKeypath.clear();
+        hdMasterKeyID.SetNull();
     }
 };
 
