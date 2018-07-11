@@ -3157,6 +3157,7 @@ bool FindBlockPos(CValidationState &state,
     // nDataPos for blockdb is a flag, just set to 1 to indicate we have that data. nFile is unused.
     if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
+        pos.nFile = 1;
         pos.nPos = 1;
         return true;
     }
@@ -3847,6 +3848,17 @@ bool static LoadBlockIndexDB()
             uiInterface.InitMessage(_("Upgrading block database...This could take a while."));
             SyncStorage(chainparams);
         }
+    }
+
+    delete pblocktreeother;
+    pblocktreeother = nullptr;
+    if(BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+    {
+        fs::remove_all(GetDataDir() / "blockdb");
+    }
+    else
+    {
+        fs::remove_all(GetDataDir() / "blocks");
     }
 
     boost::this_thread::interruption_point();

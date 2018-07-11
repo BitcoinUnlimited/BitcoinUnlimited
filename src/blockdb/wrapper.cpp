@@ -9,6 +9,7 @@
 #include "blockdb.h"
 #include "chainparams.h"
 #include "dbwrapper.h"
+#include "fs.h"
 #include "main.h"
 #include "sequential_files.h"
 #include "undo.h"
@@ -73,6 +74,7 @@ void SyncStorage(const CChainParams &chainparams)
         CValidationState state;
         int bestHeight = 0;
         CBlockIndex *pindexBest = new CBlockIndex();
+        std::vector<CBlockIndex*> blocksToRemove;
         for (const std::pair<int, CDiskBlockIndex> &item : hashesByHeight)
         {
             CBlockIndex *index;
@@ -201,6 +203,27 @@ void SyncStorage(const CChainParams &chainparams)
                 }
             }
             setDirtyBlockIndex.insert(index);
+            blocksToRemove.push_back(index);
+            if(blocksToRemove.size() % 10000 == 0)
+            {
+                CDBBatch batch(*pblockdb);
+                for(auto removeIndex : blocksToRemove)
+                {
+                  std::ostringstream key;
+                  key << removeIndex->GetBlockTime() << ":" << removeIndex->GetBlockHash().ToString();
+                  batch.Erase(key.str());
+                }
+                pblockdb->WriteBatch(batch);
+                // you must use NULL here, not nullptr
+                CBlockIndex* indexfront = blocksToRemove.front();
+                std::ostringstream frontkey;
+                frontkey << indexfront->GetBlockTime() << ":" << indexfront->GetBlockHash().ToString();
+                CBlockIndex* indexback = blocksToRemove.back();
+                std::ostringstream backkey;
+                backkey << indexback->GetBlockTime() << ":" << indexback->GetBlockHash().ToString();
+                pblockdb->CompactRange(frontkey.str(),backkey.str());
+                blocksToRemove.clear();
+            }
         }
 
         // if bestHeight != 0 then pindexBest has been initialized and we can update the best block.
@@ -214,10 +237,26 @@ void SyncStorage(const CChainParams &chainparams)
     {
         std::vector<std::pair<int, CDiskBlockIndex> > indexByHeight;
         pblocktreeother->GetSortedHashIndex(indexByHeight);
+        LOGA("indexByHeight size = %u \n", indexByHeight.size());
         int64_t bestHeight = 0;
+        uint64_t lastFinishedFile = 0;
         CBlockIndex *pindexBest = new CBlockIndex();
+        // Load block file info
+        int loadedblockfile = 0;
+        pblocktreeother->ReadLastBlockFile(loadedblockfile);
+        LOGA("loadedblockfile = %i \n", loadedblockfile);
+        std::vector<CBlockFileInfo> blockfiles;
+        blockfiles.resize(loadedblockfile + 1);
+        LOGA("blockfiles.size() = %u \n", blockfiles.size());
+        for (int nFile = 0; nFile <= loadedblockfile; nFile++)
+        {
+            pblocktreeother->ReadBlockFileInfo(nFile, blockfiles[nFile]);
+        }
+
         for (const std::pair<int, CDiskBlockIndex> &item : indexByHeight)
         {
+            bool needData = true;
+            bool needUndo = true;
             CBlockIndex *index;
             if (item.second.GetBlockHash() == chainparams.GetConsensus().hashGenesisBlock)
             {
@@ -271,7 +310,7 @@ void SyncStorage(const CChainParams &chainparams)
             }
 
             // Update the block data
-            if (index->nStatus & BLOCK_HAVE_DATA && !index->GetBlockPos().IsNull())
+            if (needData && index->nStatus & BLOCK_HAVE_DATA && !index->GetBlockPos().IsNull())
             {
                 CBlock block_seq;
                 if (!ReadBlockFromDiskSequential(block_seq, index->GetBlockPos(), chainparams.GetConsensus()))
@@ -287,7 +326,7 @@ void SyncStorage(const CChainParams &chainparams)
             }
 
             // Update the undo data
-            if (index->nStatus & BLOCK_HAVE_UNDO && !index->GetUndoPos().IsNull())
+            if (needUndo && index->nStatus & BLOCK_HAVE_UNDO && !index->GetUndoPos().IsNull())
             {
                 CBlockUndo blockundo;
 
@@ -321,6 +360,12 @@ void SyncStorage(const CChainParams &chainparams)
                 }
             }
             setDirtyBlockIndex.insert(index);
+            if(lastFinishedFile <= loadedblockfile && index->nHeight > blockfiles[lastFinishedFile].nHeightLast)
+            {
+                fs::remove(GetDataDir() / "blocks" / strprintf("blk%05u.dat", lastFinishedFile));
+                fs::remove(GetDataDir() / "blocks" / strprintf("rev%05u.dat", lastFinishedFile));
+                lastFinishedFile++;
+            }
         }
 
         // if bestHeight != 0 then pindexBest has been initialized and we can update the best block.
@@ -329,7 +374,6 @@ void SyncStorage(const CChainParams &chainparams)
             pcoinsdbview->WriteBestBlockDb(pindexBest->GetBlockHash());
         }
     }
-
     FlushStateToDisk();
     LOGA("Block database upgrade completed.\n");
 }
@@ -342,8 +386,6 @@ bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHea
     }
     else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        // we want to set nFile inside pos here to -1 so we know its in levelDB block storage, dont do this within dual
-        // most since it also uses sequential
         return WriteBlockToDB(block);
     }
     return false;
