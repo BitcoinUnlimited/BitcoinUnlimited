@@ -250,7 +250,7 @@ void CheckNodeSupportForThinBlocks();
 bool ClearLargestThinBlockAndDisconnect(CNode *pfrom);
 void ClearThinBlockInFlight(CNode *pfrom, const uint256 &hash);
 void AddThinBlockInFlight(CNode *pfrom, const uint256 &hash);
-void SendXThinBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv);
+void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
 bool IsThinBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header);
 void BuildSeededBloomFilter(CBloomFilter &memPoolFilter,
     std::vector<uint256> &vOrphanHashes,
