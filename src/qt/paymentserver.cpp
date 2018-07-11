@@ -835,7 +835,7 @@ void PaymentServer::reportSslErrors(QNetworkReply *reply, const QList<QSslError>
     Q_EMIT message(tr("Network request error"), errString, CClientUIInterface::MSG_ERROR);
 }
 
-void PaymentServer::setOptionsModel(OptionsModel *optionsModel) { this->optionsModel = optionsModel; }
+void PaymentServer::setOptionsModel(OptionsModel *_optionsModel) { this->optionsModel = _optionsModel; }
 void PaymentServer::handlePaymentACK(const QString &paymentACKMsg)
 {
     // currently we don't further process or store the paymentACK message
