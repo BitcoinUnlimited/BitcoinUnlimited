@@ -28,7 +28,7 @@ void CBloomFilter::setup(unsigned int nElements,
     double nFPRate,
     unsigned int nTweakIn,
     unsigned char nFlagsIn,
-    bool size_constrained,
+    bool fSizeConstrained,
     uint32_t nMaxFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE)
 {
     if (nElements == 0)
@@ -36,18 +36,18 @@ void CBloomFilter::setup(unsigned int nElements,
         LOGA("Construction of empty CBloomFilter attempted.\n");
         nElements = 1;
     }
-    unsigned desired_vdata_size = (unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate) / 8);
+    unsigned int nDesiredSize = (unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate) / 8);
 
-    if (size_constrained)
-        desired_vdata_size = min(desired_vdata_size, nMaxFilterSize);
+    if (fSizeConstrained)
+        nDesiredSize = min(nDesiredSize, nMaxFilterSize);
 
-    vData.resize(desired_vdata_size, 0);
+    vData.resize(nDesiredSize, 0);
     isFull = vData.size() == 0;
     isEmpty = true;
 
     nHashFuncs = (unsigned int)(vData.size() * 8 / nElements * LN2);
 
-    if (size_constrained)
+    if (fSizeConstrained)
         nHashFuncs = min(nHashFuncs, MAX_HASH_FUNCS);
 
     nTweak = nTweakIn;
@@ -58,7 +58,7 @@ void CBloomFilter::setup_guaranteeFPR(unsigned int nElements,
     double nFPRate,
     unsigned int nTweakIn,
     unsigned char nFlagsIn,
-    bool size_constrained,
+    bool fSizeConstrained,
     uint32_t nMaxFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE)
 {
     if (nElements == 0)
@@ -66,15 +66,15 @@ void CBloomFilter::setup_guaranteeFPR(unsigned int nElements,
         LOGA("Construction of empty CBloomFilter attempted.\n");
         nElements = 1;
     }
-    unsigned desired_vdata_size = (unsigned int)(ceil(-1 / LN2SQUARED * nElements * log(nFPRate) / 8));
+    unsigned int nDesiredSize = (unsigned int)(ceil(-1 / LN2SQUARED * nElements * log(nFPRate) / 8));
 
-    vData.resize(desired_vdata_size, 0);
+    vData.resize(nDesiredSize, 0);
     isFull = vData.size() == 0;
     isEmpty = true;
 
     nHashFuncs = (unsigned int)max(MIN_N_HASH_FUNC, int(vData.size() * 8 / nElements * LN2));
 
-    if (size_constrained)
+    if (fSizeConstrained)
         nHashFuncs = min(nHashFuncs, MAX_HASH_FUNCS);
 
     nTweak = nTweakIn;
