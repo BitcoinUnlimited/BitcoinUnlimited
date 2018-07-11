@@ -29,7 +29,7 @@ WalletFrame::WalletFrame(const PlatformStyle *_platformStyle, const Config *cfg,
 }
 
 WalletFrame::~WalletFrame() {}
-void WalletFrame::setClientModel(ClientModel *clientModel) { this->clientModel = clientModel; }
+void WalletFrame::setClientModel(ClientModel *_clientModel) { this->clientModel = _clientModel; }
 bool WalletFrame::addWallet(const QString &name, WalletModel *walletModel)
 {
     if (!gui || !clientModel || !walletModel || mapWalletViews.count(name) > 0)
