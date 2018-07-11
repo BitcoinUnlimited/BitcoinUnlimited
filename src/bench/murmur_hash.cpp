@@ -8,7 +8,7 @@
 static void Murmur3(benchmark::State &state)
 {
     std::vector<uint8_t> in(32, 0);
-    unsigned x;
+    unsigned int x = 0;
     while (state.KeepRunning())
     {
         for (int i = 0; i < 1000000; i++)
