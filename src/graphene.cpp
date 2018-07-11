@@ -13,6 +13,7 @@
 #include "policy/policy.h"
 #include "pow.h"
 #include "requestManager.h"
+#include "thinblock.h"
 #include "timedata.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
@@ -149,7 +150,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             return false;
     }
 
-    // If we're still missing transactions then bail out and just request the full block. This should never
+    // If we're still missing transactions then bail out and request the failover block. This should never
     // happen unless we're under some kind of attack or somehow we lost transactions out of our memory pool
     // while we were retreiving missing transactions.
     if (missingCount > 0)
@@ -157,10 +158,8 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         // Since we can't process this graphene block then clear out the data from memory
         graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
 
-        std::vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_BLOCK, grapheneBlockTx.blockhash));
-        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-        return error("Still missing transactions after reconstructing block, peer=%s: re-requesting a full block",
+        RequestFailoverBlock(pfrom, grapheneBlockTx.blockhash);
+        return error("Still missing transactions after reconstructing block, peer=%s: re-requesting failover block",
             pfrom->GetLogName());
     }
     else
@@ -371,7 +370,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
             return true;
         }
 
-        // Request full block if this one isn't extending the best chain
+        // Request failover block if this one isn't extending the best chain
         if (pIndex->nChainWork <= chainActive.Tip()->nChainWork)
         {
             std::vector<CInv> vGetData;
@@ -380,8 +379,9 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
 
             graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
 
-            LOGA("%s %s from peer %s received but does not extend longest chain; requesting full block\n", strCommand,
-                inv.hash.ToString(), pfrom->GetLogName());
+            RequestFailoverBlock(pfrom, grapheneBlock.header.GetHash());
+            LOGA("%s %s from peer %s received but does not extend longest chain; requesting failover block\n",
+                strCommand, inv.hash.ToString(), pfrom->GetLogName());
             return true;
         }
 
@@ -531,11 +531,8 @@ bool CGrapheneBlock::process(CNode *pfrom,
             }
             catch (const std::runtime_error &e)
             {
-                std::vector<CInv> vGetData;
-                vGetData.push_back(CInv(MSG_BLOCK, header.GetHash()));
-                pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-
-                LOG(GRAPHENE, "Graphene set could not be reconciled; requesting a full block for peer %s: %s\n",
+                RequestFailoverBlock(pfrom, header.GetHash());
+                LOG(GRAPHENE, "Graphene set could not be reconciled; requesting failover for peer %s: %s\n",
                     pfrom->GetLogName(), e.what());
 
                 graphenedata.ClearGrapheneBlockData(pfrom, header.GetHash());
@@ -563,21 +560,19 @@ bool CGrapheneBlock::process(CNode *pfrom,
     // These must be checked outside of the mempool.cs lock or deadlock may occur.
     // A merkle root mismatch here does not cause a ban because and expedited node will forward an graphene
     // without checking the merkle root, therefore we don't want to ban our expedited nodes. Just request
-    // a full block if a mismatch occurs.
-    // Also, there is a remote possiblity of a Tx hash collision therefore if it occurs we request a full
+    // a failover block if a mismatch occurs.
+    // Also, there is a remote possiblity of a Tx hash collision therefore if it occurs we request a failover
     // block.
     //////////////// Maybe this should raise a ban in graphene? /////////////
     if (collision || !fMerkleRootCorrect)
     {
-        std::vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_BLOCK, header.GetHash()));
-        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-
+        RequestFailoverBlock(pfrom, header.GetHash());
         if (!fMerkleRootCorrect)
             return error(
-                "Mismatched merkle root on grapheneblock: requesting a full block, peer=%s", pfrom->GetLogName());
+                "Mismatched merkle root on grapheneblock: requesting failover block, peer=%s", pfrom->GetLogName());
         else
-            return error("TX HASH COLLISION for grapheneblock: requesting a full block, peer=%s", pfrom->GetLogName());
+            return error(
+                "TX HASH COLLISION for grapheneblock: requesting a failover block, peer=%s", pfrom->GetLogName());
 
         graphenedata.ClearGrapheneBlockData(pfrom, header.GetHash());
         return true;
@@ -603,17 +598,14 @@ bool CGrapheneBlock::process(CNode *pfrom,
     }
 
     // If there are still any missing transactions then we must clear out the graphene block data
-    // and re-request a full block (This should never happen because we just checked the various pools).
+    // and re-request failover block (This should never happen because we just checked the various pools).
     if (missingCount > 0)
     {
         // Since we can't process this graphene block then clear out the data from memory
         graphenedata.ClearGrapheneBlockData(pfrom, header.GetHash());
 
-        std::vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_BLOCK, header.GetHash()));
-        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-
-        return error("Still missing transactions for graphene block: re-requesting a full block");
+        RequestFailoverBlock(pfrom, header.GetHash());
+        return error("Still missing transactions for graphene block: re-requesting failover block");
     }
 
     // We now have all the transactions that are in this block
@@ -1561,4 +1553,35 @@ uint256 GetSalt(unsigned char seed)
     std::vector<unsigned char> vec(32);
     vec[0] = seed;
     return uint256(vec);
+}
+
+void RequestFailoverBlock(CNode *pfrom, uint256 blockHash)
+{
+    if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable())
+    {
+        LOG(GRAPHENE, "Requesting xthin block as failover from peer %s\n", pfrom->GetLogName());
+        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+        CBloomFilter filterMemPool;
+        CInv inv2(MSG_XTHINBLOCK, blockHash);
+
+        AddThinBlockInFlight(pfrom, inv2.hash);
+
+        std::vector<uint256> vOrphanHashes;
+        {
+            LOCK(orphanpool.cs);
+            for (auto &mi : orphanpool.mapOrphanTransactions)
+                vOrphanHashes.emplace_back(mi.first);
+        }
+        BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
+        ss << inv2;
+        ss << filterMemPool;
+        pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
+    }
+    else
+    {
+        LOG(GRAPHENE, "Requesting full block as failover from peer %s\n", pfrom->GetLogName());
+        std::vector<CInv> vGetData;
+        vGetData.push_back(CInv(MSG_BLOCK, blockHash));
+        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+    }
 }

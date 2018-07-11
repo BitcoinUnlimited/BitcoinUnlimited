@@ -432,69 +432,8 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
     CInv inv2(obj);
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     CBloomFilter filterMemPool;
-    // BUIP010 Xtreme Thinblocks: begin section
-    if (IsThinBlocksEnabled() && IsChainNearlySyncd())
-    {
-        if (HaveConnectThinblockNodes() || (HaveThinblockNodes() && thindata.CheckThinblockTimer(obj.hash)))
-        {
-            // Must download an xthinblock from a XTHIN peer.
-            // We can only request one xthinblock per peer at a time.
-            if (pfrom->mapThinBlocksInFlight.size() < 1 && CanThinBlockBeDownloaded(pfrom))
-            {
-                AddThinBlockInFlight(pfrom, inv2.hash);
-
-                inv2.type = MSG_XTHINBLOCK;
-                std::vector<uint256> vOrphanHashes;
-                {
-                    LOCK(orphanpool.cs);
-                    for (auto &mi : orphanpool.mapOrphanTransactions)
-                        vOrphanHashes.emplace_back(mi.first);
-                }
-                BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
-                ss << inv2;
-                ss << filterMemPool;
-                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
-                pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
-                return true;
-            }
-        }
-        else
-        {
-            // Try to download a thinblock if possible otherwise just download a regular block.
-            // We can only request one xthinblock per peer at a time.
-            MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
-            if (pfrom->mapThinBlocksInFlight.size() < 1 && CanThinBlockBeDownloaded(pfrom))
-            {
-                AddThinBlockInFlight(pfrom, inv2.hash);
-
-                inv2.type = MSG_XTHINBLOCK;
-                std::vector<uint256> vOrphanHashes;
-                {
-                    LOCK(orphanpool.cs);
-                    for (auto &mi : orphanpool.mapOrphanTransactions)
-                        vOrphanHashes.emplace_back(mi.first);
-                }
-                BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
-                ss << inv2;
-                ss << filterMemPool;
-                pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
-            }
-            else
-            {
-                LOG(THIN, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
-                std::vector<CInv> vToFetch;
-                inv2.type = MSG_BLOCK;
-                vToFetch.push_back(inv2);
-                pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
-            }
-            return true;
-        }
-    }
-    // BUIP010 Xtreme Thinblocks: end section
     // BUIPXXX Graphene blocks: begin section
-    else if (IsGrapheneBlockEnabled() && IsChainNearlySyncd())
+    if (IsGrapheneBlockEnabled() && IsChainNearlySyncd())
     {
         if (HaveConnectGrapheneNodes() || (HaveGrapheneNodes() && graphenedata.CheckGrapheneBlockTimer(obj.hash)))
         {
@@ -559,6 +498,67 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         }
     }
     // BUIPXXX Graphene blocks: end section
+    // BUIP010 Xtreme Thinblocks: begin section
+    else if (IsThinBlocksEnabled() && IsChainNearlySyncd())
+    {
+        if (HaveConnectThinblockNodes() || (HaveThinblockNodes() && thindata.CheckThinblockTimer(obj.hash)))
+        {
+            // Must download an xthinblock from a XTHIN peer.
+            // We can only request one xthinblock per peer at a time.
+            if (pfrom->mapThinBlocksInFlight.size() < 1 && CanThinBlockBeDownloaded(pfrom))
+            {
+                AddThinBlockInFlight(pfrom, inv2.hash);
+
+                inv2.type = MSG_XTHINBLOCK;
+                std::vector<uint256> vOrphanHashes;
+                {
+                    LOCK(orphanpool.cs);
+                    for (auto &mi : orphanpool.mapOrphanTransactions)
+                        vOrphanHashes.emplace_back(mi.first);
+                }
+                BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
+                ss << inv2;
+                ss << filterMemPool;
+                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
+                pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
+                LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+                return true;
+            }
+        }
+        else
+        {
+            // Try to download a thinblock if possible otherwise just download a regular block.
+            // We can only request one xthinblock per peer at a time.
+            MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
+            if (pfrom->mapThinBlocksInFlight.size() < 1 && CanThinBlockBeDownloaded(pfrom))
+            {
+                AddThinBlockInFlight(pfrom, inv2.hash);
+
+                inv2.type = MSG_XTHINBLOCK;
+                std::vector<uint256> vOrphanHashes;
+                {
+                    LOCK(orphanpool.cs);
+                    for (auto &mi : orphanpool.mapOrphanTransactions)
+                        vOrphanHashes.emplace_back(mi.first);
+                }
+                BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
+                ss << inv2;
+                ss << filterMemPool;
+                pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
+                LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+            }
+            else
+            {
+                LOG(THIN, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+                std::vector<CInv> vToFetch;
+                inv2.type = MSG_BLOCK;
+                vToFetch.push_back(inv2);
+                pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
+            }
+            return true;
+        }
+    }
+    // BUIP010 Xtreme Thinblocks: end section
     else
     {
         std::vector<CInv> vToFetch;
