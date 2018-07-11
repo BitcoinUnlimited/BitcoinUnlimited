@@ -36,26 +36,6 @@ CKey LoadKey(unsigned char *src)
     return secret;
 }
 
-// From core_read.cpp #include "core_io.h"
-bool DecodeHexTx(CTransaction &tx, const std::string &strHexTx)
-{
-    if (!IsHex(strHexTx))
-        return false;
-
-    std::vector<unsigned char> txData(ParseHex(strHexTx));
-    CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION);
-    try
-    {
-        ssData >> tx;
-    }
-    catch (const std::exception &)
-    {
-        return false;
-    }
-
-    return true;
-}
-
 static const char *hexxlat = "0123456789ABCDEF";
 std::string GetHex(unsigned char *data, unsigned int len)
 {
