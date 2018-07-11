@@ -275,13 +275,13 @@ bool CPubKey::Decompress()
     return true;
 }
 
-bool CPubKey::Derive(CPubKey &pubkeyChild, ChainCode &ccChild, unsigned int nChild, const ChainCode &cc) const
+bool CPubKey::Derive(CPubKey &pubkeyChild, ChainCode &ccChild, unsigned int _nChild, const ChainCode &cc) const
 {
     assert(IsValid());
-    assert((nChild >> 31) == 0);
+    assert((_nChild >> 31) == 0);
     assert(begin() + 33 == end());
     unsigned char out[64];
-    BIP32Hash(cc, nChild, *begin(), begin() + 1, out);
+    BIP32Hash(cc, _nChild, *begin(), begin() + 1, out);
     memcpy(ccChild.begin(), out + 32, 32);
     secp256k1_pubkey pubkey;
     if (!secp256k1_ec_pubkey_parse(secp256k1_context_verify, &pubkey, &(*this)[0], size()))
@@ -321,13 +321,13 @@ void CExtPubKey::Decode(const unsigned char code[BIP32_EXTKEY_SIZE])
     pubkey.Set(code + 41, code + BIP32_EXTKEY_SIZE);
 }
 
-bool CExtPubKey::Derive(CExtPubKey &out, unsigned int nChild) const
+bool CExtPubKey::Derive(CExtPubKey &out, unsigned int _nChild) const
 {
     out.nDepth = nDepth + 1;
     CKeyID id = pubkey.GetID();
     memcpy(&out.vchFingerprint[0], &id, 4);
-    out.nChild = nChild;
-    return pubkey.Derive(out.pubkey, out.chaincode, nChild, chaincode);
+    out.nChild = _nChild;
+    return pubkey.Derive(out.pubkey, out.chaincode, _nChild, chaincode);
 }
 
 /* static */ bool CPubKey::CheckLowS(const std::vector<unsigned char> &vchSig)
