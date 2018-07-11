@@ -563,19 +563,16 @@ bool CGrapheneBlock::process(CNode *pfrom,
     // a failover block if a mismatch occurs.
     // Also, there is a remote possiblity of a Tx hash collision therefore if it occurs we request a failover
     // block.
-    //////////////// Maybe this should raise a ban in graphene? /////////////
     if (collision || !fMerkleRootCorrect)
     {
         RequestFailoverBlock(pfrom, header.GetHash());
+        graphenedata.ClearGrapheneBlockData(pfrom, header.GetHash());
+
         if (!fMerkleRootCorrect)
             return error(
                 "Mismatched merkle root on grapheneblock: requesting failover block, peer=%s", pfrom->GetLogName());
         else
-            return error(
-                "TX HASH COLLISION for grapheneblock: requesting a failover block, peer=%s", pfrom->GetLogName());
-
-        graphenedata.ClearGrapheneBlockData(pfrom, header.GetHash());
-        return true;
+            return error("TX HASH COLLISION for grapheneblock: requesting a full block, peer=%s", pfrom->GetLogName());
     }
 
     pfrom->grapheneBlockWaitingForTxns = missingCount;
