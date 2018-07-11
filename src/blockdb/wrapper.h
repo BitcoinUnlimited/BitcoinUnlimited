@@ -22,7 +22,7 @@ enum BlockDBMode
     DB_BLOCK_STORAGE // 1
 };
 
-static const BlockDBMode DEFAULT_BLOCK_DB_MODE = DB_BLOCK_STORAGE;
+static const BlockDBMode DEFAULT_BLOCK_DB_MODE = SEQUENTIAL_BLOCK_FILES;
 extern BlockDBMode BLOCK_DB_MODE;
 
 /** Determine if the block db mode we started with is behind another one already on disk*/
