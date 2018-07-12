@@ -67,7 +67,7 @@ private:
         bool size_constrained,
         uint32_t nMaxFilterSize);
     /** Alternative setup function that guarantees the false positive rate does not exceed nFPRate. */
-    void setup_guaranteeFPR(unsigned int nElements,
+    void setupGuaranteeFPR(unsigned int nElements,
         double nFPRate,
         unsigned int nTweakIn,
         unsigned char nFlagsIn,
@@ -103,7 +103,7 @@ public:
         double nFPRate,
         unsigned int nTweak,
         unsigned char nFlagsIn,
-        bool guaranteeFPR,
+        bool fGuaranteeFPR,
         uint32_t nMaxFilterSize);
     CBloomFilter() : isFull(true), isEmpty(true), nHashFuncs(0), nTweak(0), nFlags(0) {}
     ADD_SERIALIZE_METHODS;

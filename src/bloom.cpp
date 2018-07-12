@@ -54,7 +54,7 @@ void CBloomFilter::setup(unsigned int nElements,
     nFlags = nFlagsIn;
 }
 
-void CBloomFilter::setup_guaranteeFPR(unsigned int nElements,
+void CBloomFilter::setupGuaranteeFPR(unsigned int nElements,
     double nFPRate,
     unsigned int nTweakIn,
     unsigned char nFlagsIn,
@@ -94,11 +94,11 @@ CBloomFilter::CBloomFilter(unsigned int nElements,
     double nFPRate,
     unsigned int nTweakIn,
     unsigned char nFlagsIn,
-    bool guaranteeFPR,
+    bool fGuaranteeFPR,
     uint32_t nMaxFilterSize)
 {
-    if (guaranteeFPR)
-        setup_guaranteeFPR(nElements, nFPRate, nTweakIn, nFlagsIn, true, nMaxFilterSize);
+    if (fGuaranteeFPR)
+        setupGuaranteeFPR(nElements, nFPRate, nTweakIn, nFlagsIn, true, nMaxFilterSize);
     else
         setup(nElements, nFPRate, nTweakIn, nFlagsIn, true, nMaxFilterSize);
 }
