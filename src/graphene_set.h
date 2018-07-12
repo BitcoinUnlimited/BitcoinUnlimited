@@ -206,7 +206,6 @@ public:
         mapCheapHashes.clear();
 
         // Determine difference between sender and receiver IBLTs
-        CIblt diffIblt = (*pSetIblt) - localIblt;
         std::set<std::pair<uint64_t, std::vector<uint8_t> > > senderHas;
         std::set<std::pair<uint64_t, std::vector<uint8_t> > > receiverHas;
 
