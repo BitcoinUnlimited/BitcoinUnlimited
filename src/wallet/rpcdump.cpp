@@ -374,10 +374,6 @@ UniValue importaddresses(const UniValue &params, bool fHelp)
             HelpExampleCli("importaddresses", "no-rescan \"myscript\"") + "\nAs a JSON-RPC call\n" +
             HelpExampleRpc("importaddress", "\"myscript\""));
 
-    string strLabel = "";
-    if (params.size() > 1)
-        strLabel = params[1].get_str();
-
     // Whether to perform rescan after import
     bool fRescanLocal = true;
 
@@ -405,13 +401,13 @@ UniValue importaddresses(const UniValue &params, bool fHelp)
         CTxDestination dest = DecodeDestination(param);
         if (IsValidDestination(dest))
         {
-            ImportAddress(dest, strLabel);
+            ImportAddress(dest, "");
         }
         else if (IsHex(param))
         {
             bool fP2SH = true;
             std::vector<unsigned char> data(ParseHex(param));
-            ImportScript(CScript(data.begin(), data.end()), strLabel, fP2SH);
+            ImportScript(CScript(data.begin(), data.end()), "", fP2SH);
         }
         else
         {
