@@ -1144,8 +1144,7 @@ bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
         uint64_t elapsed = GetTimeMillis() - mapGrapheneBlockTimer[hash];
         if (elapsed > 10000)
         {
-            LOG(GRAPHENE, "Preferential Graphene Block timer exceeded - downloading regular block instead\n");
-
+            LOG(GRAPHENE, "Preferential Graphene Block timer exceeded\n");
             return false;
         }
     }
