@@ -655,7 +655,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
             setUnVerifiedOrphanTxHash.clear();
         }
     }
-    else if (IsGrapheneBlockEnabled())
+    if (IsGrapheneBlockEnabled())
     {
         int nTotalGrapheneBlocksInFlight = 0;
         {
