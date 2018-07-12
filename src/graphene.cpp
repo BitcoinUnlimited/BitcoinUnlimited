@@ -1302,7 +1302,7 @@ bool HaveGrapheneNodes()
     return false;
 }
 
-bool IsGrapheneBlockEnabled() { return GetBoolArg("-use-graphene-blocks", true); }
+bool IsGrapheneBlockEnabled() { return GetBoolArg("-use-grapheneblocks", false); }
 bool CanGrapheneBlockBeDownloaded(CNode *pto)
 {
     if (pto->GrapheneCapable() && !GetBoolArg("-connect-graphene-force", false))
