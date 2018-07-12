@@ -536,6 +536,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
                     pfrom->GetLogName(), e.what());
 
                 graphenedata.ClearGrapheneBlockData(pfrom, header.GetHash());
+                graphenedata.IncrementDecodeFailures();
 
                 return true;
             }
@@ -774,6 +775,12 @@ double CGrapheneBlockData::average(std::map<int64_t, uint64_t> &map)
     return (double)accum / map.size();
 }
 
+void CGrapheneBlockData::IncrementDecodeFailures()
+{
+    LOCK(cs_graphenestats);
+    nDecodeFailures += 1;
+}
+
 void CGrapheneBlockData::UpdateInBound(uint64_t nGrapheneBlockSize, uint64_t nOriginalBlockSize)
 {
     LOCK(cs_graphenestats);
@@ -880,7 +887,8 @@ std::string CGrapheneBlockData::ToString()
     double size = double(nOriginalSize() - nGrapheneSize() - nTotalMemPoolInfoBytes());
     std::ostringstream ss;
     ss << nBlocks() << " graphene " << ((nBlocks() > 1) ? "blocks have" : "block has") << " saved "
-       << formatInfoUnit(size) << " of bandwidth";
+       << formatInfoUnit(size) << " of bandwidth with " << nDecodeFailures() << " decode "
+       << ((nDecodeFailures() == 1) ? "failure" : "failures");
 
     return ss.str();
 }
@@ -1195,6 +1203,7 @@ void CGrapheneBlockData::ClearGrapheneBlockStats()
     nOriginalSize.Clear();
     nGrapheneSize.Clear();
     nBlocks.Clear();
+    nDecodeFailures.Clear();
     nMempoolLimiterBytesSaved.Clear();
     nTotalMemPoolInfoBytes.Clear();
     nTotalFilterBytes.Clear();
