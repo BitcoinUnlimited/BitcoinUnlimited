@@ -1088,8 +1088,9 @@ void CRequestManager::FindNextBlocksToDownload(NodeId nodeid, unsigned int count
 // indicate whether we requested this block.
 void CRequestManager::MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash)
 {
-    // If started then clear the thinblock timer used for preferential downloading
+    // If started then clear the timers used for preferential downloading
     thindata.ClearThinBlockTimer(hash);
+    graphenedata.ClearGrapheneBlockTimer(hash);
 
     // Add to inflight, if it hasn't already been marked inflight for this node id.
     LOCK(cs_objDownloader);
