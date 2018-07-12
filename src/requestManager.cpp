@@ -673,6 +673,7 @@ void CRequestManager::SendRequests()
                     item.outstandingReqs++;
                     int64_t then = item.lastRequestTime;
                     item.lastRequestTime = now;
+                    bool fReqBlkResult = false;
 
                     if (fBatchBlockRequests)
                     {
@@ -691,10 +692,10 @@ void CRequestManager::SendRequests()
                     else
                     {
                         LEAVE_CRITICAL_SECTION(cs_objDownloader); // item and itemIter are now invalid
-                        bool reqblkResult = RequestBlock(next.node, obj);
+                        fReqBlkResult = RequestBlock(next.node, obj);
                         ENTER_CRITICAL_SECTION(cs_objDownloader);
 
-                        if (!reqblkResult)
+                        if (!fReqBlkResult)
                         {
                             // having released cs_objDownloader, item and itemiter may be invalid.
                             // So in the rare case that we could not request the block we need to
@@ -709,23 +710,25 @@ void CRequestManager::SendRequests()
                         }
                     }
 
-                    // If you wanted to remember that this node has this data, you could push it back onto the end of
-                    // the availableFrom list like this:
-                    // next.requestCount += 1;
-                    // next.desirability /= 2;  // Make this node less desirable to re-request.
-                    // item.availableFrom.push_back(next);  // Add the node back onto the end of the list
-                    //
-                    // Instead we'll forget about it -- the node is already popped of of the available list so now we'll
-                    // release our reference.
-                    // LOG(REQ, "ReqMgr: %s removed block ref to %d count %d\n", obj.ToString(),
-                    //     next.node->GetId(), next.node->GetRefCount());
-                    //
-                    // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this only
-                    // decrements an atomic counter, and two, the counter will always be > 0 at this point, so we don't
-                    // have to worry that a pnode could be disconnected and no longer exist before the decrement takes
-                    // place.
-                    next.node->Release();
-                    next.node = nullptr;
+                    // If there was a request then release the ref otherwise put the item back into the list so
+                    // we don't lose the block source.
+                    if (fReqBlkResult)
+                    {
+                        // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this only
+                        // decrements an atomic counter, and two, the counter will always be > 0 at this point, so we
+                        // don't have to worry that a pnode could be disconnected and no longer exist before the
+                        // decrement takes place.
+                        next.node->Release();
+                        next.node = nullptr;
+                    }
+                    else
+                    {
+                        // We never asked for the block, typically because the graphene block timer hasn't timed out
+                        // yet but we only have sources for an xthinblock. When this happens we add the node back to
+                        // the end of the list so that we don't lose the source, when/if the graphene timer has
+                        // a time out and we are then ready to ask for an xthinblock.
+                        item.availableFrom.push_back(next);
+                    }
                 }
                 else
                 {
