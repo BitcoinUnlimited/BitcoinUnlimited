@@ -47,6 +47,8 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include "validationinterface.h"
+#include "weakblock.h"
+
 #ifdef ENABLE_WALLET
 #include "wallet/db.h"
 #include "wallet/wallet.h"
@@ -827,6 +829,11 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 
     // UAHF - BitcoinCash service bit
     nLocalServices |= NODE_BITCOIN_CASH;
+
+    // support for receiving and sending weak blocks with less than
+    // full POW
+    if (weakblocksEnabled())
+        nLocalServices |= NODE_WEAKBLOCKS;
 
     nMaxTipAge = GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
 
