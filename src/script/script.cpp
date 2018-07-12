@@ -233,7 +233,7 @@ const char *GetOpName(opcodetype opcode)
     case OP_CHECKMULTISIGVERIFY:
         return "OP_CHECKMULTISIGVERIFY";
 
-    // expanson
+    // expansion
     case OP_NOP1:
         return "OP_NOP1";
     case OP_CHECKLOCKTIMEVERIFY:
@@ -254,6 +254,11 @@ const char *GetOpName(opcodetype opcode)
         return "OP_NOP9";
     case OP_NOP10:
         return "OP_NOP10";
+
+    case OP_CHECKDATASIG:
+        return "OP_CHECKDATASIG";
+    case OP_CHECKDATASIGVERIFY:
+        return "OP_CHECKDATASIGVERIFY";
 
     case OP_INVALIDOPCODE:
         return "OP_INVALIDOPCODE";
