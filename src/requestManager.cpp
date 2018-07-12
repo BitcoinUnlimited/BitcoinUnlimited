@@ -443,14 +443,9 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
             {
                 AddGrapheneBlockInFlight(pfrom, inv2.hash);
 
+                // Instead of building a bloom filter here as we would for an xthin, we actually
+                // just need to fill in CMempoolInfo
                 inv2.type = MSG_GRAPHENEBLOCK;
-                std::vector<uint256> vOrphanHashes;
-                {
-                    LOCK(orphanpool.cs);
-                    for (auto &mi : orphanpool.mapOrphanTransactions)
-                        vOrphanHashes.emplace_back(mi.first);
-                }
-                // Instead of building a bloom filter here, we actually just need to fill in CMempoolInfo
                 CMemPoolInfo receiverMemPoolInfo = GetGrapheneMempoolInfo();
                 ss << inv2;
                 ss << receiverMemPoolInfo;
@@ -472,13 +467,9 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
             {
                 AddGrapheneBlockInFlight(pfrom, inv2.hash);
 
+                // Instead of building a bloom filter here as we would for an xthin, we actually
+                // just need to fill in CMempoolInfo
                 inv2.type = MSG_GRAPHENEBLOCK;
-                std::vector<uint256> vOrphanHashes;
-                {
-                    LOCK(orphanpool.cs);
-                    for (auto &mi : orphanpool.mapOrphanTransactions)
-                        vOrphanHashes.emplace_back(mi.first);
-                }
                 ss << inv2;
                 ss << GetGrapheneMempoolInfo();
                 pfrom->PushMessage(NetMsgType::GET_GRAPHENE, ss);
