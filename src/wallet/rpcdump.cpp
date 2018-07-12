@@ -356,7 +356,7 @@ UniValue importaddresses(const UniValue &params, bool fHelp)
     if (!EnsureWalletIsAvailable(fHelp))
         return NullUniValue;
 
-    if (fHelp || params.size() < 1 || params.size() > 4)
+    if (fHelp || params.size() < 1)
         throw runtime_error(
             "importaddresses [rescan | no-rescan] \"address\"...\n"
             "\nAdds a script (in hex) or address that can be watched as if it were in your wallet but cannot be used "
