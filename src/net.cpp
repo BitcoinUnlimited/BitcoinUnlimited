@@ -964,7 +964,7 @@ static void AcceptConnection(const ListenSocket &hListenSocket)
     // 2. BUT, if less than nMaxOutConnections in vAddedNodes, open up any of the unreserved
     //   "-addnode" connection slots to the inbound pool to prevent holding presently unneeded outbound connection
     //   slots.
-    int nMaxAddNodeOutbound = nMaxOutConnections;
+    int nMaxAddNodeOutbound = 0;
     {
         LOCK(cs_vAddedNodes);
         nMaxAddNodeOutbound = std::min((int)vAddedNodes.size(), nMaxOutConnections);
@@ -1510,7 +1510,6 @@ static std::string GetDNSHost(const CDNSSeedData &data, uint64_t requiredService
     // use default host for non-filter-capable seeds or if we use the default service bits (NODE_NETWORK)
     if (!data.supportsServiceBitsFiltering || requiredServiceBits == NODE_NETWORK)
     {
-        requiredServiceBits = NODE_NETWORK;
         return data.host;
     }
 
