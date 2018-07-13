@@ -331,9 +331,6 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
         .addArg("min-xthin-nodes=<n>", requiredInt,
             strprintf(_("Minimum number of xthin nodes to automatically find and connect (default: %d)"),
                     MIN_XTHIN_NODES))
-        .addArg("min-graphene-nodes=<n>", requiredInt,
-            strprintf(_("Minimum number of graphene nodes to automatically find and connect (default: %d)"),
-                    MIN_GRAPHENE_NODES))
         .addArg("onion=<ip:port>", requiredStr,
             strprintf(_("Use separate SOCKS5 proxy to reach peers via Tor hidden services (default: %s)"), "-proxy"))
         .addArg("onlynet=<net>", requiredStr, _("Only connect to nodes in network <net> (ipv4, ipv6 or onion)"))
