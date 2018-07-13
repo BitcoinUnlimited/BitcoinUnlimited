@@ -344,7 +344,7 @@ class WalletTest (BitcoinTestFramework):
 
         # test multiple private key import, and watch only address import
         bal = self.nodes[2].getbalance()
-        addrs = [ self.nodes[1].getnewaddress() for i in range(0,20)]
+        addrs = [ self.nodes[1].getnewaddress() for i in range(0,21)]
         pks   = [ self.nodes[1].dumpprivkey(x) for x in addrs]
         for a in addrs:
             self.nodes[0].sendtoaddress(a, 1)
@@ -363,23 +363,31 @@ class WalletTest (BitcoinTestFramework):
         waitForRescan(self.nodes[2])
         assert(bal + 6 == self.nodes[2].getbalance())
 
-        self.nodes[2].importaddresses(addrs[6], addrs[7])  # import watch only addresses
+        # import 5 addresses each (bug fix check)
+        self.nodes[2].importaddresses(addrs[6], addrs[7], addrs[8], addrs[9], addrs[10])  # import watch only addresses
         waitForRescan(self.nodes[2])
         assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
-        assert(bal + 8 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+        assert(bal + 11 == self.nodes[2].getbalance("*",1,True)) # show the full balance
 
-        self.nodes[2].importaddresses("rescan", addrs[8], addrs[9])  # import watch only addresses
+        self.nodes[2].importaddresses("rescan", addrs[11], addrs[12], addrs[13], addrs[14], addrs[15])  # import watch only addresses
         waitForRescan(self.nodes[2])
         assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
-        assert(bal + 10 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+        assert(bal + 16 == self.nodes[2].getbalance("*",1,True)) # show the full balance
 
-        self.nodes[2].importaddresses("no-rescan", addrs[10], addrs[11])  # import watch only addresses
+        self.nodes[2].importaddresses("no-rescan", addrs[16], addrs[17], addrs[18], addrs[19], addrs[20])  # import watch only addresses
         time.sleep(1)
         assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
-        assert(bal + 10 == self.nodes[2].getbalance("*",1,True)) # show the full balance, will be same because no rescan
+        assert(bal + 16 == self.nodes[2].getbalance("*",1,True)) # show the full balance, will be same because no rescan
         self.nodes[2].importaddresses("rescan") # force a rescan although we imported nothing
         waitForRescan(self.nodes[2])
-        assert(bal + 12 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+        assert(bal + 21 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+
+        # verify that none of the importaddress calls added the address with a label (bug fix check)
+        txns = self.nodes[2].listreceivedbyaddress(0, True, True)
+        for i in range(6,21):
+            assert_array_result(txns,
+                               {"address": addrs[i]},
+                               {"label": ""})
 
         # now try P2SH
         btcAddress = self.nodes[1].getnewaddress()
@@ -401,6 +409,14 @@ class WalletTest (BitcoinTestFramework):
         bal2 = self.nodes[2].getbalance('*', 1, True)
         assert_equal(bal1 + 2, bal2)
 
+        # verify that none of the importaddress calls added the address with a label (bug fix check)
+        txns = self.nodes[2].listreceivedbyaddress(0, True, True)
+        assert_array_result(txns,
+                            {"address": self.nodes[2].getaddressforms(p2shAddress)["bitcoincash"]},
+                            {"label": ""})
+        assert_array_result(txns,
+                            {"address": self.nodes[2].getaddressforms(p2shAddress2)["bitcoincash"]},
+                            {"label": ""})
 
         #check if wallet or blochchain maintenance changes the balance
         self.sync_all()
