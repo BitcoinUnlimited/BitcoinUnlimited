@@ -605,9 +605,9 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
                 inv.hash.ToString(), strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0,
                 pfrom->GetLogName());
 
-            if (IsThinBlocksEnabled())
+            if (strCommand != NetMsgType::GRAPHENEBLOCK)
                 thindata.UpdateValidationTime(nValidationTime);
-            else if (IsGrapheneBlockEnabled())
+            else
                 graphenedata.UpdateValidationTime(nValidationTime);
         }
         else
