@@ -457,9 +457,9 @@ int main(int argc, char **argv)
             if (testname == "list_tests")
             {
                 int idx = 0;
-                for (const auto &ft : registry_seq)
+                for (const auto &ft2 : registry_seq)
                 {
-                    printf("%4d %s\n", idx, ft->name.c_str());
+                    printf("%4d %s\n", idx, ft2->name.c_str());
                     idx++;
                 }
                 return 0;

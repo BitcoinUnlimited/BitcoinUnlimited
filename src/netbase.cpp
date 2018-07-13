@@ -717,8 +717,8 @@ bool ConnectSocketByName(CService &addr,
 
     SplitHostPort(std::string(pszDest), port, strDest);
 
-    proxyType nameProxy;
-    GetNameProxy(nameProxy);
+    proxyType _nameProxy;
+    GetNameProxy(_nameProxy);
 
     CService addrResolved;
     if (Lookup(strDest.c_str(), addrResolved, port, fNameLookup && !HaveNameProxy()))
@@ -734,7 +734,7 @@ bool ConnectSocketByName(CService &addr,
 
     if (!HaveNameProxy())
         return false;
-    return ConnectThroughProxy(nameProxy, strDest, port, hSocketRet, nTimeout, outProxyConnectionFailed);
+    return ConnectThroughProxy(_nameProxy, strDest, port, hSocketRet, nTimeout, outProxyConnectionFailed);
 }
 
 #ifdef WIN32

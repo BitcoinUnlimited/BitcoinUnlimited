@@ -292,10 +292,10 @@ public:
         return *this;
     }
 
-    TestBuilder &Add(const CScript &script)
+    TestBuilder &Add(const CScript &scriptLocal)
     {
         DoPush();
-        spendTx.vin[0].scriptSig += script;
+        spendTx.vin[0].scriptSig += scriptLocal;
         return *this;
     }
 
@@ -1553,10 +1553,10 @@ BOOST_AUTO_TEST_CASE(script_datasigverify)
         stack.clear();
         std::vector<unsigned char> vaddr = ToByteVector(dataSigner.addr);
         vaddr.resize(19);
-        CScript condScript = CScript() << vaddr << OP_DATASIGVERIFY;
+        CScript condScript2 = CScript() << vaddr << OP_DATASIGVERIFY;
         proveScript = CScript() << data << sigtype;
         BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
-        BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(!EvalScript(stack, condScript2, 0, sigChecker, &serror, nullptr));
         BOOST_CHECK(serror == SCRIPT_ERR_INVALID_STACK_OPERATION);
     }
 
@@ -1565,20 +1565,20 @@ BOOST_AUTO_TEST_CASE(script_datasigverify)
         stack.clear();
         std::vector<unsigned char> vaddr = ToByteVector(dataSigner.addr);
         vaddr.push_back(1);
-        CScript condScript = CScript() << vaddr << OP_DATASIGVERIFY;
+        CScript condScript3 = CScript() << vaddr << OP_DATASIGVERIFY;
         proveScript = CScript() << data << sigtype;
         BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
-        BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(!EvalScript(stack, condScript3, 0, sigChecker, &serror, nullptr));
         BOOST_CHECK(serror == SCRIPT_ERR_INVALID_STACK_OPERATION);
     }
 
     // Test wrong stack size
     {
         stack.clear();
-        CScript condScript = CScript() << OP_DATASIGVERIFY;
+        CScript condScript4 = CScript() << OP_DATASIGVERIFY;
         proveScript = CScript() << data << sigtype;
         BOOST_CHECK(EvalScript(stack, proveScript, 0, sigChecker, &serror, nullptr));
-        BOOST_CHECK(!EvalScript(stack, condScript, 0, sigChecker, &serror, nullptr));
+        BOOST_CHECK(!EvalScript(stack, condScript4, 0, sigChecker, &serror, nullptr));
         BOOST_CHECK(serror == SCRIPT_ERR_INVALID_STACK_OPERATION);
     }
 

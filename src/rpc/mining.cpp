@@ -592,9 +592,9 @@ UniValue mkblocktemplate(const UniValue &params, CBlock *pblockOut)
 
     UniValue aRules(UniValue::VARR);
     UniValue vbavailable(UniValue::VOBJ);
-    for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++i)
+    for (int j = 0; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++j)
     {
-        Consensus::DeploymentPos pos = Consensus::DeploymentPos(i);
+        Consensus::DeploymentPos pos = Consensus::DeploymentPos(j);
         ThresholdState state = VersionBitsState(pindexPrev, consensusParams, pos, versionbitscache);
         switch (state)
         {

@@ -54,11 +54,11 @@ public:
     }
 };
 
-CDataStream AddrmanToStream(CAddrManSerializationMock &addrman)
+CDataStream AddrmanToStream(CAddrManSerializationMock &_addrman)
 {
     CDataStream ssPeersIn(SER_DISK, CLIENT_VERSION);
     ssPeersIn << FLATDATA(Params().MessageStart());
-    ssPeersIn << addrman;
+    ssPeersIn << _addrman;
     std::string str = ssPeersIn.str();
     std::vector<uint8_t> vchData(str.begin(), str.end());
     return CDataStream(vchData, SER_DISK, CLIENT_VERSION);

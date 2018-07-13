@@ -114,11 +114,11 @@ UniValue importprivkey(const UniValue &params, bool fHelp)
         strLabel = params[1].get_str();
 
     // Whether to perform rescan after import
-    bool fRescan = true;
+    bool fRescanLocal = true;
     if (params.size() > 2)
         fRescan = params[2].get_bool();
 
-    if (fRescan && fPruneMode)
+    if (fRescanLocal && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
 
     CBitcoinSecret vchSecret;
@@ -150,7 +150,7 @@ UniValue importprivkey(const UniValue &params, bool fHelp)
         // whenever a key is imported, we need to scan the whole chain
         pwalletMain->nTimeFirstKey = 1; // 0 would be considered 'no value'
 
-        if (fRescan)
+        if (fRescanLocal)
         {
             pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true);
         }
@@ -184,16 +184,16 @@ UniValue importprivatekeys(const UniValue &params, bool fHelp)
     EnsureWalletIsUnlocked();
 
     unsigned int paramNum = 0;
-    bool fRescan = true;
+    bool fRescanLocal = true;
 
     if (params[0].get_str() == "no-rescan")
     {
-        fRescan = false;
+        fRescanLocal = false;
         paramNum++;
     }
     else if (params[0].get_str() == "rescan")
     {
-        fRescan = true;
+        fRescanLocal = true;
         paramNum++;
     }
 
@@ -232,7 +232,7 @@ UniValue importprivatekeys(const UniValue &params, bool fHelp)
         }
     }
 
-    if (fRescan)
+    if (fRescanLocal)
     {
         StartWalletRescanThread();
     }
@@ -308,11 +308,11 @@ UniValue importaddress(const UniValue &params, bool fHelp)
         strLabel = params[1].get_str();
 
     // Whether to perform rescan after import
-    bool fRescan = true;
+    bool fRescanLocal = true;
     if (params.size() > 2)
-        fRescan = params[2].get_bool();
+        fRescanLocal = params[2].get_bool();
 
-    if (fRescan && fPruneMode)
+    if (fRescanLocal && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
 
     // Whether to import a p2sh version, too
@@ -342,7 +342,7 @@ UniValue importaddress(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Bitcoin address or script");
     }
 
-    if (fRescan)
+    if (fRescanLocal)
     {
         pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true);
         pwalletMain->ReacceptWalletTransactions();
@@ -379,22 +379,22 @@ UniValue importaddresses(const UniValue &params, bool fHelp)
         strLabel = params[1].get_str();
 
     // Whether to perform rescan after import
-    bool fRescan = true;
+    bool fRescanLocal = true;
 
     unsigned int paramNum = 0;
 
     if (params[0].get_str() == "no-rescan")
     {
-        fRescan = false;
+        fRescanLocal = false;
         paramNum++;
     }
     else if (params[0].get_str() == "rescan")
     {
-        fRescan = true;
+        fRescanLocal = true;
         paramNum++;
     }
 
-    if (fRescan && fPruneMode)
+    if (fRescanLocal && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
@@ -419,7 +419,7 @@ UniValue importaddresses(const UniValue &params, bool fHelp)
         }
     }
 
-    if (fRescan)
+    if (fRescanLocal)
     {
         StartWalletRescanThread();
     }
@@ -565,11 +565,11 @@ UniValue importpubkey(const UniValue &params, bool fHelp)
         strLabel = params[1].get_str();
 
     // Whether to perform rescan after import
-    bool fRescan = true;
+    bool fRescanLocal = true;
     if (params.size() > 2)
-        fRescan = params[2].get_bool();
+        fRescanLocal = params[2].get_bool();
 
-    if (fRescan && fPruneMode)
+    if (fRescanLocal && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
 
     if (!IsHex(params[0].get_str()))
@@ -584,7 +584,7 @@ UniValue importpubkey(const UniValue &params, bool fHelp)
     ImportAddress(pubKey.GetID(), strLabel);
     ImportScript(GetScriptForRawPubKey(pubKey), strLabel, false);
 
-    if (fRescan)
+    if (fRescanLocal)
     {
         pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true);
         pwalletMain->ReacceptWalletTransactions();

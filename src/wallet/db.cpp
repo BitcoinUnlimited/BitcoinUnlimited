@@ -367,13 +367,13 @@ bool CDB::Rewrite(const string &strFile, const char *pszSkip)
                         {
                             CDataStream ssKey(SER_DISK, CLIENT_VERSION);
                             CDataStream ssValue(SER_DISK, CLIENT_VERSION);
-                            int ret = db.ReadAtCursor(pcursor, ssKey, ssValue, DB_NEXT);
-                            if (ret == DB_NOTFOUND)
+                            int ret3 = db.ReadAtCursor(pcursor, ssKey, ssValue, DB_NEXT);
+                            if (ret3 == DB_NOTFOUND)
                             {
                                 pcursor->close();
                                 break;
                             }
-                            else if (ret != 0)
+                            else if (ret3 != 0)
                             {
                                 pcursor->close();
                                 fSuccess = false;

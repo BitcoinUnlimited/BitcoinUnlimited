@@ -107,10 +107,10 @@ BOOST_AUTO_TEST_CASE(util_sharedcriticalsection)
 }
 
 
-void ThreadCorralTest(CThreadCorral *c, int region, int *readVal, int setVal)
+void ThreadCorralTest(CThreadCorral *c, int region, int *pReadVal, int setVal)
 {
     CORRAL(*c, region);
-    *readVal = critVal;
+    *pReadVal = critVal;
     if (setVal != 0)
         critVal = setVal;
 }

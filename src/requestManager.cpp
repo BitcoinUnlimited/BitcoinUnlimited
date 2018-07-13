@@ -532,14 +532,14 @@ void CRequestManager::SendRequests()
 
     // Modify retry interval. If we're doing IBD or if Traffic Shaping is ON we want to have a longer interval because
     // those blocks and txns can take much longer to download.
-    unsigned int blkReqRetryInterval = MIN_BLK_REQUEST_RETRY_INTERVAL;
-    unsigned int txReqRetryInterval = MIN_TX_REQUEST_RETRY_INTERVAL;
+    unsigned int _blkReqRetryInterval = MIN_BLK_REQUEST_RETRY_INTERVAL;
+    unsigned int _txReqRetryInterval = MIN_TX_REQUEST_RETRY_INTERVAL;
     if ((!IsChainNearlySyncd() && Params().NetworkIDString() != "regtest") || IsTrafficShapingEnabled())
     {
-        blkReqRetryInterval *= 6;
+        _blkReqRetryInterval *= 6;
         // we want to optimise block DL during IBD (and give lots of time for shaped nodes) so push the TX retry up to 2
         // minutes (default val of MIN_TX is 5 sec)
-        txReqRetryInterval *= (12 * 2);
+        _txReqRetryInterval *= (12 * 2);
     }
 
     // When we are still doing an initial sync we want to batch request the blocks instead of just
@@ -565,7 +565,7 @@ void CRequestManager::SendRequests()
             break;
 
         // if never requested then lastRequestTime==0 so this will always be true
-        if (now - item.lastRequestTime > blkReqRetryInterval)
+        if (now - item.lastRequestTime > _blkReqRetryInterval)
         {
             if (!item.availableFrom.empty())
             {
@@ -715,7 +715,7 @@ void CRequestManager::SendRequests()
             break;
 
         // if never requested then lastRequestTime==0 so this will always be true
-        if (now - item.lastRequestTime > txReqRetryInterval)
+        if (now - item.lastRequestTime > _txReqRetryInterval)
         {
             if (!item.rateLimited)
             {
@@ -1170,12 +1170,12 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         if (IsChainNearlySyncd())
         {
             LOCK(cs_vNodes);
-            for (CNode *pnode : vNodes)
+            for (CNode *_pnode : vNodes)
             {
-                if (pnode->mapThinBlocksInFlight.size() > 0)
+                if (_pnode->mapThinBlocksInFlight.size() > 0)
                 {
-                    LOCK(pnode->cs_mapthinblocksinflight);
-                    if (pnode->mapThinBlocksInFlight.count(hash))
+                    LOCK(_pnode->cs_mapthinblocksinflight);
+                    if (_pnode->mapThinBlocksInFlight.count(hash))
                     {
                         // Only update thinstats if this is actually a thinblock and not a regular block.
                         // Sometimes we request a thinblock but then revert to requesting a regular block

@@ -436,8 +436,8 @@ set<uint256> CWallet::GetConflicts(const uint256 &txid) const
         if (mapTxSpends.count(txin.prevout) <= 1)
             continue; // No conflict if zero or one spends
         range = mapTxSpends.equal_range(txin.prevout);
-        for (TxSpends::const_iterator it = range.first; it != range.second; ++it)
-            result.insert(it->second);
+        for (TxSpends::const_iterator it2 = range.first; it2 != range.second; ++it2)
+            result.insert(it2->second);
     }
     return result;
 }
@@ -1257,9 +1257,9 @@ int CWalletTx::GetRequestCount() const
                 // How about the block it's in?
                 if (nRequests == 0 && !hashUnset())
                 {
-                    map<uint256, int>::const_iterator mi = pwallet->mapRequestCount.find(hashBlock);
-                    if (mi != pwallet->mapRequestCount.end())
-                        nRequests = (*mi).second;
+                    map<uint256, int>::const_iterator mi2 = pwallet->mapRequestCount.find(hashBlock);
+                    if (mi2 != pwallet->mapRequestCount.end())
+                        nRequests = (*mi2).second;
                     else
                         nRequests = 1; // If it's in someone else's block it must have got out
                 }
@@ -3033,19 +3033,19 @@ set<set<CTxDestination> > CWallet::GetAddressGroupings()
 
     set<set<CTxDestination> *> uniqueGroupings; // a set of pointers to groups of addresses
     map<CTxDestination, set<CTxDestination> *> setmap; // map addresses to the unique group containing it
-    for (set<CTxDestination> grouping : groupings)
+    for (set<CTxDestination> grouping2 : groupings)
     {
         // make a set of all the groups hit by this new group
         set<set<CTxDestination> *> hits;
         map<CTxDestination, set<CTxDestination> *>::iterator it;
-        for (CTxDestination address : grouping)
+        for (CTxDestination address : grouping2)
         {
             if ((it = setmap.find(address)) != setmap.end())
                 hits.insert((*it).second);
         }
 
         // merge all hit groups into a new single group and delete old groups
-        set<CTxDestination> *merged = new set<CTxDestination>(grouping);
+        set<CTxDestination> *merged = new set<CTxDestination>(grouping2);
         for (set<CTxDestination> *hit : hits)
         {
             merged->insert(hit->begin(), hit->end());
