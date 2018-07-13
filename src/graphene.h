@@ -253,12 +253,9 @@ public:
 extern CGrapheneBlockData graphenedata; // Singleton class
 
 
-bool HaveConnectGrapheneNodes();
 bool HaveGrapheneNodes();
 bool IsGrapheneBlockEnabled();
 bool CanGrapheneBlockBeDownloaded(CNode *pto);
-void ConnectToGrapheneBlockNodes();
-void CheckNodeSupportForGrapheneBlocks();
 bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom);
 void ClearGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash);
 void AddGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash);

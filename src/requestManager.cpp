@@ -436,7 +436,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
     // Ask for Graphene blocks
     if (IsGrapheneBlockEnabled() && IsChainNearlySyncd())
     {
-        if (HaveConnectGrapheneNodes() || (HaveGrapheneNodes() && graphenedata.CheckGrapheneBlockTimer(obj.hash)))
+        if (HaveGrapheneNodes() && graphenedata.CheckGrapheneBlockTimer(obj.hash))
         {
             // Must download a graphene block from a graphene enabled peer.
             // We can only request one graphene block per peer at a time.

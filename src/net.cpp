@@ -1758,11 +1758,8 @@ void ThreadOpenConnections()
     // Connect to all "connect-thinblock" peers
     ConnectToThinBlockNodes();
 
-    // Connect to all "connect-graphene" peers
-    ConnectToGrapheneBlockNodes();
-
-    // NOTE: If we are in the block above, then no seeding should occur as "-connect", "-connect-thinblock"
-    // and "connect-graphene" are intended as "only make outbound connections to the configured nodes".
+    // NOTE: If we are in the block above, then no seeding should occur as "-connect" and "-connect-thinblock"
+    // are intended as "only make outbound connections to the configured nodes".
 
     // Initiate network connections
     int64_t nStart = GetTime();

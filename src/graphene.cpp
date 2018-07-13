@@ -1244,60 +1244,6 @@ void CGrapheneBlockData::DeleteGrapheneBlockBytes(uint64_t bytes, CNode *pfrom)
 
 void CGrapheneBlockData::ResetGrapheneBlockBytes() { nGrapheneBlockBytes.store(0); }
 uint64_t CGrapheneBlockData::GetGrapheneBlockBytes() { return nGrapheneBlockBytes.load(); }
-bool HaveConnectGrapheneNodes()
-{
-    // Strip the port from then list of all the current in and outbound ip addresses
-    std::vector<std::string> vNodesIP;
-    {
-        LOCK(cs_vNodes);
-        for (const CNode *pnode : vNodes)
-        {
-            int pos = pnode->addrName.rfind(":");
-            if (pos <= 0)
-                vNodesIP.push_back(pnode->addrName);
-            else
-                vNodesIP.push_back(pnode->addrName.substr(0, pos));
-        }
-    }
-
-    // Create a set used to check for cross connected nodes.
-    // A cross connected node is one where we have a connect-graphene connection to
-    // but we also have another inbound connection which is also using
-    // connect-graphene. In those cases we have created a dead-lock where no blocks
-    // can be downloaded unless we also have at least one additional connect-graphene
-    // connection to a different node.
-    std::set<std::string> nNotCrossConnected;
-
-    int nConnectionsOpen = 0;
-    for (const std::string &strAddrNode : mapMultiArgs["-connect-graphene"])
-    {
-        std::string strGrapheneNode;
-        int pos = strAddrNode.rfind(":");
-        if (pos <= 0)
-            strGrapheneNode = strAddrNode;
-        else
-            strGrapheneNode = strAddrNode.substr(0, pos);
-        for (const std::string &strAddr : vNodesIP)
-        {
-            if (strAddr == strGrapheneNode)
-            {
-                nConnectionsOpen++;
-                if (!nNotCrossConnected.count(strAddr))
-                    nNotCrossConnected.insert(strAddr);
-                else
-                    nNotCrossConnected.erase(strAddr);
-            }
-        }
-    }
-    if (nNotCrossConnected.size() > 0)
-        return true;
-    else if (nConnectionsOpen > 0)
-        LOG(GRAPHENE, "You have a cross connected graphene block node - we may download regular blocks until you "
-                      "resolve the issue\n");
-
-    return false; // Connections are either not open or they are cross connected.
-}
-
 
 bool HaveGrapheneNodes()
 {
@@ -1314,60 +1260,10 @@ bool HaveGrapheneNodes()
 bool IsGrapheneBlockEnabled() { return GetBoolArg("-use-grapheneblocks", false); }
 bool CanGrapheneBlockBeDownloaded(CNode *pto)
 {
-    if (pto->GrapheneCapable() && !GetBoolArg("-connect-graphene-force", false))
+    if (pto->GrapheneCapable())
         return true;
-    else if (pto->GrapheneCapable() && GetBoolArg("-connect-graphene-force", false))
-    {
-        // If connect-graphene-force is true then we have to check that this node is in fact a connect-graphene node.
-
-        // When -connect-graphene-force is true we will only download graphene blocks from a peer or peers that
-        // are using -connect-graphene=<ip>.  This is an undocumented setting used for setting up performance testing
-        // of graphene blocks, such as, going over the GFC and needing to have graphene blocks always come from the same
-        // peer or group of peers.  Also, this is a one way street.  Graphene blocks will flow ONLY from the remote peer
-        // to the peer that has invoked -connect-graphene.
-
-        // Check if this node is also a connect-graphene node
-        for (const std::string &strAddrNode : mapMultiArgs["-connect-graphene"])
-            if (pto->addrName == strAddrNode)
-                return true;
-    }
 
     return false;
-}
-
-void ConnectToGrapheneBlockNodes()
-{
-    // Connect to specific addresses
-    if (mapArgs.count("-connect-graphene") && mapMultiArgs["-connect-graphene"].size() > 0)
-    {
-        for (const std::string &strAddr : mapMultiArgs["-connect-graphene"])
-        {
-            CAddress addr;
-            // NOTE: Because the only nodes we are connecting to here are the ones the user put in their
-            //      bitcoin.conf/commandline args as "-connect-graphene", we don't use the semaphore to limit outbound
-            //      connections
-            OpenNetworkConnection(addr, false, nullptr, strAddr.c_str());
-            MilliSleep(500);
-        }
-    }
-}
-
-void CheckNodeSupportForGrapheneBlocks()
-{
-    if (IsGrapheneBlockEnabled())
-    {
-        // Check that a nodes pointed to with connect-graphene actually supports graphene blocks
-        for (const std::string &strAddr : mapMultiArgs["-connect-graphene"])
-        {
-            CNodeRef node = FindNodeRef(strAddr);
-            if (node && !node->GrapheneCapable())
-            {
-                LOGA("ERROR: You are trying to use connect-graphene but to a node that does not support it "
-                     "- Protocol Version: %d peer=%s\n",
-                    node->nVersion, node->GetLogName());
-            }
-        }
-    }
 }
 
 bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom)

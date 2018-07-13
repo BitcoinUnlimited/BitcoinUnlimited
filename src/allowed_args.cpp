@@ -303,9 +303,6 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
             _("Connect to a thinblock node(s). Blocks will only be downloaded from a thinblock peer.  If no "
               "connections "
               "are possible then regular blocks will then be downloaded form any other connected peers"))
-        .addArg("connect-graphene=<ip:port>", requiredStr,
-            _("Connect to graphene node(s). Blocks will only be downloaded from a graphene capable peer.  If no "
-              "connections are possible then regular blocks will then be downloaded form any other connected peers"))
         .addArg("discover", optionalBool,
             _("Discover own IP addresses (default: 1 when listening and no -externalip or -proxy)"))
         .addArg("dns", optionalBool, _("Allow DNS lookups for -addnode, -seednode and -connect") + " " +
@@ -545,8 +542,6 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
                          DEFAULT_PRINTPRIORITY))
         .addDebugArg("connect-thinblock-force", optionalBool,
             strprintf("Force download of thinblocks from connect-thinblock peers (default: %u)", false))
-        .addDebugArg("connect-graphene-force", optionalBool,
-            strprintf("Force download of graphene blocks from connect-graphene peers (default: %u)", false))
 #ifdef ENABLE_WALLET
         .addDebugArg("privdb", optionalBool,
             strprintf("Sets the DB_PRIVATE flag in the wallet db environment (default: %u)", DEFAULT_WALLET_PRIVDB))
