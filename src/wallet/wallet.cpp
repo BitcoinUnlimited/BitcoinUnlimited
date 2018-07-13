@@ -1895,7 +1895,6 @@ void CWallet::AvailableCoins(vector<COutput> &vCoins,
             for (unsigned int i = 0; i < pcoin->vout.size(); i++)
             {
                 isminetype mine = IsMine(pcoin->vout[i]);
-                LOGA("Freeze Available %s MINE=%s\n ", pcoin->vout[i].ToString(), mine);
                 if (!(IsSpent(wtxid, i)) && mine != ISMINE_NO && !IsLockedCoin((*it).first, i) &&
                     (pcoin->vout[i].nValue > 0 || fIncludeZeroValue) &&
                     (!coinControl || !coinControl->HasSelected() || coinControl->fAllowOtherInputs ||
@@ -1906,6 +1905,7 @@ void CWallet::AvailableCoins(vector<COutput> &vCoins,
                         ((mine & ISMINE_SPENDABLE) != ISMINE_NO) || (coinControl && coinControl->fAllowWatchOnly &&
                                                                         (mine & ISMINE_WATCH_SOLVABLE) != ISMINE_NO));
                     vCoins.push_back(outpoint);
+                    LOG(SELECTCOINS, "Freeze Available %s MINE=%s\n ", pcoin->vout[i].ToString(), mine);
                 }
             }
         }
