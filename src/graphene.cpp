@@ -787,7 +787,7 @@ void CGrapheneBlockData::UpdateInBound(uint64_t nGrapheneBlockSize, uint64_t nOr
     // Update InBound graphene block tracking information
     nOriginalSize += nOriginalBlockSize;
     nGrapheneSize += nGrapheneBlockSize;
-    nBlocks += 1;
+    nInBoundBlocks += 1;
     updateStats(mapGrapheneBlocksInBound, std::pair<uint64_t, uint64_t>(nGrapheneBlockSize, nOriginalBlockSize));
 }
 
@@ -796,7 +796,7 @@ void CGrapheneBlockData::UpdateOutBound(uint64_t nGrapheneBlockSize, uint64_t nO
     LOCK(cs_graphenestats);
     nOriginalSize += nOriginalBlockSize;
     nGrapheneSize += nGrapheneBlockSize;
-    nBlocks += 1;
+    nOutBoundBlocks += 1;
     updateStats(mapGrapheneBlocksOutBound, std::pair<uint64_t, uint64_t>(nGrapheneBlockSize, nOriginalBlockSize));
 }
 
@@ -886,8 +886,8 @@ std::string CGrapheneBlockData::ToString()
     LOCK(cs_graphenestats);
     double size = double(nOriginalSize() - nGrapheneSize() - nTotalMemPoolInfoBytes());
     std::ostringstream ss;
-    ss << nBlocks() << " graphene " << ((nBlocks() > 1) ? "blocks have" : "block has") << " saved "
-       << formatInfoUnit(size) << " of bandwidth with " << nDecodeFailures() << " decode "
+    ss << nInBoundBlocks() << " inbound and " << nOutBoundBlocks() << " outbound graphene blocks have saved "
+       << formatInfoUnit(size) << " of bandwidth with " << nDecodeFailures() << " local decode "
        << ((nDecodeFailures() == 1) ? "failure" : "failures");
 
     return ss.str();
@@ -1202,7 +1202,8 @@ void CGrapheneBlockData::ClearGrapheneBlockStats()
 
     nOriginalSize.Clear();
     nGrapheneSize.Clear();
-    nBlocks.Clear();
+    nInBoundBlocks.Clear();
+    nOutBoundBlocks.Clear();
     nDecodeFailures.Clear();
     nMempoolLimiterBytesSaved.Clear();
     nTotalMemPoolInfoBytes.Clear();
