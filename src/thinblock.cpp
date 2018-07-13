@@ -1298,11 +1298,25 @@ std::string CThinBlockData::FullTxToString()
 // announcement from an XTHIN node then we just download a full block instead of an xthin.
 bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
 {
+    // Base time used to calculate the random timeout value.
+    static int64_t nTimeToWait = 10000;
+
     LOCK(cs_mapThinBlockTimer);
     if (!mapThinBlockTimer.count(hash))
     {
-        mapThinBlockTimer[hash] = GetTimeMillis();
-        LOG(THIN, "Starting Preferential Thinblock timer\n");
+        // The timeout limit is a random number betwee 8 and 12 seconds.
+        // This way a node connected to this one may download the block
+        // before the other node and thus be able to serve the other with
+        // a graphene block, rather than both nodes timing out and downloading
+        // a thinblock instead. This can happen at the margins of the BU network
+        // where we receive full blocks from peers that don't support graphene.
+        //
+        // To make the timeout random we adjust the start time of the timer forward
+        // or backward by a random amount plus or minus 2 seconds.
+        FastRandomContext insecure_rand(false);
+        uint64_t nOffset = nTimeToWait - (8000 + (insecure_rand.rand64() % 4000) + 1);
+        mapThinBlockTimer[hash] = GetTimeMillis() + nOffset;
+        LOG(THIN, "Starting Preferential Thinblock timer (%d millis)\n", nTimeToWait + nOffset);
     }
     else
     {
@@ -1310,7 +1324,7 @@ bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
         // If we have then we want to return false so that we can
         // proceed to download a regular block instead.
         uint64_t elapsed = GetTimeMillis() - mapThinBlockTimer[hash];
-        if (elapsed > 10000)
+        if (elapsed > nTimeToWait)
         {
             LOG(THIN, "Preferential Thinblock timer exceeded - downloading regular block instead\n");
             return false;
