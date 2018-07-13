@@ -474,7 +474,6 @@ static UniValue GetGrapheneStats()
     if (enabled)
     {
         obj.push_back(Pair("summary", graphenedata.ToString()));
-        obj.push_back(Pair("mempool_limiter", graphenedata.MempoolLimiterBytesSavedToString()));
         obj.push_back(Pair("inbound_percent", graphenedata.InBoundPercentToString()));
         obj.push_back(Pair("outbound_percent", graphenedata.OutBoundPercentToString()));
         obj.push_back(Pair("response_time", graphenedata.ResponseTimeToString()));

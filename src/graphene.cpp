@@ -875,12 +875,6 @@ void CGrapheneBlockData::UpdateInBoundReRequestedTx(int nReRequestedTx)
     updateStats(mapGrapheneBlocksInBoundReRequestedTx, nReRequestedTx);
 }
 
-void CGrapheneBlockData::UpdateMempoolLimiterBytesSaved(unsigned int nBytesSaved)
-{
-    LOCK(cs_graphenestats);
-    nMempoolLimiterBytesSaved += nBytesSaved;
-}
-
 std::string CGrapheneBlockData::ToString()
 {
     LOCK(cs_graphenestats);
@@ -1121,15 +1115,6 @@ std::string CGrapheneBlockData::ReRequestedTxToString()
     return ss.str();
 }
 
-std::string CGrapheneBlockData::MempoolLimiterBytesSavedToString()
-{
-    LOCK(cs_graphenestats);
-    double size = (double)nMempoolLimiterBytesSaved();
-    std::ostringstream ss;
-    ss << "Graphene block mempool limiting has saved " << formatInfoUnit(size) << " of bandwidth";
-    return ss.str();
-}
-
 // Preferential Graphene Block Timer:
 // The purpose of the timer is to ensure that we more often download an GRAPHENEBLOCK rather than a full block.
 // The timer is started when we receive the first announcement indicating there is a new block to download.  If the
@@ -1219,7 +1204,6 @@ void CGrapheneBlockData::ClearGrapheneBlockStats()
     nInBoundBlocks.Clear();
     nOutBoundBlocks.Clear();
     nDecodeFailures.Clear();
-    nMempoolLimiterBytesSaved.Clear();
     nTotalMemPoolInfoBytes.Clear();
     nTotalFilterBytes.Clear();
     nTotalIbltBytes.Clear();

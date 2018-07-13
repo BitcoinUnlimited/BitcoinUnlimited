@@ -165,7 +165,6 @@ private:
     CStatHistory<uint64_t> nInBoundBlocks;
     CStatHistory<uint64_t> nOutBoundBlocks;
     CStatHistory<uint64_t> nDecodeFailures;
-    CStatHistory<uint64_t> nMempoolLimiterBytesSaved;
     CStatHistory<uint64_t> nTotalMemPoolInfoBytes;
     CStatHistory<uint64_t> nTotalFilterBytes;
     CStatHistory<uint64_t> nTotalIbltBytes;
@@ -222,7 +221,6 @@ public:
     void UpdateResponseTime(double nResponseTime);
     void UpdateValidationTime(double nValidationTime);
     void UpdateInBoundReRequestedTx(int nReRequestedTx);
-    void UpdateMempoolLimiterBytesSaved(unsigned int nBytesSaved);
     std::string ToString();
     std::string InBoundPercentToString();
     std::string OutBoundPercentToString();
@@ -236,7 +234,6 @@ public:
     std::string ResponseTimeToString();
     std::string ValidationTimeToString();
     std::string ReRequestedTxToString();
-    std::string MempoolLimiterBytesSavedToString();
 
     bool CheckGrapheneBlockTimer(const uint256 &hash);
     void ClearGrapheneBlockTimer(const uint256 &hash);
