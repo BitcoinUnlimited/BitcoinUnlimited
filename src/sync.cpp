@@ -14,7 +14,7 @@
 #include <boost/thread.hpp>
 
 #ifdef DEBUG_LOCKCONTENTION
-void PrintLockContention(const char *pszName, const char *pszFile, int nLine)
+void PrintLockContention(const char *pszName, const char *pszFile, unsigned int nLine)
 {
     LOGA("LOCKCONTENTION: %s\n", pszName);
     LOGA("Locker: %s:%d\n", pszFile, nLine);
@@ -52,7 +52,7 @@ uint64_t getTid(void)
 
 // BU move to sync.h because I need to create these in globals.cpp
 // struct CLockLocation {
-CLockLocation::CLockLocation(const char *pszName, const char *pszFile, int nLine, bool fTryIn)
+CLockLocation::CLockLocation(const char *pszName, const char *pszFile, unsigned int nLine, bool fTryIn)
 {
     mutexName = pszName;
     sourceFile = pszFile;
@@ -179,7 +179,7 @@ static void pop_lock()
     dd_mutex.unlock();
 }
 
-void EnterCritical(const char *pszName, const char *pszFile, int nLine, void *cs, bool fTry)
+void EnterCritical(const char *pszName, const char *pszFile, unsigned int nLine, void *cs, bool fTry)
 {
     push_lock(cs, CLockLocation(pszName, pszFile, nLine, fTry), fTry);
 }
@@ -210,7 +210,7 @@ std::string LocksHeld()
     return result;
 }
 
-void AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs)
+void AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs)
 {
     BOOST_FOREACH (const PAIRTYPE(void *, CLockLocation) & i, *lockstack)
         if (i.first == cs)
@@ -220,7 +220,7 @@ void AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine,
     abort();
 }
 
-void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs)
+void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs)
 {
     for (const std::pair<void *, CLockLocation> &i : *lockstack)
     {
@@ -233,7 +233,10 @@ void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, int nLi
     }
 }
 
-void AssertWriteLockHeldInternal(const char *pszName, const char *pszFile, int nLine, CSharedCriticalSection *cs)
+void AssertWriteLockHeldInternal(const char *pszName,
+    const char *pszFile,
+    unsigned int nLine,
+    CSharedCriticalSection *cs)
 {
     if (cs->try_lock()) // It would be better to check that this thread has the lock
     {

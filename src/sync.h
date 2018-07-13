@@ -183,25 +183,34 @@ typedef boost::condition_variable CConditionVariable;
 typedef boost::condition_variable_any CCond;
 
 #ifdef DEBUG_LOCKORDER
-void EnterCritical(const char *pszName, const char *pszFile, int nLine, void *cs, bool fTry = false);
+void EnterCritical(const char *pszName, const char *pszFile, unsigned int nLine, void *cs, bool fTry = false);
 void LeaveCritical();
 // BU if a CCriticalSection is allocated on the heap we need to clean it from the lockorder map upon destruction because
 // another CCriticalSection could be created on top of it.
 void DeleteCritical(const void *cs);
 std::string LocksHeld();
 /** Asserts in debug builds if a critical section is not held. */
-void AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs);
-void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs);
+void AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs);
+void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs);
 /** Asserts in debug builds if a shared critical section is not exclusively held. */
-void AssertWriteLockHeldInternal(const char *pszName, const char *pszFile, int nLine, CSharedCriticalSection *cs);
+void AssertWriteLockHeldInternal(const char *pszName,
+    const char *pszFile,
+    unsigned int nLine,
+    CSharedCriticalSection *cs);
 #else
-void static inline EnterCritical(const char *pszName, const char *pszFile, int nLine, void *cs, bool fTry = false) {}
+void static inline EnterCritical(const char *pszName,
+    const char *pszFile,
+    unsigned int nLine,
+    void *cs,
+    bool fTry = false)
+{
+}
 void static inline LeaveCritical() {}
-void static inline AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs) {}
-void static inline AssertLockNotHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs) {}
+void static inline AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs) {}
+void static inline AssertLockNotHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs) {}
 void static inline AssertWriteLockHeldInternal(const char *pszName,
     const char *pszFile,
-    int nLine,
+    unsigned int nLine,
     CSharedCriticalSection *cs)
 {
 }
@@ -211,7 +220,7 @@ void static inline AssertWriteLockHeldInternal(const char *pszName,
 #define AssertWriteLockHeld(cs) AssertWriteLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
 
 #ifdef DEBUG_LOCKCONTENTION
-void PrintLockContention(const char *pszName, const char *pszFile, int nLine);
+void PrintLockContention(const char *pszName, const char *pszFile, unsigned int nLine);
 #endif
 
 #define LOCK_WARN_TIME (500ULL * 1000ULL * 1000ULL)
@@ -229,9 +238,9 @@ private:
 #endif
     const char *name = "unknown-name";
     const char *file = "unknown-file";
-    int line = 0;
+    unsigned int line = 0;
 
-    void Enter(const char *pszName, const char *pszFile, int nLine)
+    void Enter(const char *pszName, const char *pszFile, unsigned int nLine)
     {
 #ifdef DEBUG_LOCKTIME
         uint64_t startWait = GetStopwatch();
@@ -259,7 +268,7 @@ private:
 #endif
     }
 
-    bool TryEnter(const char *pszName, const char *pszFile, int nLine)
+    bool TryEnter(const char *pszName, const char *pszFile, unsigned int nLine)
     {
         name = pszName;
         file = pszFile;
@@ -281,7 +290,7 @@ private:
     }
 
 public:
-    CMutexLock(Mutex &mutexIn, const char *pszName, const char *pszFile, int nLine, bool fTry = false)
+    CMutexLock(Mutex &mutexIn, const char *pszName, const char *pszFile, unsigned int nLine, bool fTry = false)
         EXCLUSIVE_LOCK_FUNCTION(mutexIn)
         : lock(mutexIn, boost::defer_lock)
     {
@@ -291,7 +300,7 @@ public:
             Enter(pszName, pszFile, nLine);
     }
 
-    CMutexLock(Mutex *pmutexIn, const char *pszName, const char *pszFile, int nLine, bool fTry = false)
+    CMutexLock(Mutex *pmutexIn, const char *pszName, const char *pszFile, unsigned int nLine, bool fTry = false)
         EXCLUSIVE_LOCK_FUNCTION(pmutexIn)
     {
         if (!pmutexIn)
@@ -331,9 +340,9 @@ private:
     uint64_t lockedTime = 0;
     const char *name = "unknown-name";
     const char *file = "unknown-file";
-    int line = 0;
+    unsigned int line = 0;
 
-    void Enter(const char *pszName, const char *pszFile, int nLine)
+    void Enter(const char *pszName, const char *pszFile, unsigned int nLine)
     {
 #ifdef DEBUG_LOCKTIME
         uint64_t startWait = GetStopwatch();
@@ -362,7 +371,7 @@ private:
 #endif
     }
 
-    bool TryEnter(const char *pszName, const char *pszFile, int nLine)
+    bool TryEnter(const char *pszName, const char *pszFile, unsigned int nLine)
     {
         name = pszName;
         file = pszFile;
@@ -383,7 +392,7 @@ private:
     }
 
 public:
-    CMutexReadLock(Mutex &mutexIn, const char *pszName, const char *pszFile, int nLine, bool fTry = false)
+    CMutexReadLock(Mutex &mutexIn, const char *pszName, const char *pszFile, unsigned int nLine, bool fTry = false)
         SHARED_LOCK_FUNCTION(mutexIn)
         : lock(mutexIn, boost::defer_lock)
     {
@@ -393,7 +402,7 @@ public:
             Enter(pszName, pszFile, nLine);
     }
 
-    CMutexReadLock(Mutex *pmutexIn, const char *pszName, const char *pszFile, int nLine, bool fTry = false)
+    CMutexReadLock(Mutex *pmutexIn, const char *pszName, const char *pszFile, unsigned int nLine, bool fTry = false)
         SHARED_LOCK_FUNCTION(pmutexIn)
     {
         if (!pmutexIn)
@@ -547,7 +556,7 @@ public:
 // BU move from sync.c because I need to create these in globals.cpp
 struct CLockLocation
 {
-    CLockLocation(const char *pszName, const char *pszFile, int nLine, bool fTryIn);
+    CLockLocation(const char *pszName, const char *pszFile, unsigned int nLine, bool fTryIn);
     std::string ToString() const;
     std::string MutexName() const;
 
@@ -556,7 +565,7 @@ struct CLockLocation
 private:
     std::string mutexName;
     std::string sourceFile;
-    int sourceLine;
+    unsigned int sourceLine;
 };
 
 typedef std::vector<std::pair<void *, CLockLocation> > LockStack;
