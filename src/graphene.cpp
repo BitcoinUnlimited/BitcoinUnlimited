@@ -347,7 +347,9 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
 
         CValidationState state;
         CBlockIndex *pIndex = nullptr;
-        if (!AcceptBlockHeader(grapheneBlock.header, state, Params(), &pIndex))
+        bool isWeak = false;
+
+        if (!AcceptBlockHeader(grapheneBlock.header, state, Params(), &pIndex, &isWeak))
         {
             int nDoS;
             if (state.IsInvalid(nDoS))

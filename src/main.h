@@ -286,7 +286,8 @@ bool AlreadyHaveBlock(const CInv &inv);
 bool AcceptBlockHeader(const CBlockHeader &block,
     CValidationState &state,
     const CChainParams &chainparams,
-    CBlockIndex **ppindex = nullptr);
+    CBlockIndex **ppindex,
+    bool *pWeak);
 
 bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigned int nAddSize);
 
@@ -495,7 +496,10 @@ bool CheckBlock(const CBlock &block,
     bool conservative = false);
 
 /** Context-dependent validity checks */
-bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex *pindexPrev);
+bool ContextualCheckBlockHeader(const CBlockHeader &block,
+    CValidationState &state,
+    CBlockIndex *pindexPrev,
+    bool *pWeak);
 bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIndex *pindexPrev);
 
 /** Check a block is completely valid from start to finish (only works on top of our current best block, with cs_main

@@ -83,7 +83,8 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         }
         CBlockIndex *pprev = mi->second;
         CValidationState state;
-        if (!ContextualCheckBlockHeader(thinBlock.header, state, pprev))
+
+        if (!ContextualCheckBlockHeader(thinBlock.header, state, pprev, nullptr))
         {
             // Thin block does not fit within our blockchain
             dosMan.Misbehaving(pfrom, 100);
@@ -574,7 +575,8 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
 
         CValidationState state;
         CBlockIndex *pIndex = nullptr;
-        if (!AcceptBlockHeader(thinBlock.header, state, Params(), &pIndex))
+
+        if (!AcceptBlockHeader(thinBlock.header, state, Params(), &pIndex, nullptr))
         {
             int nDoS;
             if (state.IsInvalid(nDoS))

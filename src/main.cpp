@@ -50,6 +50,7 @@
 #include "utilstrencodings.h"
 #include "validationinterface.h"
 #include "versionbits.h"
+#include "weakblock.h"
 
 #include <algorithm>
 #include <boost/algorithm/hex.hpp>
@@ -3339,9 +3340,16 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
 
 bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state, bool fCheckPOW)
 {
-    // Check proof of work matches claimed amount
-    if (fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus(), 1))
-        return state.DoS(50, error("CheckBlockHeader(): proof of work failed"), REJECT_INVALID, "high-hash");
+    {
+        LOCK(cs_weakblocks);
+        // Check proof of work matches claimed amount
+        if (fCheckPOW &&
+            !CheckProofOfWork(block.GetHash(), MinWeakblockProofOfWork(block.nBits), Params().GetConsensus(),
+                weakblocksMinPOWRatio()) &&
+            !CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus(), 1))
+            return state.DoS(50, error("CheckBlockHeader(): proof of work failed"), REJECT_INVALID, "high-hash");
+    }
+
 
     // Check timestamp
     if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)
@@ -3440,10 +3448,23 @@ bool CheckAgainstCheckpoint(unsigned int height, const uint256 &hash, const CCha
     return true;
 }
 
-bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex *const pindexPrev)
+bool ContextualCheckBlockHeader(const CBlockHeader &block,
+    CValidationState &state,
+    CBlockIndex *const pindexPrev,
+    bool *pWeak)
 {
     const Consensus::Params &consensusParams = Params().GetConsensus();
     const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
+
+    if (pWeak != nullptr)
+    {
+        LOCK(cs_weakblocks);
+        const bool hasWeakPOW = CheckProofOfWork(
+            block.GetHash(), MinWeakblockProofOfWork(block.nBits), Params().GetConsensus(), weakblocksMinPOWRatio());
+        const bool hasStrongPOW = CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus(), 1);
+
+        *pWeak = hasWeakPOW && !hasStrongPOW;
+    }
 
     // Check proof of work
     uint32_t expectedNbits = GetNextWorkRequired(pindexPrev, &block, consensusParams);
@@ -3542,12 +3563,17 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
 bool AcceptBlockHeader(const CBlockHeader &block,
     CValidationState &state,
     const CChainParams &chainparams,
-    CBlockIndex **ppindex)
+    CBlockIndex **ppindex,
+    bool *pWeak)
 {
     AssertLockHeld(cs_main);
     // Check for duplicate
     uint256 hash = block.GetHash();
     CBlockIndex *pindex = NULL;
+
+
+    CBlockIndex *pindexPrev = NULL;
+
     if (hash != chainparams.GetConsensus().hashGenesisBlock)
     {
         BlockMap::iterator miSelf = mapBlockIndex.find(hash);
@@ -3568,7 +3594,6 @@ bool AcceptBlockHeader(const CBlockHeader &block,
             return false;
 
         // Get prev block index
-        CBlockIndex *pindexPrev = NULL;
         BlockMap::iterator mi = mapBlockIndex.find(block.hashPrevBlock);
         if (mi == mapBlockIndex.end())
             return state.DoS(10, error("%s: previous block %s not found while accepting %s", __func__,
@@ -3586,11 +3611,22 @@ bool AcceptBlockHeader(const CBlockHeader &block,
         if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindexPrev->nHeight, *pindexPrev->phashBlock, chainparams))
             return error("%s: CheckAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
 
-        if (!ContextualCheckBlockHeader(block, state, pindexPrev))
+        if (!ContextualCheckBlockHeader(block, state, pindexPrev, pWeak))
             return false;
     }
     if (pindex == NULL)
-        pindex = AddToBlockIndex(block);
+    {
+        if (pWeak != nullptr && *pWeak)
+        {
+            LOG(WB, "Block is weak.\n");
+            return true; // do not add weak block to index, just keep in the structures of weakblock.cpp
+        }
+        else
+        {
+            LOG(WB, "Block is strong.\n");
+            pindex = AddToBlockIndex(block);
+        }
+    }
 
     // If the block belongs to the set of check-pointed blocks but it has a mismatched hash,
     // then we are on the wrong fork so ignore
@@ -3618,7 +3654,7 @@ static bool AcceptBlock(const CBlock &block,
 
     CBlockIndex *&pindex = *ppindex;
 
-    if (!AcceptBlockHeader(block, state, chainparams, &pindex))
+    if (!AcceptBlockHeader(block, state, chainparams, &pindex, nullptr))
     {
         return false;
     }
@@ -3838,7 +3874,8 @@ bool TestBlockValidity(CValidationState &state,
     indexDummy.nHeight = pindexPrev->nHeight + 1;
 
     // NOTE: CheckBlockHeader is called by CheckBlock
-    if (!ContextualCheckBlockHeader(block, state, pindexPrev))
+
+    if (!ContextualCheckBlockHeader(block, state, pindexPrev, nullptr))
         return false;
     if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot))
         return false;
@@ -5894,7 +5931,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         for (const CBlockHeader &header : headers)
         {
             CValidationState state;
-            if (!AcceptBlockHeader(header, state, chainparams, &pindexLast))
+
+            bool isWeak = false;
+
+            if (!AcceptBlockHeader(header, state, chainparams, &pindexLast, &isWeak))
             {
                 int nDos;
                 if (state.IsInvalid(nDos))
