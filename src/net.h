@@ -576,6 +576,7 @@ public:
         return false;
     }
 
+    bool WeakblocksCapable() { return nServices & NODE_WEAKBLOCKS; }
     void AddAddressKnown(const CAddress &_addr) { addrKnown.insert(_addr.GetKey()); }
     void PushAddress(const CAddress &_addr, FastRandomContext &insecure_rand)
     {
