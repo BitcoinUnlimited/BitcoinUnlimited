@@ -5091,17 +5091,15 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             boost::this_thread::interruption_point();
             it++;
 
-            // BUIP010 Xtreme Thinblocks: if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK ||
-                inv.type == MSG_XTHINBLOCK || inv.type == MSG_GRAPHENEBLOCK)
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
             {
-                bool send = false;
+                bool fSend = false;
                 BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
                 if (mi != mapBlockIndex.end())
                 {
                     if (chainActive.Contains(mi->second))
                     {
-                        send = true;
+                        fSend = true;
                     }
                     else
                     {
@@ -5109,11 +5107,11 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         // To prevent fingerprinting attacks, only send blocks outside of the active
                         // chain if they are valid, and no more than a month older (both in time, and in
                         // best equivalent proof of work) than the best header chain we know about.
-                        send = mi->second->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
+                        fSend = mi->second->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
                                (pindexBestHeader->GetBlockTime() - mi->second->GetBlockTime() < nOneMonth) &&
                                (GetBlockProofEquivalentTime(
                                     *pindexBestHeader, *mi->second, *pindexBestHeader, consensusParams) < nOneMonth);
-                        if (!send)
+                        if (!fSend)
                         {
                             LOGA("%s: ignoring request from peer=%i for old block that isn't in the main chain\n",
                                 __func__, pfrom->GetId());
@@ -5121,8 +5119,8 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         else
                         { // BU: don't relay excessive blocks
                             if (mi->second->nStatus & BLOCK_EXCESSIVE)
-                                send = false;
-                            if (!send)
+                                fSend = false;
+                            if (!fSend)
                                 LOGA("%s: ignoring request from peer=%i for excessive block of height %d not on "
                                      "the main chain\n",
                                     __func__, pfrom->GetId(), mi->second->nHeight);
@@ -5134,7 +5132,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 // disconnect node in case we have reached the outbound limit for serving historical blocks
                 // never disconnect whitelisted nodes
                 static const int nOneWeek = 7 * 24 * 60 * 60; // assume > 1 week = historical
-                if (send && CNode::OutboundTargetReached(true) &&
+                if (fSend && CNode::OutboundTargetReached(true) &&
                     (((pindexBestHeader != NULL) &&
                          (pindexBestHeader->GetBlockTime() - mi->second->GetBlockTime() > nOneWeek)) ||
                         inv.type == MSG_FILTERED_BLOCK) &&
@@ -5144,11 +5142,11 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
 
                     // disconnect node
                     pfrom->fDisconnect = true;
-                    send = false;
+                    fSend = false;
                 }
                 // Pruned nodes may have deleted the block, so check whether
                 // it's available before trying to send.
-                if (send && (mi->second->nStatus & BLOCK_HAVE_DATA))
+                if (fSend && (mi->second->nStatus & BLOCK_HAVE_DATA))
                 {
                     // Send block from disk
                     CBlock block;
@@ -5166,23 +5164,6 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                             pfrom->blocksSent += 1;
                             pfrom->PushMessage(NetMsgType::BLOCK, block);
                         }
-
-                        // BUIP010 Xtreme Thinblocks: begin section
-                        else if (inv.type == MSG_THINBLOCK || inv.type == MSG_XTHINBLOCK)
-                        {
-                            LOG(THIN, "Sending xthin by INV queue getdata message\n");
-                            SendXThinBlock(MakeBlockRef(block), pfrom, inv);
-                        }
-                        // BUIP010 Xtreme Thinblocks: end section
-
-                        // BUIPXXX Graphene blocks: begin section
-                        else if (inv.type == MSG_GRAPHENEBLOCK)
-                        {
-                            LOG(GRAPHENE, "Sending graphene block by INV queue getdata message\n");
-                            SendGrapheneBlock(MakeBlockRef(block), pfrom, inv);
-                        }
-                        // BUIPXXX Graphene blocks: end section
-
                         else // MSG_FILTERED_BLOCK)
                         {
                             LOCK(pfrom->cs_filter);
@@ -5227,7 +5208,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             else if (inv.IsKnownType())
             {
                 // Send stream from relay memory
-                bool pushed = false;
+                bool fPushed = false;
                 {
                     CDataStream cd(0, 0);
                     if (1)
@@ -5239,15 +5220,15 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         if (mi != mapRelay.end())
                         {
                             cd = (*mi).second; // I have to copy, because .second may be deleted once lock is released
-                            pushed = true;
+                            fPushed = true;
                         }
                     }
-                    if (pushed)
+                    if (fPushed)
                     {
                         pfrom->PushMessage(inv.GetCommand(), cd);
                     }
                 }
-                if (!pushed && inv.type == MSG_TX)
+                if (!fPushed && inv.type == MSG_TX)
                 {
                     CTxMemPoolEntry txe;
                     if (mempool.lookup(inv.hash, txe))
@@ -5259,12 +5240,12 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                             ss.reserve(1000);
                             ss << txe.GetTx();
                             pfrom->PushMessage(NetMsgType::TX, ss);
-                            pushed = true;
+                            fPushed = true;
                             pfrom->txsSent += 1;
                         }
                     }
                 }
-                if (!pushed)
+                if (!fPushed)
                 {
                     vNotFound.push_back(inv);
                 }
@@ -5277,8 +5258,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             // priority messages and we don't want to sit here processing a large number of messages
             // while we hold the cs_main lock, but rather allow these messages to be sent first and
             // process the return message before potentially reading from the queue again.
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK ||
-                inv.type == MSG_XTHINBLOCK || inv.type == MSG_GRAPHENEBLOCK)
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
                 break;
         }
     }
