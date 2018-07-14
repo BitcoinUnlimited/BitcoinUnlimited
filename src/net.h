@@ -396,8 +396,11 @@ public:
     uint64_t nLocalThinBlockBytes; // the bytes used in creating this thinblock, updated dynamically
     int nSizeThinBlock; // Original on-wire size of the block. Just used for reporting
     int thinBlockWaitingForTxns; // if -1 then not currently waiting
-    CCriticalSection cs_mapthinblocksinflight; // lock mapThinBlocksInFlight
-    std::map<uint256, CThinBlockInFlight> mapThinBlocksInFlight; // thin blocks in flight and the time requested.
+
+    // thin blocks in flight and the time they were requested.
+    CCriticalSection cs_mapthinblocksinflight;
+    std::map<uint256, CThinBlockInFlight> mapThinBlocksInFlight GUARDED_BY(cs_mapthinblocksinflight);
+
     double nGetXBlockTxCount; // Count how many get_xblocktx requests are made
     uint64_t nGetXBlockTxLastTime; // The last time a get_xblocktx request was made
     double nGetXthinCount; // Count how many get_xthin requests are made
@@ -417,9 +420,11 @@ public:
     int grapheneBlockWaitingForTxns; // if -1 then not currently waiting
     CCriticalSection cs_grapheneadditionaltxs; // lock grapheneAdditionalTxs
     std::vector<CTransactionRef> grapheneAdditionalTxs; // entire transactions included in graphene block
-    CCriticalSection cs_mapgrapheneblocksinflight; // lock mapGraheneBlocksInFlight
-    std::map<uint256, CGrapheneBlockInFlight>
-        mapGrapheneBlocksInFlight; // graphene blocks in flight and the time requested.
+
+    // graphene blocks in flight and the time they were requested.
+    CCriticalSection cs_mapgrapheneblocksinflight;
+    std::map<uint256, CGrapheneBlockInFlight> mapGrapheneBlocksInFlight GUARDED_BY(cs_mapgrapheneblocksinflight);
+
     double nGetGrapheneBlockTxCount; // Count how many get_xblocktx requests are made
     uint64_t nGetGrapheneBlockTxLastTime; // The last time a get_xblocktx request was made
     double nGetGrapheneCount; // Count how many get_graphene requests are made

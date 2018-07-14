@@ -1251,21 +1251,32 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
 
         if (IsChainNearlySyncd())
         {
+            // Update the appropriate response time based on the type of block received.
             LOCK(cs_vNodes);
             for (CNode *_pnode : vNodes)
             {
-                if (_pnode->mapThinBlocksInFlight.size() > 0)
+                // Update Thinblock stats 
+                if (IsThinBlocksEnabled())
                 {
                     LOCK(_pnode->cs_mapthinblocksinflight);
                     if (_pnode->mapThinBlocksInFlight.count(hash))
                     {
-                        // Only update thinstats if this is actually a thinblock and not a regular block.
-                        // Sometimes we request a thinblock but then revert to requesting a regular block
-                        // as can happen when the thinblock preferential timer is exceeded.
                         thindata.UpdateResponseTime(nResponseTime);
                         break;
                     }
                 }
+
+                // Update Graphene stats 
+                if (IsGrapheneBlockEnabled())
+                {
+                    LOCK(_pnode->cs_mapgrapheneblocksinflight);
+                    if (_pnode->mapGrapheneBlocksInFlight.count(hash))
+                    {
+                        graphenedata.UpdateResponseTime(nResponseTime);
+                        break;
+                    }
+                }
+
             }
         }
 
