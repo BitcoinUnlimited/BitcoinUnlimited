@@ -579,7 +579,7 @@ UniValue clearblockstats(const UniValue &params, bool fHelp)
 
     if (IsThinBlocksEnabled())
         thindata.ClearThinBlockStats();
-    else if (IsGrapheneBlockEnabled())
+    if (IsGrapheneBlockEnabled())
         graphenedata.ClearGrapheneBlockStats();
 
     return NullUniValue;
