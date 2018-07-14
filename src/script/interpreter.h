@@ -103,10 +103,9 @@ enum
     // https:
     SCRIPT_ENABLE_REPLAY_PROTECTION = (1U << 17),
 
-    // Enable new opcodes.
-    // Another placeholder, we used it during May '18 upgrade activation, but sincemay '18 got
-    // activated  there's no need to use it anymore
-    SCRIPT_ENABLE_MAY152018_OPCODES = (1U << 18),
+    // Is OP_CHECKDATASIG and variant are enabled.
+    //
+    SCRIPT_ENABLE_CHECKDATASIG = (1U << 18),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);
