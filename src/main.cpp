@@ -3642,7 +3642,8 @@ bool AcceptBlockHeader(const CBlockHeader &block,
     return true;
 }
 
-/** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
+/** Store block on disk (resp in memory in case of a weak block). If
+ * dbp is non-NULL, the file is known to already reside on disk */
 static bool AcceptBlock(const CBlock &block,
     CValidationState &state,
     const CChainParams &chainparams,
@@ -3654,10 +3655,64 @@ static bool AcceptBlock(const CBlock &block,
 
     CBlockIndex *&pindex = *ppindex;
 
-    if (!AcceptBlockHeader(block, state, chainparams, &pindex, nullptr))
+    bool isWeak = false;
+    if (!AcceptBlockHeader(block, state, chainparams, &pindex, &isWeak))
     {
         return false;
     }
+
+    // special handling of weak blocks
+    if (isWeak)
+    {
+        {
+            LOCK(cs_weakblocks);
+            if (!weakblocksEnabled())
+            {
+                return state.DoS(10,
+                    error("%s: Received weakblocks though weakblocks are disabled. Ignoring.\n", __func__), 0,
+                    "wb-disabled");
+                // FIXME: ban?
+                return true;
+            }
+
+            if (!CheckProofOfWork(block.GetHash(), ConsiderationWeakblockProofOfWork(block.nBits),
+                    Params().GetConsensus(), weakblocksConsiderPOWRatio()))
+            {
+                LOG(WB, "Weakblock %s is below consideration threshold. Ignoring.\n", block.GetHash().GetHex());
+                return true;
+            }
+        }
+        // Get prev block index
+        BlockMap::iterator mi = mapBlockIndex.find(block.hashPrevBlock);
+        if (mi == mapBlockIndex.end())
+            return state.DoS(10, error("%s: previous block %s not found while accepting weak block header %s", __func__,
+                                     block.hashPrevBlock.ToString(), block.GetHash().ToString()),
+                0, "bad-prevblk");
+        CBlockIndex *pindexPrev = mi->second;
+
+        if ((!CheckBlock(block, state)) || !ContextualCheckBlock(block, state, pindexPrev))
+        {
+            // FIXME: cache weak block validation results?
+            return false;
+        }
+
+        if (storeWeakblock(block))
+        {
+            // FIXME: Send out here?
+        }
+        else
+            LOG(WB, "Problem storing weakblock %s. Ignoring.\n", block.GetHash().GetHex());
+
+        // and done - don't store this weakBlock in any of the indices etc.
+        return true;
+    }
+    else
+    {
+        // strong block came in - discard weak ones coming before the last strong block
+        LOG(WB, "Strong block came in - discarding old weak blocks.\n");
+        purgeOldWeakblocks();
+    }
+
 
     LOG(PARALLEL, "Check Block %s with chain work %s block height %d\n", pindex->phashBlock->ToString(),
         pindex->nChainWork.ToString(), pindex->nHeight);
