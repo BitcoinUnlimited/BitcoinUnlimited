@@ -1299,21 +1299,13 @@ void AddGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash)
         std::pair<uint256, CNode::CGrapheneBlockInFlight>(hash, CNode::CGrapheneBlockInFlight()));
 }
 
-void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv)
+void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CMemPoolInfo &mempoolinfo)
 {
-    int64_t nReceiverMemPoolTx = pfrom->nGrapheneMemPoolTx;
-
-    // Use the size of your own mempool if receiver did not send hers
-    if (nReceiverMemPoolTx == -1)
-    {
-        nReceiverMemPoolTx = mempool.size();
-    }
-
     if (inv.type == MSG_GRAPHENEBLOCK)
     {
         try
         {
-            CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), nReceiverMemPoolTx);
+            CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx);
             int nSizeBlock = ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION);
             int nSizeGrapheneBlock = ::GetSerializeSize(grapheneBlock, SER_NETWORK, PROTOCOL_VERSION);
 
@@ -1404,15 +1396,10 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
         }
     }
 
-    CMemPoolInfo receiverMemPoolInfo;
+    CMemPoolInfo mempoolinfo;
     CInv inv;
-    vRecv >> inv >> receiverMemPoolInfo;
-    graphenedata.UpdateInBoundMemPoolInfo(::GetSerializeSize(receiverMemPoolInfo, SER_NETWORK, PROTOCOL_VERSION));
-
-    {
-        LOCK(pfrom->cs_ngraphenemempooltx);
-        pfrom->nGrapheneMemPoolTx = receiverMemPoolInfo.nTx;
-    }
+    vRecv >> inv >> mempoolinfo;
+    graphenedata.UpdateInBoundMemPoolInfo(::GetSerializeSize(mempoolinfo, SER_NETWORK, PROTOCOL_VERSION));
 
     // Message consistency checking
     if (!(inv.type == MSG_GRAPHENEBLOCK) || inv.hash.IsNull())
@@ -1440,7 +1427,7 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
                 inv.hash.ToString());
         }
         else
-            SendGrapheneBlock(MakeBlockRef(block), pfrom, inv);
+            SendGrapheneBlock(MakeBlockRef(block), pfrom, inv, mempoolinfo);
     }
 
     return true;

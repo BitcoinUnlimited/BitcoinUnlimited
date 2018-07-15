@@ -2951,7 +2951,6 @@ CNode::~CNode()
     // BUIPXXX - Graphene blocks - begin section
     mapGrapheneBlocksInFlight.clear();
     grapheneBlockWaitingForTxns = -1;
-    nGrapheneMemPoolTx = -1;
     grapheneBlock.SetNull();
 
     fSuccessfullyConnected = false;

@@ -256,7 +256,7 @@ bool CanGrapheneBlockBeDownloaded(CNode *pto);
 bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom);
 void ClearGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash);
 void AddGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash);
-void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv);
+void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CMemPoolInfo &mempoolinfo);
 bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header);
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);
 CMemPoolInfo GetGrapheneMempoolInfo();
