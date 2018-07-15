@@ -478,8 +478,6 @@ static UniValue GetGrapheneStats()
         obj.push_back(Pair("outbound_percent", graphenedata.OutBoundPercentToString()));
         obj.push_back(Pair("response_time", graphenedata.ResponseTimeToString()));
         obj.push_back(Pair("validation_time", graphenedata.ValidationTimeToString()));
-        obj.push_back(Pair("outbound_mempool_info", graphenedata.OutBoundMemPoolInfoToString()));
-        obj.push_back(Pair("inbound_mempool_info", graphenedata.InBoundMemPoolInfoToString()));
         obj.push_back(Pair("filter", graphenedata.FilterToString()));
         obj.push_back(Pair("iblt", graphenedata.IbltToString()));
         obj.push_back(Pair("rank", graphenedata.RankToString()));
