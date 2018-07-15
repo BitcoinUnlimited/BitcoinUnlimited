@@ -1306,12 +1306,11 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
         try
         {
             CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx);
-            int nSizeBlock = ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION);
+            int nSizeBlock = pblock->GetBlockSize();
             int nSizeGrapheneBlock = ::GetSerializeSize(grapheneBlock, SER_NETWORK, PROTOCOL_VERSION);
 
-            if (nSizeGrapheneBlock + MIN_MEMPOOL_INFO_BYTES >
-                nSizeBlock) // If graphene block is larger than a regular block then
-            // send a regular block instead
+            // If graphene block is larger than a regular block then send a regular block instead
+            if (nSizeGrapheneBlock > nSizeBlock)
             {
                 pfrom->PushMessage(NetMsgType::BLOCK, *pblock);
                 LOG(GRAPHENE, "Sent regular block instead - graphene block size: %d vs block size: %d => peer: %s\n",
