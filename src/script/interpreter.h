@@ -209,4 +209,6 @@ bool VerifyScript(const CScript &scriptSig,
 // that the signature was intended for use on this blockchain.
 extern const std::string strMessageMagic;
 
+bool CheckPubKeyEncoding(const std::vector<uint8_t> &vchSig, unsigned int flags, ScriptError *serror);
+
 #endif // BITCOIN_SCRIPT_INTERPRETER_H
