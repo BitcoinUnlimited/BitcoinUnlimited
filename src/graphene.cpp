@@ -1433,13 +1433,6 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
 }
 
 CMemPoolInfo GetGrapheneMempoolInfo() { return CMemPoolInfo(mempool.size()); }
-uint256 GetSalt(unsigned char seed)
-{
-    std::vector<unsigned char> vec(32);
-    vec[0] = seed;
-    return uint256(vec);
-}
-
 void RequestFailoverBlock(CNode *pfrom, uint256 blockHash)
 {
     if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable())
