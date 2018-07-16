@@ -14,6 +14,7 @@
 #include "util.h"
 
 #include <cmath>
+#include <numeric>
 
 #define LN2SQUARED 0.4804530139182014246671025263266649717305529515945455
 
