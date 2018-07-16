@@ -17,7 +17,6 @@ NUM_PROCS = multiprocessing.cpu_count()
 BEGIN_EPOCH = datetime(year=1970, month=1, day=1)
 CURRENT_SECS = (datetime.now() - BEGIN_EPOCH).total_seconds()
 OUT_FILE = '/tmp/compare_block_compression_%d.csv' % CURRENT_SECS
-MEMPOOL_INFO_SIZE = 8
 
 
 # running main will force system exit otherwise
@@ -155,7 +154,7 @@ class BlockTest(BitcoinTestFramework):
 
         if self.block_type == 'graphene':
             self.stats['block_size'] = self.extract_bytes(self.extract_stats(self.nodes[0])['graphene_block_size'])
-            self.stats['mempool_info_size'] = MEMPOOL_INFO_SIZE
+            self.stats['mempool_info_size'] = self.extract_bytes(self.extract_stats(self.nodes[0])['inbound_mempool_info'])
             self.stats['rank'] = self.extract_bytes(self.extract_stats(self.nodes[0])['rank'])
             self.stats['filter'] = self.extract_bytes(self.extract_stats(self.nodes[0])['filter'])
             self.stats['iblt'] = self.extract_bytes(self.extract_stats(self.nodes[0])['iblt'])
