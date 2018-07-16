@@ -3696,7 +3696,7 @@ static bool AcceptBlock(const CBlock &block,
             return false;
         }
 
-        if (storeWeakblock(block))
+        if (weakstore.store(&block))
         {
             // FIXME: Send out here?
         }
@@ -3710,7 +3710,7 @@ static bool AcceptBlock(const CBlock &block,
     {
         // strong block came in - discard weak ones coming before the last strong block
         LOG(WB, "Strong block came in - discarding old weak blocks.\n");
-        purgeOldWeakblocks();
+        weakstore.expireOld();
     }
 
 
