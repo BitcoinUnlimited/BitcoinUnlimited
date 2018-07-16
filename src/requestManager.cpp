@@ -1255,7 +1255,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
             LOCK(cs_vNodes);
             for (CNode *_pnode : vNodes)
             {
-                // Update Thinblock stats 
+                // Update Thinblock stats
                 if (IsThinBlocksEnabled())
                 {
                     LOCK(_pnode->cs_mapthinblocksinflight);
@@ -1266,7 +1266,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                     }
                 }
 
-                // Update Graphene stats 
+                // Update Graphene stats
                 if (IsGrapheneBlockEnabled())
                 {
                     LOCK(_pnode->cs_mapgrapheneblocksinflight);
@@ -1276,7 +1276,6 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                         break;
                     }
                 }
-
             }
         }
 
