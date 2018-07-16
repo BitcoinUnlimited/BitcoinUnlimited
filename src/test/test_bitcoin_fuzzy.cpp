@@ -12,6 +12,7 @@
 #include "coins.h"
 #include "compressor.h"
 #include "consensus/merkle.h"
+#include "graphene.h"
 #include "net.h"
 #include "primitives/block.h"
 #include "protocol.h"
@@ -431,6 +432,12 @@ int main(int argc, char **argv)
     FuzzVerifyScript fuzz_verifyscript;
 
     FuzzTester fuzz_tester;
+
+    FuzzDeserNet<CMemPoolInfo> fuzz_cmempoolinfo("cmempoolinfo");
+    FuzzDeserNet<CGrapheneBlock> fuzz_grapheneblock("cgrapheneblock");
+    FuzzDeserNet<CGrapheneBlockTx> fuzz_grapheneblocktx("cgrapheneblocktx");
+    FuzzDeserNet<CRequestGrapheneBlockTx> fuzz_requestgrapheneblocktx("crequestgrapheneblocktx");
+    FuzzDeserNet<CGrapheneSet> fuzz_grapheneset("cgrapheneset");
 
     // command line arguments can be used to constrain more and
     // more specifically to a particular test
