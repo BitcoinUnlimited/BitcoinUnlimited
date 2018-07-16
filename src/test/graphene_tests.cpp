@@ -100,7 +100,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_decodes_multiple_sizes)
 
 BOOST_AUTO_TEST_CASE(graphene_set_finds_optimal_settings)
 {
-    const int SERIALIZATION_OVERHEAD = 10;
+    const int SERIALIZATION_OVERHEAD = 11;
     FastRandomContext insecure_rand(true);
     CGrapheneSet grapheneSet;
 
