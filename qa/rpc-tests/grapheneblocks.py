@@ -9,21 +9,18 @@ from test_framework.util import *
 
 
 class GrapheneBlockTest(BitcoinTestFramework):
-    expected_stats = {"enabled",
-                      "summary",
-                      "mempool_limiter",
-                      "inbound_percent",
-                      "outbound_percent",
-                      "response_time",
-                      "validation_time",
-                      "outbound_mempool_info",
-                      "inbound_mempool_info",
-                      "filter",
-                      "iblt",
-                      "rank",
-                      "graphene_block_size",
-                      "graphene_additional_tx_size",
-                      "rerequested"}
+    expected_stats = {'enabled', 
+                      'filter', 
+                      'graphene_additional_tx_size', 
+                      'graphene_block_size', 
+                      'iblt', 
+                      'inbound_percent', 
+                      'outbound_percent', 
+                      'rank', 
+                      'rerequested', 
+                      'response_time', 
+                      'summary', 
+                      'validation_time'}
     def __init__(self):
         self.rep = False
         BitcoinTestFramework.__init__(self)
