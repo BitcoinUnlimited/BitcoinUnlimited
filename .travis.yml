@@ -42,7 +42,7 @@ matrix:
         - CXXFLAGS="-std=c++11"
         - HOST=x86_64-unknown-linux-gnu
         - RUN_TESTS=false
-        - PACKAGES="python3-zmq clang-format-3.8 build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils libboost-all-dev qtbase5-dev protobuf-compiler qttools5-dev-tools qttools5-dev"
+        - PACKAGES="python3-zmq libzmq3-dev clang-format-3.8 build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils libboost-all-dev qtbase5-dev protobuf-compiler qttools5-dev-tools qttools5-dev"
         - GOAL="install" BITCOIN_CONFIG="--enable-zmq --with-gui=qt5 CC=clang-5.0 CXX=clang++-5.0 CPPFLAGS=-DDEBUG_LOCKORDER"
     #bitcoind
     - compiler: gcc
