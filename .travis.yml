@@ -119,6 +119,7 @@ script:
     - echo "BITCOIN_CONFIG=$BITCOIN_CONFIG"
     - echo "GOAL=$GOAL"
     - ../configure $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG > configure.out || ( cat configure.out && cat config.log && false)
+    - if [ "$USE_CLANG" = "true" ]; then cat config.log; fi
     - if [ "$RUN_FORMATTING_CHECK" = "true" ]; then make $MAKEJOBS check-formatting VERBOSE=1; fi
     - if [ "$USE_CLANG" = "false" ]; then
         stdbuf -i0 -o0 -e0 make $MAKEJOBS $GOAL 2>&1 | ../contrib/devtools/buildsilence.py || ( echo "Build failure. Verbose build follows." && make $GOAL V=1 ; false ) ;
