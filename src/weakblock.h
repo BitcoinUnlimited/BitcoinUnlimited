@@ -16,6 +16,11 @@
 const uint32_t DEFAULT_WEAKBLOCKS_CONSIDER_POW_RATIO=4;
 const bool DEFAULT_WEAKBLOCKS_ENABLE=true;
 
+// BU tweaks enable and config for weak blocks
+// instantiated in globals.cpp
+extern CTweak<uint32_t> wbConsiderPOWratio;
+extern CTweak<bool> wbEnable;
+
 //! protects all of the above data structures
 extern CCriticalSection cs_weakblocks;
 

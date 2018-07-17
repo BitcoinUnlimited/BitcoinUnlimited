@@ -13,9 +13,6 @@
 
 //#define DEBUG_DETAIL 1
 
-// BU tweaks enable and config for weak blocks
-extern CTweak<uint32_t> wbConsiderPOWratio;
-extern CTweak<uint32_t> wbEnable;
 
 static const uint32_t WB_MIN_POW_RATIO = 600;
 
