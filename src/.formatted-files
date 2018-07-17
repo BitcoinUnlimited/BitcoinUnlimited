@@ -70,6 +70,7 @@ httpserver.cpp
 httpserver.h
 iblt.cpp
 iblt.h
+iblt_params.h
 init.cpp
 init.h
 key.cpp
