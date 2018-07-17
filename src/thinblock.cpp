@@ -25,7 +25,7 @@
 #include "util.h"
 #include "utiltime.h"
 
-static bool DEFAULT_BLOOM_FILTER_TARGETING = false;
+static bool DEFAULT_BLOOM_FILTER_TARGETING = true;
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
 
 CThinBlock::CThinBlock(const CBlock &block, CBloomFilter &filter)
@@ -1624,12 +1624,13 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
     std::set<uint256> setPriorityMemPoolHashes;
 
     // When bloom filter targeting is turned on we try to limit the number of hashes we add to the bloom
-    // filter by approximately determinig which transasctions are most likely to be mined in the next block.
+    // filter by approximately determining which transasctions are most likely to be mined in the next block.
     //
     // This helps to keep the size of the bloom filter down to a minimum however it also incurrs a small
-    // performance hit and therefore it is turned off by default. This feature would become important to use
-    // again if in the future, if for instance, the mempool was continously full.
-    if (GetBoolArg("-use-bloom-filter-targeting", DEFAULT_BLOOM_FILTER_TARGETING))
+    // performance hit and therefore it is not done unless the memepool size is larger than the excessive
+    // block size, since there is no benefit to targeting if the blocks are likely big enough to clear the mempool.
+    if (GetBoolArg("-use-bloom-filter-targeting", DEFAULT_BLOOM_FILTER_TARGETING) &&
+        excessiveBlockSize < mempool.GetTotalTxSize())
     {
         // How much of the block should be dedicated to high-priority transactions.
         // Logically this should be the same size as the DEFAULT_BLOCK_PRIORITY_SIZE however,
