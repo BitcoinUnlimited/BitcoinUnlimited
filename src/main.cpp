@@ -1731,11 +1731,11 @@ int32_t ComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Para
     LOCK(cs_main);
     int32_t nVersion = VERSIONBITS_TOP_BITS;
 
-    for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++)
+    for (int i = 0; i < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++)
     {
         // bip135 begin
         // guard this because not all deployments have window/threshold
-        if (isConfiguredDeployment(params, i))
+        if (IsConfiguredDeployment(params, i))
         {
             ThresholdState state = VersionBitsState(pindexPrev, params, (Consensus::DeploymentPos)i, versionbitscache);
             // activate the bits that are STARTED or LOCKED_IN according to their deployments
@@ -1753,7 +1753,7 @@ int32_t ComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Para
 // bip135 : removed WarningBitsConditionChecker - no longer needed
 
 // Protected by cs_main
-static ThresholdConditionCache warningcache[VERSIONBITS_NUM_BITS];
+static ThresholdConditionCache warningcache[Consensus::MAX_VERSION_BITS_DEPLOYMENTS];
 
 static uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &consensusparams)
 {
@@ -1827,7 +1827,7 @@ struct UnknownForkData
     bool UnknownForkSignalAt95Percent{false};
 };
 
-static UnknownForkData unknownFork[VERSIONBITS_NUM_BITS];
+static UnknownForkData unknownFork[Consensus::MAX_VERSION_BITS_DEPLOYMENTS];
 // bip135 end
 
 static int64_t nTimeCheck = 0;
@@ -2426,9 +2426,9 @@ void static CheckAndAlertUnknownVersionbits(const CChainParams &chainParams, con
     // start unexpected version / new fork signal checks only after BIT_WARNING_WINDOW block height
     if (pindex->nHeight >= BIT_WARNING_WINDOW)
     {
-        for (int bit = 0; bit < VERSIONBITS_NUM_BITS; bit++)
+        for (int bit = 0; bit < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; bit++)
         {
-            if (!isConfiguredDeployment(chainParams.GetConsensus(), bit))
+            if (!IsConfiguredDeployment(chainParams.GetConsensus(), bit))
             {
                 const CBlockIndex *iindex = pindex; // iterating index, reset to chain tip
                 // set count for this bit to 0
@@ -4480,7 +4480,7 @@ void UnloadBlockIndex()
     setDirtyFileInfo.clear();
     mapNodeState.clear();
     versionbitscache.Clear();
-    for (int b = 0; b < VERSIONBITS_NUM_BITS; b++)
+    for (int b = 0; b < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; b++)
     {
         warningcache[b].clear();
     }

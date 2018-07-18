@@ -930,8 +930,16 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     }
     else
     {
-        // be noisy, but don't fail if file is absent - use built-in defaults
-        LOGA("No deployment configuration found at '%s' - using defaults\n", ForksCsvFile);
+        if (strcmp(GetArg("-forks", FORKS_CSV_FILENAME).c_str(), FORKS_CSV_FILENAME) == 0)
+        {
+            // Be noisy, but don't fail if file is absent - use built-in defaults.
+            LOGA("No deployment configuration found at '%s' - using defaults\n", ForksCsvFile);
+        }
+        else
+        {
+            // Fail only when we've configured a file but it doesn't exit.
+            return InitError(strprintf(_("Deployment configuration file '%s' not found"), ForksCsvFile));
+        }
     }
     // bip135 end
 

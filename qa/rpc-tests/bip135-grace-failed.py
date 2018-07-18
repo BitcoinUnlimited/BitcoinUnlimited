@@ -19,7 +19,7 @@ import itertools
 import tempfile
 
 '''
-This test exercises BIP135 fork grace periods.
+This test exercises BIP135 fork grace periods that check the activation timeout.
 It uses a single node with custom forks.csv file.
 
 It is originally derived from bip9-softforks.
@@ -32,7 +32,7 @@ class BIP135ForksTest(ComparisonTestFramework):
         super().__init__()
         self.setup_clean_chain = True
         self.num_nodes = 1
-        self.defined_forks = [ "bip135test%d" % i for i in range(7,22) ]
+        self.defined_forks = [ "bip135test%d" % i for i in range(7,9) ]
 
     def setup_network(self):
         '''
@@ -53,55 +53,17 @@ class BIP135ForksTest(ComparisonTestFramework):
             fh.write(
             "# deployment info for network 'regtest':\n" +
 
-            ########## GRACE PERIOD TESTING BITS (7-21) ############
+            ########## GRACE PERIOD TESTING BITS (7-8) ############
 
-            # bit 7: one minlockedblock
-            "regtest,7,bip135test7,%d,999999999999,10,9,1,0,true\n" % (self.fork_starttime) +
+            # bit 7: Test threshold not reached and timeout exceeded. Should result in failure to activate
+            "regtest,7,bip135test7,%d,%d,10,9,5,0,true\n" % (self.fork_starttime, self.fork_starttime + 50) +
 
-            # bit 8: half a window of minlockedblocks
-            "regtest,8,bip135test8,%d,999999999999,10,9,5,0,true\n" % (self.fork_starttime) +
-
-            # bit 9: full window of minlockedblocks
-            "regtest,9,bip135test9,%d,999999999999,10,9,10,0,true\n" % (self.fork_starttime) +
-
-            # bit 10: just over full window of minlockedblocks
-            "regtest,10,bip135test10,%d,999999999999,10,9,11,0,true\n" % (self.fork_starttime) +
-
-            # bit 11: one second minlockedtime
-            "regtest,11,bip135test11,%d,999999999999,10,9,0,1,true\n" % (self.fork_starttime) +
-
-            # bit 12: half window of minlockedtime
-            "regtest,12,bip135test12,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 5) +
-
-            # bit 13: just under one full window of minlockedtime
-            "regtest,13,bip135test13,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 9) +
-
-            # bit 14: exactly one window of minlockedtime
-            "regtest,14,bip135test14,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 10) +
-
-            # bit 15: just over one window of minlockedtime
-            "regtest,15,bip135test15,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 11) +
-
-            # bit 16: one and a half window of minlockedtime
-            "regtest,16,bip135test16,%d,999999999999,10,9,0,%d,true\n" % (self.fork_starttime, 15) +
-
-            # bit 17: one window of minblockedblocks plus one window of minlockedtime
-            "regtest,17,bip135test17,%d,999999999999,10,9,10,%d,true\n" % (self.fork_starttime, 10) +
-
-            # bit 18: one window of minblockedblocks plus just under two windows of minlockedtime
-            "regtest,18,bip135test18,%d,999999999999,10,9,10,%d,true\n" % (self.fork_starttime, 19) +
-
-            # bit 19: one window of minblockedblocks plus two windows of minlockedtime
-            "regtest,19,bip135test19,%d,999999999999,10,9,10,%d,true\n" % (self.fork_starttime, 20) +
-
-            # bit 20: two windows of minblockedblocks plus two windows of minlockedtime
-            "regtest,20,bip135test20,%d,999999999999,10,9,20,%d,true\n" % (self.fork_starttime, 21) +
-
-            # bit 21: just over two windows of minblockedblocks plus two windows of minlockedtime
-            "regtest,21,bip135test21,%d,999999999999,10,9,21,%d,true\n" % (self.fork_starttime, 20) +
+            # bit 8: Test threshold reached and timeout exceeded. Should result in successful activation
+            "regtest,8,bip135test8,%d,%d,10,8,5,0,true\n" % (self.fork_starttime, self.fork_starttime + 50) +
 
             ########## NOT USED SO FAR ############
-            "regtest,22,bip135test22,%d,999999999999,100,9,0,0,true\n" % (self.fork_starttime)
+            "regtest,9,bip135test9,%d,999999999999,100,9,0,0,true\n" % (self.fork_starttime)
+
             )
 
         self.nodes = start_nodes(1, self.options.tmpdir,
@@ -196,106 +158,53 @@ class BIP135ForksTest(ComparisonTestFramework):
                 else:
                     assert_equal(bcinfo['bip135_forks'][f]['status'], 'defined')
 
-        # lock all of them them in by producing 9 signaling blocks out of 10
-        test_blocks = self.generate_blocks(9, 0x203fff80)
-        # tenth block doesn't need to signal
-        test_blocks = self.generate_blocks(1, 0x20000000, test_blocks)
+        # Lock one of them them in by producing 8 signaling blocks out of 10.
+        # The one that is not locked in will be one block away from lock in.
+        test_blocks = self.generate_blocks(8, 0x203fff80)
+        # last two blocks don't need to signal
+        test_blocks = self.generate_blocks(2, 0x20000000, test_blocks)
         yield TestInstance(test_blocks, sync_every_block=False)
-        # check bits 7-15 , they should all be in LOCKED_IN
+        # check bits 7-8 , only 8 should be LOCKED_IN
         bcinfo = self.nodes[0].getblockchaininfo()
         logging.info("checking all grace period forks are locked in")
-        for f in self.defined_forks:
-            assert_equal(bcinfo['bip135_forks'][f]['status'], 'locked_in')
+        activation_states = [ bcinfo['bip135_forks'][f]['status'] for f in self.defined_forks ]
+        assert_equal(activation_states, ['started',
+                                         'locked_in'
+                                         ])
 
         # now we just check that they turn ACTIVE only when their configured
         # conditions are all met. Reminder: window size is 10 blocks, inter-
         # block time is 1 sec for the synthesized chain.
         #
-        # Grace conditions for the bits 7-21:
+        # Grace conditions for the bits 7-8:
         # -----------------------------------
-        # bit 7:  minlockedblocks= 1, minlockedtime= 0  -> activate next sync
+        # bit 7:  minlockedblocks= 5, minlockedtime= 0  -> started next sync
         # bit 8:  minlockedblocks= 5, minlockedtime= 0  -> activate next sync
-        # bit 9:  minlockedblocks=10, minlockedtime= 0  -> activate next sync
-        # bit 10: minlockedblocks=11, minlockedtime= 0  -> activate next plus one sync
-        # bit 11: minlockedblocks= 0, minlockedtime= 1  -> activate next sync
-        # bit 12: minlockedblocks= 0, minlockedtime= 5  -> activate next sync
-        # bit 13: minlockedblocks= 0, minlockedtime= 9  -> activate next sync
-        # bit 14: minlockedblocks= 0, minlockedtime=10  -> activate next sync
-        # bit 15: minlockedblocks= 0, minlockedtime=11  -> activate next plus one sync
-        # bit 16: minlockedblocks= 0, minlockedtime=15  -> activate next plus one sync
-        # bit 17: minlockedblocks=10, minlockedtime=10  -> activate next sync
-        # bit 18: minlockedblocks=10, minlockedtime=19  -> activate next plus one sync
-        # bit 19: minlockedblocks=10, minlockedtime=20  -> activate next plus one sync
-        # bit 20: minlockedblocks=20, minlockedtime=21  -> activate next plus two sync
-        # bit 21: minlockedblocks=21, minlockedtime=20  -> activate next plus two sync
 
         # check the forks supposed to activate just one period after lock-in ("at next sync")
+        # and move the time to just before timeout. Bit 8 should become active and neither should fail.
+        # Set the last block time to 6 seconds before the timeout...since blocks get mined one second
+        # apart this will put the MTP at 1 second behind the timeout, and thus the activation will not fail.
+        self.last_block_time = self.fork_starttime + 50 - 6
 
         test_blocks = self.generate_blocks(10, 0x20000000)
         yield TestInstance(test_blocks, sync_every_block=False)
         bcinfo = self.nodes[0].getblockchaininfo()
         activation_states = [ bcinfo['bip135_forks'][f]['status'] for f in self.defined_forks ]
-        assert_equal(activation_states, ['active',
-                                         'active',
-                                         'active',
-                                         'locked_in',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'locked_in',
-                                         'locked_in',
-                                         'active',
-                                         'locked_in',
-                                         'locked_in',
-                                         'locked_in',
-                                         'locked_in'
+        assert_equal(activation_states, ['started',
+                                         'active'
                                          ])
 
-        # check the ones supposed to activate at next+1 sync
+
+        # Move the time to the timeout. Bit 7 never locked in and should be 'failed',
+        # whereas, Bit 8 should still be active.
         test_blocks = self.generate_blocks(10, 0x20000000)
         yield TestInstance(test_blocks, sync_every_block=False)
         bcinfo = self.nodes[0].getblockchaininfo()
         activation_states = [ bcinfo['bip135_forks'][f]['status'] for f in self.defined_forks ]
-        assert_equal(activation_states, ['active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'locked_in',
-                                         'locked_in'
+        assert_equal(activation_states, ['failed',
+                                         'active'
                                          ])
-
-        # check the ones supposed to activate at next+2 period
-        test_blocks = self.generate_blocks(10, 0x20000000)
-        yield TestInstance(test_blocks, sync_every_block=False)
-        bcinfo = self.nodes[0].getblockchaininfo()
-        activation_states = [ bcinfo['bip135_forks'][f]['status'] for f in self.defined_forks ]
-        assert_equal(activation_states, ['active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active',
-                                         'active'  # locked_in
-                                         ])
-
 
     def get_tests(self):
         '''

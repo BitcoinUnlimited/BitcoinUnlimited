@@ -14,8 +14,8 @@ struct ForkDeploymentInfo VersionBitsDeploymentInfo[Consensus::MAX_VERSION_BITS_
         /*.gbt_force =*/true,
     },
     {
-        /*.name =*/(char *)"segwit", // bit 1, known, active but not implemented in this client
-        /*.gbt_force =*/true,
+        /*.name =*/(char *)"", // unallocated bit 1
+        /*.gbt_force =*/false,
     },
     {
         /*.name =*/(char *)"", // unallocated bit 2

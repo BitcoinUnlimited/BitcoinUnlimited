@@ -5,6 +5,7 @@
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #
+import test_framework.loginit
 from test_framework.util import sync_blocks
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import *
@@ -120,7 +121,7 @@ class BIP135ForksTest(ComparisonTestFramework):
             self.last_block_time += 1
             self.tip = block.sha256
             self.height += 1
-            #print ("generate_blocks: created block %x on tip %x, height %d, time %d" % (self.tip, old_tip, self.height-1, self.last_block_time))
+            #logging.info ("generate_blocks: created block %x on tip %x, height %d, time %d" % (self.tip, old_tip, self.height-1, self.last_block_time))
         return test_blocks
 
     def get_bip135_status(self, key):
@@ -130,11 +131,11 @@ class BIP135ForksTest(ComparisonTestFramework):
     def print_rpc_status(self):
         for f in self.defined_forks:
             info = self.nodes[0].getblockchaininfo()
-            print(info['bip135_forks'][f])
+            logging.info(info['bip135_forks'][f])
 
     def test_BIP135Thresholds(self):
 
-        print("test_BIP135Thresholds: begin")
+        logging.info("test_BIP135Thresholds: begin")
         node = self.nodes[0]
         self.tip = int("0x" + node.getbestblockhash(), 0)
         header = node.getblockheader("0x%x" % self.tip)
@@ -152,11 +153,11 @@ class BIP135ForksTest(ComparisonTestFramework):
         # Test 2
         # check initial DEFINED state
         # check initial forks status and getblocktemplate
-        print("begin test 2")
+        logging.info("begin test 2")
         tmpl = self.nodes[0].getblocktemplate({})
         assert_equal(tmpl['vbrequired'], 0)
         assert_equal(tmpl['version'], 0x20000000)
-        print("initial getblocktemplate:\n%s" % tmpl)
+        logging.info("initial getblocktemplate:\n%s" % tmpl)
 
         test_blocks = []
         bcinfo = self.nodes[0].getblockchaininfo()
@@ -174,7 +175,7 @@ class BIP135ForksTest(ComparisonTestFramework):
 
         # Test 3
         # Advance from DEFINED to STARTED
-        print("begin test 3")
+        logging.info("begin test 3")
         test_blocks = self.generate_blocks(1, 0x20000001)
         for f in self.defined_forks:
             if int(f[10:]) > 1:
@@ -188,22 +189,22 @@ class BIP135ForksTest(ComparisonTestFramework):
 
         # Test 4
         # Advance from DEFINED to STARTED
-        print("begin test 4")
+        logging.info("begin test 4")
         test_blocks = self.generate_blocks(1, 0x20000001)
         yield TestInstance(test_blocks, sync_every_block=False)
 
         for f in self.defined_forks:
             info = node.getblockchaininfo()
-            print(info['bip135_forks'][f])
+            logging.info(info['bip135_forks'][f])
 
         # Test 5..?
         # Advance from DEFINED to STARTED
-        print("begin test 5 .. x - move to height 144 for bit 0 start")
+        logging.info("begin test 5 .. x - move to height 144 for bit 0 start")
         # we are not yet at height 144, so bit 0 is still defined
         assert_equal(self.get_bip135_status(self.defined_forks[0])['status'], 'defined')
         # move up until it starts
         while self.height < 144:
-            #print("last block time has not reached fork_starttime, difference: %d" % (self.fork_starttime - self.last_block_time))
+            #logging.info("last block time has not reached fork_starttime, difference: %d" % (self.fork_starttime - self.last_block_time))
             test_blocks = self.generate_blocks(1, 0x20000001)
             yield TestInstance(test_blocks, sync_every_block=False)
             if int(f[10:]) > 0:
@@ -270,12 +271,12 @@ class BIP135ForksTest(ComparisonTestFramework):
         # debug trace
         for f in self.defined_forks[2:]:
             info = node.getblockchaininfo()
-            print(info['bip135_forks'][f])
+            logging.info(info['bip135_forks'][f])
             assert_equal(self.get_bip135_status(f)['status'], 'locked_in')
 
         assert_equal(self.get_bip135_status(self.defined_forks[0])['status'], 'started')
         # move until bit 0 locks in
-        print("moving until bit 0 locks in")
+        logging.info("moving until bit 0 locks in")
         one_hundreds_active = False  # to count the 100-block bits 1-6 going active after 100 more
         while self.height % 144 != 0:
             test_blocks = self.generate_blocks(1, 0x20000001)

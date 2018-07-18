@@ -243,6 +243,7 @@ testScriptsExt = [ RpcTest(t) for t in [
     'bipdersig-p2p',
     'bipdersig',
     'bip135-grace',
+    'bip135-grace-failed',
     'bip135-threshold',
     'getblocktemplate_longpoll',
     'getblocktemplate_proposals',

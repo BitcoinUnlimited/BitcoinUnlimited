@@ -507,8 +507,10 @@ void SelectParams(const std::string &network)
  * Unconfigured deployments can be ignored to save processing time, e.g.
  * in ComputeBlockVersion() when computing the default block version to emit.
  */
-bool isConfiguredDeployment(const Consensus::Params &consensusParams, const int bit)
+bool IsConfiguredDeployment(const Consensus::Params &consensusParams, const int bit)
 {
+    DbgAssert(bit >= 0 && bit <= (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS, return false);
+
     const Consensus::ForkDeployment *vdeployments = consensusParams.vDeployments;
     const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[bit];
 
@@ -520,12 +522,11 @@ bool isConfiguredDeployment(const Consensus::Params &consensusParams, const int 
 
 /**
  * Return a string representing CSV-formatted deployments for the network.
- * Only configured deployments satisfying isConfiguredDeployment() are included.
+ * Only configured deployments satisfying IsConfiguredDeployment() are included.
  */
 const std::string NetworkDeploymentInfoCSV(const std::string &network)
 {
     const Consensus::Params &consensusParams = Params(network).GetConsensus();
-    ;
     const Consensus::ForkDeployment *vdeployments = consensusParams.vDeployments;
 
     std::string networkInfoStr;
@@ -534,7 +535,7 @@ const std::string NetworkDeploymentInfoCSV(const std::string &network)
     for (int bit = 0; bit < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; bit++)
     {
         const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[bit];
-        if (isConfiguredDeployment(consensusParams, bit))
+        if (IsConfiguredDeployment(consensusParams, bit))
         {
             networkInfoStr += network + ",";
             networkInfoStr += std::to_string(bit) + ",";

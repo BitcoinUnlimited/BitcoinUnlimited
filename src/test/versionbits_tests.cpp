@@ -285,13 +285,13 @@ BOOST_AUTO_TEST_CASE(versionbits_test)
         // activated soft fork could be later changed to be earlier to avoid
         // overlap.)
         // bip135 begin fix disjointness check
-        if (isConfiguredDeployment(mainnetParams, i))
+        if (IsConfiguredDeployment(mainnetParams, i))
         {
             BOOST_CHECK(mainnetParams.vDeployments[i].nStartTime <= mainnetParams.vDeployments[i].nTimeout);
             for (int j = 0; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; j++)
             {
                 // only check a bit for disjointness if it is in use
-                if (i != j && isConfiguredDeployment(mainnetParams, j) &&
+                if (i != j && IsConfiguredDeployment(mainnetParams, j) &&
                     VersionBitsMask(mainnetParams, (Consensus::DeploymentPos)j) == bitmask)
                 {
                     BOOST_CHECK(mainnetParams.vDeployments[j].nStartTime <= mainnetParams.vDeployments[j].nTimeout);

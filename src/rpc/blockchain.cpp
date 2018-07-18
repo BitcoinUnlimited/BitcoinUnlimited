@@ -806,7 +806,7 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
             "  ],\n"
             "  \"bip9_softforks\": {          (object) status of BIP9 softforks in progress\n"
             "     \"xxxx\" : {                (string) name of the softfork\n"
-            "        \"status\": \"xxxx\",      (string) one of \"defined\", \"started\", \"lockedin\", \"active\", "
+            "        \"status\": \"xxxx\",    (string) one of \"defined\", \"started\", \"lockedin\", \"active\", "
             "\"failed\"\n"
             "        \"bit\": xx,             (numeric) the bit, 0-28, in the block version field used to signal this "
             "soft fork\n"
@@ -862,12 +862,11 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     softforks.push_back(SoftForkDesc("bip66", 3, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip65", 4, tip, consensusParams));
     // bip135 begin : add all the configured forks
-    assert(Consensus::MAX_VERSION_BITS_DEPLOYMENTS <= VERSIONBITS_NUM_BITS);
     for (int i = 0; i < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++)
     {
         Consensus::DeploymentPos bit = static_cast<Consensus::DeploymentPos>(i);
         const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[bit];
-        if (isConfiguredDeployment(consensusParams, bit))
+        if (IsConfiguredDeployment(consensusParams, bit))
         {
             bip9_softforks.push_back(Pair(vbinfo.name, BIP9SoftForkDesc(consensusParams, bit)));
             bip135_forks.push_back(Pair(vbinfo.name, BIP135ForkDesc(consensusParams, bit)));

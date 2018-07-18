@@ -70,7 +70,7 @@ public:
     };
 
     const Consensus::Params &GetConsensus() const { return consensus; }
-    /** Modifiable consensus parameters added by bip135 */
+    /** Modifiable consensus parameters added by bip135, is not threadsafe, only use during initializtion */
     Consensus::Params &GetModifiableConsensus() { return consensus; }
     const CMessageHeader::MessageStartChars &MessageStart() const { return pchMessageStart; }
     const CMessageHeader::MessageStartChars &CashMessageStart() const { return pchCashMessageStart; }
@@ -145,6 +145,8 @@ CBlock CreateGenesisBlock(CScript prefix,
 /**
  * Return the currently selected parameters. Can be changed by reading in
  * some additional config files (e.g. CSV deployment data)
+ *
+ * This can only be used during initialization because modification is not threadsafe
  */
 CChainParams &ModifiableParams();
 
@@ -152,7 +154,7 @@ CChainParams &ModifiableParams();
  * Returns true if a deployment is considered active on a particular network
  */
 
-bool isConfiguredDeployment(const Consensus::Params &consensusParams, const int bit);
+bool IsConfiguredDeployment(const Consensus::Params &consensusParams, const int bit);
 
 /**
  * Dump the fork deployment parameters for the given BIP70 chain name.

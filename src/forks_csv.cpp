@@ -125,7 +125,7 @@ bool ReadForksCsv(string activeNetworkID, istream& csvInput, Consensus::Params& 
             // the rest are validated, but not activated.
             // NOTE: ValidateOverallParams() is stubbed.
             if (network == activeNetworkID && ValidateOverallParams(network)) {
-                assert(bit >= 0 && bit < VERSIONBITS_NUM_BITS);
+                assert(bit >= 0 && bit < Consensus::MAX_VERSION_BITS_DEPLOYMENTS);
                 // update deployment params for current network
                 ForkDeploymentInfo& vbinfo = VersionBitsDeploymentInfo[bit];
 
@@ -190,7 +190,7 @@ bool ValidateGBTForce(const string& gbtforce)
 
 bool ValidateBit(int bit)
 {
-    return (bit >= 0 && bit < VERSIONBITS_NUM_BITS);
+    return (bit >= 0 && bit < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS);
 }
 
 

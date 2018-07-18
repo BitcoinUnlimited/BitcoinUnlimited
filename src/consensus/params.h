@@ -25,8 +25,8 @@ enum DeploymentPos
     // DEPLOYMENT_UNASSIGNED_BIT_x .
     // NOTE: Also add new deployments to VersionBitsDeploymentInfo in versionbits.cpp
     DEPLOYMENT_CSV = 0, // bit 0 - deployment of BIP68, BIP112, and BIP113.
-    DEPLOYMENT_SEGWIT, // bit 1 - Segregated Witness (BIP141, BIP143, BIP144)
     // begin unassigned bits. Rename bits when allocated.
+    DEPLOYMENT_UNASSIGNED_BIT_1,
     DEPLOYMENT_UNASSIGNED_BIT_2,
     DEPLOYMENT_UNASSIGNED_BIT_3,
     DEPLOYMENT_UNASSIGNED_BIT_4,

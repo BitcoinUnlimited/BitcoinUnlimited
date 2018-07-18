@@ -15,8 +15,6 @@ static const int32_t VERSIONBITS_LAST_OLD_BLOCK_VERSION = 4;
 static const int32_t VERSIONBITS_TOP_BITS = 0x20000000UL;
 /** What bitmask determines whether versionbits is in use */
 static const int32_t VERSIONBITS_TOP_MASK = 0xE0000000UL;
-/** Total bits available for versionbits */
-static const int32_t VERSIONBITS_NUM_BITS = 29;
 /** Size of window to use for assessing warning of unknown bits */
 static const int BIT_WARNING_WINDOW = 100;
 /** Threshold to use for assessing warning of unknown bits */

@@ -16,7 +16,7 @@ namespace utf = boost::unit_test;
 
 BOOST_FIXTURE_TEST_SUITE(forkscsv_tests, BasicTestingSetup)
 
-BOOST_AUTO_TEST_CASE(forkscsv_read_test)
+BOOST_AUTO_TEST_CASE(forkscsv_read_and_dumpforks_test)
 {
     CChainParams& params = ModifiableParams();
 
@@ -35,23 +35,13 @@ BOOST_AUTO_TEST_CASE(forkscsv_read_test)
     std::istringstream is_2(
             "# deployment info for network 'main':\n"
             "main,0,csv,1462060800,1493596800,2016,1916,0,0,true\n"
-            "main,1,segwit,1479168000,1510704000,2016,1916,0,0,true\n"
             "main,28,testdummy,1199145601,1230767999,2016,1916,0,0,false\n");
     BOOST_CHECK(ReadForksCsv("main", is_2, params.GetModifiableConsensus()));
-}
 
-/**
- * Test CSV dump of built-in defaults.
- * NOTE: the dump of 'main' data in this test depends on forkscsv_read_test
- * as long as the 'segwit' line is not built-in.
- * That is why an explicit dependency has been declared here.
- */
-BOOST_AUTO_TEST_CASE(forkscsv_dumpforks_test, * utf::depends_on("forkscsv_tests/forkscsv_read_test"))
-{
+    // dump forks testing
     BOOST_CHECK(NetworkDeploymentInfoCSV(CBaseChainParams::MAIN) == std::string(
             "# deployment info for network 'main':\n"
             "main,0,csv,1462060800,1493596800,2016,1916,0,0,true\n"
-            "main,1,segwit,1479168000,1510704000,2016,1916,0,0,true\n"
             "main,28,testdummy,1199145601,1230767999,2016,1916,0,0,false\n"));
 
     BOOST_CHECK(NetworkDeploymentInfoCSV(CBaseChainParams::UNL) == std::string(
@@ -76,10 +66,11 @@ BOOST_AUTO_TEST_CASE(forkscsv_dumpforks_test, * utf::depends_on("forkscsv_tests/
 BOOST_AUTO_TEST_CASE(forkscsv_validation_test)
 {
     // bit number
-    for (int num = 0; num < VERSIONBITS_NUM_BITS; num++) {
+    for (int num = 0; num < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; num++)
+    {
         BOOST_CHECK(ValidateBit(num));
     }
-    BOOST_CHECK(!ValidateBit(VERSIONBITS_NUM_BITS + 1));
+    BOOST_CHECK(!ValidateBit(Consensus::MAX_VERSION_BITS_DEPLOYMENTS + 1));
     BOOST_CHECK(!ValidateBit(-1));
 
     // network name
@@ -104,7 +95,6 @@ BOOST_AUTO_TEST_CASE(forkscsv_validation_test)
     // fork name
     BOOST_CHECK(ValidateForkName("a_fork"));
     BOOST_CHECK(ValidateForkName("a fork"));
-    BOOST_CHECK(ValidateForkName("segwit"));
     BOOST_CHECK(!ValidateForkName(""));
 
     // window size
@@ -141,6 +131,8 @@ BOOST_AUTO_TEST_CASE(forkscsv_validation_test)
 
     // starttime / timeout
     BOOST_CHECK(!ValidateTimes(0, 0));     // starttime must be strictly less than timeout
+    BOOST_CHECK(!ValidateTimes(-1, 100));  // starttime can not be less than zero
+    BOOST_CHECK(!ValidateTimes(1000, 999));// starttime must be strictly less than timeout
     BOOST_CHECK(ValidateTimes(0, 1));      // starttime must be strictly less than timeout
     BOOST_CHECK(ValidateTimes(100, 1001)); // starttime must be strictly less than timeout
     BOOST_CHECK(ValidateTimes(0, 1001));   // starttime must be strictly less than timeout
