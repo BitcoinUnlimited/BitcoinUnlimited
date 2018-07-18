@@ -49,7 +49,7 @@ private:
     uint64_t nBlockTx;
     unsigned int nBlockSigOps;
     CAmount nFees;
-    CTxMemPool::setEntries inBlock;
+    std::set<uint256> inBlock;
 
     // Chain context for the block
     int nHeight;
@@ -72,9 +72,12 @@ private:
     /** Clear the block's state and prepare for assembling a new block */
     void resetBlock(const CScript &scriptPubKeyIn);
     /** Add a tx to the block */
-    void AddToBlock(CBlockTemplate *, CTxMemPool::txiter iter);
+    void AddToBlock(CBlockTemplate *, const CTxMemPoolEntry *iter);
 
     // Methods for how to add transactions to a block.
+    /** Add transactions from latest weak block. Returns the hash
+     (or zero if no weak block has been found to base of off)*/
+    uint256 addFromLatestWeakBlock(CBlockTemplate *);
     /** Add transactions based on modified feerate */
     void addScoreTxs(CBlockTemplate *);
     /** Add transactions based on tx "priority" */
@@ -83,7 +86,7 @@ private:
     // helper function for addScoreTxs and addPriorityTxs
     bool IsIncrementallyGood(uint64_t nExtraSize, unsigned int nExtraSigOps);
     /** Test if tx will still "fit" in the block */
-    bool TestForBlock(CTxMemPool::txiter iter);
+    bool TestForBlock(const CTxMemPoolEntry *iter);
     /** Test if tx still has unconfirmed parents not yet in block */
     bool isStillDependent(CTxMemPool::txiter iter);
     /** Bytes to reserve for coinbase and block header */
@@ -91,7 +94,7 @@ private:
     /** Internal method to construct a new block template */
     std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript &scriptPubKeyIn, bool blockstreamCoreCompatible);
     /** Constructs a coinbase transaction */
-    CTransactionRef coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue);
+    CTransactionRef coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue, const uint256 &weakhash);
 };
 
 /** Modify the extranonce in a block */

@@ -21,6 +21,7 @@
 #include "policy/policy.h"
 #include "pow.h"
 #include "primitives/transaction.h"
+#include "reverselock.h"
 #include "script/standard.h"
 #include "timedata.h"
 #include "txmempool.h"
@@ -29,6 +30,7 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
+#include "weakblock.h"
 
 #include <boost/thread.hpp>
 #include <boost/tuple/tuple.hpp>
@@ -95,6 +97,7 @@ BlockAssembler::BlockAssembler(const CChainParams &_chainparams)
     nBlockMinSize = std::min(nBlockMaxSize, nBlockMinSize);
 }
 
+
 void BlockAssembler::resetBlock(const CScript &scriptPubKeyIn)
 {
     inBlock.clear();
@@ -122,23 +125,40 @@ uint64_t BlockAssembler::reserveBlockSize(const CScript &scriptPubKeyIn)
 
     // This serializes with output value, a fixed-length 8 byte field, of zero and height, a serialized CScript
     // signed integer taking up 4 bytes for heights 32768-8388607 (around the year 2167) after which it will use 5.
-    nCoinbaseSize = ::GetSerializeSize(coinbaseTx(scriptPubKeyIn, 400000, 0), SER_NETWORK, PROTOCOL_VERSION);
+    nCoinbaseSize =
+        ::GetSerializeSize(coinbaseTx(scriptPubKeyIn, 400000, 0,
+                               uint256S("1111111111111111111111111111111111111111111111111111111111111111")),
+            SER_NETWORK, PROTOCOL_VERSION);
 
     // BU Miners take the block we give them, wipe away our coinbase and add their own.
     // So if their reserve choice is bigger then our coinbase then use that.
     return nHeaderSize + std::max(nCoinbaseSize, coinbaseReserve.Value());
 }
 
-CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _nHeight, CAmount nValue)
+CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn,
+    int _nHeight,
+    CAmount nValue,
+    const uint256 &weakhash)
 {
     CMutableTransaction tx;
 
     tx.vin.resize(1);
     tx.vin[0].prevout.SetNull();
-    tx.vout.resize(1);
+
+    tx.vout.resize(weakhash.IsNull() ? 1 : 2);
     tx.vout[0].scriptPubKey = scriptPubKeyIn;
     tx.vout[0].nValue = nValue;
     tx.vin[0].scriptSig = CScript() << _nHeight << OP_0;
+
+    if (!weakhash.IsNull())
+    {
+        tx.vout[1].nValue = 0;
+        tx.vout[1].scriptPubKey = CScript() << OP_RETURN;
+        tx.vout[1].scriptPubKey.push_back(0x22); // size byte
+        tx.vout[1].scriptPubKey.push_back('W'); // marker
+        tx.vout[1].scriptPubKey.push_back('B');
+        tx.vout[1].scriptPubKey.insert(tx.vout[1].scriptPubKey.end(), weakhash.begin(), weakhash.end());
+    }
 
     // BU005 add block size settings to the coinbase
     std::string cbmsg = FormatCoinbaseMessage(BUComments, minerComment);
@@ -193,6 +213,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     assert(pindexPrev); // can't make a new block if we don't even have the genesis block
 
     {
+        LOCK(cs_main);
         READLOCK(mempool.cs);
         nHeight = pindexPrev->nHeight + 1;
 
@@ -210,6 +231,13 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         nLockTimeCutoff =
             (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
 
+        // FIXME: only when weakblocks enabled
+        uint256 weakhash;
+        {
+            LOCK(cs_weakblocks);
+            weakhash = addFromLatestWeakBlock(pblocktemplate.get());
+        }
+
         addPriorityTxs(pblocktemplate.get());
         addScoreTxs(pblocktemplate.get());
 
@@ -220,7 +248,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
 
         // Create coinbase transaction.
         pblock->vtx[0] =
-            coinbaseTx(scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
+            coinbaseTx(scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus()), weakhash);
         pblocktemplate->vTxFees[0] = -nFees;
 
         // Fill in header
@@ -260,7 +288,7 @@ bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter)
 {
     for (CTxMemPool::txiter parent : mempool.GetMemPoolParents(iter))
     {
-        if (!inBlock.count(parent))
+        if (!inBlock.count(parent->GetTx().GetHash()))
         {
             return true;
         }
@@ -320,7 +348,7 @@ bool BlockAssembler::IsIncrementallyGood(uint64_t nExtraSize, unsigned int nExtr
     return true;
 }
 
-bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
+bool BlockAssembler::TestForBlock(const CTxMemPoolEntry *iter)
 {
     if (!IsIncrementallyGood(iter->GetTxSize(), iter->GetSigOpCount()))
         return false;
@@ -334,7 +362,7 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
     return true;
 }
 
-void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, CTxMemPool::txiter iter)
+void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, const CTxMemPoolEntry *iter)
 {
     pblocktemplate->block.vtx.push_back(iter->GetSharedTx());
     pblocktemplate->vTxFees.push_back(iter->GetFee());
@@ -343,7 +371,7 @@ void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, CTxMemPool::txit
     ++nBlockTx;
     nBlockSigOps += iter->GetSigOpCount();
     nFees += iter->GetFee();
-    inBlock.insert(iter);
+    inBlock.insert(iter->GetTx().GetHash());
 
     bool fPrintPriority = GetBoolArg("-printpriority", DEFAULT_PRINTPRIORITY);
     if (fPrintPriority)
@@ -355,6 +383,110 @@ void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, CTxMemPool::txit
             CFeeRate(iter->GetModifiedFee(), iter->GetTxSize()).ToString().c_str(),
             iter->GetTx().GetHash().ToString().c_str());
     }
+}
+
+/** Add transactions from latest received weak block, in same order as they arrive
+    in the weakblock. */
+uint256 BlockAssembler::addFromLatestWeakBlock(CBlockTemplate *pblocktemplate)
+{
+    AssertLockHeld(mempool.cs);
+    AssertLockHeld(cs_main);
+    AssertLockHeld(cs_weakblocks);
+    if (weakblocksEnabled())
+    {
+        CWeakblockRef wb = weakstore.Tip();
+        if (wb == nullptr)
+        {
+            LOG(WB, "Not adding any weakblock transactions - there are no weakblocks available right now.\n");
+            return uint256();
+        }
+        LOG(WB, "Adding %d transactions from weak block to block template.\n", wb->vtx.size() - 1);
+        int i = -1;
+        for (CTransactionRef tx : wb->vtx)
+        {
+            i++;
+            if (i == 0)
+            {
+                // skip, is coinbase
+                continue;
+            }
+
+            uint256 txid = tx->GetHash();
+
+            CTxMemPool::txiter entry_iter = mempool.mapTx.find(txid);
+
+            CTxMemPoolEntry *entry = NULL;
+
+            if (entry_iter == mempool.mapTx.end())
+            {
+                CValidationState state;
+                // FIXME: figure out mempool locking scheme. Write lock
+                // does not seem to be necessary when looking at the rest of the
+                // code?!
+                // WRITELOCK(mempool.cs);
+                std::vector<COutPoint> vCoinsToUncache_dummy;
+                {
+                    {
+                        // FIXME: needed?
+                        // mempool.cs.unlock_shared();
+                        if (!AcceptToMemoryPool(mempool, state, tx,
+                                false, // fLimitFree,
+                                NULL, // pfMissingInputs
+                                true, // fOverrideMempoolLimit
+                                false // fRejectAbsurdFee
+                                ))
+                        {
+                            if (state.GetRejectCode() == REJECT_DUPLICATE)
+                            {
+                                LOG(WB, "UNEXPECTED INTERNAL PROBLEM Missing weak block txn %s already in mempool?!\n",
+                                    tx->GetHash().GetHex());
+                            }
+                            else
+                            {
+                                LOG(WB, "UNEXPECTED INTERNAL PROBLEM Could not insert missing weak block txn %s into "
+                                        "mempool. Reason: %s\n",
+                                    tx->GetHash().GetHex(), state.GetRejectReason().c_str());
+                            }
+                            continue;
+                        }
+                    }
+                }
+                LOG(WB, "Injected missing weak block txn %s into mempool.\n", tx->GetHash().GetHex());
+                entry_iter = mempool.mapTx.find(txid);
+                if (entry_iter == mempool.mapTx.end())
+                {
+                    // FIXME: There's a slight potential for a race here where transactions get evicted from mempool
+                    // right before reaching here and this
+                    // weakblock construction fails.
+                    LOG(WB, "UNEXPECTED INTERNAL PROBLEM Txn %s not appearing in mempool after (re-)insertion?!%s\n",
+                        tx->GetHash().GetHex());
+                    continue;
+                }
+            }
+
+            entry = const_cast<CTxMemPoolEntry *>(&*entry_iter);
+
+            if (inBlock.count(entry->GetTx().GetHash()))
+            {
+                LOG(WB, "UNEXPECTED INTERNAL PROBLEM, weak txn already in block template: %s.\n", txid.GetHex());
+                continue;
+            }
+            // If this tx fits in the block add it, otherwise keep looping
+            if (TestForBlock(&*entry))
+            { // *iter != NULL due to while loop condition
+                AddToBlock(pblocktemplate, &*entry);
+            }
+            else
+            {
+                LOG(WB, "UNEXPECTED INTERNAL PROBLEM, weak txn not fitting block.\n", txid.GetHex());
+            }
+        }
+        LOG(WB, "Done adding transactions from weak block.\n");
+        return wb->GetHash();
+    }
+
+    // weak blocks not enabled:
+    return uint256();
 }
 
 void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
@@ -382,7 +514,7 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
         }
 
         // If tx already in block, skip  (added by addPriorityTxs)
-        if (inBlock.count(iter))
+        if (inBlock.count(iter->GetTx().GetHash()))
         {
             continue;
         }
@@ -414,9 +546,9 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
         }
 
         // If this tx fits in the block add it, otherwise keep looping
-        if (TestForBlock(iter))
+        if (TestForBlock(&*iter)) // *iter != NULL due to while loop condition
         {
-            AddToBlock(pblocktemplate, iter);
+            AddToBlock(pblocktemplate, &*iter);
 
             // This tx was successfully added, so
             // add transactions that depend on this one to the priority queue to try again
@@ -470,9 +602,9 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
         vecPriority.pop_back();
 
         // If tx already in block, skip
-        if (inBlock.count(iter))
+        if (inBlock.count(iter->GetTx().GetHash()))
         {
-            DbgAssert(false, ); // shouldn't happen for priority txs
+            // might happen for prio tx because of stacking onto weakblock
             continue;
         }
 
@@ -496,9 +628,9 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
         }
 
         // If this tx fits in the block add it, otherwise keep looping
-        if (TestForBlock(iter))
+        if (TestForBlock(&*iter)) // *iter != NULL due to while loop condition
         {
-            AddToBlock(pblocktemplate, iter);
+            AddToBlock(pblocktemplate, &*iter);
 
             // If now that this txs is added we've surpassed our desired priority size
             // or have dropped below the AllowFreeThreshold, then we're done adding priority txs
