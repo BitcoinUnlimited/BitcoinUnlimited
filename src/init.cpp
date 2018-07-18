@@ -1060,6 +1060,17 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 {
                     pblocktree = new CBlockTreeDB(nBlockTreeDBCache, "blockdb", false, fReindex);
                     pblocktreeother = new CBlockTreeDB(nBlockTreeDBCache, "blocks", false, fReindex);
+                    if (boost::filesystem::exists(GetDataDir() / "blockdb" / "blocks"))
+                    {
+                        for(fs::recursive_directory_iterator it(GetDataDir() / "blockdb" / "blocks"); it!=fs::recursive_directory_iterator(); ++it)
+                        {
+                            if(!fs::is_directory(*it))
+                            {
+                                nDBUsedSpace+=fs::file_size(*it);
+                            }
+                        }
+                    }
+                    pblocktree->ReadBlockSizeData(vDbBlockSizes);
                 }
                 else
                 {

@@ -30,6 +30,8 @@ static const char DB_FLAG = 'F';
 static const char DB_REINDEX_FLAG = 'R';
 static const char DB_LAST_BLOCK = 'l';
 
+static const char DB_BLOCK_SIZES = 'S';
+
 // to distinguish best block for a specific DB type, values correspond to enum vaue (blockdb_wrapper.h)
 static const char DB_BEST_BLOCK_BLOCKDB = 'D';
 
@@ -222,6 +224,11 @@ bool CBlockTreeDB::ReadReindexing(bool &fReindexing)
 }
 
 bool CBlockTreeDB::ReadLastBlockFile(int &nFile) { return Read(DB_LAST_BLOCK, nFile); }
+
+bool CBlockTreeDB::WriteBlockSizeData(std::vector< std::pair<uint256, uint64_t> > blocksizes) { return Write(DB_BLOCK_SIZES, blocksizes); }
+
+bool CBlockTreeDB::ReadBlockSizeData(std::vector< std::pair<uint256, uint64_t> >& blocksizes) { return Read(DB_BLOCK_SIZES, blocksizes); }
+
 CCoinsViewCursor *CCoinsViewDB::Cursor() const
 {
     CCoinsViewDBCursor *i = new CCoinsViewDBCursor(const_cast<CDBWrapper *>(&db)->NewIterator(), GetBestBlock());

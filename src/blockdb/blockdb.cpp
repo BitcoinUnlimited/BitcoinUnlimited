@@ -107,27 +107,30 @@ bool UndoReadFromDB(CBlockUndo &blockundo, const CBlockIndex *pindex)
 
 uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
 {
-    std::vector<uint256> hashesToPrune;
-    BlockMap::iterator iter;
-    iter = mapBlockIndex.find(chainActive.Tip()->GetBlockHash());
-    if (iter == mapBlockIndex.end())
+    LOG(PRUNE, "We have data for %u indexes \n", vDbBlockSizes.size());
+    uint64_t prunedCount;
+    CDBBatch blockBatch(*pblockdb);
+    CDBBatch undoBatch(*pblockundodb);
+    while(!vDbBlockSizes.empty() && nDBUsedSpace >= nPruneTarget)
     {
-        return 0;
+        uint256 frontHash = vDbBlockSizes.front().first;
+        uint64_t frontSize = vDbBlockSizes.front().second;
+        BlockMap::iterator iter = mapBlockIndex.find(frontHash);
+        std::ostringstream key;
+        key << iter->second->GetBlockTime() << ":" << iter->second->GetBlockHash().ToString();
+        blockBatch.Erase(key.str());
+        undoBatch.Erase(key.str());
+        iter->second->nFile = 0;
+        iter->second->nDataPos = 0;
+        iter->second->nUndoPos = 0;
+        vDbBlockSizes.erase(vDbBlockSizes.begin());
+        prunedCount = prunedCount + 1;
+        nDBUsedSpace = nDBUsedSpace - frontSize;
     }
-    CBlockIndex *pindex = iter->second;
-    while (pindex->pprev)
-    {
-        if (pindex->nHeight < nLastBlockWeCanPrune)
-        {
-            hashesToPrune.push_back(pindex->GetBlockHash());
-        }
-        pindex = pindex->pprev;
-    }
-
-    // this should prune all blocks from the DB that are old enough to prune
-    for (std::vector<uint256>::iterator iter = hashesToPrune.begin(); iter != hashesToPrune.end(); ++iter)
-    {
-        pblockdb->Erase(*iter);
-    }
-    return hashesToPrune.size();
+    pblockdb->WriteBatch(blockBatch, true);
+    pblockundodb->WriteBatch(undoBatch, true);
+    // must use NULL here, cannot use nullptr
+    pblockdb->CompactRange(NULL, NULL);
+    LOG(PRUNE, "DONE WITH DB PRUNING (%u blocks pruned, size on disk %u, data for %u indexes) \n", prunedCount, nDBUsedSpace, vDbBlockSizes.size());
+    return prunedCount;
 }

@@ -89,6 +89,8 @@ unsigned int nBytesPerSigOp = DEFAULT_BYTES_PER_SIGOP;
 bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
 uint64_t nPruneTarget = 0;
+uint64_t nDBUsedSpace = 0;
+std::vector< std::pair<uint256, uint64_t> > vDbBlockSizes;
 uint32_t nXthinBloomFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE;
 
 // The allowed size of the in memory UTXO cache
@@ -3159,6 +3161,18 @@ bool FindBlockPos(CValidationState &state,
     {
         pos.nFile = 1;
         pos.nPos = 1;
+        if (CheckDiskSpace(nAddSize))
+        {
+            nDBUsedSpace += nAddSize;
+            if (fPruneMode && nDBUsedSpace >= nPruneTarget)
+            {
+                fCheckForPruning = true;
+            }
+        }
+        else
+        {
+            return state.Error("out of disk space");
+        }
         return true;
     }
 
@@ -3236,6 +3250,10 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
     if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
         pos.nPos = 1;
+        if (!CheckDiskSpace(nAddSize))
+        {
+            return state.Error("out of disk space");
+        }
         return true;
     }
 
@@ -3614,6 +3632,10 @@ static bool AcceptBlock(const CBlock &block,
         if (!FindBlockPos(state, blockPos, nBlockSize + 8, nHeight, block.GetBlockTime(), dbp != NULL))
         {
             return error("AcceptBlock(): FindBlockPos failed");
+        }
+        if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+        {
+            vDbBlockSizes.emplace_back(std::make_pair(block.GetHash(), nBlockSize + 8));
         }
         if (dbp == NULL)
         {

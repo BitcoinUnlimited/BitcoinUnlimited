@@ -210,6 +210,10 @@ extern bool fHavePruned;
 extern bool fPruneMode;
 /** Number of MiB of block files that we're trying to stay below. */
 extern uint64_t nPruneTarget;
+/** Number of MiB the blockdb is using. */
+extern uint64_t nDBUsedSpace;
+/** keep track of the sizes of blocks in the db, DB_BLOCK_STORAGE only */
+extern std::vector< std::pair<uint256, uint64_t> > vDbBlockSizes;
 /** The maximum bloom filter size that we will support for an xthin request. This value is communicated to
  *  our peer at the time we first make the connection.
  */
