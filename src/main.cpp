@@ -5091,7 +5091,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             boost::this_thread::interruption_point();
             it++;
 
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK)
             {
                 bool fSend = false;
                 BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
@@ -5163,6 +5163,11 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         {
                             pfrom->blocksSent += 1;
                             pfrom->PushMessage(NetMsgType::BLOCK, block);
+                        }
+                        else if (inv.type == MSG_THINBLOCK)
+                        {
+                            LOG(THIN, "Sending thinblock by INV queue getdata message\n");
+                            SendXThinBlock(MakeBlockRef(block), pfrom, inv);
                         }
                         else // MSG_FILTERED_BLOCK)
                         {
@@ -5258,7 +5263,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             // priority messages and we don't want to sit here processing a large number of messages
             // while we hold the cs_main lock, but rather allow these messages to be sent first and
             // process the return message before potentially reading from the queue again.
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK)
                 break;
         }
     }
