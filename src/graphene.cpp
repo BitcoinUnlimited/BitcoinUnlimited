@@ -379,8 +379,8 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
 
             graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
 
-            LOGA("%s %s from peer %s received but does not extend longest chain; requesting full block\n",
-                strCommand, inv.hash.ToString(), pfrom->GetLogName());
+            LOGA("%s %s from peer %s received but does not extend longest chain; requesting full block\n", strCommand,
+                inv.hash.ToString(), pfrom->GetLogName());
             return true;
         }
 
@@ -531,7 +531,6 @@ bool CGrapheneBlock::process(CNode *pfrom,
             }
             catch (const std::runtime_error &e)
             {
-
                 fRequestFailover = true;
                 LOG(GRAPHENE, "Graphene set could not be reconciled; requesting failover for peer %s: %s\n",
                     pfrom->GetLogName(), e.what());
@@ -569,7 +568,8 @@ bool CGrapheneBlock::process(CNode *pfrom,
     // without checking the merkle root, therefore we don't want to ban our expedited nodes. Just request
     // a failover block if a mismatch occurs.
     // Also, there is a remote possiblity of a Tx hash collision therefore if it occurs we request a failover
-    // block.
+    // block. Note in the event that the failover block is XThin, we expect a collision there as well. However,
+    // the XThin block will itself failover to a thinblock, which will not have a collision.
     if (collision || !fMerkleRootCorrect)
     {
         RequestFailoverBlock(pfrom, header.GetHash());
