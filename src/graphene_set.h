@@ -316,6 +316,8 @@ public:
     {
         READWRITE(ordered);
         READWRITE(nReceiverUniverseItems);
+        if (nReceiverUniverseItems > LARGE_MEM_POOL_SIZE)
+            throw std::runtime_error("nReceiverUniverseItems exceeds threshold for excessive mempool size");
         READWRITE(encodedRank);
         if (!pSetFilter)
             pSetFilter = new CBloomFilter();
@@ -323,6 +325,8 @@ public:
         if (!pSetIblt)
             pSetIblt = new CIblt();
         READWRITE(*pSetIblt);
+        if (pSetIblt->getValueSize() != IBLT_VALUE_SIZE)
+            throw std::runtime_error("valueSize is not equal to IBLT fixed value size");
     }
 
 private:

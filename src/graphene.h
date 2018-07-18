@@ -16,11 +16,13 @@
 #include "stat.h"
 #include "sync.h"
 #include "uint256.h"
+#include "unlimited.h"
 
 #include <atomic>
 #include <vector>
 
 const unsigned char MIN_MEMPOOL_INFO_BYTES = 8;
+const uint64_t EXCESSIVE_BLOCK_TXS = DEFAULT_EXCESSIVE_BLOCK_SIZE / 100;
 
 class CDataStream;
 class CNode;
@@ -75,6 +77,8 @@ public:
         READWRITE(header);
         READWRITE(vAdditionalTxs);
         READWRITE(nBlockTxs);
+        if (nBlockTxs > EXCESSIVE_BLOCK_TXS)
+            throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
         if (!pGrapheneSet)
             pGrapheneSet = new CGrapheneSet();
         READWRITE(*pGrapheneSet);
