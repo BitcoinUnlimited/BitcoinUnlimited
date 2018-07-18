@@ -360,13 +360,19 @@ bool IsValidSignatureEncodingWithoutSigHash(const valtype &sig)
     return true;
 }
 
-bool static IsLowDERSignature(const valtype &vchSig, ScriptError *serror)
+bool static IsLowDERSignature(const valtype &vchSig, ScriptError *serror, const bool check_sighash)
 {
-    if (!IsValidSignatureEncoding(vchSig))
+    if (check_sighash)
     {
-        return set_error(serror, SCRIPT_ERR_SIG_DER);
+        if (!IsValidSignatureEncoding(vchSig))
+            return set_error(serror, SCRIPT_ERR_SIG_DER);
     }
-    std::vector<unsigned char> vchSigCopy(vchSig.begin(), vchSig.begin() + vchSig.size() - 1);
+    else
+    {
+        if (!IsValidSignatureEncodingWithoutSigHash(vchSig))
+            return set_error(serror, SCRIPT_ERR_SIG_DER);
+    }
+    std::vector<unsigned char> vchSigCopy(vchSig.begin(), vchSig.begin() + vchSig.size() - (check_sighash ? 1 : 0));
     if (!CPubKey::CheckLowS(vchSigCopy))
     {
         return set_error(serror, SCRIPT_ERR_SIG_HIGH_S);
@@ -397,7 +403,10 @@ static bool IsDefinedHashtypeSignature(const valtype &vchSig)
     return true;
 }
 
-bool CheckSignatureEncoding(const vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror)
+static bool CheckSignatureEncodingSigHashChoice(const vector<unsigned char> &vchSig,
+    unsigned int flags,
+    ScriptError *serror,
+    const bool check_sighash)
 {
     // Empty signature. Not strictly DER encoded, but allowed to provide a
     // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
@@ -405,21 +414,42 @@ bool CheckSignatureEncoding(const vector<unsigned char> &vchSig, unsigned int fl
     {
         return true;
     }
-    if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC)) != 0 &&
-        !IsValidSignatureEncoding(vchSig))
+    if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC)) != 0)
     {
-        return set_error(serror, SCRIPT_ERR_SIG_DER);
+        if (check_sighash)
+        {
+            if (!IsValidSignatureEncoding(vchSig))
+                return set_error(serror, SCRIPT_ERR_SIG_DER);
+        }
+        else
+        {
+            if (!IsValidSignatureEncodingWithoutSigHash(vchSig))
+                return set_error(serror, SCRIPT_ERR_SIG_DER);
+        }
     }
-    else if ((flags & SCRIPT_VERIFY_LOW_S) != 0 && !IsLowDERSignature(vchSig, serror))
+    if ((flags & SCRIPT_VERIFY_LOW_S) != 0 && !IsLowDERSignature(vchSig, serror, check_sighash))
     {
         // serror is set
         return false;
     }
-    else if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 && !IsDefinedHashtypeSignature(vchSig))
+    else if (check_sighash && ((flags & SCRIPT_VERIFY_STRICTENC) != 0) && !IsDefinedHashtypeSignature(vchSig))
     {
         return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
     }
     return true;
+}
+
+
+// For CHECKSIG etc.
+bool CheckSignatureEncoding(const vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror)
+{
+    return CheckSignatureEncodingSigHashChoice(vchSig, flags, serror, true);
+}
+
+// For CHECKDATASIG / CHECKDATASIGVERIFY
+bool CheckDataSignatureEncoding(const valtype &vchSig, uint32_t flags, ScriptError *serror)
+{
+    return CheckSignatureEncodingSigHashChoice(vchSig, flags, serror, false);
 }
 
 bool CheckPubKeyEncoding(const valtype &vchPubKey, unsigned int flags, ScriptError *serror)
