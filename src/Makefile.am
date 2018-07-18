@@ -256,6 +256,7 @@ libbitcoin_server_a_SOURCES = \
   rpc/net.cpp \
   rpc/rawtransaction.cpp \
   rpc/server.cpp \
+  rpc/weakblock.cpp \  
   respend/respendlogger.cpp \
   respend/respendrelayer.cpp \
   respend/respenddetector.cpp \

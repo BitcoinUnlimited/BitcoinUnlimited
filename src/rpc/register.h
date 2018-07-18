@@ -21,6 +21,8 @@ void RegisterMiningRPCCommands(CRPCTable &tableRPC);
 void RegisterRawTransactionRPCCommands(CRPCTable &tableRPC);
 /** Register Bitcoin Unlimited's RPC commands */
 void RegisterUnlimitedRPCCommands(CRPCTable &tableRPC);
+/** Register Weakblock RPC commands */
+void RegisterWeakBlockRPCCommands(CRPCTable &tableRPC);
 
 static inline void RegisterAllCoreRPCCommands(CRPCTable &tableRPC)
 {
@@ -30,6 +32,7 @@ static inline void RegisterAllCoreRPCCommands(CRPCTable &tableRPC)
     RegisterMiningRPCCommands(tableRPC);
     RegisterRawTransactionRPCCommands(tableRPC);
     RegisterUnlimitedRPCCommands(tableRPC);
+    RegisterWeakBlockRPCCommands(tableRPC);
 }
 
 #endif
