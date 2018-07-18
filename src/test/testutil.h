@@ -12,4 +12,10 @@
 
 fs::path GetTempPath();
 
+class CMutableTransaction;
+class CScript;
+
+void RandomScript(CScript &script);
+void RandomTransaction(CMutableTransaction &tx, bool fSingle);
+
 #endif // BITCOIN_TEST_TESTUTIL_H
