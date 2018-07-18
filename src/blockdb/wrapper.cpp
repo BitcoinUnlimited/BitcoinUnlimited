@@ -609,9 +609,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
                 {
                     // vFiles should be empty for a LEVELDB call so insert a blank vector instead
                     std::vector<std::pair<int, const CBlockFileInfo *> > vFilesEmpty;
-                    // pass in -1 for the last block file since we dont use it for level, it will be ignored in the
-                    // function if it is -1337
-                    if (!pblocktree->WriteBatchSync(vFilesEmpty, -1337, vBlocks))
+                    if (!pblocktree->WriteBatchSync(vFilesEmpty, 0, vBlocks))
                     {
                         return AbortNode(state, "Files to write to block index database");
                     }
@@ -622,7 +620,7 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
                     assert(false);
                 }
             }
-            // Finally remove any pruned files
+            // Finally remove any pruned files, this will be empty for blockdb mode
             if (fFlushForPrune)
             {
                 UnlinkPrunedFiles(setFilesToPrune);
