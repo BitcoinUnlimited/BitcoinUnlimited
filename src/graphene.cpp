@@ -268,7 +268,7 @@ bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         }
         CGrapheneBlockTx grapheneBlockTx(grapheneRequestBlockTx.blockhash, vTx);
         pfrom->PushMessage(NetMsgType::GRAPHENETX, grapheneBlockTx);
-        pfrom->blocksSent += 1;
+        pfrom->txsSent += vTx.size();
     }
 
     return true;
