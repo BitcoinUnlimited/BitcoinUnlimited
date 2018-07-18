@@ -379,7 +379,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
 
             graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
 
-            LOGA("%s %s from peer %s received but does not extend longest chain; requesting failover block\n",
+            LOGA("%s %s from peer %s received but does not extend longest chain; requesting full block\n",
                 strCommand, inv.hash.ToString(), pfrom->GetLogName());
             return true;
         }
