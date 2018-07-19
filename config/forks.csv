@@ -5,13 +5,10 @@
 ; chainname,bit,name,starttime,timeout,windowsize,threshold,minlockedblocks,minlockedtime,gbtforce
 ; main network, 95% @ 2016 blocks:
 main,0,csv,1462060800,1493596800,2016,1916,2016,0,true
-main,1,segwit,1479168000,1510704000,2016,1916,2016,0,true
 main,28,testdummy,1199145601,1230767999,2016,1916,2016,0,true
 ; test network (testnet), 75% @ 2016 blocks:
 test,0,csv,1456790400,1493596800,2016,1512,2016,0,true
-test,1,segwit,1462060800,1493596800,2016,1512,2016,0,true
 test,28,testdummy,1199145601,1230767999,2016,1512,2016,0,true
 ; regtest chain 75% @ 144 blocks:
 regtest,0,csv,0,999999999999,144,108,108,0,true
-regtest,1,segwit,0,999999999999,144,108,108,0,true
 regtest,28,testdummy,0,999999999999,144,108,108,0,true
