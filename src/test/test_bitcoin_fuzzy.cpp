@@ -506,6 +506,73 @@ protected:
     }
 };
 
+class FuzzAPICGrapheneSet : FuzzTestNet
+{
+public:
+    FuzzAPICGrapheneSet() : FuzzTestNet("api_graphene_set") {}
+protected:
+    void run(const bool produce_output)
+    {
+        CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
+
+        uint8_t cmd;
+        std::shared_ptr<CGrapheneSet> gs;
+
+        uint16_t nReceiverUniverseItems; // note: artificially constrained
+        std::vector<uint256> itemHashes;
+        bool ordered;
+        bool fDeterministic;
+        *ds >> nReceiverUniverseItems;
+        *ds >> itemHashes;
+        *ds >> ordered;
+        *ds >> fDeterministic;
+
+        if (nReceiverUniverseItems < itemHashes.size() - 1)
+            return;
+
+        try
+        {
+            gs = std::make_shared<CGrapheneSet>(nReceiverUniverseItems, itemHashes, ordered, fDeterministic);
+
+            while (!ds->empty())
+            {
+                *ds >> cmd;
+                switch (cmd)
+                {
+                case 0:
+                {
+                    uint64_t nBlockTx = 0;
+                    uint16_t nReceiverPoolTx = 0; // note: artificially constrained
+                    *ds >> nBlockTx;
+                    *ds >> nReceiverPoolTx;
+                    if ((nReceiverPoolTx >= nBlockTx - 1))
+                        out << gs->OptimalSymDiff(nBlockTx, nReceiverPoolTx);
+                }
+                break;
+                case 1:
+                {
+                    std::vector<uint256> receiverItemHashes;
+                    *ds >> receiverItemHashes;
+                    out << gs->Reconcile(receiverItemHashes);
+                }
+                break;
+                default:
+                    break;
+                }
+            }
+        }
+        catch (std::exception &e)
+        {
+            // ignore
+        }
+        if (produce_output)
+        {
+            output.insert(output.begin(), out.begin(), out.end());
+        }
+    }
+};
+
+
 int main(int argc, char **argv)
 {
     ECCVerifyHandle globalVerifyHandle;
@@ -544,6 +611,7 @@ int main(int argc, char **argv)
     FuzzDeserNet<CGrapheneSet> fuzz_grapheneset("cgrapheneset");
 
     FuzzAPICIblt fuzz_api_iblt;
+    FuzzAPICGrapheneSet fuzz_api_graphene_set;
 
     // command line arguments can be used to constrain more and
     // more specifically to a particular test
