@@ -115,7 +115,7 @@ void CIblt::resize(size_t _expectedNumEntries, size_t _valueSize)
 
 void CIblt::_insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> v)
 {
-    assert(v.size() == valueSize);
+    // assert(v.size() == valueSize);
 
     std::vector<uint8_t> kvec = ToVec(k);
 
