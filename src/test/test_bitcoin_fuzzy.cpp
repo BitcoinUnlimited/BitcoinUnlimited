@@ -402,6 +402,110 @@ protected:
     }
 };
 
+class FuzzAPICIblt : FuzzTestNet
+{
+public:
+    FuzzAPICIblt() : FuzzTestNet("api_iblt") {}
+protected:
+    void run(const bool produce_output)
+    {
+        CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
+
+        uint8_t cmd;
+        *ds >> cmd;
+        std::shared_ptr<CIblt> iblt;
+
+        uint16_t num_entries = 0;
+        uint8_t value_size = 0;
+        uint64_t k = 0;
+        std::vector<uint8_t> v;
+
+        std::set<std::pair<uint64_t, std::vector<uint8_t> > > negative, positive;
+
+        switch (cmd)
+        {
+        case 0:
+            iblt = std::make_shared<CIblt>();
+            break;
+        default:
+            *ds >> num_entries;
+            *ds >> value_size;
+            iblt = std::make_shared<CIblt>(num_entries, value_size);
+            break;
+        }
+
+        while (!ds->empty())
+        {
+            *ds >> cmd;
+            switch (cmd)
+            {
+            case 0:
+                iblt->reset();
+                break;
+            case 1:
+                out << iblt->size();
+                break;
+            case 2:
+                if (!iblt->isModified())
+                {
+                    *ds >> num_entries;
+                    *ds >> value_size;
+                    iblt->resize(num_entries, value_size);
+                }
+                break;
+            case 3:
+                *ds >> k;
+                *ds >> v;
+                iblt->insert(k, v);
+                break;
+            case 4:
+                *ds >> k;
+                *ds >> v;
+                iblt->erase(k, v);
+                break;
+            case 5:
+                *ds >> k;
+                out << iblt->get(k, v);
+                out << v;
+                break;
+            case 6:
+                out << iblt->getValueSize();
+                break;
+            case 7:
+                out << iblt->getNHash();
+                break;
+            case 8:
+                out << iblt->listEntries(positive, negative);
+                for (auto entry : positive)
+                {
+                    out << entry.first;
+                    out << entry.second;
+                }
+                for (auto entry : negative)
+                {
+                    out << entry.first;
+                    out << entry.second;
+                }
+                break;
+            case 9:
+                // fixme subtract iblts
+                break;
+            case 10:
+                out << iblt->DumpTable();
+                break;
+            case 11:
+                *ds >> *iblt;
+            default:
+                break;
+            }
+        }
+        if (produce_output)
+        {
+            output.insert(output.begin(), out.begin(), out.end());
+        }
+    }
+};
+
 int main(int argc, char **argv)
 {
     ECCVerifyHandle globalVerifyHandle;
@@ -438,6 +542,8 @@ int main(int argc, char **argv)
     FuzzDeserNet<CGrapheneBlockTx> fuzz_grapheneblocktx("cgrapheneblocktx");
     FuzzDeserNet<CRequestGrapheneBlockTx> fuzz_requestgrapheneblocktx("crequestgrapheneblocktx");
     FuzzDeserNet<CGrapheneSet> fuzz_grapheneset("cgrapheneset");
+
+    FuzzAPICIblt fuzz_api_iblt;
 
     // command line arguments can be used to constrain more and
     // more specifically to a particular test

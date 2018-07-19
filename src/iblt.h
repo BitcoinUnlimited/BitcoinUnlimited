@@ -115,6 +115,7 @@ public:
         READWRITE(hashTable);
     }
 
+    inline bool isModified() { return is_modified; }
 private:
     void _insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> v);
 
