@@ -49,6 +49,7 @@ public:
     uint32_t keyCheck;
     std::vector<uint8_t> valueSum;
 
+    HashTableEntry() : count(0), keySum(0), keyCheck(0) {}
     bool isPure() const;
     bool empty() const;
     void addValue(const std::vector<uint8_t> v);
