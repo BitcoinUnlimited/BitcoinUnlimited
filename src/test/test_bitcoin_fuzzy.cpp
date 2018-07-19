@@ -416,7 +416,6 @@ protected:
         std::shared_ptr<CIblt> iblt;
 
         uint16_t num_entries = 0;
-        uint8_t value_size = 0;
         uint64_t k = 0;
         std::vector<uint8_t> v;
 
@@ -429,8 +428,7 @@ protected:
             break;
         default:
             *ds >> num_entries;
-            *ds >> value_size;
-            iblt = std::make_shared<CIblt>(num_entries, value_size);
+            iblt = std::make_shared<CIblt>(num_entries);
             break;
         }
 
@@ -449,8 +447,7 @@ protected:
                 if (!iblt->isModified())
                 {
                     *ds >> num_entries;
-                    *ds >> value_size;
-                    iblt->resize(num_entries, value_size);
+                    iblt->resize(num_entries);
                 }
                 break;
             case 3:
@@ -469,12 +466,9 @@ protected:
                 out << v;
                 break;
             case 6:
-                out << iblt->getValueSize();
-                break;
-            case 7:
                 out << iblt->getNHash();
                 break;
-            case 8:
+            case 7:
                 out << iblt->listEntries(positive, negative);
                 for (auto entry : positive)
                 {
@@ -487,13 +481,13 @@ protected:
                     out << entry.second;
                 }
                 break;
-            case 9:
+            case 8:
                 // fixme subtract iblts
                 break;
-            case 10:
+            case 9:
                 out << iblt->DumpTable();
                 break;
-            case 11:
+            case 10:
                 *ds >> *iblt;
             default:
                 break;

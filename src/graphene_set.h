@@ -23,7 +23,6 @@ const uint8_t IBLT_CELL_SIZE = 17;
 const uint32_t LARGE_MEM_POOL_SIZE = 10000000;
 const float FILTER_FPR_MAX = 0.999;
 const uint8_t IBLT_CELL_MINIMUM = 2;
-const uint8_t IBLT_VALUE_SIZE = 0;
 const std::vector<uint8_t> IBLT_NULL_VALUE = {};
 const unsigned char WORD_BITS = 8;
 
@@ -145,7 +144,7 @@ public:
 
         // Construct IBLT
         uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
-        pSetIblt = new CIblt(nIbltCells, IBLT_VALUE_SIZE);
+        pSetIblt = new CIblt(nIbltCells);
         std::map<uint64_t, uint256> mapCheapHashes;
 
         for (const uint256 &itemHash : _itemHashes)
@@ -325,8 +324,6 @@ public:
         if (!pSetIblt)
             pSetIblt = new CIblt();
         READWRITE(*pSetIblt);
-        if (pSetIblt->getValueSize() != IBLT_VALUE_SIZE)
-            throw std::runtime_error("valueSize is not equal to IBLT fixed value size");
     }
 
 private:

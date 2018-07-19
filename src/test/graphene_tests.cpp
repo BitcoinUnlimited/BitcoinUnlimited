@@ -116,7 +116,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_finds_optimal_settings)
     for (a = 1; a < m - mu; a++)
     {
         CBloomFilter filter(n, fpr(a), insecure_rand.rand32(), BLOOM_UPDATE_ALL, std::numeric_limits<uint32_t>::max());
-        CIblt iblt(a, IBLT_VALUE_SIZE);
+        CIblt iblt(a);
 
         size_t filterBytes = ::GetSerializeSize(filter, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
         size_t ibltBytes = ::GetSerializeSize(iblt, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;

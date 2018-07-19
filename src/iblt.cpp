@@ -72,19 +72,13 @@ void HashTableEntry::addValue(const std::vector<uint8_t> v)
 
 CIblt::CIblt()
 {
-    valueSize = 0;
     n_hash = 1;
     is_modified = false;
 }
 
-CIblt::CIblt(size_t _expectedNumEntries, size_t _valueSize) : is_modified(false)
-{
-    CIblt::resize(_expectedNumEntries, _valueSize);
-}
-
+CIblt::CIblt(size_t _expectedNumEntries) : is_modified(false) { CIblt::resize(_expectedNumEntries); }
 CIblt::CIblt(const CIblt &other) : is_modified(false)
 {
-    valueSize = other.valueSize;
     n_hash = other.n_hash;
     hashTable = other.hashTable;
 }
@@ -98,11 +92,10 @@ void CIblt::reset()
 }
 
 size_t CIblt::size() { return hashTable.size(); }
-void CIblt::resize(size_t _expectedNumEntries, size_t _valueSize)
+void CIblt::resize(size_t _expectedNumEntries)
 {
     assert(is_modified == false);
 
-    CIblt::valueSize = _valueSize;
     CIblt::n_hash = OptimalNHash(_expectedNumEntries);
 
     // reduce probability of failure by increasing by overhead factor
@@ -115,8 +108,6 @@ void CIblt::resize(size_t _expectedNumEntries, size_t _valueSize)
 
 void CIblt::_insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> v)
 {
-    // assert(v.size() == valueSize);
-
     if (!n_hash)
         return;
     size_t bucketsPerHash = hashTable.size() / n_hash;
@@ -265,7 +256,6 @@ bool CIblt::listEntries(std::set<std::pair<uint64_t, std::vector<uint8_t> > > &p
 CIblt CIblt::operator-(const CIblt &other) const
 {
     // IBLT's must be same params/size:
-    assert(valueSize == other.valueSize);
     assert(hashTable.size() == other.hashTable.size());
 
     CIblt result(*this);

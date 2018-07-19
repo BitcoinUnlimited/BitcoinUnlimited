@@ -70,13 +70,13 @@ class CIblt
 {
 public:
     CIblt();
-    CIblt(size_t _expectedNumEntries, size_t _ValueSize);
+    CIblt(size_t _expectedNumEntries);
     CIblt(const CIblt &other);
     virtual ~CIblt();
 
     void reset();
     size_t size();
-    void resize(size_t _expectedNumEntries, size_t _ValueSize);
+    void resize(size_t _expectedNumEntries);
     void insert(uint64_t k, const std::vector<uint8_t> v);
     void erase(uint64_t k, const std::vector<uint8_t> v);
 
@@ -85,7 +85,6 @@ public:
     // Returns false if overloaded and we don't know whether or
     // not k is in the table.
     bool get(uint64_t k, std::vector<uint8_t> &result) const;
-    size_t getValueSize() { return valueSize; }
     uint8_t getNHash() { return n_hash; }
     // Adds entries to the given sets:
     //  positive is all entries that were inserted
@@ -110,7 +109,6 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
-        READWRITE(valueSize);
         READWRITE(n_hash);
         if (ser_action.ForRead() && n_hash == 0)
         {
@@ -124,7 +122,6 @@ public:
 private:
     void _insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> v);
 
-    size_t valueSize;
     uint8_t n_hash;
     bool is_modified;
 
