@@ -1377,7 +1377,7 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
     if (!pfrom->GrapheneCapable())
     {
         dosMan.Misbehaving(pfrom, 100);
-        return error("Graphene block message received from a non graphene block node, peer=%d", pfrom->GetId());
+        return error("Graphene block message received from a non graphene block node, peer %s\n", pfrom->GetLogName());
     }
 
     // Check for Misbehaving and DOS
@@ -1420,14 +1420,14 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
         if (mi == mapBlockIndex.end())
         {
             return error(
-                "Peer %s (%d) requested nonexistent block %s", pfrom->addrName.c_str(), pfrom->id, inv.hash.ToString());
+                "Peer %s requested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
         }
 
         const Consensus::Params &consensusParams = Params().GetConsensus();
         if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
         {
             // We don't have the block yet, although we know about it.
-            return error("Peer %s (%d) requested block %s that cannot be read", pfrom->addrName.c_str(), pfrom->id,
+            return error("Peer %s requested block %s that cannot be read", pfrom->GetLogName(),
                 inv.hash.ToString());
         }
         else
