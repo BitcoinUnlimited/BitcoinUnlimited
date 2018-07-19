@@ -117,9 +117,14 @@ void CIblt::_insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> v)
 {
     // assert(v.size() == valueSize);
 
+    if (!n_hash)
+        return;
+    size_t bucketsPerHash = hashTable.size() / n_hash;
+    if (!bucketsPerHash)
+        return;
+
     std::vector<uint8_t> kvec = ToVec(k);
 
-    size_t bucketsPerHash = hashTable.size() / n_hash;
     for (size_t i = 0; i < n_hash; i++)
     {
         size_t startEntry = i * bucketsPerHash;
@@ -148,9 +153,15 @@ bool CIblt::get(uint64_t k, std::vector<uint8_t> &result) const
 {
     result.clear();
 
+
+    if (!n_hash)
+        return false;
+    size_t bucketsPerHash = hashTable.size() / n_hash;
+    if (!bucketsPerHash)
+        return false;
+
     std::vector<uint8_t> kvec = ToVec(k);
 
-    size_t bucketsPerHash = hashTable.size() / n_hash;
     for (size_t i = 0; i < n_hash; i++)
     {
         size_t startEntry = i * bucketsPerHash;
@@ -235,9 +246,15 @@ bool CIblt::listEntries(std::set<std::pair<uint64_t, std::vector<uint8_t> > > &p
         }
     } while (nErased > 0);
 
+    if (!n_hash)
+        return false;
+    size_t peeled_bucketsPerHash = peeled.hashTable.size() / n_hash;
+    if (!peeled_bucketsPerHash)
+        return false;
+
     // If any buckets for one of the hash functions is not empty,
     // then we didn't peel them all:
-    for (size_t i = 0; i < peeled.hashTable.size() / n_hash; i++)
+    for (size_t i = 0; i < peeled_bucketsPerHash; i++)
     {
         if (peeled.hashTable.at(i).empty() != true)
             return false;
