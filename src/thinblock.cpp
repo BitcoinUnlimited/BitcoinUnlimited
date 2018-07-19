@@ -509,7 +509,7 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         }
         CXThinBlockTx thinBlockTx(thinRequestBlockTx.blockhash, vTx);
         pfrom->PushMessage(NetMsgType::XBLOCKTX, thinBlockTx);
-        pfrom->blocksSent += 1;
+        pfrom->txsSent += vTx.size();
     }
 
     return true;
