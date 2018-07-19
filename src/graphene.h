@@ -22,7 +22,7 @@
 #include <vector>
 
 const unsigned char MIN_MEMPOOL_INFO_BYTES = 8;
-const uint64_t EXCESSIVE_BLOCK_TXS = DEFAULT_EXCESSIVE_BLOCK_SIZE / 100;
+const uint64_t EXCESSIVE_BLOCK_TXS = excessiveBlockSize / 100;
 
 class CDataStream;
 class CNode;
