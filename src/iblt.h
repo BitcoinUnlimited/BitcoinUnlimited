@@ -112,6 +112,10 @@ public:
     {
         READWRITE(valueSize);
         READWRITE(n_hash);
+        if (ser_action.ForRead() && n_hash == 0)
+        {
+            throw std::ios_base::failure("Number of IBLT hash functions needs to be > 0");
+        }
         READWRITE(is_modified);
         READWRITE(hashTable);
     }
