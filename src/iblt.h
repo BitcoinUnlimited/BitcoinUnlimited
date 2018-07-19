@@ -52,7 +52,7 @@ public:
     HashTableEntry() : count(0), keySum(0), keyCheck(0) {}
     bool isPure() const;
     bool empty() const;
-    void addValue(const std::vector<uint8_t> v);
+    void addValue(const std::vector<uint8_t> &v);
 
     ADD_SERIALIZE_METHODS;
 
@@ -77,8 +77,8 @@ public:
     void reset();
     size_t size();
     void resize(size_t _expectedNumEntries);
-    void insert(uint64_t k, const std::vector<uint8_t> v);
-    void erase(uint64_t k, const std::vector<uint8_t> v);
+    void insert(uint64_t k, const std::vector<uint8_t> &v);
+    void erase(uint64_t k, const std::vector<uint8_t> &v);
 
     // Returns true if a result is definitely found or not
     // found. If not found, result will be empty.
@@ -120,7 +120,7 @@ public:
 
     inline bool isModified() { return is_modified; }
 private:
-    void _insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> v);
+    void _insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> &v);
 
     uint8_t n_hash;
     bool is_modified;

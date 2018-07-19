@@ -54,7 +54,7 @@ bool HashTableEntry::isPure() const
 }
 
 bool HashTableEntry::empty() const { return (count == 0 && keySum == 0 && keyCheck == 0); }
-void HashTableEntry::addValue(const std::vector<uint8_t> v)
+void HashTableEntry::addValue(const std::vector<uint8_t> &v)
 {
     if (v.empty())
     {
@@ -106,7 +106,7 @@ void CIblt::resize(size_t _expectedNumEntries)
     hashTable.resize(nEntries);
 }
 
-void CIblt::_insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> v)
+void CIblt::_insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> &v)
 {
     if (!n_hash)
         return;
@@ -138,8 +138,8 @@ void CIblt::_insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> v)
     is_modified = true;
 }
 
-void CIblt::insert(uint64_t k, const std::vector<uint8_t> v) { _insert(1, k, v); }
-void CIblt::erase(uint64_t k, const std::vector<uint8_t> v) { _insert(-1, k, v); }
+void CIblt::insert(uint64_t k, const std::vector<uint8_t> &v) { _insert(1, k, v); }
+void CIblt::erase(uint64_t k, const std::vector<uint8_t> &v) { _insert(-1, k, v); }
 bool CIblt::get(uint64_t k, std::vector<uint8_t> &result) const
 {
     result.clear();
