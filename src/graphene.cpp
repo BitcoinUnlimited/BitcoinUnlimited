@@ -1419,16 +1419,14 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
         BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
         if (mi == mapBlockIndex.end())
         {
-            return error(
-                "Peer %s requested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
+            return error("Peer %s requested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
         }
 
         const Consensus::Params &consensusParams = Params().GetConsensus();
         if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
         {
             // We don't have the block yet, although we know about it.
-            return error("Peer %s requested block %s that cannot be read", pfrom->GetLogName(),
-                inv.hash.ToString());
+            return error("Peer %s requested block %s that cannot be read", pfrom->GetLogName(), inv.hash.ToString());
         }
         else
             SendGrapheneBlock(MakeBlockRef(block), pfrom, inv, mempoolinfo);
