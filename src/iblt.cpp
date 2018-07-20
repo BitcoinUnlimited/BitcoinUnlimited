@@ -74,10 +74,11 @@ CIblt::CIblt()
 {
     n_hash = 1;
     is_modified = false;
+    version = 0;
 }
 
-CIblt::CIblt(size_t _expectedNumEntries) : is_modified(false) { CIblt::resize(_expectedNumEntries); }
-CIblt::CIblt(const CIblt &other) : is_modified(false)
+CIblt::CIblt(size_t _expectedNumEntries) : is_modified(false), version(0) { CIblt::resize(_expectedNumEntries); }
+CIblt::CIblt(const CIblt &other) : is_modified(false), version(0)
 {
     n_hash = other.n_hash;
     hashTable = other.hashTable;
