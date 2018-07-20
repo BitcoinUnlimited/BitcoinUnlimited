@@ -120,9 +120,12 @@ uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
         key << iter->second->GetBlockTime() << ":" << iter->second->GetBlockHash().ToString();
         blockBatch.Erase(key.str());
         undoBatch.Erase(key.str());
+        iter->second->nStatus &= ~BLOCK_HAVE_DATA;
+        iter->second->nStatus &= ~BLOCK_HAVE_UNDO;
         iter->second->nFile = 0;
         iter->second->nDataPos = 0;
         iter->second->nUndoPos = 0;
+        setDirtyBlockIndex.insert(iter->second);
         vDbBlockSizes.erase(vDbBlockSizes.begin());
         prunedCount = prunedCount + 1;
         nDBUsedSpace = nDBUsedSpace - frontSize;
