@@ -25,6 +25,7 @@
 #include "util.h"
 #include "utiltime.h"
 
+static bool DEFAULT_BLOOM_FILTER_TARGETING = true;
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
 
 CThinBlock::CThinBlock(const CBlock &block, CBloomFilter &filter)
@@ -1622,32 +1623,53 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
     std::set<uint256> setHighScoreMemPoolHashes;
     std::set<uint256> setPriorityMemPoolHashes;
 
-    // How much of the block should be dedicated to high-priority transactions.
-    // Logically this should be the same size as the DEFAULT_BLOCK_PRIORITY_SIZE however,
-    // we can't be sure that a miner won't decide to mine more high priority txs and therefore
-    // by including a full blocks worth of high priority tx's we cover every scenario.  And when we
-    // go on to add the high fee tx's there will be an intersection between the two which then makes
-    // the total number of tx's that go into the bloom filter smaller than just the sum of the two.
-    uint64_t nBlockPrioritySize = LargestBlockSeen() * 1.5;
-
-    // Largest projected block size used to add the high fee transactions.  We multiply it by an
-    // additional factor to take into account that miners may have slighty different policies when selecting
-    // high fee tx's from the pool.
-    uint64_t nBlockMaxProjectedSize = LargestBlockSeen() * 1.5;
-
-    std::vector<TxCoinAgePriority> vPriority;
-    TxCoinAgePriorityCompare pricomparer;
+    // When bloom filter targeting is turned on we try to limit the number of hashes we add to the bloom
+    // filter by approximately determining which transasctions are most likely to be mined in the next block.
+    //
+    // This helps to keep the size of the bloom filter down to a minimum however it also incurrs a small
+    // performance hit and therefore it is not done unless the memepool size is larger than the excessive
+    // block size, since there is no benefit to targeting if the blocks are likely big enough to clear the mempool.
+    if (GetBoolArg("-use-bloom-filter-targeting", DEFAULT_BLOOM_FILTER_TARGETING) &&
+        excessiveBlockSize < mempool.GetTotalTxSize())
     {
-        LOCK(cs_main);
-        READLOCK(mempool.cs);
-        if (mempool.mapTx.size() > 0)
-        {
-            CBlockIndex *pindexPrev = chainActive.Tip();
-            const int nHeight = pindexPrev->nHeight + 1;
-            const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
+        // How much of the block should be dedicated to high-priority transactions.
+        // Logically this should be the same size as the DEFAULT_BLOCK_PRIORITY_SIZE however,
+        // we can't be sure that a miner won't decide to mine more high priority txs and therefore
+        // by including a full blocks worth of high priority tx's we cover every scenario.  And when we
+        // go on to add the high fee tx's there will be an intersection between the two which then makes
+        // the total number of tx's that go into the bloom filter smaller than just the sum of the two.
+        uint64_t nBlockPrioritySize = excessiveBlockSize * 1.5;
 
-            int64_t nLockTimeCutoff =
-                (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : GetAdjustedTime();
+        // Largest projected block size used to add the high fee transactions.  We multiply it by an
+        // additional factor to take into account that miners may have slighty different policies when selecting
+        // high fee tx's from the pool.
+        uint64_t nBlockMaxProjectedSize = excessiveBlockSize * 1.5;
+
+        std::vector<TxCoinAgePriority> vPriority;
+        TxCoinAgePriorityCompare pricomparer;
+
+        uint64_t nMapTxSize = 0;
+        {
+            READLOCK(mempool.cs);
+            nMapTxSize = mempool.mapTx.size();
+        }
+
+        if (nMapTxSize > 0)
+        {
+            int nHeight = 0;
+            int64_t nMedianTimePast = 0;
+            int64_t nLockTimeCutoff = 0;
+            {
+                LOCK(cs_main);
+                CBlockIndex *pindexPrev = chainActive.Tip();
+                nHeight = pindexPrev->nHeight + 1;
+                nMedianTimePast = pindexPrev->GetMedianTimePast();
+
+                nLockTimeCutoff =
+                    (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : GetAdjustedTime();
+            }
+
+            READLOCK(mempool.cs);
 
             // Create a sorted list of transactions and their updated priorities.  This will be used to fill
             // the mempoolhashes with the expected priority area of the next block.  We will multiply this by
@@ -1695,11 +1717,12 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
             uint64_t nBlockSize = 0;
             while (mi != mempool.mapTx.get<3>().end())
             {
-                CTransaction tx = mi->GetTx();
+                const CTransaction &tx = mi->GetTx();
+                const uint256 &txHash = tx.GetHash();
 
                 if (!IsFinalTx(tx, nHeight, nLockTimeCutoff))
                 {
-                    LOG(BLOOM, "tx %s is not final\n", tx.GetHash().ToString());
+                    LOG(BLOOM, "tx %s is not final\n", txHash.ToString());
                     mi++;
                     continue;
                 }
@@ -1708,7 +1731,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
                 // it to the high score set if it can be and also add any parents or children.  Also add
                 // children and parents to the priority set tx's if they have any.
                 iter = mempool.mapTx.project<0>(mi);
-                if (!setHighScoreMemPoolHashes.count(tx.GetHash()))
+                if (!setHighScoreMemPoolHashes.count(txHash))
                 {
                     LOG(BLOOM,
                         "next tx is %s blocksize %d fee %d modified fee %d size %d clearatentry %d priority %f\n",
@@ -1716,14 +1739,14 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
                         mi->GetTxSize(), mi->WasClearAtEntry(), mi->GetPriority(nHeight));
 
                     // add tx to the set: we don't know if this is a parent or child yet.
-                    setHighScoreMemPoolHashes.insert(tx.GetHash());
+                    setHighScoreMemPoolHashes.insert(txHash);
 
                     // Add any parent tx's
                     bool fChild = false;
                     for (CTxMemPool::txiter parent : mempool.GetMemPoolParents(iter))
                     {
                         fChild = true;
-                        uint256 parentHash = parent->GetTx().GetHash();
+                        const uint256 &parentHash = parent->GetTx().GetHash();
                         if (!setHighScoreMemPoolHashes.count(parentHash))
                         {
                             setHighScoreMemPoolHashes.insert(parentHash);
@@ -1740,7 +1763,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
                     for (CTxMemPool::txiter child : mempool.GetMemPoolChildren(iter))
                     {
                         fHasChildren = true;
-                        uint256 childHash = child->GetTx().GetHash();
+                        const uint256 &childHash = child->GetTx().GetHash();
                         if (!setHighScoreMemPoolHashes.count(childHash))
                         {
                             setHighScoreMemPoolHashes.insert(childHash);
@@ -1768,6 +1791,13 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
             }
         }
     }
+    else // Add all the transaction hashes currently in the mempool
+    {
+        std::vector<uint256> vMempoolHashes;
+        mempool.queryHashes(vMempoolHashes);
+        setHighScoreMemPoolHashes.insert(vMempoolHashes.begin(), vMempoolHashes.end());
+    }
+
     LOG(THIN, "Bloom Filter Targeting completed in:%d (ms)\n", GetTimeMillis() - nStartTimer);
     nStartTimer = GetTimeMillis(); // reset the timer
 
