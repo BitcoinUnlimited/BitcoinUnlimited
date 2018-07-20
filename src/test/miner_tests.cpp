@@ -226,14 +226,15 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 
     // Assert we went right up to the limit.  We reserved 4 bytes for height but only use 2 as height is 110.
     // We also reserved 5 bytes for tx count but only use 3 as we don't have > 65535 txs in a block
-    BOOST_CHECK_EQUAL(minRoom, 4);
+    // and add 45 for the empty room for the unused weak hash reference output
+    BOOST_CHECK_EQUAL(minRoom, 4 + 45);
 
     minRoom = 1000;
     std::string testMinerComment("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvw"
                                  "xyzABCDEFGHIJKLM__________");
     // Now generate lots of full size blocks and verify that none exceed the maxGeneratedBlock value
     // printf("test mining with different sized miner comments");
-    for (unsigned int i = 2000; i <= 40000; i += 89)
+    for (unsigned int i = 1936; i <= 40000; i += 89)
     {
         maxGeneratedBlock = i;
         if ((i % 100) > 0)
@@ -255,7 +256,8 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     // Assert we went right up to the limit.  We reserved 4 bytes for height but only use 2 as height is 110.
     // However those 2 bytes are instead used by the long miner comment.
     // We also reserved 5 bytes for tx count but only use 3 as we don't have > 65535 txs in a block
-    BOOST_CHECK_EQUAL(minRoom, 2);
+    // and add 45 for the empty room for the unused weak hash reference output
+    BOOST_CHECK_EQUAL(minRoom, 2 + 45);
 
     mempool.clear();
 
