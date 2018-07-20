@@ -225,7 +225,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 
     // Assert we went right up to the limit.  We reserved 4 bytes for height but only use 2 as height is 110.
     // We also reserved 5 bytes for tx count but only use 3 as we don't have > 65535 txs in a block
-    BOOST_CHECK(minRoom == 4);
+    BOOST_CHECK_EQUAL(minRoom, 4);
 
     minRoom = 1000;
     std::string testMinerComment("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvw"
@@ -254,7 +254,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     // Assert we went right up to the limit.  We reserved 4 bytes for height but only use 2 as height is 110.
     // However those 2 bytes are instead used by the long miner comment.
     // We also reserved 5 bytes for tx count but only use 3 as we don't have > 65535 txs in a block
-    BOOST_CHECK(minRoom == 2);
+    BOOST_CHECK_EQUAL(minRoom, 2);
 
     mempool.clear();
 
