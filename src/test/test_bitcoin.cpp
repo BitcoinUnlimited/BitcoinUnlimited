@@ -172,6 +172,10 @@ struct StartupShutdown
             std::string s = opts["log_bitcoin"].as<std::string>();
             if (s == "console")
             {
+                /* To enable this, add
+                   -- --log_bitcoin console
+                   to the end of the test_bitcoin argument list. */
+                Logging::LogToggleCategory(Logging::ALL, true);
                 fPrintToConsole = true;
                 fPrintToDebugLog = false;
             }
