@@ -356,27 +356,24 @@ UniValue importaddresses(const UniValue &params, bool fHelp)
     if (!EnsureWalletIsAvailable(fHelp))
         return NullUniValue;
 
-    if (fHelp || params.size() < 1 || params.size() > 4)
+    if (fHelp || params.size() < 1)
         throw runtime_error(
             "importaddresses [rescan | no-rescan] \"address\"...\n"
             "\nAdds a script (in hex) or address that can be watched as if it were in your wallet but cannot be used "
             "to spend.\n"
             "\nArguments:\n"
-            "1. \"rescan | no-rescan\" (string, optional default rescan) If \"no-rescan\", skip wallet rescan\n"
-            "1. \"address\"           (string, 0 or more) The address or hex-encoded P2SH script\n"
-            "\nNote, this command will return before the rescan (may take hours) is complete..\n"
+            "1. \"rescan | no-rescan\" (string, optional, default=rescan) If \"no-rescan\", skip wallet rescan\n"
+            "2. \"address\"           (string, 0 or more) The address(es) or hex-encoded P2SH script(s)\n"
+            "\nNote, this command will return before the rescan (may take hours) is complete.\n"
             "If you have the full public key, you should call importpublickey instead of this.\n"
             "This command assumes all scripts are P2SH, so you should call importaddress to\n"
             "import a nonstandard non-P2SH script.\n"
             "\nExamples:\n"
-            "\nImport a script with rescan\n" +
-            HelpExampleCli("importaddresses", "\"myscript\"") + "\nImport using a label without rescan\n" +
-            HelpExampleCli("importaddresses", "no-rescan \"myscript\"") + "\nAs a JSON-RPC call\n" +
-            HelpExampleRpc("importaddress", "\"myscript\""));
-
-    string strLabel = "";
-    if (params.size() > 1)
-        strLabel = params[1].get_str();
+            "\nImport 2 scripts with rescan\n" +
+            HelpExampleCli("importaddresses", "\"myscript1\" \"myscript2\"") + "\nImport 2 scripts without rescan\n" +
+            HelpExampleCli("importaddresses", "no-rescan \"myscript1\" \"myscript2\"") + "\nRescan without import\n" +
+            HelpExampleCli("importaddresses", "rescan") + "\nAs a JSON-RPC call\n" +
+            HelpExampleRpc("importaddresses", "\"myscript1\", \"myscript2\""));
 
     // Whether to perform rescan after import
     bool fRescanLocal = true;
@@ -405,13 +402,13 @@ UniValue importaddresses(const UniValue &params, bool fHelp)
         CTxDestination dest = DecodeDestination(param);
         if (IsValidDestination(dest))
         {
-            ImportAddress(dest, strLabel);
+            ImportAddress(dest, "");
         }
         else if (IsHex(param))
         {
             bool fP2SH = true;
             std::vector<unsigned char> data(ParseHex(param));
-            ImportScript(CScript(data.begin(), data.end()), strLabel, fP2SH);
+            ImportScript(CScript(data.begin(), data.end()), "", fP2SH);
         }
         else
         {
