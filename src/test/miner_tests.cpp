@@ -165,6 +165,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).SpendsCoinbase(spendsCoinbase).FromTx(tx));
         tx.vin[0].prevout.hash = hash;
     }
+    LOGA("Transaction size: %d\n", GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION));
 
     BOOST_CHECK_EXCEPTION(
         BlockAssembler(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error, HasReason("bad-blk-sigops"));
