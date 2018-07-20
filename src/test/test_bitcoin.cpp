@@ -190,3 +190,9 @@ struct StartupShutdown
 };
 
 BOOST_GLOBAL_FIXTURE(StartupShutdown);
+
+std::ostream &operator<<(std::ostream &os, const uint256 &num)
+{
+    os << num.ToString();
+    return os;
+}
