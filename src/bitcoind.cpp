@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin developers
+// Copyright (c) 2009-2017 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,6 +10,7 @@
 #include "chainparams.h"
 #include "clientversion.h"
 #include "config.h"
+#include "forks_csv.h"
 #include "fs.h"
 #include "httprpc.h"
 #include "httpserver.h"
@@ -112,6 +113,22 @@ bool AppInit(int argc, char *argv[])
         fprintf(stdout, "%s", strUsage.c_str());
         return true;
     }
+
+    // bip135 begin
+    // dump default deployment info and exit, if requested
+    if (GetBoolArg("-dumpforks", false))
+    {
+        std::stringstream ss;
+        ss << "# " << strprintf(_("%s Daemon"), _(PACKAGE_NAME)) << " " << _("version") << " " << FormatFullVersion();
+        ss << "\n" << FORKS_CSV_FILE_HEADER;
+        ss << NetworkDeploymentInfoCSV(CBaseChainParams::MAIN);
+        ss << NetworkDeploymentInfoCSV(CBaseChainParams::UNL);
+        ss << NetworkDeploymentInfoCSV(CBaseChainParams::TESTNET);
+        ss << NetworkDeploymentInfoCSV(CBaseChainParams::REGTEST);
+        std::cout << ss.str();
+        return true;
+    }
+    // bip135 end
 
     try
     {
