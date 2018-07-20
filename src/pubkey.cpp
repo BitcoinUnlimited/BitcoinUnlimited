@@ -155,7 +155,15 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
         return 0;
     }
     spos = pos;
+
+
+// Note: ignore further increment for static analysis
+// in pos as it is currently the last one and will cause a failure.
+// In the unlikely event this function gets extended,
+// remove or move the #ifndef below.
+#ifndef __clang_analyzer__
     pos += slen;
+#endif
 
     /* Ignore leading zeroes in R */
     while (rlen > 0 && input[rpos] == 0)

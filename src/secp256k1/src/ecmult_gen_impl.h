@@ -150,7 +150,10 @@ static void secp256k1_ecmult_gen(const secp256k1_ecmult_gen_context *ctx, secp25
         secp256k1_ge_from_storage(&add, &adds);
         secp256k1_gej_add_ge(r, r, &add);
     }
+    /* see also: https://github.com/bitcoin-core/secp256k1/pull/485 */
+#ifndef __clang_analyzer__
     bits = 0;
+#endif
     secp256k1_ge_clear(&add);
     secp256k1_scalar_clear(&gnb);
 }

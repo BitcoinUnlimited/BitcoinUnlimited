@@ -109,7 +109,7 @@ double TxConfirmStats::EstimateMedianVal(int confTarget,
     // The cur variables are the current range we're counting.
     unsigned int curNearBucket = startbucket;
     unsigned int bestNearBucket = startbucket;
-    unsigned int curFarBucket = startbucket;
+    unsigned int curFarBucket = 0;
     unsigned int bestFarBucket = startbucket;
 
     bool foundAnswer = false;

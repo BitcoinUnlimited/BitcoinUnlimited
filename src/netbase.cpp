@@ -756,7 +756,7 @@ std::string NetworkErrorString(int err)
 std::string NetworkErrorString(int err)
 {
     char buf[256];
-    const char *s = buf;
+    const char *s = nullptr;
     buf[0] = 0;
 /* Too bad there are two incompatible implementations of the
  * thread-safe strerror. */
@@ -765,6 +765,7 @@ std::string NetworkErrorString(int err)
 #else /* POSIX variant always returns message in buffer */
     if (strerror_r(err, buf, sizeof(buf)))
         buf[0] = 0;
+    s = buf;
 #endif
     return strprintf("%s (%d)", s, err);
 }
