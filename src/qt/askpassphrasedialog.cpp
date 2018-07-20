@@ -82,7 +82,7 @@ AskPassphraseDialog::~AskPassphraseDialog()
     delete ui;
 }
 
-void AskPassphraseDialog::setModel(WalletModel *model) { this->model = model; }
+void AskPassphraseDialog::setModel(WalletModel *_model) { this->model = _model; }
 void AskPassphraseDialog::accept()
 {
     SecureString oldpass, newpass1, newpass2;

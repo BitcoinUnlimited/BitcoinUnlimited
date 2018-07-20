@@ -51,7 +51,7 @@ SignVerifyMessageDialog::SignVerifyMessageDialog(const PlatformStyle *platformSt
 }
 
 SignVerifyMessageDialog::~SignVerifyMessageDialog() { delete ui; }
-void SignVerifyMessageDialog::setModel(WalletModel *model) { this->model = model; }
+void SignVerifyMessageDialog::setModel(WalletModel *_model) { this->model = _model; }
 void SignVerifyMessageDialog::setAddress_SM(const QString &address)
 {
     ui->addressIn_SM->setText(address);

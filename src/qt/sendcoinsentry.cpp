@@ -77,11 +77,11 @@ void SendCoinsEntry::on_addressBookButton_clicked()
 }
 
 void SendCoinsEntry::on_payTo_textChanged(const QString &address) { updateLabel(address); }
-void SendCoinsEntry::setModel(WalletModel *model)
+void SendCoinsEntry::setModel(WalletModel *_model)
 {
-    this->model = model;
+    this->model = _model;
 
-    if (model && model->getOptionsModel())
+    if (_model && _model->getOptionsModel())
         connect(model->getOptionsModel(), SIGNAL(displayUnitChanged(int)), this, SLOT(updateDisplayUnit()));
 
     clear();

@@ -160,15 +160,15 @@ CoinControlDialog::~CoinControlDialog()
     delete ui;
 }
 
-void CoinControlDialog::setModel(WalletModel *model)
+void CoinControlDialog::setModel(WalletModel *_model)
 {
-    this->model = model;
+    this->model = _model;
 
-    if (model && model->getOptionsModel() && model->getAddressTableModel())
+    if (_model && _model->getOptionsModel() && _model->getAddressTableModel())
     {
         updateView();
         updateLabelLocked();
-        CoinControlDialog::updateLabels(model, this);
+        CoinControlDialog::updateLabels(_model, this);
     }
 }
 

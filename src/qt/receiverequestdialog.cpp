@@ -105,12 +105,12 @@ ReceiveRequestDialog::ReceiveRequestDialog(const Config *cfg, QWidget *parent)
 }
 
 ReceiveRequestDialog::~ReceiveRequestDialog() { delete ui; }
-void ReceiveRequestDialog::setModel(OptionsModel *model)
+void ReceiveRequestDialog::setModel(OptionsModel *_model)
 {
-    this->model = model;
+    this->model = _model;
 
-    if (model)
-        connect(model, SIGNAL(displayUnitChanged(int)), this, SLOT(update()));
+    if (_model)
+        connect(_model, SIGNAL(displayUnitChanged(int)), this, SLOT(update()));
 
     // update the display unit if necessary
     update();
