@@ -21,11 +21,13 @@
 #include "expedited.h"
 #include "graphene.h"
 #include "hash.h"
+#include "init.h"
 #include "leakybucket.h"
 #include "miner.h"
 #include "net.h"
 #include "parallel.h"
 #include "policy/policy.h"
+#include "pow.h"
 #include "primitives/block.h"
 #include "requestManager.h"
 #include "rpc/server.h"
@@ -43,6 +45,7 @@
 #include "utilstrencodings.h"
 #include "validationinterface.h"
 #include "version.h"
+#include "weakblock.h"
 
 #include <atomic>
 #include <boost/lexical_cast.hpp>
@@ -656,10 +659,26 @@ void static BitcoinMiner(const CChainParams &chainparams)
             //
             int64_t nStart = GetTime();
             arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
+            LOGA("(Strong) hash target: %s\n", hashTarget.GetHex());
+
             uint256 hash;
             uint32_t nNonce = 0;
+
+
+            // save old weak block to also trigger block rebuild
+            // on incoming new weak blocks
+            CWeakblockRef old_weakblock(weakstore.Tip());
+
             while (true)
             {
+                // If weakblocks are enabled, auto generate weakblocks (that can be forwarded according to current local
+                // node rules) as well.
+                if (weakblocksEnabled())
+                {
+                    LOCK(cs_weakblocks);
+                    hashTarget = arith_uint256().SetCompact(ConsiderationWeakblockProofOfWork(pblock->nBits));
+                }
+
                 // Check if something found
                 if (ScanHash(pblock, nNonce, &hash))
                 {
@@ -697,6 +716,12 @@ void static BitcoinMiner(const CChainParams &chainparams)
                     LOCK(cs_main);
                     if (pindexPrev != chainActive.Tip())
                         break;
+                }
+                // if a new weak block has been found, redo the block as well
+                if (old_weakblock != weakstore.Tip())
+                {
+                    LOG(WB, "BitcoinMiner: New weak block arrived. Recalculating.\n");
+                    break;
                 }
 
                 // Update nTime every few seconds

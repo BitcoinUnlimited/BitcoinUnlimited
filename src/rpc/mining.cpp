@@ -25,6 +25,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validationinterface.h"
+#include "weakblock.h"
 
 #include <stdint.h>
 
@@ -34,6 +35,14 @@
 #include <univalue.h>
 
 using namespace std;
+
+// generation mode for weak blocks generation
+enum GenerationMode
+{
+    genStrongOnly,
+    genWeakAndStrong,
+    genWeakOnly
+};
 
 /**
  * Return average network hashes per second based on the last 'lookup' blocks,
@@ -104,7 +113,8 @@ UniValue getnetworkhashps(const UniValue &params, bool fHelp)
 UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
     int nGenerate,
     uint64_t nMaxTries,
-    bool keepScript)
+    bool keepScript,
+    GenerationMode genmode)
 {
     static const int nInnerLoopCount = 0x10000;
     int nHeightStart = 0;
@@ -130,21 +140,42 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
             // LOCK(cs_main);
             IncrementExtraNonce(pblock, nExtraNonce);
         }
-        while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount &&
-               !CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus(), 1))
+
+        uint32_t req_nBits, weakFactor;
         {
-            ++pblock->nNonce;
-            --nMaxTries;
-        }
-        if (nMaxTries == 0)
-        {
-            break;
-        }
-        if (pblock->nNonce == nInnerLoopCount)
-        {
-            continue;
+            LOCK(cs_weakblocks);
+            // required bits for puzzle solution
+            req_nBits = (genmode == genWeakOnly || genmode == genWeakAndStrong) ?
+                            ConsiderationWeakblockProofOfWork(pblock->nBits) :
+                            pblock->nBits;
+
+            weakFactor = (genmode == genWeakOnly || genmode == genWeakAndStrong) ? weakblocksConsiderPOWRatio() : 1;
         }
 
+        do
+        {
+            ++pblock->nNonce;
+            while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount &&
+                   !CheckProofOfWork(pblock->GetHash(), req_nBits, Params().GetConsensus(), weakFactor))
+            {
+                ++pblock->nNonce;
+                --nMaxTries;
+            }
+            if (nMaxTries == 0)
+            {
+                break;
+            }
+            if (pblock->nNonce == nInnerLoopCount)
+            {
+                continue;
+            }
+
+            LOGA("Generated maybe strong block at difficulty %s, strong %s, weak %s, hash %s, nonce: %d.\n",
+                arith_uint256().SetCompact(req_nBits).GetHex(), arith_uint256().SetCompact(pblock->nBits).GetHex(),
+                arith_uint256().SetCompact(MinWeakblockProofOfWork(pblock->nBits)).GetHex(), pblock->GetHash().GetHex(),
+                pblock->nNonce);
+        } while (
+            genmode == genWeakOnly && CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus(), 1));
 
         // We take a cs_main lock here even though it will also be aquired in ProcessNewBlock.  We want
         // to make sure we give priority to our own blocks.  This is in order to prevent any other Parallel
@@ -181,12 +212,14 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
 
 UniValue generate(const UniValue &params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)
-        throw runtime_error("generate numblocks ( maxtries )\n"
+    if (fHelp || params.size() < 1 || params.size() > 3)
+        throw runtime_error("generate numblocks ( maxtries ) (genmode)\n"
                             "\nMine up to numblocks blocks immediately (before the RPC call returns)\n"
                             "\nArguments:\n"
                             "1. numblocks    (numeric, required) How many blocks are generated immediately.\n"
                             "2. maxtries     (numeric, optional) How many iterations to try (default = 1000000).\n"
+                            "3. genmode      (string, optional) Generation mode for weak and strong blocks (default = "
+                            "strong-only) Can be one of strong-only, weak-and-strong, weak-only"
                             "\nResult\n"
                             "[ blockhashes ]     (array) hashes of blocks generated\n"
                             "\nExamples:\n"
@@ -200,6 +233,21 @@ UniValue generate(const UniValue &params, bool fHelp)
         nMaxTries = params[1].get_int();
     }
 
+    GenerationMode genmode = genStrongOnly;
+
+    if (params.size() > 2)
+    {
+        const std::string gm_s = params[2].get_str();
+        if (gm_s == "strong-only")
+            genmode = genStrongOnly;
+        else if (gm_s == "weak-and-strong")
+            genmode = genWeakAndStrong;
+        else if (gm_s == "weak-only")
+            genmode = genWeakOnly;
+        else
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid genmode");
+    }
+
     boost::shared_ptr<CReserveScript> coinbaseScript;
     GetMainSignals().ScriptForMining(coinbaseScript);
 
@@ -211,7 +259,7 @@ UniValue generate(const UniValue &params, bool fHelp)
     if (coinbaseScript->reserveScript.empty())
         throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
 
-    return generateBlocks(coinbaseScript, nGenerate, nMaxTries, true);
+    return generateBlocks(coinbaseScript, nGenerate, nMaxTries, true, genmode);
 }
 
 UniValue generatetoaddress(const UniValue &params, bool fHelp)
@@ -245,7 +293,7 @@ UniValue generatetoaddress(const UniValue &params, bool fHelp)
     boost::shared_ptr<CReserveScript> coinbaseScript(new CReserveScript());
     coinbaseScript->reserveScript = GetScriptForDestination(destination);
 
-    return generateBlocks(coinbaseScript, nGenerate, nMaxTries, false);
+    return generateBlocks(coinbaseScript, nGenerate, nMaxTries, false, genStrongOnly);
 }
 
 UniValue getmininginfo(const UniValue &params, bool fHelp)
