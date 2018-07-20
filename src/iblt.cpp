@@ -31,6 +31,16 @@ SOFTWARE.
 
 static const size_t N_HASHCHECK = 11;
 
+// mask that can be reduced to reduce the number of checksum bits in the IBLT
+// -- ANY VALUE OTHER THAN 0xffffffff IS FOR TESTING ONLY! --
+static const uint32_t KEYCHECK_MASK = 0xffffffff;
+
+static inline uint32_t keyChecksumCalc(const std::vector<uint8_t> &kvec)
+{
+    return MurmurHash3(N_HASHCHECK, kvec) & KEYCHECK_MASK;
+}
+
+
 template <typename T>
 std::vector<uint8_t> ToVec(T number)
 {
@@ -47,7 +57,7 @@ bool HashTableEntry::isPure() const
 {
     if (count == 1 || count == -1)
     {
-        uint32_t check = MurmurHash3(N_HASHCHECK, ToVec(keySum));
+        uint32_t check = keyChecksumCalc(ToVec(keySum));
         return (keyCheck == check);
     }
     return false;
@@ -116,6 +126,7 @@ void CIblt::_insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> &v)
         return;
 
     std::vector<uint8_t> kvec = ToVec(k);
+    const uint32_t kchk = keyChecksumCalc(kvec);
 
     for (size_t i = 0; i < n_hash; i++)
     {
@@ -125,7 +136,7 @@ void CIblt::_insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> &v)
         HashTableEntry &entry = hashTable.at(startEntry + (h % bucketsPerHash));
         entry.count += plusOrMinus;
         entry.keySum ^= k;
-        entry.keyCheck ^= MurmurHash3(N_HASHCHECK, kvec);
+        entry.keyCheck ^= kchk;
         if (entry.empty())
         {
             entry.valueSum.clear();
@@ -294,7 +305,7 @@ std::string CIblt::DumpTable() const
     {
         const HashTableEntry &entry = hashTable.at(i);
         result << entry.count << " " << entry.keySum << " ";
-        result << (MurmurHash3(N_HASHCHECK, ToVec(entry.keySum)) == entry.keyCheck ? "true" : "false");
+        result << (keyChecksumCalc(ToVec(entry.keySum)) == entry.keyCheck ? "true" : "false");
         result << "\n";
     }
 
