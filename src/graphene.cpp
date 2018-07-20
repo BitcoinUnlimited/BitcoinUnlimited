@@ -110,8 +110,8 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // In the rare event of an erroneous checksum during IBLT decoding, the receiver may
     // have requested an invalid cheap hash, and the sender would have simply skipped sending
-    // it. In that case, the number of missing txs returned will be fewer than the number 
-    // needed. Because the graphene block will be incomplete without the missing txs, we 
+    // it. In that case, the number of missing txs returned will be fewer than the number
+    // needed. Because the graphene block will be incomplete without the missing txs, we
     // request a failover block instead.
     if (grapheneBlockTx.vMissingTx.size() < pfrom->grapheneBlockWaitingForTxns)
     {
