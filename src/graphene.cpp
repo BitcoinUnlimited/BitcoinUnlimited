@@ -108,6 +108,20 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         return true;
     }
 
+    // In the rare event of an erroneous checksum during IBLT decoding, the receiver may
+    // have requested an invalid cheap hash, and the sender would have simply skipped sending
+    // it. In that case, the number of missing txs returned will be fewer than the number 
+    // needed. Because the graphene block will be incomplete without the missing txs, we 
+    // request a failover block instead.
+    if (grapheneBlockTx.vMissingTx.size() < pfrom->grapheneBlockWaitingForTxns)
+    {
+        graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
+
+        RequestFailoverBlock(pfrom, grapheneBlockTx.blockhash);
+        return error("Still missing transactions from those returned by sender, peer=%s: re-requesting failover block",
+            pfrom->GetLogName());
+    }
+
     for (const CTransaction &tx : grapheneBlockTx.vMissingTx)
     {
         pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
