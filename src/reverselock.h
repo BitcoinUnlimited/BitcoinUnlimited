@@ -13,7 +13,7 @@ template <typename Lock>
 class reverse_lock
 {
 public:
-    explicit reverse_lock(Lock &lock) : lock(lock)
+    explicit reverse_lock(Lock &_lock) : lock(_lock)
     {
         lock.unlock();
         lock.swap(templock);
