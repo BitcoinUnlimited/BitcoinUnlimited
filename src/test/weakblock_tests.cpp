@@ -26,6 +26,8 @@ BOOST_FIXTURE_TEST_SUITE(weakblock_tests, WeakTestSetup)
 // check basic state when everything's fresh and empty
 BOOST_AUTO_TEST_CASE(default_tests)
 {
+    LOCK(cs_weakblocks);
+
     BOOST_CHECK_EQUAL(weakblocksEnabled(), DEFAULT_WEAKBLOCKS_ENABLE);
     BOOST_CHECK_EQUAL(weakblocksConsiderPOWRatio(), DEFAULT_WEAKBLOCKS_CONSIDER_POW_RATIO);
     BOOST_CHECK_EQUAL(weakblocksMinPOWRatio(), 600);
@@ -117,6 +119,7 @@ BOOST_AUTO_TEST_CASE(construct_empty)
 {
     CBlock b0;
     CWeakblock wb(&b0);
+    LOCK(cs_weakblocks);
     BOOST_CHECK_EQUAL(wb.GetWeakHeight(), 0);
     BOOST_CHECK_EQUAL(wb.GetWeakHeight(), 0); // using cached value
 }
@@ -128,7 +131,6 @@ static void scenario1() {
     CBlockRef b1 = weakextendBlock(&b0, 100);
 
     CWeakblockRef wb0, wb1, wb2;
-
     BOOST_CHECK(nullptr != (wb0 = weakstore.store(&b0)));
     BOOST_CHECK_EQUAL(weakstore.Tip()->GetHash(), b0.GetHash());
     BOOST_CHECK_EQUAL(weakstore.size(), 1);
@@ -215,6 +217,8 @@ static void scenario2() {
 BOOST_AUTO_TEST_CASE(weak_chain1)
 {
     CBlock b0;
+    LOCK(cs_weakblocks);
+
     // mark all for expiry
     weakstore.expireOld();
     // and check that all are at height -1

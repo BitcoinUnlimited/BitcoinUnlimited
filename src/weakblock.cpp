@@ -61,7 +61,6 @@ CWeakblock::CWeakblock(const CBlock* other) {
 }
 
 static bool extends_check(const CBlock* block, const CBlock* underlying) {
-    AssertLockHeld(cs_weakblocks);
     if (block == nullptr || underlying == nullptr) return false;
 
     if (underlying->vtx.size() > block->vtx.size()) return false;
@@ -233,19 +232,21 @@ void CWeakStore::expireOld(const bool fThorough) {
 }
 
 CWeakblockRef CWeakStore::byHash(const uint256& hash) const {
+    AssertLockHeld(cs_weakblocks);
     if (hash2wb.count(hash))
         return hash2wb.at(hash);
     else return nullptr;
 }
 
 CWeakblockRef CWeakStore::parent(const uint256& hash) const {
+    AssertLockHeld(cs_weakblocks);
     if (extends_map.count(hash))
         return byHash(extends_map.at(hash));
     else return nullptr;
 }
 
-size_t CWeakStore::size() const { LOCK(cs_weakblocks); return hash2wb.size(); }
-bool CWeakStore::empty() const { return size() == 0; }
+size_t CWeakStore::size() const { AssertLockHeld(cs_weakblocks); return hash2wb.size(); }
+bool CWeakStore::empty() const { AssertLockHeld(cs_weakblocks); return size() == 0; }
 
 void CWeakStore::consistencyCheck() const {
     LOCK(cs_weakblocks);
@@ -264,6 +265,7 @@ void CWeakStore::consistencyCheck() const {
 }
 
 const std::vector<CWeakblockRef>& CWeakStore::chainTips() const {
+    AssertLockHeld(cs_weakblocks);
     return chain_tips;
 }
 
