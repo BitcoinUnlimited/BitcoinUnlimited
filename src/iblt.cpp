@@ -198,7 +198,9 @@ bool CIblt::get(uint64_t k, std::vector<uint8_t> &result) const
                 return true;
             }
             ++nErased;
-            peeled._insert(-entry.count, entry.keySum, entry.valueSum);
+            // NOTE: Need to create a copy of valueSum here as entry is just a reference!
+            std::vector<uint8_t> vec = entry.valueSum;
+            peeled._insert(-entry.count, entry.keySum, vec);
         }
     }
     if (nErased > 0)
@@ -231,7 +233,9 @@ bool CIblt::listEntries(std::set<std::pair<uint64_t, std::vector<uint8_t> > > &p
                 {
                     negative.insert(std::make_pair(entry.keySum, entry.valueSum));
                 }
-                peeled._insert(-entry.count, entry.keySum, entry.valueSum);
+                // NOTE: Need to create a copy of valueSum here as entry is just a reference!
+                std::vector<uint8_t> vec = entry.valueSum;
+                peeled._insert(-entry.count, entry.keySum, vec);
                 ++nErased;
             }
         }
