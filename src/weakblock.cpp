@@ -178,7 +178,7 @@ CWeakblockRef CWeakStore::store(const CBlock* block) {
         }
     }
     chain_tips.push_back(wb);
-    LOG(WB, "Tracking weak block %s of %d transaction(s).\n", blockhash.GetHex(), wb->vtx.size());
+    LOG(WB, "Tracking weak block %s (short: %x) of %d transaction(s), parent: %s.\n", blockhash.GetHex(), blockhash.GetCheapHash(), wb->vtx.size(), wb->hashPrevBlock.GetHex());
     return wb;
 }
 
