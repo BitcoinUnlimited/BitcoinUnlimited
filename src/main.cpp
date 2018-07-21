@@ -6237,24 +6237,41 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         LoadFilter(pfrom, &filterMemPool);
         {
             LOCK(cs_main);
+            bool handled = false;
             BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
             if (mi == mapBlockIndex.end())
+            {
+                // ok, not in the blockindex, it might still be weakblock
+                {
+                    LOCK(cs_weakblocks);
+                    CWeakblockRef wb = weakstore.byHash(inv.hash);
+                    if (wb != nullptr)
+                    {
+                        SendXThinBlock(wb, pfrom, inv);
+                        handled = true;
+                    }
+                }
+            }
+            else
             {
                 dosMan.Misbehaving(pfrom, 100);
                 return error("Peer %srequested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
             }
 
-            CBlock block;
-            const Consensus::Params &consensusParams = Params().GetConsensus();
-            if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
+            if (!handled)
             {
-                // We don't have the block yet, although we know about it.
-                return error(
-                    "Peer %s requested block %s that cannot be read", pfrom->GetLogName(), inv.hash.ToString());
-            }
-            else
-            {
-                SendXThinBlock(MakeBlockRef(block), pfrom, inv);
+                CBlock block;
+                const Consensus::Params &consensusParams = Params().GetConsensus();
+                if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
+                {
+                    // We don't have the block yet, although we know about it.
+                    return error(
+                        "Peer %s requested block %s that cannot be read", pfrom->GetLogName(), inv.hash.ToString());
+                }
+                else
+                {
+                    SendXThinBlock(MakeBlockRef(block), pfrom, inv);
+                }
             }
         }
     }
