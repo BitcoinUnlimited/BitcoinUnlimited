@@ -109,6 +109,10 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
+        READWRITE(COMPACTSIZE(version));
+        if (ser_action.ForRead() && version != 0)
+            throw std::ios_base::failure("Only IBLT version zero is currently known.");
+
         READWRITE(n_hash);
         if (ser_action.ForRead() && n_hash == 0)
         {
@@ -122,6 +126,7 @@ public:
 private:
     void _insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> &v);
 
+    uint64_t version;
     uint8_t n_hash;
     bool is_modified;
 
