@@ -124,6 +124,7 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
             node->Release();
         }
     }
+    LOG(REQ, "Clearing item available from for obj: %s\n", item.obj.hash.GetHex());
     item.availableFrom.clear();
 
     if (item.obj.type == MSG_TX)
@@ -640,8 +641,13 @@ void CRequestManager::SendRequests()
                 // Go thru the availableFrom list, looking for the first node that isn't disconnected
                 while (!item.availableFrom.empty() && (next.node == nullptr))
                 {
+                    LOG(REQ, "At next available block item: node:%d item:%s\n", item.availableFrom.front().node->id,
+                        item.obj.hash.GetHex());
+
                     next = item.availableFrom.front(); // Grab the next location where we can find this object.
                     item.availableFrom.pop_front();
+
+
                     if (next.node != nullptr)
                     {
                         // Do not request from this node if it was disconnected
