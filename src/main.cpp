@@ -5917,8 +5917,11 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     hashLastBlock = header.hashPrevBlock;
             }
 
-            // Add this header to the map if it doesn't connect to a previous header
-            if (header.hashPrevBlock != hashLastBlock)
+            // Add this header to the map if it doesn't connect to a previous header and is not
+            // connecting to the current head (e.g. a weak block)
+            // FIXME: check logic!
+            if (header.hashPrevBlock != hashLastBlock &&
+                (chainActive.Tip() == nullptr || header.hashPrevBlock != chainActive.Tip()->GetBlockHash()))
             {
                 // If we still haven't finished downloading the initial headers during node sync and we get
                 // an out of order header then we must disconnect the node so that we can finish downloading
