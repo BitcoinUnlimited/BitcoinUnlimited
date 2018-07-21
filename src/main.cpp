@@ -6022,8 +6022,24 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 break;
             }
             else
-                PV->UpdateMostWorkOurFork(header);
-
+            {
+                // if a weak header, request weak block
+                if (isWeak)
+                {
+                    // pindex must be nonnull because we populated vToFetch a few lines above
+                    CInv inv(MSG_BLOCK, header.GetHash());
+                    if (weakstore.byHash(header.GetHash()) == nullptr)
+                    {
+                        requester.AskFor(inv, pfrom);
+                        LOG(REQ, "AskFor weak block via headers direct fetch %s peer=%d\n", header.GetHash().ToString(),
+                            pfrom->id);
+                    }
+                }
+                else
+                {
+                    PV->UpdateMostWorkOurFork(header);
+                }
+            }
             i++;
         }
 
