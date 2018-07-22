@@ -3698,7 +3698,11 @@ static bool AcceptBlock(const CBlock &block,
 
         if (weakstore.store(&block))
         {
-            // FIXME: Send out here?
+            const uint256 blockhash = block.GetHash();
+            for (CNode *pnode : vNodes)
+            {
+                pnode->PushBlockHash(blockhash);
+            }
         }
         else
             LOG(WB, "Problem storing weakblock %s. Ignoring.\n", block.GetHash().GetHex());
@@ -7075,6 +7079,15 @@ bool SendMessages(CNode *pto)
                 // headers that aren't on chainActive, give up.
                 for (const uint256 &hash : pto->vBlockHashesToAnnounce)
                 {
+                    {
+                        LOCK(cs_weakblocks);
+                        CWeakblockRef wb = weakstore.byHash(hash);
+                        if (wb != nullptr)
+                        {
+                            vHeaders.push_back(wb->GetBlockHeader());
+                            continue;
+                        }
+                    }
                     BlockMap::iterator mi = mapBlockIndex.find(hash);
                     // BU skip blocks that we don't know about.  was: assert(mi != mapBlockIndex.end());
                     if (mi == mapBlockIndex.end())
