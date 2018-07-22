@@ -803,4 +803,24 @@ BOOST_AUTO_TEST_CASE(util_wildmatch)
     BOOST_CHECK(!wildmatch("*", std::string("x", 10000)));
 }
 
+BOOST_AUTO_TEST_CASE(splitbycommaandremovespaces)
+{
+    std::vector<std::string> inp1{"one", "two, three  ", "f o u r"};
+
+    const std::vector<std::string> r = splitByCommasAndRemoveSpaces(inp1);
+
+    BOOST_CHECK_EQUAL(r.size(), 4);
+    BOOST_CHECK_EQUAL(r[0], "one");
+    BOOST_CHECK_EQUAL(r[1], "two");
+    BOOST_CHECK_EQUAL(r[2], "three");
+    BOOST_CHECK_EQUAL(r[3], "four");
+
+    const std::vector<std::string> r2 = splitByCommasAndRemoveSpaces(r);
+    BOOST_CHECK_EQUAL(r.size(), 4);
+    BOOST_CHECK_EQUAL(r[0], "one");
+    BOOST_CHECK_EQUAL(r[1], "two");
+    BOOST_CHECK_EQUAL(r[2], "three");
+    BOOST_CHECK_EQUAL(r[3], "four");
+}
+
 BOOST_AUTO_TEST_SUITE_END()

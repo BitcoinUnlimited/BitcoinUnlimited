@@ -91,6 +91,26 @@
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
 
+std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args)
+{
+    std::vector<std::string> result;
+    for (std::string arg : args)
+    {
+        size_t pos;
+        while ((pos = arg.find(',')) != std::string::npos)
+        {
+            result.push_back(arg.substr(0, pos));
+            arg = arg.substr(pos + 1);
+        }
+        std::string arg_nospace;
+        for (char c : arg)
+            if (c != ' ')
+                arg_nospace += c;
+        result.push_back(arg_nospace);
+    }
+    return result;
+}
+
 // Work around clang compilation problem in Boost 1.46:
 // /usr/include/boost/program_options/detail/config_file.hpp:163:17: error: call to function 'to_internal' that is
 // neither visible in the template definition nor found by argument-dependent lookup
@@ -159,7 +179,7 @@ void LogInit()
 {
     string category = "";
     uint64_t catg = Logging::NONE;
-    const vector<string> &categories = mapMultiArgs["-debug"];
+    const vector<string> categories = splitByCommasAndRemoveSpaces(mapMultiArgs["-debug"]);
 
     // enable all when given -debug=1 or -debug
     if (categories.size() == 1 && (categories[0] == "" || categories[0] == "1"))
