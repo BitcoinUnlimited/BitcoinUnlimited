@@ -3690,6 +3690,16 @@ static bool AcceptBlock(const CBlock &block,
                 0, "bad-prevblk");
         CBlockIndex *pindexPrev = mi->second;
 
+        const uint256 *phashPrev_expected = nullptr;
+        if (chainActive.Tip() != nullptr)
+            phashPrev_expected = chainActive.Tip()->phashBlock;
+
+        if (phashPrev_expected == nullptr || block.hashPrevBlock != *phashPrev_expected)
+        {
+            LOG(WB, "Weak block is not on top of most current strong block. Not accepting.\n");
+            return false;
+        }
+
         if ((!CheckBlock(block, state)) || !ContextualCheckBlock(block, state, pindexPrev))
         {
             // FIXME: cache weak block validation results?
