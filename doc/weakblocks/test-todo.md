@@ -59,4 +59,10 @@ the newly written weakblocks code.
 
 Other TODO
 ==========
-Make Weakblocks object. Allow to set names for weakblocks for easier testing.
+Allow to set names for weakblocks for easier testing.
+
+Send multiple weakblocks blocks in chronological order.
+
+Allow receival of weakblocks out of order and still build correct chains, maybe?
+
+Check enable/disable logic thoroughly
