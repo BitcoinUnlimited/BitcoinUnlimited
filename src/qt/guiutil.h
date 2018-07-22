@@ -164,7 +164,10 @@ class TableViewLastColumnResizingFixer : public QObject
     Q_OBJECT
 
 public:
-    TableViewLastColumnResizingFixer(QTableView *table, int lastColMinimumWidth, int allColsMinimumWidth, QObject *parent);
+    TableViewLastColumnResizingFixer(QTableView *table,
+        int lastColMinimumWidth,
+        int allColsMinimumWidth,
+        QObject *parent);
     void stretchColumnWidth(int column);
 
 private:
