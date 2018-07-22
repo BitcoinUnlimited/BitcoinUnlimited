@@ -4983,6 +4983,29 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         // bandwidth
                     }
                 }
+                else
+                {
+                    LOCK(cs_weakblocks);
+                    CWeakblockRef wb = weakstore.byHash(inv.hash);
+                    if (wb != nullptr)
+                    {
+                        if (inv.type == MSG_BLOCK)
+                        {
+                            pfrom->blocksSent += 1;
+                            pfrom->PushMessage(NetMsgType::BLOCK, *wb);
+                        }
+
+                        // BUIP010 Xtreme Thinblocks: begin section
+                        else if (inv.type == MSG_THINBLOCK || inv.type == MSG_XTHINBLOCK)
+                        {
+                            LOG(THIN, "Sending xthin weakblock by INV queue getdata message\n");
+                            SendXThinBlock(wb, pfrom, inv);
+                        }
+                        // BUIP010 Xtreme Thinblocks: end section
+                    }
+                    // send is fall so the rest below should not execute
+                }
+
                 // disconnect node in case we have reached the outbound limit for serving historical blocks
                 // never disconnect whitelisted nodes
                 static const int nOneWeek = 7 * 24 * 60 * 60; // assume > 1 week = historical
