@@ -26,7 +26,7 @@ class WeakblocksTest(BitcoinTestFramework):
         connect_nodes_bi(self.nodes,0,1)
         connect_nodes_bi(self.nodes,1,2)
         connect_nodes_bi(self.nodes,2,0)
-        connect_nodes_bi(self.nodes,2,3)
+        connect_nodes_bi(self.nodes,3,0)
 
         # If not, the framework assumes this partition: (0,1) and (2,3)
         # For more complex partitions, you can't use the self.sync* member functions
@@ -107,6 +107,27 @@ class WeakblocksTest(BitcoinTestFramework):
                      {"weakblocksknown": 0, "weakchaintips": 0, "weakchainheight": -1})
 
         ### WEAK BLOCK TRANSMISSION CHECKS
-        # FIXME
+        # a first, very simple 'does a weakblock propagate' test:
+        n0.generate(1, 1000000, "weak-only")
+        #self.sync_all()
+
+        wbstats_n0 = n0.weakstats()
+        wct_n0 = n0.weakchaintips()
+        #print (wbstats_n0, wct_n0)
+        assert len(wct_n0) == 1
+        assert_equal(wbstats_n0["weakblocksknown"], 1)
+        assert_equal(wbstats_n0["weakchaintips"], 1)
+        assert_equal(wbstats_n0["weakchainheight"], 0)
+
+        time.sleep(2.0) # FIXME, create proper weak blocks syncer!
+        for i, n in enumerate(self.nodes):
+            wbstats = n.weakstats()
+            wct = n.weakchaintips()
+            #print (i, n, wbstats, wct)
+            assert wbstats_n0 == wbstats
+            assert wct_n0 == wct
+
+        # now, let's add some transaction
+
 if __name__ == '__main__':
     WeakblocksTest().main ()
