@@ -157,9 +157,9 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _n
     return MakeTransactionRef(std::move(tx));
 }
 
-CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn)
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn)
 {
-    CBlockTemplate *tmpl = nullptr;
+    std::unique_ptr<CBlockTemplate> tmpl(new CBlockTemplate());
 
     if (nBlockMaxSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
         tmpl = CreateNewBlock(scriptPubKeyIn, false);
@@ -170,10 +170,11 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn)
         tmpl = CreateNewBlock(scriptPubKeyIn, true);
     }
 
-    return tmpl;
+    return std::move(tmpl);
 }
 
-CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bool blockstreamCoreCompatible)
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn,
+    bool blockstreamCoreCompatible)
 {
     resetBlock(scriptPubKeyIn);
 
@@ -252,7 +253,7 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
         throw std::runtime_error(strprintf("%s: Excessive block generated: %s", __func__, FormatStateMessage(state)));
     }
 
-    return pblocktemplate.release();
+    return std::move(pblocktemplate);
 }
 
 bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter)

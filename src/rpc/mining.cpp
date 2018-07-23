@@ -496,7 +496,7 @@ UniValue mkblocktemplate(const UniValue &params, CBlock *pblockOut)
     // Update block
     static CBlockIndex *pindexPrev = NULL;
     static int64_t nStart = 0;
-    static CBlockTemplate *pblocktemplate = NULL;
+    static std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
     if (pindexPrev != chainActive.Tip() ||
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5))
     {
@@ -509,12 +509,6 @@ UniValue mkblocktemplate(const UniValue &params, CBlock *pblockOut)
         nStart = GetTime();
 
         // Create new block
-        if (pblocktemplate)
-        {
-            delete pblocktemplate;
-            pblocktemplate = NULL;
-        }
-
         boost::shared_ptr<CReserveScript> coinbaseScript;
         GetMainSignals().ScriptForMining(coinbaseScript);
 
