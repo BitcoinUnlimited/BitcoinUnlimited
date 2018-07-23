@@ -161,6 +161,12 @@ void LogInit()
     uint64_t catg = Logging::NONE;
     const vector<string> &categories = mapMultiArgs["-debug"];
 
+    // enable all when given -debug=1 or -debug
+    if (categories.size() == 1 && (categories[0] == "" || categories[0] == "1"))
+    {
+        Logging::LogToggleCategory(Logging::ALL, true);
+        return;
+    }
     for (string const &cat : categories)
     {
         category = boost::algorithm::to_lower_copy(cat);
