@@ -353,9 +353,8 @@ void BitcoinApplication::createWindow(const Config *config, const NetworkStyle *
 void BitcoinApplication::createSplashScreen(const NetworkStyle *networkStyle)
 {
     SplashScreen *splash = new SplashScreen(0, networkStyle);
-    // We don't hold a direct pointer to the splash screen after creation, so use
-    // Qt::WA_DeleteOnClose to make sure that the window will be deleted eventually.
-    splash->setAttribute(Qt::WA_DeleteOnClose);
+    // We don't hold a direct pointer to the splash screen after creation, but the splash
+    // screen will take care of deleting itself when slotFinish happens.
     splash->show();
     connect(this, SIGNAL(splashFinished(QWidget *)), splash, SLOT(slotFinish(QWidget *)));
 }

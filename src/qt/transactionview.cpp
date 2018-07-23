@@ -37,7 +37,7 @@
 #include <QVBoxLayout>
 
 TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *parent)
-    : QWidget(parent), model(0), transactionProxyModel(0), transactionView(0)
+    : QWidget(parent), model(0), transactionProxyModel(0), transactionView(0), columnResizingFixer(0)
 {
     // Build filter row
     setContentsMargins(0, 0, 0, 0);
@@ -158,7 +158,7 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     QAction *editLabelAction = new QAction(tr("Edit label"), this);
     QAction *showDetailsAction = new QAction(tr("Show transaction details"), this);
 
-    contextMenu = new QMenu();
+    contextMenu = new QMenu(this);
     contextMenu->addAction(copyAddressAction);
     contextMenu->addAction(copyLabelAction);
     contextMenu->addAction(copyAmountAction);
@@ -219,7 +219,7 @@ void TransactionView::setModel(WalletModel *_model)
         transactionView->setColumnWidth(TransactionTableModel::Amount, AMOUNT_MINIMUM_COLUMN_WIDTH);
 
         columnResizingFixer = new GUIUtil::TableViewLastColumnResizingFixer(
-            transactionView, AMOUNT_MINIMUM_COLUMN_WIDTH, MINIMUM_COLUMN_WIDTH);
+            transactionView, AMOUNT_MINIMUM_COLUMN_WIDTH, MINIMUM_COLUMN_WIDTH, this);
 
         if (_model->getOptionsModel())
         {
