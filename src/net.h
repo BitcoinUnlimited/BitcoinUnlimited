@@ -577,7 +577,7 @@ public:
         return false;
     }
 
-    void AddAddressKnown(const CAddress &addr) { addrKnown.insert(addr.GetKey()); }
+    void AddAddressKnown(const CAddress &_addr) { addrKnown.insert(_addr.GetKey()); }
     void PushAddress(const CAddress &_addr, FastRandomContext &insecure_rand)
     {
         // Known checking here is only to save space from duplicates.
