@@ -115,7 +115,6 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
         CNode *node = i->node;
         if (node)
         {
-            i->clear();
             // LOG(REQ, "ReqMgr: %s cleanup - removed ref to %d count %d.\n", item.obj.ToString(), node->GetId(),
             //    node->GetRefCount());
             //
