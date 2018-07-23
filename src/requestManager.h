@@ -143,7 +143,6 @@ protected:
 
     void cleanup(OdMap::iterator &item);
     CLeakyBucket requestPacer;
-    CLeakyBucket blockPacer;
 
     // Request a single block.
     bool RequestBlock(CNode *pfrom, CInv obj);

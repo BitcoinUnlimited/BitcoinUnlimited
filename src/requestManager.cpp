@@ -91,8 +91,6 @@ CRequestManager::CRequestManager()
     : inFlightTxns("reqMgr/inFlight", STAT_OP_MAX), receivedTxns("reqMgr/received"), rejectedTxns("reqMgr/rejected"),
       droppedTxns("reqMgr/dropped", STAT_KEEP), pendingTxns("reqMgr/pending", STAT_KEEP),
       requestPacer(512, 256) // Max and average # of requests that can be made per second
-      ,
-      blockPacer(64, 32) // Max and average # of block requests that can be made per second
 {
     inFlight = 0;
     nOutbound = 0;
