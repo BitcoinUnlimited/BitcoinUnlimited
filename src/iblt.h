@@ -69,12 +69,18 @@ public:
 class CIblt
 {
 public:
+    // Default constructor builds a 0 size IBLT, so is meant for two-phase construction.  Call resize() before use
     CIblt();
+    // Pass the expected number of entries in the IBLT table. If the number of entries exceeds
+    // the expected, then the decode failure rate will increase dramatically.
     CIblt(size_t _expectedNumEntries);
+    // Copy constructor
     CIblt(const CIblt &other);
-    virtual ~CIblt();
+    ~CIblt();
 
+    // Clears all entries in the IBLT
     void reset();
+    // Returns the size in bytes of the IBLT.  This is NOT the count of inserted entries
     size_t size();
     void resize(size_t _expectedNumEntries);
     void insert(uint64_t k, const std::vector<uint8_t> &v);
@@ -85,7 +91,7 @@ public:
     // Returns false if overloaded and we don't know whether or
     // not k is in the table.
     bool get(uint64_t k, std::vector<uint8_t> &result) const;
-    uint8_t getNHash() { return n_hash; }
+
     // Adds entries to the given sets:
     //  positive is all entries that were inserted
     //  negative is all entreis that were erased but never added (or
@@ -94,16 +100,18 @@ public:
     bool listEntries(std::set<std::pair<uint64_t, std::vector<uint8_t> > > &positive,
         std::set<std::pair<uint64_t, std::vector<uint8_t> > > &negative) const;
 
-
     // Subtract two IBLTs
     CIblt operator-(const CIblt &other) const;
 
-    // For debugging:
-    std::string DumpTable() const;
-
+    // Returns the optimal number of hash buckets for a certain number of entries
     static size_t OptimalNHash(size_t expectedNumEntries);
+    // Returns the optimal ratio of memory cells to expected entries.
+    // OptimalOverhead()*expectedNumEntries <= allocated memory cells
     static float OptimalOverhead(size_t expectedNumEntries);
 
+    // For debugging:
+    std::string DumpTable() const;
+    uint8_t getNHash() { return n_hash; }
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
@@ -122,8 +130,9 @@ public:
         READWRITE(hashTable);
     }
 
+    // Returns true if any elements have been inserted into the IBLT since creation or reset
     inline bool isModified() { return is_modified; }
-private:
+protected:
     void _insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> &v);
 
     uint64_t version;
