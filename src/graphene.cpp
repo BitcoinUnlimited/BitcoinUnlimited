@@ -499,6 +499,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
         // Add full transactions included in the block
         if (!collision)
+        {
             for (auto &tx : vAdditionalTxs)
             {
                 const uint256 &hash = tx->GetHash();
@@ -508,6 +509,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
                 if (!ir.second)
                     collision = true;
             }
+        }
 
         if (!collision)
         {
