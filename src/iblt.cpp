@@ -100,6 +100,7 @@ void CIblt::reset()
     size_t size = this->size();
     hashTable.clear();
     hashTable.resize(size);
+    is_modified = false;
 }
 
 size_t CIblt::size() { return hashTable.size(); }

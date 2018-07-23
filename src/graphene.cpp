@@ -475,49 +475,45 @@ bool CGrapheneBlock::process(CNode *pfrom,
         for (auto &kv : orphanpool.mapOrphanTransactions)
         {
             uint64_t cheapHash = kv.first.GetCheapHash();
-
-            if (mapPartialTxHash.count(cheapHash)) // Check for collisions
-                collision = true;
-
-            mapPartialTxHash[cheapHash] = kv.first;
+            auto ir = mapPartialTxHash.insert(std::make_pair(cheapHash, kv.first));
+            if (!ir.second)
+                collision = true; // insert returns false if no insertion
         }
 
         // We don't have to keep the lock on mempool.cs here to do mempool.queryHashes
         // but we take the lock anyway so we don't have to re-lock again later.
         LOCK(cs_xval);
-        mempool.queryHashes(memPoolHashes);
-
-        for (const uint256 &hash : memPoolHashes)
+        if (!collision)
         {
-            uint64_t cheapHash = hash.GetCheapHash();
+            mempool.queryHashes(memPoolHashes);
 
-            if (mapPartialTxHash.count(cheapHash)) // Check for collisions
-                collision = true;
+            for (const uint256 &hash : memPoolHashes)
+            {
+                uint64_t cheapHash = hash.GetCheapHash();
 
-            mapPartialTxHash[cheapHash] = hash;
+                auto ir = mapPartialTxHash.insert(std::make_pair(cheapHash, hash));
+                if (!ir.second)
+                    collision = true;
+            }
         }
 
         // Add full transactions included in the block
-        for (auto &tx : vAdditionalTxs)
-        {
-            const uint256 &hash = tx->GetHash();
-            uint64_t cheapHash = hash.GetCheapHash();
+        if (!collision)
+            for (auto &tx : vAdditionalTxs)
+            {
+                const uint256 &hash = tx->GetHash();
+                uint64_t cheapHash = hash.GetCheapHash();
 
-            if (mapPartialTxHash.count(cheapHash)) // Check for collisions
-                collision = true;
-
-            mapPartialTxHash[cheapHash] = hash;
-        }
+                auto ir = mapPartialTxHash.insert(std::make_pair(cheapHash, hash));
+                if (!ir.second)
+                    collision = true;
+            }
 
         if (!collision)
         {
-            std::vector<uint256> localHashes;
-            for (const std::pair<uint64_t, uint256> &kv : mapPartialTxHash)
-                localHashes.push_back(kv.second);
-
             try
             {
-                std::vector<uint64_t> blockCheapHashes = pGrapheneSet->Reconcile(localHashes);
+                std::vector<uint64_t> blockCheapHashes = pGrapheneSet->Reconcile(mapPartialTxHash);
 
                 // Sort out what hashes we have from the complete set of cheapHashes
                 uint64_t nGrapheneTxsPossessed = 0;
@@ -528,9 +524,10 @@ bool CGrapheneBlock::process(CNode *pfrom,
                     // Update mapHashOrderIndex so it is available if we later receive missing txs
                     pfrom->grapheneMapHashOrderIndex[cheapHash] = i;
 
-                    if (mapPartialTxHash.count(cheapHash) > 0)
+                    const auto &elem = mapPartialTxHash.find(cheapHash);
+                    if (elem != mapPartialTxHash.end())
                     {
-                        pfrom->grapheneBlockHashes.push_back(mapPartialTxHash[cheapHash]);
+                        pfrom->grapheneBlockHashes.push_back(elem->second);
 
                         nGrapheneTxsPossessed++;
                     }
@@ -1264,13 +1261,10 @@ void CGrapheneBlockData::ResetGrapheneBlockBytes() { nGrapheneBlockBytes.store(0
 uint64_t CGrapheneBlockData::GetGrapheneBlockBytes() { return nGrapheneBlockBytes.load(); }
 bool HaveGrapheneNodes()
 {
-    {
-        LOCK(cs_vNodes);
-        for (CNode *pnode : vNodes)
-            if (pnode->GrapheneCapable())
-                return true;
-    }
-
+    LOCK(cs_vNodes);
+    for (CNode *pnode : vNodes)
+        if (pnode->GrapheneCapable())
+            return true;
     return false;
 }
 

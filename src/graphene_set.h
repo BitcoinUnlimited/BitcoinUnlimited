@@ -99,7 +99,8 @@ public:
         return optSymDiff;
     }
 
-    CGrapheneSet() : pSetFilter(nullptr), pSetIblt(nullptr) {}
+    // The default constructor is for 2-phase construction via deserialization
+    CGrapheneSet() : ordered(false), nReceiverUniverseItems(0), pSetFilter(nullptr), pSetIblt(nullptr) {}
     CGrapheneSet(size_t _nReceiverUniverseItems,
         const std::vector<uint256> &_itemHashes,
         bool _ordered = false,
@@ -180,6 +181,8 @@ public:
         }
     }
 
+    // Pass the transaction hashes that the local machine has to reconcile with the remote and return a list
+    // of cheap hashes in the block in the correct order
     std::vector<uint64_t> Reconcile(const std::vector<uint256> &receiverItemHashes)
     {
         std::set<uint64_t> receiverSet;
@@ -191,20 +194,44 @@ public:
         {
             uint64_t cheapHash = itemHash.GetCheapHash();
 
-            if (mapCheapHashes.count(cheapHash))
+            auto ir = mapCheapHashes.insert(std::make_pair(cheapHash, itemHash));
+            if (!ir.second)
+            {
                 throw std::runtime_error("Cheap hash collision while decoding graphene set");
+            }
 
             if ((*pSetFilter).contains(itemHash))
             {
                 receiverSet.insert(cheapHash);
                 localIblt.insert(cheapHash, IBLT_NULL_VALUE);
             }
-
-            mapCheapHashes[cheapHash] = itemHash;
         }
 
         mapCheapHashes.clear();
+        return Reconcile(receiverSet, localIblt);
+    }
 
+    // Pass a map of cheap hash to transaction hashes that the local machine has to reconcile with the remote and
+    // return a list of cheap hashes in the block in the correct order
+    std::vector<uint64_t> Reconcile(const std::map<uint64_t, uint256> &mapCheapHashes)
+    {
+        std::set<uint64_t> receiverSet;
+        CIblt localIblt((*pSetIblt));
+        localIblt.reset();
+
+        for (const auto &entry : mapCheapHashes)
+        {
+            if ((*pSetFilter).contains(entry.second))
+            {
+                receiverSet.insert(entry.first);
+                localIblt.insert(entry.first, IBLT_NULL_VALUE);
+            }
+        }
+        return Reconcile(receiverSet, localIblt);
+    }
+
+    std::vector<uint64_t> Reconcile(std::set<uint64_t> &receiverSet, const CIblt &localIblt)
+    {
         // Determine difference between sender and receiver IBLTs
         std::set<std::pair<uint64_t, std::vector<uint8_t> > > senderHas;
         std::set<std::pair<uint64_t, std::vector<uint8_t> > > receiverHas;
