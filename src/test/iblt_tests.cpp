@@ -38,6 +38,39 @@ BOOST_AUTO_TEST_CASE(iblt_handles_small_quantities)
 	BOOST_CHECK(allPassed);
 }
 
+BOOST_AUTO_TEST_CASE(iblt_reset)
+{
+    CIblt t;
+    t.insert(0, ParseHex("00000000"));
+    bool gotResult;
+    std::vector<uint8_t> result;
+    gotResult = t.get(21, result);
+    BOOST_CHECK(!gotResult);  // anything could have been inserted into a zero length IBLT
+
+    t.reset();
+    t.resize(20);
+    t.insert(0, ParseHex("00000000"));
+    t.insert(1, ParseHex("00000001"));
+    t.insert(11, ParseHex("00000011"));
+
+    gotResult = t.get(0, result);
+    BOOST_CHECK(gotResult && result == ParseHex("00000000"));
+
+    t.reset();
+
+    gotResult = t.get(0, result);
+    BOOST_CHECK(gotResult && (result.size()==0));
+
+    t.resize(40);
+
+    t.insert(0, ParseHex("00000000"));
+    t.insert(1, ParseHex("00000001"));
+    t.insert(11, ParseHex("00000011"));
+
+    gotResult = t.get(0, result);
+    BOOST_CHECK(gotResult && result == ParseHex("00000000"));
+}
+
 BOOST_AUTO_TEST_CASE(iblt_erases_properly)
 {
     CIblt t(20);
