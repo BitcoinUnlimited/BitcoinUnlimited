@@ -16,6 +16,7 @@
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "dosman.h"
+#include "graphene.h"
 #include "leakybucket.h"
 #include "main.h"
 #include "miner.h"
@@ -81,9 +82,10 @@ proxyType nameProxy;
 CCriticalSection cs_proxyInfos;
 
 
-set<uint256> setPreVerifiedTxHash;
-set<uint256> setUnVerifiedOrphanTxHash;
 CCriticalSection cs_xval;
+set<uint256> setPreVerifiedTxHash GUARDED_BY(cs_xval);
+set<uint256> setUnVerifiedOrphanTxHash GUARDED_BY(cs_xval);
+
 CCriticalSection cs_vNodes;
 CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
@@ -273,6 +275,7 @@ CCriticalSection cs_blockvalidationtime;
 CStatHistory<uint64_t> nBlockValidationTime("blockValidationTime", STAT_OP_MAX | STAT_INDIVIDUAL);
 
 CThinBlockData thindata; // Singleton class
+CGrapheneBlockData graphenedata; // Singleton class
 
 uint256 bitcoinCashForkBlockHash = uint256S("000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec");
 

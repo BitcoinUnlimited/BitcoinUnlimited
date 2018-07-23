@@ -44,6 +44,12 @@ const char *XBLOCKTX = "xblocktx";
 const char *GET_XBLOCKTX = "get_xblocktx";
 const char *GET_XTHIN = "get_xthin";
 // BUIP010 Xtreme Thinblocks - end section
+// BUIPXXX Graphene - begin section
+const char *GRAPHENEBLOCK = "grblk";
+const char *GRAPHENETX = "grblktx";
+const char *GET_GRAPHENETX = "get_grblktx";
+const char *GET_GRAPHENE = "get_grblk";
+// BUIPXXX Graphene - end section
 const char *XPEDITEDREQUEST = "req_xpedited";
 const char *XPEDITEDBLK = "Xb";
 const char *XPEDITEDTxn = "Xt";
@@ -55,9 +61,7 @@ static const char *ppszTypeName[] = {
     "ERROR", // Should never occur
     NetMsgType::TX, NetMsgType::BLOCK,
     "filtered block", // Should never occur
-    // BUIP010 Xtreme Thinblocks - begin section
-    NetMsgType::THINBLOCK, NetMsgType::XTHINBLOCK,
-    // BUIP010 Xtreme Thinblocks - end section
+    NetMsgType::THINBLOCK, NetMsgType::XTHINBLOCK, NetMsgType::GRAPHENEBLOCK,
 };
 
 /** All known message types. Keep this in the same order as the list of
@@ -68,11 +72,9 @@ const static std::string allNetMessageTypes[] = {
     NetMsgType::MERKLEBLOCK, NetMsgType::GETBLOCKS, NetMsgType::GETHEADERS, NetMsgType::TX, NetMsgType::HEADERS,
     NetMsgType::BLOCK, NetMsgType::GETADDR, NetMsgType::MEMPOOL, NetMsgType::PING, NetMsgType::PONG,
     NetMsgType::NOTFOUND, NetMsgType::FILTERLOAD, NetMsgType::FILTERADD, NetMsgType::FILTERCLEAR,
-    NetMsgType::FILTERSIZEXTHIN, NetMsgType::REJECT, NetMsgType::SENDHEADERS,
-    // BUIP010 Xtreme Thinbocks - begin section
-    NetMsgType::THINBLOCK, NetMsgType::XTHINBLOCK, NetMsgType::XBLOCKTX, NetMsgType::GET_XBLOCKTX,
-    NetMsgType::GET_XTHIN,
-    // BUIP010 Xtreme Thinbocks - end section
+    NetMsgType::FILTERSIZEXTHIN, NetMsgType::REJECT, NetMsgType::SENDHEADERS, NetMsgType::THINBLOCK,
+    NetMsgType::XTHINBLOCK, NetMsgType::XBLOCKTX, NetMsgType::GET_XBLOCKTX, NetMsgType::GET_XTHIN,
+    NetMsgType::GRAPHENEBLOCK, NetMsgType::GRAPHENETX, NetMsgType::GET_GRAPHENETX, NetMsgType::GET_GRAPHENE,
     NetMsgType::XPEDITEDREQUEST, NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTxn, NetMsgType::BUVERSION,
     NetMsgType::BUVERACK,
 };

@@ -20,7 +20,9 @@
 #include "consensus/consensus.h"
 #include "crypto/common.h"
 #include "dosman.h"
+#include "graphene.h"
 #include "hash.h"
+#include "iblt.h"
 #include "primitives/transaction.h"
 #include "requestManager.h"
 #include "scheduler.h"
@@ -589,32 +591,34 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 
         if (msg.complete())
         {
-            // BU: connection slot attack mitigation.  We don't count PONG responses as bytes received. We don't want to
-            // include
-            //     bytes sent or received for nodes that just connect and listen to INV messages.
+            // Connection slot attack mitigation.  We don't want to add useful bytes for outgoing INV, PING, ADDR,
+            // VERSION or VERACK messages since attackers will often just connect and listen to INV messages.
+            // We want to make sure that connected nodes are doing useful work in sending us data or requesting data.
             std::string strCommand = msg.hdr.GetCommand();
             if (strCommand != NetMsgType::PONG && strCommand != NetMsgType::PING && strCommand != NetMsgType::ADDR &&
                 strCommand != NetMsgType::VERSION && strCommand != NetMsgType::VERACK)
             {
                 nActivityBytes += msg.hdr.nMessageSize;
 
-                // BU: furthermore, if the message is a priority message then move from the back to the front of the
-                // deque
+                // If the message is a priority message then move from the back to the front of the deque.
+                //
                 // NOTE: for GET_XTHIN we don't jump the queue on test environments because the GET_XTHIN can get ahead
-                // of
-                // a previous GET_XTHIN/HEADER requests and result in a DOS if the block returns out of order and with
-                // no headers
-                // in the block index or the setblockindexcandidates.
+                // of a previous GET_XTHIN/HEADER requests and result in a DOS if the block returns out of order and
+                // with no headers in the block index or the setblockindexcandidates.
                 if ((strCommand == NetMsgType::GET_XTHIN && Params().NetworkIDString() == "main") ||
                     strCommand == NetMsgType::XTHINBLOCK || strCommand == NetMsgType::THINBLOCK ||
-                    strCommand == NetMsgType::XBLOCKTX || strCommand == NetMsgType::GET_XBLOCKTX)
+                    strCommand == NetMsgType::XBLOCKTX || strCommand == NetMsgType::GET_XBLOCKTX ||
+                    strCommand == NetMsgType::GET_GRAPHENE || strCommand == NetMsgType::GRAPHENEBLOCK ||
+                    strCommand == NetMsgType::GRAPHENETX || strCommand == NetMsgType::GET_GRAPHENETX)
                 {
-                    // Move the this last message to the front of the queue.
+                    LOG(THIN | GRAPHENE, "ReceiveMsgBytes %s\n", strCommand);
+
+                    // Move the this message to the front of the queue.
                     std::rotate(vRecvMsg.begin(), vRecvMsg.end() - 1, vRecvMsg.end());
 
                     std::string strFirstMsgCommand = vRecvMsg[0].hdr.GetCommand();
                     DbgAssert(strFirstMsgCommand == strCommand, );
-                    LOG(THIN, "Receive Queue: pushed %s to the front of the queue\n", strFirstMsgCommand);
+                    LOG(THIN | GRAPHENE, "Receive Queue: pushed %s to the front of the queue\n", strFirstMsgCommand);
                 }
             }
             // BU: end
@@ -1700,10 +1704,8 @@ void static ProcessOneShot()
 
 void ThreadOpenConnections()
 {
-    // Connect to specific addresses
-    if ((mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0) ||
-        // BUIP010 Xtreme Thinblocks
-        (mapArgs.count("-connect-thinblock") && mapMultiArgs["-connect-thinblock"].size() > 0))
+    // Connect to all "connect" peers
+    if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0)
     {
         for (int64_t nLoop = 0;; nLoop++)
         {
@@ -1721,15 +1723,14 @@ void ThreadOpenConnections()
                 }
             }
             MilliSleep(500);
-
-            // BUIP010 Xtreme Thinblocks: begin section
-            ConnectToThinBlockNodes();
-            // BUIP010 Xtreme Thinblocks: end section
         }
-
-        // NOTE: If we are in this block, then no seeding should occur as both "-connect" and
-        //      "-connect-thinblock" are intended as "only make outbound connections to the configured nodes".
     }
+
+    // Connect to all "connect-thinblock" peers
+    ConnectToThinBlockNodes();
+
+    // NOTE: If we are in the block above, then no seeding should occur as "-connect" and "-connect-thinblock"
+    // are intended as "only make outbound connections to the configured nodes".
 
     // Initiate network connections
     int64_t nStart = GetTime();
@@ -2918,6 +2919,17 @@ CNode::~CNode()
 
     // BUIP010 - Xtreme Thinblocks - end section
 
+    // BUIPXXX - Graphene blocks - begin section
+    mapGrapheneBlocksInFlight.clear();
+    grapheneBlockWaitingForTxns = -1;
+    grapheneBlock.SetNull();
+
+    fSuccessfullyConnected = false;
+    fAutoOutbound = false;
+
+    // BUIPXXX - Graphene blocks - end section
+
+
     addrFromPort = 0;
 
     // Update addrman timestamp
@@ -2977,9 +2989,9 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
 
     LOG(NET, "(%d bytes) peer=%d\n", nSize, id);
 
-    // BU: connection slot attack mitigation.  We don't want to add bytes for outgoing INV or PING
-    //     messages since attackers will often just connect and listen to INV messages.  We want to make
-    //     sure that connected nodes are really doing useful work in sending us data or requesting data.
+    // Connection slot attack mitigation.  We don't want to add useful bytes for outgoing INV, PING, ADDR,
+    // VERSION or VERACK messages since attackers will often just connect and listen to INV messages.
+    // We want to make sure that connected nodes are doing useful work in sending us data or requesting data.
     std::deque<CSerializeData>::iterator it;
     char strCommand[CMessageHeader::COMMAND_SIZE + 1];
     strncpy(strCommand, &(*(ssSend.begin() + MESSAGE_START_SIZE)), CMessageHeader::COMMAND_SIZE);
@@ -2990,10 +3002,12 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
     {
         nActivityBytes += nSize;
 
-        // BU: furthermore, if the message is a priority message then move to the front of the deque
+        // If the message is a priority message then move to the front of the deque
         if (strcmp(strCommand, NetMsgType::GET_XTHIN) == 0 || strcmp(strCommand, NetMsgType::XTHINBLOCK) == 0 ||
             strcmp(strCommand, NetMsgType::THINBLOCK) == 0 || strcmp(strCommand, NetMsgType::XBLOCKTX) == 0 ||
-            strcmp(strCommand, NetMsgType::GET_XBLOCKTX) == 0)
+            strcmp(strCommand, NetMsgType::GET_XBLOCKTX) == 0 || strcmp(strCommand, NetMsgType::GET_GRAPHENE) == 0 ||
+            strcmp(strCommand, NetMsgType::GRAPHENEBLOCK) == 0 || strcmp(strCommand, NetMsgType::GRAPHENETX) == 0 ||
+            strcmp(strCommand, NetMsgType::GET_GRAPHENETX) == 0)
         {
             it = vSendMsg.insert(vSendMsg.begin(), CSerializeData());
             LOG(THIN, "Send Queue: pushed %s to the front of the queue\n", strCommand);

@@ -461,7 +461,8 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
 {
     std::string debugCategories = "addrman, bench, blk, bloom, coindb, db, estimatefee, evict, http, lck, "
                                   "libevent, mempool, mempoolrej, miner, net, parallel, partitioncheck, "
-                                  "proxy, prune, rand, reindex, req, rpc, selectcoins, thin, tor, wallet, zmq";
+                                  "proxy, prune, rand, reindex, req, rpc, selectcoins, thin, tor, wallet, zmq"
+                                  "graphene";
     if (mode == HMM_BITCOIN_QT)
         debugCategories += ", qt";
 
@@ -536,6 +537,8 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addDebugArg("printpriority", optionalBool,
             strprintf("Log transaction priority and fee per kB when mining blocks (default: %u)",
                          DEFAULT_PRINTPRIORITY))
+        .addDebugArg("connect-thinblock-force", optionalBool,
+            strprintf("Force download of thinblocks from connect-thinblock peers (default: %u)", false))
 #ifdef ENABLE_WALLET
         .addDebugArg("privdb", optionalBool,
             strprintf("Sets the DB_PRIVATE flag in the wallet db environment (default: %u)", DEFAULT_WALLET_PRIVDB))
@@ -600,7 +603,8 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
                     SMALLEST_MAX_BLOOM_FILTER_SIZE))
         .addArg("use-bloom-filter-targeting", optionalBool,
             _("Enable thin block bloom filter targeting which helps to keep the size of bloom filters to a minumum "
-              "although it can impact performance. (default: 0)"));
+              "although it can impact performance. (default: 0)"))
+        .addArg("use-grapheneblocks", optionalBool, _("Enable graphene to speed up the relay of blocks (default: 1)"));
 }
 
 static void addBlockCreationOptions(AllowedArgs &allowedArgs)

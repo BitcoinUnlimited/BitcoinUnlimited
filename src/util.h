@@ -152,7 +152,9 @@ enum
     SELECTCOINS = 0x1000000,
     ZMQ = 0x2000000,
     QT = 0x4000000,
-    IBD = 0x8000000
+    IBD = 0x8000000,
+
+    GRAPHENE = 0x10000000
 };
 
 // Add corresponding lower case string for the category:
@@ -164,6 +166,7 @@ enum
             {MEMPOOLREJ, "mempoolrej"}, {BLK, "blk"}, {EVICT, "evict"}, {PARALLEL, "parallel"}, {RAND, "rand"}, \
             {REQ, "req"}, {BLOOM, "bloom"}, {LCK, "lck"}, {PROXY, "proxy"}, {DBASE, "dbase"},                   \
             {SELECTCOINS, "selectcoins"}, {ESTIMATEFEE, "estimatefee"}, {QT, "qt"}, {IBD, "ibd"},               \
+            {GRAPHENE, "graphene"},                                                                             \
         {                                                                                                       \
             ZMQ, "zmq"                                                                                          \
         }                                                                                                       \

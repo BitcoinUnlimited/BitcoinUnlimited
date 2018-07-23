@@ -509,7 +509,7 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         }
         CXThinBlockTx thinBlockTx(thinRequestBlockTx.blockhash, vTx);
         pfrom->PushMessage(NetMsgType::XBLOCKTX, thinBlockTx);
-        pfrom->blocksSent += 1;
+        pfrom->txsSent += vTx.size();
     }
 
     return true;
@@ -1053,6 +1053,20 @@ void CThinBlockData::UpdateMempoolLimiterBytesSaved(unsigned int nBytesSaved)
     nMempoolLimiterBytesSaved += nBytesSaved;
 }
 
+void CThinBlockData::UpdateThinBlock(uint64_t nThinBlockSize)
+{
+    LOCK(cs_thinblockstats);
+    nTotalThinBlockBytes += nThinBlockSize;
+    updateStats(mapThinBlock, nThinBlockSize);
+}
+
+void CThinBlockData::UpdateFullTx(uint64_t nFullTxSize)
+{
+    LOCK(cs_thinblockstats);
+    nTotalThinBlockBytes += nFullTxSize;
+    updateStats(mapFullTx, nFullTxSize);
+}
+
 std::string CThinBlockData::ToString()
 {
     LOCK(cs_thinblockstats);
@@ -1256,19 +1270,53 @@ std::string CThinBlockData::MempoolLimiterBytesSavedToString()
     return ss.str();
 }
 
+// Calculate the average xthin block size
+std::string CThinBlockData::ThinBlockToString()
+{
+    LOCK(cs_thinblockstats);
+    double avgThinBlockSize = average(mapThinBlock);
+    std::ostringstream ss;
+    ss << "Thinblock size (last 24hrs) AVG: " << formatInfoUnit(avgThinBlockSize);
+    return ss.str();
+}
+
+// Calculate the average size of all full txs sent with block
+std::string CThinBlockData::FullTxToString()
+{
+    LOCK(cs_thinblockstats);
+    double avgFullTxSize = average(mapFullTx);
+    std::ostringstream ss;
+    ss << "Thinblock full transactions size (last 24hrs) AVG: " << formatInfoUnit(avgFullTxSize);
+    return ss.str();
+}
+
 // Preferential Thinblock Timer:
 // The purpose of the timer is to ensure that we more often download an XTHINBLOCK rather than a full block.
 // The timer is started when we receive the first announcement indicating there is a new block to download.  If the
 // block inventory is from a non XTHIN node then we will continue to wait for block announcements until either we
 // get one from an XTHIN capable node or the timer is exceeded.  If the timer is exceeded before receiving an
 // announcement from an XTHIN node then we just download a full block instead of an xthin.
-bool CThinBlockData::CheckThinblockTimer(uint256 hash)
+bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
 {
+    // Base time used to calculate the random timeout value.
+    static int64_t nTimeToWait = 10000;
+
     LOCK(cs_mapThinBlockTimer);
     if (!mapThinBlockTimer.count(hash))
     {
-        mapThinBlockTimer[hash] = GetTimeMillis();
-        LOG(THIN, "Starting Preferential Thinblock timer\n");
+        // The timeout limit is a random number betwee 8 and 12 seconds.
+        // This way a node connected to this one may download the block
+        // before the other node and thus be able to serve the other with
+        // a graphene block, rather than both nodes timing out and downloading
+        // a thinblock instead. This can happen at the margins of the BU network
+        // where we receive full blocks from peers that don't support graphene.
+        //
+        // To make the timeout random we adjust the start time of the timer forward
+        // or backward by a random amount plus or minus 2 seconds.
+        FastRandomContext insecure_rand(false);
+        uint64_t nOffset = nTimeToWait - (8000 + (insecure_rand.rand64() % 4000) + 1);
+        mapThinBlockTimer[hash] = GetTimeMillis() + nOffset;
+        LOG(THIN, "Starting Preferential Thinblock timer (%d millis)\n", nTimeToWait + nOffset);
     }
     else
     {
@@ -1276,7 +1324,7 @@ bool CThinBlockData::CheckThinblockTimer(uint256 hash)
         // If we have then we want to return false so that we can
         // proceed to download a regular block instead.
         uint64_t elapsed = GetTimeMillis() - mapThinBlockTimer[hash];
-        if (elapsed > 10000)
+        if (elapsed > nTimeToWait)
         {
             LOG(THIN, "Preferential Thinblock timer exceeded - downloading regular block instead\n");
             return false;
@@ -1286,7 +1334,7 @@ bool CThinBlockData::CheckThinblockTimer(uint256 hash)
 }
 
 // The timer is cleared as soon as we request a block or thinblock.
-void CThinBlockData::ClearThinBlockTimer(uint256 hash)
+void CThinBlockData::ClearThinBlockTimer(const uint256 &hash)
 {
     LOCK(cs_mapThinBlockTimer);
     if (mapThinBlockTimer.count(hash))
@@ -1315,12 +1363,36 @@ void CThinBlockData::ClearThinBlockData(CNode *pnode)
         thindata.GetThinBlockBytes());
 }
 
-void CThinBlockData::ClearThinBlockData(CNode *pnode, uint256 hash)
+void CThinBlockData::ClearThinBlockData(CNode *pnode, const uint256 &hash)
 {
     // We must make sure to clear the thinblock data first before clearing the thinblock in flight.
     ClearThinBlockData(pnode);
     ClearThinBlockInFlight(pnode, hash);
 }
+
+void CThinBlockData::ClearThinBlockStats()
+{
+    LOCK(cs_thinblockstats);
+
+    nOriginalSize.Clear();
+    nThinSize.Clear();
+    nBlocks.Clear();
+    nMempoolLimiterBytesSaved.Clear();
+    nTotalBloomFilterBytes.Clear();
+    nTotalThinBlockBytes.Clear();
+    nTotalFullTxBytes.Clear();
+
+    mapThinBlocksInBound.clear();
+    mapThinBlocksOutBound.clear();
+    mapBloomFiltersOutBound.clear();
+    mapBloomFiltersInBound.clear();
+    mapThinBlockResponseTime.clear();
+    mapThinBlockValidationTime.clear();
+    mapThinBlocksInBoundReRequestedTx.clear();
+    mapThinBlock.clear();
+    mapFullTx.clear();
+}
+
 uint64_t CThinBlockData::AddThinBlockBytes(uint64_t bytes, CNode *pfrom)
 {
     pfrom->nLocalThinBlockBytes += bytes;
@@ -1488,13 +1560,13 @@ bool ClearLargestThinBlockAndDisconnect(CNode *pfrom)
     return false;
 }
 
-void ClearThinBlockInFlight(CNode *pfrom, uint256 hash)
+void ClearThinBlockInFlight(CNode *pfrom, const uint256 &hash)
 {
     LOCK(pfrom->cs_mapthinblocksinflight);
     pfrom->mapThinBlocksInFlight.erase(hash);
 }
 
-void AddThinBlockInFlight(CNode *pfrom, uint256 hash)
+void AddThinBlockInFlight(CNode *pfrom, const uint256 &hash)
 {
     LOCK(pfrom->cs_mapthinblocksinflight);
     pfrom->mapThinBlocksInFlight.insert(
@@ -1541,6 +1613,8 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
                 LOG(THIN, "Sent xthinblock - size: %d vs block size: %d => tx hashes: %d transactions: %d peer: %s\n",
                     nSizeThinBlock, nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(),
                     pfrom->GetLogName());
+                thindata.UpdateThinBlock(nSizeThinBlock);
+                thindata.UpdateFullTx(::GetSerializeSize(xThinBlock.vMissingTx, SER_NETWORK, PROTOCOL_VERSION));
             }
             else
             {

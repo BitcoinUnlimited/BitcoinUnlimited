@@ -12,6 +12,7 @@
 #include "coins.h"
 #include "compressor.h"
 #include "consensus/merkle.h"
+#include "graphene.h"
 #include "net.h"
 #include "primitives/block.h"
 #include "protocol.h"
@@ -401,6 +402,171 @@ protected:
     }
 };
 
+class FuzzAPICIblt : FuzzTestNet
+{
+public:
+    FuzzAPICIblt() : FuzzTestNet("api_iblt") {}
+protected:
+    void run(const bool produce_output)
+    {
+        CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
+
+        uint8_t cmd;
+        *ds >> cmd;
+        std::shared_ptr<CIblt> iblt;
+
+        uint16_t num_entries = 0;
+        uint64_t k = 0;
+        std::vector<uint8_t> v;
+
+        std::set<std::pair<uint64_t, std::vector<uint8_t> > > negative, positive;
+
+        switch (cmd)
+        {
+        case 0:
+            iblt = std::make_shared<CIblt>();
+            break;
+        default:
+            *ds >> num_entries;
+            iblt = std::make_shared<CIblt>(num_entries);
+            break;
+        }
+
+        while (!ds->empty())
+        {
+            *ds >> cmd;
+            switch (cmd)
+            {
+            case 0:
+                iblt->reset();
+                break;
+            case 1:
+                out << iblt->size();
+                break;
+            case 2:
+                if (!iblt->isModified())
+                {
+                    *ds >> num_entries;
+                    iblt->resize(num_entries);
+                }
+                break;
+            case 3:
+                *ds >> k;
+                *ds >> v;
+                iblt->insert(k, v);
+                break;
+            case 4:
+                *ds >> k;
+                *ds >> v;
+                iblt->erase(k, v);
+                break;
+            case 5:
+                *ds >> k;
+                out << iblt->get(k, v);
+                out << v;
+                break;
+            case 6:
+                out << iblt->getNHash();
+                break;
+            case 7:
+                out << iblt->listEntries(positive, negative);
+                for (auto entry : positive)
+                {
+                    out << entry.first;
+                    out << entry.second;
+                }
+                for (auto entry : negative)
+                {
+                    out << entry.first;
+                    out << entry.second;
+                }
+                break;
+            case 8:
+                // fixme subtract iblts
+                break;
+            case 9:
+                out << iblt->DumpTable();
+                break;
+            case 10:
+                *ds >> *iblt;
+            default:
+                break;
+            }
+        }
+        if (produce_output)
+        {
+            output.insert(output.begin(), out.begin(), out.end());
+        }
+    }
+};
+
+class FuzzAPICGrapheneSet : FuzzTestNet
+{
+public:
+    FuzzAPICGrapheneSet() : FuzzTestNet("api_graphene_set") {}
+protected:
+    void run(const bool produce_output)
+    {
+        CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
+
+        uint8_t cmd;
+        std::shared_ptr<CGrapheneSet> gs;
+
+        uint16_t nReceiverUniverseItems; // note: artificially constrained
+        std::vector<uint256> itemHashes;
+        bool ordered;
+        bool fDeterministic;
+        *ds >> nReceiverUniverseItems;
+        *ds >> itemHashes;
+        *ds >> ordered;
+        *ds >> fDeterministic;
+
+        if (nReceiverUniverseItems < itemHashes.size() - 1)
+            return;
+
+        try
+        {
+            gs = std::make_shared<CGrapheneSet>(nReceiverUniverseItems, itemHashes, ordered, fDeterministic);
+
+            while (!ds->empty())
+            {
+                *ds >> cmd;
+                switch (cmd)
+                {
+                case 0:
+                {
+                    uint64_t nBlockTx = 0;
+                    uint16_t nReceiverPoolTx = 0; // note: artificially constrained
+                    *ds >> nBlockTx;
+                    *ds >> nReceiverPoolTx;
+                    if ((nReceiverPoolTx >= nBlockTx - 1))
+                        out << gs->OptimalSymDiff(nBlockTx, nReceiverPoolTx);
+                }
+                break;
+                case 1:
+                {
+                    std::vector<uint256> receiverItemHashes;
+                    *ds >> receiverItemHashes;
+                    out << gs->Reconcile(receiverItemHashes);
+                }
+                break;
+                default:
+                    break;
+                }
+            }
+        }
+        catch (std::exception &e)
+        {
+            // ignore
+        }
+        if (produce_output)
+        {
+            output.insert(output.begin(), out.begin(), out.end());
+        }
+    }
+};
+
+
 int main(int argc, char **argv)
 {
     ECCVerifyHandle globalVerifyHandle;
@@ -431,6 +597,15 @@ int main(int argc, char **argv)
     FuzzVerifyScript fuzz_verifyscript;
 
     FuzzTester fuzz_tester;
+
+    FuzzDeserNet<CMemPoolInfo> fuzz_cmempoolinfo("cmempoolinfo");
+    FuzzDeserNet<CGrapheneBlock> fuzz_grapheneblock("cgrapheneblock");
+    FuzzDeserNet<CGrapheneBlockTx> fuzz_grapheneblocktx("cgrapheneblocktx");
+    FuzzDeserNet<CRequestGrapheneBlockTx> fuzz_requestgrapheneblocktx("crequestgrapheneblocktx");
+    FuzzDeserNet<CGrapheneSet> fuzz_grapheneset("cgrapheneset");
+
+    FuzzAPICIblt fuzz_api_iblt;
+    FuzzAPICGrapheneSet fuzz_api_graphene_set;
 
     // command line arguments can be used to constrain more and
     // more specifically to a particular test

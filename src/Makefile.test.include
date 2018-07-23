@@ -78,7 +78,9 @@ BITCOIN_TESTS =\
   test/exploit_tests.cpp \
   test/forkscsv_tests.cpp \
   test/getarg_tests.cpp \
+  test/graphene_tests.cpp \
   test/hash_tests.cpp \
+  test/iblt_tests.cpp \
   test/key_tests.cpp \
   test/limitedmap_tests.cpp \
   test/dbwrapper_tests.cpp \
