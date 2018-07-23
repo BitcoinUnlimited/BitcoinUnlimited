@@ -79,13 +79,13 @@ protected:
 class FuzzTestNet : public FuzzTest
 {
 public:
-    FuzzTestNet(const std::string &name) : FuzzTest(name), ds(nullptr) {}
-    bool init(const std::vector<char> &buffer)
+    FuzzTestNet(const std::string &_name) : FuzzTest(_name), ds(nullptr) {}
+    bool init(const std::vector<char> &_buffer)
     {
-        FuzzTest::init(buffer);
+        FuzzTest::init(_buffer);
         if (ds != nullptr)
             delete ds;
-        ds = new CDataStream(buffer, SER_NETWORK, INIT_PROTO_VERSION);
+        ds = new CDataStream(_buffer, SER_NETWORK, INIT_PROTO_VERSION);
         try
         {
             int nVersion;
