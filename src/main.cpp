@@ -6275,14 +6275,13 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     }
                 }
             }
-            else
-            {
-                dosMan.Misbehaving(pfrom, 100);
-                return error("Peer %srequested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
-            }
-
             if (!handled)
             {
+                if (mi == mapBlockIndex.end())
+                {
+                    dosMan.Misbehaving(pfrom, 100);
+                    return error("Peer %srequested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
+                }
                 CBlock block;
                 const Consensus::Params &consensusParams = Params().GetConsensus();
                 if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
