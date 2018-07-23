@@ -113,7 +113,7 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
     for (CUnknownObj::ObjectSourceList::iterator i = item.availableFrom.begin(); i != item.availableFrom.end(); ++i)
     {
         CNode *node = i->node;
-        if (node)
+        if (node != nullptr)
         {
             // LOG(REQ, "ReqMgr: %s cleanup - removed ref to %d count %d.\n", item.obj.ToString(), node->GetId(),
             //    node->GetRefCount());
