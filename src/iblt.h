@@ -71,8 +71,8 @@ class CIblt
 public:
     // Default constructor builds a 0 size IBLT, so is meant for two-phase construction.  Call resize() before use
     CIblt();
-    // Pass the expected number of entries in the IBLT table.  If the number of entries exceeds
-    // the expected, the false positive rate will rise
+    // Pass the expected number of entries in the IBLT table. If the number of entries exceeds
+    // the expected, then the decode failure rate will increase dramatically.
     CIblt(size_t _expectedNumEntries);
     // Copy constructor
     CIblt(const CIblt &other);
