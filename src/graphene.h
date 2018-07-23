@@ -22,7 +22,6 @@
 #include <vector>
 
 const unsigned char MIN_MEMPOOL_INFO_BYTES = 8;
-const uint64_t EXCESSIVE_BLOCK_TXS = excessiveBlockSize / 100;
 
 class CDataStream;
 class CNode;
@@ -77,7 +76,9 @@ public:
         READWRITE(header);
         READWRITE(vAdditionalTxs);
         READWRITE(nBlockTxs);
-        if (nBlockTxs > EXCESSIVE_BLOCK_TXS)
+        // This logic assumes a smallest transaction size of 100 bytes.  This is optimistic for realistic transactions
+        // and the downside for pathological blocks is just that graphene won't work so we fall back to xthin
+        if (nBlockTxs > excessiveBlockSize / 100)
             throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
         if (!pGrapheneSet)
             pGrapheneSet = new CGrapheneSet();
