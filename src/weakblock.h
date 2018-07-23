@@ -83,6 +83,11 @@ public:
     /** Look up weak block by its hash. */
     CWeakblockRef byHash(const uint256& hash) const;
 
+    /** Look up weak block by its cheap hash.
+        Might return wrong block in case of collision.
+        FIXME: currently slow. */
+    CWeakblockRef byHash(const uint64_t& hash) const;
+
     /** Look up underlying weak block. */
     CWeakblockRef parent(const uint256& hash) const;
 

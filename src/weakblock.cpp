@@ -238,6 +238,15 @@ CWeakblockRef CWeakStore::byHash(const uint256& hash) const {
     else return nullptr;
 }
 
+CWeakblockRef CWeakStore::byHash(const uint64_t& hash) const {
+    // FIXME, O(n) ...
+    for (auto p : hash2wb) {
+        if (p.first.GetCheapHash() == hash)
+            return p.second;
+    }
+    return nullptr;
+}
+
 CWeakblockRef CWeakStore::parent(const uint256& hash) const {
     AssertLockHeld(cs_weakblocks);
     if (extends_map.count(hash))

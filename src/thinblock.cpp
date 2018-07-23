@@ -25,9 +25,94 @@
 #include "txorphanpool.h"
 #include "util.h"
 #include "utiltime.h"
+#include "weakblock.h"
 
 static bool DEFAULT_BLOOM_FILTER_TARGETING = true;
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
+
+
+template <class T>
+T hashReduce(const uint256 &t);
+template <>
+uint256 hashReduce<uint256>(const uint256 &t)
+{
+    return t;
+}
+template <>
+uint64_t hashReduce<uint64_t>(const uint256 &t)
+{
+    return t.GetCheapHash();
+}
+
+
+template <class T>
+unsigned int addFromWeak(std::vector<T> &vTxHashes,
+    const CBlock &block,
+    std::set<uint64_t> *collision_set,
+    bool *pcollision)
+{
+    unsigned skip_underlying = 0;
+    /* Weak blocks mode:
+       If it is detected that the block to be transmitted is based on top of a known,
+       previous weak block, the transmitted cheap hashes will be cut short by the transactions
+       shared in the underlying block (using the skip_underlying variable) and replaced
+       with a single (cheap)hash reference to the weakblock as well as the new coinbase. */
+    if (weakblocksEnabled())
+    {
+        LOCK(cs_weakblocks);
+        uint256 underlyinghash = weakblocksExtractCommitment(&block);
+        CWeakblockRef wb = weakstore.byHash(underlyinghash);
+        if (wb != nullptr)
+        {
+            LOG(WB, "Detected (x)thin transmission of %s which builds on previous weak block %s. Deflating.\n",
+                block.GetHash().GetHex(), wb->GetHash().GetHex());
+            vTxHashes.push_back(hashReduce<T>(underlyinghash));
+            vTxHashes.push_back(hashReduce<T>(block.vtx[0]->GetHash()));
+            if (pcollision != nullptr && collision_set != nullptr)
+            {
+                if (collision_set->count(underlyinghash.GetCheapHash()))
+                {
+                    *pcollision = true;
+                }
+                collision_set->insert(underlyinghash.GetCheapHash());
+                if (collision_set->count(block.vtx[0]->GetHash().GetCheapHash()))
+                {
+                    *pcollision = true;
+                }
+                collision_set->insert(block.vtx[0]->GetHash().GetCheapHash());
+            }
+            skip_underlying = wb->vtx.size();
+        }
+    }
+    return skip_underlying;
+}
+
+// the oppposite of addFromWeak. Inflates a shortened (cheap) hash list again
+template <class T>
+void weakblockInflateTxHashes(std::vector<T> &vTxHashes)
+{
+    if (vTxHashes.size() < 2)
+        return;
+    LOCK(cs_weakblocks);
+    CWeakblockRef wb = weakstore.byHash(vTxHashes[0]);
+
+    if (wb == nullptr)
+        return;
+
+    std::vector<T> inp(vTxHashes);
+    vTxHashes.clear();
+    vTxHashes.push_back(vTxHashes[1]);
+
+    LOG(WB, "Inflating %d hashes with %d hashes from underlying weak block.\n", vTxHashes.size(), wb->vtx.size());
+    for (size_t i = 1; i < wb->vtx.size(); i++)
+    {
+        // start at 1 to skip coinbase from underlying block
+        vTxHashes.push_back(hashReduce<T>(wb->vtx[i]->GetHash()));
+    }
+
+    vTxHashes.insert(vTxHashes.end(), inp.begin() + 2, inp.end());
+}
+
 
 CThinBlock::CThinBlock(const CBlock &block, CBloomFilter &filter)
 {
@@ -35,7 +120,10 @@ CThinBlock::CThinBlock(const CBlock &block, CBloomFilter &filter)
 
     unsigned int nTx = block.vtx.size();
     vTxHashes.reserve(nTx);
-    for (unsigned int i = 0; i < nTx; i++)
+
+    unsigned skip_underlying = addFromWeak<uint256>(vTxHashes, block, nullptr, nullptr);
+
+    for (unsigned int i = skip_underlying; i < nTx; i++)
     {
         const uint256 &hash = block.vtx[i]->GetHash();
         vTxHashes.push_back(hash);
@@ -47,6 +135,8 @@ CThinBlock::CThinBlock(const CBlock &block, CBloomFilter &filter)
         if (!filter.contains(hash) || i == 0)
             vMissingTx.push_back(*block.vtx[i]);
     }
+    if (skip_underlying > 0)
+        vMissingTx.push_back(*block.vtx[0]);
 }
 
 /**
@@ -63,6 +153,8 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     CThinBlock thinBlock;
     vRecv >> thinBlock;
+
+    weakblockInflateTxHashes(thinBlock.vTxHashes);
 
     // Message consistency checking
     if (!IsThinBlockValid(pfrom, thinBlock.vMissingTx, thinBlock.header))
@@ -108,11 +200,17 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         }
     }
 
-    // Check if we've already received this block and have it on disk
+    // Check if we've already received this block and have it on disk (or in mem as a weakblock)
     bool fAlreadyHave = false;
     {
         LOCK(cs_main);
         fAlreadyHave = AlreadyHaveBlock(inv);
+    }
+    if (!fAlreadyHave)
+    {
+        LOCK(cs_weakblocks);
+        CWeakblockRef wb = weakstore.byHash(inv.hash);
+        fAlreadyHave = wb != nullptr;
     }
     if (fAlreadyHave)
     {
@@ -218,7 +316,6 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
     return true;
 }
 
-
 CXThinBlock::CXThinBlock(const CBlock &block, CBloomFilter *filter)
 {
     header = block.GetBlockHeader();
@@ -226,8 +323,12 @@ CXThinBlock::CXThinBlock(const CBlock &block, CBloomFilter *filter)
 
     unsigned int nTx = block.vtx.size();
     vTxHashes.reserve(nTx);
+
     std::set<uint64_t> setPartialTxHash;
-    for (unsigned int i = 0; i < nTx; i++)
+
+    unsigned int skip_underlying = addFromWeak<uint64_t>(vTxHashes, block, &setPartialTxHash, &collision);
+
+    for (unsigned int i = skip_underlying; i < nTx; i++)
     {
         const uint256 hash256 = block.vtx[i]->GetHash();
         uint64_t cheapHash = hash256.GetCheapHash();
@@ -244,6 +345,8 @@ CXThinBlock::CXThinBlock(const CBlock &block, CBloomFilter *filter)
         if ((filter && !filter->contains(hash256)) || i == 0)
             vMissingTx.push_back(*block.vtx[i]);
     }
+    if (skip_underlying > 0)
+        vMissingTx.push_back(*block.vtx[0]);
 }
 
 CXThinBlock::CXThinBlock(const CBlock &block)
@@ -255,8 +358,10 @@ CXThinBlock::CXThinBlock(const CBlock &block)
     vTxHashes.reserve(nTx);
     std::set<uint64_t> setPartialTxHash;
 
+    unsigned int skip_underlying = addFromWeak<uint64_t>(vTxHashes, block, &setPartialTxHash, &collision);
+
     LOCK(orphanpool.cs);
-    for (unsigned int i = 0; i < nTx; i++)
+    for (unsigned int i = skip_underlying; i < nTx; i++)
     {
         const uint256 hash256 = block.vtx[i]->GetHash();
         uint64_t cheapHash = hash256.GetCheapHash();
@@ -277,6 +382,9 @@ CXThinBlock::CXThinBlock(const CBlock &block)
         else if (i == 0)
             vMissingTx.push_back(*block.vtx[i]);
     }
+
+    if (skip_underlying > 0)
+        vMissingTx.push_back(*block.vtx[0]);
 }
 
 CXThinBlockTx::CXThinBlockTx(uint256 blockHash, std::vector<CTransaction> &vTx)
@@ -321,11 +429,17 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         }
     }
 
-    // Check if we've already received this block and have it on disk
+    // Check if we've already received this block and have it on disk (or in mem as a weakblock)
     bool fAlreadyHave = false;
     {
         LOCK(cs_main);
         fAlreadyHave = AlreadyHaveBlock(inv);
+    }
+    if (!fAlreadyHave)
+    {
+        LOCK(cs_weakblocks);
+        CWeakblockRef wb = weakstore.byHash(inv.hash);
+        fAlreadyHave = wb != nullptr;
     }
     if (fAlreadyHave)
     {
@@ -483,30 +597,52 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         LOCK(cs_main);
         std::vector<CTransaction> vTx;
         BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
+        CWeakblockRef wb = nullptr;
+
+        bool found = false;
+
         if (mi == mapBlockIndex.end())
         {
-            dosMan.Misbehaving(pfrom, 20);
-            return error("Requested block is not available");
-        }
-        else
-        {
-            CBlock block;
-            const Consensus::Params &consensusParams = Params().GetConsensus();
-            if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
+            LOCK(cs_weakblocks);
+            wb = weakstore.byHash(inv.hash);
+            if (wb == nullptr)
             {
-                // We do not assign misbehavior for not being able to read a block from disk because we already
-                // know that the block is in the block index from the step above. Secondly, a failure to read may
-                // be our own issue or the remote peer's issue in requesting too early.  We can't know at this point.
-                return error("Cannot load block from disk -- Block txn request possibly received before assembled");
+                dosMan.Misbehaving(pfrom, 20);
+                return error("Requested block is not available");
             }
             else
             {
-                for (unsigned int i = 0; i < block.vtx.size(); i++)
+                LOG(WB, "Requested block %s is weak.\n", inv.hash.GetHex());
+                found = true;
+            }
+        }
+        else
+            found = true;
+
+        if (found)
+        {
+            CBlock block;
+            if (mi != mapBlockIndex.end())
+            {
+                const Consensus::Params &consensusParams = Params().GetConsensus();
+                if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
                 {
-                    uint64_t cheapHash = block.vtx[i]->GetHash().GetCheapHash();
-                    if (thinRequestBlockTx.setCheapHashesToRequest.count(cheapHash))
-                        vTx.push_back(*block.vtx[i]);
+                    // We do not assign misbehavior for not being able to read a block from disk because we already
+                    // know that the block is in the block index from the step above. Secondly, a failure to read may
+                    // be our own issue or the remote peer's issue in requesting too early.  We can't know at this
+                    // point.
+                    return error("Cannot load block from disk -- Block txn request possibly received before assembled");
                 }
+            }
+            else
+            {
+                block = *wb;
+            }
+            for (unsigned int i = 0; i < block.vtx.size(); i++)
+            {
+                uint64_t cheapHash = block.vtx[i]->GetHash().GetCheapHash();
+                if (thinRequestBlockTx.setCheapHashesToRequest.count(cheapHash))
+                    vTx.push_back(*block.vtx[i]);
             }
         }
         CXThinBlockTx thinBlockTx(thinRequestBlockTx.blockhash, vTx);
@@ -549,6 +685,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
     CXThinBlock thinBlock;
     vRecv >> thinBlock;
 
+    weakblockInflateTxHashes(thinBlock.vTxHashes);
     {
         LOCK(cs_main);
 
@@ -595,7 +732,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         // check for weak block
         if (isWeak)
         {
-            LOG(WB, "Received weak XThin block.");
+            LOG(WB, "Received weak XThin block.\n");
             return thinBlock.process(pfrom, nSizeThinBlock, strCommand);
         }
 
