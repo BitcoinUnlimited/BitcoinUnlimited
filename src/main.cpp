@@ -281,7 +281,7 @@ void FinalizeNode(NodeId nodeid)
         requester.MapBlocksInFlightErase(hash, nodeid);
 
         // Reset all requests times to zero so that we can immediately re-request these blocks
-        requester.ResetLastRequestTime(hash);
+        requester.ResetLastBlockRequestTime(hash);
     }
     nPreferredDownload.fetch_sub(state->fPreferredDownload);
 

@@ -502,7 +502,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
     // BUIP010 Xtreme Thinblocks: end section
 }
 
-void CRequestManager::ResetLastRequestTime(const uint256 &hash)
+void CRequestManager::ResetLastBlockRequestTime(const uint256 &hash)
 {
     LOCK(cs_objDownloader);
     OdMap::iterator itemIter = sendBlkIter;

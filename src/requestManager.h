@@ -185,7 +185,7 @@ public:
     void Rejected(const CInv &obj, CNode *from, unsigned char reason = 0);
 
     // Resets the last request time to zero when a node disconnects and has blocks in flight.
-    void ResetLastRequestTime(const uint256 &hash);
+    void ResetLastBlockRequestTime(const uint256 &hash);
 
     void SendRequests();
 
