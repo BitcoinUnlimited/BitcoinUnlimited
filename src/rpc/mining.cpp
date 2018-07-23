@@ -607,15 +607,10 @@ UniValue mkblocktemplate(const UniValue &params, CBlock *pblockOut)
             vbavailable.push_back(Pair(gbt_vb_name(pos), consensusParams.vDeployments[pos].bit));
             if (setClientRules.find(vbinfo.name) == setClientRules.end())
             {
-                const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
-                vbavailable.push_back(Pair(gbt_vb_name(pos), consensusParams.vDeployments[pos].bit));
-                if (setClientRules.find(vbinfo.name) == setClientRules.end())
+                if (!vbinfo.gbt_force)
                 {
-                    if (!vbinfo.gbt_force)
-                    {
-                        // If the client doesn't support this, don't indicate it in the [default] version
-                        pblock->nVersion &= ~VersionBitsMask(consensusParams, pos);
-                    }
+                    // If the client doesn't support this, don't indicate it in the [default] version
+                    pblock->nVersion &= ~VersionBitsMask(consensusParams, pos);
                 }
             }
             break;
@@ -627,19 +622,13 @@ UniValue mkblocktemplate(const UniValue &params, CBlock *pblockOut)
             aRules.push_back(gbt_vb_name(pos));
             if (setClientRules.find(vbinfo.name) == setClientRules.end())
             {
-                // Add to rules only
-                const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
-                aRules.push_back(gbt_vb_name(pos));
-                if (setClientRules.find(vbinfo.name) == setClientRules.end())
+                // Not supported by the client; make sure it's safe to proceed
+                if (!vbinfo.gbt_force)
                 {
-                    // Not supported by the client; make sure it's safe to proceed
-                    if (!vbinfo.gbt_force)
-                    {
-                        // If we do anything other than throw an exception here, be sure version/force isn't sent to old
-                        // clients
-                        throw JSONRPCError(RPC_INVALID_PARAMETER,
-                            strprintf("Support for '%s' rule requires explicit client support", vbinfo.name));
-                    }
+                    // If we do anything other than throw an exception here, be sure version/force isn't sent to old
+                    // clients
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,
+                        strprintf("Support for '%s' rule requires explicit client support", vbinfo.name));
                 }
             }
             break;
