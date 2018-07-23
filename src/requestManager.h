@@ -173,7 +173,7 @@ public:
 
     // Did we already ask for this block. We need to do this during IBD to make sure we don't ask for another set
     // of the same blocks.
-    bool AlreadyAskedFor(const uint256 &hash);
+    bool AlreadyAskedForBlock(const uint256 &hash);
 
     // Indicate that we got this object, from and bytes are optional (for node performance tracking)
     void Received(const CInv &obj, CNode *from, int bytes = 0);

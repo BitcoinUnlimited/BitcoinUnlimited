@@ -243,7 +243,7 @@ void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *
     }
 }
 
-bool CRequestManager::AlreadyAskedFor(const uint256 &hash)
+bool CRequestManager::AlreadyAskedForBlock(const uint256 &hash)
 {
     LOCK(cs_objDownloader);
     OdMap::iterator item = mapBlkInfo.find(hash);
@@ -975,7 +975,7 @@ void CRequestManager::FindNextBlocksToDownload(NodeId nodeid, unsigned int count
         // already part of our chain (and therefore don't need it even if pruned).
         for (CBlockIndex *pindex : vToFetch)
         {
-            if (AlreadyAskedFor(pindex->GetBlockHash()))
+            if (AlreadyAskedForBlock(pindex->GetBlockHash()))
                 continue;
 
             if (!pindex->IsValid(BLOCK_VALID_TREE))
