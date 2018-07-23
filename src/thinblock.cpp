@@ -576,7 +576,9 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         CValidationState state;
         CBlockIndex *pIndex = nullptr;
 
-        if (!AcceptBlockHeader(thinBlock.header, state, Params(), &pIndex, nullptr))
+        bool isWeak = false;
+
+        if (!AcceptBlockHeader(thinBlock.header, state, Params(), &pIndex, &isWeak))
         {
             int nDoS;
             if (state.IsInvalid(nDoS))
@@ -588,6 +590,13 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
 
             thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
             return false;
+        }
+
+        // check for weak block
+        if (isWeak)
+        {
+            LOG(WB, "Received weak XThin block.");
+            return thinBlock.process(pfrom, nSizeThinBlock, strCommand);
         }
 
         // pIndex should always be set by AcceptBlockHeader
