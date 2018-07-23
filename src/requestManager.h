@@ -54,7 +54,7 @@ public:
     void clear(void)
     {
         requestCount = 0;
-        node = 0;
+        node = nullptr;
         desirability = 0;
     }
     bool operator<(const CNodeRequestData &rhs) const { return desirability < rhs.desirability; }
