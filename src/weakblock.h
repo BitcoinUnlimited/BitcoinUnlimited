@@ -95,7 +95,7 @@ public:
     /** Return weak blocks chain tip (or nullptr if there's none)
         This is the longest and earliest received (in terms of order of store() calls)
         weak block chain's tip. */
-    CWeakblockRef Tip();
+    CWeakblockRef Tip() const;
 
     //! Number of known weak blocks
     size_t size() const;

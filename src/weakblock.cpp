@@ -243,7 +243,7 @@ CWeakblockRef CWeakStore::store(const CBlock* block) {
     return wb;
 }
 
-CWeakblockRef CWeakStore::Tip() {
+CWeakblockRef CWeakStore::Tip() const {
     LOCK(cs_weakblocks);
 
     int max_wheight=-1;
