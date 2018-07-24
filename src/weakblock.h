@@ -5,14 +5,15 @@
 #ifndef BITCOIN_WEAKBLOCK_H
 #define BITCOIN_WEAKBLOCK_H
 
-#include "uint256.h"
 #include "consensus/params.h"
 #include "pow.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
+#include "main.h"
 #include "sync.h"
 #include "uint256.h"
 #include <unordered_map>
+#include <unordered_set>
 
 const uint32_t DEFAULT_WEAKBLOCKS_CONSIDER_POW_RATIO=4;
 const bool DEFAULT_WEAKBLOCKS_ENABLE=true;
@@ -109,19 +110,19 @@ public:
     const std::vector<CWeakblockRef>& chainTips() const;
 private:
     //! Map block hash to weak block
-    std::map<uint256, CWeakblockRef> hash2wb;
+    std::unordered_map<uint256, CWeakblockRef, BlockHasher> hash2wb;
     //! same as above, but for cheap hashes. In case of collision, a newly inserted weakblock
     // will override the older one.
     std::unordered_map<uint64_t, CWeakblockRef> cheaphash2wb;
 
     //! Store DAG edges, so that extends[a] = b means b is the next underlying block for a
-    std::map<uint256, uint256> extends_map;
+    std::unordered_map<uint256, uint256, BlockHasher> extends_map;
 
     /*! Store all weak block chain tips, ordered chronologically; meaning that a later received chain tip is further down in this vector. Therefore the weak block chain tip is the one with the largest weak height that comes earliest in this vector. */
     std::vector<CWeakblockRef> chain_tips;
 
     /** Chain tips pre-marked for removal for the next expireOld(..) call */
-    std::set<uint256> to_remove;
+    std::unordered_set<uint256, BlockHasher> to_remove;
 };
 
 extern CWeakStore weakstore;
