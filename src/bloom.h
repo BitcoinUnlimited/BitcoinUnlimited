@@ -71,7 +71,6 @@ private:
         double nFPRate,
         unsigned int nTweakIn,
         unsigned char nFlagsIn,
-        bool size_constrained,
         uint32_t nMaxFilterSize);
 
     //! Checks for empty and full filters to avoid wasting cpu
@@ -97,7 +96,7 @@ public:
         unsigned char nFlagsIn,
         uint32_t nMaxFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE);
     /**
-     * Add the option to force the bloom filter setup to guarantee the false positive rate does not exceed nFPRate.
+     * When fGuaranteeFPR == true, it is guaranteed that the false positive rate will not exceed nFPRate.
      */
     CBloomFilter(unsigned int nElements,
         double nFPRate,
