@@ -142,12 +142,14 @@ CWeakblockRef CWeakStore::store(const CBlock* block) {
     if (hash2wb.count(underlyinghash) > 0)
         underlying = hash2wb[underlyinghash];
 
+    bool extends_failure = false;
     if (!underlyinghash.IsNull() && underlying == nullptr) {
-        LOG(WB, "Weak block %s with unknown underlying block %s. Assuming start of new chain.\n", blockhash.GetHex(), underlyinghash.GetHex());
+        LOG(WB, "Weak block %s with unknown underlying block %s. Assuming start of new chain for now.\n", blockhash.GetHex(), underlyinghash.GetHex());
     } else if (underlying != nullptr && !extends_check(
                    block, underlying.get())) {
         LOG(WB, "WARNING, block %s does not extend weak block %s, even though it says so! Assuming start of new chain.\n", blockhash.GetHex(), underlyinghash.GetHex());
         underlying = nullptr;
+        extends_failure = true;
     }
 
     CWeakblockRef wb=std::make_shared<CWeakblock>(block);
@@ -163,8 +165,14 @@ CWeakblockRef CWeakStore::store(const CBlock* block) {
     cheaphash2wb[cheapblockhash] = wb;
 
     // extend the DAG
-    if (underlying != nullptr) {
+    /* An extension can either be a new, independent chain tip or an
+       extension of an existing one. Check whether there is an existing one
+       and move that chain tip then. There's no insertioninto the middle of
+       the DAG possible due to the hash-linked structure. */
+    if (!underlyinghash.IsNull() && !extends_failure)
         extends_map[blockhash]=underlyinghash;
+
+    if (underlying != nullptr) {
         LOG(WB, "Weakblock %s is referring to underlying weak block %s.\n", wb->GetHash().GetHex(), underlyinghash.GetHex());
 
         auto wct_iter = find(chain_tips.begin(),
@@ -176,7 +184,61 @@ CWeakblockRef CWeakStore::store(const CBlock* block) {
         }
     }
     chain_tips.push_back(wb);
-    LOG(WB, "Tracking weak block %s (short: %x) of %d transaction(s), parent: %s.\n", blockhash.GetHex(), blockhash.GetCheapHash(), wb->vtx.size(), wb->hashPrevBlock.GetHex());
+
+    bool remove_this_from_chain_tips = false;
+
+    /* Graft chains that end on the newly received block onto this
+       one. In particular, this means to invalidate the chain height
+       cache, as well as removing this one again from the chain_tips
+       list. We also have to make sure that the chains that are
+       grafted onto the newly received block actually extend the weak
+       block in the the sense of containing all transactions and in
+       order. So far, they are only known to _say_ to do so! */
+    for (CWeakblockRef chain_tip : chain_tips) {
+        std::vector<CWeakblockRef> chain;
+        CWeakblockRef x=chain_tip;
+        while(1) {
+            chain.push_back(x);
+            if (x == nullptr || x == wb) break;
+            x = parent(x->GetHash());
+        }
+        // chain ends at this weak block and is not just consisting wb?
+        if (x == wb && chain.size() > 1) {
+            chain.pop_back(); // remove block just stored, which is wb
+            CWeakblockRef last = chain.back();
+            if (!extends_check(last.get(), wb.get())) {
+                LOG(WB, "WARNING: Weak block %s wants to be grafted on top of newly inserted block %s, but is falsely asserting to be a weak extension!\n",
+                    last->GetHash().GetHex(), blockhash.GetHex());
+                // now that we know this is a fake extension as we have the block being pointed to,
+                // remove it from the extends map!
+                extends_map.erase(last->GetHash());
+                continue;
+            }
+            LOG(WB, "Late-received weak block %s (with a former chain length of %d) will be grafted on top of %s.\n", last->GetHash().GetHex(),
+                chain.size(),
+                blockhash.GetHex());
+
+            remove_this_from_chain_tips = true;
+
+            // ok looks like an out-of-order receival of weakblocks
+            // make sure all heights in the chain are invalidated
+            for (CWeakblockRef cwb : chain)
+                cwb->weak_height_cache_valid = false;
+        }
+    }
+    if (remove_this_from_chain_tips) {
+        // remove just added-block from chain tips, as there's another block going on top
+        LOG(WB, "Removing %s from chain tips again, as block(s) got grafted on top.", blockhash.GetHex());
+        auto wct_iter = find(chain_tips.begin(),
+                             chain_tips.end(),
+                             wb);
+
+        assert(wct_iter != chain_tips.end());
+        chain_tips.erase(wct_iter);
+    }
+
+    LOG(WB, "Tracking weak block %s (short: %x) of %d transaction(s), strong parent: %s.\n",
+        blockhash.GetHex(), blockhash.GetCheapHash(), wb->vtx.size(), wb->hashPrevBlock.GetHex());
     return wb;
 }
 
