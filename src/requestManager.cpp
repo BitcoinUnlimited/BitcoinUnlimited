@@ -92,8 +92,6 @@ CRequestManager::CRequestManager()
     : inFlightTxns("reqMgr/inFlight", STAT_OP_MAX), receivedTxns("reqMgr/received"), rejectedTxns("reqMgr/rejected"),
       droppedTxns("reqMgr/dropped", STAT_KEEP), pendingTxns("reqMgr/pending", STAT_KEEP),
       requestPacer(512, 256) // Max and average # of requests that can be made per second
-      ,
-      blockPacer(64, 32) // Max and average # of block requests that can be made per second
 {
     inFlight = 0;
     nOutbound = 0;
@@ -116,9 +114,8 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
     for (CUnknownObj::ObjectSourceList::iterator i = item.availableFrom.begin(); i != item.availableFrom.end(); ++i)
     {
         CNode *node = i->node;
-        if (node)
+        if (node != nullptr)
         {
-            i->clear();
             // LOG(REQ, "ReqMgr: %s cleanup - removed ref to %d count %d.\n", item.obj.ToString(), node->GetId(),
             //    node->GetRefCount());
             //
@@ -247,7 +244,7 @@ void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *
     }
 }
 
-bool CRequestManager::AlreadyAskedFor(const uint256 &hash)
+bool CRequestManager::AlreadyAskedForBlock(const uint256 &hash)
 {
     LOCK(cs_objDownloader);
     OdMap::iterator item = mapBlkInfo.find(hash);
@@ -577,7 +574,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
     return false; // no block was requested
 }
 
-void CRequestManager::ResetLastRequestTime(const uint256 &hash)
+void CRequestManager::ResetLastBlockRequestTime(const uint256 &hash)
 {
     LOCK(cs_objDownloader);
     OdMap::iterator itemIter = sendBlkIter;
@@ -1053,7 +1050,7 @@ void CRequestManager::FindNextBlocksToDownload(NodeId nodeid, unsigned int count
         // already part of our chain (and therefore don't need it even if pruned).
         for (CBlockIndex *pindex : vToFetch)
         {
-            if (AlreadyAskedFor(pindex->GetBlockHash()))
+            if (AlreadyAskedForBlock(pindex->GetBlockHash()))
                 continue;
 
             if (!pindex->IsValid(BLOCK_VALID_TREE))

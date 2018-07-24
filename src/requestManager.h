@@ -54,7 +54,7 @@ public:
     void clear(void)
     {
         requestCount = 0;
-        node = 0;
+        node = nullptr;
         desirability = 0;
     }
     bool operator<(const CNodeRequestData &rhs) const { return desirability < rhs.desirability; }
@@ -75,9 +75,6 @@ public:
     bool rateLimited;
     int64_t lastRequestTime; // In microseconds, 0 means no request
     unsigned int outstandingReqs;
-    // unsigned int receivingFrom;
-    // char    requestCount[MAX_AVAIL_FROM];
-    // CNode* availableFrom[MAX_AVAIL_FROM];
     ObjectSourceList availableFrom;
     unsigned int priority;
 
@@ -143,7 +140,6 @@ protected:
 
     void cleanup(OdMap::iterator &item);
     CLeakyBucket requestPacer;
-    CLeakyBucket blockPacer;
 
     // Request a single block.
     bool RequestBlock(CNode *pfrom, CInv obj);
@@ -174,7 +170,7 @@ public:
 
     // Did we already ask for this block. We need to do this during IBD to make sure we don't ask for another set
     // of the same blocks.
-    bool AlreadyAskedFor(const uint256 &hash);
+    bool AlreadyAskedForBlock(const uint256 &hash);
 
     // Indicate that we got this object, from and bytes are optional (for node performance tracking)
     void Received(const CInv &obj, CNode *from, int bytes = 0);
@@ -186,7 +182,7 @@ public:
     void Rejected(const CInv &obj, CNode *from, unsigned char reason = 0);
 
     // Resets the last request time to zero when a node disconnects and has blocks in flight.
-    void ResetLastRequestTime(const uint256 &hash);
+    void ResetLastBlockRequestTime(const uint256 &hash);
 
     void SendRequests();
 
