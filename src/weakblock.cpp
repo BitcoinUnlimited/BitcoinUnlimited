@@ -106,11 +106,12 @@ int CWeakblock::GetWeakHeight() const {
                 prev_height = underlying_wb->GetWeakHeight();
             else {
                 // FIXME: what else to do? this should never happen
-                LOG(WB, "GetWeakHeight(): Nullpointer encountered in hash2wb!!\n");
+                LOG(WB, "GetWeakHeight(): INTERNAL ERROR. Null pointer encountered in hash2wb!!\n");
+                return -2;
             }
         } else {
-            // FIXME: what else to do? this should never happen
-            LOG(WB, "GetWeakHeight(): Underlying weakblock not found!!\n");
+            weak_height_cache_valid = true;
+            return weak_height_cache = 0;
         }
         if (prev_height >=0) {
             weak_height_cache_valid = true;
@@ -350,10 +351,16 @@ void CWeakStore::consistencyCheck(const bool check_cached_heights) const {
         for (auto p : hash2wb)
             p.second->weak_height_cache_valid = false;
 
-        for (auto p : hash2wb)
+        for (auto p : hash2wb) {
             assert(cached_chain_heights[p.second->GetHash()]
                    == p.second->GetWeakHeight());
+            assert(cached_chain_heights[p.second->GetHash()] >= -1);
+            assert(p.second->GetWeakHeight() >= -1);
+        }
     }
+    // FIXME: add check that when all chains have a height >=0, that the number of
+    // blocks divided by the number of chain tips is less or equal to the maximum chain height.
+
 }
 
 const std::vector<CWeakblockRef>& CWeakStore::chainTips() const {
