@@ -11,9 +11,6 @@
 
 // FIXME: what about asserts here?
 
-//#define DEBUG_DETAIL 1
-
-
 static const uint32_t WB_MIN_POW_RATIO = 600;
 
 CCriticalSection cs_weakblocks;
