@@ -119,7 +119,7 @@ private:
     static void eventcb(struct bufferevent *bev, short what, void *ctx);
 };
 
-TorControlConnection::TorControlConnection(struct event_base *base) : base(base), b_conn(0) {}
+TorControlConnection::TorControlConnection(struct event_base *_base) : base(_base), b_conn(0) {}
 TorControlConnection::~TorControlConnection()
 {
     if (b_conn)
@@ -417,8 +417,8 @@ private:
     static void reconnect_cb(evutil_socket_t fd, short what, void *arg);
 };
 
-TorController::TorController(struct event_base *baseIn, const std::string &target)
-    : base(baseIn), target(target), conn(base), reconnect(true), reconnect_ev(0),
+TorController::TorController(struct event_base *baseIn, const std::string &_target)
+    : base(baseIn), target(_target), conn(base), reconnect(true), reconnect_ev(0),
       reconnect_timeout(RECONNECT_TIMEOUT_START)
 {
     reconnect_ev = event_new(base, -1, 0, reconnect_cb, this);

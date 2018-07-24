@@ -198,28 +198,28 @@ public:
     {
         Clear(false);
     }
-    CStatHistory(const char *name, unsigned int operation = STAT_OP_SUM)
-        : CStat<DataType, RecordType>(name), op(operation), timer(stat_io_service)
+    CStatHistory(const char *_name, unsigned int operation = STAT_OP_SUM)
+        : CStat<DataType, RecordType>(_name), op(operation), timer(stat_io_service)
     {
         Clear();
     }
 
-    CStatHistory(const std::string &name, unsigned int operation = STAT_OP_SUM)
-        : CStat<DataType, RecordType>(name), op(operation), timer(stat_io_service)
+    CStatHistory(const std::string &_name, unsigned int operation = STAT_OP_SUM)
+        : CStat<DataType, RecordType>(_name), op(operation), timer(stat_io_service)
     {
         Clear();
     }
 
-    void init(const char *name, unsigned int operation = STAT_OP_SUM)
+    void init(const char *_name, unsigned int operation = STAT_OP_SUM)
     {
-        CStat<DataType, RecordType>::init(name);
+        CStat<DataType, RecordType>::init(_name);
         op = operation;
         Clear();
     }
 
-    void init(const std::string &name, unsigned int operation = STAT_OP_SUM)
+    void init(const std::string &_name, unsigned int operation = STAT_OP_SUM)
     {
-        CStat<DataType, RecordType>::init(name);
+        CStat<DataType, RecordType>::init(_name);
         op = operation;
         Clear();
     }

@@ -66,9 +66,9 @@ public:
             return 1;
 
         auto fpr = [nReceiverPoolTx, nBlockAndReceiverPoolTx](uint64_t a) {
-            float fpr = a / float(nReceiverPoolTx - nBlockAndReceiverPoolTx);
+            float _fpr = a / float(nReceiverPoolTx - nBlockAndReceiverPoolTx);
 
-            return fpr < 1.0 ? fpr : FILTER_FPR_MAX;
+            return _fpr < 1.0 ? _fpr : FILTER_FPR_MAX;
         };
 
         auto F = [nBlockTxs, fpr](

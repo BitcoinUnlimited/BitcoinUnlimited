@@ -29,7 +29,7 @@ template <class Locker>
 class LockedPageManagerBase
 {
 public:
-    LockedPageManagerBase(size_t page_size) : page_size(page_size)
+    LockedPageManagerBase(size_t _page_size) : page_size(_page_size)
     {
         // Determine bitmask for extracting page from address
         assert(!(page_size & (page_size - 1))); // size must be power of two
