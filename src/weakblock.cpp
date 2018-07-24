@@ -326,7 +326,7 @@ CWeakblockRef CWeakStore::parent(const uint256& hash) const {
 size_t CWeakStore::size() const { AssertLockHeld(cs_weakblocks); return hash2wb.size(); }
 bool CWeakStore::empty() const { AssertLockHeld(cs_weakblocks); return size() == 0; }
 
-void CWeakStore::consistencyCheck() const {
+void CWeakStore::consistencyCheck(const bool check_cached_heights) const {
     LOCK(cs_weakblocks);
     LOG(WB, "Doing internal consistency check.\n");
     assert(hash2wb.count(uint256()) == 0);
@@ -340,6 +340,20 @@ void CWeakStore::consistencyCheck() const {
     for (auto wb : chain_tips)
         assert(hash2wb.count(wb->GetHash()) > 0);
 
+    // make sure all cached weak chain heights were correct
+    if (check_cached_heights) {
+        std::unordered_map<uint256, int, BlockHasher> cached_chain_heights;
+        for (auto p : hash2wb) {
+            cached_chain_heights[p.second->GetHash()] = p.second->GetWeakHeight();
+        }
+
+        for (auto p : hash2wb)
+            p.second->weak_height_cache_valid = false;
+
+        for (auto p : hash2wb)
+            assert(cached_chain_heights[p.second->GetHash()]
+                   == p.second->GetWeakHeight());
+    }
 }
 
 const std::vector<CWeakblockRef>& CWeakStore::chainTips() const {

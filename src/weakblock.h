@@ -105,7 +105,7 @@ public:
 
     /** Runs an internal consistency check that will fail with assert when something
         is broken. FIXME: Not to be used in production, update asserts to exception or DbgAssert. */
-    void consistencyCheck() const;
+    void consistencyCheck(const bool check_cached_heights=true) const;
 
     const std::vector<CWeakblockRef>& chainTips() const;
 private:
