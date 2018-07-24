@@ -9,8 +9,6 @@
 #include "connmgr.h"
 #include "ui_interface.h"
 
-#include <boost/foreach.hpp>
-
 CDoSManager::CDoSManager() : setBannedIsDirty(false), nBanThreshold(DEFAULT_BANSCORE_THRESHOLD) {}
 /**
  * Call once the command line is parsed so dosman configures itself appropriately.
@@ -25,7 +23,7 @@ void CDoSManager::HandleCommandLine() { nBanThreshold = GetArg("-banscore", DEFA
 bool CDoSManager::IsWhitelistedRange(const CNetAddr &addr)
 {
     LOCK(cs_vWhitelistedRange);
-    BOOST_FOREACH (const CSubNet &subnet, vWhitelistedRange)
+    for (const CSubNet &subnet : vWhitelistedRange)
     {
         if (subnet.Match(addr))
             return true;

@@ -21,7 +21,6 @@
 
 #include <boost/algorithm/string/case_conv.hpp> // for to_upper()
 #include <boost/bind.hpp>
-#include <boost/foreach.hpp>
 #include <boost/iostreams/concepts.hpp>
 #include <boost/iostreams/stream.hpp>
 #include <boost/shared_ptr.hpp>
@@ -64,7 +63,7 @@ void RPCServer::OnPostCommand(boost::function<void(const CRPCCommand &)> slot)
 void RPCTypeCheck(const UniValue &params, const list<UniValue::VType> &typesExpected, bool fAllowNull)
 {
     unsigned int i = 0;
-    BOOST_FOREACH (UniValue::VType t, typesExpected)
+    for (UniValue::VType t : typesExpected)
     {
         if (params.size() <= i)
             break;

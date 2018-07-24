@@ -8,7 +8,6 @@
 #include "rpc/server.h"
 #include "util.h"
 
-#include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
 #include <iomanip>

@@ -23,7 +23,7 @@ bool CheckAndRequestExpeditedBlocks(CNode *pfrom)
 {
     if (pfrom->nVersion >= EXPEDITED_VERSION)
     {
-        BOOST_FOREACH (std::string &strAddr, mapMultiArgs["-expeditedblock"])
+        for (std::string &strAddr : mapMultiArgs["-expeditedblock"])
         {
             std::string strListeningPeerIP;
             std::string strPeerIP = pfrom->addr.ToString();
@@ -119,7 +119,7 @@ void ActuallySendExpreditedBlock(CXThinBlock &thinBlock, unsigned char hops, con
 {
     VNodeRefs vNodeRefs(connmgr->ExpeditedBlockNodes());
 
-    BOOST_FOREACH (CNodeRef &nodeRef, vNodeRefs)
+    for (CNodeRef &nodeRef : vNodeRefs)
     {
         CNode *n = nodeRef.get();
 

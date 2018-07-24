@@ -367,7 +367,7 @@ void UnregisterNodeSignals(CNodeSignals &nodeSignals)
 CBlockIndex *FindForkInGlobalIndex(const CChain &chain, const CBlockLocator &locator)
 {
     // Find the first block the caller has in the main chain
-    BOOST_FOREACH (const uint256 &hash, locator.vHave)
+    for (const uint256 &hash : locator.vHave)
     {
         BlockMap::iterator mi = mapBlockIndex.find(hash);
         if (mi != mapBlockIndex.end())
@@ -500,7 +500,7 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints *lp, bool 
             // lock on a mempool input, so we can use the return value of
             // CheckSequenceLocks to indicate the LockPoints validity
             int maxInputHeight = 0;
-            BOOST_FOREACH (int height, prevheights)
+            for (int height : prevheights)
             {
                 // Can ignore mempool inputs since we'll fail if they had non-zero locks
                 if (height != tip->nHeight + 1)
@@ -645,7 +645,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
     // Check for conflicts with in-memory transactions
     {
         READLOCK(pool.cs); // protect pool.mapNextTx
-        BOOST_FOREACH (const CTxIn &txin, ptx->vin)
+        for (const CTxIn &txin : ptx->vin)
         {
             auto itConflicting = pool.mapNextTx.find(txin.prevout);
             if (itConflicting != pool.mapNextTx.end())
@@ -1297,7 +1297,7 @@ void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCach
     if (!tx.IsCoinBase())
     {
         txundo.vprevout.reserve(tx.vin.size());
-        BOOST_FOREACH (const CTxIn &txin, tx.vin)
+        for (const CTxIn &txin : tx.vin)
         {
             txundo.vprevout.emplace_back();
             inputs.SpendCoin(txin.prevout, &txundo.vprevout.back());
@@ -2965,8 +2965,9 @@ static bool ActivateBestChainStep(CValidationState &state,
         // Connect new blocks.
         CBlockIndex *pindexNewTip = nullptr;
         CBlockIndex *pindexLastNotify = nullptr;
-        BOOST_REVERSE_FOREACH (CBlockIndex *pindexConnect, vpindexToConnect)
+        for (auto i = vpindexToConnect.rbegin(); i != vpindexToConnect.rend(); i++)
         {
+            CBlockIndex* pindexConnect = *i;
             // Check if the best chain has changed while we were disconnecting or processing blocks.
             // If so then we need to return and continue processing the newer chain.
             pindexNewMostWork = FindMostWorkChain();
@@ -3085,13 +3086,14 @@ static bool ActivateBestChainStep(CValidationState &state,
                 nBlockEstimate = Checkpoints::GetTotalBlocksEstimate(chainparams.Checkpoints());
             {
                 LOCK(cs_vNodes);
-                BOOST_FOREACH (CNode *pnode, vNodes)
+                for (CNode *pnode : vNodes)
                 {
                     if (chainActive.Height() >
                         (pnode->nStartingHeight != -1 ? pnode->nStartingHeight - 2000 : nBlockEstimate))
                     {
-                        BOOST_REVERSE_FOREACH (const uint256 &hash, vHashes)
+                        for (auto i = vHashes.rbegin(); i != vHashes.rend(); i++)
                         {
+                            const uint256 &hash = *i;
                             pnode->PushBlockHash(hash);
                         }
                     }
@@ -4036,7 +4038,7 @@ bool TestBlockValidity(CValidationState &state,
 uint64_t CalculateCurrentUsage()
 {
     uint64_t retval = 0;
-    BOOST_FOREACH (const CBlockFileInfo &file, vinfoBlockFile)
+    for (const CBlockFileInfo &file : vinfoBlockFile)
     {
         retval += file.nSize + file.nUndoSize;
     }
@@ -5186,7 +5188,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                                 // Thus, the protocol spec specified allows for us to provide duplicate txn here,
                                 // however we MUST always provide at least what the remote peer needs
                                 typedef std::pair<unsigned int, uint256> PairType;
-                                BOOST_FOREACH (PairType &pair, merkleBlock.vMatchedTxn)
+                                for (PairType &pair : merkleBlock.vMatchedTxn)
                                 {
                                     pfrom->txsSent += 1;
                                     pfrom->PushMessage(NetMsgType::TX, block.vtx[pair.first]);
@@ -5553,7 +5555,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         int64_t nNow = GetAdjustedTime();
         int64_t nSince = nNow - 10 * 60;
         FastRandomContext insecure_rand;
-        BOOST_FOREACH (CAddress &addr, vAddr)
+        for (CAddress &addr : vAddr)
         {
             boost::this_thread::interruption_point();
 
@@ -5576,7 +5578,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                         UintToArith256(hashSalt) ^ (hashAddr << 32) ^ ((GetTime() + hashAddr) / (24 * 60 * 60)));
                     hashRand = Hash(BEGIN(hashRand), END(hashRand));
                     std::multimap<uint256, CNode *> mapMix;
-                    BOOST_FOREACH (CNode *pnode, vNodes)
+                    for (CNode *pnode : vNodes)
                     {
                         if (pnode->nVersion < CADDR_TIME_VERSION)
                             continue;
@@ -6281,8 +6283,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             // Download as much as possible, from earliest to latest.
             unsigned int nAskFor = 0;
-            BOOST_REVERSE_FOREACH (CBlockIndex *pindex, vToFetch)
+            for (auto i = vToFetch.rbegin(); i != vToFetch.rend(); i++)
             {
+                CBlockIndex *pindex = *i;
                 // pindex must be nonnull because we populated vToFetch a few lines above
                 CInv inv(MSG_BLOCK, pindex->GetBlockHash());
                 if (!AlreadyHaveBlock(inv))
@@ -6565,7 +6568,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->vAddrToSend.clear();
         std::vector<CAddress> vAddr = addrman.GetAddr();
         FastRandomContext insecure_rand;
-        BOOST_FOREACH (const CAddress &addr, vAddr)
+        for (const CAddress &addr : vAddr)
             pfrom->PushAddress(addr, insecure_rand);
     }
 
@@ -6581,7 +6584,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         std::vector<uint256> vtxid;
         mempool.queryHashes(vtxid);
         std::vector<CInv> vInv;
-        BOOST_FOREACH (uint256 &hash, vtxid)
+        for (uint256 &hash : vtxid)
         {
             CInv inv(MSG_TX, hash);
             if (pfrom->pfilter)

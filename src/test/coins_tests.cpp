@@ -237,7 +237,7 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
                     }
                 }
             }
-            BOOST_FOREACH (const CCoinsViewCacheTest *test, stack)
+            for (const CCoinsViewCacheTest *test : stack)
             {
                 test->SelfTest();
             }

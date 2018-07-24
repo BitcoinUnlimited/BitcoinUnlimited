@@ -18,7 +18,6 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/bind.hpp>
-#include <boost/foreach.hpp>
 #include <boost/function.hpp>
 #include <boost/signals2/signal.hpp>
 
@@ -457,7 +456,7 @@ void TorController::add_onion_cb(TorControlConnection &_conn, const TorControlRe
     if (reply.code == 250)
     {
         LOG(TOR, "tor: ADD_ONION successful\n");
-        BOOST_FOREACH (const std::string &s, reply.lines)
+        for (const std::string &s : reply.lines)
         {
             std::map<std::string, std::string> m = ParseTorReplyMapping(s);
             std::map<std::string, std::string>::iterator i;
@@ -604,7 +603,7 @@ void TorController::protocolinfo_cb(TorControlConnection &_conn, const TorContro
          * 250-AUTH METHODS=NULL
          * 250-AUTH METHODS=HASHEDPASSWORD
          */
-        BOOST_FOREACH (const std::string &s, reply.lines)
+        for (const std::string &s: reply.lines)
         {
             std::pair<std::string, std::string> l = SplitTorReplyLine(s);
             if (l.first == "AUTH")
@@ -626,7 +625,7 @@ void TorController::protocolinfo_cb(TorControlConnection &_conn, const TorContro
                 }
             }
         }
-        BOOST_FOREACH (const std::string &s, methods)
+        for (const std::string &s : methods)
         {
             LOG(TOR, "tor: Supported authentication method: %s\n", s);
         }

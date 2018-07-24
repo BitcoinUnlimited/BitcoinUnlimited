@@ -10,7 +10,6 @@
 
 #include <stdio.h>
 
-#include <boost/foreach.hpp>
 #include <boost/thread.hpp>
 
 #ifdef DEBUG_LOCKCONTENTION
@@ -99,7 +98,7 @@ static void potential_deadlock_detected(const std::pair<void *, void *> &mismatc
 
     LOGA("POTENTIAL DEADLOCK DETECTED\n");
     LOGA("Previous lock order was:\n");
-    BOOST_FOREACH (const PAIRTYPE(void *, CLockLocation) & i, s2)
+    for (const PAIRTYPE(void *, CLockLocation) & i : s2)
     {
         if (i.first == mismatch.first)
         {
@@ -120,7 +119,7 @@ static void potential_deadlock_detected(const std::pair<void *, void *> &mismatc
     firstLocked = false;
     secondLocked = false;
     LOGA("Current lock order is:\n");
-    BOOST_FOREACH (const PAIRTYPE(void *, CLockLocation) & i, s1)
+    for (const PAIRTYPE(void *, CLockLocation) & i : s1)
     {
         if (i.first == mismatch.first)
         {
@@ -153,7 +152,7 @@ static void push_lock(void *c, const CLockLocation &locklocation, bool fTry)
     // across the program
     if (!fTry)
     {
-        BOOST_FOREACH (const PAIRTYPE(void *, CLockLocation) & i, (*lockstack))
+        for (const PAIRTYPE(void *, CLockLocation) & i : (*lockstack))
         {
             if (i.first == c)
                 break;
@@ -205,14 +204,14 @@ void DeleteCritical(const void *cs)
 std::string LocksHeld()
 {
     std::string result;
-    BOOST_FOREACH (const PAIRTYPE(void *, CLockLocation) & i, *lockstack)
+    for (const PAIRTYPE(void *, CLockLocation) & i : *lockstack)
         result += i.second.ToString() + std::string("\n");
     return result;
 }
 
 void AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs)
 {
-    BOOST_FOREACH (const PAIRTYPE(void *, CLockLocation) & i, *lockstack)
+    for (const PAIRTYPE(void *, CLockLocation) & i : *lockstack)
         if (i.first == cs)
             return;
     fprintf(stderr, "Assertion failed: lock %s not held in %s:%i; locks held:\n%s", pszName, pszFile, nLine,

@@ -157,7 +157,7 @@ VNodeRefs CConnMgr::ExpeditedBlockNodes()
 
     VNodeRefs vRefs;
 
-    BOOST_FOREACH (CNode *pNode, vExpeditedUpstream)
+    for (CNode *pNode : vExpeditedUpstream)
         vRefs.push_back(CNodeRef(pNode));
 
     return vRefs;

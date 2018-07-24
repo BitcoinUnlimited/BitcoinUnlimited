@@ -12,8 +12,6 @@
 
 #include <stdint.h>
 
-#include <boost/foreach.hpp>
-
 namespace Checkpoints
 {
 /**
@@ -73,10 +71,9 @@ int GetTotalBlocksEstimate(const CCheckpointData &data)
 CBlockIndex *GetLastCheckpoint(const CCheckpointData &data)
 {
     const MapCheckpoints &checkpoints = data.mapCheckpoints;
-
-    BOOST_REVERSE_FOREACH (const MapCheckpoints::value_type &i, checkpoints)
+    for (auto i = checkpoints.rbegin(); i != checkpoints.rend(); i++)
     {
-        const uint256 &hash = i.second;
+        const uint256 &hash = i->second;
         BlockMap::const_iterator t = mapBlockIndex.find(hash);
         if (t != mapBlockIndex.end())
             return t->second;
