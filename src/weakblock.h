@@ -12,6 +12,7 @@
 #include "primitives/transaction.h"
 #include "sync.h"
 #include "uint256.h"
+#include <unordered_map>
 
 const uint32_t DEFAULT_WEAKBLOCKS_CONSIDER_POW_RATIO=4;
 const bool DEFAULT_WEAKBLOCKS_ENABLE=true;
@@ -84,9 +85,8 @@ public:
     CWeakblockRef byHash(const uint256& hash) const;
 
     /** Look up weak block by its cheap hash.
-        Might return wrong block in case of collision.
-        FIXME: currently slow. */
-    CWeakblockRef byHash(const uint64_t& hash) const;
+        Might return wrong block in case of collision! */
+    CWeakblockRef byHash(const uint64_t& cheaphash) const;
 
     /** Look up underlying weak block. */
     CWeakblockRef parent(const uint256& hash) const;
@@ -110,6 +110,9 @@ public:
 private:
     //! Map block hash to weak block
     std::map<uint256, CWeakblockRef> hash2wb;
+    //! same as above, but for cheap hashes. In case of collision, a newly inserted weakblock
+    // will override the older one.
+    std::unordered_map<uint64_t, CWeakblockRef> cheaphash2wb;
 
     //! Store DAG edges, so that extends[a] = b means b is the next underlying block for a
     std::map<uint256, uint256> extends_map;

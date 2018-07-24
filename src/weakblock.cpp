@@ -160,6 +160,11 @@ CWeakblockRef CWeakStore::store(const CBlock* block) {
 
     hash2wb[blockhash] = wb;
 
+    const uint64_t cheapblockhash = blockhash.GetCheapHash();
+    if (cheaphash2wb.count(cheapblockhash))
+        LOG(WB, "WARNING, weak block cheap hash collision for weak block %s.\n", blockhash.GetHex());
+    cheaphash2wb[cheapblockhash] = wb;
+
     // extend the DAG
     if (underlying != nullptr) {
         extends_map[blockhash]=underlyinghash;
@@ -198,6 +203,7 @@ void CWeakStore::expireOld(const bool fThorough) {
     LOCK(cs_weakblocks);
     if (fThorough) {
         hash2wb.clear();
+        cheaphash2wb.clear();
         extends_map.clear();
         chain_tips.clear();
         to_remove.clear();
@@ -211,6 +217,12 @@ void CWeakStore::expireOld(const bool fThorough) {
             CWeakblockRef wb = hash2wb[hash];
 
             hash2wb.erase(hash2wb_iter);
+
+            auto cheaphash2wb_iter = cheaphash2wb.find(hash.GetCheapHash());
+            // cheap hashes might collide ...
+            if (cheaphash2wb_iter != cheaphash2wb.end()) {
+                cheaphash2wb.erase(cheaphash2wb_iter);
+            }
 
             auto extends_iter = extends_map.find(hash);
 
@@ -238,13 +250,11 @@ CWeakblockRef CWeakStore::byHash(const uint256& hash) const {
     else return nullptr;
 }
 
-CWeakblockRef CWeakStore::byHash(const uint64_t& hash) const {
-    // FIXME, O(n) ...
-    for (auto p : hash2wb) {
-        if (p.first.GetCheapHash() == hash)
-            return p.second;
-    }
-    return nullptr;
+CWeakblockRef CWeakStore::byHash(const uint64_t& cheaphash) const {
+    AssertLockHeld(cs_weakblocks);
+    if (cheaphash2wb.count(cheaphash))
+        return cheaphash2wb.at(cheaphash);
+    else return nullptr;
 }
 
 CWeakblockRef CWeakStore::parent(const uint256& hash) const {
@@ -264,6 +274,7 @@ void CWeakStore::consistencyCheck() const {
     assert(extends_map.count(uint256()) == 0);
     assert(extends_map.size() <= hash2wb.size());
     assert(chain_tips.size() <= hash2wb.size());
+    assert(cheaphash2wb.size() <= hash2wb.size());
     for (auto ext_pair : extends_map)
         assert(hash2wb.count(ext_pair.first) > 0);
 

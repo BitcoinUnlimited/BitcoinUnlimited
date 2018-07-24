@@ -131,8 +131,11 @@ static void scenario1() {
     CBlockRef b1 = weakextendBlock(&b0, 100);
 
     CWeakblockRef wb0, wb1, wb2;
+    BOOST_CHECK(weakstore.byHash(b0.GetHash()) == nullptr);
+    BOOST_CHECK(weakstore.byHash(b0.GetHash().GetCheapHash()) == nullptr);
     BOOST_CHECK(nullptr != (wb0 = weakstore.store(&b0)));
     BOOST_CHECK_EQUAL(weakstore.Tip()->GetHash(), b0.GetHash());
+    BOOST_CHECK(weakstore.byHash(b0.GetHash().GetCheapHash()) == wb0);
     BOOST_CHECK_EQUAL(weakstore.size(), 1);
     BOOST_CHECK(!weakstore.empty());
 
