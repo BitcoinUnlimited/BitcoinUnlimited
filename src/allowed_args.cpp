@@ -512,8 +512,9 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
                          DEFAULT_DESCENDANT_SIZE_LIMIT))
         .addArg("debug=<category>", optionalStr,
             strprintf(_("Output debugging information (default: %u, supplying <category> is optional)"), 0) + ". " +
-                _("If <category> is not supplied or if <category> = 1, output all debugging information.") +
-                _("<category> can be:") + " " + debugCategories + ".")
+                _("If <category> is not supplied or if <category> = 1, output all debugging information. ") +
+                _("<category> can be:") + " " + debugCategories + ". " +
+                _("Multiple debug categories can be separated by comma."))
         .addArg("gen", optionalBool, strprintf(_("Generate coins (default: %u)"), DEFAULT_GENERATE))
         .addArg("genproclimit=<n>", requiredInt,
             strprintf(_("Set the number of threads for coin generation if enabled (-1 = all cores, default: %d)"),
