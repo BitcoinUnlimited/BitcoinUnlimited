@@ -114,7 +114,7 @@ CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransa
     unsigned int extraNonce = 0;
     IncrementExtraNonce(&block, extraNonce);
 
-    while (!CheckProofOfWork(block.GetHash(), block.nBits, chainparams.GetConsensus()))
+    while (!CheckProofOfWork(block.GetHash(), block.nBits, chainparams.GetConsensus(), 1))
         ++block.nNonce;
 
     CValidationState state;

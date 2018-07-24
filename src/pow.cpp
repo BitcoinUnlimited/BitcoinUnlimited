@@ -12,6 +12,7 @@
 #include "primitives/block.h"
 #include "uint256.h"
 #include "util.h"
+#include "weakblock.h"
 
 /**
  * Compute the next required proof of work using the legacy Bitcoin difficulty
@@ -142,7 +143,7 @@ uint32_t CalculateNextWorkRequired(const CBlockIndex *pindexLast,
     return bnNew.GetCompact();
 }
 
-bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params &params)
+bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params &params, uint32_t weakFactor)
 {
     bool fNegative;
     bool fOverflow;
@@ -151,7 +152,7 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params 
     bnTarget.SetCompact(nBits, &fNegative, &fOverflow);
 
     // Check range
-    if (fNegative || bnTarget == 0 || fOverflow || bnTarget > UintToArith256(params.powLimit))
+    if (fNegative || bnTarget == 0 || fOverflow || (bnTarget > (UintToArith256(params.powLimit) * weakFactor)))
         return false;
 
     // Check proof of work matches claimed amount
@@ -160,6 +161,39 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params 
 
     return true;
 }
+
+/** Calculate compressed weak block difficulty from compressed strong block difficulty, this is the minimum below which
+ * the validation machinery will ALWAYS reject a weak block (and consider it bannable SPAM). **/
+uint32_t MinWeakblockProofOfWork(uint32_t nBits)
+{
+    arith_uint256 strongtarget;
+    strongtarget.SetCompact(nBits);
+    arith_uint256 weaktarget = strongtarget * weakblocksMinPOWRatio();
+
+    // prevent overflows
+    if (weaktarget < strongtarget)
+    {
+        LOG(WB, "WARNING: Weakblocks weak target overflow.\n");
+        weaktarget = strongtarget;
+    }
+    return weaktarget.GetCompact();
+}
+
+uint32_t ConsiderationWeakblockProofOfWork(uint32_t nBits)
+{
+    arith_uint256 strongtarget;
+    strongtarget.SetCompact(nBits);
+    arith_uint256 considertarget = strongtarget * weakblocksConsiderPOWRatio();
+
+    // prevent overflows
+    if (considertarget < strongtarget)
+    {
+        LOG(WB, "WARNING: Weakblocks consideration target overflow.\n");
+        considertarget = strongtarget;
+    }
+    return considertarget.GetCompact();
+}
+
 
 arith_uint256 GetBlockProof(const CBlockIndex &block)
 {

@@ -131,7 +131,7 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
             IncrementExtraNonce(pblock, nExtraNonce);
         }
         while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount &&
-               !CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus()))
+               !CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus(), 1))
         {
             ++pblock->nNonce;
             --nMaxTries;
