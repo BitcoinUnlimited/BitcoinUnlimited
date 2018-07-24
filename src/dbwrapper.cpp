@@ -69,7 +69,7 @@ static void OverrideOptions(leveldb::Options &_options, COverrideOptions *_pOver
     if (_pOverride->max_file_size > 0)
         _options.max_file_size = _pOverride->max_file_size;
 
-    if (_pOverride->block_size  > 0)
+    if (_pOverride->block_size > 0)
         _options.block_size = _pOverride->block_size;
 
     if (_pOverride->write_buffer_size > 0)

@@ -111,7 +111,7 @@ uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
     uint64_t prunedCount;
     CDBBatch blockBatch(*pblockdb);
     CDBBatch undoBatch(*pblockundodb);
-    while(!vDbBlockSizes.empty() && nDBUsedSpace >= nPruneTarget)
+    while (!vDbBlockSizes.empty() && nDBUsedSpace >= nPruneTarget)
     {
         uint256 frontHash = vDbBlockSizes.front().first;
         uint64_t frontSize = vDbBlockSizes.front().second;
@@ -134,6 +134,7 @@ uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
     pblockundodb->WriteBatch(undoBatch, true);
     // must use NULL here, cannot use nullptr
     pblockdb->CompactRange(NULL, NULL);
-    LOG(PRUNE, "DONE WITH DB PRUNING (%u blocks pruned, size on disk %u, data for %u indexes) \n", prunedCount, nDBUsedSpace, vDbBlockSizes.size());
+    LOG(PRUNE, "DONE WITH DB PRUNING (%u blocks pruned, size on disk %u, data for %u indexes) \n", prunedCount,
+        nDBUsedSpace, vDbBlockSizes.size());
     return prunedCount;
 }

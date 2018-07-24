@@ -213,7 +213,7 @@ extern uint64_t nPruneTarget;
 /** Number of MiB the blockdb is using. */
 extern uint64_t nDBUsedSpace;
 /** keep track of the sizes of blocks in the db, DB_BLOCK_STORAGE only */
-extern std::vector< std::pair<uint256, uint64_t> > vDbBlockSizes;
+extern std::vector<std::pair<uint256, uint64_t> > vDbBlockSizes;
 /** The maximum bloom filter size that we will support for an xthin request. This value is communicated to
  *  our peer at the time we first make the connection.
  */
@@ -527,10 +527,18 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
 /** Remove invalidity status from a block and its descendants. */
 bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex);
 
-bool FindBlockPos(CValidationState &state, CDiskBlockPos &pos, unsigned int nAddSize, unsigned int nHeight, uint64_t nTime, bool fKnown);
+bool FindBlockPos(CValidationState &state,
+    CDiskBlockPos &pos,
+    unsigned int nAddSize,
+    unsigned int nHeight,
+    uint64_t nTime,
+    bool fKnown);
 
 /** Mark a block as having its data received and checked (up to BLOCK_VALID_TRANSACTIONS). */
-bool ReceivedBlockTransactions(const CBlock &block, CValidationState &state, CBlockIndex *pindexNew, const CDiskBlockPos &pos);
+bool ReceivedBlockTransactions(const CBlock &block,
+    CValidationState &state,
+    CBlockIndex *pindexNew,
+    const CDiskBlockPos &pos);
 
 CBlockIndex *AddToBlockIndex(const CBlockHeader &block);
 

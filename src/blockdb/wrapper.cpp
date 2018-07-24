@@ -74,7 +74,7 @@ void SyncStorage(const CChainParams &chainparams)
         CValidationState state;
         int bestHeight = 0;
         CBlockIndex *pindexBest = new CBlockIndex();
-        std::vector<CBlockIndex*> blocksToRemove;
+        std::vector<CBlockIndex *> blocksToRemove;
         for (const std::pair<int, CDiskBlockIndex> &item : hashesByHeight)
         {
             CBlockIndex *index;
@@ -204,24 +204,24 @@ void SyncStorage(const CChainParams &chainparams)
             }
             setDirtyBlockIndex.insert(index);
             blocksToRemove.push_back(index);
-            if(blocksToRemove.size() % 10000 == 0)
+            if (blocksToRemove.size() % 10000 == 0)
             {
                 CDBBatch batch(*pblockdb);
-                for(auto removeIndex : blocksToRemove)
+                for (auto removeIndex : blocksToRemove)
                 {
-                  std::ostringstream key;
-                  key << removeIndex->GetBlockTime() << ":" << removeIndex->GetBlockHash().ToString();
-                  batch.Erase(key.str());
+                    std::ostringstream key;
+                    key << removeIndex->GetBlockTime() << ":" << removeIndex->GetBlockHash().ToString();
+                    batch.Erase(key.str());
                 }
                 pblockdb->WriteBatch(batch);
                 // you must use NULL here, not nullptr
-                CBlockIndex* indexfront = blocksToRemove.front();
+                CBlockIndex *indexfront = blocksToRemove.front();
                 std::ostringstream frontkey;
                 frontkey << indexfront->GetBlockTime() << ":" << indexfront->GetBlockHash().ToString();
-                CBlockIndex* indexback = blocksToRemove.back();
+                CBlockIndex *indexback = blocksToRemove.back();
                 std::ostringstream backkey;
                 backkey << indexback->GetBlockTime() << ":" << indexback->GetBlockHash().ToString();
-                pblockdb->CompactRange(frontkey.str(),backkey.str());
+                pblockdb->CompactRange(frontkey.str(), backkey.str());
                 blocksToRemove.clear();
             }
         }
@@ -360,7 +360,7 @@ void SyncStorage(const CChainParams &chainparams)
                 }
             }
             setDirtyBlockIndex.insert(index);
-            if(lastFinishedFile <= loadedblockfile && index->nHeight > blockfiles[lastFinishedFile].nHeightLast)
+            if (lastFinishedFile <= loadedblockfile && index->nHeight > blockfiles[lastFinishedFile].nHeightLast)
             {
                 fs::remove(GetDataDir() / "blocks" / strprintf("blk%05u.dat", lastFinishedFile));
                 fs::remove(GetDataDir() / "blocks" / strprintf("rev%05u.dat", lastFinishedFile));

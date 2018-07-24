@@ -978,7 +978,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 
     fReindex = GetBoolArg("-reindex", DEFAULT_REINDEX);
     int64_t requested_block_mode = GetArg("-useblockdb", DEFAULT_BLOCK_DB_MODE);
-    if(requested_block_mode == 0)
+    if (requested_block_mode == 0)
     {
         BLOCK_DB_MODE = SEQUENTIAL_BLOCK_FILES;
     }
@@ -988,7 +988,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     }
 
     // Upgrading to 0.8; hard-link the old blknnnn.dat files into /blocks/
-    if(BLOCK_DB_MODE != DB_BLOCK_STORAGE)
+    if (BLOCK_DB_MODE != DB_BLOCK_STORAGE)
     {
         fs::path blocksDir = GetDataDir() / "blocks";
         if (!fs::exists(blocksDir))
@@ -1009,8 +1009,8 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 }
                 catch (const fs::filesystem_error &e)
                 {
-                // Note: hardlink creation failing is not a disaster, it just means
-                // blocks will get re-downloaded from peers.
+                    // Note: hardlink creation failing is not a disaster, it just means
+                    // blocks will get re-downloaded from peers.
                     LOGA("Error hardlinking blk%04u.dat: %s\n", i, e.what());
                     break;
                 }
@@ -1056,17 +1056,18 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 delete pblockundodb;
 
                 uiInterface.InitMessage(_("Opening Block database..."));
-                if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+                if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
                 {
                     pblocktree = new CBlockTreeDB(nBlockTreeDBCache, "blockdb", false, fReindex);
                     pblocktreeother = new CBlockTreeDB(nBlockTreeDBCache, "blocks", false, fReindex);
                     if (boost::filesystem::exists(GetDataDir() / "blockdb" / "blocks"))
                     {
-                        for(fs::recursive_directory_iterator it(GetDataDir() / "blockdb" / "blocks"); it!=fs::recursive_directory_iterator(); ++it)
+                        for (fs::recursive_directory_iterator it(GetDataDir() / "blockdb" / "blocks");
+                             it != fs::recursive_directory_iterator(); ++it)
                         {
-                            if(!fs::is_directory(*it))
+                            if (!fs::is_directory(*it))
                             {
-                                nDBUsedSpace+=fs::file_size(*it);
+                                nDBUsedSpace += fs::file_size(*it);
                             }
                         }
                     }
@@ -1081,14 +1082,14 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 // we want to have much larger file sizes for the blocks db so override the default.
                 COverrideOptions override;
                 override.max_file_size = nBlockDBCache / 2;
-                pblockdb = new CBlockDB("blocks", nBlockDBCache, false, false, false, &override);
+                pblockdb = new CBlockDB("blocks", nBlockDBCache, false, false, false, & override);
 
                 // Make the undo file max size larger than the default and also configure the write buffer
                 // to be a larger proportion of the overall cache since we don't really need a big read buffer
                 // for undo files.
                 override.max_file_size = nBlockUndoDBCache;
                 override.write_buffer_size = nBlockUndoDBCache / 1.8;
-                pblockundodb = new CBlockDB("undo", nBlockUndoDBCache, false, false, false, &override);
+                pblockundodb = new CBlockDB("undo", nBlockUndoDBCache, false, false, false, & override);
 
                 uiInterface.InitMessage(_("Opening UTXO database..."));
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);

@@ -169,17 +169,17 @@ public:
         const std::vector<const CBlockIndex *> &blockinfo);
     bool ReadBlockFileInfo(int nFile, CBlockFileInfo &fileinfo);
     bool ReadLastBlockFile(int &nFile);
-    bool WriteBlockSizeData(std::vector< std::pair<uint256, uint64_t> > blocksizes);
-    bool ReadBlockSizeData(std::vector< std::pair<uint256, uint64_t> >& blocksizes);
+    bool WriteBlockSizeData(std::vector<std::pair<uint256, uint64_t> > blocksizes);
+    bool ReadBlockSizeData(std::vector<std::pair<uint256, uint64_t> > &blocksizes);
     bool WriteReindexing(bool fReindex);
     bool ReadReindexing(bool &fReindex);
     bool ReadTxIndex(const uint256 &txid, CDiskTxPos &pos);
     bool WriteTxIndex(const std::vector<std::pair<uint256, CDiskTxPos> > &list);
     bool WriteFlag(const std::string &name, bool fValue);
     bool ReadFlag(const std::string &name, bool &fValue);
-    bool FindBlockIndex(uint256 blockhash, CDiskBlockIndex* index);
+    bool FindBlockIndex(uint256 blockhash, CDiskBlockIndex *index);
     bool LoadBlockIndexGuts();
-    bool GetSortedHashIndex(std::vector<std::pair<int, CDiskBlockIndex> >& hashesByHeight);
+    bool GetSortedHashIndex(std::vector<std::pair<int, CDiskBlockIndex> > &hashesByHeight);
 };
 
 /** Global variable that points to the coins database */

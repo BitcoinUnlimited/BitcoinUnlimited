@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "graphene.h"
+#include "blockdb/wrapper.h"
 #include "chainparams.h"
 #include "connmgr.h"
 #include "consensus/merkle.h"

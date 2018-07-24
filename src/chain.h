@@ -102,10 +102,7 @@ struct CDiskBlockPos
         nFile = -1;
         nPos = 0;
     }
-    bool IsNull() const
-    {
-        return (nFile == -1);
-    }
+    bool IsNull() const { return (nFile == -1); }
     std::string ToString() const { return strprintf("CBlockDiskPos(nFile=%i, nPos=%i)", nFile, nPos); }
 };
 
@@ -202,7 +199,6 @@ public:
 
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
-
 
 
     void SetNull()
@@ -375,16 +371,8 @@ public:
         hashPrev = (pprev ? pprev->GetBlockHash() : uint256());
     }
 
-    friend bool operator<(const CDiskBlockIndex& a, const CDiskBlockIndex& b)
-    {
-        return a.nHeight < b.nHeight;
-    }
-
-    friend bool operator>(const CDiskBlockIndex& a, const CDiskBlockIndex& b)
-    {
-        return a.nHeight > b.nHeight;
-    }
-
+    friend bool operator<(const CDiskBlockIndex &a, const CDiskBlockIndex &b) { return a.nHeight < b.nHeight; }
+    friend bool operator>(const CDiskBlockIndex &a, const CDiskBlockIndex &b) { return a.nHeight > b.nHeight; }
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
