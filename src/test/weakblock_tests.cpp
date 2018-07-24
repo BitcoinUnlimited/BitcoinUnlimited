@@ -6,8 +6,11 @@
 #include "consensus/merkle.h"
 #include "test/test_bitcoin.h"
 #include "test/testutil.h"
+#include "test/test_random.h"
 #include <boost/test/unit_test.hpp>
 #include <string>
+#include <algorithm>
+
 using namespace std;
 
 struct WeakTestSetup : public TestingSetup {
@@ -249,4 +252,103 @@ BOOST_AUTO_TEST_CASE(weak_chain1)
     BOOST_CHECK_EQUAL(weakstore.chainTips().size(), 0);
 }
 
+BOOST_AUTO_TEST_CASE(weak_chain_order)
+{
+    for (size_t dag_size = 0 ; dag_size < 20; dag_size++) {
+        // test that a randomly constructed weak blocks DAG will be rebuild to
+        // the same result when arrival happens in random order.
+        std::vector<CBlockRef> blocks;
+
+        LOG(WB, "Checking weak chain reconstruction order for a DAG with size: %d\n", dag_size);
+        weakstore.consistencyCheck();
+        weakstore.expireOld();
+        weakstore.consistencyCheck();
+        weakstore.expireOld(true);
+        BOOST_CHECK(weakstore.empty());
+
+        // build a random DAG. This is certainly biased in all kinds
+        // of ways, but hopefully all potential edge cases are all
+        // still properly explored. Also, size might be smaller than
+        // targeted.
+        for (size_t d=0; d < dag_size; d++) {
+            switch (insecure_rand()%2) {
+            case 0:
+            {
+                // a new root
+                CBlockRef block = make_shared<CBlock>();
+                for (size_t i=0 ; i < 50; i++) {
+                    CMutableTransaction tx;
+                    RandomTransaction(tx, false);
+                    block->vtx.push_back(MakeTransactionRef(tx));
+                }
+                block->hashMerkleRoot = BlockMerkleRoot(*block);
+                blocks.push_back(block);
+            }
+            break;
+            case 1:
+            {
+                if (blocks.size()) {
+                    CBlockRef underlying = blocks[insecure_rand() % blocks.size()];
+
+                    // build on top of one of the existing blocks
+                    CBlockRef block = weakextendBlock(underlying.get(),
+                                                      underlying->vtx.size() + insecure_rand()%1000);
+                    blocks.push_back(block);
+                }
+            }
+            break;
+            default:
+                break;
+            }
+        }
+        BOOST_CHECK(blocks.size() <= dag_size);
+        // randomize order for initial insertion
+        random_shuffle(blocks.begin(), blocks.end());
+
+        std::vector<CWeakblockRef> weaks;
+
+        for (CBlockRef b : blocks) {
+            CWeakblockRef wb = weakstore.store(b.get());
+            BOOST_CHECK(wb != nullptr);
+            weaks.push_back(wb);
+        }
+
+        std::map<uint256, int> heights0;
+        for (auto wb : weaks)
+            heights0[wb->GetHash()] = wb->GetWeakHeight();
+
+        std::set<uint256> tips0;
+        for (auto wb : weakstore.chainTips())
+            tips0.insert(wb->GetHash());
+
+        for (size_t i=0; i < 10; i++) {
+            LOG(WB, "Checking random reconstruction #%d.\n", i);
+            weakstore.consistencyCheck();
+            weakstore.expireOld();
+            weakstore.consistencyCheck();
+            weakstore.expireOld(true);
+            weaks.clear();
+
+            std::map<uint256, int> heights;
+            std::set<uint256> tips;
+
+            random_shuffle(blocks.begin(), blocks.end());
+            for (CBlockRef b : blocks) {
+                CWeakblockRef wb = weakstore.store(b.get());
+                BOOST_CHECK(wb != nullptr);
+                weaks.push_back(wb);
+            }
+            weakstore.consistencyCheck(false);
+
+            for (auto wb : weaks)
+                heights[wb->GetHash()] = wb->GetWeakHeight();
+            for (auto wb : weakstore.chainTips())
+                tips.insert(wb->GetHash());
+
+            BOOST_CHECK(heights == heights0);
+            BOOST_CHECK(tips    ==    tips0);
+            weakstore.consistencyCheck();
+        }
+    }
+}
 BOOST_AUTO_TEST_SUITE_END()
