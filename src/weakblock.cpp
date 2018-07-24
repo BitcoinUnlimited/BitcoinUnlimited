@@ -338,8 +338,21 @@ void CWeakStore::consistencyCheck(const bool check_cached_heights) const {
     for (auto ext_pair : extends_map)
         assert(hash2wb.count(ext_pair.first) > 0);
 
-    for (auto wb : chain_tips)
+    bool expired_chains = false;
+    for (auto wb : chain_tips) {
         assert(hash2wb.count(wb->GetHash()) > 0);
+        if (wb->GetWeakHeight()<0)
+            expired_chains = true;
+    }
+
+    if (!expired_chains && chain_tips.size()>0) {
+        // when all the blocks are distributed among non-expired chains,
+        // the maximum chain height (counted starting with one, so plus 1 the GetWeakHeight() value)
+        // has to be equal or larger to the number of blocks
+        // integer-divided by the number of chain tips.
+        int tip_height = Tip()->GetWeakHeight();
+        assert((unsigned)(tip_height+1) >= size() / chain_tips.size());
+    }
 
     // make sure all cached weak chain heights were correct
     if (check_cached_heights) {
@@ -358,8 +371,7 @@ void CWeakStore::consistencyCheck(const bool check_cached_heights) const {
             assert(p.second->GetWeakHeight() >= -1);
         }
     }
-    // FIXME: add check that when all chains have a height >=0, that the number of
-    // blocks divided by the number of chain tips is less or equal to the maximum chain height.
+
 
 }
 
