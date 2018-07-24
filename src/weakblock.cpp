@@ -340,7 +340,6 @@ void CWeakStore::consistencyCheck() const {
     for (auto wb : chain_tips)
         assert(hash2wb.count(wb->GetHash()) > 0);
 
-    // TODO: check that extends_map does not have any cycles
 }
 
 const std::vector<CWeakblockRef>& CWeakStore::chainTips() const {
