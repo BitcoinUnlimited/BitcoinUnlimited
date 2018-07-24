@@ -603,7 +603,7 @@ void TorController::protocolinfo_cb(TorControlConnection &_conn, const TorContro
          * 250-AUTH METHODS=NULL
          * 250-AUTH METHODS=HASHEDPASSWORD
          */
-        for (const std::string &s: reply.lines)
+        for (const std::string &s : reply.lines)
         {
             std::pair<std::string, std::string> l = SplitTorReplyLine(s);
             if (l.first == "AUTH")

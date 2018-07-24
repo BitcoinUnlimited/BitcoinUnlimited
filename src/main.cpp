@@ -2967,7 +2967,7 @@ static bool ActivateBestChainStep(CValidationState &state,
         CBlockIndex *pindexLastNotify = nullptr;
         for (auto i = vpindexToConnect.rbegin(); i != vpindexToConnect.rend(); i++)
         {
-            CBlockIndex* pindexConnect = *i;
+            CBlockIndex *pindexConnect = *i;
             // Check if the best chain has changed while we were disconnecting or processing blocks.
             // If so then we need to return and continue processing the newer chain.
             pindexNewMostWork = FindMostWorkChain();

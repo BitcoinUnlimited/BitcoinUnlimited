@@ -10,7 +10,7 @@
 #include "main.h"
 #include "tinyformat.h"
 #include "util.h"
-#include "utilstrencodings.h" 
+#include "utilstrencodings.h"
 
 /**
  * Check transaction inputs to mitigate two
