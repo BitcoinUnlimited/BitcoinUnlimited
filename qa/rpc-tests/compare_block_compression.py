@@ -153,19 +153,20 @@ class BlockTest(BitcoinTestFramework):
         self.nodes[0].generate(1)
         self.sync_all()
 
+        node0_stats = self.extract_stats(self.nodes[0])
         if self.block_type == 'graphene':
-            self.stats['block_size'] = self.extract_bytes(self.extract_stats(self.nodes[0])['graphene_block_size'])
+            self.stats['block_size'] = self.extract_bytes(node0_stats['graphene_block_size'])
             self.stats['mempool_info_size'] = MEMPOOL_INFO_SIZE
-            self.stats['rank'] = self.extract_bytes(self.extract_stats(self.nodes[0])['rank'])
-            self.stats['filter'] = self.extract_bytes(self.extract_stats(self.nodes[0])['filter'])
-            self.stats['iblt'] = self.extract_bytes(self.extract_stats(self.nodes[0])['iblt'])
-            self.stats['full_tx_size'] = self.extract_bytes(self.extract_stats(self.nodes[0])['graphene_additional_tx_size'])
+            self.stats['rank'] = self.extract_bytes(node0_stats['rank'])
+            self.stats['filter'] = self.extract_bytes(node0_stats['filter'])
+            self.stats['iblt'] = self.extract_bytes(node0_stats['iblt'])
+            self.stats['full_tx_size'] = self.extract_bytes(node0_stats['graphene_additional_tx_size'])
 
             self.stats['total_size'] = self.stats['block_size'] + self.stats['mempool_info_size'] - self.stats['full_tx_size']
         elif self.block_type == 'thin':
-            self.stats['block_size'] = self.extract_bytes(self.extract_stats(self.nodes[0])['thin_block_size'])
-            self.stats['filter_size'] = self.extract_bytes(self.extract_stats(self.nodes[0])['inbound_bloom_filters'])
-            self.stats['full_tx_size'] = self.extract_bytes(self.extract_stats(self.nodes[0])['thin_full_tx'])
+            self.stats['block_size'] = self.extract_bytes(node0_stats['thin_block_size'])
+            self.stats['filter_size'] = self.extract_bytes(node0_stats['inbound_bloom_filters'])
+            self.stats['full_tx_size'] = self.extract_bytes(node0_stats['thin_full_tx'])
 
             self.stats['total_size'] = self.stats['block_size'] + self.stats['filter_size'] - self.stats['full_tx_size']
 
