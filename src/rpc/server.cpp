@@ -63,7 +63,7 @@ void RPCServer::OnPostCommand(boost::function<void(const CRPCCommand &)> slot)
 void RPCTypeCheck(const UniValue &params, const list<UniValue::VType> &typesExpected, bool fAllowNull)
 {
     unsigned int i = 0;
-    for (UniValue::VType t : typesExpected)
+    for (const UniValue::VType &t : typesExpected)
     {
         if (params.size() <= i)
             break;

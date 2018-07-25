@@ -89,7 +89,7 @@ static bool multiUserAuthorized(std::string strUserPass)
     if (mapMultiArgs.count("-rpcauth") > 0)
     {
         // Search for multi-user login/pass "rpcauth" from config
-        for (std::string strRPCAuth : mapMultiArgs["-rpcauth"])
+        for (std::string &strRPCAuth : mapMultiArgs["-rpcauth"])
         {
             std::vector<std::string> vFields;
             boost::split(vFields, strRPCAuth, boost::is_any_of(":$"));
