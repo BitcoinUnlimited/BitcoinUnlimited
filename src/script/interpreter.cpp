@@ -335,39 +335,108 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
     ScriptError *serror,
     unsigned char *sighashtype)
 {
-    static const CScriptNum bnZero(0);
-    static const CScriptNum bnOne(1);
-    static const CScriptNum bnFalse(0);
-    static const CScriptNum bnTrue(1);
-    static const valtype vchFalse(0);
-    static const valtype vchZero(0);
-    static const valtype vchTrue(1, 1);
-
-    CScript::const_iterator pc = script.begin();
-    CScript::const_iterator pend = script.end();
-    CScript::const_iterator pbegincodehash = script.begin();
-    opcodetype opcode;
-    valtype vchPushValue;
-    vector<bool> vfExec;
-    vector<valtype> altstack;
+    ScriptMachine sm(flags, checker);
+    sm.setStack(stack);
+    bool result = sm.Eval(script);
+    stack = sm.getStack();
+    if (serror)
+        *serror = sm.getError();
     if (sighashtype)
-        *sighashtype = 0;
+        *sighashtype = sm.getSigHashType();
+    return result;
+}
 
-    set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
-    if (script.size() > MAX_SCRIPT_SIZE)
-        return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
-    int nOpCount = 0;
+static const CScriptNum bnZero(0);
+static const CScriptNum bnOne(1);
+static const CScriptNum bnFalse(0);
+static const CScriptNum bnTrue(1);
+static const StackDataType vchFalse(0);
+static const StackDataType vchZero(0);
+static const StackDataType vchTrue(1, 1);
+
+// Returns info about the next instruction to be run
+std::tuple<bool, opcodetype, StackDataType, ScriptError> ScriptMachine::Peek()
+{
+    ScriptError err;
+    opcodetype opcode;
+    StackDataType vchPushValue;
+    auto oldpc = pc;
+    if (!script->GetOp(pc, opcode, vchPushValue))
+        set_error(&err, SCRIPT_ERR_BAD_OPCODE);
+    else if (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE)
+        set_error(&err, SCRIPT_ERR_PUSH_SIZE);
+    pc = oldpc;
+    bool fExec = !count(vfExec.begin(), vfExec.end(), false);
+    return std::tuple<bool, opcodetype, StackDataType, ScriptError>(fExec, opcode, vchPushValue, err);
+}
+
+
+bool ScriptMachine::BeginStep(const CScript &_script)
+{
+    script = &_script;
+
+    pc = pbegin = script->begin();
+    pend = script->end();
+    pbegincodehash = pc;
+
+    sighashtype = 0;
+    nOpCount = 0;
+    vfExec.clear();
+
+    set_error(&error, SCRIPT_ERR_UNKNOWN_ERROR);
+    if (script->size() > MAX_SCRIPT_SIZE)
+    {
+        script = nullptr;
+        return set_error(&error, SCRIPT_ERR_SCRIPT_SIZE);
+    }
+    return true;
+}
+
+
+int ScriptMachine::getPos() { return (pc - pbegin); }
+bool ScriptMachine::Eval(const CScript &_script)
+{
+    bool ret;
+
+    if (!(ret = BeginStep(_script)))
+        return ret;
+
+    while (pc < pend)
+    {
+        ret = Step();
+        if (!ret)
+            break;
+    }
+    if (ret)
+        ret = EndStep();
+    script = nullptr; // Ensure that the ScriptMachine does not hold script for longer than this scope
+
+    return ret;
+}
+
+bool ScriptMachine::EndStep()
+{
+    script = nullptr; // let go of our use of the script
+    if (!vfExec.empty())
+        return set_error(&error, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
+    return set_success(&error);
+}
+
+bool ScriptMachine::Step()
+{
     bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
+    opcodetype opcode;
+    StackDataType vchPushValue;
+    ScriptError *serror = &error;
     try
     {
-        while (pc < pend)
         {
             bool fExec = !count(vfExec.begin(), vfExec.end(), false);
 
             //
             // Read instruction
             //
-            if (!script.GetOp(pc, opcode, vchPushValue))
+            if (!script->GetOp(pc, opcode, vchPushValue))
                 return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
             if (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE)
                 return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
@@ -1127,8 +1196,7 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                     // not used.
                     uint32_t nHashType = GetHashType(vchSig);
                     // BU remember the sighashtype so we can use it to choose when to allow this tx
-                    if (sighashtype)
-                        *sighashtype |= nHashType;
+                    sighashtype |= nHashType;
 
                     // Drop the signature, since there's no way for a signature to sign itself
                     scriptCode.FindAndDelete(CScript(vchSig));
@@ -1200,8 +1268,7 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                         // is not used.
                         uint32_t nHashType = GetHashType(vchSig);
                         // BU remember the sighashtype so we can use it to choose when to allow this tx
-                        if (sighashtype)
-                            *sighashtype |= nHashType;
+                        sighashtype |= nHashType;
                         scriptCode.FindAndDelete(CScript(vchSig));
                     }
 
@@ -1410,8 +1477,6 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
     {
         return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
     }
-    if (!vfExec.empty())
-        return set_error(serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
 
     return set_success(serror);
 }

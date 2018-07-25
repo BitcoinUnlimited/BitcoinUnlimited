@@ -318,6 +318,10 @@ libbitcoincash_a_SOURCES = \
   pubkey.h \
   random.cpp \
   random.h \
+  script/interpreter.cpp \
+  script/interpreter.h \
+  script/script.cpp \
+  script/script.h \
   support/pagelocker.cpp \
   support/pagelocker.h \
   support/cleanse.cpp \

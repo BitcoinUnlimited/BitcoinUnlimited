@@ -5,6 +5,7 @@
 import test_framework.loginit
 import time
 import sys
+import copy
 if sys.version_info[0] < 3:
     raise "Use Python 3"
 import logging
@@ -30,7 +31,97 @@ class MyTest (BitcoinTestFramework):
         self.is_network_split = False
         self.sync_all()
 
+    def runScriptMachineTests(self):
+
+        # Check basic script
+        sm = cashlib.ScriptMachine()
+        worked = sm.eval(CScript([OP_1, OP_0, OP_5, OP_6, OP_TOALTSTACK, OP_TOALTSTACK]))
+        assert(worked)
+        # Check stack
+        stk = sm.stack()
+        assert_equal(int.from_bytes(stk[1], byteorder='little'), 1)
+        assert_equal(len(stk[0]), 0)
+
+        altstk = sm.altstack()
+        assert_equal(int.from_bytes(altstk[0], byteorder='little'), 5)
+        assert_equal(int.from_bytes(altstk[1], byteorder='little'), 6)
+
+        worked = sm.eval(CScript([OP_FROMALTSTACK, OP_FROMALTSTACK]))
+        assert(worked)
+        stk = sm.stack()
+        assert_equal(int.from_bytes(stk[0], byteorder='little'), 6)
+
+        # Check reset
+        sm.reset()
+        stk = sm.stack()
+        assert(len(stk) == 0)
+        altstk = sm.altstack()
+        assert(len(altstk) == 0)
+
+        # Check stepping
+        worked = sm.eval(CScript([OP_1, OP_1]))
+        assert(worked)
+        worked = sm.begin(CScript([OP_IF, OP_IF, OP_2, OP_ELSE, OP_3, OP_ENDIF, OP_ENDIF]))
+        count = 0
+        try:
+            while 1:
+                count += 1
+                sm.step()
+                assert(sm.pos() == count)  # only matches count because every opcode in the script is 1 byte (no pushdata)
+        except cashlib.Error as e:
+            assert(str(e) == 'stepped beyond end of script')
+        stk = sm.stack()
+        assert_equal(int.from_bytes(stk[0], byteorder='little'), 2)
+
+        sm.reset()
+        # Check clone
+        worked = sm.eval(CScript([OP_1, OP_1]))
+        assert(worked)
+        sm2 = sm.clone()
+        worked = sm.eval(CScript([OP_IF, OP_IF, OP_2, OP_ELSE, OP_3, OP_ENDIF, OP_ENDIF]))
+        stk = sm.stack()
+        assert_equal(int.from_bytes(stk[0], byteorder='little'), 2)
+        sm.cleanup()
+
+        worked = sm2.eval(CScript([OP_IF, OP_IF, OP_3, OP_ELSE, OP_2, OP_ENDIF, OP_ENDIF]))
+        assert(worked)
+        stk = sm2.stack()
+        assert_equal(int.from_bytes(stk[0], byteorder='little'), 3)
+        sm2.cleanup()
+
+        # Check stack assignment
+        sm = cashlib.ScriptMachine()
+        worked = sm.eval(CScript([OP_1, OP_1]))
+        assert(worked)
+        sm.setStackItem(1, b"")
+        worked = sm.eval(CScript([OP_IF, OP_IF, OP_2, OP_ELSE, OP_3, OP_ENDIF, OP_ENDIF]))
+        assert(worked)
+        stk = sm.stack()
+        # since I overwrote a true with a false, the else condition should have been taken
+        assert_equal(int.from_bytes(stk[0], byteorder='little'), 3)
+
+        # Check stack push
+        sm.reset()
+        sm.setStackItem(-1, b"")
+        sm.setStackItem(-1, bytes([1]))
+        worked = sm.eval(CScript([OP_IF, OP_IF, OP_2, OP_ELSE, OP_3, OP_ENDIF, OP_ENDIF]))
+        assert(worked)
+        stk = sm.stack()
+        assert_equal(int.from_bytes(stk[0], byteorder='little'), 3)
+        assert(sm.error()[0] == 0)
+
+        # Check script error
+        sm.reset()
+        sm.setStackItem(-1, bytes([1]))
+        worked = sm.eval(CScript([OP_IF, OP_IF, OP_2, OP_ELSE, OP_3, OP_ENDIF, OP_ENDIF]))
+        assert(not worked)
+        err = sm.error()
+        assert_equal(err[0], sm.SCRIPT_ERR_UNBALANCED_CONDITIONAL)
+        assert_equal(err[1], 2)
+
     def run_test(self):
+
+        self.runScriptMachineTests()
 
         faulted = False
         try:
@@ -87,6 +178,30 @@ class MyTest (BitcoinTestFramework):
         sig2 = cashlib.signTxInput(tx2, 0, amt, output, destPrivKey, sighashtype)
         tx2.vin[0].scriptSig = cashlib.spendscript(sig2, destPubKey)
 
+        # Local script interpreter:
+        # Check that the spend works in a transaction-aware script machine
+        txbad = copy.deepcopy(tx2)
+        badsig = list(sig2)
+        badsig[10] = 1  # mess up the sig
+        badsig[11] = 2
+        txbad.vin[0].scriptSig = cashlib.spendscript(bytes(badsig), destPubKey)
+
+        # try a bad script (sig check should fail)
+        sm = cashlib.ScriptMachine(tx=tx2, inputIdx=0, inputAmount=tx.vout[0].nValue)
+        ret = sm.eval(txbad.vin[0].scriptSig)
+        assert(ret)
+        ret = sm.eval(tx.vout[0].scriptPubKey)
+        assert(not ret)
+        assert(sm.error()[0] == sm.SCRIPT_ERR_SIG_NULLFAIL)
+
+        # try a good spend script
+        sm.reset()
+        ret = sm.eval(tx2.vin[0].scriptSig)
+        assert(ret)
+        ret = sm.eval(tx.vout[0].scriptPubKey)
+        assert(ret)
+
+        # commit the created transaction
         tx2id = self.nodes[0].sendrawtransaction(hexlify(tx2.serialize()).decode("utf-8"))
 
         # Check that all tx were created, and commit them

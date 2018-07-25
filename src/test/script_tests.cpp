@@ -143,6 +143,11 @@ void DoTest(const CScript &scriptPubKey,
     bool result = VerifyScript(scriptSig, scriptPubKey, flags,
         MutableTransactionSignatureChecker(&tx, 0, txCredit.vout[0].nValue, flags), &err);
     BOOST_CHECK_MESSAGE(result == expect, message);
+    if (result != expect)
+    {
+        result = VerifyScript(scriptSig, scriptPubKey, flags,
+            MutableTransactionSignatureChecker(&tx, 0, txCredit.vout[0].nValue, flags), &err);
+    }
     BOOST_CHECK_MESSAGE(err == scriptError, std::string(FormatScriptError(err)) + " where " +
                                                 std::string(FormatScriptError((ScriptError_t)scriptError)) +
                                                 " expected: " + message);
@@ -1748,6 +1753,72 @@ BOOST_AUTO_TEST_CASE(script_FindAndDelete)
     expect = ScriptFromHex("03feed");
     BOOST_CHECK_EQUAL(s.FindAndDelete(d), 1);
     BOOST_CHECK(s == expect);
+}
+
+
+BOOST_AUTO_TEST_CASE(script_debugger)
+{
+    CScript testScript = CScript() << 0 << 1;
+    CScript testRedeemScript = CScript() << OP_IF << OP_IF << 1 << OP_ELSE << 2 << OP_ENDIF << OP_ELSE << 3 << OP_ENDIF;
+    BaseSignatureChecker sigChecker;
+    ScriptMachine sm(0, sigChecker);
+
+    bool result = sm.Eval(testScript);
+    BOOST_CHECK(result);
+    sm.BeginStep(testRedeemScript);
+    while (sm.isMoreSteps())
+    {
+        unsigned int pos = sm.getPos();
+        auto info = sm.Peek();
+        if (pos == 4)
+        {
+            BOOST_CHECK(std::get<0>(info) == true);
+            BOOST_CHECK(std::get<1>(info) == OP_2);
+        }
+        // you could print stepping info:
+        // printf("pos %d: %s %s datalen: %d stack len: %d\n", pos, std::get<0>(info) ? "running" : "skipping",
+        //       GetOpName(std::get<1>(info)), std::get<2>(info).size(), sm.getStack().size());
+        if (!sm.Step())
+            break;
+    }
+    sm.EndStep();
+
+    auto finalStack = sm.getStack();
+    BOOST_CHECK(finalStack.size() == 1);
+    BOOST_CHECK(finalStack[0][0] == 2);
+
+    testRedeemScript = CScript() << OP_IF << OP_IF << OP_FROMALTSTACK << OP_ELSE << OP_INVALIDOPCODE << OP_ENDIF
+                                 << OP_ELSE << 3 << OP_ENDIF;
+    sm.Reset();
+    sm.Eval(CScript() << 0 << 1);
+    result = sm.Eval(testRedeemScript);
+    BOOST_CHECK(result == false); // should get stuck at OP_INVALIDOPCODE
+    auto error = sm.getError();
+    BOOST_CHECK(error == SCRIPT_ERR_BAD_OPCODE);
+    unsigned int pos = sm.getPos();
+    BOOST_CHECK(pos == 5);
+
+    sm.Reset();
+    sm.Eval(CScript() << 1 << 1);
+    result = sm.Eval(testRedeemScript);
+    BOOST_CHECK(result == false); // should get stuck at OP_FROMALTSTACK, because nothing in altstack
+    error = sm.getError();
+    BOOST_CHECK(error == SCRIPT_ERR_INVALID_ALTSTACK_OPERATION);
+    pos = sm.getPos();
+    BOOST_CHECK(pos == 3);
+
+    std::vector<StackDataType> altStack;
+    StackDataType item;
+    item.push_back(4);
+    altStack.push_back(item);
+    sm.Reset();
+    sm.Eval(CScript() << 1 << 1);
+    sm.setAltStack(altStack);
+    result = sm.Eval(testRedeemScript);
+    BOOST_CHECK(result == true); // should work because altstack was seeded
+    auto &stk = sm.getStack();
+    BOOST_CHECK(stk.size() == 1);
+    BOOST_CHECK(stk[0][0] == 4);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
