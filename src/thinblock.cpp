@@ -969,6 +969,8 @@ bool CXThinBlock::process(CNode *pfrom,
                     header.GetHash().GetHex());
             }
         }
+        if (_collision)
+            LOG(THIN, "XThin collision detected.\n");
         if (!_collision)
         {
             // Start gathering the full tx hashes. If some are not available then add them to setHashesToRequest.
