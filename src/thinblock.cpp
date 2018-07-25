@@ -983,8 +983,10 @@ bool CXThinBlock::process(CNode *pfrom,
                 {
                     pfrom->thinBlockHashes.push_back(nullhash); // placeholder
                     setHashesToRequest.insert(cheapHash);
+                    LOG(THIN, "Cheap hash to request: %ull\n", cheapHash);
                 }
             }
+            LOG(THIN, "Hash stats: request: %d, have: %d.\n", setHashesToRequest.size(), pfrom->thinBlockHashes.size());
 
             // We don't need this after here.
             mapPartialTxHash.clear();
