@@ -4,9 +4,10 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "weakblock.h"
 #include "rpc/server.h"
 #include "utilstrencodings.h"
-#include "weakblock.h"
+#include "connmgr.h"
 #include <univalue.h>
 
 using namespace std;
@@ -85,14 +86,46 @@ UniValue weakconfirmations(const UniValue &params, bool fHelp) {
     return confs;
 }
 
+UniValue weaknodeknowledge(const UniValue &params, bool fHelp) {
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "weaknodeknowledge\n"
+            "\nReturns the nodes knowing about each weak block\n");
 
+    LOCK(cs_weakblocks);
+
+    UniValue result(UniValue::VARR);
+    const  std::unordered_map<uint256, std::unordered_set<NodeId>, BlockHasher>& node_knowledge = weakstore.nodeKnowledge();
+
+    for (auto p : node_knowledge) {
+        UniValue entry(UniValue::VARR);
+        entry.push_back(p.first.GetHex());
+
+        UniValue nodes(UniValue::VARR);
+        for (auto node_id : p.second) {
+            CNodeRef node = connmgr->FindNodeFromId(node_id);
+            if (bool(node)) {
+                std::string n = node->GetLogName();
+                nodes.push_back(n);
+            }
+        }
+        entry.push_back(nodes);
+        result.push_back(entry);
+    }
+    return result;
+}
+
+
+// clang-format off
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafeMode
   //  --------------------- ------------------------  -----------------------  ----------
-    { "weakblocks",         "weakstats",              &weakstats,   true  },
-    { "weakblocks",         "weakchaintips",          &weakchaintips, true },
+    { "weakblocks",         "weakstats",              &weakstats,              true  },
+    { "weakblocks",         "weakchaintips",          &weakchaintips,          true },
     { "weakblocks",         "weakconfirmations",      &weakconfirmations,      true  },
+    { "weakblocks",         "weaknodeknowledge",      &weaknodeknowledge,      true  }
 };
+// clang-format on
 
 void RegisterWeakBlockRPCCommands(CRPCTable &table)
 {
