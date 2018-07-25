@@ -732,48 +732,61 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         // check for weak block
         if (isWeak)
         {
-            LOG(WB, "Received weak XThin block.\n");
-            return thinBlock.process(pfrom, nSizeThinBlock, strCommand);
+            {
+                LOCK(cs_weakblocks);
+                LOG(WB, "Received weak XThin block.\n");
+                if (weakstore.byHash(thinBlock.header.GetHash()) != nullptr)
+                {
+                    LOG(THIN,
+                        "Received weak xthinblock but returning because we already have block data %s from peer %s hop"
+                        " %d size %d bytes\n",
+                        inv.hash.ToString(), pfrom->GetLogName(), nHops, nSizeThinBlock);
+                    requester.AlreadyReceived(inv);
+                    thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
+                    return true;
+                }
+            }
         }
-
-        // pIndex should always be set by AcceptBlockHeader
-        if (!pIndex)
+        else
         {
-            LOGA("INTERNAL ERROR: pIndex null in CXThinBlock::HandleMessage");
-            thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
-            return true;
+            // pIndex should always be set by AcceptBlockHeader for a strong block
+            if (!pIndex)
+            {
+                LOGA("INTERNAL ERROR: pIndex null in CXThinBlock::HandleMessage");
+                thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
+                return true;
+            }
+
+            inv.hash = pIndex->GetBlockHash();
+            requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
+
+            // Return early if we already have the block data
+            if (pIndex->nStatus & BLOCK_HAVE_DATA)
+            {
+                // Tell the Request Manager we received this block
+                requester.AlreadyReceived(inv);
+
+                thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
+                LOG(THIN, "Received xthinblock but returning because we already have block data %s from peer %s hop"
+                          " %d size %d bytes\n",
+                    inv.hash.ToString(), pfrom->GetLogName(), nHops, nSizeThinBlock);
+                return true;
+            }
+
+            // Request full block if it isn't extending the best chain
+            if (pIndex->nChainWork <= chainActive.Tip()->nChainWork)
+            {
+                std::vector<CInv> vGetData;
+                vGetData.push_back(inv);
+                pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+
+                thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
+
+                LOGA("%s %s from peer %s received but does not extend longest chain; requesting full block\n",
+                    strCommand, inv.hash.ToString(), pfrom->GetLogName());
+                return true;
+            }
         }
-
-        inv.hash = pIndex->GetBlockHash();
-        requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
-
-        // Return early if we already have the block data
-        if (pIndex->nStatus & BLOCK_HAVE_DATA)
-        {
-            // Tell the Request Manager we received this block
-            requester.AlreadyReceived(pfrom, inv);
-
-            thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
-            LOG(THIN, "Received xthinblock but returning because we already have block data %s from peer %s hop"
-                      " %d size %d bytes\n",
-                inv.hash.ToString(), pfrom->GetLogName(), nHops, nSizeThinBlock);
-            return true;
-        }
-
-        // Request full block if it isn't extending the best chain
-        if (pIndex->nChainWork <= chainActive.Tip()->nChainWork)
-        {
-            std::vector<CInv> vGetData;
-            vGetData.push_back(inv);
-            pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-
-            thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
-
-            LOGA("%s %s from peer %s received but does not extend longest chain; requesting full block\n", strCommand,
-                inv.hash.ToString(), pfrom->GetLogName());
-            return true;
-        }
-
         // If this is an expedited block then add and entry to mapThinBlocksInFlight.
         if (nHops > 0 && connmgr->IsExpeditedUpstream(pfrom))
         {
