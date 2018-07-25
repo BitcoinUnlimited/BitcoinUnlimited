@@ -664,8 +664,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         if (fRequireStandard && !AreInputsStandard(*tx, view))
             return state.Invalid(false, REJECT_NONSTANDARD, "bad-txns-nonstandard-inputs");
 
-        nSigOps = GetLegacySigOpCount(*tx);
-        nSigOps += GetP2SHSigOpCount(*tx, view);
+        nSigOps = GetLegacySigOpCount(*tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+        nSigOps += GetP2SHSigOpCount(*tx, view, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
 
         CAmount nValueOut = tx->GetValueOut();
         CAmount nFees = nValueIn - nValueOut;

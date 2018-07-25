@@ -599,13 +599,13 @@ public:
      * counted more accurately, assuming they are of the form
      *  ... OP_N CHECKMULTISIG ...
      */
-    unsigned int GetSigOpCount(bool fAccurate) const;
+    unsigned int GetSigOpCount(const uint32_t flags, bool fAccurate) const;
 
     /**
      * Accurately count sigOps, including sigOps in
      * pay-to-script-hash transactions:
      */
-    unsigned int GetSigOpCount(const CScript &scriptSig) const;
+    unsigned int GetSigOpCount(const uint32_t flags, const CScript &scriptSig) const;
 
     bool IsPayToScriptHash() const;
 

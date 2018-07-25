@@ -5,6 +5,7 @@
 
 #include "consensus/tx_verify.h"
 #include "key.h"
+#include "policy/policy.h"
 #include "pubkey.h"
 #include "script/script.h"
 #include "script/standard.h"
@@ -28,11 +29,7 @@ static std::vector<unsigned char> Serialize(const CScript &s)
 
 uint64_t GetTransactionSigOpCount(const CTransaction &tx, const CCoinsViewCache &coins, const uint32_t flags)
 {
-    uint64_t result = GetLegacySigOpCount(tx);
-    // FIXME: use flags to set / unset CHECKDATASIGVERIFY enabling etc.
-    if (flags & SCRIPT_VERIFY_P2SH)
-        result += GetP2SHSigOpCount(tx, coins);
-    return result;
+    return GetLegacySigOpCount(tx, flags) + GetP2SHSigOpCount(tx, coins, flags);
 }
 
 // FIXME: This should be properly factored out of unlimited.cpp as well
@@ -48,15 +45,15 @@ BOOST_FIXTURE_TEST_SUITE(sigopcount_tests, BasicTestingSetup)
 
 void CheckScriptSigOps(const CScript &script, uint32_t accurate_sigops, uint32_t inaccurate_sigops)
 {
-    BOOST_CHECK_EQUAL(script.GetSigOpCount(false), inaccurate_sigops);
-    BOOST_CHECK_EQUAL(script.GetSigOpCount(true), accurate_sigops);
+    BOOST_CHECK_EQUAL(script.GetSigOpCount(STANDARD_CHECKDATASIG_VERIFY_FLAGS, false), inaccurate_sigops);
+    BOOST_CHECK_EQUAL(script.GetSigOpCount(STANDARD_CHECKDATASIG_VERIFY_FLAGS, true), accurate_sigops);
 
     const CScript p2sh = GetScriptForDestination(CScriptID(script));
     const CScript scriptSig = CScript() << OP_0 << Serialize(script);
-    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(scriptSig), accurate_sigops);
+    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(STANDARD_CHECKDATASIG_VERIFY_FLAGS, scriptSig), accurate_sigops);
 
     // Check that GetSigOpCount report the exact count when not passed a P2SH.
-    BOOST_CHECK_EQUAL(script.GetSigOpCount(p2sh), accurate_sigops);
+    BOOST_CHECK_EQUAL(script.GetSigOpCount(SCRIPT_VERIFY_NONE, p2sh), accurate_sigops);
 }
 
 
@@ -88,7 +85,7 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount)
 
     CScript scriptSig2;
     scriptSig2 << OP_1 << ToByteVector(dummy) << ToByteVector(dummy) << Serialize(s3);
-    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(scriptSig2), 3U);
+    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(STANDARD_CHECKDATASIG_VERIFY_FLAGS, scriptSig2), 3U);
 }
 
 /**
