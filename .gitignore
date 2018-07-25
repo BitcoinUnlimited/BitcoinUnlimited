@@ -109,6 +109,7 @@ qa/pull-tester/run-bitcoind-for-test.sh
 qa/pull-tester/tests_config.py
 qa/pull-tester/cache/*
 qa/pull-tester/test.*/*
+qa/pull-tester/validatePerf.csv
 qa/tmp
 cache/
 share/BitcoindComparisonTool.jar
