@@ -112,7 +112,7 @@ public:
 
     // Node weakblocks knowledge tracking
 
-    // Asks whether the given node likely knows about the given underlying weak hash
+    // Asks whether the given node likely knows about the given underlying block hash
     bool nodeKnows(NodeId nid, const uint256& weakhash) const;
 
     //! asserts that the given node knows the given weakhash

@@ -48,6 +48,7 @@ uint64_t hashReduce<uint64_t>(const uint256 &t)
 template <class T>
 unsigned int addFromWeak(std::vector<T> &vTxHashes,
     const CBlock &block,
+    const CNode *pto,
     std::set<uint64_t> *collision_set,
     bool *pcollision)
 {
@@ -64,24 +65,35 @@ unsigned int addFromWeak(std::vector<T> &vTxHashes,
         CWeakblockRef wb = weakstore.byHash(underlyinghash);
         if (wb != nullptr)
         {
-            LOG(WB, "Detected (x)thin transmission of %s which builds on previous weak block %s. Deflating.\n",
+            LOG(WB, "Detected (x)thin transmission of %s which builds on previous weak block %s.\n",
                 block.GetHash().GetHex(), wb->GetHash().GetHex());
-            vTxHashes.push_back(hashReduce<T>(underlyinghash));
-            vTxHashes.push_back(hashReduce<T>(block.vtx[0]->GetHash()));
-            if (pcollision != nullptr && collision_set != nullptr)
+            if (pto != nullptr && weakstore.nodeKnows(pto->GetId(), wb->GetHash()))
             {
-                if (collision_set->count(underlyinghash.GetCheapHash()))
+                LOG(WB, "Remote node knows about underlying weak block. Deflating.\n");
+
+                vTxHashes.push_back(hashReduce<T>(underlyinghash));
+                vTxHashes.push_back(hashReduce<T>(block.vtx[0]->GetHash()));
+                if (pcollision != nullptr && collision_set != nullptr)
                 {
-                    *pcollision = true;
+                    if (collision_set->count(underlyinghash.GetCheapHash()))
+                    {
+                        *pcollision = true;
+                    }
+                    collision_set->insert(underlyinghash.GetCheapHash());
+                    if (collision_set->count(block.vtx[0]->GetHash().GetCheapHash()))
+                    {
+                        *pcollision = true;
+                    }
+                    collision_set->insert(block.vtx[0]->GetHash().GetCheapHash());
                 }
-                collision_set->insert(underlyinghash.GetCheapHash());
-                if (collision_set->count(block.vtx[0]->GetHash().GetCheapHash()))
-                {
-                    *pcollision = true;
-                }
-                collision_set->insert(block.vtx[0]->GetHash().GetCheapHash());
+                skip_underlying = wb->vtx.size();
             }
-            skip_underlying = wb->vtx.size();
+            else
+            {
+                LOG(WB, "Remote node does not know about underlying weak block. Not sending a delta block.\n");
+            }
+            // assert that the target node knows about this block now
+            weakstore.set_nodeKnows(pto->GetId(), block.GetHash());
         }
     }
     return skip_underlying;
@@ -114,14 +126,14 @@ void weakblockInflateTxHashes(std::vector<T> &vTxHashes)
 }
 
 
-CThinBlock::CThinBlock(const CBlock &block, CBloomFilter &filter)
+CThinBlock::CThinBlock(const CBlock &block, CBloomFilter &filter, const CNode *pto)
 {
     header = block.GetBlockHeader();
 
     unsigned int nTx = block.vtx.size();
     vTxHashes.reserve(nTx);
 
-    unsigned skip_underlying = addFromWeak<uint256>(vTxHashes, block, nullptr, nullptr);
+    unsigned skip_underlying = addFromWeak<uint256>(vTxHashes, block, pto, nullptr, nullptr);
 
     for (unsigned int i = skip_underlying; i < nTx; i++)
     {
@@ -155,7 +167,10 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     vRecv >> thinBlock;
 
     weakblockInflateTxHashes(thinBlock.vTxHashes);
-
+    {
+        LOCK(cs_weakblocks);
+        weakstore.set_nodeKnows(pfrom->GetId(), thinBlock.header.GetHash());
+    }
     // Message consistency checking
     if (!IsThinBlockValid(pfrom, thinBlock.vMissingTx, thinBlock.header))
     {
@@ -316,7 +331,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
     return true;
 }
 
-CXThinBlock::CXThinBlock(const CBlock &block, CBloomFilter *filter)
+CXThinBlock::CXThinBlock(const CBlock &block, CBloomFilter *filter, const CNode *pto)
 {
     header = block.GetBlockHeader();
     this->collision = false;
@@ -326,7 +341,7 @@ CXThinBlock::CXThinBlock(const CBlock &block, CBloomFilter *filter)
 
     std::set<uint64_t> setPartialTxHash;
 
-    unsigned int skip_underlying = addFromWeak<uint64_t>(vTxHashes, block, &setPartialTxHash, &collision);
+    unsigned int skip_underlying = addFromWeak<uint64_t>(vTxHashes, block, pto, &setPartialTxHash, &collision);
 
     for (unsigned int i = skip_underlying; i < nTx; i++)
     {
@@ -687,6 +702,11 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
     vRecv >> thinBlock;
 
     weakblockInflateTxHashes(thinBlock.vTxHashes);
+    {
+        LOCK(cs_weakblocks);
+        weakstore.set_nodeKnows(pfrom->GetId(), thinBlock.header.GetHash());
+    }
+
     {
         LOCK(cs_main);
 
@@ -1687,12 +1707,12 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
 {
     if (inv.type == MSG_XTHINBLOCK)
     {
-        CXThinBlock xThinBlock(*pblock, pfrom->pThinBlockFilter);
+        CXThinBlock xThinBlock(*pblock, pfrom->pThinBlockFilter, pfrom);
         int nSizeBlock = pblock->GetBlockSize();
         if (xThinBlock.collision ==
             true) // If there is a cheapHash collision in this block then send a normal thinblock
         {
-            CThinBlock thinBlock(*pblock, *pfrom->pThinBlockFilter);
+            CThinBlock thinBlock(*pblock, *pfrom->pThinBlockFilter, pfrom);
             int nSizeThinBlock = ::GetSerializeSize(xThinBlock, SER_NETWORK, PROTOCOL_VERSION);
             if (nSizeThinBlock < nSizeBlock)
             {
@@ -1738,7 +1758,7 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
     }
     else if (inv.type == MSG_THINBLOCK)
     {
-        CThinBlock thinBlock(*pblock, *pfrom->pThinBlockFilter);
+        CThinBlock thinBlock(*pblock, *pfrom->pThinBlockFilter, pfrom);
         int nSizeBlock = pblock->GetBlockSize();
         int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);
         if (nSizeThinBlock < nSizeBlock)

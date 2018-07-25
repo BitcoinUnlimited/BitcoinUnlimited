@@ -27,7 +27,7 @@ public:
     std::vector<CTransaction> vMissingTx; // vector of transactions that did not match the bloom filter
 
 public:
-    CThinBlock(const CBlock &block, CBloomFilter &filter);
+    CThinBlock(const CBlock &block, CBloomFilter &filter, const CNode *pto);
     CThinBlock() {}
     /**
      * Handle an incoming thin block.  The block is fully validated, and if any transactions are missing, we fall
@@ -61,7 +61,8 @@ public:
     bool collision;
 
 public:
-    CXThinBlock(const CBlock &block, CBloomFilter *filter); // Use the filter to determine which txns the client has
+    // Use the filter to determine which txns the client has
+    CXThinBlock(const CBlock &block, CBloomFilter *filter, const CNode *pto);
     CXThinBlock(const CBlock &block); // Assume client has all of the transactions (except coinbase)
     CXThinBlock() {}
     /**

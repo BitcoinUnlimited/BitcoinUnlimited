@@ -126,24 +126,24 @@ BOOST_AUTO_TEST_CASE(thinblock_test)
 
     /* empty filter */
     CBlock block = TestBlock();
-    CThinBlock thinblock(block, filter);
-    CXThinBlock xthinblock(block, &filter);
+    CThinBlock thinblock(block, filter, nullptr);
+    CXThinBlock xthinblock(block, &filter, nullptr);
     BOOST_CHECK_EQUAL(9, thinblock.vMissingTx.size());
     BOOST_CHECK_EQUAL(9, xthinblock.vMissingTx.size());
 
     /* insert txid not in block */
     const uint256 random_hash = uint256S("3fba505b48865fccda4e248cecc39d5dfbc6b8ef7b4adc9cd27242c1193c7133");
     filter.insert(random_hash);
-    CThinBlock thinblock1(block, filter);
-    CXThinBlock xthinblock1(block, &filter);
+    CThinBlock thinblock1(block, filter, nullptr);
+    CXThinBlock xthinblock1(block, &filter, nullptr);
     BOOST_CHECK_EQUAL(9, thinblock1.vMissingTx.size());
     BOOST_CHECK_EQUAL(9, xthinblock1.vMissingTx.size());
 
     /* insert txid in block */
     const uint256 hash_in_block = block.vtx[1]->GetHash();
     filter.insert(hash_in_block);
-    CThinBlock thinblock2(block, filter);
-    CXThinBlock xthinblock2(block, &filter);
+    CThinBlock thinblock2(block, filter, nullptr);
+    CXThinBlock xthinblock2(block, &filter, nullptr);
     BOOST_CHECK_EQUAL(8, thinblock2.vMissingTx.size());
     BOOST_CHECK_EQUAL(8, xthinblock2.vMissingTx.size());
 
@@ -151,7 +151,7 @@ BOOST_AUTO_TEST_CASE(thinblock_test)
     BOOST_CHECK(!xthinblock2.collision);
     block.vtx.push_back(block.vtx[1]); // duplicate tx
     filter.clear();
-    CXThinBlock xthinblock3(block, &filter);
+    CXThinBlock xthinblock3(block, &filter, nullptr);
     BOOST_CHECK(xthinblock3.collision);
 
 
@@ -162,24 +162,24 @@ BOOST_AUTO_TEST_CASE(thinblock_test)
 
     /* empty filter */
     CBlock block1 = TestBlock();
-    CThinBlock thinblock4(block1, filter1);
-    CXThinBlock xthinblock4(block1, &filter1);
+    CThinBlock thinblock4(block1, filter1, nullptr);
+    CXThinBlock xthinblock4(block1, &filter1, nullptr);
     BOOST_CHECK(thinblock4.vMissingTx.size() >= 8 && thinblock4.vMissingTx.size() <= 9);
     BOOST_CHECK(xthinblock4.vMissingTx.size() >= 8 && xthinblock4.vMissingTx.size() <= 9);
 
     /* insert txid not in block */
     const uint256 random_hash1 = uint256S("3fba505b48865fccda4e248cecc39d5dfbc6b8ef7b4adc9cd27242c1193c7132");
     filter1.insert(random_hash1);
-    CThinBlock thinblock5(block1, filter1);
-    CXThinBlock xthinblock5(block1, &filter1);
+    CThinBlock thinblock5(block1, filter1, nullptr);
+    CXThinBlock xthinblock5(block1, &filter1, nullptr);
     BOOST_CHECK(thinblock5.vMissingTx.size() >= 8 && thinblock5.vMissingTx.size() <= 9);
     BOOST_CHECK(xthinblock5.vMissingTx.size() >= 8 && xthinblock5.vMissingTx.size() <= 9);
 
     /* insert txid in block */
     const uint256 hash_in_block1 = block.vtx[1]->GetHash();
     filter1.insert(hash_in_block1);
-    CThinBlock thinblock6(block1, filter1);
-    CXThinBlock xthinblock6(block1, &filter1);
+    CThinBlock thinblock6(block1, filter1, nullptr);
+    CXThinBlock xthinblock6(block1, &filter1, nullptr);
     BOOST_CHECK(thinblock6.vMissingTx.size() >= 7 && thinblock6.vMissingTx.size() <= 8);
     BOOST_CHECK(xthinblock6.vMissingTx.size() >= 7 && xthinblock6.vMissingTx.size() <= 8);
 
@@ -187,7 +187,7 @@ BOOST_AUTO_TEST_CASE(thinblock_test)
     BOOST_CHECK(!xthinblock6.collision);
     block.vtx.push_back(block1.vtx[1]); // duplicate tx
     filter1.clear();
-    CXThinBlock xthinblock7(block, &filter1);
+    CXThinBlock xthinblock7(block, &filter1, nullptr);
     BOOST_CHECK(xthinblock7.collision);
 }
 
