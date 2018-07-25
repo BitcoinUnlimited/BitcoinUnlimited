@@ -358,7 +358,8 @@ CXThinBlock::CXThinBlock(const CBlock &block)
     vTxHashes.reserve(nTx);
     std::set<uint64_t> setPartialTxHash;
 
-    unsigned int skip_underlying = addFromWeak<uint64_t>(vTxHashes, block, &setPartialTxHash, &collision);
+    // no deltablocks for xpedited for now (FIXME)
+    unsigned int skip_underlying = 0; // addFromWeak<uint64_t>(vTxHashes, block, &setPartialTxHash, &collision);
 
     LOCK(orphanpool.cs);
     for (unsigned int i = skip_underlying; i < nTx; i++)
