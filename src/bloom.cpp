@@ -58,7 +58,6 @@ void CBloomFilter::setupGuaranteeFPR(unsigned int nElements,
     double nFPRate,
     unsigned int nTweakIn,
     unsigned char nFlagsIn,
-    bool fSizeConstrained,
     uint32_t nMaxFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE)
 {
     if (nElements == 0)
@@ -73,9 +72,6 @@ void CBloomFilter::setupGuaranteeFPR(unsigned int nElements,
     isEmpty = true;
 
     nHashFuncs = (unsigned int)max(MIN_N_HASH_FUNC, int(vData.size() * 8 / nElements * LN2));
-
-    if (fSizeConstrained)
-        nHashFuncs = min(nHashFuncs, MAX_HASH_FUNCS);
 
     nTweak = nTweakIn;
     nFlags = nFlagsIn;
@@ -98,7 +94,7 @@ CBloomFilter::CBloomFilter(unsigned int nElements,
     uint32_t nMaxFilterSize)
 {
     if (fGuaranteeFPR)
-        setupGuaranteeFPR(nElements, nFPRate, nTweakIn, nFlagsIn, true, nMaxFilterSize);
+        setupGuaranteeFPR(nElements, nFPRate, nTweakIn, nFlagsIn, nMaxFilterSize);
     else
         setup(nElements, nFPRate, nTweakIn, nFlagsIn, true, nMaxFilterSize);
 }
