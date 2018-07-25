@@ -735,6 +735,10 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
             {
                 LOCK(cs_weakblocks);
                 LOG(WB, "Received weak XThin block.\n");
+
+                inv.hash = thinBlock.header.GetHash();
+                requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
+
                 if (weakstore.byHash(thinBlock.header.GetHash()) != nullptr)
                 {
                     LOG(THIN,
@@ -745,6 +749,8 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
                     thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
                     return true;
                 }
+                // weak blocks handling should not need to deal with ones that are not extending
+                // the best chain
             }
         }
         else
