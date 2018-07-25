@@ -375,6 +375,7 @@ CXThinBlock::CXThinBlock(const CBlock &block)
 
     // no deltablocks for xpedited for now (FIXME)
     unsigned int skip_underlying = 0; // addFromWeak<uint64_t>(vTxHashes, block, &setPartialTxHash, &collision);
+    LOG(WB, "Building xpedited block for %s, which does not support delta transmission.\n", header.GetHash().GetHex());
 
     LOCK(orphanpool.cs);
     for (unsigned int i = skip_underlying; i < nTx; i++)
