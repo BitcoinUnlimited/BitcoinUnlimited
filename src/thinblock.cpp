@@ -28,7 +28,11 @@
 #include "weakblock.h"
 
 static bool DEFAULT_BLOOM_FILTER_TARGETING = true;
-static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
+static bool ReconstructBlock(CNode *pfrom,
+    const bool fXVal,
+    int &missingCount,
+    int &unnecessaryCount,
+    const uint256 underlying_weakref);
 
 
 template <class T>
@@ -100,16 +104,17 @@ unsigned int addFromWeak(std::vector<T> &vTxHashes,
 }
 
 // the oppposite of addFromWeak. Inflates a shortened (cheap) hash list again
+// returns hash of inflated weak block or 0.
 template <class T>
-void weakblockInflateTxHashes(std::vector<T> &vTxHashes)
+uint256 weakblockInflateTxHashes(std::vector<T> &vTxHashes)
 {
     if (vTxHashes.size() < 2)
-        return;
+        return uint256();
     LOCK(cs_weakblocks);
     CWeakblockRef wb = weakstore.byHash(vTxHashes[0]);
 
     if (wb == nullptr)
-        return;
+        return uint256();
 
     std::vector<T> inp(vTxHashes);
     vTxHashes.clear();
@@ -123,6 +128,7 @@ void weakblockInflateTxHashes(std::vector<T> &vTxHashes)
     }
 
     vTxHashes.insert(vTxHashes.end(), inp.begin() + 2, inp.end());
+    return wb->GetHash();
 }
 
 
@@ -166,7 +172,7 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     CThinBlock thinBlock;
     vRecv >> thinBlock;
 
-    weakblockInflateTxHashes(thinBlock.vTxHashes);
+    uint256 underlying_weakref = weakblockInflateTxHashes(thinBlock.vTxHashes);
     {
         LOCK(cs_weakblocks);
         weakstore.set_nodeKnows(pfrom->GetId(), thinBlock.header.GetHash());
@@ -237,10 +243,10 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         return true;
     }
 
-    return thinBlock.process(pfrom, nSizeThinBlock);
+    return thinBlock.process(pfrom, nSizeThinBlock, underlying_weakref);
 }
 
-bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
+bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock, uint256 underlying_weakref)
 {
     // Xpress Validation - only perform xval if the chaintip matches the last blockhash in the thinblock
     bool fXVal;
@@ -281,7 +287,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
         int missingCount = 0;
         int unnecessaryCount = 0;
 
-        if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
+        if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount, underlying_weakref))
             return false;
 
         pfrom->thinBlockWaitingForTxns = missingCount;
@@ -518,7 +524,18 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     {
         LOCK(orphanpool.cs);
         LOCK(cs_xval);
-        if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
+
+        uint256 underlying_weakref;
+        {
+            LOCK(cs_weakblocks);
+            CWeakblockRef wb = weakstore.parent(inv.hash);
+            if (wb != nullptr)
+            {
+                LOG(WB, "Weak block reference found in CXThinBlockTX::HandleMessage().\n");
+                underlying_weakref = wb->GetHash();
+            }
+        }
+        if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount, underlying_weakref))
             return false;
     }
 
@@ -702,7 +719,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
     CXThinBlock thinBlock;
     vRecv >> thinBlock;
 
-    weakblockInflateTxHashes(thinBlock.vTxHashes);
+    uint256 underlying_weakref = weakblockInflateTxHashes(thinBlock.vTxHashes);
     {
         LOCK(cs_weakblocks);
         weakstore.set_nodeKnows(pfrom->GetId(), thinBlock.header.GetHash());
@@ -842,12 +859,14 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
     // Send expedited block without checking merkle root.
     SendExpeditedBlock(thinBlock, nHops, pfrom);
 
-    return thinBlock.process(pfrom, nSizeThinBlock, strCommand);
+    return thinBlock.process(pfrom, nSizeThinBlock, strCommand, underlying_weakref);
 }
 
 bool CXThinBlock::process(CNode *pfrom,
     int nSizeThinBlock,
-    std::string strCommand) // TODO: request from the "best" txn source not necessarily from the block source
+    std::string strCommand,
+    // TODO: request from the "best" txn source not necessarily from the block source
+    uint256 underlying_weakref)
 {
     // In PV we must prevent two thinblocks from simulaneously processing from that were recieved from the
     // same peer. This would only happen as in the example of an expedited block coming in
@@ -928,7 +947,28 @@ bool CXThinBlock::process(CNode *pfrom,
             }
             mapPartialTxHash[cheapHash] = mi.second->GetHash();
         }
-
+        {
+            LOCK(cs_weakblocks);
+            CWeakblockRef wb_parent = weakstore.byHash(underlying_weakref);
+            if (wb_parent != nullptr)
+            {
+                LOG(WB, "Adding %d partial hashes for underlying weak block %s.\n", wb_parent->vtx.size(),
+                    wb_parent->GetHash().GetHex());
+                for (auto tx : wb_parent->vtx)
+                {
+                    const uint256 txhash = tx->GetHash();
+                    const uint64_t cheaphash = txhash.GetCheapHash();
+                    if (mapPartialTxHash.count(cheaphash) && mapPartialTxHash[cheaphash] != txhash)
+                        _collision = true;
+                    mapPartialTxHash[cheaphash] = txhash;
+                }
+            }
+            else if (!underlying_weakref.IsNull())
+            {
+                LOG(WB, "INTERNAL ERROR: Weak block underlying %s not known, requesting all hashes.\n",
+                    header.GetHash().GetHex());
+            }
+        }
         if (!_collision)
         {
             // Start gathering the full tx hashes. If some are not available then add them to setHashesToRequest.
@@ -958,7 +998,7 @@ bool CXThinBlock::process(CNode *pfrom,
                 }
                 else
                 {
-                    if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
+                    if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount, underlying_weakref))
                         return false;
                 }
             }
@@ -1035,7 +1075,11 @@ bool CXThinBlock::process(CNode *pfrom,
     return true;
 }
 
-static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount)
+static bool ReconstructBlock(CNode *pfrom,
+    const bool fXVal,
+    int &missingCount,
+    int &unnecessaryCount,
+    uint256 const underlying_weakref)
 {
     AssertLockHeld(cs_xval);
 
@@ -1063,6 +1107,19 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
     CTransactionRef dummyptx = nullptr;
     uint32_t nTxSize = sizeof(dummyptx);
     uint64_t maxAllowedSize = nTxSize * maxMessageSizeMultiplier * excessiveBlockSize / 158;
+
+
+    // FIXME: find better way to deal with this, this all seems like quite redundant actions
+    std::unordered_map<uint256, CTransactionRef, BlockHasher> wb_txn;
+    {
+        LOCK(cs_weakblocks);
+        CWeakblockRef wb = weakstore.byHash(underlying_weakref);
+        if (wb != nullptr)
+        {
+            for (CTransactionRef tx : wb->vtx)
+                wb_txn[tx->GetHash()] = tx;
+        }
+    }
 
     // Look for each transaction in our various pools and buffers.
     // With xThinBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
@@ -1092,6 +1149,8 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
                 setPreVerifiedTxHash.insert(hash);
             else if (inMissingTx)
                 ptx = pfrom->mapMissingTx[hash.GetCheapHash()];
+            else if (wb_txn.count(hash) > 0)
+                ptx = wb_txn[hash];
         }
         if (!ptx)
             missingCount++;

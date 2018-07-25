@@ -49,7 +49,7 @@ public:
     }
 
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, int nSizeThinBlock);
+    bool process(CNode *pfrom, int nSizeThinBlock, uint256 underlying_weakref);
 };
 
 class CXThinBlock
@@ -88,7 +88,7 @@ public:
         READWRITE(vMissingTx);
     }
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, int nSizeThinbBlock, std::string strCommand);
+    bool process(CNode *pfrom, int nSizeThinbBlock, std::string strCommand, uint256 underlying_weakref);
     bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state);
 };
 
