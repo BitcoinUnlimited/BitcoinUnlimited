@@ -1414,7 +1414,6 @@ void CThinBlockData::DeleteThinBlockBytes(uint64_t bytes, CNode *pfrom)
 
 void CThinBlockData::ResetThinBlockBytes() { nThinBlockBytes.store(0); }
 uint64_t CThinBlockData::GetThinBlockBytes() { return nThinBlockBytes.load(); }
-
 bool HaveThinblockNodes()
 {
     {
