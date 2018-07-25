@@ -1299,7 +1299,7 @@ std::string CThinBlockData::FullTxToString()
 bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
 {
     // Base time used to calculate the random timeout value.
-    static int64_t nTimeToWait = 10000;
+    static uint64_t nTimeToWait = 10000;
 
     LOCK(cs_mapThinBlockTimer);
     if (!mapThinBlockTimer.count(hash))
