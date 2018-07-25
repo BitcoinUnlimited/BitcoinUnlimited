@@ -128,7 +128,7 @@ public:
 
         // Sender's estimate of number of items in both block and receiver mempool
         // This is the parameter "mu" from the graphene paper
-        uint64_t nItemIntersect = std::min(nItems, (uint64_t)nReceiverUniverseItems) - 1;
+        uint64_t nItemIntersect = std::min(nItems, nReceiverUniverseItems) - 1;
 
         // Set false positive rate for Bloom filter based on optSymDiff
         double fpr;
@@ -355,7 +355,7 @@ public:
 
 private:
     bool ordered;
-    size_t nReceiverUniverseItems;
+    uint64_t nReceiverUniverseItems;
     std::vector<unsigned char> encodedRank;
     CBloomFilter *pSetFilter;
     CIblt *pSetIblt;
