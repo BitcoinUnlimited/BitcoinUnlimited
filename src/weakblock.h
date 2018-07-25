@@ -10,6 +10,7 @@
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "main.h"
+#include "net.h"
 #include "sync.h"
 #include "uint256.h"
 #include <unordered_map>
@@ -108,6 +109,17 @@ public:
     void consistencyCheck(const bool check_cached_heights=true) const;
 
     const std::vector<CWeakblockRef>& chainTips() const;
+
+    // Node weakblocks knowledge tracking
+
+    // Asks whether the given node likely knows about the given underlying weak hash
+    bool nodeKnows(NodeId nid, const uint256& weakhash) const;
+
+    //! asserts that the given node knows the given weakhash
+    void set_nodeKnows(NodeId nid, const uint256& weakhash);
+
+    //! Returns all node knowlege
+    const std::unordered_map<uint256, std::unordered_set<NodeId>, BlockHasher>& nodeKnowledge() const;
 private:
     //! Map block hash to weak block
     std::unordered_map<uint256, CWeakblockRef, BlockHasher> hash2wb;
@@ -123,8 +135,12 @@ private:
 
     /** Chain tips pre-marked for removal for the next expireOld(..) call */
     std::unordered_set<uint256, BlockHasher> to_remove;
+
+    //! Which node knows about which weak block
+    std::unordered_map<uint256, std::unordered_set<NodeId>, BlockHasher> node_knowledge;
 };
 
 extern CWeakStore weakstore;
+
 
 #endif

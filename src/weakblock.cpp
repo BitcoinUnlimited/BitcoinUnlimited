@@ -267,6 +267,7 @@ void CWeakStore::expireOld(const bool fThorough) {
         extends_map.clear();
         chain_tips.clear();
         to_remove.clear();
+        node_knowledge.clear();
         return;
     } else {
         for (uint256 hash : to_remove) {
@@ -294,6 +295,10 @@ void CWeakStore::expireOld(const bool fThorough) {
                 wb);
             if (wct_iter != chain_tips.end())
                 chain_tips.erase(wct_iter);
+
+            auto nk_iter = node_knowledge.find(hash);
+            if (nk_iter != node_knowledge.end())
+                node_knowledge.erase(nk_iter);
         }
         to_remove.clear();
         for (auto hashwb_pair : hash2wb) {
@@ -335,6 +340,7 @@ void CWeakStore::consistencyCheck(const bool check_cached_heights) const {
     assert(extends_map.size() <= hash2wb.size());
     assert(chain_tips.size() <= hash2wb.size());
     assert(cheaphash2wb.size() <= hash2wb.size());
+    assert(node_knowledge.size() <= hash2wb.size());
     for (auto ext_pair : extends_map)
         assert(hash2wb.count(ext_pair.first) > 0);
 
@@ -378,6 +384,20 @@ void CWeakStore::consistencyCheck(const bool check_cached_heights) const {
 const std::vector<CWeakblockRef>& CWeakStore::chainTips() const {
     AssertLockHeld(cs_weakblocks);
     return chain_tips;
+}
+
+bool CWeakStore::nodeKnows(NodeId nid, const uint256& weakhash) const {
+    AssertLockHeld(cs_weakblocks);
+    return node_knowledge.count(weakhash) && node_knowledge.at(weakhash).count(nid);
+}
+
+void CWeakStore::set_nodeKnows(NodeId nid, const uint256& weakhash) {
+    AssertLockHeld(cs_weakblocks);
+    node_knowledge[weakhash].insert(nid);
+}
+
+const std::unordered_map<uint256, std::unordered_set<NodeId>, BlockHasher>& CWeakStore::nodeKnowledge() const {
+    return node_knowledge;
 }
 
 CWeakStore weakstore;
