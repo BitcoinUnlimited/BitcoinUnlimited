@@ -299,10 +299,6 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
             strprintf(_("Time to wait before requesting a block from a different peer, in microseconds (default: %u)"),
                     DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL))
         .addArg("connect=<ip>", optionalStr, _("Connect only to the specified node(s)"))
-        .addArg("connect-thinblock=<ip:port>", requiredStr,
-            _("Connect to a thinblock node(s). Blocks will only be downloaded from a thinblock peer.  If no "
-              "connections "
-              "are possible then regular blocks will then be downloaded form any other connected peers"))
         .addArg("discover", optionalBool,
             _("Discover own IP addresses (default: 1 when listening and no -externalip or -proxy)"))
         .addArg("dns", optionalBool, _("Allow DNS lookups for -addnode, -seednode and -connect") + " " +
@@ -538,8 +534,6 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addDebugArg("printpriority", optionalBool,
             strprintf("Log transaction priority and fee per kB when mining blocks (default: %u)",
                          DEFAULT_PRINTPRIORITY))
-        .addDebugArg("connect-thinblock-force", optionalBool,
-            strprintf("Force download of thinblocks from connect-thinblock peers (default: %u)", false))
 #ifdef ENABLE_WALLET
         .addDebugArg("privdb", optionalBool,
             strprintf("Sets the DB_PRIVATE flag in the wallet db environment (default: %u)", DEFAULT_WALLET_PRIVDB))

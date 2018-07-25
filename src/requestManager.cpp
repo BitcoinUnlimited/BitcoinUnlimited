@@ -496,7 +496,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         (IsThinBlocksEnabled() && IsChainNearlySyncd() && IsGrapheneBlockEnabled() &&
             !graphenedata.CheckGrapheneBlockTimer(obj.hash)))
     {
-        if (HaveConnectThinblockNodes() || (HaveThinblockNodes() && thindata.CheckThinblockTimer(obj.hash)))
+        if (HaveThinblockNodes() && thindata.CheckThinblockTimer(obj.hash))
         {
             // Must download an xthinblock from a XTHIN peer.
             // We can only request one xthinblock per peer at a time.

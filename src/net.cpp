@@ -1726,9 +1726,6 @@ void ThreadOpenConnections()
         }
     }
 
-    // Connect to all "connect-thinblock" peers
-    ConnectToThinBlockNodes();
-
     // NOTE: If we are in the block above, then no seeding should occur as "-connect" and "-connect-thinblock"
     // are intended as "only make outbound connections to the configured nodes".
 
