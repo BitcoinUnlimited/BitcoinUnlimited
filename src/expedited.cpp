@@ -9,6 +9,7 @@
 #include "dosman.h"
 #include "expedited.h"
 #include "main.h" // Misbehaving, cs_main
+#include "weakblock.h"
 
 
 #define NUM_XPEDITED_STORE 10
@@ -123,6 +124,12 @@ void ActuallySendExpreditedBlock(CXThinBlock &thinBlock, unsigned char hops, con
     {
         CNode *n = nodeRef.get();
 
+        if (n != nullptr)
+        {
+            LOCK(cs_weakblocks);
+            weakstore.set_nodeKnows(n->GetId(), thinBlock.header.GetHash());
+        }
+
         if (n->fDisconnect)
         {
             connmgr->RemovedNode(n);
@@ -130,7 +137,6 @@ void ActuallySendExpreditedBlock(CXThinBlock &thinBlock, unsigned char hops, con
         else if (n != skip) // Don't send back to the sending node to avoid looping
         {
             LOG(THIN, "Sending expedited block %s to %s\n", thinBlock.header.GetHash().ToString(), n->GetLogName());
-
             n->PushMessage(NetMsgType::XPEDITEDBLK, (unsigned char)EXPEDITED_MSG_XTHIN, hops, thinBlock);
             n->blocksSent += 1;
         }
