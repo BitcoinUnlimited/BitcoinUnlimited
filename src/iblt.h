@@ -81,7 +81,7 @@ public:
     // Clears all entries in the IBLT
     void reset();
     // Returns the size in bytes of the IBLT.  This is NOT the count of inserted entries
-    size_t size();
+    uint64_t size();
     void resize(size_t _expectedNumEntries);
     void insert(uint64_t k, const std::vector<uint8_t> &v);
     void erase(uint64_t k, const std::vector<uint8_t> &v);

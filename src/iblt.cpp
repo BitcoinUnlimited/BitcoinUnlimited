@@ -103,7 +103,7 @@ void CIblt::reset()
     is_modified = false;
 }
 
-size_t CIblt::size() { return hashTable.size(); }
+uint64_t CIblt::size() { return hashTable.size(); }
 void CIblt::resize(size_t _expectedNumEntries)
 {
     assert(is_modified == false);
