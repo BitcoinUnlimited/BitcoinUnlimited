@@ -30,6 +30,9 @@ SOFTWARE.
 #include <utility>
 
 static const size_t N_HASHCHECK = 11;
+// It's extremely unlikely that an IBLT will decode with fewer
+// than 1 cell for every 10 items.
+static const float MIN_OVERHEAD = 0.1;
 
 // mask that can be reduced to reduce the number of checksum bits in the IBLT
 // -- ANY VALUE OTHER THAN 0xffffffff IS FOR TESTING ONLY! --
@@ -230,6 +233,7 @@ bool CIblt::listEntries(std::set<std::pair<uint64_t, std::vector<uint8_t> > > &p
     CIblt peeled = *this;
 
     size_t nErased = 0;
+    size_t nTotalErased = 0;
     do
     {
         nErased = 0;
@@ -252,7 +256,8 @@ bool CIblt::listEntries(std::set<std::pair<uint64_t, std::vector<uint8_t> > > &p
                 ++nErased;
             }
         }
-    } while (nErased > 0);
+        nTotalErased += nErased;
+    } while (nErased > 0 && nTotalErased < peeled.hashTable.size() / MIN_OVERHEAD);
 
     if (!n_hash)
         return false;
