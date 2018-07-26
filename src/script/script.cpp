@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "script.h"
+#include "interpreter.h"
 
 #include "tinyformat.h"
 #include "utilstrencodings.h"
@@ -372,6 +373,8 @@ unsigned int CScript::GetSigOpCount(const uint32_t flags, bool fAccurate) const
         if (!GetOp(pc, opcode))
             break;
         if (opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY)
+            n++;
+        if ((flags & SCRIPT_ENABLE_CHECKDATASIG) && (opcode == OP_CHECKDATASIG || opcode == OP_CHECKDATASIGVERIFY))
             n++;
         else if (opcode == OP_CHECKMULTISIG || opcode == OP_CHECKMULTISIGVERIFY)
         {
