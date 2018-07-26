@@ -6,6 +6,9 @@
 #ifndef BITCOIN_QT_CLIENTMODEL_H
 #define BITCOIN_QT_CLIENTMODEL_H
 
+#include "graphene.h"
+#include "thinblock.h"
+
 #include <QDateTime>
 #include <QObject>
 
@@ -94,6 +97,9 @@ private:
     PeerTableModel *peerTableModel;
     BanTableModel *banTableModel;
 
+    ThinBlockQuickStats thinStats;
+    GrapheneQuickStats grapheneStats;
+
     QTimer *pollTimer1;
     QTimer *pollTimer2;
 
@@ -108,6 +114,8 @@ Q_SIGNALS:
     void alertsChanged(const QString &warnings);
     void bytesChanged(quint64 totalBytesIn, quint64 totalBytesOut);
     void transactionsPerSecondChanged(double tansactionsPerSecond); // BU:
+    void thinBlockPropagationStatsChanged(const ThinBlockQuickStats &thin);
+    void grapheneBlockPropagationStatsChanged(const GrapheneQuickStats &graphene);
 
     //! Fired when a message should be reported to the user
     void message(const QString &title, const QString &message, unsigned int style);

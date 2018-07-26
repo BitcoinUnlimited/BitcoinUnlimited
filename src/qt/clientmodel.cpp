@@ -112,6 +112,12 @@ void ClientModel::updateTimer2()
     Q_EMIT orphanPoolSizeChanged(getOrphanPoolSize());
     Q_EMIT bytesChanged(getTotalBytesRecv(), getTotalBytesSent());
 
+    thindata.FillThinBlockQuickStats(thinStats);
+    Q_EMIT thinBlockPropagationStatsChanged(thinStats);
+
+    graphenedata.FillGrapheneQuickStats(grapheneStats);
+    Q_EMIT grapheneBlockPropagationStatsChanged(grapheneStats);
+
     uiInterface.BannedListChanged();
 }
 
