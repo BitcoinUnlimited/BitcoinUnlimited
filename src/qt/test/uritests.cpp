@@ -160,8 +160,8 @@ void URITests::uriTestsCashAddr() {
 namespace {
 class UriTestConfig : public DummyConfig {
 public:
-    UriTestConfig(bool useCashAddr)
-        : useCashAddr(useCashAddr), net(CBaseChainParams::MAIN) {}
+    UriTestConfig(bool _useCashAddr)
+        : useCashAddr(_useCashAddr), net(CBaseChainParams::MAIN) {}
     bool UseCashAddrEncoding() const override { return useCashAddr; }
     const CChainParams &GetChainParams() const override { return Params(net); }
     void SetChainParams(const std::string &n) { net = n; }

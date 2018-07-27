@@ -2088,31 +2088,31 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     {
         if (*it == nullptr)
             continue;
-        CNode &n = **it;
+        CNode &inode = **it;
         UniValue node(UniValue::VOBJ);
-        disconnected += (n.fDisconnect) ? 1 : 0;
+        disconnected += (inode.fDisconnect) ? 1 : 0;
 
-        node.push_back(Pair("vSendMsg", n.vSendMsg.size()));
-        node.push_back(Pair("vRecvGetData", n.vRecvGetData.size()));
-        node.push_back(Pair("vRecvMsg", n.vRecvMsg.size()));
-        if (n.pfilter)
+        node.push_back(Pair("vSendMsg", inode.vSendMsg.size()));
+        node.push_back(Pair("vRecvGetData", inode.vRecvGetData.size()));
+        node.push_back(Pair("vRecvMsg", inode.vRecvMsg.size()));
+        if (inode.pfilter)
         {
-            node.push_back(Pair("pfilter", ::GetSerializeSize(*n.pfilter, SER_NETWORK, PROTOCOL_VERSION)));
+            node.push_back(Pair("pfilter", ::GetSerializeSize(*inode.pfilter, SER_NETWORK, PROTOCOL_VERSION)));
         }
-        if (n.pThinBlockFilter)
+        if (inode.pThinBlockFilter)
         {
             node.push_back(
-                Pair("pThinBlockFilter", ::GetSerializeSize(*n.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION)));
+                Pair("pThinBlockFilter", ::GetSerializeSize(*inode.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION)));
         }
-        node.push_back(Pair("thinblock.vtx", n.thinBlock.vtx.size()));
-        uint64_t thinBlockSize = ::GetSerializeSize(n.thinBlock, SER_NETWORK, PROTOCOL_VERSION);
+        node.push_back(Pair("thinblock.vtx", inode.thinBlock.vtx.size()));
+        uint64_t thinBlockSize = ::GetSerializeSize(inode.thinBlock, SER_NETWORK, PROTOCOL_VERSION);
         totalThinBlockSize += thinBlockSize;
         node.push_back(Pair("thinblock.size", thinBlockSize));
-        node.push_back(Pair("thinBlockHashes", n.thinBlockHashes.size()));
-        node.push_back(Pair("xThinBlockHashes", n.xThinBlockHashes.size()));
-        node.push_back(Pair("vAddrToSend", n.vAddrToSend.size()));
-        node.push_back(Pair("vInventoryToSend", n.vInventoryToSend.size()));
-        ret.push_back(Pair(n.addrName, node));
+        node.push_back(Pair("thinBlockHashes", inode.thinBlockHashes.size()));
+        node.push_back(Pair("xThinBlockHashes", inode.xThinBlockHashes.size()));
+        node.push_back(Pair("vAddrToSend", inode.vAddrToSend.size()));
+        node.push_back(Pair("vInventoryToSend", inode.vInventoryToSend.size()));
+        ret.push_back(Pair(inode.addrName, node));
     }
     ret.push_back(Pair("totalThinBlockSize", totalThinBlockSize));
     ret.push_back(Pair("disconnectedNodes", disconnected));

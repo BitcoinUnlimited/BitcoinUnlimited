@@ -58,8 +58,8 @@ static bool ValidCashaddrInput(const QString &prefix, const QString &input)
     return true;
 }
 
-BitcoinAddressEntryValidator::BitcoinAddressEntryValidator(const std::string &cashaddrprefix, QObject *parent)
-    : QValidator(parent), cashaddrprefix(cashaddrprefix)
+BitcoinAddressEntryValidator::BitcoinAddressEntryValidator(const std::string &_cashaddrprefix, QObject *parent)
+    : QValidator(parent), cashaddrprefix(_cashaddrprefix)
 {
 }
 

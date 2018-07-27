@@ -28,9 +28,9 @@
 #include <QSettings>
 #include <QTextDocument>
 
-SendCoinsDialog::SendCoinsDialog(const PlatformStyle *platformStyle, QWidget *parent)
+SendCoinsDialog::SendCoinsDialog(const PlatformStyle *_platformStyle, QWidget *parent)
     : QDialog(parent), ui(new Ui::SendCoinsDialog), clientModel(0), model(0), fNewRecipientAllowed(true),
-      fFeeMinimized(true), platformStyle(platformStyle)
+      fFeeMinimized(true), platformStyle(_platformStyle)
 {
     ui->setupUi(this);
 

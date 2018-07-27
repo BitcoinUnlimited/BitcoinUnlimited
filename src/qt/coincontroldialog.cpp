@@ -38,8 +38,8 @@ QList<CAmount> CoinControlDialog::payAmounts;
 CCoinControl *CoinControlDialog::coinControl = new CCoinControl();
 bool CoinControlDialog::fSubtractFeeFromAmount = false;
 
-CoinControlDialog::CoinControlDialog(const PlatformStyle *platformStyle, QWidget *parent)
-    : QDialog(parent), ui(new Ui::CoinControlDialog), model(0), platformStyle(platformStyle)
+CoinControlDialog::CoinControlDialog(const PlatformStyle *_platformStyle, QWidget *parent)
+    : QDialog(parent), ui(new Ui::CoinControlDialog), model(0), platformStyle(_platformStyle)
 {
     ui->setupUi(this);
 

@@ -12,8 +12,8 @@
 #include <QDataWidgetMapper>
 #include <QMessageBox>
 
-EditAddressDialog::EditAddressDialog(Mode mode, QWidget *parent)
-    : QDialog(parent), ui(new Ui::EditAddressDialog), mapper(0), mode(mode), model(0)
+EditAddressDialog::EditAddressDialog(Mode _mode, QWidget *parent)
+    : QDialog(parent), ui(new Ui::EditAddressDialog), mapper(0), mode(_mode), model(0)
 {
     ui->setupUi(this);
 

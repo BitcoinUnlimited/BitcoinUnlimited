@@ -28,8 +28,8 @@ class CBlockIndex;
 static const int64_t nClientStartupTime = GetTime();
 static int64_t nLastBlockTipUpdateNotification = 0;
 
-ClientModel::ClientModel(OptionsModel *optionsModel, UnlimitedModel *ul, QObject *parent)
-    : QObject(parent), unlimitedModel(ul), optionsModel(optionsModel), peerTableModel(0), banTableModel(0),
+ClientModel::ClientModel(OptionsModel *_optionsModel, UnlimitedModel *ul, QObject *parent)
+    : QObject(parent), unlimitedModel(ul), optionsModel(_optionsModel), peerTableModel(0), banTableModel(0),
       pollTimer1(0), pollTimer2(0)
 {
     peerTableModel = new PeerTableModel(this);

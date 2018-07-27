@@ -1600,6 +1600,7 @@ static void DNSAddressSeed()
     LOGA("%d addresses found from DNS seeds\n", found);
 }
 
+#if 0
 // BITCOINUNLIMITED START
 static void BitnodesAddressSeed()
 {
@@ -1640,6 +1641,7 @@ static void BitnodesAddressSeed()
     LOGA("%d addresses found from Bitnodes API\n", vAdd.size());
 }
 // BITCOINUNLIMITED END
+#endif
 
 void ThreadAddressSeeding()
 {

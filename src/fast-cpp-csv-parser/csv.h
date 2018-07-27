@@ -73,8 +73,8 @@ namespace io{
                                 std::memset(file_name, 0, max_file_name_length+1);
                         }
                        
-                        void set_file_name(const char*file_name){
-                                std::strncpy(this->file_name, file_name, max_file_name_length);
+                        void set_file_name(const char* _file_name){
+                                std::strncpy(this->file_name, _file_name, max_file_name_length);
                                 this->file_name[max_file_name_length] = '\0';
                         }
 
@@ -86,8 +86,8 @@ namespace io{
                                 file_line = -1;
                         }
                        
-                        void set_file_line(int file_line){
-                                this->file_line = file_line;
+                        void set_file_line(int _file_line){
+                                this->file_line = _file_line;
                         }
 
                         int file_line;
@@ -98,8 +98,8 @@ namespace io{
                                 errno_value = 0;
                         }
                        
-                        void set_errno(int errno_value){
-                                this->errno_value = errno_value;
+                        void set_errno(int _errno_value){
+                                this->errno_value = _errno_value;
                         }
 
                         int errno_value;
@@ -143,7 +143,7 @@ namespace io{
 
                 class OwningStdIOByteSourceBase : public ByteSourceBase{
                 public:
-                        explicit OwningStdIOByteSourceBase(FILE*file):file(file){
+                        explicit OwningStdIOByteSourceBase(FILE* _file):file(_file){
                                 // Tell the std library that we want to do the buffering ourself.
                                 std::setvbuf(file, 0, _IONBF, 0);
                         }
@@ -162,7 +162,7 @@ namespace io{
 
                 class NonOwningIStreamByteSource : public ByteSourceBase{
                 public:
-                        explicit NonOwningIStreamByteSource(std::istream&in):in(in){}
+                        explicit NonOwningIStreamByteSource(std::istream& _in):in(_in){}
 
                         int read(char*buffer, int size){
                                 in.read(buffer, size);
@@ -177,7 +177,7 @@ namespace io{
 
                 class NonOwningStringByteSource : public ByteSourceBase{
                 public:
-                        NonOwningStringByteSource(const char*str, long long size):str(str), remaining_byte_count(size){}
+                        NonOwningStringByteSource(const char* _str, long long size):str(_str), remaining_byte_count(size){}
 
                         int read(char*buffer, int desired_byte_count){
                                 int to_copy_byte_count = desired_byte_count;
@@ -206,7 +206,7 @@ namespace io{
                                 termination_requested = false;
                                 worker = std::thread(
                                         [&]{
-                                                std::unique_lock<std::mutex>guard(lock);
+                                                std::unique_lock<std::mutex>guard2(lock);
                                                 try{
                                                         for(;;){
                                                                 read_requested_condition.wait(
@@ -362,62 +362,62 @@ namespace io{
                 LineReader(const LineReader&) = delete;
                 LineReader&operator=(const LineReader&) = delete;
 
-                explicit LineReader(const char*file_name){
-                        set_file_name(file_name);
-                        init(open_file(file_name));
+                explicit LineReader(const char*_file_name){
+                        set_file_name(_file_name);
+                        init(open_file(_file_name));
                 }
 
-                explicit LineReader(const std::string&file_name){
-                        set_file_name(file_name.c_str());
-                        init(open_file(file_name.c_str()));
+                explicit LineReader(const std::string&_file_name){
+                        set_file_name(_file_name.c_str());
+                        init(open_file(_file_name.c_str()));
                 }
 
-                LineReader(const char*file_name, std::unique_ptr<ByteSourceBase>byte_source){
-                        set_file_name(file_name);
+                LineReader(const char*_file_name, std::unique_ptr<ByteSourceBase>byte_source){
+                        set_file_name(_file_name);
                         init(std::move(byte_source));
                 }
 
-                LineReader(const std::string&file_name, std::unique_ptr<ByteSourceBase>byte_source){
-                        set_file_name(file_name.c_str());
+                LineReader(const std::string&_file_name, std::unique_ptr<ByteSourceBase>byte_source){
+                        set_file_name(_file_name.c_str());
                         init(std::move(byte_source));
                 }
 
-                LineReader(const char*file_name, const char*data_begin, const char*data_end){
-                        set_file_name(file_name);
-                        init(std::unique_ptr<ByteSourceBase>(new detail::NonOwningStringByteSource(data_begin, data_end-data_begin)));
+                LineReader(const char*_file_name, const char*_data_begin, const char*_data_end){
+                        set_file_name(_file_name);
+                        init(std::unique_ptr<ByteSourceBase>(new detail::NonOwningStringByteSource(_data_begin, _data_end-_data_begin)));
                 }
 
-                LineReader(const std::string&file_name, const char*data_begin, const char*data_end){
-                        set_file_name(file_name.c_str());
-                        init(std::unique_ptr<ByteSourceBase>(new detail::NonOwningStringByteSource(data_begin, data_end-data_begin)));
+                LineReader(const std::string&_file_name, const char*_data_begin, const char*_data_end){
+                        set_file_name(_file_name.c_str());
+                        init(std::unique_ptr<ByteSourceBase>(new detail::NonOwningStringByteSource(_data_begin, _data_end-_data_begin)));
                 }
 
-                LineReader(const char*file_name, FILE*file){
-                        set_file_name(file_name);
+                LineReader(const char*_file_name, FILE*file){
+                        set_file_name(_file_name);
                         init(std::unique_ptr<ByteSourceBase>(new detail::OwningStdIOByteSourceBase(file)));
                 }
 
-                LineReader(const std::string&file_name, FILE*file){
-                        set_file_name(file_name.c_str());
+                LineReader(const std::string&_file_name, FILE*file){
+                        set_file_name(_file_name.c_str());
                         init(std::unique_ptr<ByteSourceBase>(new detail::OwningStdIOByteSourceBase(file)));
                 }
 
-                LineReader(const char*file_name, std::istream&in){
-                        set_file_name(file_name);
+                LineReader(const char*_file_name, std::istream&in){
+                        set_file_name(_file_name);
                         init(std::unique_ptr<ByteSourceBase>(new detail::NonOwningIStreamByteSource(in)));
                 }
 
-                LineReader(const std::string&file_name, std::istream&in){
-                        set_file_name(file_name.c_str());
+                LineReader(const std::string&_file_name, std::istream&in){
+                        set_file_name(_file_name.c_str());
                         init(std::unique_ptr<ByteSourceBase>(new detail::NonOwningIStreamByteSource(in)));
                 }
 
-                void set_file_name(const std::string&file_name){
-                        set_file_name(file_name.c_str());
+                void set_file_name(const std::string&_file_name){
+                        set_file_name(_file_name.c_str());
                 }
 
-                void set_file_name(const char*file_name){
-                        strncpy(this->file_name, file_name, error::max_file_name_length);
+                void set_file_name(const char*_file_name){
+                        strncpy(this->file_name, _file_name, error::max_file_name_length);
                         this->file_name[error::max_file_name_length] = '\0';
                 }
 
@@ -425,8 +425,8 @@ namespace io{
                         return file_name;
                 }
 
-                void set_file_line(unsigned file_line){
-                        this->file_line = file_line;
+                void set_file_line(unsigned _file_line){
+                        this->file_line = _file_line;
                 }
 
                 unsigned get_file_line()const{
@@ -497,8 +497,8 @@ namespace io{
                                 std::memset(column_name, 0, max_column_name_length+1);
                         }
                        
-                        void set_column_name(const char*column_name){
-                                std::strncpy(this->column_name, column_name, max_column_name_length);
+                        void set_column_name(const char*_column_name){
+                                std::strncpy(this->column_name, _column_name, max_column_name_length);
                                 this->column_name[max_column_name_length] = '\0';
                         }
 
@@ -513,8 +513,8 @@ namespace io{
                                 std::memset(column_content, 0, max_column_content_length+1);
                         }
                        
-                        void set_column_content(const char*column_content){
-                                std::strncpy(this->column_content, column_content, max_column_content_length);
+                        void set_column_content(const char*_column_content){
+                                std::strncpy(this->column_content, _column_content, max_column_content_length);
                                 this->column_content[max_column_content_length] = '\0';
                         }
 

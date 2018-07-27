@@ -22,7 +22,7 @@
 
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
 
-CMemPoolInfo::CMemPoolInfo(uint64_t nTx) { this->nTx = nTx; }
+CMemPoolInfo::CMemPoolInfo(uint64_t _nTx):nTx(_nTx) { }
 CMemPoolInfo::CMemPoolInfo() { this->nTx = 0; }
 CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx)
 {
@@ -113,7 +113,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // it. In that case, the number of missing txs returned will be fewer than the number
     // needed. Because the graphene block will be incomplete without the missing txs, we
     // request a failover block instead.
-    if (grapheneBlockTx.vMissingTx.size() < pfrom->grapheneBlockWaitingForTxns)
+    if ((int) grapheneBlockTx.vMissingTx.size() < pfrom->grapheneBlockWaitingForTxns)
     {
         graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
 
@@ -179,7 +179,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     else
     {
         // We have all the transactions now that are in this block: try to reassemble and process.
-        CInv inv(CInv(MSG_BLOCK, grapheneBlockTx.blockhash));
+        CInv inv2(MSG_BLOCK, grapheneBlockTx.blockhash);
 
         // for compression statistics, we have to add up the size of grapheneblock and the re-requested grapheneBlockTx.
         int nSizeGrapheneBlockTx = msgSize;
@@ -195,7 +195,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         graphenedata.UpdateInBound(nSizeGrapheneBlockTx + pfrom->nSizeGrapheneBlock, blockSize);
         LOG(GRAPHENE, "Graphene block stats: %s\n", graphenedata.ToString());
 
-        PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->grapheneBlock), inv);
+        PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->grapheneBlock), inv2);
     }
 
     return true;

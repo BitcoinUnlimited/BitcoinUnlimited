@@ -91,8 +91,8 @@ void QRImageWidget::contextMenuEvent(QContextMenuEvent *event)
     contextMenu->exec(event->globalPos());
 }
 
-ReceiveRequestDialog::ReceiveRequestDialog(const Config *cfg, QWidget *parent)
-    : QDialog(parent), ui(new Ui::ReceiveRequestDialog), model(0), cfg(cfg)
+ReceiveRequestDialog::ReceiveRequestDialog(const Config *_cfg, QWidget *parent)
+    : QDialog(parent), ui(new Ui::ReceiveRequestDialog), model(0), cfg(_cfg)
 {
     ui->setupUi(this);
 
