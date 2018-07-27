@@ -107,8 +107,7 @@ bool UndoReadFromDB(CBlockUndo &blockundo, const CBlockIndex *pindex)
 
 uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
 {
-    LOG(PRUNE, "We have data for %u indexes \n", vDbBlockSizes.size());
-    uint64_t prunedCount;
+    uint64_t prunedCount = 0;
     CDBBatch blockBatch(*pblockdb);
     CDBBatch undoBatch(*pblockundodb);
     while (!vDbBlockSizes.empty() && nDBUsedSpace >= nPruneTarget)
@@ -132,9 +131,9 @@ uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
     }
     pblockdb->WriteBatch(blockBatch, true);
     pblockundodb->WriteBatch(undoBatch, true);
-    // must use NULL here, cannot use nullptr
-    pblockdb->CompactRange(NULL, NULL);
-    LOG(PRUNE, "DONE WITH DB PRUNING (%u blocks pruned, size on disk %u, data for %u indexes) \n", prunedCount,
-        nDBUsedSpace, vDbBlockSizes.size());
+    pblockdb->Compact();
+    pblockundodb->Compact();
+    LOG(PRUNE, "Pruned %u blocks, size on disk %u, data for %u indexes\n", prunedCount, nDBUsedSpace,
+        vDbBlockSizes.size());
     return prunedCount;
 }

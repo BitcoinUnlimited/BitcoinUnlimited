@@ -363,6 +363,21 @@ public:
         pdb->CompactRange(&slKey1, &slKey2);
     }
 
+    /**
+     * Compact the entire database.
+     */
+    void Compact() const
+    {
+        // workaround for google/leveldb#227
+        // NULL batch means just wait for earlier writes to be done
+        leveldb::WriteBatch b;
+        pdb->Write(writeoptions, &b);
+        pdb->CompactRange(NULL, NULL);
+    }
+
+    /**
+     * Return the size of all write buffers.
+     */
     size_t TotalWriteBufferSize() const
     {
         // There can be up to two write buffers so return the total
