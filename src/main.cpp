@@ -5333,8 +5333,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         uint64_t nNonce = 1;
         vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
 
-        CheckNodeSupportForThinBlocks(); // BUIP010 Xtreme Thinblocks
-
         if (pfrom->nVersion < MIN_PEER_PROTO_VERSION)
         {
             // ban peers older than this proto version

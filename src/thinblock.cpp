@@ -1299,7 +1299,7 @@ std::string CThinBlockData::FullTxToString()
 bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
 {
     // Base time used to calculate the random timeout value.
-    static int64_t nTimeToWait = 10000;
+    static uint64_t nTimeToWait = 10000;
 
     LOCK(cs_mapThinBlockTimer);
     if (!mapThinBlockTimer.count(hash))
@@ -1414,60 +1414,6 @@ void CThinBlockData::DeleteThinBlockBytes(uint64_t bytes, CNode *pfrom)
 
 void CThinBlockData::ResetThinBlockBytes() { nThinBlockBytes.store(0); }
 uint64_t CThinBlockData::GetThinBlockBytes() { return nThinBlockBytes.load(); }
-bool HaveConnectThinblockNodes()
-{
-    // Strip the port from then list of all the current in and outbound ip addresses
-    std::vector<std::string> vNodesIP;
-    {
-        LOCK(cs_vNodes);
-        for (CNode *pnode : vNodes)
-        {
-            int pos = pnode->addrName.rfind(":");
-            if (pos <= 0)
-                vNodesIP.push_back(pnode->addrName);
-            else
-                vNodesIP.push_back(pnode->addrName.substr(0, pos));
-        }
-    }
-
-    // Create a set used to check for cross connected nodes.
-    // A cross connected node is one where we have a connect-thinblock connection to
-    // but we also have another inbound connection which is also using
-    // connect-thinblock. In those cases we have created a dead-lock where no blocks
-    // can be downloaded unless we also have at least one additional connect-thinblock
-    // connection to a different node.
-    std::set<std::string> nNotCrossConnected;
-
-    int nConnectionsOpen = 0;
-    for (const std::string &strAddrNode : mapMultiArgs["-connect-thinblock"])
-    {
-        std::string strThinblockNode;
-        int pos = strAddrNode.rfind(":");
-        if (pos <= 0)
-            strThinblockNode = strAddrNode;
-        else
-            strThinblockNode = strAddrNode.substr(0, pos);
-        for (std::string &strAddr : vNodesIP)
-        {
-            if (strAddr == strThinblockNode)
-            {
-                nConnectionsOpen++;
-                if (!nNotCrossConnected.count(strAddr))
-                    nNotCrossConnected.insert(strAddr);
-                else
-                    nNotCrossConnected.erase(strAddr);
-            }
-        }
-    }
-    if (nNotCrossConnected.size() > 0)
-        return true;
-    else if (nConnectionsOpen > 0)
-        LOG(THIN,
-            "You have a cross connected thinblock node - we may download regular blocks until you resolve the issue\n");
-    return false; // Connections are either not open or they are cross connected.
-}
-
-
 bool HaveThinblockNodes()
 {
     {
@@ -1482,59 +1428,10 @@ bool HaveThinblockNodes()
 bool IsThinBlocksEnabled() { return GetBoolArg("-use-thinblocks", true); }
 bool CanThinBlockBeDownloaded(CNode *pto)
 {
-    if (pto->ThinBlockCapable() && !GetBoolArg("-connect-thinblock-force", false))
+    if (pto->ThinBlockCapable())
         return true;
-    else if (pto->ThinBlockCapable() && GetBoolArg("-connect-thinblock-force", false))
-    {
-        // If connect-thinblock-force is true then we have to check that this node is in fact a connect-thinblock node.
 
-        // When -connect-thinblock-force is true we will only download thinblocks from a peer or peers that
-        // are using -connect-thinblock=<ip>.  This is an undocumented setting used for setting up performance testing
-        // of thinblocks, such as, going over the GFC and needing to have thinblocks always come from the same peer or
-        // group of peers.  Also, this is a one way street.  Thinblocks will flow ONLY from the remote peer to the peer
-        // that has invoked -connect-thinblock.
-
-        // Check if this node is also a connect-thinblock node
-        for (const std::string &strAddrNode : mapMultiArgs["-connect-thinblock"])
-            if (pto->addrName == strAddrNode)
-                return true;
-    }
     return false;
-}
-
-void ConnectToThinBlockNodes()
-{
-    // Connect to specific addresses
-    if (mapArgs.count("-connect-thinblock") && mapMultiArgs["-connect-thinblock"].size() > 0)
-    {
-        for (const std::string &strAddr : mapMultiArgs["-connect-thinblock"])
-        {
-            CAddress addr;
-            // NOTE: Because the only nodes we are connecting to here are the ones the user put in their
-            //      bitcoin.conf/commandline args as "-connect-thinblock", we don't use the semaphore to limit outbound
-            //      connections
-            OpenNetworkConnection(addr, false, nullptr, strAddr.c_str());
-            MilliSleep(500);
-        }
-    }
-}
-
-void CheckNodeSupportForThinBlocks()
-{
-    if (IsThinBlocksEnabled())
-    {
-        // Check that a nodes pointed to with connect-thinblock actually supports thinblocks
-        for (std::string &strAddr : mapMultiArgs["-connect-thinblock"])
-        {
-            CNodeRef node = FindNodeRef(strAddr);
-            if (node && !node->ThinBlockCapable())
-            {
-                LOGA("ERROR: You are trying to use connect-thinblocks but to a node that does not support it "
-                     "- Protocol Version: %d peer=%s\n",
-                    node->nVersion, node->GetLogName());
-            }
-        }
-    }
 }
 
 bool ClearLargestThinBlockAndDisconnect(CNode *pfrom)

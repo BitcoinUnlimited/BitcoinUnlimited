@@ -241,12 +241,9 @@ public:
 extern CThinBlockData thindata; // Singleton class
 
 
-bool HaveConnectThinblockNodes();
 bool HaveThinblockNodes();
 bool IsThinBlocksEnabled();
 bool CanThinBlockBeDownloaded(CNode *pto);
-void ConnectToThinBlockNodes();
-void CheckNodeSupportForThinBlocks();
 bool ClearLargestThinBlockAndDisconnect(CNode *pfrom);
 void ClearThinBlockInFlight(CNode *pfrom, const uint256 &hash);
 void AddThinBlockInFlight(CNode *pfrom, const uint256 &hash);
