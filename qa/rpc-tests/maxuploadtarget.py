@@ -195,6 +195,12 @@ class MaxUploadTest(BitcoinTestFramework):
 
         # Test logic begins here
 
+        # Must reset these settings because since the May152018 hardfork the minimum EB is set to 32MB on startup,
+        # but in order for this test to run properly and in a reasonable amount of time we set these values back
+        # to something smaller.
+        self.nodes[0].setminingmaxblock(self.blockmaxsize);
+        self.nodes[0].setexcessiveblock(EXCESSIVE_BLOCKSIZE, 1)
+
         # Now mine a big block
         self.mine_big_block(self.nodes[0], self.nodes[0].getnewaddress())
 
