@@ -10,6 +10,14 @@
 #include <cmath>
 #include <iostream>
 
+// Create a deterministic hash by providing an index
+uint256 GetHash(unsigned int nIndex)
+{
+    std::stringstream ss;
+    ss << std::setfill('0') << std::setw(32) << nIndex;
+    return uint256S(ss.str());
+}
+
 BOOST_FIXTURE_TEST_SUITE(graphene_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(graphene_set_encodes_and_decodes)
@@ -54,16 +62,17 @@ BOOST_AUTO_TEST_CASE(graphene_set_encodes_and_decodes)
 
 BOOST_AUTO_TEST_CASE(graphene_set_decodes_multiple_sizes)
 {
-    int SEED = 13;
     size_t nItemList[] = {1, 10, 50, 500, 5000, 10000};
+    int nNumHashes = 0;
     for (size_t nItems : nItemList)
     {
         std::vector<uint256> senderItems;
         std::vector<uint64_t> senderCheapHashes;
         std::vector<uint256> baseReceiverItems;
-        for (size_t i=1;i <= nItems;i++)
+        for (size_t i = 1; i <= nItems; i++)
         {
-            auto hash = SerializeHash(i-SEED);
+            nNumHashes++;
+            const uint256 &hash = GetHash(nNumHashes);
             senderItems.push_back(hash);
             senderCheapHashes.push_back(hash.GetCheapHash());
             baseReceiverItems.push_back(hash);
@@ -72,8 +81,11 @@ BOOST_AUTO_TEST_CASE(graphene_set_decodes_multiple_sizes)
         // Add 10 more items to receiver mempool
         {
             std::vector<uint256> receiverItems = baseReceiverItems;
-            for (size_t j=1;j < 11;j++)
-                receiverItems.push_back(SerializeHash(nItems+j+SEED));
+            for (size_t j = 1; j < 11; j++)
+            {
+                nNumHashes++;
+                receiverItems.push_back(SerializeHash(GetHash(nNumHashes)));
+            }
 
             CGrapheneSet senderGrapheneSet(receiverItems.size(), senderItems, true, true);
             std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
@@ -85,8 +97,11 @@ BOOST_AUTO_TEST_CASE(graphene_set_decodes_multiple_sizes)
         // Add 100 more items to receiver mempool
         {
             std::vector<uint256> receiverItems = baseReceiverItems;
-            for (size_t j=1;j < 101;j++)
-                receiverItems.push_back(SerializeHash(nItems+j+SEED));
+            for (size_t j = 1; j < 101; j++)
+            {
+                nNumHashes++;
+                receiverItems.push_back(SerializeHash(GetHash(nNumHashes)));
+            }
 
             CGrapheneSet senderGrapheneSet(receiverItems.size(), senderItems, true, true);
             std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
