@@ -263,6 +263,10 @@ CTweak<uint64_t> checkScriptDays("blockchain.checkScriptDays",
     "The number of days in the past we check scripts during initial block download.",
     DEFAULT_CHECKPOINT_DAYS);
 
+/** Dust Threshold (in satoshis) defines the minimum quantity an output may contain for the
+    transaction to be considered standard, and therefore relayable.
+ */
+CTweak<unsigned int> nDustThreshold("net.dustThreshold", "Dust Threshold (in satoshis).", DEFAULT_DUST_THRESHOLD);
 
 CRequestManager requester; // after the maps nodes and tweaks
 

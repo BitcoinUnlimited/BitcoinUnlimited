@@ -555,6 +555,10 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
         .addArg("datacarriersize=<n>", requiredInt,
             strprintf(_("Maximum size of data in data carrier transactions we relay and mine (default: %u)"),
                     MAX_OP_RETURN_RELAY))
+        .addArg("dustthreshold=<amt>", requiredAmount,
+            strprintf(_("Dust Threshold (in satoshis) defines the minimum quantity an output may contain for the "
+                        "transaction to be considered standard, and therefore relayable. (default: %s)"),
+                    DEFAULT_DUST_THRESHOLD))
         .addArg("excessiveacceptdepth=<n>", requiredInt,
             strprintf(_("Excessive blocks are accepted if this many blocks are mined on top of them (default: %u)"),
                     DEFAULT_EXCESSIVE_ACCEPT_DEPTH))

@@ -36,7 +36,6 @@ using namespace std;
 // In script_tests.cpp
 extern UniValue read_json(const std::string &jsondata);
 
-
 BOOST_FIXTURE_TEST_SUITE(transaction_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(tx_valid)
@@ -335,27 +334,24 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     string reason;
     BOOST_CHECK(IsStandardTx(t, reason));
 
-    // Check dust with default relay fee:
-    minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
-    CAmount nDustThreshold = 182 * minRelayTxFee.GetFeePerK() / 1000 * 3;
-    BOOST_CHECK_EQUAL(nDustThreshold, 546);
+    // Check dust with default threshold:
+    nDustThreshold.value = DEFAULT_DUST_THRESHOLD;
     // dust:
-    t.vout[0].nValue = nDustThreshold - 1;
+    t.vout[0].nValue = nDustThreshold.value - 1;
     BOOST_CHECK(!IsStandardTx(t, reason));
     // not dust:
-    t.vout[0].nValue = nDustThreshold;
+    t.vout[0].nValue = nDustThreshold.value;
     BOOST_CHECK(IsStandardTx(t, reason));
 
-    // Check dust with odd relay fee to verify rounding:
-    // nDustThreshold = 182 * 1234 / 1000 * 3
-    minRelayTxFee = CFeeRate(1234);
+    // Check dust with odd threshold
+    nDustThreshold.value = 1234;
     // dust:
-    t.vout[0].nValue = 672 - 1;
+    t.vout[0].nValue = 1234 - 1;
     BOOST_CHECK(!IsStandardTx(t, reason));
     // not dust:
-    t.vout[0].nValue = 672;
+    t.vout[0].nValue = 1234;
     BOOST_CHECK(IsStandardTx(t, reason));
-    minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
+    nDustThreshold.value = DEFAULT_DUST_THRESHOLD;
 
     t.vout[0].scriptPubKey = CScript() << OP_1;
     BOOST_CHECK(!IsStandardTx(t, reason));
