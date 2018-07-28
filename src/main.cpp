@@ -855,8 +855,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             minRelayTxFee = CFeeRate(nMinRelay * 1000);
             LOG(MEMPOOL, "MempoolBytes:%d  LimitFreeRelay:%.5g  nMinRelay:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d  "
                          "TxFees:%d\n",
-                poolBytes, nFreeLimit, ((double)::minRelayTxFee.GetFee(nSize)) / nSize, ((double)nFees) / nSize, nSize,
-                nFees);
+                poolBytes, nFreeLimit, nMinRelay, ((double)nFees) / nSize, nSize, nFees);
             if (fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize))
             {
                 static double dFreeCount = 0;
