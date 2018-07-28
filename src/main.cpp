@@ -795,88 +795,90 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
         static CCriticalSection cs_limiter;
         {
-        LOCK(cs_limiter);
+            LOCK(cs_limiter);
 
-        // If the tweak values have changed then use them.
-        if (dMinLimiterTxFee.value != _dMinLimiterTxFee)
-        {
-            _dMinLimiterTxFee = dMinLimiterTxFee.value;
-            nMinRelay = _dMinLimiterTxFee;
-        }
-        if (dMaxLimiterTxFee.value != _dMaxLimiterTxFee)
-        {
-            _dMaxLimiterTxFee = dMaxLimiterTxFee.value;
-        }
-
-        // Limit check. Make sure minlimterfee is not > maxlimiterfee
-        if (_dMinLimiterTxFee > _dMaxLimiterTxFee)
-        {
-            dMaxLimiterTxFee.value = dMinLimiterTxFee.value;
-            _dMaxLimiterTxFee = _dMinLimiterTxFee;
-        }
-
-        // When the mempool starts falling use an exponentially decaying ~24 hour window:
-        // nFreeLimit = nFreeLimit + ((double)(DEFAULT_LIMIT_FREE_RELAY - nFreeLimit) / pow(1.0 - 1.0/86400,
-        // (double)(nNow - nLastTime)));
-        nFreeLimit /= std::pow(1.0 - 1.0 / 86400, (double)(nNow - nLastTime));
-
-        // When the mempool starts falling use an exponentially decaying ~24 hour window:
-        nMinRelay *= std::pow(1.0 - 1.0 / 86400, (double)(nNow - nLastTime));
-
-        uint64_t nLargestBlockSeen = LargestBlockSeen();
-
-        if (poolBytes < nLargestBlockSeen)
-        {
-            nMinRelay = std::max(nMinRelay, _dMinLimiterTxFee);
-            nFreeLimit = std::min(nFreeLimit, (double)nLimitFreeRelay);
-        }
-        else if (poolBytes < (nLargestBlockSeen * MAX_BLOCK_SIZE_MULTIPLIER))
-        {
-            // Gradually choke off what is considered a free transaction
-            nMinRelay = std::max(nMinRelay,
-                _dMinLimiterTxFee + ((_dMaxLimiterTxFee - _dMinLimiterTxFee) * (poolBytes - nLargestBlockSeen) /
-                                        (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1))));
-
-            // Gradually choke off the nFreeLimit as well but leave at least DEFAULT_MIN_LIMITFREERELAY
-            // So that some free transactions can still get through
-            nFreeLimit = std::min(
-                nFreeLimit, ((double)nLimitFreeRelay - ((double)(nLimitFreeRelay - DEFAULT_MIN_LIMITFREERELAY) *
-                                                           (double)(poolBytes - nLargestBlockSeen) /
-                                                           (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1)))));
-            if (nFreeLimit < DEFAULT_MIN_LIMITFREERELAY)
-                nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
-        }
-        else
-        {
-            nMinRelay = _dMaxLimiterTxFee;
-            nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
-        }
-
-        minRelayTxFee = CFeeRate(nMinRelay * 1000);
-        LOG(MEMPOOL,
-            "MempoolBytes:%d  LimitFreeRelay:%.5g  nMinRelay:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d  TxFees:%d\n",
-            poolBytes, nFreeLimit, ((double)::minRelayTxFee.GetFee(nSize)) / nSize, ((double)nFees) / nSize, nSize,
-            nFees);
-        if (fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize))
-        {
-            static double dFreeCount = 0;
-
-            // Use an exponentially decaying ~10-minute window:
-            dFreeCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - nLastTime));
-            nLastTime = nNow;
-
-            // -limitfreerelay unit is thousand-bytes-per-minute
-            // At default rate it would take over a month to fill 1GB
-            LOG(MEMPOOL, "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount + nSize);
-            if ((dFreeCount + nSize) >= (nFreeLimit * 10 * 1000 * nLargestBlockSeen / BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
+            // If the tweak values have changed then use them.
+            if (dMinLimiterTxFee.value != _dMinLimiterTxFee)
             {
-                thindata.UpdateMempoolLimiterBytesSaved(nSize);
-                LOG(MEMPOOL, "AcceptToMemoryPool : free transaction %s rejected by rate limiter\n", hash.ToString());
-                return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "rate limited free transaction");
+                _dMinLimiterTxFee = dMinLimiterTxFee.value;
+                nMinRelay = _dMinLimiterTxFee;
             }
-            dFreeCount += nSize;
-        }
-        nLastTime = nNow;
+            if (dMaxLimiterTxFee.value != _dMaxLimiterTxFee)
+            {
+                _dMaxLimiterTxFee = dMaxLimiterTxFee.value;
+            }
+
+            // Limit check. Make sure minlimterfee is not > maxlimiterfee
+            if (_dMinLimiterTxFee > _dMaxLimiterTxFee)
+            {
+                dMaxLimiterTxFee.value = dMinLimiterTxFee.value;
+                _dMaxLimiterTxFee = _dMinLimiterTxFee;
+            }
+
+            // When the mempool starts falling use an exponentially decaying ~24 hour window:
+            // nFreeLimit = nFreeLimit + ((double)(DEFAULT_LIMIT_FREE_RELAY - nFreeLimit) / pow(1.0 - 1.0/86400,
+            // (double)(nNow - nLastTime)));
+            nFreeLimit /= std::pow(1.0 - 1.0 / 86400, (double)(nNow - nLastTime));
+
+            // When the mempool starts falling use an exponentially decaying ~24 hour window:
+            nMinRelay *= std::pow(1.0 - 1.0 / 86400, (double)(nNow - nLastTime));
+
+            uint64_t nLargestBlockSeen = LargestBlockSeen();
+
+            if (poolBytes < nLargestBlockSeen)
+            {
+                nMinRelay = std::max(nMinRelay, _dMinLimiterTxFee);
+                nFreeLimit = std::min(nFreeLimit, (double)nLimitFreeRelay);
+            }
+            else if (poolBytes < (nLargestBlockSeen * MAX_BLOCK_SIZE_MULTIPLIER))
+            {
+                // Gradually choke off what is considered a free transaction
+                nMinRelay = std::max(nMinRelay,
+                    _dMinLimiterTxFee + ((_dMaxLimiterTxFee - _dMinLimiterTxFee) * (poolBytes - nLargestBlockSeen) /
+                                            (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1))));
+
+                // Gradually choke off the nFreeLimit as well but leave at least DEFAULT_MIN_LIMITFREERELAY
+                // So that some free transactions can still get through
+                nFreeLimit = std::min(
+                    nFreeLimit, ((double)nLimitFreeRelay - ((double)(nLimitFreeRelay - DEFAULT_MIN_LIMITFREERELAY) *
+                                                               (double)(poolBytes - nLargestBlockSeen) /
+                                                               (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1)))));
+                if (nFreeLimit < DEFAULT_MIN_LIMITFREERELAY)
+                    nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
+            }
+            else
+            {
+                nMinRelay = _dMaxLimiterTxFee;
+                nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
+            }
+
+            minRelayTxFee = CFeeRate(nMinRelay * 1000);
+            LOG(MEMPOOL, "MempoolBytes:%d  LimitFreeRelay:%.5g  nMinRelay:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d  "
+                         "TxFees:%d\n",
+                poolBytes, nFreeLimit, ((double)::minRelayTxFee.GetFee(nSize)) / nSize, ((double)nFees) / nSize, nSize,
+                nFees);
+            if (fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize))
+            {
+                static double dFreeCount = 0;
+
+                // Use an exponentially decaying ~10-minute window:
+                dFreeCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - nLastTime));
+                nLastTime = nNow;
+
+                // -limitfreerelay unit is thousand-bytes-per-minute
+                // At default rate it would take over a month to fill 1GB
+                LOG(MEMPOOL, "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount + nSize);
+                if ((dFreeCount + nSize) >=
+                    (nFreeLimit * 10 * 1000 * nLargestBlockSeen / BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
+                {
+                    thindata.UpdateMempoolLimiterBytesSaved(nSize);
+                    LOG(MEMPOOL, "AcceptToMemoryPool : free transaction %s rejected by rate limiter\n",
+                        hash.ToString());
+                    return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "rate limited free transaction");
+                }
+                dFreeCount += nSize;
+            }
+            nLastTime = nNow;
         }
         // BU - Xtreme Thinblocks Auto Mempool Limiter - end section
 
