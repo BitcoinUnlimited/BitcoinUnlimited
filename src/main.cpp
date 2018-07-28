@@ -776,12 +776,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
          * This mitigates 'penny-flooding' -- sending thousands of free transactions just to
          * be annoying or make others' transactions take longer to confirm. */
         // maximum feeCutoff in satoshi per byte
-        static std::string default_maxlimitertxfee = std::to_string((double)DEFAULT_MAXLIMITERTXFEE / 1000);
-        static const double dMaxLimiterTxFee =
-            boost::lexical_cast<double>(GetArg("-maxlimitertxfee", default_maxlimitertxfee.c_str()));
-        // starting value for feeCutoff in satoshi per byte
-        static const double dMinLimiterTxFee =
-            boost::lexical_cast<double>(GetArg("-minlimitertxfee", DEFAULT_MINLIMITERTXFEE));
         static const int nLimitFreeRelay = GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY);
 
         // get current memory pool size
@@ -791,10 +785,31 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         //   When the feeCutoff is larger than the satoshiPerByte of the
         //   current transaction then spam blocking will be in effect. However
         //   Some free transactions will still get through based on -limitfreerelay
-        static double feeCutoff = dMinLimiterTxFee;
+        static double feeCutoff = dMinLimiterTxFee.value;
         static double nFreeLimit = nLimitFreeRelay;
         static int64_t nLastTime = GetTime();
         int64_t nNow = GetTime();
+
+        static double _dMinLimiterTxFee = dMinLimiterTxFee.value;
+        static double _dMaxLimiterTxFee = dMaxLimiterTxFee.value;
+
+        // If the tweak values have changed then use them.
+        if (dMinLimiterTxFee.value != _dMinLimiterTxFee)
+        {
+            _dMinLimiterTxFee = dMinLimiterTxFee.value;
+            feeCutoff = _dMinLimiterTxFee;
+        }
+        if (dMaxLimiterTxFee.value != _dMaxLimiterTxFee)
+        {
+            _dMaxLimiterTxFee = dMaxLimiterTxFee.value;
+        }
+
+        // Limit check. Make sure minlimterfee is not > maxlimiterfee
+        if (_dMinLimiterTxFee > _dMaxLimiterTxFee)
+        {
+            dMaxLimiterTxFee.value = dMinLimiterTxFee.value;
+            _dMaxLimiterTxFee = _dMinLimiterTxFee;
+        }
 
         // When the mempool starts falling use an exponentially decaying ~24 hour window:
         // nFreeLimit = nFreeLimit + ((double)(DEFAULT_LIMIT_FREE_RELAY - nFreeLimit) / pow(1.0 - 1.0/86400,
@@ -808,15 +823,15 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
         if (poolBytes < nLargestBlockSeen)
         {
-            feeCutoff = std::max(feeCutoff, dMinLimiterTxFee);
+            feeCutoff = std::max(feeCutoff, _dMinLimiterTxFee);
             nFreeLimit = std::min(nFreeLimit, (double)nLimitFreeRelay);
         }
         else if (poolBytes < (nLargestBlockSeen * MAX_BLOCK_SIZE_MULTIPLIER))
         {
             // Gradually choke off what is considered a free transaction
-            feeCutoff = std::max(
-                feeCutoff, dMinLimiterTxFee + ((dMaxLimiterTxFee - dMinLimiterTxFee) * (poolBytes - nLargestBlockSeen) /
-                                                  (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1))));
+            feeCutoff = std::max(feeCutoff,
+                _dMinLimiterTxFee + ((_dMaxLimiterTxFee - _dMinLimiterTxFee) * (poolBytes - nLargestBlockSeen) /
+                                        (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1))));
 
             // Gradually choke off the nFreeLimit as well but leave at least DEFAULT_MIN_LIMITFREERELAY
             // So that some free transactions can still get through
@@ -829,7 +844,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         }
         else
         {
-            feeCutoff = dMaxLimiterTxFee;
+            feeCutoff = _dMaxLimiterTxFee;
             nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
         }
 

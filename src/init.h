@@ -7,6 +7,7 @@
 #ifndef BITCOIN_INIT_H
 #define BITCOIN_INIT_H
 
+#include "tweak.h"
 #include <string>
 
 class Config;
@@ -37,6 +38,9 @@ static const bool DEFAULT_REST_ENABLE = false;
 static const bool DEFAULT_DISABLE_SAFEMODE = false;
 static const bool DEFAULT_STOPAFTERBLOCKIMPORT = false;
 static const bool DEFAULT_PV_TESTMODE = false;
+
+extern CTweak<double> dMinLimiterTxFee;
+extern CTweak<double> dMaxLimiterTxFee;
 
 /** Returns licensing information (for -version) */
 std::string LicenseInfo();

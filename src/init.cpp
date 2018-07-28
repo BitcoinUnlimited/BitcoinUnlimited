@@ -752,6 +752,20 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     if (nConnectTimeout <= 0)
         nConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 
+    // Set the maxlimitertxfee tweak
+    if (mapArgs.count("-maxlimitertxfee"))
+    {
+        try
+        {
+            dMaxLimiterTxFee.value = boost::lexical_cast<double>(mapArgs["-maxlimitertxfee"]);
+        }
+        catch (boost::bad_lexical_cast &)
+        {
+            return InitError(
+                _("ERROR: an incorrect value was specified for -maxlimitertxfee.  Please check value and restart."));
+        }
+    }
+
     // Fee in satoshi per byte amount considered the same as "free"
     // If you are mining, be careful setting this:
     // if you set it to zero then
@@ -760,11 +774,12 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     // cost to you of processing a transaction.
     if (mapArgs.count("-minlimitertxfee"))
     {
-        CAmount n = 0;
-        double minrelaytxfee;
+        CAmount nAmt = 0;
+        double minrelaytxfee = 0;
         try
         {
-            minrelaytxfee = boost::lexical_cast<double>(mapArgs["-minlimitertxfee"]) / 100000;
+            // assign the value to our tweak
+            dMinLimiterTxFee.value = boost::lexical_cast<double>(mapArgs["-minlimitertxfee"]);
         }
         catch (boost::bad_lexical_cast &)
         {
@@ -772,11 +787,15 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 _("ERROR: an incorrect value was specified for -minlimitertxfee.  Please check value and restart."));
         }
 
+
+        // calculate the starting minrelaytxfee
+        minrelaytxfee = dMinLimiterTxFee.value / 100000;
+
         ostringstream ss;
         ss << fixed << setprecision(8);
         ss << minrelaytxfee;
-        if (ParseMoney(ss.str(), n))
-            ::minRelayTxFee = CFeeRate(n);
+        if (ParseMoney(ss.str(), nAmt))
+            ::minRelayTxFee = CFeeRate(nAmt);
         else
             return InitError(
                 strprintf(_("Invalid amount for -minlimitertxfee=<amount>: '%s'"), mapArgs["-minlimitertxfee"]));

@@ -153,10 +153,10 @@ static const bool DEFAULT_DISCOVER = true;
 static const bool DEFAULT_PRINTTOCONSOLE = false;
 
 // BU - Xtreme Thinblocks Auto Mempool Limiter - begin section
-/** The default value for -minrelaytxfee */
-static const char DEFAULT_MINLIMITERTXFEE[] = "0.000";
-/** The default value for -maxrelaytxfee */
-static const unsigned int DEFAULT_MAXLIMITERTXFEE = DEFAULT_MIN_RELAY_TX_FEE;
+/** The default value for -minrelaytxfee in sat/byte */
+static const double DEFAULT_MINLIMITERTXFEE = 0.0;
+/** The default value for -maxrelaytxfee in sat/byte */
+static const double DEFAULT_MAXLIMITERTXFEE = (double)DEFAULT_MIN_RELAY_TX_FEE / 1000;
 /** The number of block heights to gradually choke spam transactions over */
 static const unsigned int MAX_BLOCK_SIZE_MULTIPLIER = 3;
 /** The minimum value possible for -limitfreerelay when rate limiting */

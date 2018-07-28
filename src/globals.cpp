@@ -267,6 +267,12 @@ CTweak<uint64_t> checkScriptDays("blockchain.checkScriptDays",
  */
 CTweak<unsigned int> nDustThreshold("net.dustThreshold", "Dust Threshold (in satoshis).", DEFAULT_DUST_THRESHOLD);
 
+/** The maxlimitertxfee (in satoshi's per byte) */
+CTweak<double> dMaxLimiterTxFee("net.maxLimiterTxFee", "The maxlimitertxfee (in satoshi's per byte)", boost::lexical_cast<double>(DEFAULT_MAXLIMITERTXFEE));
+
+/** The minlimitertxfee (in satoshi's per byte) */
+CTweak<double> dMinLimiterTxFee("net.minLimiterTxFee", "The minlimitertxfee (in satoshi's per byte).", boost::lexical_cast<double>(DEFAULT_MINLIMITERTXFEE));
+
 CRequestManager requester; // after the maps nodes and tweaks
 
 CStatHistory<unsigned int> txAdded; //"memPool/txAdded");

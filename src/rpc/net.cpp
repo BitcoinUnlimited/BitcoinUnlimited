@@ -16,6 +16,7 @@
 #include "sync.h"
 #include "thinblock.h"
 #include "timedata.h"
+#include "tweak.h"
 #include "ui_interface.h"
 #include "unlimited.h"
 #include "util.h"
@@ -25,6 +26,9 @@
 #include <boost/lexical_cast.hpp>
 
 #include <univalue.h>
+
+extern CTweak<double> dMinLimiterTxFee;
+extern CTweak<double> dMaxLimiterTxFee;
 
 using namespace std;
 
@@ -541,6 +545,8 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
     obj.push_back(Pair("connections", (int)vNodes.size()));
     obj.push_back(Pair("networks", GetNetworksInfo()));
     obj.push_back(Pair("relayfee", ValueFromAmount(::minRelayTxFee.GetFeePerK())));
+    obj.push_back(Pair("minlimitertxfee", strprintf("%.4f", dMinLimiterTxFee.value)));
+    obj.push_back(Pair("maxlimitertxfee", strprintf("%.4f", dMaxLimiterTxFee.value)));
     UniValue localAddresses(UniValue::VARR);
     {
         LOCK(cs_mapLocalHost);
