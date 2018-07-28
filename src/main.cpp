@@ -793,6 +793,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         static double _dMinLimiterTxFee = dMinLimiterTxFee.value;
         static double _dMaxLimiterTxFee = dMaxLimiterTxFee.value;
 
+        static CCriticalSection cs_limiter;
+        {
+        LOCK(cs_limiter);
+
         // If the tweak values have changed then use them.
         if (dMinLimiterTxFee.value != _dMinLimiterTxFee)
         {
@@ -873,6 +877,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
             dFreeCount += nSize;
         }
         nLastTime = nNow;
+        }
         // BU - Xtreme Thinblocks Auto Mempool Limiter - end section
 
         // BU: we calculate the recommended fee by looking at what's in the mempool.  This starts at 0 though for an
