@@ -22,7 +22,7 @@
 
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
 
-CMemPoolInfo::CMemPoolInfo(uint64_t _nTx):nTx(_nTx) { }
+CMemPoolInfo::CMemPoolInfo(uint64_t _nTx) : nTx(_nTx) {}
 CMemPoolInfo::CMemPoolInfo() { this->nTx = 0; }
 CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx)
 {
@@ -113,7 +113,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // it. In that case, the number of missing txs returned will be fewer than the number
     // needed. Because the graphene block will be incomplete without the missing txs, we
     // request a failover block instead.
-    if ((int) grapheneBlockTx.vMissingTx.size() < pfrom->grapheneBlockWaitingForTxns)
+    if ((int)grapheneBlockTx.vMissingTx.size() < pfrom->grapheneBlockWaitingForTxns)
     {
         graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
 
