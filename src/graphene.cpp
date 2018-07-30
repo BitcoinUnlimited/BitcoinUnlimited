@@ -157,7 +157,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     int missingCount = 0;
     int unnecessaryCount = 0;
     // Look for each transaction in our various pools and buffers.
-    // With grapheneBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
+    // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
     {
         LOCK2(orphanpool.cs, cs_xval);
         if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
@@ -454,8 +454,6 @@ bool CGrapheneBlock::process(CNode *pfrom,
             pfrom->grapheneAdditionalTxs.push_back(tx);
     }
 
-    vTxHashes.reserve(nBlockTxs);
-
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
     // We need to check all transaction sources (orphan list, mempool, and new (incoming) transactions in this block)
     // for a collision.
@@ -681,7 +679,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
     }
 
     // Look for each transaction in our various pools and buffers.
-    // With grapheneBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
+    // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
     for (const uint256 &hash : pfrom->grapheneBlockHashes)
     {
         // Replace the truncated hash with the full hash value if it exists

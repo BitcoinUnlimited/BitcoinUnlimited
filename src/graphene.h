@@ -48,7 +48,6 @@ class CGrapheneBlock
 {
 public:
     CBlockHeader header;
-    std::vector<uint256> vTxHashes; // List of all transactions id's in the block
     std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
     uint64_t nBlockTxs;
     CGrapheneSet *pGrapheneSet;
