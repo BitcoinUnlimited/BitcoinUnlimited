@@ -814,8 +814,6 @@ int main(int argc, char *argv[])
     if (GetBoolArg("-splash", DEFAULT_SPLASHSCREEN) && !GetBoolArg("-min", false))
         app.createSplashScreen(networkStyle.data());
 
-    UnlimitedSetup();
-
     // Get global config
     Config &config = const_cast<Config &>(GetConfig());
 

@@ -596,6 +596,9 @@ void InitLogging()
 bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &scheduler)
 {
 // ********************************************************* Step 1: setup
+
+UnlimitedSetup();
+
 #ifdef _MSC_VER
     // Turn off Microsoft heap dump noise
     _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
@@ -758,18 +761,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     // a transaction spammer can cheaply fill blocks using
     // 1-satoshi-fee transactions. It should be set above the real
     // cost to you of processing a transaction.
-    if (mapArgs.count("-minlimitertxfee"))
-    {
-        try
-        {
-            dMinLimiterTxFee.value = boost::lexical_cast<double>(mapArgs["-minlimitertxfee"]);
-        }
-        catch (boost::bad_lexical_cast &)
-        {
-            return InitError(
-                strprintf(_("Invalid amount for -minlimitertxfee=<amount>: '%s'"), mapArgs["-minlimitertxfee"]));
-        }
-    }
     ::minRelayTxFee = CFeeRate(dMinLimiterTxFee.value * 1000);
 
     // -minrelaytxfee is no longer a command line option however it is still used in Bitcon Core so we want to tell
