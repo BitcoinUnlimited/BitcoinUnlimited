@@ -165,7 +165,8 @@ private:
 
     CStatHistory<uint64_t> nOriginalSize;
     CStatHistory<uint64_t> nThinSize;
-    CStatHistory<uint64_t> nBlocks;
+    CStatHistory<uint64_t> nInBoundBlocks;
+    CStatHistory<uint64_t> nOutBoundBlocks;
     CStatHistory<uint64_t> nMempoolLimiterBytesSaved;
     CStatHistory<uint64_t> nTotalBloomFilterBytes;
     CStatHistory<uint64_t> nTotalThinBlockBytes;

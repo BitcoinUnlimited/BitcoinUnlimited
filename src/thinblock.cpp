@@ -990,7 +990,7 @@ void CThinBlockData::UpdateInBound(uint64_t nThinBlockSize, uint64_t nOriginalBl
     // Update InBound thinblock tracking information
     nOriginalSize += nOriginalBlockSize;
     nThinSize += nThinBlockSize;
-    nBlocks += 1;
+    nInBoundBlocks += 1;
     updateStats(mapThinBlocksInBound, std::pair<uint64_t, uint64_t>(nThinBlockSize, nOriginalBlockSize));
 }
 
@@ -999,7 +999,7 @@ void CThinBlockData::UpdateOutBound(uint64_t nThinBlockSize, uint64_t nOriginalB
     LOCK(cs_thinblockstats);
     nOriginalSize += nOriginalBlockSize;
     nThinSize += nThinBlockSize;
-    nBlocks += 1;
+    nOutBoundBlocks += 1;
     updateStats(mapThinBlocksOutBound, std::pair<uint64_t, uint64_t>(nThinBlockSize, nOriginalBlockSize));
 }
 
@@ -1072,8 +1072,8 @@ std::string CThinBlockData::ToString()
     LOCK(cs_thinblockstats);
     double size = double(nOriginalSize() - nThinSize() - nTotalBloomFilterBytes());
     std::ostringstream ss;
-    ss << nBlocks() << " thin " << ((nBlocks() > 1) ? "blocks have" : "block has") << " saved " << formatInfoUnit(size)
-       << " of bandwidth";
+    ss << nInBoundBlocks() << " inbound and " << nOutBoundBlocks() << " outbound thin blocks have saved "
+       << formatInfoUnit(size) << " of bandwidth";
     return ss.str();
 }
 
@@ -1376,7 +1376,8 @@ void CThinBlockData::ClearThinBlockStats()
 
     nOriginalSize.Clear();
     nThinSize.Clear();
-    nBlocks.Clear();
+    nInBoundBlocks.Clear();
+    nOutBoundBlocks.Clear();
     nMempoolLimiterBytesSaved.Clear();
     nTotalBloomFilterBytes.Clear();
     nTotalThinBlockBytes.Clear();
