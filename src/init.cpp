@@ -595,9 +595,9 @@ void InitLogging()
  */
 bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &scheduler)
 {
-// ********************************************************* Step 1: setup
+    // ********************************************************* Step 1: setup
 
-UnlimitedSetup();
+    UnlimitedSetup();
 
 #ifdef _MSC_VER
     // Turn off Microsoft heap dump noise
