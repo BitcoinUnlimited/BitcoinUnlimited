@@ -752,20 +752,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     if (nConnectTimeout <= 0)
         nConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 
-    // Set the maxlimitertxfee tweak
-    if (mapArgs.count("-maxlimitertxfee"))
-    {
-        try
-        {
-            dMaxLimiterTxFee.value = boost::lexical_cast<double>(mapArgs["-maxlimitertxfee"]);
-        }
-        catch (boost::bad_lexical_cast &)
-        {
-            return InitError(
-                strprintf(_("Invalid amount for -maxlimitertxfee=<amount>: '%s'"), mapArgs["-maxlimitertxfee"]));
-        }
-    }
-
     // Fee in satoshi per byte amount considered the same as "free"
     // If you are mining, be careful setting this:
     // if you set it to zero then
@@ -774,9 +760,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     // cost to you of processing a transaction.
     if (mapArgs.count("-minlimitertxfee"))
     {
-        CAmount nAmt = 0;
-        double minrelaytxfee = 0;
-
         try
         {
             dMinLimiterTxFee.value = boost::lexical_cast<double>(mapArgs["-minlimitertxfee"]);
@@ -786,19 +769,8 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
             return InitError(
                 strprintf(_("Invalid amount for -minlimitertxfee=<amount>: '%s'"), mapArgs["-minlimitertxfee"]));
         }
-
-        // calculate the starting minrelaytxfee. We get this from the minlimitertxfee tweak
-        minrelaytxfee = dMinLimiterTxFee.value / 100000;
-
-        ostringstream ss;
-        ss << fixed << setprecision(8);
-        ss << minrelaytxfee;
-        if (ParseMoney(ss.str(), nAmt))
-            ::minRelayTxFee = CFeeRate(nAmt);
-        else
-            return InitError(
-                strprintf(_("Invalid amount for -minlimitertxfee=<amount>: '%s'"), mapArgs["-minlimitertxfee"]));
     }
+    ::minRelayTxFee = CFeeRate(dMinLimiterTxFee.value * 1000);
 
     // -minrelaytxfee is no longer a command line option however it is still used in Bitcon Core so we want to tell
     // any users that migrate from Core to BU that this option is not used.
