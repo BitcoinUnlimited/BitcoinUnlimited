@@ -571,13 +571,6 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
             _("The maximum number of nodes this node will forward expedited blocks to"))
         .addArg("maxexpeditedtxrecipients=<n>", requiredInt,
             _("The maximum number of nodes this node will forward expedited transactions to"))
-        .addArg("maxlimitertxfee=<amt>", requiredAmount,
-            strprintf(_("Fees (in satoshi/byte) larger than this are always relayed (default: %s)"),
-                    DEFAULT_MAXLIMITERTXFEE))
-        .addArg("minlimitertxfee=<amt>", requiredAmount,
-            strprintf(_("Fees (in satoshi/byte) smaller than this are considered "
-                        "zero fee and subject to -limitfreerelay (default: %s)"),
-                    DEFAULT_MINLIMITERTXFEE))
         .addArg("minrelaytxfee=<amt>", requiredAmount,
             strprintf(_("Fees (in %s/kB) smaller than this are considered zero fee for relaying, mining and "
                         "transaction creation (default: %s)"),
@@ -684,6 +677,8 @@ static void addTweaks(AllowedArgs &allowedArgs, CTweakMap *pTweaks)
         std::string optName = tweak->GetName();
 
         if (dynamic_cast<CTweak<CAmount> *>(tweak))
+            allowedArgs.addArg(optName + "=<amt>", requiredAmount, tweak->GetHelp());
+        else if (dynamic_cast<CTweak<double> *>(tweak))
             allowedArgs.addArg(optName + "=<amt>", requiredAmount, tweak->GetHelp());
         else if (dynamic_cast<CTweakRef<CAmount> *>(tweak))
             allowedArgs.addArg(optName + "=<amt>", requiredAmount, tweak->GetHelp());

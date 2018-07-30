@@ -762,7 +762,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         catch (boost::bad_lexical_cast &)
         {
             return InitError(
-                _("ERROR: an incorrect value was specified for -maxlimitertxfee.  Please check value and restart."));
+                strprintf(_("Invalid amount for -maxlimitertxfee=<amount>: '%s'"), mapArgs["-maxlimitertxfee"]));
         }
     }
 
@@ -776,19 +776,18 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     {
         CAmount nAmt = 0;
         double minrelaytxfee = 0;
+
         try
         {
-            // assign the value to our tweak
             dMinLimiterTxFee.value = boost::lexical_cast<double>(mapArgs["-minlimitertxfee"]);
         }
         catch (boost::bad_lexical_cast &)
         {
             return InitError(
-                _("ERROR: an incorrect value was specified for -minlimitertxfee.  Please check value and restart."));
+                strprintf(_("Invalid amount for -minlimitertxfee=<amount>: '%s'"), mapArgs["-minlimitertxfee"]));
         }
 
-
-        // calculate the starting minrelaytxfee
+        // calculate the starting minrelaytxfee. We get this from the minlimitertxfee tweak
         minrelaytxfee = dMinLimiterTxFee.value / 100000;
 
         ostringstream ss;
@@ -800,6 +799,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
             return InitError(
                 strprintf(_("Invalid amount for -minlimitertxfee=<amount>: '%s'"), mapArgs["-minlimitertxfee"]));
     }
+
     // -minrelaytxfee is no longer a command line option however it is still used in Bitcon Core so we want to tell
     // any users that migrate from Core to BU that this option is not used.
     if (mapArgs.count("-minrelaytxfee"))
