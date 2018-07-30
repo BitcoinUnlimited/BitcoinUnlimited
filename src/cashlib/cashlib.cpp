@@ -36,6 +36,10 @@ CKey LoadKey(unsigned char *src)
     return secret;
 }
 
+#if 0
+// This function is temporarily removed since it is not used.  However it will be needed for interfacing to
+// languages that handle binary data poorly, since it allows transaction information to be communicated via hex strings
+
 // From core_read.cpp #include "core_io.h"
 bool DecodeHexTx(CTransaction &tx, const std::string &strHexTx)
 {
@@ -55,6 +59,7 @@ bool DecodeHexTx(CTransaction &tx, const std::string &strHexTx)
 
     return true;
 }
+#endif
 
 static const char *hexxlat = "0123456789ABCDEF";
 std::string GetHex(unsigned char *data, unsigned int len)

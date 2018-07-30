@@ -1600,7 +1600,7 @@ static void DNSAddressSeed()
     LOGA("%d addresses found from DNS seeds\n", found);
 }
 
-// BITCOINUNLIMITED START
+#if 0 // Disabled until a Bitcoin Cash compatible "bitnodes" site becomes available
 static void BitnodesAddressSeed()
 {
     // Get nodes from websites offering Bitnodes API
@@ -1639,7 +1639,7 @@ static void BitnodesAddressSeed()
 
     LOGA("%d addresses found from Bitnodes API\n", vAdd.size());
 }
-// BITCOINUNLIMITED END
+#endif
 
 void ThreadAddressSeeding()
 {

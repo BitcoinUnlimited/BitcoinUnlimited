@@ -19,8 +19,8 @@
 #include <QMessageBox>
 #include <QPushButton>
 
-AskPassphraseDialog::AskPassphraseDialog(Mode mode, QWidget *parent)
-    : QDialog(parent), ui(new Ui::AskPassphraseDialog), mode(mode), model(0), fCapsLock(false)
+AskPassphraseDialog::AskPassphraseDialog(Mode _mode, QWidget *parent)
+    : QDialog(parent), ui(new Ui::AskPassphraseDialog), mode(_mode), model(0), fCapsLock(false)
 {
     ui->setupUi(this);
 

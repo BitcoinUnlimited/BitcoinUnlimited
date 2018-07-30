@@ -270,7 +270,7 @@ public:
         std::vector<unsigned char> encoded(nEncodedWords, 0);
 
         // form boolean array (low-order first)
-        bool bits[nEncodedWords * WORD_BITS];
+        std::unique_ptr<bool[]> bits(new bool[nEncodedWords * WORD_BITS]);
         for (size_t i = 0; i < items.size(); i++)
         {
             uint64_t item = items[i];
@@ -297,7 +297,8 @@ public:
         size_t nEncodedWords = int(ceil(nBitsPerItem * nItems / float(WORD_BITS)));
 
         // decode into boolean array (low-order first)
-        bool bits[nEncodedWords * WORD_BITS];
+        std::unique_ptr<bool[]> bits(new bool[nEncodedWords * WORD_BITS]);
+
         for (size_t i = 0; i < nEncodedWords; i++)
         {
             unsigned char word = encoded[i];
@@ -313,7 +314,6 @@ public:
             for (size_t j = 0; j < nBitsPerItem; j++)
                 items[i] |= bits[j + i * nBitsPerItem] << j;
         }
-
         return items;
     }
 
