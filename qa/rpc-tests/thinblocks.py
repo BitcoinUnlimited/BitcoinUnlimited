@@ -120,7 +120,7 @@ class ThinBlockTest(BitcoinTestFramework):
         gni = self.nodes[0].getnetworkinfo()
         tbs = gni["thinblockstats"]
 
-        assert tbs['summary'] == '0 thin block has saved 0.00B of bandwidth'
+        assert tbs['summary'] == '0 inbound and 0 outbound thin blocks have saved 0.00B of bandwidth'
 
 if __name__ == '__main__':
     ThinBlockTest().main()
