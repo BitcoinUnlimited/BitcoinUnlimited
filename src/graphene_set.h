@@ -29,6 +29,9 @@ const unsigned char WORD_BITS = 8;
 
 class CGrapheneSet
 {
+public:
+    uint64_t version;
+
 private:
     std::vector<uint64_t> ArgSort(const std::vector<uint64_t> &items)
     {
@@ -100,11 +103,12 @@ public:
     }
 
     // The default constructor is for 2-phase construction via deserialization
-    CGrapheneSet() : ordered(false), nReceiverUniverseItems(0), pSetFilter(nullptr), pSetIblt(nullptr) {}
+    CGrapheneSet() : version(0), ordered(false), nReceiverUniverseItems(0), pSetFilter(nullptr), pSetIblt(nullptr) {}
     CGrapheneSet(size_t _nReceiverUniverseItems,
         const std::vector<uint256> &_itemHashes,
         bool _ordered = false,
         bool fDeterministic = false)
+        : version(0)
     {
         ordered = _ordered;
         // Below is the parameter "m" from the graphene paper
@@ -340,6 +344,9 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
+        READWRITE(COMPACTSIZE(version));
+        if (ser_action.ForRead() && version != 0)
+            throw std::ios_base::failure("Only graphene-set message version zero is supported at the moment.");
         READWRITE(ordered);
         READWRITE(nReceiverUniverseItems);
         if (nReceiverUniverseItems > LARGE_MEM_POOL_SIZE)
