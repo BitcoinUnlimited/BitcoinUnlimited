@@ -1130,7 +1130,7 @@ void CThinBlockData::UpdateFullTx(uint64_t nFullTxSize)
 std::string CThinBlockData::ToString()
 {
     LOCK(cs_thinblockstats);
-    double size = double(nOriginalSize() - nThinSize() - nTotalBloomFilterBytes());
+    double size = computeTotalBandwidthSavingsInternal();
     std::ostringstream ss;
     ss << nInBoundBlocks() << " inbound and " << nOutBoundBlocks() << " outbound thin blocks have saved "
        << formatInfoUnit(size) << " of bandwidth";
@@ -1142,28 +1142,11 @@ std::string CThinBlockData::InBoundPercentToString()
 {
     LOCK(cs_thinblockstats);
 
-    expireStats(mapThinBlocksInBound);
-    expireStats(mapBloomFiltersOutBound);
+    double nCompressionRate = compute24hAverageCompressionInternal(mapThinBlocksInBound, mapBloomFiltersOutBound);
 
-    double nCompressionRate = 0;
-    uint64_t nThinSizeTotal = 0;
-    uint64_t nOriginalSizeTotal = 0;
-    for (const auto &mi : mapThinBlocksInBound)
-    {
-        nThinSizeTotal += mi.second.first;
-        nOriginalSizeTotal += mi.second.second;
-    }
-    // We count up the outbound bloom filters. Outbound bloom filters go with Inbound xthins.
-    uint64_t nOutBoundBloomFilterSize = 0;
-    for (const auto &mi : mapBloomFiltersOutBound)
-    {
-        nOutBoundBloomFilterSize += mi.second;
-    }
-
-
-    if (nOriginalSizeTotal > 0)
-        nCompressionRate = 100 - (100 * (double)(nThinSizeTotal + nOutBoundBloomFilterSize) / nOriginalSizeTotal);
-
+    // NOTE: Potential gotcha, compute24hAverageCompressionInternal has a side-effect of calling
+    //       expireStats which modifies the contents of mapThinBlocksInBound
+    // We currently rely on this side-effect for the string produced below
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(1);
     ss << "Compression for " << mapThinBlocksInBound.size() << " Inbound  thinblocks (last 24hrs): " << nCompressionRate
@@ -1176,27 +1159,11 @@ std::string CThinBlockData::OutBoundPercentToString()
 {
     LOCK(cs_thinblockstats);
 
-    expireStats(mapThinBlocksOutBound);
-    expireStats(mapBloomFiltersInBound);
+    double nCompressionRate = compute24hAverageCompressionInternal(mapThinBlocksOutBound, mapBloomFiltersInBound);
 
-    double nCompressionRate = 0;
-    uint64_t nThinSizeTotal = 0;
-    uint64_t nOriginalSizeTotal = 0;
-    for (const auto &mi : mapThinBlocksOutBound)
-    {
-        nThinSizeTotal += mi.second.first;
-        nOriginalSizeTotal += mi.second.second;
-    }
-    // We count up the inbound bloom filters. Inbound bloom filters go with Outbound xthins.
-    uint64_t nInBoundBloomFilterSize = 0;
-    for (const auto &mi : mapBloomFiltersInBound)
-    {
-        nInBoundBloomFilterSize += mi.second;
-    }
-
-    if (nOriginalSizeTotal > 0)
-        nCompressionRate = 100 - (100 * (double)(nThinSizeTotal + nInBoundBloomFilterSize) / nOriginalSizeTotal);
-
+    // NOTE: Potential gotcha, compute24hAverageCompressionInternal has a side-effect of calling
+    //       expireStats which modifies the contents of mapThinBlocksOutBound
+    // We currently rely on this side-effect for the string produced below
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(1);
     ss << "Compression for " << mapThinBlocksOutBound.size()
@@ -1300,24 +1267,15 @@ std::string CThinBlockData::ReRequestedTxToString()
 {
     LOCK(cs_thinblockstats);
 
-    expireStats(mapThinBlocksInBoundReRequestedTx);
-    expireStats(mapThinBlocksInBound);
+    double nReRequestRate = compute24hInboundRerequestTxPercentInternal();
 
-    double nReRequestRate = 0;
-    uint64_t nTotalReRequests = 0;
-    uint64_t nTotalReRequestedTxs = 0;
-    for (const auto &mi : mapThinBlocksInBoundReRequestedTx)
-    {
-        nTotalReRequests += 1;
-        nTotalReRequestedTxs += mi.second;
-    }
-
-    if (mapThinBlocksInBound.size() > 0)
-        nReRequestRate = 100 * (double)nTotalReRequests / mapThinBlocksInBound.size();
-
+    // NOTE: Potential gotcha, compute24hInboundRerequestTxPercentInternal has a side-effect of calling
+    //       expireStats which modifies the contents of mapThinBlocksInBoundReRequestedTx
+    // We currently rely on this side-effect for the string produced below
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(1);
-    ss << "Tx re-request rate (last 24hrs): " << nReRequestRate << "% Total re-requests:" << nTotalReRequests;
+    ss << "Tx re-request rate (last 24hrs): " << nReRequestRate
+       << "% Total re-requests:" << mapThinBlocksInBoundReRequestedTx.size();
     return ss.str();
 }
 
