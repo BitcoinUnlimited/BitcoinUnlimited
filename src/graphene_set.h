@@ -29,6 +29,9 @@ const unsigned char WORD_BITS = 8;
 
 class CGrapheneSet
 {
+public:
+    uint64_t version;
+
 private:
     std::vector<uint64_t> ArgSort(const std::vector<uint64_t> &items)
     {
@@ -100,13 +103,13 @@ public:
     }
 
     // The default constructor is for 2-phase construction via deserialization
-    CGrapheneSet() : ordered(false), nReceiverUniverseItems(0), pSetFilter(nullptr), pSetIblt(nullptr) {}
+    CGrapheneSet() : version(0), nReceiverUniverseItems(0), pSetFilter(nullptr), pSetIblt(nullptr) {}
     CGrapheneSet(size_t _nReceiverUniverseItems,
         const std::vector<uint256> &_itemHashes,
         bool _ordered = false,
         bool fDeterministic = false)
+        : version(uint64_t(_ordered))
     {
-        ordered = _ordered;
         // Below is the parameter "m" from the graphene paper
         nReceiverUniverseItems = _nReceiverUniverseItems;
         // Below is the parameter "n" from the graphene paper
@@ -162,7 +165,7 @@ public:
         }
 
         // Record transaction order
-        if (ordered)
+        if (ordered())
         {
             std::map<uint256, uint64_t> mapItemHashes;
             for (const std::pair<uint64_t, uint256> &kv : mapCheapHashes)
@@ -249,7 +252,7 @@ public:
 
         std::vector<uint64_t> receiverSetItems(receiverSet.begin(), receiverSet.end());
 
-        if (!ordered)
+        if (!ordered())
             return receiverSetItems;
 
         // Place items in order
@@ -340,7 +343,9 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
-        READWRITE(ordered);
+        READWRITE(COMPACTSIZE(version));
+        if (ser_action.ForRead() && version != 0 && version != 1)
+            throw std::ios_base::failure("Only graphene-set message version zero or one is supported at the moment.");
         READWRITE(nReceiverUniverseItems);
         if (nReceiverUniverseItems > LARGE_MEM_POOL_SIZE)
             throw std::runtime_error("nReceiverUniverseItems exceeds threshold for excessive mempool size");
@@ -354,7 +359,7 @@ public:
     }
 
 private:
-    bool ordered;
+    bool ordered() const { return version & 1; }
     uint64_t nReceiverUniverseItems;
     std::vector<unsigned char> encodedRank;
     CBloomFilter *pSetFilter;

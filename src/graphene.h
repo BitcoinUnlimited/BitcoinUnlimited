@@ -29,6 +29,7 @@ class CNode;
 class CMemPoolInfo
 {
 public:
+    uint64_t version;
     uint64_t nTx;
 
 public:
@@ -40,6 +41,9 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
+        READWRITE(COMPACTSIZE(version));
+        if (ser_action.ForRead() && version != 0)
+            throw std::ios_base::failure("Only graphene-mempool message version zero is supported at the moment.");
         READWRITE(nTx);
     }
 };
@@ -47,6 +51,7 @@ public:
 class CGrapheneBlock
 {
 public:
+    uint64_t version;
     CBlockHeader header;
     std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
     uint64_t nBlockTxs;
@@ -54,7 +59,7 @@ public:
 
 public:
     CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx);
-    CGrapheneBlock() : pGrapheneSet(nullptr) {}
+    CGrapheneBlock() : version(0), pGrapheneSet(nullptr) {}
     ~CGrapheneBlock();
     /**
      * Handle an incoming Graphene block
@@ -72,6 +77,9 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
+        READWRITE(COMPACTSIZE(version));
+        if (ser_action.ForRead() && version != 0)
+            throw std::ios_base::failure("Only graphene-block message version zero is supported at the moment.");
         READWRITE(header);
         READWRITE(vAdditionalTxs);
         READWRITE(nBlockTxs);
@@ -98,12 +106,13 @@ class CGrapheneBlockTx
 {
 public:
     /** Public only for unit testing */
+    uint64_t version;
     uint256 blockhash;
     std::vector<CTransaction> vMissingTx; // map of missing transactions
 
 public:
     CGrapheneBlockTx(uint256 blockHash, std::vector<CTransaction> &vTx);
-    CGrapheneBlockTx() {}
+    CGrapheneBlockTx() : version(0) {}
     /**
      * Handle receiving a list of missing graphene block transactions from a prior request
      * @param[in] vRecv        The raw binary message
@@ -117,6 +126,9 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
+        READWRITE(COMPACTSIZE(version));
+        if (ser_action.ForRead() && version != 0)
+            throw std::ios_base::failure("Only graphene-block-tx message version zero is supported at the moment.");
         READWRITE(blockhash);
         READWRITE(vMissingTx);
     }
@@ -129,12 +141,13 @@ class CRequestGrapheneBlockTx
 {
 public:
     /** Public only for unit testing */
+    uint64_t version;
     uint256 blockhash;
     std::set<uint64_t> setCheapHashesToRequest; // map of missing transactions
 
 public:
     CRequestGrapheneBlockTx(uint256 blockHash, std::set<uint64_t> &setHashesToRequest);
-    CRequestGrapheneBlockTx() {}
+    CRequestGrapheneBlockTx() : version(0) {}
     /**
      * Handle an incoming request for missing graphene block transactions
      * @param[in] vRecv        The raw binary message
@@ -147,6 +160,10 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
+        READWRITE(COMPACTSIZE(version));
+        if (ser_action.ForRead() && version != 0)
+            throw std::ios_base::failure(
+                "Only request-graphene-block-tx message version zero is supported at the moment.");
         READWRITE(blockhash);
         READWRITE(setCheapHashesToRequest);
     }

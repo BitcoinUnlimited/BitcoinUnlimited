@@ -22,9 +22,9 @@
 
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
 
-CMemPoolInfo::CMemPoolInfo(uint64_t _nTx) : nTx(_nTx) {}
-CMemPoolInfo::CMemPoolInfo() { this->nTx = 0; }
-CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx)
+CMemPoolInfo::CMemPoolInfo(uint64_t _nTx) : nTx(_nTx), version(0) {}
+CMemPoolInfo::CMemPoolInfo() : nTx(0), version(0) {}
+CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx) : version(0)
 {
     header = pblock->GetBlockHeader();
     nBlockTxs = pblock->vtx.size();
@@ -50,7 +50,7 @@ CGrapheneBlock::~CGrapheneBlock()
     }
 }
 
-CGrapheneBlockTx::CGrapheneBlockTx(uint256 blockHash, std::vector<CTransaction> &vTx)
+CGrapheneBlockTx::CGrapheneBlockTx(uint256 blockHash, std::vector<CTransaction> &vTx) : version(0)
 {
     blockhash = blockHash;
     vMissingTx = vTx;
@@ -201,7 +201,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     return true;
 }
 
-CRequestGrapheneBlockTx::CRequestGrapheneBlockTx(uint256 blockHash, std::set<uint64_t> &setHashesToRequest)
+CRequestGrapheneBlockTx::CRequestGrapheneBlockTx(uint256 blockHash, std::set<uint64_t> &setHashesToRequest) : version(0)
 {
     blockhash = blockHash;
     setCheapHashesToRequest = setHashesToRequest;
