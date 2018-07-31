@@ -36,6 +36,7 @@
 #include "banentry.h"
 #include "stat.h"
 #include "unlimited.h"
+#include "xversionmessage.h"
 
 class CAddrMan;
 class CScheduler;
@@ -65,8 +66,6 @@ static const int64_t MAX_RECV_CHUNK = 256 * 1024;
 /** Maximum length of incoming protocol messages (no message over 2 MiB is currently acceptable). */
 // BU: currently allowing DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER*excessiveBlockSize as the max message.
 // static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 2 * 1024 * 1024;
-/** Maximum length of strSubVer in `version` message */
-static const unsigned int MAX_SUBVERSION_LENGTH = 256;
 /** -listen default */
 static const bool DEFAULT_LISTEN = true;
 /** -upnp default */
@@ -373,6 +372,8 @@ public:
     const char *currentCommand; // if in the middle of the send, this is the command type
     CService addrLocal;
     int nVersion;
+    CXVersionMessage xVersion;
+    bool xVersionReceived;
     // strSubVer is whatever byte array we read from the wire. However, this field is intended
     // to be printed out, displayed to humans in various forms and so on. So we sanitize it and
     // store the sanitized version in cleanSubVer. The original should be used when dealing with
@@ -387,7 +388,7 @@ public:
     bool fNetworkNode; // any outbound node
     int64_t tVersionSent;
     bool fVerackSent;
-    bool fBUVersionSent;
+    bool fBUVersionSent; // this goes for both BUVERSION and XVERSION here in BU
     bool fSuccessfullyConnected;
     std::atomic<bool> fDisconnect;
     std::atomic<bool> fDisconnectRequest;

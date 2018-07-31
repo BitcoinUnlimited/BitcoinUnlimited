@@ -51,6 +51,8 @@
 #include "validation/validation.h"
 #include "validationinterface.h"
 #include "versionbits.h"
+#include "xversionkeys.h"
+#include "xversionmessage.h"
 
 #include <algorithm>
 #include <boost/algorithm/hex.hpp>
@@ -1196,17 +1198,23 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             pfrom->PushMessage(NetMsgType::FILTERSIZEXTHIN, nXthinBloomFilterSize);
         }
 
-        // BU expedited procecessing requires the exchange of the listening port id but we have to send it in a separate
-        // version
-        // message because we don't know if in the future Core will append more data to the end of the current VERSION
-        // message.
-        // The BUVERSION should be after the VERACK message otherwise Core may flag an error if another messaged shows
-        // up before the VERACK is received.
-        // The BUVERSION message is active from the protocol EXPEDITED_VERSION onwards.
+        // BU expedited procecessing requires the exchange of the listening port id
+        // The former BUVERSION message has now been integrated into the xmap field in CXVersionMessage.
+
+
         if (pfrom->nVersion >= EXPEDITED_VERSION)
         {
-            pfrom->fBUVersionSent = true;
-            pfrom->PushMessage(NetMsgType::BUVERSION, GetListenPort());
+            if (!pfrom->fBUVersionSent)
+            {
+                // prepare xversion message
+                CXVersionMessage xver;
+                xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
+                pfrom->PushMessage(NetMsgType::XVERSION, xver);
+
+                // and also send legacy message (at least for now)
+                pfrom->PushMessage(NetMsgType::BUVERSION, GetListenPort());
+                pfrom->fBUVersionSent = true;
+            }
         }
     }
 
@@ -1978,11 +1986,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // Each connection can only send one version message
         if (pfrom->addrFromPort != 0)
         {
-            pfrom->PushMessage(
-                NetMsgType::REJECT, strCommand, REJECT_DUPLICATE, std::string("Duplicate BU version message"));
-            dosMan.Misbehaving(pfrom, 100);
-            return error("Duplicate BU version message received from peer=%s version=%s", pfrom->GetLogName(),
-                pfrom->cleanSubVer);
+            LOG(NET, "Ignoring duplicate BUVERSION or extra addrFromPort setting. peer=%s version=%s\n",
+                pfrom->GetLogName(), pfrom->cleanSubVer);
+            return false;
         }
 
         // addrFromPort is needed for connecting and initializing Xpedited forwarding.
@@ -2003,7 +2009,48 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // This step done after final handshake
         CheckAndRequestExpeditedBlocks(pfrom);
     }
+    else if (strCommand == NetMsgType::XVERSION)
+    {
+        if (!pfrom->fVerackSent)
+        {
+            dosMan.Misbehaving(pfrom, 100);
+            return error("XVERSION received but we never sent a VERACK message - banning peer=%s version=%s",
+                pfrom->GetLogName(), pfrom->cleanSubVer);
+        }
 
+        if (pfrom->xVersionReceived)
+        {
+            dosMan.Misbehaving(pfrom, 100);
+            return error("XVERSION received but we already got one - banning peer=%s version=%s", pfrom->GetLogName(),
+                pfrom->cleanSubVer);
+        }
+        vRecv >> pfrom->xVersion;
+        pfrom->xVersionReceived = true;
+        if (pfrom->addrFromPort == 0)
+        {
+            pfrom->addrFromPort = pfrom->xVersion.as_u64c(XVer::BU_LISTEN_PORT) & 0xffff;
+        }
+        else
+        {
+            LOG(NET, "Encountered odd node that sent BUVERSION before XVERSION. Ignoring duplicate addrFromPort "
+                     "setting. peer=%s version=%s\n",
+                pfrom->GetLogName(), pfrom->cleanSubVer);
+        }
+        pfrom->PushMessage(NetMsgType::XVERACK);
+    }
+    else if (strCommand == NetMsgType::XVERACK)
+    {
+        // If we never sent a BUVERSION message then we should not get a VERACK message.
+        if (!pfrom->fBUVersionSent)
+        {
+            dosMan.Misbehaving(pfrom, 100);
+            return error("XVERACK received but we never sent an XVERSION message - banning peer=%s version=%s",
+                pfrom->GetLogName(), pfrom->cleanSubVer);
+        }
+
+        // This step done after final handshake
+        CheckAndRequestExpeditedBlocks(pfrom);
+    }
     else if (strCommand == NetMsgType::XTHINBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsThinBlocksEnabled())
     {

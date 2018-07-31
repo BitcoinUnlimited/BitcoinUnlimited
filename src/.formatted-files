@@ -171,6 +171,8 @@ validationinterface.h
 versionbits.cpp
 versionbits.h
 version.h
+xversionmessage.h
+xversionmessage.cpp
 qt/addressbookpage.cpp
 qt/addressbookpage.h
 qt/addresstablemodel.cpp

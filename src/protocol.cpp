@@ -54,6 +54,8 @@ const char *XPEDITEDREQUEST = "req_xpedited";
 const char *XPEDITEDBLK = "Xb";
 const char *XPEDITEDTxn = "Xt";
 const char *BUVERSION = "buversion";
+const char *XVERSION = "xversion";
+const char *XVERACK = "xverack";
 const char *BUVERACK = "buverack";
 const char *SENDCMPCT = "sendcmpct";
 };

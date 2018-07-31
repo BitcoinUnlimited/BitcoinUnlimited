@@ -117,7 +117,8 @@ UniValue getpeerinfo(const UniValue &params, bool fHelp)
             "    \"synced_headers\": n,           (numeric) The last header we have in common with this peer\n"
             "    \"synced_blocks\": n,            (numeric) The last block we have in common with this peer\n"
             "    \"inflight\": [\n"
-            "       n,                          (numeric) The heights of blocks we're currently asking from this peer\n"
+            "       n,                            (numeric) The heights of blocks we're currently asking from this "
+            "peer\n"
             "       ...\n"
             "    ]\n"
             "    \"whitelisted\": true|false,     (boolean) Whether we have whitelisted this peer, preventing us from "
@@ -187,6 +188,17 @@ UniValue getpeerinfo(const UniValue &params, bool fHelp)
             }
             obj.push_back(Pair("whitelisted", stats.fWhitelisted));
 
+            CNodeRef snode = FindLikelyNode(stats.addrName);
+
+            if (snode)
+            {
+                UniValue xmap_enc(UniValue::VOBJ);
+                for (auto kv : snode->xVersion.xmap)
+                {
+                    xmap_enc.push_back(Pair(strprintf("%016llx", kv.first), HexStr(kv.second).c_str()));
+                }
+                obj.push_back(Pair("xversion_map", xmap_enc));
+            }
             ret.push_back(obj);
         }
     }
