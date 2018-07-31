@@ -984,6 +984,66 @@ double CThinBlockData::average(std::map<int64_t, uint64_t> &map)
     return (double)accum / map.size();
 }
 
+double CThinBlockData::computeTotalBandwidthSavingsInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats)
+{
+    AssertLockHeld(cs_thinblockstats);
+
+    return double(nOriginalSize() - nThinSize() - nTotalBloomFilterBytes());
+}
+
+double CThinBlockData::compute24hAverageCompressionInternal(
+    std::map<int64_t, std::pair<uint64_t, uint64_t> > &mapThinBlocks,
+    std::map<int64_t, uint64_t> &mapBloomFilters) EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats)
+{
+    AssertLockHeld(cs_thinblockstats);
+
+    expireStats(mapThinBlocks);
+    expireStats(mapBloomFilters);
+
+    double nCompressionRate = 0;
+    uint64_t nThinSizeTotal = 0;
+    uint64_t nOriginalSizeTotal = 0;
+    for (const auto &mi : mapThinBlocks)
+    {
+        nThinSizeTotal += mi.second.first;
+        nOriginalSizeTotal += mi.second.second;
+    }
+    // We count up the bloom filters from the opposite direction as the blocks.
+    // Outbound bloom filters go with Inbound XThins and vice versa.
+    uint64_t nBloomFilterSize = 0;
+    for (const auto &mi : mapBloomFilters)
+    {
+        nBloomFilterSize += mi.second;
+    }
+
+    if (nOriginalSizeTotal > 0)
+        nCompressionRate = 100 - (100 * (double)(nThinSizeTotal + nBloomFilterSize) / nOriginalSizeTotal);
+
+    return nCompressionRate;
+}
+
+double CThinBlockData::compute24hInboundRerequestTxPercentInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats)
+{
+    AssertLockHeld(cs_thinblockstats);
+
+    expireStats(mapThinBlocksInBoundReRequestedTx);
+    expireStats(mapThinBlocksInBound);
+
+    double nReRequestRate = 0;
+    uint64_t nTotalReRequests = 0;
+    uint64_t nTotalReRequestedTxs = 0;
+    for (const auto &mi : mapThinBlocksInBoundReRequestedTx)
+    {
+        nTotalReRequests += 1;
+        nTotalReRequestedTxs += mi.second;
+    }
+
+    if (mapThinBlocksInBound.size() > 0)
+        nReRequestRate = 100 * (double)nTotalReRequests / mapThinBlocksInBound.size();
+
+    return nReRequestRate;
+}
+
 void CThinBlockData::UpdateInBound(uint64_t nThinBlockSize, uint64_t nOriginalBlockSize)
 {
     LOCK(cs_thinblockstats);
@@ -1415,6 +1475,30 @@ void CThinBlockData::DeleteThinBlockBytes(uint64_t bytes, CNode *pfrom)
 
 void CThinBlockData::ResetThinBlockBytes() { nThinBlockBytes.store(0); }
 uint64_t CThinBlockData::GetThinBlockBytes() { return nThinBlockBytes.load(); }
+void CThinBlockData::FillThinBlockQuickStats(ThinBlockQuickStats &stats)
+{
+    if (!IsThinBlocksEnabled())
+        return;
+
+    LOCK(cs_thinblockstats);
+
+    stats.nTotalInbound = nInBoundBlocks();
+    stats.nTotalOutbound = nOutBoundBlocks();
+    stats.nTotalBandwidthSavings = computeTotalBandwidthSavingsInternal();
+
+    // NOTE: The following calls rely on the side-effect of the compute*Internal
+    //       calls also calling expireStats on the associated statistics maps
+    //       This is why we set the % value first, then the count second for compression values
+    stats.fLast24hInboundCompression =
+        compute24hAverageCompressionInternal(mapThinBlocksInBound, mapBloomFiltersOutBound);
+    stats.nLast24hInbound = mapThinBlocksInBound.size();
+    stats.fLast24hOutboundCompression =
+        compute24hAverageCompressionInternal(mapThinBlocksOutBound, mapBloomFiltersInBound);
+    stats.nLast24hOutbound = mapThinBlocksOutBound.size();
+    stats.fLast24hRerequestTxPercent = compute24hInboundRerequestTxPercentInternal();
+    stats.nLast24hRerequestTx = mapThinBlocksInBoundReRequestedTx.size();
+}
+
 bool HaveThinblockNodes()
 {
     {
