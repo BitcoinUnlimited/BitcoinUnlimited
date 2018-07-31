@@ -26,7 +26,6 @@
 #include <string>
 #include <vector>
 
-#include <boost/foreach.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include <univalue.h>
@@ -912,7 +911,7 @@ BOOST_AUTO_TEST_CASE(script_build)
 
     std::string strGen;
 
-    BOOST_FOREACH (TestBuilder &test, tests)
+    for (TestBuilder &test : tests)
     {
         test.Test();
         std::string str = JSONPrettyPrint(test.GetJSON());
@@ -1023,7 +1022,7 @@ CScript sign_multisig(const CScript &scriptPubKey, std::vector<CKey> keys, const
     // and vice-versa)
     //
     result << OP_0;
-    BOOST_FOREACH (const CKey &key, keys)
+    for (const CKey &key : keys)
     {
         vector<unsigned char> vchSig;
         BOOST_CHECK(key.Sign(hash, vchSig));

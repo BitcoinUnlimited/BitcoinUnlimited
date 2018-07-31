@@ -41,7 +41,6 @@
 #include "version.h"
 
 #include <atomic>
-#include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
 #include <inttypes.h>

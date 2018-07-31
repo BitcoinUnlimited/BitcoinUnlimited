@@ -374,7 +374,7 @@ void CleanupBlockRevFiles()
     // keeping a separate counter.  Once we hit a gap (or if 0 doesn't exist)
     // start removing block files.
     int nContigCounter = 0;
-    BOOST_FOREACH (const PAIRTYPE(std::string, fs::path) & item, mapBlockFiles)
+    for (const PAIRTYPE(std::string, fs::path) & item : mapBlockFiles)
     {
         if (atoi(item.first) == nContigCounter)
         {
@@ -432,7 +432,7 @@ void ThreadImport(std::vector<fs::path> vImportFiles)
     }
 
     // -loadblock=
-    BOOST_FOREACH (const fs::path &path, vImportFiles)
+    for (const fs::path &path : vImportFiles)
     {
         FILE *file = fsbridge::fopen(path, "rb");
         if (file)
@@ -1258,7 +1258,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     std::vector<fs::path> vImportFiles;
     if (mapArgs.count("-loadblock"))
     {
-        BOOST_FOREACH (const std::string &strFile, mapMultiArgs["-loadblock"])
+        for (const std::string &strFile : mapMultiArgs["-loadblock"])
             vImportFiles.push_back(strFile);
     }
     threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
@@ -1275,7 +1275,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 
     // sanitize comments per BIP-0014, format user agent and check total size
     std::vector<string> uacomments;
-    BOOST_FOREACH (string cmt, mapMultiArgs["-uacomment"])
+    for (string &cmt : mapMultiArgs["-uacomment"])
     {
         if (cmt != SanitizeString(cmt, SAFE_CHARS_UA_COMMENT))
             return InitError(strprintf(_("User Agent comment (%s) contains unsafe characters."), cmt));
@@ -1292,7 +1292,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     if (mapArgs.count("-onlynet"))
     {
         std::set<enum Network> nets;
-        BOOST_FOREACH (const std::string &snet, mapMultiArgs["-onlynet"])
+        for (const std::string &snet : mapMultiArgs["-onlynet"])
         {
             enum Network net = ParseNetwork(snet);
             if (net == NET_UNROUTABLE)
@@ -1309,7 +1309,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 
     if (mapArgs.count("-whitelist"))
     {
-        BOOST_FOREACH (const std::string &net, mapMultiArgs["-whitelist"])
+        for (const std::string &net : mapMultiArgs["-whitelist"])
         {
             CSubNet subnet(net);
             if (!subnet.IsValid())
@@ -1367,7 +1367,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     {
         if (mapArgs.count("-bind") || mapArgs.count("-whitebind"))
         {
-            BOOST_FOREACH (const std::string &strBind, mapMultiArgs["-bind"])
+            for (const std::string &strBind : mapMultiArgs["-bind"])
             {
                 CService addrBind;
                 if (!Lookup(strBind.c_str(), addrBind, GetListenPort(), false))
@@ -1377,7 +1377,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 fBindFailure |= !bound;
                 fBound |= bound;
             }
-            BOOST_FOREACH (const std::string &strBind, mapMultiArgs["-whitebind"])
+            for (const std::string &strBind : mapMultiArgs["-whitebind"])
             {
                 CService addrBind;
                 if (!Lookup(strBind.c_str(), addrBind, 0, false))
@@ -1410,7 +1410,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 
     if (mapArgs.count("-externalip"))
     {
-        BOOST_FOREACH (const std::string &strAddr, mapMultiArgs["-externalip"])
+        for (const std::string &strAddr : mapMultiArgs["-externalip"])
         {
             CService addrLocal;
             if (Lookup(strAddr.c_str(), addrLocal, GetListenPort(), fNameLookup) && addrLocal.IsValid())
@@ -1420,7 +1420,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         }
     }
 
-    BOOST_FOREACH (const std::string &strDest, mapMultiArgs["-seednode"])
+    for (const std::string &strDest : mapMultiArgs["-seednode"])
         AddOneShot(strDest);
 
 #if ENABLE_ZMQ

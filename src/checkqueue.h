@@ -10,7 +10,6 @@
 #include <atomic>
 #include <vector>
 
-#include <boost/foreach.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
@@ -139,7 +138,7 @@ private:
                 fOk = fAllOk;
             }
             // execute work
-            BOOST_FOREACH (T &check, vChecks)
+            for (T &check : vChecks)
                 if (fOk)
                     fOk = check();
             vChecks.clear();
@@ -163,7 +162,7 @@ public:
     void Add(std::vector<T> &vChecks)
     {
         boost::unique_lock<boost::mutex> lock(mutex);
-        BOOST_FOREACH (T &check, vChecks)
+        for (T &check : vChecks)
         {
             queue.push_back(T());
             check.swap(queue.back());
