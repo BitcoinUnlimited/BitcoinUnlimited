@@ -6281,9 +6281,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             // Download as much as possible, from earliest to latest.
             unsigned int nAskFor = 0;
-            for (auto i = vToFetch.rbegin(); i != vToFetch.rend(); i++)
+            for (auto pindex_iter = vToFetch.rbegin(); pindex_iter != vToFetch.rend(); pindex_iter++)
             {
-                CBlockIndex *pindex = *i;
+                CBlockIndex *pindex = *pindex_iter;
                 // pindex must be nonnull because we populated vToFetch a few lines above
                 CInv inv(MSG_BLOCK, pindex->GetBlockHash());
                 if (!AlreadyHaveBlock(inv))
