@@ -862,7 +862,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
                 // Use an exponentially decaying ~10-minute window:
                 dFreeCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - nLastTime));
-                nLastTime = nNow;
 
                 // -limitfreerelay unit is thousand-bytes-per-minute
                 // At default rate it would take over a month to fill 1GB
