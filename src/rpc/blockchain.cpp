@@ -19,6 +19,7 @@
 #include "sync.h"
 #include "txdb.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -1056,6 +1057,31 @@ UniValue getmempoolinfo(const UniValue &params, bool fHelp)
     return mempoolInfoToJSON();
 }
 
+UniValue orphanpoolInfoToJSON()
+{
+    UniValue ret(UniValue::VOBJ);
+    ret.push_back(Pair("size", (int64_t)orphanpool.GetOrphanPoolSize()));
+    ret.push_back(Pair("bytes", (int64_t)orphanpool.GetOrphanPoolBytes()));
+
+    return ret;
+}
+
+UniValue getorphanpoolinfo(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error("getorphanpoolinfo\n"
+                            "\nReturns details on the active state of the TX orphan pool.\n"
+                            "\nResult:\n"
+                            "{\n"
+                            "  \"size\": xxxxx,               (numeric) Current tx count\n"
+                            "  \"bytes\": xxxxx,              (numeric) Sum of all tx sizes\n"
+                            "}\n"
+                            "\nExamples:\n" +
+                            HelpExampleCli("getorphanpoolinfo", "") + HelpExampleRpc("getorphanoolinfo", ""));
+
+    return orphanpoolInfoToJSON();
+}
+
 UniValue invalidateblock(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
@@ -1203,6 +1229,7 @@ static const CRPCCommand commands[] = {
     {"blockchain", "getblock", &getblock, true}, {"blockchain", "getblockhash", &getblockhash, true},
     {"blockchain", "getblockheader", &getblockheader, true}, {"blockchain", "getchaintips", &getchaintips, true},
     {"blockchain", "getdifficulty", &getdifficulty, true}, {"blockchain", "getmempoolinfo", &getmempoolinfo, true},
+    {"blockchain", "getorphanpoolinfo", &getorphanpoolinfo, true},
     {"blockchain", "getrawmempool", &getrawmempool, true}, {"blockchain", "gettxout", &gettxout, true},
     {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true}, {"blockchain", "verifychain", &verifychain, true},
 

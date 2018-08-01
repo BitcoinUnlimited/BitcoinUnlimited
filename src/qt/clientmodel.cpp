@@ -80,12 +80,7 @@ QDateTime ClientModel::getLastBlockDate() const
 }
 
 long ClientModel::getMempoolSize() const { return mempool.size(); }
-long ClientModel::getOrphanPoolSize() const
-{
-    LOCK(orphanpool.cs);
-    return orphanpool.mapOrphanTransactions.size();
-}
-
+long ClientModel::getOrphanPoolSize() const { return orphanpool.GetOrphanPoolSize(); }
 size_t ClientModel::getMempoolDynamicUsage() const { return mempool.DynamicMemoryUsage(); }
 // BU: begin
 double ClientModel::getTransactionsPerSecond() const { return mempool.TransactionsPerSecond(); }
