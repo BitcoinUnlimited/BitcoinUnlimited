@@ -107,33 +107,39 @@ bool ReadUndoFromDB(CBlockUndo &blockundo, const CBlockIndex *pindex)
 
 uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
 {
+    CBlockIndex *pindexOldest = chainActive.Tip();
+    while (pindexOldest->pprev && pindexOldest->pprev->nFile != 0)
+    {
+        pindexOldest = pindexOldest->pprev;
+    }
     uint64_t prunedCount = 0;
     CDBBatch blockBatch(*pblockdb);
     CDBBatch undoBatch(*pblockundodb);
-    while (!vDbBlockSizes.empty() && nDBUsedSpace >= nPruneTarget)
+    while (nDBUsedSpace >= nPruneTarget && pindexOldest != nullptr)
     {
-        uint256 frontHash = vDbBlockSizes.front().first;
-        uint64_t frontSize = vDbBlockSizes.front().second;
-        BlockMap::iterator iter = mapBlockIndex.find(frontHash);
+        if (pindexOldest->nHeight >= nLastBlockWeCanPrune)
+        {
+            break;
+        }
+        unsigned int blockSize = pindexOldest->nDataPos;
         std::ostringstream key;
-        key << iter->second->GetBlockTime() << ":" << iter->second->GetBlockHash().ToString();
+        key << pindexOldest->GetBlockTime() << ":" << pindexOldest->GetBlockHash().ToString();
         blockBatch.Erase(key.str());
         undoBatch.Erase(key.str());
-        iter->second->nStatus &= ~BLOCK_HAVE_DATA;
-        iter->second->nStatus &= ~BLOCK_HAVE_UNDO;
-        iter->second->nFile = 0;
-        iter->second->nDataPos = 0;
-        iter->second->nUndoPos = 0;
-        setDirtyBlockIndex.insert(iter->second);
-        vDbBlockSizes.erase(vDbBlockSizes.begin());
+        nDBUsedSpace = nDBUsedSpace - blockSize;
+        pindexOldest->nStatus &= ~BLOCK_HAVE_DATA;
+        pindexOldest->nStatus &= ~BLOCK_HAVE_UNDO;
+        pindexOldest->nFile = 0;
+        pindexOldest->nDataPos = 0;
+        pindexOldest->nUndoPos = 0;
+        setDirtyBlockIndex.insert(pindexOldest);
         prunedCount = prunedCount + 1;
-        nDBUsedSpace = nDBUsedSpace - frontSize;
+        pindexOldest = chainActive.Next(pindexOldest);
     }
     pblockdb->WriteBatch(blockBatch, true);
     pblockundodb->WriteBatch(undoBatch, true);
     pblockdb->Compact();
     pblockundodb->Compact();
-    LOG(PRUNE, "Pruned %u blocks, size on disk %u, data for %u indexes\n", prunedCount, nDBUsedSpace,
-        vDbBlockSizes.size());
+    LOG(PRUNE, "Pruned %u blocks, size on disk %u\n", prunedCount, nDBUsedSpace);
     return prunedCount;
 }

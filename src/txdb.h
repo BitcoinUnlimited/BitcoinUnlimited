@@ -169,8 +169,6 @@ public:
         const std::vector<const CBlockIndex *> &blockinfo);
     bool ReadBlockFileInfo(int nFile, CBlockFileInfo &fileinfo);
     bool ReadLastBlockFile(int &nFile);
-    bool WriteBlockSizeData(std::vector<std::pair<uint256, uint64_t> > blocksizes);
-    bool ReadBlockSizeData(std::vector<std::pair<uint256, uint64_t> > &blocksizes);
     bool WriteReindexing(bool fReindex);
     bool ReadReindexing(bool &fReindex);
     bool ReadTxIndex(const uint256 &txid, CDiskTxPos &pos);

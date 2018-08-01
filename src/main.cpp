@@ -8,8 +8,8 @@
 
 #include "addrman.h"
 #include "arith_uint256.h"
-#include "blockstorage/sequential_files.h"
 #include "blockstorage/blockstorage.h"
+#include "blockstorage/sequential_files.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "checkqueue.h"
@@ -84,7 +84,6 @@ bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
 uint64_t nPruneTarget = 0;
 uint64_t nDBUsedSpace = 0;
-std::vector<std::pair<uint256, uint64_t> > vDbBlockSizes;
 uint32_t nXthinBloomFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE;
 
 // BU: Move global objects to a single file
@@ -3095,7 +3094,7 @@ bool FindBlockPos(CValidationState &state,
     if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
         pos.nFile = 1;
-        pos.nPos = 1;
+        pos.nPos = nAddSize;
         if (CheckDiskSpace(nAddSize))
         {
             nDBUsedSpace += nAddSize;
@@ -3569,10 +3568,6 @@ static bool AcceptBlock(const CBlock &block,
         if (!FindBlockPos(state, blockPos, nBlockSize + 8, nHeight, block.GetBlockTime(), dbp != NULL))
         {
             return error("AcceptBlock(): FindBlockPos failed");
-        }
-        if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
-        {
-            vDbBlockSizes.emplace_back(std::make_pair(block.GetHash(), nBlockSize + 8));
         }
         if (dbp == NULL)
         {

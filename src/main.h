@@ -133,6 +133,8 @@ static const uint32_t UNCONNECTED_HEADERS_TIMEOUT = 120;
 static const uint32_t DEFAULT_LIMITFREERELAY = DEFAULT_BLOCK_MAX_SIZE * 0.000015;
 /** Subject free transactions to priority checking when entering the mempool */
 static const bool DEFAULT_RELAYPRIORITY = false;
+/** The number of MiB that we will wait for the block storage method to go over before pruning */
+static const uint64_t DEFAULT_PRUNE_INTERVAL = 100;
 
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 
@@ -212,8 +214,6 @@ extern bool fPruneMode;
 extern uint64_t nPruneTarget;
 /** Number of MiB the blockdb is using. */
 extern uint64_t nDBUsedSpace;
-/** keep track of the sizes of blocks in the db, DB_BLOCK_STORAGE only */
-extern std::vector<std::pair<uint256, uint64_t> > vDbBlockSizes;
 /** The maximum bloom filter size that we will support for an xthin request. This value is communicated to
  *  our peer at the time we first make the connection.
  */

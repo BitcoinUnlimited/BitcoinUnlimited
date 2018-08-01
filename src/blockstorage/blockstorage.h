@@ -25,7 +25,9 @@ enum BlockDBMode
 static const BlockDBMode DEFAULT_BLOCK_DB_MODE = SEQUENTIAL_BLOCK_FILES;
 extern BlockDBMode BLOCK_DB_MODE;
 
-void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache, const int64_t &_nBlockDBCache, const int64_t &_nBlockUndoDBCache);
+void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache,
+    const int64_t &_nBlockDBCache,
+    const int64_t &_nBlockUndoDBCache);
 
 /** Determine if the block db mode we started with is behind another one already on disk*/
 bool DetermineStorageSync();

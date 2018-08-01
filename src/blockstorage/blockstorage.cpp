@@ -19,29 +19,32 @@ extern bool fCheckForPruning;
 extern CCriticalSection cs_LastBlockFile;
 extern std::set<int> setDirtyFileInfo;
 extern std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
+extern uint64_t pruneInterval;
 
 /**
   * Config param to determine what DB type we are using
   */
 BlockDBMode BLOCK_DB_MODE = DEFAULT_BLOCK_DB_MODE;
 
-void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache, const int64_t &_nBlockDBCache, const int64_t &_nBlockUndoDBCache)
+void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache,
+    const int64_t &_nBlockDBCache,
+    const int64_t &_nBlockUndoDBCache)
 {
-    if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
         pblocktree = new CBlockTreeDB(_nBlockTreeDBCache, "blockdb", false, fReindex);
         pblocktreeother = new CBlockTreeDB(_nBlockTreeDBCache, "blocks", false, fReindex);
         if (boost::filesystem::exists(GetDataDir() / "blockdb" / "blocks"))
         {
-            for(fs::recursive_directory_iterator it(GetDataDir() / "blockdb" / "blocks"); it!=fs::recursive_directory_iterator(); ++it)
+            for (fs::recursive_directory_iterator it(GetDataDir() / "blockdb" / "blocks");
+                 it != fs::recursive_directory_iterator(); ++it)
             {
-                if(!fs::is_directory(*it))
+                if (!fs::is_directory(*it))
                 {
-                    nDBUsedSpace+=fs::file_size(*it);
+                    nDBUsedSpace += fs::file_size(*it);
                 }
             }
         }
-        pblocktree->ReadBlockSizeData(vDbBlockSizes);
     }
     else
     {
@@ -52,14 +55,14 @@ void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache, const int64_t &_n
     // we want to have much larger file sizes for the blocks db so override the default.
     COverrideOptions override;
     override.max_file_size = _nBlockDBCache / 2;
-    pblockdb = new CBlockDB("blocks", _nBlockDBCache, false, false, false, &override);
+    pblockdb = new CBlockDB("blocks", _nBlockDBCache, false, false, false, & override);
 
     // Make the undo file max size larger than the default and also configure the write buffer
     // to be a larger proportion of the overall cache since we don't really need a big read buffer
     // for undo files.
     override.max_file_size = _nBlockUndoDBCache;
     override.write_buffer_size = _nBlockUndoDBCache / 1.8;
-    pblockundodb = new CBlockDB("undo", _nBlockUndoDBCache, false, false, false, &override);
+    pblockundodb = new CBlockDB("undo", _nBlockUndoDBCache, false, false, false, & override);
 }
 
 bool DetermineStorageSync()
@@ -355,6 +358,8 @@ void SyncStorage(const CChainParams &chainparams)
                     LOGA("SyncStorage(): critical error, failure to read block data from sequential files \n");
                     assert(false);
                 }
+                unsigned int nBlockSize = ::GetSerializeSize(block_seq, SER_DISK, CLIENT_VERSION);
+                index->nDataPos = nBlockSize;
                 if (!WriteBlockToDB(block_seq))
                 {
                     LOGA("critical error, failed to write block to db, asserting false \n");
@@ -502,7 +507,6 @@ bool ReadUndoFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const CBl
     return false;
 }
 
-
 /* Calculate the block/rev files that should be deleted to remain under target*/
 void FindFilesToPrune(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight)
 {
@@ -524,6 +528,10 @@ void FindFilesToPrune(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight
     }
     else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
+        if (nDBUsedSpace < nPruneTarget + pruneInterval)
+        {
+            return;
+        }
         uint64_t amntPruned = FindFilesToPruneLevelDB(nLastBlockWeCanPrune);
         // because we just prune the DB here and dont have a file set to return, we need to set prune triggers here
         // otherwise they will check for the fileset and incorrectly never be set

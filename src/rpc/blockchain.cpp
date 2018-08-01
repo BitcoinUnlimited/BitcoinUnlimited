@@ -18,6 +18,7 @@
 #include "rpc/server.h"
 #include "streams.h"
 #include "sync.h"
+#include "tweak.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
