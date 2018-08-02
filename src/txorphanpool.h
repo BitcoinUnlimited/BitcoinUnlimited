@@ -56,6 +56,19 @@ public:
 
     //! Set the last orphan check time (used primarily in testing)
     void SetLastOrphanCheck(int64_t nTime) { nLastOrphanCheck = nTime; }
+    //! Orphan pool current number of transactions
+    uint64_t GetOrphanPoolSize()
+    {
+        LOCK(cs);
+        return mapOrphanTransactions.size();
+    }
+
+    //! Orphan pool bytes used
+    uint64_t GetOrphanPoolBytes()
+    {
+        LOCK(cs);
+        return nBytesOrphanPool;
+    }
 };
 extern CTxOrphanPool orphanpool;
 
