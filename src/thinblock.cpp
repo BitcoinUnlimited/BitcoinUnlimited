@@ -96,8 +96,9 @@ unsigned int addFromWeak(std::vector<T> &vTxHashes,
             {
                 LOG(WB, "Remote node does not know about underlying weak block. Not sending a delta block.\n");
             }
-            // assert that the target node knows about this block now
-            weakstore.set_nodeKnows(pto->GetId(), block.GetHash());
+            if (pto != nullptr)
+                // assert that the target node knows about this block now
+                weakstore.set_nodeKnows(pto->GetId(), block.GetHash());
         }
     }
     return skip_underlying;
