@@ -11,6 +11,10 @@
 // c++11 #include <type_traits>
 #include "univalue/include/univalue.h"
 
+#include <iostream>
+#include <mutex>
+#include <thread>
+
 class CTweakBase;
 
 typedef std::string CTweakKey;
@@ -20,6 +24,8 @@ extern CTweakMap tweaks;
 class CTweakBase
 {
 public:
+    mutable std::mutex cs_tweak;
+
     CTweakBase(){};
     virtual std::string GetName() const = 0; // Returns the name of this statistic
     virtual std::string GetHelp() const = 0; // Returns the help for this statistic
@@ -117,23 +123,36 @@ public:
             tweaks.erase(CTweakKey(name));
     }
 
-    CTweakRef(const char *namep, const char *helpp, DataType *val, EventFn callback = NULL)
+    CTweakRef(const char *namep, const char *helpp, DataType *val, EventFn callback = nullptr)
         : name(namep), help(helpp), value(val), eventCb(callback)
     {
         tweaks[CTweakKey(name)] = this;
     }
 
-    CTweakRef(const std::string &namep, const std::string &helpp, DataType *val, EventFn callback = NULL)
+    CTweakRef(const std::string &namep, const std::string &helpp, DataType *val, EventFn callback = nullptr)
         : name(namep), help(helpp), value(val), eventCb(callback)
     {
         tweaks[CTweakKey(name)] = this;
     }
 
-    virtual std::string GetName() const { return name; }
-    virtual std::string GetHelp() const { return help; }
-    virtual UniValue Get() const { return UniValue(*value); }
+    virtual std::string GetName() const
+    {
+        std::unique_lock<std::mutex> lck(cs_tweak);
+        return name;
+    }
+    virtual std::string GetHelp() const
+    {
+        std::unique_lock<std::mutex> lck(cs_tweak);
+        return help;
+    }
+    virtual UniValue Get() const
+    {
+        std::unique_lock<std::mutex> lck(cs_tweak);
+        return UniValue(*value);
+    }
     virtual std::string Validate(const UniValue &val)
     {
+        std::unique_lock<std::mutex> lck(cs_tweak);
         if (eventCb)
         {
             DataType candidate;
@@ -147,6 +166,7 @@ public:
 
     virtual UniValue Set(const UniValue &v) // Returns NullUnivalue or an error string
     {
+        std::unique_lock<std::mutex> lck(cs_tweak);
         DataType prior = *value;
         fill(v, *value);
         if (eventCb)
@@ -187,11 +207,24 @@ public:
         tweaks[CTweakKey(name)] = this;
     }
 
-    virtual std::string GetName() const { return name; }
-    virtual std::string GetHelp() const { return help; }
-    virtual UniValue Get() const { return UniValue(value); }
+    virtual std::string GetName() const
+    {
+        std::unique_lock<std::mutex> lck(cs_tweak);
+        return name;
+    }
+    virtual std::string GetHelp() const
+    {
+        std::unique_lock<std::mutex> lck(cs_tweak);
+        return help;
+    }
+    virtual UniValue Get() const
+    {
+        std::unique_lock<std::mutex> lck(cs_tweak);
+        return UniValue(value);
+    }
     virtual UniValue Set(const UniValue &v)
     {
+        std::unique_lock<std::mutex> lck(cs_tweak);
         fill(v, value);
 
         // Returns NullUnivalue or an error string
