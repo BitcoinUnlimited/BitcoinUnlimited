@@ -102,6 +102,11 @@ inline void fill(const UniValue &v, bool &output)
 template <class DataType>
 class CTweakRef : public CTweakBase
 {
+private:
+    std::string name;
+    std::string help;
+    DataType *value;
+
 public:
     // Validation and assignment notification function.
     // If "validate" is true, then return nonempty error string if this field
@@ -112,9 +117,6 @@ public:
     // want to give some kind of ACK message to the user.
     typedef std::string (*EventFn)(const DataType &value, DataType *item, bool validate);
 
-    std::string name;
-    std::string help;
-    DataType *value;
     EventFn eventCb;
 
     ~CTweakRef()
@@ -177,6 +179,12 @@ public:
         }
         return NullUniValue;
     }
+
+    virtual DataType Value() const
+    {
+        std::unique_lock<std::mutex> lck(cs_tweak);
+        return *value;
+    }
 };
 
 /** A configuration parameter that is automatically hooked up to
@@ -185,11 +193,12 @@ public:
 template <class DataType>
 class CTweak : public CTweakBase
 {
-public:
+private:
     std::string name;
     std::string help;
     DataType value;
 
+public:
     ~CTweak()
     {
         if (name.size())
@@ -229,6 +238,12 @@ public:
 
         // Returns NullUnivalue or an error string
         return NullUniValue;
+    }
+
+    virtual DataType Value() const
+    {
+        std::unique_lock<std::mutex> lck(cs_tweak);
+        return value;
     }
 };
 

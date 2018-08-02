@@ -2490,10 +2490,10 @@ void RelayTransaction(const CTransaction &tx)
 void RelayTransaction(const CTransaction &tx, const CDataStream &ss)
 {
     uint64_t len = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-    if (len > maxTxSize.value)
+    if (len > maxTxSize.Value())
     {
         LOGA("Will not announce (INV) excessive transaction %s.  Size: %llu, Limit: %llu\n", tx.GetHash().ToString(),
-            len, (uint64_t)maxTxSize.value);
+            len, (uint64_t)maxTxSize.Value());
         return;
     }
 

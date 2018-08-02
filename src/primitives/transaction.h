@@ -152,7 +152,7 @@ public:
         if (scriptPubKey.IsUnspendable())
             return (CAmount)0;
 
-        return (CAmount)nDustThreshold.value;
+        return (CAmount)nDustThreshold.Value();
     }
     bool IsDust() const { return (nValue < GetDustThreshold()); }
     friend bool operator==(const CTxOut &a, const CTxOut &b)
