@@ -910,6 +910,7 @@ std::string CGrapheneBlockData::InBoundPercentToString()
     LOCK(cs_graphenestats);
 
     expireStats(mapGrapheneBlocksInBound);
+    expireStats(mapMemPoolInfoOutBound);
 
     double nCompressionRate = 0;
     uint64_t nGrapheneSizeTotal = 0;
@@ -943,6 +944,7 @@ std::string CGrapheneBlockData::OutBoundPercentToString()
     LOCK(cs_graphenestats);
 
     expireStats(mapGrapheneBlocksOutBound);
+    expireStats(mapMemPoolInfoInBound);
 
     double nCompressionRate = 0;
     uint64_t nGrapheneSizeTotal = 0;
@@ -1037,6 +1039,8 @@ std::string CGrapheneBlockData::ResponseTimeToString()
 {
     LOCK(cs_graphenestats);
 
+    expireStats(mapGrapheneBlockResponseTime);
+
     std::vector<double> vResponseTime;
 
     double nResponseTimeAverage = 0;
@@ -1070,6 +1074,8 @@ std::string CGrapheneBlockData::ResponseTimeToString()
 std::string CGrapheneBlockData::ValidationTimeToString()
 {
     LOCK(cs_graphenestats);
+
+    expireStats(mapGrapheneBlockValidationTime);
 
     std::vector<double> vValidationTime;
 
@@ -1106,6 +1112,7 @@ std::string CGrapheneBlockData::ReRequestedTxToString()
     LOCK(cs_graphenestats);
 
     expireStats(mapGrapheneBlocksInBoundReRequestedTx);
+    expireStats(mapGrapheneBlocksInBound);
 
     double nReRequestRate = 0;
     uint64_t nTotalReRequests = 0;

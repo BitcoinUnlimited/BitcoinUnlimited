@@ -1083,6 +1083,7 @@ std::string CThinBlockData::InBoundPercentToString()
     LOCK(cs_thinblockstats);
 
     expireStats(mapThinBlocksInBound);
+    expireStats(mapBloomFiltersOutBound);
 
     double nCompressionRate = 0;
     uint64_t nThinSizeTotal = 0;
@@ -1116,6 +1117,7 @@ std::string CThinBlockData::OutBoundPercentToString()
     LOCK(cs_thinblockstats);
 
     expireStats(mapThinBlocksOutBound);
+    expireStats(mapBloomFiltersInBound);
 
     double nCompressionRate = 0;
     uint64_t nThinSizeTotal = 0;
@@ -1166,6 +1168,8 @@ std::string CThinBlockData::ResponseTimeToString()
 {
     LOCK(cs_thinblockstats);
 
+    expireStats(mapThinBlockResponseTime);
+
     std::vector<double> vResponseTime;
 
     double nResponseTimeAverage = 0;
@@ -1199,6 +1203,8 @@ std::string CThinBlockData::ResponseTimeToString()
 std::string CThinBlockData::ValidationTimeToString()
 {
     LOCK(cs_thinblockstats);
+
+    expireStats(mapThinBlockValidationTime);
 
     std::vector<double> vValidationTime;
 
@@ -1235,6 +1241,7 @@ std::string CThinBlockData::ReRequestedTxToString()
     LOCK(cs_thinblockstats);
 
     expireStats(mapThinBlocksInBoundReRequestedTx);
+    expireStats(mapThinBlocksInBound);
 
     double nReRequestRate = 0;
     uint64_t nTotalReRequests = 0;
