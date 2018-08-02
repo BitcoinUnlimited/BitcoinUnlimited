@@ -1087,18 +1087,16 @@ std::string CThinBlockData::InBoundPercentToString()
     double nCompressionRate = 0;
     uint64_t nThinSizeTotal = 0;
     uint64_t nOriginalSizeTotal = 0;
-    for (std::map<int64_t, std::pair<uint64_t, uint64_t> >::iterator mi = mapThinBlocksInBound.begin();
-         mi != mapThinBlocksInBound.end(); ++mi)
+    for (const auto &mi : mapThinBlocksInBound)
     {
-        nThinSizeTotal += (*mi).second.first;
-        nOriginalSizeTotal += (*mi).second.second;
+        nThinSizeTotal += mi.second.first;
+        nOriginalSizeTotal += mi.second.second;
     }
     // We count up the outbound bloom filters. Outbound bloom filters go with Inbound xthins.
     uint64_t nOutBoundBloomFilterSize = 0;
-    for (std::map<int64_t, uint64_t>::iterator mi = mapBloomFiltersOutBound.begin();
-         mi != mapBloomFiltersOutBound.end(); ++mi)
+    for (const auto &mi : mapBloomFiltersOutBound)
     {
-        nOutBoundBloomFilterSize += (*mi).second;
+        nOutBoundBloomFilterSize += mi.second;
     }
 
 
@@ -1122,18 +1120,16 @@ std::string CThinBlockData::OutBoundPercentToString()
     double nCompressionRate = 0;
     uint64_t nThinSizeTotal = 0;
     uint64_t nOriginalSizeTotal = 0;
-    for (std::map<int64_t, std::pair<uint64_t, uint64_t> >::iterator mi = mapThinBlocksOutBound.begin();
-         mi != mapThinBlocksOutBound.end(); ++mi)
+    for (const auto &mi : mapThinBlocksOutBound)
     {
-        nThinSizeTotal += (*mi).second.first;
-        nOriginalSizeTotal += (*mi).second.second;
+        nThinSizeTotal += mi.second.first;
+        nOriginalSizeTotal += mi.second.second;
     }
     // We count up the inbound bloom filters. Inbound bloom filters go with Outbound xthins.
     uint64_t nInBoundBloomFilterSize = 0;
-    for (std::map<int64_t, uint64_t>::iterator mi = mapBloomFiltersInBound.begin(); mi != mapBloomFiltersInBound.end();
-         ++mi)
+    for (const auto &mi : mapBloomFiltersInBound)
     {
-        nInBoundBloomFilterSize += (*mi).second;
+        nInBoundBloomFilterSize += mi.second;
     }
 
     if (nOriginalSizeTotal > 0)
@@ -1176,12 +1172,11 @@ std::string CThinBlockData::ResponseTimeToString()
     double nPercentile = 0;
     double nTotalResponseTime = 0;
     double nTotalEntries = 0;
-    for (std::map<int64_t, double>::iterator mi = mapThinBlockResponseTime.begin();
-         mi != mapThinBlockResponseTime.end(); ++mi)
+    for (const auto &mi : mapThinBlockResponseTime)
     {
         nTotalEntries += 1;
-        nTotalResponseTime += (*mi).second;
-        vResponseTime.push_back((*mi).second);
+        nTotalResponseTime += mi.second;
+        vResponseTime.push_back(mi.second);
     }
 
     if (nTotalEntries > 0)
@@ -1211,12 +1206,11 @@ std::string CThinBlockData::ValidationTimeToString()
     double nPercentile = 0;
     double nTotalValidationTime = 0;
     double nTotalEntries = 0;
-    for (std::map<int64_t, double>::iterator mi = mapThinBlockValidationTime.begin();
-         mi != mapThinBlockValidationTime.end(); ++mi)
+    for (const auto &mi : mapThinBlockValidationTime)
     {
         nTotalEntries += 1;
-        nTotalValidationTime += (*mi).second;
-        vValidationTime.push_back((*mi).second);
+        nTotalValidationTime += mi.second;
+        vValidationTime.push_back(mi.second);
     }
 
     if (nTotalEntries > 0)
@@ -1245,11 +1239,10 @@ std::string CThinBlockData::ReRequestedTxToString()
     double nReRequestRate = 0;
     uint64_t nTotalReRequests = 0;
     uint64_t nTotalReRequestedTxs = 0;
-    for (std::map<int64_t, int>::iterator mi = mapThinBlocksInBoundReRequestedTx.begin();
-         mi != mapThinBlocksInBoundReRequestedTx.end(); ++mi)
+    for (const auto &mi : mapThinBlocksInBoundReRequestedTx)
     {
         nTotalReRequests += 1;
-        nTotalReRequestedTxs += (*mi).second;
+        nTotalReRequestedTxs += mi.second;
     }
 
     if (mapThinBlocksInBound.size() > 0)

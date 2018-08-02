@@ -914,18 +914,16 @@ std::string CGrapheneBlockData::InBoundPercentToString()
     double nCompressionRate = 0;
     uint64_t nGrapheneSizeTotal = 0;
     uint64_t nOriginalSizeTotal = 0;
-    for (std::map<int64_t, std::pair<uint64_t, uint64_t> >::iterator mi = mapGrapheneBlocksInBound.begin();
-         mi != mapGrapheneBlocksInBound.end(); ++mi)
+    for (const auto &mi : mapGrapheneBlocksInBound)
     {
-        nGrapheneSizeTotal += (*mi).second.first;
-        nOriginalSizeTotal += (*mi).second.second;
+        nGrapheneSizeTotal += mi.second.first;
+        nOriginalSizeTotal += mi.second.second;
     }
     // We count up the outbound CMemPoolInfo sizes. Outbound CMemPoolInfo sizes go with Inbound graphene blocks.
     uint64_t nOutBoundMemPoolInfoSize = 0;
-    for (std::map<int64_t, uint64_t>::iterator mi = mapMemPoolInfoOutBound.begin(); mi != mapMemPoolInfoOutBound.end();
-         ++mi)
+    for (const auto &mi : mapMemPoolInfoOutBound)
     {
-        nOutBoundMemPoolInfoSize += (*mi).second;
+        nOutBoundMemPoolInfoSize += mi.second;
     }
 
     if (nOriginalSizeTotal > 0)
@@ -949,17 +947,15 @@ std::string CGrapheneBlockData::OutBoundPercentToString()
     double nCompressionRate = 0;
     uint64_t nGrapheneSizeTotal = 0;
     uint64_t nOriginalSizeTotal = 0;
-    for (std::map<int64_t, std::pair<uint64_t, uint64_t> >::iterator mi = mapGrapheneBlocksOutBound.begin();
-         mi != mapGrapheneBlocksOutBound.end(); ++mi)
+    for (const auto &mi : mapGrapheneBlocksOutBound)
     {
-        nGrapheneSizeTotal += (*mi).second.first;
-        nOriginalSizeTotal += (*mi).second.second;
+        nGrapheneSizeTotal += mi.second.first;
+        nOriginalSizeTotal += mi.second.second;
     }
     // We count up the inbound CMemPoolInfo sizes. Inbound CMemPoolInfo sizes go with Outbound graphene blocks.
     uint64_t nInBoundMemPoolInfoSize = 0;
-    for (std::map<int64_t, uint64_t>::iterator mi = mapMemPoolInfoInBound.begin(); mi != mapMemPoolInfoInBound.end();
-         ++mi)
-        nInBoundMemPoolInfoSize += (*mi).second;
+    for (const auto &mi : mapMemPoolInfoInBound)
+        nInBoundMemPoolInfoSize += mi.second;
 
     if (nOriginalSizeTotal > 0)
         nCompressionRate = 100 - (100 * (double)(nGrapheneSizeTotal + nInBoundMemPoolInfoSize) / nOriginalSizeTotal);
@@ -1047,12 +1043,11 @@ std::string CGrapheneBlockData::ResponseTimeToString()
     double nPercentile = 0;
     double nTotalResponseTime = 0;
     double nTotalEntries = 0;
-    for (std::map<int64_t, double>::iterator mi = mapGrapheneBlockResponseTime.begin();
-         mi != mapGrapheneBlockResponseTime.end(); ++mi)
+    for (const auto &mi : mapGrapheneBlockResponseTime)
     {
         nTotalEntries += 1;
-        nTotalResponseTime += (*mi).second;
-        vResponseTime.push_back((*mi).second);
+        nTotalResponseTime += mi.second;
+        vResponseTime.push_back(mi.second);
     }
 
     if (nTotalEntries > 0)
@@ -1082,12 +1077,11 @@ std::string CGrapheneBlockData::ValidationTimeToString()
     double nPercentile = 0;
     double nTotalValidationTime = 0;
     double nTotalEntries = 0;
-    for (std::map<int64_t, double>::iterator mi = mapGrapheneBlockValidationTime.begin();
-         mi != mapGrapheneBlockValidationTime.end(); ++mi)
+    for (const auto &mi : mapGrapheneBlockValidationTime)
     {
         nTotalEntries += 1;
-        nTotalValidationTime += (*mi).second;
-        vValidationTime.push_back((*mi).second);
+        nTotalValidationTime += mi.second;
+        vValidationTime.push_back(mi.second);
     }
 
     if (nTotalEntries > 0)
@@ -1116,11 +1110,10 @@ std::string CGrapheneBlockData::ReRequestedTxToString()
     double nReRequestRate = 0;
     uint64_t nTotalReRequests = 0;
     uint64_t nTotalReRequestedTxs = 0;
-    for (std::map<int64_t, int>::iterator mi = mapGrapheneBlocksInBoundReRequestedTx.begin();
-         mi != mapGrapheneBlocksInBoundReRequestedTx.end(); ++mi)
+    for (const auto &mi : mapGrapheneBlocksInBoundReRequestedTx)
     {
         nTotalReRequests += 1;
-        nTotalReRequestedTxs += (*mi).second;
+        nTotalReRequestedTxs += mi.second;
     }
 
     if (mapGrapheneBlocksInBound.size() > 0)
