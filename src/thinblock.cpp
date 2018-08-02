@@ -1778,7 +1778,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
     static int64_t nStartGrowth = GetTime();
 
     // Tuning knobs for the false positive growth algorithm
-    static uint8_t nHoursToGrow = 72; // number of hours until maximum growth for false positive rate
+    static uint8_t nHoursToGrow = 12; // number of hours until maximum growth for false positive rate
     // use for nMinFalsePositive = 0.0001 and nMaxFalsePositive = 0.01 for
     // static double nGrowthCoefficient = 0.7676;
     // 6 hour growth period
