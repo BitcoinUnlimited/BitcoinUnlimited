@@ -1034,6 +1034,14 @@ UniValue mempoolInfoToJSON()
     size_t maxmempool = GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
     ret.push_back(Pair("maxmempool", (int64_t)maxmempool));
     ret.push_back(Pair("mempoolminfee", ValueFromAmount(mempool.GetMinFee(maxmempool).GetFeePerK())));
+    try
+    {
+        ret.push_back(Pair("tps", boost::lexical_cast<double>(strprintf("%.2f", mempool.TransactionsPerSecond()))));
+    }
+    catch (boost::bad_lexical_cast &)
+    {
+        ret.push_back(Pair("tps", "N/A"));
+    }
 
     return ret;
 }
@@ -1050,6 +1058,7 @@ UniValue getmempoolinfo(const UniValue &params, bool fHelp)
                             "  \"usage\": xxxxx,              (numeric) Total memory usage for the mempool\n"
                             "  \"maxmempool\": xxxxx,         (numeric) Maximum memory usage for the mempool\n"
                             "  \"mempoolminfee\": xxxxx       (numeric) Minimum fee for tx to be accepted\n"
+                            "  \"tps\": xxxxx                 (numeric) Transactions per second accepted\n"
                             "}\n"
                             "\nExamples:\n" +
                             HelpExampleCli("getmempoolinfo", "") + HelpExampleRpc("getmempoolinfo", ""));
