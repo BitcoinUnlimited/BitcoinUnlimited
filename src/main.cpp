@@ -3457,14 +3457,7 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block,
     const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
 
     if (pWeak != nullptr)
-    {
-        LOCK(cs_weakblocks);
-        const bool hasWeakPOW = CheckProofOfWork(
-            block.GetHash(), MinWeakblockProofOfWork(block.nBits), Params().GetConsensus(), weakblocksMinPOWRatio());
-        const bool hasStrongPOW = CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus(), 1);
-
-        *pWeak = hasWeakPOW && !hasStrongPOW;
-    }
+        *pWeak = hasWeakButNotStrongPOW(&block);
 
     // Check proof of work
     uint32_t expectedNbits = GetNextWorkRequired(pindexPrev, &block, consensusParams);

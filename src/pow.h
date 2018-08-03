@@ -31,6 +31,9 @@ uint32_t MinWeakblockProofOfWork(uint32_t nBits);
 // the -weakblocks-max-difficulty-factor command line argument
 uint32_t ConsiderationWeakblockProofOfWork(uint32_t nBits);
 
+// Returns true iff the given block has weak but not strong POW
+bool hasWeakButNotStrongPOW(const CBlockHeader *block);
+
 arith_uint256 GetBlockProof(const CBlockIndex &block);
 
 /** Return the time it would take to redo the work difference between from and to, assuming the current hashrate

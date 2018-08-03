@@ -194,6 +194,14 @@ uint32_t ConsiderationWeakblockProofOfWork(uint32_t nBits)
     return considertarget.GetCompact();
 }
 
+bool hasWeakButNotStrongPOW(const CBlockHeader *block)
+{
+    LOCK(cs_weakblocks);
+    const bool hasWeakPOW = CheckProofOfWork(
+        block->GetHash(), MinWeakblockProofOfWork(block->nBits), Params().GetConsensus(), weakblocksMinPOWRatio());
+    const bool hasStrongPOW = CheckProofOfWork(block->GetHash(), block->nBits, Params().GetConsensus(), 1);
+    return hasWeakPOW && !hasStrongPOW;
+}
 
 arith_uint256 GetBlockProof(const CBlockIndex &block)
 {
