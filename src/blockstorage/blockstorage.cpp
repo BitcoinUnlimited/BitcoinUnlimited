@@ -25,6 +25,43 @@ extern std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
   */
 BlockDBMode BLOCK_DB_MODE = DEFAULT_BLOCK_DB_MODE;
 
+void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache, const int64_t &_nBlockDBCache, const int64_t &_nBlockUndoDBCache)
+{
+    if(BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    {
+        pblocktree = new CBlockTreeDB(_nBlockTreeDBCache, "blockdb", false, fReindex);
+        pblocktreeother = new CBlockTreeDB(_nBlockTreeDBCache, "blocks", false, fReindex);
+        if (boost::filesystem::exists(GetDataDir() / "blockdb" / "blocks"))
+        {
+            for(fs::recursive_directory_iterator it(GetDataDir() / "blockdb" / "blocks"); it!=fs::recursive_directory_iterator(); ++it)
+            {
+                if(!fs::is_directory(*it))
+                {
+                    nDBUsedSpace+=fs::file_size(*it);
+                }
+            }
+        }
+        pblocktree->ReadBlockSizeData(vDbBlockSizes);
+    }
+    else
+    {
+        pblocktree = new CBlockTreeDB(_nBlockTreeDBCache, "blocks", false, fReindex);
+        pblocktreeother = new CBlockTreeDB(_nBlockTreeDBCache, "blockdb", false, fReindex);
+    }
+
+    // we want to have much larger file sizes for the blocks db so override the default.
+    COverrideOptions override;
+    override.max_file_size = _nBlockDBCache / 2;
+    pblockdb = new CBlockDB("blocks", _nBlockDBCache, false, false, false, &override);
+
+    // Make the undo file max size larger than the default and also configure the write buffer
+    // to be a larger proportion of the overall cache since we don't really need a big read buffer
+    // for undo files.
+    override.max_file_size = _nBlockUndoDBCache;
+    override.write_buffer_size = _nBlockUndoDBCache / 1.8;
+    pblockundodb = new CBlockDB("undo", _nBlockUndoDBCache, false, false, false, &override);
+}
+
 bool DetermineStorageSync()
 {
     uint256 bestHashSeq = pcoinsdbview->GetBestBlockSeq();

@@ -244,9 +244,9 @@ void Shutdown()
         delete pblocktree;
         pblocktree = nullptr;
         delete pblockdb;
-        pblockdb = NULL;
+        pblockdb = nullptr;
         delete pblockundodb;
-        pblockundodb = NULL;
+        pblockundodb = nullptr;
     }
 #ifdef ENABLE_WALLET
     if (pwalletMain)
@@ -1056,40 +1056,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 delete pblockundodb;
 
                 uiInterface.InitMessage(_("Opening Block database..."));
-                if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
-                {
-                    pblocktree = new CBlockTreeDB(nBlockTreeDBCache, "blockdb", false, fReindex);
-                    pblocktreeother = new CBlockTreeDB(nBlockTreeDBCache, "blocks", false, fReindex);
-                    if (boost::filesystem::exists(GetDataDir() / "blockdb" / "blocks"))
-                    {
-                        for (fs::recursive_directory_iterator it(GetDataDir() / "blockdb" / "blocks");
-                             it != fs::recursive_directory_iterator(); ++it)
-                        {
-                            if (!fs::is_directory(*it))
-                            {
-                                nDBUsedSpace += fs::file_size(*it);
-                            }
-                        }
-                    }
-                    pblocktree->ReadBlockSizeData(vDbBlockSizes);
-                }
-                else
-                {
-                    pblocktree = new CBlockTreeDB(nBlockTreeDBCache, "blocks", false, fReindex);
-                    pblocktreeother = new CBlockTreeDB(nBlockTreeDBCache, "blockdb", false, fReindex);
-                }
-
-                // we want to have much larger file sizes for the blocks db so override the default.
-                COverrideOptions override;
-                override.max_file_size = nBlockDBCache / 2;
-                pblockdb = new CBlockDB("blocks", nBlockDBCache, false, false, false, & override);
-
-                // Make the undo file max size larger than the default and also configure the write buffer
-                // to be a larger proportion of the overall cache since we don't really need a big read buffer
-                // for undo files.
-                override.max_file_size = nBlockUndoDBCache;
-                override.write_buffer_size = nBlockUndoDBCache / 1.8;
-                pblockundodb = new CBlockDB("undo", nBlockUndoDBCache, false, false, false, & override);
+                InitializeBlockStorage(nBlockTreeDBCache, nBlockDBCache, nBlockUndoDBCache);
 
                 uiInterface.InitMessage(_("Opening UTXO database..."));
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
