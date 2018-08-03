@@ -16,6 +16,7 @@
 #include "policy/policy.h"
 #include "qt/guiconstants.h"
 #include "requestManager.h"
+#include "respend/respendrelayer.h"
 #include "script/sigcache.h"
 #include "tinyformat.h"
 #include "torcontrol.h"
@@ -525,6 +526,10 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addDebugArg("limitfreerelay=<n>", optionalInt,
             strprintf("Continuously rate-limit free transactions to <n>*1000 bytes per minute (default: %u)",
                          DEFAULT_LIMITFREERELAY))
+        .addDebugArg(
+            "limitrespendrelay=<n>", optionalInt, strprintf("Continuously rate-limit relaying of double spend"
+                                                            " transactions to <n>*1000 bytes per minute (default: %u)",
+                                                      respend::DEFAULT_LIMITRESPENDRELAY))
         .addDebugArg("relaypriority", optionalBool,
             strprintf("Require high priority for relaying free or low-fee transactions (default: %u)",
                          DEFAULT_RELAYPRIORITY))

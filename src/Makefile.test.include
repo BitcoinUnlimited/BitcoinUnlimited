@@ -50,6 +50,8 @@ BITCOIN_TEST_SUITE = \
 
 # test_bitcoin binary #
 BITCOIN_TESTS =\
+  respend/test/respendrelayer_tests.cpp \
+  respend/test/respenddetector_tests.cpp \
   test/uahf_test.cpp \
   test/fork_tests.cpp \
   test/excessiveblock_test.cpp \

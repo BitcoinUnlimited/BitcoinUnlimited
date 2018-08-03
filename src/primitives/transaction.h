@@ -225,6 +225,9 @@ public:
 
     bool IsNull() const { return vin.empty() && vout.empty(); }
     const uint256 &GetHash() const { return hash; }
+    // True if only scriptSigs are different
+    bool IsEquivalentTo(const CTransaction &tx) const;
+
     // Return sum of txouts.
     CAmount GetValueOut() const;
     // GetValueIn() is a method on CCoinsViewCache, because

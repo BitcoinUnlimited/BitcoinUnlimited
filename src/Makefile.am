@@ -158,6 +158,10 @@ BITCOIN_CORE_H = \
   rpc/protocol.h \
   rpc/server.h \
   rpc/register.h \
+  respend/respendaction.h \
+  respend/respendlogger.h \
+  respend/respendrelayer.h \
+  respend/respenddetector.h \
   scheduler.h \
   script/sigcache.h \
   script/sign.h \
@@ -245,6 +249,9 @@ libbitcoin_server_a_SOURCES = \
   rpc/net.cpp \
   rpc/rawtransaction.cpp \
   rpc/server.cpp \
+  respend/respendlogger.cpp \
+  respend/respendrelayer.cpp \
+  respend/respenddetector.cpp \
   script/sigcache.cpp \
   thinblock.cpp \
   script/ismine.cpp \
