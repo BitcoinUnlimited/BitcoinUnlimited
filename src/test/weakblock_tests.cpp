@@ -17,6 +17,7 @@ struct WeakTestSetup : public TestingSetup {
     WeakTestSetup() : TestingSetup() {
         wbEnable.Set(DEFAULT_WEAKBLOCKS_ENABLE);
         wbConsiderPOWratio.Set(DEFAULT_WEAKBLOCKS_CONSIDER_POW_RATIO);
+        weakstore.expireOld(true);
     }
     ~WeakTestSetup() {
         weakstore.consistencyCheck();
