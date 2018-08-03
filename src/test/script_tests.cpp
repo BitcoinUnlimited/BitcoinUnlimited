@@ -270,6 +270,29 @@ private:
         havePush = true;
     }
 
+    std::vector<uint8_t> DoSign(const CKey &key,
+        const uint256 &hash,
+        unsigned int lenR = 32,
+        unsigned int lenS = 32) const
+    {
+        std::vector<uint8_t> vchSig, r, s;
+        uint32_t iter = 0;
+        do
+        {
+            key.Sign(hash, vchSig, iter++);
+            if ((lenS == 33) != (vchSig[5 + vchSig[3]] == 33))
+            {
+                NegateSignatureS(vchSig);
+            }
+
+            r = std::vector<uint8_t>(vchSig.begin() + 4, vchSig.begin() + 4 + vchSig[3]);
+            s = std::vector<uint8_t>(
+                vchSig.begin() + 6 + vchSig[3], vchSig.begin() + 6 + vchSig[3] + vchSig[5 + vchSig[3]]);
+        } while (lenR != r.size() || lenS != s.size());
+
+        return vchSig;
+    }
+
 public:
     TestBuilder(const CScript &script_, const std::string &comment_, int flags_, bool P2SH = false, CAmount nValue_ = 0)
         : script(script_), havePush(false), comment(comment_), flags(flags_), scriptError(SCRIPT_ERR_OK),
@@ -319,19 +342,7 @@ public:
     {
         uint256 hash = SignatureHash(script, spendTx, 0, nHashType, amount);
         BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
-        std::vector<unsigned char> vchSig, r, s;
-        uint32_t iter = 0;
-        do
-        {
-            key.Sign(hash, vchSig, iter++);
-            if ((lenS == 33) != (vchSig[5 + vchSig[3]] == 33))
-            {
-                NegateSignatureS(vchSig);
-            }
-            r = std::vector<unsigned char>(vchSig.begin() + 4, vchSig.begin() + 4 + vchSig[3]);
-            s = std::vector<unsigned char>(
-                vchSig.begin() + 6 + vchSig[3], vchSig.begin() + 6 + vchSig[3] + vchSig[5 + vchSig[3]]);
-        } while (lenR != r.size() || lenS != s.size());
+        std::vector<uint8_t> vchSig = DoSign(key, hash, lenR, lenS);
         vchSig.push_back(static_cast<unsigned char>(nHashType));
         DoPush(vchSig);
         return *this;
