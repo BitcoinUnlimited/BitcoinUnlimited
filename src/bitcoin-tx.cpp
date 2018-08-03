@@ -30,6 +30,8 @@
 #include <boost/assign/list_of.hpp>
 #include <boost/thread.hpp>
 
+CCriticalSection cs_utxo;
+
 using namespace std;
 
 // BU add lockstack stuff here for bitcoin-cli, because I need to carefully
@@ -496,7 +498,7 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
-                LOCK(view.cs_utxo);
+                LOCK(cs_utxo);
                 const Coin &coin = view.AccessCoin(out);
                 if (!coin.IsSpent() && coin.out.scriptPubKey != scriptPubKey)
                 {
@@ -534,7 +536,7 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
     {
-        LOCK(view.cs_utxo);
+        LOCK(cs_utxo);
 
         CTxIn &txin = mergedTx.vin[i];
         const Coin &coin = view.AccessCoin(txin.prevout);

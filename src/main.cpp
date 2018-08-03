@@ -736,7 +736,7 @@ static bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         // during reorgs to ensure COINBASE_MATURITY is still met.
         bool fSpendsCoinbase = false;
         {
-            LOCK(view.cs_utxo);
+            LOCK(cs_utxo);
             for (const CTxIn &txin : ptx->vin)
             {
                 const Coin &coin = view.AccessCoin(txin.prevout);
@@ -1049,7 +1049,7 @@ bool GetTransaction(const uint256 &hash,
     // use coin database to locate block that contains transaction, and scan it
     if (fAllowSlow)
     {
-        LOCK(pcoinsTip->cs_utxo);
+        LOCK(cs_utxo);
         const Coin &coin = AccessByTxid(*pcoinsTip, hash);
         if (!coin.IsSpent())
             pindexSlow = chainActive[coin.nHeight];
@@ -1366,7 +1366,7 @@ bool CheckInputs(const CTransaction &tx,
                 CScript scriptPubKey;
                 CAmount amount;
                 {
-                    LOCK(inputs.cs_utxo);
+                    LOCK(cs_utxo);
                     const Coin &coin = inputs.AccessCoin(prevout);
                     if (coin.IsSpent())
                         LOGA("ASSERTION: no inputs available\n");
@@ -1538,7 +1538,7 @@ int ApplyTxInUndo(Coin &&undo, CCoinsViewCache &view, const COutPoint &out)
         // Missing undo metadata (height and coinbase). Older versions included this
         // information only in undo records for the last spend of a transactions'
         // outputs. This implies that it must be present for some other output of the same tx.
-        LOCK(view.cs_utxo);
+        LOCK(cs_utxo);
         const Coin &alternate = AccessByTxid(view, out.hash);
         if (!alternate.IsSpent())
         {
@@ -2051,7 +2051,7 @@ bool ConnectBlock(const CBlock &block,
                 // be in ConnectBlock because they require the UTXO set
                 prevheights.resize(tx.vin.size());
                 {
-                    LOCK(view.cs_utxo);
+                    LOCK(cs_utxo);
                     for (size_t j = 0; j < tx.vin.size(); j++)
                     {
                         prevheights[j] = view.AccessCoin(tx.vin[j].prevout).nHeight;

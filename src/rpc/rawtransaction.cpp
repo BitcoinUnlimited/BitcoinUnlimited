@@ -266,7 +266,7 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
     }
     else
     {
-        LOCK(pcoinsTip->cs_utxo);
+        LOCK(cs_utxo);
         const Coin &coin = AccessByTxid(*pcoinsTip, oneTxid);
         if (!coin.IsSpent() && coin.nHeight > 0 && coin.nHeight <= chainActive.Height())
         {
@@ -708,7 +708,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         view.SetBackend(viewMempool); // temporarily switch cache backend to db+mempool view
 
         {
-            LOCK(view.cs_utxo);
+            LOCK(cs_utxo);
             for (const CTxIn &txin : mergedTx.vin)
             {
                 // Load entries from viewChain into view; can fail.
@@ -770,7 +770,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
-                LOCK(view.cs_utxo);
+                LOCK(cs_utxo);
                 const Coin &coin = view.AccessCoin(out);
                 if (!coin.IsSpent() && coin.out.scriptPubKey != scriptPubKey)
                 {
@@ -868,7 +868,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
     {
-        LOCK(view.cs_utxo);
+        LOCK(cs_utxo);
         CTxIn &txin = mergedTx.vin[i];
         const Coin &coin = view.AccessCoin(txin.prevout);
         if (coin.IsSpent())
@@ -978,7 +978,7 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
     CCoinsViewCache &view = *pcoinsTip;
     bool fHaveChain = false;
     {
-        LOCK(view.cs_utxo);
+        LOCK(cs_utxo);
         for (size_t o = 0; !fHaveChain && o < tx.vout.size(); o++)
         {
             const Coin &existingCoin = view.AccessCoin(COutPoint(hashTx, o));

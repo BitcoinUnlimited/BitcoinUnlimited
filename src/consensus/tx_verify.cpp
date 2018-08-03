@@ -146,7 +146,7 @@ unsigned int GetP2SHSigOpCount(const CTransaction &tx, const CCoinsViewCache &in
 
     unsigned int nSigOps = 0;
     {
-        LOCK(inputs.cs_utxo);
+        LOCK(cs_utxo);
         for (unsigned int i = 0; i < tx.vin.size(); i++)
         {
             const CTxOut &prevout = inputs.AccessCoin(tx.vin[i].prevout).out;
@@ -214,14 +214,14 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
  */
 static int GetSpendHeight(const CCoinsViewCache &inputs)
 {
-    AssertLockHeld(inputs.cs_utxo);
+    AssertLockHeld(cs_utxo);
 
     // Must leave cs_utxo in order to maintain correct locking order with cs_main. We re-aquire
     // cs_utxo when we leave this scope.
-    LEAVE_CRITICAL_SECTION(inputs.cs_utxo);
+    LEAVE_CRITICAL_SECTION(cs_utxo);
 
     // Scope guard to make sure cs_utxo gets locked upon leaving ths scope whether or not we throw an exception.
-    BOOST_SCOPE_EXIT(&inputs) { ENTER_CRITICAL_SECTION(inputs.cs_utxo); }
+    BOOST_SCOPE_EXIT(&inputs) { ENTER_CRITICAL_SECTION(cs_utxo); }
     BOOST_SCOPE_EXIT_END
 
     LOCK(cs_main);
@@ -250,7 +250,7 @@ bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, c
     CAmount nFees = 0;
     int nSpendHeight = -1;
     {
-        LOCK(inputs.cs_utxo);
+        LOCK(cs_utxo);
         for (unsigned int i = 0; i < tx.vin.size(); i++)
         {
             const COutPoint &prevout = tx.vin[i].prevout;
