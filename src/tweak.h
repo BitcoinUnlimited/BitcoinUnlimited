@@ -103,8 +103,8 @@ template <class DataType>
 class CTweakRef : public CTweakBase
 {
 private:
-    std::string name;
-    std::string help;
+    const std::string name;
+    const std::string help;
     DataType *value;
 
 public:
@@ -137,16 +137,8 @@ public:
         tweaks[CTweakKey(name)] = this;
     }
 
-    virtual std::string GetName() const
-    {
-        std::unique_lock<std::mutex> lck(cs_tweak);
-        return name;
-    }
-    virtual std::string GetHelp() const
-    {
-        std::unique_lock<std::mutex> lck(cs_tweak);
-        return help;
-    }
+    virtual std::string GetName() const { return name; }
+    virtual std::string GetHelp() const { return help; }
     virtual UniValue Get() const
     {
         std::unique_lock<std::mutex> lck(cs_tweak);
@@ -194,8 +186,8 @@ template <class DataType>
 class CTweak : public CTweakBase
 {
 private:
-    std::string name;
-    std::string help;
+    const std::string name;
+    const std::string help;
     DataType value;
 
 public:
@@ -216,16 +208,8 @@ public:
         tweaks[CTweakKey(name)] = this;
     }
 
-    virtual std::string GetName() const
-    {
-        std::unique_lock<std::mutex> lck(cs_tweak);
-        return name;
-    }
-    virtual std::string GetHelp() const
-    {
-        std::unique_lock<std::mutex> lck(cs_tweak);
-        return help;
-    }
+    virtual std::string GetName() const { return name; }
+    virtual std::string GetHelp() const { return help; }
     virtual UniValue Get() const
     {
         std::unique_lock<std::mutex> lck(cs_tweak);
