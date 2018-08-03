@@ -12,8 +12,8 @@
 
 #include "addrman.h"
 #include "amount.h"
-#include "blockdb/sequential_files.h"
-#include "blockdb/wrapper.h"
+#include "blockstorage/sequential_files.h"
+#include "blockstorage/blockstorage.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "checkpoints.h"

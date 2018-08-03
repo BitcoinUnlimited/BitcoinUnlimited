@@ -8,8 +8,8 @@
 
 #include "addrman.h"
 #include "arith_uint256.h"
-#include "blockdb/sequential_files.h"
-#include "blockdb/wrapper.h"
+#include "blockstorage/sequential_files.h"
+#include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "checkqueue.h"
@@ -1417,7 +1417,7 @@ static DisconnectResult DisconnectBlock(const CBlock &block, const CBlockIndex *
         error("DisconnectBlock(): no undo data available");
         return DISCONNECT_FAILED;
     }
-    if (!UndoReadFromDisk(blockUndo, pos, pindex->pprev))
+    if (!ReadUndoFromDisk(blockUndo, pos, pindex->pprev))
     {
         error("DisconnectBlock(): failure reading undo data");
         return DISCONNECT_FAILED;
@@ -2015,11 +2015,9 @@ bool ConnectBlock(const CBlock &block,
             CDiskBlockPos _pos;
             if (!FindUndoPos(state, pindex->nFile, _pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
                 return error("ConnectBlock(): FindUndoPos failed");
-           }
-            if (!UndoWriteToDisk(blockundo, pos, pindex->pprev, chainparams.MessageStart()))
-            {
-                return AbortNode(state, "Failed to write undo data");
 
+            if (!WriteUndoToDisk(blockundo, _pos, pindex->pprev, chainparams.MessageStart()))
+                return AbortNode(state, "Failed to write undo data");
 
             // update nUndoPos in block index
             pindex->nUndoPos = _pos.nPos;
@@ -4017,7 +4015,7 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
             CDiskBlockPos pos = pindex->GetUndoPos();
             if (!pos.IsNull())
             {
-                if (!UndoReadFromDisk(undo, pos, pindex->pprev))
+                if (!ReadUndoFromDisk(undo, pos, pindex->pprev))
                     return error("VerifyDB(): *** found bad undo data at %d, hash=%s\n", pindex->nHeight,
                         pindex->GetBlockHash().ToString());
             }

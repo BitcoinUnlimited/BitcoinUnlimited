@@ -4,7 +4,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "blockdb.h"
+#include "blockleveldb.h"
 #include "main.h"
 #include "undo.h"
 
@@ -25,6 +25,8 @@ enum BlockDBMode
 static const BlockDBMode DEFAULT_BLOCK_DB_MODE = SEQUENTIAL_BLOCK_FILES;
 extern BlockDBMode BLOCK_DB_MODE;
 
+void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache, const int64_t &_nBlockDBCache, const int64_t &_nBlockUndoDBCache);
+
 /** Determine if the block db mode we started with is behind another one already on disk*/
 bool DetermineStorageSync();
 
@@ -35,11 +37,11 @@ void SyncStorage(const CChainParams &chainparams);
 bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex, const Consensus::Params &consensusParams);
 bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHeader::MessageStartChars &messageStart);
 
-bool UndoWriteToDisk(const CBlockUndo &blockundo,
+bool WriteUndoToDisk(const CBlockUndo &blockundo,
     CDiskBlockPos &pos,
     const CBlockIndex *pindex,
     const CMessageHeader::MessageStartChars &messageStart);
-bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const CBlockIndex *pindex);
+bool ReadUndoFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const CBlockIndex *pindex);
 
 /**
  * Prune block and undo files (blk???.dat and undo???.dat) so that the disk space used is less than a user-defined

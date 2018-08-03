@@ -35,11 +35,11 @@ bool WriteBlockToDiskSequential(const CBlock &block,
     const CMessageHeader::MessageStartChars &messageStart);
 bool ReadBlockFromDiskSequential(CBlock &block, const CDiskBlockPos &pos, const Consensus::Params &consensusParams);
 void FindFilesToPruneSequential(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight);
-bool UndoWriteToDiskSequenatial(const CBlockUndo &blockundo,
+bool WriteUndoToDiskSequenatial(const CBlockUndo &blockundo,
     CDiskBlockPos &pos,
     const uint256 &hashBlock,
     const CMessageHeader::MessageStartChars &messageStart);
-bool UndoReadFromDiskSequential(CBlockUndo &blockundo, const CDiskBlockPos &pos, const uint256 &hashBlock);
+bool ReadUndoFromDiskSequential(CBlockUndo &blockundo, const CDiskBlockPos &pos, const uint256 &hashBlock);
 
 
 #endif // BLOCKDB_SEQUENTIAL_H

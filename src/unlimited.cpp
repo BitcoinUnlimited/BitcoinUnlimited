@@ -5,7 +5,7 @@
 #include "unlimited.h"
 
 #include "base58.h"
-#include "blockdb/wrapper.h"
+#include "blockstorage/blockstorage.h"
 #include "cashaddrenc.h"
 #include "chain.h"
 #include "chainparams.h"

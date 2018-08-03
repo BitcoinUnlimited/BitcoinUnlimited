@@ -3,7 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 
-#include "blockdb.h"
+#include "blockleveldb.h"
 #include "hash.h"
 #include "main.h"
 
@@ -41,7 +41,7 @@ bool ReadBlockFromDB(const CBlockIndex *pindex, CBlock &block)
     return pblockdb->Read(key.str(), block);
 }
 
-bool UndoWriteToDB(const CBlockUndo &blockundo, const CBlockIndex *pindex)
+bool WriteUndoToDB(const CBlockUndo &blockundo, const CBlockIndex *pindex)
 {
     // Create a key which will sort the database by the blocktime.  This is needed to prevent unnecessary
     // compactions which hamper performance. Will a key sorted by time the only files that need to undergo
@@ -68,7 +68,7 @@ bool UndoWriteToDB(const CBlockUndo &blockundo, const CBlockIndex *pindex)
     return pblockundodb->Write(key.str(), value);
 }
 
-bool UndoReadFromDB(CBlockUndo &blockundo, const CBlockIndex *pindex)
+bool ReadUndoFromDB(CBlockUndo &blockundo, const CBlockIndex *pindex)
 {
     // Create a key which will sort the database by the blocktime.  This is needed to prevent unnecessary
     // compactions which hamper performance. Will a key sorted by time the only files that need to undergo

@@ -234,7 +234,7 @@ void FindFilesToPruneSequential(std::set<int> &setFilesToPrune, uint64_t nLastBl
         ((int64_t)nPruneTarget - (int64_t)nCurrentUsage) / 1024 / 1024, nLastBlockWeCanPrune, count);
 }
 
-bool UndoWriteToDiskSequenatial(const CBlockUndo &blockundo,
+bool WriteUndoToDiskSequenatial(const CBlockUndo &blockundo,
     CDiskBlockPos &pos,
     const uint256 &hashBlock,
     const CMessageHeader::MessageStartChars &messageStart)
@@ -268,7 +268,7 @@ bool UndoWriteToDiskSequenatial(const CBlockUndo &blockundo,
     return true;
 }
 
-bool UndoReadFromDiskSequential(CBlockUndo &blockundo, const CDiskBlockPos &pos, const uint256 &hashBlock)
+bool ReadUndoFromDiskSequential(CBlockUndo &blockundo, const CDiskBlockPos &pos, const uint256 &hashBlock)
 {
     // Open history file to read
     CAutoFile filein(OpenUndoFile(pos, true), SER_DISK, CLIENT_VERSION);

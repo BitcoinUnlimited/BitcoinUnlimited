@@ -4,9 +4,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "wrapper.h"
+#include "blockstorage/blockstorage.h"
 
-#include "blockdb.h"
+#include "blockleveldb.h"
 #include "chainparams.h"
 #include "dbwrapper.h"
 #include "fs.h"
@@ -166,7 +166,7 @@ void SyncStorage(const CChainParams &chainparams)
             if (index->nStatus & BLOCK_HAVE_UNDO && item.second.nUndoPos != 0)
             {
                 CBlockUndo blockundo;
-                if (UndoReadFromDB(blockundo, index->pprev))
+                if (ReadUndoFromDB(blockundo, index->pprev))
                 {
                     CDiskBlockPos pos;
                     if (!FindUndoPos(
@@ -175,7 +175,7 @@ void SyncStorage(const CChainParams &chainparams)
                         LOGA("SyncStorage(): FindUndoPos failed");
                         assert(false);
                     }
-                    if (!UndoWriteToDisk(blockundo, pos, index->pprev, chainparams.MessageStart()))
+                    if (!WriteUndoToDisk(blockundo, pos, index->pprev, chainparams.MessageStart()))
                     {
                         LOGA("SyncStorage(): Failed to write undo data");
                         assert(false);
@@ -338,12 +338,12 @@ void SyncStorage(const CChainParams &chainparams)
                         index->GetBlockHash().GetHex().c_str());
                     assert(false);
                 }
-                if (!UndoReadFromDiskSequential(blockundo, pos, index->pprev->GetBlockHash()))
+                if (!ReadUndoFromDiskSequential(blockundo, pos, index->pprev->GetBlockHash()))
                 {
                     LOGA("SyncStorage(): critical error, failure to read undo data from sequential files \n");
                     assert(false);
                 }
-                if (!UndoWriteToDB(blockundo, index->pprev))
+                if (!WriteUndoToDB(blockundo, index->pprev))
                 {
                     LOGA("critical error, failed to write undo to db, asserting false \n");
                     assert(false);
@@ -424,7 +424,7 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex, const Consensus
     return false;
 }
 
-bool UndoWriteToDisk(const CBlockUndo &blockundo,
+bool WriteUndoToDisk(const CBlockUndo &blockundo,
     CDiskBlockPos &pos,
     const CBlockIndex *pindex,
     const CMessageHeader::MessageStartChars &messageStart)
@@ -440,24 +440,27 @@ bool UndoWriteToDisk(const CBlockUndo &blockundo,
         {
             hashBlock.SetNull();
         }
-        return UndoWriteToDiskSequenatial(blockundo, pos, hashBlock, messageStart);
+        return WriteUndoToDiskSequenatial(blockundo, pos, hashBlock, messageStart);
     }
     else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        return UndoWriteToDB(blockundo, pindex);
+        return WriteUndoToDB(blockundo, pindex);
     }
     return false;
 }
 
-bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const CBlockIndex *pindex)
+/**
+ * ReadUndoFromDisk only uses CDiskBlockPos for sequential files, not for blockdb
+ */
+bool ReadUndoFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const CBlockIndex *pindex)
 {
     if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
-        return UndoReadFromDiskSequential(blockundo, pos, pindex->GetBlockHash());
+        return ReadUndoFromDiskSequential(blockundo, pos, pindex->GetBlockHash());
     }
     else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        return UndoReadFromDB(blockundo, pindex);
+        return ReadUndoFromDB(blockundo, pindex);
     }
     return false;
 }

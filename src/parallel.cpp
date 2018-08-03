@@ -4,7 +4,7 @@
 
 #include "parallel.h"
 
-#include "blockdb/wrapper.h"
+#include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "dosman.h"
 #include "graphene.h"
