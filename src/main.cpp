@@ -68,12 +68,6 @@
  * Global state
  */
 
-// BU variables moved to globals.cpp
-// - moved CCriticalSection cs_main;
-// - moved BlockMap mapBlockIndex;
-// - movedCChain chainActive;
-CBlockIndex *pindexBestHeader GUARDED_BY(cs_main) = nullptr;
-
 // Last time the block tip was updated
 std::atomic<int64_t> nTimeBestReceived{0};
 
@@ -93,11 +87,6 @@ uint64_t nDBUsedSpace = 0;
 std::vector<std::pair<uint256, uint64_t> > vDbBlockSizes;
 uint32_t nXthinBloomFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE;
 
-// The allowed size of the in memory UTXO cache
-int64_t nCoinCacheMaxSize GUARDED_BY(cs_main) = 0;
-
-CFeeRate minRelayTxFee GUARDED_BY(cs_main) = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
-
 // BU: Move global objects to a single file
 extern CTxMemPool mempool;
 
@@ -108,13 +97,18 @@ extern CTweak<uint64_t> reindexTypicalBlockSize;
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
 extern CCriticalSection cs_mapInboundConnectionTracker;
 
-/** A cache to store headers that have arrived but can not yet be connected **/
-std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders GUARDED_BY(cs_main);
-
 static void CheckBlockIndex(const Consensus::Params &consensusParams);
 
 extern CCriticalSection cs_LastBlockFile;
 
+extern CBlockIndex *pindexBestInvalid;
+extern std::map<uint256, NodeId> mapBlockSource;
+extern CCriticalSection cs_recentRejects;
+extern std::unique_ptr<CRollingBloomFilter> recentRejects;
+extern std::unique_ptr<CRollingBloomFilter> txn_recently_in_block;
+extern std::set<int> setDirtyFileInfo;
+extern std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders;
+extern uint64_t nBlockSequenceId;
 
 // Internal stuff
 namespace
@@ -147,7 +141,7 @@ struct CBlockIndexWorkComparator
     }
 };
 
-CBlockIndex *pindexBestInvalid GUARDED_BY(cs_main) = nullptr;
+uint256 hashRecentRejectsChainTip;
 
 /**
  * The set of all CBlockIndex entries with BLOCK_VALID_TRANSACTIONS (for itself and all ancestors) and
@@ -155,60 +149,9 @@ CBlockIndex *pindexBestInvalid GUARDED_BY(cs_main) = nullptr;
  * missing the data for the block.
  */
 std::set<CBlockIndex *, CBlockIndexWorkComparator> setBlockIndexCandidates GUARDED_BY(cs_main);
+
 /** Number of nodes with fSyncStarted. */
 int nSyncStarted = 0;
-
-/**
- * Every received block is assigned a unique and increasing identifier, so we
- * know which one to give priority in case of a fork.
- */
-/** Blocks loaded from disk are assigned id 0, so start the counter at 1. */
-uint64_t nBlockSequenceId GUARDED_BY(cs_main) = 1;
-
-/**
- * Sources of received blocks, saved to be able to send them reject
- * messages or ban them when processing happens afterwards. Protected by
- * cs_main.
- */
-std::map<uint256, NodeId> mapBlockSource GUARDED_BY(cs_main);
-
-CCriticalSection cs_recentRejects;
-/**
- * Filter for transactions that were recently rejected by
- * AcceptToMemoryPool. These are not rerequested until the chain tip
- * changes, at which point the entire filter is reset. Protected by
- * cs_main.
- *
- * Without this filter we'd be re-requesting txs from each of our peers,
- * increasing bandwidth consumption considerably. For instance, with 100
- * peers, half of which relay a tx we don't accept, that might be a 50x
- * bandwidth increase. A flooding attacker attempting to roll-over the
- * filter using minimum-sized, 60byte, transactions might manage to send
- * 1000/sec if we have fast peers, so we pick 120,000 to give our peers a
- * two minute window to send invs to us.
- *
- * Decreasing the false positive rate is fairly cheap, so we pick one in a
- * million to make it highly unlikely for users to have issues with this
- * filter.
- *
- * Memory used: 1.7MB
- */
-std::unique_ptr<CRollingBloomFilter> recentRejects GUARDED_BY(cs_recentRejects);
-uint256 hashRecentRejectsChainTip;
-
-/**
- * Keep track of transaction which were recently in a block and don't
- * request those again.
- *
- * Note that we dont actually ever clear this - in cases of reorgs where
- * transactions dropped out they were either added back to our mempool
- * or fell out due to size limitations (in which case we'll get them again
- * if the user really cares and re-sends).
- *
- * Protected by cs_recentRejects.
- */
-std::unique_ptr<CRollingBloomFilter> txn_recently_in_block GUARDED_BY(cs_recentRejects);
-
 
 /** Number of preferable block download peers. */
 std::atomic<int> nPreferredDownload{0};
@@ -226,14 +169,8 @@ std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
  */
 bool fCheckForPruning = false;
 
-/** Dirty block file entries. */
-std::set<int> setDirtyFileInfo GUARDED_BY(cs_main);
-
 std::vector<CBlockFileInfo> vinfoBlockFile;
 int nLastBlockFile = 0;
-
-/** Dirty block index entries. */
-std::set<CBlockIndex *> setDirtyBlockIndex GUARDED_BY(cs_main);
 
 //////////////////////////////////////////////////////////////////////////////
 //
