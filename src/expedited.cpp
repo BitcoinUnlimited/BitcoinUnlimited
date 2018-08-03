@@ -126,19 +126,21 @@ void ActuallySendExpreditedBlock(CXThinBlock &thinBlock, unsigned char hops, con
 
         if (n != nullptr)
         {
-            LOCK(cs_weakblocks);
-            weakstore.set_nodeKnows(n->GetId(), thinBlock.header.GetHash());
-        }
+            {
+                LOCK(cs_weakblocks);
+                weakstore.set_nodeKnows(n->GetId(), thinBlock.header.GetHash());
+            }
 
-        if (n->fDisconnect)
-        {
-            connmgr->RemovedNode(n);
-        }
-        else if (n != skip) // Don't send back to the sending node to avoid looping
-        {
-            LOG(THIN, "Sending expedited block %s to %s\n", thinBlock.header.GetHash().ToString(), n->GetLogName());
-            n->PushMessage(NetMsgType::XPEDITEDBLK, (unsigned char)EXPEDITED_MSG_XTHIN, hops, thinBlock);
-            n->blocksSent += 1;
+            if (n->fDisconnect)
+            {
+                connmgr->RemovedNode(n);
+            }
+            else if (n != skip) // Don't send back to the sending node to avoid looping
+            {
+                LOG(THIN, "Sending expedited block %s to %s\n", thinBlock.header.GetHash().ToString(), n->GetLogName());
+                n->PushMessage(NetMsgType::XPEDITEDBLK, (unsigned char)EXPEDITED_MSG_XTHIN, hops, thinBlock);
+                n->blocksSent += 1;
+            }
         }
     }
 }
