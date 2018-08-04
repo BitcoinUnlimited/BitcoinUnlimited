@@ -2479,15 +2479,15 @@ void NetCleanup()
 }
 
 
-void RelayTransaction(const CTransaction &tx)
+void RelayTransaction(const CTransaction &tx, bool fDoubleSpend)
 {
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     ss.reserve(10000);
     ss << tx;
-    RelayTransaction(tx, ss);
+    RelayTransaction(tx, ss, fDoubleSpend);
 }
 
-void RelayTransaction(const CTransaction &tx, const CDataStream &ss)
+void RelayTransaction(const CTransaction &tx, const CDataStream &ss, bool fDoubleSpend)
 {
     uint64_t len = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
     if (len > maxTxSize.value)
@@ -2516,10 +2516,13 @@ void RelayTransaction(const CTransaction &tx, const CDataStream &ss)
     {
         if (!pnode->fRelayTxes)
             continue;
+
         LOCK(pnode->cs_filter);
         if (pnode->pfilter)
         {
-            if (pnode->pfilter->IsRelevantAndUpdate(tx))
+            // Relaying double spends to SPV clients is an easy attack vector,
+            // and therefore do not relay double spends to SPV clients. 
+            if (!fDoubleSpend && pnode->pfilter->IsRelevantAndUpdate(tx))
                 pnode->PushInventory(inv);
         }
         else
