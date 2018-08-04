@@ -77,8 +77,9 @@ private:
     void UpdateEmptyFull();
 
 public:
+    bool IsEmpty() const { return isEmpty; }
     //! for testing only
-    bool getFull() const { return isFull; }
+    bool IsFull() const { return isFull; }
     //! for testing only
     unsigned int vDataSize() const { return vData.size(); }
     /**
