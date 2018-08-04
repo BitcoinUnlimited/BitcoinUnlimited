@@ -11,7 +11,6 @@
 // c++11 #include <type_traits>
 #include "univalue/include/univalue.h"
 
-#include <iostream>
 #include <mutex>
 #include <thread>
 
