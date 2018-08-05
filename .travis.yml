@@ -32,7 +32,7 @@ matrix:
     - compiler: gcc
       env:
         - CXX=g++ CC=gcc
-        - HOST=x86_64-unknown-linux-gnu PACKAGES="python3-zmq clang-format-3.8" DEP_OPTS="NO_QT=1 NO_UPNP=1 DEBUG=0" RUN_TESTS=true RUN_FORMATTING_CHECK=true GOAL="install" BITCOIN_CONFIG="--enable-zmq --enable-glibc-back-compat --enable-reduce-exports CPPFLAGS=-DDEBUG_LOCKORDER"
+        - HOST=x86_64-unknown-linux-gnu PACKAGES="python3-zmq clang-format-3.8" DEP_OPTS="NO_QT=1 NO_UPNP=1 DEBUG=1" RUN_TESTS=true RUN_FORMATTING_CHECK=true GOAL="install" BITCOIN_CONFIG="--enable-zmq --enable-glibc-back-compat --enable-reduce-exports CPPFLAGS=-DDEBUG_LOCKORDER"
 
 before_install:
     - export PATH=$(echo $PATH | tr ':' "\n" | sed '/\/opt\/python/d' | tr "\n" ":" | sed "s|::|:|g")
