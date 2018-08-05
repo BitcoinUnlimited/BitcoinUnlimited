@@ -34,12 +34,6 @@ CCriticalSection cs_utxo;
 
 using namespace std;
 
-// BU add lockstack stuff here for bitcoin-cli, because I need to carefully
-// order it in globals.cpp for bitcoind and bitcoin-qt
-boost::mutex dd_mutex;
-std::map<std::pair<void *, void *>, LockStack> lockorders;
-boost::thread_specific_ptr<LockStack> lockstack;
-
 static bool fCreateBlank;
 static map<string, UniValue> registers;
 static const int CONTINUE_EXECUTION = -1;
@@ -498,7 +492,6 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
-                LOCK(cs_utxo);
                 const Coin &coin = view.AccessCoin(out);
                 if (!coin.IsSpent() && coin.out.scriptPubKey != scriptPubKey)
                 {
@@ -536,8 +529,6 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
     {
-        LOCK(cs_utxo);
-
         CTxIn &txin = mergedTx.vin[i];
         const Coin &coin = view.AccessCoin(txin.prevout);
         if (coin.IsSpent())
