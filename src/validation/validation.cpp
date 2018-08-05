@@ -1751,6 +1751,12 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
 
+    // The Nov 15, 2018 HF enable sig push only.
+    if (IsNov152018Enabled(consensusparams, pindex->pprev))
+    {
+        flags |= SCRIPT_VERIFY_SIGPUSHONLY;
+    }
+
     return flags;
 }
 
