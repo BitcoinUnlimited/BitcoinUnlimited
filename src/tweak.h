@@ -140,12 +140,12 @@ public:
     virtual std::string GetHelp() const { return help; }
     virtual UniValue Get() const
     {
-        std::unique_lock<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::mutex> lck(cs_tweak);
         return UniValue(*value);
     }
     virtual std::string Validate(const UniValue &val)
     {
-        std::unique_lock<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::mutex> lck(cs_tweak);
         if (eventCb)
         {
             DataType candidate;
@@ -159,7 +159,7 @@ public:
 
     virtual UniValue Set(const UniValue &v) // Returns NullUnivalue or an error string
     {
-        std::unique_lock<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::mutex> lck(cs_tweak);
         DataType prior = *value;
         fill(v, *value);
         if (eventCb)
@@ -173,7 +173,7 @@ public:
 
     virtual DataType Value() const
     {
-        std::unique_lock<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::mutex> lck(cs_tweak);
         return *value;
     }
 };
@@ -211,12 +211,12 @@ public:
     virtual std::string GetHelp() const { return help; }
     virtual UniValue Get() const
     {
-        std::unique_lock<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::mutex> lck(cs_tweak);
         return UniValue(value);
     }
     virtual UniValue Set(const UniValue &v)
     {
-        std::unique_lock<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::mutex> lck(cs_tweak);
         fill(v, value);
 
         // Returns NullUnivalue or an error string
@@ -225,7 +225,7 @@ public:
 
     virtual DataType Value() const
     {
-        std::unique_lock<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::mutex> lck(cs_tweak);
         return value;
     }
 };
