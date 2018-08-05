@@ -28,61 +28,11 @@ env:
 
 matrix:
   include:
-    #bitcoind clang
-    - compiler: clang
-      addons:
-        apt:
-          sources:
-            - llvm-toolchain-trusty-5.0
-          packages:
-            - clang-5.0
-      env:
-        - USE_CLANG=true
-        - CXX=clang++-5.0 CC=clang-5.0
-        - CXXFLAGS="-std=c++11"
-        - HOST=x86_64-unknown-linux-gnu
-        - RUN_TESTS=false
-        - PACKAGES="python3-zmq libzmq3-dev clang-format-3.8 build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils libboost-all-dev qtbase5-dev protobuf-compiler qttools5-dev-tools qttools5-dev"
-        - GOAL="install" BITCOIN_CONFIG="--enable-zmq --with-gui=qt5 CC=clang-5.0 CXX=clang++-5.0 CPPFLAGS=-DDEBUG_LOCKORDER"
     #bitcoind
     - compiler: gcc
       env:
         - CXX=g++ CC=gcc
-        - HOST=x86_64-unknown-linux-gnu PACKAGES="python3-zmq clang-format-3.8" DEP_OPTS="NO_QT=1 NO_UPNP=1 DEBUG=1" RUN_TESTS=true RUN_FORMATTING_CHECK=true GOAL="install" BITCOIN_CONFIG="--enable-zmq --enable-glibc-back-compat --enable-reduce-exports CPPFLAGS=-DDEBUG_LOCKORDER"
-    #ARM64
-    - compiler: gcc
-      env:
-        - CXX=g++ CC=gcc
-        - HOST=aarch64-linux-gnu PACKAGES="g++-aarch64-linux-gnu" DEP_OPTS="NO_QT=1" GOAL="install" BITCOIN_CONFIG="--enable-glibc-back-compat --enable-reduce-exports"
-    #ARM32
-    - compiler: gcc
-      env:
-        - CXX=g++ CC=gcc
-        - HOST=arm-linux-gnueabihf PACKAGES="g++-arm-linux-gnueabihf" DEP_OPTS="NO_QT=1" GOAL="install" BITCOIN_CONFIG="--enable-glibc-back-compat --enable-reduce-exports"
-    #Win32
-    - compiler: gcc
-      env:
-        - CXX=g++ CC=gcc
-        - HOST=i686-w64-mingw32 DPKG_ADD_ARCH="i386" DEP_OPTS="NO_QT=1" PACKAGES="python3 nsis g++-mingw-w64-i686 wine1.6 bc" RUN_TESTS=true GOAL="install" BITCOIN_CONFIG="--enable-reduce-exports"
-    #Linux32-bit + dash
-    - compiler: gcc
-      env:
-        - CXX=g++ CC=gcc
-        - HOST=i686-pc-linux-gnu PACKAGES="g++-multilib bc python3-zmq" DEP_OPTS="NO_QT=1" RUN_TESTS=true GOAL="install" BITCOIN_CONFIG="--enable-zmq --enable-glibc-back-compat --enable-reduce-exports LDFLAGS=-static-libstdc++" USE_SHELL="/bin/dash"
-    #Win64
-    - compiler: gcc
-      env:
-        - CXX=g++ CC=gcc
-        - HOST=x86_64-w64-mingw32 DPKG_ADD_ARCH="i386" DEP_OPTS="NO_QT=1" PACKAGES="python3 nsis g++-mingw-w64-x86-64 wine1.6 bc" RUN_TESTS=true GOAL="install" BITCOIN_CONFIG="--enable-reduce-exports"
-    #x86_64 Linux, No wallet (uses qt5 dev package instead of depends Qt to speed up build and avoid timeout)
-    - compiler: gcc
-      env:
-        - CXX=g++ CC=gcc
-        - HOST=x86_64-unknown-linux-gnu PACKAGES="python3 qtbase5-dev qttools5-dev-tools protobuf-compiler libdbus-1-dev libharfbuzz-dev" DEP_OPTS="NO_WALLET=1 NO_QT=1 ALLOW_HOST_PACKAGES=1" RUN_TESTS=true GOAL="install" BITCOIN_CONFIG="--enable-glibc-back-compat --enable-reduce-exports"
-    #Cross-Mac
-    - compiler: gcc
-      env:
-        - HOST=x86_64-apple-darwin11 PACKAGES="cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python-dev clang-3.8 libc++-dev" BITCOIN_CONFIG="--enable-reduce-exports" OSX_SDK=10.11 GOAL="deploy"
+        - HOST=x86_64-unknown-linux-gnu PACKAGES="python3-zmq clang-format-3.8" DEP_OPTS="NO_QT=1 NO_UPNP=1 DEBUG=0" RUN_TESTS=true RUN_FORMATTING_CHECK=true GOAL="install" BITCOIN_CONFIG="--enable-zmq --enable-glibc-back-compat --enable-reduce-exports CPPFLAGS=-DDEBUG_LOCKORDER"
 
 before_install:
     - export PATH=$(echo $PATH | tr ':' "\n" | sed '/\/opt\/python/d' | tr "\n" ":" | sed "s|::|:|g")
