@@ -34,6 +34,12 @@ CCriticalSection cs_utxo;
 
 using namespace std;
 
+// BU add lockstack stuff here for bitcoin-cli, because I need to carefully
+// order it in globals.cpp for bitcoind and bitcoin-qt
+boost::mutex dd_mutex;
+std::map<std::pair<void *, void *>, LockStack> lockorders;
+boost::thread_specific_ptr<LockStack> lockstack;
+
 static bool fCreateBlank;
 static map<string, UniValue> registers;
 static const int CONTINUE_EXECUTION = -1;
