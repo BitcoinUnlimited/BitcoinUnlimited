@@ -39,8 +39,9 @@ def bctest(testDir, testObj, exeext):
 	wantRC = 0
 	if "return_code" in testObj:
 		wantRC = testObj['return_code']
+        print("want code " + str(wantRC))
 	if proc.returncode != wantRC:
-		print("Return code mismatch for " + outputFn)
+		print("Return code mismatch for " + outputFn + "proc want code " + str(proc.returncode))
 		sys.exit(1)
 
 def bctester(testDir, input_basename, buildenv):

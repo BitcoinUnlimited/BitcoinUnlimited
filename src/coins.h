@@ -23,6 +23,8 @@
 
 #include <unordered_map>
 
+extern CCriticalSection cs_utxo;
+
 struct CCoinsStats
 {
     int nHeight;
@@ -155,8 +157,6 @@ private:
 class CCoinsView
 {
 public:
-    mutable CCriticalSection cs_utxo;
-
     //! Retrieve the Coin (unspent transaction output) for a given outpoint.
     virtual bool GetCoin(const COutPoint &outpoint, Coin &coin) const;
 

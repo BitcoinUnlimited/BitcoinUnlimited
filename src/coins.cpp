@@ -12,6 +12,8 @@
 
 #include <assert.h>
 
+extern CCriticalSection cs_utxo;
+
 bool CCoinsView::GetCoin(const COutPoint &outpoint, Coin &coin) const { return false; }
 bool CCoinsView::HaveCoin(const COutPoint &outpoint) const { return false; }
 uint256 CCoinsView::GetBestBlock() const { return uint256(); }
@@ -492,7 +494,7 @@ const Coin &AccessByTxid(const CCoinsViewCache &view, const uint256 &txid)
 {
     // We may return a reference to a coin cache entry so therefore we must make sure the caller
     // has taken a lock on cs_utxo.
-    AssertLockHeld(view.cs_utxo);
+    AssertLockHeld(cs_utxo);
 
     COutPoint iter(txid, 0);
     while (iter.n < nMaxOutputsPerBlock)
