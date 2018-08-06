@@ -19,7 +19,7 @@ extern bool fCheckForPruning;
 extern CCriticalSection cs_LastBlockFile;
 extern std::set<int> setDirtyFileInfo;
 extern std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
-extern uint64_t pruneInterval;
+extern CTweak<uint64_t> pruneIntervalTweak;
 
 /**
   * Config param to determine what DB type we are using
@@ -528,7 +528,7 @@ void FindFilesToPrune(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight
     }
     else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        if (nDBUsedSpace < nPruneTarget + pruneInterval)
+        if (nDBUsedSpace < nPruneTarget + (pruneIntervalTweak.value * 1024 * 1024))
         {
             return;
         }

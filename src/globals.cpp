@@ -171,7 +171,6 @@ vector<std::string> vUseDNSSeeds;
 vector<std::string> vAddedNodes;
 set<CNetAddr> setservAddNodeAddresses;
 
-uint64_t pruneInterval = 0; // this is set in init.cpp
 uint64_t maxGeneratedBlock = DEFAULT_BLOCK_MAX_SIZE;
 uint64_t excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
 unsigned int excessiveAcceptDepth = DEFAULT_EXCESSIVE_ACCEPT_DEPTH;
@@ -214,9 +213,9 @@ CNodeSignals g_signals;
 CAddrMan addrman;
 CDoSManager dosMan;
 
-CTweakRef<uint64_t> pruneIntervalTweak("prune.pruneInterval",
-    "How often in MiB we prune our block storage when pruning",
-    &pruneInterval);
+CTweak<uint64_t> pruneIntervalTweak("prune.pruneInterval",
+    "How much block data (in MiB) is written to disk before trying to prune our block storage",
+    DEFAULT_PRUNE_INTERVAL);
 
 CTweakRef<uint64_t> ebTweak("net.excessiveBlock",
     "Excessive block size in bytes",

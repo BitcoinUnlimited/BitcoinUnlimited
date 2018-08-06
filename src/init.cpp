@@ -100,7 +100,6 @@ enum BindFlags
 };
 
 static const char *FEE_ESTIMATES_FILENAME = "fee_estimates.dat";
-extern uint64_t pruneInterval;
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -750,7 +749,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         LOGA("Prune configured to target %uMiB on disk for block and undo files.\n", nPruneTarget / 1024 / 1024);
         fPruneMode = true;
     }
-    pruneInterval = GetArg("-pruneinterval", DEFAULT_PRUNE_INTERVAL) * 1024 * 1024;
 
     RegisterAllCoreRPCCommands(tableRPC);
 #ifdef ENABLE_WALLET
