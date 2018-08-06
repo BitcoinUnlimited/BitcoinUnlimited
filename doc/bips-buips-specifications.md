@@ -1,4 +1,4 @@
-BIPs that are implemented by Bitcoin Core (up-to-date up to **v0.12.0**):
+BIPs that are implemented by Bitcoin Unlimited (up-to-date up to **v1.3.0.1**):
 
 * [`BIP 11`](https://github.com/bitcoin/bips/blob/master/bip-0011.mediawiki): Multisig outputs are standard since **v0.6.0** ([PR #669](https://github.com/bitcoin/bitcoin/pull/669)).
 * [`BIP 13`](https://github.com/bitcoin/bips/blob/master/bip-0013.mediawiki): The address format for P2SH addresses has been implemented since **v0.6.0** ([PR #669](https://github.com/bitcoin/bitcoin/pull/669)).
@@ -19,3 +19,17 @@ BIPs that are implemented by Bitcoin Core (up-to-date up to **v0.12.0**):
 * [`BIP 70`](https://github.com/bitcoin/bips/blob/master/bip-0070.mediawiki) [`71`](https://github.com/bitcoin/bips/blob/master/bip-0071.mediawiki) [`72`](https://github.com/bitcoin/bips/blob/master/bip-0072.mediawiki): Payment Protocol support has been available in Bitcoin Unlimited GUI since **v0.9.0** ([PR #5216](https://github.com/bitcoin/bitcoin/pull/5216)).
 * [`BIP 111`](https://github.com/bitcoin/bips/blob/master/bip-0111.mediawiki): `NODE_BLOOM` service bit added, and enforced for all peer versions as of **v1.1.0** ([PR #6579](https://github.com/bitcoin/bitcoin/pull/6579) and [PR #6641](https://github.com/bitcoin/bitcoin/pull/6641)).
 * [`BIP 130`](https://github.com/bitcoin/bips/blob/master/bip-0130.mediawiki): direct headers announcement is negotiated with peer versions `>=70012` as of **v0.12.0** ([PR 6494](https://github.com/bitcoin/bitcoin/pull/6494)).
+
+BIPs that are implemented by Bitcoin Unlimited (up-to-date up to dev@43aa7a05):
+
+* [`BUIP 010`](https://github.com/BitcoinUnlimited/BUIP/blob/master/010.mediawiki): Xtreme Thinblocks (initial commit: 2c9e2c62f5bf4369f4bff7ba783ae32432de4f68 Fri Jan 15 21:37:25 2016 -0800)
+* [`BUIP 018`](https://github.com/BitcoinUnlimited/BUIP/blob/master/018.mediawiki): Bitnodes Seeding and User-Configurable DNS Seeds ([PR #30](https://github.com/BitcoinUnlimited/BitcoinUnlimited/pull/30)).
+* [`BUIP 033`](https://github.com/BitcoinUnlimited/BUIP/blob/master/018.mediawiki): Parallel Block Validation ([PR #254](https://github.com/BitcoinUnlimited/BitcoinUnlimited/pull/254)).
+* [`BUIP 070`](https://github.com/BitcoinUnlimited/BUIP/blob/master/070.mediawiki): Support BitPay's new Bitcoin Cash address format in BUCash ([PR #883](https://github.com/BitcoinUnlimited/BitcoinUnlimited/pull/883)).
+* [`BUIP 085`](https://github.com/BitcoinUnlimited/BUIP/blob/master/085.mediawiki): Double spend relaying ([PR #1109](https://github.com/BitcoinUnlimited/BitcoinUnlimited/pull/1109)).
+
+Bitcoin Cash Specification (up-to-date up to **v1.3.0.1**):
+
+* [August 1st 2017 Protocol Upgrade](https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/uahf-technical-spec.md)
+* [New Bitcoin Cash Address Format](https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/cashaddr.md)
+* [May 15th 2018 Protocol Upgrade](https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/may-2018-hardfork.md)
