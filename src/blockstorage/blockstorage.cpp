@@ -549,6 +549,158 @@ void FindFilesToPrune(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight
     }
 }
 
+bool FlushStateToDiskInternal(CValidationState &state, FlushStateMode mode, bool fFlushForPrune, std::set<int> setFilesToPrune)
+{
+    static int64_t nLastWrite = 0;
+    static int64_t nLastFlush = 0;
+    static int64_t nLastSetChain = 0;
+    int64_t nNow = GetTimeMicros();
+    // Avoid writing/flushing immediately after startup.
+    if (nLastWrite == 0)
+    {
+        nLastWrite = nNow;
+    }
+    if (nLastFlush == 0)
+    {
+        nLastFlush = nNow;
+    }
+    if (nLastSetChain == 0)
+    {
+        nLastSetChain = nNow;
+    }
+
+    // If possible adjust the max size of the coin cache (nCoinCacheMaxSize) based on current available memory. Do
+    // this before determinining whether to flush the cache or not in the steps that follow.
+    AdjustCoinCacheSize();
+
+    size_t cacheSize = pcoinsTip->DynamicMemoryUsage();
+    static int64_t nSizeAfterLastFlush = 0;
+    // The cache is close to the limit. Try to flush and trim.
+    bool fCacheCritical = ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > nCoinCacheMaxSize * 0.995)) ||
+                          (cacheSize - nSizeAfterLastFlush > nMaxCacheIncreaseSinceLastFlush);
+    // It's been a while since we wrote the block index to disk. Do this frequently, so we don't need to redownload
+    // after a crash.
+    bool fPeriodicWrite =
+        mode == FLUSH_STATE_PERIODIC && nNow > nLastWrite + (int64_t)DATABASE_WRITE_INTERVAL * 1000000;
+    // It's been very long since we flushed the cache. Do this infrequently, to optimize cache usage.
+    bool fPeriodicFlush =
+        mode == FLUSH_STATE_PERIODIC && nNow > nLastFlush + (int64_t)DATABASE_FLUSH_INTERVAL * 1000000;
+    // Combine all conditions that result in a full cache flush.
+    bool fDoFullFlush = (mode == FLUSH_STATE_ALWAYS) || fCacheCritical || fPeriodicFlush || fFlushForPrune;
+    // Write blocks and block index to disk.
+    if (fDoFullFlush || fPeriodicWrite)
+    {
+        // Depend on nMinDiskSpace to ensure we can write block index
+        if (!CheckDiskSpace(0))
+        {
+            return state.Error("out of disk space");
+        }
+        // First make sure all block and undo data is flushed to disk. This is not used for levelDB block storage
+        if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+        {
+            FlushBlockFile();
+        }
+        // Then update all block file information (which may refer to block and undo files).
+        {
+            std::vector<std::pair<int, const CBlockFileInfo *> > vFiles;
+            vFiles.reserve(setDirtyFileInfo.size());
+            for (std::set<int>::iterator it = setDirtyFileInfo.begin(); it != setDirtyFileInfo.end();)
+            {
+                vFiles.push_back(std::make_pair(*it, &vinfoBlockFile[*it]));
+                setDirtyFileInfo.erase(it++);
+            }
+            std::vector<const CBlockIndex *> vBlocks;
+            vBlocks.reserve(setDirtyBlockIndex.size());
+            for (std::set<CBlockIndex *>::iterator it = setDirtyBlockIndex.begin(); it != setDirtyBlockIndex.end();)
+            {
+                vBlocks.push_back(*it);
+                setDirtyBlockIndex.erase(it++);
+            }
+
+
+            // we write different info depending on block storage system
+            if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+            {
+                if (!pblocktree->WriteBatchSync(vFiles, nLastBlockFile, vBlocks))
+                {
+                    return AbortNode(state, "Files to write to block index database");
+                }
+            }
+            else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+            {
+                // vFiles should be empty for a LEVELDB call so insert a blank vector instead
+                std::vector<std::pair<int, const CBlockFileInfo *> > vFilesEmpty;
+                if (!pblocktree->WriteBatchSync(vFilesEmpty, 0, vBlocks))
+                {
+                    return AbortNode(state, "Files to write to block index database");
+                }
+            }
+            else
+            {
+                // THIS SHOULD NEVER HAPPEN, it means we werent running in any recognizable block DB mode
+                assert(false);
+            }
+        }
+        // Finally remove any pruned files, this will be empty for blockdb mode
+        if (fFlushForPrune)
+        {
+            UnlinkPrunedFiles(setFilesToPrune);
+        }
+        nLastWrite = nNow;
+    }
+    // Flush best chain related state. This can only be done if the blocks / block index write was also done.
+    if (fDoFullFlush)
+    {
+        // Typical Coin structures on disk are around 48 bytes in size.
+        // Pushing a new one to the database can cause it to be written
+        // twice (once in the log, and once in the tables). This is already
+        // an overestimation, as most will delete an existing entry or
+        // overwrite one. Still, use a conservative safety factor of 2.
+        if (!CheckDiskSpace(48 * 2 * 2 * pcoinsTip->GetCacheSize()))
+        {
+            return state.Error("out of disk space");
+        }
+        // Flush the chainstate (which may refer to block index entries).
+        if (!pcoinsTip->Flush())
+        {
+            return AbortNode(state, "Failed to write to coin database");
+        }
+        nLastFlush = nNow;
+        // Trim any excess entries from the cache if needed.  If chain is not syncd then
+        // trim extra so that we don't flush as often during IBD.
+        if (IsChainNearlySyncd() && !fReindex && !fImporting)
+        {
+            pcoinsTip->Trim(nCoinCacheMaxSize);
+        }
+        else
+        {
+            // Trim, but never trim more than nMaxCacheIncreaseSinceLastFlush
+            size_t nTrimSize = nCoinCacheMaxSize * .90;
+            if (nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush > nTrimSize)
+            {
+                nTrimSize = nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush;
+            }
+            pcoinsTip->Trim(nTrimSize);
+        }
+        nSizeAfterLastFlush = pcoinsTip->DynamicMemoryUsage();
+    }
+    if (fDoFullFlush || ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) &&
+                            nNow > nLastSetChain + (int64_t)DATABASE_WRITE_INTERVAL * 1000000))
+    {
+        // Update best block in wallet (so we can detect restored wallets).
+        GetMainSignals().SetBestChain(chainActive.GetLocator());
+        nLastSetChain = nNow;
+    }
+
+    // As a safeguard, periodically check and correct any drift in the value of cachedCoinsUsage.  While a
+    // correction should never be needed, resetting the value allows the node to continue operating, and only
+    // an error is reported if the new and old values do not match.
+    if (fPeriodicFlush)
+    {
+        pcoinsTip->ResetCachedCoinUsage();
+    }
+    return true;
+}
 
 /**
  * Update the on-disk chain state.
@@ -560,9 +712,6 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
 {
     const CChainParams &chainparams = Params();
     LOCK2(cs_main, cs_LastBlockFile);
-    static int64_t nLastWrite = 0;
-    static int64_t nLastFlush = 0;
-    static int64_t nLastSetChain = 0;
     std::set<int> setFilesToPrune;
     bool fFlushForPrune = false;
     try
@@ -581,157 +730,12 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode)
                 }
             }
         }
-        int64_t nNow = GetTimeMicros();
-        // Avoid writing/flushing immediately after startup.
-        if (nLastWrite == 0)
-        {
-            nLastWrite = nNow;
-        }
-        if (nLastFlush == 0)
-        {
-            nLastFlush = nNow;
-        }
-        if (nLastSetChain == 0)
-        {
-            nLastSetChain = nNow;
-        }
-
-        // If possible adjust the max size of the coin cache (nCoinCacheMaxSize) based on current available memory. Do
-        // this before determinining whether to flush the cache or not in the steps that follow.
-        AdjustCoinCacheSize();
-
-        size_t cacheSize = pcoinsTip->DynamicMemoryUsage();
-        static int64_t nSizeAfterLastFlush = 0;
-        // The cache is close to the limit. Try to flush and trim.
-        bool fCacheCritical = ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > nCoinCacheMaxSize * 0.995)) ||
-                              (cacheSize - nSizeAfterLastFlush > nMaxCacheIncreaseSinceLastFlush);
-        // It's been a while since we wrote the block index to disk. Do this frequently, so we don't need to redownload
-        // after a crash.
-        bool fPeriodicWrite =
-            mode == FLUSH_STATE_PERIODIC && nNow > nLastWrite + (int64_t)DATABASE_WRITE_INTERVAL * 1000000;
-        // It's been very long since we flushed the cache. Do this infrequently, to optimize cache usage.
-        bool fPeriodicFlush =
-            mode == FLUSH_STATE_PERIODIC && nNow > nLastFlush + (int64_t)DATABASE_FLUSH_INTERVAL * 1000000;
-        // Combine all conditions that result in a full cache flush.
-        bool fDoFullFlush = (mode == FLUSH_STATE_ALWAYS) || fCacheCritical || fPeriodicFlush || fFlushForPrune;
-        // Write blocks and block index to disk.
-        if (fDoFullFlush || fPeriodicWrite)
-        {
-            // Depend on nMinDiskSpace to ensure we can write block index
-            if (!CheckDiskSpace(0))
-            {
-                return state.Error("out of disk space");
-            }
-            // First make sure all block and undo data is flushed to disk. This is not used for levelDB block storage
-            if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
-            {
-                FlushBlockFile();
-            }
-            // Then update all block file information (which may refer to block and undo files).
-            {
-                std::vector<std::pair<int, const CBlockFileInfo *> > vFiles;
-                vFiles.reserve(setDirtyFileInfo.size());
-                for (std::set<int>::iterator it = setDirtyFileInfo.begin(); it != setDirtyFileInfo.end();)
-                {
-                    vFiles.push_back(std::make_pair(*it, &vinfoBlockFile[*it]));
-                    setDirtyFileInfo.erase(it++);
-                }
-                std::vector<const CBlockIndex *> vBlocks;
-                vBlocks.reserve(setDirtyBlockIndex.size());
-                for (std::set<CBlockIndex *>::iterator it = setDirtyBlockIndex.begin(); it != setDirtyBlockIndex.end();)
-                {
-                    vBlocks.push_back(*it);
-                    setDirtyBlockIndex.erase(it++);
-                }
-
-
-                // we write different info depending on block storage system
-                if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
-                {
-                    if (!pblocktree->WriteBatchSync(vFiles, nLastBlockFile, vBlocks))
-                    {
-                        return AbortNode(state, "Files to write to block index database");
-                    }
-                }
-                else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
-                {
-                    // vFiles should be empty for a LEVELDB call so insert a blank vector instead
-                    std::vector<std::pair<int, const CBlockFileInfo *> > vFilesEmpty;
-                    if (!pblocktree->WriteBatchSync(vFilesEmpty, 0, vBlocks))
-                    {
-                        return AbortNode(state, "Files to write to block index database");
-                    }
-                }
-                else
-                {
-                    // THIS SHOULD NEVER HAPPEN, it means we werent running in any recognizable block DB mode
-                    assert(false);
-                }
-            }
-            // Finally remove any pruned files, this will be empty for blockdb mode
-            if (fFlushForPrune)
-            {
-                UnlinkPrunedFiles(setFilesToPrune);
-            }
-            nLastWrite = nNow;
-        }
-        // Flush best chain related state. This can only be done if the blocks / block index write was also done.
-        if (fDoFullFlush)
-        {
-            // Typical Coin structures on disk are around 48 bytes in size.
-            // Pushing a new one to the database can cause it to be written
-            // twice (once in the log, and once in the tables). This is already
-            // an overestimation, as most will delete an existing entry or
-            // overwrite one. Still, use a conservative safety factor of 2.
-            if (!CheckDiskSpace(48 * 2 * 2 * pcoinsTip->GetCacheSize()))
-            {
-                return state.Error("out of disk space");
-            }
-            // Flush the chainstate (which may refer to block index entries).
-            if (!pcoinsTip->Flush())
-            {
-                return AbortNode(state, "Failed to write to coin database");
-            }
-            nLastFlush = nNow;
-            // Trim any excess entries from the cache if needed.  If chain is not syncd then
-            // trim extra so that we don't flush as often during IBD.
-            if (IsChainNearlySyncd() && !fReindex && !fImporting)
-            {
-                pcoinsTip->Trim(nCoinCacheMaxSize);
-            }
-            else
-            {
-                // Trim, but never trim more than nMaxCacheIncreaseSinceLastFlush
-                size_t nTrimSize = nCoinCacheMaxSize * .90;
-                if (nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush > nTrimSize)
-                {
-                    nTrimSize = nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush;
-                }
-                pcoinsTip->Trim(nTrimSize);
-            }
-            nSizeAfterLastFlush = pcoinsTip->DynamicMemoryUsage();
-        }
-        if (fDoFullFlush || ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) &&
-                                nNow > nLastSetChain + (int64_t)DATABASE_WRITE_INTERVAL * 1000000))
-        {
-            // Update best block in wallet (so we can detect restored wallets).
-            GetMainSignals().SetBestChain(chainActive.GetLocator());
-            nLastSetChain = nNow;
-        }
-
-        // As a safeguard, periodically check and correct any drift in the value of cachedCoinsUsage.  While a
-        // correction should never be needed, resetting the value allows the node to continue operating, and only
-        // an error is reported if the new and old values do not match.
-        if (fPeriodicFlush)
-        {
-            pcoinsTip->ResetCachedCoinUsage();
-        }
+        return FlushStateToDiskInternal(state, mode, fFlushForPrune, setFilesToPrune);
     }
     catch (const std::runtime_error &e)
     {
         return AbortNode(state, std::string("System error while flushing: ") + e.what());
     }
-    return true;
 }
 
 void FlushStateToDisk()

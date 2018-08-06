@@ -4,6 +4,7 @@
 
 
 #include "blockleveldb.h"
+#include "blockstorage.h"
 #include "hash.h"
 #include "main.h"
 
@@ -28,7 +29,7 @@ bool WriteBlockToDB(const CBlock &block)
     std::ostringstream key;
     key << block.GetBlockTime() << ":" << block.GetHash().ToString();
 
-    return pblockdb->Write(key.str(), block);
+    return pblockdb->Write(key.str(), block, true);
 }
 
 bool ReadBlockFromDB(const CBlockIndex *pindex, CBlock &block)
@@ -65,7 +66,7 @@ bool WriteUndoToDB(const CBlockUndo &blockundo, const CBlockIndex *pindex)
     hasher << hashBlock;
     hasher << blockundo;
     UndoDBValue value(hasher.GetHash(), hashBlock, &blockundo);
-    return pblockundodb->Write(key.str(), value);
+    return pblockundodb->Write(key.str(), value, true);
 }
 
 bool ReadUndoFromDB(CBlockUndo &blockundo, const CBlockIndex *pindex)
@@ -136,6 +137,8 @@ uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
         prunedCount = prunedCount + 1;
         pindexOldest = chainActive.Next(pindexOldest);
     }
+    CValidationState state;
+    FlushStateToDiskInternal(state);
     pblockdb->WriteBatch(blockBatch, true);
     pblockundodb->WriteBatch(undoBatch, true);
     pblockdb->Compact();
