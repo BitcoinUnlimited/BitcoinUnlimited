@@ -435,7 +435,7 @@ UniValue mkblocktemplate(const UniValue &params, CBlock *pblockOut)
     if (strMode != "template")
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mode");
 
-    if (!unsafeGetBlockTemplate.value)
+    if (!unsafeGetBlockTemplate.Value())
     {
         if (vNodes.empty())
             throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Bitcoin is not connected!");

@@ -1234,13 +1234,13 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         if (state->nBlocksInFlight <= 0)
             pnode->nMaxBlocksInTransit.fetch_add(4);
 
-        if (maxBlocksInTransitPerPeer.value != 0)
+        if (maxBlocksInTransitPerPeer.Value() != 0)
         {
-            pnode->nMaxBlocksInTransit.store(maxBlocksInTransitPerPeer.value);
+            pnode->nMaxBlocksInTransit.store(maxBlocksInTransitPerPeer.Value());
         }
-        if (blockDownloadWindow.value != 0)
+        if (blockDownloadWindow.Value() != 0)
         {
-            BLOCK_DOWNLOAD_WINDOW.store(blockDownloadWindow.value);
+            BLOCK_DOWNLOAD_WINDOW.store(blockDownloadWindow.Value());
         }
         LOG(THIN | BLK, "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %d\n", BLOCK_DOWNLOAD_WINDOW.load(),
             pnode->nMaxBlocksInTransit.load());

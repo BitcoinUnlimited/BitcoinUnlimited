@@ -141,17 +141,17 @@ BOOST_AUTO_TEST_CASE(excessiveChecks)
 
     // Check sigops > 1MB.
     BOOST_CHECK_MESSAGE(
-        false == CheckExcessive(block, 1000000 + 1, (blockSigopsPerMb.value * 2), 100, 100), "improper sigops");
+        false == CheckExcessive(block, 1000000 + 1, (blockSigopsPerMb.Value() * 2), 100, 100), "improper sigops");
     BOOST_CHECK_MESSAGE(
-        true == CheckExcessive(block, 1000000 + 1, (blockSigopsPerMb.value * 2) + 1, 100, 100), "improper sigops");
+        true == CheckExcessive(block, 1000000 + 1, (blockSigopsPerMb.Value() * 2) + 1, 100, 100), "improper sigops");
     BOOST_CHECK_MESSAGE(
-        true == CheckExcessive(block, (2 * 1000000), (blockSigopsPerMb.value * 2) + 1, 100, 100), "improper sigops");
-    BOOST_CHECK_MESSAGE(false == CheckExcessive(block, (2 * 1000000) + 1, (blockSigopsPerMb.value * 2) + 1, 100, 100),
+        true == CheckExcessive(block, (2 * 1000000), (blockSigopsPerMb.Value() * 2) + 1, 100, 100), "improper sigops");
+    BOOST_CHECK_MESSAGE(false == CheckExcessive(block, (2 * 1000000) + 1, (blockSigopsPerMb.Value() * 2) + 1, 100, 100),
         "improper sigops");
 
 
     // Check tx size values
-    maxTxSize.value = DEFAULT_LARGEST_TRANSACTION;
+    maxTxSize.Set(DEFAULT_LARGEST_TRANSACTION);
 
     // Within a 1 MB block, a 1MB transaction is not excessive
     BOOST_CHECK_MESSAGE(
@@ -159,9 +159,9 @@ BOOST_AUTO_TEST_CASE(excessiveChecks)
         "improper max tx");
 
     // With a > 1 MB block, use the maxTxSize to determine
-    BOOST_CHECK_MESSAGE(
-        false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, 1, maxTxSize.value), "improper max tx");
-    BOOST_CHECK_MESSAGE(true == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, 1, maxTxSize.value + 1),
+    BOOST_CHECK_MESSAGE(false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, 1, maxTxSize.Value()),
+        "improper max tx");
+    BOOST_CHECK_MESSAGE(true == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, 1, maxTxSize.Value() + 1),
         "improper max tx");
 }
 

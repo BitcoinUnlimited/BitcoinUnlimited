@@ -858,11 +858,11 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
     if (blockSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
     {
         // Check transaction size to limit sighash
-        if (largestTx > maxTxSize.value)
+        if (largestTx > maxTxSize.Value())
         {
             LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
                  " largest TX:%d  :tx too large.  Expected less than: %d\n",
-                block.nVersion, block.nTime, blockSize, nTx, largestTx, maxTxSize.value);
+                block.nVersion, block.nTime, blockSize, nTx, largestTx, maxTxSize.Value());
             return true;
         }
 
@@ -870,11 +870,11 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
         uint64_t blockMbSize =
             1 + ((blockSize - 1) /
                     1000000); // block size in megabytes rounded up. 1-1000000 -> 1, 1000001-2000000 -> 2, etc.
-        if (nSigOps > blockSigopsPerMb.value * blockMbSize)
+        if (nSigOps > blockSigopsPerMb.Value() * blockMbSize)
         {
             LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
                  " Sig:%d  :too many sigops.  Expected less than: %d\n",
-                block.nVersion, block.nTime, blockSize, nTx, nSigOps, blockSigopsPerMb.value * blockMbSize);
+                block.nVersion, block.nTime, blockSize, nTx, nSigOps, blockSigopsPerMb.Value() * blockMbSize);
             return true;
         }
     }

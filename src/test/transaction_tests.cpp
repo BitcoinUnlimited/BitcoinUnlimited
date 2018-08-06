@@ -335,23 +335,23 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     BOOST_CHECK(IsStandardTx(t, reason));
 
     // Check dust with default threshold:
-    nDustThreshold.value = DEFAULT_DUST_THRESHOLD;
+    nDustThreshold.Set(DEFAULT_DUST_THRESHOLD);
     // dust:
-    t.vout[0].nValue = nDustThreshold.value - 1;
+    t.vout[0].nValue = nDustThreshold.Value() - 1;
     BOOST_CHECK(!IsStandardTx(t, reason));
     // not dust:
-    t.vout[0].nValue = nDustThreshold.value;
+    t.vout[0].nValue = nDustThreshold.Value();
     BOOST_CHECK(IsStandardTx(t, reason));
 
     // Check dust with odd threshold
-    nDustThreshold.value = 1234;
+    nDustThreshold.Set(1234);
     // dust:
     t.vout[0].nValue = 1234 - 1;
     BOOST_CHECK(!IsStandardTx(t, reason));
     // not dust:
     t.vout[0].nValue = 1234;
     BOOST_CHECK(IsStandardTx(t, reason));
-    nDustThreshold.value = DEFAULT_DUST_THRESHOLD;
+    nDustThreshold.Set(DEFAULT_DUST_THRESHOLD);
 
     t.vout[0].scriptPubKey = CScript() << OP_1;
     BOOST_CHECK(!IsStandardTx(t, reason));

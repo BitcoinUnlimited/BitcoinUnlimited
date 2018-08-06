@@ -562,7 +562,7 @@ bool IsMay152018Enabled(const Consensus::Params &consensusparams, const CBlockIn
         return false;
     }
 
-    return pindexPrev->IsforkActiveOnNextBlock(miningForkTime.value);
+    return pindexPrev->IsforkActiveOnNextBlock(miningForkTime.Value());
 }
 
 bool IsMay152018Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev)
@@ -572,7 +572,7 @@ bool IsMay152018Next(const Consensus::Params &consensusparams, const CBlockIndex
         return false;
     }
 
-    return pindexPrev->forkAtNextBlock(miningForkTime.value);
+    return pindexPrev->forkAtNextBlock(miningForkTime.Value());
 }
 
 
@@ -862,9 +862,9 @@ static bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         // BU: we calculate the recommended fee by looking at what's in the mempool.  This starts at 0 though for an
         // empty mempool.  So set the minimum "absurd" fee to 10000 satoshies per byte.  If for some reason fees rise
         // above that, you can specify up to 100x what other txns are paying in the mempool
-        if (fRejectAbsurdFee && nFees > std::max((int64_t)100L * nSize, maxTxFee.value) * 100)
+        if (fRejectAbsurdFee && nFees > std::max((int64_t)100L * nSize, maxTxFee.Value()) * 100)
             return state.Invalid(false, REJECT_HIGHFEE, "absurdly-high-fee",
-                strprintf("%d > %d", nFees, std::max((int64_t)1L, maxTxFee.value) * 10000));
+                strprintf("%d > %d", nFees, std::max((int64_t)1L, maxTxFee.Value()) * 10000));
 
         // Calculate in-mempool ancestors, up to a limit.
         CTxMemPool::setEntries setAncestors;
@@ -1876,7 +1876,7 @@ bool ConnectBlock(const CBlock &block,
         return true;
     }
 
-    const int64_t timeBarrier = GetTime() - (24 * 3600 * checkScriptDays.value);
+    const int64_t timeBarrier = GetTime() - (24 * 3600 * checkScriptDays.Value());
     // Blocks that have various days of POW behind them makes them secure in that
     // real online nodes have checked the scripts.  Therefore, during initial block
     // download we don't need to check most of those scripts except for the most
@@ -1888,7 +1888,7 @@ bool ConnectBlock(const CBlock &block,
             fScriptChecks = !fCheckpointsEnabled || block.nTime > timeBarrier;
         else
             fScriptChecks = !fCheckpointsEnabled || block.nTime > timeBarrier ||
-                            (uint32_t)pindex->nHeight > pindexBestHeader->nHeight - (144 * checkScriptDays.value);
+                            (uint32_t)pindex->nHeight > pindexBestHeader->nHeight - (144 * checkScriptDays.Value());
     }
 
     int64_t nTime1 = GetTimeMicros();
@@ -2555,16 +2555,16 @@ void static UpdateTip(CBlockIndex *pindexNew)
     if (IsMay152018Next(chainParams.GetConsensus(), pindexNew))
     {
         // Bump the default generated size to 8MB
-        if (miningForkMG.value > maxGeneratedBlock)
-            maxGeneratedBlock = miningForkMG.value;
+        if (miningForkMG.Value() > maxGeneratedBlock)
+            maxGeneratedBlock = miningForkMG.Value();
     }
 
     // Next, check every on every block for EB < 32MB and force this as the minimum because this is a consensus issue
     if (IsMay152018Enabled(chainParams.GetConsensus(), pindexNew))
     {
-        if (miningForkEB.value > excessiveBlockSize)
+        if (miningForkEB.Value() > excessiveBlockSize)
         {
-            excessiveBlockSize = miningForkEB.value;
+            excessiveBlockSize = miningForkEB.Value();
             settingsToUserAgentString();
         }
     }
@@ -4579,8 +4579,8 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
     try
     {
         // This takes over fileIn and calls fclose() on it in the CBufferedFile destructor
-        CBufferedFile blkdat(fileIn, 2 * (reindexTypicalBlockSize.value + MESSAGE_START_SIZE + sizeof(unsigned int)),
-            reindexTypicalBlockSize.value + MESSAGE_START_SIZE + sizeof(unsigned int), SER_DISK, CLIENT_VERSION);
+        CBufferedFile blkdat(fileIn, 2 * (reindexTypicalBlockSize.Value() + MESSAGE_START_SIZE + sizeof(unsigned int)),
+            reindexTypicalBlockSize.Value() + MESSAGE_START_SIZE + sizeof(unsigned int), SER_DISK, CLIENT_VERSION);
         uint64_t nRewind = blkdat.GetPos();
         while (!blkdat.eof())
         {
@@ -6272,8 +6272,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             chainActive.Tip()->nChainWork <= pindexLast->nChainWork)
         {
             // Set tweak value.  Mostly used in testing direct fetch.
-            if (maxBlocksInTransitPerPeer.value != 0)
-                pfrom->nMaxBlocksInTransit.store(maxBlocksInTransitPerPeer.value);
+            if (maxBlocksInTransitPerPeer.Value() != 0)
+                pfrom->nMaxBlocksInTransit.store(maxBlocksInTransitPerPeer.Value());
 
             std::vector<CBlockIndex *> vToFetch;
             CBlockIndex *pindexWalk = pindexLast;

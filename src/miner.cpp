@@ -126,7 +126,7 @@ uint64_t BlockAssembler::reserveBlockSize(const CScript &scriptPubKeyIn)
 
     // BU Miners take the block we give them, wipe away our coinbase and add their own.
     // So if their reserve choice is bigger then our coinbase then use that.
-    return nHeaderSize + std::max(nCoinbaseSize, coinbaseReserve.value);
+    return nHeaderSize + std::max(nCoinbaseSize, coinbaseReserve.Value());
 }
 
 CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _nHeight, CAmount nValue)
@@ -307,9 +307,9 @@ bool BlockAssembler::IsIncrementallyGood(uint64_t nExtraSize, unsigned int nExtr
     else
     {
         uint64_t blockMbSize = 1 + (nBlockSize + nExtraSize - 1) / 1000000;
-        if (nBlockSigOps + nExtraSigOps > blockMiningSigopsPerMb.value * blockMbSize)
+        if (nBlockSigOps + nExtraSigOps > blockMiningSigopsPerMb.Value() * blockMbSize)
         {
-            if (nBlockSigOps > blockMiningSigopsPerMb.value * blockMbSize - 2)
+            if (nBlockSigOps > blockMiningSigopsPerMb.Value() * blockMbSize - 2)
                 // very close to the limit, so the block is finished.  So a block that is near the sigops limit
                 // might be shorter than it could be if the high sigops tx was backed out and other tx added.
                 blockFinished = true;

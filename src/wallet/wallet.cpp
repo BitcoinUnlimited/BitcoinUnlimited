@@ -2439,7 +2439,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
 
                 // Sign
                 unsigned int sighashType = SIGHASH_ALL;
-                if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) && walletSignWithForkSig.value)
+                if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) && walletSignWithForkSig.Value())
                 {
                     sighashType |= SIGHASH_FORKID;
                 }
@@ -2639,8 +2639,8 @@ CAmount CWallet::GetMinimumFee(unsigned int nTxBytes, unsigned int nConfirmTarge
     // prevent user from paying a fee below minRelayTxFee or minTxFee
     nFeeNeeded = std::max(nFeeNeeded, GetRequiredFee(nTxBytes));
     // But always obey the maximum
-    if (nFeeNeeded > maxTxFee.value)
-        nFeeNeeded = maxTxFee.value;
+    if (nFeeNeeded > maxTxFee.Value())
+        nFeeNeeded = maxTxFee.Value();
     return nFeeNeeded;
 }
 
@@ -3551,8 +3551,8 @@ bool CWallet::ParameterInteraction()
             return InitError(AmountErrMsg("maxtxfee", mapArgs["-maxtxfee"]));
         if (nMaxFee > HIGH_MAX_TX_FEE)
             InitWarning(_("-maxtxfee is set very high! Fees this large could be paid on a single transaction."));
-        maxTxFee.value = nMaxFee;
-        if (CFeeRate(maxTxFee.value, 1000) < ::minRelayTxFee)
+        maxTxFee.Set(nMaxFee);
+        if (CFeeRate(maxTxFee.Value(), 1000) < ::minRelayTxFee)
         {
             return InitError(strprintf(_("Invalid amount for -maxtxfee=<amount>: '%s' (must be at least the minrelay "
                                          "fee of %s to prevent stuck transactions)"),

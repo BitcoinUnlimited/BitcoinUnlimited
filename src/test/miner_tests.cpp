@@ -204,7 +204,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     uint64_t minRoom = 1000;
 
     // Test no reserve and standard length miner comment
-    coinbaseReserve.value = 0;
+    coinbaseReserve.Set(0);
     minerComment = "I am a meat popsicle.";
 
     // Now generate lots of full size blocks and verify that none exceed the maxGeneratedBlock value
