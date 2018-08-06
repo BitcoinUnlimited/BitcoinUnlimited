@@ -5433,6 +5433,11 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
         }
 
+        if (pfrom->strSubVer.size() > 12) {
+            const std::string substr = pfrom->strSubVer.substr(0, 13);
+            pfrom->fTestsRespends = substr == "/BUCash:1.3.0" || substr == "/Bitcoin XT:0";
+        }
+
         LOG(NET, "receive version message: %s: version %d, blocks=%d, us=%s, peer=%s\n", pfrom->cleanSubVer,
             pfrom->nVersion, pfrom->nStartingHeight, addrMe.ToString(), pfrom->GetLogName());
 

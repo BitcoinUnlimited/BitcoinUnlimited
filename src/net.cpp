@@ -2848,6 +2848,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nLocalThinBlockBytes = 0;
     nAvgBlkResponseTime = -1.0;
     nMaxBlocksInTransit = 16;
+    fTestsRespends = false;
 
     nMisbehavior = 0;
     fShouldBan = false;
