@@ -362,17 +362,20 @@ bool CBlockTreeDB::WriteTxIndex(const std::vector<std::pair<uint256, CDiskTxPos>
     return WriteBatch(batch);
 }
 
+uint64_t CBlockTreeDB::saltedAddrHash(const uint160 &addrid) const
+{
+    CHashWriter ss(SER_GETHASH, 0);
+    ss << salt;
+    ss << addrid;
+    return UintToArith256(ss.GetHash()).GetLow64();
+}
+
+
 bool CBlockTreeDB::ReadAddrIndex(uint160 addrid, std::vector<CExtDiskTxPos> &list)
 {
     boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
 
-    uint64_t lookupid;
-    {
-        CHashWriter ss(SER_GETHASH, 0);
-        ss << salt;
-        ss << addrid;
-        lookupid = UintToArith256(ss.GetHash()).GetLow64();
-    }
+    uint64_t lookupid = saltedAddrHash(addrid);
 
     pcursor->Seek(make_pair(DB_ADDRINDEX, lookupid));
 
@@ -380,13 +383,9 @@ bool CBlockTreeDB::ReadAddrIndex(uint160 addrid, std::vector<CExtDiskTxPos> &lis
     {
         std::pair<std::pair<char, uint64_t>, CExtDiskTxPos> key;
         if (pcursor->GetKey(key) && key.first.first == DB_ADDRINDEX && key.first.second == lookupid)
-        {
             list.push_back(key.second);
-        }
         else
-        {
             break;
-        }
         pcursor->Next();
     }
     return true;
@@ -398,11 +397,7 @@ bool CBlockTreeDB::AddAddrIndex(const std::vector<std::pair<uint160, CExtDiskTxP
     CDBBatch batch(*this);
     for (std::vector<std::pair<uint160, CExtDiskTxPos> >::const_iterator it = list.begin(); it != list.end(); it++)
     {
-        CHashWriter ss(SER_GETHASH, 0);
-        ss << salt;
-        ss << it->first;
-        batch.Write(
-            make_pair(make_pair(DB_ADDRINDEX, UintToArith256(ss.GetHash()).GetLow64()), it->second), FLATDATA(foo));
+        batch.Write(make_pair(make_pair(DB_ADDRINDEX, saltedAddrHash(it->first)), it->second), FLATDATA(foo));
     }
     return WriteBatch(batch, true);
 }

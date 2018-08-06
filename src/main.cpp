@@ -60,6 +60,7 @@
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/scope_exit.hpp>
 #include <boost/thread.hpp>
+#include <boost/variant/polymorphic_get.hpp>
 #include <sstream>
 
 #if defined(NDEBUG)
@@ -529,24 +530,15 @@ bool ReadTransaction(CTransaction &tx, const CDiskTxPos &pos, uint256 &hashBlock
 
 bool FindTransactionsByDestination(const CTxDestination &dest, std::set<CExtDiskTxPos> &setpos)
 {
-    uint160 addrid;
-    const CKeyID *pkeyid = boost::get<CKeyID>(&dest);
-    if (pkeyid)
-        addrid = static_cast<uint160>(*pkeyid);
-    if (addrid.IsNull())
-    {
-        const CScriptID *pscriptid = boost::get<CScriptID>(&dest);
-        if (pscriptid)
-            addrid = static_cast<uint160>(*pscriptid);
-    }
-    if (addrid.IsNull())
+    const uint160 *const addrid = boost::polymorphic_get<const uint160>(&dest);
+    if (addrid == nullptr || addrid->IsNull())
         return false;
 
     LOCK(cs_main);
     if (!fAddrIndex)
         return false;
     std::vector<CExtDiskTxPos> vPos;
-    if (!pblocktree->ReadAddrIndex(addrid, vPos))
+    if (!pblocktree->ReadAddrIndex(*addrid, vPos))
         return false;
     setpos.insert(vPos.begin(), vPos.end());
     return true;
@@ -1394,10 +1386,6 @@ bool ConnectBlock(const CBlock &block,
     int nInputs = 0;
     unsigned int nSigOps = 0;
 
-    // CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
-    // std::vector<std::pair<uint256, CDiskTxPos> > vPos;
-    // vPos.reserve(block.vtx.size());
-
     CExtDiskTxPos pos(CDiskTxPos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size())), pindex->nHeight);
     std::vector<std::pair<uint256, CDiskTxPos> > vPosTxid;
     std::vector<std::pair<uint160, CExtDiskTxPos> > vPosAddrid;
@@ -1573,7 +1561,6 @@ bool ConnectBlock(const CBlock &block,
                 blockundo.vtxundo.push_back(CTxUndo());
             }
             UpdateCoins(tx, state, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
-            // vPos.push_back(std::make_pair(tx.GetHash(), pos));
             pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
 
             if (PV->QuitReceived(this_id, fParallel))
