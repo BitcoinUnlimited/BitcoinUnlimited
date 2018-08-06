@@ -209,6 +209,8 @@ private:
     CBlockTreeDB(const CBlockTreeDB &);
     void operator=(const CBlockTreeDB &);
 
+    uint64_t saltedAddrHash(const uint160 &addrid) const;
+
 public:
     bool WriteBatchSync(const std::vector<std::pair<int, const CBlockFileInfo *> > &fileInfo,
         int nLastFile,
