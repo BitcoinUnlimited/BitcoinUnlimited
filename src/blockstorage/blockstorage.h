@@ -65,7 +65,10 @@ bool ReadUndoFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const CBl
 void FindFilesToPrune(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight);
 
 /** Flush all state, indexes and buffers to disk. */
-bool FlushStateToDiskInternal(CValidationState &state, FlushStateMode mode = FLUSH_STATE_ALWAYS, bool fFlushForPrune = false, std::set<int> setFilesToPrune = {});
+bool FlushStateToDiskInternal(CValidationState &state,
+    FlushStateMode mode = FLUSH_STATE_ALWAYS,
+    bool fFlushForPrune = false,
+    std::set<int> setFilesToPrune = {});
 bool FlushStateToDisk(CValidationState &state, FlushStateMode mode);
 void FlushStateToDisk();
 /** Prune block files and flush state to disk. */

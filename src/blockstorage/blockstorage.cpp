@@ -528,7 +528,7 @@ void FindFilesToPrune(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight
     }
     else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        if (nDBUsedSpace < nPruneTarget + (pruneIntervalTweak.value * 1024 * 1024))
+        if (nDBUsedSpace < nPruneTarget + (pruneIntervalTweak.Value() * 1024 * 1024))
         {
             return;
         }
@@ -549,7 +549,10 @@ void FindFilesToPrune(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight
     }
 }
 
-bool FlushStateToDiskInternal(CValidationState &state, FlushStateMode mode, bool fFlushForPrune, std::set<int> setFilesToPrune)
+bool FlushStateToDiskInternal(CValidationState &state,
+    FlushStateMode mode,
+    bool fFlushForPrune,
+    std::set<int> setFilesToPrune)
 {
     static int64_t nLastWrite = 0;
     static int64_t nLastFlush = 0;

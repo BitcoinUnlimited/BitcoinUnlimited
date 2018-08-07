@@ -3817,9 +3817,9 @@ bool static LoadBlockIndexDB()
             fs::remove_all(GetDataDir() / "blocks");
         }
     }
-    catch(boost::filesystem::filesystem_error const & e)
+    catch (boost::filesystem::filesystem_error const &e)
     {
-        LOG(PRUNE, "%s \n",e.code().message());
+        LOG(PRUNE, "%s \n", e.code().message());
     }
 
     boost::this_thread::interruption_point();
