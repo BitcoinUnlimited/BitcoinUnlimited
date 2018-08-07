@@ -775,88 +775,109 @@ static bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         /* Continuously rate-limit free (really, very-low-fee) transactions
          * This mitigates 'penny-flooding' -- sending thousands of free transactions just to
          * be annoying or make others' transactions take longer to confirm. */
-        // maximum feeCutoff in satoshi per byte
-        static const double maxFeeCutoff =
-            boost::lexical_cast<double>(GetArg("-maxlimitertxfee", DEFAULT_MAXLIMITERTXFEE));
-        // starting value for feeCutoff in satoshi per byte
-        static const double initFeeCutoff =
-            boost::lexical_cast<double>(GetArg("-minlimitertxfee", DEFAULT_MINLIMITERTXFEE));
+        // maximum nMinRelay in satoshi per byte
         static const int nLimitFreeRelay = GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY);
 
         // get current memory pool size
         uint64_t poolBytes = pool.GetTotalTxSize();
 
-        // Calculate feeCutoff in satoshis per byte:
-        //   When the feeCutoff is larger than the satoshiPerByte of the
+        // Calculate nMinRelay in satoshis per byte:
+        //   When the nMinRelay is larger than the satoshiPerByte of the
         //   current transaction then spam blocking will be in effect. However
         //   Some free transactions will still get through based on -limitfreerelay
-        static double feeCutoff = initFeeCutoff;
+        static double nMinRelay = dMinLimiterTxFee.value;
         static double nFreeLimit = nLimitFreeRelay;
         static int64_t nLastTime = GetTime();
         int64_t nNow = GetTime();
 
-        // When the mempool starts falling use an exponentially decaying ~24 hour window:
-        // nFreeLimit = nFreeLimit + ((double)(DEFAULT_LIMIT_FREE_RELAY - nFreeLimit) / pow(1.0 - 1.0/86400,
-        // (double)(nNow - nLastTime)));
-        nFreeLimit /= std::pow(1.0 - 1.0 / 86400, (double)(nNow - nLastTime));
+        static double _dMinLimiterTxFee = dMinLimiterTxFee.value;
+        static double _dMaxLimiterTxFee = dMaxLimiterTxFee.value;
 
-        // When the mempool starts falling use an exponentially decaying ~24 hour window:
-        feeCutoff *= std::pow(1.0 - 1.0 / 86400, (double)(nNow - nLastTime));
-
-        uint64_t nLargestBlockSeen = LargestBlockSeen();
-
-        if (poolBytes < nLargestBlockSeen)
+        static CCriticalSection cs_limiter;
         {
-            feeCutoff = std::max(feeCutoff, initFeeCutoff);
-            nFreeLimit = std::min(nFreeLimit, (double)nLimitFreeRelay);
-        }
-        else if (poolBytes < (nLargestBlockSeen * MAX_BLOCK_SIZE_MULTIPLIER))
-        {
-            // Gradually choke off what is considered a free transaction
-            feeCutoff =
-                std::max(feeCutoff, initFeeCutoff + ((maxFeeCutoff - initFeeCutoff) * (poolBytes - nLargestBlockSeen) /
-                                                        (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1))));
+            LOCK(cs_limiter);
 
-            // Gradually choke off the nFreeLimit as well but leave at least DEFAULT_MIN_LIMITFREERELAY
-            // So that some free transactions can still get through
-            nFreeLimit = std::min(
-                nFreeLimit, ((double)nLimitFreeRelay - ((double)(nLimitFreeRelay - DEFAULT_MIN_LIMITFREERELAY) *
-                                                           (double)(poolBytes - nLargestBlockSeen) /
-                                                           (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1)))));
-            if (nFreeLimit < DEFAULT_MIN_LIMITFREERELAY)
-                nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
-        }
-        else
-        {
-            feeCutoff = maxFeeCutoff;
-            nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
-        }
-
-        minRelayTxFee = CFeeRate(feeCutoff * 1000);
-        LOG(MEMPOOL,
-            "MempoolBytes:%d  LimitFreeRelay:%.5g  FeeCutOff:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d  TxFees:%d\n",
-            poolBytes, nFreeLimit, ((double)::minRelayTxFee.GetFee(nSize)) / nSize, ((double)nFees) / nSize, nSize,
-            nFees);
-        if (fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize))
-        {
-            static double dFreeCount = 0;
-
-            // Use an exponentially decaying ~10-minute window:
-            dFreeCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - nLastTime));
-            nLastTime = nNow;
-
-            // -limitfreerelay unit is thousand-bytes-per-minute
-            // At default rate it would take over a month to fill 1GB
-            LOG(MEMPOOL, "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount + nSize);
-            if ((dFreeCount + nSize) >= (nFreeLimit * 10 * 1000 * nLargestBlockSeen / BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
+            // If the tweak values have changed then use them.
+            if (dMinLimiterTxFee.value != _dMinLimiterTxFee)
             {
-                thindata.UpdateMempoolLimiterBytesSaved(nSize);
-                LOG(MEMPOOL, "AcceptToMemoryPool : free transaction %s rejected by rate limiter\n", hash.ToString());
-                return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "rate limited free transaction");
+                _dMinLimiterTxFee = dMinLimiterTxFee.value;
+                nMinRelay = _dMinLimiterTxFee;
             }
-            dFreeCount += nSize;
+            if (dMaxLimiterTxFee.value != _dMaxLimiterTxFee)
+            {
+                _dMaxLimiterTxFee = dMaxLimiterTxFee.value;
+            }
+
+            // Limit check. Make sure minlimterfee is not > maxlimiterfee
+            if (_dMinLimiterTxFee > _dMaxLimiterTxFee)
+            {
+                dMaxLimiterTxFee.value = dMinLimiterTxFee.value;
+                _dMaxLimiterTxFee = _dMinLimiterTxFee;
+            }
+
+            // When the mempool starts falling use an exponentially decaying ~24 hour window:
+            // nFreeLimit = nFreeLimit + ((double)(DEFAULT_LIMIT_FREE_RELAY - nFreeLimit) / pow(1.0 - 1.0/86400,
+            // (double)(nNow - nLastTime)));
+            nFreeLimit /= std::pow(1.0 - 1.0 / 86400, (double)(nNow - nLastTime));
+
+            // When the mempool starts falling use an exponentially decaying ~24 hour window:
+            nMinRelay *= std::pow(1.0 - 1.0 / 86400, (double)(nNow - nLastTime));
+
+            uint64_t nLargestBlockSeen = LargestBlockSeen();
+
+            if (poolBytes < nLargestBlockSeen)
+            {
+                nMinRelay = std::max(nMinRelay, _dMinLimiterTxFee);
+                nFreeLimit = std::min(nFreeLimit, (double)nLimitFreeRelay);
+            }
+            else if (poolBytes < (nLargestBlockSeen * MAX_BLOCK_SIZE_MULTIPLIER))
+            {
+                // Gradually choke off what is considered a free transaction
+                nMinRelay = std::max(nMinRelay,
+                    _dMinLimiterTxFee + ((_dMaxLimiterTxFee - _dMinLimiterTxFee) * (poolBytes - nLargestBlockSeen) /
+                                            (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1))));
+
+                // Gradually choke off the nFreeLimit as well but leave at least DEFAULT_MIN_LIMITFREERELAY
+                // So that some free transactions can still get through
+                nFreeLimit = std::min(
+                    nFreeLimit, ((double)nLimitFreeRelay - ((double)(nLimitFreeRelay - DEFAULT_MIN_LIMITFREERELAY) *
+                                                               (double)(poolBytes - nLargestBlockSeen) /
+                                                               (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1)))));
+                if (nFreeLimit < DEFAULT_MIN_LIMITFREERELAY)
+                    nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
+            }
+            else
+            {
+                nMinRelay = _dMaxLimiterTxFee;
+                nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
+            }
+
+            minRelayTxFee = CFeeRate(nMinRelay * 1000);
+            LOG(MEMPOOL, "MempoolBytes:%d  LimitFreeRelay:%.5g  nMinRelay:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d  "
+                         "TxFees:%d\n",
+                poolBytes, nFreeLimit, nMinRelay, ((double)nFees) / nSize, nSize, nFees);
+            if (fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize))
+            {
+                static double dFreeCount = 0;
+
+                // Use an exponentially decaying ~10-minute window:
+                dFreeCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - nLastTime));
+
+                // -limitfreerelay unit is thousand-bytes-per-minute
+                // At default rate it would take over a month to fill 1GB
+                LOG(MEMPOOL, "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount + nSize);
+                if ((dFreeCount + nSize) >=
+                    (nFreeLimit * 10 * 1000 * nLargestBlockSeen / BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
+                {
+                    thindata.UpdateMempoolLimiterBytesSaved(nSize);
+                    LOG(MEMPOOL, "AcceptToMemoryPool : free transaction %s rejected by rate limiter\n",
+                        hash.ToString());
+                    return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "rate limited free transaction");
+                }
+                dFreeCount += nSize;
+            }
+            nLastTime = nNow;
         }
-        nLastTime = nNow;
         // BU - Xtreme Thinblocks Auto Mempool Limiter - end section
 
         // BU: we calculate the recommended fee by looking at what's in the mempool.  This starts at 0 though for an

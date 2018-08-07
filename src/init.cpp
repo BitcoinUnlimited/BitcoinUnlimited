@@ -595,7 +595,10 @@ void InitLogging()
  */
 bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &scheduler)
 {
-// ********************************************************* Step 1: setup
+    // ********************************************************* Step 1: setup
+
+    UnlimitedSetup();
+
 #ifdef _MSC_VER
     // Turn off Microsoft heap dump noise
     _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
@@ -758,29 +761,8 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     // a transaction spammer can cheaply fill blocks using
     // 1-satoshi-fee transactions. It should be set above the real
     // cost to you of processing a transaction.
-    if (mapArgs.count("-minlimitertxfee"))
-    {
-        CAmount n = 0;
-        double minrelaytxfee;
-        try
-        {
-            minrelaytxfee = boost::lexical_cast<double>(mapArgs["-minlimitertxfee"]) / 100000;
-        }
-        catch (boost::bad_lexical_cast &)
-        {
-            return InitError(
-                _("ERROR: an incorrect value was specified for -minlimitertxfee.  Please check value and restart."));
-        }
+    ::minRelayTxFee = CFeeRate(dMinLimiterTxFee.value * 1000);
 
-        ostringstream ss;
-        ss << fixed << setprecision(8);
-        ss << minrelaytxfee;
-        if (ParseMoney(ss.str(), n))
-            ::minRelayTxFee = CFeeRate(n);
-        else
-            return InitError(
-                strprintf(_("Invalid amount for -minlimitertxfee=<amount>: '%s'"), mapArgs["-minlimitertxfee"]));
-    }
     // -minrelaytxfee is no longer a command line option however it is still used in Bitcon Core so we want to tell
     // any users that migrate from Core to BU that this option is not used.
     if (mapArgs.count("-minrelaytxfee"))

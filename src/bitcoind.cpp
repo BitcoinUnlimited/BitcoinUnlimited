@@ -215,8 +215,6 @@ bool AppInit(int argc, char *argv[])
         PrintExceptionContinue(NULL, "AppInit()");
     }
 
-    UnlimitedSetup();
-
     if (!fRet)
     {
         Interrupt(threadGroup);

@@ -267,6 +267,18 @@ CTweak<uint64_t> checkScriptDays("blockchain.checkScriptDays",
  */
 CTweak<unsigned int> nDustThreshold("net.dustThreshold", "Dust Threshold (in satoshis).", DEFAULT_DUST_THRESHOLD);
 
+/** The maxlimitertxfee (in satoshi's per byte) */
+CTweak<double> dMaxLimiterTxFee("maxlimitertxfee",
+    strprintf("Fees (in satoshi/byte) larger than this are always relayed (default: %.4f)", DEFAULT_MAXLIMITERTXFEE),
+    DEFAULT_MAXLIMITERTXFEE);
+
+/** The minlimitertxfee (in satoshi's per byte) */
+CTweak<double> dMinLimiterTxFee("minlimitertxfee",
+    strprintf("Fees (in satoshi/byte) smaller than this are considered "
+              "zero fee and subject to -limitfreerelay (default: %.4f)",
+                                    DEFAULT_MINLIMITERTXFEE),
+    DEFAULT_MINLIMITERTXFEE);
+
 CRequestManager requester; // after the maps nodes and tweaks
 
 CStatHistory<unsigned int> txAdded; //"memPool/txAdded");
