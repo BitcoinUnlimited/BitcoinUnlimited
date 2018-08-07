@@ -545,8 +545,8 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
     obj.push_back(Pair("connections", (int)vNodes.size()));
     obj.push_back(Pair("networks", GetNetworksInfo()));
     obj.push_back(Pair("relayfee", ValueFromAmount(::minRelayTxFee.GetFeePerK())));
-    obj.push_back(Pair("minlimitertxfee", strprintf("%.4f", dMinLimiterTxFee.value)));
-    obj.push_back(Pair("maxlimitertxfee", strprintf("%.4f", dMaxLimiterTxFee.value)));
+    obj.push_back(Pair("minlimitertxfee", strprintf("%.4f", dMinLimiterTxFee.Value())));
+    obj.push_back(Pair("maxlimitertxfee", strprintf("%.4f", dMaxLimiterTxFee.Value())));
     UniValue localAddresses(UniValue::VARR);
     {
         LOCK(cs_mapLocalHost);
