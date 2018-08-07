@@ -86,7 +86,16 @@ void RespendRelayer::Trigger()
     if (!valid || !interesting)
         return;
 
-    RelayTransaction(respend);
+    CInv inv(MSG_TX, respend.GetHash());
+    LOCK(cs_vNodes);
+    for (CNode *pnode : vNodes)
+    {
+        if (!pnode->fRelayTxes || !pnode->fTestsRespends)
+            continue;
+        LOCK(pnode->cs_filter);
+        if (!pnode->pfilter || pnode->pfilter->IsRelevantAndUpdate(respend))
+            pnode->PushInventory(inv);
+    }
 }
 
 } // ns respend

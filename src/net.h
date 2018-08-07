@@ -435,6 +435,8 @@ public:
 
     unsigned short addrFromPort;
 
+    bool fTestsRespends;
+
 protected:
     // Basic fuzz-testing
     void Fuzz(int nChance); // modifies ssSend
