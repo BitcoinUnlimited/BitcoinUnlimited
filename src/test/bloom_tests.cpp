@@ -892,27 +892,27 @@ BOOST_AUTO_TEST_CASE(bloom_full_and_size_tests)
     {
         // FP rate of 1.0 will create an empty, zero-element bloom filter
         CBloomFilter filter(1, 1.0, 0, BLOOM_UPDATE_ALL);
-        BOOST_CHECK(filter.getFull());
+        BOOST_CHECK(filter.IsFull());
         filter.insert(ParseHex("00"));
     }
 
     {
         // a filter with good parameters should be non-full upon construction
         CBloomFilter filter(8, 0.01, 0, BLOOM_UPDATE_ALL);
-        BOOST_CHECK(!filter.getFull());
+        BOOST_CHECK(!filter.IsFull());
     }
 
     {
         // constructing bloom filters without any empty elements should work
         // and yield non-full filters as nElements will be set to 1
         CBloomFilter filter(0, 0.01, 0, BLOOM_UPDATE_ALL);
-        BOOST_CHECK(!filter.getFull());
+        BOOST_CHECK(!filter.IsFull());
     }
 
     {
         // default empty filter is full
         CBloomFilter filter;
-        BOOST_CHECK(filter.getFull());
+        BOOST_CHECK(filter.IsFull());
     }
 
     {
@@ -921,7 +921,7 @@ BOOST_AUTO_TEST_CASE(bloom_full_and_size_tests)
         CBloomFilter filter;
         CDataStream stream(ParseHex("00000000000000000000"), SER_NETWORK, PROTOCOL_VERSION);
         stream >> filter;
-        BOOST_CHECK(filter.getFull());
+        BOOST_CHECK(filter.IsFull());
         BOOST_CHECK(filter.IsWithinSizeConstraints());
     }
 
@@ -931,7 +931,7 @@ BOOST_AUTO_TEST_CASE(bloom_full_and_size_tests)
         CBloomFilter filter;
         CDataStream stream(ParseHex("0100000000000000000000"), SER_NETWORK, PROTOCOL_VERSION);
         stream >> filter;
-        BOOST_CHECK(!filter.getFull());
+        BOOST_CHECK(!filter.IsFull());
         BOOST_CHECK(filter.IsWithinSizeConstraints());
     }
 
@@ -941,7 +941,7 @@ BOOST_AUTO_TEST_CASE(bloom_full_and_size_tests)
         CBloomFilter filter;
         CDataStream stream(ParseHex("01ff000000000000000000"), SER_NETWORK, PROTOCOL_VERSION);
         stream >> filter;
-        BOOST_CHECK(filter.getFull());
+        BOOST_CHECK(filter.IsFull());
         BOOST_CHECK(filter.IsWithinSizeConstraints());
     }
     {
@@ -957,7 +957,7 @@ BOOST_AUTO_TEST_CASE(bloom_full_and_size_tests)
         stream << (unsigned char)0; // nFlags
 
         stream >> filter;
-        BOOST_CHECK(!filter.getFull());
+        BOOST_CHECK(!filter.IsFull());
         BOOST_CHECK(!filter.IsWithinSizeConstraints());
     }
 
@@ -975,7 +975,7 @@ BOOST_AUTO_TEST_CASE(bloom_full_and_size_tests)
 
 
         stream >> filter;
-        BOOST_CHECK(filter.getFull());
+        BOOST_CHECK(filter.IsFull());
         BOOST_CHECK(!filter.IsWithinSizeConstraints());
     }
 

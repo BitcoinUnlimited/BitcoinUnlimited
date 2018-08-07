@@ -922,8 +922,8 @@ private:
 typedef std::vector<CNodeRef> VNodeRefs;
 
 class CTransaction;
-void RelayTransaction(const CTransaction &tx);
-void RelayTransaction(const CTransaction &tx, const CDataStream &ss);
+void RelayTransaction(const CTransaction &tx, const bool fRespend = false);
+void RelayTransaction(const CTransaction &tx, const CDataStream &ss, const bool fRespend = false);
 
 /** Access to the (IP) address database (peers.dat) */
 class CAddrDB

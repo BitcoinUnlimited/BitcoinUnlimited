@@ -2479,15 +2479,15 @@ void NetCleanup()
 }
 
 
-void RelayTransaction(const CTransaction &tx)
+void RelayTransaction(const CTransaction &tx, const bool fRespend)
 {
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     ss.reserve(10000);
     ss << tx;
-    RelayTransaction(tx, ss);
+    RelayTransaction(tx, ss, fRespend);
 }
 
-void RelayTransaction(const CTransaction &tx, const CDataStream &ss)
+void RelayTransaction(const CTransaction &tx, const CDataStream &ss, const bool fRespend)
 {
     uint64_t len = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
     if (len > maxTxSize.Value())
@@ -2516,10 +2516,15 @@ void RelayTransaction(const CTransaction &tx, const CDataStream &ss)
     {
         if (!pnode->fRelayTxes)
             continue;
+
         LOCK(pnode->cs_filter);
-        if (pnode->pfilter)
+        // If the bloom filter is not empty then a peer must have sent us a filter
+        // and we can assume this node is an SPV node.
+        if (pnode->pfilter && !pnode->pfilter->IsEmpty())
         {
-            if (pnode->pfilter->IsRelevantAndUpdate(tx))
+            // Relaying double spends to SPV clients is an easy attack vector,
+            // and therefore only relay txns that are not potential double spends.
+            if (!fRespend && pnode->pfilter->IsRelevantAndUpdate(tx))
                 pnode->PushInventory(inv);
         }
         else
