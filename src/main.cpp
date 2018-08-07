@@ -785,33 +785,33 @@ static bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         //   When the nMinRelay is larger than the satoshiPerByte of the
         //   current transaction then spam blocking will be in effect. However
         //   Some free transactions will still get through based on -limitfreerelay
-        static double nMinRelay = dMinLimiterTxFee.value;
+        static double nMinRelay = dMinLimiterTxFee.Value();
         static double nFreeLimit = nLimitFreeRelay;
         static int64_t nLastTime = GetTime();
         int64_t nNow = GetTime();
 
-        static double _dMinLimiterTxFee = dMinLimiterTxFee.value;
-        static double _dMaxLimiterTxFee = dMaxLimiterTxFee.value;
+        static double _dMinLimiterTxFee = dMinLimiterTxFee.Value();
+        static double _dMaxLimiterTxFee = dMaxLimiterTxFee.Value();
 
         static CCriticalSection cs_limiter;
         {
             LOCK(cs_limiter);
 
             // If the tweak values have changed then use them.
-            if (dMinLimiterTxFee.value != _dMinLimiterTxFee)
+            if (dMinLimiterTxFee.Value() != _dMinLimiterTxFee)
             {
-                _dMinLimiterTxFee = dMinLimiterTxFee.value;
+                _dMinLimiterTxFee = dMinLimiterTxFee.Value();
                 nMinRelay = _dMinLimiterTxFee;
             }
-            if (dMaxLimiterTxFee.value != _dMaxLimiterTxFee)
+            if (dMaxLimiterTxFee.Value() != _dMaxLimiterTxFee)
             {
-                _dMaxLimiterTxFee = dMaxLimiterTxFee.value;
+                _dMaxLimiterTxFee = dMaxLimiterTxFee.Value();
             }
 
             // Limit check. Make sure minlimterfee is not > maxlimiterfee
             if (_dMinLimiterTxFee > _dMaxLimiterTxFee)
             {
-                dMaxLimiterTxFee.value = dMinLimiterTxFee.value;
+                dMaxLimiterTxFee.Set(dMinLimiterTxFee.Value());
                 _dMaxLimiterTxFee = _dMinLimiterTxFee;
             }
 
