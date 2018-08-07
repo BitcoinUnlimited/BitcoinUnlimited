@@ -3806,13 +3806,20 @@ bool static LoadBlockIndexDB()
 
     delete pblocktreeother;
     pblocktreeother = nullptr;
-    if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+    try
     {
-        fs::remove_all(GetDataDir() / "blockdb");
+        if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+        {
+            fs::remove_all(GetDataDir() / "blockdb");
+        }
+        else
+        {
+            fs::remove_all(GetDataDir() / "blocks");
+        }
     }
-    else
+    catch(boost::filesystem::filesystem_error const & e)
     {
-        fs::remove_all(GetDataDir() / "blocks");
+        LOG(PRUNE, "%s \n",e.code().message());
     }
 
     boost::this_thread::interruption_point();
@@ -3880,7 +3887,7 @@ bool static LoadBlockIndexDB()
             (pindexBestHeader == nullptr || CBlockIndexWorkComparator()(pindexBestHeader, pindex)))
             pindexBestHeader = pindex;
     }
-    
+
     if (BLOCK_DB_MODE != DB_BLOCK_STORAGE)
     {
         // Check presence of blk files
