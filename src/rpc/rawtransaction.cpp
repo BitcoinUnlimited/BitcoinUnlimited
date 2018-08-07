@@ -130,7 +130,15 @@ void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry)
 UniValue searchrawtransactions(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 4)
-        throw runtime_error("searchrawtransactions <address> [verbose=1] [skip=0] [count=100]\n");
+        throw runtime_error(
+            "searchrawtransactions <address> [verbose=true] [skip=0] [count=100]\n"
+            "\nSearch for transactions by address. Requires address index to be enabled (-addrindex option)\n"
+            "\nArguments:\n"
+            "1. address     (address, mandatory) The address to look for\n"
+            "2. verbose     (boolean, optional, default=true) If this is set, also return the decoded transaction\n"
+            "3. skip        (integer, optional, default=0) The number of entries to skip from the beginning. If "
+            "negative, skip that many before the end\n"
+            "4. count       (integer, optiona, default=100) The number of entries to return\n");
 
     if (!fAddrIndex)
         throw JSONRPCError(RPC_MISC_ERROR, "Address index not enabled");
