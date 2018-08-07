@@ -257,7 +257,8 @@ testScriptsExt = [ RpcTest(t) for t in [
     'maxblocksinflight',
     'p2p-acceptblock',
     'mempool_packages',
-    'maxuploadtarget'
+    'maxuploadtarget',
+    'addrindex'
 ] ]
 
 #Enable ZMQ tests
