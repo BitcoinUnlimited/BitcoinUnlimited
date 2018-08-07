@@ -9,7 +9,9 @@
 #include "guiutil.h"
 #include "peertablemodel.h"
 
+#include "graphene.h"
 #include "net.h"
+#include "thinblock.h"
 
 #include <QCompleter>
 #include <QWidget>
@@ -98,6 +100,10 @@ public Q_SLOTS:
     void setOrphanPoolSize(long numberOfTxs);
     /** Set tx's per second in the UI */
     void setTransactionsPerSecond(double nTxPerSec);
+    /** Set block propagation statistics in the UI */
+    void setThinBlockPropagationStats(const ThinBlockQuickStats &thin);
+    /** Set block propagation statistics in the UI */
+    void setGrapheneBlockPropagationStats(const GrapheneQuickStats &graphene);
     /** Go forward or back in history */
     void browseHistory(int offset);
     /** Scroll console view to end */

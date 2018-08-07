@@ -151,6 +151,24 @@ public:
     }
 };
 
+// This struct is so we can obtain a quick summar of stats for UI display purposes
+// without needing to take the lock more than once
+struct ThinBlockQuickStats
+{
+    // Totals for the lifetime of the node (or since last clear of stats)
+    uint64_t nTotalInbound;
+    uint64_t nTotalOutbound;
+    uint64_t nTotalBandwidthSavings;
+
+    // Last 24-hour averages (or since last clear of stats)
+    uint64_t nLast24hInbound;
+    double fLast24hInboundCompression;
+    uint64_t nLast24hOutbound;
+    double fLast24hOutboundCompression;
+    uint64_t nLast24hRerequestTx;
+    double fLast24hRerequestTxPercent;
+};
+
 // This class stores statistics for thin block derived protocols.
 class CThinBlockData
 {
@@ -165,7 +183,8 @@ private:
 
     CStatHistory<uint64_t> nOriginalSize;
     CStatHistory<uint64_t> nThinSize;
-    CStatHistory<uint64_t> nBlocks;
+    CStatHistory<uint64_t> nInBoundBlocks;
+    CStatHistory<uint64_t> nOutBoundBlocks;
     CStatHistory<uint64_t> nMempoolLimiterBytesSaved;
     CStatHistory<uint64_t> nTotalBloomFilterBytes;
     CStatHistory<uint64_t> nTotalThinBlockBytes;
@@ -199,6 +218,33 @@ private:
       Calculate average of long long values in given map. Return 0 for no entries.
       Expires values before calculation. */
     double average(std::map<int64_t, uint64_t> &map);
+
+    /**
+      Calculate total bandwidth savings for using XThin.
+      Requires lock on cs_thinblockstats be held external to this call. */
+    double computeTotalBandwidthSavingsInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats);
+
+    /**
+      Calculate last 24-hour "compression" percent for XThin
+      Requires lock on cs_thinblockstats be held external to this call.
+
+      NOTE: The thinblock and bloom filter maps should be from opposite directions
+            For example inbound block map paired wtih outbound bloom filter map
+
+      Side-effect: This method calls expireStats() on mapThinBlocks and mapBloomFilters
+
+      @param [mapThinBlocks] a statistics array of inbound/outbound XThin blocks
+      @param [mapBloomFilters] a statistics array of outbound/inbound XThin bloom filters
+     */
+    double compute24hAverageCompressionInternal(std::map<int64_t, std::pair<uint64_t, uint64_t> > &mapThinBlocks,
+        std::map<int64_t, uint64_t> &mapBloomFilters) EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats);
+
+    /**
+      Calculate last 24-hour transaction re-request percent for inbound XThin
+      Requires lock on cs_thinblockstats be held external to this call.
+
+      Side-effect: This method calls expireStats() on mapThinBlocksInBoundReRequestedTx */
+    double compute24hInboundRerequestTxPercentInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats);
 
 protected:
     //! Virtual method so it can be overridden for better unit testing
@@ -237,6 +283,8 @@ public:
     void DeleteThinBlockBytes(uint64_t, CNode *pfrom);
     void ResetThinBlockBytes();
     uint64_t GetThinBlockBytes();
+
+    void FillThinBlockQuickStats(ThinBlockQuickStats &stats);
 };
 extern CThinBlockData thindata; // Singleton class
 

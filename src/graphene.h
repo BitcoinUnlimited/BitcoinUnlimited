@@ -152,6 +152,25 @@ public:
     }
 };
 
+// This struct is so we can obtain a quick summar of stats for UI display purposes
+// without needing to take the lock more than once
+struct GrapheneQuickStats
+{
+    // Totals for the lifetime of the node (or since last clear of stats)
+    uint64_t nTotalInbound;
+    uint64_t nTotalOutbound;
+    uint64_t nTotalBandwidthSavings;
+    uint64_t nTotalDecodeFailures;
+
+    // Last 24-hour averages (or since last clear of stats)
+    uint64_t nLast24hInbound;
+    double fLast24hInboundCompression;
+    uint64_t nLast24hOutbound;
+    double fLast24hOutboundCompression;
+    uint64_t nLast24hRerequestTx;
+    double fLast24hRerequestTxPercent;
+};
+
 // This class stores statistics for graphene block derived protocols.
 class CGrapheneBlockData
 {
@@ -208,6 +227,33 @@ private:
       Expires values before calculation. */
     double average(std::map<int64_t, uint64_t> &map);
 
+    /**
+      Calculate total bandwidth savings for using Graphene.
+      Requires lock on cs_graphenestats be held external to this call. */
+    double computeTotalBandwidthSavingsInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_graphenestats);
+
+    /**
+      Calculate last 24-hour "compression" percent for graphene
+      Requires lock on cs_graphenestats be held external to this call.
+
+      NOTE: The graphene block and mempool info maps should be from opposite directions
+            For example inbound block map paired wtih outbound mempool info map
+
+      Side-effect: This method calls expireStats() on mapGrapheneBlocks and mapMemPoolInfo
+
+      @param [mapGrapheneBlocks] a statistics array of inbound/outbound graphene blocks
+      @param [mapMemPoolInfo] a statistics array of outbound/inbound graphene mempool info
+     */
+    double compute24hAverageCompressionInternal(std::map<int64_t, std::pair<uint64_t, uint64_t> > &mapGrapheneBlocks,
+        std::map<int64_t, uint64_t> &mapMemPoolInfo) EXCLUSIVE_LOCKS_REQUIRED(cs_graphenestats);
+
+    /**
+      Calculate last 24-hour transaction re-request percent for inbound graphene blocks
+      Requires lock on cs_graphenestats be held external to this call.
+
+      Side-effect: This method calls expireStats() on mapGrapheneBlocksInBoundReRequestedTx */
+    double compute24hInboundRerequestTxPercentInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_graphenestats);
+
 protected:
     //! Virtual method so it can be overridden for better unit testing
     virtual int64_t getTimeForStats() { return GetTimeMillis(); }
@@ -250,6 +296,8 @@ public:
     void DeleteGrapheneBlockBytes(uint64_t, CNode *pfrom);
     void ResetGrapheneBlockBytes();
     uint64_t GetGrapheneBlockBytes();
+
+    void FillGrapheneQuickStats(GrapheneQuickStats &stats);
 };
 extern CGrapheneBlockData graphenedata; // Singleton class
 

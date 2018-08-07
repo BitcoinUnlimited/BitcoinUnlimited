@@ -792,6 +792,66 @@ double CGrapheneBlockData::average(std::map<int64_t, uint64_t> &map)
     return (double)accum / map.size();
 }
 
+double CGrapheneBlockData::computeTotalBandwidthSavingsInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_graphenestats)
+{
+    AssertLockHeld(cs_graphenestats);
+
+    return double(nOriginalSize() - nGrapheneSize() - nTotalMemPoolInfoBytes());
+}
+
+double CGrapheneBlockData::compute24hAverageCompressionInternal(
+    std::map<int64_t, std::pair<uint64_t, uint64_t> > &mapGrapheneBlocks,
+    std::map<int64_t, uint64_t> &mapMemPoolInfo) EXCLUSIVE_LOCKS_REQUIRED(cs_graphenestats)
+{
+    AssertLockHeld(cs_graphenestats);
+
+    expireStats(mapGrapheneBlocks);
+    expireStats(mapMemPoolInfo);
+
+    double nCompressionRate = 0;
+    uint64_t nGrapheneSizeTotal = 0;
+    uint64_t nOriginalSizeTotal = 0;
+    for (const auto &mi : mapGrapheneBlocks)
+    {
+        nGrapheneSizeTotal += mi.second.first;
+        nOriginalSizeTotal += mi.second.second;
+    }
+    // We count up the CMemPoolInfo sizes from the opposite direction as the blocks.
+    // Outbound CMemPoolInfo sizes go with Inbound graphene blocks and vice versa.
+    uint64_t nMemPoolInfoSize = 0;
+    for (const auto &mi : mapMemPoolInfo)
+    {
+        nMemPoolInfoSize += mi.second;
+    }
+
+    if (nOriginalSizeTotal > 0)
+        nCompressionRate = 100 - (100 * (double)(nGrapheneSizeTotal + nMemPoolInfoSize) / nOriginalSizeTotal);
+
+    return nCompressionRate;
+}
+
+double CGrapheneBlockData::compute24hInboundRerequestTxPercentInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_graphenestats)
+{
+    AssertLockHeld(cs_graphenestats);
+
+    expireStats(mapGrapheneBlocksInBoundReRequestedTx);
+    expireStats(mapGrapheneBlocksInBound);
+
+    double nReRequestRate = 0;
+    uint64_t nTotalReRequests = 0;
+    uint64_t nTotalReRequestedTxs = 0;
+    for (const auto &mi : mapGrapheneBlocksInBoundReRequestedTx)
+    {
+        nTotalReRequests += 1;
+        nTotalReRequestedTxs += mi.second;
+    }
+
+    if (mapGrapheneBlocksInBound.size() > 0)
+        nReRequestRate = 100 * (double)nTotalReRequests / mapGrapheneBlocksInBound.size();
+
+    return nReRequestRate;
+}
+
 void CGrapheneBlockData::IncrementDecodeFailures()
 {
     LOCK(cs_graphenestats);
@@ -895,7 +955,7 @@ void CGrapheneBlockData::UpdateInBoundReRequestedTx(int nReRequestedTx)
 std::string CGrapheneBlockData::ToString()
 {
     LOCK(cs_graphenestats);
-    double size = double(nOriginalSize() - nGrapheneSize() - nTotalMemPoolInfoBytes());
+    double size = computeTotalBandwidthSavingsInternal();
     std::ostringstream ss;
     ss << nInBoundBlocks() << " inbound and " << nOutBoundBlocks() << " outbound graphene blocks have saved "
        << formatInfoUnit(size) << " of bandwidth with " << nDecodeFailures() << " local decode "
@@ -909,32 +969,15 @@ std::string CGrapheneBlockData::InBoundPercentToString()
 {
     LOCK(cs_graphenestats);
 
-    expireStats(mapGrapheneBlocksInBound);
+    double nCompressionRate = compute24hAverageCompressionInternal(mapGrapheneBlocksInBound, mapMemPoolInfoOutBound);
 
-    double nCompressionRate = 0;
-    uint64_t nGrapheneSizeTotal = 0;
-    uint64_t nOriginalSizeTotal = 0;
-    for (std::map<int64_t, std::pair<uint64_t, uint64_t> >::iterator mi = mapGrapheneBlocksInBound.begin();
-         mi != mapGrapheneBlocksInBound.end(); ++mi)
-    {
-        nGrapheneSizeTotal += (*mi).second.first;
-        nOriginalSizeTotal += (*mi).second.second;
-    }
-    // We count up the outbound CMemPoolInfo sizes. Outbound CMemPoolInfo sizes go with Inbound graphene blocks.
-    uint64_t nOutBoundMemPoolInfoSize = 0;
-    for (std::map<int64_t, uint64_t>::iterator mi = mapMemPoolInfoOutBound.begin(); mi != mapMemPoolInfoOutBound.end();
-         ++mi)
-    {
-        nOutBoundMemPoolInfoSize += (*mi).second;
-    }
-
-    if (nOriginalSizeTotal > 0)
-        nCompressionRate = 100 - (100 * (double)(nGrapheneSizeTotal + nOutBoundMemPoolInfoSize) / nOriginalSizeTotal);
-
+    // NOTE: Potential gotcha, compute24hInboundCompressionInternal has a side-effect of calling
+    //       expireStats which modifies the contents of mapGrapheneBlocksInBound
+    // We currently rely on this side-effect for the string produced below
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(1);
     ss << "Compression for " << mapGrapheneBlocksInBound.size()
-       << " Inbound  graphene blocks (last 24hrs): " << nCompressionRate << "%";
+       << " Inbound graphene blocks (last 24hrs): " << nCompressionRate << "%";
 
     return ss.str();
 }
@@ -944,26 +987,11 @@ std::string CGrapheneBlockData::OutBoundPercentToString()
 {
     LOCK(cs_graphenestats);
 
-    expireStats(mapGrapheneBlocksOutBound);
+    double nCompressionRate = compute24hAverageCompressionInternal(mapGrapheneBlocksOutBound, mapMemPoolInfoInBound);
 
-    double nCompressionRate = 0;
-    uint64_t nGrapheneSizeTotal = 0;
-    uint64_t nOriginalSizeTotal = 0;
-    for (std::map<int64_t, std::pair<uint64_t, uint64_t> >::iterator mi = mapGrapheneBlocksOutBound.begin();
-         mi != mapGrapheneBlocksOutBound.end(); ++mi)
-    {
-        nGrapheneSizeTotal += (*mi).second.first;
-        nOriginalSizeTotal += (*mi).second.second;
-    }
-    // We count up the inbound CMemPoolInfo sizes. Inbound CMemPoolInfo sizes go with Outbound graphene blocks.
-    uint64_t nInBoundMemPoolInfoSize = 0;
-    for (std::map<int64_t, uint64_t>::iterator mi = mapMemPoolInfoInBound.begin(); mi != mapMemPoolInfoInBound.end();
-         ++mi)
-        nInBoundMemPoolInfoSize += (*mi).second;
-
-    if (nOriginalSizeTotal > 0)
-        nCompressionRate = 100 - (100 * (double)(nGrapheneSizeTotal + nInBoundMemPoolInfoSize) / nOriginalSizeTotal);
-
+    // NOTE: Potential gotcha, compute24hOutboundCompressionInternal has a side-effect of calling
+    //       expireStats which modifies the contents of mapGrapheneBlocksOutBound
+    // We currently rely on this side-effect for the string produced below
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(1);
     ss << "Compression for " << mapGrapheneBlocksOutBound.size()
@@ -1041,18 +1069,19 @@ std::string CGrapheneBlockData::ResponseTimeToString()
 {
     LOCK(cs_graphenestats);
 
+    expireStats(mapGrapheneBlockResponseTime);
+
     std::vector<double> vResponseTime;
 
     double nResponseTimeAverage = 0;
     double nPercentile = 0;
     double nTotalResponseTime = 0;
     double nTotalEntries = 0;
-    for (std::map<int64_t, double>::iterator mi = mapGrapheneBlockResponseTime.begin();
-         mi != mapGrapheneBlockResponseTime.end(); ++mi)
+    for (const auto &mi : mapGrapheneBlockResponseTime)
     {
         nTotalEntries += 1;
-        nTotalResponseTime += (*mi).second;
-        vResponseTime.push_back((*mi).second);
+        nTotalResponseTime += mi.second;
+        vResponseTime.push_back(mi.second);
     }
 
     if (nTotalEntries > 0)
@@ -1076,18 +1105,19 @@ std::string CGrapheneBlockData::ValidationTimeToString()
 {
     LOCK(cs_graphenestats);
 
+    expireStats(mapGrapheneBlockValidationTime);
+
     std::vector<double> vValidationTime;
 
     double nValidationTimeAverage = 0;
     double nPercentile = 0;
     double nTotalValidationTime = 0;
     double nTotalEntries = 0;
-    for (std::map<int64_t, double>::iterator mi = mapGrapheneBlockValidationTime.begin();
-         mi != mapGrapheneBlockValidationTime.end(); ++mi)
+    for (const auto &mi : mapGrapheneBlockValidationTime)
     {
         nTotalEntries += 1;
-        nTotalValidationTime += (*mi).second;
-        vValidationTime.push_back((*mi).second);
+        nTotalValidationTime += mi.second;
+        vValidationTime.push_back(mi.second);
     }
 
     if (nTotalEntries > 0)
@@ -1111,24 +1141,15 @@ std::string CGrapheneBlockData::ReRequestedTxToString()
 {
     LOCK(cs_graphenestats);
 
-    expireStats(mapGrapheneBlocksInBoundReRequestedTx);
+    double nReRequestRate = compute24hInboundRerequestTxPercentInternal();
 
-    double nReRequestRate = 0;
-    uint64_t nTotalReRequests = 0;
-    uint64_t nTotalReRequestedTxs = 0;
-    for (std::map<int64_t, int>::iterator mi = mapGrapheneBlocksInBoundReRequestedTx.begin();
-         mi != mapGrapheneBlocksInBoundReRequestedTx.end(); ++mi)
-    {
-        nTotalReRequests += 1;
-        nTotalReRequestedTxs += (*mi).second;
-    }
-
-    if (mapGrapheneBlocksInBound.size() > 0)
-        nReRequestRate = 100 * (double)nTotalReRequests / mapGrapheneBlocksInBound.size();
-
+    // NOTE: Potential gotcha, compute24hInboundRerequestTxPercentInternal has a side-effect of calling
+    //       expireStats which modifies the contents of mapGrapheneBlocksInBoundReRequestedTx
+    // We currently rely on this side-effect for the string produced below
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(1);
-    ss << "Tx re-request rate (last 24hrs): " << nReRequestRate << "% Total re-requests:" << nTotalReRequests;
+    ss << "Tx re-request rate (last 24hrs): " << nReRequestRate
+       << "% Total re-requests:" << mapGrapheneBlocksInBoundReRequestedTx.size();
     return ss.str();
 }
 
@@ -1259,6 +1280,31 @@ void CGrapheneBlockData::DeleteGrapheneBlockBytes(uint64_t bytes, CNode *pfrom)
 
 void CGrapheneBlockData::ResetGrapheneBlockBytes() { nGrapheneBlockBytes.store(0); }
 uint64_t CGrapheneBlockData::GetGrapheneBlockBytes() { return nGrapheneBlockBytes.load(); }
+void CGrapheneBlockData::FillGrapheneQuickStats(GrapheneQuickStats &stats)
+{
+    if (!IsGrapheneBlockEnabled())
+        return;
+
+    LOCK(cs_graphenestats);
+
+    stats.nTotalInbound = nInBoundBlocks();
+    stats.nTotalOutbound = nOutBoundBlocks();
+    stats.nTotalDecodeFailures = nDecodeFailures();
+    stats.nTotalBandwidthSavings = computeTotalBandwidthSavingsInternal();
+
+    // NOTE: The following calls rely on the side-effect of the compute*Internal
+    //       calls also calling expireStats on the associated statistics maps
+    //       This is why we set the % value first, then the count second for compression values
+    stats.fLast24hInboundCompression =
+        compute24hAverageCompressionInternal(mapGrapheneBlocksInBound, mapMemPoolInfoOutBound);
+    stats.nLast24hInbound = mapGrapheneBlocksInBound.size();
+    stats.fLast24hOutboundCompression =
+        compute24hAverageCompressionInternal(mapGrapheneBlocksOutBound, mapMemPoolInfoInBound);
+    stats.nLast24hOutbound = mapGrapheneBlocksOutBound.size();
+    stats.fLast24hRerequestTxPercent = compute24hInboundRerequestTxPercentInternal();
+    stats.nLast24hRerequestTx = mapGrapheneBlocksInBoundReRequestedTx.size();
+}
+
 bool HaveGrapheneNodes()
 {
     LOCK(cs_vNodes);
