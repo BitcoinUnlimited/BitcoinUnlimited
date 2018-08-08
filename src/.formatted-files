@@ -18,6 +18,12 @@ bitcoin-miner.cpp
 bitcoin-tx.cpp
 bitnodes.cpp
 bitnodes.h
+blockstorage/blockleveldb.cpp
+blockstorage/blockleveldb.h
+blockstorage/sequential_files.cpp
+blockstorage/sequential_files.h
+blockstorage/blockstorage.cpp
+blockstorage/blockstorage.h
 bloom.cpp
 bloom.h
 cashaddr.cpp

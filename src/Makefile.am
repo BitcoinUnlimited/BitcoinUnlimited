@@ -98,6 +98,9 @@ BITCOIN_CORE_H = \
   base58.h \
   bandb.h \
   banentry.h \
+  blockstorage/blockleveldb.h \
+  blockstorage/sequential_files.h \
+  blockstorage/blockstorage.h \
   bitnodes.h \
   bloom.h \
   cashaddr.h \
@@ -218,6 +221,9 @@ libbitcoin_server_a_SOURCES = \
   bandb.cpp \
   banentry.cpp \
   bitnodes.cpp \
+  blockstorage/blockleveldb.cpp \
+  blockstorage/sequential_files.cpp \
+  blockstorage/blockstorage.cpp \
   bloom.cpp \
   chain.cpp \
   checkpoints.cpp \

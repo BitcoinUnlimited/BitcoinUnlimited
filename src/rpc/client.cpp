@@ -32,27 +32,26 @@ public:
     int paramIdx; //! 0-based idx of param to convert
 };
 
-static const CRPCConvertParam vRPCConvertParams[] = {
-    {"stop", 0}, {"setmocktime", 0}, {"getaddednodeinfo", 0}, {"setgenerate", 0}, {"setgenerate", 1}, {"generate", 0},
-    {"generate", 1}, {"generatetoaddress", 0}, {"generatetoaddress", 2}, {"getnetworkhashps", 0},
-    {"getnetworkhashps", 1}, {"sendtoaddress", 1}, {"sendtoaddress", 4}, {"settxfee", 0}, {"getreceivedbyaddress", 1},
-    {"getreceivedbyaccount", 1}, {"listreceivedbyaddress", 0}, {"listreceivedbyaddress", 1},
-    {"listreceivedbyaddress", 2}, {"listreceivedbyaccount", 0}, {"listreceivedbyaccount", 1},
-    {"listreceivedbyaccount", 2}, {"getbalance", 1}, {"getbalance", 2}, {"getblockhash", 0}, {"move", 2}, {"move", 3},
-    {"sendfrom", 2}, {"sendfrom", 3}, {"listtransactions", 1}, {"listtransactions", 2}, {"listtransactions", 3},
-    {"listtransactionsfrom", 1}, {"listtransactionsfrom", 2}, {"listtransactionsfrom", 3}, {"listaccounts", 0},
-    {"listaccounts", 1}, {"walletpassphrase", 1}, {"getblocktemplate", 0}, {"submitminingsolution", 0},
-    {"listsinceblock", 1}, {"listsinceblock", 2}, {"sendmany", 1}, {"sendmany", 2}, {"sendmany", 4},
-    {"addmultisigaddress", 0}, {"addmultisigaddress", 1}, {"createmultisig", 0}, {"createmultisig", 1},
-    {"listunspent", 0}, {"listunspent", 1}, {"listunspent", 2}, {"getblock", 1}, {"getblock", 2}, {"getblockheader", 1},
-    {"gettransaction", 1}, {"getrawtransaction", 1}, {"createrawtransaction", 0}, {"createrawtransaction", 1},
-    {"createrawtransaction", 2}, {"signrawtransaction", 1}, {"signrawtransaction", 2}, {"sendrawtransaction", 1},
-    {"fundrawtransaction", 1}, {"gettxout", 1}, {"gettxout", 2}, {"gettxoutproof", 0}, {"lockunspent", 0},
-    {"lockunspent", 1}, {"importprivkey", 2}, {"importaddress", 2}, {"importaddress", 3}, {"importpubkey", 2},
-    {"verifychain", 0}, {"verifychain", 1}, {"keypoolrefill", 0}, {"getrawmempool", 0}, {"estimatefee", 0},
-    {"estimatepriority", 0}, {"estimatesmartfee", 0}, {"estimatesmartpriority", 0}, {"prioritisetransaction", 1},
-    {"prioritisetransaction", 2}, {"setban", 2}, {"setban", 3}, {"rollbackchain", 0}, {"rollbackchain", 1},
-};
+static const CRPCConvertParam vRPCConvertParams[] = {{"stop", 0}, {"setmocktime", 0}, {"getaddednodeinfo", 0},
+    {"setgenerate", 0}, {"setgenerate", 1}, {"generate", 0}, {"generate", 1}, {"generatetoaddress", 0},
+    {"generatetoaddress", 2}, {"getnetworkhashps", 0}, {"getnetworkhashps", 1}, {"sendtoaddress", 1},
+    {"sendtoaddress", 4}, {"settxfee", 0}, {"getreceivedbyaddress", 1}, {"getreceivedbyaccount", 1},
+    {"listreceivedbyaddress", 0}, {"listreceivedbyaddress", 1}, {"listreceivedbyaddress", 2},
+    {"listreceivedbyaccount", 0}, {"listreceivedbyaccount", 1}, {"listreceivedbyaccount", 2}, {"getbalance", 1},
+    {"getbalance", 2}, {"getblockhash", 0}, {"move", 2}, {"move", 3}, {"sendfrom", 2}, {"sendfrom", 3},
+    {"listtransactions", 1}, {"listtransactions", 2}, {"listtransactions", 3}, {"listtransactionsfrom", 1},
+    {"listtransactionsfrom", 2}, {"listtransactionsfrom", 3}, {"listaccounts", 0}, {"listaccounts", 1},
+    {"walletpassphrase", 1}, {"getblocktemplate", 0}, {"submitminingsolution", 0}, {"listsinceblock", 1},
+    {"listsinceblock", 2}, {"sendmany", 1}, {"sendmany", 2}, {"sendmany", 4}, {"addmultisigaddress", 0},
+    {"addmultisigaddress", 1}, {"createmultisig", 0}, {"createmultisig", 1}, {"listunspent", 0}, {"listunspent", 1},
+    {"listunspent", 2}, {"getblock", 1}, {"getblock", 2}, {"getblockheader", 1}, {"gettransaction", 1},
+    {"getrawtransaction", 1}, {"createrawtransaction", 0}, {"createrawtransaction", 1}, {"createrawtransaction", 2},
+    {"signrawtransaction", 1}, {"signrawtransaction", 2}, {"sendrawtransaction", 1}, {"fundrawtransaction", 1},
+    {"gettxout", 1}, {"gettxout", 2}, {"gettxoutproof", 0}, {"lockunspent", 0}, {"lockunspent", 1},
+    {"importprivkey", 2}, {"importaddress", 2}, {"importaddress", 3}, {"importpubkey", 2}, {"verifychain", 0},
+    {"verifychain", 1}, {"keypoolrefill", 0}, {"getrawmempool", 0}, {"estimatefee", 0}, {"estimatepriority", 0},
+    {"estimatesmartfee", 0}, {"estimatesmartpriority", 0}, {"prioritisetransaction", 1}, {"prioritisetransaction", 2},
+    {"setban", 2}, {"setban", 3}, {"rollbackchain", 0}, {"rollbackchain", 1}};
 
 class CRPCConvertTable
 {

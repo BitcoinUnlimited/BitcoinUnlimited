@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "amount.h"
+#include "blockstorage/blockstorage.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "consensus/consensus.h"

@@ -200,6 +200,7 @@ public:
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
 
+
     void SetNull()
     {
         phashBlock = NULL;
@@ -370,6 +371,7 @@ public:
         hashPrev = (pprev ? pprev->GetBlockHash() : uint256());
     }
 
+    friend bool operator<(const CDiskBlockIndex &a, const CDiskBlockIndex &b) { return a.nHeight < b.nHeight; }
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
@@ -460,7 +462,7 @@ public:
         if (Contains(pindex))
             return (*this)[pindex->nHeight + 1];
         else
-            return NULL;
+            return nullptr;
     }
 
     /** Return the maximal height in the chain. Is equal to chain.Tip() ? chain.Tip()->nHeight : -1. */

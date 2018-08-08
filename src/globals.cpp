@@ -72,6 +72,69 @@ CCriticalSection cs_main;
 BlockMap mapBlockIndex GUARDED_BY(cs_main);
 CChain chainActive GUARDED_BY(cs_main);
 std::map<NodeId, CNodeState> mapNodeState GUARDED_BY(cs_main); // nodestate.h
+// BU variables moved to globals.cpp
+// - moved CCriticalSection cs_main;
+// - moved BlockMap mapBlockIndex;
+// - movedCChain chainActive;
+CBlockIndex *pindexBestHeader GUARDED_BY(cs_main) = nullptr;
+CFeeRate minRelayTxFee GUARDED_BY(cs_main) = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
+// The allowed size of the in memory UTXO cache
+int64_t nCoinCacheMaxSize GUARDED_BY(cs_main) = 0;
+/** A cache to store headers that have arrived but can not yet be connected **/
+std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders GUARDED_BY(cs_main);
+CBlockIndex *pindexBestInvalid GUARDED_BY(cs_main) = nullptr;
+/**
+ * Every received block is assigned a unique and increasing identifier, so we
+ * know which one to give priority in case of a fork.
+ */
+/** Blocks loaded from disk are assigned id 0, so start the counter at 1. */
+uint64_t nBlockSequenceId GUARDED_BY(cs_main) = 1;
+/**
+ * Sources of received blocks, saved to be able to send them reject
+ * messages or ban them when processing happens afterwards. Protected by
+ * cs_main.
+ */
+std::map<uint256, NodeId> mapBlockSource GUARDED_BY(cs_main);
+/** Dirty block file entries. */
+std::set<int> setDirtyFileInfo GUARDED_BY(cs_main);
+/** Dirty block index entries. */
+std::set<CBlockIndex *> setDirtyBlockIndex GUARDED_BY(cs_main);
+
+CCriticalSection cs_recentRejects;
+/**
+ * Filter for transactions that were recently rejected by
+ * AcceptToMemoryPool. These are not rerequested until the chain tip
+ * changes, at which point the entire filter is reset. Protected by
+ * cs_main.
+ *
+ * Without this filter we'd be re-requesting txs from each of our peers,
+ * increasing bandwidth consumption considerably. For instance, with 100
+ * peers, half of which relay a tx we don't accept, that might be a 50x
+ * bandwidth increase. A flooding attacker attempting to roll-over the
+ * filter using minimum-sized, 60byte, transactions might manage to send
+ * 1000/sec if we have fast peers, so we pick 120,000 to give our peers a
+ * two minute window to send invs to us.
+ *
+ * Decreasing the false positive rate is fairly cheap, so we pick one in a
+ * million to make it highly unlikely for users to have issues with this
+ * filter.
+ *
+ * Memory used: 1.7MB
+ */
+std::unique_ptr<CRollingBloomFilter> recentRejects GUARDED_BY(cs_recentRejects);
+
+/**
+ * Keep track of transaction which were recently in a block and don't
+ * request those again.
+ *
+ * Note that we dont actually ever clear this - in cases of reorgs where
+ * transactions dropped out they were either added back to our mempool
+ * or fell out due to size limitations (in which case we'll get them again
+ * if the user really cares and re-sends).
+ *
+ * Protected by cs_recentRejects.
+ */
+std::unique_ptr<CRollingBloomFilter> txn_recently_in_block GUARDED_BY(cs_recentRejects);
 
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
@@ -149,6 +212,10 @@ CSemaphore *semOutboundAddNode = NULL; // BU: separate semaphore for -addnodes
 CNodeSignals g_signals;
 CAddrMan addrman;
 CDoSManager dosMan;
+
+CTweak<uint64_t> pruneIntervalTweak("prune.pruneInterval",
+    "How much block data (in MiB) is written to disk before trying to prune our block storage",
+    DEFAULT_PRUNE_INTERVAL);
 
 CTweakRef<uint64_t> ebTweak("net.excessiveBlock",
     "Excessive block size in bytes",

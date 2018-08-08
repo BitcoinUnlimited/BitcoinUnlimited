@@ -41,7 +41,7 @@ static void SetMaxOpenFiles(leveldb::Options *options)
     LOGA("LevelDB using max_open_files=%d (default=%d)\n", options->max_open_files, default_open_files);
 }
 
-static leveldb::Options GetOptions(size_t nCacheSize)
+static leveldb::Options GetDefaultOptions(size_t nCacheSize)
 {
     leveldb::Options options;
     options.block_cache = leveldb::NewLRUCache(nCacheSize / 2);
@@ -54,19 +54,45 @@ static leveldb::Options GetOptions(size_t nCacheSize)
         // on corruption in later versions.
         options.paranoid_checks = true;
     }
+    options.create_if_missing = true;
+
     SetMaxOpenFiles(&options);
     return options;
 }
 
-CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize, bool fMemory, bool fWipe, bool obfuscate)
+static void OverrideOptions(leveldb::Options &_options, COverrideOptions *_pOverride)
 {
-    penv = NULL;
+    if (_pOverride == nullptr)
+        return;
+
+    // If an ovverride option was defined and is valid then modify the corresponding level db option.
+    if (_pOverride->max_file_size > 0)
+        _options.max_file_size = _pOverride->max_file_size;
+
+    if (_pOverride->block_size > 0)
+        _options.block_size = _pOverride->block_size;
+
+    if (_pOverride->write_buffer_size > 0)
+        _options.write_buffer_size = _pOverride->write_buffer_size;
+}
+
+CDBWrapper::CDBWrapper(const fs::path &path,
+    size_t nCacheSize,
+    bool fMemory,
+    bool fWipe,
+    bool obfuscate,
+    COverrideOptions *pOverride)
+{
+    penv = nullptr;
     readoptions.verify_checksums = true;
     iteroptions.verify_checksums = true;
     iteroptions.fill_cache = false;
     syncoptions.sync = true;
-    options = GetOptions(nCacheSize);
-    options.create_if_missing = true;
+    options = GetDefaultOptions(nCacheSize);
+
+    // Modify default database options
+    OverrideOptions(options, pOverride);
+
     if (fMemory)
     {
         penv = leveldb::NewMemEnv(leveldb::Env::Default());
@@ -111,13 +137,13 @@ CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize, bool fMemory, bo
 CDBWrapper::~CDBWrapper()
 {
     delete pdb;
-    pdb = NULL;
+    pdb = nullptr;
     delete options.filter_policy;
-    options.filter_policy = NULL;
+    options.filter_policy = nullptr;
     delete options.block_cache;
-    options.block_cache = NULL;
+    options.block_cache = nullptr;
     delete penv;
-    options.env = NULL;
+    options.env = nullptr;
 }
 
 bool CDBWrapper::WriteBatch(CDBBatch &batch, bool fSync)

@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "amount.h"
+#include "blockstorage/blockstorage.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -17,6 +18,7 @@
 #include "rpc/server.h"
 #include "streams.h"
 #include "sync.h"
+#include "tweak.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "txorphanpool.h"

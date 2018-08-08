@@ -12,6 +12,8 @@
 
 #include "addrman.h"
 #include "amount.h"
+#include "blockstorage/blockstorage.h"
+#include "blockstorage/sequential_files.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -240,7 +242,11 @@ void Shutdown()
         delete pcoinsdbview;
         pcoinsdbview = NULL;
         delete pblocktree;
-        pblocktree = NULL;
+        pblocktree = nullptr;
+        delete pblockdb;
+        pblockdb = nullptr;
+        delete pblockundodb;
+        pblockundodb = nullptr;
     }
 #ifdef ENABLE_WALLET
     if (pwalletMain)
@@ -971,44 +977,60 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     // ********************************************************* Step 6: load block chain
 
     fReindex = GetBoolArg("-reindex", DEFAULT_REINDEX);
+    int64_t requested_block_mode = GetArg("-useblockdb", DEFAULT_BLOCK_DB_MODE);
+    if (requested_block_mode == 0)
+    {
+        BLOCK_DB_MODE = SEQUENTIAL_BLOCK_FILES;
+    }
+    else
+    {
+        BLOCK_DB_MODE = DB_BLOCK_STORAGE;
+    }
 
     // Upgrading to 0.8; hard-link the old blknnnn.dat files into /blocks/
-    fs::path blocksDir = GetDataDir() / "blocks";
-    if (!fs::exists(blocksDir))
+    if (BLOCK_DB_MODE != DB_BLOCK_STORAGE)
     {
-        fs::create_directories(blocksDir);
-        bool linked = false;
-        for (unsigned int i = 1; i < 10000; i++)
+        fs::path blocksDir = GetDataDir() / "blocks";
+        if (!fs::exists(blocksDir))
         {
-            fs::path source = GetDataDir() / strprintf("blk%04u.dat", i);
-            if (!fs::exists(source))
-                break;
-            fs::path dest = blocksDir / strprintf("blk%05u.dat", i - 1);
-            try
+            fs::create_directories(blocksDir);
+            bool linked = false;
+            for (unsigned int i = 1; i < 10000; i++)
             {
-                fs::create_hard_link(source, dest);
-                LOGA("Hardlinked %s -> %s\n", source.string(), dest.string());
-                linked = true;
+                fs::path source = GetDataDir() / strprintf("blk%04u.dat", i);
+                if (!fs::exists(source))
+                    break;
+                fs::path dest = blocksDir / strprintf("blk%05u.dat", i - 1);
+                try
+                {
+                    fs::create_hard_link(source, dest);
+                    LOGA("Hardlinked %s -> %s\n", source.string(), dest.string());
+                    linked = true;
+                }
+                catch (const fs::filesystem_error &e)
+                {
+                    // Note: hardlink creation failing is not a disaster, it just means
+                    // blocks will get re-downloaded from peers.
+                    LOGA("Error hardlinking blk%04u.dat: %s\n", i, e.what());
+                    break;
+                }
             }
-            catch (const fs::filesystem_error &e)
+            if (linked)
             {
-                // Note: hardlink creation failing is not a disaster, it just means
-                // blocks will get re-downloaded from peers.
-                LOGA("Error hardlinking blk%04u.dat: %s\n", i, e.what());
-                break;
+                fReindex = true;
             }
-        }
-        if (linked)
-        {
-            fReindex = true;
         }
     }
 
     // Return the initial values for the various in memory caches.
+    int64_t nBlockDBCache = 0;
+    int64_t nBlockUndoDBCache = 0;
     int64_t nBlockTreeDBCache = 0;
     int64_t nCoinDBCache = 0;
-    GetCacheConfiguration(nBlockTreeDBCache, nCoinDBCache, nCoinCacheMaxSize);
+    GetCacheConfiguration(nBlockDBCache, nBlockUndoDBCache, nBlockTreeDBCache, nCoinDBCache, nCoinCacheMaxSize);
     LOGA("Cache configuration:\n");
+    LOGA("* Using %.1fMiB for block database\n", nBlockDBCache * (1.0 / 1024 / 1024));
+    LOGA("* Using %.1fMiB for block undo database\n", nBlockUndoDBCache * (1.0 / 1024 / 1024));
     LOGA("* Using %.1fMiB for block index database\n", nBlockTreeDBCache * (1.0 / 1024 / 1024));
     LOGA("* Using %.1fMiB for chain state database\n", nCoinDBCache * (1.0 / 1024 / 1024));
     LOGA("* Using %.1fMiB for in-memory UTXO set\n", nCoinCacheMaxSize * (1.0 / 1024 / 1024));
@@ -1029,9 +1051,13 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 delete pcoinsdbview;
                 delete pcoinscatcher;
                 delete pblocktree;
+                delete pblocktreeother;
+                delete pblockdb;
+                delete pblockundodb;
 
                 uiInterface.InitMessage(_("Opening Block database..."));
-                pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
+                InitializeBlockStorage(nBlockTreeDBCache, nBlockDBCache, nBlockUndoDBCache);
+
                 uiInterface.InitMessage(_("Opening UTXO database..."));
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
@@ -1109,7 +1135,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                         break;
                     }
                 }
-
                 if (!CVerifyDB().VerifyDB(chainparams, pcoinsdbview, GetArg("-checklevel", DEFAULT_CHECKLEVEL),
                         GetArg("-checkblocks", DEFAULT_CHECKBLOCKS)))
                 {

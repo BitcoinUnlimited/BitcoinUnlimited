@@ -4,6 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "zmqpublishnotifier.h"
+#include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "main.h"
 #include "util.h"

@@ -3,6 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "parallel.h"
+
+#include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "dosman.h"
 #include "graphene.h"

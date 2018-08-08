@@ -6,6 +6,7 @@
 #include <set>
 
 #include "allowed_args.h"
+#include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "dosman.h"
 #include "httpserver.h"
@@ -233,6 +234,9 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
             _("Execute command when the best block changes (%s in cmd is replaced by block hash)"))
         .addDebugArg("blocksonly", optionalBool,
             strprintf(_("Whether to operate in a blocks only mode (default: %u)"), DEFAULT_BLOCKSONLY))
+        .addArg("useblockdb", optionalBool,
+            strprintf(_("Which method to store blocks on disk (default: %u) 0 = sequential files, 1 = blockdb"),
+                    DEFAULT_BLOCK_DB_MODE))
         .addArg("checkblocks=<n>", requiredInt,
             strprintf(_("How many blocks to check at startup (default: %u, 0 = all)"), DEFAULT_CHECKBLOCKS))
         .addArg("checklevel=<n>", requiredInt,

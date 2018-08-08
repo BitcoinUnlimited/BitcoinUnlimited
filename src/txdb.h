@@ -52,7 +52,9 @@ uint64_t GetTotalSystemMemory();
 /** Get the sizes for each of the caches. This is done during init.cpp on startup but also
  *  later, during dynamic sizing of the coins cache, when need to know the initial startup values.
  */
-void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
+void GetCacheConfiguration(int64_t &_nBlockDBCache,
+    int64_t &_nBlockUndoDBcache,
+    int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
     int64_t &_nCoinCacheMaxSize,
     bool fDefault = false);
@@ -60,6 +62,8 @@ void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
  *  dynamic sizing of the coins cache we also need to use this function directly.
  */
 void CacheSizeCalculations(int64_t _nTotalCache,
+    int64_t &_nBlockDBCache,
+    int64_t &_nBlockUndoDBcache,
     int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
     int64_t &_nCoinCacheMaxSize);
@@ -108,6 +112,10 @@ public:
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
     uint256 GetBestBlock() const override;
+    uint256 GetBestBlockSeq() const;
+    void WriteBestBlockSeq(const uint256 &hashBlock);
+    uint256 GetBestBlockDb() const;
+    void WriteBestBlockDb(const uint256 &hashBlock);
     bool BatchWrite(CCoinsMap &mapCoins,
         const uint256 &hashBlock,
         const uint64_t nBestCoinHeight,
@@ -149,7 +157,7 @@ private:
 class CBlockTreeDB : public CDBWrapper
 {
 public:
-    CBlockTreeDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
+    CBlockTreeDB(size_t nCacheSize, std::string folder, bool fMemory = false, bool fWipe = false);
 
 private:
     CBlockTreeDB(const CBlockTreeDB &);
@@ -167,7 +175,9 @@ public:
     bool WriteTxIndex(const std::vector<std::pair<uint256, CDiskTxPos> > &list);
     bool WriteFlag(const std::string &name, bool fValue);
     bool ReadFlag(const std::string &name, bool &fValue);
+    bool FindBlockIndex(uint256 blockhash, CDiskBlockIndex *index);
     bool LoadBlockIndexGuts();
+    bool GetSortedHashIndex(std::vector<std::pair<int, CDiskBlockIndex> > &hashesByHeight);
 };
 
 /** Global variable that points to the coins database */
