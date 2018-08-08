@@ -510,7 +510,7 @@ public:
             throw std::ios_base::failure("Read attempted past buffer limit");
         if (nSize + nRewind > vchBuf.size()) // What's already read + what I want to read + how far I want to rewind
         {
-            LOG(REINDEX, "Large read, growing buffer\n", nSize);
+            LOG(REINDEX, "Large read, growing buffer (size: %lld)\n", nSize);
             GrowTo(nSize + nRewind + RESIZE_EXTRA);
             if (nSize + nRewind > vchBuf.size()) // make sure it worked
                 throw std::ios_base::failure("Read larger than buffer size");
