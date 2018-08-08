@@ -156,25 +156,28 @@ std::string LogGetLabel(uint64_t category)
 
     return label;
 }
-
-std::string LogGetAllString()
+// Return a string rapresentation of all debug categories and their current status,
+// one category per line. If enabled is true it returns only the list of enabled
+// debug categories concatenated in a single line.
+std::string LogGetAllString(bool fEnabled)
 {
-    string ret = "";
+    string allCategories = "";
+    string enabledCategories = "";
     for (auto &x : logLabelMap)
     {
         if (x.first == ALL || x.first == NONE)
             continue;
 
         if (LogAcceptCategory(x.first))
-            ret += "on ";
+            allCategories += "on ";
+        if (fEnabled)
+            enabledCategories += (std::string)x.second + " ";
         else
-            ret += "   ";
+            allCategories += "   ";
 
-        ret += (std::string)x.second;
-        ret += "\n";
+        allCategories += (std::string)x.second + "\n";
     }
-
-    return ret;
+    return fEnabled ? enabledCategories : allCategories;
 }
 
 void LogInit()
@@ -187,35 +190,37 @@ void LogInit()
     if (categories.size() == 1 && (categories[0] == "" || categories[0] == "1"))
     {
         Logging::LogToggleCategory(Logging::ALL, true);
-        return;
     }
-
-    for (string const &cat : categories)
+    else
     {
-        category = boost::algorithm::to_lower_copy(cat);
-
-        // remove the category from the list of enables one
-        // if label is suffixed with a dash
-        bool toggle_flag = true;
-
-        if (category.length() > 0 && category.at(0) == '-')
+        for (string const &cat : categories)
         {
-            toggle_flag = false;
-            category.erase(0, 1);
+            category = boost::algorithm::to_lower_copy(cat);
+
+            // remove the category from the list of enables one
+            // if label is suffixed with a dash
+            bool toggle_flag = true;
+
+            if (category.length() > 0 && category.at(0) == '-')
+            {
+                toggle_flag = false;
+                category.erase(0, 1);
+            }
+
+            if (category == "" || category == "1")
+            {
+                category = "all";
+            }
+
+            catg = LogFindCategory(category);
+
+            if (catg == NONE) // Not a valid category
+                continue;
+
+            LogToggleCategory(catg, toggle_flag);
         }
-
-        if (category == "" || category == "1")
-        {
-            category == "all";
-        }
-
-        catg = LogFindCategory(category);
-
-        if (catg == NONE) // Not a valid category
-            continue;
-
-        LogToggleCategory(catg, toggle_flag);
     }
+    LOGA("List of enabled categories: %s\n", LogGetAllString(true));
 }
 }
 

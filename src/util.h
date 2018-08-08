@@ -231,7 +231,7 @@ std::string LogGetLabel(uint64_t category);
  * Formatted for display.
  * returns all categories and states
  */
-std::string LogGetAllString();
+std::string LogGetAllString(bool fEnabled = false);
 
 /**
  * Initialize
