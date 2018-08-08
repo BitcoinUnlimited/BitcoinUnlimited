@@ -63,15 +63,15 @@ class ParallelTest (BitcoinTestFramework):
         i = 0
         for n in self.nodes:
           print("Node %d is %s" % (i,n.url))
-          print ("generating coins for node")  
+          print ("generating coins for node")
           n.generate(200)
           self.sync_all()
           i += 1
-          
+
         for i in range(0,200):
           # Create many utxo's
           print ("round %d: Generating txns..." % i)
-          for n in self.nodes:  
+          for n in self.nodes:
             send_to = {}
             n.keypoolrefill(100)
             n.keypoolrefill(100)
@@ -92,7 +92,7 @@ class ParallelTest (BitcoinTestFramework):
             i += 1
           print ("  syncing...")
           self.sync_all()
-                    
+
     def run_test (self):
         if self.rep:
             self.repetitiveTest()
@@ -133,7 +133,7 @@ class ParallelTest (BitcoinTestFramework):
         # a few inputs to check when the two competing blocks enter parallel validation.
         for i in range(5):
             self.nodes[2].sendtoaddress(self.nodes[0].getnewaddress(), "0.01")
- 
+
 
         # Have node0 and node2 mine the same block which will compete to advance the chaintip when
         # The nodes are connected back together.
@@ -154,7 +154,7 @@ class ParallelTest (BitcoinTestFramework):
         interconnect_nodes(self.nodes)
         sync_blocks(self.nodes[0:3])
 
-        # Wait here to make sure a re-org does not happen on node0 so we want to give it some time.  If the 
+        # Wait here to make sure a re-org does not happen on node0 so we want to give it some time.  If the
         # memory pool on node 0 does not change within 5 seconds then we assume a reorg is not occurring
         # because a reorg would cause transactions to be placed in the mempool from the old block on node 0.
         old_mempoolbytes = self.nodes[0].getmempoolinfo()["bytes"]
@@ -164,7 +164,7 @@ class ParallelTest (BitcoinTestFramework):
                 assert("Reorg happened when it should not - Mempoolbytes has changed")
             old_mempoolbytes = mempoolbytes
             # node0 has the bigger block and was sent and began processing first, however the block from node2
-            # should have come in after and beaten node0's block.  Therefore the blockhash from chaintip from 
+            # should have come in after and beaten node0's block.  Therefore the blockhash from chaintip from
             # node2 should now match the blockhash from the chaintip on node1; and node0 and node1 should not match.
             print ("check for re-org " + str(i+1))
             assert_equal(self.nodes[1].getbestblockhash(), self.nodes[2].getbestblockhash())
@@ -192,7 +192,7 @@ class ParallelTest (BitcoinTestFramework):
         connect_nodes(self.nodes[1],3)
         sync_blocks(self.nodes)
 
-        # Wait here to make sure a re-org does not happen on node0 so we want to give it some time.  If the 
+        # Wait here to make sure a re-org does not happen on node0 so we want to give it some time.  If the
         # memory pool on node 0 does not change within 5 seconds then we assume a reorg is not occurring
         # because a reorg would cause transactions to be placed in the mempool from the old block on node 0.
         for i in range(5):
@@ -207,7 +207,7 @@ class ParallelTest (BitcoinTestFramework):
             time.sleep(1)
 
 
-        # Send some transactions and Mine a block on node 2.  
+        # Send some transactions and Mine a block on node 2.
         # This should cause node0 and node3 to re-org and all chains should now match.
         for i in range(5):
             self.nodes[2].sendtoaddress(self.nodes[2].getnewaddress(), .01)
@@ -217,7 +217,7 @@ class ParallelTest (BitcoinTestFramework):
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[2].getbestblockhash())
         assert_equal(self.nodes[0].getbestblockhash(), self.nodes[1].getbestblockhash())
         counts = [ x.getblockcount() for x in self.nodes ]
-        assert_equal(counts, [205,205,205,205])  
+        assert_equal(counts, [205,205,205,205])
 
         #stop nodes
         stop_nodes(self.nodes)
@@ -286,7 +286,7 @@ class ParallelTest (BitcoinTestFramework):
         self.nodes[4].generate(1)
         self.nodes[5].generate(1)
         counts = [ x.getblockcount() for x in self.nodes ]
-        assert_equal(counts, [331,330,331,331,331,331])  
+        assert_equal(counts, [331,330,331,331,331,331])
 
         # Connect nodes so that all blocks are sent at same time to node1. Largest block from node0 will be terminated.
         print ("connnect nodes...")
@@ -320,7 +320,7 @@ class ParallelTest (BitcoinTestFramework):
         #stop nodes
         stop_nodes(self.nodes)
         wait_bitcoinds()
- 
+
         # Cleanup by mining more blocks if we need to run extended tests
         if self.longTest == True:
             self.cleanup_and_reset()
@@ -330,7 +330,7 @@ class ParallelTest (BitcoinTestFramework):
         ################################################
         if self.longTest == False:
             return
- 
+
         ###########################################################################################
         # Test reorgs
         ###########################################################################################
@@ -386,7 +386,7 @@ class ParallelTest (BitcoinTestFramework):
         print ("Connect node2...")
         counts = [ x.getblockcount() for x in self.nodes ]
         print (str(counts))
-        assert_equal(counts, [basecount,basecount,basecount+1])  
+        assert_equal(counts, [basecount,basecount,basecount+1])
         interconnect_nodes(self.nodes)
 
         # All chains will sync to node2
@@ -466,7 +466,7 @@ class ParallelTest (BitcoinTestFramework):
         print ("Connect node2...")
         counts = [ x.getblockcount() for x in self.nodes ]
         print (str(counts))
-        assert_equal(counts, [basecount,basecount,basecount+1])  
+        assert_equal(counts, [basecount,basecount,basecount+1])
         interconnect_nodes(self.nodes)
 
         # All chains will sync to node2
@@ -558,7 +558,7 @@ class ParallelTest (BitcoinTestFramework):
         print ("Connect node4...")
         counts = [ x.getblockcount() for x in self.nodes ]
         print (str(counts))
-        assert_equal(counts, [basecount,basecount,basecount, basecount, basecount+1])  
+        assert_equal(counts, [basecount,basecount,basecount, basecount, basecount+1])
         interconnect_nodes(self.nodes)
 
         # All chains will sync to node2
@@ -656,7 +656,7 @@ class ParallelTest (BitcoinTestFramework):
         print ("Connect node2 - fork2...")
         counts = [ x.getblockcount() for x in self.nodes ]
         print (str(counts))
-        assert_equal(counts, [basecount,basecount,basecount+1])  
+        assert_equal(counts, [basecount,basecount,basecount+1])
         interconnect_nodes(self.nodes)
 
         # Wait for a little while before connecting node 3 (fork3)
@@ -666,7 +666,7 @@ class ParallelTest (BitcoinTestFramework):
         counts = [ x.getblockcount() for x in self.nodes ]
         interconnect_nodes(self.nodes)
         print (str(counts))
-        assert_equal(counts, [basecount-1,basecount-1,basecount+1, basecount+2])  
+        assert_equal(counts, [basecount-1,basecount-1,basecount+1, basecount+2])
         interconnect_nodes(self.nodes)
 
         sync_blocks(self.nodes)
@@ -681,7 +681,7 @@ class ParallelTest (BitcoinTestFramework):
         # cleanup and sync chains for next tests
         self.cleanup_and_reset()
 
-        
+
         ###########################################################################################
         # 1) Large reorg - can we do a 144 block reorg?
         print ("Starting repeating many competing blocks test")
@@ -691,7 +691,7 @@ class ParallelTest (BitcoinTestFramework):
         print ("Mine 144 blocks on each chain...")
         self.nodes[0].generate(144)
         self.nodes[1].generate(144)
- 
+
         print ("Connect nodes for larg reorg...")
         connect_nodes(self.nodes[1],0)
         sync_blocks(self.nodes)
@@ -711,7 +711,7 @@ class ParallelTest (BitcoinTestFramework):
 
         # cleanup and sync chains for next tests
         self.cleanup_and_reset()
- 
+
         ###########################################################################################
         # Test the 4 block attack scenarios - use -pvtest=true to slow down the checking of inputs.
         ###########################################################################################
@@ -764,7 +764,7 @@ class ParallelTest (BitcoinTestFramework):
         connect_nodes(self.nodes[1],4)
         sync_blocks(self.nodes)
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[4].getbestblockhash())
- 
+
         # stop nodes
         stop_nodes(self.nodes)
         wait_bitcoinds()
@@ -792,7 +792,7 @@ class ParallelTest (BitcoinTestFramework):
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[2].getbestblockhash())
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[3].getbestblockhash())
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[4].getbestblockhash())
- 
+
         #stop nodes
         stop_nodes(self.nodes)
         wait_bitcoinds()
@@ -845,12 +845,12 @@ class ParallelTest (BitcoinTestFramework):
         connect_nodes(self.nodes[1],3)
         connect_nodes(self.nodes[1],4)
         time.sleep(5) #wait for blocks to start processing
-        
+
         # Connect 5th block and this one should win the race
         connect_nodes(self.nodes[1],5)
         sync_blocks(self.nodes)
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[5].getbestblockhash())
- 
+
         #stop nodes
         stop_nodes(self.nodes)
         wait_bitcoinds()
@@ -878,7 +878,7 @@ class ParallelTest (BitcoinTestFramework):
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[3].getbestblockhash())
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[4].getbestblockhash())
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[5].getbestblockhash())
- 
+
         # stop nodes
         stop_nodes(self.nodes)
         wait_bitcoinds()
@@ -934,12 +934,12 @@ class ParallelTest (BitcoinTestFramework):
         time.sleep(1)
         connect_nodes(self.nodes[1],4)
         time.sleep(1) #wait for blocks to start processing
-        
+
         # Connect 5th block and this one be terminated and the first block to connect from node0 should win the race
         connect_nodes(self.nodes[1],5)
         sync_blocks(self.nodes)
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[0].getbestblockhash())
- 
+
         #stop nodes
         stop_nodes(self.nodes)
         wait_bitcoinds()
@@ -967,7 +967,7 @@ class ParallelTest (BitcoinTestFramework):
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[3].getbestblockhash())
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[4].getbestblockhash())
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[5].getbestblockhash())
- 
+
         # stop nodes
         stop_nodes(self.nodes)
         wait_bitcoinds()
@@ -1020,12 +1020,12 @@ class ParallelTest (BitcoinTestFramework):
         time.sleep(1)
         connect_nodes(self.nodes[1],4)
         time.sleep(1) #wait for blocks to start processing
-        
+
         # Connect 5th block and this one be terminated and the first block to connect from node0 should win the race
         connect_nodes(self.nodes[1],5)
         sync_blocks(self.nodes)
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[0].getbestblockhash())
- 
+
         # stop nodes
         stop_nodes(self.nodes)
         wait_bitcoinds()
@@ -1053,7 +1053,7 @@ class ParallelTest (BitcoinTestFramework):
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[3].getbestblockhash())
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[4].getbestblockhash())
         assert_equal(self.nodes[1].getbestblockhash(), self.nodes[5].getbestblockhash())
- 
+
         # stop nodes
         stop_nodes(self.nodes)
         wait_bitcoinds()
@@ -1065,7 +1065,7 @@ class ParallelTest (BitcoinTestFramework):
         #################################################################################
         # Repeated 5 blocks mined with a reorg after
         #################################################################################
-        
+
         # Repeatedly mine 5 blocks at a time on each node to have many blocks both arriving
         # at the same time and racing each other to see which can extend the chain the fastest.
         # This is intented just a stress test of the 4 block scenario but also while blocks
@@ -1112,9 +1112,9 @@ def Test():
     t.rep = True
     t.main(["--tmpdir=/ramdisk/test", "--nocleanup","--noshutdown"])
 
-if __name__ == '__main__':  
+if __name__ == '__main__':
 
-    p = ParallelTest()  
+    p = ParallelTest()
     if "--rep" in sys.argv:
         print("Repetitive test")
         p.rep = True
@@ -1136,4 +1136,4 @@ if __name__ == '__main__':
 
 
     p.main ()
-    
+
