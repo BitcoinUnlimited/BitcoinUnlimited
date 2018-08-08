@@ -19,10 +19,10 @@ class ParallelTest (BitcoinTestFramework):
 
     def setup_network(self, split=False):
         self.nodes = []
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-parallel=0", "-rpcservertimeout=0", "-debug", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-parallel=0", "-rpcservertimeout=0", "-debug", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-parallel=0", "-rpcservertimeout=0", "-debug", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-parallel=0", "-rpcservertimeout=0", "-debug", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-parallel=0", "-rpcservertimeout=0", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-parallel=0", "-rpcservertimeout=0", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-parallel=0", "-rpcservertimeout=0", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-parallel=0", "-rpcservertimeout=0", "-use-thinblocks=0", "-excessiveblocksize=6000000", "-blockprioritysize=6000000", "-blockmaxsize=6000000"]))
         interconnect_nodes(self.nodes)
         self.is_network_split=False
         self.sync_all()
@@ -31,12 +31,12 @@ class ParallelTest (BitcoinTestFramework):
 
         # Cleanup - start and connect the other nodes so that we have syncd chains before proceeding
         # to other tests.
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug=", "-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug=", "-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug=", "-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug=", "-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug=", "-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug=", "-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
         interconnect_nodes(self.nodes)
         sync_blocks(self.nodes)
 
@@ -120,10 +120,10 @@ class ParallelTest (BitcoinTestFramework):
         wait_bitcoinds()
 
         #restart nodes with -pvtest off and do not yet connect the nodes
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0"]))
 
         # Send tx's which do not propagate
         for i in range(50):
@@ -146,9 +146,9 @@ class ParallelTest (BitcoinTestFramework):
         wait_bitcoinds()
 
         # Restart nodes with pvtest=1
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=1"]))
 
         print ("Connect nodes...")
         interconnect_nodes(self.nodes)
@@ -176,9 +176,9 @@ class ParallelTest (BitcoinTestFramework):
         wait_bitcoinds()
 
         # Restart nodes with pvtest off.
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0"]))
 
         print ("Connect nodes...")
         interconnect_nodes(self.nodes)
@@ -187,7 +187,7 @@ class ParallelTest (BitcoinTestFramework):
         # the tip has been advanced.
         # this block should propagate to the other nodes but not cause a re-org
         print ("Mine another block...")
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0"]))
         self.nodes[3].generate(1)
         connect_nodes(self.nodes[1],3)
         sync_blocks(self.nodes)
@@ -224,12 +224,12 @@ class ParallelTest (BitcoinTestFramework):
         wait_bitcoinds()
 
 
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-pvtest=0"]))
         connect_nodes(self.nodes[1],0)
         connect_nodes(self.nodes[1],2)
         connect_nodes(self.nodes[1],3)
@@ -257,12 +257,12 @@ class ParallelTest (BitcoinTestFramework):
         wait_bitcoinds()
 
 
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-pvtest=0"]))
 
         print ("Send more transactions...")
         num_range = 50
@@ -344,9 +344,9 @@ class ParallelTest (BitcoinTestFramework):
         # 1) Start a slow to validate block race then mine another block pulling one chain ahead.
         # - threads on the chain that is now not the most proof of work should be stopped and the
         #   most proof of work block should proceed.
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0"]))
 
         print ("Send more transactions...")
         num_range = 15
@@ -373,9 +373,9 @@ class ParallelTest (BitcoinTestFramework):
         wait_bitcoinds()
 
         # Restart nodes with pvtest=1
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=1"]))
 
         # Connect node 0 and 1 so that a block validation race begins
         print ("Connect nodes0 and 1...")
@@ -411,23 +411,23 @@ class ParallelTest (BitcoinTestFramework):
 
         print ("Mine two forks.")
         # fork 1 (both nodes on fork1 should be syncd)
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
         interconnect_nodes(self.nodes)
         self.nodes[0].generate(1)
         sync_blocks(self.nodes)
 
         # fork 2
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
         self.nodes[2].generate(1)
 
         stop_nodes(self.nodes)
         wait_bitcoinds()
 
         # restart nodes but don't connect them yet
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
 
         # Create txns on node0 and 1 to setup for a slow to validate race between those nodes.
         print ("Send more transactions...")
@@ -453,9 +453,9 @@ class ParallelTest (BitcoinTestFramework):
         wait_bitcoinds()
 
         # Restart nodes with pvtest=1
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=1", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=1", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=1", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=1", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=1", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=1", "-whitelist=127.0.0.1"]))
 
         # Connect node 0 and 1 so that a block validation race begins
         print ("Connect nodes0 and 1...")
@@ -491,27 +491,27 @@ class ParallelTest (BitcoinTestFramework):
 
         print ("Mine two forks.")
         # fork 1 (both nodes on fork1 should be syncd)
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
         interconnect_nodes(self.nodes)
         self.nodes[0].generate(1)
         sync_blocks(self.nodes)
 
         # fork 2
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
         self.nodes[4].generate(1)
 
         stop_nodes(self.nodes)
         wait_bitcoinds()
 
         # restart nodes but don't connect them yet
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
 
         # Create txns on node0 and 1 to setup for a slow to validate race between those nodes.
         print ("Send more transactions...")
@@ -543,11 +543,11 @@ class ParallelTest (BitcoinTestFramework):
         wait_bitcoinds()
 
         # Restart nodes with pvtest=1
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=1", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=1", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=1", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=1", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=1", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=1", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=1", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=1", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=1", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=1", "-whitelist=127.0.0.1"]))
 
         # Connect node 0 and 1 so that a block validation race begins
         print ("Connect nodes0, 1, 2 and 3...")
@@ -586,28 +586,28 @@ class ParallelTest (BitcoinTestFramework):
 
         print ("Mine three forks.")
         # fork 1 (both nodes on fork1 should be syncd)
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
         interconnect_nodes(self.nodes)
         self.nodes[0].generate(1)
         sync_blocks(self.nodes)
 
         # fork 2
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
         self.nodes[2].generate(1)
 
         # fork 3
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
         self.nodes[3].generate(1)
 
         stop_nodes(self.nodes)
         wait_bitcoinds()
 
         # restart nodes but don't connect them yet
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0", "-whitelist=127.0.0.1"]))
 
         # Create txns on node0 and 1 to setup for a slow to validate race between those nodes.
         print ("Send more transactions...")
@@ -643,9 +643,9 @@ class ParallelTest (BitcoinTestFramework):
         wait_bitcoinds()
 
         # Restart nodes with pvtest=1
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=1", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=1", "-whitelist=127.0.0.1"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=1", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=1", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=1", "-whitelist=127.0.0.1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=1", "-whitelist=127.0.0.1"]))
 
         # Connect node 0 and 1 so that a block validation race begins
         print ("Connect nodes 0 and 1...")
@@ -719,11 +719,11 @@ class ParallelTest (BitcoinTestFramework):
         ####################################################################
         # Mine 4 blocks of all different sizes
         # - the smallest block should win
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=0"]))
 
         print ("Send more transactions...")
         num_range = 15
@@ -751,11 +751,11 @@ class ParallelTest (BitcoinTestFramework):
         wait_bitcoinds()
 
         # start nodes with -pvtest set to true.
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=1"]))
 
         # Connect nodes so that all blocks are sent at same time to node1.
         connect_nodes(self.nodes[1],0)
@@ -769,12 +769,12 @@ class ParallelTest (BitcoinTestFramework):
         stop_nodes(self.nodes)
         wait_bitcoinds()
 
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-pvtest=0"]))
 
         connect_nodes(self.nodes[1],0)
         connect_nodes(self.nodes[1],2)
@@ -803,12 +803,12 @@ class ParallelTest (BitcoinTestFramework):
         ########################################################################################################
         # Mine 4 blocks all the same size and get them to start validating and then send a 5th that is smaller
         # - the last smallest and last block arriving should win.
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-pvtest=0"]))
 
         print ("Send more transactions...")
         num_range = 15
@@ -832,12 +832,12 @@ class ParallelTest (BitcoinTestFramework):
         wait_bitcoinds()
 
         # start nodes with -pvtest set to true.
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug","-pvtest=1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-pvtest=1"]))
 
         # Connect nodes so that first 4 blocks are sent at same time to node1.
         connect_nodes(self.nodes[1],0)
@@ -855,12 +855,12 @@ class ParallelTest (BitcoinTestFramework):
         stop_nodes(self.nodes)
         wait_bitcoinds()
 
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-pvtest=0"]))
 
         connect_nodes(self.nodes[1],0)
         connect_nodes(self.nodes[1],2)
@@ -889,12 +889,12 @@ class ParallelTest (BitcoinTestFramework):
         ############################################################################################################
         # Mine 4 blocks all the same size and get them to start validating and then send a 5th that is the same size
         # - the first block arriving should win
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-pvtest=0"]))
 
         print ("Send more transactions...")
         num_range = 10
@@ -918,12 +918,12 @@ class ParallelTest (BitcoinTestFramework):
         wait_bitcoinds()
 
         # start nodes with -pvtest set to true.
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug","-pvtest=1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-pvtest=1"]))
 
         # Connect nodes so that first 4 blocks are sent 1 second apart to node1.
         connect_nodes(self.nodes[1],0)
@@ -944,12 +944,12 @@ class ParallelTest (BitcoinTestFramework):
         stop_nodes(self.nodes)
         wait_bitcoinds()
 
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-pvtest=0"]))
 
         connect_nodes(self.nodes[1],0)
         connect_nodes(self.nodes[1],2)
@@ -975,12 +975,12 @@ class ParallelTest (BitcoinTestFramework):
         #########################################################################################################
         # Mine 4 blocks all the same size and get them to start validating and then send a 5th that is bigger
         # - the first block arriving should win
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-pvtest=0"]))
 
         print ("Send more transactions...")
         num_range = 10
@@ -1004,12 +1004,12 @@ class ParallelTest (BitcoinTestFramework):
         wait_bitcoinds()
 
         # start nodes with -pvtest set to true.
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=1"]))
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug","-pvtest=1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=1"]))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-pvtest=1"]))
 
         # Connect nodes so that first 4 blocks are sent 1 second apart to node1.
         connect_nodes(self.nodes[1],0)
@@ -1030,12 +1030,12 @@ class ParallelTest (BitcoinTestFramework):
         stop_nodes(self.nodes)
         wait_bitcoinds()
 
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-pvtest=0"]))
 
         connect_nodes(self.nodes[1],0)
         connect_nodes(self.nodes[1],2)
@@ -1071,12 +1071,12 @@ class ParallelTest (BitcoinTestFramework):
         # This is intented just a stress test of the 4 block scenario but also while blocks
         # are in the process of being both mined and with reorgs sometimes happening at the same time.
         print ("Starting repeating many competing blocks test")
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(4, self.options.tmpdir, ["-debug","-pvtest=0"]))
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug","-pvtest=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(4, self.options.tmpdir, ["-pvtest=0"]))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-pvtest=0"]))
 
         connect_nodes(self.nodes[1],0)
         connect_nodes(self.nodes[1],2)
