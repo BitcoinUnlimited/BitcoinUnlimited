@@ -7016,10 +7016,6 @@ bool SendMessages(CNode *pto)
                 pto->fDisconnect = true;
                 LOG(IBD, "peer %s, disconnect request was set, so disconnected\n", pto->GetLogName());
             }
-            // If we are waiting for blocks, we need to make sure this connection is alive by attempting a send
-            // otherwise we may wait for PING_INTERVAL seconds.
-            else
-                pto->fPingQueued = true;
         }
 
         // Now exit early if disconnecting or the version handshake is not complete.  We must not send PING or other

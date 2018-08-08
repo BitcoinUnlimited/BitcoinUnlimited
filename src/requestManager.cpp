@@ -450,8 +450,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                 MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
                 AddGrapheneBlockInFlight(pfrom, inv2.hash);
                 pfrom->PushMessage(NetMsgType::GET_GRAPHENE, ss);
-                LOG(GRAPHENE, "Requesting graphene block %s from peer %s (%d)\n", inv2.hash.ToString(),
-                    pfrom->addrName.c_str(), pfrom->id);
+                LOG(GRAPHENE, "Requesting graphene block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
                 return true;
             }
         }
@@ -470,14 +469,12 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                 MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
                 AddGrapheneBlockInFlight(pfrom, inv2.hash);
                 pfrom->PushMessage(NetMsgType::GET_GRAPHENE, ss);
-                LOG(GRAPHENE, "Requesting graphene block %s from peer %s (%d)\n", inv2.hash.ToString(),
-                    pfrom->addrName.c_str(), pfrom->id);
+                LOG(GRAPHENE, "Requesting graphene block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
                 return true;
             }
             else if (!IsThinBlocksEnabled())
             {
-                LOG(GRAPHENE, "Requesting regular block %s from peer %s (%d)\n", inv2.hash.ToString(),
-                    pfrom->addrName.c_str(), pfrom->id);
+                LOG(GRAPHENE, "Requesting regular block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
                 std::vector<CInv> vToFetch;
                 inv2.type = MSG_BLOCK;
                 vToFetch.push_back(inv2);
@@ -1195,7 +1192,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 {
                     LOG(IBD, "disconnecting %s because too slow , overall avg %d peer avg %d\n", pnode->GetLogName(),
                         nOverallAverageResponseTime, pnode->nAvgBlkResponseTime);
-                    pnode->fDisconnectRequest = true;
+                    pnode->InitiateGracefulDisconnect();
                     // We must not return here but continue in order
                     // to update the vBlocksInFlight stats.
                 }
@@ -1347,8 +1344,8 @@ void CRequestManager::DisconnectOnDownloadTimeout(CNode *pnode, const Consensus:
             mapRequestManagerNodeState[nodeid].nDownloadingSince +
                 consensusParams.nPowTargetSpacing * (BLOCK_DOWNLOAD_TIMEOUT_BASE + BLOCK_DOWNLOAD_TIMEOUT_PER_PEER))
         {
-            LOGA("Timeout downloading block %s from peer=%d, disconnecting\n",
-                mapRequestManagerNodeState[nodeid].vBlocksInFlight.front().hash.ToString(), nodeid);
+            LOGA("Timeout downloading block %s from peer %s, disconnecting\n",
+                mapRequestManagerNodeState[nodeid].vBlocksInFlight.front().hash.ToString(), pnode->GetLogName());
             pnode->fDisconnect = true;
         }
     }
