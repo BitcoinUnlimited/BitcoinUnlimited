@@ -7176,7 +7176,7 @@ bool SendMessages(CNode *pto)
         if (!state.fSyncStarted && !pto->fClient && !fImporting && !fReindex)
         {
             // Only actively request headers from a single peer, unless we're close to today.
-            if ((nSyncStarted < MAX_HEADER_REQS_DURING_IBD && fFetch && !pto->fInbound) ||
+            if ((nSyncStarted < MAX_HEADER_REQS_DURING_IBD && fFetch) ||
                 chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - SINGLE_PEER_REQUEST_MODE_AGE)
             {
                 const CBlockIndex *pindexStart = chainActive.Tip();
