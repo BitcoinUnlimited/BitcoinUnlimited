@@ -5,6 +5,7 @@
 #include "requestManager.h"
 #include "chain.h"
 #include "chainparams.h"
+#include "connmgr.h"
 #include "consensus/consensus.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
@@ -943,6 +944,20 @@ void CRequestManager::UpdateBlockAvailability(NodeId nodeid, const uint256 &hash
         if (state->pindexBestKnownBlock == nullptr || it->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
         {
             state->pindexBestKnownBlock = it->second;
+
+            // At the beginning of chain sync if a peer connects to us inbound but then doesn't give
+            // us any blocks before any other peers connect then our initial sync could be hung because
+            // the request manager won't be able to update and askfor() blocks that have already been
+            // asked for. We solve this initial problem by automatically asking for all blocks at the
+            // beginning of the chain from every peer. This way the request manager can re-request any
+            // blocks from any peer regardless if those first peers are hung for some reason.
+            if (chainActive.Tip()->nHeight < (int64_t)BLOCK_DOWNLOAD_WINDOW.load())
+            {
+                for (auto &iter : mapBlkInfo)
+                {
+                     AskFor(iter.second.obj, connmgr->FindNodeFromId(nodeid).get());
+                }
+            }
         }
     }
     else
