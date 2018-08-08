@@ -16,6 +16,9 @@ import pdb        # BU added
 import shutil
 import tempfile
 import traceback
+from os.path import basename
+import string
+from sys import argv
 
 from .util import (
     initialize_chain,
@@ -142,7 +145,14 @@ class BitcoinTestFramework(object):
                           help="Don't stop bitcoinds after the test execution")
         parser.add_option("--srcdir", dest="srcdir", default=os.path.normpath(os.path.dirname(os.path.realpath(__file__))+"/../../../src"),
                           help="Source directory containing bitcoind/bitcoin-cli (default: %default)")
-        parser.add_option("--tmpdir", dest="tmpdir", default=tempfile.mkdtemp(prefix="test"),
+
+
+        testname = "".join(
+            filter(lambda x : x in string.ascii_lowercase, basename(argv[0])))
+
+        default_tempdir = tempfile.mkdtemp(prefix="test_"+testname+"_")
+
+        parser.add_option("--tmpdir", dest="tmpdir", default=default_tempdir,
                           help="Root directory for datadirs")
         parser.add_option("--tracerpc", dest="trace_rpc", default=False, action="store_true",
                           help="Print out all RPC calls as they are made")
