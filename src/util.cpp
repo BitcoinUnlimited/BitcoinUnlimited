@@ -189,15 +189,32 @@ void LogInit()
         Logging::LogToggleCategory(Logging::ALL, true);
         return;
     }
+
     for (string const &cat : categories)
     {
         category = boost::algorithm::to_lower_copy(cat);
+
+        // remove the category from the list of enables one
+        // if label is suffixed with a dash
+        bool toggle_flag = true;
+
+        if (category.length() > 0 && category.at(0) == '-')
+        {
+            toggle_flag = false;
+            category.erase(0, 1);
+        }
+
+        if (category == "" || category == "1")
+        {
+            category == "all";
+        }
+
         catg = LogFindCategory(category);
 
         if (catg == NONE) // Not a valid category
             continue;
 
-        LogToggleCategory(catg, true);
+        LogToggleCategory(catg, toggle_flag);
     }
 }
 }
