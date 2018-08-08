@@ -961,7 +961,7 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
         nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
     {
         std::vector<CBlockIndex *> vToDownload;
-        FindNextBlocksToDownload(pto->GetId(), pto->nMaxBlocksInTransit.load() - nBlocksInFlight, vToDownload);
+        FindNextBlocksToDownload(pto, pto->nMaxBlocksInTransit.load() - nBlocksInFlight, vToDownload);
         // LOG(REQ, "IBD AskFor %d blocks from peer=%s\n", vToDownload.size(), pto->GetLogName());
         std::vector<CInv> vGetBlocks;
         for (CBlockIndex *pindex : vToDownload)
@@ -986,13 +986,14 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
 
 // Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
 // at most count entries.
-void CRequestManager::FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex *> &vBlocks)
+void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, std::vector<CBlockIndex *> &vBlocks)
 {
     AssertLockHeld(cs_main);
 
     if (count == 0)
         return;
 
+    NodeId nodeid = node->GetId();
     vBlocks.reserve(vBlocks.size() + count);
     CNodeState *state = State(nodeid);
     DbgAssert(state != nullptr, return );
@@ -1049,8 +1050,12 @@ void CRequestManager::FindNextBlocksToDownload(NodeId nodeid, unsigned int count
         // already part of our chain (and therefore don't need it even if pruned).
         for (CBlockIndex *pindex : vToFetch)
         {
-            if (AlreadyAskedForBlock(pindex->GetBlockHash()))
+            uint256 blockHash = pindex->GetBlockHash();
+            if (AlreadyAskedForBlock(blockHash))
+            {
+                AskFor(CInv(MSG_BLOCK, blockHash), node); // Add another source
                 continue;
+            }
 
             if (!pindex->IsValid(BLOCK_VALID_TREE))
             {

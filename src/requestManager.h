@@ -197,7 +197,7 @@ public:
     void RequestNextBlocksToDownload(CNode *pto);
 
     // This gets called from RequestNextBlocksToDownload
-    void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex *> &vBlocks);
+    void FindNextBlocksToDownload(CNode *node, unsigned int count, std::vector<CBlockIndex *> &vBlocks);
 
     // Returns a bool indicating whether we requested this block.
     void MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash);
