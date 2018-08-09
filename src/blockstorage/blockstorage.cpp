@@ -124,7 +124,6 @@ void SyncStorage(const CChainParams &chainparams)
                 // Start new block file
                 unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
                 CDiskBlockPos blockPos;
-                CValidationState state;
                 if (!FindBlockPos(state, blockPos, nBlockSize + 8, 0, block.GetBlockTime(), false))
                 {
                     LOGA("SyncStorage(): FindBlockPos failed");
