@@ -436,7 +436,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         {
             // Must download a graphene block from a graphene enabled peer.
             // We can only request one graphene block per peer at a time.
-            if (pfrom->mapGrapheneBlocksInFlight.size() < 1 && CanGrapheneBlockBeDownloaded(pfrom))
+            if (CanGrapheneBlockBeDownloaded(pfrom))
             {
                 // Instead of building a bloom filter here as we would for an xthin, we actually
                 // just need to fill in CMempoolInfo
@@ -459,7 +459,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         {
             // Try to download a graphene block if possible otherwise just download a regular block.
             // We can only request one graphene block per peer at a time.
-            if (pfrom->mapGrapheneBlocksInFlight.size() < 1 && CanGrapheneBlockBeDownloaded(pfrom))
+            if (CanGrapheneBlockBeDownloaded(pfrom))
             {
                 // Instead of building a bloom filter here as we would for an xthin, we actually
                 // just need to fill in CMempoolInfo.
@@ -499,7 +499,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         {
             // Must download an xthinblock from a XTHIN peer.
             // We can only request one xthinblock per peer at a time.
-            if (pfrom->mapThinBlocksInFlight.size() < 1 && CanThinBlockBeDownloaded(pfrom))
+            if (CanThinBlockBeDownloaded(pfrom))
             {
                 inv2.type = MSG_XTHINBLOCK;
                 std::vector<uint256> vOrphanHashes;
@@ -523,7 +523,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         {
             // Try to download a thinblock if possible otherwise just download a regular block.
             // We can only request one xthinblock per peer at a time.
-            if (pfrom->mapThinBlocksInFlight.size() < 1 && CanThinBlockBeDownloaded(pfrom))
+            if (CanThinBlockBeDownloaded(pfrom))
             {
                 inv2.type = MSG_XTHINBLOCK;
                 std::vector<uint256> vOrphanHashes;
