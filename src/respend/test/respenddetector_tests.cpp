@@ -27,12 +27,12 @@ public:
     bool AddOutpointConflict(const COutPoint &out,
         const CTxMemPool::txiter mempoolEntry,
         const CTransaction &respendTx,
-        bool respentBefore,
-        bool isEquivalent) override
+        bool fRespentBefore,
+        bool fIsEquivalent) override
     {
         addOutpointCalls++;
-        this->respentBefore = respentBefore;
-        this->isEquivalent = isEquivalent;
+        this->respentBefore = fRespentBefore;
+        this->isEquivalent = fIsEquivalent;
         return false;
     }
 

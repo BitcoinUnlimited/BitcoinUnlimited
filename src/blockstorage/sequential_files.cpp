@@ -175,11 +175,11 @@ void PruneOneBlockFile(const int fileNumber)
                 range = mapBlocksUnlinked.equal_range(pindex->pprev);
             while (range.first != range.second)
             {
-                std::multimap<CBlockIndex *, CBlockIndex *>::iterator it = range.first;
+                std::multimap<CBlockIndex *, CBlockIndex *>::iterator itr = range.first;
                 range.first++;
-                if (it->second == pindex)
+                if (itr->second == pindex)
                 {
-                    mapBlocksUnlinked.erase(it);
+                    mapBlocksUnlinked.erase(itr);
                 }
             }
         }

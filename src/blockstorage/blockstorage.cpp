@@ -124,7 +124,6 @@ void SyncStorage(const CChainParams &chainparams)
                 // Start new block file
                 unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
                 CDiskBlockPos blockPos;
-                CValidationState state;
                 if (!FindBlockPos(state, blockPos, nBlockSize + 8, 0, block.GetBlockTime(), false))
                 {
                     LOGA("SyncStorage(): FindBlockPos failed");
@@ -279,7 +278,7 @@ void SyncStorage(const CChainParams &chainparams)
         pblocktreeother->GetSortedHashIndex(indexByHeight);
         LOGA("indexByHeight size = %u \n", indexByHeight.size());
         int64_t bestHeight = 0;
-        uint64_t lastFinishedFile = 0;
+        int64_t lastFinishedFile = 0;
         CBlockIndex *pindexBest = new CBlockIndex();
         // Load block file info
         int loadedblockfile = 0;
@@ -402,7 +401,7 @@ void SyncStorage(const CChainParams &chainparams)
                 }
             }
             setDirtyBlockIndex.insert(index);
-            if (lastFinishedFile <= loadedblockfile && index->nHeight > blockfiles[lastFinishedFile].nHeightLast)
+            if (lastFinishedFile <= loadedblockfile && index->nHeight > (int)blockfiles[lastFinishedFile].nHeightLast)
             {
                 fs::remove(GetDataDir() / "blocks" / strprintf("blk%05u.dat", lastFinishedFile));
                 fs::remove(GetDataDir() / "blocks" / strprintf("rev%05u.dat", lastFinishedFile));
