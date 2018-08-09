@@ -844,6 +844,19 @@ public:
         return idstr;
     }
 
+    //! Disconnects after receiving all the blocks we are waiting for.  Typically this happens if the node is
+    // responding slowly compared to other nodes.
+    void InitiateGracefulDisconnect()
+    {
+        if (!fDisconnectRequest)
+        {
+            fDisconnectRequest = true;
+            // But we need to make sure this connection is actually alive by attempting a send
+            // otherwise there is no reason to wait (up to PING_INTERVAL seconds).
+            // If the other side of a TCP connection goes silent you need to do a send to find out that its dead.
+            fPingQueued = true;
+        }
+    }
 
     void copyStats(CNodeStats &stats);
 
