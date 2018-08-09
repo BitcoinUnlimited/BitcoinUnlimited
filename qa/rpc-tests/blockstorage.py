@@ -5,7 +5,7 @@
 
 """Test the block storage methods
 WARNING:
-This test may take 10 mins or more to complete
+This test may take 10 mins or more to complete if not in fastRun mode
 """
 
 import test_framework.loginit
@@ -22,6 +22,18 @@ from random import randint
 
 
 class BlockstorageTest (BitcoinTestFramework):
+
+    def __init__(self, fastRun=True):
+        # set some params for how many blocks to generate and how many we should test to assume
+        # chains are the same across nodes
+        if fastRun:
+            self.generatedblocks = 50
+            self.blockstotest = 5
+            self.maxtxperblock = 2
+        else:
+            self.generatedblocks = 500
+            self.blockstotest = 50
+            self.maxtxperblock = 20
 
     def setup_chain(self, bitcoinConfDict=None, wallets=None):
         print("Initializing test directory "+self.options.tmpdir)
@@ -42,32 +54,27 @@ class BlockstorageTest (BitcoinTestFramework):
     def run_test(self):
 
         self.sync_blocks()
-        # set some params for how many blocks to generate and how many we should test to assume
-        # chains are the same across nodes
-        generatedblocks = 500
-        blockstotest = 50
-        maxtxperblock = 20
 
         # generate non-empty blocks on the mining node
-        for x in range(0, generatedblocks):
+        for x in range(0, self.generatedblocks):
             if x > 101:
-                for y in range(1, maxtxperblock):
+                for y in range(1, self.maxtxperblock):
                     self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
             self.nodes[0].generate(1)
 
         self.sync_blocks()
 
         # check that nodes across different db's have the same data
-        for x in range(0, blockstotest):
-            randblocknum = randint(1, generatedblocks)
+        for x in range(0, self.blockstotest):
+            randblocknum = randint(1, self.generatedblocks)
             assert_equal(self.nodes[0].getblock(self.nodes[0].getblockhash(randblocknum), False),
                          self.nodes[1].getblock(self.nodes[1].getblockhash(randblocknum), False))
             assert_equal(self.nodes[1].getblock(self.nodes[1].getblockhash(randblocknum), False),
                          self.nodes[2].getblock(self.nodes[2].getblockhash(randblocknum), False))
 
         # test to make sure tips are equal
-        assert_equal(self.nodes[0].getblockhash(generatedblocks), self.nodes[1].getblockhash(generatedblocks))
-        assert_equal(self.nodes[1].getblockhash(generatedblocks), self.nodes[2].getblockhash(generatedblocks))
+        assert_equal(self.nodes[0].getblockhash(self.generatedblocks), self.nodes[1].getblockhash(self.generatedblocks))
+        assert_equal(self.nodes[1].getblockhash(self.generatedblocks), self.nodes[2].getblockhash(self.generatedblocks))
 
         # at this point we know all 3 nodes had the same blocks so lets try upgrading/downgrading
         stop_nodes(self.nodes)
@@ -82,16 +89,16 @@ class BlockstorageTest (BitcoinTestFramework):
         self.sync_blocks()
 
         # check blocks again as nodes have gone through upgrading/downgrading
-        for x in range(0, blockstotest):
-            randblocknum = randint(1, generatedblocks)
+        for x in range(0, self.blockstotest):
+            randblocknum = randint(1, self.generatedblocks)
             assert_equal(self.nodes[0].getblock(self.nodes[0].getblockhash(randblocknum), False),
                          self.nodes[1].getblock(self.nodes[1].getblockhash(randblocknum), False))
             assert_equal(self.nodes[1].getblock(self.nodes[1].getblockhash(randblocknum), False),
                          self.nodes[2].getblock(self.nodes[2].getblockhash(randblocknum), False))
 
         # test to make sure tips are equal
-        assert_equal(self.nodes[0].getblockhash(generatedblocks), self.nodes[1].getblockhash(generatedblocks))
-        assert_equal(self.nodes[1].getblockhash(generatedblocks), self.nodes[2].getblockhash(generatedblocks))
+        assert_equal(self.nodes[0].getblockhash(self.generatedblocks), self.nodes[1].getblockhash(self.generatedblocks))
+        assert_equal(self.nodes[1].getblockhash(self.generatedblocks), self.nodes[2].getblockhash(self.generatedblocks))
 
 
 if __name__ == '__main__':
@@ -99,7 +106,7 @@ if __name__ == '__main__':
 
 
 def Test():
-    t = MyTest()
+    t = BlockstorageTest(False)
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
