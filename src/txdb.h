@@ -31,7 +31,7 @@ static const int64_t nMinDbCache = 4;
 //! % of available memory to leave unused by dbcache if/when we dynamically size the dbcache.
 static const int64_t nDefaultPcntMemUnused = 10;
 //! max increase in cache size since the last time we did a full flush
-static const int64_t nMaxCacheIncreaseSinceLastFlush = 512 * 1000 * 1000;
+static const uint64_t nMaxCacheIncreaseSinceLastFlush = 512 * 1000 * 1000;
 //! the minimum system memory we always keep free when doing automatic dbcache sizing
 static const uint64_t nMinMemToKeepAvaialable = 300 * 1000 * 1000;
 //! the max size a batch can get before a write to the utxo is made

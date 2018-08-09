@@ -118,7 +118,7 @@ uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
     CDBBatch undoBatch(*pblockundodb);
     while (nDBUsedSpace >= nPruneTarget && pindexOldest != nullptr)
     {
-        if (pindexOldest->nHeight >= nLastBlockWeCanPrune)
+        if (pindexOldest->nHeight >= (int)nLastBlockWeCanPrune)
         {
             break;
         }
