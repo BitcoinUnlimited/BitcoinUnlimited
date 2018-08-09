@@ -1318,7 +1318,8 @@ bool HaveGrapheneNodes()
 bool IsGrapheneBlockEnabled() { return GetBoolArg("-use-grapheneblocks", false); }
 bool CanGrapheneBlockBeDownloaded(CNode *pto)
 {
-    if (pto->GrapheneCapable())
+    LOCK(pto->cs_mapgrapheneblocksinflight);
+    if (pto->mapGrapheneBlocksInFlight.size() < 1 && pto->GrapheneCapable())
         return true;
 
     return false;

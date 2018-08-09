@@ -1472,7 +1472,8 @@ bool HaveThinblockNodes()
 bool IsThinBlocksEnabled() { return GetBoolArg("-use-thinblocks", true); }
 bool CanThinBlockBeDownloaded(CNode *pto)
 {
-    if (pto->ThinBlockCapable())
+    LOCK(pto->cs_mapthinblocksinflight);
+    if (pto->mapThinBlocksInFlight.size() < 1 && pto->ThinBlockCapable())
         return true;
 
     return false;
