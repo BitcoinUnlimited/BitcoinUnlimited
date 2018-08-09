@@ -601,6 +601,8 @@ void InitLogging()
  */
 bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &scheduler)
 {
+    LOCK(cs_main);  // Single threaded here, but this makes access semantics consistent for certain globals
+
     // ********************************************************* Step 1: setup
 
     UnlimitedSetup();

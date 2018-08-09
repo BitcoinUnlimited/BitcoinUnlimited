@@ -170,7 +170,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         tmpl = CreateNewBlock(scriptPubKeyIn, true);
     }
 
-    return std::move(tmpl);
+    return tmpl;
 }
 
 std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn,
@@ -253,7 +253,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         throw std::runtime_error(strprintf("%s: Excessive block generated: %s", __func__, FormatStateMessage(state)));
     }
 
-    return std::move(pblocktemplate);
+    return pblocktemplate;
 }
 
 bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter)

@@ -30,8 +30,8 @@ std::vector<RespendActionPtr> CreateDefaultActions()
     return actions;
 }
 
-RespendDetector::RespendDetector(const CTxMemPool &pool, const CTransaction &tx, std::vector<RespendActionPtr> actions)
-    : actions(actions)
+RespendDetector::RespendDetector(const CTxMemPool &pool, const CTransaction &tx, std::vector<RespendActionPtr> _actions)
+    : actions(_actions)
 {
     {
         std::lock_guard<std::mutex> lock(respentBeforeMutex);

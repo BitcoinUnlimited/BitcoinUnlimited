@@ -1171,6 +1171,7 @@ void static InvalidChainFound(CBlockIndex *pindexNew)
 
 void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state)
 {
+    AssertLockHeld(cs_main);
     int nDoS = 0;
     if (state.IsInvalid(nDoS))
     {
@@ -2429,6 +2430,7 @@ bool static ConnectTip(CValidationState &state,
  */
 CBlockIndex *FindMostWorkChain()
 {
+    AssertLockHeld(cs_main);
     do
     {
         CBlockIndex *pindexNew = NULL;
@@ -2544,6 +2546,7 @@ CBlockIndex *FindMostWorkChain()
 /** Delete all entries in setBlockIndexCandidates that are worse than the current tip. */
 static void PruneBlockIndexCandidates()
 {
+    AssertLockHeld(cs_main);
     // Note that we can't delete the current block itself, as we may need to return to it later in case a
     // reorganization to a better block fails.
     std::set<CBlockIndex *, CBlockIndexWorkComparator>::iterator it = setBlockIndexCandidates.begin();
@@ -3026,6 +3029,7 @@ bool ReceivedBlockTransactions(const CBlock &block,
     CBlockIndex *pindexNew,
     const CDiskBlockPos &pos)
 {
+    AssertLockHeld(cs_main); // for setBlockIndexCandidates use
     pindexNew->nTx = block.vtx.size();
     pindexNew->nChainTx = 0;
     pindexNew->nFile = pos.nFile;
@@ -3777,6 +3781,7 @@ CBlockIndex *InsertBlockIndex(uint256 hash)
 
 bool static LoadBlockIndexDB()
 {
+    AssertLockHeld(cs_main);
     const CChainParams &chainparams = Params();
     if (!pblocktree->LoadBlockIndexGuts())
     {
@@ -3956,9 +3961,12 @@ bool static LoadBlockIndexDB()
     {
         return true;
     }
-    chainActive.SetTip(it->second);
 
-    PruneBlockIndexCandidates();
+    {
+        LOCK(cs_main);
+        chainActive.SetTip(it->second);
+        PruneBlockIndexCandidates();
+    }
 
     LOGA("%s: hashBestChain=%s height=%d date=%s progress=%f\n", __func__, chainActive.Tip()->GetBlockHash().ToString(),
         chainActive.Height(), DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
@@ -6688,22 +6696,26 @@ bool SendMessages(CNode *pto)
         // timeout interval. If so then we need to disconnect them so that the thinblock data is nullified.
         // We could null the associated data here but that would possibly cause a node to be banned later if
         // the thinblock or graphene block finally did show up, so instead we just disconnect this slow node.
-        if (!pto->mapThinBlocksInFlight.empty())
         {
             LOCK(pto->cs_mapthinblocksinflight);
-            for (auto &item : pto->mapThinBlocksInFlight)
+            if (!pto->mapThinBlocksInFlight.empty())
             {
-                if (CheckForDownloadTimeout(pto, item.second.fReceived, item.second.nRequestTime))
-                    break;
+                for (auto &item : pto->mapThinBlocksInFlight)
+                {
+                    if (CheckForDownloadTimeout(pto, item.second.fReceived, item.second.nRequestTime))
+                        break;
+                }
             }
         }
-        if (!pto->mapGrapheneBlocksInFlight.empty())
         {
             LOCK(pto->cs_mapgrapheneblocksinflight);
-            for (auto &item : pto->mapGrapheneBlocksInFlight)
+            if (!pto->mapGrapheneBlocksInFlight.empty())
             {
-                if (CheckForDownloadTimeout(pto, item.second.fReceived, item.second.nRequestTime))
-                    break;
+                for (auto &item : pto->mapGrapheneBlocksInFlight)
+                {
+                    if (CheckForDownloadTimeout(pto, item.second.fReceived, item.second.nRequestTime))
+                        break;
+                }
             }
         }
 

@@ -107,6 +107,7 @@ bool DetermineStorageSync()
 
 void SyncStorage(const CChainParams &chainparams)
 {
+    AssertLockHeld(cs_main);
     if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
         std::vector<std::pair<int, CDiskBlockIndex> > hashesByHeight;
