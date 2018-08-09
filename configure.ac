@@ -10,11 +10,11 @@ esac
 dnl require autoconf 2.60 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.60])
 define(_CLIENT_VERSION_MAJOR, 1)
-define(_CLIENT_VERSION_MINOR, 3)
+define(_CLIENT_VERSION_MINOR, 4)
 define(_CLIENT_VERSION_REVISION, 0)
-define(_CLIENT_VERSION_BUILD, 1)  # version 99 here indicates an unreleased version
+define(_CLIENT_VERSION_BUILD, 0)  # version 99 here indicates an unreleased version
 define(_CLIENT_VERSION_IS_RELEASE, true)
-define(_COPYRIGHT_YEAR, 2017)
+define(_COPYRIGHT_YEAR, 2018)
 define(_COPYRIGHT_HOLDERS,[The %s developers])
 define(_COPYRIGHT_HOLDERS_SUBSTITUTION,[Bitcoin Bitcoin XT and Bitcoin Unlimited])
 AC_INIT([Bitcoin Unlimited Cash Edition],[_CLIENT_VERSION_MAJOR._CLIENT_VERSION_MINOR._CLIENT_VERSION_REVISION._CLIENT_VERSION_BUILD],[https://github.com/BitcoinUnlimited/BitcoinUnlimited/issues],[BUcash])
