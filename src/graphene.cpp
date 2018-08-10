@@ -101,7 +101,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
     if (fAlreadyHave)
     {
-        requester.AlreadyReceived(inv);
+        requester.AlreadyReceived(pfrom, inv);
         graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
 
         LOG(GRAPHENE, "Received grblocktx but returning because we already have this block %s on disk, peer=%s\n",
@@ -376,7 +376,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
         if (pIndex->nStatus & BLOCK_HAVE_DATA)
         {
             // Tell the Request Manager we received this block
-            requester.AlreadyReceived(inv);
+            requester.AlreadyReceived(pfrom, inv);
 
             graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
             LOG(GRAPHENE, "Received grapheneblock but returning because we already have block data %s from peer %s hop"

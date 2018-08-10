@@ -176,7 +176,7 @@ public:
     void Received(const CInv &obj, CNode *from, int bytes = 0);
 
     // Indicate that we previously got this object
-    void AlreadyReceived(const CInv &obj);
+    void AlreadyReceived(CNode *pnode, const CInv &obj);
 
     // Indicate that getting this object was rejected
     void Rejected(const CInv &obj, CNode *from, unsigned char reason = 0);
