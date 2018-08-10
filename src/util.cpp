@@ -183,13 +183,13 @@ std::string LogGetAllString(bool fEnabled)
 void LogInit()
 {
     string category = "";
-    uint64_t catg = Logging::NONE;
+    uint64_t catg = NONE;
     const vector<string> categories = splitByCommasAndRemoveSpaces(mapMultiArgs["-debug"]);
 
     // enable all when given -debug=1 or -debug
     if (categories.size() == 1 && (categories[0] == "" || categories[0] == "1"))
     {
-        Logging::LogToggleCategory(Logging::ALL, true);
+        LogToggleCategory(ALL, true);
     }
     else
     {
