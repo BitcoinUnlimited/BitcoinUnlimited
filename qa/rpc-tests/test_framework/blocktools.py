@@ -5,10 +5,11 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 import pdb
 import binascii
+import decimal
 
 from .mininode import *
 from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, OP_RETURN
-from .util import BTC
+from .util import BTC, satoshi_round
 
 # Create a block (with regtest difficulty)
 def create_block(hashprev, coinbase, nTime=None, txns=None):
@@ -166,3 +167,45 @@ def createrawtransaction(inputs, outputs, outScriptGenerator=p2pkh):
             tx.vout.append(CTxOut(amount * BTC, outScriptGenerator(addr)))
     tx.rehash()
     return hexlify(tx.serialize()).decode("utf-8")
+
+
+def generateTx(node, txBytes, addrs, data=None, split=1, wallet=None):
+    """Generate txBytes of transactions, sending to addrs addresses"""
+
+    size = 0
+    count = 0
+    decContext = decimal.getcontext().prec
+    decimal.getcontext().prec = 8 + 8  # 8 digits to get to 21million, and each bitcoin is 100 million satoshis
+    while size < txBytes:
+            count += 1
+            try:
+                utxo = wallet.pop()
+            except:
+                tmp = node.listunspent()
+                wallet += tmp
+                wallet.sort(key=lambda x: x["amount"], reverse=False)
+                logging.info("Wallet length is %d" % len(wallet))
+                utxo = wallet.pop()
+            outp = {}
+            # Make the tx bigger by adding addtl outputs so it validates faster
+            payamt = satoshi_round(utxo["amount"] / decimal.Decimal(split))
+            for x in range(0, split):
+                # its test code, I don't care if rounding error is folded into the fee
+                outp[addrs[(count + x) % len(addrs)]] = payamt
+            if data:
+                outp["data"] = data
+            txn = createrawtransaction([utxo], outp)  # , createWastefulOutput)
+            # The python createrawtransaction is meant to have the same API as the node's RPC so you can also do:
+            # txn2 = node.createrawtransaction([utxo], outp)
+            signedtxn = node.signrawtransaction(txn)
+            size += len(binascii.unhexlify(signedtxn["hex"]))
+            node.sendrawtransaction(signedtxn["hex"])
+    logging.info("%d tx %d length" % (count, size))
+    decimal.getcontext().prec = decContext
+    return (count, size)
+
+def generateBlock(node, minBlockSize, addrs, wallet=None):
+    data = binascii.hexlify(b"j" * int(minBlockSize/4))
+    generateTx(node, minBlockSize, addrs, data, 1, wallet)
+    blkHash = node.generate(1)
+    return blkHash

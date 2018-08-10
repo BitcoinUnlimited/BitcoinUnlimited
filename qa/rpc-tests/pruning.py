@@ -14,6 +14,7 @@ import test_framework.loginit
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
+from test_framework.blocktools import *
 import time
 import os
 
@@ -56,8 +57,8 @@ class PruneTest(BitcoinTestFramework):
         self.prunedirs.append(self.options.tmpdir+"/node3/regtest/blockdb/")
 
 
-        self.address[0] = self.nodes[0].getnewaddress()
-        self.address[1] = self.nodes[1].getnewaddress()
+        self.address[0] = self.nodes[0].getaddressforms(self.nodes[0].getnewaddress())["legacy"]
+        self.address[1] = self.nodes[1].getaddressforms(self.nodes[1].getnewaddress())["legacy"]
 
         # Determine default relay fee
         self.relayfee = self.nodes[0].getnetworkinfo()["relayfee"]
@@ -70,6 +71,20 @@ class PruneTest(BitcoinTestFramework):
         connect_nodes(self.nodes[2], 3)
         sync_blocks(self.nodes[0:4])
 
+    def mine_large_block(node, utxos=None):
+        # generate a 66k transaction,
+        # and 14 of them is close to the 1MB block limit
+        num = 14
+        txouts = gen_return_txouts()
+        utxos = utxos if utxos is not None else []
+        if len(utxos) < num:
+            utxos.clear()
+            utxos.extend(node.listunspent())
+        fee = 100 * node.getnetworkinfo()["relayfee"]
+        create_lots_of_big_transactions(node, txouts, utxos, num, fee=fee)
+        blkhash = node.generate(1)
+        print("block: %s\n" % str(blkhash))
+
     def create_big_chain(self):
         # Start by creating some coinbases we can spend later
         self.nodes[1].generate(200)
@@ -77,8 +92,12 @@ class PruneTest(BitcoinTestFramework):
         self.nodes[0].generate(150)
         sync_blocks(self.nodes[0:2])
         # Then mine enough full blocks to create more than 550MiB of data
-        for i in range(645):
-            mine_large_block(self.nodes[0], self.utxo_cache_0)
+        addrs = [ self.nodes[0].getnewaddress() for x in range(0,20)]
+        addrs = [ self.nodes[0].getaddressforms(x)["legacy"] for x in addrs]
+        wallet = []
+        for i in range(645):  # 645
+            print("block %d" % i)
+            generateBlock(self.nodes[0], 1024*1024, addrs, wallet)
 
         sync_blocks(self.nodes[0:4])
 
@@ -91,21 +110,22 @@ class PruneTest(BitcoinTestFramework):
         print("Though we're already using more than 550MiB, current usage:", calc_usage(self.prunedirs[index]))
         print("Mining 25 more blocks should cause the first block file to be pruned")
         # Pruning doesn't run until we're allocating another chunk, 20 full blocks past the height cutoff will ensure this
+        wallet = []
         for i in range(25):
             counts = [ x.getblockcount() for x in self.nodes ]
             print(counts)
-            self.mine_full_block(self.nodes[0],self.address[0])
+            generateBlock(self.nodes[0], 1024*1024, [self.address[0]], wallet)
 
         # only check for block files in sequential mode (0)
         waitstart = time.time()
         if index == 0:
-            while os.path.isfile(self.prunedir+"blk00000.dat"):
+            while os.path.isfile(self.prunedirs[index]+"blk00000.dat"):
                 time.sleep(0.1)
                 if time.time() - waitstart > 10:
                     raise AssertionError("blk00000.dat not pruned when it should be")
 
         print("Success")
-        usage = calc_usage(self.prunediris[index])
+        usage = calc_usage(self.prunedirs[index])
         print("Usage should be below target:", usage)
         if (usage > 550):
             raise AssertionError("Pruning target not being met")
@@ -121,8 +141,8 @@ class PruneTest(BitcoinTestFramework):
             time.sleep(0.1)
 
         # Mine several new blocks while the chain on node 3 is syncing.  This
-        # should not allow new blocks to get into the block files until we 
-        # are within 144 blocks of the chain tip.  If new blocks do get into the 
+        # should not allow new blocks to get into the block files until we
+        # are within 144 blocks of the chain tip.  If new blocks do get into the
         # first block file then we won't be able to prune it and the test will fail.
         for i in range(20):
             print ("generate a block")
@@ -157,10 +177,10 @@ class PruneTest(BitcoinTestFramework):
             stop_node(self.nodes[0],0)
             self.nodes[0]=start_node(0, self.options.tmpdir, ["-debug","-rpcservertimeout=0", "-maxreceivebuffer=20000","-blockmaxsize=999000", "-checkblocks=5"], timewait=900)
             # Mine 24 blocks in node 1
-            self.utxo = self.nodes[1].listunspent()
+            wallet = []
             for i in range(24):
                 if j == 0:
-                    mine_large_block(self.nodes[1], self.utxo_cache_1)
+                    generateBlock(self.nodes[1], 1024*1024, [self.address[1]], wallet)
                 else:
                     self.nodes[1].generate(1) #tx's already in mempool from previous disconnects
 
@@ -174,7 +194,7 @@ class PruneTest(BitcoinTestFramework):
             connect_nodes(self.nodes[2], 0)
             sync_blocks(self.nodes[0:4])
 
-        print("Usage can be over target because of high stale rate:", calc_usage(self.prunedir))
+#        print("Usage can be over target because of high stale rate:", calc_usage(self.prunedir))
 
     def reorg_test(self):
         # Node 1 will mine a 300 block chain starting 287 blocks back from Node 0 and Node 2's tip
@@ -311,7 +331,7 @@ class PruneTest(BitcoinTestFramework):
         print("Check that block files are pruned after a sync that has also mined new blocks")
         # When new blocks are mined while a node is syncing the chain from the beginning,
         # thos newly mined blocks should not get included in a block file until the chain is almost
-        # sync'd. If this were to be allowed to happen then those early block files may not be 
+        # sync'd. If this were to be allowed to happen then those early block files may not be
         # prunable because they contain newer blocks.
         #self.test_height_after_sync() TODO:  comment out for now until we can fix the "regtest" issue with IBD and new blocks
 
@@ -338,8 +358,8 @@ class PruneTest(BitcoinTestFramework):
         # Save some current chain state for later use
         self.mainchainheights.append(self.nodes[2].getblockcount())   #1320
         self.mainchainheights.append(self.nodes[3].getblockcount())   #1320
-        self.mainchainhashes.append(self.nodes[2].getblockhash(self.mainchainheights[2]))
-        self.mainchainhashes.append(self.nodes[3].getblockhash(self.mainchainheights[3]))
+        self.mainchainhashes.append(self.nodes[2].getblockhash(self.mainchainheights[0]))
+        self.mainchainhashes.append(self.nodes[3].getblockhash(self.mainchainheights[1]))
 
         print("Check that we can survive a 288 block reorg still")
         (self.forkheight,self.forkhash) = self.reorg_test() #(1033, )
@@ -404,7 +424,7 @@ if __name__ == '__main__':
 
 # Create a convenient function for an interactive python debugging session
 def Test():
-    t = MyTest()
+    t = PruneTest()
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"]
     }
@@ -416,8 +436,8 @@ def Test():
     # flags.append("--noshutdown")
 
     # Execution is much faster if a ramdisk is used, so use it if one exists in a typical location
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmpdir=/ramdisk/test")
+    if os.path.isdir("/blockchains/test"):
+        flags.append("--tmpdir=/blockchains/test")
 
     # Out-of-source builds are awkward to start because they need an additional flag
     # automatically add this flag during testing for common out-of-source locations
@@ -432,4 +452,4 @@ def Test():
             print("Running from the release directory (%s)" % rel)
             flags.append("--srcdir=%s" % os.path.dirname(rel))
 
-t.main(flags, bitcoinConf, None)
+    t.main(flags, bitcoinConf, None)
