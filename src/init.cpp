@@ -601,8 +601,6 @@ void InitLogging()
  */
 bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &scheduler)
 {
-    LOCK(cs_main); // Single threaded here, but this makes access semantics consistent for certain globals
-
     // ********************************************************* Step 1: setup
 
     UnlimitedSetup();
@@ -1198,16 +1196,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
 
-    // Set the EB and datacarrier size if we have restarted after the fork has already happened.
-    // It is possible that we need to override the old settings in QT and bitcoin.conf.
-    if (IsMay152018Enabled(chainparams.GetConsensus(), chainActive.Tip()))
-    {
-        // Bump the accepted block size to 32MB
-        if (miningForkEB.Value() > excessiveBlockSize)
-            excessiveBlockSize = miningForkEB.Value();
-        settingsToUserAgentString();
-    }
-
 // ********************************************************* Step 7: load wallet
 
 #ifdef ENABLE_WALLET
@@ -1271,11 +1259,27 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
             vImportFiles.push_back(strFile);
     }
     threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
-    if (chainActive.Tip() == NULL)
+
+    LOGA("Waiting for genesis block to be imported...\n");
+    CBlockIndex *tip = nullptr;
+    while (!fRequestShutdown && !tip)
     {
-        LOGA("Waiting for genesis block to be imported...\n");
-        while (!fRequestShutdown && chainActive.Tip() == NULL)
+        {
+            LOCK(cs_main);
+            tip = chainActive.Tip();
+        }
+        if (!tip)
             MilliSleep(10);
+    }
+
+    // Set the EB and datacarrier size if we have restarted after the fork has already happened.
+    // It is possible that we need to override the old settings in QT and bitcoin.conf.
+    if (IsMay152018Enabled(chainparams.GetConsensus(), tip))
+    {
+        // Bump the accepted block size to 32MB
+        if (miningForkEB.Value() > excessiveBlockSize)
+            excessiveBlockSize = miningForkEB.Value();
+        settingsToUserAgentString();
     }
 
     // ********************************************************* Step 10: network initialization
@@ -1458,7 +1462,10 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 
     //// debug print
     LOGA("mapBlockIndex.size() = %u\n", mapBlockIndex.size());
-    LOGA("nBestHeight = %d\n", chainActive.Height());
+    {
+        LOCK(cs_main);
+        LOGA("nBestHeight = %d\n", chainActive.Height());
+    }
 #ifdef ENABLE_WALLET
     LOGA("setKeyPool.size() = %u\n", pwalletMain ? pwalletMain->setKeyPool.size() : 0);
     LOGA("mapWallet.size() = %u\n", pwalletMain ? pwalletMain->mapWallet.size() : 0);

@@ -159,7 +159,7 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _n
 
 std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn)
 {
-    std::unique_ptr<CBlockTemplate> tmpl(new CBlockTemplate());
+    std::unique_ptr<CBlockTemplate> tmpl(nullptr);
 
     if (nBlockMaxSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
         tmpl = CreateNewBlock(scriptPubKeyIn, false);

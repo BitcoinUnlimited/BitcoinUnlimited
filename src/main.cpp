@@ -4129,6 +4129,7 @@ void UnloadBlockIndex()
 
 bool LoadBlockIndex()
 {
+    LOCK(cs_main);
     // Load block index from databases
     if (!fReindex && !LoadBlockIndexDB())
         return false;
