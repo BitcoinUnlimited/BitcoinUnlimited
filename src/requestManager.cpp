@@ -283,7 +283,7 @@ void CRequestManager::Received(const CInv &obj, CNode *from, int bytes)
 }
 
 // Indicate that we got this object, from and bytes are optional (for node performance tracking)
-void CRequestManager::AlreadyReceived(const CInv &obj)
+void CRequestManager::AlreadyReceived(CNode *pnode, const CInv &obj)
 {
     LOCK(cs_objDownloader);
     OdMap::iterator item = mapTxnInfo.find(obj.hash);
@@ -294,6 +294,11 @@ void CRequestManager::AlreadyReceived(const CInv &obj)
             return; // Not in any map
     }
     LOG(REQ, "ReqMgr: Already received %s.  Removing request.\n", item->second.obj.ToString().c_str());
+
+    // If we have it already make sure to mark it as received here or we'll end up disconnecting this
+    // peer later when we think this block download attempt has timed out.
+    MarkBlockAsReceived(obj.hash, pnode);
+
     // will be decremented in the item cleanup: if (inFlight) inFlight--;
     cleanup(item); // remove the item
 }
