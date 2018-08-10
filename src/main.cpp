@@ -3961,12 +3961,9 @@ bool static LoadBlockIndexDB()
     {
         return true;
     }
+    chainActive.SetTip(it->second);
 
-    {
-        LOCK(cs_main);
-        chainActive.SetTip(it->second);
-        PruneBlockIndexCandidates();
-    }
+    PruneBlockIndexCandidates();
 
     LOGA("%s: hashBestChain=%s height=%d date=%s progress=%f\n", __func__, chainActive.Tip()->GetBlockHash().ToString(),
         chainActive.Height(), DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
