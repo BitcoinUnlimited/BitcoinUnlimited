@@ -371,7 +371,7 @@ bool CBlockTreeDB::FindBlockIndex(uint256 blockhash, CDiskBlockIndex *pindex)
             {
                 if (pcursor->GetValue(*pindex))
                 {
-                    if (!CheckProofOfWork(blockhash, pindex->nBits, Params().GetConsensus()))
+                    if (!CheckProofOfWork(blockhash, pindex->nBits, Params().GetConsensus(), 1))
                     {
                         return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindex->ToString());
                     }
