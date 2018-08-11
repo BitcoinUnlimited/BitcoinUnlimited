@@ -785,7 +785,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
                         "Received weak xthinblock but returning because we already have block data %s from peer %s hop"
                         " %d size %d bytes\n",
                         inv.hash.ToString(), pfrom->GetLogName(), nHops, nSizeThinBlock);
-                    requester.AlreadyReceived(inv);
+                    requester.AlreadyReceived(pfrom, inv);
                     thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
                     return true;
                 }
@@ -810,7 +810,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
             if (pIndex->nStatus & BLOCK_HAVE_DATA)
             {
                 // Tell the Request Manager we received this block
-                requester.AlreadyReceived(inv);
+                requester.AlreadyReceived(pfrom, inv);
 
                 thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
                 LOG(THIN, "Received xthinblock but returning because we already have block data %s from peer %s hop"
