@@ -363,6 +363,8 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
             return false;
         }
 
+        // FIXME: deal with weak blocks through graphene!
+
         // pIndex should always be set by AcceptBlockHeader
         if (!pIndex)
         {
