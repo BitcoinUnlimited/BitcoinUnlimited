@@ -132,7 +132,7 @@ bool ReadBlockFromDiskSequential(CBlock &block, const CDiskBlockPos &pos, const 
     }
 
     // Check the header
-    if (!CheckProofOfWork(block.GetHash(), block.nBits, consensusParams))
+    if (!CheckProofOfWork(block.GetHash(), block.nBits, consensusParams, 1))
     {
         return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
     }
