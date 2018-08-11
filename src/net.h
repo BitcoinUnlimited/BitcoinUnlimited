@@ -233,6 +233,8 @@ public:
     double dPingWait;
     double dPingMin;
     std::string addrLocal;
+    //! Whether this peer supports CompactBlocks (for statistics only, BU doesn't support CB protocol)
+    bool fSupportsCompactBlocks;
 };
 
 
@@ -455,6 +457,9 @@ public:
     std::atomic<int64_t> nMaxBlocksInTransit;
 
     unsigned short addrFromPort;
+
+    //! Whether this peer supports CompactBlocks (for statistics only, BU doesn't support CB protocol)
+    std::atomic<bool> fSupportsCompactBlocks;
 
 protected:
     // Basic fuzz-testing

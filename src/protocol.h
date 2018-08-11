@@ -205,7 +205,7 @@ extern const char *PONG;
 /**
  * The notfound message is a reply to a getdata message which requested an
  * object the receiving node does not have available for relay.
- * @ince protocol version 70001.
+ * @since protocol version 70001.
  * @see https://bitcoin.org/en/developer-reference#notfound
  */
 extern const char *NOTFOUND;
@@ -285,6 +285,17 @@ extern const char *BUVERSION;
  * @since protocol version 80002.
  */
 extern const char *BUVERACK;
+
+/**
+ * Indicates that a node accepts Compact Blocks and provides version and
+ * configuration information.
+ * @since protocol version 70014.
+ * @see https://bitcoin.org/en/developer-reference#sendcmpct
+ *
+ * NOTE: Compact Blocks is not currently supported by BU.  We only process this
+ * message for reporting which of our peers have announced they have CB enabled
+ */
+extern const char *SENDCMPCT;
 };
 
 /* Get a vector of all valid message types (see above) */
