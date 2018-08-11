@@ -10,7 +10,7 @@ cache:
 
 env:
   global:
-    - MAKEJOBS=-j3
+    - MAKEJOBS=-j2
     - RUN_TESTS=false
     - RUN_FORMATTING_CHECK=false
     - CHECK_DOC=0
@@ -40,15 +40,11 @@ matrix:
         - USE_CLANG=true
         - CXX=clang++-5.0 CC=clang-5.0
         - CXXFLAGS="-std=c++11"
-        - HOST=x86_64-unknown-linux-gnu
-        - RUN_TESTS=false
+        - HOST=x86_64-unknown-linux-gnu DEP_OPTS="DEBUG=1"
+        - RUN_TESTS=true
+        - RUN_FORMATTING_CHECK=true
         - PACKAGES="python3-zmq libzmq3-dev clang-format-3.8 build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils libboost-all-dev qtbase5-dev protobuf-compiler qttools5-dev-tools qttools5-dev"
         - GOAL="install" BITCOIN_CONFIG="--enable-zmq --with-gui=qt5 CC=clang-5.0 CXX=clang++-5.0 CPPFLAGS=-DDEBUG_LOCKORDER"
-    #bitcoind
-    - compiler: gcc
-      env:
-        - CXX=g++ CC=gcc
-        - HOST=x86_64-unknown-linux-gnu PACKAGES="python3-zmq clang-format-3.8" DEP_OPTS="NO_QT=1 NO_UPNP=1 DEBUG=1" RUN_TESTS=true RUN_FORMATTING_CHECK=true GOAL="install" BITCOIN_CONFIG="--enable-zmq --enable-glibc-back-compat --enable-reduce-exports CPPFLAGS=-DDEBUG_LOCKORDER"
     #ARM64
     - compiler: gcc
       env:
