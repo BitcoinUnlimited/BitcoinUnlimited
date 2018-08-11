@@ -10,7 +10,7 @@ cache:
 
 env:
   global:
-    - MAKEJOBS=-j2
+    - MAKEJOBS=-j3
     - RUN_TESTS=false
     - RUN_FORMATTING_CHECK=false
     - CHECK_DOC=0
