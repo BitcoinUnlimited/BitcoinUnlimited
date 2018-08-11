@@ -15,11 +15,11 @@ static const uint32_t WB_MIN_POW_RATIO = 600;
 
 CCriticalSection cs_weakblocks;
 
-bool weakblocksEnabled()  { LOCK(cs_weakblocks); return wbEnable.value; }
+bool weakblocksEnabled()  { LOCK(cs_weakblocks); return wbEnable.Value(); }
 
 uint32_t weakblocksConsiderPOWRatio() {
     AssertLockHeld(cs_weakblocks);
-    return wbConsiderPOWratio.value;
+    return wbConsiderPOWratio.Value();
 }
 
 uint32_t weakblocksMinPOWRatio() {
