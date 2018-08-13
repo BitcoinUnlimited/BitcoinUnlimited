@@ -248,6 +248,10 @@ UniValue generate(const UniValue &params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid genmode");
     }
 
+    if (genmode != genStrongOnly && !weakblocksEnabled())
+        throw JSONRPCError(
+            RPC_INVALID_PARAMETER, "Only strong-blocks-mining is available as weak blocks are disabled.");
+
     boost::shared_ptr<CReserveScript> coinbaseScript;
     GetMainSignals().ScriptForMining(coinbaseScript);
 
