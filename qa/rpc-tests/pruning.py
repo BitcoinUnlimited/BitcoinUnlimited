@@ -192,6 +192,7 @@ class PruneTest(BitcoinTestFramework):
             # Create connections in the order so both nodes can see the reorg at the same time
             connect_nodes(self.nodes[1], 0)
             connect_nodes(self.nodes[2], 0)
+            connect_nodes(self.nodes[3], 0)
             sync_blocks(self.nodes[0:4])
 
 #        print("Usage can be over target because of high stale rate:", calc_usage(self.prunedir))
