@@ -136,6 +136,7 @@ BITCOIN_CORE_H = \
   httprpc.h \
   httpserver.h \
   iblt.h \
+  iblt_params.h \
   init.h \
   key.h \
   keystore.h \
