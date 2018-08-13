@@ -126,6 +126,7 @@ void ActuallySendExpreditedBlock(CXThinBlock &thinBlock, unsigned char hops, con
 
         if (n != nullptr)
         {
+            if (weakblocksEnabled())
             {
                 LOCK(cs_weakblocks);
                 weakstore.set_nodeKnows(n->GetId(), thinBlock.header.GetHash());

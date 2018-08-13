@@ -3703,7 +3703,8 @@ static bool AcceptBlock(const CBlock &block,
             const uint256 blockhash = block.GetHash();
             for (CNode *pnode : vNodes)
             {
-                pnode->PushBlockHash(blockhash);
+                if (pnode->nServices & NODE_WEAKBLOCKS)
+                    pnode->PushBlockHash(blockhash);
             }
         }
         else
@@ -3715,8 +3716,10 @@ static bool AcceptBlock(const CBlock &block,
     else
     {
         // strong block came in - discard weak ones coming before the last strong block
+        // Also do this in any case (weak blocks enabled or not) as preparation to be
+        // able to maybe be able to enable/disable this on the fly later on.
         LOG(WB, "Strong block came in - discarding old weak blocks.\n");
-        weakstore.expireOld();
+        weakstore.expireOld(!weakblocksEnabled());
     }
 
 
@@ -4981,17 +4984,24 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     CWeakblockRef wb = weakstore.byHash(inv.hash);
                     if (wb != nullptr)
                     {
-                        if (inv.type == MSG_BLOCK)
+                        if (pfrom->nServices && NODE_WEAKBLOCKS)
                         {
-                            pfrom->blocksSent += 1;
-                            pfrom->PushMessage(NetMsgType::BLOCK, *wb);
-                        }
+                            if (inv.type == MSG_BLOCK)
+                            {
+                                pfrom->blocksSent += 1;
+                                pfrom->PushMessage(NetMsgType::BLOCK, *wb);
+                            }
 
-                        // BUIP010 Xtreme Thinblocks: begin section
-                        else if (inv.type == MSG_THINBLOCK || inv.type == MSG_XTHINBLOCK)
+                            // BUIP010 Xtreme Thinblocks: begin section
+                            else if (inv.type == MSG_THINBLOCK || inv.type == MSG_XTHINBLOCK)
+                            {
+                                LOG(THIN, "Sending xthin weakblock by INV queue getdata message\n");
+                                SendXThinBlock(wb, pfrom, inv);
+                            }
+                        }
+                        else
                         {
-                            LOG(THIN, "Sending xthin weakblock by INV queue getdata message\n");
-                            SendXThinBlock(wb, pfrom, inv);
+                            LOG(THIN, "Not sending xthin weakblock as peer is not capable of understanding it.\n");
                         }
                         // BUIP010 Xtreme Thinblocks: end section
                     }
@@ -6039,15 +6049,24 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             else
             {
                 // if a weak header, request weak block
-                if (isWeak)
+                if (isWeak && weakblocksEnabled())
                 {
-                    // pindex must be nonnull because we populated vToFetch a few lines above
-                    CInv inv(MSG_BLOCK, header.GetHash());
-                    if (weakstore.byHash(header.GetHash()) == nullptr)
+                    if (!(pfrom->nServices & NODE_WEAKBLOCKS))
                     {
-                        requester.AskFor(inv, pfrom);
-                        LOG(REQ, "AskFor weak block via headers direct fetch %s peer=%d\n", header.GetHash().ToString(),
+                        LOG(REQ,
+                            "Peer %d announced weak block header but does not advertise itself as weak blocks capable.",
                             pfrom->id);
+                        // FIXME: ban?
+                    }
+                    else
+                    {
+                        CInv inv(MSG_BLOCK, header.GetHash());
+                        if (weakstore.byHash(header.GetHash()) == nullptr)
+                        {
+                            requester.AskFor(inv, pfrom);
+                            LOG(REQ, "AskFor weak block via headers direct fetch %s peer=%d\n",
+                                header.GetHash().ToString(), pfrom->id);
+                        }
                     }
                 }
                 else
@@ -6262,8 +6281,18 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     CWeakblockRef wb = weakstore.byHash(inv.hash);
                     if (wb != nullptr)
                     {
-                        SendXThinBlock(wb, pfrom, inv);
-                        handled = true;
+                        if (pfrom->nServices & NODE_WEAKBLOCKS)
+                        {
+                            SendXThinBlock(wb, pfrom, inv);
+                            handled = true;
+                        }
+                        else
+                        {
+                            dosMan.Misbehaving(pfrom, 100);
+                            return error(
+                                "Peer %s requested weak block %s but advertises itself as not weakblocks capable.",
+                                pfrom->GetLogName(), inv.hash.ToString());
+                        }
                     }
                 }
             }
@@ -7142,7 +7171,7 @@ bool SendMessages(CNode *pto)
                     {
                         LOCK(cs_weakblocks);
                         CWeakblockRef wb = weakstore.byHash(hash);
-                        if (wb != nullptr)
+                        if (wb != nullptr && (pto->nServices & NODE_WEAKBLOCKS))
                         {
                             vHeaders.push_back(wb->GetBlockHeader());
                             continue;

@@ -96,7 +96,7 @@ unsigned int addFromWeak(std::vector<T> &vTxHashes,
             {
                 LOG(WB, "Remote node does not know about underlying weak block. Not sending a delta block.\n");
             }
-            if (pto != nullptr)
+            if (pto != nullptr && weakblocksEnabled())
                 // assert that the target node knows about this block now
                 weakstore.set_nodeKnows(pto->GetId(), block.GetHash());
         }
@@ -772,6 +772,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         // check for weak block
         if (isWeak)
         {
+            if (weakblocksEnabled())
             {
                 LOCK(cs_weakblocks);
                 LOG(WB, "Received weak XThin block.\n");
@@ -791,6 +792,12 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
                 }
                 // weak blocks handling should not need to deal with ones that are not extending
                 // the best chain
+            }
+            else
+            {
+                LOGA("Received weak block %s from peer %s, but weak blocks are disabled.",
+                    thinBlock.header.GetHash().GetHex(), pfrom->GetLogName());
+                return false;
             }
         }
         else
