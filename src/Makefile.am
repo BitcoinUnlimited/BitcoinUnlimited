@@ -128,6 +128,7 @@ BITCOIN_CORE_H = \
   dosman.h \
   dstencode.h \
   expedited.h \
+  fast-cpp-csv-parser/csv.h \
   forks_csv.h \
   fs.h \
   graphene.h \
