@@ -3612,7 +3612,7 @@ bool AcceptBlockHeader(const CBlockHeader &block,
         if (pWeak != nullptr && *pWeak)
         {
             LOG(WB, "Block is weak.\n");
-            return true; // do not add weak block to index, just keep in the structures of weakblock.cpp
+            return true; // do not add weak block to index, just keep in the structures of weakblock.cpp (if enabled)
         }
         else
         {
@@ -3662,9 +3662,8 @@ static bool AcceptBlock(const CBlock &block,
             if (!weakblocksEnabled())
             {
                 return state.DoS(10,
-                    error("%s: Received weakblocks though weakblocks are disabled. Ignoring.\n", __func__), 0,
+                    error("%s: Received weakblock though weakblocks are disabled. Ignoring.\n", __func__), 0,
                     "wb-disabled");
-                // FIXME: ban?
                 return true;
             }
 

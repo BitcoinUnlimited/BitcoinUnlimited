@@ -121,7 +121,7 @@ static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafeMode
   //  --------------------- ------------------------  -----------------------  ----------
     { "weakblocks",         "weakstats",              &weakstats,              true  },
-    { "weakblocks",         "weakchaintips",          &weakchaintips,          true },
+    { "weakblocks",         "weakchaintips",          &weakchaintips,          true  },
     { "weakblocks",         "weakconfirmations",      &weakconfirmations,      true  },
     { "weakblocks",         "weaknodeknowledge",      &weaknodeknowledge,      true  }
 };
