@@ -347,8 +347,11 @@ CTweak<double> dMinLimiterTxFee("minlimitertxfee",
                                     DEFAULT_MINLIMITERTXFEE),
     DEFAULT_MINLIMITERTXFEE);
 
+
+// FIXME: This is not meant to be changed on-the-fly due to the complexities of handling changes!
 CTweak<bool> wbEnable("weakblocks.enable", "Enable weakblocks support", DEFAULT_WEAKBLOCKS_ENABLE);
 
+// FIXME: This is not meant to be changed on-the-fly due to the complexities of handling changes!
 CTweak<uint32_t> wbConsiderPOWratio("weakblocks.considerPOW",
     "The factor to be applied to the current strong blocks target value which will be the maximum target value where a "
     "weak block will be stored and forwarded",
