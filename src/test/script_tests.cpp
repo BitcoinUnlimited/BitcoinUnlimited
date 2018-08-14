@@ -337,10 +337,10 @@ public:
         unsigned int lenR = 32,
         unsigned int lenS = 32)
     {
-        CHashWriter ss(SER_GETHASH, 0);
-        ss << data;
+        std::vector<uint8_t> vchHash(32);
+        CSHA256().Write(data.data(), data.size()).Finalize(vchHash.data());
 
-        DoPush(DoSign(key, ss.GetHash(), lenR, lenS));
+        DoPush(DoSign(key, uint256(vchHash), lenR, lenS));
         return *this;
     }
 
