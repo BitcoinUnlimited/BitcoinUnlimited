@@ -19,6 +19,7 @@ BIPs that are implemented by Bitcoin Unlimited (up-to-date up to **v1.3.0.1**):
 * [`BIP 70`](https://github.com/bitcoin/bips/blob/master/bip-0070.mediawiki) [`71`](https://github.com/bitcoin/bips/blob/master/bip-0071.mediawiki) [`72`](https://github.com/bitcoin/bips/blob/master/bip-0072.mediawiki): Payment Protocol support has been available in Bitcoin Unlimited GUI since **v0.9.0** ([PR #5216](https://github.com/bitcoin/bitcoin/pull/5216)).
 * [`BIP 111`](https://github.com/bitcoin/bips/blob/master/bip-0111.mediawiki): `NODE_BLOOM` service bit added, and enforced for all peer versions as of **v1.1.0** ([PR #6579](https://github.com/bitcoin/bitcoin/pull/6579) and [PR #6641](https://github.com/bitcoin/bitcoin/pull/6641)).
 * [`BIP 130`](https://github.com/bitcoin/bips/blob/master/bip-0130.mediawiki): direct headers announcement is negotiated with peer versions `>=70012` as of **v0.12.0** ([PR 6494](https://github.com/bitcoin/bitcoin/pull/6494)).
+* [`BIP 135`](https://github.com/bitcoin/bips/blob/master/bip-0135.mediawiki): Generalized version bits voting as of dev@9e1d7f97c ([PR 1088](https://github.com/BitcoinUnlimited/BitcoinUnlimited/pull/1088)).
 
 BIPs that are implemented by Bitcoin Unlimited (up-to-date up to dev@43aa7a05):
 
