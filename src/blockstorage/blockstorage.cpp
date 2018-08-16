@@ -32,7 +32,15 @@ void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache,
     const int64_t &_nBlockDBCache,
     const int64_t &_nBlockUndoDBCache)
 {
-    if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES) // BLOCK_DB_MODE 0
+    {
+        pblocktree = new CBlockTreeDB(_nBlockTreeDBCache, "blocks", false, fReindex);
+        pblocktreeother = new CBlockTreeDB(_nBlockTreeDBCache, "blockdb", false, fReindex);
+        delete pblockdb;
+        pblockdb = nullptr;
+    }
+
+    else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE) // BLOCK_DB_MODE 1
     {
         pblocktree = new CBlockTreeDB(_nBlockTreeDBCache, "blockdb", false, fReindex);
         pblocktreeother = new CBlockTreeDB(_nBlockTreeDBCache, "blocks", false, fReindex);
@@ -47,24 +55,8 @@ void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache,
                 }
             }
         }
+        pblockdb = new CBlockLevelDB(_nBlockDBCache, _nBlockUndoDBCache, false, false, false);
     }
-    else
-    {
-        pblocktree = new CBlockTreeDB(_nBlockTreeDBCache, "blocks", false, fReindex);
-        pblocktreeother = new CBlockTreeDB(_nBlockTreeDBCache, "blockdb", false, fReindex);
-    }
-
-    // we want to have much larger file sizes for the blocks db so override the default.
-    COverrideOptions override;
-    override.max_file_size = _nBlockDBCache / 2;
-    pblockdb = new CBlockDB("blocks", _nBlockDBCache, false, false, false, & override);
-
-    // Make the undo file max size larger than the default and also configure the write buffer
-    // to be a larger proportion of the overall cache since we don't really need a big read buffer
-    // for undo files.
-    override.max_file_size = _nBlockUndoDBCache;
-    override.write_buffer_size = _nBlockUndoDBCache / 1.8;
-    pblockundodb = new CBlockDB("undo", _nBlockUndoDBCache, false, false, false, & override);
 }
 
 bool DetermineStorageSync()
@@ -173,9 +165,7 @@ void SyncStorage(const CChainParams &chainparams)
             if (index->nStatus & BLOCK_HAVE_DATA && item.second.nDataPos != 0)
             {
                 CBlock block_lev;
-                std::ostringstream key;
-                key << index->GetBlockTime() << ":" << index->GetBlockHash().ToString();
-                if (pblockdb->Read(key.str(), block_lev))
+                if (pblockdb->ReadBlock(index, block_lev))
                 {
                     unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
                     CDiskBlockPos blockPos;
@@ -208,7 +198,7 @@ void SyncStorage(const CChainParams &chainparams)
             if (index->nStatus & BLOCK_HAVE_UNDO && item.second.nUndoPos != 0)
             {
                 CBlockUndo blockundo;
-                if (ReadUndoFromDB(blockundo, index->pprev))
+                if (pblockdb->ReadUndo(blockundo, index->pprev))
                 {
                     CDiskBlockPos pos;
                     if (!FindUndoPos(
@@ -248,14 +238,10 @@ void SyncStorage(const CChainParams &chainparams)
             blocksToRemove.push_back(index);
             if (blocksToRemove.size() % 10000 == 0)
             {
-                CDBBatch batch(*pblockdb);
-                for (auto removeIndex : blocksToRemove)
+                for (CBlockIndex *removeIndex : blocksToRemove)
                 {
-                    std::ostringstream key;
-                    key << removeIndex->GetBlockTime() << ":" << removeIndex->GetBlockHash().ToString();
-                    batch.Erase(key.str());
+                    pblockdb->EraseBlock(removeIndex);
                 }
-                pblockdb->WriteBatch(batch);
                 // you must use NULL here, not nullptr
                 CBlockIndex *indexfront = blocksToRemove.front();
                 std::ostringstream frontkey;
@@ -263,7 +249,7 @@ void SyncStorage(const CChainParams &chainparams)
                 CBlockIndex *indexback = blocksToRemove.back();
                 std::ostringstream backkey;
                 backkey << indexback->GetBlockTime() << ":" << indexback->GetBlockHash().ToString();
-                pblockdb->CompactRange(frontkey.str(), backkey.str());
+                pblockdb->CondenseBlockData(frontkey.str(), backkey.str());
                 blocksToRemove.clear();
             }
         }
@@ -362,7 +348,7 @@ void SyncStorage(const CChainParams &chainparams)
                 }
                 unsigned int nBlockSize = ::GetSerializeSize(block_seq, SER_DISK, CLIENT_VERSION);
                 index->nDataPos = nBlockSize;
-                if (!WriteBlockToDB(block_seq))
+                if (!pblockdb->WriteBlock(block_seq))
                 {
                     LOGA("critical error, failed to write block to db, asserting false \n");
                     assert(false);
@@ -387,7 +373,7 @@ void SyncStorage(const CChainParams &chainparams)
                     LOGA("SyncStorage(): critical error, failure to read undo data from sequential files \n");
                     assert(false);
                 }
-                if (!WriteUndoToDB(blockundo, index->pprev))
+                if (!pblockdb->WriteUndo(blockundo, index->pprev))
                 {
                     LOGA("critical error, failed to write undo to db, asserting false \n");
                     assert(false);
@@ -430,7 +416,7 @@ bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHea
     }
     else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        return WriteBlockToDB(block);
+        return pblockdb->WriteBlock(block);
     }
     return false;
 }
@@ -453,7 +439,7 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex, const Consensus
     else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
         block.SetNull();
-        if (!ReadBlockFromDB(pindex, block))
+        if (!pblockdb->ReadBlock(pindex, block))
         {
             LOGA("failed to read block with hash %s from leveldb \n", pindex->GetBlockHash().GetHex().c_str());
             return false;
@@ -488,7 +474,7 @@ bool WriteUndoToDisk(const CBlockUndo &blockundo,
     }
     else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        return WriteUndoToDB(blockundo, pindex);
+        return pblockdb->WriteUndo(blockundo, pindex);
     }
     return false;
 }
@@ -504,7 +490,7 @@ bool ReadUndoFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const CBl
     }
     else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        return ReadUndoFromDB(blockundo, pindex);
+        return pblockdb->ReadUndo(blockundo, pindex);
     }
     return false;
 }
@@ -534,7 +520,7 @@ void FindFilesToPrune(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight
         {
             return;
         }
-        uint64_t amntPruned = FindFilesToPruneLevelDB(nLastBlockWeCanPrune);
+        uint64_t amntPruned = pblockdb->PruneDB(nLastBlockWeCanPrune);
         // because we just prune the DB here and dont have a file set to return, we need to set prune triggers here
         // otherwise they will check for the fileset and incorrectly never be set
 

@@ -8,18 +8,25 @@
 #include "hash.h"
 #include "main.h"
 
-
-CBlockDB::CBlockDB(std::string folder,
-    size_t nCacheSize,
-    bool fMemory,
-    bool fWipe,
-    bool obfuscate,
-    COverrideOptions *pOverride)
-    : CDBWrapper(GetDataDir() / "blockdb" / folder.c_str(), nCacheSize, fMemory, fWipe, obfuscate, pOverride)
+CBlockLevelDB::CBlockLevelDB(size_t nCacheSizeBlock, size_t nCacheSizeUndo, bool fMemory, bool fWipe, bool obfuscate)
 {
+    COverrideOptions overrideblock;
+    // we want to have much larger file sizes for the blocks db so override the default.
+    overrideblock.max_file_size = nCacheSizeBlock / 2;
+    pwrapperblock =
+        new CDBWrapper(GetDataDir() / "blockdb" / "blocks", nCacheSizeBlock, fMemory, fWipe, obfuscate, &overrideblock);
+
+    COverrideOptions overrideundo;
+    // Make the undo file max size larger than the default and also configure the write buffer
+    // to be a larger proportion of the overall cache since we don't really need a big read buffer
+    // for undo files.
+    overrideundo.max_file_size = nCacheSizeUndo;
+    overrideundo.write_buffer_size = nCacheSizeUndo / 1.8;
+    pwrapperundo =
+        new CDBWrapper(GetDataDir() / "blockdb" / "undo", nCacheSizeUndo, fMemory, fWipe, obfuscate, &overrideundo);
 }
 
-bool WriteBlockToDB(const CBlock &block)
+bool CBlockLevelDB::WriteBlock(const CBlock &block)
 {
     // Create a key which will sort the database by the blocktime.  This is needed to prevent unnecessary
     // compactions which hamper performance. Will a key sorted by time the only files that need to undergo
@@ -27,20 +34,35 @@ bool WriteBlockToDB(const CBlock &block)
     std::ostringstream key;
     key << block.GetBlockTime() << ":" << block.GetHash().ToString();
 
-    return pblockdb->Write(key.str(), block, true);
+    return pwrapperblock->Write(key.str(), block, true);
 }
 
-bool ReadBlockFromDB(const CBlockIndex *pindex, CBlock &block)
+bool CBlockLevelDB::ReadBlock(const CBlockIndex *pindex, CBlock &block)
 {
     // Create a key which will sort the database by the blocktime.  This is needed to prevent unnecessary
     // compactions which hamper performance. Will a key sorted by time the only files that need to undergo
     // compaction are the most recent files only.
     std::ostringstream key;
     key << pindex->GetBlockTime() << ":" << pindex->GetBlockHash().ToString();
-    return pblockdb->Read(key.str(), block);
+    return pwrapperblock->Read(key.str(), block);
 }
 
-bool WriteUndoToDB(const CBlockUndo &blockundo, const CBlockIndex *pindex)
+bool CBlockLevelDB::EraseBlock(CBlock &block)
+{
+    std::ostringstream key;
+    key << block.GetBlockTime() << ":" << block.GetHash().ToString();
+    return pwrapperblock->Erase(key.str(), true);
+}
+
+bool CBlockLevelDB::EraseBlock(const CBlockIndex *pindex)
+{
+    std::ostringstream key;
+    key << pindex->GetBlockTime() << ":" << pindex->GetBlockHash().ToString();
+    return pwrapperblock->Erase(key.str(), true);
+}
+
+
+bool CBlockLevelDB::WriteUndo(const CBlockUndo &blockundo, const CBlockIndex *pindex)
 {
     // Create a key which will sort the database by the blocktime.  This is needed to prevent unnecessary
     // compactions which hamper performance. Will a key sorted by time the only files that need to undergo
@@ -64,10 +86,10 @@ bool WriteUndoToDB(const CBlockUndo &blockundo, const CBlockIndex *pindex)
     hasher << hashBlock;
     hasher << blockundo;
     UndoDBValue value(hasher.GetHash(), hashBlock, &blockundo);
-    return pblockundodb->Write(key.str(), value, true);
+    return pwrapperundo->Write(key.str(), value, true);
 }
 
-bool ReadUndoFromDB(CBlockUndo &blockundo, const CBlockIndex *pindex)
+bool CBlockLevelDB::ReadUndo(CBlockUndo &blockundo, const CBlockIndex *pindex)
 {
     // Create a key which will sort the database by the blocktime.  This is needed to prevent unnecessary
     // compactions which hamper performance. Will a key sorted by time the only files that need to undergo
@@ -88,7 +110,7 @@ bool ReadUndoFromDB(CBlockUndo &blockundo, const CBlockIndex *pindex)
 
     // Read block
     UndoDBValue value;
-    if (!pblockundodb->ReadUndo(key.str(), value, blockundo))
+    if (!ReadUndoInternal(key.str(), value, blockundo))
     {
         return error("%s: failure to read undoblock from db", __func__);
     }
@@ -104,7 +126,25 @@ bool ReadUndoFromDB(CBlockUndo &blockundo, const CBlockIndex *pindex)
     return true;
 }
 
-uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
+bool CBlockLevelDB::EraseUndo(const CBlockIndex *pindex)
+{
+    std::ostringstream key;
+    uint256 hashBlock;
+    int64_t nBlockTime = 0;
+    if (pindex)
+    {
+        hashBlock = pindex->GetBlockHash();
+        nBlockTime = pindex->GetBlockTime();
+    }
+    else
+    {
+        return false;
+    }
+    key << nBlockTime << ":" << hashBlock.ToString();
+    return pwrapperundo->Erase(key.str(), true);
+}
+
+uint64_t CBlockLevelDB::PruneDB(uint64_t nLastBlockWeCanPrune)
 {
     CBlockIndex *pindexOldest = chainActive.Tip();
     while (pindexOldest->pprev && pindexOldest->pprev->nFile != 0)
@@ -112,8 +152,8 @@ uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
         pindexOldest = pindexOldest->pprev;
     }
     uint64_t prunedCount = 0;
-    CDBBatch blockBatch(*pblockdb);
-    CDBBatch undoBatch(*pblockundodb);
+    CDBBatch blockBatch(*pwrapperblock);
+    CDBBatch undoBatch(*pwrapperundo);
     while (nDBUsedSpace >= nPruneTarget && pindexOldest != nullptr)
     {
         if (pindexOldest->nHeight >= (int)nLastBlockWeCanPrune)
@@ -137,10 +177,10 @@ uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune)
     }
     CValidationState state;
     FlushStateToDiskInternal(state);
-    pblockdb->WriteBatch(blockBatch, true);
-    pblockundodb->WriteBatch(undoBatch, true);
-    pblockdb->Compact();
-    pblockundodb->Compact();
+    pwrapperblock->WriteBatch(blockBatch, true);
+    pwrapperundo->WriteBatch(undoBatch, true);
+    pwrapperblock->Compact();
+    pwrapperundo->Compact();
     LOG(PRUNE, "Pruned %u blocks, size on disk %u\n", prunedCount, nDBUsedSpace);
     return prunedCount;
 }
