@@ -13,6 +13,7 @@
 #include "config.h"
 #include "dstencode.h"
 #include "main.h" // For minRelayTxFee
+#include "policy/policy.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "wallet/wallet.h"
@@ -41,12 +42,7 @@
 #include <QSslSocket>
 #include <QStringList>
 #include <QTextDocument>
-
-#if QT_VERSION < 0x050000
-#include <QUrl>
-#else
 #include <QUrlQuery>
-#endif
 
 const int BITCOIN_IPC_CONNECT_TIMEOUT = 1000; // milliseconds
 // BIP70 payment protocol messages
@@ -94,16 +90,10 @@ static QList<QString> savedPaymentRequests;
 
 static void ReportInvalidCertificate(const QSslCertificate &cert)
 {
-#if QT_VERSION < 0x050000
-    qDebug() << QString("%1: Payment server found an invalid certificate: ").arg(__func__) << cert.serialNumber()
-             << cert.subjectInfo(QSslCertificate::CommonName)
-             << cert.subjectInfo(QSslCertificate::OrganizationalUnitName);
-#else
     qDebug() << QString("%1: Payment server found an invalid certificate: ").arg(__func__) << cert.serialNumber()
              << cert.subjectInfo(QSslCertificate::CommonName)
              << cert.subjectInfo(QSslCertificate::DistinguishedNameQualifier)
              << cert.subjectInfo(QSslCertificate::OrganizationalUnitName);
-#endif
 }
 
 //
@@ -167,14 +157,12 @@ void PaymentServer::LoadRootCAs(X509_STORE *_store)
             continue;
         }
 
-#if QT_VERSION >= 0x050000
         // Blacklisted certificate
         if (cert.isBlacklisted())
         {
             ReportInvalidCertificate(cert);
             continue;
         }
-#endif
         QByteArray certData = cert.toDer();
         const unsigned char *data = (const unsigned char *)certData.data();
 
@@ -246,7 +234,7 @@ static bool ipcCanParseLegacyURI(const QString &arg, const std::string &network)
 void PaymentServer::ipcParseCommandLine(int argc, char *argv[])
 {
     std::array<const std::string *, 3> networks = {
-        &CBaseChainParams::MAIN, &CBaseChainParams::TESTNET, &CBaseChainParams::REGTEST};
+        {&CBaseChainParams::MAIN, &CBaseChainParams::TESTNET, &CBaseChainParams::REGTEST}};
 
     const std::string *chosenNetwork = nullptr;
 
@@ -462,11 +450,7 @@ bool PaymentServer::handleURI(const QString &scheme, const QString &s)
         return false;
     }
 
-#if QT_VERSION < 0x050000
-    QUrl uri(s);
-#else
     QUrlQuery uri((QUrl(s)));
-#endif
     if (uri.hasQueryItem("r"))
     {
         // payment request URI
@@ -672,7 +656,7 @@ bool PaymentServer::processPaymentRequest(const PaymentRequestPlus &request, Sen
 
         // Extract and check amounts
         CTxOut txOut(sendingTo.second, sendingTo.first);
-        if (txOut.IsDust(::minRelayTxFee))
+        if (txOut.IsDust())
         {
             Q_EMIT message(tr("Payment request error"),
                 tr("Requested payment amount of %1 is too small (considered dust).")
@@ -852,7 +836,7 @@ void PaymentServer::reportSslErrors(QNetworkReply *reply, const QList<QSslError>
     Q_EMIT message(tr("Network request error"), errString, CClientUIInterface::MSG_ERROR);
 }
 
-void PaymentServer::setOptionsModel(OptionsModel *optionsModel) { this->optionsModel = optionsModel; }
+void PaymentServer::setOptionsModel(OptionsModel *_optionsModel) { this->optionsModel = _optionsModel; }
 void PaymentServer::handlePaymentACK(const QString &paymentACKMsg)
 {
     // currently we don't further process or store the paymentACK message

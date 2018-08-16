@@ -30,6 +30,12 @@ static const unsigned int MAX_STANDARD_TX_SIGOPS = BLOCKSTREAM_CORE_MAX_BLOCK_SI
 // BU TODO: we chose: static const unsigned int MAX_STANDARD_TX_SIGOPS = 100*MAX_BLOCK_SIGOPS/5;
 /** Default for -maxmempool, maximum megabytes of mempool memory usage */
 static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE = 300;
+/** Dust threshold in satoshis. Historically this value was calculated as
+ *  minRelayTxFee/1000 * 546. However now we just allow the operator to set
+ *  a simple dust threshold independant of any other value or relay fee.
+ */
+static const unsigned int DEFAULT_DUST_THRESHOLD = 546;
+
 /**
  * Standard script verification flags that standard transactions will comply
  * with. However scripts violating these flags may still be present in valid

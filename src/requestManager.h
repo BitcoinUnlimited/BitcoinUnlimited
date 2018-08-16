@@ -54,7 +54,7 @@ public:
     void clear(void)
     {
         requestCount = 0;
-        node = 0;
+        node = nullptr;
         desirability = 0;
     }
     bool operator<(const CNodeRequestData &rhs) const { return desirability < rhs.desirability; }
@@ -75,9 +75,6 @@ public:
     bool rateLimited;
     int64_t lastRequestTime; // In microseconds, 0 means no request
     unsigned int outstandingReqs;
-    // unsigned int receivingFrom;
-    // char    requestCount[MAX_AVAIL_FROM];
-    // CNode* availableFrom[MAX_AVAIL_FROM];
     ObjectSourceList availableFrom;
     unsigned int priority;
 
@@ -143,7 +140,6 @@ protected:
 
     void cleanup(OdMap::iterator &item);
     CLeakyBucket requestPacer;
-    CLeakyBucket blockPacer;
 
     // Request a single block.
     bool RequestBlock(CNode *pfrom, CInv obj);
@@ -153,6 +149,12 @@ public:
 
     // How many outbound nodes are we connected to.
     std::atomic<int32_t> nOutbound;
+
+    /** Size of the "block download window": how far ahead of our current height do we fetch?
+     *  Larger windows tolerate larger download speed differences between peer, but increase the potential
+     *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
+     *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
+    std::atomic<unsigned int> BLOCK_DOWNLOAD_WINDOW{1024};
 
     // Get this object from somewhere, asynchronously.
     void AskFor(const CInv &obj, CNode *from, unsigned int priority = 0);
@@ -168,19 +170,19 @@ public:
 
     // Did we already ask for this block. We need to do this during IBD to make sure we don't ask for another set
     // of the same blocks.
-    bool AlreadyAskedFor(const uint256 &hash);
+    bool AlreadyAskedForBlock(const uint256 &hash);
 
     // Indicate that we got this object, from and bytes are optional (for node performance tracking)
     void Received(const CInv &obj, CNode *from, int bytes = 0);
 
     // Indicate that we previously got this object
-    void AlreadyReceived(const CInv &obj);
+    void AlreadyReceived(CNode *pnode, const CInv &obj);
 
     // Indicate that getting this object was rejected
     void Rejected(const CInv &obj, CNode *from, unsigned char reason = 0);
 
     // Resets the last request time to zero when a node disconnects and has blocks in flight.
-    void ResetLastRequestTime(const uint256 &hash);
+    void ResetLastBlockRequestTime(const uint256 &hash);
 
     void SendRequests();
 
@@ -195,7 +197,7 @@ public:
     void RequestNextBlocksToDownload(CNode *pto);
 
     // This gets called from RequestNextBlocksToDownload
-    void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex *> &vBlocks);
+    void FindNextBlocksToDownload(CNode *node, unsigned int count, std::vector<CBlockIndex *> &vBlocks);
 
     // Returns a bool indicating whether we requested this block.
     void MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash);

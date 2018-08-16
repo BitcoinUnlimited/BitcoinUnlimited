@@ -4,8 +4,8 @@
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
 
-#ifndef _SECP256K1_ECMULT_GEN_IMPL_H_
-#define _SECP256K1_ECMULT_GEN_IMPL_H_
+#ifndef SECP256K1_ECMULT_GEN_IMPL_H
+#define SECP256K1_ECMULT_GEN_IMPL_H
 
 #include "scalar.h"
 #include "group.h"
@@ -150,7 +150,10 @@ static void secp256k1_ecmult_gen(const secp256k1_ecmult_gen_context *ctx, secp25
         secp256k1_ge_from_storage(&add, &adds);
         secp256k1_gej_add_ge(r, r, &add);
     }
+    /* see also: https://github.com/bitcoin-core/secp256k1/pull/485 */
+#ifndef __clang_analyzer__
     bits = 0;
+#endif
     secp256k1_ge_clear(&add);
     secp256k1_scalar_clear(&gnb);
 }
@@ -161,7 +164,7 @@ static void secp256k1_ecmult_gen_blind(secp256k1_ecmult_gen_context *ctx, const 
     secp256k1_gej gb;
     secp256k1_fe s;
     unsigned char nonce32[32];
-    secp256k1_rfc6979_hmac_sha256_t rng;
+    secp256k1_rfc6979_hmac_sha256 rng;
     int retry;
     unsigned char keydata[64] = {0};
     if (seed32 == NULL) {
@@ -207,4 +210,4 @@ static void secp256k1_ecmult_gen_blind(secp256k1_ecmult_gen_context *ctx, const 
     secp256k1_gej_clear(&gb);
 }
 
-#endif
+#endif /* SECP256K1_ECMULT_GEN_IMPL_H */

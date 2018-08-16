@@ -3,10 +3,11 @@
 # Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
+import test_framework.loginit
+
 import pdb
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
-
 # Create one-input, one-output, no-fee transaction:
 class RawTransactionsTest(BitcoinTestFramework):
 
@@ -15,7 +16,8 @@ class RawTransactionsTest(BitcoinTestFramework):
         initialize_chain_clean(self.options.tmpdir, 4, bitcoinConfDict, wallets)
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(4, self.options.tmpdir)
+        self.extra_args = [["-minlimitertxfee=1"], ["-minlimitertxfee=1"],["-minlimitertxfee=1"],["-minlimitertxfee=1"]]
+        self.nodes = start_nodes(4, self.options.tmpdir, self.extra_args)
 
         connect_nodes_bi(self.nodes,0,1)
         connect_nodes_bi(self.nodes,1,2)
@@ -41,6 +43,8 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         #            = 2 bytes * minRelayTxFeePerByte
         feeTolerance = 2 * min_relay_tx_fee/1000
+        if feeTolerance < 0.00000001:
+            feeTolerance = 0.00000001
 
         self.nodes[2].generate(1)
         self.sync_all()

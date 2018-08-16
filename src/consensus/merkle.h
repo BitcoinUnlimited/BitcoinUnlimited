@@ -14,7 +14,19 @@
 #include "uint256.h"
 
 uint256 ComputeMerkleRoot(const std::vector<uint256> &leaves, bool *mutated = NULL);
+
+/*
+To compute a merkle path (AKA merkle proof), pass the index of the element being proved into position.
+The merkle proof will be returned, not including the element.
+For example, ComputeMerkleBranch(4 elements, 0) will return:
+[ element[1], Hash256(element[2], element[3]) ]
+*/
 std::vector<uint256> ComputeMerkleBranch(const std::vector<uint256> &leaves, uint32_t position);
+
+
+/* To verify a merkle proof, pass the hash of the element in "leaf", the merkle proof in "branch", and the zero-based
+index specifying where the element was in the array when the merkle proof was created.
+*/
 uint256 ComputeMerkleRootFromBranch(const uint256 &leaf, const std::vector<uint256> &branch, uint32_t position);
 
 /*

@@ -3,13 +3,13 @@
 # Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
+import test_framework.loginit
+
 import time
 import sys
 if sys.version_info[0] < 3:
     raise "Use Python 3"
 import logging
-logging.basicConfig(format='%(asctime)s.%(levelname)s: %(message)s', level=logging.INFO,stream=sys.stdout)
-
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 import binascii
@@ -49,7 +49,8 @@ class WalletTest (BitcoinTestFramework):
         initialize_chain_clean(self.options.tmpdir, 4, bitcoinConfDict, wallets)
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(3, self.options.tmpdir)
+        self.node_args = [['-usehd=0'], ['-usehd=0'], ['-usehd=0']]
+        self.nodes = start_nodes(3, self.options.tmpdir, self.node_args)
         connect_nodes_bi(self.nodes,0,1)
         connect_nodes_bi(self.nodes,1,2)
         connect_nodes_bi(self.nodes,0,2)
@@ -184,7 +185,7 @@ class WalletTest (BitcoinTestFramework):
         txid2 = self.nodes[1].sendtoaddress(self.nodes[0].getnewaddress(), 1)
         sync_mempools(self.nodes)
 
-        self.nodes.append(start_node(3, self.options.tmpdir))
+        self.nodes.append(start_node(3, self.options.tmpdir, ['-usehd=0']))
         connect_nodes_bi(self.nodes, 0, 3)
         sync_blocks(self.nodes)
 
@@ -230,7 +231,7 @@ class WalletTest (BitcoinTestFramework):
         #do some -walletbroadcast tests
         stop_nodes(self.nodes)
         wait_bitcoinds()
-        self.nodes = start_nodes(3, self.options.tmpdir, [["-walletbroadcast=0"],["-walletbroadcast=0"],["-walletbroadcast=0"]])
+        self.nodes = start_nodes(3, self.options.tmpdir, [["-walletbroadcast=0", "-usehd=0"],["-walletbroadcast=0", "-usehd=0"],["-walletbroadcast=0", "-usehd=0"]])
         connect_nodes_bi(self.nodes,0,1)
         connect_nodes_bi(self.nodes,1,2)
         connect_nodes_bi(self.nodes,0,2)
@@ -256,7 +257,8 @@ class WalletTest (BitcoinTestFramework):
         #restart the nodes with -walletbroadcast=1
         stop_nodes(self.nodes)
         wait_bitcoinds()
-        self.nodes = start_nodes(3, self.options.tmpdir)
+        self.node_args = [['-usehd=0'], ['-usehd=0'], ['-usehd=0']]
+        self.nodes = start_nodes(3, self.options.tmpdir, self.node_args)
         connect_nodes_bi(self.nodes,0,1)
         connect_nodes_bi(self.nodes,1,2)
         connect_nodes_bi(self.nodes,0,2)
@@ -342,7 +344,7 @@ class WalletTest (BitcoinTestFramework):
 
         # test multiple private key import, and watch only address import
         bal = self.nodes[2].getbalance()
-        addrs = [ self.nodes[1].getnewaddress() for i in range(0,20)]
+        addrs = [ self.nodes[1].getnewaddress() for i in range(0,21)]
         pks   = [ self.nodes[1].dumpprivkey(x) for x in addrs]
         for a in addrs:
             self.nodes[0].sendtoaddress(a, 1)
@@ -361,23 +363,31 @@ class WalletTest (BitcoinTestFramework):
         waitForRescan(self.nodes[2])
         assert(bal + 6 == self.nodes[2].getbalance())
 
-        self.nodes[2].importaddresses(addrs[6], addrs[7])  # import watch only addresses
+        # import 5 addresses each (bug fix check)
+        self.nodes[2].importaddresses(addrs[6], addrs[7], addrs[8], addrs[9], addrs[10])  # import watch only addresses
         waitForRescan(self.nodes[2])
         assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
-        assert(bal + 8 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+        assert(bal + 11 == self.nodes[2].getbalance("*",1,True)) # show the full balance
 
-        self.nodes[2].importaddresses("rescan", addrs[8], addrs[9])  # import watch only addresses
+        self.nodes[2].importaddresses("rescan", addrs[11], addrs[12], addrs[13], addrs[14], addrs[15])  # import watch only addresses
         waitForRescan(self.nodes[2])
         assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
-        assert(bal + 10 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+        assert(bal + 16 == self.nodes[2].getbalance("*",1,True)) # show the full balance
 
-        self.nodes[2].importaddresses("no-rescan", addrs[10], addrs[11])  # import watch only addresses
+        self.nodes[2].importaddresses("no-rescan", addrs[16], addrs[17], addrs[18], addrs[19], addrs[20])  # import watch only addresses
         time.sleep(1)
         assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
-        assert(bal + 10 == self.nodes[2].getbalance("*",1,True)) # show the full balance, will be same because no rescan
+        assert(bal + 16 == self.nodes[2].getbalance("*",1,True)) # show the full balance, will be same because no rescan
         self.nodes[2].importaddresses("rescan") # force a rescan although we imported nothing
         waitForRescan(self.nodes[2])
-        assert(bal + 12 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+        assert(bal + 21 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+
+        # verify that none of the importaddress calls added the address with a label (bug fix check)
+        txns = self.nodes[2].listreceivedbyaddress(0, True, True)
+        for i in range(6,21):
+            assert_array_result(txns,
+                               {"address": addrs[i]},
+                               {"label": ""})
 
         # now try P2SH
         btcAddress = self.nodes[1].getnewaddress()
@@ -399,6 +409,14 @@ class WalletTest (BitcoinTestFramework):
         bal2 = self.nodes[2].getbalance('*', 1, True)
         assert_equal(bal1 + 2, bal2)
 
+        # verify that none of the importaddress calls added the address with a label (bug fix check)
+        txns = self.nodes[2].listreceivedbyaddress(0, True, True)
+        assert_array_result(txns,
+                            {"address": self.nodes[2].getaddressforms(p2shAddress)["bitcoincash"]},
+                            {"label": ""})
+        assert_array_result(txns,
+                            {"address": self.nodes[2].getaddressforms(p2shAddress2)["bitcoincash"]},
+                            {"label": ""})
 
         #check if wallet or blochchain maintenance changes the balance
         self.sync_all()
@@ -432,7 +450,8 @@ class WalletTest (BitcoinTestFramework):
             logging.info("check " + m)
             stop_nodes(self.nodes)
             wait_bitcoinds()
-            self.nodes = start_nodes(3, self.options.tmpdir, [[m]] * 3)
+            self.node_args = [['-usehd=0'], ['-usehd=0'], ['-usehd=0']]
+            self.nodes = start_nodes(3, self.options.tmpdir, self.node_args)
             while m == '-reindex' and [block_count] * 3 != [self.nodes[i].getblockcount() for i in range(3)]:
                 # reindex will leave rpc warm up "early"; Wait for it to finish
                 time.sleep(0.1)

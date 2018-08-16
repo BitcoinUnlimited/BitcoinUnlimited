@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "connmgr.h"
 #include "consensus/merkle.h"
@@ -25,6 +26,7 @@
 #include "util.h"
 #include "utiltime.h"
 
+static bool DEFAULT_BLOOM_FILTER_TARGETING = true;
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
 
 CThinBlock::CThinBlock(const CBlock &block, CBloomFilter &filter)
@@ -109,11 +111,11 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     bool fAlreadyHave = false;
     {
         LOCK(cs_main);
-        fAlreadyHave = AlreadyHave(inv);
+        fAlreadyHave = AlreadyHaveBlock(inv);
     }
     if (fAlreadyHave)
     {
-        requester.AlreadyReceived(inv);
+        requester.AlreadyReceived(pfrom, inv);
         thindata.ClearThinBlockData(pfrom, inv.hash);
 
         LOG(THIN, "Received thinblock but returning because we already have this block %s on disk, peer=%s\n",
@@ -144,7 +146,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
     pfrom->thinBlock.hashPrevBlock = header.hashPrevBlock;
     pfrom->thinBlockHashes = vTxHashes;
 
-    // Check that the merkleroot matches the merkelroot calculated from the hashes provided.
+    // Check that the merkleroot matches the merkleroot calculated from the hashes provided.
     bool mutated;
     uint256 merkleroot = ComputeMerkleRoot(vTxHashes, &mutated);
     if (header.hashMerkleRoot != merkleroot || mutated)
@@ -322,11 +324,11 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     bool fAlreadyHave = false;
     {
         LOCK(cs_main);
-        fAlreadyHave = AlreadyHave(inv);
+        fAlreadyHave = AlreadyHaveBlock(inv);
     }
     if (fAlreadyHave)
     {
-        requester.AlreadyReceived(inv);
+        requester.AlreadyReceived(pfrom, inv);
         thindata.ClearThinBlockData(pfrom, inv.hash);
 
         LOG(THIN, "Received xblocktx but returning because we already have this block %s on disk, peer=%s\n",
@@ -357,7 +359,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         pfrom->GetLogName());
 
     // At this point we should have all the full hashes in the block. Check that the merkle
-    // root in the block header matches the merkel root calculated from the hashes provided.
+    // root in the block header matches the merkleroot calculated from the hashes provided.
     bool mutated;
     uint256 merkleroot = ComputeMerkleRoot(pfrom->thinBlockHashes, &mutated);
     if (pfrom->thinBlock.hashMerkleRoot != merkleroot || mutated)
@@ -405,7 +407,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     else
     {
         // We have all the transactions now that are in this block: try to reassemble and process.
-        CInv inv(CInv(MSG_BLOCK, thinBlockTx.blockhash));
+        CInv inv2(CInv(MSG_BLOCK, thinBlockTx.blockhash));
 
         // for compression statistics, we have to add up the size of xthinblock and the re-requested thinBlockTx.
         int nSizeThinBlockTx = msgSize;
@@ -423,7 +425,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
         // create a non-deleting shared pointer to wrap pfrom->thinBlock.  We know that thinBlock will outlast the
         // thread because the thread has a node reference.
-        PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->thinBlock), inv);
+        PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->thinBlock), inv2);
     }
 
     return true;
@@ -508,7 +510,7 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         }
         CXThinBlockTx thinBlockTx(thinRequestBlockTx.blockhash, vTx);
         pfrom->PushMessage(NetMsgType::XBLOCKTX, thinBlockTx);
-        pfrom->blocksSent += 1;
+        pfrom->txsSent += vTx.size();
     }
 
     return true;
@@ -601,7 +603,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         if (pIndex->nStatus & BLOCK_HAVE_DATA)
         {
             // Tell the Request Manager we received this block
-            requester.AlreadyReceived(inv);
+            requester.AlreadyReceived(pfrom, inv);
 
             thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
             LOG(THIN, "Received xthinblock but returning because we already have block data %s from peer %s hop"
@@ -691,7 +693,7 @@ bool CXThinBlock::process(CNode *pfrom,
     // for a collision.
     int missingCount = 0;
     int unnecessaryCount = 0;
-    bool collision = false;
+    bool _collision = false;
     std::map<uint64_t, uint256> mapPartialTxHash;
     std::vector<uint256> memPoolHashes;
     std::set<uint64_t> setHashesToRequest;
@@ -704,7 +706,7 @@ bool CXThinBlock::process(CNode *pfrom,
         {
             uint64_t cheapHash = mi.first.GetCheapHash();
             if (mapPartialTxHash.count(cheapHash)) // Check for collisions
-                collision = true;
+                _collision = true;
             mapPartialTxHash[cheapHash] = mi.first;
         }
 
@@ -715,7 +717,7 @@ bool CXThinBlock::process(CNode *pfrom,
         {
             uint64_t cheapHash = memPoolHashes[i].GetCheapHash();
             if (mapPartialTxHash.count(cheapHash)) // Check for collisions
-                collision = true;
+                _collision = true;
             mapPartialTxHash[cheapHash] = memPoolHashes[i];
         }
         for (auto &mi : pfrom->mapMissingTx)
@@ -732,13 +734,13 @@ bool CXThinBlock::process(CNode *pfrom,
                 // Check if it really is a cheap hash collision and not just the same transaction
                 if (existingHash != mi.second->GetHash())
                 {
-                    collision = true;
+                    _collision = true;
                 }
             }
             mapPartialTxHash[cheapHash] = mi.second->GetHash();
         }
 
-        if (!collision)
+        if (!_collision)
         {
             // Start gathering the full tx hashes. If some are not available then add them to setHashesToRequest.
             uint256 nullhash;
@@ -781,7 +783,7 @@ bool CXThinBlock::process(CNode *pfrom,
     // a full thinblock if a mismatch occurs.
     // Also, there is a remote possiblity of a Tx hash collision therefore if it occurs we re-request a normal
     // thinblock which has the full Tx hash data rather than just the truncated hash.
-    if (collision || !fMerkleRootCorrect)
+    if (_collision || !fMerkleRootCorrect)
     {
         std::vector<CInv> vGetData;
         vGetData.push_back(CInv(MSG_THINBLOCK, header.GetHash()));
@@ -848,8 +850,8 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
 {
     AssertLockHeld(cs_xval);
 
-    // We must have all the full tx hashes by this point.  We first check for any repeating
-    // sequences in transaction id's.  This is a possible attack vector and has been used in the past.
+    // We must have all the full tx hashes by this point.  We first check for any duplicate
+    // transaction ids.  This is a possible attack vector and has been used in the past.
     {
         std::set<uint256> setHashes(pfrom->thinBlockHashes.begin(), pfrom->thinBlockHashes.end());
         if (setHashes.size() != pfrom->thinBlockHashes.size())
@@ -857,7 +859,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
             thindata.ClearThinBlockData(pfrom, pfrom->thinBlock.GetBlockHeader().GetHash());
 
             dosMan.Misbehaving(pfrom, 10);
-            return error("Repeating Transaction Id sequence, peer=%s", pfrom->GetLogName());
+            return error("Duplicate transaction ids, peer=%s", pfrom->GetLogName());
         }
     }
 
@@ -983,13 +985,73 @@ double CThinBlockData::average(std::map<int64_t, uint64_t> &map)
     return (double)accum / map.size();
 }
 
+double CThinBlockData::computeTotalBandwidthSavingsInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats)
+{
+    AssertLockHeld(cs_thinblockstats);
+
+    return double(nOriginalSize() - nThinSize() - nTotalBloomFilterBytes());
+}
+
+double CThinBlockData::compute24hAverageCompressionInternal(
+    std::map<int64_t, std::pair<uint64_t, uint64_t> > &mapThinBlocks,
+    std::map<int64_t, uint64_t> &mapBloomFilters) EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats)
+{
+    AssertLockHeld(cs_thinblockstats);
+
+    expireStats(mapThinBlocks);
+    expireStats(mapBloomFilters);
+
+    double nCompressionRate = 0;
+    uint64_t nThinSizeTotal = 0;
+    uint64_t nOriginalSizeTotal = 0;
+    for (const auto &mi : mapThinBlocks)
+    {
+        nThinSizeTotal += mi.second.first;
+        nOriginalSizeTotal += mi.second.second;
+    }
+    // We count up the bloom filters from the opposite direction as the blocks.
+    // Outbound bloom filters go with Inbound XThins and vice versa.
+    uint64_t nBloomFilterSize = 0;
+    for (const auto &mi : mapBloomFilters)
+    {
+        nBloomFilterSize += mi.second;
+    }
+
+    if (nOriginalSizeTotal > 0)
+        nCompressionRate = 100 - (100 * (double)(nThinSizeTotal + nBloomFilterSize) / nOriginalSizeTotal);
+
+    return nCompressionRate;
+}
+
+double CThinBlockData::compute24hInboundRerequestTxPercentInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats)
+{
+    AssertLockHeld(cs_thinblockstats);
+
+    expireStats(mapThinBlocksInBoundReRequestedTx);
+    expireStats(mapThinBlocksInBound);
+
+    double nReRequestRate = 0;
+    uint64_t nTotalReRequests = 0;
+    uint64_t nTotalReRequestedTxs = 0;
+    for (const auto &mi : mapThinBlocksInBoundReRequestedTx)
+    {
+        nTotalReRequests += 1;
+        nTotalReRequestedTxs += mi.second;
+    }
+
+    if (mapThinBlocksInBound.size() > 0)
+        nReRequestRate = 100 * (double)nTotalReRequests / mapThinBlocksInBound.size();
+
+    return nReRequestRate;
+}
+
 void CThinBlockData::UpdateInBound(uint64_t nThinBlockSize, uint64_t nOriginalBlockSize)
 {
     LOCK(cs_thinblockstats);
     // Update InBound thinblock tracking information
     nOriginalSize += nOriginalBlockSize;
     nThinSize += nThinBlockSize;
-    nBlocks += 1;
+    nInBoundBlocks += 1;
     updateStats(mapThinBlocksInBound, std::pair<uint64_t, uint64_t>(nThinBlockSize, nOriginalBlockSize));
 }
 
@@ -998,7 +1060,7 @@ void CThinBlockData::UpdateOutBound(uint64_t nThinBlockSize, uint64_t nOriginalB
     LOCK(cs_thinblockstats);
     nOriginalSize += nOriginalBlockSize;
     nThinSize += nThinBlockSize;
-    nBlocks += 1;
+    nOutBoundBlocks += 1;
     updateStats(mapThinBlocksOutBound, std::pair<uint64_t, uint64_t>(nThinBlockSize, nOriginalBlockSize));
 }
 
@@ -1052,13 +1114,27 @@ void CThinBlockData::UpdateMempoolLimiterBytesSaved(unsigned int nBytesSaved)
     nMempoolLimiterBytesSaved += nBytesSaved;
 }
 
+void CThinBlockData::UpdateThinBlock(uint64_t nThinBlockSize)
+{
+    LOCK(cs_thinblockstats);
+    nTotalThinBlockBytes += nThinBlockSize;
+    updateStats(mapThinBlock, nThinBlockSize);
+}
+
+void CThinBlockData::UpdateFullTx(uint64_t nFullTxSize)
+{
+    LOCK(cs_thinblockstats);
+    nTotalThinBlockBytes += nFullTxSize;
+    updateStats(mapFullTx, nFullTxSize);
+}
+
 std::string CThinBlockData::ToString()
 {
     LOCK(cs_thinblockstats);
-    double size = double(nOriginalSize() - nThinSize() - nTotalBloomFilterBytes());
+    double size = computeTotalBandwidthSavingsInternal();
     std::ostringstream ss;
-    ss << nBlocks() << " thin " << ((nBlocks() > 1) ? "blocks have" : "block has") << " saved " << formatInfoUnit(size)
-       << " of bandwidth";
+    ss << nInBoundBlocks() << " inbound and " << nOutBoundBlocks() << " outbound thin blocks have saved "
+       << formatInfoUnit(size) << " of bandwidth";
     return ss.str();
 }
 
@@ -1067,29 +1143,11 @@ std::string CThinBlockData::InBoundPercentToString()
 {
     LOCK(cs_thinblockstats);
 
-    expireStats(mapThinBlocksInBound);
+    double nCompressionRate = compute24hAverageCompressionInternal(mapThinBlocksInBound, mapBloomFiltersOutBound);
 
-    double nCompressionRate = 0;
-    uint64_t nThinSizeTotal = 0;
-    uint64_t nOriginalSizeTotal = 0;
-    for (std::map<int64_t, std::pair<uint64_t, uint64_t> >::iterator mi = mapThinBlocksInBound.begin();
-         mi != mapThinBlocksInBound.end(); ++mi)
-    {
-        nThinSizeTotal += (*mi).second.first;
-        nOriginalSizeTotal += (*mi).second.second;
-    }
-    // We count up the outbound bloom filters. Outbound bloom filters go with Inbound xthins.
-    uint64_t nOutBoundBloomFilterSize = 0;
-    for (std::map<int64_t, uint64_t>::iterator mi = mapBloomFiltersOutBound.begin();
-         mi != mapBloomFiltersOutBound.end(); ++mi)
-    {
-        nOutBoundBloomFilterSize += (*mi).second;
-    }
-
-
-    if (nOriginalSizeTotal > 0)
-        nCompressionRate = 100 - (100 * (double)(nThinSizeTotal + nOutBoundBloomFilterSize) / nOriginalSizeTotal);
-
+    // NOTE: Potential gotcha, compute24hAverageCompressionInternal has a side-effect of calling
+    //       expireStats which modifies the contents of mapThinBlocksInBound
+    // We currently rely on this side-effect for the string produced below
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(1);
     ss << "Compression for " << mapThinBlocksInBound.size() << " Inbound  thinblocks (last 24hrs): " << nCompressionRate
@@ -1102,28 +1160,11 @@ std::string CThinBlockData::OutBoundPercentToString()
 {
     LOCK(cs_thinblockstats);
 
-    expireStats(mapThinBlocksOutBound);
+    double nCompressionRate = compute24hAverageCompressionInternal(mapThinBlocksOutBound, mapBloomFiltersInBound);
 
-    double nCompressionRate = 0;
-    uint64_t nThinSizeTotal = 0;
-    uint64_t nOriginalSizeTotal = 0;
-    for (std::map<int64_t, std::pair<uint64_t, uint64_t> >::iterator mi = mapThinBlocksOutBound.begin();
-         mi != mapThinBlocksOutBound.end(); ++mi)
-    {
-        nThinSizeTotal += (*mi).second.first;
-        nOriginalSizeTotal += (*mi).second.second;
-    }
-    // We count up the inbound bloom filters. Inbound bloom filters go with Outbound xthins.
-    uint64_t nInBoundBloomFilterSize = 0;
-    for (std::map<int64_t, uint64_t>::iterator mi = mapBloomFiltersInBound.begin(); mi != mapBloomFiltersInBound.end();
-         ++mi)
-    {
-        nInBoundBloomFilterSize += (*mi).second;
-    }
-
-    if (nOriginalSizeTotal > 0)
-        nCompressionRate = 100 - (100 * (double)(nThinSizeTotal + nInBoundBloomFilterSize) / nOriginalSizeTotal);
-
+    // NOTE: Potential gotcha, compute24hAverageCompressionInternal has a side-effect of calling
+    //       expireStats which modifies the contents of mapThinBlocksOutBound
+    // We currently rely on this side-effect for the string produced below
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(1);
     ss << "Compression for " << mapThinBlocksOutBound.size()
@@ -1155,18 +1196,19 @@ std::string CThinBlockData::ResponseTimeToString()
 {
     LOCK(cs_thinblockstats);
 
+    expireStats(mapThinBlockResponseTime);
+
     std::vector<double> vResponseTime;
 
     double nResponseTimeAverage = 0;
     double nPercentile = 0;
     double nTotalResponseTime = 0;
     double nTotalEntries = 0;
-    for (std::map<int64_t, double>::iterator mi = mapThinBlockResponseTime.begin();
-         mi != mapThinBlockResponseTime.end(); ++mi)
+    for (const auto &mi : mapThinBlockResponseTime)
     {
         nTotalEntries += 1;
-        nTotalResponseTime += (*mi).second;
-        vResponseTime.push_back((*mi).second);
+        nTotalResponseTime += mi.second;
+        vResponseTime.push_back(mi.second);
     }
 
     if (nTotalEntries > 0)
@@ -1190,18 +1232,19 @@ std::string CThinBlockData::ValidationTimeToString()
 {
     LOCK(cs_thinblockstats);
 
+    expireStats(mapThinBlockValidationTime);
+
     std::vector<double> vValidationTime;
 
     double nValidationTimeAverage = 0;
     double nPercentile = 0;
     double nTotalValidationTime = 0;
     double nTotalEntries = 0;
-    for (std::map<int64_t, double>::iterator mi = mapThinBlockValidationTime.begin();
-         mi != mapThinBlockValidationTime.end(); ++mi)
+    for (const auto &mi : mapThinBlockValidationTime)
     {
         nTotalEntries += 1;
-        nTotalValidationTime += (*mi).second;
-        vValidationTime.push_back((*mi).second);
+        nTotalValidationTime += mi.second;
+        vValidationTime.push_back(mi.second);
     }
 
     if (nTotalEntries > 0)
@@ -1225,24 +1268,15 @@ std::string CThinBlockData::ReRequestedTxToString()
 {
     LOCK(cs_thinblockstats);
 
-    expireStats(mapThinBlocksInBoundReRequestedTx);
+    double nReRequestRate = compute24hInboundRerequestTxPercentInternal();
 
-    double nReRequestRate = 0;
-    uint64_t nTotalReRequests = 0;
-    uint64_t nTotalReRequestedTxs = 0;
-    for (std::map<int64_t, int>::iterator mi = mapThinBlocksInBoundReRequestedTx.begin();
-         mi != mapThinBlocksInBoundReRequestedTx.end(); ++mi)
-    {
-        nTotalReRequests += 1;
-        nTotalReRequestedTxs += (*mi).second;
-    }
-
-    if (mapThinBlocksInBound.size() > 0)
-        nReRequestRate = 100 * (double)nTotalReRequests / mapThinBlocksInBound.size();
-
+    // NOTE: Potential gotcha, compute24hInboundRerequestTxPercentInternal has a side-effect of calling
+    //       expireStats which modifies the contents of mapThinBlocksInBoundReRequestedTx
+    // We currently rely on this side-effect for the string produced below
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(1);
-    ss << "Tx re-request rate (last 24hrs): " << nReRequestRate << "% Total re-requests:" << nTotalReRequests;
+    ss << "Tx re-request rate (last 24hrs): " << nReRequestRate
+       << "% Total re-requests:" << mapThinBlocksInBoundReRequestedTx.size();
     return ss.str();
 }
 
@@ -1255,19 +1289,53 @@ std::string CThinBlockData::MempoolLimiterBytesSavedToString()
     return ss.str();
 }
 
+// Calculate the average xthin block size
+std::string CThinBlockData::ThinBlockToString()
+{
+    LOCK(cs_thinblockstats);
+    double avgThinBlockSize = average(mapThinBlock);
+    std::ostringstream ss;
+    ss << "Thinblock size (last 24hrs) AVG: " << formatInfoUnit(avgThinBlockSize);
+    return ss.str();
+}
+
+// Calculate the average size of all full txs sent with block
+std::string CThinBlockData::FullTxToString()
+{
+    LOCK(cs_thinblockstats);
+    double avgFullTxSize = average(mapFullTx);
+    std::ostringstream ss;
+    ss << "Thinblock full transactions size (last 24hrs) AVG: " << formatInfoUnit(avgFullTxSize);
+    return ss.str();
+}
+
 // Preferential Thinblock Timer:
 // The purpose of the timer is to ensure that we more often download an XTHINBLOCK rather than a full block.
 // The timer is started when we receive the first announcement indicating there is a new block to download.  If the
 // block inventory is from a non XTHIN node then we will continue to wait for block announcements until either we
 // get one from an XTHIN capable node or the timer is exceeded.  If the timer is exceeded before receiving an
 // announcement from an XTHIN node then we just download a full block instead of an xthin.
-bool CThinBlockData::CheckThinblockTimer(uint256 hash)
+bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
 {
+    // Base time used to calculate the random timeout value.
+    static uint64_t nTimeToWait = 10000;
+
     LOCK(cs_mapThinBlockTimer);
     if (!mapThinBlockTimer.count(hash))
     {
-        mapThinBlockTimer[hash] = GetTimeMillis();
-        LOG(THIN, "Starting Preferential Thinblock timer\n");
+        // The timeout limit is a random number betwee 8 and 12 seconds.
+        // This way a node connected to this one may download the block
+        // before the other node and thus be able to serve the other with
+        // a graphene block, rather than both nodes timing out and downloading
+        // a thinblock instead. This can happen at the margins of the BU network
+        // where we receive full blocks from peers that don't support graphene.
+        //
+        // To make the timeout random we adjust the start time of the timer forward
+        // or backward by a random amount plus or minus 2 seconds.
+        FastRandomContext insecure_rand(false);
+        uint64_t nOffset = nTimeToWait - (8000 + (insecure_rand.rand64() % 4000) + 1);
+        mapThinBlockTimer[hash] = GetTimeMillis() + nOffset;
+        LOG(THIN, "Starting Preferential Thinblock timer (%d millis)\n", nTimeToWait + nOffset);
     }
     else
     {
@@ -1275,7 +1343,7 @@ bool CThinBlockData::CheckThinblockTimer(uint256 hash)
         // If we have then we want to return false so that we can
         // proceed to download a regular block instead.
         uint64_t elapsed = GetTimeMillis() - mapThinBlockTimer[hash];
-        if (elapsed > 10000)
+        if (elapsed > nTimeToWait)
         {
             LOG(THIN, "Preferential Thinblock timer exceeded - downloading regular block instead\n");
             return false;
@@ -1285,7 +1353,7 @@ bool CThinBlockData::CheckThinblockTimer(uint256 hash)
 }
 
 // The timer is cleared as soon as we request a block or thinblock.
-void CThinBlockData::ClearThinBlockTimer(uint256 hash)
+void CThinBlockData::ClearThinBlockTimer(const uint256 &hash)
 {
     LOCK(cs_mapThinBlockTimer);
     if (mapThinBlockTimer.count(hash))
@@ -1314,12 +1382,37 @@ void CThinBlockData::ClearThinBlockData(CNode *pnode)
         thindata.GetThinBlockBytes());
 }
 
-void CThinBlockData::ClearThinBlockData(CNode *pnode, uint256 hash)
+void CThinBlockData::ClearThinBlockData(CNode *pnode, const uint256 &hash)
 {
     // We must make sure to clear the thinblock data first before clearing the thinblock in flight.
     ClearThinBlockData(pnode);
     ClearThinBlockInFlight(pnode, hash);
 }
+
+void CThinBlockData::ClearThinBlockStats()
+{
+    LOCK(cs_thinblockstats);
+
+    nOriginalSize.Clear();
+    nThinSize.Clear();
+    nInBoundBlocks.Clear();
+    nOutBoundBlocks.Clear();
+    nMempoolLimiterBytesSaved.Clear();
+    nTotalBloomFilterBytes.Clear();
+    nTotalThinBlockBytes.Clear();
+    nTotalFullTxBytes.Clear();
+
+    mapThinBlocksInBound.clear();
+    mapThinBlocksOutBound.clear();
+    mapBloomFiltersOutBound.clear();
+    mapBloomFiltersInBound.clear();
+    mapThinBlockResponseTime.clear();
+    mapThinBlockValidationTime.clear();
+    mapThinBlocksInBoundReRequestedTx.clear();
+    mapThinBlock.clear();
+    mapFullTx.clear();
+}
+
 uint64_t CThinBlockData::AddThinBlockBytes(uint64_t bytes, CNode *pfrom)
 {
     pfrom->nLocalThinBlockBytes += bytes;
@@ -1341,59 +1434,29 @@ void CThinBlockData::DeleteThinBlockBytes(uint64_t bytes, CNode *pfrom)
 
 void CThinBlockData::ResetThinBlockBytes() { nThinBlockBytes.store(0); }
 uint64_t CThinBlockData::GetThinBlockBytes() { return nThinBlockBytes.load(); }
-bool HaveConnectThinblockNodes()
+void CThinBlockData::FillThinBlockQuickStats(ThinBlockQuickStats &stats)
 {
-    // Strip the port from then list of all the current in and outbound ip addresses
-    std::vector<std::string> vNodesIP;
-    {
-        LOCK(cs_vNodes);
-        for (CNode *pnode : vNodes)
-        {
-            int pos = pnode->addrName.rfind(":");
-            if (pos <= 0)
-                vNodesIP.push_back(pnode->addrName);
-            else
-                vNodesIP.push_back(pnode->addrName.substr(0, pos));
-        }
-    }
+    if (!IsThinBlocksEnabled())
+        return;
 
-    // Create a set used to check for cross connected nodes.
-    // A cross connected node is one where we have a connect-thinblock connection to
-    // but we also have another inbound connection which is also using
-    // connect-thinblock. In those cases we have created a dead-lock where no blocks
-    // can be downloaded unless we also have at least one additional connect-thinblock
-    // connection to a different node.
-    std::set<std::string> nNotCrossConnected;
+    LOCK(cs_thinblockstats);
 
-    int nConnectionsOpen = 0;
-    for (const std::string &strAddrNode : mapMultiArgs["-connect-thinblock"])
-    {
-        std::string strThinblockNode;
-        int pos = strAddrNode.rfind(":");
-        if (pos <= 0)
-            strThinblockNode = strAddrNode;
-        else
-            strThinblockNode = strAddrNode.substr(0, pos);
-        for (std::string &strAddr : vNodesIP)
-        {
-            if (strAddr == strThinblockNode)
-            {
-                nConnectionsOpen++;
-                if (!nNotCrossConnected.count(strAddr))
-                    nNotCrossConnected.insert(strAddr);
-                else
-                    nNotCrossConnected.erase(strAddr);
-            }
-        }
-    }
-    if (nNotCrossConnected.size() > 0)
-        return true;
-    else if (nConnectionsOpen > 0)
-        LOG(THIN,
-            "You have a cross connected thinblock node - we may download regular blocks until you resolve the issue\n");
-    return false; // Connections are either not open or they are cross connected.
+    stats.nTotalInbound = nInBoundBlocks();
+    stats.nTotalOutbound = nOutBoundBlocks();
+    stats.nTotalBandwidthSavings = computeTotalBandwidthSavingsInternal();
+
+    // NOTE: The following calls rely on the side-effect of the compute*Internal
+    //       calls also calling expireStats on the associated statistics maps
+    //       This is why we set the % value first, then the count second for compression values
+    stats.fLast24hInboundCompression =
+        compute24hAverageCompressionInternal(mapThinBlocksInBound, mapBloomFiltersOutBound);
+    stats.nLast24hInbound = mapThinBlocksInBound.size();
+    stats.fLast24hOutboundCompression =
+        compute24hAverageCompressionInternal(mapThinBlocksOutBound, mapBloomFiltersInBound);
+    stats.nLast24hOutbound = mapThinBlocksOutBound.size();
+    stats.fLast24hRerequestTxPercent = compute24hInboundRerequestTxPercentInternal();
+    stats.nLast24hRerequestTx = mapThinBlocksInBoundReRequestedTx.size();
 }
-
 
 bool HaveThinblockNodes()
 {
@@ -1409,59 +1472,11 @@ bool HaveThinblockNodes()
 bool IsThinBlocksEnabled() { return GetBoolArg("-use-thinblocks", true); }
 bool CanThinBlockBeDownloaded(CNode *pto)
 {
-    if (pto->ThinBlockCapable() && !GetBoolArg("-connect-thinblock-force", false))
+    LOCK(pto->cs_mapthinblocksinflight);
+    if (pto->mapThinBlocksInFlight.size() < 1 && pto->ThinBlockCapable())
         return true;
-    else if (pto->ThinBlockCapable() && GetBoolArg("-connect-thinblock-force", false))
-    {
-        // If connect-thinblock-force is true then we have to check that this node is in fact a connect-thinblock node.
 
-        // When -connect-thinblock-force is true we will only download thinblocks from a peer or peers that
-        // are using -connect-thinblock=<ip>.  This is an undocumented setting used for setting up performance testing
-        // of thinblocks, such as, going over the GFC and needing to have thinblocks always come from the same peer or
-        // group of peers.  Also, this is a one way street.  Thinblocks will flow ONLY from the remote peer to the peer
-        // that has invoked -connect-thinblock.
-
-        // Check if this node is also a connect-thinblock node
-        for (const std::string &strAddrNode : mapMultiArgs["-connect-thinblock"])
-            if (pto->addrName == strAddrNode)
-                return true;
-    }
     return false;
-}
-
-void ConnectToThinBlockNodes()
-{
-    // Connect to specific addresses
-    if (mapArgs.count("-connect-thinblock") && mapMultiArgs["-connect-thinblock"].size() > 0)
-    {
-        for (const std::string &strAddr : mapMultiArgs["-connect-thinblock"])
-        {
-            CAddress addr;
-            // NOTE: Because the only nodes we are connecting to here are the ones the user put in their
-            //      bitcoin.conf/commandline args as "-connect-thinblock", we don't use the semaphore to limit outbound
-            //      connections
-            OpenNetworkConnection(addr, false, nullptr, strAddr.c_str());
-            MilliSleep(500);
-        }
-    }
-}
-
-void CheckNodeSupportForThinBlocks()
-{
-    if (IsThinBlocksEnabled())
-    {
-        // Check that a nodes pointed to with connect-thinblock actually supports thinblocks
-        for (std::string &strAddr : mapMultiArgs["-connect-thinblock"])
-        {
-            CNodeRef node = FindNodeRef(strAddr);
-            if (node && !node->ThinBlockCapable())
-            {
-                LOGA("ERROR: You are trying to use connect-thinblocks but to a node that does not support it "
-                     "- Protocol Version: %d peer=%s\n",
-                    node->nVersion, node->GetLogName());
-            }
-        }
-    }
 }
 
 bool ClearLargestThinBlockAndDisconnect(CNode *pfrom)
@@ -1487,20 +1502,20 @@ bool ClearLargestThinBlockAndDisconnect(CNode *pfrom)
     return false;
 }
 
-void ClearThinBlockInFlight(CNode *pfrom, uint256 hash)
+void ClearThinBlockInFlight(CNode *pfrom, const uint256 &hash)
 {
     LOCK(pfrom->cs_mapthinblocksinflight);
     pfrom->mapThinBlocksInFlight.erase(hash);
 }
 
-void AddThinBlockInFlight(CNode *pfrom, uint256 hash)
+void AddThinBlockInFlight(CNode *pfrom, const uint256 &hash)
 {
     LOCK(pfrom->cs_mapthinblocksinflight);
     pfrom->mapThinBlocksInFlight.insert(
         std::pair<uint256, CNode::CThinBlockInFlight>(hash, CNode::CThinBlockInFlight()));
 }
 
-void SendXThinBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv)
+void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
 {
     if (inv.type == MSG_XTHINBLOCK)
     {
@@ -1540,6 +1555,8 @@ void SendXThinBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv)
                 LOG(THIN, "Sent xthinblock - size: %d vs block size: %d => tx hashes: %d transactions: %d peer: %s\n",
                     nSizeThinBlock, nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(),
                     pfrom->GetLogName());
+                thindata.UpdateThinBlock(nSizeThinBlock);
+                thindata.UpdateFullTx(::GetSerializeSize(xThinBlock.vMissingTx, SER_NETWORK, PROTOCOL_VERSION));
             }
             else
             {
@@ -1622,32 +1639,53 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
     std::set<uint256> setHighScoreMemPoolHashes;
     std::set<uint256> setPriorityMemPoolHashes;
 
-    // How much of the block should be dedicated to high-priority transactions.
-    // Logically this should be the same size as the DEFAULT_BLOCK_PRIORITY_SIZE however,
-    // we can't be sure that a miner won't decide to mine more high priority txs and therefore
-    // by including a full blocks worth of high priority tx's we cover every scenario.  And when we
-    // go on to add the high fee tx's there will be an intersection between the two which then makes
-    // the total number of tx's that go into the bloom filter smaller than just the sum of the two.
-    uint64_t nBlockPrioritySize = LargestBlockSeen() * 1.5;
-
-    // Largest projected block size used to add the high fee transactions.  We multiply it by an
-    // additional factor to take into account that miners may have slighty different policies when selecting
-    // high fee tx's from the pool.
-    uint64_t nBlockMaxProjectedSize = LargestBlockSeen() * 1.5;
-
-    std::vector<TxCoinAgePriority> vPriority;
-    TxCoinAgePriorityCompare pricomparer;
+    // When bloom filter targeting is turned on we try to limit the number of hashes we add to the bloom
+    // filter by approximately determining which transasctions are most likely to be mined in the next block.
+    //
+    // This helps to keep the size of the bloom filter down to a minimum however it also incurrs a small
+    // performance hit and therefore it is not done unless the memepool size is larger than the excessive
+    // block size, since there is no benefit to targeting if the blocks are likely big enough to clear the mempool.
+    if (GetBoolArg("-use-bloom-filter-targeting", DEFAULT_BLOOM_FILTER_TARGETING) &&
+        excessiveBlockSize < mempool.GetTotalTxSize())
     {
-        LOCK(cs_main);
-        READLOCK(mempool.cs);
-        if (mempool.mapTx.size() > 0)
-        {
-            CBlockIndex *pindexPrev = chainActive.Tip();
-            const int nHeight = pindexPrev->nHeight + 1;
-            const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
+        // How much of the block should be dedicated to high-priority transactions.
+        // Logically this should be the same size as the DEFAULT_BLOCK_PRIORITY_SIZE however,
+        // we can't be sure that a miner won't decide to mine more high priority txs and therefore
+        // by including a full blocks worth of high priority tx's we cover every scenario.  And when we
+        // go on to add the high fee tx's there will be an intersection between the two which then makes
+        // the total number of tx's that go into the bloom filter smaller than just the sum of the two.
+        uint64_t nBlockPrioritySize = excessiveBlockSize * 1.5;
 
-            int64_t nLockTimeCutoff =
-                (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : GetAdjustedTime();
+        // Largest projected block size used to add the high fee transactions.  We multiply it by an
+        // additional factor to take into account that miners may have slighty different policies when selecting
+        // high fee tx's from the pool.
+        uint64_t nBlockMaxProjectedSize = excessiveBlockSize * 1.5;
+
+        std::vector<TxCoinAgePriority> vPriority;
+        TxCoinAgePriorityCompare pricomparer;
+
+        uint64_t nMapTxSize = 0;
+        {
+            READLOCK(mempool.cs);
+            nMapTxSize = mempool.mapTx.size();
+        }
+
+        if (nMapTxSize > 0)
+        {
+            int nHeight = 0;
+            int64_t nMedianTimePast = 0;
+            int64_t nLockTimeCutoff = 0;
+            {
+                LOCK(cs_main);
+                CBlockIndex *pindexPrev = chainActive.Tip();
+                nHeight = pindexPrev->nHeight + 1;
+                nMedianTimePast = pindexPrev->GetMedianTimePast();
+
+                nLockTimeCutoff =
+                    (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : GetAdjustedTime();
+            }
+
+            READLOCK(mempool.cs);
 
             // Create a sorted list of transactions and their updated priorities.  This will be used to fill
             // the mempoolhashes with the expected priority area of the next block.  We will multiply this by
@@ -1695,11 +1733,12 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
             uint64_t nBlockSize = 0;
             while (mi != mempool.mapTx.get<3>().end())
             {
-                CTransaction tx = mi->GetTx();
+                const CTransaction &tx = mi->GetTx();
+                const uint256 &txHash = tx.GetHash();
 
                 if (!IsFinalTx(tx, nHeight, nLockTimeCutoff))
                 {
-                    LOG(BLOOM, "tx %s is not final\n", tx.GetHash().ToString());
+                    LOG(BLOOM, "tx %s is not final\n", txHash.ToString());
                     mi++;
                     continue;
                 }
@@ -1708,7 +1747,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
                 // it to the high score set if it can be and also add any parents or children.  Also add
                 // children and parents to the priority set tx's if they have any.
                 iter = mempool.mapTx.project<0>(mi);
-                if (!setHighScoreMemPoolHashes.count(tx.GetHash()))
+                if (!setHighScoreMemPoolHashes.count(txHash))
                 {
                     LOG(BLOOM,
                         "next tx is %s blocksize %d fee %d modified fee %d size %d clearatentry %d priority %f\n",
@@ -1716,14 +1755,14 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
                         mi->GetTxSize(), mi->WasClearAtEntry(), mi->GetPriority(nHeight));
 
                     // add tx to the set: we don't know if this is a parent or child yet.
-                    setHighScoreMemPoolHashes.insert(tx.GetHash());
+                    setHighScoreMemPoolHashes.insert(txHash);
 
                     // Add any parent tx's
                     bool fChild = false;
                     for (CTxMemPool::txiter parent : mempool.GetMemPoolParents(iter))
                     {
                         fChild = true;
-                        uint256 parentHash = parent->GetTx().GetHash();
+                        const uint256 &parentHash = parent->GetTx().GetHash();
                         if (!setHighScoreMemPoolHashes.count(parentHash))
                         {
                             setHighScoreMemPoolHashes.insert(parentHash);
@@ -1740,7 +1779,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
                     for (CTxMemPool::txiter child : mempool.GetMemPoolChildren(iter))
                     {
                         fHasChildren = true;
-                        uint256 childHash = child->GetTx().GetHash();
+                        const uint256 &childHash = child->GetTx().GetHash();
                         if (!setHighScoreMemPoolHashes.count(childHash))
                         {
                             setHighScoreMemPoolHashes.insert(childHash);
@@ -1768,6 +1807,13 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
             }
         }
     }
+    else // Add all the transaction hashes currently in the mempool
+    {
+        std::vector<uint256> vMempoolHashes;
+        mempool.queryHashes(vMempoolHashes);
+        setHighScoreMemPoolHashes.insert(vMempoolHashes.begin(), vMempoolHashes.end());
+    }
+
     LOG(THIN, "Bloom Filter Targeting completed in:%d (ms)\n", GetTimeMillis() - nStartTimer);
     nStartTimer = GetTimeMillis(); // reset the timer
 
@@ -1777,7 +1823,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
     static int64_t nStartGrowth = GetTime();
 
     // Tuning knobs for the false positive growth algorithm
-    static uint8_t nHoursToGrow = 72; // number of hours until maximum growth for false positive rate
+    static uint8_t nHoursToGrow = 12; // number of hours until maximum growth for false positive rate
     // use for nMinFalsePositive = 0.0001 and nMaxFalsePositive = 0.01 for
     // static double nGrowthCoefficient = 0.7676;
     // 6 hour growth period

@@ -155,7 +155,15 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
         return 0;
     }
     spos = pos;
+
+
+// Note: ignore further increment for static analysis
+// in pos as it is currently the last one and will cause a failure.
+// In the unlikely event this function gets extended,
+// remove or move the #ifndef below.
+#ifndef __clang_analyzer__
     pos += slen;
+#endif
 
     /* Ignore leading zeroes in R */
     while (rlen > 0 && input[rpos] == 0)
@@ -275,13 +283,13 @@ bool CPubKey::Decompress()
     return true;
 }
 
-bool CPubKey::Derive(CPubKey &pubkeyChild, ChainCode &ccChild, unsigned int nChild, const ChainCode &cc) const
+bool CPubKey::Derive(CPubKey &pubkeyChild, ChainCode &ccChild, unsigned int _nChild, const ChainCode &cc) const
 {
     assert(IsValid());
-    assert((nChild >> 31) == 0);
+    assert((_nChild >> 31) == 0);
     assert(begin() + 33 == end());
     unsigned char out[64];
-    BIP32Hash(cc, nChild, *begin(), begin() + 1, out);
+    BIP32Hash(cc, _nChild, *begin(), begin() + 1, out);
     memcpy(ccChild.begin(), out + 32, 32);
     secp256k1_pubkey pubkey;
     if (!secp256k1_ec_pubkey_parse(secp256k1_context_verify, &pubkey, &(*this)[0], size()))
@@ -321,13 +329,13 @@ void CExtPubKey::Decode(const unsigned char code[BIP32_EXTKEY_SIZE])
     pubkey.Set(code + 41, code + BIP32_EXTKEY_SIZE);
 }
 
-bool CExtPubKey::Derive(CExtPubKey &out, unsigned int nChild) const
+bool CExtPubKey::Derive(CExtPubKey &out, unsigned int _nChild) const
 {
     out.nDepth = nDepth + 1;
     CKeyID id = pubkey.GetID();
     memcpy(&out.vchFingerprint[0], &id, 4);
-    out.nChild = nChild;
-    return pubkey.Derive(out.pubkey, out.chaincode, nChild, chaincode);
+    out.nChild = _nChild;
+    return pubkey.Derive(out.pubkey, out.chaincode, _nChild, chaincode);
 }
 
 /* static */ bool CPubKey::CheckLowS(const std::vector<unsigned char> &vchSig)

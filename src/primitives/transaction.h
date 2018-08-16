@@ -10,9 +10,12 @@
 #include "amount.h"
 #include "script/script.h"
 #include "serialize.h"
+#include "tweak.h"
 #include "uint256.h"
 
 #include <memory>
+
+extern CTweak<unsigned int> nDustThreshold;
 
 /** An outpoint - a combination of a transaction hash and an index n into its vout */
 class COutPoint
@@ -144,24 +147,14 @@ public:
     bool IsNull() const { return (nValue == -1); }
     uint256 GetHash() const;
 
-    CAmount GetDustThreshold(const CFeeRate &minRelayTxFee) const
+    CAmount GetDustThreshold() const
     {
-        // "Dust" is defined in terms of CTransaction::minRelayTxFee,
-        // which has units satoshis-per-kilobyte.
-        // If you'd pay more than 1/3 in fees
-        // to spend something, then we consider it dust.
-        // A typical spendable txout is 34 bytes big, and will
-        // need a CTxIn of at least 148 bytes to spend:
-        // so dust is a spendable txout less than
-        // 546*minRelayTxFee/1000 (in satoshis)
         if (scriptPubKey.IsUnspendable())
-            return 0;
+            return (CAmount)0;
 
-        size_t nSize = GetSerializeSize(*this, SER_DISK, 0) + 148u;
-        return 3 * minRelayTxFee.GetFee(nSize);
+        return (CAmount)nDustThreshold.Value();
     }
-
-    bool IsDust(const CFeeRate &minRelayTxFee) const { return (nValue < GetDustThreshold(minRelayTxFee)); }
+    bool IsDust() const { return (nValue < GetDustThreshold()); }
     friend bool operator==(const CTxOut &a, const CTxOut &b)
     {
         return (a.nValue == b.nValue && a.scriptPubKey == b.scriptPubKey);
@@ -232,6 +225,9 @@ public:
 
     bool IsNull() const { return vin.empty() && vout.empty(); }
     const uint256 &GetHash() const { return hash; }
+    // True if only scriptSigs are different
+    bool IsEquivalentTo(const CTransaction &tx) const;
+
     // Return sum of txouts.
     CAmount GetValueOut() const;
     // GetValueIn() is a method on CCoinsViewCache, because
@@ -247,6 +243,9 @@ public:
     friend bool operator==(const CTransaction &a, const CTransaction &b) { return a.hash == b.hash; }
     friend bool operator!=(const CTransaction &a, const CTransaction &b) { return a.hash != b.hash; }
     std::string ToString() const;
+
+    // Return the size the transaction in bytes.
+    uint32_t GetTxSize() const;
 };
 
 /** A mutable version of CTransaction. */
@@ -266,7 +265,6 @@ struct CMutableTransaction
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(this->nVersion);
-        nVersion = this->nVersion;
         READWRITE(vin);
         READWRITE(vout);
         READWRITE(nLockTime);
@@ -291,6 +289,4 @@ static inline CTransactionRef MakeTransactionRef(Tx &&txIn)
 {
     return std::make_shared<const CTransaction>(std::forward<Tx>(txIn));
 }
-static inline CTransactionRef MakeTransactionRef(const CTransactionRef &txIn) { return txIn; }
-static inline CTransactionRef MakeTransactionRef(CTransactionRef &&txIn) { return std::move(txIn); }
 #endif // BITCOIN_PRIMITIVES_TRANSACTION_H

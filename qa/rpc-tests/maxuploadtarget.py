@@ -2,7 +2,7 @@
 # Copyright (c) 2015-2016 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 from test_framework.mininode import *
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
@@ -194,6 +194,12 @@ class MaxUploadTest(BitcoinTestFramework):
         [x.wait_for_verack() for x in test_nodes]
 
         # Test logic begins here
+
+        # Must reset these settings because since the May152018 hardfork the minimum EB is set to 32MB on startup,
+        # but in order for this test to run properly and in a reasonable amount of time we set these values back
+        # to something smaller.
+        self.nodes[0].setminingmaxblock(self.blockmaxsize);
+        self.nodes[0].setexcessiveblock(EXCESSIVE_BLOCKSIZE, 1)
 
         # Now mine a big block
         self.mine_big_block(self.nodes[0], self.nodes[0].getnewaddress())

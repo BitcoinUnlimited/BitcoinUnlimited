@@ -12,6 +12,7 @@
 #include "compat.h"
 #include "fs.h"
 #include "hash.h"
+#include "iblt.h"
 #include "limitedmap.h"
 #include "netbase.h"
 #include "primitives/block.h"
@@ -29,7 +30,6 @@
 #include <arpa/inet.h>
 #endif
 
-#include <boost/foreach.hpp>
 #include <boost/signals2/signal.hpp>
 
 #include "banentry.h"
@@ -307,6 +307,18 @@ public:
         }
     };
 
+    struct CGrapheneBlockInFlight
+    {
+        int64_t nRequestTime;
+        bool fReceived;
+
+        CGrapheneBlockInFlight()
+        {
+            nRequestTime = GetTime();
+            fReceived = false;
+        }
+    };
+
     // socket
     uint64_t nServices;
     SOCKET hSocket;
@@ -383,14 +395,39 @@ public:
     uint64_t nLocalThinBlockBytes; // the bytes used in creating this thinblock, updated dynamically
     int nSizeThinBlock; // Original on-wire size of the block. Just used for reporting
     int thinBlockWaitingForTxns; // if -1 then not currently waiting
-    CCriticalSection cs_mapthinblocksinflight; // lock mapThinBlocksInFlight
-    std::map<uint256, CThinBlockInFlight> mapThinBlocksInFlight; // thin blocks in flight and the time requested.
+
+    // thin blocks in flight and the time they were requested.
+    CCriticalSection cs_mapthinblocksinflight;
+    std::map<uint256, CThinBlockInFlight> mapThinBlocksInFlight GUARDED_BY(cs_mapthinblocksinflight);
+
     double nGetXBlockTxCount; // Count how many get_xblocktx requests are made
     uint64_t nGetXBlockTxLastTime; // The last time a get_xblocktx request was made
     double nGetXthinCount; // Count how many get_xthin requests are made
     uint64_t nGetXthinLastTime; // The last time a get_xthin request was made
     uint32_t nXthinBloomfilterSize; // The maximum xthin bloom filter size (in bytes) that our peer will accept.
     // BUIP010 Xtreme Thinblocks: end section
+
+    // BUIPXXX Graphene blocks: begin section
+    CBlock grapheneBlock;
+    std::vector<uint256> grapheneBlockHashes;
+    std::map<uint64_t, uint32_t> grapheneMapHashOrderIndex;
+    std::map<uint64_t, CTransaction> mapGrapheneMissingTx;
+    uint64_t nLocalGrapheneBlockBytes; // the bytes used in creating this graphene block, updated dynamically
+    int nSizeGrapheneBlock; // Original on-wire size of the block. Just used for reporting
+    int grapheneBlockWaitingForTxns; // if -1 then not currently waiting
+    CCriticalSection cs_grapheneadditionaltxs; // lock grapheneAdditionalTxs
+    std::vector<CTransactionRef> grapheneAdditionalTxs; // entire transactions included in graphene block
+
+    // graphene blocks in flight and the time they were requested.
+    CCriticalSection cs_mapgrapheneblocksinflight;
+    std::map<uint256, CGrapheneBlockInFlight> mapGrapheneBlocksInFlight GUARDED_BY(cs_mapgrapheneblocksinflight);
+
+    double nGetGrapheneBlockTxCount; // Count how many get_xblocktx requests are made
+    uint64_t nGetGrapheneBlockTxLastTime; // The last time a get_xblocktx request was made
+    double nGetGrapheneCount; // Count how many get_graphene requests are made
+    uint64_t nGetGrapheneLastTime; // The last time a get_graphene request was made
+    uint32_t nGrapheneBloomfilterSize; // The maximum graphene bloom filter size (in bytes) that our peer will accept.
+    // BUIPXXX Graphene blocks: end section
 
     CCriticalSection cs_nAvgBlkResponseTime;
     double nAvgBlkResponseTime;
@@ -490,7 +527,7 @@ public:
     unsigned int GetTotalRecvSize()
     {
         unsigned int total = 0;
-        BOOST_FOREACH (const CNetMessage &msg, vRecvMsg)
+        for (const CNetMessage &msg : vRecvMsg)
             total += msg.vRecv.size() + 24;
         return total;
     }
@@ -502,7 +539,7 @@ public:
     void SetRecvVersion(int nVersionIn)
     {
         nRecvVersion = nVersionIn;
-        BOOST_FOREACH (CNetMessage &msg, vRecvMsg)
+        for (CNetMessage &msg : vRecvMsg)
             msg.SetVersion(nVersionIn);
     }
 
@@ -517,11 +554,24 @@ public:
         return this;
     }
 
-    void Release() { nRefCount--; }
+    void Release()
+    {
+        DbgAssert(nRefCount > 0, );
+        nRefCount--;
+    }
+
     // BUIP010:
     bool ThinBlockCapable()
     {
         if (nServices & NODE_XTHIN)
+            return true;
+        return false;
+    }
+
+    // BUIPXXX:
+    bool GrapheneCapable()
+    {
+        if (nServices & NODE_GRAPHENE)
             return true;
         return false;
     }
@@ -794,6 +844,19 @@ public:
         return idstr;
     }
 
+    //! Disconnects after receiving all the blocks we are waiting for.  Typically this happens if the node is
+    // responding slowly compared to other nodes.
+    void InitiateGracefulDisconnect()
+    {
+        if (!fDisconnectRequest)
+        {
+            fDisconnectRequest = true;
+            // But we need to make sure this connection is actually alive by attempting a send
+            // otherwise there is no reason to wait (up to PING_INTERVAL seconds).
+            // If the other side of a TCP connection goes silent you need to do a send to find out that its dead.
+            fPingQueued = true;
+        }
+    }
 
     void copyStats(CNodeStats &stats);
 
@@ -872,8 +935,8 @@ private:
 typedef std::vector<CNodeRef> VNodeRefs;
 
 class CTransaction;
-void RelayTransaction(const CTransaction &tx);
-void RelayTransaction(const CTransaction &tx, const CDataStream &ss);
+void RelayTransaction(const CTransaction &tx, const bool fRespend = false);
+void RelayTransaction(const CTransaction &tx, const CDataStream &ss, const bool fRespend = false);
 
 /** Access to the (IP) address database (peers.dat) */
 class CAddrDB

@@ -73,7 +73,7 @@ class CTxMemPool;
 class CTxMemPoolEntry
 {
 private:
-    CTransaction tx;
+    CTransactionRef tx;
     CAmount nFee; //! Cached to avoid expensive parent-transaction lookups
     size_t nTxSize; //! ... and avoid recomputing tx size
     size_t nModSize; //! ... and modified size for priority
@@ -102,7 +102,7 @@ private:
 public:
     unsigned char sighashType;
     CTxMemPoolEntry();
-    CTxMemPoolEntry(const CTransaction &_tx,
+    CTxMemPoolEntry(const CTransactionRef &_tx,
         const CAmount &_nFee,
         int64_t _nTime,
         double _entryPriority,
@@ -114,8 +114,8 @@ public:
         LockPoints lp);
     CTxMemPoolEntry(const CTxMemPoolEntry &other);
 
-    const CTransaction &GetTx() const { return this->tx; }
-    CTransactionRef GetSharedTx() const { return MakeTransactionRef(std::move(this->tx)); }
+    const CTransaction &GetTx() const { return *this->tx; }
+    CTransactionRef GetSharedTx() const { return this->tx; }
     /**
      * Fast calculation of lower bound of current priority as update
      * from entry priority. Only inputs that were originally in-chain will age.
@@ -162,7 +162,7 @@ struct update_descendant_state
     {
     }
 
-    void operator()(CTxMemPoolEntry &e) { e.UpdateState(modifySize, modifyFee, modifyCount); }
+    void operator()(CTxMemPoolEntry &e) const { e.UpdateState(modifySize, modifyFee, modifyCount); }
 private:
     int64_t modifySize;
     CAmount modifyFee;
@@ -171,13 +171,13 @@ private:
 
 struct set_dirty
 {
-    void operator()(CTxMemPoolEntry &e) { e.SetDirty(); }
+    void operator()(CTxMemPoolEntry &e) const { e.SetDirty(); }
 };
 
 struct update_fee_delta
 {
     update_fee_delta(int64_t _feeDelta) : feeDelta(_feeDelta) {}
-    void operator()(CTxMemPoolEntry &e) { e.UpdateFeeDelta(feeDelta); }
+    void operator()(CTxMemPoolEntry &e) const { e.UpdateFeeDelta(feeDelta); }
 private:
     int64_t feeDelta;
 };
@@ -185,7 +185,7 @@ private:
 struct update_lock_points
 {
     update_lock_points(const LockPoints &_lp) : lp(_lp) {}
-    void operator()(CTxMemPoolEntry &e) { e.UpdateLockPoints(lp); }
+    void operator()(CTxMemPoolEntry &e) const { e.UpdateLockPoints(lp); }
 private:
     const LockPoints &lp;
 };
@@ -204,7 +204,7 @@ struct mempoolentry_txid
 class CompareTxMemPoolEntryByDescendantScore
 {
 public:
-    bool operator()(const CTxMemPoolEntry &a, const CTxMemPoolEntry &b)
+    bool operator()(const CTxMemPoolEntry &a, const CTxMemPoolEntry &b) const
     {
         bool fUseADescendants = UseDescendantScore(a);
         bool fUseBDescendants = UseDescendantScore(b);
@@ -227,7 +227,7 @@ public:
     }
 
     // Calculate which score to use for an entry (avoiding division).
-    bool UseDescendantScore(const CTxMemPoolEntry &a)
+    bool UseDescendantScore(const CTxMemPoolEntry &a) const
     {
         double f1 = (double)a.GetModifiedFee() * a.GetSizeWithDescendants();
         double f2 = (double)a.GetModFeesWithDescendants() * a.GetTxSize();
@@ -242,7 +242,7 @@ public:
 class CompareTxMemPoolEntryByScore
 {
 public:
-    bool operator()(const CTxMemPoolEntry &a, const CTxMemPoolEntry &b)
+    bool operator()(const CTxMemPoolEntry &a, const CTxMemPoolEntry &b) const
     {
         double f1 = (double)a.GetModifiedFee() * b.GetTxSize();
         double f2 = (double)b.GetModifiedFee() * a.GetTxSize();
@@ -257,7 +257,7 @@ public:
 class CompareTxMemPoolEntryByEntryTime
 {
 public:
-    bool operator()(const CTxMemPoolEntry &a, const CTxMemPoolEntry &b) { return a.GetTime() < b.GetTime(); }
+    bool operator()(const CTxMemPoolEntry &a, const CTxMemPoolEntry &b) const { return a.GetTime() < b.GetTime(); }
 };
 
 // Multi_index tag names
@@ -624,12 +624,12 @@ public:
         return totalTxSize;
     }
 
-    bool exists(uint256 hash) const
+    bool exists(const uint256 &hash) const
     {
         READLOCK(cs);
         return (mapTx.count(hash) != 0);
     }
-    bool _exists(uint256 hash) const { return (mapTx.count(hash) != 0); }
+    bool _exists(const uint256 &hash) const { return (mapTx.count(hash) != 0); }
     double TransactionsPerSecond()
     {
         boost::mutex::scoped_lock lock(cs_txPerSec);

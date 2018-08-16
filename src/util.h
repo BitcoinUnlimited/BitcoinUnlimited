@@ -89,9 +89,15 @@ extern CTranslationInterface translationInterface;
 
 extern const char *const BITCOIN_CONF_FILENAME;
 extern const char *const BITCOIN_PID_FILENAME;
+extern const char *const FORKS_CSV_FILENAME; // bip135 added
 
 /** Send a string to the log output */
 int LogPrintStr(const std::string &str);
+
+// Takes a std::vector of strings and splits individual arguments further up if
+// they contain commas. Also removes space from the output strings.
+// For example, ["a", "b,c", "d"] becomes ["a", "b", "c", "d"]
+extern std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args);
 
 // Logging API:
 // Use the two macros
@@ -151,7 +157,9 @@ enum
     SELECTCOINS = 0x1000000,
     ZMQ = 0x2000000,
     QT = 0x4000000,
-    IBD = 0x8000000
+    IBD = 0x8000000,
+    GRAPHENE = 0x10000000,
+    RESPEND = 0x20000000
 };
 
 // Add corresponding lower case string for the category:
@@ -163,6 +171,7 @@ enum
             {MEMPOOLREJ, "mempoolrej"}, {BLK, "blk"}, {EVICT, "evict"}, {PARALLEL, "parallel"}, {RAND, "rand"}, \
             {REQ, "req"}, {BLOOM, "bloom"}, {LCK, "lck"}, {PROXY, "proxy"}, {DBASE, "dbase"},                   \
             {SELECTCOINS, "selectcoins"}, {ESTIMATEFEE, "estimatefee"}, {QT, "qt"}, {IBD, "ibd"},               \
+            {GRAPHENE, "graphene"}, {RESPEND, "respend"},                                                       \
         {                                                                                                       \
             ZMQ, "zmq"                                                                                          \
         }                                                                                                       \
@@ -363,6 +372,7 @@ fs::path GetDefaultDataDir();
 const fs::path &GetDataDir(bool fNetSpecific = true);
 void ClearDatadirCache();
 fs::path GetConfigFile(const std::string &confPath);
+fs::path GetForksCsvFile(); // bip135 added
 #ifndef WIN32
 fs::path GetPidFile();
 void CreatePidFile(const fs::path &path, pid_t pid);
@@ -473,5 +483,11 @@ void TraceThread(const char *name, Callable func)
 }
 
 std::string CopyrightHolders(const std::string &strPrefix);
+
+/** Wildcard matching of strings
+The first argument (the pattern) might contain '?' and '*' wildcards and
+the second argument will be matched to this pattern. Returns true iff the string
+matches pattern. */
+bool wildmatch(std::string pattern, std::string test);
 
 #endif // BITCOIN_UTIL_H

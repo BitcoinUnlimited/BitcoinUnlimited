@@ -185,6 +185,8 @@ UniValue validateaddress(const UniValue &params, bool fHelp)
             "  \"iscompressed\" : true|false,  (boolean) If the address is compressed\n"
             "  \"account\" : \"account\"         (string) DEPRECATED. The account associated with the address, \"\" is "
             "the default account\n"
+            "  \"hdkeypath\" : \"keypath\"       (string, optional) The HD keypath if the key is HD and available\n"
+            "  \"hdmasterkeyid\" : \"<hash160>\" (hex string, optional) The Hash160 of the HD master pubkey\n"
             "}\n"
             "\nExamples:\n" +
             HelpExampleCli("validateaddress", "\"1PSSGeFHDnKNxiEyFrD1wcEaHr9hrQDDWc\"") +
@@ -217,6 +219,16 @@ UniValue validateaddress(const UniValue &params, bool fHelp)
         ret.pushKVs(detail);
         if (pwalletMain && pwalletMain->mapAddressBook.count(dest))
             ret.push_back(Pair("account", pwalletMain->mapAddressBook[dest].name));
+        const CKeyID *keyID = boost::get<CKeyID>(&dest);
+        if (keyID)
+        {
+            if (pwalletMain && pwalletMain->mapKeyMetadata.count(*keyID) &&
+                !pwalletMain->mapKeyMetadata[*keyID].hdKeypath.empty())
+            {
+                ret.push_back(Pair("hdkeypath", pwalletMain->mapKeyMetadata[*keyID].hdKeypath));
+                ret.push_back(Pair("hdmasterkeyid", pwalletMain->mapKeyMetadata[*keyID].hdMasterKeyID.GetHex()));
+            }
+        }
 #endif
     }
     return ret;
@@ -413,7 +425,7 @@ UniValue setmocktime(const UniValue &params, bool fHelp)
     SetMockTime(params[0].get_int64());
 
     uint64_t t = GetTime();
-    BOOST_FOREACH (CNode *pnode, vNodes)
+    for (CNode *pnode : vNodes)
     {
         pnode->nLastSend = pnode->nLastRecv = t;
     }
@@ -432,8 +444,8 @@ static const CRPCCommand commands[] = {
     {"hidden", "setmocktime", &setmocktime, true},
 };
 
-void RegisterMiscRPCCommands(CRPCTable &tableRPC)
+void RegisterMiscRPCCommands(CRPCTable &table)
 {
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
-        tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
+    for (auto cmd : commands)
+        table.appendCommand(cmd);
 }

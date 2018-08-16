@@ -19,6 +19,8 @@ class CReserveKey;
 class CScript;
 class CWallet;
 
+extern CScript COINBASE_FLAGS;
+
 namespace Consensus
 {
 struct Params;
@@ -63,7 +65,7 @@ private:
 public:
     BlockAssembler(const CChainParams &chainparams);
     /** Construct a new block template with coinbase to scriptPubKeyIn */
-    CBlockTemplate *CreateNewBlock(const CScript &scriptPubKeyIn);
+    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript &scriptPubKeyIn);
 
 private:
     // utility functions
@@ -87,7 +89,7 @@ private:
     /** Bytes to reserve for coinbase and block header */
     uint64_t reserveBlockSize(const CScript &scriptPubKeyIn);
     /** Internal method to construct a new block template */
-    CBlockTemplate *CreateNewBlock(const CScript &scriptPubKeyIn, bool blockstreamCoreCompatible);
+    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript &scriptPubKeyIn, bool blockstreamCoreCompatible);
     /** Constructs a coinbase transaction */
     CTransactionRef coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue);
 };
@@ -95,5 +97,13 @@ private:
 /** Modify the extranonce in a block */
 void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce);
 int64_t UpdateTime(CBlockHeader *pblock, const Consensus::Params &consensusParams, const CBlockIndex *pindexPrev);
+
+// TODO: There is no mining.h
+// Create mining.h (The next two functions are in mining.cpp) or leave them here ?
+
+/** Submit a mined block */
+UniValue SubmitBlock(CBlock &block);
+/** Make a block template to send to miners. */
+UniValue mkblocktemplate(const UniValue &params, CBlock *pblockOut);
 
 #endif // BITCOIN_MINER_H

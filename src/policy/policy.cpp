@@ -12,8 +12,6 @@
 #include "util.h"
 #include "utilstrencodings.h"
 
-#include <boost/foreach.hpp>
-
 /**
  * Check transaction inputs to mitigate two
  * potential denial-of-service attacks:
@@ -79,7 +77,7 @@ bool IsStandardTx(const CTransaction &tx, std::string &reason)
         return false;
     }
 
-    BOOST_FOREACH (const CTxIn &txin, tx.vin)
+    for (const CTxIn &txin : tx.vin)
     {
         // Biggest 'standard' txin is a 15-of-15 P2SH multisig with compressed
         // keys. (remember the 520 byte limit on redeemScript size) That works
@@ -102,7 +100,7 @@ bool IsStandardTx(const CTransaction &tx, std::string &reason)
 
     unsigned int nDataOut = 0;
     txnouttype whichType;
-    BOOST_FOREACH (const CTxOut &txout, tx.vout)
+    for (const CTxOut &txout : tx.vout)
     {
         if (!::IsStandard(txout.scriptPubKey, whichType))
         {
@@ -117,7 +115,7 @@ bool IsStandardTx(const CTransaction &tx, std::string &reason)
             reason = "bare-multisig";
             return false;
         }
-        else if (txout.IsDust(::minRelayTxFee))
+        else if (txout.IsDust())
         {
             reason = "dust";
             return false;
@@ -141,14 +139,17 @@ bool AreInputsStandard(const CTransaction &tx, const CCoinsViewCache &mapInputs)
 
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        const CTxOut &prev = mapInputs.AccessCoin(tx.vin[i].prevout).out;
-
-        std::vector<std::vector<unsigned char> > vSolutions;
         txnouttype whichType;
-        // get the scriptPubKey corresponding to this input:
-        const CScript &prevScript = prev.scriptPubKey;
-        if (!Solver(prevScript, whichType, vSolutions))
-            return false;
+        {
+            LOCK(mapInputs.cs_utxo);
+            const CTxOut &prev = mapInputs.AccessCoin(tx.vin[i].prevout).out;
+
+            std::vector<std::vector<unsigned char> > vSolutions;
+            // get the scriptPubKey corresponding to this input:
+            const CScript &prevScript = prev.scriptPubKey;
+            if (!Solver(prevScript, whichType, vSolutions))
+                return false;
+        }
 
         if (whichType == TX_SCRIPTHASH)
         {

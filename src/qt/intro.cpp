@@ -65,7 +65,7 @@ private:
 
 #include "intro.moc"
 
-FreespaceChecker::FreespaceChecker(Intro *intro) { this->intro = intro; }
+FreespaceChecker::FreespaceChecker(Intro *_intro) { this->intro = _intro; }
 void FreespaceChecker::check()
 {
     QString dataDirStr = intro->getPathToCheck();

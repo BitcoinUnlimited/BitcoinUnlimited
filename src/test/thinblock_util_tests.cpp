@@ -10,14 +10,14 @@
 
 
 BOOST_FIXTURE_TEST_SUITE(thinblock_util_tests, BasicTestingSetup)
-BOOST_AUTO_TEST_CASE(TestCBufferedFile)
+BOOST_AUTO_TEST_CASE(test_format_info_unit)
 {
     const double pinf = std::numeric_limits<double>::infinity();
     const double ninf = -pinf;
     const double qnan = std::numeric_limits<double>::quiet_NaN();
     const double snan = std::numeric_limits<double>::signaling_NaN();
 
-    // exercise special values as well to make sure they don't due
+    // exercise special values as well to make sure they don't do
     // any overruns etc.
     formatInfoUnit(pinf);
     formatInfoUnit(ninf);

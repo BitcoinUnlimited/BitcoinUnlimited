@@ -3,7 +3,7 @@
 # Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 #
 # Test RPC calls related to blockchain state. Tests correspond to code in
 # rpc/blockchain.cpp.
@@ -41,6 +41,7 @@ class BlockchainTest(BitcoinTestFramework):
         self._test_gettxoutsetinfo()
         self._test_getblockheader()
         self._test_rollbackchain()
+        self._test_transaction_pools()
         self.nodes[0].verifychain(4, 0)
 
     def _test_gettxoutsetinfo(self):
@@ -216,6 +217,23 @@ class BlockchainTest(BitcoinTestFramework):
         # Reconsider the fork2. Blocks should now be fully reconnected on fork2.
         self.nodes[0].reconsiderblock(bestblockhash2)
         assert_equal(self.nodes[0].getbestblockhash(), bestblockhash2);
+
+    def _test_transaction_pools(self):
+        node = self.nodes[0]
+
+        # main txn pool
+        res = node.getmempoolinfo()
+        assert_equal(res['size'], 0)
+        assert_equal(res['bytes'], 0)
+        assert_equal(res['usage'], 0)
+        assert_equal(res['bytes'], 0)
+        assert_equal(res['maxmempool'], 300000000)
+        assert_equal(res['mempoolminfee'], Decimal('0E-8'))
+
+        # orphan pool
+        res2 = node.getorphanpoolinfo()
+        assert_equal(res2['size'], 0)
+        assert_equal(res2['bytes'], 0)
 
 
 if __name__ == '__main__':

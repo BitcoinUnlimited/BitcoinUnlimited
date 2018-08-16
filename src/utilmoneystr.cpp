@@ -40,6 +40,7 @@ bool ParseMoney(const char *pszIn, CAmount &nRet)
     string strWhole;
     int64_t nUnits = 0;
     const char *p = pszIn;
+    nRet = 0;
     while (isspace(*p))
         p++;
     for (; *p; p++)

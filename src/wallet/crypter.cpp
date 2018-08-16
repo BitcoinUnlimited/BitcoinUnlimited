@@ -11,7 +11,6 @@
 #include "script/standard.h"
 #include "util.h"
 
-#include <boost/foreach.hpp>
 #include <string>
 #include <vector>
 
@@ -302,7 +301,7 @@ bool CCryptoKeyStore::EncryptKeys(CKeyingMaterial &vMasterKeyIn)
             return false;
 
         fUseCrypto = true;
-        BOOST_FOREACH (KeyMap::value_type &mKey, mapKeys)
+        for (KeyMap::value_type &mKey : mapKeys)
         {
             const CKey &key = mKey.second;
             CPubKey vchPubKey = key.GetPubKey();

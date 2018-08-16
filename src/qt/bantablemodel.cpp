@@ -53,9 +53,7 @@ public:
         dosMan.GetBanned(banMap);
 
         cachedBanlist.clear();
-#if QT_VERSION >= 0x040700
         cachedBanlist.reserve(banMap.size());
-#endif
         for (banmap_t::iterator it = banMap.begin(); it != banMap.end(); it++)
         {
             CCombinedBan banEntry;
@@ -82,12 +80,17 @@ public:
 BanTableModel::BanTableModel(ClientModel *parent) : QAbstractTableModel(parent), clientModel(parent)
 {
     columns << tr("IP/Netmask") << tr("Banned Until");
-    priv = new BanTablePriv();
+    priv.reset(new BanTablePriv());
     // default to unsorted
     priv->sortColumn = -1;
 
     // load initial data
     refresh();
+}
+
+BanTableModel::~BanTableModel()
+{
+    // Intentionally left empty
 }
 
 int BanTableModel::rowCount(const QModelIndex &parent) const

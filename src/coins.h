@@ -18,7 +18,6 @@
 #include <assert.h>
 #include <stdint.h>
 
-#include <boost/foreach.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/shared_mutex.hpp>
 
@@ -272,7 +271,12 @@ public:
     /**
      * Empty the coins cache. Used primarily when we're shutting down and want to release memory
      */
-    void Clear() { cacheCoins.clear(); }
+    void Clear()
+    {
+        LOCK(cs_utxo);
+        cacheCoins.clear();
+    }
+
     /**
      * Remove excess entries from this cache.
      * Entries are trimmed starting from the beginning of the map.  In this way if those entries

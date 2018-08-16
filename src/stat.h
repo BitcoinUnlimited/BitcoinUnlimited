@@ -69,9 +69,9 @@ public:
     virtual ~CStatBase(){};
     virtual UniValue GetNow() = 0; // Returns the current value of this statistic
     virtual UniValue GetTotal() = 0; // Returns the cumulative value of this statistic
-    virtual UniValue GetSeries(const std::string &name, int count) = 0; // Returns the historical or series data
+    virtual UniValue GetSeries(const std::string &_name, int count) = 0; // Returns the historical or series data
     // Returns the historical or series data along with timestamp
-    virtual UniValue GetSeriesTime(const std::string &name, int count) = 0;
+    virtual UniValue GetSeriesTime(const std::string &_namep, int count) = 0;
 };
 
 template <class DataType, class RecordType = DataType>
@@ -143,11 +143,11 @@ public:
     RecordType &operator()() { return value; }
     virtual UniValue GetNow() { return UniValue(value); }
     virtual UniValue GetTotal() { return NullUniValue; }
-    virtual UniValue GetSeries(const std::string &name, int count)
+    virtual UniValue GetSeries(const std::string &_name, int count)
     {
         return NullUniValue; // Has no series data
     }
-    virtual UniValue GetSeriesTime(const std::string &name, int count)
+    virtual UniValue GetSeriesTime(const std::string &_name, int count)
     {
         return NullUniValue; // Has no series data
     }
@@ -198,28 +198,28 @@ public:
     {
         Clear(false);
     }
-    CStatHistory(const char *name, unsigned int operation = STAT_OP_SUM)
-        : CStat<DataType, RecordType>(name), op(operation), timer(stat_io_service)
+    CStatHistory(const char *_name, unsigned int operation = STAT_OP_SUM)
+        : CStat<DataType, RecordType>(_name), op(operation), timer(stat_io_service)
     {
         Clear();
     }
 
-    CStatHistory(const std::string &name, unsigned int operation = STAT_OP_SUM)
-        : CStat<DataType, RecordType>(name), op(operation), timer(stat_io_service)
+    CStatHistory(const std::string &_name, unsigned int operation = STAT_OP_SUM)
+        : CStat<DataType, RecordType>(_name), op(operation), timer(stat_io_service)
     {
         Clear();
     }
 
-    void init(const char *name, unsigned int operation = STAT_OP_SUM)
+    void init(const char *_name, unsigned int operation = STAT_OP_SUM)
     {
-        CStat<DataType, RecordType>::init(name);
+        CStat<DataType, RecordType>::init(_name);
         op = operation;
         Clear();
     }
 
-    void init(const std::string &name, unsigned int operation = STAT_OP_SUM)
+    void init(const std::string &_name, unsigned int operation = STAT_OP_SUM)
     {
-        CStat<DataType, RecordType>::init(name);
+        CStat<DataType, RecordType>::init(_name);
         op = operation;
         Clear();
     }
@@ -298,23 +298,23 @@ public:
         }
     }
 
-    int Series(int series, DataType *array, int len)
+    int Series(int series, DataType *array, int _len)
     {
         assert(series < STATISTICS_NUM_RANGES);
-        if (len > STATISTICS_SAMPLES)
-            len = STATISTICS_SAMPLES;
+        if (_len > STATISTICS_SAMPLES)
+            _len = STATISTICS_SAMPLES;
 
         int pos = loc[series] - STATISTICS_SAMPLES;
         if (pos < 0)
             pos += STATISTICS_SAMPLES;
-        for (int i = 0; i < len; i++, pos++) // could be a lot more efficient with 2 memcpy
+        for (int i = 0; i < _len; i++, pos++) // could be a lot more efficient with 2 memcpy
         {
             if (pos >= STATISTICS_SAMPLES)
                 pos -= STATISTICS_SAMPLES;
             array[i] = history[series][pos];
         }
 
-        return len;
+        return _len;
     }
 
     virtual UniValue GetTotal()
@@ -325,11 +325,11 @@ public:
         return UniValue(total);
     }
 
-    virtual UniValue GetSeries(const std::string &name, int count)
+    virtual UniValue GetSeries(const std::string &_name, int count)
     {
         for (int series = 0; series < STATISTICS_NUM_RANGES; series++)
         {
-            if (name == sampleNames[series])
+            if (_name == sampleNames[series])
             {
                 UniValue ret(UniValue::VARR);
                 if (count < 0)
@@ -360,11 +360,11 @@ public:
         return history[series][pos];
     }
 
-    virtual UniValue GetSeriesTime(const std::string &name, int count)
+    virtual UniValue GetSeriesTime(const std::string &_name, int count)
     {
         for (int series = 0; series < STATISTICS_NUM_RANGES; series++)
         {
-            if (name == sampleNames[series])
+            if (_name == sampleNames[series])
             {
                 UniValue data(UniValue::VARR);
                 UniValue times(UniValue::VARR);

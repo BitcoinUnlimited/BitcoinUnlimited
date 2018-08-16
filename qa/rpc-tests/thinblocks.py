@@ -3,7 +3,7 @@
 # Copyright (c) 2015-2016 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
@@ -16,13 +16,14 @@ class ThinBlockTest(BitcoinTestFramework):
 
     def setup_chain(self):
         print ("Initializing test directory " + self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir, 3)
+        initialize_chain_clean(self.options.tmpdir, 4)
 
     def setup_network(self, split=False):
         node_opts1 = [
             "-rpcservertimeout=0",
             "-debug=thin",
             "-use-thinblocks=1",
+            "-use-bloom-filter-targeting=0",
             "-excessiveblocksize=6000000",
             "-blockprioritysize=6000000",
             "-blockmaxsize=6000000",
@@ -33,15 +34,28 @@ class ThinBlockTest(BitcoinTestFramework):
             "-rpcservertimeout=0",
             "-debug=thin",
             "-use-thinblocks=1",
+            "-use-bloom-filter-targeting=0",
             "-excessiveblocksize=6000000",
             "-blockprioritysize=6000000",
             "-blockmaxsize=6000000",
             "-peerbloomfilters=0"]
 
+        # This node has bloom filter targeting enabled.
+        node_opts3 = [
+            "-rpcservertimeout=0",
+            "-debug=thin",
+            "-use-thinblocks=1",
+            "-use-bloom-filter-targeting=1",
+            "-excessiveblocksize=6000000",
+            "-blockprioritysize=6000000",
+            "-blockmaxsize=6000000",
+            "-peerbloomfilters=1"]
+
         self.nodes = [
             start_node(0, self.options.tmpdir, node_opts1),
             start_node(1, self.options.tmpdir, node_opts1),
-            start_node(2, self.options.tmpdir, node_opts2)
+            start_node(2, self.options.tmpdir, node_opts2),
+            start_node(3, self.options.tmpdir, node_opts3)
         ]
         interconnect_nodes(self.nodes)
         self.is_network_split = False
@@ -97,8 +111,16 @@ class ThinBlockTest(BitcoinTestFramework):
                             "validation_time",
                             "outbound_bloom_filters",
                             "inbound_bloom_filters",
+                            "thin_block_size",
+                            "thin_full_tx",
                             "rerequested"}
 
+        # test clear block stats function
+        self.nodes[0].clearblockstats()
+        gni = self.nodes[0].getnetworkinfo()
+        tbs = gni["thinblockstats"]
+
+        assert tbs['summary'] == '0 inbound and 0 outbound thin blocks have saved 0.00B of bandwidth'
 
 if __name__ == '__main__':
     ThinBlockTest().main()

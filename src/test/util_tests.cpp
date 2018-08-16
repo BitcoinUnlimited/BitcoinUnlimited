@@ -107,10 +107,10 @@ BOOST_AUTO_TEST_CASE(util_sharedcriticalsection)
 }
 
 
-void ThreadCorralTest(CThreadCorral *c, int region, int *readVal, int setVal)
+void ThreadCorralTest(CThreadCorral *c, int region, int *pReadVal, int setVal)
 {
     CORRAL(*c, region);
-    *readVal = critVal;
+    *pReadVal = critVal;
     if (setVal != 0)
         critVal = setVal;
 }
@@ -154,7 +154,17 @@ BOOST_AUTO_TEST_CASE(util_DbgAssert)
     fPrintToConsole = true;
     DbgAssert(1, i = 1);
     BOOST_CHECK(i == 0);
+
+    // prevent debug output for this failing (on purpose) DbgAssert
+    bool fPrintToConsole_bak = fPrintToConsole;
+    bool fPrintToDebugLog_bak = fPrintToDebugLog;
+    fPrintToConsole = fPrintToDebugLog = false;
+
     DbgAssert(0, i = 1);
+
+    fPrintToDebugLog = fPrintToDebugLog_bak;
+    fPrintToConsole = fPrintToConsole_bak;
+
     BOOST_CHECK(i == 1);
     fPrintToConsole = savedVal;
 #endif
@@ -765,6 +775,52 @@ BOOST_AUTO_TEST_CASE(util_Logging)
         BOOST_CHECK(!IsStringTrue("off"));
         BOOST_CHECK(IsStringTrueBadArgTest("bad"));
     }
+}
+
+BOOST_AUTO_TEST_CASE(util_wildmatch)
+{
+    BOOST_CHECK(wildmatch("123", "123"));
+    BOOST_CHECK(wildmatch("", ""));
+    BOOST_CHECK(wildmatch("?", "?"));
+    BOOST_CHECK(wildmatch("?", "x"));
+    BOOST_CHECK(wildmatch("*", "123"));
+    BOOST_CHECK(!wildmatch("456", "123"));
+
+    // multi-star pattern is not allowed
+    BOOST_CHECK(!wildmatch("**", "123"));
+    BOOST_CHECK(!wildmatch("************************************", "123"));
+    BOOST_CHECK(!wildmatch("?*?*?*?*?*?*?*?*?*?*?*?*?*?*?*?*?*?", "123"));
+
+    BOOST_CHECK(wildmatch("????", "1234"));
+    BOOST_CHECK(wildmatch("????a?b?", "1234a5b6"));
+    BOOST_CHECK(!wildmatch("????a?b?", "1234a5c6"));
+    BOOST_CHECK(wildmatch("123*", "123456"));
+    BOOST_CHECK(wildmatch("123*456", "123acdef456"));
+    BOOST_CHECK(wildmatch("*123", "abcdef123"));
+
+    // length limit check
+    BOOST_CHECK(!wildmatch(std::string("*", 10000), ""));
+    BOOST_CHECK(!wildmatch("*", std::string("x", 10000)));
+}
+
+BOOST_AUTO_TEST_CASE(splitbycommaandremovespaces)
+{
+    std::vector<std::string> inp1{"one", "two, three  ", "f o u r"};
+
+    const std::vector<std::string> r = splitByCommasAndRemoveSpaces(inp1);
+
+    BOOST_CHECK_EQUAL(r.size(), 4);
+    BOOST_CHECK_EQUAL(r[0], "one");
+    BOOST_CHECK_EQUAL(r[1], "two");
+    BOOST_CHECK_EQUAL(r[2], "three");
+    BOOST_CHECK_EQUAL(r[3], "four");
+
+    const std::vector<std::string> r2 = splitByCommasAndRemoveSpaces(r);
+    BOOST_CHECK_EQUAL(r.size(), 4);
+    BOOST_CHECK_EQUAL(r[0], "one");
+    BOOST_CHECK_EQUAL(r[1], "two");
+    BOOST_CHECK_EQUAL(r[2], "three");
+    BOOST_CHECK_EQUAL(r[3], "four");
 }
 
 BOOST_AUTO_TEST_SUITE_END()

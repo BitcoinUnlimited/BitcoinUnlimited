@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "amount.h"
+#include "blockstorage/blockstorage.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -17,8 +18,10 @@
 #include "rpc/server.h"
 #include "streams.h"
 #include "sync.h"
+#include "tweak.h"
 #include "txdb.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -191,7 +194,7 @@ UniValue mempoolToJSON(bool fVerbose = false)
     {
         READLOCK(mempool.cs);
         UniValue o(UniValue::VOBJ);
-        BOOST_FOREACH (const CTxMemPoolEntry &e, mempool.mapTx)
+        for (const CTxMemPoolEntry &e : mempool.mapTx)
         {
             const uint256 &hash = e.GetTx().GetHash();
             UniValue info(UniValue::VOBJ);
@@ -207,14 +210,14 @@ UniValue mempoolToJSON(bool fVerbose = false)
             info.push_back(Pair("descendantfees", e.GetModFeesWithDescendants()));
             const CTransaction &tx = e.GetTx();
             set<string> setDepends;
-            BOOST_FOREACH (const CTxIn &txin, tx.vin)
+            for (const CTxIn &txin : tx.vin)
             {
                 if (mempool._exists(txin.prevout.hash))
                     setDepends.insert(txin.prevout.hash.ToString());
             }
 
             UniValue depends(UniValue::VARR);
-            BOOST_FOREACH (const string &dep, setDepends)
+            for (const string &dep : setDepends)
             {
                 depends.push_back(dep);
             }
@@ -230,7 +233,7 @@ UniValue mempoolToJSON(bool fVerbose = false)
         mempool.queryHashes(vtxid);
 
         UniValue a(UniValue::VARR);
-        BOOST_FOREACH (const uint256 &hash, vtxid)
+        for (const uint256 &hash : vtxid)
             a.push_back(hash.ToString());
 
         return a;
@@ -470,17 +473,18 @@ static void ApplyStats(CCoinsStats &stats,
 {
     assert(!outputs.empty());
     ss << hash;
-    ss << VARINT(outputs.begin()->second.nHeight * 2 + outputs.begin()->second.fCoinBase);
+    ss << VARINT(
+        outputs.begin()->second.nHeight * 2 + outputs.begin()->second.fCoinBase, VarIntMode::NONNEGATIVE_SIGNED);
     stats.nTransactions++;
     for (const auto output : outputs)
     {
         ss << VARINT(output.first + 1);
         ss << *(const CScriptBase *)(&output.second.out.scriptPubKey);
-        ss << VARINT(output.second.out.nValue);
+        ss << VARINT(output.second.out.nValue, VarIntMode::NONNEGATIVE_SIGNED);
         stats.nTransactionOutputs++;
         stats.nTotalAmount += output.second.out.nValue;
     }
-    ss << VARINT(0);
+    ss << VARINT(0u);
 }
 
 //! Calculate statistics about the unspent transaction output set
@@ -742,6 +746,40 @@ static UniValue BIP9SoftForkDesc(const Consensus::Params &consensusParams, Conse
     return rv;
 }
 
+// bip135 begin
+static UniValue BIP135ForkDesc(const Consensus::Params &consensusParams, Consensus::DeploymentPos id)
+{
+    UniValue rv(UniValue::VOBJ);
+    rv.push_back(Pair("bit", (int)id));
+    const ThresholdState thresholdState = VersionBitsTipState(consensusParams, id);
+    switch (thresholdState)
+    {
+    case THRESHOLD_DEFINED:
+        rv.push_back(Pair("status", "defined"));
+        break;
+    case THRESHOLD_STARTED:
+        rv.push_back(Pair("status", "started"));
+        break;
+    case THRESHOLD_LOCKED_IN:
+        rv.push_back(Pair("status", "locked_in"));
+        break;
+    case THRESHOLD_ACTIVE:
+        rv.push_back(Pair("status", "active"));
+        break;
+    case THRESHOLD_FAILED:
+        rv.push_back(Pair("status", "failed"));
+        break;
+    }
+    rv.push_back(Pair("startTime", consensusParams.vDeployments[id].nStartTime));
+    rv.push_back(Pair("timeout", consensusParams.vDeployments[id].nTimeout));
+    rv.push_back(Pair("windowsize", consensusParams.vDeployments[id].windowsize));
+    rv.push_back(Pair("threshold", consensusParams.vDeployments[id].threshold));
+    rv.push_back(Pair("minlockedblocks", consensusParams.vDeployments[id].minlockedblocks));
+    rv.push_back(Pair("minlockedtime", consensusParams.vDeployments[id].minlockedtime));
+    return rv;
+}
+// bip135 end
+
 UniValue getblockchaininfo(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -781,6 +819,25 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
             "considered failed if not yet locked in\n"
             "     }\n"
             "  }\n"
+            // bip135 begin
+            "  \"bip135_forks\": {            (object) status of BIP135 forks in progress\n"
+            "     \"xxxx\" : {                (string) name of the fork\n"
+            "        \"status\": \"xxxx\",      (string) one of \"defined\", \"started\", \"locked_in\", \"active\", "
+            "\"failed\"\n"
+            "        \"bit\": xx,             (numeric) the bit (0-28) in the block version field used to signal this "
+            "fork (only for \"started\" status)\n"
+            "        \"startTime\": xx,       (numeric) the minimum median time past of a block at which the bit gains "
+            "its meaning\n"
+            "        \"windowsize\": xx,      (numeric) the number of blocks over which the fork status is tallied\n"
+            "        \"threshold\": xx,       (numeric) the number of blocks in a window that must signal for fork to "
+            "lock in\n"
+            "        \"minlockedblocks\": xx, (numeric) the minimum number of blocks to elapse after lock-in and "
+            "before activation\n"
+            "        \"minlockedtime\": xx,   (numeric) the minimum number of seconds to elapse after median time past "
+            "of lock-in until activation\n"
+            "     }\n"
+            "  }\n"
+            // bip135 end
             "}\n"
             "\nExamples:\n" +
             HelpExampleCli("getblockchaininfo", "") + HelpExampleRpc("getblockchaininfo", ""));
@@ -803,12 +860,27 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     CBlockIndex *tip = chainActive.Tip();
     UniValue softforks(UniValue::VARR);
     UniValue bip9_softforks(UniValue::VOBJ);
+    UniValue bip135_forks(UniValue::VOBJ); // bip135 added
     softforks.push_back(SoftForkDesc("bip34", 2, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip66", 3, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip65", 4, tip, consensusParams));
-    bip9_softforks.push_back(Pair("csv", BIP9SoftForkDesc(consensusParams, Consensus::DEPLOYMENT_CSV)));
+    // bip135 begin : add all the configured forks
+    for (int i = 0; i < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++)
+    {
+        Consensus::DeploymentPos bit = static_cast<Consensus::DeploymentPos>(i);
+        const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[bit];
+        if (IsConfiguredDeployment(consensusParams, bit))
+        {
+            bip9_softforks.push_back(Pair(vbinfo.name, BIP9SoftForkDesc(consensusParams, bit)));
+            bip135_forks.push_back(Pair(vbinfo.name, BIP135ForkDesc(consensusParams, bit)));
+        }
+    }
+
     obj.push_back(Pair("softforks", softforks));
     obj.push_back(Pair("bip9_softforks", bip9_softforks));
+    // to maintain backward compat initially, we introduce a new list for the full BIP135 data
+    obj.push_back(Pair("bip135_forks", bip135_forks));
+    // bip135 end
 
     if (fPruneMode)
     {
@@ -816,7 +888,8 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
         while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
             block = block->pprev;
 
-        obj.push_back(Pair("pruneheight", block->nHeight));
+        if (block != nullptr)
+            obj.push_back(Pair("pruneheight", block->nHeight));
     }
     return obj;
 }
@@ -881,7 +954,7 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
     std::set<const CBlockIndex *> setOrphans;
     std::set<const CBlockIndex *> setPrevs;
 
-    BOOST_FOREACH (const PAIRTYPE(const uint256, CBlockIndex *) & item, mapBlockIndex)
+    for (const PAIRTYPE(const uint256, CBlockIndex *) & item : mapBlockIndex)
     {
         if (!chainActive.Contains(item.second))
         {
@@ -903,7 +976,7 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
 
     /* Construct the output array.  */
     UniValue res(UniValue::VARR);
-    BOOST_FOREACH (const CBlockIndex *block, setTips)
+    for (const CBlockIndex *block : setTips)
     {
         UniValue obj(UniValue::VOBJ);
         obj.push_back(Pair("height", block->nHeight));
@@ -963,6 +1036,14 @@ UniValue mempoolInfoToJSON()
     size_t maxmempool = GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
     ret.push_back(Pair("maxmempool", (int64_t)maxmempool));
     ret.push_back(Pair("mempoolminfee", ValueFromAmount(mempool.GetMinFee(maxmempool).GetFeePerK())));
+    try
+    {
+        ret.push_back(Pair("tps", boost::lexical_cast<double>(strprintf("%.2f", mempool.TransactionsPerSecond()))));
+    }
+    catch (boost::bad_lexical_cast &)
+    {
+        ret.push_back(Pair("tps", "N/A"));
+    }
 
     return ret;
 }
@@ -979,11 +1060,37 @@ UniValue getmempoolinfo(const UniValue &params, bool fHelp)
                             "  \"usage\": xxxxx,              (numeric) Total memory usage for the mempool\n"
                             "  \"maxmempool\": xxxxx,         (numeric) Maximum memory usage for the mempool\n"
                             "  \"mempoolminfee\": xxxxx       (numeric) Minimum fee for tx to be accepted\n"
+                            "  \"tps\": xxxxx                 (numeric) Transactions per second accepted\n"
                             "}\n"
                             "\nExamples:\n" +
                             HelpExampleCli("getmempoolinfo", "") + HelpExampleRpc("getmempoolinfo", ""));
 
     return mempoolInfoToJSON();
+}
+
+UniValue orphanpoolInfoToJSON()
+{
+    UniValue ret(UniValue::VOBJ);
+    ret.push_back(Pair("size", (int64_t)orphanpool.GetOrphanPoolSize()));
+    ret.push_back(Pair("bytes", (int64_t)orphanpool.GetOrphanPoolBytes()));
+
+    return ret;
+}
+
+UniValue getorphanpoolinfo(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error("getorphanpoolinfo\n"
+                            "\nReturns details on the active state of the TX orphan pool.\n"
+                            "\nResult:\n"
+                            "{\n"
+                            "  \"size\": xxxxx,               (numeric) Current tx count\n"
+                            "  \"bytes\": xxxxx,              (numeric) Sum of all tx sizes\n"
+                            "}\n"
+                            "\nExamples:\n" +
+                            HelpExampleCli("getorphanpoolinfo", "") + HelpExampleRpc("getorphanoolinfo", ""));
+
+    return orphanpoolInfoToJSON();
 }
 
 UniValue invalidateblock(const UniValue &params, bool fHelp)
@@ -1133,6 +1240,7 @@ static const CRPCCommand commands[] = {
     {"blockchain", "getblock", &getblock, true}, {"blockchain", "getblockhash", &getblockhash, true},
     {"blockchain", "getblockheader", &getblockheader, true}, {"blockchain", "getchaintips", &getchaintips, true},
     {"blockchain", "getdifficulty", &getdifficulty, true}, {"blockchain", "getmempoolinfo", &getmempoolinfo, true},
+    {"blockchain", "getorphanpoolinfo", &getorphanpoolinfo, true},
     {"blockchain", "getrawmempool", &getrawmempool, true}, {"blockchain", "gettxout", &gettxout, true},
     {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true}, {"blockchain", "verifychain", &verifychain, true},
 
@@ -1141,8 +1249,8 @@ static const CRPCCommand commands[] = {
     {"hidden", "rollbackchain", &rollbackchain, true},
 };
 
-void RegisterBlockchainRPCCommands(CRPCTable &tableRPC)
+void RegisterBlockchainRPCCommands(CRPCTable &table)
 {
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
-        tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
+    for (auto cmd : commands)
+        table.appendCommand(cmd);
 }

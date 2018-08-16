@@ -4,6 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "zmqpublishnotifier.h"
+#include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "main.h"
 #include "util.h"
@@ -24,6 +25,7 @@ static int zmq_send_multipart(void *sock, const void *data, size_t size, ...)
         if (rc != 0)
         {
             zmqError("Unable to initialize ZMQ msg");
+            va_end(args);
             return -1;
         }
 
@@ -37,6 +39,7 @@ static int zmq_send_multipart(void *sock, const void *data, size_t size, ...)
         {
             zmqError("Unable to send ZMQ msg");
             zmq_msg_close(&msg);
+            va_end(args);
             return -1;
         }
 
@@ -47,6 +50,7 @@ static int zmq_send_multipart(void *sock, const void *data, size_t size, ...)
 
         size = va_arg(args, size_t);
     }
+    va_end(args);
     return 0;
 }
 
@@ -129,9 +133,9 @@ bool CZMQPublishHashBlockNotifier::NotifyBlock(const CBlockIndex *pindex)
     return rc == 0;
 }
 
-bool CZMQPublishHashTransactionNotifier::NotifyTransaction(const CTransaction &transaction)
+bool CZMQPublishHashTransactionNotifier::NotifyTransaction(const CTransactionRef &ptx)
 {
-    uint256 hash = transaction.GetHash();
+    uint256 hash = ptx->GetHash();
     LOG(ZMQ, "zmq: Publish hashtx %s\n", hash.GetHex());
     char data[32];
     for (unsigned int i = 0; i < 32; i++)
@@ -162,12 +166,12 @@ bool CZMQPublishRawBlockNotifier::NotifyBlock(const CBlockIndex *pindex)
     return rc == 0;
 }
 
-bool CZMQPublishRawTransactionNotifier::NotifyTransaction(const CTransaction &transaction)
+bool CZMQPublishRawTransactionNotifier::NotifyTransaction(const CTransactionRef &ptx)
 {
-    uint256 hash = transaction.GetHash();
+    uint256 hash = ptx->GetHash();
     LOG(ZMQ, "zmq: Publish rawtx %s\n", hash.GetHex());
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-    ss << transaction;
+    ss << *ptx;
     int rc = zmq_send_multipart(psocket, "rawtx", 5, &(*ss.begin()), ss.size(), 0);
     return rc == 0;
 }

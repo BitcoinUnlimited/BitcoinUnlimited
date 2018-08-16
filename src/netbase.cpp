@@ -717,8 +717,8 @@ bool ConnectSocketByName(CService &addr,
 
     SplitHostPort(std::string(pszDest), port, strDest);
 
-    proxyType nameProxy;
-    GetNameProxy(nameProxy);
+    proxyType _nameProxy;
+    GetNameProxy(_nameProxy);
 
     CService addrResolved;
     if (Lookup(strDest.c_str(), addrResolved, port, fNameLookup && !HaveNameProxy()))
@@ -734,7 +734,7 @@ bool ConnectSocketByName(CService &addr,
 
     if (!HaveNameProxy())
         return false;
-    return ConnectThroughProxy(nameProxy, strDest, port, hSocketRet, nTimeout, outProxyConnectionFailed);
+    return ConnectThroughProxy(_nameProxy, strDest, port, hSocketRet, nTimeout, outProxyConnectionFailed);
 }
 
 #ifdef WIN32
@@ -756,7 +756,7 @@ std::string NetworkErrorString(int err)
 std::string NetworkErrorString(int err)
 {
     char buf[256];
-    const char *s = buf;
+    const char *s = nullptr;
     buf[0] = 0;
 /* Too bad there are two incompatible implementations of the
  * thread-safe strerror. */
@@ -765,6 +765,7 @@ std::string NetworkErrorString(int err)
 #else /* POSIX variant always returns message in buffer */
     if (strerror_r(err, buf, sizeof(buf)))
         buf[0] = 0;
+    s = buf;
 #endif
     return strprintf("%s (%d)", s, err);
 }

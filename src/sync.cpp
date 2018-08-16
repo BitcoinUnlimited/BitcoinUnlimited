@@ -10,11 +10,10 @@
 
 #include <stdio.h>
 
-#include <boost/foreach.hpp>
 #include <boost/thread.hpp>
 
 #ifdef DEBUG_LOCKCONTENTION
-void PrintLockContention(const char *pszName, const char *pszFile, int nLine)
+void PrintLockContention(const char *pszName, const char *pszFile, unsigned int nLine)
 {
     LOGA("LOCKCONTENTION: %s\n", pszName);
     LOGA("Locker: %s:%d\n", pszFile, nLine);
@@ -52,7 +51,7 @@ uint64_t getTid(void)
 
 // BU move to sync.h because I need to create these in globals.cpp
 // struct CLockLocation {
-CLockLocation::CLockLocation(const char *pszName, const char *pszFile, int nLine, bool fTryIn)
+CLockLocation::CLockLocation(const char *pszName, const char *pszFile, unsigned int nLine, bool fTryIn)
 {
     mutexName = pszName;
     sourceFile = pszFile;
@@ -99,7 +98,7 @@ static void potential_deadlock_detected(const std::pair<void *, void *> &mismatc
 
     LOGA("POTENTIAL DEADLOCK DETECTED\n");
     LOGA("Previous lock order was:\n");
-    BOOST_FOREACH (const PAIRTYPE(void *, CLockLocation) & i, s2)
+    for (const PAIRTYPE(void *, CLockLocation) & i : s2)
     {
         if (i.first == mismatch.first)
         {
@@ -120,7 +119,7 @@ static void potential_deadlock_detected(const std::pair<void *, void *> &mismatc
     firstLocked = false;
     secondLocked = false;
     LOGA("Current lock order is:\n");
-    BOOST_FOREACH (const PAIRTYPE(void *, CLockLocation) & i, s1)
+    for (const PAIRTYPE(void *, CLockLocation) & i : s1)
     {
         if (i.first == mismatch.first)
         {
@@ -153,7 +152,7 @@ static void push_lock(void *c, const CLockLocation &locklocation, bool fTry)
     // across the program
     if (!fTry)
     {
-        BOOST_FOREACH (const PAIRTYPE(void *, CLockLocation) & i, (*lockstack))
+        for (const PAIRTYPE(void *, CLockLocation) & i : (*lockstack))
         {
             if (i.first == c)
                 break;
@@ -179,7 +178,7 @@ static void pop_lock()
     dd_mutex.unlock();
 }
 
-void EnterCritical(const char *pszName, const char *pszFile, int nLine, void *cs, bool fTry)
+void EnterCritical(const char *pszName, const char *pszFile, unsigned int nLine, void *cs, bool fTry)
 {
     push_lock(cs, CLockLocation(pszName, pszFile, nLine, fTry), fTry);
 }
@@ -205,14 +204,14 @@ void DeleteCritical(const void *cs)
 std::string LocksHeld()
 {
     std::string result;
-    BOOST_FOREACH (const PAIRTYPE(void *, CLockLocation) & i, *lockstack)
+    for (const PAIRTYPE(void *, CLockLocation) & i : *lockstack)
         result += i.second.ToString() + std::string("\n");
     return result;
 }
 
-void AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs)
+void AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs)
 {
-    BOOST_FOREACH (const PAIRTYPE(void *, CLockLocation) & i, *lockstack)
+    for (const PAIRTYPE(void *, CLockLocation) & i : *lockstack)
         if (i.first == cs)
             return;
     fprintf(stderr, "Assertion failed: lock %s not held in %s:%i; locks held:\n%s", pszName, pszFile, nLine,
@@ -220,7 +219,7 @@ void AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine,
     abort();
 }
 
-void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, int nLine, void *cs)
+void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs)
 {
     for (const std::pair<void *, CLockLocation> &i : *lockstack)
     {
@@ -233,7 +232,10 @@ void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, int nLi
     }
 }
 
-void AssertWriteLockHeldInternal(const char *pszName, const char *pszFile, int nLine, CSharedCriticalSection *cs)
+void AssertWriteLockHeldInternal(const char *pszName,
+    const char *pszFile,
+    unsigned int nLine,
+    CSharedCriticalSection *cs)
 {
     if (cs->try_lock()) // It would be better to check that this thread has the lock
     {

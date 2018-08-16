@@ -43,7 +43,7 @@ public:
     bool AlreadyHaveOrphan(const uint256 &hash);
 
     //! Add a transaction to the orphan pool
-    bool AddOrphanTx(const CTransaction &tx, NodeId peer);
+    bool AddOrphanTx(const CTransactionRef &ptx, NodeId peer);
 
     //! Erase an ophan tx from the orphan pool
     void EraseOrphanTx(uint256 hash);
@@ -56,6 +56,19 @@ public:
 
     //! Set the last orphan check time (used primarily in testing)
     void SetLastOrphanCheck(int64_t nTime) { nLastOrphanCheck = nTime; }
+    //! Orphan pool current number of transactions
+    uint64_t GetOrphanPoolSize()
+    {
+        LOCK(cs);
+        return mapOrphanTransactions.size();
+    }
+
+    //! Orphan pool bytes used
+    uint64_t GetOrphanPoolBytes()
+    {
+        LOCK(cs);
+        return nBytesOrphanPool;
+    }
 };
 extern CTxOrphanPool orphanpool;
 

@@ -193,6 +193,33 @@ class CBloomFilter:
         return "%s(vData=%s)" % (self.__class__.__name__, self.vData)
 
 
+class CMemPoolSize:
+    def __init__(self, vData=None):
+        self.vData = vData
+        self.nHashFuncs = None
+        self.nTweak = None
+        self.nFlags = None
+
+    def deserialize(self, f):
+        self.vData = deser_string(f)
+        self.nHashFuncs = struct.unpack("<I", f.read(4))[0]
+        self.nTweak = struct.unpack("<I", f.read(4))[0]
+        self.nFlags = struct.unpack("<B", f.read(1))[0]
+        return self
+
+    def serialize(self):
+        r = b""
+        r += ser_string(f, self.vData)
+        r += struct.pack("<I", self.nHashFuncs)
+        r += struct.pack("<I", self.nTweak)
+        r += struct.pack("<B", self.nFlags)
+        return r
+
+    def __repr__(self):
+        return "%s(vData=%s)" % (self.__class__.__name__, self.vData)
+
+
+
 class msg_thinblock(object):
     command = b"thinblock"
 

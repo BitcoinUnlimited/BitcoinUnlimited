@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "base58.h"
+#include "blockstorage/blockstorage.h"
 #include "chain.h"
 #include "coins.h"
 #include "consensus/validation.h"
@@ -74,7 +75,7 @@ void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry)
     entry.push_back(Pair("version", tx.nVersion));
     entry.push_back(Pair("locktime", (int64_t)tx.nLockTime));
     UniValue vin(UniValue::VARR);
-    BOOST_FOREACH (const CTxIn &txin, tx.vin)
+    for (const CTxIn &txin : tx.vin)
     {
         UniValue in(UniValue::VOBJ);
         if (tx.IsCoinBase())
@@ -266,6 +267,7 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
     }
     else
     {
+        LOCK(pcoinsTip->cs_utxo);
         const Coin &coin = AccessByTxid(*pcoinsTip, oneTxid);
         if (!coin.IsSpent() && coin.nHeight > 0 && coin.nHeight <= chainActive.Height())
         {
@@ -331,7 +333,7 @@ UniValue verifytxoutproof(const UniValue &params, bool fHelp)
         !chainActive.Contains(mapBlockIndex[merkleBlock.header.GetHash()]))
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found in chain");
 
-    BOOST_FOREACH (const uint256 &hash, vMatch)
+    for (const uint256 &hash : vMatch)
         res.push_back(hash.GetHex());
     return res;
 }
@@ -354,6 +356,8 @@ UniValue createrawtransaction(const UniValue &params, bool fHelp)
             "       {\n"
             "         \"txid\":\"id\",    (string, required) The transaction id\n"
             "         \"vout\":n        (numeric, required) The output number\n"
+            "         \"vout\":n,         (numeric, required) The output number\n"
+            "         \"sequence\":n    (numeric, optional) The sequence number\n"
             "       }\n"
             "       ,...\n"
             "     ]\n"
@@ -415,6 +419,22 @@ UniValue createrawtransaction(const UniValue &params, bool fHelp)
 
         uint32_t nSequence =
             (rawTx.nLockTime ? std::numeric_limits<uint32_t>::max() - 1 : std::numeric_limits<uint32_t>::max());
+
+        // set the sequence number if passed in the parameters object
+        const UniValue &sequenceObj = find_value(o, "sequence");
+        if (sequenceObj.isNum())
+        {
+            int64_t seqNr64 = sequenceObj.get_int64();
+            if (seqNr64 < 0 || seqNr64 > std::numeric_limits<uint32_t>::max())
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, sequence number is out of range");
+            else
+                nSequence = (uint32_t)seqNr64;
+        }
+        else if (!sequenceObj.isNull())
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, sequence parameter is not a number");
+        }
+
         CTxIn in(COutPoint(txid, nOutput), CScript(), nSequence);
 
         rawTx.vin.push_back(in);
@@ -688,9 +708,13 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         CCoinsViewMemPool viewMempool(&viewChain, mempool);
         view.SetBackend(viewMempool); // temporarily switch cache backend to db+mempool view
 
-        BOOST_FOREACH (const CTxIn &txin, mergedTx.vin)
         {
-            view.AccessCoin(txin.prevout); // Load entries from viewChain into view; can fail.
+            LOCK(view.cs_utxo);
+            for (const CTxIn &txin : mergedTx.vin)
+            {
+                // Load entries from viewChain into view; can fail.
+                view.AccessCoin(txin.prevout);
+            }
         }
 
         view.SetBackend(viewDummy); // switch back to avoid locking mempool for too long
@@ -747,6 +771,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
+                LOCK(view.cs_utxo);
                 const Coin &coin = view.AccessCoin(out);
                 if (!coin.IsSpent() && coin.out.scriptPubKey != scriptPubKey)
                 {
@@ -844,6 +869,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
     {
+        LOCK(view.cs_utxo);
         CTxIn &txin = mergedTx.vin[i];
         const Coin &coin = view.AccessCoin(txin.prevout);
         if (coin.IsSpent())
@@ -861,7 +887,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         // ... and merge in other signatures:
         if (pickedForkId)
         {
-            BOOST_FOREACH (const CMutableTransaction &txv, txVariants)
+            for (const CMutableTransaction &txv : txVariants)
             {
                 txin.scriptSig = CombineSignatures(prevPubKey,
                     TransactionSignatureChecker(&txConst, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID), txin.scriptSig,
@@ -876,7 +902,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         }
         else
         {
-            BOOST_FOREACH (const CMutableTransaction &txv, txVariants)
+            for (const CMutableTransaction &txv : txVariants)
             {
                 txin.scriptSig = CombineSignatures(prevPubKey, TransactionSignatureChecker(&txConst, i, amount, 0),
                     txin.scriptSig, txv.vin[i].scriptSig);
@@ -931,7 +957,8 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
     CTransaction tx;
     if (!DecodeHexTx(tx, params[0].get_str()))
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
-    uint256 hashTx = tx.GetHash();
+    CTransactionRef ptx(MakeTransactionRef(std::move(tx)));
+    const uint256 &hashTx = ptx->GetHash();
 
     bool fOverrideFees = false;
     TransactionClass txClass = TransactionClass::DEFAULT;
@@ -951,10 +978,13 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
 
     CCoinsViewCache &view = *pcoinsTip;
     bool fHaveChain = false;
-    for (size_t o = 0; !fHaveChain && o < tx.vout.size(); o++)
     {
-        const Coin &existingCoin = view.AccessCoin(COutPoint(hashTx, o));
-        fHaveChain = !existingCoin.IsSpent();
+        LOCK(view.cs_utxo);
+        for (size_t o = 0; !fHaveChain && o < tx.vout.size(); o++)
+        {
+            const Coin &existingCoin = view.AccessCoin(COutPoint(hashTx, o));
+            fHaveChain = !existingCoin.IsSpent();
+        }
     }
     bool fHaveMempool = mempool.exists(hashTx);
     if (!fHaveMempool && !fHaveChain)
@@ -962,7 +992,7 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
         // push to local node and sync with wallets
         CValidationState state;
         bool fMissingInputs;
-        if (!AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, false, !fOverrideFees, txClass))
+        if (!AcceptToMemoryPool(mempool, state, std::move(ptx), false, &fMissingInputs, false, !fOverrideFees, txClass))
         {
             if (state.IsInvalid())
             {
@@ -980,14 +1010,14 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
         }
 #ifdef ENABLE_WALLET
         else
-            SyncWithWallets(tx, NULL, -1);
+            SyncWithWallets(ptx, nullptr, -1);
 #endif
     }
     else if (fHaveChain)
     {
         throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "transaction already in block chain");
     }
-    RelayTransaction(tx);
+    RelayTransaction(*ptx);
 
     return hashTx.GetHex();
 }
@@ -1005,8 +1035,8 @@ static const CRPCCommand commands[] = {
     {"blockchain", "gettxoutproof", &gettxoutproof, true}, {"blockchain", "verifytxoutproof", &verifytxoutproof, true},
 };
 
-void RegisterRawTransactionRPCCommands(CRPCTable &tableRPC)
+void RegisterRawTransactionRPCCommands(CRPCTable &table)
 {
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
-        tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
+    for (auto cmd : commands)
+        table.appendCommand(cmd);
 }

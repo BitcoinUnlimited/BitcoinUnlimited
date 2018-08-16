@@ -27,7 +27,6 @@
 
 #include <univalue.h>
 
-#include <boost/foreach.hpp>
 
 using namespace std;
 
@@ -51,7 +50,7 @@ int64_t static DecodeDumpTime(const std::string &str)
 std::string static EncodeDumpString(const std::string &str)
 {
     std::stringstream ret;
-    BOOST_FOREACH (unsigned char c, str)
+    for (unsigned char c : str)
     {
         if (c <= 32 || c >= 128 || c == '%')
         {
@@ -115,11 +114,11 @@ UniValue importprivkey(const UniValue &params, bool fHelp)
         strLabel = params[1].get_str();
 
     // Whether to perform rescan after import
-    bool fRescan = true;
+    bool fRescanLocal = true;
     if (params.size() > 2)
         fRescan = params[2].get_bool();
 
-    if (fRescan && fPruneMode)
+    if (fRescanLocal && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
 
     CBitcoinSecret vchSecret;
@@ -151,7 +150,7 @@ UniValue importprivkey(const UniValue &params, bool fHelp)
         // whenever a key is imported, we need to scan the whole chain
         pwalletMain->nTimeFirstKey = 1; // 0 would be considered 'no value'
 
-        if (fRescan)
+        if (fRescanLocal)
         {
             pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true);
         }
@@ -185,16 +184,16 @@ UniValue importprivatekeys(const UniValue &params, bool fHelp)
     EnsureWalletIsUnlocked();
 
     unsigned int paramNum = 0;
-    bool fRescan = true;
+    bool fRescanLocal = true;
 
     if (params[0].get_str() == "no-rescan")
     {
-        fRescan = false;
+        fRescanLocal = false;
         paramNum++;
     }
     else if (params[0].get_str() == "rescan")
     {
-        fRescan = true;
+        fRescanLocal = true;
         paramNum++;
     }
 
@@ -233,7 +232,7 @@ UniValue importprivatekeys(const UniValue &params, bool fHelp)
         }
     }
 
-    if (fRescan)
+    if (fRescanLocal)
     {
         StartWalletRescanThread();
     }
@@ -309,11 +308,11 @@ UniValue importaddress(const UniValue &params, bool fHelp)
         strLabel = params[1].get_str();
 
     // Whether to perform rescan after import
-    bool fRescan = true;
+    bool fRescanLocal = true;
     if (params.size() > 2)
-        fRescan = params[2].get_bool();
+        fRescanLocal = params[2].get_bool();
 
-    if (fRescan && fPruneMode)
+    if (fRescanLocal && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
 
     // Whether to import a p2sh version, too
@@ -343,7 +342,7 @@ UniValue importaddress(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Bitcoin address or script");
     }
 
-    if (fRescan)
+    if (fRescanLocal)
     {
         pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true);
         pwalletMain->ReacceptWalletTransactions();
@@ -357,45 +356,42 @@ UniValue importaddresses(const UniValue &params, bool fHelp)
     if (!EnsureWalletIsAvailable(fHelp))
         return NullUniValue;
 
-    if (fHelp || params.size() < 1 || params.size() > 4)
+    if (fHelp || params.size() < 1)
         throw runtime_error(
             "importaddresses [rescan | no-rescan] \"address\"...\n"
             "\nAdds a script (in hex) or address that can be watched as if it were in your wallet but cannot be used "
             "to spend.\n"
             "\nArguments:\n"
-            "1. \"rescan | no-rescan\" (string, optional default rescan) If \"no-rescan\", skip wallet rescan\n"
-            "1. \"address\"           (string, 0 or more) The address or hex-encoded P2SH script\n"
-            "\nNote, this command will return before the rescan (may take hours) is complete..\n"
+            "1. \"rescan | no-rescan\" (string, optional, default=rescan) If \"no-rescan\", skip wallet rescan\n"
+            "2. \"address\"           (string, 0 or more) The address(es) or hex-encoded P2SH script(s)\n"
+            "\nNote, this command will return before the rescan (may take hours) is complete.\n"
             "If you have the full public key, you should call importpublickey instead of this.\n"
             "This command assumes all scripts are P2SH, so you should call importaddress to\n"
             "import a nonstandard non-P2SH script.\n"
             "\nExamples:\n"
-            "\nImport a script with rescan\n" +
-            HelpExampleCli("importaddresses", "\"myscript\"") + "\nImport using a label without rescan\n" +
-            HelpExampleCli("importaddresses", "no-rescan \"myscript\"") + "\nAs a JSON-RPC call\n" +
-            HelpExampleRpc("importaddress", "\"myscript\""));
-
-    string strLabel = "";
-    if (params.size() > 1)
-        strLabel = params[1].get_str();
+            "\nImport 2 scripts with rescan\n" +
+            HelpExampleCli("importaddresses", "\"myscript1\" \"myscript2\"") + "\nImport 2 scripts without rescan\n" +
+            HelpExampleCli("importaddresses", "no-rescan \"myscript1\" \"myscript2\"") + "\nRescan without import\n" +
+            HelpExampleCli("importaddresses", "rescan") + "\nAs a JSON-RPC call\n" +
+            HelpExampleRpc("importaddresses", "\"myscript1\", \"myscript2\""));
 
     // Whether to perform rescan after import
-    bool fRescan = true;
+    bool fRescanLocal = true;
 
     unsigned int paramNum = 0;
 
     if (params[0].get_str() == "no-rescan")
     {
-        fRescan = false;
+        fRescanLocal = false;
         paramNum++;
     }
     else if (params[0].get_str() == "rescan")
     {
-        fRescan = true;
+        fRescanLocal = true;
         paramNum++;
     }
 
-    if (fRescan && fPruneMode)
+    if (fRescanLocal && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
@@ -406,13 +402,13 @@ UniValue importaddresses(const UniValue &params, bool fHelp)
         CTxDestination dest = DecodeDestination(param);
         if (IsValidDestination(dest))
         {
-            ImportAddress(dest, strLabel);
+            ImportAddress(dest, "");
         }
         else if (IsHex(param))
         {
             bool fP2SH = true;
             std::vector<unsigned char> data(ParseHex(param));
-            ImportScript(CScript(data.begin(), data.end()), strLabel, fP2SH);
+            ImportScript(CScript(data.begin(), data.end()), "", fP2SH);
         }
         else
         {
@@ -420,7 +416,7 @@ UniValue importaddresses(const UniValue &params, bool fHelp)
         }
     }
 
-    if (fRescan)
+    if (fRescanLocal)
     {
         StartWalletRescanThread();
     }
@@ -566,11 +562,11 @@ UniValue importpubkey(const UniValue &params, bool fHelp)
         strLabel = params[1].get_str();
 
     // Whether to perform rescan after import
-    bool fRescan = true;
+    bool fRescanLocal = true;
     if (params.size() > 2)
-        fRescan = params[2].get_bool();
+        fRescanLocal = params[2].get_bool();
 
-    if (fRescan && fPruneMode)
+    if (fRescanLocal && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
 
     if (!IsHex(params[0].get_str()))
@@ -585,7 +581,7 @@ UniValue importpubkey(const UniValue &params, bool fHelp)
     ImportAddress(pubKey.GetID(), strLabel);
     ImportScript(GetScriptForRawPubKey(pubKey), strLabel, false);
 
-    if (fRescan)
+    if (fRescanLocal)
     {
         pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true);
         pwalletMain->ReacceptWalletTransactions();
@@ -787,6 +783,23 @@ UniValue dumpwallet(const UniValue &params, bool fHelp)
         chainActive.Tip()->GetBlockHash().ToString());
     file << strprintf("#   mined on %s\n", EncodeDumpTime(chainActive.Tip()->GetBlockTime()));
     file << "\n";
+
+    // add the base58check encoded extended master if the wallet uses HD
+    CKeyID masterKeyID = pwalletMain->GetHDChain().masterKeyID;
+    if (!masterKeyID.IsNull())
+    {
+        CKey key;
+        if (pwalletMain->GetKey(masterKeyID, key))
+        {
+            CExtKey masterKey;
+            masterKey.SetMaster(key.begin(), key.size());
+
+            CBitcoinExtKey b58extkey;
+            b58extkey.SetKey(masterKey);
+
+            file << "# extended private masterkey: " << b58extkey.ToString() << "\n\n";
+        }
+    }
     for (std::vector<std::pair<int64_t, CKeyID> >::const_iterator it = vKeyBirth.begin(); it != vKeyBirth.end(); it++)
     {
         const CKeyID &keyid = it->second;
@@ -795,19 +808,31 @@ UniValue dumpwallet(const UniValue &params, bool fHelp)
         CKey key;
         if (pwalletMain->GetKey(keyid, key))
         {
+            file << strprintf("%s %s ", CBitcoinSecret(key).ToString(), strTime);
             if (pwalletMain->mapAddressBook.count(keyid))
             {
-                file << strprintf("%s %s label=%s # addr=%s\n", CBitcoinSecret(key).ToString(), strTime,
-                    EncodeDumpString(pwalletMain->mapAddressBook[keyid].name), strAddr);
+                file << strprintf("label=%s", EncodeDumpString(pwalletMain->mapAddressBook[keyid].name));
+            }
+            else if (keyid == masterKeyID)
+            {
+                file << "hdmaster=1";
             }
             else if (setKeyPool.count(keyid))
             {
-                file << strprintf("%s %s reserve=1 # addr=%s\n", CBitcoinSecret(key).ToString(), strTime, strAddr);
+                file << "reserve=1";
+            }
+            else if (pwalletMain->mapKeyMetadata[keyid].hdKeypath == "m")
+            {
+                file << "inactivehdmaster=1";
             }
             else
             {
-                file << strprintf("%s %s change=1 # addr=%s\n", CBitcoinSecret(key).ToString(), strTime, strAddr);
+                file << "change=1";
             }
+            file << strprintf(
+                " # addr=%s%s\n", strAddr, (pwalletMain->mapKeyMetadata[keyid].hdKeypath.size() > 0 ?
+                                                   " hdkeypath=" + pwalletMain->mapKeyMetadata[keyid].hdKeypath :
+                                                   ""));
         }
     }
     file << "\n";

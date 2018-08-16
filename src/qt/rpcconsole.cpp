@@ -40,10 +40,6 @@
 #include <QTime>
 #include <QTimer>
 
-#if QT_VERSION < 0x050000
-#include <QUrl>
-#endif
-
 // TODO: add a scrollback limit, as there is currently none
 // TODO: make it possible to filter out categories (esp debug messages when implemented)
 // TODO: receive errors and debug messages through ClientModel
@@ -80,7 +76,7 @@ class QtRPCTimerBase : public QObject, public RPCTimerBase
 {
     Q_OBJECT
 public:
-    QtRPCTimerBase(boost::function<void(void)> &func, int64_t millis) : func(func)
+    QtRPCTimerBase(boost::function<void(void)> &_func, int64_t millis) : func(_func)
     {
         timer.setSingleShot(true);
         connect(&timer, SIGNAL(timeout()), this, SLOT(timeout()));
@@ -261,9 +257,9 @@ void RPCExecutor::request(const QString &command)
     }
 }
 
-RPCConsole::RPCConsole(const PlatformStyle *platformStyle, QWidget *parent)
+RPCConsole::RPCConsole(const PlatformStyle *_platformStyle, QWidget *parent)
     : QWidget(parent), ui(new Ui::RPCConsole), clientModel(0), historyPtr(0), cachedNodeid(-1),
-      platformStyle(platformStyle), peersTableContextMenu(0), banTableContextMenu(0), consoleFontSize(0)
+      platformStyle(_platformStyle), peersTableContextMenu(0), banTableContextMenu(0), consoleFontSize(0)
 {
     ui->setupUi(this);
     GUIUtil::restoreWindowGeometry("nRPCConsoleWindow", this->size(), this);
@@ -396,6 +392,10 @@ void RPCConsole::setClientModel(ClientModel *model)
         connect(model, SIGNAL(mempoolSizeChanged(long, size_t)), this, SLOT(setMempoolSize(long, size_t)));
         connect(model, SIGNAL(orphanPoolSizeChanged(long)), this, SLOT(setOrphanPoolSize(long)));
         connect(model, SIGNAL(transactionsPerSecondChanged(double)), this, SLOT(setTransactionsPerSecond(double)));
+        connect(model, SIGNAL(thinBlockPropagationStatsChanged(const ThinBlockQuickStats &)), this,
+            SLOT(setThinBlockPropagationStats(const ThinBlockQuickStats &)));
+        connect(model, SIGNAL(grapheneBlockPropagationStatsChanged(const GrapheneQuickStats &)), this,
+            SLOT(setGrapheneBlockPropagationStats(const GrapheneQuickStats &)));
 
         // set up peer table
         ui->peerWidget->setModel(model->getPeerTableModel());
@@ -417,7 +417,7 @@ void RPCConsole::setClientModel(ClientModel *model)
         QAction *banAction365d = new QAction(tr("Ban Node for") + " " + tr("1 &year"), this);
 
         // create peer table context menu
-        peersTableContextMenu = new QMenu();
+        peersTableContextMenu = new QMenu(this);
         peersTableContextMenu->addAction(disconnectAction);
         peersTableContextMenu->addAction(banAction1h);
         peersTableContextMenu->addAction(banAction24h);
@@ -465,7 +465,7 @@ void RPCConsole::setClientModel(ClientModel *model)
         QAction *unbanAction = new QAction(tr("&Unban Node"), this);
 
         // create ban table context menu
-        banTableContextMenu = new QMenu();
+        banTableContextMenu = new QMenu(this);
         banTableContextMenu->addAction(unbanAction);
 
         // ban table context menu signals
@@ -647,6 +647,65 @@ void RPCConsole::setTransactionsPerSecond(double nTxPerSec)
         ui->transactionsPerSecond->setText(QString::number(nTxPerSec, 'f', 2));
     else
         ui->transactionsPerSecond->setText(QString::number((uint64_t)nTxPerSec));
+}
+
+void RPCConsole::setThinBlockPropagationStats(const ThinBlockQuickStats &thin)
+{
+    if (!IsThinBlocksEnabled())
+    {
+        ui->blocksXThinTotals->setText(tr("Disabled"));
+        ui->blocksXThin24hAverages->setText(tr("Disabled"));
+        return;
+    }
+
+    // Total: n (Sent: i / Received: r) saved bw
+    QString text = QString::number(thin.nTotalOutbound + thin.nTotalInbound) + " (Sent: ";
+    text += QString::number(thin.nTotalOutbound) + " / Received: ";
+    text += QString::number(thin.nTotalInbound) + ") saved ";
+    text += QString::fromStdString(formatInfoUnit(thin.nTotalBandwidthSavings));
+
+    ui->blocksXThinTotals->setText(text);
+
+    // 24-hour Average: n (Sent: i / Received: r), Compression (i% / r%), ReRequests f (f%)
+    text = QString::number(thin.nLast24hOutbound + thin.nLast24hInbound) + " (Sent: ";
+    text += QString::number(thin.nLast24hOutbound) + " / Received: ";
+    text += QString::number(thin.nLast24hInbound) + "), Compression (";
+    text += QString::number(thin.fLast24hOutboundCompression, 'f', 1) + "% / ";
+    text += QString::number(thin.fLast24hInboundCompression, 'f', 1) + "%), ReRequests ";
+    text += QString::number(thin.nLast24hRerequestTx) + " (";
+    text += QString::number(thin.fLast24hRerequestTxPercent, 'f', 1) + "%)";
+
+    ui->blocksXThin24hAverages->setText(text);
+}
+
+void RPCConsole::setGrapheneBlockPropagationStats(const GrapheneQuickStats &graphene)
+{
+    if (!IsGrapheneBlockEnabled())
+    {
+        ui->blocksGrapheneTotals->setText(tr("Disabled"));
+        ui->blocksGraphene24hAverages->setText(tr("Disabled"));
+        return;
+    }
+
+    // Total: n (Sent: i / Received: r) saved bw, Decode failures d
+    QString text = QString::number(graphene.nTotalOutbound + graphene.nTotalInbound) + " (Sent: ";
+    text += QString::number(graphene.nTotalOutbound) + " / Received: ";
+    text += QString::number(graphene.nTotalInbound) + ") saved ";
+    text += QString::fromStdString(formatInfoUnit(graphene.nTotalBandwidthSavings)) + ", Decode failures ";
+    text += QString::number(graphene.nTotalDecodeFailures);
+
+    ui->blocksGrapheneTotals->setText(text);
+
+    // 24-hour Average: n (Sent: i / Received: r), Compression (i% / r%), ReRequests f (f%)
+    text = QString::number(graphene.nLast24hOutbound + graphene.nLast24hInbound) + " (Sent: ";
+    text += QString::number(graphene.nLast24hOutbound) + " / Received: ";
+    text += QString::number(graphene.nLast24hInbound) + "), Compression (";
+    text += QString::number(graphene.fLast24hOutboundCompression, 'f', 1) + "% / ";
+    text += QString::number(graphene.fLast24hInboundCompression, 'f', 1) + "%), ReRequests ";
+    text += QString::number(graphene.nLast24hRerequestTx) + " (";
+    text += QString::number(graphene.fLast24hRerequestTxPercent, 'f', 1) + "%)";
+
+    ui->blocksGraphene24hAverages->setText(text);
 }
 
 void RPCConsole::on_lineEdit_returnPressed()

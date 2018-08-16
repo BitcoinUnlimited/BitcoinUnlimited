@@ -56,29 +56,24 @@
 #include <QStyle>
 #include <QTimer>
 #include <QToolBar>
-#include <QVBoxLayout>
-
-#if QT_VERSION < 0x050000
-#include <QTextDocument>
-#include <QUrl>
-#else
 #include <QUrlQuery>
-#endif
+#include <QVBoxLayout>
 
 const QString BitcoinGUI::DEFAULT_WALLET = "~Default";
 
-BitcoinGUI::BitcoinGUI(const Config *cfg,
-    const PlatformStyle *platformStyle,
+BitcoinGUI::BitcoinGUI(const Config *_cfg,
+    const PlatformStyle *_platformStyle,
     const NetworkStyle *networkStyle,
     QWidget *parent)
-    : QMainWindow(parent), clientModel(0), walletFrame(0), unitDisplayControl(0), labelEncryptionIcon(0),
-      labelConnectionsIcon(0), labelBlocksIcon(0), progressBarLabel(0), progressBar(0), progressDialog(0),
-      appMenuBar(0), overviewAction(0), historyAction(0), quitAction(0), sendCoinsAction(0), sendCoinsMenuAction(0),
-      usedSendingAddressesAction(0), usedReceivingAddressesAction(0), signMessageAction(0), verifyMessageAction(0),
-      aboutAction(0), receiveCoinsAction(0), receiveCoinsMenuAction(0), optionsAction(0), unlimitedAction(0),
-      toggleHideAction(0), encryptWalletAction(0), backupWalletAction(0), changePassphraseAction(0), aboutQtAction(0),
-      openRPCConsoleAction(0), openAction(0), showHelpMessageAction(0), trayIcon(0), trayIconMenu(0), notificator(0),
-      rpcConsole(0), helpMessageDialog(0), prevBlocks(0), spinnerFrame(0), platformStyle(platformStyle), cfg(cfg)
+    : QMainWindow(parent), clientModel(0), walletFrame(0), unitDisplayControl(0), labelWalletEncryptionIcon(0),
+      labelWalletHDStatusIcon(0), labelConnectionsIcon(0), labelBlocksIcon(0), progressBarLabel(0), progressBar(0),
+      progressDialog(0), appMenuBar(0), overviewAction(0), historyAction(0), quitAction(0), sendCoinsAction(0),
+      sendCoinsMenuAction(0), usedSendingAddressesAction(0), usedReceivingAddressesAction(0), signMessageAction(0),
+      verifyMessageAction(0), aboutAction(0), receiveCoinsAction(0), receiveCoinsMenuAction(0), optionsAction(0),
+      unlimitedAction(0), toggleHideAction(0), encryptWalletAction(0), backupWalletAction(0), changePassphraseAction(0),
+      aboutQtAction(0), openRPCConsoleAction(0), openAction(0), showHelpMessageAction(0), trayIcon(0), trayIconMenu(0),
+      notificator(0), rpcConsole(0), helpMessageDialog(0), prevBlocks(0), spinnerFrame(0),
+      platformStyle(_platformStyle), cfg(_cfg)
 {
     GUIUtil::restoreWindowGeometry("nWindow", QSize(850, 550), this);
 
@@ -105,12 +100,6 @@ BitcoinGUI::BitcoinGUI(const Config *cfg,
     MacDockIconHandler::instance()->setIcon(networkStyle->getAppIcon());
 #endif
     setWindowTitle(windowTitle);
-
-#if defined(Q_OS_MAC) && QT_VERSION < 0x050000
-    // This property is not implemented in Qt 5. Setting it has no effect.
-    // A replacement API (QtMacUnifiedToolBar) is available in QtMacExtras.
-    setUnifiedTitleAndToolBarOnMac(true);
-#endif
 
     rpcConsole = new RPCConsole(platformStyle, 0);
     helpMessageDialog = new HelpMessageDialog(this, false);
@@ -160,7 +149,8 @@ BitcoinGUI::BitcoinGUI(const Config *cfg,
     frameBlocksLayout->setContentsMargins(3, 0, 3, 0);
     frameBlocksLayout->setSpacing(3);
     unitDisplayControl = new UnitDisplayStatusBarControl(platformStyle);
-    labelEncryptionIcon = new QLabel();
+    labelWalletEncryptionIcon = new QLabel();
+    labelWalletHDStatusIcon = new QLabel();
     labelConnectionsIcon = new QLabel();
     labelBlocksIcon = new QLabel();
     if (enableWallet)
@@ -168,7 +158,8 @@ BitcoinGUI::BitcoinGUI(const Config *cfg,
         frameBlocksLayout->addStretch();
         frameBlocksLayout->addWidget(unitDisplayControl);
         frameBlocksLayout->addStretch();
-        frameBlocksLayout->addWidget(labelEncryptionIcon);
+        frameBlocksLayout->addWidget(labelWalletEncryptionIcon);
+        frameBlocksLayout->addWidget(labelWalletHDStatusIcon);
     }
     frameBlocksLayout->addStretch();
     frameBlocksLayout->addWidget(labelConnectionsIcon);
@@ -435,39 +426,39 @@ void BitcoinGUI::createToolBars()
     }
 }
 
-void BitcoinGUI::setClientModel(ClientModel *clientModel)
+void BitcoinGUI::setClientModel(ClientModel *_clientModel)
 {
-    this->clientModel = clientModel;
-    if (clientModel)
+    this->clientModel = _clientModel;
+    if (_clientModel)
     {
         // Create system tray menu (or setup the dock menu) that late to prevent users from calling actions,
         // while the client has not yet fully loaded
         createTrayIconMenu();
 
         // Keep up to date with client
-        setNumConnections(clientModel->getNumConnections());
-        connect(clientModel, SIGNAL(numConnectionsChanged(int)), this, SLOT(setNumConnections(int)));
+        setNumConnections(_clientModel->getNumConnections());
+        connect(_clientModel, SIGNAL(numConnectionsChanged(int)), this, SLOT(setNumConnections(int)));
 
-        setNumBlocks(
-            clientModel->getNumBlocks(), clientModel->getLastBlockDate(), clientModel->getVerificationProgress(NULL));
-        connect(clientModel, SIGNAL(numBlocksChanged(int, QDateTime, double)), this,
+        setNumBlocks(_clientModel->getNumBlocks(), _clientModel->getLastBlockDate(),
+            _clientModel->getVerificationProgress(NULL));
+        connect(_clientModel, SIGNAL(numBlocksChanged(int, QDateTime, double)), this,
             SLOT(setNumBlocks(int, QDateTime, double)));
 
         // Receive and report messages from client model
-        connect(clientModel, SIGNAL(message(QString, QString, unsigned int)), this,
+        connect(_clientModel, SIGNAL(message(QString, QString, unsigned int)), this,
             SLOT(message(QString, QString, unsigned int)));
 
         // Show progress dialog
-        connect(clientModel, SIGNAL(showProgress(QString, int)), this, SLOT(showProgress(QString, int)));
+        connect(_clientModel, SIGNAL(showProgress(QString, int)), this, SLOT(showProgress(QString, int)));
 
-        rpcConsole->setClientModel(clientModel);
+        rpcConsole->setClientModel(_clientModel);
 #ifdef ENABLE_WALLET
         if (walletFrame)
         {
-            walletFrame->setClientModel(clientModel);
+            walletFrame->setClientModel(_clientModel);
         }
 #endif // ENABLE_WALLET
-        unitDisplayControl->setOptionsModel(clientModel->getOptionsModel());
+        unitDisplayControl->setOptionsModel(_clientModel->getOptionsModel());
     }
     else
     {
@@ -1000,30 +991,44 @@ bool BitcoinGUI::handlePaymentRequest(const SendCoinsRecipient &recipient)
     return false;
 }
 
+void BitcoinGUI::setHDStatus(int hdEnabled)
+{
+    labelWalletHDStatusIcon->setPixmap(
+        platformStyle->SingleColorIcon(hdEnabled ? ":/icons/hd_enabled" : ":/icons/hd_disabled")
+            .pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
+    labelWalletHDStatusIcon->setToolTip(
+        hdEnabled ? tr("HD key generation is <b>enabled</b>") : tr("HD key generation is <b>disabled</b>"));
+
+    // eventually disable the QLabel to set its opacity to 50%
+    labelWalletHDStatusIcon->setEnabled(hdEnabled);
+}
+
 void BitcoinGUI::setEncryptionStatus(int status)
 {
     switch (status)
     {
     case WalletModel::Unencrypted:
-        labelEncryptionIcon->hide();
+        labelWalletEncryptionIcon->hide();
         encryptWalletAction->setChecked(false);
         changePassphraseAction->setEnabled(false);
         encryptWalletAction->setEnabled(true);
         break;
     case WalletModel::Unlocked:
-        labelEncryptionIcon->show();
-        labelEncryptionIcon->setPixmap(
+        labelWalletEncryptionIcon->show();
+        labelWalletEncryptionIcon->setPixmap(
             platformStyle->SingleColorIcon(":/icons/lock_open").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
-        labelEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>unlocked</b>"));
+        labelWalletEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>unlocked</b>"));
+
         encryptWalletAction->setChecked(true);
         changePassphraseAction->setEnabled(true);
         encryptWalletAction->setEnabled(false); // TODO: decrypt currently not supported
         break;
     case WalletModel::Locked:
-        labelEncryptionIcon->show();
-        labelEncryptionIcon->setPixmap(
+        labelWalletEncryptionIcon->show();
+        labelWalletEncryptionIcon->setPixmap(
             platformStyle->SingleColorIcon(":/icons/lock_closed").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
-        labelEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>locked</b>"));
+        labelWalletEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>locked</b>"));
+
         encryptWalletAction->setChecked(true);
         changePassphraseAction->setEnabled(true);
         encryptWalletAction->setEnabled(false); // TODO: decrypt currently not supported
@@ -1141,7 +1146,7 @@ void UnitDisplayStatusBarControl::mousePressEvent(QMouseEvent *event) { onDispla
 /** Creates context menu, its actions, and wires up all the relevant signals for mouse events. */
 void UnitDisplayStatusBarControl::createContextMenu()
 {
-    menu = new QMenu();
+    menu = new QMenu(this);
     Q_FOREACH (BitcoinUnits::Unit u, BitcoinUnits::availableUnits())
     {
         QAction *menuAction = new QAction(QString(BitcoinUnits::name(u)), this);
@@ -1152,17 +1157,17 @@ void UnitDisplayStatusBarControl::createContextMenu()
 }
 
 /** Lets the control know about the Options Model (and its signals) */
-void UnitDisplayStatusBarControl::setOptionsModel(OptionsModel *optionsModel)
+void UnitDisplayStatusBarControl::setOptionsModel(OptionsModel *_optionsModel)
 {
-    if (optionsModel)
+    if (_optionsModel)
     {
-        this->optionsModel = optionsModel;
+        this->optionsModel = _optionsModel;
 
         // be aware of a display unit change reported by the OptionsModel object.
-        connect(optionsModel, SIGNAL(displayUnitChanged(int)), this, SLOT(updateDisplayUnit(int)));
+        connect(_optionsModel, SIGNAL(displayUnitChanged(int)), this, SLOT(updateDisplayUnit(int)));
 
         // initialize the display units label with the current value in the model.
-        updateDisplayUnit(optionsModel->getDisplayUnit());
+        updateDisplayUnit(_optionsModel->getDisplayUnit());
     }
 }
 

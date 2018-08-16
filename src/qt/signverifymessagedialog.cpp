@@ -21,8 +21,8 @@
 
 #include <QClipboard>
 
-SignVerifyMessageDialog::SignVerifyMessageDialog(const PlatformStyle *platformStyle, QWidget *parent)
-    : QDialog(parent), ui(new Ui::SignVerifyMessageDialog), model(0), platformStyle(platformStyle)
+SignVerifyMessageDialog::SignVerifyMessageDialog(const PlatformStyle *_platformStyle, QWidget *parent)
+    : QDialog(parent), ui(new Ui::SignVerifyMessageDialog), model(0), platformStyle(_platformStyle)
 {
     ui->setupUi(this);
 
@@ -34,10 +34,7 @@ SignVerifyMessageDialog::SignVerifyMessageDialog(const PlatformStyle *platformSt
     ui->addressBookButton_VM->setIcon(platformStyle->SingleColorIcon(":/icons/address-book"));
     ui->verifyMessageButton_VM->setIcon(platformStyle->SingleColorIcon(":/icons/transaction_0"));
     ui->clearButton_VM->setIcon(platformStyle->SingleColorIcon(":/icons/remove"));
-
-#if QT_VERSION >= 0x040700
     ui->signatureOut_SM->setPlaceholderText(tr("Click \"Sign Message\" to generate signature"));
-#endif
 
     GUIUtil::setupAddressWidget(ui->addressIn_SM, this);
     GUIUtil::setupAddressWidget(ui->addressIn_VM, this);
@@ -54,7 +51,7 @@ SignVerifyMessageDialog::SignVerifyMessageDialog(const PlatformStyle *platformSt
 }
 
 SignVerifyMessageDialog::~SignVerifyMessageDialog() { delete ui; }
-void SignVerifyMessageDialog::setModel(WalletModel *model) { this->model = model; }
+void SignVerifyMessageDialog::setModel(WalletModel *_model) { this->model = _model; }
 void SignVerifyMessageDialog::setAddress_SM(const QString &address)
 {
     ui->addressIn_SM->setText(address);

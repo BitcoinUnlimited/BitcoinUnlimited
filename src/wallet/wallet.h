@@ -64,6 +64,9 @@ static const unsigned int DEFAULT_TX_CONFIRM_TARGET = 2;
 static const unsigned int MAX_FREE_TRANSACTION_CREATE_SIZE = MAX_STANDARD_TX_SIZE;
 static const bool DEFAULT_WALLETBROADCAST = true;
 
+//! if set, all keys will be derived by using BIP32
+static const bool DEFAULT_USE_HD_WALLET = true;
+
 extern const char *DEFAULT_WALLET_DAT;
 
 class CBlockIndex;
@@ -82,7 +85,8 @@ enum WalletFeature
     FEATURE_WALLETCRYPT = 40000, // wallet encryption
     FEATURE_COMPRPUBKEY = 60000, // compressed public keys
 
-    FEATURE_LATEST = 60000
+    FEATURE_HD = 130000, // Hierarchical key derivation after BIP32 (HD Wallet)
+    FEATURE_LATEST = FEATURE_COMPRPUBKEY // HD is optional, use FEATURE_COMPRPUBKEY as latest version
 };
 
 
@@ -380,9 +384,6 @@ public:
         const isminefilter &filter) const;
 
     bool IsFromMe(const isminefilter &filter) const { return (GetDebit(filter) > 0); }
-    // True if only scriptSigs are different
-    bool IsEquivalentTo(const CWalletTx &tx) const;
-
     bool InMempool() const;
     bool IsTrusted() const;
 
@@ -571,6 +572,9 @@ private:
 
     void SyncMetaData(std::pair<TxSpends::iterator, TxSpends::iterator>);
 
+    /* the HD chain data model (external chain counters) */
+    CHDChain hdChain;
+
 public:
     /*
      * Main wallet lock.
@@ -681,6 +685,7 @@ public:
      * Generate a new key
      */
     CPubKey GenerateNewKey();
+    void DeriveNewChildKey(CKeyMetadata &metadata, CKey &secret);
     //! Adds a key to the store, and saves it to disk.
     bool AddKeyPubKey(const CKey &key, const CPubKey &pubkey);
     //! Adds a key to the store, without saving it to disk (used by LoadWallet)
@@ -729,12 +734,12 @@ public:
      * Increment the next transaction order id
      * @return next transaction order id
      */
-    int64_t IncOrderPosNext(CWalletDB *pwalletdb = NULL);
+    int64_t IncOrderPosNext(CWalletDB *pwalletdb = nullptr);
 
     void MarkDirty();
     bool AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletDB *pwalletdb);
-    void SyncTransaction(const CTransaction &tx, const CBlock *pblock, int txIndex = -1);
-    bool AddToWalletIfInvolvingMe(const CTransaction &tx, const CBlock *pblock, bool fUpdate, int txIndex = -1);
+    void SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIndex = -1);
+    bool AddToWalletIfInvolvingMe(const CTransactionRef &ptx, const CBlock *pblock, bool fUpdate, int txIndex = -1);
     int ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate = false);
     void ReacceptWalletTransactions();
     void ResendWalletTransactions(int64_t nBestBlockTime);
@@ -914,6 +919,20 @@ public:
 
     /* Wallets parameter interaction */
     static bool ParameterInteraction();
+
+    bool BackupWallet(const std::string &strDest);
+
+    /* Set the HD chain model (chain child index counters) */
+    bool SetHDChain(const CHDChain &chain, bool memonly);
+    const CHDChain &GetHDChain() { return hdChain; }
+    /* Returns true if HD is enabled */
+    bool IsHDEnabled();
+
+    /* Generates a new HD master key (will not be activated) */
+    CPubKey GenerateNewHDMasterKey();
+
+    /* Set the current HD master key (will reset the chain child index counters) */
+    bool SetHDMasterKey(const CPubKey &key);
 };
 
 /** A key allocated from the key pool. */

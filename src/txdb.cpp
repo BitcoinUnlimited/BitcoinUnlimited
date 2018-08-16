@@ -5,8 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "txdb.h"
-
-#include "chain.h"
+#include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "hash.h"
 #include "main.h"
@@ -15,6 +14,8 @@
 #include "uint256.h"
 
 #include <stdint.h>
+
+CCoinsViewDB *pcoinsdbview = nullptr;
 
 using namespace std;
 
@@ -28,6 +29,10 @@ static const char DB_BEST_BLOCK = 'B';
 static const char DB_FLAG = 'F';
 static const char DB_REINDEX_FLAG = 'R';
 static const char DB_LAST_BLOCK = 'l';
+
+// to distinguish best block for a specific DB type, values correspond to enum vaue (blockdb_wrapper.h)
+static const char DB_BEST_BLOCK_BLOCKDB = 'D';
+
 
 namespace
 {
@@ -65,9 +70,55 @@ uint256 CCoinsViewDB::GetBestBlock() const
 {
     LOCK(cs_utxo);
     uint256 hashBestChain;
+    if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+    {
+        hashBestChain = GetBestBlockSeq();
+    }
+    else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    {
+        hashBestChain = GetBestBlockDb();
+    }
+    else
+    {
+        return uint256();
+    }
+    return hashBestChain;
+}
+
+uint256 CCoinsViewDB::GetBestBlockSeq() const
+{
+    LOCK(cs_utxo);
+    uint256 hashBestChain;
     if (!db.Read(DB_BEST_BLOCK, hashBestChain))
         return uint256();
     return hashBestChain;
+}
+
+void CCoinsViewDB::WriteBestBlockSeq(const uint256 &hashBlock)
+{
+    LOCK(cs_utxo);
+    if (!hashBlock.IsNull())
+    {
+        db.Write(DB_BEST_BLOCK, hashBlock);
+    }
+}
+
+uint256 CCoinsViewDB::GetBestBlockDb() const
+{
+    LOCK(cs_utxo);
+    uint256 hashBestChain;
+    if (!db.Read(DB_BEST_BLOCK_BLOCKDB, hashBestChain))
+        return uint256();
+    return hashBestChain;
+}
+
+void CCoinsViewDB::WriteBestBlockDb(const uint256 &hashBlock)
+{
+    LOCK(cs_utxo);
+    if (!hashBlock.IsNull())
+    {
+        db.Write(DB_BEST_BLOCK_BLOCKDB, hashBlock);
+    }
 }
 
 bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
@@ -132,8 +183,10 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
             it++;
         count++;
     }
-    if (!hashBlock.IsNull())
+    if (!hashBlock.IsNull() && BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
         batch.Write(DB_BEST_BLOCK, hashBlock);
+    else if (!hashBlock.IsNull() && BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+        batch.Write(DB_BEST_BLOCK_BLOCKDB, hashBlock);
 
     bool ret = db.WriteBatch(batch);
     LOG(COINDB, "Committing %u changed transactions (out of %u) to coin database with %u batch writes...\n",
@@ -142,8 +195,8 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
 }
 
 size_t CCoinsViewDB::EstimateSize() const { return db.EstimateSize(DB_COIN, (char)(DB_COIN + 1)); }
-CBlockTreeDB::CBlockTreeDB(size_t nCacheSize, bool fMemory, bool fWipe)
-    : CDBWrapper(GetDataDir() / "blocks" / "index", nCacheSize, fMemory, fWipe)
+CBlockTreeDB::CBlockTreeDB(size_t nCacheSize, string folder, bool fMemory, bool fWipe)
+    : CDBWrapper(GetDataDir() / folder.c_str() / "index", nCacheSize, fMemory, fWipe)
 {
 }
 
@@ -227,7 +280,6 @@ bool CBlockTreeDB::WriteBatchSync(const std::vector<std::pair<int, const CBlockF
     {
         batch.Write(make_pair(DB_BLOCK_FILES, it->first), *it->second);
     }
-    batch.Write(DB_LAST_BLOCK, nLastFile);
     for (std::vector<const CBlockIndex *>::const_iterator it = blockinfo.begin(); it != blockinfo.end(); it++)
     {
         batch.Write(make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()), CDiskBlockIndex(*it));
@@ -256,6 +308,45 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue)
         return false;
     fValue = ch == '1';
     return true;
+}
+
+bool CBlockTreeDB::FindBlockIndex(uint256 blockhash, CDiskBlockIndex *pindex)
+{
+    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(make_pair(DB_BLOCK_INDEX, uint256()));
+    // Load mapBlockIndex
+    while (pcursor->Valid())
+    {
+        boost::this_thread::interruption_point();
+        std::pair<char, uint256> key;
+        if (pcursor->GetKey(key) && key.first == DB_BLOCK_INDEX)
+        {
+            if (key.second == blockhash)
+            {
+                if (pcursor->GetValue(*pindex))
+                {
+                    if (!CheckProofOfWork(blockhash, pindex->nBits, Params().GetConsensus()))
+                    {
+                        return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindex->ToString());
+                    }
+                    return true;
+                }
+                else
+                {
+                    return error("FindBlockIndex() : failed to read value");
+                }
+            }
+            else
+            {
+                pcursor->Next();
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+    return error("FindBlockIndex(): couldnt find index with requested hash %s", blockhash.GetHex().c_str());
 }
 
 bool CBlockTreeDB::LoadBlockIndexGuts()
@@ -304,7 +395,38 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
             break;
         }
     }
+    return true;
+}
 
+bool CBlockTreeDB::GetSortedHashIndex(std::vector<std::pair<int, CDiskBlockIndex> > &hashesByHeight)
+{
+    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(make_pair(DB_BLOCK_INDEX, uint256()));
+    // Load mapBlockIndex
+    while (pcursor->Valid())
+    {
+        boost::this_thread::interruption_point();
+        std::pair<char, uint256> key;
+        if (pcursor->GetKey(key) && key.first == DB_BLOCK_INDEX)
+        {
+            CDiskBlockIndex diskindex;
+            if (pcursor->GetValue(diskindex))
+            {
+                // Construct block index object
+                hashesByHeight.push_back(std::make_pair(diskindex.nHeight, diskindex));
+                pcursor->Next();
+            }
+            else
+            {
+                return error("LoadBlockIndex() : failed to read value");
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+    std::sort(hashesByHeight.begin(), hashesByHeight.end());
     return true;
 }
 
@@ -330,7 +452,7 @@ public:
     {
         unsigned int nCode = 0;
         // version
-        int nVersionDummy;
+        unsigned int nVersionDummy;
         ::Unserialize(s, VARINT(nVersionDummy));
         // header code
         ::Unserialize(s, VARINT(nCode));
@@ -360,7 +482,7 @@ public:
                 ::Unserialize(s, REF(CTxOutCompressor(vout[i])));
         }
         // coinbase height
-        ::Unserialize(s, VARINT(nHeight));
+        ::Unserialize(s, VARINT(nHeight, VarIntMode::NONNEGATIVE_SIGNED));
     }
 };
 }
@@ -506,9 +628,11 @@ uint64_t GetTotalSystemMemory()
 }
 #endif
 
-void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
+void GetCacheConfiguration(int64_t &_nBlockDBCache,
+    int64_t &_nBlockUndoDBcache,
+    int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
-    int64_t &_nCoinCacheUsage,
+    int64_t &_nCoinCacheMaxSize,
     bool fDefault)
 {
 #ifdef WIN32
@@ -548,13 +672,16 @@ void GetCacheConfiguration(int64_t &_nBlockTreeDBCache,
     }
 
     // Now that we have the nTotalCache we can calculate all the various cache sizes.
-    CacheSizeCalculations(nTotalCache, _nBlockTreeDBCache, _nCoinDBCache, _nCoinCacheUsage);
+    CacheSizeCalculations(
+        nTotalCache, _nBlockDBCache, _nBlockUndoDBcache, _nBlockTreeDBCache, _nCoinDBCache, _nCoinCacheMaxSize);
 }
 
 void CacheSizeCalculations(int64_t _nTotalCache,
+    int64_t &_nBlockDBCache,
+    int64_t &_nBlockUndoDBcache,
     int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
-    int64_t &_nCoinCacheUsage)
+    int64_t &_nCoinCacheMaxSize)
 {
     // make sure total cache is within limits
     _nTotalCache = std::max(_nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache
@@ -566,25 +693,49 @@ void CacheSizeCalculations(int64_t _nTotalCache,
     if (_nBlockTreeDBCache > (1 << 21) && !GetBoolArg("-txindex", DEFAULT_TXINDEX))
         _nBlockTreeDBCache = (1 << 21);
 
-    // use 25%-50% of the remainder for the utxo leveldb disk cache
+    // If we are in block db storage mode then calculated the level db cache size for the block and undo caches.
+    // As a safeguard make them at least as large as the _nBlockTreeDBCache;
     _nTotalCache -= _nBlockTreeDBCache;
+    if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    {
+        // use up to 5% for the level db block cache but no bigger than 256MB
+        _nBlockDBCache = _nTotalCache * 0.05;
+        if (_nBlockDBCache < _nBlockTreeDBCache)
+            _nBlockDBCache = _nBlockTreeDBCache;
+        else if (_nBlockDBCache > 256 << 20)
+            _nBlockDBCache = 256 << 20;
+
+        // use up to 1% for the level db undo cache but no bigger than 64MB
+        _nBlockUndoDBcache = _nTotalCache * 0.01;
+        if (_nBlockUndoDBcache < _nBlockTreeDBCache)
+            _nBlockUndoDBcache = _nBlockTreeDBCache;
+        else if (_nBlockUndoDBcache > 64 << 20)
+            _nBlockUndoDBcache = 64 << 20;
+    }
+
+    // use 25%-50% of the remainder for the utxo leveldb disk cache
+    _nTotalCache -= _nBlockDBCache;
+    _nTotalCache -= _nBlockUndoDBcache;
     _nCoinDBCache = std::min(_nTotalCache / 2, (_nTotalCache / 4) + (1 << 23));
 
     // the remainder goes to the in-memory utxo coins cache
     _nTotalCache -= _nCoinDBCache;
-    _nCoinCacheUsage = _nTotalCache;
+    _nCoinCacheMaxSize = _nTotalCache;
 }
 
 void AdjustCoinCacheSize()
 {
+    AssertLockHeld(cs_main);
+
     // If the operator has not set a dbcache and initial sync is complete then revert back to the default
     // value for dbcache. This will cause the current coins cache to be immediately trimmed to size.
     if (!IsInitialBlockDownload() && !GetArg("-dbcache", 0) && chainActive.Tip())
     {
-        // Get the default value for nCoinCacheUsage.
-        int64_t dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
-        CacheSizeCalculations(nDefaultDbCache, dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
-        nCoinCacheUsage = nMaxCoinCache;
+        // Get the default value for nCoinCacheMaxSize.
+        int64_t dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
+        CacheSizeCalculations(
+            nDefaultDbCache, dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
+        nCoinCacheMaxSize = nMaxCoinCache;
 
         return;
     }
@@ -598,8 +749,8 @@ void AdjustCoinCacheSize()
         nLastDbAdjustment = nNow;
     }
 
-    // used to determine if we had previously reduced the nCoinCacheUsage and also to tell us what the last
-    // mem available was when we modified the nCoinCacheUsage.
+    // used to determine if we had previously reduced the nCoinCacheMaxSize and also to tell us what the last
+    // mem available was when we modified the nCoinCacheMaxSize.
     static int64_t nLastMemAvailable = 0;
 
     // If there is no dbcache setting specified by the node operator then float the dbache setting down or up
@@ -617,36 +768,37 @@ void AdjustCoinCacheSize()
             nUnusedMem = pcoinsdbview->TotalWriteBufferSize();
         }
 
-        // Reduce nCoinCacheUsage if mem available gets near the threshold. We have to be more strict about flushing
+        // Reduce nCoinCacheMaxSize if mem available gets near the threshold. We have to be more strict about flushing
         // if we're running low on mem because on marginal systems with smaller RAM we have very little wiggle room.
         if (nMemAvailable < nUnusedMem * 1.05)
         {
             // Get the lowest possible default coins cache configuration possible and use this value as a limiter
-            // to prevent the nCoinCacheUsage from falling below this value.
-            int64_t dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache = 0;
-            GetCacheConfiguration(dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache, true);
+            // to prevent the nCoinCacheMaxSize from falling below this value.
+            int64_t dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache = 0;
+            GetCacheConfiguration(
+                dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache, true);
 
-            nCoinCacheUsage = std::max(nDefaultCoinCache, nCoinCacheUsage - (nUnusedMem - nMemAvailable));
-            LOG(COINDB, "Current cache size: %ld MB, nCoinCacheUsage was reduced by %u MB\n", nCoinCacheUsage / 1000000,
-                (nUnusedMem - nMemAvailable) / 1000000);
+            nCoinCacheMaxSize = std::max(nDefaultCoinCache, nCoinCacheMaxSize - (nUnusedMem - nMemAvailable));
+            LOG(COINDB, "Current cache size: %ld MB, nCoinCacheMaxSize was reduced by %u MB\n",
+                nCoinCacheMaxSize / 1000000, (nUnusedMem - nMemAvailable) / 1000000);
             nLastDbAdjustment = nNow;
             nLastMemAvailable = nMemAvailable;
         }
 
-        // Increase nCoinCacheUsage if mem available increases. We don't want to constantly be
+        // Increase nCoinCacheMaxSize if mem available increases. We don't want to constantly be
         // triggering an increase whenever the nMemAvailable crosses the threshold by just a
         // few bytes, so we'll dampen the increases by triggering only when the threshold is crossed by 5%.
         else if (nLastMemAvailable > 0 && nMemAvailable * 0.95 >= nLastMemAvailable)
         {
             // find the max coins cache possible for this configuration.  Use the max int possible for total cache
             // size to ensure you receive the max cache size possible.
-            int64_t dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
-            CacheSizeCalculations(
-                std::numeric_limits<long long>::max(), dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
+            int64_t dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
+            CacheSizeCalculations(std::numeric_limits<long long>::max(), dummyBlockCache, dummyUndoCache,
+                dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
 
-            nCoinCacheUsage = std::min(nMaxCoinCache, nCoinCacheUsage + (nMemAvailable - nLastMemAvailable));
-            LOG(COINDB, "Current cache size: %ld MB, nCoinCacheUsage was increased by %u MB\n",
-                nCoinCacheUsage / 1000000, (nMemAvailable - nLastMemAvailable) / 1000000);
+            nCoinCacheMaxSize = std::min(nMaxCoinCache, nCoinCacheMaxSize + (nMemAvailable - nLastMemAvailable));
+            LOG(COINDB, "Current cache size: %ld MB, nCoinCacheMaxSize was increased by %u MB\n",
+                nCoinCacheMaxSize / 1000000, (nMemAvailable - nLastMemAvailable) / 1000000);
             nLastDbAdjustment = nNow;
             nLastMemAvailable = nMemAvailable;
         }

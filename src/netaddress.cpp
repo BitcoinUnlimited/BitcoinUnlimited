@@ -159,8 +159,8 @@ bool CNetAddr::IsValid() const
         return false;
 
     // unspecified IPv6 address (::/128)
-    unsigned char ipNone[16] = {};
-    if (memcmp(ip, ipNone, 16) == 0)
+    unsigned char _ipNone[16] = {};
+    if (memcmp(ip, _ipNone, 16) == 0)
         return false;
 
     // documentation IPv6 address
@@ -435,30 +435,30 @@ CService::CService(const struct sockaddr_in6 &addr)
 
 CService::CService(const char *pszIpPort) : port(0)
 {
-    CService ip;
-    if (Lookup(pszIpPort, ip, 0, false))
-        *this = ip;
+    CService _ip;
+    if (Lookup(pszIpPort, _ip, 0, false))
+        *this = _ip;
 }
 
 CService::CService(const char *pszIpPort, int portDefault) : port(0)
 {
-    CService ip;
-    if (Lookup(pszIpPort, ip, portDefault, false))
-        *this = ip;
+    CService _ip;
+    if (Lookup(pszIpPort, _ip, portDefault, false))
+        *this = _ip;
 }
 
 CService::CService(const std::string &strIpPort) : port(0)
 {
-    CService ip;
-    if (Lookup(strIpPort.c_str(), ip, 0, false))
-        *this = ip;
+    CService _ip;
+    if (Lookup(strIpPort.c_str(), _ip, 0, false))
+        *this = _ip;
 }
 
 CService::CService(const std::string &strIpPort, int portDefault) : port(0)
 {
-    CService ip;
-    if (Lookup(strIpPort.c_str(), ip, portDefault, false))
-        *this = ip;
+    CService _ip;
+    if (Lookup(strIpPort.c_str(), _ip, portDefault, false))
+        *this = _ip;
 }
 
 bool CService::SetSockAddr(const struct sockaddr *paddr)

@@ -5,6 +5,7 @@ src/bitcoin
 src/bitcoind
 src/bitcoin-cli
 src/bitcoin-tx
+src/bitcoin-miner
 src/test/test_bitcoin
 src/test/test_bitcoin_fuzzy
 src/qt/test/test_bitcoin-qt
@@ -108,6 +109,7 @@ qa/pull-tester/run-bitcoind-for-test.sh
 qa/pull-tester/tests_config.py
 qa/pull-tester/cache/*
 qa/pull-tester/test.*/*
+qa/pull-tester/validatePerf.csv
 qa/tmp
 cache/
 share/BitcoindComparisonTool.jar

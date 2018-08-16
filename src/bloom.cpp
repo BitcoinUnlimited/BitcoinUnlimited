@@ -16,10 +16,9 @@
 #include <math.h>
 #include <stdlib.h>
 
-#include <boost/foreach.hpp>
-
 #define LN2SQUARED 0.4804530139182014246671025263266649717305529515945455
 #define LN2 0.6931471805599453094172321214581765680755001343602552
+#define MIN_N_HASH_FUNC 1
 
 using namespace std;
 
@@ -27,7 +26,7 @@ void CBloomFilter::setup(unsigned int nElements,
     double nFPRate,
     unsigned int nTweakIn,
     unsigned char nFlagsIn,
-    bool size_constrained,
+    bool fSizeConstrained,
     uint32_t nMaxFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE)
 {
     if (nElements == 0)
@@ -35,19 +34,42 @@ void CBloomFilter::setup(unsigned int nElements,
         LOGA("Construction of empty CBloomFilter attempted.\n");
         nElements = 1;
     }
-    unsigned desired_vdata_size = (unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate) / 8);
+    unsigned int nDesiredSize = (unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate) / 8);
 
-    if (size_constrained)
-        desired_vdata_size = min(desired_vdata_size, nMaxFilterSize);
+    if (fSizeConstrained)
+        nDesiredSize = min(nDesiredSize, nMaxFilterSize);
 
-    vData.resize(desired_vdata_size, 0);
+    vData.resize(nDesiredSize, 0);
     isFull = vData.size() == 0;
     isEmpty = true;
 
     nHashFuncs = (unsigned int)(vData.size() * 8 / nElements * LN2);
 
-    if (size_constrained)
+    if (fSizeConstrained)
         nHashFuncs = min(nHashFuncs, MAX_HASH_FUNCS);
+
+    nTweak = nTweakIn;
+    nFlags = nFlagsIn;
+}
+
+void CBloomFilter::setupGuaranteeFPR(unsigned int nElements,
+    double nFPRate,
+    unsigned int nTweakIn,
+    unsigned char nFlagsIn,
+    uint32_t nMaxFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE)
+{
+    if (nElements == 0)
+    {
+        LOGA("Construction of empty CBloomFilter attempted.\n");
+        nElements = 1;
+    }
+    unsigned int nDesiredSize = (unsigned int)(ceil(-1 / LN2SQUARED * nElements * log(nFPRate) / 8));
+
+    vData.resize(nDesiredSize, 0);
+    isFull = vData.size() == 0;
+    isEmpty = true;
+
+    nHashFuncs = (unsigned int)max(MIN_N_HASH_FUNC, int(vData.size() * 8 / nElements * LN2));
 
     nTweak = nTweakIn;
     nFlags = nFlagsIn;
@@ -60,6 +82,19 @@ CBloomFilter::CBloomFilter(unsigned int nElements,
     uint32_t nMaxFilterSize)
 {
     setup(nElements, nFPRate, nTweakIn, nFlagsIn, true, nMaxFilterSize);
+}
+
+CBloomFilter::CBloomFilter(unsigned int nElements,
+    double nFPRate,
+    unsigned int nTweakIn,
+    unsigned char nFlagsIn,
+    bool fGuaranteeFPR,
+    uint32_t nMaxFilterSize)
+{
+    if (fGuaranteeFPR)
+        setupGuaranteeFPR(nElements, nFPRate, nTweakIn, nFlagsIn, nMaxFilterSize);
+    else
+        setup(nElements, nFPRate, nTweakIn, nFlagsIn, true, nMaxFilterSize);
 }
 
 // Private constructor used by CRollingBloomFilter
@@ -87,14 +122,15 @@ void CBloomFilter::insert(const vector<unsigned char> &vKey)
     isEmpty = false;
 }
 
-void CBloomFilter::insert(const COutPoint &outpoint)
+static std::vector<unsigned char> ToVector(const COutPoint &outpoint)
 {
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
     stream << outpoint;
-    vector<unsigned char> data(stream.begin(), stream.end());
-    insert(data);
+    return std::vector<unsigned char>(stream.begin(), stream.end());
 }
 
+
+void CBloomFilter::insert(const COutPoint &outpoint) { insert(ToVector(outpoint)); }
 void CBloomFilter::insert(const uint256 &hash)
 {
     vector<unsigned char> data(hash.begin(), hash.end());
@@ -117,14 +153,7 @@ bool CBloomFilter::contains(const vector<unsigned char> &vKey) const
     return true;
 }
 
-bool CBloomFilter::contains(const COutPoint &outpoint) const
-{
-    CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
-    stream << outpoint;
-    vector<unsigned char> data(stream.begin(), stream.end());
-    return contains(data);
-}
-
+bool CBloomFilter::contains(const COutPoint &outpoint) const { return contains(ToVector(outpoint)); }
 bool CBloomFilter::contains(const uint256 &hash) const
 {
     vector<unsigned char> data(hash.begin(), hash.end());
@@ -197,7 +226,7 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction &tx)
     if (fFound)
         return true;
 
-    BOOST_FOREACH (const CTxIn &txin, tx.vin)
+    for (const CTxIn &txin : tx.vin)
     {
         // Match if the filter contains an outpoint tx spends
         if (contains(txin.prevout))
@@ -269,6 +298,7 @@ void CRollingBloomFilter::insert(const uint256 &hash)
     insert(data);
 }
 
+void CRollingBloomFilter::insert(const COutPoint &outpoint) { insert(ToVector(outpoint)); }
 bool CRollingBloomFilter::contains(const std::vector<unsigned char> &vKey) const
 {
     if (nInsertions < nBloomSize / 2)
@@ -284,6 +314,7 @@ bool CRollingBloomFilter::contains(const uint256 &hash) const
     return contains(data);
 }
 
+bool CRollingBloomFilter::contains(const COutPoint &outpoint) const { return contains(ToVector(outpoint)); }
 void CRollingBloomFilter::reset()
 {
     unsigned int nNewTweak = GetRand(std::numeric_limits<unsigned int>::max());

@@ -28,8 +28,8 @@ class CBlockIndex;
 static const int64_t nClientStartupTime = GetTime();
 static int64_t nLastBlockTipUpdateNotification = 0;
 
-ClientModel::ClientModel(OptionsModel *optionsModel, UnlimitedModel *ul, QObject *parent)
-    : QObject(parent), unlimitedModel(ul), optionsModel(optionsModel), peerTableModel(0), banTableModel(0),
+ClientModel::ClientModel(OptionsModel *_optionsModel, UnlimitedModel *ul, QObject *parent)
+    : QObject(parent), unlimitedModel(ul), optionsModel(_optionsModel), peerTableModel(0), banTableModel(0),
       pollTimer1(0), pollTimer2(0)
 {
     peerTableModel = new PeerTableModel(this);
@@ -54,7 +54,7 @@ int ClientModel::getNumConnections(unsigned int flags) const
         return vNodes.size();
 
     int nNum = 0;
-    BOOST_FOREACH (const CNode *pnode, vNodes)
+    for (const CNode *pnode : vNodes)
         if (flags & (pnode->fInbound ? CONNECTIONS_IN : CONNECTIONS_OUT))
             nNum++;
 
@@ -80,12 +80,7 @@ QDateTime ClientModel::getLastBlockDate() const
 }
 
 long ClientModel::getMempoolSize() const { return mempool.size(); }
-long ClientModel::getOrphanPoolSize() const
-{
-    LOCK(orphanpool.cs);
-    return orphanpool.mapOrphanTransactions.size();
-}
-
+long ClientModel::getOrphanPoolSize() const { return orphanpool.GetOrphanPoolSize(); }
 size_t ClientModel::getMempoolDynamicUsage() const { return mempool.DynamicMemoryUsage(); }
 // BU: begin
 double ClientModel::getTransactionsPerSecond() const { return mempool.TransactionsPerSecond(); }
@@ -116,6 +111,12 @@ void ClientModel::updateTimer2()
     // the following calls will aquire the required lock
     Q_EMIT orphanPoolSizeChanged(getOrphanPoolSize());
     Q_EMIT bytesChanged(getTotalBytesRecv(), getTotalBytesSent());
+
+    thindata.FillThinBlockQuickStats(thinStats);
+    Q_EMIT thinBlockPropagationStatsChanged(thinStats);
+
+    graphenedata.FillGrapheneQuickStats(grapheneStats);
+    Q_EMIT grapheneBlockPropagationStatsChanged(grapheneStats);
 
     uiInterface.BannedListChanged();
 }

@@ -83,13 +83,32 @@
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
-#include <boost/foreach.hpp>
 #include <boost/program_options/detail/config_file.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/thread.hpp>
 #include <openssl/conf.h>
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
+
+std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args)
+{
+    std::vector<std::string> result;
+    for (std::string arg : args)
+    {
+        size_t pos;
+        while ((pos = arg.find(',')) != std::string::npos)
+        {
+            result.push_back(arg.substr(0, pos));
+            arg = arg.substr(pos + 1);
+        }
+        std::string arg_nospace;
+        for (char c : arg)
+            if (c != ' ')
+                arg_nospace += c;
+        result.push_back(arg_nospace);
+    }
+    return result;
+}
 
 // Work around clang compilation problem in Boost 1.46:
 // /usr/include/boost/program_options/detail/config_file.hpp:163:17: error: call to function 'to_internal' that is
@@ -159,8 +178,14 @@ void LogInit()
 {
     string category = "";
     uint64_t catg = Logging::NONE;
-    const vector<string> &categories = mapMultiArgs["-debug"];
+    const vector<string> categories = splitByCommasAndRemoveSpaces(mapMultiArgs["-debug"]);
 
+    // enable all when given -debug=1 or -debug
+    if (categories.size() == 1 && (categories[0] == "" || categories[0] == "1"))
+    {
+        Logging::LogToggleCategory(Logging::ALL, true);
+        return;
+    }
     for (string const &cat : categories)
     {
         category = boost::algorithm::to_lower_copy(cat);
@@ -176,7 +201,7 @@ void LogInit()
 
 const char *const BITCOIN_CONF_FILENAME = "bitcoin.conf";
 const char *const BITCOIN_PID_FILENAME = "bitcoind.pid";
-
+const char *const FORKS_CSV_FILENAME = "forks.csv"; // bip135 added
 
 map<string, string> mapArgs;
 map<string, vector<string> > mapMultiArgs;
@@ -603,6 +628,19 @@ fs::path GetConfigFile(const std::string &confPath)
     return pathConfigFile;
 }
 
+// bip135 added
+/**
+ * Function to return expected path of FORKS_CSV_FILENAME
+ */
+fs::path GetForksCsvFile()
+{
+    fs::path pathCsvFile(GetArg("-forks", FORKS_CSV_FILENAME));
+    if (!pathCsvFile.is_complete())
+        pathCsvFile = GetDataDir(false) / pathCsvFile;
+
+    return pathCsvFile;
+}
+
 void ReadConfigFile(map<string, string> &mapSettingsRet,
     map<string, vector<string> > &mapMultiSettingsRet,
     const AllowedArgs::AllowedArgs &allowedArgs)
@@ -680,19 +718,19 @@ bool TryCreateDirectories(const fs::path &p)
     return false;
 }
 
-void FileCommit(FILE *fileout)
+void FileCommit(FILE *pFileout)
 {
-    fflush(fileout); // harmless if redundantly called
+    fflush(pFileout); // harmless if redundantly called
 #ifdef WIN32
-    HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(fileout));
+    HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(pFileout));
     FlushFileBuffers(hFile);
 #else
 #if defined(__linux__) || defined(__NetBSD__)
-    fdatasync(fileno(fileout));
+    fdatasync(fileno(pFileout));
 #elif defined(__APPLE__) && defined(F_FULLFSYNC)
-    fcntl(fileno(fileout), F_FULLFSYNC, 0);
+    fcntl(fileno(pFileout), F_FULLFSYNC, 0);
 #else
-    fsync(fileno(fileout));
+    fsync(fileno(pFileout));
 #endif
 #endif
 }
@@ -927,4 +965,77 @@ bool IsStringTrue(const std::string &str)
     throw std::string("IsStringTrue() was passed an Invalid string");
 
     return false;
+}
+
+static const int wildmatch_max_length = 1024;
+
+bool wildmatch(string pattern, string test)
+{
+    // stack overflow prevention
+    if (test.size() > wildmatch_max_length || pattern.size() > wildmatch_max_length)
+    {
+        return false;
+    }
+
+    while (true)
+    {
+        // handle empty strings
+        if (!test.size() && !pattern.size())
+            return true;
+
+        // handle trailing chars in test str
+        if (test.size() && !pattern.size())
+            return false;
+
+        // handle trailing chars in  pattern str. Needs to be a single asterisk to match.
+        if (!test.size() && pattern.size())
+        {
+            return pattern == "*";
+        }
+
+        // test.size() && pattern.size() holds when reaching here
+
+        if (pattern[0] == '?')
+        {
+            pattern = pattern.substr(1);
+            test = test.substr(1);
+            continue;
+        }
+
+        if (pattern[0] == '*')
+        {
+            if (pattern.size() > 1)
+            {
+                // Will not try multiple ways to match to avoid the potential
+                // for path explosion, like matching "*-*-*-*" to "------------" and the like
+                // Just eat up the test string until the first char mismatches
+                if (pattern[1] == '?' || pattern[1] == '*')
+                {
+                    // ** or *? patterns are disallowed in the midst of a matching expression
+                    return false;
+                }
+                size_t i = 0;
+                while (i < test.size())
+                {
+                    if (test[i] != pattern[1])
+                        i++;
+                    else
+                        break;
+                }
+                if (i == test.size())
+                    return true;
+
+                pattern = pattern.substr(1);
+                test = test.substr(i);
+                continue;
+            }
+            else
+                return true;
+        }
+        if (test[0] != pattern[0])
+            return false;
+
+        pattern = pattern.substr(1);
+        test = test.substr(1);
+    }
 }

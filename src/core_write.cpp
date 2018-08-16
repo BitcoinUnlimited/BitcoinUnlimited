@@ -17,7 +17,6 @@
 #include <univalue.h>
 
 #include <boost/assign/list_of.hpp>
-#include <boost/foreach.hpp>
 
 using namespace std;
 
@@ -192,7 +191,7 @@ void TxToUniv(const CTransaction &tx, const uint256 &hashBlock, UniValue &entry)
     entry.pushKV("locktime", (int64_t)tx.nLockTime);
 
     UniValue vin(UniValue::VARR);
-    BOOST_FOREACH (const CTxIn &txin, tx.vin)
+    for (const CTxIn &txin : tx.vin)
     {
         UniValue in(UniValue::VOBJ);
         if (tx.IsCoinBase())

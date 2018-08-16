@@ -38,7 +38,13 @@
        root.
 */
 
-/* This implements a constant-space merkle root/path calculator, limited to 2^32 leaves. */
+/* This implements a constant-space merkle root/path calculator, limited to 2^32 leaves.
+
+To compute a merkle root, pass -1 as the branchpos.
+
+To compute a merkle path (AKA merkle proof), pass the index of the element being proved in branchpos.
+pbranch will contain the merkle proof, not counting the element passed.
+*/
 static void MerkleComputation(const std::vector<uint256> &leaves,
     uint256 *proot,
     bool *pmutated,

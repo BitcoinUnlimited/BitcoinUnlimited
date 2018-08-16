@@ -2,7 +2,7 @@
 # Copyright (c) 2014-2016 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+import test_framework.loginit
 from test_framework.mininode import *
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
@@ -286,7 +286,8 @@ class SendHeadersTest(BitcoinTestFramework):
         # Currently there are mininode syncronization issues when Parallel Validation is turned on
         # and therefore have -parallel=0 when running these tests.
         self.nodes = []
-        self.nodes = start_nodes(2, self.options.tmpdir, [["-debug", "-logtimemicros=1", "-parallel=0", "-use-thinblocks=0"]]*2)
+        args = [["-debug", "-logtimemicros=1", "-parallel=0", "-use-thinblocks=0", "-use-grapheneblocks=0"]]*2
+        self.nodes = start_nodes(2, self.options.tmpdir, args)
         connect_nodes(self.nodes[0], 1)
 
     # mine count blocks and return the new tip

@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2010 Satoshi Nakamoto
+// Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
@@ -6,6 +6,7 @@
 
 #include "chainparams.h"
 #include "consensus/merkle.h"
+#include "versionbits.h" // bip135 added
 
 #include "tinyformat.h"
 #include "util.h"
@@ -112,16 +113,20 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
-        consensus.nRuleChangeActivationThreshold = 1916; // 95% of 2016
-        consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
 
         // Deployment of BIP68, BIP112, and BIP113.
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1462060800; // May 1st, 2016
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800; // May 1st, 2017
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1462060800LL; // May 1st, 2016
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800LL; // May 1st, 2017
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].windowsize = 2016;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].threshold = 1916; // 95% of 2016
+
+        // testing bit
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601LL; // January 1, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999LL; // December 31, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].windowsize = 2016;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].threshold = 1916; // 95% of 2016
 
         // Aug, 1 2017 hard fork
         consensus.uahfHeight = 478559;
@@ -197,9 +202,11 @@ public:
                 // August 1st 2017 CASH fork (UAHF)
                 478559, uint256S("0x000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec"))(
                 // November 13th 2017 new DAA fork
-                504031, uint256S("0x0000000000000000011ebf65b60d0a3de80b8175be709d653b4c1a1beeb6ab9c")),
-            1483472411, // * UNIX timestamp of last checkpoint block
-            184495391, // * total number of transactions between genesis and last checkpoint
+                504031, uint256S("0x0000000000000000011ebf65b60d0a3de80b8175be709d653b4c1a1beeb6ab9c"))(
+                // May 15th 2018 re-enable op_codes and 32 MB max block size
+                530359, uint256S("0x0000000000000000011ada8bd08f46074f44a8f155396f43e38acf9501c49103")),
+            1526410186, // * UNIX timestamp of last checkpoint block
+            249416375, // * total number of transactions between genesis and last checkpoint
             //   (the tx=... number in the SetBestChain debug.log lines)
             280000.0 // * estimated number of transactions per day after checkpoint (~3.5 TPS)
         };
@@ -221,6 +228,7 @@ public:
             2301659837, 0x1d00ffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
         consensus.nSubsidyHalvingInterval = 210000;
+        consensus.BIP16Height = 0;
         consensus.BIP34Height = 0;
         consensus.BIP34Hash = consensus.hashGenesisBlock;
         consensus.BIP65Height = 0;
@@ -230,8 +238,6 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = false;
-        consensus.nRuleChangeActivationThreshold = 1916; // 95% of 2016
-        consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
 
         assert(
             consensus.hashGenesisBlock == uint256S("0000000057e31bd2066c939a63b7b8623bd0f10d8c001304bdfc1a7902ae6d35"));
@@ -304,16 +310,18 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = false;
-        consensus.nRuleChangeActivationThreshold = 1512; // 75% for testchains
-        consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].windowsize = 2016;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].threshold = 1512; // 75% of 2016
 
         // Deployment of BIP68, BIP112, and BIP113.
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 0;
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1456790400; // March 1st, 2016
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800; // May 1st, 2017
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].windowsize = 2016;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].threshold = 1512; // 75% of 2016
 
         // Aug, 1 2017 hard fork
         consensus.uahfHeight = 1155876;
@@ -402,14 +410,18 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = true;
-        consensus.nRuleChangeActivationThreshold = 108; // 75% for testchains
-        consensus.nMinerConfirmationWindow = 144; // Faster than normal for regtest (144 instead of 2016)
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 999999999999ULL;
+
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 0;
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 999999999999ULL;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 999999999999LL;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].windowsize = 144;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].threshold = 108; // 75% of 144
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 999999999999LL;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].windowsize = 144;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].threshold = 108; // 75% of 144
 
         // Hard fork is always enabled on regtest.
         consensus.uahfHeight = 0;
@@ -485,3 +497,69 @@ void SelectParams(const std::string &network)
     SelectBaseParams(network);
     pCurrentParams = &Params(network);
 }
+
+// bip135 begin
+/**
+ * Return true if a deployment is considered to be configured for the network.
+ * Deployments with a zero-length name, or a windowsize or threshold equal to
+ * zero are not considered to be configured, and will be reported as 'unknown'
+ * if signals are detected for them.
+ * Unconfigured deployments can be ignored to save processing time, e.g.
+ * in ComputeBlockVersion() when computing the default block version to emit.
+ */
+bool IsConfiguredDeployment(const Consensus::Params &consensusParams, const int bit)
+{
+    DbgAssert(bit >= 0 && bit <= (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS, return false);
+
+    const Consensus::ForkDeployment *vdeployments = consensusParams.vDeployments;
+    const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[bit];
+
+    if (strlen(vbinfo.name) == 0)
+        return false;
+
+    return (vdeployments[bit].windowsize != 0 && vdeployments[bit].threshold != 0);
+}
+
+/**
+ * Return a string representing CSV-formatted deployments for the network.
+ * Only configured deployments satisfying IsConfiguredDeployment() are included.
+ */
+const std::string NetworkDeploymentInfoCSV(const std::string &network)
+{
+    const Consensus::Params &consensusParams = Params(network).GetConsensus();
+    const Consensus::ForkDeployment *vdeployments = consensusParams.vDeployments;
+
+    std::string networkInfoStr;
+    networkInfoStr = "# deployment info for network '" + network + "':\n";
+
+    for (int bit = 0; bit < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; bit++)
+    {
+        const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[bit];
+        if (IsConfiguredDeployment(consensusParams, bit))
+        {
+            networkInfoStr += network + ",";
+            networkInfoStr += std::to_string(bit) + ",";
+            networkInfoStr += std::string(vbinfo.name) + ",";
+            networkInfoStr += std::to_string(vdeployments[bit].nStartTime) + ",";
+            networkInfoStr += std::to_string(vdeployments[bit].nTimeout) + ",";
+            networkInfoStr += std::to_string(vdeployments[bit].windowsize) + ",";
+            networkInfoStr += std::to_string(vdeployments[bit].threshold) + ",";
+            networkInfoStr += std::to_string(vdeployments[bit].minlockedblocks) + ",";
+            networkInfoStr += std::to_string(vdeployments[bit].minlockedtime) + ",";
+            networkInfoStr += (vbinfo.gbt_force ? "true" : "false");
+            networkInfoStr += "\n";
+        }
+    }
+    return networkInfoStr;
+}
+
+/**
+ * Return a modifiable reference to the chain params, to be updated by the
+ * CSV deployment data reading routine.
+ */
+CChainParams &ModifiableParams()
+{
+    assert(pCurrentParams);
+    return *pCurrentParams;
+}
+// bip135 end

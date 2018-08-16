@@ -23,7 +23,7 @@ class CThinBlock
 {
 public:
     CBlockHeader header;
-    std::vector<uint256> vTxHashes; // List of all transactions id's in the block
+    std::vector<uint256> vTxHashes; // List of all transaction ids in the block
     std::vector<CTransaction> vMissingTx; // vector of transactions that did not match the bloom filter
 
 public:
@@ -56,7 +56,7 @@ class CXThinBlock
 {
 public:
     CBlockHeader header;
-    std::vector<uint64_t> vTxHashes; // List of all transactions id's in the block
+    std::vector<uint64_t> vTxHashes; // List of all transaction ids in the block
     std::vector<CTransaction> vMissingTx; // vector of transactions that did not match the bloom filter
     bool collision;
 
@@ -98,7 +98,7 @@ class CXThinBlockTx
 public:
     /** Public only for unit testing */
     uint256 blockhash;
-    std::vector<CTransaction> vMissingTx; // map of missing transactions
+    std::vector<CTransaction> vMissingTx; // array of missing transactions
 
 public:
     CXThinBlockTx(uint256 blockHash, std::vector<CTransaction> &vTx);
@@ -129,7 +129,7 @@ class CXRequestThinBlockTx
 public:
     /** Public only for unit testing */
     uint256 blockhash;
-    std::set<uint64_t> setCheapHashesToRequest; // map of missing transactions
+    std::set<uint64_t> setCheapHashesToRequest; // set of missing transactions
 
 public:
     CXRequestThinBlockTx(uint256 blockHash, std::set<uint64_t> &setHashesToRequest);
@@ -151,6 +151,24 @@ public:
     }
 };
 
+// This struct is so we can obtain a quick summar of stats for UI display purposes
+// without needing to take the lock more than once
+struct ThinBlockQuickStats
+{
+    // Totals for the lifetime of the node (or since last clear of stats)
+    uint64_t nTotalInbound;
+    uint64_t nTotalOutbound;
+    uint64_t nTotalBandwidthSavings;
+
+    // Last 24-hour averages (or since last clear of stats)
+    uint64_t nLast24hInbound;
+    double fLast24hInboundCompression;
+    uint64_t nLast24hOutbound;
+    double fLast24hOutboundCompression;
+    uint64_t nLast24hRerequestTx;
+    double fLast24hRerequestTxPercent;
+};
+
 // This class stores statistics for thin block derived protocols.
 class CThinBlockData
 {
@@ -165,9 +183,12 @@ private:
 
     CStatHistory<uint64_t> nOriginalSize;
     CStatHistory<uint64_t> nThinSize;
-    CStatHistory<uint64_t> nBlocks;
+    CStatHistory<uint64_t> nInBoundBlocks;
+    CStatHistory<uint64_t> nOutBoundBlocks;
     CStatHistory<uint64_t> nMempoolLimiterBytesSaved;
     CStatHistory<uint64_t> nTotalBloomFilterBytes;
+    CStatHistory<uint64_t> nTotalThinBlockBytes;
+    CStatHistory<uint64_t> nTotalFullTxBytes;
     std::map<int64_t, std::pair<uint64_t, uint64_t> > mapThinBlocksInBound;
     std::map<int64_t, std::pair<uint64_t, uint64_t> > mapThinBlocksOutBound;
     std::map<int64_t, uint64_t> mapBloomFiltersOutBound;
@@ -175,6 +196,8 @@ private:
     std::map<int64_t, double> mapThinBlockResponseTime;
     std::map<int64_t, double> mapThinBlockValidationTime;
     std::map<int64_t, int> mapThinBlocksInBoundReRequestedTx;
+    std::map<int64_t, uint64_t> mapThinBlock;
+    std::map<int64_t, uint64_t> mapFullTx;
 
     /**
         Add new entry to statistics array; also removes old timestamps
@@ -196,6 +219,33 @@ private:
       Expires values before calculation. */
     double average(std::map<int64_t, uint64_t> &map);
 
+    /**
+      Calculate total bandwidth savings for using XThin.
+      Requires lock on cs_thinblockstats be held external to this call. */
+    double computeTotalBandwidthSavingsInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats);
+
+    /**
+      Calculate last 24-hour "compression" percent for XThin
+      Requires lock on cs_thinblockstats be held external to this call.
+
+      NOTE: The thinblock and bloom filter maps should be from opposite directions
+            For example inbound block map paired wtih outbound bloom filter map
+
+      Side-effect: This method calls expireStats() on mapThinBlocks and mapBloomFilters
+
+      @param [mapThinBlocks] a statistics array of inbound/outbound XThin blocks
+      @param [mapBloomFilters] a statistics array of outbound/inbound XThin bloom filters
+     */
+    double compute24hAverageCompressionInternal(std::map<int64_t, std::pair<uint64_t, uint64_t> > &mapThinBlocks,
+        std::map<int64_t, uint64_t> &mapBloomFilters) EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats);
+
+    /**
+      Calculate last 24-hour transaction re-request percent for inbound XThin
+      Requires lock on cs_thinblockstats be held external to this call.
+
+      Side-effect: This method calls expireStats() on mapThinBlocksInBoundReRequestedTx */
+    double compute24hInboundRerequestTxPercentInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats);
+
 protected:
     //! Virtual method so it can be overridden for better unit testing
     virtual int64_t getTimeForStats() { return GetTimeMillis(); }
@@ -208,6 +258,8 @@ public:
     void UpdateValidationTime(double nValidationTime);
     void UpdateInBoundReRequestedTx(int nReRequestedTx);
     void UpdateMempoolLimiterBytesSaved(unsigned int nBytesSaved);
+    void UpdateThinBlock(uint64_t nThinBlockSize);
+    void UpdateFullTx(uint64_t nFullTxSize);
     std::string ToString();
     std::string InBoundPercentToString();
     std::string OutBoundPercentToString();
@@ -217,31 +269,33 @@ public:
     std::string ValidationTimeToString();
     std::string ReRequestedTxToString();
     std::string MempoolLimiterBytesSavedToString();
+    std::string ThinBlockToString();
+    std::string FullTxToString();
 
-    bool CheckThinblockTimer(uint256 hash);
-    void ClearThinBlockTimer(uint256 hash);
+    bool CheckThinblockTimer(const uint256 &hash);
+    void ClearThinBlockTimer(const uint256 &hash);
 
     void ClearThinBlockData(CNode *pfrom);
-    void ClearThinBlockData(CNode *pfrom, uint256 hash);
+    void ClearThinBlockData(CNode *pfrom, const uint256 &hash);
+    void ClearThinBlockStats();
 
     uint64_t AddThinBlockBytes(uint64_t, CNode *pfrom);
     void DeleteThinBlockBytes(uint64_t, CNode *pfrom);
     void ResetThinBlockBytes();
     uint64_t GetThinBlockBytes();
+
+    void FillThinBlockQuickStats(ThinBlockQuickStats &stats);
 };
 extern CThinBlockData thindata; // Singleton class
 
 
-bool HaveConnectThinblockNodes();
 bool HaveThinblockNodes();
 bool IsThinBlocksEnabled();
 bool CanThinBlockBeDownloaded(CNode *pto);
-void ConnectToThinBlockNodes();
-void CheckNodeSupportForThinBlocks();
 bool ClearLargestThinBlockAndDisconnect(CNode *pfrom);
-void ClearThinBlockInFlight(CNode *pfrom, uint256 hash);
-void AddThinBlockInFlight(CNode *pfrom, uint256 hash);
-void SendXThinBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv);
+void ClearThinBlockInFlight(CNode *pfrom, const uint256 &hash);
+void AddThinBlockInFlight(CNode *pfrom, const uint256 &hash);
+void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
 bool IsThinBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header);
 void BuildSeededBloomFilter(CBloomFilter &memPoolFilter,
     std::vector<uint256> &vOrphanHashes,

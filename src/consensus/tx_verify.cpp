@@ -5,6 +5,7 @@
 #include "tx_verify.h"
 
 #include "consensus.h"
+#include "main.h"
 #include "primitives/transaction.h"
 #include "script/interpreter.h"
 #include "unlimited.h"
@@ -15,7 +16,8 @@
 #include "coins.h"
 #include "utilmoneystr.h"
 
-int GetSpendHeight(const CCoinsViewCache &inputs);
+#include <boost/scope_exit.hpp>
+
 
 bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
 {
@@ -143,11 +145,14 @@ unsigned int GetP2SHSigOpCount(const CTransaction &tx, const CCoinsViewCache &in
         return 0;
 
     unsigned int nSigOps = 0;
-    for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        const CTxOut &prevout = inputs.AccessCoin(tx.vin[i].prevout).out;
-        if (prevout.scriptPubKey.IsPayToScriptHash())
-            nSigOps += prevout.scriptPubKey.GetSigOpCount(tx.vin[i].scriptSig);
+        LOCK(inputs.cs_utxo);
+        for (unsigned int i = 0; i < tx.vin.size(); i++)
+        {
+            const CTxOut &prevout = inputs.AccessCoin(tx.vin[i].prevout).out;
+            if (prevout.scriptPubKey.IsPayToScriptHash())
+                nSigOps += prevout.scriptPubKey.GetSigOpCount(tx.vin[i].scriptSig);
+        }
     }
     return nSigOps;
 }
@@ -202,6 +207,38 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
     return true;
 }
 
+/**
+ * Return the spend height, which is one more than the inputs.GetBestBlock().
+ * While checking, GetBestBlock() refers to the parent block. (protected by cs_main)
+ * This is also true for mempool checks.
+ */
+static int GetSpendHeight(const CCoinsViewCache &inputs)
+{
+    AssertLockHeld(inputs.cs_utxo);
+
+    // Must leave cs_utxo in order to maintain correct locking order with cs_main. We re-aquire
+    // cs_utxo when we leave this scope.
+    LEAVE_CRITICAL_SECTION(inputs.cs_utxo);
+
+    // Scope guard to make sure cs_utxo gets locked upon leaving ths scope whether or not we throw an exception.
+    BOOST_SCOPE_EXIT(&inputs) { ENTER_CRITICAL_SECTION(inputs.cs_utxo); }
+    BOOST_SCOPE_EXIT_END
+
+    LOCK(cs_main);
+    BlockMap::iterator i = mapBlockIndex.find(inputs.GetBestBlock());
+    if (i != mapBlockIndex.end())
+    {
+        CBlockIndex *pindexPrev = i->second;
+        if (pindexPrev)
+            return pindexPrev->nHeight + 1;
+        else
+        {
+            throw std::runtime_error("GetSpendHeight(): mapBlockIndex contains null block");
+        }
+    }
+    throw std::runtime_error("GetSpendHeight(): best block does not exist");
+}
+
 bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, const CCoinsViewCache &inputs)
 {
     // This doesn't trigger the DoS code on purpose; if it did, it would make it easier
@@ -212,26 +249,46 @@ bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, c
     CAmount nValueIn = 0;
     CAmount nFees = 0;
     int nSpendHeight = -1;
-    for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        const COutPoint &prevout = tx.vin[i].prevout;
-        const Coin &coin = inputs.AccessCoin(prevout);
-        assert(!coin.IsSpent());
-
-        // If prev is coinbase, check that it's matured
-        if (coin.IsCoinBase())
+        LOCK(inputs.cs_utxo);
+        for (unsigned int i = 0; i < tx.vin.size(); i++)
         {
-            if (nSpendHeight == -1)
-                nSpendHeight = GetSpendHeight(inputs);
-            if (nSpendHeight - coin.nHeight < COINBASE_MATURITY)
-                return state.Invalid(false, REJECT_INVALID, "bad-txns-premature-spend-of-coinbase",
-                    strprintf("tried to spend coinbase at depth %d", nSpendHeight - coin.nHeight));
-        }
+            const COutPoint &prevout = tx.vin[i].prevout;
+            const Coin &coin = inputs.AccessCoin(prevout);
+            assert(!coin.IsSpent());
 
-        // Check for negative or overflow input values
-        nValueIn += coin.out.nValue;
-        if (!MoneyRange(coin.out.nValue) || !MoneyRange(nValueIn))
-            return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputvalues-outofrange");
+            // If prev is coinbase, check that it's matured
+            if (coin.IsCoinBase())
+            {
+                // Copy these values here because once we unlock and re-lock cs_utxo we can't count on "coin"
+                // still being valid.
+                CAmount nCoinOutValue = coin.out.nValue;
+                int nCoinHeight = coin.nHeight;
+
+                // If there are multiple coinbase spends we still only need to get the spend height once.
+                if (nSpendHeight == -1)
+                {
+                    nSpendHeight = GetSpendHeight(inputs);
+                }
+                if (nSpendHeight - nCoinHeight < COINBASE_MATURITY)
+                    return state.Invalid(false, REJECT_INVALID, "bad-txns-premature-spend-of-coinbase",
+                        strprintf("tried to spend coinbase at depth %d", nSpendHeight - nCoinHeight));
+
+                // Check for negative or overflow input values.  We use nCoinOutValue which was copied before
+                // we released cs_utxo, because we can't be certain the value didn't change during the time
+                // cs_utxo was unlocked.
+                nValueIn += nCoinOutValue;
+                if (!MoneyRange(nCoinOutValue) || !MoneyRange(nValueIn))
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputvalues-outofrange");
+            }
+            else
+            {
+                // Check for negative or overflow input values
+                nValueIn += coin.out.nValue;
+                if (!MoneyRange(coin.out.nValue) || !MoneyRange(nValueIn))
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputvalues-outofrange");
+            }
+        }
     }
 
     if (nValueIn < tx.GetValueOut())

@@ -50,6 +50,9 @@ using namespace std;
 uint64_t nLastBlockTx = 0;
 uint64_t nLastBlockSize = 0;
 
+/** Coinbase transactions we create: */
+CScript COINBASE_FLAGS;
+
 class ScoreCompare
 {
 public:
@@ -123,10 +126,10 @@ uint64_t BlockAssembler::reserveBlockSize(const CScript &scriptPubKeyIn)
 
     // BU Miners take the block we give them, wipe away our coinbase and add their own.
     // So if their reserve choice is bigger then our coinbase then use that.
-    return nHeaderSize + std::max(nCoinbaseSize, coinbaseReserve.value);
+    return nHeaderSize + std::max(nCoinbaseSize, coinbaseReserve.Value());
 }
 
-CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue)
+CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _nHeight, CAmount nValue)
 {
     CMutableTransaction tx;
 
@@ -135,7 +138,7 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int nH
     tx.vout.resize(1);
     tx.vout[0].scriptPubKey = scriptPubKeyIn;
     tx.vout[0].nValue = nValue;
-    tx.vin[0].scriptSig = CScript() << nHeight << OP_0;
+    tx.vin[0].scriptSig = CScript() << _nHeight << OP_0;
 
     // BU005 add block size settings to the coinbase
     std::string cbmsg = FormatCoinbaseMessage(BUComments, minerComment);
@@ -154,9 +157,9 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int nH
     return MakeTransactionRef(std::move(tx));
 }
 
-CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn)
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn)
 {
-    CBlockTemplate *tmpl = nullptr;
+    std::unique_ptr<CBlockTemplate> tmpl(nullptr);
 
     if (nBlockMaxSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
         tmpl = CreateNewBlock(scriptPubKeyIn, false);
@@ -170,7 +173,8 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn)
     return tmpl;
 }
 
-CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bool blockstreamCoreCompatible)
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn,
+    bool blockstreamCoreCompatible)
 {
     resetBlock(scriptPubKeyIn);
 
@@ -249,12 +253,12 @@ CBlockTemplate *BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, bo
         throw std::runtime_error(strprintf("%s: Excessive block generated: %s", __func__, FormatStateMessage(state)));
     }
 
-    return pblocktemplate.release();
+    return pblocktemplate;
 }
 
 bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter)
 {
-    BOOST_FOREACH (CTxMemPool::txiter parent, mempool.GetMemPoolParents(iter))
+    for (CTxMemPool::txiter parent : mempool.GetMemPoolParents(iter))
     {
         if (!inBlock.count(parent))
         {
@@ -303,9 +307,9 @@ bool BlockAssembler::IsIncrementallyGood(uint64_t nExtraSize, unsigned int nExtr
     else
     {
         uint64_t blockMbSize = 1 + (nBlockSize + nExtraSize - 1) / 1000000;
-        if (nBlockSigOps + nExtraSigOps > blockMiningSigopsPerMb.value * blockMbSize)
+        if (nBlockSigOps + nExtraSigOps > blockMiningSigopsPerMb.Value() * blockMbSize)
         {
-            if (nBlockSigOps > blockMiningSigopsPerMb.value * blockMbSize - 2)
+            if (nBlockSigOps > blockMiningSigopsPerMb.Value() * blockMbSize - 2)
                 // very close to the limit, so the block is finished.  So a block that is near the sigops limit
                 // might be shorter than it could be if the high sigops tx was backed out and other tx added.
                 blockFinished = true;
@@ -383,11 +387,6 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
             continue;
         }
 
-        // If tx is not applicable to this (forked) chain, skip it
-        if (uahfChainBlock && IsTxOpReturnInvalid(iter->GetTx()))
-        {
-            continue;
-        }
         // Reject the tx if we are on the fork, but the tx is not fork-signed
         if (uahfChainBlock && !IsTxUAHFOnly(*iter))
         {
@@ -421,7 +420,7 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
 
             // This tx was successfully added, so
             // add transactions that depend on this one to the priority queue to try again
-            BOOST_FOREACH (CTxMemPool::txiter child, mempool.GetMemPoolChildren(iter))
+            for (CTxMemPool::txiter child : mempool.GetMemPoolChildren(iter))
             {
                 if (waitSet.count(child))
                 {
@@ -485,11 +484,6 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
             continue;
         }
 
-        // If tx is not applicable to this (forked) chain, skip it
-        if (uahfChainBlock && IsTxOpReturnInvalid(iter->GetTx()))
-        {
-            continue;
-        }
         // Reject the tx if we are on the fork, but the tx is not fork-signed
         if (uahfChainBlock && !IsTxUAHFOnly(*iter))
         {
@@ -515,7 +509,7 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
 
             // This tx was successfully added, so
             // add transactions that depend on this one to the priority queue to try again
-            BOOST_FOREACH (CTxMemPool::txiter child, mempool.GetMemPoolChildren(iter))
+            for (CTxMemPool::txiter child : mempool.GetMemPoolChildren(iter))
             {
                 waitPriIter wpiter = waitPriMap.find(child);
                 if (wpiter != waitPriMap.end())

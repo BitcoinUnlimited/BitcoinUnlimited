@@ -8,6 +8,7 @@
 #include "chainparams.h"
 #include "clientversion.h"
 #include "dosman.h"
+#include "graphene.h"
 #include "main.h"
 #include "net.h"
 #include "netbase.h"
@@ -15,16 +16,19 @@
 #include "sync.h"
 #include "thinblock.h"
 #include "timedata.h"
+#include "tweak.h"
 #include "ui_interface.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "version.h"
 
-#include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 
 #include <univalue.h>
+
+extern CTweak<double> dMinLimiterTxFee;
+extern CTweak<double> dMaxLimiterTxFee;
 
 using namespace std;
 
@@ -57,7 +61,7 @@ UniValue ping(const UniValue &params, bool fHelp)
     // Request that each node send a ping during next message processing pass
     LOCK2(cs_main, cs_vNodes);
 
-    BOOST_FOREACH (CNode *pNode, vNodes)
+    for (CNode *pNode : vNodes)
     {
         pNode->fPingQueued = true;
     }
@@ -71,7 +75,7 @@ static void CopyNodeStats(std::vector<CNodeStats> &vstats)
 
     LOCK(cs_vNodes);
     vstats.reserve(vNodes.size());
-    BOOST_FOREACH (CNode *pnode, vNodes)
+    for (CNode *pnode : vNodes)
     {
         CNodeStats stats;
         pnode->copyStats(stats);
@@ -136,7 +140,7 @@ UniValue getpeerinfo(const UniValue &params, bool fHelp)
             throw runtime_error("Unknown node");
     }
 
-    BOOST_FOREACH (const CNodeStats &stats, vstats)
+    for (const CNodeStats &stats : vstats)
     {
         if (!node || (node->id == stats.nodeid))
         {
@@ -172,7 +176,7 @@ UniValue getpeerinfo(const UniValue &params, bool fHelp)
                 obj.push_back(Pair("synced_headers", statestats.nSyncHeight));
                 obj.push_back(Pair("synced_blocks", statestats.nCommonHeight));
                 UniValue heights(UniValue::VARR);
-                BOOST_FOREACH (int height, statestats.vHeightInFlight)
+                for (int height : statestats.vHeightInFlight)
                 {
                     heights.push_back(height);
                 }
@@ -296,14 +300,14 @@ UniValue getaddednodeinfo(const UniValue &params, bool fHelp)
     if (params.size() == 1)
     {
         LOCK(cs_vAddedNodes);
-        BOOST_FOREACH (const std::string &strAddNode, vAddedNodes)
+        for (const std::string &strAddNode : vAddedNodes)
             laddedNodes.push_back(strAddNode);
     }
     else
     {
         string strNode = params[1].get_str();
         LOCK(cs_vAddedNodes);
-        BOOST_FOREACH (const std::string &strAddNode, vAddedNodes)
+        for (const std::string &strAddNode : vAddedNodes)
         {
             if (strAddNode == strNode)
             {
@@ -318,7 +322,7 @@ UniValue getaddednodeinfo(const UniValue &params, bool fHelp)
     UniValue ret(UniValue::VARR);
     if (!fDns)
     {
-        BOOST_FOREACH (const std::string &strAddNode, laddedNodes)
+        for (const std::string &strAddNode : laddedNodes)
         {
             UniValue obj(UniValue::VOBJ);
             obj.push_back(Pair("addednode", strAddNode));
@@ -328,7 +332,7 @@ UniValue getaddednodeinfo(const UniValue &params, bool fHelp)
     }
 
     list<pair<string, vector<CService> > > laddedAddreses(0);
-    BOOST_FOREACH (const std::string &strAddNode, laddedNodes)
+    for (const std::string &strAddNode : laddedNodes)
     {
         vector<CService> vservNode(0);
         if (Lookup(strAddNode.c_str(), vservNode, Params().GetDefaultPort(), 0, fNameLookup))
@@ -351,12 +355,12 @@ UniValue getaddednodeinfo(const UniValue &params, bool fHelp)
 
         UniValue addresses(UniValue::VARR);
         bool fConnected = false;
-        BOOST_FOREACH (const CService &addrNode, it->second)
+        for (const CService &addrNode : it->second)
         {
             bool fFound = false;
             UniValue node(UniValue::VOBJ);
             node.push_back(Pair("address", addrNode.ToString()));
-            BOOST_FOREACH (CNode *pnode, vNodes)
+            for (CNode *pnode : vNodes)
             {
                 if (pnode->addr == addrNode)
                 {
@@ -456,11 +460,37 @@ static UniValue GetThinBlockStats()
         obj.push_back(Pair("validation_time", thindata.ValidationTimeToString()));
         obj.push_back(Pair("outbound_bloom_filters", thindata.OutBoundBloomFiltersToString()));
         obj.push_back(Pair("inbound_bloom_filters", thindata.InBoundBloomFiltersToString()));
+        obj.push_back(Pair("thin_block_size", thindata.ThinBlockToString()));
+        obj.push_back(Pair("thin_full_tx", thindata.FullTxToString()));
         obj.push_back(Pair("rerequested", thindata.ReRequestedTxToString()));
     }
     return obj;
 }
 // BitcoinUnlimited BUIP010 : End
+
+// BitcoinUnlimited BUIPXXX : Start
+static UniValue GetGrapheneStats()
+{
+    UniValue obj(UniValue::VOBJ);
+    bool enabled = IsGrapheneBlockEnabled();
+    obj.push_back(Pair("enabled", enabled));
+    if (enabled)
+    {
+        obj.push_back(Pair("summary", graphenedata.ToString()));
+        obj.push_back(Pair("inbound_percent", graphenedata.InBoundPercentToString()));
+        obj.push_back(Pair("outbound_percent", graphenedata.OutBoundPercentToString()));
+        obj.push_back(Pair("response_time", graphenedata.ResponseTimeToString()));
+        obj.push_back(Pair("validation_time", graphenedata.ValidationTimeToString()));
+        obj.push_back(Pair("filter", graphenedata.FilterToString()));
+        obj.push_back(Pair("iblt", graphenedata.IbltToString()));
+        obj.push_back(Pair("rank", graphenedata.RankToString()));
+        obj.push_back(Pair("graphene_block_size", graphenedata.GrapheneBlockToString()));
+        obj.push_back(Pair("graphene_additional_tx_size", graphenedata.AdditionalTxToString()));
+        obj.push_back(Pair("rerequested", graphenedata.ReRequestedTxToString()));
+    }
+    return obj;
+}
+// BitcoinUnlimited BUIPXXX : End
 
 UniValue getnetworkinfo(const UniValue &params, bool fHelp)
 {
@@ -515,10 +545,12 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
     obj.push_back(Pair("connections", (int)vNodes.size()));
     obj.push_back(Pair("networks", GetNetworksInfo()));
     obj.push_back(Pair("relayfee", ValueFromAmount(::minRelayTxFee.GetFeePerK())));
+    obj.push_back(Pair("minlimitertxfee", strprintf("%.4f", dMinLimiterTxFee.Value())));
+    obj.push_back(Pair("maxlimitertxfee", strprintf("%.4f", dMaxLimiterTxFee.Value())));
     UniValue localAddresses(UniValue::VARR);
     {
         LOCK(cs_mapLocalHost);
-        BOOST_FOREACH (const PAIRTYPE(CNetAddr, LocalServiceInfo) & item, mapLocalHost)
+        for (const PAIRTYPE(CNetAddr, LocalServiceInfo) & item : mapLocalHost)
         {
             UniValue rec(UniValue::VOBJ);
             rec.push_back(Pair("address", item.first.ToString()));
@@ -531,9 +563,31 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
     // BitcoinUnlimited BUIP010: Start
     obj.push_back(Pair("thinblockstats", GetThinBlockStats()));
     // BitcoinUnlimited BUIP010: End
+    //// BitcoinUnlimited BUIPXXX: Start
+    obj.push_back(Pair("grapheneblockstats", GetGrapheneStats()));
+    // BitcoinUnlimited BUIPXXX: End
     obj.push_back(Pair("warnings", GetWarnings("statusbar")));
     return obj;
 }
+
+
+UniValue clearblockstats(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() > 0)
+        throw runtime_error("clearblockstats\n"
+                            "\nClears statistics related to compression blocks such as xthin or graphene.\n"
+                            "\nArguments: None\n"
+                            "\nExample:\n" +
+                            HelpExampleCli("clearblockstats", ""));
+
+    if (IsThinBlocksEnabled())
+        thindata.ClearThinBlockStats();
+    if (IsGrapheneBlockEnabled())
+        graphenedata.ClearGrapheneBlockStats();
+
+    return NullUniValue;
+}
+
 
 UniValue setban(const UniValue &params, bool fHelp)
 {
@@ -651,11 +705,11 @@ static const CRPCCommand commands[] = {
     {"network", "disconnectnode", &disconnectnode, true}, {"network", "getaddednodeinfo", &getaddednodeinfo, true},
     {"network", "getnettotals", &getnettotals, true}, {"network", "getnetworkinfo", &getnetworkinfo, true},
     {"network", "setban", &setban, true}, {"network", "listbanned", &listbanned, true},
-    {"network", "clearbanned", &clearbanned, true},
+    {"network", "clearblockstats", &clearblockstats, true}, {"network", "clearbanned", &clearbanned, true},
 };
 
-void RegisterNetRPCCommands(CRPCTable &tableRPC)
+void RegisterNetRPCCommands(CRPCTable &table)
 {
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
-        tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
+    for (auto cmd : commands)
+        table.appendCommand(cmd);
 }

@@ -26,8 +26,8 @@ class TxViewDelegate : public QAbstractItemDelegate
 {
     Q_OBJECT
 public:
-    TxViewDelegate(const PlatformStyle *platformStyle)
-        : QAbstractItemDelegate(), unit(BitcoinUnits::BCH), platformStyle(platformStyle)
+    TxViewDelegate(const PlatformStyle *_platformStyle, QObject *parent = nullptr)
+        : QAbstractItemDelegate(), unit(BitcoinUnits::BCH), platformStyle(_platformStyle)
     {
     }
 
@@ -109,8 +109,8 @@ public:
 OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent)
     : QWidget(parent), ui(new Ui::OverviewPage), clientModel(0), walletModel(0), currentBalance(-1),
       currentUnconfirmedBalance(-1), currentImmatureBalance(-1), currentWatchOnlyBalance(-1),
-      currentWatchUnconfBalance(-1), currentWatchImmatureBalance(-1), txdelegate(new TxViewDelegate(platformStyle)),
-      filter(0)
+      currentWatchUnconfBalance(-1), currentWatchImmatureBalance(-1),
+      txdelegate(new TxViewDelegate(platformStyle, this))
 {
     ui->setupUi(this);
 
@@ -216,7 +216,7 @@ void OverviewPage::setWalletModel(WalletModel *model)
     if (model && model->getOptionsModel())
     {
         // Set up transaction list
-        filter = new TransactionFilterProxy();
+        filter.reset(new TransactionFilterProxy());
         filter->setSourceModel(model->getTransactionTableModel());
         filter->setLimit(NUM_ITEMS);
         filter->setDynamicSortFilter(true);
@@ -224,7 +224,7 @@ void OverviewPage::setWalletModel(WalletModel *model)
         filter->setShowInactive(false);
         filter->sort(TransactionTableModel::Status, Qt::DescendingOrder);
 
-        ui->listTransactions->setModel(filter);
+        ui->listTransactions->setModel(filter.get());
         ui->listTransactions->setModelColumn(TransactionTableModel::ToAddress);
 
         // Keep up to date with wallet

@@ -12,6 +12,8 @@
 
 #include "addrman.h"
 #include "amount.h"
+#include "blockstorage/blockstorage.h"
+#include "blockstorage/sequential_files.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -20,8 +22,10 @@
 #include "connmgr.h"
 #include "consensus/validation.h"
 #include "dosman.h"
+#include "forks_csv.h"
 #include "fs.h"
 #include "httprpc.h"
+#include "httpserver.h"
 #include "httpserver.h"
 #include "key.h"
 #include "main.h"
@@ -96,7 +100,6 @@ enum BindFlags
 };
 
 static const char *FEE_ESTIMATES_FILENAME = "fee_estimates.dat";
-CClientUIInterface uiInterface; // Declared but not defined in ui_interface.h
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -239,7 +242,11 @@ void Shutdown()
         delete pcoinsdbview;
         pcoinsdbview = NULL;
         delete pblocktree;
-        pblocktree = NULL;
+        pblocktree = nullptr;
+        delete pblockdb;
+        pblockdb = nullptr;
+        delete pblockundodb;
+        pblockundodb = nullptr;
     }
 #ifdef ENABLE_WALLET
     if (pwalletMain)
@@ -284,18 +291,6 @@ void Shutdown()
  */
 void HandleSIGTERM(int) { fRequestShutdown = true; }
 void HandleSIGHUP(int) { fReopenDebugLog = true; }
-bool static InitError(const std::string &str)
-{
-    uiInterface.ThreadSafeMessageBox(str, "", CClientUIInterface::MSG_ERROR);
-    return false;
-}
-
-bool static InitWarning(const std::string &str)
-{
-    uiInterface.ThreadSafeMessageBox(str, "", CClientUIInterface::MSG_WARNING);
-    return true;
-}
-
 bool static Bind(const CService &addr, unsigned int flags)
 {
     if (!(flags & BF_EXPLICIT) && IsLimited(addr))
@@ -385,7 +380,7 @@ void CleanupBlockRevFiles()
     // keeping a separate counter.  Once we hit a gap (or if 0 doesn't exist)
     // start removing block files.
     int nContigCounter = 0;
-    BOOST_FOREACH (const PAIRTYPE(std::string, fs::path) & item, mapBlockFiles)
+    for (const PAIRTYPE(std::string, fs::path) & item : mapBlockFiles)
     {
         if (atoi(item.first) == nContigCounter)
         {
@@ -443,7 +438,7 @@ void ThreadImport(std::vector<fs::path> vImportFiles)
     }
 
     // -loadblock=
-    BOOST_FOREACH (const fs::path &path, vImportFiles)
+    for (const fs::path &path : vImportFiles)
     {
         FILE *file = fsbridge::fopen(path, "rb");
         if (file)
@@ -606,7 +601,10 @@ void InitLogging()
  */
 bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &scheduler)
 {
-// ********************************************************* Step 1: setup
+    // ********************************************************* Step 1: setup
+
+    UnlimitedSetup();
+
 #ifdef _MSC_VER
     // Turn off Microsoft heap dump noise
     _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
@@ -668,7 +666,10 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 #endif
 
     // ********************************************************* Step 2: parameter interactions
-    const CChainParams &chainparams = Params();
+    // bip135 begin
+    // changed from const to modifiable so that deployment params can be updated
+    CChainParams &chainparams = ModifiableParams();
+    // bip135 end
 
     // also see: InitParameterInteraction()
 
@@ -766,29 +767,8 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     // a transaction spammer can cheaply fill blocks using
     // 1-satoshi-fee transactions. It should be set above the real
     // cost to you of processing a transaction.
-    if (mapArgs.count("-minlimitertxfee"))
-    {
-        CAmount n = 0;
-        double minrelaytxfee;
-        try
-        {
-            minrelaytxfee = boost::lexical_cast<double>(mapArgs["-minlimitertxfee"]) / 100000;
-        }
-        catch (boost::bad_lexical_cast &)
-        {
-            return InitError(
-                _("ERROR: an incorrect value was specified for -minlimitertxfee.  Please check value and restart."));
-        }
+    ::minRelayTxFee = CFeeRate(dMinLimiterTxFee.Value() * 1000);
 
-        ostringstream ss;
-        ss << fixed << setprecision(8);
-        ss << minrelaytxfee;
-        if (ParseMoney(ss.str(), n))
-            ::minRelayTxFee = CFeeRate(n);
-        else
-            return InitError(
-                strprintf(_("Invalid amount for -minlimitertxfee=<amount>: '%s'"), mapArgs["-minlimitertxfee"]));
-    }
     // -minrelaytxfee is no longer a command line option however it is still used in Bitcon Core so we want to tell
     // any users that migrate from Core to BU that this option is not used.
     if (mapArgs.count("-minrelaytxfee"))
@@ -806,6 +786,10 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     if (fStandard != Params().RequireStandard())
         return InitError(
             strprintf("acceptnonstdtxn is not currently supported for %s chain", chainparams.NetworkIDString()));
+
+    // Set Dust Threshold for outputs.
+    nDustThreshold.Set(GetArg("-dustthreshold", DEFAULT_DUST_THRESHOLD));
+
     nBytesPerSigOp = GetArg("-bytespersigop", nBytesPerSigOp);
 
 #ifdef ENABLE_WALLET
@@ -816,6 +800,12 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     fIsBareMultisigStd = GetBoolArg("-permitbaremultisig", DEFAULT_PERMIT_BAREMULTISIG);
     fAcceptDatacarrier = GetBoolArg("-datacarrier", DEFAULT_ACCEPT_DATACARRIER);
     nMaxDatacarrierBytes = GetArg("-datacarriersize", nMaxDatacarrierBytes);
+    if (nMaxDatacarrierBytes < MAX_OP_RETURN_RELAY)
+    {
+        InitWarning(strprintf(_("Increasing -datacarriersize from %d to %d due to new May 15th OP_RETURN size policy."),
+            nMaxDatacarrierBytes, MAX_OP_RETURN_RELAY));
+        nMaxDatacarrierBytes = MAX_OP_RETURN_RELAY;
+    }
 
     // Option to startup with mocktime set (used for regression testing):
     SetMockTime(GetArg("-mocktime", 0)); // SetMockTime(0) is a no-op
@@ -827,6 +817,11 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     if (GetBoolArg("-use-thinblocks", DEFAULT_USE_THINBLOCKS))
         nLocalServices |= NODE_XTHIN;
     // BUIP010 Xtreme Thinblocks: end section
+
+    // BUIPXXX Graphene Blocks: begin section initialize Graphene service
+    if (GetBoolArg("-use-grapheneblocks", DEFAULT_USE_GRAPHENE_BLOCKS))
+        nLocalServices |= NODE_GRAPHENE;
+    // BUIPXXX Graphene Blocks: end section
 
     // UAHF - BitcoinCash service bit
     nLocalServices |= NODE_BITCOIN_CASH;
@@ -894,6 +889,57 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     LOGA("Using at most %i connections (%i file descriptors available)\n", nMaxConnections, nFD);
     std::ostringstream strErrors;
 
+    // bip135 begin
+    // check for fork deployment CSV file, read it
+    string ForksCsvFile = GetForksCsvFile().string();
+
+    if (boost::filesystem::exists(ForksCsvFile))
+    {
+        ifstream csvFile;
+        bool CsvReadOk = true;
+        try
+        {
+            csvFile.open(ForksCsvFile.c_str(), ios::in);
+            if (csvFile.fail())
+            {
+                throw std::runtime_error("unable to open deployment file for reading");
+            }
+
+            LOGA("Reading deployment configuration CSV file at '%s'\n", ForksCsvFile);
+            // read the CSV file and apply the parameters for current network
+            CsvReadOk = ReadForksCsv(chainparams.NetworkIDString(), csvFile, chainparams.GetModifiableConsensus());
+            csvFile.close();
+        }
+        catch (const std::exception &e)
+        {
+            LOGA("Unable to read '%s'\n", ForksCsvFile);
+            // if unable to read file which is present: abort
+            return InitError(strprintf(
+                _("Warning: Could not open deployment configuration CSV file '%s' for reading"), ForksCsvFile));
+        }
+        // if the deployments data doesn't validate correctly, shut down for safety reasons.
+        if (!CsvReadOk)
+        {
+            LOGA("Validation of '%s' failed\n", ForksCsvFile);
+            return InitError(strprintf(
+                _("Deployment configuration file '%s' contained invalid data - see debug.log"), ForksCsvFile));
+        }
+    }
+    else
+    {
+        if (strcmp(GetArg("-forks", FORKS_CSV_FILENAME).c_str(), FORKS_CSV_FILENAME) == 0)
+        {
+            // Be noisy, but don't fail if file is absent - use built-in defaults.
+            LOGA("No deployment configuration found at '%s' - using defaults\n", ForksCsvFile);
+        }
+        else
+        {
+            // Fail only when we've configured a file but it doesn't exit.
+            return InitError(strprintf(_("Deployment configuration file '%s' not found"), ForksCsvFile));
+        }
+    }
+    // bip135 end
+
     // -par=0 means autodetect, but passing 0 to the CParallelValidation constructor means no concurrency
     int nPVThreads = GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
     if (nPVThreads <= 0)
@@ -931,47 +977,63 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     // ********************************************************* Step 6: load block chain
 
     fReindex = GetBoolArg("-reindex", DEFAULT_REINDEX);
+    int64_t requested_block_mode = GetArg("-useblockdb", DEFAULT_BLOCK_DB_MODE);
+    if (requested_block_mode == 0)
+    {
+        BLOCK_DB_MODE = SEQUENTIAL_BLOCK_FILES;
+    }
+    else
+    {
+        BLOCK_DB_MODE = DB_BLOCK_STORAGE;
+    }
 
     // Upgrading to 0.8; hard-link the old blknnnn.dat files into /blocks/
-    fs::path blocksDir = GetDataDir() / "blocks";
-    if (!fs::exists(blocksDir))
+    if (BLOCK_DB_MODE != DB_BLOCK_STORAGE)
     {
-        fs::create_directories(blocksDir);
-        bool linked = false;
-        for (unsigned int i = 1; i < 10000; i++)
+        fs::path blocksDir = GetDataDir() / "blocks";
+        if (!fs::exists(blocksDir))
         {
-            fs::path source = GetDataDir() / strprintf("blk%04u.dat", i);
-            if (!fs::exists(source))
-                break;
-            fs::path dest = blocksDir / strprintf("blk%05u.dat", i - 1);
-            try
+            fs::create_directories(blocksDir);
+            bool linked = false;
+            for (unsigned int i = 1; i < 10000; i++)
             {
-                fs::create_hard_link(source, dest);
-                LOGA("Hardlinked %s -> %s\n", source.string(), dest.string());
-                linked = true;
+                fs::path source = GetDataDir() / strprintf("blk%04u.dat", i);
+                if (!fs::exists(source))
+                    break;
+                fs::path dest = blocksDir / strprintf("blk%05u.dat", i - 1);
+                try
+                {
+                    fs::create_hard_link(source, dest);
+                    LOGA("Hardlinked %s -> %s\n", source.string(), dest.string());
+                    linked = true;
+                }
+                catch (const fs::filesystem_error &e)
+                {
+                    // Note: hardlink creation failing is not a disaster, it just means
+                    // blocks will get re-downloaded from peers.
+                    LOGA("Error hardlinking blk%04u.dat: %s\n", i, e.what());
+                    break;
+                }
             }
-            catch (const fs::filesystem_error &e)
+            if (linked)
             {
-                // Note: hardlink creation failing is not a disaster, it just means
-                // blocks will get re-downloaded from peers.
-                LOGA("Error hardlinking blk%04u.dat: %s\n", i, e.what());
-                break;
+                fReindex = true;
             }
-        }
-        if (linked)
-        {
-            fReindex = true;
         }
     }
 
     // Return the initial values for the various in memory caches.
+    int64_t nBlockDBCache = 0;
+    int64_t nBlockUndoDBCache = 0;
     int64_t nBlockTreeDBCache = 0;
     int64_t nCoinDBCache = 0;
-    GetCacheConfiguration(nBlockTreeDBCache, nCoinDBCache, nCoinCacheUsage);
+    GetCacheConfiguration(nBlockDBCache, nBlockUndoDBCache, nBlockTreeDBCache, nCoinDBCache, nCoinCacheMaxSize);
     LOGA("Cache configuration:\n");
+    LOGA("* Using %.1fMiB for block database\n", nBlockDBCache * (1.0 / 1024 / 1024));
+    LOGA("* Using %.1fMiB for block undo database\n", nBlockUndoDBCache * (1.0 / 1024 / 1024));
     LOGA("* Using %.1fMiB for block index database\n", nBlockTreeDBCache * (1.0 / 1024 / 1024));
     LOGA("* Using %.1fMiB for chain state database\n", nCoinDBCache * (1.0 / 1024 / 1024));
-    LOGA("* Using %.1fMiB for in-memory UTXO set\n", nCoinCacheUsage * (1.0 / 1024 / 1024));
+    LOGA("* Using %.1fMiB for in-memory UTXO set\n", nCoinCacheMaxSize * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
     while (!fLoaded)
@@ -989,9 +1051,13 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 delete pcoinsdbview;
                 delete pcoinscatcher;
                 delete pblocktree;
+                delete pblocktreeother;
+                delete pblockdb;
+                delete pblockundodb;
 
                 uiInterface.InitMessage(_("Opening Block database..."));
-                pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
+                InitializeBlockStorage(nBlockTreeDBCache, nBlockDBCache, nBlockUndoDBCache);
+
                 uiInterface.InitMessage(_("Opening UTXO database..."));
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
@@ -1069,7 +1135,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                         break;
                     }
                 }
-
                 if (!CVerifyDB().VerifyDB(chainparams, pcoinsdbview, GetArg("-checklevel", DEFAULT_CHECKLEVEL),
                         GetArg("-checkblocks", DEFAULT_CHECKBLOCKS)))
                 {
@@ -1131,19 +1196,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
 
-    // Set the EB and datacarrier size if we have restarted after the fork has already happened.
-    // It is possible that we need to override the old settings in QT and bitcoin.conf.
-    if (IsMay152018Enabled(chainparams.GetConsensus(), chainActive.Tip()))
-    {
-        // Bump the accepted block size to 32MB
-        if (miningForkEB.value > excessiveBlockSize)
-            excessiveBlockSize = miningForkEB.value;
-        settingsToUserAgentString();
-        // Bump OP_RETURN size:
-        if (nMaxDatacarrierBytes < MAX_OP_RETURN_MAY2018)
-            nMaxDatacarrierBytes = MAX_OP_RETURN_MAY2018;
-    }
-
 // ********************************************************* Step 7: load wallet
 
 #ifdef ENABLE_WALLET
@@ -1203,15 +1255,31 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     std::vector<fs::path> vImportFiles;
     if (mapArgs.count("-loadblock"))
     {
-        BOOST_FOREACH (const std::string &strFile, mapMultiArgs["-loadblock"])
+        for (const std::string &strFile : mapMultiArgs["-loadblock"])
             vImportFiles.push_back(strFile);
     }
     threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
-    if (chainActive.Tip() == NULL)
+
+    LOGA("Waiting for genesis block to be imported...\n");
+    CBlockIndex *tip = nullptr;
+    while (!fRequestShutdown && !tip)
     {
-        LOGA("Waiting for genesis block to be imported...\n");
-        while (!fRequestShutdown && chainActive.Tip() == NULL)
+        {
+            LOCK(cs_main);
+            tip = chainActive.Tip();
+        }
+        if (!tip)
             MilliSleep(10);
+    }
+
+    // Set the EB and datacarrier size if we have restarted after the fork has already happened.
+    // It is possible that we need to override the old settings in QT and bitcoin.conf.
+    if (IsMay152018Enabled(chainparams.GetConsensus(), tip))
+    {
+        // Bump the accepted block size to 32MB
+        if (miningForkEB.Value() > excessiveBlockSize)
+            excessiveBlockSize = miningForkEB.Value();
+        settingsToUserAgentString();
     }
 
     // ********************************************************* Step 10: network initialization
@@ -1220,7 +1288,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 
     // sanitize comments per BIP-0014, format user agent and check total size
     std::vector<string> uacomments;
-    BOOST_FOREACH (string cmt, mapMultiArgs["-uacomment"])
+    for (string &cmt : mapMultiArgs["-uacomment"])
     {
         if (cmt != SanitizeString(cmt, SAFE_CHARS_UA_COMMENT))
             return InitError(strprintf(_("User Agent comment (%s) contains unsafe characters."), cmt));
@@ -1237,7 +1305,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     if (mapArgs.count("-onlynet"))
     {
         std::set<enum Network> nets;
-        BOOST_FOREACH (const std::string &snet, mapMultiArgs["-onlynet"])
+        for (const std::string &snet : mapMultiArgs["-onlynet"])
         {
             enum Network net = ParseNetwork(snet);
             if (net == NET_UNROUTABLE)
@@ -1254,7 +1322,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 
     if (mapArgs.count("-whitelist"))
     {
-        BOOST_FOREACH (const std::string &net, mapMultiArgs["-whitelist"])
+        for (const std::string &net : mapMultiArgs["-whitelist"])
         {
             CSubNet subnet(net);
             if (!subnet.IsValid())
@@ -1306,42 +1374,56 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     fDiscover = GetBoolArg("-discover", DEFAULT_DISCOVER);
     fNameLookup = GetBoolArg("-dns", DEFAULT_NAME_LOOKUP);
 
+    bool fBindFailure = false; // will be set true for any failure to bind to a P2P port
     bool fBound = false;
     if (fListen)
     {
         if (mapArgs.count("-bind") || mapArgs.count("-whitebind"))
         {
-            BOOST_FOREACH (const std::string &strBind, mapMultiArgs["-bind"])
+            for (const std::string &strBind : mapMultiArgs["-bind"])
             {
                 CService addrBind;
                 if (!Lookup(strBind.c_str(), addrBind, GetListenPort(), false))
                     return InitError(strprintf(_("Cannot resolve -bind address: '%s'"), strBind));
-                fBound |= Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR));
+
+                bool bound = Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR));
+                fBindFailure |= !bound;
+                fBound |= bound;
             }
-            BOOST_FOREACH (const std::string &strBind, mapMultiArgs["-whitebind"])
+            for (const std::string &strBind : mapMultiArgs["-whitebind"])
             {
                 CService addrBind;
                 if (!Lookup(strBind.c_str(), addrBind, 0, false))
                     return InitError(strprintf(_("Cannot resolve -whitebind address: '%s'"), strBind));
                 if (addrBind.GetPort() == 0)
                     return InitError(strprintf(_("Need to specify a port with -whitebind: '%s'"), strBind));
-                fBound |= Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR | BF_WHITELIST));
+                bool bound = Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR | BF_WHITELIST));
+                fBindFailure |= !bound;
+                fBound |= bound;
             }
         }
         else
         {
             struct in_addr inaddr_any;
             inaddr_any.s_addr = INADDR_ANY;
-            fBound |= Bind(CService(in6addr_any, GetListenPort()), BF_NONE);
-            fBound |= Bind(CService(inaddr_any, GetListenPort()), !fBound ? BF_REPORT_ERROR : BF_NONE);
+            bool bound = Bind(CService(in6addr_any, GetListenPort()), BF_NONE);
+            fBindFailure |= !bound;
+            fBound |= bound;
+
+            bound = Bind(CService(inaddr_any, GetListenPort()), !fBound ? BF_REPORT_ERROR : BF_NONE);
+            fBindFailure |= !bound;
+            fBound |= bound;
         }
         if (!fBound)
             return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
+
+        if (fBindFailure && GetBoolArg("-bindallorfail", false))
+            return InitError(_("Failed to listen on all P2P ports. Failing as requested by -bindallorfail."));
     }
 
     if (mapArgs.count("-externalip"))
     {
-        BOOST_FOREACH (const std::string &strAddr, mapMultiArgs["-externalip"])
+        for (const std::string &strAddr : mapMultiArgs["-externalip"])
         {
             CService addrLocal;
             if (Lookup(strAddr.c_str(), addrLocal, GetListenPort(), fNameLookup) && addrLocal.IsValid())
@@ -1351,7 +1433,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         }
     }
 
-    BOOST_FOREACH (const std::string &strDest, mapMultiArgs["-seednode"])
+    for (const std::string &strDest : mapMultiArgs["-seednode"])
         AddOneShot(strDest);
 
 #if ENABLE_ZMQ
@@ -1380,7 +1462,10 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 
     //// debug print
     LOGA("mapBlockIndex.size() = %u\n", mapBlockIndex.size());
-    LOGA("nBestHeight = %d\n", chainActive.Height());
+    {
+        LOCK(cs_main);
+        LOGA("nBestHeight = %d\n", chainActive.Height());
+    }
 #ifdef ENABLE_WALLET
     LOGA("setKeyPool.size() = %u\n", pwalletMain ? pwalletMain->setKeyPool.size() : 0);
     LOGA("mapWallet.size() = %u\n", pwalletMain ? pwalletMain->mapWallet.size() : 0);
@@ -1422,5 +1507,5 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 #endif
 
     uiInterface.InitMessage(_("Done loading"));
-    return !fRequestShutdown;
+    return true;
 }

@@ -66,13 +66,20 @@ private:
         unsigned char nFlagsIn,
         bool size_constrained,
         uint32_t nMaxFilterSize);
+    /** Alternative setup function that guarantees the false positive rate does not exceed nFPRate. */
+    void setupGuaranteeFPR(unsigned int nElements,
+        double nFPRate,
+        unsigned int nTweakIn,
+        unsigned char nFlagsIn,
+        uint32_t nMaxFilterSize);
 
     //! Checks for empty and full filters to avoid wasting cpu
     void UpdateEmptyFull();
 
 public:
+    bool IsEmpty() const { return isEmpty; }
     //! for testing only
-    bool getFull() const { return isFull; }
+    bool IsFull() const { return isFull; }
     //! for testing only
     unsigned int vDataSize() const { return vData.size(); }
     /**
@@ -89,6 +96,15 @@ public:
         unsigned int nTweak,
         unsigned char nFlagsIn,
         uint32_t nMaxFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE);
+    /**
+     * When fGuaranteeFPR == true, it is guaranteed that the false positive rate will not exceed nFPRate.
+     */
+    CBloomFilter(unsigned int nElements,
+        double nFPRate,
+        unsigned int nTweak,
+        unsigned char nFlagsIn,
+        bool fGuaranteeFPR,
+        uint32_t nMaxFilterSize);
     CBloomFilter() : isFull(true), isEmpty(true), nHashFuncs(0), nTweak(0), nFlags(0) {}
     ADD_SERIALIZE_METHODS;
 
@@ -145,8 +161,10 @@ public:
 
     void insert(const std::vector<unsigned char> &vKey);
     void insert(const uint256 &hash);
+    void insert(const COutPoint &outpoint);
     bool contains(const std::vector<unsigned char> &vKey) const;
     bool contains(const uint256 &hash) const;
+    bool contains(const COutPoint &outpoint) const;
 
     void reset();
 

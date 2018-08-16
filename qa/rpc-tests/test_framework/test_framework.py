@@ -30,7 +30,10 @@ from .util import (
     check_json_precision,
     initialize_chain_clean,
     PortSeed,
+    UtilOptions
 )
+
+
 from .authproxy import JSONRPCException
 
 
@@ -50,7 +53,7 @@ class BitcoinTestFramework(object):
         """
         Sets up the blockchain for the bitcoin nodes.  It also sets up the daemon configuration.
         bitcoinConfDict:  Pass a dictionary of values you want written to bitcoin.conf.  If you have a key with multiple values, pass a list of the values as the value, for example:
-        { "debug":["net","blk","thin","lck","mempool","req","bench","evict"] }        
+        { "debug":["net","blk","thin","lck","mempool","req","bench","evict"] }
         This framework provides values for the necessary fields (like regtest=1).  But you can override these
         defaults by setting them in this dictionary.
 
@@ -150,8 +153,14 @@ class BitcoinTestFramework(object):
         # BU: added for tests using randomness (e.g. excessive.py)
         parser.add_option("--randomseed", dest="randomseed",
                           help="Set RNG seed for tests that use randomness (ignored otherwise)")
+        parser.add_option("--no-ipv6-rpc-listen", dest="no_ipv6_rpc_listen", default=False, action="store_true",
+                          help="Switch off listening on the IPv6 ::1 localhost RPC port. "
+                          "This is meant to deal with travis which is currently not supporting IPv6 sockets.")
+
         self.add_options(parser)
         (self.options, self.args) = parser.parse_args(argsOverride)
+
+        UtilOptions.no_ipv6_rpc_listen = self.options.no_ipv6_rpc_listen
 
         # BU: initialize RNG seed based on time if no seed specified
         if self.options.randomseed:
@@ -215,7 +224,8 @@ class BitcoinTestFramework(object):
 
         if not self.options.noshutdown:
             print("Stopping nodes")
-            stop_nodes(self.nodes)
+            if hasattr(self, "nodes"):  # nodes may not exist if there's a startup error
+                stop_nodes(self.nodes)
             wait_bitcoinds()
         else:
             print("Note: bitcoinds were not stopped and may still be running")

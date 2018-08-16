@@ -6,6 +6,7 @@
 #include <set>
 
 #include "allowed_args.h"
+#include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "dosman.h"
 #include "httpserver.h"
@@ -16,6 +17,7 @@
 #include "policy/policy.h"
 #include "qt/guiconstants.h"
 #include "requestManager.h"
+#include "respend/respendrelayer.h"
 #include "script/sigcache.h"
 #include "tinyformat.h"
 #include "torcontrol.h"
@@ -147,11 +149,11 @@ std::string AllowedArgs::helpMessage() const
 // CheckValueFunc functions
 //
 
-static const std::set<std::string> boolStrings{"", "1", "0", "t", "f", "y", "n", "true", "false", "yes", "no"};
-static const std::set<char> intChars{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
-static const std::set<char> amountChars{'.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
+const std::set<std::string> boolStrings{"", "1", "0", "t", "f", "y", "n", "true", "false", "yes", "no"};
+const std::set<char> intChars{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
+const std::set<char> amountChars{'.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
 
-static bool validateString(const std::string &str, const std::set<char> &validChars)
+bool validateString(const std::string &str, const std::set<char> &validChars)
 {
     for (const char &c : str)
         if (!validChars.count(c))
@@ -159,10 +161,10 @@ static bool validateString(const std::string &str, const std::set<char> &validCh
     return true;
 }
 
-static bool optionalBool(const std::string &str) { return (boolStrings.count(str) != 0); }
-static bool requiredStr(const std::string &str) { return !str.empty(); }
-static bool optionalStr(const std::string &str) { return true; }
-static bool requiredInt(const std::string &str)
+bool optionalBool(const std::string &str) { return (boolStrings.count(str) != 0); }
+bool requiredStr(const std::string &str) { return !str.empty(); }
+bool optionalStr(const std::string &str) { return true; }
+bool requiredInt(const std::string &str)
 {
     if (str.empty() || str == "-")
         return false;
@@ -171,14 +173,14 @@ static bool requiredInt(const std::string &str)
     return validateString(str[0] == '-' ? str.substr(1) : str, intChars);
 }
 
-static bool optionalInt(const std::string &str)
+bool optionalInt(const std::string &str)
 {
     if (str.empty())
         return true;
     return requiredInt(str);
 }
 
-static bool requiredAmount(const std::string &str)
+bool requiredAmount(const std::string &str)
 {
     if (str.empty())
         return false;
@@ -218,6 +220,8 @@ static void addConfigurationLocationOptions(AllowedArgs &allowedArgs)
     allowedArgs.addHeader(_("Configuration location options:"))
         .addArg(
             "conf=<file>", requiredStr, strprintf(_("Specify configuration file (default: %s)"), BITCOIN_CONF_FILENAME))
+        .addArg(
+            "forks=<file>", requiredStr, strprintf(_("Specify fork deployment file (default: %s)"), FORKS_CSV_FILENAME))
         .addArg("datadir=<dir>", requiredStr, _("Specify data directory"));
 }
 
@@ -230,11 +234,15 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
             _("Execute command when the best block changes (%s in cmd is replaced by block hash)"))
         .addDebugArg("blocksonly", optionalBool,
             strprintf(_("Whether to operate in a blocks only mode (default: %u)"), DEFAULT_BLOCKSONLY))
+        .addArg("useblockdb", optionalBool,
+            strprintf(_("Which method to store blocks on disk (default: %u) 0 = sequential files, 1 = blockdb"),
+                    DEFAULT_BLOCK_DB_MODE))
         .addArg("checkblocks=<n>", requiredInt,
             strprintf(_("How many blocks to check at startup (default: %u, 0 = all)"), DEFAULT_CHECKBLOCKS))
         .addArg("checklevel=<n>", requiredInt,
-            strprintf(_("How thorough the block verification of -checkblocks is (0-4, default: %u)"),
-                    DEFAULT_CHECKLEVEL));
+            strprintf(
+                    _("How thorough the block verification of -checkblocks is (0-4, default: %u)"), DEFAULT_CHECKLEVEL))
+        .addDebugArg("dumpforks", optionalBool, _("Dump built-in fork deployment data in CSV format and exit"));
 
 #ifndef WIN32
     if (mode == HMM_BITCOIND)
@@ -260,7 +268,8 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addArg("par=<n>", requiredInt, strprintf(_("Set the number of script verification threads (%u to %d, 0 = "
                                                     "auto, <0 = leave that many cores free, default: %d)"),
                                             -GetNumCores(), MAX_SCRIPTCHECK_THREADS, DEFAULT_SCRIPTCHECK_THREADS))
-        .addArg("parallel=<n>", optionalBool, strprintf(_("Turn Parallel Block Validation on or off (default: %u)"), 1))
+        .addArg("parallel={true,false,0,1}", optionalBool,
+            strprintf(_("Turn Parallel Block Validation on or off (default: %u)"), true))
 #ifndef WIN32
         .addArg("pid=<file>", requiredStr, strprintf(_("Specify pid file (default: %s)"), BITCOIN_PID_FILENAME))
 #endif
@@ -287,16 +296,14 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
                     DEFAULT_MISBEHAVING_BANTIME))
         .addArg("bind=<addr>", requiredStr,
             _("Bind to given address and always listen on it. Use [host]:port notation for IPv6"))
+        .addArg("bindallorfail", optionalBool, strprintf(_("Bind all ports (P2P as well RPC) or fail to start. This is "
+                                                           "used for RPC testing, but might find other uses.")))
         .addArg("bitnodes", optionalBool,
             _("Query for peer addresses via Bitnodes API, if low on addresses (default: 1 unless -connect)"))
         .addArg("blkretryinterval", requiredInt,
             strprintf(_("Time to wait before requesting a block from a different peer, in microseconds (default: %u)"),
                     DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL))
         .addArg("connect=<ip>", optionalStr, _("Connect only to the specified node(s)"))
-        .addArg("connect-thinblock=<ip:port>", requiredStr,
-            _("Connect to a thinblock node(s). Blocks will only be downloaded from a thinblock peer.  If no "
-              "connections "
-              "are possible then regular blocks will then be downloaded form any other connected peers"))
         .addArg("discover", optionalBool,
             _("Discover own IP addresses (default: 1 when listening and no -externalip or -proxy)"))
         .addArg("dns", optionalBool, _("Allow DNS lookups for -addnode, -seednode and -connect") + " " +
@@ -420,6 +427,10 @@ static void addWalletOptions(AllowedArgs &allowedArgs)
                         "abort large transactions (default: %s)"),
                     CURRENCY_UNIT, FormatMoney(DEFAULT_TRANSACTION_MAXFEE)))
         .addArg("upgradewallet", optionalInt, _("Upgrade wallet to latest format on startup"))
+        .addArg("usehd", optionalBool,
+            _("Use hierarchical deterministic key generation (HD) after bip32. Only has effect during "
+              "wallet creation/first start") +
+                " " + strprintf(_("(default: %u)"), DEFAULT_USE_HD_WALLET))
         .addArg("wallet=<file>", requiredStr,
             _("Specify wallet file (within data directory)") + " " + strprintf(_("(default: %s)"), "wallet.dat"))
         .addArg("walletbroadcast", optionalBool,
@@ -451,7 +462,8 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
 {
     std::string debugCategories = "addrman, bench, blk, bloom, coindb, db, estimatefee, evict, http, lck, "
                                   "libevent, mempool, mempoolrej, miner, net, parallel, partitioncheck, "
-                                  "proxy, prune, rand, reindex, req, rpc, selectcoins, thin, tor, wallet, zmq";
+                                  "proxy, prune, rand, reindex, req, rpc, selectcoins, thin, tor, wallet, zmq, "
+                                  "graphene";
     if (mode == HMM_BITCOIN_QT)
         debugCategories += ", qt";
 
@@ -501,8 +513,9 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
                          DEFAULT_DESCENDANT_SIZE_LIMIT))
         .addArg("debug=<category>", optionalStr,
             strprintf(_("Output debugging information (default: %u, supplying <category> is optional)"), 0) + ". " +
-                _("If <category> is not supplied or if <category> = 1, output all debugging information.") +
-                _("<category> can be:") + " " + debugCategories + ".")
+                _("If <category> is not supplied or if <category> = 1, output all debugging information. ") +
+                _("<category> can be:") + " " + debugCategories + ". " +
+                _("Multiple debug categories can be separated by comma."))
         .addArg("gen", optionalBool, strprintf(_("Generate coins (default: %u)"), DEFAULT_GENERATE))
         .addArg("genproclimit=<n>", requiredInt,
             strprintf(_("Set the number of threads for coin generation if enabled (-1 = all cores, default: %d)"),
@@ -517,6 +530,10 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addDebugArg("limitfreerelay=<n>", optionalInt,
             strprintf("Continuously rate-limit free transactions to <n>*1000 bytes per minute (default: %u)",
                          DEFAULT_LIMITFREERELAY))
+        .addDebugArg(
+            "limitrespendrelay=<n>", optionalInt, strprintf("Continuously rate-limit relaying of double spend"
+                                                            " transactions to <n>*1000 bytes per minute (default: %u)",
+                                                      respend::DEFAULT_LIMITRESPENDRELAY))
         .addDebugArg("relaypriority", optionalBool,
             strprintf("Require high priority for relaying free or low-fee transactions (default: %u)",
                          DEFAULT_RELAYPRIORITY))
@@ -547,6 +564,10 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
         .addArg("datacarriersize=<n>", requiredInt,
             strprintf(_("Maximum size of data in data carrier transactions we relay and mine (default: %u)"),
                     MAX_OP_RETURN_RELAY))
+        .addArg("dustthreshold=<amt>", requiredAmount,
+            strprintf(_("Dust Threshold (in satoshis) defines the minimum quantity an output may contain for the "
+                        "transaction to be considered standard, and therefore relayable. (default: %s)"),
+                    DEFAULT_DUST_THRESHOLD))
         .addArg("excessiveacceptdepth=<n>", requiredInt,
             strprintf(_("Excessive blocks are accepted if this many blocks are mined on top of them (default: %u)"),
                     DEFAULT_EXCESSIVE_ACCEPT_DEPTH))
@@ -559,13 +580,6 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
             _("The maximum number of nodes this node will forward expedited blocks to"))
         .addArg("maxexpeditedtxrecipients=<n>", requiredInt,
             _("The maximum number of nodes this node will forward expedited transactions to"))
-        .addArg("maxlimitertxfee=<amt>", requiredAmount,
-            strprintf(_("Fees (in satoshi/byte) larger than this are always relayed (default: %s)"),
-                    DEFAULT_MAXLIMITERTXFEE))
-        .addArg("minlimitertxfee=<amt>", requiredAmount,
-            strprintf(_("Fees (in satoshi/byte) smaller than this are considered "
-                        "zero fee and subject to -limitfreerelay (default: %s)"),
-                    DEFAULT_MINLIMITERTXFEE))
         .addArg("minrelaytxfee=<amt>", requiredAmount,
             strprintf(_("Fees (in %s/kB) smaller than this are considered zero fee for relaying, mining and "
                         "transaction creation (default: %s)"),
@@ -587,7 +601,12 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
         .addArg("use-thinblocks", optionalBool, _("Enable thin blocks to speed up the relay of blocks (default: 1)"))
         .addArg("xthinbloomfiltersize=<n>", requiredInt,
             strprintf(_("The maximum xthin bloom filter size that our node will accept in Bytes (default: %u)"),
-                    SMALLEST_MAX_BLOOM_FILTER_SIZE));
+                    SMALLEST_MAX_BLOOM_FILTER_SIZE))
+        .addArg("use-bloom-filter-targeting", optionalBool,
+            _("Enable thin block bloom filter targeting which helps to keep the size of bloom filters to a minumum "
+              "although it can impact performance. (default: 0)"))
+        .addArg("use-grapheneblocks", optionalBool,
+            strprintf(_("Enable graphene to speed up the relay of blocks (default: %d)"), DEFAULT_USE_GRAPHENE_BLOCKS));
 }
 
 static void addBlockCreationOptions(AllowedArgs &allowedArgs)
@@ -667,6 +686,8 @@ static void addTweaks(AllowedArgs &allowedArgs, CTweakMap *pTweaks)
         std::string optName = tweak->GetName();
 
         if (dynamic_cast<CTweak<CAmount> *>(tweak))
+            allowedArgs.addArg(optName + "=<amt>", requiredAmount, tweak->GetHelp());
+        else if (dynamic_cast<CTweak<double> *>(tweak))
             allowedArgs.addArg(optName + "=<amt>", requiredAmount, tweak->GetHelp());
         else if (dynamic_cast<CTweakRef<CAmount> *>(tweak))
             allowedArgs.addArg(optName + "=<amt>", requiredAmount, tweak->GetHelp());

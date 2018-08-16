@@ -7,8 +7,10 @@
 #include "primitives/transaction.h"
 
 #include "hash.h"
+#include "policy/policy.h"
 #include "tinyformat.h"
 #include "utilstrencodings.h"
+
 
 std::string COutPoint::ToString() const { return strprintf("COutPoint(%s, %u)", hash.ToString().substr(0, 10), n); }
 CTxIn::CTxIn(COutPoint prevoutIn, CScript scriptSigIn, uint32_t nSequenceIn)
@@ -84,6 +86,17 @@ CTransaction &CTransaction::operator=(const CTransaction &tx)
     return *this;
 }
 
+bool CTransaction::IsEquivalentTo(const CTransaction &tx) const
+{
+    CMutableTransaction tx1 = *this;
+    CMutableTransaction tx2 = tx;
+    for (unsigned int i = 0; i < tx1.vin.size(); i++)
+        tx1.vin[i].scriptSig = CScript();
+    for (unsigned int i = 0; i < tx2.vin.size(); i++)
+        tx2.vin[i].scriptSig = CScript();
+    return CTransaction(tx1) == CTransaction(tx2);
+}
+
 CAmount CTransaction::GetValueOut() const
 {
     CAmount nValueOut = 0;
@@ -134,3 +147,5 @@ std::string CTransaction::ToString() const
         str += "    " + vout[i].ToString() + "\n";
     return str;
 }
+
+uint32_t CTransaction::GetTxSize() const { return ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION); }

@@ -11,12 +11,11 @@
 
 #include <QUrl>
 
-OpenURIDialog::OpenURIDialog(const Config *cfg, QWidget *parent) : QDialog(parent), ui(new Ui::OpenURIDialog), cfg(cfg)
+OpenURIDialog::OpenURIDialog(const Config *_cfg, QWidget *parent)
+    : QDialog(parent), ui(new Ui::OpenURIDialog), cfg(_cfg)
 {
     ui->setupUi(this);
-#if QT_VERSION >= 0x040700
     ui->uriEdit->setPlaceholderText(GUIUtil::bitcoinURIScheme(*cfg) + ":");
-#endif
 }
 
 OpenURIDialog::~OpenURIDialog() { delete ui; }

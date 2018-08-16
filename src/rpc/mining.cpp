@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "amount.h"
+#include "blockstorage/blockstorage.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "consensus/consensus.h"
@@ -344,13 +345,334 @@ static UniValue BIP22ValidationResult(const CValidationState &state)
 
 std::string gbt_vb_name(const Consensus::DeploymentPos pos)
 {
-    const struct BIP9DeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
+    const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
     std::string s = vbinfo.name;
     if (!vbinfo.gbt_force)
     {
         s.insert(s.begin(), '!');
     }
     return s;
+}
+
+
+/*
+Outputs:
+JSON -returns UniValue
+pblockOut a copy of the block if not NULL
+*/
+UniValue mkblocktemplate(const UniValue &params, CBlock *pblockOut)
+{
+    LOCK(cs_main);
+
+    std::string strMode = "template";
+    UniValue lpval = NullUniValue;
+    std::set<std::string> setClientRules;
+    int64_t nMaxVersionPreVB = -1;
+    if (params.size() > 0)
+    {
+        const UniValue &oparam = params[0].get_obj();
+        const UniValue &modeval = find_value(oparam, "mode");
+        if (modeval.isStr())
+            strMode = modeval.get_str();
+        else if (modeval.isNull())
+        {
+            /* Do nothing */
+        }
+        else
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mode");
+        lpval = find_value(oparam, "longpollid");
+
+        if (strMode == "proposal")
+        {
+            const UniValue &dataval = find_value(oparam, "data");
+            if (!dataval.isStr())
+                throw JSONRPCError(RPC_TYPE_ERROR, "Missing data String key for proposal");
+
+            CBlock block;
+            if (!DecodeHexBlk(block, dataval.get_str()))
+                throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
+
+            uint256 hash = block.GetHash();
+            BlockMap::iterator mi = mapBlockIndex.find(hash);
+            if (mi != mapBlockIndex.end())
+            {
+                CBlockIndex *pindex = mi->second;
+                if (pindex->IsValid(BLOCK_VALID_SCRIPTS))
+                    return "duplicate";
+                if (pindex->nStatus & BLOCK_FAILED_MASK)
+                    return "duplicate-invalid";
+                return "duplicate-inconclusive";
+            }
+
+            CBlockIndex *const pindexPrev = chainActive.Tip();
+            // TestBlockValidity only supports blocks built on the current Tip
+            if (block.hashPrevBlock != pindexPrev->GetBlockHash())
+                return "inconclusive-not-best-prevblk";
+            CValidationState state;
+            TestBlockValidity(state, Params(), block, pindexPrev, false, true);
+            return BIP22ValidationResult(state);
+        }
+
+        const UniValue &aClientRules = find_value(oparam, "rules");
+        if (aClientRules.isArray())
+        {
+            for (unsigned int i = 0; i < aClientRules.size(); ++i)
+            {
+                const UniValue &v = aClientRules[i];
+                setClientRules.insert(v.get_str());
+            }
+        }
+        else
+        {
+            // NOTE: It is important that this NOT be read if versionbits is supported
+            const UniValue &uvMaxVersion = find_value(oparam, "maxversion");
+            if (uvMaxVersion.isNum())
+            {
+                nMaxVersionPreVB = uvMaxVersion.get_int64();
+            }
+        }
+    }
+
+    if (strMode != "template")
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mode");
+
+    if (!unsafeGetBlockTemplate.Value())
+    {
+        if (vNodes.empty())
+            throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Bitcoin is not connected!");
+
+        if (IsInitialBlockDownload())
+            throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Bitcoin is downloading blocks...");
+    }
+
+    static unsigned int nTransactionsUpdatedLast;
+
+    if (!lpval.isNull())
+    {
+        // Wait to respond until either the best block changes, OR a minute has passed and there are more transactions
+        uint256 hashWatchedChain;
+        boost::system_time checktxtime;
+        unsigned int nTransactionsUpdatedLastLP;
+
+        if (lpval.isStr())
+        {
+            // Format: <hashBestChain><nTransactionsUpdatedLast>
+            std::string lpstr = lpval.get_str();
+
+            hashWatchedChain.SetHex(lpstr.substr(0, 64));
+            nTransactionsUpdatedLastLP = atoi64(lpstr.substr(64));
+        }
+        else
+        {
+            // NOTE: Spec does not specify behaviour for non-string longpollid, but this makes testing easier
+            hashWatchedChain = chainActive.Tip()->GetBlockHash();
+            nTransactionsUpdatedLastLP = nTransactionsUpdatedLast;
+        }
+
+        // Release the wallet and main lock while waiting
+        LEAVE_CRITICAL_SECTION(cs_main);
+        {
+            checktxtime = boost::get_system_time() + boost::posix_time::minutes(1);
+
+            boost::unique_lock<boost::mutex> lock(csBestBlock);
+            while (chainActive.Tip()->GetBlockHash() == hashWatchedChain && IsRPCRunning())
+            {
+                if (!cvBlockChange.timed_wait(lock, checktxtime))
+                {
+                    // Timeout: Check transactions for update
+                    if (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLastLP)
+                        break;
+                    checktxtime += boost::posix_time::seconds(10);
+                }
+            }
+        }
+        ENTER_CRITICAL_SECTION(cs_main);
+
+        if (!IsRPCRunning())
+            throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Shutting down");
+        // TODO: Maybe recheck connections/IBD and (if something wrong) send an expires-immediately template to stop
+        // miners?
+    }
+
+    // Update block
+    static CBlockIndex *pindexPrev = NULL;
+    static int64_t nStart = 0;
+    static std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
+    if (pindexPrev != chainActive.Tip() ||
+        (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5))
+    {
+        // Clear pindexPrev so future calls make a new block, despite any failures from here on
+        pindexPrev = NULL;
+
+        // Store the pindexBest used before CreateNewBlock, to avoid races
+        nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
+        CBlockIndex *pindexPrevNew = chainActive.Tip();
+        nStart = GetTime();
+
+        // Create new block
+        boost::shared_ptr<CReserveScript> coinbaseScript;
+        GetMainSignals().ScriptForMining(coinbaseScript);
+
+        // If the keypool is exhausted, no script is returned at all.  Catch this.
+        if (!coinbaseScript)
+            throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
+
+        // throw an error if no script was provided
+        if (coinbaseScript->reserveScript.empty())
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
+
+        pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript);
+        if (!pblocktemplate)
+            throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
+
+        // Need to update only after we know CreateNewBlock succeeded
+        pindexPrev = pindexPrevNew;
+    }
+    CBlock *pblock = &pblocktemplate->block; // pointer for convenience
+    const Consensus::Params &consensusParams = Params().GetConsensus();
+
+    // Update nTime
+    UpdateTime(pblock, consensusParams, pindexPrev);
+    pblock->nNonce = 0;
+
+    UniValue aCaps(UniValue::VARR);
+    aCaps.push_back("proposal");
+
+    UniValue transactions(UniValue::VARR);
+    map<uint256, int64_t> setTxIndex;
+    int i = 0;
+    for (const auto &it : pblock->vtx)
+    {
+        const CTransaction &tx = *it;
+        uint256 txHash = tx.GetHash();
+        setTxIndex[txHash] = i++;
+
+        if (tx.IsCoinBase())
+            continue;
+
+        UniValue entry(UniValue::VOBJ);
+
+        entry.push_back(Pair("data", EncodeHexTx(tx)));
+
+        entry.push_back(Pair("hash", txHash.GetHex()));
+
+        UniValue deps(UniValue::VARR);
+        for (const CTxIn &in : tx.vin)
+        {
+            if (setTxIndex.count(in.prevout.hash))
+                deps.push_back(setTxIndex[in.prevout.hash]);
+        }
+        entry.push_back(Pair("depends", deps));
+
+        int index_in_template = i - 1;
+        entry.push_back(Pair("fee", pblocktemplate->vTxFees[index_in_template]));
+        entry.push_back(Pair("sigops", pblocktemplate->vTxSigOps[index_in_template]));
+
+        transactions.push_back(entry);
+    }
+
+    UniValue aux(UniValue::VOBJ);
+    // COINBASE_FLAGS were assigned in CreateNewBlock() in the steps above.  Now we can use it here.
+    aux.push_back(Pair("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end())));
+
+    arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
+
+    UniValue aMutable(UniValue::VARR);
+    aMutable.push_back("time");
+    aMutable.push_back("transactions");
+    aMutable.push_back("prevblock");
+
+    UniValue result(UniValue::VOBJ);
+    result.push_back(Pair("capabilities", aCaps));
+
+    UniValue aRules(UniValue::VARR);
+    UniValue vbavailable(UniValue::VOBJ);
+    for (int j = 0; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++j)
+    {
+        Consensus::DeploymentPos pos = Consensus::DeploymentPos(j);
+        ThresholdState state = VersionBitsState(pindexPrev, consensusParams, pos, versionbitscache);
+        switch (state)
+        {
+        case THRESHOLD_DEFINED:
+        case THRESHOLD_FAILED:
+            // Not exposed to GBT at all
+            break;
+        case THRESHOLD_LOCKED_IN:
+            // Ensure bit is set in block version
+            pblock->nVersion |= VersionBitsMask(consensusParams, pos);
+        // FALLTHROUGH
+        // to get vbavailable set...
+        case THRESHOLD_STARTED:
+        {
+            const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
+            vbavailable.push_back(Pair(gbt_vb_name(pos), consensusParams.vDeployments[pos].bit));
+            if (setClientRules.find(vbinfo.name) == setClientRules.end())
+            {
+                if (!vbinfo.gbt_force)
+                {
+                    // If the client doesn't support this, don't indicate it in the [default] version
+                    pblock->nVersion &= ~VersionBitsMask(consensusParams, pos);
+                }
+            }
+            break;
+        }
+        case THRESHOLD_ACTIVE:
+        {
+            // Add to rules only
+            const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
+            aRules.push_back(gbt_vb_name(pos));
+            if (setClientRules.find(vbinfo.name) == setClientRules.end())
+            {
+                // Not supported by the client; make sure it's safe to proceed
+                if (!vbinfo.gbt_force)
+                {
+                    // If we do anything other than throw an exception here, be sure version/force isn't sent to old
+                    // clients
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,
+                        strprintf("Support for '%s' rule requires explicit client support", vbinfo.name));
+                }
+            }
+            break;
+        }
+        }
+    }
+    result.push_back(Pair("version", pblock->nVersion));
+    result.push_back(Pair("rules", aRules));
+    result.push_back(Pair("vbavailable", vbavailable));
+    result.push_back(Pair("vbrequired", int(0)));
+
+    if (nMaxVersionPreVB >= 2)
+    {
+        // If VB is supported by the client, nMaxVersionPreVB is -1, so we won't get here
+        // Because BIP 34 changed how the generation transaction is serialised, we can only use version/force back to v2
+        // blocks
+        // This is safe to do [otherwise-]unconditionally only because we are throwing an exception above if a non-force
+        // deployment gets activated
+        // Note that this can probably also be removed entirely after the first BIP9/BIP135 non-force deployment
+        // (ie, segwit) gets activated
+        aMutable.push_back("version/force");
+    }
+
+    result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
+    result.push_back(Pair("transactions", transactions));
+    result.push_back(Pair("coinbaseaux", aux));
+    result.push_back(Pair("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue));
+    result.push_back(
+        Pair("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast)));
+    result.push_back(Pair("target", hashTarget.GetHex()));
+    result.push_back(Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1));
+    result.push_back(Pair("mutable", aMutable));
+    result.push_back(Pair("noncerange", "00000000ffffffff"));
+    result.push_back(Pair("sigoplimit", (int64_t)BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS));
+    result.push_back(Pair("sizelimit", (int64_t)maxGeneratedBlock));
+    result.push_back(Pair("curtime", pblock->GetBlockTime()));
+    result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
+    // BU get the height directly from the block because pindexPrev could change if another block has come in.
+    result.push_back(Pair("height", (int64_t)(pblock->GetHeight())));
+
+    if (pblockOut != nullptr)
+        *pblockOut = *pblock;
+    return result;
 }
 
 UniValue getblocktemplate(const UniValue &params, bool fHelp)
@@ -438,309 +760,7 @@ UniValue getblocktemplate(const UniValue &params, bool fHelp)
             "\nExamples:\n" +
             HelpExampleCli("getblocktemplate", "") + HelpExampleRpc("getblocktemplate", ""));
 
-    LOCK(cs_main);
-
-    std::string strMode = "template";
-    UniValue lpval = NullUniValue;
-    std::set<std::string> setClientRules;
-    int64_t nMaxVersionPreVB = -1;
-    if (params.size() > 0)
-    {
-        const UniValue &oparam = params[0].get_obj();
-        const UniValue &modeval = find_value(oparam, "mode");
-        if (modeval.isStr())
-            strMode = modeval.get_str();
-        else if (modeval.isNull())
-        {
-            /* Do nothing */
-        }
-        else
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mode");
-        lpval = find_value(oparam, "longpollid");
-
-        if (strMode == "proposal")
-        {
-            const UniValue &dataval = find_value(oparam, "data");
-            if (!dataval.isStr())
-                throw JSONRPCError(RPC_TYPE_ERROR, "Missing data String key for proposal");
-
-            CBlock block;
-            if (!DecodeHexBlk(block, dataval.get_str()))
-                throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
-
-            uint256 hash = block.GetHash();
-            BlockMap::iterator mi = mapBlockIndex.find(hash);
-            if (mi != mapBlockIndex.end())
-            {
-                CBlockIndex *pindex = mi->second;
-                if (pindex->IsValid(BLOCK_VALID_SCRIPTS))
-                    return "duplicate";
-                if (pindex->nStatus & BLOCK_FAILED_MASK)
-                    return "duplicate-invalid";
-                return "duplicate-inconclusive";
-            }
-
-            CBlockIndex *const pindexPrev = chainActive.Tip();
-            // TestBlockValidity only supports blocks built on the current Tip
-            if (block.hashPrevBlock != pindexPrev->GetBlockHash())
-                return "inconclusive-not-best-prevblk";
-            CValidationState state;
-            TestBlockValidity(state, Params(), block, pindexPrev, false, true);
-            return BIP22ValidationResult(state);
-        }
-
-        const UniValue &aClientRules = find_value(oparam, "rules");
-        if (aClientRules.isArray())
-        {
-            for (unsigned int i = 0; i < aClientRules.size(); ++i)
-            {
-                const UniValue &v = aClientRules[i];
-                setClientRules.insert(v.get_str());
-            }
-        }
-        else
-        {
-            // NOTE: It is important that this NOT be read if versionbits is supported
-            const UniValue &uvMaxVersion = find_value(oparam, "maxversion");
-            if (uvMaxVersion.isNum())
-            {
-                nMaxVersionPreVB = uvMaxVersion.get_int64();
-            }
-        }
-    }
-
-    if (strMode != "template")
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mode");
-
-    if (!unsafeGetBlockTemplate.value)
-    {
-        if (vNodes.empty())
-            throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Bitcoin is not connected!");
-
-        if (IsInitialBlockDownload())
-            throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Bitcoin is downloading blocks...");
-    }
-
-    static unsigned int nTransactionsUpdatedLast;
-
-    if (!lpval.isNull())
-    {
-        // Wait to respond until either the best block changes, OR a minute has passed and there are more transactions
-        uint256 hashWatchedChain;
-        boost::system_time checktxtime;
-        unsigned int nTransactionsUpdatedLastLP;
-
-        if (lpval.isStr())
-        {
-            // Format: <hashBestChain><nTransactionsUpdatedLast>
-            std::string lpstr = lpval.get_str();
-
-            hashWatchedChain.SetHex(lpstr.substr(0, 64));
-            nTransactionsUpdatedLastLP = atoi64(lpstr.substr(64));
-        }
-        else
-        {
-            // NOTE: Spec does not specify behaviour for non-string longpollid, but this makes testing easier
-            hashWatchedChain = chainActive.Tip()->GetBlockHash();
-            nTransactionsUpdatedLastLP = nTransactionsUpdatedLast;
-        }
-
-        // Release the wallet and main lock while waiting
-        LEAVE_CRITICAL_SECTION(cs_main);
-        {
-            checktxtime = boost::get_system_time() + boost::posix_time::minutes(1);
-
-            boost::unique_lock<boost::mutex> lock(csBestBlock);
-            while (chainActive.Tip()->GetBlockHash() == hashWatchedChain && IsRPCRunning())
-            {
-                if (!cvBlockChange.timed_wait(lock, checktxtime))
-                {
-                    // Timeout: Check transactions for update
-                    if (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLastLP)
-                        break;
-                    checktxtime += boost::posix_time::seconds(10);
-                }
-            }
-        }
-        ENTER_CRITICAL_SECTION(cs_main);
-
-        if (!IsRPCRunning())
-            throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Shutting down");
-        // TODO: Maybe recheck connections/IBD and (if something wrong) send an expires-immediately template to stop
-        // miners?
-    }
-
-    // Update block
-    static CBlockIndex *pindexPrev = NULL;
-    static int64_t nStart = 0;
-    static CBlockTemplate *pblocktemplate = NULL;
-    if (pindexPrev != chainActive.Tip() ||
-        (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5))
-    {
-        // Clear pindexPrev so future calls make a new block, despite any failures from here on
-        pindexPrev = NULL;
-
-        // Store the pindexBest used before CreateNewBlock, to avoid races
-        nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
-        CBlockIndex *pindexPrevNew = chainActive.Tip();
-        nStart = GetTime();
-
-        // Create new block
-        if (pblocktemplate)
-        {
-            delete pblocktemplate;
-            pblocktemplate = NULL;
-        }
-        CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = BlockAssembler(Params()).CreateNewBlock(scriptDummy);
-        if (!pblocktemplate)
-            throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
-
-        // Need to update only after we know CreateNewBlock succeeded
-        pindexPrev = pindexPrevNew;
-    }
-    CBlock *pblock = &pblocktemplate->block; // pointer for convenience
-    const Consensus::Params &consensusParams = Params().GetConsensus();
-
-    // Update nTime
-    UpdateTime(pblock, consensusParams, pindexPrev);
-    pblock->nNonce = 0;
-
-    UniValue aCaps(UniValue::VARR);
-    aCaps.push_back("proposal");
-
-    UniValue transactions(UniValue::VARR);
-    map<uint256, int64_t> setTxIndex;
-    int i = 0;
-    for (const auto &it : pblock->vtx)
-    {
-        const CTransaction &tx = *it;
-        uint256 txHash = tx.GetHash();
-        setTxIndex[txHash] = i++;
-
-        if (tx.IsCoinBase())
-            continue;
-
-        UniValue entry(UniValue::VOBJ);
-
-        entry.push_back(Pair("data", EncodeHexTx(tx)));
-
-        entry.push_back(Pair("hash", txHash.GetHex()));
-
-        UniValue deps(UniValue::VARR);
-        BOOST_FOREACH (const CTxIn &in, tx.vin)
-        {
-            if (setTxIndex.count(in.prevout.hash))
-                deps.push_back(setTxIndex[in.prevout.hash]);
-        }
-        entry.push_back(Pair("depends", deps));
-
-        int index_in_template = i - 1;
-        entry.push_back(Pair("fee", pblocktemplate->vTxFees[index_in_template]));
-        entry.push_back(Pair("sigops", pblocktemplate->vTxSigOps[index_in_template]));
-
-        transactions.push_back(entry);
-    }
-
-    UniValue aux(UniValue::VOBJ);
-    aux.push_back(Pair("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end())));
-
-    arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
-
-    UniValue aMutable(UniValue::VARR);
-    aMutable.push_back("time");
-    aMutable.push_back("transactions");
-    aMutable.push_back("prevblock");
-
-    UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("capabilities", aCaps));
-
-    UniValue aRules(UniValue::VARR);
-    UniValue vbavailable(UniValue::VOBJ);
-    for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++i)
-    {
-        Consensus::DeploymentPos pos = Consensus::DeploymentPos(i);
-        ThresholdState state = VersionBitsState(pindexPrev, consensusParams, pos, versionbitscache);
-        switch (state)
-        {
-        case THRESHOLD_DEFINED:
-        case THRESHOLD_FAILED:
-            // Not exposed to GBT at all
-            break;
-        case THRESHOLD_LOCKED_IN:
-            // Ensure bit is set in block version
-            pblock->nVersion |= VersionBitsMask(consensusParams, pos);
-        // FALLTHROUGH
-        // to get vbavailable set...
-        case THRESHOLD_STARTED:
-        {
-            const struct BIP9DeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
-            vbavailable.push_back(Pair(gbt_vb_name(pos), consensusParams.vDeployments[pos].bit));
-            if (setClientRules.find(vbinfo.name) == setClientRules.end())
-            {
-                if (!vbinfo.gbt_force)
-                {
-                    // If the client doesn't support this, don't indicate it in the [default] version
-                    pblock->nVersion &= ~VersionBitsMask(consensusParams, pos);
-                }
-            }
-            break;
-        }
-        case THRESHOLD_ACTIVE:
-        {
-            // Add to rules only
-            const struct BIP9DeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
-            aRules.push_back(gbt_vb_name(pos));
-            if (setClientRules.find(vbinfo.name) == setClientRules.end())
-            {
-                // Not supported by the client; make sure it's safe to proceed
-                if (!vbinfo.gbt_force)
-                {
-                    // If we do anything other than throw an exception here, be sure version/force isn't sent to old
-                    // clients
-                    throw JSONRPCError(RPC_INVALID_PARAMETER,
-                        strprintf("Support for '%s' rule requires explicit client support", vbinfo.name));
-                }
-            }
-            break;
-        }
-        }
-    }
-    result.push_back(Pair("version", pblock->nVersion));
-    result.push_back(Pair("rules", aRules));
-    result.push_back(Pair("vbavailable", vbavailable));
-    result.push_back(Pair("vbrequired", int(0)));
-
-    if (nMaxVersionPreVB >= 2)
-    {
-        // If VB is supported by the client, nMaxVersionPreVB is -1, so we won't get here
-        // Because BIP 34 changed how the generation transaction is serialised, we can only use version/force back to v2
-        // blocks
-        // This is safe to do [otherwise-]unconditionally only because we are throwing an exception above if a non-force
-        // deployment gets activated
-        // Note that this can probably also be removed entirely after the first BIP9 non-force deployment (ie, probably
-        // segwit) gets activated
-        aMutable.push_back("version/force");
-    }
-
-    result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
-    result.push_back(Pair("transactions", transactions));
-    result.push_back(Pair("coinbaseaux", aux));
-    result.push_back(Pair("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue));
-    result.push_back(
-        Pair("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast)));
-    result.push_back(Pair("target", hashTarget.GetHex()));
-    result.push_back(Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1));
-    result.push_back(Pair("mutable", aMutable));
-    result.push_back(Pair("noncerange", "00000000ffffffff"));
-    result.push_back(Pair("sigoplimit", (int64_t)BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS));
-    result.push_back(Pair("sizelimit", (int64_t)maxGeneratedBlock));
-    result.push_back(Pair("curtime", pblock->GetBlockTime()));
-    result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
-    // BU get the height directly from the block because pindexPrev could change if another block has come in.
-    result.push_back(Pair("height", (int64_t)(pblock->GetHeight())));
-
-    return result;
+    return mkblocktemplate(params, nullptr);
 }
 
 class submitblock_StateCatcher : public CValidationInterface
@@ -762,29 +782,8 @@ protected:
     };
 };
 
-UniValue submitblock(const UniValue &params, bool fHelp)
+UniValue SubmitBlock(CBlock &block)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)
-        throw runtime_error("submitblock \"hexdata\" ( \"jsonparametersobject\" )\n"
-                            "\nAttempts to submit new block to network.\n"
-                            "The 'jsonparametersobject' parameter is currently ignored.\n"
-                            "See https://en.bitcoin.it/wiki/BIP_0022 for full specification.\n"
-
-                            "\nArguments\n"
-                            "1. \"hexdata\"    (string, required) the hex-encoded block data to submit\n"
-                            "2. \"jsonparametersobject\"     (string, optional) object of optional parameters\n"
-                            "    {\n"
-                            "      \"workid\" : \"id\"    (string, optional) if the server provided a workid, it MUST "
-                            "be included with submissions\n"
-                            "    }\n"
-                            "\nResult:\n"
-                            "\nExamples:\n" +
-                            HelpExampleCli("submitblock", "\"mydata\"") + HelpExampleRpc("submitblock", "\"mydata\""));
-
-    CBlock block;
-    if (!DecodeHexBlk(block, params[0].get_str()))
-        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
-
     uint256 hash = block.GetHash();
     bool fBlockPresent = false;
     {
@@ -834,6 +833,32 @@ UniValue submitblock(const UniValue &params, bool fHelp)
         state = sc.state;
     }
     return BIP22ValidationResult(state);
+}
+
+UniValue submitblock(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)
+        throw runtime_error("submitblock \"hexdata\" ( \"jsonparametersobject\" )\n"
+                            "\nAttempts to submit new block to network.\n"
+                            "The 'jsonparametersobject' parameter is currently ignored.\n"
+                            "See https://en.bitcoin.it/wiki/BIP_0022 for full specification.\n"
+
+                            "\nArguments\n"
+                            "1. \"hexdata\"    (string, required) the hex-encoded block data to submit\n"
+                            "2. \"jsonparametersobject\"     (string, optional) object of optional parameters\n"
+                            "    {\n"
+                            "      \"workid\" : \"id\"    (string, optional) if the server provided a workid, it MUST "
+                            "be included with submissions\n"
+                            "    }\n"
+                            "\nResult:\n"
+                            "\nExamples:\n" +
+                            HelpExampleCli("submitblock", "\"mydata\"") + HelpExampleRpc("submitblock", "\"mydata\""));
+
+    CBlock block;
+    if (!DecodeHexBlk(block, params[0].get_str()))
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
+
+    return SubmitBlock(block);
 }
 
 UniValue estimatefee(const UniValue &params, bool fHelp)
@@ -972,8 +997,8 @@ static const CRPCCommand commands[] = {
     {"util", "estimatesmartpriority", &estimatesmartpriority, true},
 };
 
-void RegisterMiningRPCCommands(CRPCTable &tableRPC)
+void RegisterMiningRPCCommands(CRPCTable &table)
 {
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
-        tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
+    for (auto cmd : commands)
+        table.appendCommand(cmd);
 }

@@ -13,6 +13,7 @@
 #include "ui_interface.h"
 #include "util.h"
 
+#include <mutex>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +24,7 @@
 #include <sys/types.h>
 
 #include <event2/buffer.h>
+#include <event2/bufferevent.h>
 #include <event2/event.h>
 #include <event2/http.h>
 #include <event2/keyvalq_struct.h>
@@ -43,8 +45,8 @@ static const size_t MAX_HEADERS_SIZE = 8192;
 class HTTPWorkItem : public HTTPClosure
 {
 public:
-    HTTPWorkItem(std::unique_ptr<HTTPRequest> req, const std::string &path, const HTTPRequestHandler &func)
-        : req(std::move(req)), path(path), func(func)
+    HTTPWorkItem(std::unique_ptr<HTTPRequest> _req, const std::string &_path, const HTTPRequestHandler &_func)
+        : req(std::move(_req)), path(_path), func(_func)
     {
     }
     void operator()() { func(req.get(), path); }
@@ -89,9 +91,8 @@ private:
     };
 
 public:
-    WorkQueue(size_t maxDepth) : running(true), maxDepth(maxDepth), numThreads(0) {}
+    WorkQueue(size_t _maxDepth) : running(true), maxDepth(_maxDepth), numThreads(0) {}
     /** Precondition: worker threads have all stopped
-     * (call WaitExit)
      */
     ~WorkQueue() {}
     /** Enqueue a work item */
@@ -132,27 +133,13 @@ public:
         running = false;
         cond.notify_all();
     }
-    /** Wait for worker threads to exit */
-    void WaitExit()
-    {
-        std::unique_lock<std::mutex> lock(cs);
-        while (numThreads > 0)
-            cond.wait(lock);
-    }
-
-    /** Return current depth of queue */
-    size_t Depth()
-    {
-        std::unique_lock<std::mutex> lock(cs);
-        return queue.size();
-    }
 };
 
 struct HTTPPathHandler
 {
     HTTPPathHandler() {}
-    HTTPPathHandler(std::string prefix, bool exactMatch, HTTPRequestHandler handler)
-        : prefix(prefix), exactMatch(exactMatch), handler(handler)
+    HTTPPathHandler(std::string _prefix, bool _exactMatch, HTTPRequestHandler _handler)
+        : prefix(_prefix), exactMatch(_exactMatch), handler(_handler)
     {
     }
     std::string prefix;
@@ -242,6 +229,19 @@ static std::string RequestMethodString(HTTPRequest::RequestMethod m)
 /** HTTP request callback */
 static void http_request_cb(struct evhttp_request *req, void *arg)
 {
+    // Disable reading to work around a libevent bug, fixed in 2.2.0.
+    if (event_get_version_number() >= 0x02010600 && event_get_version_number() < 0x02020001)
+    {
+        evhttp_connection *conn = evhttp_request_get_connection(req);
+        if (conn)
+        {
+            bufferevent *bev = evhttp_connection_get_bufferevent(conn);
+            if (bev)
+            {
+                bufferevent_disable(bev, EV_READ);
+            }
+        }
+    }
     std::unique_ptr<HTTPRequest> hreq(new HTTPRequest(req));
 
     LOG(HTTP, "Received a %s request for %s from %s\n", RequestMethodString(hreq->GetRequestMethod()), hreq->GetURI(),
@@ -367,7 +367,18 @@ static bool HTTPBindAddresses(struct evhttp *http)
             LOGA("Binding RPC on address %s port %i failed.\n", i->first, i->second);
         }
     }
-    return !boundSockets.empty();
+    const bool fBoundAll = boundSockets.size() == endpoints.size();
+    const bool fBoundAny = boundSockets.size();
+    if (GetBoolArg("-bindallorfail", false))
+    {
+        if (!fBoundAll)
+        {
+            LOGA("Binding to all RPC sockets failed. Failing as -bindallorfail is set.\n");
+        }
+        return fBoundAll;
+    }
+    else
+        return fBoundAny;
 }
 
 /** Simple wrapper to set thread name and run work queue */
@@ -455,6 +466,7 @@ bool InitHTTPServer()
 
 std::thread threadHTTP;
 std::future<bool> threadResult;
+static std::vector<std::thread> g_thread_http_workers;
 
 bool StartHTTPServer()
 {
@@ -467,8 +479,7 @@ bool StartHTTPServer()
 
     for (int i = 0; i < rpcThreads; i++)
     {
-        std::thread rpc_worker(HTTPWorkQueueRun, workQueue);
-        rpc_worker.detach();
+        g_thread_http_workers.emplace_back(HTTPWorkQueueRun, workQueue);
     }
     return true;
 }
@@ -496,7 +507,11 @@ void StopHTTPServer()
     if (workQueue)
     {
         LOG(HTTP, "Waiting for HTTP worker threads to exit\n");
-        workQueue->WaitExit();
+        for (auto &thread : g_thread_http_workers)
+        {
+            thread.join();
+        }
+        g_thread_http_workers.clear();
         delete workQueue;
     }
     if (eventBase)
@@ -516,7 +531,10 @@ void StopHTTPServer()
             LOGA("HTTP event loop did not exit within allotted time, sending loopbreak\n");
             event_base_loopbreak(eventBase);
         }
-        threadHTTP.join();
+        if (threadHTTP.joinable())
+        {
+            threadHTTP.join();
+        }
     }
     if (eventHTTP)
     {
@@ -541,8 +559,8 @@ static void httpevent_callback_fn(evutil_socket_t, short, void *data)
         delete self;
 }
 
-HTTPEvent::HTTPEvent(struct event_base *base, bool deleteWhenTriggered, const std::function<void(void)> &handler)
-    : deleteWhenTriggered(deleteWhenTriggered), handler(handler)
+HTTPEvent::HTTPEvent(struct event_base *base, bool _deleteWhenTriggered, const std::function<void(void)> &_handler)
+    : deleteWhenTriggered(_deleteWhenTriggered), handler(_handler)
 {
     ev = event_new(base, -1, 0, httpevent_callback_fn, this);
     assert(ev);
@@ -555,7 +573,7 @@ void HTTPEvent::trigger(struct timeval *tv)
     else
         evtimer_add(ev, tv); // trigger after timeval passed
 }
-HTTPRequest::HTTPRequest(struct evhttp_request *req) : req(req), replySent(false) {}
+HTTPRequest::HTTPRequest(struct evhttp_request *_req) : req(_req), replySent(false) {}
 HTTPRequest::~HTTPRequest()
 {
     if (!replySent)
@@ -617,9 +635,25 @@ void HTTPRequest::WriteReply(int nStatus, const std::string &strReply)
     struct evbuffer *evb = evhttp_request_get_output_buffer(req);
     assert(evb);
     evbuffer_add(evb, strReply.data(), strReply.size());
-    HTTPEvent *ev = new HTTPEvent(
-        eventBase, true, std::bind(evhttp_send_reply, req, nStatus, (const char *)NULL, (struct evbuffer *)NULL));
-    ev->trigger(0);
+    auto req_copy = req;
+    HTTPEvent *ev = new HTTPEvent(eventBase, true, [req_copy, nStatus] {
+        evhttp_send_reply(req_copy, nStatus, nullptr, nullptr);
+        // Re-enable reading from the socket. This is the second part of the libevent
+        // workaround above.
+        if (event_get_version_number() >= 0x02010600 && event_get_version_number() < 0x02020001)
+        {
+            evhttp_connection *conn = evhttp_request_get_connection(req_copy);
+            if (conn)
+            {
+                bufferevent *bev = evhttp_connection_get_bufferevent(conn);
+                if (bev)
+                {
+                    bufferevent_enable(bev, EV_READ | EV_WRITE);
+                }
+            }
+        }
+    });
+    ev->trigger(nullptr);
     replySent = true;
     req = 0; // transferred back to main thread
 }

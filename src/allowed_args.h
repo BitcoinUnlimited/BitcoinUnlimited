@@ -9,6 +9,7 @@
 #include <functional>
 #include <list>
 #include <map>
+#include <set>
 #include <string>
 
 namespace AllowedArgs
@@ -142,6 +143,16 @@ class ConfigFile : public AllowedArgs
 public:
     ConfigFile(CTweakMap *pTweaks);
 };
+
+
+/** These APIs validate the parameter and are typically used in .addArg */
+bool validateString(const std::string &str, const std::set<char> &validChars);
+bool optionalBool(const std::string &str);
+bool requiredStr(const std::string &str);
+bool optionalStr(const std::string &str);
+bool requiredInt(const std::string &str);
+bool optionalInt(const std::string &str);
+bool requiredAmount(const std::string &str);
 
 } // namespace AllowedArgs
 
