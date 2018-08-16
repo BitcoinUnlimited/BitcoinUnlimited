@@ -21,6 +21,8 @@ extern std::set<int> setDirtyFileInfo;
 extern std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
 extern CTweak<uint64_t> pruneIntervalTweak;
 
+CDatabaseAbstract *pblockdb = nullptr;
+
 /**
   * Config param to determine what DB type we are using
   */

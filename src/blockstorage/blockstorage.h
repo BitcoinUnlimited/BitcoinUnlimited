@@ -24,6 +24,7 @@ enum BlockDBMode
 
 static const BlockDBMode DEFAULT_BLOCK_DB_MODE = SEQUENTIAL_BLOCK_FILES;
 extern BlockDBMode BLOCK_DB_MODE;
+extern CDatabaseAbstract *pblockdb;
 
 void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache,
     const int64_t &_nBlockDBCache,

@@ -245,8 +245,6 @@ void Shutdown()
         pblocktree = nullptr;
         delete pblockdb;
         pblockdb = nullptr;
-        delete pblockundodb;
-        pblockundodb = nullptr;
     }
 #ifdef ENABLE_WALLET
     if (pwalletMain)
@@ -1055,7 +1053,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 delete pblocktree;
                 delete pblocktreeother;
                 delete pblockdb;
-                delete pblockundodb;
 
                 uiInterface.InitMessage(_("Opening Block database..."));
                 InitializeBlockStorage(nBlockTreeDBCache, nBlockDBCache, nBlockUndoDBCache);

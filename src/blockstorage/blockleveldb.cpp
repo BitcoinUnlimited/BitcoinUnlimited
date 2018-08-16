@@ -8,8 +8,6 @@
 #include "hash.h"
 #include "main.h"
 
-CBlockDB *pblockdb = nullptr;
-CBlockDB *pblockundodb = nullptr;
 
 CBlockDB::CBlockDB(std::string folder,
     size_t nCacheSize,
