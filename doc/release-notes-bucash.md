@@ -42,8 +42,8 @@ the rules activated Nov 13th 2017 and May 15th 2018 protocol upgrades.
 Main Changes
 ------------
 
-- Graphene Relay: A protocol for efficiently relaying blocks across a blockchain's network (experimental)
-- blocksdb: Add leveldb as an alternative storage method for blocks and undo data
+- Graphene Relay: A protocol for efficiently relaying blocks across a blockchain's network (experimental, turned off by default)
+- blocksdb: Add leveldb as an alternative storage method for blocks and undo data (experimental, on-disk blocksdb data formats may change in subsequent releases, turned off by default)
 - Double Spend Relaying
 - BIP 135: Generalized version bits voting
 - clean up shadowing/thread clang warn
