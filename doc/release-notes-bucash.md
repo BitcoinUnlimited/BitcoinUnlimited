@@ -42,7 +42,7 @@ the rules activated Nov 13th 2017 and May 15th 2018 protocol upgrades.
 Main Changes
 ------------
 
-- Graphene Relay: A protocol for efficiently relaying blocks across a blockchain's network (experimental, turned off by default)
+- Graphene Relay: A protocol for efficiently relaying blocks across a blockchain's network (experimental, turned off by default, set `use-grapheneblocks=1` to turn it on)
 - blocksdb: Add leveldb as an alternative storage method for blocks and undo data (experimental, on-disk blocksdb data formats may change in subsequent releases, turned off by default)
 - Double Spend Relaying
 - BIP 135: Generalized version bits voting
@@ -50,8 +50,8 @@ Main Changes
 - Update depends libraries
 - Rework of the Bitcoin fuzzer command line driver tool
 - Add stand alone cpu miner to the set of binaries
-- Cashlib: create a shared library to make creating wallets easier
-- Imporva QA machinery (travis mainly)
+- Cashlib: create a shared library to make creating wallets easier (experimental, this library factors useful functionality out of bitcoind into a separate shared library that is callable from higher level languages. Currently supports transaction signing, additional functionality TBD)
+- Improve QA machinery (travis mainly)
 - Port Hierarchical Deterministic wallet (BIP 32)
 - add space-efficient mining RPC calls that send only the block header, coinbase transaction, and merkle branch: getminingcandidate, submitminingsolution
 
