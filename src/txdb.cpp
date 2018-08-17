@@ -30,8 +30,8 @@ static const char DB_FLAG = 'F';
 static const char DB_REINDEX_FLAG = 'R';
 static const char DB_LAST_BLOCK = 'l';
 
-// to distinguish best block for a specific DB type, values correspond to enum vaue (blockdb_wrapper.h)
-static const char DB_BEST_BLOCK_BLOCKDB = 'D';
+// to distinguish best block for a specific DB type, values correspond to enum value (blockdb_wrapper.h)
+static const std::string DB_BEST_BLOCK_BLOCKDB = "1";
 
 
 namespace
