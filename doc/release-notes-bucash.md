@@ -49,7 +49,7 @@ Main Changes
 - clean up shadowing/thread clang warn
 - Update depends libraries
 - Rework of the Bitcoin fuzzer command line driver tool
-- Add stand alone cpu miner to the set of binaries
+- Add stand alone cpu miner to the set of binaries (useful to showcase the new mining RPC calls, provides a template for development of mining pool software, and is valuable for regtest/testnet mining)
 - Cashlib: create a shared library to make creating wallets easier (experimental, this library factors useful functionality out of bitcoind into a separate shared library that is callable from higher level languages. Currently supports transaction signing, additional functionality TBD)
 - Improve QA machinery (travis mainly)
 - Port Hierarchical Deterministic wallet (BIP 32)
