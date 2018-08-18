@@ -4881,10 +4881,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         // Only offer a TX to the fork if its signed properly
                         if (!(!IsTxUAHFOnly(txe) && IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight)))
                         {
-                            CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-                            ss.reserve(1000);
-                            ss << txe.GetTx();
-                            pfrom->PushMessage(NetMsgType::TX, ss);
+                            pfrom->PushMessage(NetMsgType::TX, txe.GetTx());
                             fPushed = true;
                             pfrom->txsSent += 1;
                         }
