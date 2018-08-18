@@ -8,7 +8,7 @@ If there is no test, a good first step is to get a good reproduction of
 the issue, and then write a test for it which fails only if the problem
 is present.  Sometimes this is difficult in itself, but try.
 
-If you are lucky, and existing regression test might already flag the
+If you are lucky, an existing regression test might already flag the
 issue (this is rare).
 
 Once you are able to reproduce the problem, the next step is to figure

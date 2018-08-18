@@ -58,7 +58,7 @@ bits MUST be treated as if they are 0.
 
 REQ-ANCESTORS-DETERMINE-BLOCK-STATE: A block's state SHALL never depend on its own nVersion, but only on that of its ancestors.
 
-REQ-GENESIS-DEFINED : The genesis block for any chain SHALL by definition be in the DEFINED state for a configured deployment.
+REQ-GENESIS-DEFINED: The genesis block for any chain SHALL by definition be in the DEFINED state for a configured deployment.
 
 
 
@@ -86,7 +86,7 @@ REQ-SIGNAL-0-FOR-NO-SUPPORT: A signaling bit value of '0' SHALL indicate absence
 
 REQ-NO-ID-NO-TALLY: If a block's nVersion does not have its top 3 bits set to 001, all its signaling bits MUST be treated as if they are '0'.
 
-REQ-TALLY-AFTER-STARTED: Once a deployment has STARTED, the signal for that deployment SHALL be tallied over the the past windowsize blocks whenever a new block is received on that chain.
+REQ-TALLY-AFTER-STARTED: Once a deployment has STARTED, the signal for that deployment SHALL be tallied over the past windowsize blocks whenever a new block is received on that chain.
 
 REQ-TALLY-ON-HEAD-CHANGE: The signaling bits SHALL be tallied whenever the head of the active chain changes, including after reorganizations.
 

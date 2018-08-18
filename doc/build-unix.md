@@ -7,7 +7,7 @@ Some notes on how to build Bitcoin Unlimited in Unix.
 Note
 ---------------------
 Always use absolute paths to configure and compile bitcoin and the dependencies,
-for example, when specifying the the path of the dependency:
+for example, when specifying the path of the dependency:
 
 	../dist/configure --enable-cxx --disable-shared --with-pic --prefix=$BDB_PREFIX
 
@@ -173,7 +173,7 @@ If you need to build Boost yourself:
 
 Security
 --------
-To help make your bitcoin installation more secure by making certain attacks impossible to
+To help make your Bitcoin installation more secure by making certain attacks impossible to
 exploit even if a vulnerability is found, binaries are hardened by default.
 This can be disabled with:
 
@@ -252,7 +252,7 @@ just follow these steps:
     ./configure --prefix=$PWD/depends/x86_64-pc-linux-gnu --without-gui
     make -j4
 
-in the above commands we are statically compiling headless 64 bit linux binaries. If you want to compile
+in the above commands we are statically compiling headless 64 bit Linux binaries. If you want to compile
 32 bit binaries just use `i686-pc-linux-gnu` rather than `x86_64-pc-linux-gnu`
 
 ARM Cross-compilation

@@ -100,7 +100,7 @@ Exactly the same as ***submitblock***.  None means successful, error string or J
 Setting your excessive block size and accept depth
 --------------------------------------------------
 
-Blocks larger than the excessive block size will be ignored until "accept depth" (see next section) blocks are  built upon them.  This allows miners to discourage blocks that they feel are excessively large, but to ultimately accept them if it looks like the majority of the network is accepting this size.  You can learn more about these parameters [here](https://medium.com/@peter_r/the-excessive-block-gate-how-a-bitcoin-unlimited-node-deals-with-large-blocks-22a4a5c322d4#.bhkz538kw), and a miner's opinion on how they should be set [here](https://medium.com/@ViaBTC/miner-guide-how-to-safely-hard-fork-to-bitcoin-unlimited-8ac1570dc1a8#.zdklfb67p).
+Blocks larger than the excessive block size will be ignored until "accept depth" (see next section) blocks are built upon them.  This allows miners to discourage blocks that they feel are excessively large, but to ultimately accept them if it looks like the majority of the network is accepting this size.  You can learn more about these parameters [here](https://medium.com/@peter_r/the-excessive-block-gate-how-a-bitcoin-unlimited-node-deals-with-large-blocks-22a4a5c322d4#.bhkz538kw), and a miner's opinion on how they should be set [here](https://medium.com/@ViaBTC/miner-guide-how-to-safely-hard-fork-to-bitcoin-unlimited-8ac1570dc1a8#.zdklfb67p).
 
 To change the largest block that Bitcoin Unlimited will generate, run:
 ```sh
@@ -262,7 +262,7 @@ bitcoin-cli getminercomment
 Filling a new node's transaction memory pool
 ---------------------------------------------
 
-When you restart bitcoind, the memory pool starts empty.  If a block is found quickly, this could result in an block with few transactions.  It is possible to "prime" a new instance of bitcoind with the memory pool of a different Bitcoin Unlimited node.  To do so, go to the CLI on the node that has a full mempool, connect to your new node, and push the transactions to it.
+When you restart bitcoind, the memory pool starts empty.  If a block is found quickly, this could result in a block with few transactions.  It is possible to "prime" a new instance of bitcoind with the memory pool of a different Bitcoin Unlimited node.  To do so, go to the CLI on the node that has a full mempool, connect to your new node, and push the transactions to it.
 
 ```sh
 `bitcoin-cli addnode <new node's IP:port> onetry`

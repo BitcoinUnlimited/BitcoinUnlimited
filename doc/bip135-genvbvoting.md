@@ -98,7 +98,7 @@ with error message on console and more detailed messages in the log file.
 This is on purpose, to prevent operation on possibly incomplete / bad data.
 
 
-3.2. Adaptated files
+3.2. Adapted files
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 The AbstractThresholdConditionChecker has been extended with the
