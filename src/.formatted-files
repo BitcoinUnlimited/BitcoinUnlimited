@@ -18,6 +18,8 @@ bitcoin-miner.cpp
 bitcoin-tx.cpp
 bitnodes.cpp
 bitnodes.h
+blockorder.cpp
+blockorder.h
 blockstorage/blockleveldb.cpp
 blockstorage/blockleveldb.h
 blockstorage/sequential_files.cpp

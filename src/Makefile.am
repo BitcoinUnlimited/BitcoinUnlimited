@@ -98,6 +98,7 @@ BITCOIN_CORE_H = \
   base58.h \
   bandb.h \
   banentry.h \
+  blockorder.h \
   blockstorage/blockleveldb.h \
   blockstorage/sequential_files.h \
   blockstorage/blockstorage.h \
@@ -395,6 +396,7 @@ libbitcoin_common_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_common_a_SOURCES = \
   amount.cpp \
   base58.cpp \
+  blockorder.cpp \
   cashaddr.cpp \
   cashaddrenc.cpp \
   chainparams.cpp \
