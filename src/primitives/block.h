@@ -73,7 +73,14 @@ private:
     // memory only
     mutable uint64_t nBlockSize; // Serialized block size in bytes
 
+    // this flag can be set and queried but will NOT be checked when set
+    // It is meant to signal a generated or received block that is in topocanonical order,
+    // with signalling from the network layer (e.g. Graphene) or the mining code.
+    bool fTopoCanonical;
+
 public:
+    void setTopoCanonical(bool _f) { fTopoCanonical = _f; }
+    bool isTopoCanonical() { return fTopoCanonical; }
     // network and disk
     std::vector<CTransactionRef> vtx;
 
@@ -162,6 +169,7 @@ public:
         fChecked = false;
         fExcessive = false;
         nBlockSize = 0;
+        fTopoCanonical = false;
     }
 
     CBlockHeader GetBlockHeader() const
