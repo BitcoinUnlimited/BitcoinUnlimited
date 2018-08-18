@@ -8,6 +8,7 @@
 
 #include "addrman.h"
 #include "arith_uint256.h"
+#include "blockorder.h"
 #include "blockstorage/blockstorage.h"
 #include "blockstorage/sequential_files.h"
 #include "chainparams.h"
@@ -1840,9 +1841,17 @@ bool ConnectBlock(const CBlock &block,
         // a chance to process in parallel. This is crucial for parallel validation to work.
         // NOTE: the only place where cs_main is needed is if we hit PV->ChainWorkHasChanged, which
         //       internally grabs the cs_main lock when needed.
+        /*
+        CTxRefVector txrfv(block.vtx);
+        BlockOrder::TopoCanonical topo_canonical;
+        topo_canonical.prepare(txrfv);
+        topo_canonical.sort(txrfv);
+        assert(BlockOrder::isTopological(txrfv));
+        LOGA("BlockOrder topo-canonical.\n");
+        */
         for (unsigned int i = 0; i < block.vtx.size(); i++)
         {
-            const CTransaction &tx = *(block.vtx[i]);
+            const CTransaction &tx = *(block.vtx[i]); //*(txrfv[i]);
 
             nInputs += tx.vin.size();
             nSigOps += GetLegacySigOpCount(tx);
@@ -1934,11 +1943,11 @@ bool ConnectBlock(const CBlock &block,
             }
 
             CTxUndo undoDummy;
-            if (i > 0)
+            if (!tx.IsCoinBase())
             {
                 blockundo.vtxundo.push_back(CTxUndo());
             }
-            UpdateCoins(tx, state, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
+            UpdateCoins(tx, state, view, tx.IsCoinBase() ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
             vPos.push_back(std::make_pair(tx.GetHash(), pos));
             pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
 
