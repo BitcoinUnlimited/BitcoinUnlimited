@@ -7,6 +7,7 @@
 #endif
 
 #include "base58.h"
+#include "blockorder.h"
 #include "chainparams.h"
 #include "clientversion.h"
 #include "coins.h"
@@ -18,6 +19,8 @@
 #include "primitives/transaction.h"
 #include "script/script.h"
 #include "script/sign.h"
+#include "serialize.h"
+#include "streams.h"
 #include "sync.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -29,6 +32,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/assign/list_of.hpp>
 #include <boost/thread.hpp>
+#include <iostream>
 
 using namespace std;
 
@@ -757,6 +761,69 @@ static int CommandLineRawTx(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
     SetupEnvironment();
+    size_t num_tx = 0;
+    int mode = 0;
+
+    if (argc >= 2)
+        num_tx = atoi(argv[1]);
+    if (argc >= 3)
+        mode = atoi(argv[2]);
+
+    cout << "Number of transaction to take (0 = single block):" << num_tx << endl;
+
+    CTxRefVector txrv;
+    // to get block samples:
+    // for i in `seq 400000 400999`; do ./bitcoin-cli getblock $i false >> /tmp/blocks-400000-400999; done
+    while (txrv.size() < num_tx || !num_tx)
+    {
+        // take block hex data from cmdline
+        std::string blockhex;
+        cin >> blockhex;
+        std::vector<unsigned char> data(ParseHex(blockhex));
+        CDataStream ds(data, SER_NETWORK, PROTOCOL_VERSION);
+        CBlock block;
+        ds >> block;
+        txrv.insert(txrv.begin(), block.vtx.begin(), block.vtx.end());
+        cout << "Imported block of " << block.vtx.size() << " transactions.\n";
+        cout << "Now having " << txrv.size() << " total." << endl;
+        if (!num_tx)
+            break;
+    }
+    if (num_tx)
+        txrv.resize(num_tx);
+    cout << "After resize: " << txrv.size() << " transactions." << endl;
+
+    BlockOrder::Lexical lexical;
+    BlockOrder::TopoCanonical topo_canonical;
+
+    CTxRefVector c;
+    lexical.prepare(c);
+    topo_canonical.prepare(c);
+
+    for (int i = 0; i < 100; i++)
+    {
+        c.clear();
+        c.insert(c.begin(), txrv.begin(), txrv.end());
+        switch (mode)
+        {
+        case 0:
+            break;
+        case 1:
+            lexical.sort(c);
+            break;
+        case 2:
+            topo_canonical.sort(c);
+            break;
+        case 3:
+        {
+            BlockOrder::TopoCanonical topo_canonical;
+            topo_canonical.prepare(c);
+            topo_canonical.sort(c);
+        }
+        break;
+        }
+    }
+    return 0;
 
     try
     {
