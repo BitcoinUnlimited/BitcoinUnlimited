@@ -262,7 +262,7 @@ bitcoin-cli getminercomment
 Filling a new node's transaction memory pool
 ---------------------------------------------
 
-When you restart bitcoind, the memory pool starts empty.  If a block is found quickly, this could result in an block with few transactions.  It is possible to "prime" a new instance of bitcoind with the memory pool of a different Bitcoin Unlimited node.  To do so, go to the CLI on the node that has a full mempool, connect to your new node, and push the transactions to it.
+When you restart bitcoind, the memory pool starts empty.  If a block is found quickly, this could result in a block with few transactions.  It is possible to "prime" a new instance of bitcoind with the memory pool of a different Bitcoin Unlimited node.  To do so, go to the CLI on the node that has a full mempool, connect to your new node, and push the transactions to it.
 
 ```sh
 `bitcoin-cli addnode <new node's IP:port> onetry`

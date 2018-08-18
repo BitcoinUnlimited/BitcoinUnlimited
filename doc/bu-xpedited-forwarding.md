@@ -10,7 +10,7 @@ can participate in or easily setup their own Xpedited Network.
 
 The forwarding mechanism while simple to understand uses several enhancements to speed the delivery of newly mined blocks
 throughout the world and most importantly to other miners.  Essentially when one participates in the network, as soon as a new block 
-is found, an Xthin-format block is forwarded to every node you are connected to that has requested expedited forwarding.  When they recieve 
+is found, an Xthin-format block is forwarded to every node you are connected to that has requested expedited forwarding.  When they receive 
 the Xthin-format block, the header is quickly checked to make sure it is valid (and of appropriate difficulty) and then forwarded to the next
 set of nodes and so on.
 
@@ -36,7 +36,7 @@ will be restarted when either your node or the other is restarted.
 --------------------------------------------------------
 
 Two bitcoin.conf entries need to be made.  One is the `addnode` connection which opens the connection to the remote peer and the 
-second is the `expeditedblock` entry which makes the request to begin the receipt of xpedited blocks from this peer.
+second is the `expeditedblock` entry which makes the request to begin the receipt of Xpedited blocks from this peer.
 
 	addnode=<ip:port>
 	expeditedblock=<ip:port>
@@ -64,7 +64,7 @@ You can have muliple `addnode` and expedited entries up to a maximum of 8 connec
 2b. Setting up an Xpedited connection with RPC
 ----------------------------------------------
 
-You can also setup connections using the RPC interface, however once you restart your node the xpedited forwarding will no longer be in effect
+You can also setup connections using the RPC interface, however once you restart your node the Xpedited forwarding will no longer be in effect
 and you will have to re-request forwarding unless you use a script of some kind to send the forwarding requests.
 
 First, make sure the node you want expedited connections from is actually connected:
@@ -81,7 +81,7 @@ For example, to turn on expedited forwarding of blocks from a remote peer to my 
 
 	bitcoin-cli expedited block "192.168.0.6:8333" on
 
-and to do the same for transaction fowarding I would enter:
+and to do the same for transaction forwarding I would enter:
 
 	bitcoin-cli expedited tx "192.168.0.6:8333" on
 
@@ -94,7 +94,7 @@ then simply type "help expedited".
 -------------------------------
 
 By default the maximum number of recipients that can request forwarding from your node is set to 3.  If you wish to limit that or reduce that
-you can uses the following settings.
+you can use the following settings.
 
 	maxexpeditedblockrecipients=<n>
 	maxexpeditedtxrecipients=<n>

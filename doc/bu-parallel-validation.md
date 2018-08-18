@@ -34,7 +34,7 @@ signatures.  Each new block that arrives will be assigned one of those queues du
 2c) Locking: The parallel processing is made possible by first having separate threads for validation, but then largely by managing
 the internal locks of `cs_main` in the `ConnectBlock()` function which is found in the `src/main.cpp` source file. During the
 process of `CheckInputs()` we do not have to maintain the lock on `cs_main` which allows other competing threads to continue their
-own validation; the reason for this is that each thread of validation uses it's own view of the UTXO and the `scriptcheckqueue`'s and
+own validation; the reason for this is that each thread of validation uses its own view of the UTXO and the `scriptcheckqueue`'s and
 UTXO cache's have their own internal locking mechanisms. Furthermore when it comes time to wait for the script threads to finish we
 also do not need to maintain the `cs_main` locks during the `control.Wait()` where we wait for the script threads to finish up.
 
@@ -46,7 +46,7 @@ arrives there are several ways we use to stop one or all of the other competing 
 the script threads which prevents them from completing their verification, followed by issuing a `Quit` message to the blockvalidation threads. Also, if one
 block has finished and has advanced the tip, the other concurrent threads may see that the tip has advanced and will exit their validation threads.
 
-2e) Temp view cache:  Each processing thread has it's own temporary view of the UTXO which it can use to pre-validate the inputs and ensure
+2e) Temp view cache:  Each processing thread has its own temporary view of the UTXO which it can use to pre-validate the inputs and ensure
 that the block is valid (as each input is checked the UTXO must be updated before the next input can be checked because often the
 current input depends on some previous output in the same block). When and if a processing thread wins the validation race it will flush it's
 temporary and now updated view of the UTXO to the base view (in memory UTXO cache).  This is key to having several threads of
@@ -77,7 +77,7 @@ are not unlocked and then locked, giving priority to mined blocks and allowing t
 is invoked or not depends on the boolean `fParallel`.  When set to `true` then parallel validation is in effect, and when `false` , as in the case
 of generating a new block, then it is turned off.
 NOTE: Miners will still use parallel validation if a block arrives from an external source. It is only turned off when validating a block they
-mine themself.
+mine themselves.
 
 
 5. Special Cases and possible attacks
