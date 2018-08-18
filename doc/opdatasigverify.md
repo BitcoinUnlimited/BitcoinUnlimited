@@ -53,11 +53,11 @@ Otherwise, the top 2 items are popped off the stack (leaving *data* on the top o
 
 ### Why is the non-verify version unnecessary?
 
-OP_DATASIGVERIFY fails the script if signature validation fails.  But one could imagine another opcode, let's call it OP_CHECKDATASIG, that would instead push true or false onto the stack depending on whether signature validation suceeded or failed.  Therefore additional opcode would relate to OP_DATASIGVERIFY in the same way OP_CHECKSIG is to OP_CHECKSIGVERIFY.
+OP_DATASIGVERIFY fails the script if signature validation fails.  But one could imagine another opcode, let's call it OP_CHECKDATASIG, that would instead push true or false onto the stack depending on whether signature validation succeeded or failed.  Therefore additional opcode would relate to OP_DATASIGVERIFY in the same way OP_CHECKSIG is to OP_CHECKSIGVERIFY.
 
 But, this instruction is not necessary because a Bitcoin Cash script is not exactly like a normal program.  Its fundamental and only purpose is to encumber spendability -- your input script must meet the output script's requirements in order to spend the coins.  Therefore, any program sequence that does not narrow the group of possible spenders is equivalent to a simple choice.  In the OP_CHECKDATASIG case, any potential spender can create a spend script that fails OP_CHECKDATASIG by pushing random bytes rather than a valid signature, so the "false" result is equivalent to (but less efficient than) an if statement on a pushed constant.
 
-Formally, any script with encumberances x, y, z and solutions x', y', and z', of the form:
+Formally, any script with encumbrances x, y, z and solutions x', y', and z', of the form:
 
 `pubkeyhash OP_CHECKDATASIG OP_IF x OP_ELSE y OP_ENDIF z`
 
@@ -76,7 +76,7 @@ else-branch spend: `z' y' 0`
 
 ## Reference Implementation
 
-Please refer to [this github commit](https://github.com/BitcoinUnlimited/BitcoinUnlimited/commit/1bf53307cab5d96076721ef5a238a63b03aca07d) for a complete implementation.  Implementation is in src/test/interpreter.{cpp,h} and unit tests are located at src/test/script_tests.cpp.
+Please refer to [this GitHub commit](https://github.com/BitcoinUnlimited/BitcoinUnlimited/commit/1bf53307cab5d96076721ef5a238a63b03aca07d) for a complete implementation.  Implementation is in src/test/interpreter.{cpp,h} and unit tests are located at src/test/script_tests.cpp.
 
 The opcode implementation is short enough to include here:
 ```c++

@@ -15,7 +15,7 @@ Semi-Automated Development Environment Configuration Scripts
 
 There now exists a set of scripts which automates most of the steps covered in
 this guide.  This set of scripts, plus instructions for configuring them to
-perform a semi-automated installation of the development enviornment may be found
+perform a semi-automated installation of the development environment may be found
 here [build-aux/mingw/readme.md](/build-aux/mingw/readme.md)
 
 
@@ -96,13 +96,13 @@ Save them in c:\deps folder.
 From a MinGw shell (C:\MinGW\msys\1.0\msys.bat), unpack the source archive with tar (this will avoid symlink issues) 
 then configure and make:
 
-NOTE: For 64-bit builds, when you run the ./Configure command below, you must change mingw to mingw64.
+NOTE: For 64-bit builds, when you run the ./configure command below, you must change mingw to mingw64.
 
 
 cd /c/deps/
 tar xvfz openssl-1.0.1k.tar.gz
 cd openssl-1.0.1k
-./Configure no-zlib no-shared no-dso no-krb5 no-camellia no-capieng no-cast no-cms no-dtls1 no-gost no-gmp no-heartbeats no-idea no-jpake no-md2 no-mdc2 no-rc5 no-rdrand no-rfc3779 no-rsax no-sctp no-seed no-sha0 no-static_engine no-whirlpool no-rc2 no-rc4 no-ssl2 no-ssl3 mingw
+./configure no-zlib no-shared no-dso no-krb5 no-camellia no-capieng no-cast no-cms no-dtls1 no-gost no-gmp no-heartbeats no-idea no-jpake no-md2 no-mdc2 no-rc5 no-rdrand no-rfc3779 no-rsax no-sctp no-seed no-sha0 no-static_engine no-whirlpool no-rc2 no-rc4 no-ssl2 no-ssl3 mingw
 make
 
 
@@ -129,7 +129,7 @@ bootstrap.bat gcc
 b2 --build-type=complete --with-chrono --with-filesystem --with-program_options --with-system --with-thread toolset=gcc variant=release link=static threading=multi runtime-link=static stage
 
 This will compile the required boost libraries and put them into the stage folder (C:\deps\boost_1_61_0\stage).
-NOTE: make sure you don't use tarballs, as unix EOL markers can break batch files.
+NOTE: make sure you don't use tarballs, as Unix EOL markers can break batch files.
 
 
 2.3.1  Libevent 2.0.22: https://sourceforge.net/projects/levent/files/release-2.0.22-stable/libevent-2.0.22-stable.tar.gz/download
@@ -230,7 +230,7 @@ NOTE: consider using -j switch with mingw32-make to speed up compilation process
 then 
 
 make a BOOST_ROOT environment variable.  best to place it in your mysys.bat file which should
-be on your desktop now.  that way it's there whenever you startup the shell.
+be on your desktop now.  that way it's there whenever you start up the shell.
 Enter the following in the mysys shell or add it to the top (after the comment section) of the mysys.bat file.
 
 set BOOST_ROOT=/c/deps/boost_1_61_0
@@ -281,7 +281,7 @@ make -j4
 NOTE: j is followed by the number of cores your machine has, so two core would be -j2 etc..
 
 
-Finally you can strip the executables if you wish.  Stripping will remove debug symbols and greately reduce the final file size of the executables.  For example, the v12.1 bitcoin-qt.exe will go from ~241MB to ~26MB.
+Finally you can strip the executables if you wish.  Stripping will remove debug symbols and greatly reduce the final file size of the executables.  For example, the v12.1 bitcoin-qt.exe will go from ~241MB to ~26MB.
 
 strip src/bitcoin-tx.exe
 strip src/bitcoin-cli.exe

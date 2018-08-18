@@ -27,7 +27,7 @@ If you are moving from another Bitcoin compatible implementations (Core, Classic
    - `cd /path/where/the/code/is/stored`
    - `sudo make uninstall`
 
-Other than the PPA repo mentioned above, serving stable version of Bitcoin Unlimited, we have set up another repository which will contain binaries built from source code snapshots of the BU development branch (`0.12.1bu` currently). If you're interested in testing the latest features included in BU but still not released just add this repository to your system. Use this commands:
+Other than the PPA repo mentioned above, serving stable version of Bitcoin Unlimited, we have set up another repository which will contain binaries built from source code snapshots of the BU development branch (`0.12.1bu` currently). If you're interested in testing the latest features included in BU but still not released just add this repository to your system. Use these commands:
 
 ```sh
 sudo add-apt-repository ppa:bitcoin-unlimited/bu-ppa-nightly

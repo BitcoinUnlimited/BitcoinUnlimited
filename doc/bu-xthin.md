@@ -71,8 +71,8 @@ There are two setting one can change as follows:
 	maxlimitertxfee : default is 3 satoshi/byte
 	minlimitertxfee : default is 0 satoshi/byte
 
-Generally you can just use the defaults, but if you know for instance that an attacker is sending many transaction that are 1.014 sat/byte then you
-could set your maxlimitertxfee=1.1 which would effectively choke off the attackers transactions while having the least impact to other transactions
+Generally you can just use the defaults, but if you know for instance that an attacker is sending many transactions that are 1.014 sat/byte then you
+could set your maxlimitertxfee=1.1 which would effectively choke off the attacker's transactions while having the least impact to other transactions
 that are likely to be mineable.
 
 	maxlimitertxfee=1.1

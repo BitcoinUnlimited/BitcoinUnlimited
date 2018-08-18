@@ -7,7 +7,7 @@ Most developers use cross-compilation from Ubuntu to build executables for Windo
 
 While there are potentially a number of ways to build on Windows, using the Windows Subsystem For Linux is the most straight forward.  If you are building with an alternative method, please contribute the instructions here for others who are running versions of Windows that are not compatible with the Windows Subsystem for Linux.
 
-A second alternative way of building on windows using msys / mingw-w64 is documented in 'build-windows-mingw.md'.
+A second alternative way of building on Windows using msys / mingw-w64 is documented in 'build-windows-mingw.md'.
 
 Compiling with Windows Subsystem For Linux
 -------------------------------------------
@@ -89,7 +89,7 @@ Installation
 -------------
 
 After building using the Windows subsystem it can be useful to copy the compiled
-executables to a directory on the windows drive in the same directory structure
+executables to a directory on the Windows drive in the same directory structure
 as they appear in the release `.zip` archive. This can be done in the following
 way. This will install to `c:\workspace\bitcoin`, for example:
 
