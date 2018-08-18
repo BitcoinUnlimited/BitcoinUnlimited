@@ -27,6 +27,13 @@ const std::vector<uint8_t> IBLT_NULL_VALUE = {};
 const unsigned char WORD_BITS = 8;
 
 
+enum GrapheneOrderings
+{
+    ORDERING_UNORDERED,
+    ORDERING_INCLUDED,
+    ORDERING_TOPOCANONICAL
+};
+
 class CGrapheneSet
 {
 private:
@@ -100,13 +107,13 @@ public:
     }
 
     // The default constructor is for 2-phase construction via deserialization
-    CGrapheneSet() : ordered(false), nReceiverUniverseItems(0), pSetFilter(nullptr), pSetIblt(nullptr) {}
+    CGrapheneSet() : ordering(ORDERING_UNORDERED), nReceiverUniverseItems(0), pSetFilter(nullptr), pSetIblt(nullptr) {}
     CGrapheneSet(size_t _nReceiverUniverseItems,
         const std::vector<uint256> &_itemHashes,
-        bool _ordered = false,
+        uint8_t _ordering = ORDERING_UNORDERED,
         bool fDeterministic = false)
     {
-        ordered = _ordered;
+        ordering = _ordering;
         // Below is the parameter "m" from the graphene paper
         nReceiverUniverseItems = _nReceiverUniverseItems;
         // Below is the parameter "n" from the graphene paper
@@ -162,7 +169,7 @@ public:
         }
 
         // Record transaction order
-        if (ordered)
+        if (ordering == ORDERING_INCLUDED)
         {
             std::map<uint256, uint64_t> mapItemHashes;
             for (const std::pair<uint64_t, uint256> &kv : mapCheapHashes)
@@ -249,7 +256,7 @@ public:
 
         std::vector<uint64_t> receiverSetItems(receiverSet.begin(), receiverSet.end());
 
-        if (!ordered)
+        if (ordering == ORDERING_UNORDERED || ordering == ORDERING_TOPOCANONICAL)
             return receiverSetItems;
 
         // Place items in order
@@ -340,7 +347,7 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
-        READWRITE(ordered);
+        READWRITE(ordering);
         READWRITE(nReceiverUniverseItems);
         if (nReceiverUniverseItems > LARGE_MEM_POOL_SIZE)
             throw std::runtime_error("nReceiverUniverseItems exceeds threshold for excessive mempool size");
@@ -354,7 +361,7 @@ public:
     }
 
 private:
-    bool ordered;
+    uint8_t ordering;
     uint64_t nReceiverUniverseItems;
     std::vector<unsigned char> encodedRank;
     CBloomFilter *pSetFilter;
