@@ -98,6 +98,7 @@ BITCOIN_CORE_H = \
   base58.h \
   bandb.h \
   banentry.h \
+  blockrelay/blockrelay_common.h \
   blockrelay/graphene.h \
   blockrelay/graphene_set.h \
   blockrelay/thinblock.h \
@@ -223,6 +224,7 @@ libbitcoin_server_a_SOURCES = \
   bandb.cpp \
   banentry.cpp \
   bitnodes.cpp \
+  blockrelay/blockrelay_common.cpp \
   blockrelay/graphene.cpp \
   blockrelay/thinblock.cpp \
   blockstorage/blockleveldb.cpp \
