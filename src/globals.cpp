@@ -256,6 +256,8 @@ CTweak<uint64_t> miningForkMG("mining.forkBlockSize",
     "Set the maximum block generation size to this value at the time of the fork.",
     8000000);
 
+CTweak<bool> miningTopoCanonical("mining.topoCanonical", "Enable mining of topo-canonically ordered blocks.", false);
+
 CTweak<bool> walletSignWithForkSig("wallet.useNewSig",
     "Once the fork occurs, sign transactions using the new signature scheme so that they will only be valid on the "
     "fork.",

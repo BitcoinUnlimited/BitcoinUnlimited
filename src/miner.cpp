@@ -7,6 +7,7 @@
 #include "miner.h"
 
 #include "amount.h"
+#include "blockorder.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "coins.h"
@@ -251,6 +252,21 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     if (pblock->fExcessive)
     {
         throw std::runtime_error(strprintf("%s: Excessive block generated: %s", __func__, FormatStateMessage(state)));
+    }
+
+    if (miningTopoCanonical.Value())
+    {
+        LOGA("CreateNewBlock(): Reording template block in topo-canonical order.\n");
+        BlockOrder::TopoCanonical tc;
+        tc.prepare(pblock->vtx);
+        tc.sort(pblock->vtx);
+        /*
+        for (auto txr : pblock->vtx) {
+            LOGA("XXXX: %s %s\n", txr->GetHash().GetHex(), txr->ToString());
+            }*/
+        pblock->setTopoCanonical(true);
+        assert(BlockOrder::isTopological(pblock->vtx));
+        assert(pblock->vtx[0]->IsCoinBase());
     }
 
     return pblocktemplate;

@@ -277,6 +277,8 @@ extern CTweak<uint64_t> miningForkTime;
 extern CTweak<uint64_t> miningForkEB;
 /** This specifies the minimum max block size at the fork point */
 extern CTweak<uint64_t> miningForkMG;
+/** This specificies whether the miner uses topo-canonical ordering for the blocks and block templates produced */
+extern CTweak<bool> miningTopoCanonical;
 
 // Mining-Candidate start
 /** Return a Merkle root given a Coinbase hash and Merkle proof */
