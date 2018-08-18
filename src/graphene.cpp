@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "graphene.h"
+#include "blockorder.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "connmgr.h"
@@ -38,8 +39,25 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPool
         if (tx->IsCoinBase())
             vAdditionalTxs.push_back(tx);
     }
+    uint8_t ordering = ORDERING_INCLUDED;
 
-    pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, blockHashes, true);
+    // Note, FIXME: ordering info of blocks is not stored and sending
+    // the graphene block takes it from disk. So for demo purposes,
+    // rebuild the block using topocanonical order, check whether it
+    // matches and then set the corresponding ordering flag.
+
+    // if(pblock->isTopoCanonical()) ordering = ORDERING_TOPOCANONICAL;
+
+    CTxRefVector txrfv;
+    txrfv.insert(txrfv.begin(), pblock->vtx.begin(), pblock->vtx.end());
+    BlockOrder::TopoCanonical tc;
+    tc.prepare(txrfv);
+    tc.sort(txrfv);
+    if (txrfv == pblock->vtx)
+        ordering = ORDERING_TOPOCANONICAL;
+    LOG(GRAPHENE, "Constructed graphene block ordering: %d\n", ordering);
+
+    pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, blockHashes, ordering);
 }
 
 CGrapheneBlock::~CGrapheneBlock()
@@ -55,6 +73,48 @@ CGrapheneBlockTx::CGrapheneBlockTx(uint256 blockHash, std::vector<CTransaction> 
 {
     blockhash = blockHash;
     vMissingTx = vTx;
+}
+
+// FIXME: This is a total ad-hoc function that does a lot of unnecessary double work
+// this is to avoid having to refactor more parts of Graphene here for now.
+void SortGrapheneHashesTopoCanonical(CNode *pfrom)
+{
+    std::map<uint256, CTransactionRef> mapAdditionalTxs;
+    {
+        LOCK(pfrom->cs_grapheneadditionaltxs);
+
+        for (auto tx : pfrom->grapheneAdditionalTxs)
+            mapAdditionalTxs[tx->GetHash()] = tx;
+    }
+
+    CTxRefVector txrfv;
+    for (const uint256 &hash : pfrom->grapheneBlockHashes)
+    {
+        CTransactionRef ptx = mempool.get(hash);
+        if (!ptx)
+        {
+            if (pfrom->mapMissingTx.count(hash.GetCheapHash()))
+            {
+                ptx = pfrom->mapMissingTx[hash.GetCheapHash()];
+            }
+            else if (mapAdditionalTxs.count(hash))
+                ptx = mapAdditionalTxs[hash];
+            else if (orphanpool.mapOrphanTransactions.count(hash))
+                ptx = orphanpool.mapOrphanTransactions[hash].ptx;
+        }
+        if (!ptx)
+        {
+            LOG(GRAPHENE, "Topocanonical reorder impossible with the transaction set. Something is missing.\n");
+            return; // reorder impossible
+        }
+        txrfv.emplace_back(ptx);
+    }
+
+    BlockOrder::TopoCanonical tc;
+    tc.prepare(txrfv);
+    tc.sort(txrfv);
+    for (size_t i = 0; i < txrfv.size(); i++)
+        pfrom->grapheneBlockHashes[i] = txrfv[i]->GetHash();
 }
 
 bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
@@ -133,6 +193,9 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
 
     LOG(GRAPHENE, "Got %d Re-requested txs from peer=%s\n", grapheneBlockTx.vMissingTx.size(), pfrom->GetLogName());
+
+    if (pfrom->grapheneBlock.isTopoCanonical() == ORDERING_TOPOCANONICAL)
+        SortGrapheneHashesTopoCanonical(pfrom);
 
     // At this point we should have all the full hashes in the block. Check that the merkle
     // root in the block header matches the merkel root calculated from the hashes provided.
@@ -321,6 +384,8 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
     CGrapheneBlock grapheneBlock;
     vRecv >> grapheneBlock;
 
+    pfrom->grapheneBlock.setTopoCanonical(grapheneBlock.pGrapheneSet->ordering == ORDERING_TOPOCANONICAL);
+    LOG(GRAPHENE, "Received graphene block ordering: %d\n", grapheneBlock.pGrapheneSet->ordering);
     {
         LOCK(cs_main);
 
@@ -555,6 +620,10 @@ bool CGrapheneBlock::process(CNode *pfrom,
             if (setHashesToRequest.empty() && !fRequestFailover)
             {
                 bool mutated;
+
+                if (pGrapheneSet->ordering == ORDERING_TOPOCANONICAL)
+                    SortGrapheneHashesTopoCanonical(pfrom);
+
                 uint256 merkleroot = ComputeMerkleRoot(pfrom->grapheneBlockHashes, &mutated);
                 if (header.hashMerkleRoot != merkleroot || mutated)
                     fMerkleRootCorrect = false;
@@ -1367,7 +1436,7 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
     {
         try
         {
-            CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx);
+            CGrapheneBlock grapheneBlock(pblock, mempoolinfo.nTx);
             int nSizeBlock = pblock->GetBlockSize();
             int nSizeGrapheneBlock = ::GetSerializeSize(grapheneBlock, SER_NETWORK, PROTOCOL_VERSION);
 

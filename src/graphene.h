@@ -100,7 +100,6 @@ public:
     /** Public only for unit testing */
     uint256 blockhash;
     std::vector<CTransaction> vMissingTx; // map of missing transactions
-
 public:
     CGrapheneBlockTx(uint256 blockHash, std::vector<CTransaction> &vTx);
     CGrapheneBlockTx() {}

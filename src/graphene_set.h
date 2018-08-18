@@ -36,6 +36,8 @@ enum GrapheneOrderings
 
 class CGrapheneSet
 {
+    friend class CGrapheneBlock;
+
 private:
     std::vector<uint64_t> ArgSort(const std::vector<uint64_t> &items)
     {
