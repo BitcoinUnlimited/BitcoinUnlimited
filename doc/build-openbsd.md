@@ -132,7 +132,7 @@ Clang (not currently working)
 
 Using a newer g++ results in linking the new code to a new libstdc++.
 Libraries built with the old g++, will still import the old library.
-This gives conflicts, necessitating rebuild of all C++ dependencies of the application.
+This produces conflicts, necessitating a rebuild of all C++ dependencies of the application.
 
 With clang this can - at least theoretically - be avoided because it uses the
 base system's libstdc++.
