@@ -2479,25 +2479,25 @@ void NetCleanup()
 }
 
 
-void RelayTransaction(const CTransaction &tx, const bool fRespend)
+void RelayTransaction(const CTransactionRef &ptx, const bool fRespend)
 {
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     ss.reserve(10000);
-    ss << tx;
-    RelayTransaction(tx, ss, fRespend);
+    ss << *ptx;
+    RelayTransaction(ptx, ss, fRespend);
 }
 
-void RelayTransaction(const CTransaction &tx, const CDataStream &ss, const bool fRespend)
+void RelayTransaction(const CTransactionRef &ptx, const CDataStream &ss, const bool fRespend)
 {
-    uint64_t len = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
+    uint64_t len = ::GetSerializeSize(*ptx, SER_NETWORK, PROTOCOL_VERSION);
     if (len > maxTxSize.Value())
     {
-        LOGA("Will not announce (INV) excessive transaction %s.  Size: %llu, Limit: %llu\n", tx.GetHash().ToString(),
+        LOGA("Will not announce (INV) excessive transaction %s.  Size: %llu, Limit: %llu\n", ptx->GetHash().ToString(),
             len, (uint64_t)maxTxSize.Value());
         return;
     }
 
-    CInv inv(MSG_TX, tx.GetHash());
+    CInv inv(MSG_TX, ptx->GetHash());
     {
         LOCK(cs_mapRelay);
         // Expire old relay messages
@@ -2508,7 +2508,7 @@ void RelayTransaction(const CTransaction &tx, const CDataStream &ss, const bool 
         }
 
         // Save original serialized message so newer versions are preserved
-        mapRelay.insert(std::make_pair(inv, ss));
+        mapRelay.insert(std::make_pair(inv, ptx));
         vRelayExpiration.push_back(std::make_pair(GetTime() + 15 * 60, inv));
     }
     LOCK(cs_vNodes);
@@ -2524,7 +2524,7 @@ void RelayTransaction(const CTransaction &tx, const CDataStream &ss, const bool 
         {
             // Relaying double spends to SPV clients is an easy attack vector,
             // and therefore only relay txns that are not potential double spends.
-            if (!fRespend && pnode->pfilter->IsRelevantAndUpdate(tx))
+            if (!fRespend && pnode->pfilter->IsRelevantAndUpdate(*ptx))
                 pnode->PushInventory(inv);
         }
         else

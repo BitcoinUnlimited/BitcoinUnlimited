@@ -4853,22 +4853,24 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 // Send stream from relay memory
                 bool fPushed = false;
                 {
-                    CDataStream cd(0, 0);
-                    if (1)
+                    CTransactionRef ptx;
+
+                    // We need to release this lock before push message. There is a potential deadlock because
+                    // cs_vSend is often taken before cs_mapRelay
                     {
-                        // BU: We need to release this lock before push message or there is a potential deadlock because
-                        // cs_vSend is often taken before cs_mapRelay
                         LOCK(cs_mapRelay);
-                        std::map<CInv, CDataStream>::iterator mi = mapRelay.find(inv);
+                        std::map<CInv, CTransactionRef>::iterator mi = mapRelay.find(inv);
                         if (mi != mapRelay.end())
                         {
-                            cd = (*mi).second; // I have to copy, because .second may be deleted once lock is released
+                            // Copy shared ptr to second because it may be deleted once lock is released
+                            ptx = (*mi).second;
                             fPushed = true;
                         }
                     }
+
                     if (fPushed)
                     {
-                        pfrom->PushMessage(inv.GetCommand(), cd);
+                        pfrom->PushMessage(inv.GetCommand(), ptx);
                     }
                 }
                 if (!fPushed && inv.type == MSG_TX)
@@ -5499,9 +5501,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         std::vector<uint256> vEraseQueue;
         CTransactionRef ptx;
         vRecv >> ptx;
-        const CTransaction &tx = *ptx;
 
-        CInv inv(MSG_TX, tx.GetHash());
+        CInv inv(MSG_TX, ptx->GetHash());
         pfrom->AddInventoryKnown(inv);
         requester.Received(inv, pfrom, msgSize);
 
@@ -5514,11 +5515,11 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!AlreadyHaveTx(inv) && AcceptToMemoryPool(mempool, state, ptx, true, &fMissingInputs))
         {
             mempool.check(pcoinsTip);
-            RelayTransaction(tx);
+            RelayTransaction(ptx);
             vWorkQueue.push_back(inv.hash);
 
             LOG(MEMPOOL, "AcceptToMemoryPool: peer=%d: accepted %s (poolsz %u txn, %u kB)\n", pfrom->id,
-                tx.GetHash().ToString(), mempool.size(), mempool.DynamicMemoryUsage() / 1000);
+                ptx->GetHash().ToString(), mempool.size(), mempool.DynamicMemoryUsage() / 1000);
 
             // Recursively process any orphan transactions that depended on this one
             LOCK(orphanpool.cs);
@@ -5555,7 +5556,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     if (AcceptToMemoryPool(mempool, stateDummy, pOrphanTx, true, &fMissingInputs2))
                     {
                         LOG(MEMPOOL, "   accepted orphan tx %s\n", orphanHash.ToString());
-                        RelayTransaction(*pOrphanTx);
+                        RelayTransaction(pOrphanTx);
                         vWorkQueue.push_back(orphanHash);
                         vEraseQueue.push_back(orphanHash);
                     }
@@ -5588,7 +5589,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         else if (fMissingInputs)
         {
             // If we've forked and this is probably not a valid tx, then skip adding it to the orphan pool
-            if (!IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) || IsTxProbablyNewSigHash(tx))
+            if (!IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) || IsTxProbablyNewSigHash(*ptx))
             {
                 LOCK(orphanpool.cs);
                 orphanpool.AddOrphanTx(ptx, pfrom->GetId());
@@ -5606,7 +5607,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         else
         {
             if (recentRejects)
-                recentRejects->insert(tx.GetHash()); // should always be true
+                recentRejects->insert(ptx->GetHash()); // should always be true
 
             if (pfrom->fWhitelisted && GetBoolArg("-whitelistforcerelay", DEFAULT_WHITELISTFORCERELAY))
             {
@@ -5622,7 +5623,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 if (!state.IsInvalid(nDoS) || nDoS == 0)
                 {
                     LOGA("Force relaying tx %s from whitelisted peer=%d\n", ptx->GetHash().ToString(), pfrom->id);
-                    RelayTransaction(tx);
+                    RelayTransaction(ptx);
                 }
                 else
                 {

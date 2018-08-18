@@ -1017,7 +1017,7 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
     {
         throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "transaction already in block chain");
     }
-    RelayTransaction(*ptx);
+    RelayTransaction(ptx);
 
     return hashTx.GetHex();
 }
