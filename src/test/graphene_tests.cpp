@@ -1,5 +1,5 @@
+#include "blockrelay/graphene_set.h"
 #include "bloom.h"
-#include "graphene_set.h"
 #include "hash.h"
 #include "serialize.h"
 #include "streams.h"

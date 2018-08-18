@@ -98,6 +98,9 @@ BITCOIN_CORE_H = \
   base58.h \
   bandb.h \
   banentry.h \
+  blockrelay/graphene.h \
+  blockrelay/graphene_set.h \
+  blockrelay/thinblock.h \
   blockstorage/blockleveldb.h \
   blockstorage/sequential_files.h \
   blockstorage/blockstorage.h \
@@ -131,8 +134,6 @@ BITCOIN_CORE_H = \
   fast-cpp-csv-parser/csv.h \
   forks_csv.h \
   fs.h \
-  graphene.h \
-  graphene_set.h \
   httprpc.h \
   httpserver.h \
   iblt.h \
@@ -178,7 +179,6 @@ BITCOIN_CORE_H = \
   support/cleanse.h \
   support/pagelocker.h \
   sync.h \
-  thinblock.h \
   threadsafety.h \
   timedata.h \
   torcontrol.h \
@@ -223,6 +223,8 @@ libbitcoin_server_a_SOURCES = \
   bandb.cpp \
   banentry.cpp \
   bitnodes.cpp \
+  blockrelay/graphene.cpp \
+  blockrelay/thinblock.cpp \
   blockstorage/blockleveldb.cpp \
   blockstorage/sequential_files.cpp \
   blockstorage/blockstorage.cpp \
@@ -234,7 +236,6 @@ libbitcoin_server_a_SOURCES = \
   dosman.cpp \
   expedited.cpp \
   forks_csv.cpp \
-  graphene.cpp \
   httprpc.cpp \
   httpserver.cpp \
   iblt.cpp \
@@ -261,7 +262,6 @@ libbitcoin_server_a_SOURCES = \
   respend/respendrelayer.cpp \
   respend/respenddetector.cpp \
   script/sigcache.cpp \
-  thinblock.cpp \
   script/ismine.cpp \
   timedata.cpp \
   torcontrol.cpp \

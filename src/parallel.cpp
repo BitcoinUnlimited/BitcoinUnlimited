@@ -4,10 +4,10 @@
 
 #include "parallel.h"
 
+#include "blockrelay/graphene.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "dosman.h"
-#include "graphene.h"
 #include "net.h"
 #include "pow.h"
 #include "timedata.h"

@@ -2,7 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "graphene.h"
+#include "blockrelay/graphene.h"
+#include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "connmgr.h"
@@ -14,7 +15,6 @@
 #include "policy/policy.h"
 #include "pow.h"
 #include "requestManager.h"
-#include "thinblock.h"
 #include "timedata.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
