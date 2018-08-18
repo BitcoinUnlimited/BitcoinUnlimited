@@ -2481,14 +2481,6 @@ void NetCleanup()
 
 void RelayTransaction(const CTransactionRef &ptx, const bool fRespend)
 {
-    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-    ss.reserve(10000);
-    ss << *ptx;
-    RelayTransaction(ptx, ss, fRespend);
-}
-
-void RelayTransaction(const CTransactionRef &ptx, const CDataStream &ss, const bool fRespend)
-{
     uint64_t len = ::GetSerializeSize(*ptx, SER_NETWORK, PROTOCOL_VERSION);
     if (len > maxTxSize.Value())
     {
