@@ -226,6 +226,7 @@ libbitcoin_server_a_SOURCES = \
   bitnodes.cpp \
   blockrelay/blockrelay_common.cpp \
   blockrelay/graphene.cpp \
+  blockrelay/graphene_set.cpp \
   blockrelay/thinblock.cpp \
   blockstorage/blockleveldb.cpp \
   blockstorage/sequential_files.cpp \
