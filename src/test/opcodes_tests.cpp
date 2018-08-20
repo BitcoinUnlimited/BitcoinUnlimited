@@ -79,6 +79,10 @@ static void CheckBinaryOpMagnetic(const valtype &a, const valtype &b, opcodetype
     CheckTestResultForAllFlagsMagnetic({a, b}, CScript() << op, {expected});
 }
 
+static void CheckUnaryOpMagnetic(const valtype &a, opcodetype op, const valtype &expected) {
+    CheckTestResultForAllFlagsMagnetic({a}, CScript() << op, {expected});
+}
+
 static valtype NegativeValtype(const valtype &v) {
     valtype r(v);
     if (r.size() > 0) {
