@@ -356,11 +356,15 @@ std::string gbt_vb_name(const Consensus::DeploymentPos pos)
 
 
 /*
+Inputs:
+params
+coinbaseSize -Set the size of coinbase if >=0
+
 Outputs:
 JSON -returns UniValue
-pblockOut a copy of the block if not NULL
+pblockOut -A copy of the block if not NULL
 */
-UniValue mkblocktemplate(const UniValue &params, CBlock *pblockOut)
+UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *pblockOut)
 {
     LOCK(cs_main);
 
@@ -521,7 +525,7 @@ UniValue mkblocktemplate(const UniValue &params, CBlock *pblockOut)
         if (coinbaseScript->reserveScript.empty())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
 
-        pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript);
+        pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript, coinbaseSize);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -760,7 +764,7 @@ UniValue getblocktemplate(const UniValue &params, bool fHelp)
             "\nExamples:\n" +
             HelpExampleCli("getblocktemplate", "") + HelpExampleRpc("getblocktemplate", ""));
 
-    return mkblocktemplate(params, nullptr);
+    return mkblocktemplate(params);
 }
 
 class submitblock_StateCatcher : public CValidationInterface

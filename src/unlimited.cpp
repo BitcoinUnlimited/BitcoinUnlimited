@@ -1683,6 +1683,7 @@ static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
     {
         const CTransaction *tran = block.vtx[0].get();
         ret.push_back(Pair("coinbase", EncodeHexTx(*tran)));
+        // printf("MkMiningCandidateJson coinbase %lu\n",EncodeHexTx(*tran).length());
     }
 
     ret.push_back(Pair("version", block.nVersion));
@@ -1718,15 +1719,38 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
     CMiningCandidate candid;
+    int32_t coinbaseSize = -1; // If -1 then not used to set coinbase size
     LOCK(cs_main);
 
-    if (fHelp || params.size() > 0)
+    if (fHelp || params.size() > 1)
     {
         throw runtime_error("getminingcandidate"
                             "\nReturns Mining-Candidate protocol data.\n"
-                            "\nArguments: None\n");
+                            "\nArguments:\n"
+                            "1. \"coinbasesize\" (int, optional) Get a fixed size coinbase transaction.\n" +
+                            HelpExampleCli("", "") + HelpExampleCli("coinbasesize", "100"));
     }
-    mkblocktemplate(params, &candid.block);
+
+    if (params.size() == 1)
+    {
+        coinbaseSize = params[0].get_int();
+    }
+
+    mkblocktemplate(UniValue(UniValue::VARR), coinbaseSize, &candid.block);
+
+    if (coinbaseSize > -1)
+    {
+        int txsiz = candid.block.vtx[0].get()->GetTxSize();
+        // LOGA("txsiz %d\n",txsiz);
+        if (coinbaseSize != txsiz)
+        {
+            LOGA("Error: BUG bad mkblocktemplate() w coinbaseSize %d %d.", coinbaseSize, txsiz);
+            assert(coinbaseSize == txsiz);
+            throw std::runtime_error(
+                strprintf("Sorry a coinbasesize bug has occured. Please report %d %d.", coinbaseSize, txsiz));
+        }
+    }
+
     ret = MkMiningCandidateJson(candid);
     return ret;
 }
