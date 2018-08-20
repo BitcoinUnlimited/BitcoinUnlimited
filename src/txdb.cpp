@@ -64,8 +64,18 @@ CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe)
 {
 }
 
-bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const { return db.Read(CoinEntry(&outpoint), coin); }
-bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const { return db.Exists(CoinEntry(&outpoint)); }
+bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const
+{
+    LOCK(cs_utxo);
+    return db.Read(CoinEntry(&outpoint), coin);
+}
+
+bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const
+{
+    LOCK(cs_utxo);
+    return db.Exists(CoinEntry(&outpoint));
+}
+
 uint256 CCoinsViewDB::GetBestBlock() const
 {
     LOCK(cs_utxo);
@@ -194,13 +204,23 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
     return ret;
 }
 
-size_t CCoinsViewDB::EstimateSize() const { return db.EstimateSize(DB_COIN, (char)(DB_COIN + 1)); }
+size_t CCoinsViewDB::EstimateSize() const
+{
+    LOCK(cs_utxo);
+    return db.EstimateSize(DB_COIN, (char)(DB_COIN + 1));
+}
+
+size_t CCoinsViewDB::TotalWriteBufferSize() const
+{
+    LOCK(cs_utxo);
+    return db.TotalWriteBufferSize();
+}
+
 CBlockTreeDB::CBlockTreeDB(size_t nCacheSize, string folder, bool fMemory, bool fWipe)
     : CDBWrapper(GetDataDir() / folder.c_str() / "index", nCacheSize, fMemory, fWipe)
 {
 }
 
-size_t CCoinsViewDB::TotalWriteBufferSize() const { return db.TotalWriteBufferSize(); }
 bool CBlockTreeDB::ReadBlockFileInfo(int nFile, CBlockFileInfo &info)
 {
     return Read(make_pair(DB_BLOCK_FILES, nFile), info);
