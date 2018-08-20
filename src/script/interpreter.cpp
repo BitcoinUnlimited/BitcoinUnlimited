@@ -1141,6 +1141,19 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                         stack.push_back(RShift(vch1, n.getint()));
                     } break;
 
+                case OP_INVERT: {
+                        // (x -- out)
+                        if (stack.size() < 1) {
+                            return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        }
+                        valtype &vch1 = stacktop(-1);
+                        // To avoid allocating, we modify vch1 in place
+                        for(size_t i=0; i<vch1.size(); i++)
+                        {
+                            vch1[i] = ~vch1[i];
+                        }
+                    } break;
+
                 case OP_EQUAL:
                 case OP_EQUALVERIFY:
                     // case OP_NOTEQUAL: // use OP_NUMNOTEQUAL
