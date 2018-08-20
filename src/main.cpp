@@ -3787,19 +3787,11 @@ bool static LoadBlockIndexDB()
     if (!fHavePruned)
     {
         // by default we want to sync from disk instead of network if possible
-        bool syncBlocks = true;
-        if (!DetermineStorageSync())
-        {
-            syncBlocks = false;
-        }
-        if (syncBlocks)
-        {
-            // run a db sync here to sync storage methods
-            // may increase startup time significantly but is faster than network sync
-            LOGA("Upgrading block database...\n");
-            uiInterface.InitMessage(_("Upgrading block database...This could take a while."));
-            SyncStorage(chainparams);
-        }
+        // run a db sync here to sync storage methods
+        // may increase startup time significantly but is faster than network sync
+        LOGA("Upgrading block database...\n");
+        uiInterface.InitMessage(_("Upgrading block database...This could take a while."));
+        SyncStorage(chainparams);
     }
 
     delete pblocktreeother;

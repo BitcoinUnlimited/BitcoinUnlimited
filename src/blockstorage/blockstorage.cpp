@@ -35,15 +35,12 @@ void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache,
     if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES) // BLOCK_DB_MODE 0
     {
         pblocktree = new CBlockTreeDB(_nBlockTreeDBCache, "blocks", false, fReindex);
-        pblocktreeother = new CBlockTreeDB(_nBlockTreeDBCache, "blockdb", false, fReindex);
         delete pblockdb;
         pblockdb = nullptr;
     }
-
     else if (BLOCK_DB_MODE == LEVELDB_BLOCK_STORAGE) // BLOCK_DB_MODE 1
     {
         pblocktree = new CBlockTreeDB(_nBlockTreeDBCache, "blockdb", false, fReindex);
-        pblocktreeother = new CBlockTreeDB(_nBlockTreeDBCache, "blocks", false, fReindex);
         if (boost::filesystem::exists(GetDataDir() / "blockdb" / "blocks"))
         {
             for (fs::recursive_directory_iterator it(GetDataDir() / "blockdb" / "blocks");
@@ -59,40 +56,73 @@ void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache,
     }
 }
 
-bool DetermineStorageSync()
+// grab the block tree for mode and put it at pblocktreeother
+void GetBlockTreeOther(BlockDBMode mode)
 {
-    uint256 bestHashSeq = pcoinsdbview->GetBestBlock(SEQUENTIAL_BLOCK_FILES);
-    uint256 bestHashLev = pcoinsdbview->GetBestBlock(LEVELDB_BLOCK_STORAGE);
+    // hardcode 2MiB here, it is a negligable amount and is only used temporarily
+    int64_t _nBlockTreeDBCache = (1 << 21);
+    if (mode == SEQUENTIAL_BLOCK_FILES)
+    {
+        pblocktreeother = new CBlockTreeDB(_nBlockTreeDBCache, "blocks", false, fReindex);
+    }
+    else if (mode == LEVELDB_BLOCK_STORAGE)
+    {
+        pblocktreeother = new CBlockTreeDB(_nBlockTreeDBCache, "blockdb", false, fReindex);
+    }
+}
 
-    // if we are using method X and method Y doesnt have any sync progress, assume nothing to sync
-    if (bestHashSeq.IsNull() && BLOCK_DB_MODE == LEVELDB_BLOCK_STORAGE)
+void GetTempBlockDB(CDatabaseAbstract *&_pblockdbsync, BlockDBMode &_otherMode)
+{
+    _pblockdbsync = nullptr;
+    if (_otherMode == SEQUENTIAL_BLOCK_FILES)
+    {
+        return;
+    }
+    else if (_otherMode == LEVELDB_BLOCK_STORAGE)
+    {
+        int64_t _nBlockDBCache = 64 << 20;
+        int64_t _nBlockUndoDBCache = 64 << 20;
+        _pblockdbsync = new CBlockLevelDB(_nBlockDBCache, _nBlockUndoDBCache, false, false, false);
+    }
+}
+
+bool DetermineStorageSync(BlockDBMode &_otherMode)
+{
+    uint256 bestHashMode = pcoinsdbview->GetBestBlock();
+    uint256 bestHashOther = uint256();
+    int32_t curmodenum = static_cast<int32_t>(BLOCK_DB_MODE);
+    int32_t maxoptions = static_cast<int32_t>(END_STORAGE_OPTIONS);
+    for (int32_t i = 0; i < maxoptions; i++)
+    {
+        if (i != curmodenum)
+        {
+            BlockDBMode checkmode = static_cast<BlockDBMode>(i);
+            uint256 modehash = pcoinsdbview->GetBestBlock(checkmode);
+            if (!modehash.IsNull())
+            {
+                bestHashOther = modehash;
+                _otherMode = checkmode;
+                // we break because we can only have, at most, 1 other mode
+                // with a value (the last mode we used) so there is no need to keep checking
+                break;
+            }
+        }
+    }
+
+    // if we are missing a best hash for every other node we
+    // have nothing to sync against so return false
+    if (bestHashOther.IsNull())
     {
         return false;
     }
-    if (bestHashLev.IsNull() && BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
-    {
-        return false;
-    }
-
-    CDiskBlockIndex bestIndexSeq;
-    CDiskBlockIndex bestIndexLev;
-    if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
-    {
-        pblocktree->FindBlockIndex(bestHashSeq, &bestIndexSeq);
-        pblocktreeother->FindBlockIndex(bestHashLev, &bestIndexLev);
-    }
-    else
-    {
-        pblocktreeother->FindBlockIndex(bestHashSeq, &bestIndexSeq);
-        pblocktree->FindBlockIndex(bestHashLev, &bestIndexLev);
-    }
+    GetBlockTreeOther(_otherMode);
+    CDiskBlockIndex bestIndexMode;
+    CDiskBlockIndex bestIndexOther;
+    pblocktree->FindBlockIndex(bestHashMode, &bestIndexMode);
+    pblocktreeother->FindBlockIndex(bestHashOther, &bestIndexOther);
 
     // if the best height of the storage type we are using is higher than any other type, return false
-    if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES && bestIndexSeq.nHeight >= bestIndexLev.nHeight)
-    {
-        return false;
-    }
-    if (BLOCK_DB_MODE == LEVELDB_BLOCK_STORAGE && bestIndexLev.nHeight >= bestIndexSeq.nHeight)
+    if (bestIndexMode.nHeight >= bestIndexOther.nHeight)
     {
         return false;
     }
@@ -101,6 +131,13 @@ bool DetermineStorageSync()
 
 void SyncStorage(const CChainParams &chainparams)
 {
+    CDatabaseAbstract *pblockdbsync = nullptr;
+    BlockDBMode otherMode = END_STORAGE_OPTIONS;
+    if (!DetermineStorageSync(otherMode))
+    {
+        return;
+    }
+    GetTempBlockDB(pblockdbsync, otherMode);
     AssertLockHeld(cs_main);
     if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
@@ -165,7 +202,11 @@ void SyncStorage(const CChainParams &chainparams)
             if (index->nStatus & BLOCK_HAVE_DATA && item.second.nDataPos != 0)
             {
                 CBlock block_lev;
-                if (pblockdb->ReadBlock(index, block_lev))
+                if (pblockdbsync == nullptr)
+                {
+                    LOGA("blockdbsync is a nullptr \n");
+                }
+                if (pblockdbsync->ReadBlock(index, block_lev))
                 {
                     unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
                     CDiskBlockPos blockPos;
@@ -198,7 +239,7 @@ void SyncStorage(const CChainParams &chainparams)
             if (index->nStatus & BLOCK_HAVE_UNDO && item.second.nUndoPos != 0)
             {
                 CBlockUndo blockundo;
-                if (pblockdb->ReadUndo(blockundo, index->pprev))
+                if (pblockdbsync->ReadUndo(blockundo, index->pprev))
                 {
                     CDiskBlockPos pos;
                     if (!FindUndoPos(
@@ -240,7 +281,7 @@ void SyncStorage(const CChainParams &chainparams)
             {
                 for (CBlockIndex *removeIndex : blocksToRemove)
                 {
-                    pblockdb->EraseBlock(removeIndex);
+                    pblockdbsync->EraseBlock(removeIndex);
                 }
                 // you must use NULL here, not nullptr
                 CBlockIndex *indexfront = blocksToRemove.front();
@@ -249,7 +290,7 @@ void SyncStorage(const CChainParams &chainparams)
                 CBlockIndex *indexback = blocksToRemove.back();
                 std::ostringstream backkey;
                 backkey << indexback->GetBlockTime() << ":" << indexback->GetBlockHash().ToString();
-                pblockdb->CondenseBlockData(frontkey.str(), backkey.str());
+                pblockdbsync->CondenseBlockData(frontkey.str(), backkey.str());
                 blocksToRemove.clear();
             }
         }
@@ -404,6 +445,9 @@ void SyncStorage(const CChainParams &chainparams)
             pcoinsdbview->WriteBestBlock(pindexBest->GetBlockHash(), LEVELDB_BLOCK_STORAGE);
         }
     }
+    // make sure whatever node we did a sync from has no best block anymore
+    uint256 emptyHash = uint256();
+    pcoinsdbview->WriteBestBlock(emptyHash, otherMode);
     FlushStateToDisk();
     LOGA("Block database upgrade completed.\n");
 }
@@ -498,7 +542,7 @@ void FindFilesToPrune(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight
     {
         FindFilesToPruneSequential(setFilesToPrune, nLastBlockWeCanPrune);
     }
-    else //if (pblockdb)
+    else // if (pblockdb)
     {
         if (nDBUsedSpace < nPruneTarget + (pruneIntervalTweak.Value() * 1024 * 1024))
         {
@@ -601,7 +645,7 @@ bool FlushStateToDiskInternal(CValidationState &state,
                     return AbortNode(state, "Files to write to block index database");
                 }
             }
-            else// if (pblockdb) //we are using a db, not sequential files
+            else // if (pblockdb) //we are using a db, not sequential files
             {
                 // vFiles should be empty for a DB call so insert a blank vector instead
                 std::vector<std::pair<int, const CBlockFileInfo *> > vFilesEmpty;

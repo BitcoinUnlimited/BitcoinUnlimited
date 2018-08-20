@@ -78,7 +78,7 @@ uint256 CCoinsViewDB::GetBestBlock() const
     READLOCK(cs_utxo);
     uint256 hashBestChain;
     std::string strmode = std::to_string(static_cast<int32_t>(BLOCK_DB_MODE));
-    if(pblockdb)
+    if (pblockdb)
     {
         // just use the int that is the db mode as its key for the best block it has
         if (!db.Read(strmode, hashBestChain))
@@ -87,7 +87,7 @@ uint256 CCoinsViewDB::GetBestBlock() const
     else
     {
         if (!db.Read(DB_BEST_BLOCK, hashBestChain))
-        return uint256();
+            return uint256();
     }
     return hashBestChain;
 }
@@ -121,7 +121,7 @@ void CCoinsViewDB::WriteBestBlock(const uint256 &hashBlock)
     std::string strmode = std::to_string(static_cast<int32_t>(BLOCK_DB_MODE));
     if (!hashBlock.IsNull())
     {
-        if(pblockdb)
+        if (pblockdb)
         {
             // just use the int that is the db mode as its key for the best block it has
             db.Write(strmode, hashBlock);
@@ -139,7 +139,7 @@ void CCoinsViewDB::WriteBestBlock(const uint256 &hashBlock, BlockDBMode mode)
     if(mode != END_STORAGE_OPTIONS)
     {
         std::string strmode = std::to_string(static_cast<int32_t>(mode));
-        if(mode == SEQUENTIAL_BLOCK_FILES)
+        if (mode == SEQUENTIAL_BLOCK_FILES)
         {
             db.Write(DB_BEST_BLOCK, hashBlock);
         }
@@ -147,7 +147,6 @@ void CCoinsViewDB::WriteBestBlock(const uint256 &hashBlock, BlockDBMode mode)
         {
             db.Write(strmode, hashBlock);
         }
-
     }
 }
 
