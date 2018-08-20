@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018 The Bitcoin SV developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -247,6 +248,7 @@ public:
     inline bool operator<(const int64_t &rhs) const { return m_value < rhs; }
     inline bool operator>=(const int64_t &rhs) const { return m_value >= rhs; }
     inline bool operator>(const int64_t &rhs) const { return m_value > rhs; }
+
     inline bool operator==(const CScriptNum &rhs) const { return operator==(rhs.m_value); }
     inline bool operator!=(const CScriptNum &rhs) const { return operator!=(rhs.m_value); }
     inline bool operator<=(const CScriptNum &rhs) const { return operator<=(rhs.m_value); }
@@ -259,6 +261,12 @@ public:
     inline CScriptNum operator-(const CScriptNum &rhs) const { return operator-(rhs.m_value); }
     inline CScriptNum operator/(const int64_t &rhs) const { return CScriptNum(m_value / rhs); }
     inline CScriptNum operator/(const CScriptNum &rhs) const { return operator/(rhs.m_value); }
+    inline CScriptNum operator*(const int64_t &rhs) const {
+        return CScriptNum(m_value * rhs);
+    }
+    inline CScriptNum operator*(const CScriptNum &rhs) const {
+        return operator*(rhs.m_value);
+    }
     inline CScriptNum operator%(const int64_t &rhs) const { return CScriptNum(m_value % rhs); }
     inline CScriptNum operator%(const CScriptNum &rhs) const { return operator%(rhs.m_value); }
     inline CScriptNum &operator+=(const CScriptNum &rhs) { return operator+=(rhs.m_value); }

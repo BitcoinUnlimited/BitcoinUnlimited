@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018 The Bitcoin SV developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -583,7 +584,6 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
             return true;
         }
         break;
-
     default:
         break;
     }
@@ -1216,6 +1216,7 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
 
                 case OP_ADD:
                 case OP_SUB:
+                case OP_MUL:
                 case OP_DIV:
                 case OP_MOD:
                 case OP_BOOLAND:
@@ -1246,6 +1247,10 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
 
                     case OP_SUB:
                         bn = bn1 - bn2;
+                        break;
+
+                    case OP_MUL:
+                        bn = bn1 * bn2;
                         break;
 
                     case OP_DIV:
