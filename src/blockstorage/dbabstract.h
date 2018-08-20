@@ -8,6 +8,14 @@
 #include "chain.h"
 #include "undo.h"
 
+enum BlockDBMode
+{
+    SEQUENTIAL_BLOCK_FILES, // 0
+    LEVELDB_BLOCK_STORAGE, // 1
+
+    END_STORAGE_OPTIONS // should always be the last option in the list
+};
+
 /**
  * Abstract database class that must be used as the base class for all supported databases
  * This allows us to use one "polymorphic pointer" for all database suport without editing the
