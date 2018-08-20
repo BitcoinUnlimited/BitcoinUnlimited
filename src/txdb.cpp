@@ -136,7 +136,7 @@ void CCoinsViewDB::WriteBestBlock(const uint256 &hashBlock)
 void CCoinsViewDB::WriteBestBlock(const uint256 &hashBlock, BlockDBMode mode)
 {
     WRITELOCK(cs_utxo);
-    if(mode != END_STORAGE_OPTIONS)
+    if (mode != END_STORAGE_OPTIONS)
     {
         std::string strmode = std::to_string(static_cast<int32_t>(mode));
         if (mode == SEQUENTIAL_BLOCK_FILES)

@@ -28,7 +28,6 @@ enum BlockDBMode
 class CDatabaseAbstract
 {
 public:
-
     //! Write a block to the database
     virtual bool WriteBlock(const CBlock &block) = 0;
 
@@ -59,7 +58,7 @@ public:
     // prune the database
     virtual uint64_t PruneDB(uint64_t nLastBlockWeCanPrune) = 0;
 
-    virtual ~CDatabaseAbstract(){}
+    virtual ~CDatabaseAbstract() {}
 };
 
 #endif // BITCOIN_DBABSTRACT_H
