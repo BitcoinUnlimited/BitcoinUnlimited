@@ -978,17 +978,17 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 
     fReindex = GetBoolArg("-reindex", DEFAULT_REINDEX);
     int64_t requested_block_mode = GetArg("-useblockdb", DEFAULT_BLOCK_DB_MODE);
-    if (requested_block_mode == 0)
+    if (requested_block_mode >= 0 && requested_block_mode < END_STORAGE_OPTIONS)
     {
-        BLOCK_DB_MODE = SEQUENTIAL_BLOCK_FILES;
+        BLOCK_DB_MODE = static_cast<BlockDBMode>(requested_block_mode);
     }
     else
     {
-        BLOCK_DB_MODE = DB_BLOCK_STORAGE;
+        BLOCK_DB_MODE = DEFAULT_BLOCK_DB_MODE;
     }
 
     // Upgrading to 0.8; hard-link the old blknnnn.dat files into /blocks/
-    if (BLOCK_DB_MODE != DB_BLOCK_STORAGE)
+    if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
         fs::path blocksDir = GetDataDir() / "blocks";
         if (!fs::exists(blocksDir))

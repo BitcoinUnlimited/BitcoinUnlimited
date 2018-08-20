@@ -30,9 +30,6 @@ static const char DB_FLAG = 'F';
 static const char DB_REINDEX_FLAG = 'R';
 static const char DB_LAST_BLOCK = 'l';
 
-// to distinguish best block for a specific DB type, values correspond to enum vaue (blockdb_wrapper.h)
-static const char DB_BEST_BLOCK_BLOCKDB = 'D';
-
 
 namespace
 {
@@ -216,10 +213,8 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
             it++;
         count++;
     }
-    if (!hashBlock.IsNull() && BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
-        batch.Write(DB_BEST_BLOCK, hashBlock);
-    else if (!hashBlock.IsNull() && BLOCK_DB_MODE == DB_BLOCK_STORAGE)
-        batch.Write(DB_BEST_BLOCK_BLOCKDB, hashBlock);
+    if (!hashBlock.IsNull())
+        WriteBestBlock(hashBlock);
 
     bool ret = db.WriteBatch(batch);
     LOG(COINDB, "Committing %u changed transactions (out of %u) to coin database with %u batch writes...\n",
@@ -739,7 +734,7 @@ void CacheSizeCalculations(int64_t _nTotalCache,
     // If we are in block db storage mode then calculated the level db cache size for the block and undo caches.
     // As a safeguard make them at least as large as the _nBlockTreeDBCache;
     _nTotalCache -= _nBlockTreeDBCache;
-    if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    if (BLOCK_DB_MODE == LEVELDB_BLOCK_STORAGE)
     {
         // use up to 5% for the level db block cache but no bigger than 256MB
         _nBlockDBCache = _nTotalCache * 0.05;
