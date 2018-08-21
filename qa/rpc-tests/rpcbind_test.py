@@ -106,7 +106,7 @@ def main():
                       help="Leave bitcoinds and test.* datadir on exit or error")
     parser.add_option("--srcdir", dest="srcdir", default="../../src",
                       help="Source directory containing bitcoind/bitcoin-cli (default: %default%)")
-    parser.add_option("--tmpdir", dest="tmpdir", default=tempfile.mkdtemp(prefix="test"),
+    parser.add_option("--tmppfx", dest="tmpdir", default=tempfile.mkdtemp(prefix="test"),
                       help="Root directory for datadirs")
     (options, args) = parser.parse_args()
 

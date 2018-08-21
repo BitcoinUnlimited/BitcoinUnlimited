@@ -1110,7 +1110,7 @@ class ParallelTest (BitcoinTestFramework):
 def Test():
     t = ParallelTest()
     t.rep = True
-    t.main(["--tmpdir=/ramdisk/test", "--nocleanup","--noshutdown"])
+    t.main(["--tmppfx=/ramdisk/test", "--nocleanup","--noshutdown"])
 
 if __name__ == '__main__':
 

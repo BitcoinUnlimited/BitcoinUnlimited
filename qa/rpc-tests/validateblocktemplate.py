@@ -329,8 +329,8 @@ def Test():
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],  # "lck"
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
         }
-#    t.main(["--tmpdir=/ramdisk/test", "--nocleanup", "--noshutdown"], bitcoinConf, None)
-        t.main(["--tmpdir=/ramdisk/test","--nocleanup", "--noshutdown"], bitcoinConf, None)
+#    t.main(["--tmppfx=/ramdisk/test", "--nocleanup", "--noshutdown"], bitcoinConf, None)
+        t.main(["--tmppfx=/ramdisk/test","--nocleanup", "--noshutdown"], bitcoinConf, None)
     except Exception as e:
         print(str(e))
         pdb.pm()

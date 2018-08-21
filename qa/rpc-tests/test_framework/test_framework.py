@@ -16,6 +16,9 @@ import pdb        # BU added
 import shutil
 import tempfile
 import traceback
+from os.path import basename
+import string
+from sys import argv
 
 from .util import (
     initialize_chain,
@@ -142,8 +145,17 @@ class BitcoinTestFramework(object):
                           help="Don't stop bitcoinds after the test execution")
         parser.add_option("--srcdir", dest="srcdir", default=os.path.normpath(os.path.dirname(os.path.realpath(__file__))+"/../../../src"),
                           help="Source directory containing bitcoind/bitcoin-cli (default: %default)")
-        parser.add_option("--tmpdir", dest="tmpdir", default=tempfile.mkdtemp(prefix="test"),
-                          help="Root directory for datadirs")
+
+
+        testname = "".join(
+            filter(lambda x : x in string.ascii_lowercase, basename(argv[0])))
+
+        default_tempdir = tempfile.mkdtemp(prefix="test_"+testname+"_")
+
+        parser.add_option("--tmppfx", dest="tmppfx", default=default_tempdir,
+                          help="Directory prefix for data directories")
+        parser.add_option("--tmpdir", dest="tmpdir", default=None,
+                          help="Root directory for data directories. If specified, overrides tmppfx.")
         parser.add_option("--tracerpc", dest="trace_rpc", default=False, action="store_true",
                           help="Print out all RPC calls as they are made")
         parser.add_option("--portseed", dest="port_seed", default=os.getpid(), type='int',
@@ -170,7 +182,8 @@ class BitcoinTestFramework(object):
         random.seed(self.randomseed)
         print("Random seed: %s" % self.randomseed)
 
-        self.options.tmpdir = os.path.join(self.options.tmpdir, str(self.options.port_seed))
+        if self.options.tmpdir is None:
+            self.options.tmpdir = os.path.join(self.options.tmppfx, str(self.options.port_seed))
 
         if self.options.trace_rpc:
             logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)

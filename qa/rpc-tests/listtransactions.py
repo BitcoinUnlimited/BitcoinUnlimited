@@ -178,5 +178,5 @@ def Test():
         "debug": ["all"],
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
-    # "--tmpdir=/ramdisk/test", "--nocleanup", "--noshutdown"
+    # "--tmppfx=/ramdisk/test", "--nocleanup", "--noshutdown"
     t.main([], bitcoinConf, None)
