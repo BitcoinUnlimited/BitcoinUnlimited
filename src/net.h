@@ -190,7 +190,7 @@ extern int nMaxConnections;
 extern int nMinXthinNodes;
 extern std::vector<CNode *> vNodes;
 extern CCriticalSection cs_vNodes;
-extern std::map<CInv, CDataStream> mapRelay;
+extern std::map<CInv, CTransactionRef> mapRelay;
 extern std::deque<std::pair<int64_t, CInv> > vRelayExpiration;
 extern CCriticalSection cs_mapRelay;
 
@@ -935,8 +935,7 @@ private:
 typedef std::vector<CNodeRef> VNodeRefs;
 
 class CTransaction;
-void RelayTransaction(const CTransaction &tx, const bool fRespend = false);
-void RelayTransaction(const CTransaction &tx, const CDataStream &ss, const bool fRespend = false);
+void RelayTransaction(const CTransactionRef &ptx, const bool fRespend = false);
 
 /** Access to the (IP) address database (peers.dat) */
 class CAddrDB

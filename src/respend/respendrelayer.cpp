@@ -86,7 +86,7 @@ void RespendRelayer::Trigger()
     if (!valid || !interesting)
         return;
 
-    RelayTransaction(respend, true);
+    RelayTransaction(MakeTransactionRef(respend), true);
 }
 
 } // ns respend

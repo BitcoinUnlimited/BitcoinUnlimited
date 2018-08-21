@@ -201,7 +201,7 @@ std::list<CStatBase *> mallocedStats;
 CStatMap statistics;
 CTweakMap tweaks;
 
-map<CInv, CDataStream> mapRelay;
+map<CInv, CTransactionRef> mapRelay;
 deque<pair<int64_t, CInv> > vRelayExpiration;
 CCriticalSection cs_mapRelay;
 
