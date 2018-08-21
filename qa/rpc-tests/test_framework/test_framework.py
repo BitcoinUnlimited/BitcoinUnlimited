@@ -152,7 +152,7 @@ class BitcoinTestFramework(object):
 
         default_tempdir = tempfile.mkdtemp(prefix="test_"+testname+"_")
 
-        parser.add_option("--tmpdir", dest="tmpdir", default=default_tempdir,
+        parser.add_option("--tmppfx", dest="tmpdir", default=default_tempdir,
                           help="Root directory for datadirs")
         parser.add_option("--tracerpc", dest="trace_rpc", default=False, action="store_true",
                           help="Print out all RPC calls as they are made")

@@ -237,6 +237,6 @@ def Test():
     "debug":["bench"],
     "blockprioritysize":2000000  # we don't want any transactions rejected due to insufficient fees...
     }
-    tpt.main(["--nocleanup","--tmpdir=/ramdisk/test"],bitcoinConf)
+    tpt.main(["--nocleanup","--tmppfx=/ramdisk/test"],bitcoinConf)
        
     

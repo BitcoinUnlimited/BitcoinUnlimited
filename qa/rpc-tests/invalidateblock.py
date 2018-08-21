@@ -145,4 +145,4 @@ def Test():
     "debug":["net","blk","thin","mempool","req","bench","evict"], # "lck"
     "blockprioritysize":2000000  # we don't want any transactions rejected due to insufficient fees...
      }
-    t.main(["--nocleanup","--noshutdown", "--tmpdir=/ramdisk/test"],bitcoinConf,None)
+    t.main(["--nocleanup","--noshutdown", "--tmppfx=/ramdisk/test"],bitcoinConf,None)
