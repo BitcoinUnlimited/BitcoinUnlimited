@@ -35,7 +35,9 @@ Possible options:
   --noshutdown          Don't stop bitcoinds after the test execution
   --srcdir=SRCDIR       Source directory containing bitcoind/bitcoin-cli
                         (default: ../../src)
-  --tmppfx=TMPDIR       Directory prefix for data directories
+  --tmppfx=TMPPREFIX    Directory prefix for data directories
+  --tmpdir=TMPDIR	Directory to use for data directories (overrides
+                        `--tmppfx`)
   --tracerpc            Print out all RPC calls as they are made
   --coveragedir=COVERAGEDIR
                         Write tested RPC commands into this directory
