@@ -184,7 +184,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
         // for compression statistics, we have to add up the size of grapheneblock and the re-requested grapheneBlockTx.
         int nSizeGrapheneBlockTx = msgSize;
-        int blockSize = ::GetSerializeSize(pfrom->grapheneBlock, SER_NETWORK, CBlock::CURRENT_VERSION);
+        int blockSize = pfrom->grapheneBlock.GetBlockSize();
         LOG(GRAPHENE, "Reassembled grblktx for %s (%d bytes). Message was %d bytes (graphene block) and %d bytes "
                       "(re-requested tx), compression ratio %3.2f, peer=%s\n",
             pfrom->grapheneBlock.GetHash().ToString(), blockSize, pfrom->nSizeGrapheneBlock, nSizeGrapheneBlockTx,
@@ -626,7 +626,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
     // We now have all the transactions that are in this block
     pfrom->grapheneBlockWaitingForTxns = -1;
-    int blockSize = ::GetSerializeSize(pfrom->grapheneBlock, SER_NETWORK, CBlock::CURRENT_VERSION);
+    int blockSize = pfrom->grapheneBlock.GetBlockSize();
     LOG(GRAPHENE,
         "Reassembled graphene block for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
         pfrom->grapheneBlock.GetHash().ToString(), blockSize, pfrom->nSizeGrapheneBlock,
