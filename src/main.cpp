@@ -590,7 +590,7 @@ static bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
 
     // Check for conflicts with in-memory transactions and triggers actions at
     // end of scope (relay tx, sync wallet, etc)
-    respend::RespendDetector respend(pool, *ptx);
+    respend::RespendDetector respend(pool, ptx);
     *isRespend = respend.IsRespend();
 
     if (respend.IsRespend() && !respend.IsInteresting())
