@@ -1491,7 +1491,7 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
     return true;
 }
 
-CMemPoolInfo GetGrapheneMempoolInfo() { return CMemPoolInfo(mempool.size()); }
+CMemPoolInfo GetGrapheneMempoolInfo() { return CMemPoolInfo(mempool.size() + orphanpool.GetOrphanPoolSize()); }
 void RequestFailoverBlock(CNode *pfrom, uint256 blockHash)
 {
     if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable())
