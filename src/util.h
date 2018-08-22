@@ -444,9 +444,8 @@ bool SoftSetArg(const std::string &strArg, const std::string &strValue);
 bool SoftSetBoolArg(const std::string &strArg, bool fValue);
 
 /**
- * Return the number of physical cores available on the current system.
- * @note This does not count virtual cores, such as those provided by HyperThreading
- * when boost is newer than 1.56.
+ * Return the number of cores available on the current system.
+ * @note This does count virtual cores, such as those provided by HyperThreading.
  */
 int GetNumCores();
 
@@ -491,5 +490,14 @@ The first argument (the pattern) might contain '?' and '*' wildcards and
 the second argument will be matched to this pattern. Returns true iff the string
 matches pattern. */
 bool wildmatch(std::string pattern, std::string test);
+
+/**
+ * On platforms that support it, tell the kernel the calling thread is
+ * CPU-intensive and non-interactive. See SCHED_BATCH in sched(7) for details.
+ *
+ * @return The return value of sched_setschedule(), or 1 on systems without
+ * sched_setchedule().
+ */
+int ScheduleBatchPriority(void);
 
 #endif // BITCOIN_UTIL_H

@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <fcntl.h>
+#include <sched.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 
@@ -89,6 +90,7 @@
 #include <openssl/conf.h>
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
+#include <thread>
 
 std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args)
 {
@@ -930,15 +932,7 @@ void SetThreadPriority(int nPriority)
 #endif // WIN32
 }
 
-int GetNumCores()
-{
-#if BOOST_VERSION >= 105600
-    return boost::thread::physical_concurrency();
-#else // Must fall back to hardware_concurrency, which unfortunately counts virtual cores
-    return boost::thread::hardware_concurrency();
-#endif
-}
-
+int GetNumCores() { return std::thread::hardware_concurrency(); }
 std::string CopyrightHolders(const std::string &strPrefix)
 {
     std::string strCopyrightHolders = strPrefix + _(COPYRIGHT_HOLDERS);
@@ -1038,4 +1032,19 @@ bool wildmatch(string pattern, string test)
         pattern = pattern.substr(1);
         test = test.substr(1);
     }
+}
+
+int ScheduleBatchPriority(void)
+{
+#ifdef SCHED_BATCH
+    const static sched_param param{0};
+    if (int ret = pthread_setschedparam(pthread_self(), SCHED_BATCH, &param))
+    {
+        LOGA("Failed to pthread_setschedparam: %s\n", strerror(errno));
+        return ret;
+    }
+    return 0;
+#else
+    return 1;
+#endif
 }
