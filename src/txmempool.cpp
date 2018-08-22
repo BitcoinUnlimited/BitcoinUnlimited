@@ -960,19 +960,19 @@ void CTxMemPool::_queryHashes(vector<uint256> &vtxid) const
 }
 
 
-bool CTxMemPool::lookup(const uint256 &hash, CTransaction &result) const
+bool CTxMemPool::lookup(const uint256 &hash, CTransactionRef &result) const
 {
     READLOCK(cs);
     return _lookup(hash, result);
 }
 
-bool CTxMemPool::_lookup(const uint256 &hash, CTransaction &result) const
+bool CTxMemPool::_lookup(const uint256 &hash, CTransactionRef &result) const
 {
     AssertLockHeld(cs);
     indexed_transaction_set::const_iterator i = mapTx.find(hash);
     if (i == mapTx.end())
         return false;
-    result = i->GetTx();
+    result = i->GetSharedTx();
     return true;
 }
 

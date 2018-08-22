@@ -648,8 +648,8 @@ public:
     TxMempoolInfo info(const uint256 &hash) const;
     std::vector<TxMempoolInfo> infoAll() const;
 
-    bool lookup(const uint256 &hash, CTransaction &result) const;
-    bool _lookup(const uint256 &hash, CTransaction &result) const;
+    bool lookup(const uint256 &hash, CTransactionRef &result) const;
+    bool _lookup(const uint256 &hash, CTransactionRef &result) const;
 
     /** Estimate fee rate needed to get into the next nBlocks
      *  If no answer can be given at nBlocks, return an estimate

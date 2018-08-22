@@ -347,7 +347,6 @@ UniValue pushtx(const UniValue &params, bool fHelp)
 
 void UnlimitedPushTxns(CNode *dest)
 {
-    // LOCK2(cs_main, pfrom->cs_filter);
     LOCK(dest->cs_filter);
     std::vector<uint256> vtxid;
     mempool.queryHashes(vtxid);
@@ -355,11 +354,11 @@ void UnlimitedPushTxns(CNode *dest)
     for (uint256 &hash : vtxid)
     {
         CInv inv(MSG_TX, hash);
-        CTransaction tx;
-        bool fInMemPool = mempool.lookup(hash, tx);
+        CTransactionRef ptx;
+        bool fInMemPool = mempool.lookup(hash, ptx);
         if (!fInMemPool)
             continue; // another thread removed since queryHashes, maybe...
-        if ((dest->pfilter && dest->pfilter->IsRelevantAndUpdate(tx)) || (!dest->pfilter))
+        if ((dest->pfilter && dest->pfilter->IsRelevantAndUpdate(*ptx)) || (!dest->pfilter))
             vInv.push_back(inv);
         if (vInv.size() == MAX_INV_SZ)
         {

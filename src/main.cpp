@@ -4875,10 +4875,10 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 }
                 if (!fPushed && inv.type == MSG_TX)
                 {
-                    CTransaction tx;
-                    if (mempool.lookup(inv.hash, tx))
+                    CTransactionRef ptx;
+                    if (mempool.lookup(inv.hash, ptx))
                     {
-                        pfrom->PushMessage(NetMsgType::TX, tx);
+                        pfrom->PushMessage(NetMsgType::TX, ptx);
                         fPushed = true;
                         pfrom->txsSent += 1;
                     }
@@ -6217,11 +6217,11 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             CInv inv(MSG_TX, hash);
             if (pfrom->pfilter)
             {
-                CTransaction tx;
-                bool fInMemPool = mempool.lookup(hash, tx);
+                CTransactionRef ptx;
+                bool fInMemPool = mempool.lookup(hash, ptx);
                 if (!fInMemPool)
                     continue; // another thread removed since queryHashes, maybe...
-                if (!pfrom->pfilter->IsRelevantAndUpdate(tx))
+                if (!pfrom->pfilter->IsRelevantAndUpdate(*ptx))
                     continue;
             }
             vInv.push_back(inv);
