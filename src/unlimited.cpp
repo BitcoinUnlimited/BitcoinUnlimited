@@ -354,9 +354,9 @@ void UnlimitedPushTxns(CNode *dest)
     for (uint256 &hash : vtxid)
     {
         CInv inv(MSG_TX, hash);
-        CTransactionRef ptx;
-        bool fInMemPool = mempool.lookup(hash, ptx);
-        if (!fInMemPool)
+        CTransactionRef ptx = nullptr;
+        ptx = mempool.get(hash);
+        if (ptx == nullptr)
             continue; // another thread removed since queryHashes, maybe...
         if ((dest->pfilter && dest->pfilter->IsRelevantAndUpdate(*ptx)) || (!dest->pfilter))
             vInv.push_back(inv);
