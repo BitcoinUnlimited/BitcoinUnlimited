@@ -10,12 +10,12 @@ namespace respend
 RespendLogger::RespendLogger() : equivalent(false), valid("indeterminate"), newConflict(false) {}
 bool RespendLogger::AddOutpointConflict(const COutPoint &,
     const CTxMemPool::txiter mempoolEntry,
-    const CTransaction &respendTx,
+    const CTransactionRef &pRespendTx,
     bool seen,
     bool isEquivalent)
 {
     orig = mempoolEntry->GetTx().GetHash().ToString();
-    respend = respendTx.GetHash().ToString();
+    respend = pRespendTx->GetHash().ToString();
     equivalent = isEquivalent;
     newConflict = newConflict || !seen;
 

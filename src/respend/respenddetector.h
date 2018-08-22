@@ -22,11 +22,11 @@ class RespendDetector
 {
 public:
     RespendDetector(const CTxMemPool &pool,
-        const CTransaction &tx,
+        const CTransactionRef &ptx,
         std::vector<RespendActionPtr> = CreateDefaultActions());
 
     ~RespendDetector();
-    void CheckForRespend(const CTxMemPool &pool, const CTransaction &tx);
+    void CheckForRespend(const CTxMemPool &pool, const CTransactionRef &ptx);
     void SetValid(bool valid);
     bool IsRespend() const;
 

@@ -18,7 +18,7 @@ public:
 
     bool AddOutpointConflict(const COutPoint &,
         const CTxMemPool::txiter,
-        const CTransaction &respendTx,
+        const CTransactionRef &pRespendTx,
         bool seenBefore,
         bool isEquivalent) override;
 
@@ -30,7 +30,7 @@ public:
 private:
     bool interesting;
     bool valid;
-    CTransaction respend;
+    CTransactionRef pRespend;
 };
 
 } // ns respend
