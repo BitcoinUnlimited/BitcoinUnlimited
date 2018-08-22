@@ -648,8 +648,6 @@ public:
     TxMempoolInfo info(const uint256 &hash) const;
     std::vector<TxMempoolInfo> infoAll() const;
 
-    bool lookup(const uint256 &hash, CTxMemPoolEntry &result) const;
-    bool _lookup(const uint256 &hash, CTxMemPoolEntry &result) const;
     bool lookup(const uint256 &hash, CTransaction &result) const;
     bool _lookup(const uint256 &hash, CTransaction &result) const;
 
