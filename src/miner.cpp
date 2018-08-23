@@ -113,84 +113,35 @@ void BlockAssembler::resetBlock(const CScript &scriptPubKeyIn, int64_t coinbaseS
 uint64_t BlockAssembler::reserveBlockSize(const CScript &scriptPubKeyIn, int64_t coinbaseSize)
 {
     CBlockHeader h;
-    uint64_t nHeaderSize, nCoinbaseSize;
+    uint64_t nHeaderSize, nCoinbaseSize, nCoinbaseReserve;
 
     // BU add the proper block size quantity to the actual size
     nHeaderSize = ::GetSerializeSize(h, SER_NETWORK, PROTOCOL_VERSION);
     assert(nHeaderSize == 80); // BU always 80 bytes
     nHeaderSize += 5; // tx count varint - 5 bytes is enough for 4 billion txs; 3 bytes for 65535 txs
 
+
     // This serializes with output value, a fixed-length 8 byte field, of zero and height, a serialized CScript
     // signed integer taking up 4 bytes for heights 32768-8388607 (around the year 2167) after which it will use 5
-    nCoinbaseSize =
-        ::GetSerializeSize(coinbaseTx(scriptPubKeyIn, 400000, 0, coinbaseSize), SER_NETWORK, PROTOCOL_VERSION);
+    nCoinbaseSize = ::GetSerializeSize(coinbaseTx(scriptPubKeyIn, 400000, 0), SER_NETWORK, PROTOCOL_VERSION);
 
-    if (coinbaseSize < 0) // Explicit size of coinbase has not been requested
+    if (coinbaseSize >= 0) // Explicit size of coinbase has been requested
     {
-        // BU Miners take the block we give them, wipe away our coinbase and add their own.
-        // So if their reserve choice is bigger then our coinbase then use that.
-        nCoinbaseSize = std::max(nCoinbaseSize, coinbaseReserve.Value());
-    }
-
-    return nHeaderSize + nCoinbaseSize;
-}
-
-
-/** Create a coinbase of specified size. Size must be multiple of 4*/
-static void MkFixedSizeCoinbaseTx(CMutableTransaction &tx, int64_t coinbaseSize)
-{
-    // Generates a bunch of bytes -Not a valid script.
-    // Removes any existing Tx(s)
-    int padsize = 0;
-    const int PAD76 = 76;
-    const int PAD78 = 78;
-    int maxpad = MAX_SCRIPT_SIZE; // Note: MAX_SCRIPT_SIZE --bytes are put into one script.
-
-    if (tx.vout.size() > 1)
-        LOGA("Discarding more than one transaction: %d.", tx.vout.size());
-
-    tx.vout.resize(1);
-    tx.vout[0].scriptPubKey.clear();
-    tx.vout[0].nValue = 0;
-
-    // Arg coinbaseSize 329 and 330 cause getminingcandidate() to generate 329+1, 330+1 size coinbase tx.
-    // By only accepting multiples of 4 the above is mitigated.
-    if (coinbaseSize % 4 != 0)
-    {
-        int tmp = coinbaseSize / 4;
-        tmp *= 4;
-        throw std::runtime_error(strprintf(
-            "Requested coinbase size %d is not a multiple of 4. Closest are %d and %d.", coinbaseSize, tmp, tmp + 4));
-    }
-
-    if (coinbaseSize <= 328)
-    {
-        padsize = coinbaseSize - PAD76;
+        nCoinbaseReserve = (uint64_t)coinbaseSize;
     }
     else
     {
-        padsize = coinbaseSize - PAD78;
+        nCoinbaseReserve = coinbaseReserve.Value();
     }
 
-    if (padsize < 0)
-    {
-        throw std::runtime_error(
-            strprintf("Requested coinbase size  %d too small by %d bytes", coinbaseSize, padsize * -1));
-    }
+    // BU Miners take the block we give them, wipe away our coinbase and add their own.
+    // So if their reserve choice is bigger then our coinbase then use that.
+    nCoinbaseSize = std::max(nCoinbaseSize, nCoinbaseReserve);
 
-    if (padsize > maxpad - PAD76)
-    {
-        throw std::runtime_error(
-            strprintf("Requested coinbase size %d too big. Max allowed: %d", coinbaseSize, maxpad));
-    }
 
-    tx.vout[0].scriptPubKey.resize(padsize);
+    return nHeaderSize + nCoinbaseSize;
 }
-
-CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn,
-    int _nHeight,
-    CAmount nValue,
-    int64_t coinbaseSize)
+CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _nHeight, CAmount nValue)
 {
     CMutableTransaction tx;
 
@@ -200,10 +151,6 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn,
     tx.vout[0].scriptPubKey = scriptPubKeyIn;
     tx.vout[0].nValue = nValue;
     tx.vin[0].scriptSig = CScript() << _nHeight << OP_0;
-
-    if (coinbaseSize > -1)
-        MkFixedSizeCoinbaseTx(tx, (int32_t)coinbaseSize);
-    // Do not add transactions to tx.vout[0] below here.
 
     // BU005 add block size settings to the coinbase
     std::string cbmsg = FormatCoinbaseMessage(BUComments, minerComment);
@@ -284,8 +231,8 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
             nBlockSigOps);
 
         // Create coinbase transaction.
-        pblock->vtx[0] = coinbaseTx(
-            scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus()), coinbaseSize);
+        pblock->vtx[0] =
+            coinbaseTx(scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
         pblocktemplate->vTxFees[0] = -nFees;
 
         // Fill in header

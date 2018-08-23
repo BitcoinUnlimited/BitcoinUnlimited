@@ -1719,7 +1719,7 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
     CMiningCandidate candid;
-    int32_t coinbaseSize = -1; // If -1 then not used to set coinbase size
+    int64_t coinbaseSize = -1; // If -1 then not used to set coinbase size
     LOCK(cs_main);
 
     if (fHelp || params.size() > 1)
@@ -1733,23 +1733,20 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
 
     if (params.size() == 1)
     {
-        coinbaseSize = params[0].get_int();
+        coinbaseSize = params[0].get_int64();
+        if (coinbaseSize < 0)
+        {
+            throw std::runtime_error("Requested coinbase size is less than 0");
+        }
+
+        if (coinbaseSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
+        {
+            throw std::runtime_error(
+                strprintf("Requested coinbase size too big. Max allowed: %u", BLOCKSTREAM_CORE_MAX_BLOCK_SIZE));
+        }
     }
 
     mkblocktemplate(UniValue(UniValue::VARR), coinbaseSize, &candid.block);
-
-    if (coinbaseSize > -1)
-    {
-        int txsiz = candid.block.vtx[0].get()->GetTxSize();
-        // LOGA("txsiz %d\n",txsiz);
-        if (coinbaseSize != txsiz)
-        {
-            LOGA("Error: BUG bad mkblocktemplate() w coinbaseSize %d %d.", coinbaseSize, txsiz);
-            assert(coinbaseSize == txsiz);
-            throw std::runtime_error(
-                strprintf("Sorry a coinbasesize bug has occured. Please report %d %d.", coinbaseSize, txsiz));
-        }
-    }
 
     ret = MkMiningCandidateJson(candid);
     return ret;

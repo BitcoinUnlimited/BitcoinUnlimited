@@ -93,7 +93,7 @@ private:
         bool blockstreamCoreCompatible,
         int64_t coinbaseSize = -1);
     /** Constructs a coinbase transaction */
-    CTransactionRef coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue, int64_t coinbaseSize = -1);
+    CTransactionRef coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue);
 };
 
 /** Modify the extranonce in a block */
