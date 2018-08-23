@@ -496,12 +496,11 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
-                LOCK(view.cs_utxo);
-                const Coin &coin = view.AccessCoin(out);
-                if (!coin.IsSpent() && coin.out.scriptPubKey != scriptPubKey)
+                CoinAccessor coin(view, out);
+                if (!coin->IsSpent() && coin->out.scriptPubKey != scriptPubKey)
                 {
                     std::string err("Previous output scriptPubKey mismatch:\n");
-                    err = err + ScriptToAsmStr(coin.out.scriptPubKey) + "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
+                    err = err + ScriptToAsmStr(coin->out.scriptPubKey) + "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
                     throw runtime_error(err);
                 }
                 Coin newcoin;
@@ -534,17 +533,15 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
     {
-        LOCK(view.cs_utxo);
-
         CTxIn &txin = mergedTx.vin[i];
-        const Coin &coin = view.AccessCoin(txin.prevout);
-        if (coin.IsSpent())
+        CoinModifier coin(view, txin.prevout);
+        if (coin->IsSpent())
         {
             fComplete = false;
             continue;
         }
-        const CScript &prevPubKey = coin.out.scriptPubKey;
-        const CAmount &amount = coin.out.nValue;
+        const CScript &prevPubKey = coin->out.scriptPubKey;
+        const CAmount &amount = coin->out.nValue;
 
         txin.scriptSig.clear();
         // Only sign SIGHASH_SINGLE if there's a corresponding output:

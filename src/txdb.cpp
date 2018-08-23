@@ -66,19 +66,18 @@ CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe)
 
 bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const
 {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
     return db.Read(CoinEntry(&outpoint), coin);
 }
 
 bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const
 {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
     return db.Exists(CoinEntry(&outpoint));
 }
 
 uint256 CCoinsViewDB::GetBestBlock() const
 {
-    LOCK(cs_utxo);
     uint256 hashBestChain;
     if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
@@ -97,7 +96,7 @@ uint256 CCoinsViewDB::GetBestBlock() const
 
 uint256 CCoinsViewDB::GetBestBlockSeq() const
 {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
     uint256 hashBestChain;
     if (!db.Read(DB_BEST_BLOCK, hashBestChain))
         return uint256();
@@ -106,7 +105,7 @@ uint256 CCoinsViewDB::GetBestBlockSeq() const
 
 void CCoinsViewDB::WriteBestBlockSeq(const uint256 &hashBlock)
 {
-    LOCK(cs_utxo);
+    WRITELOCK(cs_utxo);
     if (!hashBlock.IsNull())
     {
         db.Write(DB_BEST_BLOCK, hashBlock);
@@ -115,7 +114,7 @@ void CCoinsViewDB::WriteBestBlockSeq(const uint256 &hashBlock)
 
 uint256 CCoinsViewDB::GetBestBlockDb() const
 {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
     uint256 hashBestChain;
     if (!db.Read(DB_BEST_BLOCK_BLOCKDB, hashBestChain))
         return uint256();
@@ -124,7 +123,7 @@ uint256 CCoinsViewDB::GetBestBlockDb() const
 
 void CCoinsViewDB::WriteBestBlockDb(const uint256 &hashBlock)
 {
-    LOCK(cs_utxo);
+    WRITELOCK(cs_utxo);
     if (!hashBlock.IsNull())
     {
         db.Write(DB_BEST_BLOCK_BLOCKDB, hashBlock);
@@ -136,7 +135,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
     const uint64_t nBestCoinHeight,
     size_t &nChildCachedCoinsUsage)
 {
-    LOCK(cs_utxo);
+    WRITELOCK(cs_utxo);
     CDBBatch batch(db);
     size_t count = 0;
     size_t changed = 0;
@@ -206,13 +205,13 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
 
 size_t CCoinsViewDB::EstimateSize() const
 {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
     return db.EstimateSize(DB_COIN, (char)(DB_COIN + 1));
 }
 
 size_t CCoinsViewDB::TotalWriteBufferSize() const
 {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
     return db.TotalWriteBufferSize();
 }
 

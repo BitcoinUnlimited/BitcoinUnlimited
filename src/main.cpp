@@ -679,11 +679,10 @@ static bool AcceptToMemoryPoolWorker(CTxMemPool &pool,
         // during reorgs to ensure COINBASE_MATURITY is still met.
         bool fSpendsCoinbase = false;
         {
-            LOCK(view.cs_utxo);
             for (const CTxIn &txin : ptx->vin)
             {
-                const Coin &coin = view.AccessCoin(txin.prevout);
-                if (coin.IsCoinBase())
+                CoinAccessor coin(view, txin.prevout);
+                if (coin->IsCoinBase())
                 {
                     fSpendsCoinbase = true;
                     break;
@@ -1013,10 +1012,9 @@ bool GetTransaction(const uint256 &hash,
     // use coin database to locate block that contains transaction, and scan it
     if (fAllowSlow)
     {
-        LOCK(pcoinsTip->cs_utxo);
-        const Coin &coin = AccessByTxid(*pcoinsTip, hash);
-        if (!coin.IsSpent())
-            pindexSlow = chainActive[coin.nHeight];
+        CoinAccessor coin(*pcoinsTip, hash);
+        if (!coin->IsSpent())
+            pindexSlow = chainActive[coin->nHeight];
     }
 
     if (pindexSlow)
@@ -1270,24 +1268,21 @@ bool CheckInputs(const CTransaction &tx,
             for (unsigned int i = 0; i < tx.vin.size(); i++)
             {
                 const COutPoint &prevout = tx.vin[i].prevout;
+                CoinAccessor coin(inputs, prevout);
 
-                CScript scriptPubKey;
-                CAmount amount;
+                if (coin->IsSpent())
                 {
-                    LOCK(inputs.cs_utxo);
-                    const Coin &coin = inputs.AccessCoin(prevout);
-                    if (coin.IsSpent())
-                        LOGA("ASSERTION: no inputs available\n");
-                    assert(!coin.IsSpent());
-
-                    // We very carefully only pass in things to CScriptCheck which
-                    // are clearly committed. This provides
-                    // a sanity check that our caching is not introducing consensus
-                    // failures through additional data in, eg, the coins being
-                    // spent being checked as a part of CScriptCheck.
-                    scriptPubKey = coin.out.scriptPubKey;
-                    amount = coin.out.nValue;
+                    LOGA("ASSERTION: no inputs available\n");
                 }
+                assert(!coin->IsSpent());
+
+                // We very carefully only pass in things to CScriptCheck which
+                // are clearly committed. This provides
+                // a sanity check that our caching is not introducing consensus
+                // failures through additional data in, eg, the coins being
+                // spent being checked as a part of CScriptCheck.
+                const CScript scriptPubKey = coin->out.scriptPubKey;
+                const CAmount amount = coin->out.nValue;
 
                 // Verify signature
                 CScriptCheck check(resourceTracker, scriptPubKey, amount, tx, i, flags, cacheStore);
@@ -1384,12 +1379,11 @@ int ApplyTxInUndo(Coin &&undo, CCoinsViewCache &view, const COutPoint &out)
         // Missing undo metadata (height and coinbase). Older versions included this
         // information only in undo records for the last spend of a transactions'
         // outputs. This implies that it must be present for some other output of the same tx.
-        LOCK(view.cs_utxo);
-        const Coin &alternate = AccessByTxid(view, out.hash);
-        if (!alternate.IsSpent())
+        CoinAccessor alternate(view, out.hash);
+        if (!alternate->IsSpent())
         {
-            undo.nHeight = alternate.nHeight;
-            undo.fCoinBase = alternate.fCoinBase;
+            undo.nHeight = alternate->nHeight;
+            undo.fCoinBase = alternate->fCoinBase;
         }
         else
         {
@@ -1872,10 +1866,9 @@ bool ConnectBlock(const CBlock &block,
                 // be in ConnectBlock because they require the UTXO set
                 prevheights.resize(tx.vin.size());
                 {
-                    LOCK(view.cs_utxo);
                     for (size_t j = 0; j < tx.vin.size(); j++)
                     {
-                        prevheights[j] = view.AccessCoin(tx.vin[j].prevout).nHeight;
+                        prevheights[j] = CoinAccessor(view, tx.vin[j].prevout)->nHeight;
                     }
                 }
 
@@ -6774,10 +6767,8 @@ bool SendMessages(CNode *pto)
         if ((state.fSyncStarted) && (state.nSyncStartTime < GetTime() - INITIAL_HEADERS_TIMEOUT) &&
             (!state.fFirstHeadersReceived) && !pto->fWhitelisted)
         {
-            pto->fDisconnect = true;
-            LOGA(
-                "Initial headers were either not received or not received before the timeout - disconnecting peer=%s\n",
-                pto->GetLogName());
+            // pto->fDisconnect = true;
+            LOGA("Initial headers were either not received or not received before the timeout\n", pto->GetLogName());
         }
 
         // Start block sync

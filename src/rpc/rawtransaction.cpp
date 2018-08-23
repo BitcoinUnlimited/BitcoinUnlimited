@@ -267,11 +267,10 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
     }
     else
     {
-        LOCK(pcoinsTip->cs_utxo);
-        const Coin &coin = AccessByTxid(*pcoinsTip, oneTxid);
-        if (!coin.IsSpent() && coin.nHeight > 0 && coin.nHeight <= chainActive.Height())
+        CoinAccessor coin(*pcoinsTip, oneTxid);
+        if (coin && !coin->IsSpent() && coin->nHeight > 0 && coin->nHeight <= chainActive.Height())
         {
-            pblockindex = chainActive[coin.nHeight];
+            pblockindex = chainActive[coin->nHeight];
         }
     }
 
@@ -709,11 +708,11 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         view.SetBackend(viewMempool); // temporarily switch cache backend to db+mempool view
 
         {
-            LOCK(view.cs_utxo);
+            WRITELOCK(view.cs_utxo);
             for (const CTxIn &txin : mergedTx.vin)
             {
                 // Load entries from viewChain into view; can fail.
-                view.AccessCoin(txin.prevout);
+                view._AccessCoin(txin.prevout);
             }
         }
 
@@ -770,16 +769,16 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             std::vector<unsigned char> pkData(ParseHexO(prevOut, "scriptPubKey"));
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
+            Coin newcoin;
             {
-                LOCK(view.cs_utxo);
-                const Coin &coin = view.AccessCoin(out);
-                if (!coin.IsSpent() && coin.out.scriptPubKey != scriptPubKey)
+                CoinAccessor coin(view, out);
+
+                if (!coin->IsSpent() && coin->out.scriptPubKey != scriptPubKey)
                 {
                     std::string err("Previous output scriptPubKey mismatch:\n");
-                    err = err + ScriptToAsmStr(coin.out.scriptPubKey) + "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
+                    err = err + ScriptToAsmStr(coin->out.scriptPubKey) + "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
                     throw JSONRPCError(RPC_DESERIALIZATION_ERROR, err);
                 }
-                Coin newcoin;
                 newcoin.out.scriptPubKey = scriptPubKey;
                 newcoin.out.nValue = 0;
                 if (prevOut.exists("amount"))
@@ -787,8 +786,8 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
                     newcoin.out.nValue = AmountFromValue(find_value(prevOut, "amount"));
                 }
                 newcoin.nHeight = 1;
-                view.AddCoin(out, std::move(newcoin), true);
             }
+            view.AddCoin(out, std::move(newcoin), true);
 
             // if redeemScript given and not using the local wallet (private keys
             // given), add redeemScript to the tempKeystore so it can be signed:
@@ -869,16 +868,15 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
     {
-        LOCK(view.cs_utxo);
         CTxIn &txin = mergedTx.vin[i];
-        const Coin &coin = view.AccessCoin(txin.prevout);
-        if (coin.IsSpent())
+        CoinAccessor coin(view, txin.prevout);
+        if (coin->IsSpent())
         {
             TxInErrorToJSON(txin, vErrors, "Input not found or already spent");
             continue;
         }
-        const CScript &prevPubKey = coin.out.scriptPubKey;
-        const CAmount &amount = coin.out.nValue;
+        const CScript &prevPubKey = coin->out.scriptPubKey;
+        const CAmount &amount = coin->out.nValue;
 
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if (!fHashSingle || (i < mergedTx.vout.size()))
@@ -979,11 +977,10 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
     CCoinsViewCache &view = *pcoinsTip;
     bool fHaveChain = false;
     {
-        LOCK(view.cs_utxo);
         for (size_t o = 0; !fHaveChain && o < tx.vout.size(); o++)
         {
-            const Coin &existingCoin = view.AccessCoin(COutPoint(hashTx, o));
-            fHaveChain = !existingCoin.IsSpent();
+            CoinAccessor existingCoin(view, COutPoint(hashTx, o));
+            fHaveChain = !existingCoin->IsSpent();
         }
     }
     bool fHaveMempool = mempool.exists(hashTx);
