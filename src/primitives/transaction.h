@@ -175,6 +175,7 @@ private:
     /** Memory only. */
     const uint256 hash;
     void UpdateHash() const;
+    mutable uint64_t _nTxSize; // Serialized transaction size in bytes
 
 public:
     // Default transaction version.
@@ -245,7 +246,7 @@ public:
     std::string ToString() const;
 
     // Return the size the transaction in bytes.
-    uint32_t GetTxSize() const;
+    uint64_t GetTxSize() const;
 };
 
 /** A mutable version of CTransaction. */

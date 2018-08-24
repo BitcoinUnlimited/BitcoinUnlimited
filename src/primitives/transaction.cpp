@@ -63,15 +63,15 @@ CMutableTransaction::CMutableTransaction(const CTransaction &tx)
 
 uint256 CMutableTransaction::GetHash() const { return SerializeHash(*this); }
 void CTransaction::UpdateHash() const { *const_cast<uint256 *>(&hash) = SerializeHash(*this); }
-CTransaction::CTransaction() : nVersion(CTransaction::CURRENT_VERSION), vin(), vout(), nLockTime(0) {}
+CTransaction::CTransaction() : _nTxSize(0), nVersion(CTransaction::CURRENT_VERSION), vin(), vout(), nLockTime(0) {}
 CTransaction::CTransaction(const CMutableTransaction &tx)
-    : nVersion(tx.nVersion), vin(tx.vin), vout(tx.vout), nLockTime(tx.nLockTime)
+    : _nTxSize(0), nVersion(tx.nVersion), vin(tx.vin), vout(tx.vout), nLockTime(tx.nLockTime)
 {
     UpdateHash();
 }
 
 CTransaction::CTransaction(CMutableTransaction &&tx)
-    : nVersion(tx.nVersion), vin(std::move(tx.vin)), vout(std::move(tx.vout)), nLockTime(tx.nLockTime)
+    : _nTxSize(0), nVersion(tx.nVersion), vin(std::move(tx.vin)), vout(std::move(tx.vout)), nLockTime(tx.nLockTime)
 {
     UpdateHash();
 }
@@ -126,7 +126,7 @@ unsigned int CTransaction::CalculateModifiedSize(unsigned int nTxSize) const
     // Providing any more cleanup incentive than making additional inputs free would
     // risk encouraging people to create junk outputs to redeem later.
     if (nTxSize == 0)
-        nTxSize = ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+        nTxSize = GetTxSize();
     for (std::vector<CTxIn>::const_iterator it(vin.begin()); it != vin.end(); ++it)
     {
         unsigned int offset = 41U + std::min(110U, (unsigned int)it->scriptSig.size());
@@ -148,4 +148,9 @@ std::string CTransaction::ToString() const
     return str;
 }
 
-uint32_t CTransaction::GetTxSize() const { return ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION); }
+uint64_t CTransaction::GetTxSize() const
+{ 
+    if (_nTxSize == 0)
+        _nTxSize = ::GetSerializeSize(*this, SER_NETWORK, CTransaction::CURRENT_VERSION);
+    return _nTxSize;
+}
