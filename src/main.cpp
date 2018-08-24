@@ -6801,7 +6801,7 @@ bool SendMessages(CNode *pto)
                     state.fSyncStarted = true;
                     state.nSyncStartTime = GetTime();
                     state.fRequestedInitialBlockAvailability = true;
-                    state.nFirstHeadersExpectedHeight = pindexBestHeader->nHeight - 2; // -2 to give room for slow sync
+                    state.nFirstHeadersExpectedHeight = pindexStart->nHeight;
                     nSyncStarted++;
 
                     LOG(NET, "initial getheaders (%d) to peer=%s (startheight:%d)\n", pindexStart->nHeight,
