@@ -5438,12 +5438,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         uint256 hashStop;
         vRecv >> locator >> hashStop;
 
-        if (IsInitialBlockDownload() && !pfrom->fWhitelisted)
-        {
-            LOG(NET, "Ignoring getheaders from peer=%d because node is in initial block download\n", pfrom->id);
-            return true;
-        }
-
         LOCK(cs_main);
         CNodeState *nodestate = State(pfrom->GetId());
         CBlockIndex *pindex = NULL;
