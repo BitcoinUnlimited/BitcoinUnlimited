@@ -332,8 +332,8 @@ void CRollingBloomFilter::insert(const std::vector<unsigned char> &vKey)
 
 void CRollingBloomFilter::insert(const uint256 &hash)
 {
-    vector<unsigned char> data(hash.begin(), hash.end());
-    insert(data);
+    vector<unsigned char> _vData(hash.begin(), hash.end());
+    insert(_vData);
 }
 
 void CRollingBloomFilter::insert(const COutPoint &outpoint) { insert(ToVector(outpoint)); }
@@ -355,8 +355,8 @@ bool CRollingBloomFilter::contains(const std::vector<unsigned char> &vKey) const
 
 bool CRollingBloomFilter::contains(const uint256 &hash) const
 {
-    vector<unsigned char> data(hash.begin(), hash.end());
-    return contains(data);
+    vector<unsigned char> _vData(hash.begin(), hash.end());
+    return contains(_vData);
 }
 
 bool CRollingBloomFilter::contains(const COutPoint &outpoint) const { return contains(ToVector(outpoint)); }
