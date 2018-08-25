@@ -665,10 +665,23 @@ UniValue setban(const UniValue &params, bool fHelp)
 UniValue listbanned(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
-        throw runtime_error("listbanned\n"
-                            "\nList all banned IPs/Subnets.\n"
-                            "\nExamples:\n" +
-                            HelpExampleCli("listbanned", "") + HelpExampleRpc("listbanned", ""));
+        throw runtime_error(
+            "listbanned\n"
+            "\nList all banned IPs/Subnets.\n"
+            "\nResult:\n"
+            "[\n"
+            "  {\n"
+            "    \"address\" : \"192.168.0.201/32\",    (string) The banned IP/Subnet with netmask (/32 = single ip)\n"
+            "    \"banned_until\" : ttt,              (numeric) The ban expiration time in seconds since epoch (Jan 1 "
+            "1970 GMT)\n"
+            "    \"ban_created\" : ttt                (numeric) The ban creation time in seconds since epoch (Jan 1 "
+            "1970 GMT)\n"
+            "    \"ban_reason\" : \"node misbehaving\"  (string) The reason the ban was created\n"
+            "  }\n"
+            "  ,...\n"
+            "]\n"
+            "\nExamples:\n" +
+            HelpExampleCli("listbanned", "") + HelpExampleRpc("listbanned", ""));
 
     banmap_t banMap;
     dosMan.GetBanned(banMap);
