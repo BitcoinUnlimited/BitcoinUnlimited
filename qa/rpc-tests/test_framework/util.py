@@ -323,7 +323,7 @@ def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None)
     return datadir
 
 def rpc_auth_pair(n):
-    return 'rpcuser' + str(n), 'rpcpass' + str(n)
+    return 'rpcuser💻' + str(n), 'rpcpass🔑' + str(n)
 
 def rpc_url(i, rpchost=None):
     rpc_u, rpc_p = rpc_auth_pair(i)

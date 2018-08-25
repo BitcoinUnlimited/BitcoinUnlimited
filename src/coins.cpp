@@ -14,7 +14,7 @@
 Coin emptyCoin;
 bool CCoinsView::GetCoin(const COutPoint &outpoint, Coin &coin) const { return false; }
 bool CCoinsView::HaveCoin(const COutPoint &outpoint) const { return false; }
-uint256 CCoinsView::GetBestBlock() const { return uint256(); }
+uint256 CCoinsView::_GetBestBlock() const { return uint256(); }
 bool CCoinsView::BatchWrite(CCoinsMap &mapCoins,
     const uint256 &hashBlock,
     const uint64_t nBestCoinHeight,
@@ -26,7 +26,7 @@ CCoinsViewCursor *CCoinsView::Cursor() const { return nullptr; }
 CCoinsViewBacked::CCoinsViewBacked(CCoinsView *viewIn) : base(viewIn) {}
 bool CCoinsViewBacked::GetCoin(const COutPoint &outpoint, Coin &coin) const { return base->GetCoin(outpoint, coin); }
 bool CCoinsViewBacked::HaveCoin(const COutPoint &outpoint) const { return base->HaveCoin(outpoint); }
-uint256 CCoinsViewBacked::GetBestBlock() const { return base->GetBestBlock(); }
+uint256 CCoinsViewBacked::_GetBestBlock() const { return base->GetBestBlock(); }
 void CCoinsViewBacked::SetBackend(CCoinsView &viewIn) { base = &viewIn; }
 bool CCoinsViewBacked::BatchWrite(CCoinsMap &mapCoins,
     const uint256 &hashBlock,
@@ -56,7 +56,6 @@ size_t CCoinsViewCache::ResetCachedCoinUsage() const
 {
     bool drifted = false;
     size_t newCachedCoinsUsage = 0;
-    if (1)
     {
         READLOCK(cs_utxo);
         for (CCoinsMap::iterator it = cacheCoins.begin(); it != cacheCoins.end(); it++)
@@ -74,7 +73,8 @@ size_t CCoinsViewCache::ResetCachedCoinUsage() const
 
 CCoinsMap::iterator CCoinsViewCache::FetchCoin(const COutPoint &outpoint, CDeferredSharedLocker *lock) const
 {
-    // AssertLockHeld(cs_utxo);
+    // When fetching a coin, we only need the shared lock if the coin exists in the cache.
+    // So we have the Locker object take the shared lock and return with the read lock held if the coin was in cache.
     {
         if (lock)
             lock->lock_shared();
@@ -88,6 +88,7 @@ CCoinsMap::iterator CCoinsViewCache::FetchCoin(const COutPoint &outpoint, CDefer
     if (!base->GetCoin(outpoint, tmp))
         return cacheCoins.end();
 
+    // But if the coin is NOT in the cache, we need to grab the exclusive lock in order to modify the cache
     if (lock)
         lock->lock();
     CCoinsMap::iterator ret =

@@ -110,12 +110,7 @@ private:
 public:
     SaltedOutpointHasher();
 
-    /**
-     * This *must* return size_t. With Boost 1.46 on 32-bit systems the
-     * unordered_map will behave unpredictably if the custom hasher returns a
-     * uint64_t, resulting in failures when syncing the chain (#4634).
-     */
-    size_t operator()(const COutPoint &id) const { return SipHashUint256Extra(k0, k1, id.hash, id.n); }
+    uint64_t operator()(const COutPoint &id) const { return SipHashUint256Extra(k0, k1, id.hash, id.n); }
 };
 
 struct CCoinsCacheEntry
@@ -170,7 +165,12 @@ public:
     virtual bool HaveCoin(const COutPoint &outpoint) const;
 
     //! Retrieve the block hash whose state this CCoinsView currently represents
-    virtual uint256 GetBestBlock() const;
+    virtual uint256 _GetBestBlock() const;
+    uint256 GetBestBlock() const
+    {
+        READLOCK(cs_utxo);
+        return _GetBestBlock();
+    }
 
     //! Do a bulk modification (multiple Coin changes + BestBlock change).
     //! The passed mapCoins can be modified.
@@ -199,7 +199,7 @@ public:
     CCoinsViewBacked(CCoinsView *viewIn);
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
-    uint256 GetBestBlock() const override;
+    uint256 _GetBestBlock() const override;
     void SetBackend(CCoinsView &viewIn);
     bool BatchWrite(CCoinsMap &mapCoins,
         const uint256 &hashBlock,
@@ -399,8 +399,5 @@ protected:
 // TODO: pass in a boolean to limit these possible overwrites to known
 // (pre-BIP34) cases.
 void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight);
-
-//! Utility function to find any unspent output with a given txid.
-// const Coin& AccessByTxid(const CCoinsViewCache& cache, const uint256& txid);
 
 #endif // BITCOIN_COINS_H

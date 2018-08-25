@@ -76,16 +76,16 @@ bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const
     return db.Exists(CoinEntry(&outpoint));
 }
 
-uint256 CCoinsViewDB::GetBestBlock() const
+uint256 CCoinsViewDB::_GetBestBlock() const
 {
     uint256 hashBestChain;
     if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
-        hashBestChain = GetBestBlockSeq();
+        hashBestChain = _GetBestBlockSeq();
     }
     else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
     {
-        hashBestChain = GetBestBlockDb();
+        hashBestChain = _GetBestBlockDb();
     }
     else
     {
@@ -97,6 +97,11 @@ uint256 CCoinsViewDB::GetBestBlock() const
 uint256 CCoinsViewDB::GetBestBlockSeq() const
 {
     READLOCK(cs_utxo);
+    return _GetBestBlockSeq();
+}
+
+uint256 CCoinsViewDB::_GetBestBlockSeq() const
+{
     uint256 hashBestChain;
     if (!db.Read(DB_BEST_BLOCK, hashBestChain))
         return uint256();
@@ -115,6 +120,11 @@ void CCoinsViewDB::WriteBestBlockSeq(const uint256 &hashBlock)
 uint256 CCoinsViewDB::GetBestBlockDb() const
 {
     READLOCK(cs_utxo);
+
+    return _GetBestBlockDb();
+}
+uint256 CCoinsViewDB::_GetBestBlockDb() const
+{
     uint256 hashBestChain;
     if (!db.Read(DB_BEST_BLOCK_BLOCKDB, hashBestChain))
         return uint256();
