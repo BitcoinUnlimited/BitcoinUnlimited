@@ -57,6 +57,7 @@ core_io.h
 core_memusage.h
 core_read.cpp
 core_write.cpp
+cuckoocache.h
 dbwrapper.cpp
 dbwrapper.h
 dosman.cpp
