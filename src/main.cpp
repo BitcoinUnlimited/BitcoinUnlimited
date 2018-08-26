@@ -5438,12 +5438,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         uint256 hashStop;
         vRecv >> locator >> hashStop;
 
-        if (IsInitialBlockDownload() && !pfrom->fWhitelisted)
-        {
-            LOG(NET, "Ignoring getheaders from peer=%d because node is in initial block download\n", pfrom->id);
-            return true;
-        }
-
         LOCK(cs_main);
         CNodeState *nodestate = State(pfrom->GetId());
         CBlockIndex *pindex = NULL;
@@ -6807,7 +6801,7 @@ bool SendMessages(CNode *pto)
                     state.fSyncStarted = true;
                     state.nSyncStartTime = GetTime();
                     state.fRequestedInitialBlockAvailability = true;
-                    state.nFirstHeadersExpectedHeight = pindexBestHeader->nHeight - 2; // -2 to give room for slow sync
+                    state.nFirstHeadersExpectedHeight = pindexStart->nHeight;
                     nSyncStarted++;
 
                     LOG(NET, "initial getheaders (%d) to peer=%s (startheight:%d)\n", pindexStart->nHeight,
