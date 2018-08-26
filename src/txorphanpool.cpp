@@ -31,10 +31,9 @@ bool CTxOrphanPool::AddOrphanTx(const CTransactionRef &ptx, NodeId peer)
         return false;
 
     // Ignore orphans larger than the largest txn size allowed.
-    unsigned int sz = ::GetSerializeSize(*ptx, SER_NETWORK, CTransaction::CURRENT_VERSION);
-    if (sz > MAX_STANDARD_TX_SIZE)
+    if (ptx->GetTxSize() > MAX_STANDARD_TX_SIZE)
     {
-        LOG(MEMPOOL, "ignoring large orphan tx (size: %u, hash: %s)\n", sz, hash.ToString());
+        LOG(MEMPOOL, "ignoring large orphan tx (size: %u, hash: %s)\n", ptx->GetTxSize(), hash.ToString());
         return false;
     }
 

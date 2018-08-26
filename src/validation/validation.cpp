@@ -1518,17 +1518,16 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
                 FormatStateMessage(state));
 
     uint64_t nSigOps = 0;
-    // BU: count the number of transactions in case the CheckExcessive function wants to use this as criteria
+    // Count the number of transactions in case the CheckExcessive function wants to use this as criteria
     uint64_t nTx = 0;
-    uint64_t nLargestTx = 0; // BU: track the longest transaction
+    uint64_t nLargestTx = 0;
 
     for (const auto &tx : block.vtx)
     {
         nTx++;
         nSigOps += GetLegacySigOpCount(*tx);
-        uint64_t nTxSize = ::GetSerializeSize(*tx, SER_NETWORK, PROTOCOL_VERSION);
-        if (nTxSize > nLargestTx)
-            nLargestTx = nTxSize;
+        if (tx->GetTxSize() > nLargestTx)
+            nLargestTx = tx->GetTxSize();
     }
 
     // BU only enforce sigops during block generation not acceptance

@@ -324,7 +324,9 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
         WRITELOCK(orphanpool.cs);
-        orphanpool.AddOrphanTx(MakeTransactionRef(tx), i);
+        LOCK(orphanpool.cs);
+        CTransaction _tx(tx);
+        orphanpool.AddOrphanTx(MakeTransactionRef(_tx), i);
     }
 
     {
@@ -351,8 +353,14 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         tx.vout[0].nValue = 1 * CENT;
         tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
+<<<<<<< fb845c33c91d25e201e1eb6bf67950f56536d356
         WRITELOCK(orphanpool.cs);
         orphanpool.AddOrphanTx(MakeTransactionRef(tx), i);
+=======
+        LOCK(orphanpool.cs);
+        CTransaction _tx(tx);
+        orphanpool.AddOrphanTx(MakeTransactionRef(_tx), i);
+>>>>>>> use GetTxSize
     }
 
     // ... and 50 that depend on other orphans:
@@ -369,8 +377,14 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
         SignSignature(keystore, txPrev, tx, 0);
 
+<<<<<<< fb845c33c91d25e201e1eb6bf67950f56536d356
         WRITELOCK(orphanpool.cs);
         orphanpool.AddOrphanTx(MakeTransactionRef(tx), i);
+=======
+        LOCK(orphanpool.cs);
+        CTransaction _tx(tx);
+        orphanpool.AddOrphanTx(MakeTransactionRef(_tx), i);
+>>>>>>> use GetTxSize
     }
 
     // This really-big orphan should be ignored:
@@ -397,7 +411,8 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         WRITELOCK(orphanpool.cs);
         // BU, we keep orphans up to the configured memory limit to help xthin compression so this should succeed
         // whereas it fails in other clients
-        BOOST_CHECK(orphanpool.AddOrphanTx(MakeTransactionRef(tx), i));
+        CTransaction _tx(tx);
+        BOOST_CHECK(orphanpool.AddOrphanTx(MakeTransactionRef(_tx), i));
     }
 
     // Test LimitOrphanTxSize() function: limit by number of txns
@@ -429,7 +444,8 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
             tx.vout[0].nValue = 1 * CENT;
             tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
-            orphanpool.AddOrphanTx(MakeTransactionRef(tx), i);
+            CTransaction _tx(tx);
+            orphanpool.AddOrphanTx(MakeTransactionRef(_tx), i);
         }
         BOOST_CHECK(orphanpool.mapOrphanTransactions.size() == 50);
         orphanpool.EraseOrphansByTime();

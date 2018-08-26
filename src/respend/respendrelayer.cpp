@@ -33,7 +33,7 @@ public:
     RelayLimiter() : respendCount(0), lastRespendTime(0) {}
     bool HasLimitExceeded(const CTransactionRef &pDoubleSpend)
     {
-        unsigned int size = ::GetSerializeSize(*pDoubleSpend, SER_NETWORK, PROTOCOL_VERSION);
+        unsigned int size = pDoubleSpend->GetTxSize();
 
         std::lock_guard<std::mutex> lock(cs);
         int64_t limit = GetArg("-limitrespendrelay", DEFAULT_LIMITRESPENDRELAY);

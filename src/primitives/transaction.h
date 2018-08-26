@@ -175,7 +175,7 @@ private:
     /** Memory only. */
     const uint256 hash;
     void UpdateHash() const;
-    mutable uint64_t _nTxSize; // Serialized transaction size in bytes
+    mutable size_t _nTxSize; // Serialized transaction size in bytes
 
 public:
     // Default transaction version.
@@ -245,7 +245,7 @@ public:
     friend bool operator!=(const CTransaction &a, const CTransaction &b) { return a.hash != b.hash; }
     std::string ToString() const;
 
-    // Return the size the transaction in bytes.
+    // Return the size of the transaction in bytes.
     uint64_t GetTxSize() const;
 };
 

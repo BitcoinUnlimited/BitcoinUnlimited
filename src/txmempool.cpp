@@ -48,7 +48,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx,
       hadNoDependencies(poolHasNoInputsOf), inChainInputValue(_inChainInputValue), spendsCoinbase(_spendsCoinbase),
       sigOpCount(_sigOps), lockPoints(lp)
 {
-    nTxSize = ::GetSerializeSize(*tx, SER_NETWORK, PROTOCOL_VERSION);
+    nTxSize = tx->GetTxSize();
     nModSize = tx->CalculateModifiedSize(nTxSize);
     nUsageSize = RecursiveDynamicUsage(*tx);
 

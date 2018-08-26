@@ -72,7 +72,7 @@ void ScriptPubKeyToJSON(const CScript &scriptPubKey, UniValue &out, bool fInclud
 void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry)
 {
     entry.push_back(Pair("txid", tx.GetHash().GetHex()));
-    entry.push_back(Pair("size", (int)::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION)));
+    entry.push_back(Pair("size", (int)tx.GetTxSize()));
     entry.push_back(Pair("version", tx.nVersion));
     entry.push_back(Pair("locktime", (int64_t)tx.nLockTime));
     UniValue vin(UniValue::VARR);
