@@ -65,9 +65,6 @@ dstencode.h
 expedited.cpp
 expedited.h
 globals.cpp
-graphene.cpp
-graphene.h
-graphene_set.h
 hash.cpp
 hash.h
 httprpc.cpp
@@ -124,8 +121,6 @@ stat.h
 streams.h
 sync.cpp
 sync.h
-thinblock.cpp
-thinblock.h
 threadsafety.h
 timedata.cpp
 timedata.h
