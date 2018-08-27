@@ -146,12 +146,11 @@ unsigned int GetP2SHSigOpCount(const CTransaction &tx, const CCoinsViewCache &in
 
     unsigned int nSigOps = 0;
     {
-        LOCK(inputs.cs_utxo);
         for (unsigned int i = 0; i < tx.vin.size(); i++)
         {
-            const CTxOut &prevout = inputs.AccessCoin(tx.vin[i].prevout).out;
-            if (prevout.scriptPubKey.IsPayToScriptHash())
-                nSigOps += prevout.scriptPubKey.GetSigOpCount(tx.vin[i].scriptSig);
+            CoinAccessor coin(inputs, tx.vin[i].prevout);
+            if (coin && coin->out.scriptPubKey.IsPayToScriptHash())
+                nSigOps += coin->out.scriptPubKey.GetSigOpCount(tx.vin[i].scriptSig);
         }
     }
     return nSigOps;
@@ -214,16 +213,6 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
  */
 static int GetSpendHeight(const CCoinsViewCache &inputs)
 {
-    AssertLockHeld(inputs.cs_utxo);
-
-    // Must leave cs_utxo in order to maintain correct locking order with cs_main. We re-aquire
-    // cs_utxo when we leave this scope.
-    LEAVE_CRITICAL_SECTION(inputs.cs_utxo);
-
-    // Scope guard to make sure cs_utxo gets locked upon leaving ths scope whether or not we throw an exception.
-    BOOST_SCOPE_EXIT(&inputs) { ENTER_CRITICAL_SECTION(inputs.cs_utxo); }
-    BOOST_SCOPE_EXIT_END
-
     LOCK(cs_main);
     BlockMap::iterator i = mapBlockIndex.find(inputs.GetBestBlock());
     if (i != mapBlockIndex.end())
@@ -250,11 +239,11 @@ bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, c
     CAmount nFees = 0;
     int nSpendHeight = -1;
     {
-        LOCK(inputs.cs_utxo);
         for (unsigned int i = 0; i < tx.vin.size(); i++)
         {
             const COutPoint &prevout = tx.vin[i].prevout;
-            const Coin &coin = inputs.AccessCoin(prevout);
+            Coin coin;
+            inputs.GetCoin(prevout, coin); // Make a copy so I don't hold the utxo lock
             assert(!coin.IsSpent());
 
             // If prev is coinbase, check that it's matured

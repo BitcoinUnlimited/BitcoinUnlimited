@@ -141,8 +141,8 @@ bool AreInputsStandard(const CTransaction &tx, const CCoinsViewCache &mapInputs)
     {
         txnouttype whichType;
         {
-            LOCK(mapInputs.cs_utxo);
-            const CTxOut &prev = mapInputs.AccessCoin(tx.vin[i].prevout).out;
+            CoinAccessor coin(mapInputs, tx.vin[i].prevout);
+            const CTxOut &prev = coin->out;
 
             std::vector<std::vector<unsigned char> > vSolutions;
             // get the scriptPubKey corresponding to this input:

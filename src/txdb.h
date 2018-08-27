@@ -111,10 +111,12 @@ public:
 
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
-    uint256 GetBestBlock() const override;
+    uint256 _GetBestBlock() const override;
     uint256 GetBestBlockSeq() const;
+    uint256 _GetBestBlockSeq() const;
     void WriteBestBlockSeq(const uint256 &hashBlock);
     uint256 GetBestBlockDb() const;
+    uint256 _GetBestBlockDb() const;
     void WriteBestBlockDb(const uint256 &hashBlock);
     bool BatchWrite(CCoinsMap &mapCoins,
         const uint256 &hashBlock,

@@ -716,17 +716,16 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
         }
         else if (it->GetSpendsCoinbase())
         {
-            LOCK(pcoins->cs_utxo);
             for (const CTxIn &txin : tx.vin)
             {
                 indexed_transaction_set::const_iterator it2 = mapTx.find(txin.prevout.hash);
                 if (it2 != mapTx.end())
                     continue;
-                const Coin &coin = pcoins->AccessCoin(txin.prevout);
+                CoinAccessor coin(*pcoins, txin.prevout);
                 if (nCheckFrequency != 0)
-                    assert(!coin.IsSpent());
-                if (coin.IsSpent() ||
-                    (coin.IsCoinBase() && ((signed long)nMemPoolHeight) - coin.nHeight < COINBASE_MATURITY))
+                    assert(!coin->IsSpent());
+                if (coin->IsSpent() ||
+                    (coin->IsCoinBase() && ((signed long)nMemPoolHeight) - coin->nHeight < COINBASE_MATURITY))
                 {
                     transactionsToRemove.push_back(tx);
                     break;
