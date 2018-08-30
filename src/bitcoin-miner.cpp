@@ -88,7 +88,9 @@ public:
             .addArg("duration=<n>", ::AllowedArgs::requiredInt,
                 _("Number of seconds to mine a particular block candidate (default: 30). Value must be an integer"))
             .addArg("nblocks=<n>", ::AllowedArgs::requiredInt,
-                _("Number of blocks to mine (default: mine forever / -1). Value must be an integer"));
+                _("Number of blocks to mine (default: mine forever / -1). Value must be an integer"))
+            .addArg("coinbasesize=<n>", ::AllowedArgs::requiredInt,
+                _("Get a fixed size coinbase Tx (default: do not use / 0). Value must be an integer"));
     }
 };
 
@@ -333,6 +335,13 @@ int CpuMiner(void)
 {
     int searchDuration = GetArg("-duration", 30);
     int nblocks = GetArg("-nblocks", -1); //-1 mine forever
+    int coinbasesize = GetArg("-coinbasesize", 0);
+
+    if (coinbasesize < 0)
+    {
+        printf("Negative coinbasesize not reasonable/supported.\n");
+        return 0;
+    }
 
     UniValue mineresult;
     bool found = false;
@@ -357,7 +366,7 @@ int CpuMiner(void)
             {
                 try
                 {
-                    UniValue params;
+                    UniValue params(UniValue::VARR);
                     if (found)
                     {
                         // Submit the solution.
@@ -370,6 +379,10 @@ int CpuMiner(void)
 
                     if (!found)
                     {
+                        if (coinbasesize > 0)
+                        {
+                            params.push_back(UniValue(coinbasesize));
+                        }
                         reply = CallRPC("getminingcandidate", params);
                     }
 

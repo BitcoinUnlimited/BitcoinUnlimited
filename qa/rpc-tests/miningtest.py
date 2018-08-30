@@ -53,6 +53,15 @@ class MyTest (BitcoinTestFramework):
         del c["prevhash"]
         expectException(lambda: node.submitminingsolution(c), JSONRPCException)
 
+        # ask for a valid coinbase size
+        c = node.getminingcandidate(1050)
+		
+        # ask for a coinbase size that is too big
+        expectException(lambda: node.getminingcandidate(1000000000000000), JSONRPCException)
+               
+        # ask for a coinbase size that is too small
+        expectException(lambda: node.getminingcandidate(-1), JSONRPCException)
+        
         # the most awful mining algorithm: just submit with an arbitrary nonce
         # (works because testnet accepts almost anything)
         nonce = 0

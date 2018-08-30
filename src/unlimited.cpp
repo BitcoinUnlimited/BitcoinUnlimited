@@ -1718,15 +1718,35 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
     CMiningCandidate candid;
+    int64_t coinbaseSize = -1; // If -1 then not used to set coinbase size
     LOCK(cs_main);
 
-    if (fHelp || params.size() > 0)
+    if (fHelp || params.size() > 1)
     {
         throw runtime_error("getminingcandidate"
                             "\nReturns Mining-Candidate protocol data.\n"
-                            "\nArguments: None\n");
+                            "\nArguments:\n"
+                            "1. \"coinbasesize\" (int, optional) Get a fixed size coinbase transaction.\n" +
+                            HelpExampleCli("", "") + HelpExampleCli("coinbasesize", "100"));
     }
-    mkblocktemplate(params, &candid.block);
+
+    if (params.size() == 1)
+    {
+        coinbaseSize = params[0].get_int64();
+        if (coinbaseSize < 0)
+        {
+            throw std::runtime_error("Requested coinbase size is less than 0");
+        }
+
+        if (coinbaseSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
+        {
+            throw std::runtime_error(
+                strprintf("Requested coinbase size too big. Max allowed: %u", BLOCKSTREAM_CORE_MAX_BLOCK_SIZE));
+        }
+    }
+
+    mkblocktemplate(UniValue(UniValue::VARR), coinbaseSize, &candid.block);
+
     ret = MkMiningCandidateJson(candid);
     return ret;
 }

@@ -95,11 +95,11 @@ BlockAssembler::BlockAssembler(const CChainParams &_chainparams)
     nBlockMinSize = std::min(nBlockMaxSize, nBlockMinSize);
 }
 
-void BlockAssembler::resetBlock(const CScript &scriptPubKeyIn)
+void BlockAssembler::resetBlock(const CScript &scriptPubKeyIn, int64_t coinbaseSize)
 {
     inBlock.clear();
 
-    nBlockSize = reserveBlockSize(scriptPubKeyIn); // Core: 1000
+    nBlockSize = reserveBlockSize(scriptPubKeyIn, coinbaseSize); // Core: 1000
     nBlockSigOps = 100; // Reserve 100 sigops for miners to use in their coinbase transaction
 
     // These counters do not include coinbase tx
@@ -110,25 +110,37 @@ void BlockAssembler::resetBlock(const CScript &scriptPubKeyIn)
     blockFinished = false;
 }
 
-uint64_t BlockAssembler::reserveBlockSize(const CScript &scriptPubKeyIn)
+uint64_t BlockAssembler::reserveBlockSize(const CScript &scriptPubKeyIn, int64_t coinbaseSize)
 {
     CBlockHeader h;
-    uint64_t nHeaderSize, nCoinbaseSize;
+    uint64_t nHeaderSize, nCoinbaseSize, nCoinbaseReserve;
 
     // BU add the proper block size quantity to the actual size
     nHeaderSize = ::GetSerializeSize(h, SER_NETWORK, PROTOCOL_VERSION);
     assert(nHeaderSize == 80); // BU always 80 bytes
     nHeaderSize += 5; // tx count varint - 5 bytes is enough for 4 billion txs; 3 bytes for 65535 txs
 
+
     // This serializes with output value, a fixed-length 8 byte field, of zero and height, a serialized CScript
-    // signed integer taking up 4 bytes for heights 32768-8388607 (around the year 2167) after which it will use 5.
+    // signed integer taking up 4 bytes for heights 32768-8388607 (around the year 2167) after which it will use 5
     nCoinbaseSize = ::GetSerializeSize(coinbaseTx(scriptPubKeyIn, 400000, 0), SER_NETWORK, PROTOCOL_VERSION);
+
+    if (coinbaseSize >= 0) // Explicit size of coinbase has been requested
+    {
+        nCoinbaseReserve = (uint64_t)coinbaseSize;
+    }
+    else
+    {
+        nCoinbaseReserve = coinbaseReserve.Value();
+    }
 
     // BU Miners take the block we give them, wipe away our coinbase and add their own.
     // So if their reserve choice is bigger then our coinbase then use that.
-    return nHeaderSize + std::max(nCoinbaseSize, coinbaseReserve.Value());
-}
+    nCoinbaseSize = std::max(nCoinbaseSize, nCoinbaseReserve);
 
+
+    return nHeaderSize + nCoinbaseSize;
+}
 CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _nHeight, CAmount nValue)
 {
     CMutableTransaction tx;
@@ -153,30 +165,30 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _n
     }
     tx.vin[0].scriptSig = tx.vin[0].scriptSig + COINBASE_FLAGS;
 
-
     return MakeTransactionRef(std::move(tx));
 }
 
-std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn)
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, int64_t coinbaseSize)
 {
     std::unique_ptr<CBlockTemplate> tmpl(nullptr);
 
     if (nBlockMaxSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
-        tmpl = CreateNewBlock(scriptPubKeyIn, false);
+        tmpl = CreateNewBlock(scriptPubKeyIn, false, coinbaseSize);
 
     // If the block is too small we need to drop back to the 1MB ruleset
     if ((!tmpl) || (tmpl->block.GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
     {
-        tmpl = CreateNewBlock(scriptPubKeyIn, true);
+        tmpl = CreateNewBlock(scriptPubKeyIn, true, coinbaseSize);
     }
 
     return tmpl;
 }
 
 std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn,
-    bool blockstreamCoreCompatible)
+    bool blockstreamCoreCompatible,
+    int64_t coinbaseSize)
 {
-    resetBlock(scriptPubKeyIn);
+    resetBlock(scriptPubKeyIn, coinbaseSize);
 
     // The constructed block template
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
