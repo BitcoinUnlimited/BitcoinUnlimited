@@ -958,40 +958,6 @@ void CTxMemPool::_queryHashes(vector<uint256> &vtxid) const
         vtxid.push_back(mi->GetTx().GetHash());
 }
 
-
-bool CTxMemPool::_lookup(const uint256 &hash, CTxMemPoolEntry &result) const
-{
-    AssertLockHeld(cs);
-    indexed_transaction_set::const_iterator i = mapTx.find(hash);
-    if (i == mapTx.end())
-        return false;
-    result = *i;
-    return true;
-}
-
-bool CTxMemPool::lookup(const uint256 &hash, CTxMemPoolEntry &result) const
-{
-    READLOCK(cs);
-    return _lookup(hash, result);
-}
-
-
-bool CTxMemPool::lookup(const uint256 &hash, CTransaction &result) const
-{
-    READLOCK(cs);
-    return _lookup(hash, result);
-}
-
-bool CTxMemPool::_lookup(const uint256 &hash, CTransaction &result) const
-{
-    AssertLockHeld(cs);
-    indexed_transaction_set::const_iterator i = mapTx.find(hash);
-    if (i == mapTx.end())
-        return false;
-    result = i->GetTx();
-    return true;
-}
-
 CFeeRate CTxMemPool::estimateFee(int nBlocks) const
 {
     READLOCK(cs);

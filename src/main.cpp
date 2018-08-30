@@ -4852,16 +4852,13 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 }
                 if (!fPushed && inv.type == MSG_TX)
                 {
-                    CTxMemPoolEntry txe;
-                    if (mempool.lookup(inv.hash, txe))
+                    CTransactionRef ptx = nullptr;
+                    ptx = mempool.get(inv.hash);
+                    if (ptx)
                     {
-                        // Only offer a TX to the fork if its signed properly
-                        if (!(!IsTxUAHFOnly(txe) && IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight)))
-                        {
-                            pfrom->PushMessage(NetMsgType::TX, txe.GetTx());
-                            fPushed = true;
-                            pfrom->txsSent += 1;
-                        }
+                        pfrom->PushMessage(NetMsgType::TX, ptx);
+                        fPushed = true;
+                        pfrom->txsSent += 1;
                     }
                 }
                 if (!fPushed)
@@ -6192,14 +6189,11 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             CInv inv(MSG_TX, hash);
             if (pfrom->pfilter)
             {
-                CTxMemPoolEntry txe;
-                bool fInMemPool = mempool.lookup(hash, txe);
-                if (!fInMemPool)
+                CTransactionRef ptx = nullptr;
+                ptx = mempool.get(inv.hash);
+                if (ptx == nullptr)
                     continue; // another thread removed since queryHashes, maybe...
-                if (!pfrom->pfilter->IsRelevantAndUpdate(txe.GetTx()))
-                    continue;
-                // don't relay old-style transactions after the fork.
-                if (!IsTxUAHFOnly(txe) && IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
+                if (!pfrom->pfilter->IsRelevantAndUpdate(*ptx))
                     continue;
             }
             vInv.push_back(inv);
