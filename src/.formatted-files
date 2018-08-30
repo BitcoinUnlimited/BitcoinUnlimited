@@ -20,6 +20,7 @@ bitnodes.cpp
 bitnodes.h
 blockstorage/blockleveldb.cpp
 blockstorage/blockleveldb.h
+blockstorage/dbabstract.h
 blockstorage/sequential_files.cpp
 blockstorage/sequential_files.h
 blockstorage/blockstorage.cpp

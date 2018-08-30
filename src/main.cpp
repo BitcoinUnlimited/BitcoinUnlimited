@@ -3088,7 +3088,7 @@ bool FindBlockPos(CValidationState &state,
     bool fKnown = false)
 {
     // nDataPos for blockdb is a flag, just set to 1 to indicate we have that data. nFile is unused.
-    if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    if (pblockdb)
     {
         pos.nFile = 1;
         pos.nPos = nAddSize;
@@ -3178,7 +3178,7 @@ bool FindBlockPos(CValidationState &state,
 bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigned int nAddSize)
 {
     // nUndoPos for blockdb is a flag, set it to 1 to inidicate we have the data
-    if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    if (pblockdb)
     {
         pos.nPos = 1;
         if (!CheckDiskSpace(nAddSize))
@@ -3787,19 +3787,11 @@ bool static LoadBlockIndexDB()
     if (!fHavePruned)
     {
         // by default we want to sync from disk instead of network if possible
-        bool syncBlocks = true;
-        if (!DetermineStorageSync())
-        {
-            syncBlocks = false;
-        }
-        if (syncBlocks)
-        {
-            // run a db sync here to sync storage methods
-            // may increase startup time significantly but is faster than network sync
-            LOGA("Upgrading block database...\n");
-            uiInterface.InitMessage(_("Upgrading block database...This could take a while."));
-            SyncStorage(chainparams);
-        }
+        // run a db sync here to sync storage methods
+        // may increase startup time significantly but is faster than network sync
+        LOGA("Upgrading block database...\n");
+        uiInterface.InitMessage(_("Upgrading block database...This could take a while."));
+        SyncStorage(chainparams);
     }
 
     delete pblocktreeother;
@@ -3886,7 +3878,7 @@ bool static LoadBlockIndexDB()
             pindexBestHeader = pindex;
     }
 
-    if (BLOCK_DB_MODE != DB_BLOCK_STORAGE)
+    if (!pblockdb) // sequential files
     {
         // Check presence of blk files
 
@@ -3940,15 +3932,7 @@ bool static LoadBlockIndexDB()
     LOGA("%s: transaction index %s\n", __func__, fTxIndex ? "enabled" : "disabled");
 
     // Load pointer to end of best chain
-    uint256 bestblockhash;
-    if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
-    {
-        bestblockhash = pcoinsdbview->GetBestBlockSeq();
-    }
-    if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
-    {
-        bestblockhash = pcoinsdbview->GetBestBlockDb();
-    }
+    uint256 bestblockhash = pcoinsdbview->GetBestBlock();
     BlockMap::iterator it = mapBlockIndex.find(bestblockhash);
     if (it == mapBlockIndex.end())
     {
