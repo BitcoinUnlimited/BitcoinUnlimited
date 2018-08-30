@@ -9,9 +9,9 @@
 #include "guiutil.h"
 #include "peertablemodel.h"
 
-#include "graphene.h"
+#include "blockrelay/graphene.h"
+#include "blockrelay/thinblock.h"
 #include "net.h"
-#include "thinblock.h"
 
 #include <QCompleter>
 #include <QWidget>

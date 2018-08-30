@@ -3,12 +3,13 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "requestManager.h"
+#include "blockrelay/graphene.h"
+#include "blockrelay/thinblock.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "consensus/consensus.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
-#include "graphene.h"
 #include "leakybucket.h"
 #include "main.h"
 #include "net.h"
@@ -17,7 +18,6 @@
 #include "primitives/block.h"
 #include "rpc/server.h"
 #include "stat.h"
-#include "thinblock.h"
 #include "tinyformat.h"
 #include "txmempool.h"
 #include "txorphanpool.h"

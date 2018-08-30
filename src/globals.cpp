@@ -9,6 +9,8 @@
 // purposes.
 
 #include "addrman.h"
+#include "blockrelay/graphene.h"
+#include "blockrelay/thinblock.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "clientversion.h"
@@ -16,7 +18,6 @@
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "dosman.h"
-#include "graphene.h"
 #include "leakybucket.h"
 #include "main.h"
 #include "miner.h"
@@ -28,7 +29,6 @@
 #include "rpc/server.h"
 #include "script/standard.h"
 #include "stat.h"
-#include "thinblock.h"
 #include "timedata.h"
 #include "tinyformat.h"
 #include "tweak.h"

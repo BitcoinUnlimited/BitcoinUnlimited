@@ -5,10 +5,10 @@
 #ifndef BITCOIN_GRAPHENE_H
 #define BITCOIN_GRAPHENE_H
 
+#include "blockrelay/graphene_set.h"
 #include "bloom.h"
 #include "config.h"
 #include "consensus/validation.h"
-#include "graphene_set.h"
 #include "iblt.h"
 #include "primitives/block.h"
 #include "protocol.h"

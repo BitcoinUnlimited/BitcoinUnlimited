@@ -15,12 +15,12 @@
 #include "net.h"
 
 #include "addrman.h"
+#include "blockrelay/graphene.h"
 #include "chainparams.h"
 #include "connmgr.h"
 #include "consensus/consensus.h"
 #include "crypto/common.h"
 #include "dosman.h"
-#include "graphene.h"
 #include "hash.h"
 #include "iblt.h"
 #include "primitives/transaction.h"

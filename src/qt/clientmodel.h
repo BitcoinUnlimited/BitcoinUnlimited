@@ -6,8 +6,8 @@
 #ifndef BITCOIN_QT_CLIENTMODEL_H
 #define BITCOIN_QT_CLIENTMODEL_H
 
-#include "graphene.h"
-#include "thinblock.h"
+#include "blockrelay/graphene.h"
+#include "blockrelay/thinblock.h"
 
 #include <QDateTime>
 #include <QObject>

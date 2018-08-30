@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "connmgr.h"
@@ -19,7 +20,6 @@
 #include "policy/policy.h"
 #include "pow.h"
 #include "requestManager.h"
-#include "thinblock.h"
 #include "timedata.h"
 #include "txmempool.h"
 #include "txorphanpool.h"

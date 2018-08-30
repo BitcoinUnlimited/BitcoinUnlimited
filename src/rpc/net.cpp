@@ -5,16 +5,16 @@
 
 #include "rpc/server.h"
 
+#include "blockrelay/graphene.h"
+#include "blockrelay/thinblock.h"
 #include "chainparams.h"
 #include "clientversion.h"
 #include "dosman.h"
-#include "graphene.h"
 #include "main.h"
 #include "net.h"
 #include "netbase.h"
 #include "protocol.h"
 #include "sync.h"
-#include "thinblock.h"
 #include "timedata.h"
 #include "tweak.h"
 #include "ui_interface.h"
