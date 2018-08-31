@@ -76,6 +76,12 @@ bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const
 uint256 CCoinsViewDB::GetBestBlock() const
 {
     READLOCK(cs_utxo);
+    return _GetBestBlock();
+}
+
+uint256 CCoinsViewDB::_GetBestBlock() const
+{
+    AssertLockHeld(cs_utxo);
     uint256 hashBestChain;
     std::string strmode = std::to_string(static_cast<int32_t>(BLOCK_DB_MODE));
     if (pblockdb)
@@ -95,6 +101,12 @@ uint256 CCoinsViewDB::GetBestBlock() const
 uint256 CCoinsViewDB::GetBestBlock(BlockDBMode mode) const
 {
     READLOCK(cs_utxo);
+    return _GetBestBlock(mode);
+}
+
+uint256 CCoinsViewDB::_GetBestBlock(BlockDBMode mode) const
+{
+    AssertLockHeld(cs_utxo);
     uint256 hashBestChain;
     // if override isnt end, override the fetch to get the best block of a specific mode
     if (mode != END_STORAGE_OPTIONS)
@@ -114,10 +126,15 @@ uint256 CCoinsViewDB::GetBestBlock(BlockDBMode mode) const
     return hashBestChain;
 }
 
-
 void CCoinsViewDB::WriteBestBlock(const uint256 &hashBlock)
 {
     WRITELOCK(cs_utxo);
+    _WriteBestBlock(hashBlock);
+}
+
+void CCoinsViewDB::_WriteBestBlock(const uint256 &hashBlock)
+{
+    AssertWriteLockHeld(cs_utxo);
     std::string strmode = std::to_string(static_cast<int32_t>(BLOCK_DB_MODE));
     if (!hashBlock.IsNull())
     {
@@ -136,6 +153,12 @@ void CCoinsViewDB::WriteBestBlock(const uint256 &hashBlock)
 void CCoinsViewDB::WriteBestBlock(const uint256 &hashBlock, BlockDBMode mode)
 {
     WRITELOCK(cs_utxo);
+    _WriteBestBlock(hashBlock);
+}
+
+void CCoinsViewDB::_WriteBestBlock(const uint256 &hashBlock, BlockDBMode mode)
+{
+    AssertWriteLockHeld(cs_utxo);
     if (mode != END_STORAGE_OPTIONS)
     {
         std::string strmode = std::to_string(static_cast<int32_t>(mode));
@@ -213,7 +236,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
         count++;
     }
     if (!hashBlock.IsNull())
-        WriteBestBlock(hashBlock);
+        _WriteBestBlock(hashBlock);
 
     bool ret = db.WriteBatch(batch);
     LOG(COINDB, "Committing %u changed transactions (out of %u) to coin database with %u batch writes...\n",
