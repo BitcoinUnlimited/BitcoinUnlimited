@@ -383,10 +383,6 @@ public:
         // There can be up to two write buffers so return the total
         return options.write_buffer_size * 2;
     }
-
-    leveldb::DB *getpdb() { return this->pdb; }
-    leveldb::ReadOptions getreadoptions() const { return this->readoptions; }
-    std::vector<unsigned char> getobfuscate_key() const { return this->obfuscate_key; }
 };
 
 #endif // BITCOIN_DBWRAPPER_H
