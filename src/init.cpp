@@ -245,6 +245,8 @@ void Shutdown()
         pblocktree = nullptr;
         delete pblockdb;
         pblockdb = nullptr;
+        delete pblockundodb;
+        pblockundodb = nullptr;
     }
 #ifdef ENABLE_WALLET
     if (pwalletMain)
@@ -978,17 +980,17 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 
     fReindex = GetBoolArg("-reindex", DEFAULT_REINDEX);
     int64_t requested_block_mode = GetArg("-useblockdb", DEFAULT_BLOCK_DB_MODE);
-    if (requested_block_mode >= 0 && requested_block_mode < END_STORAGE_OPTIONS)
+    if (requested_block_mode == 0)
     {
-        BLOCK_DB_MODE = static_cast<BlockDBMode>(requested_block_mode);
+        BLOCK_DB_MODE = SEQUENTIAL_BLOCK_FILES;
     }
     else
     {
-        BLOCK_DB_MODE = DEFAULT_BLOCK_DB_MODE;
+        BLOCK_DB_MODE = DB_BLOCK_STORAGE;
     }
 
     // Upgrading to 0.8; hard-link the old blknnnn.dat files into /blocks/
-    if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+    if (BLOCK_DB_MODE != DB_BLOCK_STORAGE)
     {
         fs::path blocksDir = GetDataDir() / "blocks";
         if (!fs::exists(blocksDir))
@@ -1053,6 +1055,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                 delete pblocktree;
                 delete pblocktreeother;
                 delete pblockdb;
+                delete pblockundodb;
 
                 uiInterface.InitMessage(_("Opening Block database..."));
                 InitializeBlockStorage(nBlockTreeDBCache, nBlockDBCache, nBlockUndoDBCache);

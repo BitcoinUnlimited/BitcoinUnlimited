@@ -7,7 +7,6 @@
 #ifndef BITCOIN_TXDB_H
 #define BITCOIN_TXDB_H
 
-#include "blockstorage/dbabstract.h"
 #include "chain.h"
 #include "coins.h"
 #include "dbwrapper.h"
@@ -112,10 +111,13 @@ public:
 
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
-    uint256 GetBestBlock() const;
-    uint256 GetBestBlock(BlockDBMode mode) const;
-    void WriteBestBlock(const uint256 &hashBlock);
-    void WriteBestBlock(const uint256 &hashBlock, BlockDBMode mode);
+    uint256 _GetBestBlock() const override;
+    uint256 GetBestBlockSeq() const;
+    uint256 _GetBestBlockSeq() const;
+    void WriteBestBlockSeq(const uint256 &hashBlock);
+    uint256 GetBestBlockDb() const;
+    uint256 _GetBestBlockDb() const;
+    void WriteBestBlockDb(const uint256 &hashBlock);
     bool BatchWrite(CCoinsMap &mapCoins,
         const uint256 &hashBlock,
         const uint64_t nBestCoinHeight,

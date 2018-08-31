@@ -6,11 +6,13 @@
 #define BLOCKDB_H
 
 #include "chain.h"
-#include "dbabstract.h"
 #include "dbwrapper.h"
 #include "primitives/block.h"
 #include "uint256.h"
 #include "undo.h"
+
+// current version of the blockdb data structure
+const int32_t CURRENT_VERSION = 1;
 
 /**
  * A note on UndoDBValue
@@ -57,35 +59,24 @@ struct UndoDBValue
 };
 
 /** Access to the block database (blocks/ * /) */
-class CBlockLevelDB : public CDatabaseAbstract
+class CBlockDB : public CDBWrapper
 {
 public:
-    CBlockLevelDB(size_t nCacheSizeBlock,
-        size_t nCacheSizeUndo,
+    CBlockDB(std::string folder,
+        size_t nCacheSize,
         bool fMemory = false,
         bool fWipe = false,
-        bool obfuscate = false);
+        bool obfuscate = false,
+        COverrideOptions * override = nullptr);
 
 private:
-    CBlockLevelDB(const CBlockLevelDB &);
-    void operator=(const CBlockLevelDB &);
-
-    CDBWrapper *pwrapperblock;
-    CDBWrapper *pwrapperundo;
+    CBlockDB(const CBlockDB &);
+    void operator=(const CBlockDB &);
 
 public:
-    // clean up our internal pointers
-    ~CBlockLevelDB()
-    {
-        delete pwrapperblock;
-        pwrapperblock = nullptr;
-        delete pwrapperundo;
-        pwrapperundo = nullptr;
-    }
-
     // we need a custom read function to account for the way we want to deserialize undodbvalue
     template <typename K>
-    bool ReadUndoInternal(const K &key, UndoDBValue &value, CBlockUndo &blockundo) const
+    bool ReadUndo(const K &key, UndoDBValue &value, CBlockUndo &blockundo) const
     {
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
         ssKey.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
@@ -93,7 +84,7 @@ public:
         leveldb::Slice slKey(ssKey.data(), ssKey.size());
 
         std::string strValue;
-        leveldb::Status status = pwrapperundo->getpdb()->Get(pwrapperundo->getreadoptions(), slKey, &strValue);
+        leveldb::Status status = pdb->Get(readoptions, slKey, &strValue);
         if (!status.ok())
         {
             if (status.IsNotFound())
@@ -104,7 +95,7 @@ public:
         try
         {
             CDataStream ssValue(strValue.data(), strValue.data() + strValue.size(), SER_DISK, CLIENT_VERSION);
-            ssValue.Xor(pwrapperundo->getobfuscate_key());
+            ssValue.Xor(obfuscate_key);
             value.Unserialize(ssValue, blockundo);
         }
         catch (const std::exception &)
@@ -113,41 +104,17 @@ public:
         }
         return true;
     }
-
-    bool WriteBlock(const CBlock &block);
-    bool ReadBlock(const CBlockIndex *pindex, CBlock &block);
-    bool EraseBlock(CBlock &block);
-    bool EraseBlock(const CBlockIndex *pindex);
-
-    void CondenseBlockData(const std::string &key_begin, const std::string &key_end)
-    {
-        CDataStream ssKey1(SER_DISK, CLIENT_VERSION), ssKey2(SER_DISK, CLIENT_VERSION);
-        ssKey1.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
-        ssKey2.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
-        ssKey1 << key_begin;
-        ssKey2 << key_end;
-        leveldb::Slice slKey1(ssKey1.data(), ssKey1.size());
-        leveldb::Slice slKey2(ssKey2.data(), ssKey2.size());
-        pwrapperblock->getpdb()->CompactRange(&slKey1, &slKey2);
-    }
-
-    bool WriteUndo(const CBlockUndo &blockundo, const CBlockIndex *pindex);
-    bool ReadUndo(CBlockUndo &blockundo, const CBlockIndex *pindex);
-    bool EraseUndo(const CBlockIndex *pindex);
-
-    void CondenseUndoData(const std::string &key_begin, const std::string &key_end)
-    {
-        CDataStream ssKey1(SER_DISK, CLIENT_VERSION), ssKey2(SER_DISK, CLIENT_VERSION);
-        ssKey1.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
-        ssKey2.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
-        ssKey1 << key_begin;
-        ssKey2 << key_end;
-        leveldb::Slice slKey1(ssKey1.data(), ssKey1.size());
-        leveldb::Slice slKey2(ssKey2.data(), ssKey2.size());
-        pwrapperundo->getpdb()->CompactRange(&slKey1, &slKey2);
-    }
-
-    uint64_t PruneDB(uint64_t nLastBlockWeCanPrune);
 };
+
+extern CBlockDB *pblockdb;
+extern CBlockDB *pblockundodb;
+
+bool WriteBlockToDB(const CBlock &block);
+bool ReadBlockFromDB(const CBlockIndex *pindex, CBlock &block);
+
+bool WriteUndoToDB(const CBlockUndo &blockundo, const CBlockIndex *pindex);
+bool ReadUndoFromDB(CBlockUndo &blockundo, const CBlockIndex *pindex);
+
+uint64_t FindFilesToPruneLevelDB(uint64_t nLastBlockWeCanPrune);
 
 #endif // BLOCKDB_H
