@@ -18,6 +18,7 @@ class CWalletTx;
 
 // Addresses need to preserve their txout order for accurate display so implemented as list (instead of map)
 typedef std::pair<std::string, CScript> Address;
+
 typedef std::list<Address> AddressList;
 
 /** UI model for transaction status. The transaction status is the part of a transaction that will change over time.
@@ -104,6 +105,7 @@ public:
         const CAmount &debit,
         const CAmount &credit)
         : hash(hash), time(time), type(type), addresses(addresses), debit(debit), credit(credit), idx(0)
+
     {
     }
 
@@ -130,6 +132,9 @@ public:
 
     /** Whether the transaction was sent/received with a watch-only address */
     bool involvesWatchAddress;
+
+    /** Whether the transaction involves a public label */
+    bool involvesPublicLabel;
 
     /** Return the unique identifier for this transaction (part) */
     QString getTxID() const;

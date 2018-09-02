@@ -20,6 +20,7 @@ const QDateTime TransactionFilterProxy::MAX_DATE = QDateTime::fromTime_t(0xFFFFF
 TransactionFilterProxy::TransactionFilterProxy(QObject *parent)
     : QSortFilterProxyModel(parent), dateFrom(MIN_DATE), dateTo(MAX_DATE), addrPrefix(), typeFilter(ALL_TYPES),
       watchOnlyFilter(WatchOnlyFilter_All), minAmount(0), limitRows(-1), showInactive(true)
+
 {
 }
 
@@ -30,6 +31,8 @@ bool TransactionFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex &
     int type = index.data(TransactionTableModel::TypeRole).toInt();
     QDateTime datetime = index.data(TransactionTableModel::DateRole).toDateTime();
     bool involvesWatchAddress = index.data(TransactionTableModel::WatchonlyRole).toBool();
+    bool involvesPublicLabelAddress = index.data(TransactionTableModel::PublicLabelRole).toBool();
+
     QString address = index.data(TransactionTableModel::AddressRole).toString();
     QString label = index.data(TransactionTableModel::LabelRole).toString();
     qint64 amount = llabs(index.data(TransactionTableModel::AmountRole).toLongLong());
@@ -43,7 +46,9 @@ bool TransactionFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex &
         return false;
     if (!involvesWatchAddress && watchOnlyFilter == WatchOnlyFilter_Yes)
         return false;
-    if (datetime < dateFrom || datetime > dateTo)
+    if (involvesPublicLabelAddress != publicLabelFilter)
+        return false;;
+    if(datetime < dateFrom || datetime > dateTo)
         return false;
     if (!address.contains(addrPrefix, Qt::CaseInsensitive) && !label.contains(addrPrefix, Qt::CaseInsensitive))
         return false;
@@ -85,6 +90,7 @@ void TransactionFilterProxy::setWatchOnlyFilter(WatchOnlyFilter filter)
 }
 
 void TransactionFilterProxy::setLimit(int limit) { this->limitRows = limit; }
+
 void TransactionFilterProxy::setShowInactive(bool showInactive)
 {
     this->showInactive = showInactive;

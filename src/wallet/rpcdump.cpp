@@ -250,6 +250,7 @@ void ImportScript(const CScript &script, const std::string &strLabel,
                                              "private key for this address or "
                                              "script");
 
+
     pwalletMain->MarkDirty();
 
     if (!pwalletMain->HaveWatchOnly(script) && !pwalletMain->AddWatchOnly(script))

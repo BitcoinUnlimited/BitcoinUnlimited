@@ -52,6 +52,8 @@ public:
         DateRole,
         /** Watch-only boolean */
         WatchonlyRole,
+        /** Public label boolean */
+        PublicLabelRole,
         /** Watch-only icon */
         WatchonlyDecorationRole,
         /** Long description (HTML format) */
@@ -107,11 +109,16 @@ private:
     QString formatTooltip(const TransactionRecord *rec) const;
 #ifdef ENABLE_WALLET
     QString pickLabelWithAddress(AddressList listAddresses, std::string &address) const;
+
 #endif
 
     QVariant txStatusDecoration(const TransactionRecord *wtx) const;
     QVariant txWatchonlyDecoration(const TransactionRecord *wtx) const;
     QVariant txAddressDecoration(const TransactionRecord *wtx) const;
+
+    mutable QMap<std::string, CAmount> publicLabelTotals;
+    CAmount unspentPublicLabelAmount(const TransactionRecord *tr) const;
+    CAmount unspentPublicLabelTotal(std::string publicLabel) const;
 
 public Q_SLOTS:
     /* New transaction, or transaction changed status */

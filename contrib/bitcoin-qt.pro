@@ -19,6 +19,9 @@ FORMS += \
     ../src/qt/forms/transactiondescdialog.ui \
 
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> gui_top_public_labels
 RESOURCES += \
     ../src/qt/bitcoin.qrc

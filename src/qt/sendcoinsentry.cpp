@@ -227,12 +227,19 @@ void SendCoinsEntry::setAddress(const QString &address)
     ui->payAmount->setFocus();
 }
 
+void SendCoinsEntry::setPublicLabel(const QString labelPublic)
+{
+    ui->lineEditPublic->setText(labelPublic);
+    ui->payAmount->setFocus();
+}
+
 bool SendCoinsEntry::isClear()
 {
     return ui->payTo->text().isEmpty() && ui->payTo_is->text().isEmpty() && ui->payTo_s->text().isEmpty();
 }
 
 void SendCoinsEntry::setFocus() { ui->payTo->setFocus(); }
+
 void SendCoinsEntry::updateDisplayUnit()
 {
     if (model && model->getOptionsModel())
