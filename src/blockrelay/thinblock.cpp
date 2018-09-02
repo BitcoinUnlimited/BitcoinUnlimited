@@ -1334,7 +1334,7 @@ bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
         // or backward by a random amount plus or minus 2 seconds.
         FastRandomContext insecure_rand(false);
         uint64_t nOffset = nTimeToWait - (8000 + (insecure_rand.rand64() % 4000) + 1);
-        mapThinBlockTimer[hash] = GetTimeMillis() + nOffset;
+        mapThinBlockTimer[hash] = std::make_pair(GetTimeMillis() + nOffset, false);
         LOG(THIN, "Starting Preferential Thinblock timer (%d millis)\n", nTimeToWait + nOffset);
     }
     else
@@ -1342,11 +1342,21 @@ bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
         // Check that we have not exceeded the 10 second limit.
         // If we have then we want to return false so that we can
         // proceed to download a regular block instead.
-        uint64_t elapsed = GetTimeMillis() - mapThinBlockTimer[hash];
-        if (elapsed > nTimeToWait)
+        auto iter =  mapThinBlockTimer.find(hash);
+        if (iter != mapThinBlockTimer.end())
         {
-            LOG(THIN, "Preferential Thinblock timer exceeded - downloading regular block instead\n");
-            return false;
+            int64_t elapsed = GetTimeMillis() - iter->second.first;
+            if (elapsed > nTimeToWait)
+            {
+                // Only print out the log entry once.  Because the thinblock timer will be hit
+                // many times when requesting a block we don't want to fill up the log file.
+                if (!iter->second.second)
+                {
+                    iter->second.second = true;
+                    LOG(THIN, "Preferential Thinblock timer exceeded - downloading regular block instead\n");
+                }
+                return false;
+            }
         }
     }
     return true;
