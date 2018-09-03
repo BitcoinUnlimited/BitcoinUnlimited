@@ -400,10 +400,10 @@ public:
     CCriticalSection cs_mapthinblocksinflight;
     std::map<uint256, CThinBlockInFlight> mapThinBlocksInFlight GUARDED_BY(cs_mapthinblocksinflight);
 
-    double nGetXBlockTxCount; // Count how many get_xblocktx requests are made
-    uint64_t nGetXBlockTxLastTime; // The last time a get_xblocktx request was made
-    double nGetXthinCount; // Count how many get_xthin requests are made
-    uint64_t nGetXthinLastTime; // The last time a get_xthin request was made
+    std::atomic<double> nGetXBlockTxCount; // Count how many get_xblocktx requests are made
+    std::atomic<uint64_t> nGetXBlockTxLastTime; // The last time a get_xblocktx request was made
+    std::atomic<double> nGetXthinCount; // Count how many get_xthin requests are made
+    std::atomic<uint64_t> nGetXthinLastTime; // The last time a get_xthin request was made
     uint32_t nXthinBloomfilterSize; // The maximum xthin bloom filter size (in bytes) that our peer will accept.
     // BUIP010 Xtreme Thinblocks: end section
 
@@ -422,10 +422,10 @@ public:
     CCriticalSection cs_mapgrapheneblocksinflight;
     std::map<uint256, CGrapheneBlockInFlight> mapGrapheneBlocksInFlight GUARDED_BY(cs_mapgrapheneblocksinflight);
 
-    double nGetGrapheneBlockTxCount; // Count how many get_xblocktx requests are made
-    uint64_t nGetGrapheneBlockTxLastTime; // The last time a get_xblocktx request was made
-    double nGetGrapheneCount; // Count how many get_graphene requests are made
-    uint64_t nGetGrapheneLastTime; // The last time a get_graphene request was made
+    std::atomic<double> nGetGrapheneBlockTxCount; // Count how many get_xblocktx requests are made
+    std::atomic<uint64_t> nGetGrapheneBlockTxLastTime; // The last time a get_xblocktx request was made
+    std::atomic<double> nGetGrapheneCount; // Count how many get_graphene requests are made
+    std::atomic<uint64_t> nGetGrapheneLastTime; // The last time a get_graphene request was made
     uint32_t nGrapheneBloomfilterSize; // The maximum graphene bloom filter size (in bytes) that our peer will accept.
     // BUIPXXX Graphene blocks: end section
 

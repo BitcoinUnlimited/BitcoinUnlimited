@@ -4905,13 +4905,12 @@ static bool BasicThinblockChecks(CNode *pfrom, const CChainParams &chainparams)
     // Check for Misbehaving and DOS
     // If they make more than 20 requests in 10 minutes then disconnect them
     {
-        LOCK(cs_vNodes);
         if (pfrom->nGetXthinLastTime <= 0)
             pfrom->nGetXthinLastTime = GetTime();
         uint64_t nNow = GetTime();
-        pfrom->nGetXthinCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXthinLastTime));
+        pfrom->nGetXthinCount = pfrom->nGetXthinCount * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXthinLastTime));
         pfrom->nGetXthinLastTime = nNow;
-        pfrom->nGetXthinCount += 1;
+        pfrom->nGetXthinCount = pfrom->nGetXthinCount + 1;
         LOG(THIN, "nGetXthinCount is %f\n", pfrom->nGetXthinCount);
         if (chainparams.NetworkIDString() == "main") // other networks have variable mining rates
         {
