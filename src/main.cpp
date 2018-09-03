@@ -4894,6 +4894,38 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
     }
 }
 
+static bool BasicThinblockChecks(CNode *pfrom, const CChainParams &chainparams)
+{
+    if (!pfrom->ThinBlockCapable())
+    {
+        dosMan.Misbehaving(pfrom, 100);
+        return error("Thinblock message received from a non thinblock node, peer=%d", pfrom->GetId());
+    }
+
+    // Check for Misbehaving and DOS
+    // If they make more than 20 requests in 10 minutes then disconnect them
+    {
+        LOCK(cs_vNodes);
+        if (pfrom->nGetXthinLastTime <= 0)
+            pfrom->nGetXthinLastTime = GetTime();
+        uint64_t nNow = GetTime();
+        pfrom->nGetXthinCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXthinLastTime));
+        pfrom->nGetXthinLastTime = nNow;
+        pfrom->nGetXthinCount += 1;
+        LOG(THIN, "nGetXthinCount is %f\n", pfrom->nGetXthinCount);
+        if (chainparams.NetworkIDString() == "main") // other networks have variable mining rates
+        {
+            if (pfrom->nGetXthinCount >= 20)
+            {
+                dosMan.Misbehaving(pfrom, 50); // If they exceed the limit then disconnect them
+                return error("requesting too many getdata thinblocks");
+            }
+        }
+    }
+
+    return true;
+}
+
 bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived)
 {
     int64_t receiptTime = GetTime();
@@ -5340,18 +5372,24 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 dosMan.Misbehaving(pfrom, 20);
                 return error("message inv invalid type = %u", inv.type);
             }
-            // inv.hash does not need validation, since SHA2556 hash can be any value
+
+            // Make basic checks
+            if (inv.type == MSG_THINBLOCK)
+            {
+                if (!BasicThinblockChecks(pfrom, chainparams))
+                    return false;
+            }
+
+
+            if (fDebug || (vInv.size() != 1))
+                LOG(NET, "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
+
+            if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
+                LOG(NET, "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
+
+            pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
+            ProcessGetData(pfrom, chainparams.GetConsensus());
         }
-
-
-        if (fDebug || (vInv.size() != 1))
-            LOG(NET, "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
-
-        if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
-            LOG(NET, "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
-
-        pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
-        ProcessGetData(pfrom, chainparams.GetConsensus());
     }
 
 
@@ -5500,7 +5538,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     const uint256 &orphanHash = *mi;
 
                     // Make sure we actually have an entry on the orphan cache. While this should never fail because
-                    // we always erase orphans and any mapOrphanTransactionsByPrev at the same time, still we need to
+                    // we always erase orphans and any mapOrphanTransactionsByPrev at the same time, still we need
+                    // to
                     // be sure.
                     bool fOk = true;
                     DbgAssert(orphanpool.mapOrphanTransactions.count(orphanHash), fOk = false);
@@ -5612,7 +5651,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
         FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
 
-        // The flush to disk above is only periodic therefore we need to continuously trim any excess from the cache.
+        // The flush to disk above is only periodic therefore we need to continuously trim any excess from the
+        // cache.
         pcoinsTip->Trim(nCoinCacheMaxSize);
     }
 
@@ -5790,8 +5830,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     state->nSyncStartTime = GetTime(); // reset the time because more headers needed
             }
 
-            // During the process of IBD we need to update block availability for every connected peer. To do that we
-            // request, from each NODE_NETWORK peer, a header that matches the last blockhash found in this recent set
+            // During the process of IBD we need to update block availability for every connected peer. To do that
+            // we
+            // request, from each NODE_NETWORK peer, a header that matches the last blockhash found in this recent
+            // set
             // of headers. Once the reqeusted header is received then the block availability for this peer will get
             // updated.
             if (IsInitialBlockDownload())
@@ -5847,7 +5889,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!nodestate->fFirstHeadersReceived)
         {
             // We want to make sure that the peer doesn't just send us any old valid header. The block height of the
-            // last header they send us should be equal to our block height at the time we made the GETHEADERS request.
+            // last header they send us should be equal to our block height at the time we made the GETHEADERS
+            // request.
             if (pindexLast && nodestate->nFirstHeadersExpectedHeight <= pindexLast->nHeight)
             {
                 nodestate->fFirstHeadersReceived = true;
@@ -5917,32 +5960,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     // BUIP010 Xtreme Thinblocks: begin section
     else if (strCommand == NetMsgType::GET_XTHIN && !fImporting && !fReindex && IsThinBlocksEnabled())
     {
-        if (!pfrom->ThinBlockCapable())
-        {
-            dosMan.Misbehaving(pfrom, 100);
-            return error("Thinblock message received from a non thinblock node, peer=%d", pfrom->GetId());
-        }
-
-        // Check for Misbehaving and DOS
-        // If they make more than 20 requests in 10 minutes then disconnect them
-        {
-            LOCK(cs_vNodes);
-            if (pfrom->nGetXthinLastTime <= 0)
-                pfrom->nGetXthinLastTime = GetTime();
-            uint64_t nNow = GetTime();
-            pfrom->nGetXthinCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXthinLastTime));
-            pfrom->nGetXthinLastTime = nNow;
-            pfrom->nGetXthinCount += 1;
-            LOG(THIN, "nGetXthinCount is %f\n", pfrom->nGetXthinCount);
-            if (chainparams.NetworkIDString() == "main") // other networks have variable mining rates
-            {
-                if (pfrom->nGetXthinCount >= 20)
-                {
-                    dosMan.Misbehaving(pfrom, 100); // If they exceed the limit then disconnect them
-                    return error("requesting too many get_xthin");
-                }
-            }
-        }
+        if (!BasicThinblockChecks(pfrom, chainparams))
+            return false;
 
         CBloomFilter filterMemPool;
         CInv inv;
@@ -5992,8 +6011,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     {
         return HandleExpeditedRequest(vRecv, pfrom);
     }
-
-
     else if (strCommand == NetMsgType::XPEDITEDBLK)
     {
         // ignore the expedited message unless we are at the chain tip...
@@ -6374,7 +6391,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     else if (strCommand == NetMsgType::REJECT)
     {
-        // BU: Request manager: this was restructured to not just be active in fDebug mode so that the request manager
+        // BU: Request manager: this was restructured to not just be active in fDebug mode so that the request
+        // manager
         // can be notified of request rejections.
         try
         {
@@ -6733,8 +6751,10 @@ bool SendMessages(CNode *pto)
 
         CNodeState &state = *State(pto->GetId());
 
-        // If a sync has been started check whether we received the first batch of headers requested within the timeout
-        // period. If not then disconnect and ban the node and a new node will automatically be selected to start the
+        // If a sync has been started check whether we received the first batch of headers requested within the
+        // timeout
+        // period. If not then disconnect and ban the node and a new node will automatically be selected to start
+        // the
         // headers download.
         if ((state.fSyncStarted) && (state.nSyncStartTime < GetTime() - INITIAL_HEADERS_TIMEOUT) &&
             (!state.fFirstHeadersReceived) && !pto->fWhitelisted)
@@ -6780,9 +6800,12 @@ bool SendMessages(CNode *pto)
             }
         }
 
-        // During IBD and when a new NODE_NETWORK peer connects we have to ask for if it has our best header in order
-        // to update our block availability. We only want/need to do this only once per peer (if the initial batch of
-        // headers has still not been etirely donwnloaded yet then the block availability will be updated during that
+        // During IBD and when a new NODE_NETWORK peer connects we have to ask for if it has our best header in
+        // order
+        // to update our block availability. We only want/need to do this only once per peer (if the initial batch
+        // of
+        // headers has still not been etirely donwnloaded yet then the block availability will be updated during
+        // that
         // process rather than here).
         if (IsInitialBlockDownload() && !state.fRequestedInitialBlockAvailability &&
             state.pindexBestKnownBlock == nullptr && !fReindex && !fImporting)
@@ -6969,7 +6992,8 @@ bool SendMessages(CNode *pto)
                 // about 3/4 of the nodes should end up in this list, so over-allocate by 1/10th + 10 items
                 vInvWait.reserve((invsz * 3) / 4 + invsz / 10 + 10);
 
-                // Make copy of vInventoryToSend while cs_inventory is locked but also ignore some tx and defer others
+                // Make copy of vInventoryToSend while cs_inventory is locked but also ignore some tx and defer
+                // others
                 for (const CInv &inv : pto->vInventoryToSend)
                 {
                     if (inv.type == MSG_TX)
