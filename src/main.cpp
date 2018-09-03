@@ -6953,17 +6953,8 @@ bool SendMessages(CNode *pto)
         //
 
         FastRandomContext insecure_rand;
-        std::vector<CInv> vInvWait;
         std::vector<CInv> vInvSend;
         {
-            bool fSendTrickle = !pto->fWhitelisted;
-            if (pto->nNextInvSend < nNow)
-            {
-                fSendTrickle = false;
-                pto->nNextInvSend = PoissonNextSend(nNow, AVG_INVENTORY_BROADCAST_INTERVAL);
-            }
-
-            if (1)
             {
                 // BU - here we only want to forward message inventory if our peer has actually been requesting
                 // useful data or giving us useful data.  We give them 2 minutes to be useful but then choke off
@@ -6976,8 +6967,6 @@ bool SendMessages(CNode *pto)
 
                 int invsz = pto->vInventoryToSend.size();
                 vInvSend.reserve(invsz);
-                // about 3/4 of the nodes should end up in this list, so over-allocate by 1/10th + 10 items
-                vInvWait.reserve((invsz * 3) / 4 + invsz / 10 + 10);
 
                 // Make copy of vInventoryToSend while cs_inventory is locked but also ignore some tx and defer others
                 for (const CInv &inv : pto->vInventoryToSend)
@@ -6989,20 +6978,11 @@ bool SendMessages(CNode *pto)
                         // skip if we already know abt this one
                         if (pto->filterInventoryKnown.contains(inv.hash))
                             continue;
-                        if (fSendTrickle)
-                        {
-                            // 1/4 of tx invs blast to all immediately
-                            if ((insecure_rand.rand32() & 3) != 0)
-                            {
-                                vInvWait.push_back(inv);
-                                continue;
-                            }
-                        }
                     }
                     vInvSend.push_back(inv);
                     pto->filterInventoryKnown.insert(inv.hash);
                 }
-                pto->vInventoryToSend = vInvWait;
+                pto->vInventoryToSend.clear();
             }
 
             const int MAX_INV_ELEMENTS = 1000;
