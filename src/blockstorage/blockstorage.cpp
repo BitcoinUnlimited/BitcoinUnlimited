@@ -12,6 +12,7 @@
 #include "fs.h"
 #include "main.h"
 #include "sequential_files.h"
+#include "ui_interface.h"
 #include "undo.h"
 
 extern bool AbortNode(CValidationState &state, const std::string &strMessage, const std::string &userMessage = "");
@@ -137,6 +138,10 @@ void SyncStorage(const CChainParams &chainparams)
     {
         return;
     }
+
+    LOGA("Upgrading block database...\n");
+    uiInterface.InitMessage(_("Upgrading block database...This could take a while."));
+
     GetTempBlockDB(pblockdbsync, otherMode);
     AssertLockHeld(cs_main);
     if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
