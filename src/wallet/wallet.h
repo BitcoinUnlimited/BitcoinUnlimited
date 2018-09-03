@@ -625,6 +625,8 @@ public:
     }
 
     std::map<uint256, CWalletTx> mapWallet;
+    std::map<uint256, CWalletTx> mapWalletPublicLabels;
+
     std::list<CAccountingEntry> laccentries;
 
     typedef std::pair<CWalletTx *, CAccountingEntry *> TxPair;
@@ -799,6 +801,8 @@ public:
     int64_t GetOldestKeyPoolTime();
     void GetAllReserveKeys(std::set<CKeyID> &setAddress) const;
 
+    std::vector<std::pair<CWalletTx, int> > GetPublicLabelTxs(std::string& comparePublicLabel) const;
+
     std::set<std::set<CTxDestination> > GetAddressGroupings();
     std::map<CTxDestination, CAmount> GetAddressBalances();
 
@@ -809,6 +813,7 @@ public:
     isminetype IsMine(const CTxDestination &dest) const;
     bool IsMine(const CTransaction &tx) const;
 
+    std::pair<CAmount, int> UnspentPublicLabelAmount(const CTransaction& tx, const std::string comparePublicLabel) const;
     CAmount GetDebit(const CTxIn &txin, const isminefilter &filter) const;
     CAmount GetCredit(const CTxOut &txout, const isminefilter &filter) const;
     bool IsChange(const CTxOut &txout) const;
@@ -824,6 +829,7 @@ public:
     DBErrors LoadWallet(bool &fFirstRunRet);
     DBErrors ZapWalletTx(std::vector<CWalletTx> &vWtx);
     DBErrors ZapSelectTx(std::vector<uint256> &vHashIn, std::vector<uint256> &vHashOut);
+    void ZapOldPublicLabels();
 
     bool SetAddressBook(const CTxDestination &address, const std::string &strName, const std::string &purpose);
 

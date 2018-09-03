@@ -235,6 +235,7 @@ void SendCoinsDialog::on_sendButton_clicked()
                 }
 
                 recipients.append(rcp);
+
             }
             else
             {
@@ -247,6 +248,7 @@ void SendCoinsDialog::on_sendButton_clicked()
     {
         return;
     }
+
 
 
     fNewRecipientAllowed = false;
@@ -292,6 +294,7 @@ void SendCoinsDialog::on_sendButton_clicked()
             // generate bold amount string
             QString amount =
                 "<b>" + BitcoinUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), rcp.amount);
+
             amount.append("</b>");
             // generate monospace address string
             QString address = "<span style='font-family: monospace;'>" + rcp.address;
@@ -300,6 +303,7 @@ void SendCoinsDialog::on_sendButton_clicked()
             if (!rcp.paymentRequest.IsInitialized()) // normal payment
             {
                 if (rcp.label.length() > 0) // label with address
+
                 {
                     recipientElement = tr("%1 to %2").arg(amount, GUIUtil::HtmlEscape(rcp.label));
                     recipientElement.append(QString(" (%1)").arg(address));
@@ -310,6 +314,7 @@ void SendCoinsDialog::on_sendButton_clicked()
                 }
             }
             else if (!rcp.authenticatedMerchant.isEmpty()) // authenticated payment request
+
             {
                 recipientElement = tr("%1 to %2").arg(amount, GUIUtil::HtmlEscape(rcp.authenticatedMerchant));
             }
@@ -322,6 +327,7 @@ void SendCoinsDialog::on_sendButton_clicked()
                 recipientElement.append(tr("<br><br><b>WARNING!!! DESTINATION IS A FREEZE ADDRESS<br>UNSPENDABLE "
                                            "UNTIL</b> %1 <br>*************************************************<br>")
                                             .arg(GUIUtil::HtmlEscape(rcp.freezeLockTime)));
+
             }
 
         } // else if (!rcp.labelPublic.isEmpty())
@@ -462,16 +468,33 @@ void SendCoinsDialog::setAddress(const QString &address)
     {
         SendCoinsEntry *first = qobject_cast<SendCoinsEntry *>(ui->entries->itemAt(0)->widget());
         if (first->isClear())
+
         {
             entry = first;
+            break;
         }
     }
     if (!entry)
+
     {
         entry = addEntry();
     }
 
-    entry->setAddress(address);
+    if (address != "") entry->setAddress(address);
+}
+
+void SendCoinsDialog::setPublicLabel(const QString labelPublic)
+{
+    // Replace the first empty public label
+    for (int i = 0; ui->entries->count(); i++)
+    {
+        SendCoinsEntry *entry = qobject_cast<SendCoinsEntry*>(ui->entries->itemAt(i)->widget());
+        if (entry->isClearPublicLabel())
+        {
+            entry->setPublicLabel(labelPublic);
+            break;
+        }
+    }
 }
 
 void SendCoinsDialog::pasteEntry(const SendCoinsRecipient &rv)

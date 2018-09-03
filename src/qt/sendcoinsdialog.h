@@ -46,6 +46,7 @@ public:
     QWidget *setupTabChain(QWidget *prev);
 
     void setAddress(const QString &address);
+    void setPublicLabel(const QString labelPublic);
     void pasteEntry(const SendCoinsRecipient &rv);
     bool handlePaymentRequest(const SendCoinsRecipient &recipient);
 
@@ -61,6 +62,8 @@ public Q_SLOTS:
         const CAmount &watchOnlyBalance,
         const CAmount &watchUnconfBalance,
         const CAmount &watchImmatureBalance);
+
+
 
 private:
     Ui::SendCoinsDialog *ui;
