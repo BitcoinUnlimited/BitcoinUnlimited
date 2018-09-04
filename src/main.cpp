@@ -6951,10 +6951,13 @@ bool SendMessages(CNode *pto)
         //
         // Message: inventory
         //
+        // We must send all INV's before returning otherwise, under very heavy transaction rates, we could end up
+        // falling behind in sending INV's and vInventoryToSend could possibly get quite large.
         std::vector<CInv> vInvSend;
+        while (!pto->vInventoryToSend.empty())
         {
             // Send message INV up to the MAX_INV_ELEMENTS. Once we reach the max then send the INV message
-            // and if there is any remaining it will be sent the next time we pass through here.
+            // and if there is any remaining it will be sent on the next iteration until vInventoryToSend is empty.
             int nToErase = 0;
             {
                 // BU - here we only want to forward message inventory if our peer has actually been requesting
