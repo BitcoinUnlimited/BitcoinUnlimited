@@ -29,9 +29,9 @@
 
 #include <memory>
 
-#include <boost/thread.hpp>
 #include <boost/program_options.hpp>
 #include <boost/test/unit_test.hpp>
+#include <boost/thread.hpp>
 
 FastRandomContext insecure_rand_ctx(true);
 
