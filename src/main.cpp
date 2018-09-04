@@ -6951,10 +6951,11 @@ bool SendMessages(CNode *pto)
         //
         // Message: inventory
         //
-
-        FastRandomContext insecure_rand;
         std::vector<CInv> vInvSend;
         {
+            // Send message INV up to the MAX_INV_ELEMENTS. Once we reach the max then send the INV message
+            // and if there is any remaining it will be sent the next time we pass through here.
+            int nToErase = 0;
             {
                 // BU - here we only want to forward message inventory if our peer has actually been requesting
                 // useful data or giving us useful data.  We give them 2 minutes to be useful but then choke off
@@ -6963,41 +6964,40 @@ bool SendMessages(CNode *pto)
                 // However we will still send them block inventory in the case they are a pruned node or wallet
                 // waiting for block announcements, therefore we have to check each inv in pto->vInventoryToSend.
                 bool chokeTxInv = (pto->nActivityBytes == 0 && (nNow / 1000000 - pto->nTimeConnected) > 120);
-                LOCK(pto->cs_inventory);
 
-                int invsz = pto->vInventoryToSend.size();
+                // Make copy of vInventoryToSend while cs_inventory is locked
+                const int MAX_INV_ELEMENTS = 1000;
+                int invsz = std::min((int)pto->vInventoryToSend.size(), MAX_INV_ELEMENTS);
                 vInvSend.reserve(invsz);
 
-                // Make copy of vInventoryToSend while cs_inventory is locked but also ignore some tx and defer others
+                LOCK(pto->cs_inventory);
                 for (const CInv &inv : pto->vInventoryToSend)
                 {
+                    nToErase++;
+
                     if (inv.type == MSG_TX)
                     {
                         if (chokeTxInv)
                             continue;
-                        // skip if we already know abt this one
+                        // skip if we already know about this one
                         if (pto->filterInventoryKnown.contains(inv.hash))
                             continue;
                     }
                     vInvSend.push_back(inv);
                     pto->filterInventoryKnown.insert(inv.hash);
+
+                    if (vInvSend.size() >= MAX_INV_ELEMENTS)
+                        break;
                 }
-                pto->vInventoryToSend.clear();
             }
 
-            const int MAX_INV_ELEMENTS = 1000;
-            int sz = vInvSend.size();
-            if (sz)
+            if (nToErase > 0)
             {
+                pto->vInventoryToSend.erase(pto->vInventoryToSend.begin(), pto->vInventoryToSend.begin() + nToErase);
+
                 LOCK(pto->cs_vSend);
-                for (int i = 0; i < sz; i += MAX_INV_ELEMENTS)
-                {
-                    int sendsz = std::min(MAX_INV_ELEMENTS, sz - i);
-                    std::vector<CInv> vInv(sendsz);
-                    for (int j = 0; j < sendsz; j++)
-                        vInv[j] = vInvSend[i + j];
-                    pto->PushMessage(NetMsgType::INV, vInv); // TODO subvector PushMessage to avoid copy
-                }
+                if (!vInvSend.empty())
+                    pto->PushMessage(NetMsgType::INV, vInvSend);
             }
         }
 
