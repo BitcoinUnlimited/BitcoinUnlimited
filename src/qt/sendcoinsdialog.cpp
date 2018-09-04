@@ -471,7 +471,6 @@ void SendCoinsDialog::setAddress(const QString &address)
 
         {
             entry = first;
-            break;
         }
     }
     if (!entry)

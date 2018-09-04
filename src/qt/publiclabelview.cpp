@@ -158,15 +158,15 @@ PublicLabelView::PublicLabelView(const PlatformStyle *platformStyle, QWidget *pa
     connect(showDetailsAction, SIGNAL(triggered()), this, SLOT(showDetails()));
 }
 
-void PublicLabelView::setModel(WalletModel *model)
+void PublicLabelView::setModel(WalletModel *_model)
 {
-    this->model = model;
-    if(model)
+    this->model = _model;
+    if(_model)
     {
         transactionProxyModel = new TransactionFilterProxy(this);
         // only interested in txs which involve public labels
         transactionProxyModel->setPublicLabelFilter(true);
-        transactionProxyModel->setSourceModel(model->getTransactionTableModel());
+        transactionProxyModel->setSourceModel(_model->getTransactionTableModel());
         transactionProxyModel->setDynamicSortFilter(true);
         transactionProxyModel->setSortCaseSensitivity(Qt::CaseInsensitive);
         transactionProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
@@ -189,12 +189,13 @@ void PublicLabelView::setModel(WalletModel *model)
         publicLabelView->setColumnWidth(TransactionTableModel::Type, TYPE_COLUMN_WIDTH);
         publicLabelView->setColumnWidth(TransactionTableModel::Amount, AMOUNT_MINIMUM_COLUMN_WIDTH);
 
-        columnResizingFixer = new GUIUtil::TableViewLastColumnResizingFixer(publicLabelView, AMOUNT_MINIMUM_COLUMN_WIDTH, MINIMUM_COLUMN_WIDTH);
+        columnResizingFixer = new GUIUtil::TableViewLastColumnResizingFixer(
+                    publicLabelView, AMOUNT_MINIMUM_COLUMN_WIDTH, MINIMUM_COLUMN_WIDTH, this);
 
-        if (model->getOptionsModel())
+        if (_model->getOptionsModel())
         {
             // Add third party transaction URLs to context menu
-            QStringList listUrls = model->getOptionsModel()->getThirdPartyTxUrls().split("|", QString::SkipEmptyParts);
+            QStringList listUrls = _model->getOptionsModel()->getThirdPartyTxUrls().split("|", QString::SkipEmptyParts);
             for (int i = 0; i < listUrls.size(); ++i)
             {
                 QString host = QUrl(listUrls[i].trimmed(), QUrl::StrictMode).host();
@@ -211,10 +212,10 @@ void PublicLabelView::setModel(WalletModel *model)
         }
 
         // show/hide column Watch-only
-        updateWatchOnlyColumn(model->haveWatchOnly());
+        updateWatchOnlyColumn(_model->haveWatchOnly());
 
         // Watch-only signal
-        connect(model, SIGNAL(notifyWatchonlyChanged(bool)), this, SLOT(updateWatchOnlyColumn(bool)));
+        connect(_model, SIGNAL(notifyWatchonlyChanged(bool)), this, SLOT(updateWatchOnlyColumn(bool)));
     }
 }
 

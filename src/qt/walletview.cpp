@@ -20,6 +20,7 @@
 #include "transactionview.h"
 #include "publiclabelview.h"
 #include "walletmodel.h"
+#include "dstencode.h"
 
 #include "ui_interface.h"
 
@@ -62,7 +63,7 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, const Config *cfg, Q
     publicLabelPage->setLayout(vbox2);
 
 
-    receiveCoinsPage = new ReceiveCoinsDialog(platformStyle);
+    receiveCoinsPage = new ReceiveCoinsDialog(platformStyle, cfg);
     sendCoinsPage = new SendCoinsDialog(platformStyle);
 
     usedSendingAddressesPage =
@@ -95,10 +96,6 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, const Config *cfg, Q
     connect(transactionView, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
     // Pass through messages from publicLabelView
     connect(publicLabelView, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
-}
-
-WalletView::~WalletView()
-{
 }
 
 WalletView::~WalletView() {}
@@ -198,7 +195,7 @@ void WalletView::gotoOverviewPage() { setCurrentWidget(overviewPage); }
 void WalletView::gotoHistoryPage() { setCurrentWidget(transactionsPage); }
 void WalletView::gotoPublicLabelPage() { setCurrentWidget(publicLabelPage); }
 void WalletView::gotoReceiveCoinsPage() { setCurrentWidget(receiveCoinsPage); }
-void WalletView::gotoSendCoinsPage(QString addr)
+void WalletView::gotoSendCoinsPage(QString addr, QString labelPublic)
 {
     setCurrentWidget(sendCoinsPage);
 
@@ -208,7 +205,7 @@ void WalletView::gotoSendCoinsPage(QString addr)
         CPubKey pubkey;
         pubkey = walletModel->getNewPubKey();
 
-        if (pubkey.IsValid()) addr = QString::fromStdString(CBitcoinAddress(pubkey.GetID()).ToString());
+        if (pubkey.IsValid()) addr = QString::fromStdString(EncodeDestination(pubkey.GetID()));
     }
 
     sendCoinsPage->setAddress(addr);

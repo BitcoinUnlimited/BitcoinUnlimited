@@ -89,6 +89,12 @@ void TransactionFilterProxy::setWatchOnlyFilter(WatchOnlyFilter filter)
     invalidateFilter();
 }
 
+void TransactionFilterProxy::setPublicLabelFilter(bool filter)
+{
+    this->publicLabelFilter = filter;
+    invalidateFilter();
+}
+
 void TransactionFilterProxy::setLimit(int limit) { this->limitRows = limit; }
 void TransactionFilterProxy::setShowInactive(bool _showInactive)
 {
@@ -107,3 +113,4 @@ int TransactionFilterProxy::rowCount(const QModelIndex &parent) const
         return QSortFilterProxyModel::rowCount(parent);
     }
 }
+

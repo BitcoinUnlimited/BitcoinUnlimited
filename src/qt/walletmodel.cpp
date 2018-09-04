@@ -529,6 +529,13 @@ bool WalletModel::getPubKey(const CKeyID &address, CPubKey &vchPubKeyOut) const
     return wallet->GetPubKey(address, vchPubKeyOut);
 }
 
+CPubKey WalletModel::getNewPubKey()
+{
+    // Generate a new address to associate with given label
+    CPubKey newKey;
+    if(wallet->GetKeyFromPool(newKey)) return newKey;
+}
+
 bool WalletModel::IsSpendable(const CTxDestination &dest) const { return wallet->IsMine(dest) & ISMINE_SPENDABLE; }
 // returns a list of COutputs from COutPoints
 void WalletModel::getOutputs(const std::vector<COutPoint> &vOutpoints, std::vector<COutput> &vOutputs)
