@@ -177,7 +177,7 @@ private:
     std::atomic<uint64_t> nThinBlockBytes{0};
 
     CCriticalSection cs_mapThinBlockTimer; // locks mapThinBlockTimer
-    std::map<uint256, uint64_t> mapThinBlockTimer;
+    std::map<uint256, std::pair<uint64_t, bool> > mapThinBlockTimer;
 
     CCriticalSection cs_thinblockstats; // locks everything below this point
 

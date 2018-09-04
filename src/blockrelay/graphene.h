@@ -179,7 +179,7 @@ private:
     std::atomic<uint64_t> nGrapheneBlockBytes{0};
 
     CCriticalSection cs_mapGrapheneBlockTimer; // locks mapGrapheneBlockTimer
-    std::map<uint256, uint64_t> mapGrapheneBlockTimer;
+    std::map<uint256, std::pair<uint64_t, bool> > mapGrapheneBlockTimer;
 
     CCriticalSection cs_graphenestats; // locks everything below this point
 
