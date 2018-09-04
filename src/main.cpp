@@ -6963,7 +6963,7 @@ bool SendMessages(CNode *pto)
                 // while providing no value to the network.
                 // However we will still send them block inventory in the case they are a pruned node or wallet
                 // waiting for block announcements, therefore we have to check each inv in pto->vInventoryToSend.
-                bool chokeTxInv = (pto->nActivityBytes == 0 && (nNow / 1000000 - pto->nTimeConnected) > 120);
+                bool fChokeTxInv = (pto->nActivityBytes == 0 && (nNow / 1000000 - pto->nTimeConnected) > 120);
 
                 // Make copy of vInventoryToSend while cs_inventory is locked
                 const int MAX_INV_ELEMENTS = 1000;
@@ -6977,7 +6977,7 @@ bool SendMessages(CNode *pto)
 
                     if (inv.type == MSG_TX)
                     {
-                        if (chokeTxInv)
+                        if (fChokeTxInv)
                             continue;
                         // skip if we already know about this one
                         if (pto->filterInventoryKnown.contains(inv.hash))
