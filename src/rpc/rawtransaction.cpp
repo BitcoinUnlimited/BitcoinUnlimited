@@ -812,8 +812,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     const CKeyStore &keystore = tempKeystore;
 #endif
 
-    int nHashType = SIGHASH_ALL;
-    bool pickedForkId = false;
+    int nHashType = SIGHASH_ALL | SIGHASH_FORKID;
     if (params.size() > 3 && !params[3].isNull())
     {
         std::string strHashType = params[3].get_str();
@@ -833,27 +832,11 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             else if (boost::iequals(s, "ANYONECANPAY"))
                 nHashType |= SIGHASH_ANYONECANPAY;
             else if (boost::iequals(s, "FORKID"))
-            {
-                pickedForkId = true;
                 nHashType |= SIGHASH_FORKID;
-            }
-            else if (boost::iequals(s, "NOFORKID"))
-            {
-                pickedForkId = true;
-                nHashType &= ~SIGHASH_FORKID;
-            }
             else
             {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid sighash param");
             }
-        }
-    }
-    if (!pickedForkId) // If the user didn't specify, use the configured default for the hash type
-    {
-        if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
-        {
-            nHashType |= SIGHASH_FORKID;
-            pickedForkId = true;
         }
     }
 
@@ -883,34 +866,17 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             SignSignature(keystore, prevPubKey, mergedTx, i, amount, nHashType);
 
         // ... and merge in other signatures:
-        if (pickedForkId)
+        for (const CMutableTransaction &txv : txVariants)
         {
-            for (const CMutableTransaction &txv : txVariants)
-            {
-                txin.scriptSig = CombineSignatures(prevPubKey,
-                    TransactionSignatureChecker(&txConst, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID), txin.scriptSig,
-                    txv.vin[i].scriptSig);
-            }
-            ScriptError serror = SCRIPT_ERR_OK;
-            if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_SIGHASH_FORKID,
-                    MutableTransactionSignatureChecker(&mergedTx, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID), &serror))
-            {
-                TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
-            }
+            txin.scriptSig = CombineSignatures(prevPubKey,
+                TransactionSignatureChecker(&txConst, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID), txin.scriptSig,
+                txv.vin[i].scriptSig);
         }
-        else
+        ScriptError serror = SCRIPT_ERR_OK;
+        if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_SIGHASH_FORKID,
+                MutableTransactionSignatureChecker(&mergedTx, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID), &serror))
         {
-            for (const CMutableTransaction &txv : txVariants)
-            {
-                txin.scriptSig = CombineSignatures(prevPubKey, TransactionSignatureChecker(&txConst, i, amount, 0),
-                    txin.scriptSig, txv.vin[i].scriptSig);
-            }
-            ScriptError serror = SCRIPT_ERR_OK;
-            if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS,
-                    MutableTransactionSignatureChecker(&mergedTx, i, amount, 0), &serror))
-            {
-                TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
-            }
+            TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
         }
     }
     bool fComplete = vErrors.empty();
