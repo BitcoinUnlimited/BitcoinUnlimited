@@ -37,7 +37,6 @@ BOOST_AUTO_TEST_CASE(fastfilter_tests)
             BOOST_CHECK(filt.contains(tmp));
             BOOST_CHECK(!filt.checkAndSet(tmp));
         }
-        // printf("collisions: %d\n", collisions);
         BOOST_CHECK(collisions < 400); // sanity check, actual result may vary
         // check them all again
         num = origNum;
@@ -57,7 +56,6 @@ BOOST_AUTO_TEST_CASE(fastfilter_tests)
             if (filt.contains(tmp))
                 numFalsePositives++;
         }
-        // printf("numFalsePositives: %d\n", numFalsePositives);
         BOOST_CHECK(numFalsePositives < 2000); // sanity check, actual result may vary
     }
 
@@ -77,7 +75,6 @@ BOOST_AUTO_TEST_CASE(fastfilter_tests)
                 collisions += 1;
             BOOST_CHECK(filt.contains(tmp));
         }
-        // printf("collisions: %d\n", collisions);
         BOOST_CHECK(collisions < 2000); // sanity check, actual result may vary
     }
 }
@@ -114,8 +111,9 @@ BOOST_AUTO_TEST_CASE(rollingfastfilter_tests)
         BOOST_CHECK(rfilt.contains(tmp));
         BOOST_CHECK(!rfilt.checkAndSet(tmp));
     }
-    // printf("collisions: %d  rolling collisions: %d\n", collisions, rcollisions);
     BOOST_CHECK(rcollisions < collisions);
+    // This next check is probabilistic, see comment in CRollingFastFilter insert()
+    BOOST_CHECK(((double)rcollisions) / 2000000.0 < .02);
 }
 
 

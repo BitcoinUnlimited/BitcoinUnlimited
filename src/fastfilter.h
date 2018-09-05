@@ -18,7 +18,10 @@ class uint256;
  * definitely is NOT in the set, but only that an element is LIKELY in the set.
  * This is similar to a Bloom filter, but much faster.
  *
- * This filter expects that the input elements have a random distribution (i.e. hashes)
+ * This filter expects that the input elements have a random distribution (i.e. hashes), and so does not hash the
+ * input again.  This is how it gains the majority of its performance improvement.
+ *
+ * This class can be used anywhere a Bloom filter is used so long as the input data is random.
  *
  * This class is thread-safe in the sense that simultaneous calls to insert and contains will not crash,
  * but "inserts" may be lost.  However, if you are using this class as an in-ram filter before doing a more expensive
@@ -94,12 +97,19 @@ public:
     }
     void insert(const uint256 &hash)
     {
-        // By clearing 128 entries each time, the filter will never have a false positive rate > 1%
-        erase += REL_PRIME;
+        // By clearing some entries each time, the filter's false positive rate is limited.
+        // Every time insert is called 1 entry is added and eraseAmt*8 entries are cleared.
+        // The average "fill" of the filter (ratio of set to total)  will therefore be 1/(eraseAmt*8).
+        // Since the false positive rate is the chance that a random value insertion hits one already there, it
+        // is the same as the fill ratio.  At the default value of 16, this is 1/128 or < 1%
+
+        // To match the math above it is essential that every entry is erased before an entry is erased again.
+        // Erasing entries sequentially accomplishes this and is fine because inserts happen in random position.
+        erase += eraseAmt;
         erase &= (CFastFilter<FILTER_SIZE>::FILTER_BYTES - 1);
         // the loc var and repeated & is for thread safety
         unsigned int loc = erase & (CFastFilter<FILTER_SIZE>::FILTER_BYTES - 1);
-        for (unsigned int j = 0; j < eraseAmt; j++) // todo: optimize
+        for (unsigned int j = 0; j < eraseAmt; j++) // todo: optimize by clearing in 64 bit chunks
         {
             this->vData[loc] = 0;
             loc++;
