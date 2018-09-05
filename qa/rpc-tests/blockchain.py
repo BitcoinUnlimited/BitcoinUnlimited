@@ -11,6 +11,7 @@ import test_framework.loginit
 
 from decimal import Decimal
 
+import test_framework.loginit
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.authproxy import JSONRPCException
 from test_framework.util import *
@@ -30,7 +31,7 @@ class BlockchainTest(BitcoinTestFramework):
     """
 
     def setup_chain(self):
-        print("Initializing test directory " + self.options.tmpdir)
+        logging.info ("Initializing test directory " + self.options.tmpdir)
         initialize_chain(self.options.tmpdir)
 
     def setup_network(self, split=False):
@@ -63,7 +64,7 @@ class BlockchainTest(BitcoinTestFramework):
         assert_equal(len(res['bestblock']), 64)
         assert_equal(len(res['hash_serialized_2']), 64)
 
-        print ("Test that gettxoutsetinfo() works for blockchain with just the genesis block")
+        logging.info ("Test that gettxoutsetinfo() works for blockchain with just the genesis block")
         b1hash = node.getblockhash(1)
         node.invalidateblock(b1hash)
 
@@ -75,7 +76,7 @@ class BlockchainTest(BitcoinTestFramework):
         assert_equal(res2['bestblock'], node.getblockhash(0))
         assert_equal(len(res2['hash_serialized_2']), 64)
 
-        print ("Test that gettxoutsetinfo() returns the same result after invalidate/reconsider block")
+        logging.info ("Test that gettxoutsetinfo() returns the same result after invalidate/reconsider block")
         node.reconsiderblock(b1hash)
 
         res3 = node.gettxoutsetinfo()
@@ -122,7 +123,7 @@ class BlockchainTest(BitcoinTestFramework):
         assert_equal(blockcount + 10, self.nodes[1].getblockcount())
 
         # Now Rollback the chain on Node 0 by 5 blocks
-        print ("Test that rollbackchain() works")
+        logging.info ("Test that rollbackchain() works")
         blockcount = self.nodes[0].getblockcount()
         self.nodes[0].rollbackchain(self.nodes[0].getblockcount() - 5)
         assert_equal(blockcount - 5, self.nodes[0].getblockcount())
@@ -156,7 +157,7 @@ class BlockchainTest(BitcoinTestFramework):
         try:
             self.nodes[0].rollbackchain(self.nodes[0].getblockcount() - 101)
         except JSONRPCException as e:
-            print (e.error['message'])
+            logging.info (e.error['message'])
             assert("You are attempting to rollback the chain by 101 blocks, however the limit is 100 blocks." in e.error['message'])
         assert_equal(blockcount, self.nodes[0].getblockcount())
         assert_equal(blockcount, self.nodes[1].getblockcount())
@@ -229,7 +230,7 @@ class BlockchainTest(BitcoinTestFramework):
         # fork3 the active chain, and disregarding fork1 which is longer than fork2 but
         # shorter than fork3.
         
-        print ("Test that reconsidermostworkchain() works")
+        logging.info ("Test that reconsidermostworkchain() works")
 
         # rollback to before fork 1 and 2, and then mine another longer fork 3
         self.nodes[0].rollbackchain(self.nodes[0].getblockcount() - 120, True)
@@ -245,7 +246,7 @@ class BlockchainTest(BitcoinTestFramework):
         try:
             self.nodes[0].reconsidermostworkchain()
         except JSONRPCException as e:
-            print (e.error['message'])
+            logging.info (e.error['message'])
             assert("You are attempting to rollback the chain by 120 blocks, however the limit is 100 blocks." in e.error['message'])
 
         # now do a reconsidermostworkchain with the override. We should now be on fork3 best block hash
