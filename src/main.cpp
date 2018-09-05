@@ -4908,10 +4908,11 @@ static bool BasicThinblockChecks(CNode *pfrom, const CChainParams &chainparams)
         if (pfrom->nGetXthinLastTime <= 0)
             pfrom->nGetXthinLastTime = GetTime();
         uint64_t nNow = GetTime();
-        pfrom->nGetXthinCount =
-            pfrom->nGetXthinCount * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXthinLastTime));
+        double tmp = pfrom->nGetXthinCount;
+        while (pfrom->nGetXthinCount.compare_exchange_weak(
+            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXthinLastTime)) + 1)))
+            ;
         pfrom->nGetXthinLastTime = nNow;
-        pfrom->nGetXthinCount = pfrom->nGetXthinCount + 1;
         LOG(THIN, "nGetXthinCount is %f\n", pfrom->nGetXthinCount);
         if (chainparams.NetworkIDString() == "main") // other networks have variable mining rates
         {
