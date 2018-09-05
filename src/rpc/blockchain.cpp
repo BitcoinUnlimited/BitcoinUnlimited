@@ -1276,7 +1276,7 @@ UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
 
     // If already on the longest chain then return
     if (pMostWork == chainActive.Tip())
-       throw runtime_error("Nothing to do. Already on the correct chain.");
+        throw runtime_error("Nothing to do. Already on the correct chain.");
 
     // Find where chainActive meets the most work chaintip
     const CBlockIndex *pFork;
