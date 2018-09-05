@@ -74,7 +74,6 @@ BitcoinGUI::BitcoinGUI(const Config *_cfg,
       aboutQtAction(0), openRPCConsoleAction(0), openAction(0), showHelpMessageAction(0), trayIcon(0), trayIconMenu(0),
       notificator(0), rpcConsole(0), helpMessageDialog(0), prevBlocks(0), spinnerFrame(0),
       platformStyle(_platformStyle), cfg(_cfg)
-
 {
     GUIUtil::restoreWindowGeometry("nWindow", QSize(850, 550), this);
 
@@ -266,6 +265,7 @@ void BitcoinGUI::createActions()
     publicLabelAction->setCheckable(true);
     publicLabelAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_5));
     tabGroup->addAction(publicLabelAction);
+    if (!GetBoolArg("-toppubliclabels", false)) { publicLabelAction->setVisible(false); }
 
 #ifdef ENABLE_WALLET
     // These showNormalIfMinimized are needed because Send Coins and Receive Coins

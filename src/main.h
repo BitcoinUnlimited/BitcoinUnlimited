@@ -155,6 +155,7 @@ static const bool DEFAULT_USE_GRAPHENE_BLOCKS = false;
 static const bool DEFAULT_REINDEX = false;
 static const bool DEFAULT_DISCOVER = true;
 static const bool DEFAULT_PRINTTOCONSOLE = false;
+static const bool DEFAULT_TOPPUBLICLABELS = false;
 
 // BU - Xtreme Thinblocks Auto Mempool Limiter - begin section
 /** The default value for -minrelaytxfee in sat/byte */

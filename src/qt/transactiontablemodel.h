@@ -117,7 +117,6 @@ private:
     QVariant txAddressDecoration(const TransactionRecord *wtx) const;
 
     mutable QMap<std::string, CAmount> publicLabelTotals;
-    CAmount unspentPublicLabelAmount(const TransactionRecord *tr) const;
     CAmount unspentPublicLabelTotal(std::string publicLabel) const;
 
 public Q_SLOTS:

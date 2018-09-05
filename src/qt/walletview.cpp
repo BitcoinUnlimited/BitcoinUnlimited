@@ -208,7 +208,7 @@ void WalletView::gotoSendCoinsPage(QString addr, QString labelPublic)
         if (pubkey.IsValid()) addr = QString::fromStdString(EncodeDestination(pubkey.GetID()));
     }
 
-    sendCoinsPage->setAddress(addr);
+    if (!addr.isEmpty()) sendCoinsPage->setAddress(addr);
 
     if (!labelPublic.isEmpty())
         sendCoinsPage->setPublicLabel(labelPublic);

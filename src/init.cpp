@@ -673,6 +673,13 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 
     // also see: InitParameterInteraction()
 
+    // if using toppubliclabels, then must use txindex
+    if (GetBoolArg("-toppubliclabels", false))
+    {
+        if (!GetBoolArg("-txindex", DEFAULT_TXINDEX))
+            return InitError(_("Top Public Labels mode requires -txindex."));
+    }
+
     // if using block pruning, then disable txindex
     if (GetArg("-prune", 0))
     {

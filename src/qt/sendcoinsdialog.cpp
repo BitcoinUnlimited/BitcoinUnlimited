@@ -235,7 +235,6 @@ void SendCoinsDialog::on_sendButton_clicked()
                 }
 
                 recipients.append(rcp);
-
             }
             else
             {
@@ -248,7 +247,6 @@ void SendCoinsDialog::on_sendButton_clicked()
     {
         return;
     }
-
 
 
     fNewRecipientAllowed = false;
@@ -294,7 +292,6 @@ void SendCoinsDialog::on_sendButton_clicked()
             // generate bold amount string
             QString amount =
                 "<b>" + BitcoinUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), rcp.amount);
-
             amount.append("</b>");
             // generate monospace address string
             QString address = "<span style='font-family: monospace;'>" + rcp.address;
@@ -303,7 +300,6 @@ void SendCoinsDialog::on_sendButton_clicked()
             if (!rcp.paymentRequest.IsInitialized()) // normal payment
             {
                 if (rcp.label.length() > 0) // label with address
-
                 {
                     recipientElement = tr("%1 to %2").arg(amount, GUIUtil::HtmlEscape(rcp.label));
                     recipientElement.append(QString(" (%1)").arg(address));
@@ -314,7 +310,6 @@ void SendCoinsDialog::on_sendButton_clicked()
                 }
             }
             else if (!rcp.authenticatedMerchant.isEmpty()) // authenticated payment request
-
             {
                 recipientElement = tr("%1 to %2").arg(amount, GUIUtil::HtmlEscape(rcp.authenticatedMerchant));
             }
@@ -329,7 +324,6 @@ void SendCoinsDialog::on_sendButton_clicked()
                                             .arg(GUIUtil::HtmlEscape(rcp.freezeLockTime)));
 
             }
-
         } // else if (!rcp.labelPublic.isEmpty())
 
 
@@ -468,13 +462,11 @@ void SendCoinsDialog::setAddress(const QString &address)
     {
         SendCoinsEntry *first = qobject_cast<SendCoinsEntry *>(ui->entries->itemAt(0)->widget());
         if (first->isClear())
-
         {
             entry = first;
         }
     }
     if (!entry)
-
     {
         entry = addEntry();
     }

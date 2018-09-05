@@ -271,7 +271,6 @@ bool CWallet::LoadFreezeScript(CPubKey newKey, CScriptNum nFreezeLockTime, std::
     address = EncodeDestination(CScriptID(freezeScript));
     LOGA("CLTV Freeze Script Load \n %s => %s \n ", ::ScriptToAsmStr(freezeScript), address.c_str());
     return true;
-
 }
 
 bool CWallet::AddWatchOnly(const CScript &dest)
@@ -729,10 +728,14 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
     uint256 hash = wtxIn.GetHash();
 
     LOCK2(cs_main, cs_wallet);
+
+    // if toppubliclabels mode and tx has a public label with unspent amounts then add to the public labels map
+    if (GetBoolArg("-toppubliclabels", false))
+     { if (UnspentPublicLabelAmount(wtxIn, "").first > 0) mapWalletPublicLabels[hash] = wtxIn; }
+
     if (fFromLoadWallet)
     {
         mapWallet[hash] = wtxIn;
-        if (UnspentPublicLabelAmount(wtxIn, "").first > 0) mapWalletPublicLabels[hash] = wtxIn;
         CWalletTx &wtx = mapWallet[hash];
         wtx.BindWallet(this);
         wtxOrdered.insert(make_pair(wtx.nOrderPos, TxPair(&wtx, (CAccountingEntry *)0)));
@@ -894,8 +897,14 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef &ptx, const CBlock 
     bool fExisted = mapWallet.count(ptx->GetHash()) != 0;
     if (fExisted && !fUpdate)
         return false;
+
+    // If toppubliclabels mode then include public labels if they are unspent
+    bool IsUnspentPublicLabel = false;
+    if (GetBoolArg("-toppubliclabels", false))
+        { if (UnspentPublicLabelAmount(*ptx, "").first > 0) IsUnspentPublicLabel = true; }
+
     CAmount unspentPublicLabelAmount = UnspentPublicLabelAmount(*ptx, "").first;
-    if (fExisted || IsMine(*ptx) || IsFromMe(*ptx) || unspentPublicLabelAmount > 0)
+    if (fExisted || IsMine(*ptx) || IsFromMe(*ptx) || IsUnspentPublicLabel)
     {
         CWalletTx wtx(this, *ptx);
 
@@ -909,13 +918,8 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef &ptx, const CBlock 
         // SetBestChain-mechanism
         CWalletDB walletdb(strWalletFile, "r+", false);
 
-
-        // Keep map of txs involving public label
-        if (unspentPublicLabelAmount > 0)
-        {
-
-            mapWalletPublicLabels[wtx.GetHash()] = wtx;
-        }
+        // Keep map of txs involving unspent public label
+        if (unspentPublicLabelAmount > 0) { mapWalletPublicLabels[wtx.GetHash()] = wtx; }
 
         return AddToWallet(wtx, false, &walletdb);
     }
@@ -1456,11 +1460,12 @@ int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
     {
         LOCK2(cs_main, cs_wallet);
 
-        // commented below out so that public labels with unspent utxos from any date/time may be tracked
-        // no need to read and scan block, if block was created before
-        // our wallet birthday (as adjusted for block time variability)
-        //while (pindex && nTimeFirstKey && (pindex->GetBlockTime() < (nTimeFirstKey - 7200)))
-        //    pindex = chainActive.Next(pindex);
+        // public labels with unspent utxos from any date/time may be tracked
+        if (!GetBoolArg("-toppubliclabels", false))
+            // no need to read and scan block, if block was created before
+            // our wallet birthday (as adjusted for block time variability)
+            while (pindex && nTimeFirstKey && (pindex->GetBlockTime() < (nTimeFirstKey - 7200)))
+                pindex = chainActive.Next(pindex);
 
         // show rescan progress in GUI as dialog or on splashscreen, if -rescan on startup
         ShowProgress(_("Rescanning..."), 0);

@@ -69,15 +69,17 @@ public:
             for (std::map<uint256, CWalletTx>::iterator it = wallet->mapWallet.begin(); it != wallet->mapWallet.end();
                  ++it)
             {
-
-                if(TransactionRecord::showTransaction(it->second))
+                if (!GetBoolArg("-toppubliclabels", false))
+                    if (TransactionRecord::showTransaction(it->second))
+                                        cachedWallet.append(TransactionRecord::decomposeTransaction(wallet, it->second));
+                else if (TransactionRecord::showTransaction(it->second))
                 {
                     QList<TransactionRecord> recList = TransactionRecord::decomposeTransaction(wallet, it->second);
                     for (TransactionRecord &recNew: recList)
                     {
                         // Exclude public labels that already exist
                         bool found = false;
-                        Q_FOREACH(const TransactionRecord &rec, cachedWallet)
+                        for (const TransactionRecord &rec: cachedWallet)
                         {
                             if ((rec.type == TransactionRecord::PublicLabel)
                                     && (rec.addresses.begin()->first == recNew.addresses.begin()->first))
@@ -89,8 +91,8 @@ public:
                         }
                         if (!found) cachedWallet.append(recNew);
                     }
-                }
-            }
+                } // end else if
+            } // end for
         }
     }
 
@@ -244,7 +246,6 @@ TransactionTableModel::TransactionTableModel(const PlatformStyle *_platformStyle
 {
     columns << QString() << QString() << tr("Date") << tr("Type") << tr("Address or Label")
             << BitcoinUnits::getAmountColumnTitle(walletModel->getOptionsModel()->getDisplayUnit());
-
     priv->refreshWallet();
 
     connect(walletModel->getOptionsModel(), SIGNAL(displayUnitChanged(int)), this, SLOT(updateDisplayUnit()));
@@ -390,7 +391,6 @@ QString TransactionTableModel::formatTxType(const TransactionRecord *wtx) const
         return tr("Public label");
     case TransactionRecord::Other:
         return tr("Other");
-
     default:
         return QString();
     }
@@ -424,7 +424,6 @@ QString TransactionTableModel::formatTxToAddress(const TransactionRecord *wtx, b
     }
 
     /* Get the first label. */
-
     std::string address;
     QString label = pickLabelWithAddress(wtx->addresses, address);
 
@@ -461,7 +460,6 @@ QVariant TransactionTableModel::addressColor(const TransactionRecord *wtx) const
             return COLOR_BAREADDRESS;
         QString label = walletModel->getAddressTableModel()->labelForAddress(QString::fromStdString(firstAddr->first));
         if (label.isEmpty())
-
             return COLOR_BAREADDRESS;
     }
     break;
@@ -473,19 +471,21 @@ QVariant TransactionTableModel::addressColor(const TransactionRecord *wtx) const
     return QVariant();
 }
 
-
-QString TransactionTableModel::formatTxAmount(const TransactionRecord *rec, bool showUnconfirmed, BitcoinUnits::SeparatorStyle separators) const
+QString TransactionTableModel::formatTxAmount(const TransactionRecord *wtx,
+    bool showUnconfirmed,
+    BitcoinUnits::SeparatorStyle separators) const
 {
     CAmount amt = 0;
-    if (rec->type == TransactionRecord::PublicLabel)
-        amt = unspentPublicLabelTotal(rec->addresses.begin()->first);
+    if (wtx->type == TransactionRecord::PublicLabel)
+        amt = unspentPublicLabelTotal(wtx->addresses.begin()->first);
     else
-        amt = rec->credit + rec->debit;
+        amt = wtx->credit + wtx->debit;
 
-    QString str = BitcoinUnits::format(walletModel->getOptionsModel()->getDisplayUnit(), amt, false, separators);
-    if(showUnconfirmed)
+    QString str = BitcoinUnits::format(
+    walletModel->getOptionsModel()->getDisplayUnit(), amt, false, separators);
+    if (showUnconfirmed)
     {
-        if(!rec->status.countsForBalance)
+        if (!wtx->status.countsForBalance)
         {
             str = QString("[") + str + QString("]");
         }
@@ -544,19 +544,6 @@ QVariant TransactionTableModel::txWatchonlyDecoration(const TransactionRecord *w
         return QVariant();
 }
 
-CAmount TransactionTableModel::unspentPublicLabelAmount(const TransactionRecord *rec) const
-{// OBSOLETE
-    // Returns the public label unspent amount related to the specified transaction record
-    LOCK2(cs_main, wallet->cs_wallet);
-    std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(rec->hash);
-    if(mi != wallet->mapWallet.end())
-    {
-        CTransaction tx(mi->second);
-        return wallet->UnspentPublicLabelAmount(tx, rec->addresses.begin()->first).first;
-    }
-    return 0;
-}
-
 CAmount TransactionTableModel::unspentPublicLabelTotal(std::string publicLabel) const
 {
     // Returns the total of public label unspent amounts related to the specified public label string
@@ -594,7 +581,6 @@ QString TransactionTableModel::pickLabelWithAddress(AddressList listAddresses, s
         label = walletModel->getAddressTableModel()->labelForAddress(QString::fromStdString(address));
         if (label != "")
             break;
-
     }
 
     return label;
@@ -611,7 +597,6 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
     QString label = pickLabelWithAddress(rec->addresses, address);
 
     switch (role)
-
     {
     case RawDecorationRole:
         switch (index.column())
