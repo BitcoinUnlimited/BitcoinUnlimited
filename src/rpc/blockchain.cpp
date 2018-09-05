@@ -1247,7 +1247,10 @@ UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() > 1)
         throw runtime_error("reconsidermostworkchain \"[override]\"\n"
-                            "\nWill rollback the chain if needed and then sync to the most work chain.\n"
+                            "\nWill rollback the chain if needed and then sync to the most work chain. If this\n"
+                            "client was not upgraded before a hard fork and marked the \"real\" chain as invalid,\n"
+                            "then this command should be run after upgrading the client so as to join the correct\n"
+                            "and most work chain\n"
                             "\nArguments:\n"
                             "1. override      (boolean, optional, default=false)"
                             "\nResult:\n"
