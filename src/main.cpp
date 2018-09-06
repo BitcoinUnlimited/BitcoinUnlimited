@@ -5378,17 +5378,16 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 if (!BasicThinblockChecks(pfrom, chainparams))
                     return false;
             }
-
-
-            if (fDebug || (vInv.size() != 1))
-                LOG(NET, "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
-
-            if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
-                LOG(NET, "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
-
-            pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
-            ProcessGetData(pfrom, chainparams.GetConsensus());
         }
+
+        if (fDebug || (vInv.size() != 1))
+            LOG(NET, "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
+
+        if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
+            LOG(NET, "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
+
+        pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
+        ProcessGetData(pfrom, chainparams.GetConsensus());
     }
 
 
