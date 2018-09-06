@@ -234,14 +234,14 @@ bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Check for Misbehaving and DOS
     // If they make more than 20 requests in 10 minutes then disconnect them
     {
-        LOCK(cs_vNodes);
         if (pfrom->nGetGrapheneBlockTxLastTime <= 0)
             pfrom->nGetGrapheneBlockTxLastTime = GetTime();
         uint64_t nNow = GetTime();
-        pfrom->nGetGrapheneBlockTxCount *=
-            std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneBlockTxLastTime));
+        double tmp = pfrom->nGetGrapheneBlockTxCount;
+        while (pfrom->nGetGrapheneBlockTxCount.compare_exchange_weak(
+            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneBlockTxLastTime)) + 1)))
+            ;
         pfrom->nGetGrapheneBlockTxLastTime = nNow;
-        pfrom->nGetGrapheneBlockTxCount += 1;
         LOG(GRAPHENE, "nGetGrapheneTxCount is %f\n", pfrom->nGetGrapheneBlockTxCount);
         if (pfrom->nGetGrapheneBlockTxCount >= 20)
         {
@@ -1449,13 +1449,14 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
     // Check for Misbehaving and DOS
     // If they make more than 20 requests in 10 minutes then disconnect them
     {
-        LOCK(cs_vNodes);
         if (pfrom->nGetGrapheneLastTime <= 0)
             pfrom->nGetGrapheneLastTime = GetTime();
         uint64_t nNow = GetTime();
-        pfrom->nGetGrapheneCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneLastTime));
+        double tmp = pfrom->nGetGrapheneCount;
+        while (pfrom->nGetGrapheneCount.compare_exchange_weak(
+            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneLastTime)) + 1)))
+            ;
         pfrom->nGetGrapheneLastTime = nNow;
-        pfrom->nGetGrapheneCount += 1;
         LOG(GRAPHENE, "nGetGrapheneCount is %f\n", pfrom->nGetGrapheneCount);
         if (chainparams.NetworkIDString() == "main") // other networks have variable mining rates
         {

@@ -4892,6 +4892,39 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
     }
 }
 
+static bool BasicThinblockChecks(CNode *pfrom, const CChainParams &chainparams)
+{
+    if (!pfrom->ThinBlockCapable())
+    {
+        dosMan.Misbehaving(pfrom, 100);
+        return error("Thinblock message received from a non thinblock node, peer=%d", pfrom->GetId());
+    }
+
+    // Check for Misbehaving and DOS
+    // If they make more than 20 requests in 10 minutes then disconnect them
+    {
+        if (pfrom->nGetXthinLastTime <= 0)
+            pfrom->nGetXthinLastTime = GetTime();
+        uint64_t nNow = GetTime();
+        double tmp = pfrom->nGetXthinCount;
+        while (pfrom->nGetXthinCount.compare_exchange_weak(
+            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXthinLastTime)) + 1)))
+            ;
+        pfrom->nGetXthinLastTime = nNow;
+        LOG(THIN, "nGetXthinCount is %f\n", pfrom->nGetXthinCount);
+        if (chainparams.NetworkIDString() == "main") // other networks have variable mining rates
+        {
+            if (pfrom->nGetXthinCount >= 20)
+            {
+                dosMan.Misbehaving(pfrom, 50); // If they exceed the limit then disconnect them
+                return error("requesting too many getdata thinblocks");
+            }
+        }
+    }
+
+    return true;
+}
+
 bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived)
 {
     int64_t receiptTime = GetTime();
@@ -5338,18 +5371,24 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 dosMan.Misbehaving(pfrom, 20);
                 return error("message inv invalid type = %u", inv.type);
             }
-            // inv.hash does not need validation, since SHA2556 hash can be any value
+
+            // Make basic checks
+            if (inv.type == MSG_THINBLOCK)
+            {
+                if (!BasicThinblockChecks(pfrom, chainparams))
+                    return false;
+            }
+
+
+            if (fDebug || (vInv.size() != 1))
+                LOG(NET, "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
+
+            if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
+                LOG(NET, "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
+
+            pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
+            ProcessGetData(pfrom, chainparams.GetConsensus());
         }
-
-
-        if (fDebug || (vInv.size() != 1))
-            LOG(NET, "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
-
-        if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
-            LOG(NET, "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
-
-        pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
-        ProcessGetData(pfrom, chainparams.GetConsensus());
     }
 
 
@@ -5915,32 +5954,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     // BUIP010 Xtreme Thinblocks: begin section
     else if (strCommand == NetMsgType::GET_XTHIN && !fImporting && !fReindex && IsThinBlocksEnabled())
     {
-        if (!pfrom->ThinBlockCapable())
-        {
-            dosMan.Misbehaving(pfrom, 100);
-            return error("Thinblock message received from a non thinblock node, peer=%d", pfrom->GetId());
-        }
-
-        // Check for Misbehaving and DOS
-        // If they make more than 20 requests in 10 minutes then disconnect them
-        {
-            LOCK(cs_vNodes);
-            if (pfrom->nGetXthinLastTime <= 0)
-                pfrom->nGetXthinLastTime = GetTime();
-            uint64_t nNow = GetTime();
-            pfrom->nGetXthinCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXthinLastTime));
-            pfrom->nGetXthinLastTime = nNow;
-            pfrom->nGetXthinCount += 1;
-            LOG(THIN, "nGetXthinCount is %f\n", pfrom->nGetXthinCount);
-            if (chainparams.NetworkIDString() == "main") // other networks have variable mining rates
-            {
-                if (pfrom->nGetXthinCount >= 20)
-                {
-                    dosMan.Misbehaving(pfrom, 100); // If they exceed the limit then disconnect them
-                    return error("requesting too many get_xthin");
-                }
-            }
-        }
+        if (!BasicThinblockChecks(pfrom, chainparams))
+            return false;
 
         CBloomFilter filterMemPool;
         CInv inv;
@@ -5990,8 +6005,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     {
         return HandleExpeditedRequest(vRecv, pfrom);
     }
-
-
     else if (strCommand == NetMsgType::XPEDITEDBLK)
     {
         // ignore the expedited message unless we are at the chain tip...

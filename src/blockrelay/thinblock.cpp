@@ -463,13 +463,14 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Check for Misbehaving and DOS
     // If they make more than 20 requests in 10 minutes then disconnect them
     {
-        LOCK(cs_vNodes);
         if (pfrom->nGetXBlockTxLastTime <= 0)
             pfrom->nGetXBlockTxLastTime = GetTime();
         uint64_t nNow = GetTime();
-        pfrom->nGetXBlockTxCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXBlockTxLastTime));
+        double tmp = pfrom->nGetXBlockTxCount;
+        while (pfrom->nGetXBlockTxCount.compare_exchange_weak(
+            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXBlockTxLastTime)) + 1)))
+            ;
         pfrom->nGetXBlockTxLastTime = nNow;
-        pfrom->nGetXBlockTxCount += 1;
         LOG(THIN, "nGetXBlockTxCount is %f\n", pfrom->nGetXBlockTxCount);
         if (pfrom->nGetXBlockTxCount >= 20)
         {
