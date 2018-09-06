@@ -181,6 +181,9 @@ public:
     // Indicate that getting this object was rejected
     void Rejected(const CInv &obj, CNode *from, unsigned char reason = 0);
 
+    // request a block by its hash
+    void RequestCorruptedBlock(const uint256 &blockHash);
+
     // Resets the last request time to zero when a node disconnects and has blocks in flight.
     void ResetLastBlockRequestTime(const uint256 &hash);
 
