@@ -52,7 +52,11 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     if (optSymDiff >= nReceiverExcessItems)
         fpr = FILTER_FPR_MAX;
     else
+    {
         fpr = optSymDiff / float(nReceiverExcessItems);
+        if (fpr > FILTER_FPR_MAX)
+            fpr = FILTER_FPR_MAX;
+    }
 
     // Construct Bloom filter
     pSetFilter = new CBloomFilter(
