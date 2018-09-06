@@ -467,7 +467,7 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             pfrom->nGetXBlockTxLastTime = GetTime();
         uint64_t nNow = GetTime();
         double tmp = pfrom->nGetXBlockTxCount;
-        while (pfrom->nGetXBlockTxCount.compare_exchange_weak(
+        while (!pfrom->nGetXBlockTxCount.compare_exchange_weak(
             tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXBlockTxLastTime)) + 1)))
             ;
         pfrom->nGetXBlockTxLastTime = nNow;

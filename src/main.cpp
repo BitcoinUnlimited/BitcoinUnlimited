@@ -4907,7 +4907,7 @@ static bool BasicThinblockChecks(CNode *pfrom, const CChainParams &chainparams)
             pfrom->nGetXthinLastTime = GetTime();
         uint64_t nNow = GetTime();
         double tmp = pfrom->nGetXthinCount;
-        while (pfrom->nGetXthinCount.compare_exchange_weak(
+        while (!pfrom->nGetXthinCount.compare_exchange_weak(
             tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXthinLastTime)) + 1)))
             ;
         pfrom->nGetXthinLastTime = nNow;
