@@ -59,9 +59,6 @@ private:
     int lastFewTxs;
     bool blockFinished;
 
-    // will be initialized by IsUAHFforkActiveOnNextBlock
-    bool uahfChainBlock;
-
 public:
     BlockAssembler(const CChainParams &chainparams);
     /** Construct a new block template with coinbase to scriptPubKeyIn */

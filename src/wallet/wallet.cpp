@@ -2439,11 +2439,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
                 }
 
                 // Sign
-                unsigned int sighashType = SIGHASH_ALL;
-                if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) && walletSignWithForkSig.Value())
-                {
-                    sighashType |= SIGHASH_FORKID;
-                }
+                unsigned int sighashType = SIGHASH_ALL | SIGHASH_FORKID;
                 int nIn = 0;
                 CTransaction txNewConst(txNew);
                 for (const PAIRTYPE(const CWalletTx *, unsigned int) & coin : setCoins)
