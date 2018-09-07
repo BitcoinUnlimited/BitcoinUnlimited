@@ -99,5 +99,10 @@
     ["01000000011f5c38dfcf6f1a5f5a87c416076d392c87e6d41970d5ad5e477a02d66bde97580000000000fdffffff0180a81201000000001976a9141fc11f39be1729bf973a7ab6a615ca4729d6457488ac00000000",
      "in=5897de6bd6027a475eadd57019d4e6872c396d0716c4875a5f1a6fcfdf385c1f:0:1"],
     "output_cmp": "txcreatedata_seq1.hex"
+  },
+  { "exec": "./bitcoin-tx",
+    "args":
+    ["-regtest", "-create", "in=a6203029526697378230d48f70d9f05c1983465a10d9934eecceb5c8ded6fefc:0", "outaddr=50.0:bchreg:qqkx25nsqzuzcftu7hs7w2f2ne3ayedefu8mpceqwy"],
+    "output_cmp": "txcreatedata_cashaddr.hex"
   }
 ]
