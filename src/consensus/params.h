@@ -147,7 +147,8 @@ struct Params
     int daaHeight;
     /** May 15, 2018 Activation time */
     int may2018activationTime;
-
+    /** Nov 15, 2018 Activation time */
+    int nov2018activationTime;
     Params();
 };
 } // namespace Consensus

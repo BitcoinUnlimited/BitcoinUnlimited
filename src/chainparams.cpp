@@ -84,7 +84,12 @@ bool CChainParams::RequireStandard() const
     return fRequireStandard || !GetBoolArg("-acceptnonstdtxn", true);
 }
 
-Consensus::Params::Params() { may2018activationTime = 1526400000; }
+Consensus::Params::Params()
+{
+    may2018activationTime = 1526400000;
+    nov2018activationTime = 1542300000;
+}
+
 /**
  * Main network
  */
