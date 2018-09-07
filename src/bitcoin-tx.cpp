@@ -262,8 +262,17 @@ static void MutateTxAddOutAddr(CMutableTransaction &tx, const string &strInput)
     std::vector<std::string> vStrInputParts;
     boost::split(vStrInputParts, strInput, boost::is_any_of(":"));
 
-    if (vStrInputParts.size() != 2)
+    if (vStrInputParts.size() != 2 && vStrInputParts.size() != 3)
         throw runtime_error("TX output missing or too many separators");
+    if (vStrInputParts.size() == 3)
+    {
+        if (vStrInputParts[1] != "bchreg" && vStrInputParts[1] != "bitcoincash" && vStrInputParts[1] != "bchnol" &&
+            vStrInputParts[1] != "bchtest")
+        {
+            throw runtime_error(tfm::format("TX output unknown destination address type %s.", vStrInputParts[1]));
+        }
+        vStrInputParts.erase(vStrInputParts.begin() + 1);
+    }
 
     // Extract and validate VALUE
     CAmount value = ExtractAndValidateValue(vStrInputParts[0]);
