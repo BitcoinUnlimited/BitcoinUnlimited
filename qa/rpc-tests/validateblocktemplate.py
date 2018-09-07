@@ -44,8 +44,8 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
         connect_nodes(self.nodes[0], 1)
 
     def run_test(self):
-        # Generate enough blocks to trigger certain block votes
-        self.nodes[0].generate(1150)
+        # Generate enough blocks to trigger certain block votes and activate BIP65 (version 4 blocks)
+        self.nodes[0].generate(1352 - self.nodes[0].getblockcount())
         self.sync_all()
 
         logging.info("not on chain tip")
@@ -340,7 +340,7 @@ if __name__ == '__main__':
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"]
     }
-    args = []
+    args = sys.argv
     if "--no-ipv6-rpc-listen":
         args.append("--no-ipv6-rpc-listen")
     ValidateblocktemplateTest().main(args,bitcoinConf)
