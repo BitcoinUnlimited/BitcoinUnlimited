@@ -123,6 +123,8 @@ static const uint32_t INITIAL_HEADERS_TIMEOUT = 120;
 static const uint32_t MAX_UNCONNECTED_HEADERS = 144;
 /** The maximum length of time, in seconds, we keep unconnected headers in the cache **/
 static const uint32_t UNCONNECTED_HEADERS_TIMEOUT = 120;
+/** Maximum number of INV's that can be send in one message */
+static const int MAX_INV_TO_SEND = 1000;
 
 /** The maximum number of free transactions (in KB) that can enter the mempool per minute.
  *  For a 1MB block we allow 15KB of free transactions per 1 minute.

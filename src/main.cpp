@@ -6956,7 +6956,7 @@ bool SendMessages(CNode *pto)
         std::vector<CInv> vInvSend;
         while (!pto->vInventoryToSend.empty())
         {
-            // Send message INV up to the MAX_INV_ELEMENTS. Once we reach the max then send the INV message
+            // Send message INV up to the MAX_INV_TO_SEND. Once we reach the max then send the INV message
             // and if there is any remaining it will be sent on the next iteration until vInventoryToSend is empty.
             int nToErase = 0;
             {
@@ -6968,9 +6968,8 @@ bool SendMessages(CNode *pto)
                 // waiting for block announcements, therefore we have to check each inv in pto->vInventoryToSend.
                 bool fChokeTxInv = (pto->nActivityBytes == 0 && (nNow / 1000000 - pto->nTimeConnected) > 120);
 
-                // Make copy of vInventoryToSend while cs_inventory is locked
-                const int MAX_INV_ELEMENTS = 1000;
-                int invsz = std::min((int)pto->vInventoryToSend.size(), MAX_INV_ELEMENTS);
+                // Find INV's which should be sent, save them to vInvSend, and then erase from vInventoryToSend.
+                int invsz = std::min((int)pto->vInventoryToSend.size(), MAX_INV_TO_SEND);
                 vInvSend.reserve(invsz);
 
                 LOCK(pto->cs_inventory);
@@ -6989,9 +6988,10 @@ bool SendMessages(CNode *pto)
                     vInvSend.push_back(inv);
                     pto->filterInventoryKnown.insert(inv.hash);
 
-                    if (vInvSend.size() >= MAX_INV_ELEMENTS)
+                    if (vInvSend.size() >= MAX_INV_TO_SEND)
                         break;
                 }
+
                 if (nToErase > 0)
                 {
                     pto->vInventoryToSend.erase(
