@@ -241,6 +241,7 @@ class BlockchainTest(BitcoinTestFramework):
         # now rollback again and make the shortest fork2 the active chain
         self.nodes[0].rollbackchain(self.nodes[0].getblockcount() - fork3blocks, True)
         self.nodes[0].reconsiderblock(bestblockhashfork2)
+        assert_equal(self.nodes[0].getbestblockhash(), bestblockhashfork2);
 
         # do a reconsidermostworkchain but without the override flag
         try:
@@ -248,6 +249,8 @@ class BlockchainTest(BitcoinTestFramework):
         except JSONRPCException as e:
             logging.info (e.error['message'])
             assert("You are attempting to rollback the chain by 120 blocks, however the limit is 100 blocks." in e.error['message'])
+        # check that nothing happened and we're still on the same chaintip
+        assert_equal(self.nodes[0].getbestblockhash(), bestblockhashfork2);
 
         # now do a reconsidermostworkchain with the override. We should now be on fork3 best block hash
         self.nodes[0].reconsidermostworkchain(True)
@@ -260,6 +263,8 @@ class BlockchainTest(BitcoinTestFramework):
         except JSONRPCException as e:
             logging.info (e.error['message'])
             assert("Nothing to do. Already on the correct chain." in e.error['message'])
+        # check that nothing happened and we're still on the same chaintip
+        assert_equal(self.nodes[0].getbestblockhash(), bestblockhashfork3);
 
     def _test_transaction_pools(self):
         node = self.nodes[0]
