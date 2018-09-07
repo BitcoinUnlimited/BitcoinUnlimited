@@ -24,7 +24,6 @@
 #include "script/standard.h"
 #include "timedata.h"
 #include "txmempool.h"
-#include "uahf_fork.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -80,7 +79,7 @@ int64_t UpdateTime(CBlockHeader *pblock, const Consensus::Params &consensusParam
 
 BlockAssembler::BlockAssembler(const CChainParams &_chainparams)
     : chainparams(_chainparams), nBlockSize(0), nBlockTx(0), nBlockSigOps(0), nFees(0), nHeight(0), nLockTimeCutoff(0),
-      lastFewTxs(0), blockFinished(false), uahfChainBlock(false)
+      lastFewTxs(0), blockFinished(false)
 {
     // Largest block you're willing to create:
     nBlockMaxSize = maxGeneratedBlock;
@@ -207,8 +206,6 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     {
         READLOCK(mempool.cs);
         nHeight = pindexPrev->nHeight + 1;
-
-        uahfChainBlock = IsUAHFforkActiveOnNextBlock(pindexPrev->nHeight);
 
         pblock->nTime = GetAdjustedTime();
         pblock->nVersion = UnlimitedComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), pblock->nTime);
@@ -399,16 +396,6 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
             continue;
         }
 
-        // Reject the tx if we are on the fork, but the tx is not fork-signed
-        if (uahfChainBlock && !IsTxUAHFOnly(*iter))
-        {
-            continue;
-        }
-        // if tx is not applicable to this (unforked) chain, skip it
-        if (!uahfChainBlock && IsTxUAHFOnly(*iter))
-        {
-            continue;
-        }
 
         // If tx is dependent on other mempool txs which haven't yet been included
         // then put it in the waitSet
@@ -493,17 +480,6 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
         if (isStillDependent(iter))
         {
             waitPriMap.insert(std::make_pair(iter, actualPriority));
-            continue;
-        }
-
-        // Reject the tx if we are on the fork, but the tx is not fork-signed
-        if (uahfChainBlock && !IsTxUAHFOnly(*iter))
-        {
-            continue;
-        }
-        // if tx is not applicable to this (unforked) chain, skip it
-        if (!uahfChainBlock && IsTxUAHFOnly(*iter))
-        {
             continue;
         }
 

@@ -812,8 +812,8 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     const CKeyStore &keystore = tempKeystore;
 #endif
 
-    int nHashType = SIGHASH_ALL;
-    bool pickedForkId = false;
+    bool fForkId = true;
+    int nHashType = SIGHASH_ALL | SIGHASH_FORKID;
     if (params.size() > 3 && !params[3].isNull())
     {
         std::string strHashType = params[3].get_str();
@@ -833,27 +833,17 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             else if (boost::iequals(s, "ANYONECANPAY"))
                 nHashType |= SIGHASH_ANYONECANPAY;
             else if (boost::iequals(s, "FORKID"))
-            {
-                pickedForkId = true;
                 nHashType |= SIGHASH_FORKID;
-            }
             else if (boost::iequals(s, "NOFORKID"))
             {
-                pickedForkId = true;
+                // Still support signing legacy chain transactions
+                fForkId = false;
                 nHashType &= ~SIGHASH_FORKID;
             }
             else
             {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid sighash param");
             }
-        }
-    }
-    if (!pickedForkId) // If the user didn't specify, use the configured default for the hash type
-    {
-        if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
-        {
-            nHashType |= SIGHASH_FORKID;
-            pickedForkId = true;
         }
     }
 
@@ -883,7 +873,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             SignSignature(keystore, prevPubKey, mergedTx, i, amount, nHashType);
 
         // ... and merge in other signatures:
-        if (pickedForkId)
+        if (fForkId)
         {
             for (const CMutableTransaction &txv : txVariants)
             {
@@ -900,6 +890,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         }
         else
         {
+            // Still support signing legacy chain transactions
             for (const CMutableTransaction &txv : txVariants)
             {
                 txin.scriptSig = CombineSignatures(prevPubKey, TransactionSignatureChecker(&txConst, i, amount, 0),
