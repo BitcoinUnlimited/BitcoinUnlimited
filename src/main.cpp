@@ -6992,12 +6992,17 @@ bool SendMessages(CNode *pto)
                     if (vInvSend.size() >= MAX_INV_ELEMENTS)
                         break;
                 }
+                if (nToErase > 0)
+                {
+                    pto->vInventoryToSend.erase(
+                        pto->vInventoryToSend.begin(), pto->vInventoryToSend.begin() + nToErase);
+                }
             }
 
+            // To maintain proper locking order we have to push the message when we do not hold cs_inventory which
+            // was held in the section above.
             if (nToErase > 0)
             {
-                pto->vInventoryToSend.erase(pto->vInventoryToSend.begin(), pto->vInventoryToSend.begin() + nToErase);
-
                 LOCK(pto->cs_vSend);
                 if (!vInvSend.empty())
                     pto->PushMessage(NetMsgType::INV, vInvSend);
