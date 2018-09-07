@@ -51,6 +51,21 @@ PORT_RANGE = 5000
 
 debug_port_assignments = False
 
+def SetupPythonLogConfig():
+    logOn = os.getenv("PYTHON_DEBUG")
+    level = logging.ERROR
+    if logOn=="ERROR":
+        level = logging.ERROR
+    if logOn=="WARN":
+        level = logging.WARN
+    if logOn=="DEBUG":
+        level = logging.DEBUG
+    if logOn == "1" or logOn == "INFO":
+        level = logging.INFO
+    logging.basicConfig(level=level, stream=sys.stdout, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+
+SetupPythonLogConfig()
+
 class UtilOptions:
     # this module-wide var is set from test_framework.py
     no_ipv6_rpc_listen = False
@@ -355,16 +370,6 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
     4 wallets.
     """
 
-    logOn = os.getenv("PYTHON_DEBUG")
-    if logOn=="ERROR":
-        logging.getLogger().setLevel(logging.ERROR)
-    if logOn=="WARN":
-        logging.getLogger().setLevel(logging.WARN)
-    if logOn=="DEBUG":
-        logging.getLogger().setLevel(logging.DEBUG)
-    if logOn == "1" or logOn == "INFO":
-        logging.getLogger().setLevel(logging.INFO)
-
     if (not os.path.isdir(os.path.join("cache","node0"))
         or not os.path.isdir(os.path.join("cache","node1"))
         or not os.path.isdir(os.path.join("cache","node2"))
@@ -496,10 +501,10 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
     for retry in range(4):
         try:
             bitcoind_processes[i] = subprocess.Popen(args)
-            logging.info("start_node: bitcoind started, waiting for RPC to come up")
+            logging.debug("start_node: bitcoind started, waiting for RPC to come up")
             url = rpc_url(i, rpchost)
             wait_for_bitcoind_start(bitcoind_processes[i], url, i)
-            logging.info("start_node: RPC succesfully started")
+            logging.debug("start_node: RPC succesfully started")
             break
         except Exception as exc:
             logging.error("Error bringing up bitcoind #%d (start_node, directory %s), this might be retried. Problem is:", i, dirname)
