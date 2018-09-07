@@ -238,7 +238,7 @@ bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             pfrom->nGetGrapheneBlockTxLastTime = GetTime();
         uint64_t nNow = GetTime();
         double tmp = pfrom->nGetGrapheneBlockTxCount;
-        while (pfrom->nGetGrapheneBlockTxCount.compare_exchange_weak(
+        while (!pfrom->nGetGrapheneBlockTxCount.compare_exchange_weak(
             tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneBlockTxLastTime)) + 1)))
             ;
         pfrom->nGetGrapheneBlockTxLastTime = nNow;
@@ -1453,7 +1453,7 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
             pfrom->nGetGrapheneLastTime = GetTime();
         uint64_t nNow = GetTime();
         double tmp = pfrom->nGetGrapheneCount;
-        while (pfrom->nGetGrapheneCount.compare_exchange_weak(
+        while (!pfrom->nGetGrapheneCount.compare_exchange_weak(
             tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneLastTime)) + 1)))
             ;
         pfrom->nGetGrapheneLastTime = nNow;
