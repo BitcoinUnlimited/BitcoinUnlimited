@@ -6951,19 +6951,14 @@ bool SendMessages(CNode *pto)
         //
         // Message: inventory
         //
-
-        FastRandomContext insecure_rand;
-        std::vector<CInv> vInvWait;
+        // We must send all INV's before returning otherwise, under very heavy transaction rates, we could end up
+        // falling behind in sending INV's and vInventoryToSend could possibly get quite large.
         std::vector<CInv> vInvSend;
+        while (!pto->vInventoryToSend.empty())
         {
-            bool fSendTrickle = !pto->fWhitelisted;
-            if (pto->nNextInvSend < nNow)
-            {
-                fSendTrickle = false;
-                pto->nNextInvSend = PoissonNextSend(nNow, AVG_INVENTORY_BROADCAST_INTERVAL);
-            }
-
-            if (1)
+            // Send message INV up to the MAX_INV_TO_SEND. Once we reach the max then send the INV message
+            // and if there is any remaining it will be sent on the next iteration until vInventoryToSend is empty.
+            int nToErase = 0;
             {
                 // BU - here we only want to forward message inventory if our peer has actually been requesting
                 // useful data or giving us useful data.  We give them 2 minutes to be useful but then choke off
@@ -6971,53 +6966,46 @@ bool SendMessages(CNode *pto)
                 // while providing no value to the network.
                 // However we will still send them block inventory in the case they are a pruned node or wallet
                 // waiting for block announcements, therefore we have to check each inv in pto->vInventoryToSend.
-                bool chokeTxInv = (pto->nActivityBytes == 0 && (nNow / 1000000 - pto->nTimeConnected) > 120);
-                LOCK(pto->cs_inventory);
+                bool fChokeTxInv = (pto->nActivityBytes == 0 && (nNow / 1000000 - pto->nTimeConnected) > 120);
 
-                int invsz = pto->vInventoryToSend.size();
+                // Find INV's which should be sent, save them to vInvSend, and then erase from vInventoryToSend.
+                int invsz = std::min((int)pto->vInventoryToSend.size(), MAX_INV_TO_SEND);
                 vInvSend.reserve(invsz);
-                // about 3/4 of the nodes should end up in this list, so over-allocate by 1/10th + 10 items
-                vInvWait.reserve((invsz * 3) / 4 + invsz / 10 + 10);
 
-                // Make copy of vInventoryToSend while cs_inventory is locked but also ignore some tx and defer others
+                LOCK(pto->cs_inventory);
                 for (const CInv &inv : pto->vInventoryToSend)
                 {
+                    nToErase++;
+
                     if (inv.type == MSG_TX)
                     {
-                        if (chokeTxInv)
+                        if (fChokeTxInv)
                             continue;
-                        // skip if we already know abt this one
+                        // skip if we already know about this one
                         if (pto->filterInventoryKnown.contains(inv.hash))
                             continue;
-                        if (fSendTrickle)
-                        {
-                            // 1/4 of tx invs blast to all immediately
-                            if ((insecure_rand.rand32() & 3) != 0)
-                            {
-                                vInvWait.push_back(inv);
-                                continue;
-                            }
-                        }
                     }
                     vInvSend.push_back(inv);
                     pto->filterInventoryKnown.insert(inv.hash);
+
+                    if (vInvSend.size() >= MAX_INV_TO_SEND)
+                        break;
                 }
-                pto->vInventoryToSend = vInvWait;
+
+                if (nToErase > 0)
+                {
+                    pto->vInventoryToSend.erase(
+                        pto->vInventoryToSend.begin(), pto->vInventoryToSend.begin() + nToErase);
+                }
             }
 
-            const int MAX_INV_ELEMENTS = 1000;
-            int sz = vInvSend.size();
-            if (sz)
+            // To maintain proper locking order we have to push the message when we do not hold cs_inventory which
+            // was held in the section above.
+            if (nToErase > 0)
             {
                 LOCK(pto->cs_vSend);
-                for (int i = 0; i < sz; i += MAX_INV_ELEMENTS)
-                {
-                    int sendsz = std::min(MAX_INV_ELEMENTS, sz - i);
-                    std::vector<CInv> vInv(sendsz);
-                    for (int j = 0; j < sendsz; j++)
-                        vInv[j] = vInvSend[i + j];
-                    pto->PushMessage(NetMsgType::INV, vInv); // TODO subvector PushMessage to avoid copy
-                }
+                if (!vInvSend.empty())
+                    pto->PushMessage(NetMsgType::INV, vInvSend);
             }
         }
 
