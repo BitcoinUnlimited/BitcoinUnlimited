@@ -39,12 +39,24 @@ class SignRawTransactionsTest(BitcoinTestFramework):
         rawTx = self.nodes[0].createrawtransaction(inputs, outputs)
         rawTxSigned = self.nodes[0].signrawtransaction(rawTx, inputs, privKeys)
 
+        #### Sign with default forkid
         # 1) The transaction has a complete set of signatures
         assert 'complete' in rawTxSigned
         assert_equal(rawTxSigned['complete'], True)
 
         # 2) No script verification error occurred
         assert 'errors' not in rawTxSigned
+
+        #### Make sure you can still sign with NOFORKID for doing cross chain signing with legacy Bitcoin
+        rawTxSigned_noforkid = self.nodes[0].signrawtransaction(rawTx, inputs, privKeys, "ALL|NOFORKID")
+
+        # 1) The transaction has a complete set of signatures
+        assert 'complete' in rawTxSigned_noforkid
+        assert_equal(rawTxSigned_noforkid['complete'], True)
+
+        # 2) No script verification error occurred
+        assert 'errors' not in rawTxSigned_noforkid
+
 
     def script_verification_error_test(self):
         """Creates and signs a raw transaction with valid (vin 0), invalid (vin 1) and one missing (vin 2) input script.

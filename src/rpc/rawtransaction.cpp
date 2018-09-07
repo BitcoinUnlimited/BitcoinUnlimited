@@ -812,6 +812,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     const CKeyStore &keystore = tempKeystore;
 #endif
 
+    bool fForkId = true;
     int nHashType = SIGHASH_ALL | SIGHASH_FORKID;
     if (params.size() > 3 && !params[3].isNull())
     {
@@ -833,6 +834,12 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
                 nHashType |= SIGHASH_ANYONECANPAY;
             else if (boost::iequals(s, "FORKID"))
                 nHashType |= SIGHASH_FORKID;
+            else if (boost::iequals(s, "NOFORKID"))
+            {
+                // Still support signing legacy chain transactions
+                fForkId = false;
+                nHashType &= ~SIGHASH_FORKID;
+            }
             else
             {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid sighash param");
@@ -866,17 +873,35 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             SignSignature(keystore, prevPubKey, mergedTx, i, amount, nHashType);
 
         // ... and merge in other signatures:
-        for (const CMutableTransaction &txv : txVariants)
+        if (fForkId)
         {
-            txin.scriptSig = CombineSignatures(prevPubKey,
-                TransactionSignatureChecker(&txConst, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID), txin.scriptSig,
-                txv.vin[i].scriptSig);
+            for (const CMutableTransaction &txv : txVariants)
+            {
+                txin.scriptSig = CombineSignatures(prevPubKey,
+                    TransactionSignatureChecker(&txConst, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID), txin.scriptSig,
+                    txv.vin[i].scriptSig);
+            }
+            ScriptError serror = SCRIPT_ERR_OK;
+            if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_SIGHASH_FORKID,
+                    MutableTransactionSignatureChecker(&mergedTx, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID), &serror))
+            {
+                TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
+            }
         }
-        ScriptError serror = SCRIPT_ERR_OK;
-        if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_SIGHASH_FORKID,
-                MutableTransactionSignatureChecker(&mergedTx, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID), &serror))
+        else
         {
-            TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
+            // Still support signing legacy chain transactions
+            for (const CMutableTransaction &txv : txVariants)
+            {
+                txin.scriptSig = CombineSignatures(prevPubKey, TransactionSignatureChecker(&txConst, i, amount, 0),
+                    txin.scriptSig, txv.vin[i].scriptSig);
+            }
+            ScriptError serror = SCRIPT_ERR_OK;
+            if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS,
+                    MutableTransactionSignatureChecker(&mergedTx, i, amount, 0), &serror))
+            {
+                TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
+            }
         }
     }
     bool fComplete = vErrors.empty();
