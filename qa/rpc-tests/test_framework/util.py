@@ -403,7 +403,7 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
                     break
                 except Exception as exc:
                     logging.error("Error bringing up bitcoind #%d (initialize_chain, directory %s), this might be retried. Problem is:", i, test_dir)
-                    do_and_ignore_failure(bitcoind_processes[i].kill)
+                    do_and_ignore_failure(lambda x: bitcoind_processes[i].kill())
                     traceback.print_exc(file=sys.stdout)
                     remap_ports(i)
             else:
@@ -500,6 +500,7 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
     if extra_args is not None: args.extend(extra_args)
     for retry in range(4):
         try:
+            logging.debug("executing: %s" % str(args))
             bitcoind_processes[i] = subprocess.Popen(args)
             logging.debug("start_node: bitcoind started, waiting for RPC to come up")
             url = rpc_url(i, rpchost)
@@ -507,8 +508,8 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
             logging.debug("start_node: RPC succesfully started")
             break
         except Exception as exc:
-            logging.error("Error bringing up bitcoind #%d (start_node, directory %s), this might be retried. Problem is:", i, dirname)
-            do_and_ignore_failure(bitcoind_processes[i].kill)
+            logging.error("Error bringing up bitcoind #%d (start_node, directory %s), this might be retried. Problem is: %s", i, dirname, str(exc))
+            do_and_ignore_failure(lambda x: bitcoind_processes[i].kill())
             traceback.print_exc(file=sys.stdout)
             remap_ports(i)
             fixup_ports_in_configfile(i)
