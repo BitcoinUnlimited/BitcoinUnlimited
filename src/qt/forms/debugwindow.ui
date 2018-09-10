@@ -96,7 +96,7 @@
        <item row="12" column="0">
         <widget class="QLabel" name="labelLastBlockTime">
          <property name="text">
-          <string>Last block time</string>
+          <string>Last block time (time since)</string>
          </property>
         </widget>
        </item>

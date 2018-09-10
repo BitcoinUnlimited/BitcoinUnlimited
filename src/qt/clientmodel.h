@@ -92,6 +92,10 @@ public:
     QString dataDir() const;
     UnlimitedModel *unlimitedModel;
 
+    //! Cache last block time so that we can make fast updates (every 250 ms)
+    //! to time since last block without having to take the cs_main lock every time
+    mutable std::atomic<qint64> lastBlockTime;
+
 private:
     OptionsModel *optionsModel;
     PeerTableModel *peerTableModel;
@@ -109,6 +113,7 @@ private:
 Q_SIGNALS:
     void numConnectionsChanged(int count);
     void numBlocksChanged(int count, const QDateTime &blockDate, double nVerificationProgress);
+    void timeSinceLastBlockChanged(qint64 lastBlockTime);
     void mempoolSizeChanged(long count, size_t mempoolSizeInBytes);
     void orphanPoolSizeChanged(long count);
     void alertsChanged(const QString &warnings);
