@@ -1740,16 +1740,6 @@ void static UpdateTip(CBlockIndex *pindexNew)
     // txs a second chance.
     recentRejects.reset();
 
-    // Check Activate May 2018 HF rules after each new tip is connected and the blockindex updated.
-
-    // First check if the next block is the fork block and set non-consensus parameters appropriately
-    if (IsMay152018Next(chainParams.GetConsensus(), pindexNew))
-    {
-        // Bump the default generated size to 8MB
-        if (miningForkMG.Value() > maxGeneratedBlock)
-            maxGeneratedBlock = miningForkMG.Value();
-    }
-
     // Next, check every on every block for EB < 32MB and force this as the minimum because this is a consensus issue
     if (IsMay152018Enabled(chainParams.GetConsensus(), pindexNew))
     {
