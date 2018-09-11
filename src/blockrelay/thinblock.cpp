@@ -1346,7 +1346,7 @@ bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
         auto iter =  mapThinBlockTimer.find(hash);
         if (iter != mapThinBlockTimer.end())
         {
-            int64_t elapsed = GetTimeMillis() - iter->second.first;
+            uint64_t elapsed = GetTimeMillis() - iter->second.first;
             if (elapsed > nTimeToWait)
             {
                 // Only print out the log entry once.  Because the thinblock timer will be hit
