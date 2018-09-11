@@ -126,6 +126,7 @@ extern CCriticalSection cs_vAddedNodes;
 // BITCOINUNLIMITED START
 extern vector<std::string> vUseDNSSeeds;
 extern CCriticalSection cs_vUseDNSSeeds;
+extern CTweak<unsigned int> numMsgHandlerThreads;
 // BITCOINUNLIMITED END
 
 extern CSemaphore *semOutbound;
@@ -2141,20 +2142,22 @@ void ThreadMessageHandler()
                 continue;
 
             // Receive messages from the net layer and put them into the receive queue.
-            {
-                TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                if (lockRecv)
-                {
-                    if (!g_signals.ProcessMessages(pnode))
-                        pnode->fDisconnect = true;
+            if (!g_signals.ProcessMessages(pnode))
+                pnode->fDisconnect = true;
 
-                    if (pnode->nSendSize < SendBufferSize())
-                    {
-                        if (!pnode->vRecvGetData.empty() || (!pnode->vRecvMsg.empty() && pnode->vRecvMsg[0].complete()))
-                        {
-                            fSleep = false;
-                        }
-                    }
+            // Discover if there's more work to be done
+            if (pnode->nSendSize < SendBufferSize())
+            {
+                { // If already locked some other thread is working on it, so no work for this thread
+                    TRY_LOCK(pnode->csRecvGetData, lockRecv);
+                    if (lockRecv && (!pnode->vRecvGetData.empty()))
+                        fSleep = false;
+                }
+                if (fSleep)
+                { // If already locked some other thread is working on it, so no work for this thread
+                    TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
+                    if (lockRecv && (!pnode->vRecvMsg.empty() && pnode->vRecvMsg[0].complete()))
+                        fSleep = false;
                 }
             }
             boost::this_thread::interruption_point();
@@ -2413,7 +2416,10 @@ void StartNode(boost::thread_group &threadGroup, CScheduler &scheduler)
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "opencon", &ThreadOpenConnections));
 
     // Process messages
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msghand", &ThreadMessageHandler));
+    for (unsigned int i = 0; i < numMsgHandlerThreads.Value(); i++)
+    {
+        threadGroup.create_thread(boost::bind(&TraceThreads<void (*)()>, strprintf("msg%d", i), &ThreadMessageHandler));
+    }
 
     // Dump network addresses
     scheduler.scheduleEvery(&DumpData, DUMP_ADDRESSES_INTERVAL);
@@ -2889,19 +2895,23 @@ CNode::~CNode()
 {
     CloseSocket(hSocket);
 
-    if (pfilter)
-    {
-        delete pfilter;
-        pfilter = nullptr; // BU
+    { // locking should be unnecessary because nothing is holding a reference to this node anymore, so single-threaded
+        // however, lock here for static analysis correctness.
+        LOCK(cs_filter);
+        if (pfilter)
+        {
+            delete pfilter;
+            pfilter = nullptr; // BU
+        }
+
+        // BUIP010 - Xtreme Thinblocks - begin section
+        if (pThinBlockFilter)
+        {
+            delete pThinBlockFilter;
+            pThinBlockFilter = nullptr;
+        }
     }
 
-
-    // BUIP010 - Xtreme Thinblocks - begin section
-    if (pThinBlockFilter)
-    {
-        delete pThinBlockFilter;
-        pThinBlockFilter = nullptr;
-    }
     mapThinBlocksInFlight.clear();
     thinBlockWaitingForTxns = -1;
     thinBlock.SetNull();

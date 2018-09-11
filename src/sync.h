@@ -173,6 +173,17 @@ public:
     ~CDeferredSharedLocker() { unlock(); }
 };
 
+// This class unlocks a shared lock for the duration of its life
+class CSharedUnlocker
+{
+    CSharedCriticalSection &cs;
+
+public:
+    CSharedUnlocker(CSharedCriticalSection &c) : cs(c) { cs.unlock_shared(); }
+    ~CSharedUnlocker() { cs.lock_shared(); }
+};
+
+
 /** Wrapped boost mutex: supports waiting but not recursive locking */
 typedef AnnotatedMixin<boost::mutex> CWaitableCriticalSection;
 

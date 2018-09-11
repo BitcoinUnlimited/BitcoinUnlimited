@@ -248,6 +248,15 @@ public:
 
     int64_t nTime; // time (in microseconds) of message receipt.
 
+    // default constructor builds an empty message object to accept assignment of real messages
+    CNetMessage() : hdrbuf(0, 0), hdr({0, 0, 0, 0}), vRecv(0, 0)
+    {
+        in_data = false;
+        nHdrPos = 0;
+        nDataPos = 0;
+        nTime = 0;
+    }
+
     CNetMessage(const CMessageHeader::MessageStartChars &pchMessageStartIn, int nTypeIn, int nVersionIn)
         : hdrbuf(nTypeIn, nVersionIn), hdr(pchMessageStartIn), vRecv(nTypeIn, nVersionIn)
     {
@@ -258,6 +267,8 @@ public:
         nTime = 0;
     }
 
+    // Returns true if this message has been completely received.  This is determined by checking the message size
+    // field in the header against the number of payload bytes in this object.
     bool complete() const
     {
         if (!in_data)
@@ -265,6 +276,9 @@ public:
         return (hdr.nMessageSize == nDataPos);
     }
 
+    // Returns the size of this message including header.  If the message is still being received
+    // this call returns only what has been received.
+    unsigned int size() const { return ((in_data) ? sizeof(CMessageHeader) : hdrbuf.size()) + nDataPos; }
     void SetVersion(int nVersionIn)
     {
         hdrbuf.SetVersion(nVersionIn);
@@ -319,6 +333,9 @@ public:
         }
     };
 
+    // This is shared-locked whenever messages are processed.
+    // Take it exclusive-locked to finish all ongoing processing
+    CSharedCriticalSection csMsgSerializer;
     // socket
     uint64_t nServices;
     SOCKET hSocket;
@@ -329,8 +346,10 @@ public:
     std::deque<CSerializeData> vSendMsg;
     CCriticalSection cs_vSend;
 
+    CCriticalSection csRecvGetData;
     std::deque<CInv> vRecvGetData;
     std::deque<CNetMessage> vRecvMsg;
+    CStatHistory<uint64_t> currentRecvMsgSize;
     CCriticalSection cs_vRecvMsg;
     uint64_t nRecvBytes;
     int nRecvVersion;

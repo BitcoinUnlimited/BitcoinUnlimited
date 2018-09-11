@@ -319,12 +319,9 @@ void CSharedCriticalSection::lock_shared()
             printf("already locked at %s:%d\n", li.file, li.line);
             assert(alreadyLocked == sharedowners.end());
         }
-    }
-    boost::shared_mutex::lock_shared();
-    {
-        boost::unique_lock<boost::mutex> lock(setlock);
         sharedowners[tid] = LockInfo("", 0);
     }
+    boost::shared_mutex::lock_shared();
 }
 
 void CSharedCriticalSection::unlock_shared()
@@ -340,18 +337,16 @@ void CSharedCriticalSection::unlock_shared()
             printf("never locked at %s:%d\n", li.file, li.line);
             assert(alreadyLocked != sharedowners.end());
         }
-    }
-    boost::shared_mutex::unlock_shared();
-    {
-        boost::unique_lock<boost::mutex> lock(setlock);
         sharedowners.erase(tid);
     }
+    boost::shared_mutex::unlock_shared();
 }
 
 bool CSharedCriticalSection::try_lock_shared()
 {
     // detect recursive locking
     uint64_t tid = getTid();
+    boost::unique_lock<boost::mutex> lock(setlock);
     assert(exclusiveOwner != tid);
     assert(sharedowners.find(tid) == sharedowners.end());
 

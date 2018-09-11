@@ -366,10 +366,10 @@ static void MonitorLogfile()
     // Check if debug.log has been deleted or moved.
     // If so re-open
     static int existcounter = 1;
+    static fs::path fileName = GetDataDir() / "debug.log";
     existcounter++;
     if (existcounter % 63 == 0) // Check every 64 log msgs
     {
-        fs::path fileName = GetDataDir() / "debug.log";
         bool exists = boost::filesystem::exists(fileName);
         if (!exists)
             fReopenDebugLog = true;

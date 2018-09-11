@@ -451,6 +451,7 @@ class RPCTestHandler:
             log_stdout = tempfile.SpooledTemporaryFile(max_size=2**16, mode="w+")
             log_stderr = tempfile.SpooledTemporaryFile(max_size=2**16, mode="w+")
             got_outputs = [False]
+            print("Starting %s" % t)
             self.jobs.append((t,
                               time.time(),
                               subprocess.Popen((RPC_TESTS_DIR + t).split() + self.flags.split() + port_seed,
@@ -474,7 +475,6 @@ class RPCTestHandler:
                     stdout_data, stderr_data = proc.communicate(timeout=timeout)
                     log_stdout.write(stdout_data)
                     log_stderr.write(stderr_data)
-
 
                 # Poll for new data on stdout and stderr. This is also necessary as to not block
                 # the subprocess when the stdout or stderr pipe is full.
