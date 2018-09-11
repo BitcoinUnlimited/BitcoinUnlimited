@@ -507,7 +507,6 @@ bool AreFreeTxnsDisallowed()
     return true;
 }
 
-/** Return transaction in tx, and if it was found inside a block, its hash is placed in hashBlock */
 bool GetTransaction(const uint256 &hash,
     CTransactionRef &txOut,
     const Consensus::Params &consensusParams,
@@ -836,8 +835,7 @@ bool CheckInputs(const CTransaction &tx,
                 else if (!check())
                 {
                     const bool hasNonMandatoryFlags = (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
-                    const bool doesNotHaveMay152018 = (flags & SCRIPT_ENABLE_MAY152018_OPCODES) == 0;
-                    if (hasNonMandatoryFlags || doesNotHaveMay152018)
+                    if (hasNonMandatoryFlags)
                     {
                         // Check whether the failure was caused by a
                         // non-mandatory script verification check, such as
@@ -845,14 +843,8 @@ bool CheckInputs(const CTransaction &tx,
                         // arguments; if so, don't trigger DoS protection to
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
-                        //
-                        // We also check activating the may152018 opcodes as it is a
-                        // strictly additive change and we would not like to ban some of
-                        // our peer that are ahead of us and are considering the fork
-                        // as activated.
                         CScriptCheck check2(nullptr, scriptPubKey, amount, tx, i,
-                            (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS) | SCRIPT_ENABLE_MAY152018_OPCODES,
-                            cacheStore);
+                            (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS), cacheStore);
                         if (check2())
                             return state.Invalid(
                                 false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
@@ -1161,13 +1153,6 @@ static uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::
         flags |= SCRIPT_VERIFY_LOW_S;
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
-
-    // The May 15, 2018 HF enable a set of opcodes.
-    if (IsMay152018Enabled(consensusparams, pindex->pprev))
-    {
-        flags |= SCRIPT_ENABLE_MAY152018_OPCODES;
-    }
-
 
     return flags;
 }

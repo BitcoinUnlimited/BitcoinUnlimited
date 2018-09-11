@@ -460,9 +460,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     if (pfMissingInputs)
         *pfMissingInputs = false;
 
-    // After the May, 15 hard fork, we start accepting larger op_return.
     const CChainParams &chainparams = Params();
-    const bool hasMay152018 = IsMay152018Enabled(chainparams.GetConsensus(), chainActive.Tip());
 
     // LOG(MEMPOOL, "Mempool: Considering Tx %s\n", tx->GetHash().ToString());
 
@@ -763,10 +761,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
         // Set extraFlags as a set of flags that needs to be activated.
         uint32_t extraFlags = 0;
-        if (hasMay152018)
-        {
-            extraFlags |= SCRIPT_ENABLE_MAY152018_OPCODES;
-        }
 
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
