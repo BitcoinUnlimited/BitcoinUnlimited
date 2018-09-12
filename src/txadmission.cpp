@@ -503,6 +503,13 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     if (!CheckFinalTx(*tx, STANDARD_LOCKTIME_VERIFY_FLAGS))
         return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
 
+    // Make sure tx size is acceptable after Nov 15, 2018 fork
+    if (IsNov152018Enabled(chainparams.GetConsensus(), chainActive.Tip()))
+    {
+        if (tx->GetTxSize() < MIN_TX_SIZE)
+            return state.DoS(0, false, REJECT_NONSTANDARD, "txn-undersize");
+    }
+
     // is it already in the memory pool?
     uint256 hash = tx->GetHash();
     if (pool.exists(hash))

@@ -2901,6 +2901,14 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
             return state.DoS(
                 10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
         }
+
+        // Make sure tx size is acceptable after Nov 15, 2018 fork
+        if (IsNov152018Enabled(consensusParams, chainActive.Tip()))
+        {
+            if (tx->GetTxSize() < MIN_TX_SIZE)
+                return state.DoS(10, error("%s: contains transactions that are too small", __func__), REJECT_INVALID,
+                    "bad-txns-undersize");
+        }
     }
 
     // Enforce block nVersion=2 rule that the coinbase starts with serialized block height
