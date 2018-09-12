@@ -1334,8 +1334,8 @@ void LoadFilter(CNode *pfrom, CBloomFilter *filter)
     else
     {
         uint64_t nSizeFilter;
-        LOCK(pfrom->cs_filter);
         {
+            LOCK(pfrom->cs_filter);
             nSizeFilter = ::GetSerializeSize(*pfrom->pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION);
             thindata.UpdateInBoundBloomFilter(nSizeFilter);
             delete pfrom->pThinBlockFilter;

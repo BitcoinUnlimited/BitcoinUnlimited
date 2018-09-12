@@ -111,7 +111,7 @@ public:
         LockInfo(const char *f, unsigned int l) : file(f), line(l) {}
     };
 
-    boost::mutex setlock;
+    std::mutex setlock;
     std::map<uint64_t, LockInfo> sharedowners;
     const char *name;
     uint64_t exclusiveOwner;

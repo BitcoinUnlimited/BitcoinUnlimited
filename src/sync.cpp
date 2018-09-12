@@ -197,6 +197,12 @@ void DeleteCritical(const void *cs)
         }
         prev = i;
     }
+    // get the last one
+    if ((prev != lockorders.end()) && ((prev->first.first == cs) || (prev->first.second == cs)))
+    {
+        lockorders.erase(prev);
+    }
+
     dd_mutex.unlock();
 }
 
@@ -310,7 +316,7 @@ void CSharedCriticalSection::lock_shared()
     uint64_t tid = getTid();
     // detect recursive locking
     {
-        boost::unique_lock<boost::mutex> lock(setlock);
+        std::unique_lock<std::mutex> lock(setlock);
         assert(exclusiveOwner != tid);
         auto alreadyLocked = sharedowners.find(tid);
         if (alreadyLocked != sharedowners.end())
@@ -329,7 +335,7 @@ void CSharedCriticalSection::unlock_shared()
     // detect recursive locking
     uint64_t tid = getTid();
     {
-        boost::unique_lock<boost::mutex> lock(setlock);
+        std::unique_lock<std::mutex> lock(setlock);
         auto alreadyLocked = sharedowners.find(tid);
         if (alreadyLocked == sharedowners.end())
         {
@@ -346,7 +352,7 @@ bool CSharedCriticalSection::try_lock_shared()
 {
     // detect recursive locking
     uint64_t tid = getTid();
-    boost::unique_lock<boost::mutex> lock(setlock);
+    std::unique_lock<std::mutex> lock(setlock);
     assert(exclusiveOwner != tid);
     assert(sharedowners.find(tid) == sharedowners.end());
 
