@@ -163,7 +163,15 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _n
     {
         COINBASE_FLAGS.resize(MAX_COINBASE_SCRIPTSIG_SIZE - tx.vin[0].scriptSig.size());
     }
+
     tx.vin[0].scriptSig = tx.vin[0].scriptSig + COINBASE_FLAGS;
+
+    // Make sure the coinbase is big enough.
+    uint64_t nCoinbaseSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
+    if (nCoinbaseSize < MIN_TX_SIZE)
+    {
+        tx.vin[0].scriptSig << std::vector<uint8_t>(MIN_TX_SIZE - nCoinbaseSize - 1);
+    }
 
     return MakeTransactionRef(std::move(tx));
 }
@@ -222,7 +230,6 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
             pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
 
         const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
-
         nLockTimeCutoff =
             (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
 
@@ -366,6 +373,13 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
     // as long as reorgs keep the mempool consistent.
     if (!IsFinalTx(iter->GetTx(), nHeight, nLockTimeCutoff))
         return false;
+
+    // Make sure tx size is acceptable after Nov 15, 2018 fork
+    if (IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
+    {
+        if (iter->GetTxSize() < MIN_TX_SIZE)
+            return false;
+    }
 
     return true;
 }
