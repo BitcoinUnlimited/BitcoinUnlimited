@@ -100,8 +100,7 @@ class MyTest (BitcoinTestFramework):
         assert_equal(0x123456, block["version"])
 
         # change the coinbase
-        tx = CTransaction()
-        tx.deserialize(BytesIO(unhexlify(c["coinbase"])))
+        tx = CTransaction().deserialize(c["coinbase"])
         tx.vout[0].scriptPubKey = CScript([OP_1])
 
         nonce = 0

@@ -117,18 +117,12 @@ class BIP68_112_113Test(ComparisonTestFramework):
         inputs = [{ "txid" : txid, "vout" : 0}]
         outputs = { to_address : amount }
         rawtx = node.createrawtransaction(inputs, outputs)
-        tx = CTransaction()
-        f = BytesIO(hex_str_to_bytes(rawtx))
-        tx.deserialize(f)
-        return tx
+        return CTransaction().deserialize(rawtx)
 
     def sign_transaction(self, node, unsignedtx):
         rawtx = ToHex(unsignedtx)
         signresult = node.signrawtransaction(rawtx)
-        tx = CTransaction()
-        f = BytesIO(hex_str_to_bytes(signresult['hex']))
-        tx.deserialize(f)
-        return tx
+        return CTransaction().deserialize(signresult['hex'])
 
     def generate_blocks(self, number, version, test_blocks = []):
         for i in range(number):

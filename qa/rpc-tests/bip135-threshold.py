@@ -92,24 +92,6 @@ class BIP135ForksTest(ComparisonTestFramework):
         NetworkThread().start() # Start up network handling in another thread
         self.test.run()
 
-    def create_transaction(self, node, coinbase, to_address, amount):
-        from_txid = node.getblock(coinbase)['tx'][0]
-        inputs = [{ "txid" : from_txid, "vout" : 0}]
-        outputs = { to_address : amount }
-        rawtx = node.createrawtransaction(inputs, outputs)
-        tx = CTransaction()
-        f = BytesIO(hex_str_to_bytes(rawtx))
-        tx.deserialize(f)
-        tx.nVersion = 2
-        return tx
-
-    def sign_transaction(self, node, tx):
-        signresult = node.signrawtransaction(bytes_to_hex_str(tx.serialize()))
-        tx = CTransaction()
-        f = BytesIO(hex_str_to_bytes(signresult['hex']))
-        tx.deserialize(f)
-        return tx
-
     def generate_blocks(self, number, version, test_blocks = []):
         for i in range(number):
             old_tip = self.tip
