@@ -17,6 +17,7 @@ Functionality to build scripts, as well as SignatureHash().
 from sys import stdout
 from .mininode import CTransaction, CTxOut, hash256
 from binascii import hexlify
+from .constants import (SIGHASH_ALL, SIGHASH_NONE, SIGHASH_SINGLE, SIGHASH_FORKID, SIGHASH_ANYONECANPAY)
 
 import sys
 bchr = chr
@@ -860,12 +861,6 @@ class CScript(bytes):
                     n += 20
             lastOpcode = opcode
         return n
-
-
-SIGHASH_ALL = 1
-SIGHASH_NONE = 2
-SIGHASH_SINGLE = 3
-SIGHASH_ANYONECANPAY = 0x80
 
 def FindAndDelete(script, sig):
     """Consensus critical, see FindAndDelete() in Satoshi codebase"""
