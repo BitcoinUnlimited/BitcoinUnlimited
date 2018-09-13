@@ -1725,16 +1725,6 @@ void static UpdateTip(CBlockIndex *pindexNew)
     // txs a second chance.
     recentRejects.reset();
 
-    // Next, check every on every block for EB < 32MB and force this as the minimum because this is a consensus issue
-    if (IsMay152018Enabled(chainParams.GetConsensus(), pindexNew))
-    {
-        if (miningForkEB.Value() > excessiveBlockSize)
-        {
-            excessiveBlockSize = miningForkEB.Value();
-            settingsToUserAgentString();
-        }
-    }
-
     // New best block
     nTimeBestReceived.store(GetTime());
     mempool.AddTransactionsUpdated(1);

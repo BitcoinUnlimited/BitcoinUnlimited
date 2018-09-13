@@ -80,6 +80,7 @@ bool MiningAndExcessiveBlockValidatorRule(const uint64_t newExcessiveBlockSize, 
     LOGA("newMiningBlockSize: %d - newExcessiveBlockSize: %d\n", newMiningBlockSize, newExcessiveBlockSize);
     return (newMiningBlockSize <= newExcessiveBlockSize);
 }
+
 std::string AcceptDepthValidator(const unsigned int &value, unsigned int *item, bool validate)
 {
     if (!validate)
@@ -99,6 +100,13 @@ std::string ExcessiveBlockValidator(const uint64_t &value, uint64_t *item, bool 
             ret << "Sorry, your maximum mined block (" << maxGeneratedBlock
                 << ") is larger than your proposed excessive size (" << value
                 << ").  This would cause you to orphan your own blocks.";
+            return ret.str();
+        }
+        if (value < MIN_EXCESSIVE_BLOCK_SIZE)
+        {
+            std::ostringstream ret;
+            ret << "Sorry, your proposed excessive block size (" << value << ") is smaller than the minimum EB size ("
+                << MIN_EXCESSIVE_BLOCK_SIZE << ").  This would cause you to orphan blocks from the rest of the net.";
             return ret.str();
         }
     }
