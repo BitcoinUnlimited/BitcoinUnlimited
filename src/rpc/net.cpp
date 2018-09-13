@@ -711,6 +711,9 @@ UniValue clearbanned(const UniValue &params, bool fHelp)
                             HelpExampleCli("clearbanned", "") + HelpExampleRpc("clearbanned", ""));
 
     dosMan.ClearBanned();
+    // We also need to clear the number of incoming reqs from this node, or we'll just instantly ban again
+    LOCK(cs_mapInboundConnectionTracker);
+    mapInboundConnectionTracker.clear();
     return NullUniValue;
 }
 

@@ -2540,6 +2540,9 @@ CBlockIndex *FindMostWorkChain()
 static void PruneBlockIndexCandidates()
 {
     AssertLockHeld(cs_main);
+    if (setBlockIndexCandidates.empty())
+        return; // nothing to prune
+
     // Note that we can't delete the current block itself, as we may need to return to it later in case a
     // reorganization to a better block fails.
     std::set<CBlockIndex *, CBlockIndexWorkComparator>::iterator it = setBlockIndexCandidates.begin();
@@ -3391,18 +3394,30 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
     // Enforce block nVersion=2 rule that the coinbase starts with serialized block height
     if (nHeight >= consensusParams.BIP34Height)
     {
+        // For legacy reasons keep the original way of checking BIP34 compliance
         CScript expect = CScript() << nHeight;
         if (block.vtx[0]->vin[0].scriptSig.size() < expect.size() ||
             !std::equal(expect.begin(), expect.end(), block.vtx[0]->vin[0].scriptSig.begin()))
         {
+            // However the original way only checks a specific serialized int encoding, BUT BIP34 does not mandate
+            // the most efficient encoding, only that it be a "serialized CScript", and then gives an example with
+            // 3 byte encoding.  Therefore we've ended up with miners that only generate 3 byte encodings...
             int blockCoinbaseHeight = block.GetHeight();
-            uint256 hashp = block.hashPrevBlock;
-            uint256 hash = block.GetHash();
-            return state.DoS(100, error("%s: block height mismatch in coinbase, expected %d, got %d, block is %s, "
-                                        "parent block is %s, pprev is %s",
-                                      __func__, nHeight, blockCoinbaseHeight, hash.ToString(), hashp.ToString(),
-                                      pindexPrev->phashBlock->ToString()),
-                REJECT_INVALID, "bad-cb-height");
+            if (blockCoinbaseHeight == nHeight)
+            {
+                LOG(BLK, "Mined block valid but suboptimal height format, different client interpretions of "
+                         "BIP34 may cause fork");
+            }
+            else
+            {
+                uint256 hashp = block.hashPrevBlock;
+                uint256 hash = block.GetHash();
+                return state.DoS(100, error("%s: block height mismatch in coinbase, expected %d, got %d, block is %s, "
+                                            "parent block is %s, pprev is %s",
+                                          __func__, nHeight, blockCoinbaseHeight, hash.ToString(), hashp.ToString(),
+                                          pindexPrev->phashBlock->ToString()),
+                    REJECT_INVALID, "bad-cb-height");
+            }
         }
     }
 
@@ -4685,27 +4700,26 @@ bool AlreadyHaveBlock(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
     return true;
 }
 
-void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParams)
+bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParams, std::deque<CInv> &vInv)
 {
-    std::deque<CInv>::iterator it = pfrom->vRecvGetData.begin();
+    bool gotWorkDone = false;
 
     std::vector<CInv> vNotFound;
 
-    LOCK(cs_main);
-
-    while (it != pfrom->vRecvGetData.end())
+    while (!vInv.empty())
     {
         // Don't bother if send buffer is too full to respond anyway
         if (pfrom->nSendSize >= SendBufferSize())
             break;
 
-        const CInv &inv = *it;
+        const CInv inv = vInv.front();
+        vInv.pop_front();
         {
             boost::this_thread::interruption_point();
-            it++;
-
+            gotWorkDone = true;
             if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK)
             {
+                LOCK(cs_main);
                 bool fSend = false;
                 BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
                 if (mi != mapBlockIndex.end())
@@ -4726,17 +4740,17 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                                      *pindexBestHeader, *mi->second, *pindexBestHeader, consensusParams) < nOneMonth);
                         if (!fSend)
                         {
-                            LOGA("%s: ignoring request from peer=%i for old block that isn't in the main chain\n",
-                                __func__, pfrom->GetId());
+                            LOGA("%s: ignoring request from peer=%s for old block that isn't in the main chain\n",
+                                __func__, pfrom->GetLogName());
                         }
                         else
-                        { // BU: don't relay excessive blocks
+                        { // BU: don't relay excessive blocks that are not on the active chain
                             if (mi->second->nStatus & BLOCK_EXCESSIVE)
                                 fSend = false;
                             if (!fSend)
-                                LOGA("%s: ignoring request from peer=%i for excessive block of height %d not on "
+                                LOGA("%s: ignoring request from peer=%s for excessive block of height %d not on "
                                      "the main chain\n",
-                                    __func__, pfrom->GetId(), mi->second->nHeight);
+                                    __func__, pfrom->GetLogName(), mi->second->nHeight);
                         }
                         // BU: in the future we can throttle old block requests by setting send=false if we are out of
                         // bandwidth
@@ -4815,9 +4829,9 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                             // Bypass PushInventory, this must send even if redundant,
                             // and we want it right after the last block so they don't
                             // wait for other stuff first.
-                            std::vector<CInv> vInv;
-                            vInv.push_back(CInv(MSG_BLOCK, chainActive.Tip()->GetBlockHash()));
-                            pfrom->PushMessage(NetMsgType::INV, vInv);
+                            std::vector<CInv> oneInv;
+                            oneInv.push_back(CInv(MSG_BLOCK, chainActive.Tip()->GetBlockHash()));
+                            pfrom->PushMessage(NetMsgType::INV, oneInv);
                             pfrom->hashContinue.SetNull();
                         }
                     }
@@ -4846,6 +4860,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     if (fPushed)
                     {
                         pfrom->PushMessage(inv.GetCommand(), ptx);
+                        pfrom->txsSent += 1;
                     }
                 }
                 if (!fPushed && inv.type == MSG_TX)
@@ -4877,8 +4892,6 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
         }
     }
 
-    pfrom->vRecvGetData.erase(pfrom->vRecvGetData.begin(), it);
-
     if (!vNotFound.empty())
     {
         // Let the peer know that we didn't find what it asked for, so it doesn't
@@ -4890,7 +4903,9 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
         // having to download the entire memory pool.
         pfrom->PushMessage(NetMsgType::NOTFOUND, vNotFound);
     }
+    return gotWorkDone;
 }
+
 
 static bool BasicThinblockChecks(CNode *pfrom, const CChainParams &chainparams)
 {
@@ -5089,15 +5104,17 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
     }
 
-
-    else if (pfrom->nVersion == 0 && !pfrom->fWhitelisted)
-    {
-        // Must have version message before anything else (Although we may send our VERSION before
-        // we receive theirs, it would not be possible to receive their VERACK before their VERSION).
-        pfrom->fDisconnect = true;
-        return error("%s receieved before VERSION message - disconnecting peer=%s", strCommand, pfrom->GetLogName());
-    }
-
+    /* Since we are processing messages in multiple threads, we may process them out of order.  Does enforcing this
+       order actually matter?  Note we allow mis-order (or no version message at all) if whitelisted...
+        else if (pfrom->nVersion == 0 && !pfrom->fWhitelisted)
+        {
+            // Must have version message before anything else (Although we may send our VERSION before
+            // we receive theirs, it would not be possible to receive their VERACK before their VERSION).
+            pfrom->fDisconnect = true;
+            return error("%s receieved before VERSION message - disconnecting peer=%s", strCommand,
+       pfrom->GetLogName());
+        }
+    */
 
     else if (strCommand == NetMsgType::VERACK)
     {
@@ -5350,7 +5367,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::GETDATA)
     {
         if (fImporting || fReindex)
+        {
+            LOG(NET, "received getdata from %s but importing\n", pfrom->GetLogName());
             return true;
+        }
 
         std::vector<CInv> vInv;
         vRecv >> vInv;
@@ -5362,6 +5382,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
 
         // Validate that INVs are a valid type
+        std::deque<CInv> invDeque;
         for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
         {
             const CInv &inv = vInv[nInv];
@@ -5378,16 +5399,20 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 if (!BasicThinblockChecks(pfrom, chainparams))
                     return false;
             }
+            invDeque.push_back(inv);
         }
 
-        if (fDebug || (vInv.size() != 1))
-            LOG(NET, "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
+        if (fDebug || (invDeque.size() != 1))
+            LOG(NET, "received getdata (%u invsz) peer=%s\n", invDeque.size(), pfrom->GetLogName());
 
-        if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
-            LOG(NET, "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
+        if ((fDebug && invDeque.size() > 0) || (invDeque.size() == 1))
+            LOG(NET, "received getdata for: %s peer=%s\n", invDeque[0].ToString(), pfrom->GetLogName());
 
-        pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
-        ProcessGetData(pfrom, chainparams.GetConsensus());
+        ProcessGetData(pfrom, chainparams.GetConsensus(), invDeque);
+        {
+            LOCK(pfrom->csRecvGetData);
+            pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), invDeque.begin(), invDeque.end());
+        }
     }
 
 
@@ -6222,20 +6247,25 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     {
         if (pfrom->nVersion > BIP0031_VERSION)
         {
-            uint64_t nonce = 0;
-            vRecv >> nonce;
-            // Echo the message back with the nonce. This allows for two useful features:
-            //
-            // 1) A remote node can quickly check if the connection is operational
-            // 2) Remote nodes can measure the latency of the network thread. If this node
-            //    is overloaded it won't respond to pings quickly and the remote node can
-            //    avoid sending us more work, like chain download requests.
-            //
-            // The nonce stops the remote getting confused between different pings: without
-            // it, if the remote node sends a ping once per second and this node takes 5
-            // seconds to respond to each, the 5th ping the remote sends would appear to
-            // return very quickly.
-            pfrom->PushMessage(NetMsgType::PONG, nonce);
+            // take the lock exclusively to force a serialization point
+            CSharedUnlocker unl(pfrom->csMsgSerializer);
+            {
+                WRITELOCK(pfrom->csMsgSerializer);
+                uint64_t nonce = 0;
+                vRecv >> nonce;
+                // Echo the message back with the nonce. This allows for two useful features:
+                //
+                // 1) A remote node can quickly check if the connection is operational
+                // 2) Remote nodes can measure the latency of the network thread. If this node
+                //    is overloaded it won't respond to pings quickly and the remote node can
+                //    avoid sending us more work, like chain download requests.
+                //
+                // The nonce stops the remote getting confused between different pings: without
+                // it, if the remote node sends a ping once per second and this node takes 5
+                // seconds to respond to each, the 5th ping the remote sends would appear to
+                // return very quickly.
+                pfrom->PushMessage(NetMsgType::PONG, nonce);
+            }
         }
     }
 
@@ -6447,7 +6477,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
 bool ProcessMessages(CNode *pfrom)
 {
-    AssertLockHeld(pfrom->cs_vRecvMsg);
     const CChainParams &chainparams = Params();
     // if (fDebug)
     //    LOGA("%s(%u messages)\n", __func__, pfrom->vRecvMsg.size());
@@ -6461,35 +6490,48 @@ bool ProcessMessages(CNode *pfrom)
     //  (x) data
     //
     bool fOk = true;
+    bool gotWorkDone = false;
 
-    if (!pfrom->vRecvGetData.empty())
-        ProcessGetData(pfrom, chainparams.GetConsensus());
-
-    // this maintains the order of responses
-    if (!pfrom->vRecvGetData.empty())
-        return fOk;
-
-    std::deque<CNetMessage>::iterator it = pfrom->vRecvMsg.begin();
-    while (!pfrom->fDisconnect && it != pfrom->vRecvMsg.end())
     {
-        // Don't bother if send buffer is too full to respond anyway
-        if (pfrom->nSendSize >= SendBufferSize())
-            break;
+        TRY_LOCK(pfrom->csRecvGetData, locked);
+        if (locked && !pfrom->vRecvGetData.empty())
+        {
+            gotWorkDone |= ProcessGetData(pfrom, chainparams.GetConsensus(), pfrom->vRecvGetData);
+        }
+    }
 
-        // get next message
-        CNetMessage &msg = *it;
+    int msgsProcessed = 0;
+    // Don't bother if send buffer is too full to respond anyway
+    while ((!pfrom->fDisconnect) && (pfrom->nSendSize < SendBufferSize()))
+    {
+        READLOCK(pfrom->csMsgSerializer);
+        CNetMessage msg;
+        {
+            TRY_LOCK(pfrom->cs_vRecvMsg, lockRecv);
+            if (!lockRecv)
+                break;
+
+            if (pfrom->vRecvMsg.empty())
+                break;
+            CNetMessage &msgOnQ = pfrom->vRecvMsg.front();
+            if (!msgOnQ.complete()) // end if an incomplete message is on the top
+            {
+                // LogPrintf("%s: partial message %d of size %d. Recvd bytes: %d\n", pfrom->GetLogName(),
+                // msgOnQ.nDataPos, msgOnQ.size(), pfrom->currentRecvMsgSize.value);
+                break;
+            }
+            msg = msgOnQ;
+            // at this point, any failure means we can delete the current message
+            pfrom->vRecvMsg.pop_front();
+            pfrom->currentRecvMsgSize -= msg.size();
+            msgsProcessed++;
+            gotWorkDone = true;
+        }
 
         // if (fDebug)
         //    LOGA("%s(message %u msgsz, %u bytes, complete:%s)\n", __func__,
         //            msg.hdr.nMessageSize, msg.vRecv.size(),
         //            msg.complete() ? "Y" : "N");
-
-        // end, if an incomplete message is found
-        if (!msg.complete())
-            break;
-
-        // at this point, any failure means we can delete the current message
-        it++;
 
         // Scan for message start
         if (memcmp(msg.hdr.pchMessageStart, pfrom->GetMagic(chainparams), MESSAGE_START_SIZE) != 0)
@@ -6573,12 +6615,9 @@ bool ProcessMessages(CNode *pfrom)
             LOGA("%s(%s, %u bytes) FAILED peer %s\n", __func__, SanitizeString(strCommand), nMessageSize,
                 pfrom->GetLogName());
 
-        break;
+        if (msgsProcessed > 2000)
+            break; // let someone else do something periodically
     }
-
-    // In case the connection got shut down, its receive buffer was wiped
-    if (!pfrom->fDisconnect)
-        pfrom->vRecvMsg.erase(pfrom->vRecvMsg.begin(), it);
 
     return fOk;
 }

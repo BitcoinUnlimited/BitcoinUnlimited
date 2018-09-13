@@ -456,7 +456,7 @@ void RenameThread(const char *name);
  * .. and a wrapper that just calls func once
  */
 template <typename Callable>
-void TraceThread(const char *name, Callable func)
+void TraceThreads(const std::string &name, Callable func)
 {
     std::string s = strprintf("bitcoin-%s", name);
     RenameThread(s.c_str());
@@ -473,15 +473,22 @@ void TraceThread(const char *name, Callable func)
     }
     catch (const std::exception &e)
     {
-        PrintExceptionContinue(&e, name);
+        PrintExceptionContinue(&e, name.c_str());
         throw;
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, name);
+        PrintExceptionContinue(NULL, name.c_str());
         throw;
     }
 }
+
+template <typename Callable>
+void TraceThread(const char *name, Callable func)
+{
+    TraceThreads(std::string(name), func);
+}
+
 
 std::string CopyrightHolders(const std::string &strPrefix);
 

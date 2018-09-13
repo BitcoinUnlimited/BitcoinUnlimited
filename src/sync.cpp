@@ -197,6 +197,12 @@ void DeleteCritical(const void *cs)
         }
         prev = i;
     }
+    // get the last one
+    if ((prev != lockorders.end()) && ((prev->first.first == cs) || (prev->first.second == cs)))
+    {
+        lockorders.erase(prev);
+    }
+
     dd_mutex.unlock();
 }
 
@@ -310,7 +316,7 @@ void CSharedCriticalSection::lock_shared()
     uint64_t tid = getTid();
     // detect recursive locking
     {
-        boost::unique_lock<boost::mutex> lock(setlock);
+        std::unique_lock<std::mutex> lock(setlock);
         assert(exclusiveOwner != tid);
         auto alreadyLocked = sharedowners.find(tid);
         if (alreadyLocked != sharedowners.end())
@@ -319,12 +325,9 @@ void CSharedCriticalSection::lock_shared()
             printf("already locked at %s:%d\n", li.file, li.line);
             assert(alreadyLocked == sharedowners.end());
         }
-    }
-    boost::shared_mutex::lock_shared();
-    {
-        boost::unique_lock<boost::mutex> lock(setlock);
         sharedowners[tid] = LockInfo("", 0);
     }
+    boost::shared_mutex::lock_shared();
 }
 
 void CSharedCriticalSection::unlock_shared()
@@ -332,7 +335,7 @@ void CSharedCriticalSection::unlock_shared()
     // detect recursive locking
     uint64_t tid = getTid();
     {
-        boost::unique_lock<boost::mutex> lock(setlock);
+        std::unique_lock<std::mutex> lock(setlock);
         auto alreadyLocked = sharedowners.find(tid);
         if (alreadyLocked == sharedowners.end())
         {
@@ -340,18 +343,16 @@ void CSharedCriticalSection::unlock_shared()
             printf("never locked at %s:%d\n", li.file, li.line);
             assert(alreadyLocked != sharedowners.end());
         }
-    }
-    boost::shared_mutex::unlock_shared();
-    {
-        boost::unique_lock<boost::mutex> lock(setlock);
         sharedowners.erase(tid);
     }
+    boost::shared_mutex::unlock_shared();
 }
 
 bool CSharedCriticalSection::try_lock_shared()
 {
     // detect recursive locking
     uint64_t tid = getTid();
+    std::unique_lock<std::mutex> lock(setlock);
     assert(exclusiveOwner != tid);
     assert(sharedowners.find(tid) == sharedowners.end());
 

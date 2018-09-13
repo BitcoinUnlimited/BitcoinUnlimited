@@ -523,8 +523,13 @@ class SendHeadersTest(BitcoinTestFramework):
             block_time += 1
             height += 1
             inv_node.send_message(msg_block(blocks[-1]))
+            inv_node.sync_with_ping() # Make sure block is processed before sending next one
 
-        inv_node.sync_with_ping() # Make sure blocks are processed
+        # wait until we've processed the new blocks
+        tipHexHash = "%064x" % blocks[-1].gethash()
+        while tipHexHash != self.nodes[0].getbestblockhash():
+            time.sleep(0.5)
+
         test_node.last_getdata = []
         test_node.send_header_for_blocks(blocks)
         test_node.sync_with_ping()
@@ -865,3 +870,34 @@ class SendHeadersTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     SendHeadersTest().main()
+
+def Test():
+    t = SendHeadersTest()
+    bitcoinConf = {
+        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
+    }
+
+    flags = []
+    # you may want these additional flags:
+    # flags.append("--nocleanup")
+    # flags.append("--noshutdown")
+
+    # Execution is much faster if a ramdisk is used, so use it if one exists in a typical location
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmppfx=/ramdisk/test")
+
+    # Out-of-source builds are awkward to start because they need an additional flag
+    # automatically add this flag during testing for common out-of-source locations
+    here = os.path.dirname(os.path.abspath(__file__))
+    if not os.path.exists(os.path.abspath(here + "/../../src/bitcoind")):
+        dbg = os.path.abspath(here + "/../../debug/src/bitcoind")
+        rel = os.path.abspath(here + "/../../release/src/bitcoind")
+        if os.path.exists(dbg):
+            print("Running from the debug directory (%s)" % dbg)
+            flags.append("--srcdir=%s" % os.path.dirname(dbg))
+        elif os.path.exists(rel):
+            print("Running from the release directory (%s)" % rel)
+            flags.append("--srcdir=%s" % os.path.dirname(rel))
+
+    t.main(flags, bitcoinConf, None)

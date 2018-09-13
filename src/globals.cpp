@@ -287,6 +287,8 @@ CTweakRef<bool> enableDataSigVerifyTweak("consensus.enableDataSigVerify",
     "true if OP_DATASIGVERIFY is enabled.",
     &enableDataSigVerify);
 
+CTweak<unsigned int> numMsgHandlerThreads("net.msgHandlerThreads", "Number of message handler threads", 4);
+
 CTweak<CAmount> maxTxFee("wallet.maxTxFee",
     "Maximum total fees to use in a single wallet transaction or raw transaction; setting this too low may abort large "
     "transactions.",
