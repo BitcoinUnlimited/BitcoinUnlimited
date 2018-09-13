@@ -340,7 +340,7 @@ public:
     uint64_t nServices;
     SOCKET hSocket;
     CDataStream ssSend;
-    size_t nSendSize; // total size of all vSendMsg entries
+    std::atomic<uint64_t> nSendSize; // total size in bytes of all vSendMsg entries
     size_t nSendOffset; // offset inside the first vSendMsg already sent
     uint64_t nSendBytes;
     std::deque<CSerializeData> vSendMsg;

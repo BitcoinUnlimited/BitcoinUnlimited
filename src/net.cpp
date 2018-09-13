@@ -729,7 +729,7 @@ int SocketSendData(CNode *pnode)
             if (pnode->nSendOffset == data.size())
             {
                 pnode->nSendOffset = 0;
-                pnode->nSendSize -= data.size();
+                pnode->nSendSize.fetch_sub(data.size());
                 it++;
             }
             else
@@ -3024,7 +3024,7 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
     // BU: end
 
     ssSend.GetAndClear(*it);
-    nSendSize += (*it).size();
+    nSendSize.fetch_add((*it).size());
 
     // If write queue empty, attempt "optimistic write"
     if (it == vSendMsg.begin())
