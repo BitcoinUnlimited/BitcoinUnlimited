@@ -558,7 +558,7 @@ static const unsigned int REJECT_WRONG_FORK = 0x103;
 CBlockIndex *FindMostWorkChain();
 
 /** Test if fork is active */
-bool IsMay152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev);
+bool IsNov152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev);
 
 // BU cleaning up at destuction time creates many global variable dependencies.  Instead clean up in a function called
 // in main()

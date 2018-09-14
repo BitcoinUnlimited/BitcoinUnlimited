@@ -478,7 +478,7 @@ bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *p
     return IsDAAEnabled(consensusparams, pindexPrev->nHeight);
 }
 
-bool IsMay152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev)
+bool IsNov152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev)
 {
     if (pindexPrev == nullptr)
     {
@@ -488,7 +488,7 @@ bool IsMay152018Enabled(const Consensus::Params &consensusparams, const CBlockIn
     return pindexPrev->IsforkActiveOnNextBlock(miningForkTime.Value());
 }
 
-bool IsMay152018Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev)
+bool IsNov152018Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev)
 {
     if (pindexPrev == nullptr)
     {

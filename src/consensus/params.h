@@ -145,8 +145,10 @@ struct Params
     int uahfHeight;
     /** Block height at which the new DAA becomes active */
     int daaHeight;
-    /** May 15, 2018 Activation time */
-    int may2018activationTime;
+    /** May 15, 2018 block height at which the fork activated */
+    int may2018Height;
+    /** Nov 15, 2018 activation time */
+    int nov2018ActivationTime;
 };
 } // namespace Consensus
 

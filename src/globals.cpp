@@ -266,9 +266,9 @@ CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
     &nMaxDatacarrierBytes,
     &MaxDataCarrierValidator);
 
-CTweak<uint64_t> miningForkTime("mining.forkMay2018Time",
-    "Time in seconds since the epoch to initiate a hard fork scheduled on 15th May 2018.",
-    1526400000); // Tue 15 May 2018 16:00:00 UTC
+CTweak<uint64_t> miningForkTime("mining.forkNov2018Time",
+    "Time in seconds since the epoch to initiate a hard fork scheduled on 15th Nov 2018.",
+    1542300000); // Thu Nov 15 17:40:00 CET 2018
 
 CTweak<bool> unsafeGetBlockTemplate("mining.unsafeGetBlockTemplate",
     "Allow getblocktemplate to succeed even if the chain tip is old or this node is not connected to other nodes",
