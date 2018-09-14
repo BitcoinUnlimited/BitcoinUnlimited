@@ -1772,16 +1772,12 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
 
-    // If this block enabled the may152018 opcodes, then we need to
-    // clear the mempool of any transaction using them.
-    // NB: comment this code temporary we need to adpat it once we add the activation code for Nov '18 upgrade will be
-    // ready this code will handle the case of a reorg in which the block that activated the upgraded will be
-    // disconnected
-    // if (IsMay152018Enabled(consensusParams, pindexDelete) && !IsMay152018Enabled(consensusParams,
-    // pindexDelete->pprev))
-    //{
-    //    mempool.clear();
-    //}
+    // If this block enabled the nov152018 protocol upgrade, then we need to clear the mempool of any transaction using
+    // not previously avaiable features (e.g. OP_CHECKDATASIGVERIFY).
+    if (IsNov152018Enabled(consensusParams, pindexDelete) && !IsNov152018Enabled(consensusParams, pindexDelete->pprev))
+    {
+        mempool.clear();
+    }
 
     // Resurrect mempool transactions from the disconnected block but do not do this step if we are
     // rolling back the chain using the "rollbackchain" rpc command.
