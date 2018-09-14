@@ -520,16 +520,14 @@ public:
 
 private:
     // Network usage totals
-    static CCriticalSection cs_totalBytesRecv;
-    static CCriticalSection cs_totalBytesSent;
-    static uint64_t nTotalBytesRecv;
-    static uint64_t nTotalBytesSent;
+    static std::atomic<uint64_t> nTotalBytesRecv;
+    static std::atomic<uint64_t> nTotalBytesSent;
 
     // outbound limit & stats
-    static uint64_t nMaxOutboundTotalBytesSentInCycle;
-    static uint64_t nMaxOutboundCycleStartTime;
-    static uint64_t nMaxOutboundLimit;
-    static uint64_t nMaxOutboundTimeframe;
+    static std::atomic<uint64_t> nMaxOutboundTotalBytesSentInCycle;
+    static std::atomic<uint64_t> nMaxOutboundCycleStartTime;
+    static std::atomic<uint64_t> nMaxOutboundLimit;
+    static std::atomic<uint64_t> nMaxOutboundTimeframe;
 
     CNode(const CNode &);
     void operator=(const CNode &);

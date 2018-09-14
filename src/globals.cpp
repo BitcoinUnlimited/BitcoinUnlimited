@@ -151,10 +151,6 @@ set<uint256> setUnVerifiedOrphanTxHash GUARDED_BY(cs_xval);
 CCriticalSection cs_vNodes;
 CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
-uint64_t CNode::nTotalBytesRecv = 0;
-uint64_t CNode::nTotalBytesSent = 0;
-CCriticalSection CNode::cs_totalBytesRecv;
-CCriticalSection CNode::cs_totalBytesSent;
 
 // critical sections from net.cpp
 CCriticalSection cs_setservAddNodeAddresses;
