@@ -284,13 +284,13 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
         for n in self.nodes:
             n.validateblocktemplate(hexblk)
 
-        logging.info("excessive")
-        self.nodes[0].setminingmaxblock(1000)
-        self.nodes[0].setexcessiveblock(1000, 12)
-        expectException(lambda: self.nodes[0].validateblocktemplate(hexblk),
-                        JSONRPCException, "invalid block: excessive")
-        self.nodes[0].setexcessiveblock(16 * 1000 * 1000, 12)
-        self.nodes[0].setminingmaxblock(1000 * 1000)
+        #logging.info("excessive")
+        #self.nodes[0].setminingmaxblock(1000)
+        #self.nodes[0].setexcessiveblock(1000, 12)
+        #expectException(lambda: self.nodes[0].validateblocktemplate(hexblk),
+        #                JSONRPCException, "invalid block: excessive")
+        #self.nodes[0].setexcessiveblock(16 * 1000 * 1000, 12)
+        #self.nodes[0].setminingmaxblock(1000 * 1000)
 
         for it in range(0, 100):
             # if (it&1023)==0: print(it)
