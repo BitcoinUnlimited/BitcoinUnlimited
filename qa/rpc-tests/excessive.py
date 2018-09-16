@@ -74,15 +74,6 @@ class ExcessiveBlockTest (BitcoinTestFramework):
                 pdb.set_trace()
 
     def run_test(self):
-        # Temporary workaround for the may15th hardfork. These tests will not work if the fork is enabled
-        # because we are forcing an EB of 32MB after each block is mined which invalidates many of these tests.
-        # So we set the mocktime to sometime far in advance of the fork.
-        MAY152018_START_TIME = 1526400000;
-        self.nodes[0].setmocktime(MAY152018_START_TIME - 10000)
-        self.nodes[1].setmocktime(MAY152018_START_TIME - 10000)
-        self.nodes[2].setmocktime(MAY152018_START_TIME - 10000)
-        self.nodes[3].setmocktime(MAY152018_START_TIME - 10000)
-
         BitcoinTestFramework.run_test(self)
         self.testCli()
         self.testExcessiveSigops()

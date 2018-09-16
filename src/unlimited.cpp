@@ -102,11 +102,21 @@ std::string ExcessiveBlockValidator(const uint64_t &value, uint64_t *item, bool 
                 << ").  This would cause you to orphan your own blocks.";
             return ret.str();
         }
-        if (value < MIN_EXCESSIVE_BLOCK_SIZE)
+        if ((value < MIN_EXCESSIVE_BLOCK_SIZE) &&
+            ((Params().NetworkIDString() == "main") || (Params().NetworkIDString() == "test")))
         {
             std::ostringstream ret;
-            ret << "Sorry, your proposed excessive block size (" << value << ") is smaller than the minimum EB size ("
-                << MIN_EXCESSIVE_BLOCK_SIZE << ").  This would cause you to orphan blocks from the rest of the net.";
+            ret << Params().NetworkIDString() << "Sorry, your proposed excessive block size (" << value
+                << ") is smaller than the minimum EB size (" << MIN_EXCESSIVE_BLOCK_SIZE
+                << ").  This would cause you to orphan blocks from the rest of the net.";
+            return ret.str();
+        }
+        if ((value < MIN_EXCESSIVE_BLOCK_SIZE_REGTEST) && (Params().NetworkIDString() == "regtest"))
+        {
+            std::ostringstream ret;
+            ret << Params().NetworkIDString() << "Sorry, your proposed excessive block size (" << value
+                << ") is smaller than the minimum EB size (" << MIN_EXCESSIVE_BLOCK_SIZE_REGTEST
+                << ").  This would cause you to orphan blocks from the rest of the net.";
             return ret.str();
         }
     }
