@@ -93,9 +93,9 @@ class ExcessiveBlockTest (BitcoinTestFramework):
 
     def testCli(self):
 
-        # Assumes the default excessive at 16MB and mining at 1MB
+        # Assumes the default excessive at 32MB and mining at 8MB
         try:
-            self.nodes[0].setminingmaxblock(32000000)
+            self.nodes[0].setminingmaxblock(33000000)
         except JSONRPCException as e:
             pass
         else:
@@ -200,14 +200,14 @@ class ExcessiveBlockTest (BitcoinTestFramework):
         logging.info("testExcessiveSigops: Cleaning up node state")
 
         # We are not testing excessively sized blocks so make these large
-        self.nodes[0].set("net.excessiveBlock=5000000")
-        self.nodes[1].set("net.excessiveBlock=5000000")
-        self.nodes[2].set("net.excessiveBlock=5000000")
-        self.nodes[3].set("net.excessiveBlock=5000000")
         self.nodes[0].setminingmaxblock(5000000)
         self.nodes[1].setminingmaxblock(5000000)
         self.nodes[2].setminingmaxblock(5000000)
         self.nodes[3].setminingmaxblock(5000000)
+        self.nodes[0].set("net.excessiveBlock=5000000")
+        self.nodes[1].set("net.excessiveBlock=5000000")
+        self.nodes[2].set("net.excessiveBlock=5000000")
+        self.nodes[3].set("net.excessiveBlock=5000000")
         # Stagger the accept depths so we can see the block accepted stepwise
         self.nodes[0].set("net.excessiveAcceptDepth=0")
         self.nodes[1].set("net.excessiveAcceptDepth=1")

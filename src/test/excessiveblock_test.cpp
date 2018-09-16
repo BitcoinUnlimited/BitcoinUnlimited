@@ -229,8 +229,7 @@ BOOST_AUTO_TEST_CASE(check_excessive_validator)
 
     // TEST 1): EB has to be always greater or equal to MG
     // TEST 2): EB has to be always greater or equal of MIN_EXCESSIVE_BLOCK_SIZE
-    // TEST 3): On success we need to check that useragent strings to see if the on
-    //          success trigger has been executed properly.
+    // Test 2 will be perfomred in validateblocktemplate.py
 
     // TEST 1)
     // new EB = 31MB, old EB = 32MB, perform validation
@@ -248,29 +247,6 @@ BOOST_AUTO_TEST_CASE(check_excessive_validator)
 
     str = ExcessiveBlockValidator(tmpExcessive, nullptr, true);
     BOOST_CHECK(str == expected_ret.str());
-
-    // TEST 2)
-    // new EB = 1MB, old EB = 42, perform validation true
-    tmpExcessive = 31000000;
-    maxGeneratedBlock = 8000000;
-    expected_ret.str(std::string());
-    expected_ret << "Sorry, your proposed excessive block size (" << tmpExcessive
-                 << ") is smaller than the minimum EB size (" << MIN_EXCESSIVE_BLOCK_SIZE
-                 << ").  This would cause you to orphan blocks from the rest of the net.";
-    str = ExcessiveBlockValidator(tmpExcessive, nullptr, true);
-    BOOST_CHECK_MESSAGE(str == expected_ret.str(), str + expected_ret.str());
-
-    // TEST 3)
-    maxGeneratedBlock = 8800000;
-    excessiveBlockSize = 34000000;
-    tmpExcessive = 32000000;
-    std::string exceptedEB = "EB32";
-
-    str = ExcessiveBlockValidator(tmpExcessive, nullptr, true);
-    BOOST_CHECK(str.empty());
-
-    str = ExcessiveBlockValidator(tmpExcessive, nullptr, false);
-    BOOST_CHECK(str.empty());
 
     // Restore default value for EB and MG
     maxGeneratedBlock = c_mgb;
