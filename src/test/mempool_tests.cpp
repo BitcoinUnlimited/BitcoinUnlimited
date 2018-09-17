@@ -396,10 +396,13 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
     // tx1 and tx5 are both 10000
     // Ties are broken by hash, not timestamp, so determine which
     // hash comes first.
-    if (tx1.GetHash() < tx5.GetHash()) {
+    if (tx1.GetHash() < tx5.GetHash())
+    {
         sortedOrder[2] = tx1.GetHash().ToString();
         sortedOrder[3] = tx5.GetHash().ToString();
-    } else {
+    }
+    else
+    {
         sortedOrder[2] = tx5.GetHash().ToString();
         sortedOrder[3] = tx1.GetHash().ToString();
     }
@@ -430,12 +433,12 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
     uint64_t tx7Size = ::GetSerializeSize(tx7, SER_NETWORK, PROTOCOL_VERSION);
 
     /* set the fee to just below tx2's feerate when including ancestor */
-    CAmount fee = (20000/tx2Size)*(tx7Size + tx6Size) - 1;
+    CAmount fee = (20000 / tx2Size) * (tx7Size + tx6Size) - 1;
 
-    //CTxMemPoolEntry entry7(tx7, fee, 2, 10.0, 1, true);
+    // CTxMemPoolEntry entry7(tx7, fee, 2, 10.0, 1, true);
     pool.addUnchecked(tx7.GetHash(), entry.Fee(fee).FromTx(tx7));
     BOOST_CHECK_EQUAL(pool.size(), 7);
-    sortedOrder.insert(sortedOrder.begin()+1, tx7.GetHash().ToString());
+    sortedOrder.insert(sortedOrder.begin() + 1, tx7.GetHash().ToString());
     CheckSort<ancestor_score>(pool, sortedOrder);
 
     /* after tx6 is mined, tx7 should move up in the sort */
@@ -444,7 +447,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
     std::list<CTransactionRef> dummy;
     pool.removeForBlock(vtx, 1, dummy, false);
 
-    sortedOrder.erase(sortedOrder.begin()+1);
+    sortedOrder.erase(sortedOrder.begin() + 1);
     sortedOrder.pop_back();
     sortedOrder.insert(sortedOrder.begin(), tx7.GetHash().ToString());
     CheckSort<ancestor_score>(pool, sortedOrder);
