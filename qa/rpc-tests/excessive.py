@@ -200,19 +200,11 @@ class ExcessiveBlockTest (BitcoinTestFramework):
         logging.info("testExcessiveSigops: Cleaning up node state")
 
         # We are not testing excessively sized blocks so make these large
-        self.nodes[0].setminingmaxblock(5000000)
-        self.nodes[1].setminingmaxblock(5000000)
-        self.nodes[2].setminingmaxblock(5000000)
-        self.nodes[3].setminingmaxblock(5000000)
-        self.nodes[0].set("net.excessiveBlock=5000000")
-        self.nodes[1].set("net.excessiveBlock=5000000")
-        self.nodes[2].set("net.excessiveBlock=5000000")
-        self.nodes[3].set("net.excessiveBlock=5000000")
-        # Stagger the accept depths so we can see the block accepted stepwise
-        self.nodes[0].set("net.excessiveAcceptDepth=0")
-        self.nodes[1].set("net.excessiveAcceptDepth=1")
-        self.nodes[2].set("net.excessiveAcceptDepth=2")
-        self.nodes[3].set("net.excessiveAcceptDepth=3")
+        for i in range(0,3):
+            self.nodes[i].setminingmaxblock(5000000)
+            self.nodes[i].set("net.excessiveBlock=5000000")
+            # Stagger the accept depths so we can see the block accepted stepwise
+            self.nodes[i].set("net.excessiveAcceptDepth=%d"%(i))
 
         for n in self.nodes:
             n.generate(10)
