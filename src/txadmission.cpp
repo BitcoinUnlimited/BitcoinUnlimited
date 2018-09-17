@@ -759,14 +759,11 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         size_t nLimitDescendantSize = GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
         std::string errString;
 
-        // Set extraFlags as a set of flags that needs to be activated.
-        uint32_t extraFlags = 0;
-
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         unsigned char sighashType = 0;
-        if (!CheckInputs(*tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | extraFlags, true, &resourceTracker,
-                nullptr, &sighashType))
+        if (!CheckInputs(
+                *tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS, true, &resourceTracker, nullptr, &sighashType))
         {
             LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", tx->GetHash().ToString().c_str());
             return false;
@@ -783,8 +780,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(*tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | extraFlags, true, nullptr, nullptr,
-                &sighashType2))
+        if (!CheckInputs(*tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true, nullptr, nullptr, &sighashType2))
         {
             return error(
                 "%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
