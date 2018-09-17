@@ -103,7 +103,7 @@ std::vector<unsigned char> signmessage(const BYTEARRAY &data, const CKey &key)
     return vchSig;
 }
 
-/** sign arbitrary data using the same algorithm as the signmessage/verifymessage RPCs and OP_DATASIGVERIFY */
+/** sign arbitrary data using the same algorithm as the signmessage/verifymessage RPCs and OP_CHECKDATASIG(VERIFY) */
 extern template std::vector<unsigned char> signmessage(const std::vector<unsigned char> &data, const CKey &key);
 extern template std::vector<unsigned char> signmessage(const std::string &data, const CKey &key);
 

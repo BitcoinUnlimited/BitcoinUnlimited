@@ -1057,44 +1057,6 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                 }
                 break;
 
-                case OP_DATASIGVERIFY:
-                {
-                    if (!enableDataSigVerify)
-                        return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
-                    if (stack.size() < 3)
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-
-                    valtype &data = stacktop(-3);
-                    valtype &vchSigAndType = stacktop(-2);
-                    valtype &vchAddr = stacktop(-1);
-
-                    if (vchAddr.size() != 20)
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-
-                    if (vchSigAndType.size() != 66)
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-
-                    if (vchSigAndType[65] == DATASIG_COMPACT_ECDSA)
-                    {
-                        vchSigAndType.resize(65); // chop off the type byte
-                        CHashWriter ss(SER_GETHASH, 0);
-                        ss << strMessageMagic << data;
-
-                        CPubKey pubkey;
-                        if (!pubkey.RecoverCompact(ss.GetHash(), vchSigAndType))
-                            return set_error(serror, SCRIPT_ERR_VERIFY);
-                        CKeyID id = pubkey.GetID();
-                        if (id != uint160(vchAddr))
-                            return set_error(serror, SCRIPT_ERR_VERIFY);
-                    }
-                    else // No other signature types currently supported
-                    {
-                        return set_error(serror, SCRIPT_ERR_VERIFY);
-                    }
-                    popstack(stack);
-                    popstack(stack);
-                }
-                break;
                 case OP_CHECKSIG:
                 case OP_CHECKSIGVERIFY:
                 {
