@@ -103,8 +103,9 @@ BITCOIN_CORE_H = \
   blockrelay/graphene_set.h \
   blockrelay/thinblock.h \
   blockstorage/blockleveldb.h \
-  blockstorage/sequential_files.h \
   blockstorage/blockstorage.h \
+  blockstorage/dbabstract.h \
+  blockstorage/sequential_files.h \
   bitnodes.h \
   bloom.h \
   cashaddr.h \
