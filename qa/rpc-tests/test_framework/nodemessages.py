@@ -524,6 +524,10 @@ class CTransaction(object):
         r += struct.pack("<I", self.nLockTime)
         return r
 
+    def toHex(self):
+        """Return the hex string serialization of this object"""
+        return hexlify(self.serialize()).decode("utf-8")
+
     def rehash(self):
         self.sha256 = None
         self.calc_sha256()

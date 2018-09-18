@@ -33,7 +33,7 @@ static void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlo
 static void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck> *pqueue)
 {
     ostringstream tName;
-    tName << "bitcoin-scriptchk" << i;
+    tName << "scriptchk" << i;
     RenameThread(tName.str().c_str());
     pqueue->Thread();
 }

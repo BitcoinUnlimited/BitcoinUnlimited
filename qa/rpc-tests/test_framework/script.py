@@ -83,6 +83,14 @@ class CScriptOp(int):
         else:
             return False
 
+    def toHex(self):
+        """Return the hex representation of this opcode"""
+        return hexlify(self.to_bytes(1,"little")).decode()
+
+    def toBin(self):
+        """Return the binary representation of this opcode"""
+        return self.to_bytes(1,"little")
+
     def __str__(self):
         return repr(self)
 

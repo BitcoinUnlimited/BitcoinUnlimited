@@ -30,6 +30,8 @@
 #include "unlimited.h"
 #include "utilstrencodings.h"
 
+extern CTweak<bool> ignoreNetTimeouts;
+
 #ifdef WIN32
 #include <string.h>
 #else
@@ -1352,23 +1354,27 @@ void ThreadSocketHandler()
                 {
                     LOG(NET, "Node %s socket no message in first 60 seconds, %d %d from %d\n", pnode->GetLogName(),
                         pnode->nLastRecv != 0, pnode->nLastSend != 0, pnode->id);
-                    pnode->fDisconnect = true;
+                    if (ignoreNetTimeouts.Value() == false)
+                        pnode->fDisconnect = true;
                 }
                 else if (nTime - pnode->nLastSend > TIMEOUT_INTERVAL)
                 {
                     LOG(NET, "Node %s socket sending timeout: %is\n", pnode->GetLogName(), nTime - pnode->nLastSend);
-                    pnode->fDisconnect = true;
+                    if (ignoreNetTimeouts.Value() == false)
+                        pnode->fDisconnect = true;
                 }
                 else if (nTime - pnode->nLastRecv > (pnode->nVersion > BIP0031_VERSION ? TIMEOUT_INTERVAL : 90 * 60))
                 {
                     LOG(NET, "Node %s socket receive timeout: %is\n", pnode->GetLogName(), nTime - pnode->nLastRecv);
-                    pnode->fDisconnect = true;
+                    if (ignoreNetTimeouts.Value() == false)
+                        pnode->fDisconnect = true;
                 }
                 else if (pnode->nPingNonceSent && pnode->nPingUsecStart + TIMEOUT_INTERVAL * 1000000 < GetTimeMicros())
                 {
                     LOG(NET, "Node %s ping timeout: %fs\n", pnode->GetLogName(),
                         0.000001 * (GetTimeMicros() - pnode->nPingUsecStart));
-                    pnode->fDisconnect = true;
+                    if (ignoreNetTimeouts.Value() == false)
+                        pnode->fDisconnect = true;
                 }
             }
         }
