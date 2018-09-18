@@ -509,12 +509,18 @@ class CTransaction(object):
             self.hash = None
 
     def deserialize(self, f):
+        if isinstance(f, str):
+            # str - assumed to be hex string
+            f = BytesIO(unhexlify(f))
+        elif isinstance(f, bytes):
+            f = BytesIO(f)
         self.nVersion = struct.unpack("<i", f.read(4))[0]
         self.vin = deser_vector(f, CTxIn)
         self.vout = deser_vector(f, CTxOut)
         self.nLockTime = struct.unpack("<I", f.read(4))[0]
         self.sha256 = None
         self.hash = None
+        return self
 
     def serialize(self):
         r = b""
@@ -545,7 +551,7 @@ class CTransaction(object):
         s = ["Transaction: %064x\n" % self.sha256]
         s.append("%d inputs\n" % len(self.vin))
         for vin in self.vin:
-            s.append("  %064x.%d\n" % (vin.prevout.hash, vin.prevout.n))
+            s.append("  %064x:%d\n" % (vin.prevout.hash, vin.prevout.n))
         s.append("%d outputs\n" % len(self.vout))
         for vout in self.vout:
             s.append("  %12d %s\n" % (vout.nValue, hexlify((vout.scriptPubKey))))

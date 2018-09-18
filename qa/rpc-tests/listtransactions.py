@@ -13,10 +13,7 @@ from io import BytesIO
 
 
 def txFromHex(hexstring):
-    tx = CTransaction()
-    f = BytesIO(hex_str_to_bytes(hexstring))
-    tx.deserialize(f)
-    return tx
+    return CTransaction().deserialize(hexstring)
 
 
 class ListTransactionsTest(BitcoinTestFramework):
