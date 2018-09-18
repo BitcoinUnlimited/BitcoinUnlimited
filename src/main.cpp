@@ -6796,9 +6796,14 @@ bool SendMessages(CNode *pto)
         if (pindexBestHeader == nullptr)
             pindexBestHeader = chainActive.Tip();
         // Download if this is a nice peer, or we have no nice peers and this one might do.
-        bool fFetch = state.fPreferredDownload || (nPreferredDownload.load() == 0 && !pto->fClient && !pto->fOneShot);
-        if (!state.fSyncStarted && !pto->fClient && !fImporting && !fReindex)
+        bool fFetch = state.fPreferredDownload || (nPreferredDownload.load() == 0 && !pto->fOneShot);
+        if (!state.fSyncStarted && !fImporting && !fReindex)
         {
+            // Only allow the downloading of headers from a single pruned peer.
+            static int nSyncStartedPruned = 0;
+            if (pto->fClient && nSyncStartedPruned >= 1)
+                fFetch = false;
+
             // Only actively request headers from a single peer, unless we're close to today.
             if ((nSyncStarted < MAX_HEADER_REQS_DURING_IBD && fFetch) ||
                 chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - SINGLE_PEER_REQUEST_MODE_AGE)
@@ -6821,6 +6826,9 @@ bool SendMessages(CNode *pto)
                     state.fRequestedInitialBlockAvailability = true;
                     state.nFirstHeadersExpectedHeight = pindexStart->nHeight;
                     nSyncStarted++;
+
+                    if (pto->fClient)
+                        nSyncStartedPruned++;
 
                     LOG(NET, "initial getheaders (%d) to peer=%s (startheight:%d)\n", pindexStart->nHeight,
                         pto->GetLogName(), pto->nStartingHeight);
