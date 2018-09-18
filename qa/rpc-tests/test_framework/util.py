@@ -51,6 +51,9 @@ PORT_RANGE = 5000
 
 debug_port_assignments = False
 
+class TimeoutException(Exception):
+    pass
+
 def SetupPythonLogConfig():
     logOn = os.getenv("PYTHON_DEBUG")
     level = logging.ERROR
@@ -121,6 +124,21 @@ class NoConfigValue:
     def __init__(self):
         pass
 
+def waitFor(timeout, fn, onError="timeout in waitFor", sleepAmt=1.0):
+    """  Repeatedly calls fn while it returns None, raising an assert after timeout.  If fn returns non None, return that result
+    """
+    timeout = float(timeout)
+    while 1:
+        result = fn()
+        if not result is None:
+            return result
+        if timeout <= 0:
+            if callable(onError):
+                onError = onError()
+            raise TimeoutException(onError)
+        time.sleep(sleepAmt)
+        timeout -= sleepAmt
+        
 def expectException(fn, ExcType, comparison=None):
     try:
         fn()
@@ -505,7 +523,8 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
             logging.debug("start_node: bitcoind started, waiting for RPC to come up")
             url = rpc_url(i, rpchost)
             wait_for_bitcoind_start(bitcoind_processes[i], url, i)
-            logging.debug("start_node: RPC succesfully started")
+            # log all the info you need for debugging access
+            logging.info("Started %s %d as pid %d at %s dir %s  " % (binary, i, bitcoind_processes[i].pid, "127.0.0.1:"+str(p2p_port(i)), datadir))
             break
         except Exception as exc:
             logging.error("Error bringing up bitcoind #%d (start_node, directory %s), this might be retried. Problem is: %s", i, dirname, str(exc))

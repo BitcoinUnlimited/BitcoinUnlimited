@@ -199,7 +199,16 @@ class BitcoinTestFramework(object):
 
         success = False
         try:
-            os.makedirs(self.options.tmpdir, exist_ok=False)
+            try:
+                os.makedirs(self.options.tmpdir, exist_ok=False)
+            except FileExistsError as e:
+                assert (self.options.tmpdir.count(os.sep) >= 2) # sanity check that tmpdir is not the top level before I delete stuff
+                for n in range(0,8): # delete the nodeN directories so their contents dont affect the new test
+                    d = self.options.tmpdir + os.sep + ("node%d" % n)
+                    try:
+                        shutil.rmtree(d)
+                    except FileNotFoundError:
+                        pass
 
             # Not pretty but, I changed the function signature
             # of setup_chain to allow customization of the setup.

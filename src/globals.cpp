@@ -220,6 +220,8 @@ CTweakRef<uint64_t> ebTweak("net.excessiveBlock",
 CTweak<uint64_t> blockSigopsPerMb("net.excessiveSigopsPerMb",
     "Excessive effort per block, denoted in cost (# inputs * txsize) per MB",
     BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
+CTweak<bool> ignoreNetTimeouts("net.ignoreTimeouts", "ignore inactivity timeouts, used during debugging", false);
+
 CTweak<uint64_t> blockMiningSigopsPerMb("mining.excessiveSigopsPerMb",
     "Excessive effort per block, denoted in cost (# inputs * txsize) per MB",
     BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);

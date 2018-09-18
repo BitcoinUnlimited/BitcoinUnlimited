@@ -20,7 +20,7 @@ class MyTest (BitcoinTestFramework):
     def setup_chain(self,bitcoinConfDict=None, wallets=None):
         print("Initializing test directory "+self.options.tmpdir)
         # pick this one to start from the cached 4 node 100 blocks mined configuration
-        # initialize_chain(self.options.tmpdir)
+        # initialize_chain(self.options.tmpdir, bitcoinConfDict, wallets)
         # pick this one to start at 0 mined blocks
         initialize_chain_clean(self.options.tmpdir, 4, bitcoinConfDict, wallets)
         # Number of nodes to initialize ----------> ^
