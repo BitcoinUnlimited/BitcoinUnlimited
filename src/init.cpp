@@ -940,6 +940,15 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     }
     // bip135 end
 
+    // Setup the number of p2p message processing threads used to process incoming messages
+    if (numMsgHandlerThreads.Value() == 0)
+    {
+        // Set the number of threads to half the available Cores.
+        int nThreads = std::max((int)(GetNumCores() * 0.5), 1);
+        numMsgHandlerThreads.Set(nThreads);
+        LOGA("Using %d Message Handler Threads\n", numMsgHandlerThreads.Value());
+    }
+
     // -par=0 means autodetect, but passing 0 to the CParallelValidation constructor means no concurrency
     int nPVThreads = GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
     if (nPVThreads <= 0)

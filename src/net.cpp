@@ -126,7 +126,6 @@ extern CCriticalSection cs_vAddedNodes;
 // BITCOINUNLIMITED START
 extern vector<std::string> vUseDNSSeeds;
 extern CCriticalSection cs_vUseDNSSeeds;
-extern CTweak<unsigned int> numMsgHandlerThreads;
 // BITCOINUNLIMITED END
 
 extern CSemaphore *semOutbound;
