@@ -405,13 +405,6 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
             continue;
         }
 
-        // If the fee rate is below the min fee rate for mining, then we're done
-        // adding txs based on score (fee rate)
-        if (iter->GetModifiedFee() < ::minRelayTxFee.GetFee(iter->GetTxSize()) && nBlockSize >= nBlockMinSize)
-        {
-            return;
-        }
-
         // If this tx fits in the block add it, otherwise keep looping
         if (TestForBlock(iter))
         {

@@ -123,6 +123,45 @@ class MyTest (BitcoinTestFramework):
         block.deserialize(BytesIO(unhexlify(blockhex)))
         assert_equal(block.vtx[0].vout[0].scriptPubKey, CScript([OP_1]))
 
+        #### Test that a dynamic relay policy change does not effect the mining
+        #    of txns currently in the mempool.
+        self.nodes[0].generate(5);
+        self.sync_all()
+        
+        # Add a few txns to the mempool and mine them with the default fee
+        self.nodes[0].set("minlimitertxfee=0")
+        self.nodes[1].set("minlimitertxfee=0")
+        self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
+        self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
+        self.sync_all()
+        assert_equal(str(self.nodes[0].getnetworkinfo()["relayfee"]), "0E-8")
+        assert_equal(self.nodes[0].getmempoolinfo()["size"], 2)
+        assert_equal(self.nodes[0].getmempoolinfo()["mempoolminfee"], 0)
+        self.nodes[0].generate(1);
+        self.sync_all()
+        assert_equal(self.nodes[0].getmempoolinfo()["size"], 0)
+        assert_equal(self.nodes[0].getmempoolinfo()["mempoolminfee"], 0)
+
+        # Add a few txns to the mempool, then increase the relayfee beyond what the txns would pay
+        # and mine a block. All txns should be mined and removed from the
+        self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
+        self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
+        self.sync_all()
+        assert_equal(self.nodes[0].getmempoolinfo()["size"], 2)
+        assert_equal(self.nodes[0].getmempoolinfo()["mempoolminfee"], 0)
+
+        # Make the minlimitertxfee so high it would be higher than any possible fee.
+        self.nodes[0].set("minlimitertxfee=1000")
+        self.nodes[1].set("minlimitertxfee=1000")
+        self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
+        self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
+        self.sync_all()
+        assert_equal(str(self.nodes[0].getnetworkinfo()["relayfee"]), "0.01000000")
+        self.nodes[0].generate(1);
+        self.sync_all()
+        print(str(self.nodes[0].getmempoolinfo()["mempoolminfee"]))
+        assert_equal(self.nodes[0].getmempoolinfo()["size"], 0)
+
 
 if __name__ == '__main__':
     MyTest().main()
