@@ -4760,7 +4760,7 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 // never disconnect whitelisted nodes
                 static const int nOneWeek = 7 * 24 * 60 * 60; // assume > 1 week = historical
                 if (fSend && CNode::OutboundTargetReached(true) &&
-                    (((pindexBestHeader != NULL) &&
+                    (((pindexBestHeader != nullptr) &&
                          (pindexBestHeader->GetBlockTime() - mi->second->GetBlockTime() > nOneWeek)) ||
                         inv.type == MSG_FILTERED_BLOCK) &&
                     !pfrom->fWhitelisted)
