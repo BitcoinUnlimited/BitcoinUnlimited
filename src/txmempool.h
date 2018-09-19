@@ -473,6 +473,7 @@ private:
     void _UpdateChild(txiter entry, txiter child, bool add);
 
 public:
+    // Connects an output to the transaction that spends it.
     std::map<COutPoint, CInPoint> mapNextTx;
     std::map<uint256, std::pair<double, CAmount> > mapDeltas;
 

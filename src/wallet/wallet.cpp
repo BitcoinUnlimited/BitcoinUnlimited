@@ -25,6 +25,7 @@
 #include "script/script.h"
 #include "script/sign.h"
 #include "timedata.h"
+#include "txadmission.h"
 #include "txmempool.h"
 #include "uahf_fork.h"
 #include "ui_interface.h"
@@ -807,9 +808,18 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
         }
 
         bool fUpdated = false;
-        if (!fInsertedNew)
+        if (!fInsertedNew) // Merge
         {
-            // Merge
+            // When the tx is accepted by the mempool, it will be added to the wallet but any account info is stripped
+            // since accounts are not part of the base CTransaction.  This addition races against the wallet adding
+            // the transaction (with account info) itself.  If the mempool path wins, we may need to update the tx with
+            // account info.
+            if ((wtxIn.strFromAccount.size() > 0) && (wtx.strFromAccount.size() == 0))
+            {
+                LOGA("Add an account into wallet tx");
+                wtx.strFromAccount = wtxIn.strFromAccount;
+                fUpdated = true;
+            }
             if (!wtxIn.hashUnset() && wtxIn.hashBlock != wtx.hashBlock)
             {
                 wtx.hashBlock = wtxIn.hashBlock;
@@ -833,9 +843,9 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
             }
         }
 
-        //// debug print
-        LOGA("AddToWallet %s  %s%s\n", wtxIn.GetHash().ToString(), (fInsertedNew ? "new" : ""),
-            (fUpdated ? "update" : ""));
+        // Only useful if debugging wallet
+        // LOGA("AddToWallet %s  %s%s\n", wtxIn.GetHash().ToString(), (fInsertedNew ? "new" : ""),
+        //    (fUpdated ? "update" : ""));
 
         // Write to disk
         if (fInsertedNew || fUpdated)
@@ -1449,21 +1459,24 @@ void CWallet::ReacceptWalletTransactions()
     // If transactions aren't being broadcasted, don't let them into local mempool either
     if (!fBroadcastTransactions)
         return;
-    LOCK2(cs_main, cs_wallet);
     std::map<int64_t, CWalletTx *> mapSorted;
 
-    // Sort pending wallet transactions based on their initial wallet insertion order
-    for (PAIRTYPE(const uint256, CWalletTx) & item : mapWallet)
     {
-        const uint256 &wtxid = item.first;
-        CWalletTx &wtx = item.second;
-        assert(wtx.GetHash() == wtxid);
+        LOCK2(cs_main, cs_wallet);
 
-        int nDepth = wtx.GetDepthInMainChain();
-
-        if (!wtx.IsCoinBase() && (nDepth == 0 && !wtx.isAbandoned()))
+        // Sort pending wallet transactions based on their initial wallet insertion order
+        for (PAIRTYPE(const uint256, CWalletTx) & item : mapWallet)
         {
-            mapSorted.insert(std::make_pair(wtx.nOrderPos, &wtx));
+            const uint256 &wtxid = item.first;
+            CWalletTx &wtx = item.second;
+            assert(wtx.GetHash() == wtxid);
+
+            int nDepth = wtx.GetDepthInMainChain();
+
+            if (!wtx.IsCoinBase() && (nDepth == 0 && !wtx.isAbandoned()))
+            {
+                mapSorted.insert(std::make_pair(wtx.nOrderPos, &wtx));
+            }
         }
     }
 
@@ -1475,6 +1488,7 @@ void CWallet::ReacceptWalletTransactions()
         wtx.AcceptToMemoryPool(false);
         SyncWithWallets(MakeTransactionRef(wtx), nullptr, -1);
     }
+    CommitTxToMempool();
 }
 
 bool CWalletTx::RelayWalletTransaction()
@@ -2539,10 +2553,6 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
 bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey)
 {
     {
-        LOCK2(cs_main, cs_wallet);
-        LOGA("CommitTransaction:\n%s", wtxNew.ToString());
-
-#if 1
         if (fBroadcastTransactions)
         {
             // Broadcast
@@ -2553,8 +2563,8 @@ bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey)
                 return false;
             }
         }
-#endif
 
+        LOCK2(cs_main, cs_wallet);
         {
             // This is only to keep the database open to defeat the auto-flush for the
             // duration of this scope.  This is the only place where this optimization
@@ -2586,17 +2596,7 @@ bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey)
 
         if (fBroadcastTransactions)
         {
-#if 0
-            // Broadcast
-            if (!wtxNew.AcceptToMemoryPool(false))
-            {
-                // This must not fail. The transaction has already been signed and recorded.
-                LOGA("CommitTransaction(): Error: Transaction not valid\n");
-                return false;
-            }
-#else
             SyncWithWallets(MakeTransactionRef(wtxNew), nullptr, -1);
-#endif
             wtxNew.RelayWalletTransaction();
         }
     }
@@ -3617,7 +3617,7 @@ int CMerkleTx::GetDepthInMainChain(const CBlockIndex *&pindexRet) const
     if (hashUnset())
         return 0;
 
-    AssertLockHeld(cs_main);
+    LOCK(cs_main);
 
     // Find the block it claims to be in
     BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
@@ -3627,7 +3627,7 @@ int CMerkleTx::GetDepthInMainChain(const CBlockIndex *&pindexRet) const
     if (!pindex || !chainActive.Contains(pindex))
         return 0;
 
-    pindexRet = pindex;
+    pindexRet = pindex; // we can return a pindex out of the lock because block headers are never deleted
     return ((nIndex == -1) ? (-1) : 1) * (chainActive.Height() - pindex->nHeight + 1);
 }
 
@@ -3642,8 +3642,10 @@ int CMerkleTx::GetBlocksToMaturity() const
 bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectAbsurdFee)
 {
     CValidationState state;
-    return ::AcceptToMemoryPool(
-        mempool, state, MakeTransactionRef(*this), fLimitFree, nullptr, false, fRejectAbsurdFee);
+    // Skip mempool commit because the commit informs the wallet but with the accounts stripped.
+    // By not committing inline, the caller wallet code can place this tx into the wallet first
+    return ::AcceptToMemoryPool(mempool, state, MakeTransactionRef(*this), fLimitFree, nullptr, false, fRejectAbsurdFee,
+        TransactionClass::DEFAULT);
 }
 
 

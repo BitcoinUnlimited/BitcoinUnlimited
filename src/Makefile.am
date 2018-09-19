@@ -185,6 +185,7 @@ BITCOIN_CORE_H = \
   threadsafety.h \
   timedata.h \
   torcontrol.h \
+  txadmission.h \
   txdb.h \
   txmempool.h \
   txorphanpool.h \
@@ -270,6 +271,7 @@ libbitcoin_server_a_SOURCES = \
   script/ismine.cpp \
   timedata.cpp \
   torcontrol.cpp \
+  txadmission.cpp \
   txdb.cpp \
   txmempool.cpp \
   txorphanpool.cpp \

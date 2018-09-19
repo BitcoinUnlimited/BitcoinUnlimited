@@ -2489,6 +2489,7 @@ void NetCleanup()
 
 void RelayTransaction(const CTransactionRef &ptx, const bool fRespend)
 {
+    // TODO call a GetSize() function that caches the tx size
     uint64_t len = ::GetSerializeSize(*ptx, SER_NETWORK, PROTOCOL_VERSION);
     if (len > maxTxSize.Value())
     {
@@ -2767,8 +2768,7 @@ bool CAddrDB::Read(CAddrMan &addr, CDataStream &ssPeers)
 unsigned int ReceiveFloodSize() { return 1000 * GetArg("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER); }
 unsigned int SendBufferSize() { return 1000 * GetArg("-maxsendbuffer", DEFAULT_MAXSENDBUFFER); }
 CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn, bool fInboundIn)
-    : ssSend(SER_NETWORK, INIT_PROTO_VERSION), id(connmgr->NextNodeId()), addrKnown(5000, 0.001),
-      filterInventoryKnown(50000, 0.000001)
+    : ssSend(SER_NETWORK, INIT_PROTO_VERSION), id(connmgr->NextNodeId()), addrKnown(5000, 0.001)
 {
     nServices = 0;
     hSocket = hSocketIn;

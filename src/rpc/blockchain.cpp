@@ -19,6 +19,7 @@
 #include "streams.h"
 #include "sync.h"
 #include "tweak.h"
+#include "txadmission.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
@@ -1121,14 +1122,14 @@ UniValue invalidateblock(const UniValue &params, bool fHelp)
     uint256 hash(uint256S(strHash));
     CValidationState state;
 
-    {
-        LOCK(cs_main);
-        if (mapBlockIndex.count(hash) == 0)
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+    TxAdmissionPause txlock;
+    LOCK(cs_main);
 
-        CBlockIndex *pblockindex = mapBlockIndex[hash];
-        InvalidateBlock(state, Params().GetConsensus(), pblockindex);
-    }
+    if (mapBlockIndex.count(hash) == 0)
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+
+    CBlockIndex *pblockindex = mapBlockIndex[hash];
+    InvalidateBlock(state, Params().GetConsensus(), pblockindex);
 
     if (state.IsValid())
     {

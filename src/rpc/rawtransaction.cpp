@@ -23,6 +23,7 @@
 #include "script/script_error.h"
 #include "script/sign.h"
 #include "script/standard.h"
+#include "txadmission.h"
 #include "txmempool.h"
 #include "uahf_fork.h"
 #include "uint256.h"
@@ -923,7 +924,9 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
         throw runtime_error(
             "sendrawtransaction \"hexstring\" ( allowhighfees, allownonstandard )\n"
             "\nSubmits raw transaction (serialized, hex-encoded) to local node and network.\n"
-            "\nAlso see createrawtransaction and signrawtransaction calls.\n"
+            "This API does not return until the transaction has been fully validated, and raises\n"
+            "an exception if submission was unsuccessful.\n"
+            "\nAlso see enqueuerawtransaction, createrawtransaction and signrawtransaction calls.\n"
             "\nArguments:\n"
             "1. \"hexstring\"    (string, required) The hex string of the raw transaction)\n"
             "2. allowhighfees    (boolean, optional, default=false) Allow high fees\n"
@@ -939,7 +942,6 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
             "\nSend the transaction (signed hex)\n" + HelpExampleCli("sendrawtransaction", "\"signedhex\"") +
             "\nAs a json rpc call\n" + HelpExampleRpc("sendrawtransaction", "\"signedhex\""));
 
-    LOCK(cs_main);
     RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VBOOL)(UniValue::VSTR));
 
     // parse hex string from parameter
@@ -1005,10 +1007,55 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
     {
         throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "transaction already in block chain");
     }
-    RelayTransaction(ptx);
-
     return hashTx.GetHex();
 }
+
+
+UniValue enqueuerawtransaction(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)
+        throw runtime_error(
+            "enqueuerawtransaction \"hexstring\" ( options )\n"
+            "\nSubmits raw transaction (serialized, hex-encoded) to local node and network.\n"
+            "This RPC by default does not wait for transaction validation and so is very fast.\n"
+            "\nAlso see sendrawtransaction, createrawtransaction and signrawtransaction calls.\n"
+            "\nArguments:\n"
+            "1. \"hexstring\"    (string, required) The hex string of the raw transaction)\n"
+            "2. \"options\"      (string, optional) \"flush\" to wait for every enqueued transaction to be handled\n"
+            "\nResult:\n"
+            "\"hex\"             (string) The transaction hash in hex\n"
+            "\nExamples:\n"
+            "\nCreate a transaction\n" +
+            HelpExampleCli("createrawtransaction",
+                "\"[{\\\"txid\\\" : \\\"mytxid\\\",\\\"vout\\\":0}]\" \"{\\\"myaddress\\\":0.01}\"") +
+            "Sign the transaction, and get back the hex\n" + HelpExampleCli("signrawtransaction", "\"myhex\"") +
+            "\nSend the transaction (signed hex)\n" + HelpExampleCli("enqueuerawtransaction", "\"signedhex\"") +
+            "\nAs a json rpc call\n" + HelpExampleRpc("enqueuerawtransaction", "\"signedhex\""));
+
+    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR));
+
+    CTransaction tx;
+    if (!DecodeHexTx(tx, params[0].get_str())) // parse hex string from parameter
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+
+    CTxInputData txd;
+    txd.tx = MakeTransactionRef(std::move(tx));
+    txd.nodeId = -1;
+    txd.nodeName = "rpc";
+    txd.whitelisted = false;
+    EnqueueTxForAdmission(txd);
+
+    if (params.size() > 1)
+    {
+        if (params[1].get_str() == "flush")
+        {
+            FlushTxAdmission();
+        }
+    }
+
+    return txd.tx->GetHash().GetHex();
+}
+
 
 static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
@@ -1018,6 +1065,7 @@ static const CRPCCommand commands[] = {
     {"rawtransactions", "decoderawtransaction", &decoderawtransaction, true},
     {"rawtransactions", "decodescript", &decodescript, true},
     {"rawtransactions", "sendrawtransaction", &sendrawtransaction, false},
+    {"rawtransactions", "enqueuerawtransaction", &enqueuerawtransaction, false},
     {"rawtransactions", "signrawtransaction", &signrawtransaction, false}, /* uses wallet if enabled */
 
     {"blockchain", "gettxoutproof", &gettxoutproof, true}, {"blockchain", "verifytxoutproof", &verifytxoutproof, true},
