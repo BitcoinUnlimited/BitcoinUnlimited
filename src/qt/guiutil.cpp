@@ -935,7 +935,7 @@ QString formatDurationStr(int secs)
     return strList.join(" ");
 }
 
-QString formatServicesStr(quint64 mask)
+QString formatServicesStr(quint64 mask, const QStringList &additionalServices)
 {
     QStringList strList;
 
@@ -979,6 +979,10 @@ QString formatServicesStr(quint64 mask)
             }
         }
     }
+
+    // Adds in additional services not denoted by nServices bits
+    if (additionalServices.size())
+        strList.append(additionalServices);
 
     if (strList.size())
         return strList.join(", ");

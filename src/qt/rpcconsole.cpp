@@ -900,13 +900,19 @@ void RPCConsole::updateNodeDetail(const CNodeCombinedStats *stats)
     // Update cached nodeid
     cachedNodeid = stats->nodeStats.nodeid;
 
+    // List of services not defined by a nServices bit that we still want to display on the UI
+    // as a peer advertised service (i.e. Compact Blocks)
+    QStringList additionalServices;
+    if (stats->nodeStats.fSupportsCompactBlocks)
+        additionalServices.append("CMPCT");
+
     // update the detail ui with latest node information
     QString peerAddrDetails(QString::fromStdString(stats->nodeStats.addrName) + "<br />");
     peerAddrDetails += tr("(node id: %1)").arg(QString::number(stats->nodeStats.nodeid));
     if (!stats->nodeStats.addrLocal.empty())
         peerAddrDetails += "<br />" + tr("via %1").arg(QString::fromStdString(stats->nodeStats.addrLocal));
     ui->peerHeading->setText(peerAddrDetails);
-    ui->peerServices->setText(GUIUtil::formatServicesStr(stats->nodeStats.nServices));
+    ui->peerServices->setText(GUIUtil::formatServicesStr(stats->nodeStats.nServices, additionalServices));
     ui->peerLastSend->setText(
         stats->nodeStats.nLastSend ? GUIUtil::formatDurationStr(GetTime() - stats->nodeStats.nLastSend) : tr("never"));
     ui->peerLastRecv->setText(
