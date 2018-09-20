@@ -64,7 +64,10 @@ TestingSetup::TestingSetup(const std::string &chainName) : BasicTestingSetup(cha
     bool worked = InitBlockIndex(chainparams);
     assert(worked);
 
-    PV.reset(new CParallelValidation(3, &threadGroup));
+    // Make sure there are 3 script check threads running for each queue
+    SoftSetArg("-par", std::to_string(3));
+    PV.reset(new CParallelValidation(&threadGroup));
+
     RegisterNodeSignals(GetNodeSignals());
 }
 
