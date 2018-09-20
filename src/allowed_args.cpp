@@ -463,7 +463,7 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
     std::string debugCategories = "addrman, bench, blk, bloom, coindb, db, estimatefee, evict, http, lck, "
                                   "libevent, mempool, mempoolrej, miner, net, parallel, partitioncheck, "
                                   "proxy, prune, rand, reindex, req, rpc, selectcoins, thin, tor, wallet, zmq, "
-                                  "graphene";
+                                  "graphene, respend, weakblocks";
     if (mode == HMM_BITCOIN_QT)
         debugCategories += ", qt";
 
