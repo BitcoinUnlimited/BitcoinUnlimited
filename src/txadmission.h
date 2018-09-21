@@ -3,8 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "fastfilter.h"
-#include "txmempool.h"
 #include "net.h"
+#include "txmempool.h"
 #include <queue>
 
 /**
@@ -89,7 +89,7 @@ enum
 {
     CORRAL_TX_PROCESSING = 1,
     CORRAL_TX_COMMITMENT = 2,
-    CORRAL_TX_PAUSE      = 3,
+    CORRAL_TX_PAUSE = 3,
 };
 
 // Transaction mempool admission globals
@@ -97,11 +97,11 @@ enum
 // maximum transaction mempool admission threads
 extern CTweak<unsigned int> numTxAdmissionThreads;
 
-extern CRollingFastFilter<4*1024*1024> recentRejects;
-extern CRollingFastFilter<4*1024*1024> txRecentlyInBlock;
+extern CRollingFastFilter<4 * 1024 * 1024> recentRejects;
+extern CRollingFastFilter<4 * 1024 * 1024> txRecentlyInBlock;
 
 // Finds transactions that may conflict with other pending transactions
-extern CFastFilter<4*1024*1024> incomingConflicts;
+extern CFastFilter<4 * 1024 * 1024> incomingConflicts;
 
 // Transactions that are available to be added to the mempool, and protection
 extern CCriticalSection csTxInQ;
@@ -147,7 +147,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     bool fRejectAbsurdFee,
     TransactionClass allowedTx,
     std::vector<COutPoint> &vCoinsToUncache,
-                                bool *isRespend);
+    bool *isRespend);
 
 /** Checks the size of the mempool and trims it if needed */
 void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);

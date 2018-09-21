@@ -130,6 +130,8 @@ torcontrol.cpp
 torcontrol.h
 tweak.cpp
 tweak.h
+txadmission.cpp
+txadmission.h
 txdb.cpp
 txdb.h
 txmempool.cpp
