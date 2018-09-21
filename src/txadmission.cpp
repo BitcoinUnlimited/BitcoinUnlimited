@@ -174,8 +174,6 @@ void ThreadCommitToMempool()
             LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
                 GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
 
-            // BU: update tx per second when a tx is valid and accepted
-            mempool.UpdateTransactionsPerSecond();
             CValidationState state;
             FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
             // The flush to disk above is only periodic therefore we need to continuously trim any excess from the
@@ -236,6 +234,9 @@ void CommitTxToMempool()
             SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
 #endif
             whatChanged.push_back(data.hash);
+
+            // Update txn per second only when a txn is valid and accepted to the mempool
+            mempool.UpdateTransactionsPerSecond();
         }
         txCommitQ.clear();
     }
