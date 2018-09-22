@@ -11,7 +11,7 @@ import test_framework.loginit
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 
-class TxnMallTest(BitcoinTestFramework):
+class TxnDoubleSpendTest(BitcoinTestFramework):
 
     def add_options(self, parser):
         parser.add_option("--mineblock", dest="mine_block", default=False, action="store_true",
@@ -19,7 +19,7 @@ class TxnMallTest(BitcoinTestFramework):
 
     def setup_network(self):
         # Start with split network:
-        return super(TxnMallTest, self).setup_network(True)
+        return super(TxnDoubleSpendTest, self).setup_network(True)
 
     def run_test(self):
         # All nodes should start with 1,250 BTC:
@@ -139,5 +139,19 @@ class TxnMallTest(BitcoinTestFramework):
         assert_equal(self.nodes[1].getbalance("from0"), 1240)
 
 if __name__ == '__main__':
-    TxnMallTest().main()
+    TxnDoubleSpendTest().main()
 
+def Test():
+    t = TxnDoubleSpendTest()
+    # t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["blk", "mempool", "net", "req"],
+        "logtimemicros": 1
+    }
+
+    flags = [] # ["--nocleanup", "--noshutdown"]
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmppfx=/ramdisk/test")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
+    t.main(flags, bitcoinConf, None)

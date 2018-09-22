@@ -6,7 +6,7 @@ import test_framework.loginit
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.blocktools import *
-import time
+import time, os
 
 
 '''
@@ -69,3 +69,18 @@ class InvalidTxRequestTest(ComparisonTestFramework):
 
 if __name__ == '__main__':
     InvalidTxRequestTest().main()
+
+
+def Test():
+    t = InvalidTxRequestTest()
+    # t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"],
+    }
+
+    flags = [] # ["--nocleanup", "--noshutdown"]
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmppfx=/ramdisk/test")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
+    t.main(flags, bitcoinConf, None)

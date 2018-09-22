@@ -933,7 +933,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         uint256 hash = it->second.ptx->GetHash();
         indexed_transaction_set::const_iterator it2 = mapTx.find(hash);
         const CTransaction &tx = it2->GetTx();
-        assert(it2 != mapTx.end());
+        assert(it2 != mapTx.end()); // Every entry in mapNextTx should point to a mempool entry
         assert(&tx == it->second.ptx);
         assert(tx.vin.size() > it->second.n);
         assert(it->first == it->second.ptx->vin[it->second.n].prevout);

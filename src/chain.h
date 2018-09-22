@@ -14,6 +14,7 @@
 #include "uint256.h"
 #include "util.h"
 
+#include <atomic>
 #include <vector>
 
 class CBlockFileInfo
@@ -429,11 +430,15 @@ class CChain
 private:
     std::vector<CBlockIndex *> vChain;
 
+    // hold a copy of the tip outside of the vector so it can be accessed without holding cs_main
+    std::atomic<CBlockIndex *> tip;
+
 public:
+    CChain() : tip(nullptr) {}
     /** Returns the index entry for the genesis block of this chain, or NULL if none. */
     CBlockIndex *Genesis() const { return vChain.size() > 0 ? vChain[0] : NULL; }
-    /** Returns the index entry for the tip of this chain, or NULL if none. */
-    CBlockIndex *Tip() const { return vChain.size() > 0 ? vChain[vChain.size() - 1] : NULL; }
+    /** Returns the index entry for the tip of this chain, or NULL if none.  Does not require cs_main. */
+    CBlockIndex *Tip() const { return tip; }
     /** Returns the index entry at a particular height in this chain, or NULL if no such height exists. */
     CBlockIndex *operator[](int nHeight) const
     {
@@ -465,8 +470,8 @@ public:
             return nullptr;
     }
 
-    /** Return the maximal height in the chain. Is equal to chain.Tip() ? chain.Tip()->nHeight : -1. */
-    int Height() const { return vChain.size() - 1; }
+    /** Return the maximal height in the chain.  Does not require cs_main */
+    int Height() const { return tip.load() ? tip.load()->nHeight : -1; }
     /** Set/initialize a chain with a given tip. */
     void SetTip(CBlockIndex *pindex);
 

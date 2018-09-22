@@ -39,6 +39,7 @@
 #include "script/sigcache.h"
 #include "script/standard.h"
 #include "torcontrol.h"
+#include "txadmission.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
@@ -214,6 +215,7 @@ void Shutdown()
         pwalletMain->Flush(false);
 #endif
     GenerateBitcoins(false, 0, Params());
+    StopTxAdmission();
     StopNode();
     StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
@@ -944,9 +946,17 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     if (numMsgHandlerThreads.Value() == 0)
     {
         // Set the number of threads to half the available Cores.
-        int nThreads = std::max((int)(GetNumCores() * 0.5), 1);
+        int nThreads = std::max(GetNumCores() / 2, 1);
         numMsgHandlerThreads.Set(nThreads);
-        LOGA("Using %d Message Handler Threads\n", numMsgHandlerThreads.Value());
+        LOGA("Using %d message handler threads\n", numMsgHandlerThreads.Value());
+    }
+    // Setup the number of transaction mempool admission threads
+    if (numTxAdmissionThreads.Value() == 0)
+    {
+        // Set the number of threads to half the available Cores.
+        int nThreads = std::max(GetNumCores() / 2, 1);
+        numTxAdmissionThreads.Set(nThreads);
+        LOGA("Using %d transaction admission threads\n", numTxAdmissionThreads.Value());
     }
 
     // Create the parallel block validator
@@ -1478,6 +1488,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
         StartTorControl(threadGroup, scheduler);
 
+    StartTxAdmission(threadGroup);
     StartNode(threadGroup, scheduler);
 
     // Monitor the chain, and alert if we get blocks much quicker or slower than expected

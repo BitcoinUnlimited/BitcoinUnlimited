@@ -10,6 +10,7 @@
 #include "bloom.h"
 #include "chainparams.h"
 #include "compat.h"
+#include "fastfilter.h"
 #include "fs.h"
 #include "hash.h"
 #include "iblt.h"
@@ -102,8 +103,15 @@ static const size_t DEFAULT_MAXSENDBUFFER = 1 * 1000;
 unsigned int ReceiveFloodSize();
 unsigned int SendBufferSize();
 
+// Node IDs are currently signed but only values greater than zero are returned.  Zero or negative can be used as a
+// sentinel value.
+typedef int NodeId;
+
 void AddOneShot(const std::string &strDest);
+// Find a node by name.  Returns a null ref if no node found
 CNodeRef FindNodeRef(const std::string &addrName);
+// Find a node by id.  Returns a null ref if no node found
+CNodeRef FindNodeRef(const NodeId id);
 int DisconnectSubNetNodes(const CSubNet &subNet);
 bool OpenNetworkConnection(const CAddress &addrConnect,
     bool fCountFailure,
@@ -117,10 +125,6 @@ bool BindListenPort(const CService &bindAddr, std::string &strError, bool fWhite
 void StartNode(boost::thread_group &threadGroup, CScheduler &scheduler);
 bool StopNode();
 int SocketSendData(CNode *pnode);
-
-// Node IDs are currently signed but only values greater than zero are returned.  Zero or negative can be used as a
-// sentinel value.
-typedef int NodeId;
 
 struct CombinerAll
 {
@@ -468,7 +472,7 @@ public:
     int nStartingHeight;
 
     // flood relay
-    std::vector<CAddress> vAddrToSend;
+    std::vector<CAddress> vAddrToSend GUARDED_BY(cs_vSend);
     CRollingBloomFilter addrKnown;
     bool fGetAddr;
     std::set<uint256> setKnown;
@@ -476,7 +480,7 @@ public:
     int64_t nNextLocalAddrSend;
 
     // inventory based relay
-    CRollingBloomFilter filterInventoryKnown;
+    CRollingFastFilter<4 * 1024 * 1024> filterInventoryKnown;
     std::vector<CInv> vInventoryToSend;
     CCriticalSection cs_inventory;
     int64_t nNextInvSend;
@@ -598,6 +602,7 @@ public:
     void AddAddressKnown(const CAddress &_addr) { addrKnown.insert(_addr.GetKey()); }
     void PushAddress(const CAddress &_addr, FastRandomContext &insecure_rand)
     {
+        LOCK(cs_vSend);
         // Known checking here is only to save space from duplicates.
         // SendMessages will filter it again for knowns that were added
         // after addresses were pushed.
@@ -934,8 +939,11 @@ public:
     ~CNodeRef() { Release(); }
     CNode &operator*() const { return *_pnode; };
     CNode *operator->() const { return _pnode; };
+    // Returns true if this reference is not null
     explicit operator bool() const { return _pnode; }
+    // Access the raw pointer
     CNode *get() const { return _pnode; }
+    // Assignment -- destroys any reference to the current node and adds a ref to the new one
     CNodeRef &operator=(CNode *pnode)
     {
         if (pnode != _pnode)
@@ -946,6 +954,7 @@ public:
         }
         return *this;
     }
+    // Assignment -- destroys any reference to the current node and adds a ref to the new one
     CNodeRef &operator=(const CNodeRef &other) { return operator=(other._pnode); }
 private:
     CNode *_pnode;

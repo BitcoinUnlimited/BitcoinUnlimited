@@ -46,7 +46,7 @@ public:
         FastRandomContext insecure_rand;
         vData.resize(FILTER_BYTES);
         // by sampling from a different part of the uint256, we make it harder for an attacker to generate collisions
-        grabFrom = (insecure_rand.rand32() % 7) * 4; // should be 4 byte aligned for speed
+        grabFrom = (1 + (insecure_rand.rand32() % 6)) * 4; // should be 4 byte aligned for speed
     }
 
     // returns true IF this function made a change (i.e. the value was previously not set).
@@ -54,7 +54,7 @@ public:
     {
         const unsigned char *mem = hash.begin();
         const uint32_t *pos = (const uint32_t *)&(mem[grabFrom]);
-        uint32_t idx = (*pos) & (FILTER_SIZE - 1);
+        uint32_t idx = ((*pos) ^ mem[0]) & (FILTER_SIZE - 1);
 
         bool ret = vData[idx >> 3] & (1 << (idx & 7));
         vData[idx >> 3] |= (1 << (idx & 7));
@@ -67,18 +67,18 @@ public:
     {
         const unsigned char *mem = hash.begin();
         const uint32_t *pos = (const uint32_t *)&(mem[grabFrom]);
-        uint32_t idx = (*pos) & (FILTER_SIZE - 1);
+        uint32_t idx = ((*pos) ^ mem[0]) & (FILTER_SIZE - 1);
         vData[idx >> 3] |= (1 << (idx & 7));
     }
     bool contains(const uint256 &hash) const
     {
         const unsigned char *mem = hash.begin();
         const uint32_t *pos = (const uint32_t *)&(mem[grabFrom]);
-        uint32_t idx = (*pos) & (FILTER_SIZE - 1);
+        uint32_t idx = ((*pos) ^ mem[0]) & (FILTER_SIZE - 1);
         return vData[idx >> 3] & (1 << (idx & 7));
     }
 
-    void reset() { bzero(&vData[0], FILTER_BYTES); }
+    void reset() { memset(&vData[0], 0, FILTER_BYTES); }
 };
 
 

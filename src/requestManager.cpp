@@ -150,7 +150,10 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
     {
         // Don't allow the in flight requests to grow unbounded.
         if (mapTxnInfo.size() >= (size_t)(MAX_INV_SZ * 2 * GetArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE)))
+        {
+            LOG(REQ, "Tx request buffer full: Dropping request for %s", obj.hash.ToString());
             return;
+        }
 
         uint256 temp = obj.hash;
         OdMap::value_type v(temp, CUnknownObj());
@@ -208,7 +211,7 @@ void CRequestManager::AskFor(const std::vector<CInv> &objArray, CNode *from, uns
 void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *from, unsigned int priority)
 {
     // must maintain correct locking order:  cs_main, then cs_objDownloader, then cs_vNodes.
-    AssertLockHeld(cs_main);
+    LOCK(cs_main);
 
     // This is block and peer that was selected in FindNextBlocksToDownload() so we want to add it as a block
     // source first so that it gets requested first.
@@ -804,9 +807,10 @@ void CRequestManager::SendRequests()
                 if (item.availableFrom.empty())
                 {
                     // TODO: tell someone about this issue, look in a random node, or something.
+                    LOG(REQ, "No sources for %s.  Dropping\n", item.obj.ToString().c_str());
                     cleanup(itemIter); // right now we give up requesting it if we have no other sources...
                 }
-                else // Ok, we have at least on source so request this item.
+                else // Ok, we have at least one source so request this item.
                 {
                     CNodeRequestData next;
                     // Go thru the availableFrom list, looking for the first node that isn't disconnected
@@ -908,7 +912,7 @@ void CRequestManager::SendRequests()
 // Check whether the last unknown block a peer advertised is not yet known.
 void CRequestManager::ProcessBlockAvailability(NodeId nodeid)
 {
-    AssertLockHeld(cs_main);
+    LOCK(cs_main); // TODO fine grained lock around mapBlockIndex
 
     CNodeState *state = State(nodeid);
     DbgAssert(state != nullptr, return );
@@ -956,8 +960,6 @@ void CRequestManager::UpdateBlockAvailability(NodeId nodeid, const uint256 &hash
 
 void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
 {
-    AssertLockHeld(cs_main);
-
     int nBlocksInFlight = mapRequestManagerNodeState[pto->GetId()].nBlocksInFlight;
     if (!pto->fDisconnectRequest && !pto->fDisconnect && !pto->fClient &&
         nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
@@ -990,8 +992,6 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
 // at most count entries.
 void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, std::vector<CBlockIndex *> &vBlocks)
 {
-    AssertLockHeld(cs_main);
-
     if (count == 0)
         return;
 
@@ -1009,6 +1009,8 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
         // This peer has nothing interesting.
         return;
     }
+
+    LOCK(cs_main);
 
     if (state->pindexLastCommonBlock == nullptr)
     {

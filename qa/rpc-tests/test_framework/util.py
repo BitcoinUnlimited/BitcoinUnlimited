@@ -130,7 +130,7 @@ def waitFor(timeout, fn, onError="timeout in waitFor", sleepAmt=1.0):
     timeout = float(timeout)
     while 1:
         result = fn()
-        if not result is None:
+        if not (result is None or result is False):
             return result
         if timeout <= 0:
             if callable(onError):
@@ -138,7 +138,7 @@ def waitFor(timeout, fn, onError="timeout in waitFor", sleepAmt=1.0):
             raise TimeoutException(onError)
         time.sleep(sleepAmt)
         timeout -= sleepAmt
-        
+
 def expectException(fn, ExcType, comparison=None):
     try:
         fn()
@@ -1019,3 +1019,20 @@ def get_bip135_status(node, key):
     info = node.getblockchaininfo()
     return info['bip135_forks'][key]
 # bip135 end
+
+def findBitcoind():
+    """Find the bitcoind executable if you build in typical out-of-source locations (debug or release)"""
+    here = os.path.dirname(os.path.abspath(__file__))
+    objpath = os.path.abspath(here + "/../../../src/bitcoind")
+    if not os.path.exists(objpath):
+        dbg = os.path.abspath(here + "/../../../debug/src/bitcoind")
+        rel = os.path.abspath(here + "/../../../release/src/bitcoind")
+        if os.path.exists(dbg):
+            logging.info("Running from the debug directory (%s)" % dbg)
+            objpath = os.path.dirname(dbg)
+        elif os.path.exists(rel):
+            logging.info("Running from the release directory (%s)" % rel)
+            objpath = os.path.dirname(rel)
+    else:
+        objpath = os.path.dirname(objpath)
+    return objpath

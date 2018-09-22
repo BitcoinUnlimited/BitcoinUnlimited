@@ -130,7 +130,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         assert_equal(rawTxPartialSigned['complete'], False) #node1 only has one key, can't comp. sign the tx
         rawTxSigned = self.nodes[2].signrawtransaction(rawTx, inputs)
         assert_equal(rawTxSigned['complete'], True) #node2 can sign the tx compl., own two of three keys
-        self.nodes[2].sendrawtransaction(rawTxSigned['hex'])
+        self.nodes[2].enqueuerawtransaction(rawTxSigned['hex'],"flush")
         rawTx = self.nodes[0].decoderawtransaction(rawTxSigned['hex'])
         self.sync_all()
         self.nodes[0].generate(1)
@@ -268,16 +268,15 @@ if __name__ == '__main__':
 
 def Test():
     t = RawTransactionsTest()
-    t.drop_to_pdb = True
+    #t.drop_to_pdb = True
     bitcoinConf = {
-        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],  # "lck"
-        "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
+        "debug": ["rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"],
     }
 
-    flags = []
-    # you may want these additional flags:
-    # "--srcdir=<out-of-source-build-dir>/debug/src"
-    # "--nocleanup", "--noshutdown"
-    if os.path.isdir("/ramdisk/test"):  # execution is much faster if a ramdisk is used
+    flags = [] # ["--nocleanup", "--noshutdown"]
+    if os.path.isdir("/ramdisk/test"):
         flags.append("--tmppfx=/ramdisk/test")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
     t.main(flags, bitcoinConf, None)
+

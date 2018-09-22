@@ -426,8 +426,6 @@ UniValue sendtoaddress(const UniValue &params, bool fHelp)
             HelpExampleRpc(
                 "sendtoaddress", "\"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", 0.1, \"donation\", \"seans outpost\""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
-
     CTxDestination dest = DecodeDestination(params[0].get_str());
     if (!IsValidDestination(dest))
     {
