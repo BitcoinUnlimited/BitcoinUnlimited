@@ -2109,6 +2109,11 @@ void ThreadMessageHandler()
     boost::mutex condition_mutex;
     boost::unique_lock<boost::mutex> lock(condition_mutex);
 
+    // Stagger the last rotation start times so all MsgHandlerThreads don't do their rotation at the same time.
+    int nRotationPeriod = 60;
+    static std::atomic<int> nThisThread{0};
+    int64_t nLastRotation = GetTime() - (nThisThread++ * nRotationPeriod);
+
     while (true)
     {
         vector<CNode *> vNodesCopy;
@@ -2122,8 +2127,8 @@ void ThreadMessageHandler()
             // connected and end up downloading a disproportionate amount of data from that first peer.
             // By rotating vNodes evertime we send messages we can alleviate this problem.
             // Rotate every 60 seconds so we don't do this too often.
-            static int64_t nLastRotation = GetTime();
-            if (IsInitialBlockDownload() && vNodes.size() > 0 && GetTime() - nLastRotation > 60)
+            if (IsInitialBlockDownload() && vNodes.size() > 0 &&
+                (GetTime() - nLastRotation > numMsgHandlerThreads.Value() * nRotationPeriod))
             {
                 std::rotate(vNodes.begin(), vNodes.end() - 1, vNodes.end());
                 nLastRotation = GetTime();
