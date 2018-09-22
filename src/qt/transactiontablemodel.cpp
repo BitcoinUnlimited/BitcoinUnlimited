@@ -66,33 +66,36 @@ public:
         cachedWallet.clear();
         {
             LOCK2(cs_main, wallet->cs_wallet);
-            for (std::map<uint256, CWalletTx>::iterator it = wallet->mapWallet.begin(); it != wallet->mapWallet.end();
-                 ++it)
+            for (std::map<uint256, CWalletTx>::iterator it = wallet->mapWallet.begin(); it != wallet->mapWallet.end();++it)
             {
-                if (!GetBoolArg("-toppubliclabels", false))
-                    if (TransactionRecord::showTransaction(it->second))
-                                        cachedWallet.append(TransactionRecord::decomposeTransaction(wallet, it->second));
-                else if (TransactionRecord::showTransaction(it->second))
-                {
-                    QList<TransactionRecord> recList = TransactionRecord::decomposeTransaction(wallet, it->second);
-                    for (TransactionRecord &recNew: recList)
-                    {
-                        // Exclude public labels that already exist
-                        bool found = false;
-                        for (const TransactionRecord &rec: cachedWallet)
-                        {
-                            if ((rec.type == TransactionRecord::PublicLabel)
-                                    && (rec.addresses.begin()->first == recNew.addresses.begin()->first))
-                            {
-                                found = true;
-                                continue;
-                            }
+                if (TransactionRecord::showTransaction(it->second))
+                                    cachedWallet.append(TransactionRecord::decomposeTransaction(wallet, it->second, false));
+            }
 
+            if (GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS) > 0)
+            {
+                for (std::map<uint256, CWalletTx>::iterator it = wallet->mapWalletTopPublicLabels.begin(); it != wallet->mapWalletTopPublicLabels.end();++it)
+                {
+                    if (TransactionRecord::showTransaction(it->second))
+                    {
+                        QList<TransactionRecord> recList = TransactionRecord::decomposeTransaction(wallet, it->second, true);
+                        for (TransactionRecord &recNew: recList)
+                        {
+                            // Exclude public labels that already exist
+                            for (const TransactionRecord &rec: cachedWallet)
+                                if (rec.addresses.begin()->first == recNew.addresses.begin()->first) goto recNew_Next;
+
+                            // Check if the record is in the Top 20 if not skip
+                            cachedWallet.append(recNew);
+
+                            recNew_Next: {}
+                            // Continue
                         }
-                        if (!found) cachedWallet.append(recNew);
                     }
-                } // end else if
-            } // end for
+                }
+                // Clear spent public labels
+                wallet->ZapSpentTopPublicLabels();
+            }
         }
     }
 
@@ -148,7 +151,7 @@ public:
                     break;
                 }
                 // Added -- insert at the right position
-                QList<TransactionRecord> toInsert = TransactionRecord::decomposeTransaction(wallet, mi->second);
+                QList<TransactionRecord> toInsert = TransactionRecord::decomposeTransaction(wallet, mi->second, false);
                 if (!toInsert.isEmpty()) /* only if something to insert */
                 {
                     parent->beginInsertRows(QModelIndex(), lowerIndex, lowerIndex + toInsert.size() - 1);
@@ -199,7 +202,7 @@ public:
             if (lockMain)
             {
                 TRY_LOCK(wallet->cs_wallet, lockWallet);
-                if (lockWallet && rec->statusUpdateNeeded())
+                if (lockWallet && rec->statusUpdateNeeded() && rec->type != TransactionRecord::TopPublicLabel)
                 {
                     std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(rec->hash);
 
@@ -218,8 +221,9 @@ public:
     {
         {
             LOCK2(cs_main, wallet->cs_wallet);
-            std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(rec->hash);
-            if (mi != wallet->mapWallet.end())
+            std::map<uint256, CWalletTx> walletMap = (rec->type == TransactionRecord::TopPublicLabel ? wallet->mapWalletTopPublicLabels : wallet->mapWallet);
+            std::map<uint256, CWalletTx>::iterator mi = walletMap.find(rec->hash);
+            if (mi != walletMap.end())
             {
                 return TransactionDesc::toHTML(wallet, mi->second, rec, unit, labelFreeze);
             }
@@ -230,8 +234,9 @@ public:
     QString getTxHex(TransactionRecord *rec)
     {
         LOCK2(cs_main, wallet->cs_wallet);
-        std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(rec->hash);
-        if (mi != wallet->mapWallet.end())
+        std::map<uint256, CWalletTx> walletMap = (rec->type == TransactionRecord::TopPublicLabel ? wallet->mapWalletTopPublicLabels : wallet->mapWallet);
+        std::map<uint256, CWalletTx>::iterator mi = walletMap.find(rec->hash);
+        if (mi != walletMap.end())
         {
             std::string strHex = EncodeHexTx(static_cast<CTransaction>(mi->second));
             return QString::fromStdString(strHex);
@@ -265,6 +270,18 @@ void TransactionTableModel::updateAmountColumnTitle()
 {
     columns[Amount] = BitcoinUnits::getAmountColumnTitle(walletModel->getOptionsModel()->getDisplayUnit());
     Q_EMIT headerDataChanged(Qt::Horizontal, Amount, Amount);
+}
+
+void TransactionTableModel::updateAddressColumnTitle()
+{
+    columns[ToAddress] = "Address or Label";
+    Q_EMIT headerDataChanged(Qt::Horizontal, ToAddress, ToAddress);
+}
+
+void TransactionTableModel::updatePublicLabelColumnTitle()
+{
+    columns[ToAddress] = "Public Label";
+    Q_EMIT headerDataChanged(Qt::Horizontal, ToAddress, ToAddress);
 }
 
 void TransactionTableModel::updateTransaction(const QString &hash, int status, bool showTransaction)
@@ -387,7 +404,7 @@ QString TransactionTableModel::formatTxType(const TransactionRecord *wtx) const
         return tr("Payment to yourself");
     case TransactionRecord::Generated:
         return tr("Mined");
-    case TransactionRecord::PublicLabel:
+    case TransactionRecord::TopPublicLabel:
         return tr("Public label");
     case TransactionRecord::Other:
         return tr("Other");
@@ -476,14 +493,14 @@ QString TransactionTableModel::formatTxAmount(const TransactionRecord *wtx,
     BitcoinUnits::SeparatorStyle separators) const
 {
     CAmount amt = 0;
-    if (wtx->type == TransactionRecord::PublicLabel)
+    if (wtx->type == TransactionRecord::TopPublicLabel)
         amt = unspentPublicLabelTotal(wtx->addresses.begin()->first);
     else
         amt = wtx->credit + wtx->debit;
 
     QString str = BitcoinUnits::format(
     walletModel->getOptionsModel()->getDisplayUnit(), amt, false, separators);
-    if (showUnconfirmed)
+    if (showUnconfirmed && wtx->type != TransactionRecord::TopPublicLabel)
     {
         if (!wtx->status.countsForBalance)
         {
@@ -551,7 +568,7 @@ CAmount TransactionTableModel::unspentPublicLabelTotal(std::string publicLabel) 
 
     LOCK2(cs_main, wallet->cs_wallet);
     CAmount amt = 0;
-    for(std::map<uint256, CWalletTx>::iterator it = wallet->mapWalletPublicLabels.begin(); it != wallet->mapWalletPublicLabels.end(); ++it)
+    for(std::map<uint256, CWalletTx>::iterator it = wallet->mapWalletTopPublicLabels.begin(); it != wallet->mapWalletTopPublicLabels.end(); ++it)
     {
         CTransaction tx(it->second);
         amt += wallet->UnspentPublicLabelAmount(tx, publicLabel).first;
@@ -642,7 +659,7 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
         case ToAddress:
             return formatTxToAddress(rec, true);
         case Amount:
-            if (rec->type == TransactionRecord::PublicLabel)
+            if (rec->type == TransactionRecord::TopPublicLabel)
                 return qint64(unspentPublicLabelTotal(rec->addresses.begin()->first));
             else
                 return qint64(rec->credit + rec->debit);
@@ -654,7 +671,7 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
         return column_alignments[index.column()];
     case Qt::ForegroundRole:
         // Non-confirmed (but not immature) as transactions are grey
-        if (!rec->status.countsForBalance && rec->status.status != TransactionStatus::Immature)
+        if (!rec->status.countsForBalance && rec->status.status != TransactionStatus::Immature && rec->type != TransactionRecord::TopPublicLabel)
         {
             return COLOR_UNCONFIRMED;
         }
@@ -674,27 +691,18 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
     case WatchonlyRole:
         return rec->involvesWatchAddress;
     case PublicLabelRole:
-        return (rec->type == TransactionRecord::PublicLabel);
+        return (rec->type == TransactionRecord::TopPublicLabel);
     case WatchonlyDecorationRole:
         return txWatchonlyDecoration(rec);
     case LongDescriptionRole:
-
-        // refresh publicLabelTotals when user inspects transaction description
-        if (rec->type == TransactionRecord::PublicLabel)
-        {
-            publicLabelTotals.remove(rec->addresses.begin()->first);
-            unspentPublicLabelTotal(rec->addresses.begin()->first);
-        }
-
         return priv->describe(rec, walletModel->getOptionsModel()->getDisplayUnit(),
             walletModel->getAddressTableModel()->labelForFreeze(QString::fromStdString(address)));
-
     case AddressRole:
         return QString::fromStdString(address);
     case LabelRole:
         return label;
     case AmountRole:
-        if (rec->type == TransactionRecord::PublicLabel)
+        if (rec->type == TransactionRecord::TopPublicLabel)
             return qint64(unspentPublicLabelTotal(rec->addresses.begin()->first));
         else
             return qint64(rec->credit + rec->debit);

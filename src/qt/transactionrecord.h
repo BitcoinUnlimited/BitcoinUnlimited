@@ -85,7 +85,7 @@ public:
         RecvWithAddress,
         RecvFromOther,
         SendToSelf,
-        PublicLabel
+        TopPublicLabel
     };
 
     /** Number of confirmation recommended for accepting a transaction */
@@ -110,7 +110,7 @@ public:
     /** Decompose CWallet transaction to model transaction records.
      */
     static bool showTransaction(const CWalletTx &wtx);
-    static QList<TransactionRecord> decomposeTransaction(const CWallet *wallet, const CWalletTx &wtx);
+    static QList<TransactionRecord> decomposeTransaction(const CWallet *wallet, const CWalletTx &wtx, bool isTopPublicLabel);
 
     /** @name Immutable transaction attributes
       @{*/

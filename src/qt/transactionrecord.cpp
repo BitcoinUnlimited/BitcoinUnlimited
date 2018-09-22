@@ -30,7 +30,7 @@ bool TransactionRecord::showTransaction(const CWalletTx &wtx)
 /*
  * Decompose CWallet transaction to model transaction records.
  */
-QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *wallet, const CWalletTx &wtx)
+QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *wallet, const CWalletTx &wtx, bool isTopPublicLabel)
 {
     QList<TransactionRecord> parts;
     int64_t nTime = wtx.GetTxTime();
@@ -60,7 +60,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             TransactionRecord sub(hash, nTime);
             sub.idx = parts.size(); // sequence number
             sub.credit = txout.nValue;
-            sub.type = TransactionRecord::PublicLabel;
+            sub.type = TransactionRecord::TopPublicLabel;
             sub.addresses.push_back(std::make_pair(labelPublic, txout.scriptPubKey));
 
             parts.append(sub);
@@ -81,6 +81,8 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             if(fAllToMe > mine) fAllToMe = mine;
         }
     } // end load all tx addresses for user display/filter
+
+    if (isTopPublicLabel) return parts;
 
     if (nNet > 0 || wtx.IsCoinBase())
     {

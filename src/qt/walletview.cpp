@@ -192,8 +192,18 @@ void WalletView::processNewTransaction(const QModelIndex &parent, int start, int
 }
 
 void WalletView::gotoOverviewPage() { setCurrentWidget(overviewPage); }
-void WalletView::gotoHistoryPage() { setCurrentWidget(transactionsPage); }
-void WalletView::gotoPublicLabelPage() { setCurrentWidget(publicLabelPage); }
+void WalletView::gotoHistoryPage()
+{
+    // change column title to public label
+    walletModel->getTransactionTableModel()->updateAddressColumnTitle();
+    setCurrentWidget(transactionsPage);
+}
+void WalletView::gotoPublicLabelPage()
+{
+    // change column title to public label
+    walletModel->getTransactionTableModel()->updatePublicLabelColumnTitle();
+    setCurrentWidget(publicLabelPage);
+}
 void WalletView::gotoReceiveCoinsPage() { setCurrentWidget(receiveCoinsPage); }
 void WalletView::gotoSendCoinsPage(QString addr, QString labelPublic)
 {
