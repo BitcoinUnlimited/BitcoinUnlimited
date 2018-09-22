@@ -136,7 +136,7 @@ class WalletBackupTest(BitcoinTestFramework):
 
         # Generate 101 more blocks, so any fees paid mature
         self.nodes[3].generate(101)
-        self.sync_all()
+        self.sync_blocks()
 
         balance0 = self.nodes[0].getbalance()
         balance1 = self.nodes[1].getbalance()
@@ -199,3 +199,18 @@ class WalletBackupTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     WalletBackupTest().main()
+
+
+def Test():
+    t = WalletBackupTest()
+    # t.drop_to_pdb = True
+    bitcoinConf = {
+        # "debug": ["rpc", "net", "blk", "thin", "mempool", "req", "bench", "evict"],
+    }
+
+    flags = [] # ["--nocleanup", "--noshutdown"]
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmppfx=/ramdisk/test")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
+    t.main(flags, bitcoinConf, None)

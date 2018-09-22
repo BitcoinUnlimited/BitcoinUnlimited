@@ -54,6 +54,10 @@ debug_port_assignments = False
 class TimeoutException(Exception):
     pass
 
+class DisconnectedException(Exception):
+    pass
+
+
 def SetupPythonLogConfig():
     logOn = os.getenv("PYTHON_DEBUG")
     level = logging.ERROR
@@ -287,6 +291,18 @@ def sync_mempools(rpc_connections, wait=1,verbose=1):
             logging.info("sync mempool: " + str(pool_len))
         if num_match == len(rpc_connections):
             break
+
+        if ((count&3)==0):
+            # mempools may never sync fully because there is a bloom filter that can block some INVs
+            # so randomly push all txs from one node to another until the sync happens
+            source = random.randint(0, len(rpc_connections)-1)
+            peers = rpc_connections[source].getpeerinfo()
+            if len(peers)==0:
+                raise DisconnectedException("Node %d has no peers so cannot sync mempools" % source)
+            dest = random.randint(0, len(peers)-1)
+            destPeer = peers[dest]
+            rpc_connections[source].pushtx(destPeer['addr'])
+            logging.info("sync_mempools: pushed tx from %d to %s" % (source, destPeer['addr']))
         time.sleep(wait)
 
 def filterUnsupportedParams(defaults, param_keys=FILTER_PARAM_KEYS):
@@ -350,7 +366,7 @@ def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None)
       regtestdir = os.path.join(datadir,"regtest")
       if not os.path.isdir(regtestdir):
           os.makedirs(regtestdir)
-      logging.info(regtestdir, os.path.join(regtestdir, "wallet.dat"))
+      logging.info("%s %s" % (regtestdir, os.path.join(regtestdir, "wallet.dat")))
       shutil.copyfile(wallet,os.path.join(regtestdir, "wallet.dat"))
 
     return datadir

@@ -38,6 +38,25 @@ private:
     const std::string m_reason;
 };
 
+class HasEitherReason
+{
+public:
+    HasEitherReason(const std::string &reason, const std::string &reason2) : m_reason(reason), m_reason2(reason2) {}
+    bool operator()(const std::runtime_error &e) const
+    {
+        std::string what(e.what());
+        bool ret = false;
+        printf("Exception Reason: %s\n", what.c_str());
+        ret |= what.find(m_reason) != std::string::npos;
+        ret |= what.find(m_reason2) != std::string::npos;
+        return ret;
+    };
+
+private:
+    const std::string m_reason;
+    const std::string m_reason2;
+};
+
 
 static struct
 {
@@ -330,7 +349,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
     BOOST_CHECK_EXCEPTION(BlockAssembler(chainparams_regtest).CreateNewBlock(scriptPubKey), std::runtime_error,
-        HasReason("bad-blk-signatures"));
+        HasEitherReason("mandatory-script-verify-flag-failed", "bad-blk-signatures"));
     mempool.clear();
 
     // double spend txn pair in mempool, template creation fails
