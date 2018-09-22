@@ -531,7 +531,7 @@ bool WalletModel::getPubKey(const CKeyID &address, CPubKey &vchPubKeyOut) const
 
 CPubKey WalletModel::getNewPubKey()
 {
-    // Generate a new address to associate with given label
+    // Generate a new address to associate with a new send transaction
     CPubKey newKey;
     if(wallet->GetKeyFromPool(newKey)) return newKey;
 }
