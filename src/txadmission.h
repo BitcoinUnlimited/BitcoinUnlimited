@@ -116,6 +116,9 @@ extern CWaitableCriticalSection csCommitQ;
 extern CConditionVariable cvCommitQ;
 extern std::map<uint256, CTxCommitData> txCommitQ;
 
+// returns a transaction ref, if it exists in the commitQ
+CTransactionRef CommitQGet(uint256 hash);
+
 /** Start the transaction mempool admission threads */
 void StartTxAdmission(boost::thread_group &threadGroup);
 /** Stop the transaction mempool admission threads (assumes that ShutdownRequested() will return true) */

@@ -645,6 +645,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount)
 {
+    AssertLockHeld(orphanpool.cs);
     AssertLockHeld(cs_xval);
 
     // We must have all the full tx hashes by this point.  We first check for any repeating
@@ -688,16 +689,31 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         CTransactionRef ptx = nullptr;
         if (!hash.IsNull())
         {
+            // Check the commit queue first. If we check the mempool first and it's not in there then when we release
+            // the lock on the mempool it may get transfered from the commitQ to the mempool before we have time to
+            // grab the lock on the commitQ and we'll think we don't have the transaction.
+            // the mempool.
             bool inMemPool = false;
-            ptx = mempool.get(hash);
+            bool inCommitQ = false;
+            ptx = CommitQGet(hash);
             if (ptx)
-                inMemPool = true;
+            {
+                inCommitQ = true;
+            }
+            else
+            {
+                // if it's not in the mempool then check the commitQ
+                ptx = mempool.get(hash);
+                if (ptx)
+                    inMemPool = true;
+            }
 
             bool inMissingTx = pfrom->mapMissingTx.count(hash.GetCheapHash()) > 0;
             bool inAdditionalTxs = mapAdditionalTxs.count(hash) > 0;
             bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
 
-            if ((inMemPool && inMissingTx) || (inOrphanCache && inMissingTx) || (inAdditionalTxs && inMissingTx))
+            if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx) ||
+                (inAdditionalTxs && inMissingTx))
                 unnecessaryCount++;
 
             if (inAdditionalTxs)
@@ -707,7 +723,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
                 ptx = orphanpool.mapOrphanTransactions[hash].ptx;
                 setUnVerifiedOrphanTxHash.insert(hash);
             }
-            else if (inMemPool && fXVal)
+            else if ((inMemPool || inCommitQ) && fXVal)
                 setPreVerifiedTxHash.insert(hash);
             else if (inMissingTx)
                 ptx = pfrom->mapMissingTx[hash.GetCheapHash()];
@@ -1188,7 +1204,7 @@ bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
         // Check that we have not exceeded time limit.
         // If we have then we want to return false so that we can
         // proceed to download a regular block instead.
-        auto iter =  mapGrapheneBlockTimer.find(hash);
+        auto iter = mapGrapheneBlockTimer.find(hash);
         if (iter != mapGrapheneBlockTimer.end())
         {
             int64_t elapsed = GetTimeMillis() - iter->second.first;

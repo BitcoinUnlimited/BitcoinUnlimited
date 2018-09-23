@@ -42,6 +42,15 @@ bool CheckSequenceLocks(const CTransaction &tx,
     const Snapshot &ss);
 
 
+CTransactionRef CommitQGet(uint256 hash)
+{
+    boost::unique_lock<boost::mutex> lock(csCommitQ);
+    std::map<uint256, CTxCommitData>::iterator it = txCommitQ.find(hash);
+    if (it == txCommitQ.end())
+        return nullptr;
+    return it->second.entry.GetSharedTx();
+}
+
 void StartTxAdmission(boost::thread_group &threadGroup)
 {
     txHandlerSnap.Load(); // Get an initial view for the transaction processors
