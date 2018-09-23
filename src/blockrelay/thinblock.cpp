@@ -21,6 +21,7 @@
 #include "pow.h"
 #include "requestManager.h"
 #include "timedata.h"
+#include "txadmission.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "util.h"
@@ -1830,11 +1831,22 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
             }
         }
     }
-    else // Add all the transaction hashes currently in the mempool
+    else
     {
         std::vector<uint256> vMempoolHashes;
+
+        // Add all the transaction hashes currently in the mempool
         mempool.queryHashes(vMempoolHashes);
         setHighScoreMemPoolHashes.insert(vMempoolHashes.begin(), vMempoolHashes.end());
+    }
+
+    // Also add all the transaction hashes currently in the txCommitQ
+    {
+        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        for (auto &it : txCommitQ)
+        {
+             setHighScoreMemPoolHashes.insert(it.first);
+        }
     }
 
     LOG(THIN, "Bloom Filter Targeting completed in:%d (ms)\n", GetTimeMillis() - nStartTimer);
@@ -1864,8 +1876,10 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
 
     // Count up all the transactions that we'll be putting into the filter, removing any duplicates
     for (const uint256 &txHash : setHighScoreMemPoolHashes)
+    {
         if (setPriorityMemPoolHashes.count(txHash))
             setPriorityMemPoolHashes.erase(txHash);
+    }
 
     unsigned int nSelectedTxHashes =
         setHighScoreMemPoolHashes.size() + vOrphanHashes.size() + setPriorityMemPoolHashes.size();
