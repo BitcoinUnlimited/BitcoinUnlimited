@@ -53,6 +53,14 @@ bool TransactionFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex &
         return false;
     if (amount < minAmount)
         return false;
+    if (type == TransactionRecord::TopPublicLabel)
+    {
+        // Exclude public labels that are not in the Top 20
+        auto plit = std::find_if( publicLabelsGrouped.begin(), publicLabelsGrouped.end(),
+            [&address](const std::pair<std::string, CAmount>& element){ return element.first == address.toStdString();} );
+
+        if (plit == publicLabelsGrouped.end()) return false;
+    }
 
     return true;
 }
@@ -91,6 +99,12 @@ void TransactionFilterProxy::setWatchOnlyFilter(WatchOnlyFilter filter)
 void TransactionFilterProxy::setPublicLabelFilter(bool filter)
 {
     this->publicLabelFilter = filter;
+    invalidateFilter();
+}
+
+void TransactionFilterProxy::setTopPublicLabelsList(std::vector<std::pair<std::string, CAmount>> &_publicLabelsGrouped)
+{
+    this->publicLabelsGrouped = _publicLabelsGrouped;
     invalidateFilter();
 }
 
