@@ -16,6 +16,7 @@
 #include "pow.h"
 #include "requestManager.h"
 #include "timedata.h"
+#include "txadmission.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "util.h"
@@ -1502,7 +1503,17 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
     return true;
 }
 
-CMemPoolInfo GetGrapheneMempoolInfo() { return CMemPoolInfo(mempool.size() + orphanpool.GetOrphanPoolSize()); }
+CMemPoolInfo GetGrapheneMempoolInfo()
+{
+    // We need the number of transactions in the mempool and orphanpools but also the number
+    // in the txCommitQ that have been processed and valid, and which will be in the mempool shortly.
+    uint64_t nCommitQ = 0;
+    {
+        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        nCommitQ = txCommitQ.size();
+    }
+    return CMemPoolInfo(mempool.size() + orphanpool.GetOrphanPoolSize() + nCommitQ);
+}
 void RequestFailoverBlock(CNode *pfrom, uint256 blockHash)
 {
     if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable())
