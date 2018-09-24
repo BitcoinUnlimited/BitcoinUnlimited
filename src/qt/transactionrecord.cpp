@@ -39,13 +39,14 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
     CAmount nDebit = wtx.GetDebit(ISMINE_ALL);
     CAmount nNet = nCredit - nDebit;
     uint256 hash = wtx.GetHash();
+    std::map<std::string, std::string> mapValue = wtx.mapValue;
     AddressList listAllAddresses;
 
     // load all tx addresses for user display/filter
     isminetype fAllToMe = ISMINE_SPENDABLE;
     bool involvesWatchAddress = false;
     CTxDestination address;
-    BOOST_FOREACH(const CTxOut& txout, wtx.vout)
+    for (const CTxOut& txout: wtx.vout)
     {
         // get public label if it exists
         std::string labelPublic = getLabelPublic(txout.scriptPubKey);
@@ -66,7 +67,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
         }
         else if (ExtractDestination(txout.scriptPubKey, address))
             // a standard address
-            listAllAddresses.push_back(std::make_pair(CBitcoinAddress(address).ToString(), txout.scriptPubKey));
+            listAllAddresses.push_back(std::make_pair(EncodeDestination(address), txout.scriptPubKey));
 
         else
             // add the unknown scriptPubKey as n/a - TODO could also skip these if there is no need to display/filter??
@@ -92,7 +93,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             if (mine)
             {
                 TransactionRecord sub(hash, nTime);
-                CTxDestination address;
+                CTxDestination _address;
                 sub.idx = parts.size(); // sequence number
                 sub.credit = txout.nValue;
                 sub.involvesWatchAddress = mine & ISMINE_WATCH_ONLY;
@@ -111,7 +112,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     sub.type = TransactionRecord::Generated;
                 }
 
-                else if (ExtractDestination(txout.scriptPubKey, address) && wallet->IsMine(address))
+                else if (ExtractDestination(txout.scriptPubKey, _address) && wallet->IsMine(_address))
                 {
                     // Received by Bitcoin Address
                     sub.type = TransactionRecord::RecvWithAddress;
@@ -246,7 +247,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
 
             // Check if at least one of the inputs/outputs are mine
             bool atLeastOneMine = false;
-            BOOST_FOREACH(const CTxIn& txin, wtx.vin)
+            for (const CTxIn& txin: wtx.vin)
             {
                 isminetype mine = wallet->IsMine(txin);
                 if(mine)
@@ -256,7 +257,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 }
             }
             if (!atLeastOneMine)
-                BOOST_FOREACH(const CTxOut& txout, wtx.vout)
+                for (const CTxOut& txout: wtx.vout)
                 {
                     isminetype mine = wallet->IsMine(txout);
                     if(mine)

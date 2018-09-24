@@ -73,7 +73,7 @@ public:
                 if(TransactionRecord::showTransaction(it->second))
                 {
                     QList<TransactionRecord> recList = TransactionRecord::decomposeTransaction(wallet, it->second);
-                    BOOST_FOREACH (TransactionRecord &recNew, recList)
+                    for (TransactionRecord &recNew: recList)
                     {
                         // Exclude public labels that already exist
                         bool found = false;

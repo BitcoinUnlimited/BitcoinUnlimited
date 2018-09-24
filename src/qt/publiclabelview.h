@@ -50,7 +50,8 @@ public:
         Range
     };
 
-    enum ColumnWidths {
+    enum ColumnWidths
+    {
         STATUS_COLUMN_WIDTH = 30,
         WATCHONLY_COLUMN_WIDTH = 23,
         DATE_COLUMN_WIDTH = 150,

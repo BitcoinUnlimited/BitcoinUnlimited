@@ -2622,7 +2622,7 @@ std::vector<std::pair<CWalletTx, int>> CWallet::GetPublicLabelTxs(std::string& c
 {
     // Make a list of all public label txs with unspent outputs that match the specified public label
     std::vector<std::pair<CWalletTx, int>> listPublicLabelTxs;
-    BOOST_FOREACH(PAIRTYPE(uint256, CWalletTx) item, mapWalletPublicLabels)
+    for (PAIRTYPE(uint256, CWalletTx) item: mapWalletPublicLabels)
     {
         const uint256& wtxid = item.first;
         CWalletTx& wtx = item.second;
@@ -2752,7 +2752,7 @@ void CWallet::ZapOldPublicLabels()
 {
     // Delete/remove all public label txs with zero unspent outputs
     std::vector<CWalletTx> vWtx;
-    BOOST_FOREACH(PAIRTYPE(uint256, CWalletTx) item, mapWalletPublicLabels)
+    for (PAIRTYPE(uint256, CWalletTx) item: mapWalletPublicLabels)
     {
         const uint256& wtxid = item.first;
         CWalletTx wtx = item.second;

@@ -238,6 +238,11 @@ bool SendCoinsEntry::isClear()
     return ui->payTo->text().isEmpty() && ui->payTo_is->text().isEmpty() && ui->payTo_s->text().isEmpty();
 }
 
+bool SendCoinsEntry::isClearPublicLabel()
+{
+    return ui->lineEditPublic->text().isEmpty();
+}
+
 void SendCoinsEntry::setFocus() { ui->payTo->setFocus(); }
 
 void SendCoinsEntry::updateDisplayUnit()
