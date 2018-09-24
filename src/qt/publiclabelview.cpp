@@ -53,13 +53,6 @@ PublicLabelView::PublicLabelView(const PlatformStyle *platformStyle, QWidget *pa
         hlayout->addSpacing(23);
     }
 
-    watchOnlyWidget = new QComboBox(this);
-    watchOnlyWidget->setFixedWidth(24);
-    watchOnlyWidget->addItem("", TransactionFilterProxy::WatchOnlyFilter_All);
-    watchOnlyWidget->addItem(platformStyle->SingleColorIcon(":/icons/eye_plus"), "", TransactionFilterProxy::WatchOnlyFilter_Yes);
-    watchOnlyWidget->addItem(platformStyle->SingleColorIcon(":/icons/eye_minus"), "", TransactionFilterProxy::WatchOnlyFilter_No);
-    hlayout->addWidget(watchOnlyWidget);
-
     dateWidget = new QComboBox(this);
     if (platformStyle->getUseExtraSpacing()) {
         dateWidget->setFixedWidth(121);
@@ -142,7 +135,6 @@ PublicLabelView::PublicLabelView(const PlatformStyle *platformStyle, QWidget *pa
     connect(mapperThirdPartyTxUrls, SIGNAL(mapped(QString)), this, SLOT(openThirdPartyTxUrl(QString)));
 
     connect(dateWidget, SIGNAL(activated(int)), this, SLOT(chooseDate(int)));
-    connect(watchOnlyWidget, SIGNAL(activated(int)), this, SLOT(chooseWatchonly(int)));
     connect(addressWidget, SIGNAL(textChanged(QString)), this, SLOT(changedPrefix(QString)));
     connect(amountWidget, SIGNAL(textChanged(QString)), this, SLOT(changedAmount(QString)));
 
@@ -170,7 +162,6 @@ void PublicLabelView::setModel(WalletModel *_model)
         transactionProxyModel->setDynamicSortFilter(true);
         transactionProxyModel->setSortCaseSensitivity(Qt::CaseInsensitive);
         transactionProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
-
         transactionProxyModel->setSortRole(Qt::EditRole);
 
         publicLabelView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -181,7 +172,6 @@ void PublicLabelView::setModel(WalletModel *_model)
         publicLabelView->setSortingEnabled(true);
         publicLabelView->sortByColumn(TransactionTableModel::Amount, Qt::DescendingOrder);
         publicLabelView->verticalHeader()->hide();
-        //rename Address column >publicLabelView->renameHeading(TransactionTableModel::Amount, "Public label")
 
         publicLabelView->setColumnWidth(TransactionTableModel::Status, STATUS_COLUMN_WIDTH);
         publicLabelView->setColumnWidth(TransactionTableModel::Watchonly, WATCHONLY_COLUMN_WIDTH);
@@ -211,11 +201,10 @@ void PublicLabelView::setModel(WalletModel *_model)
             }
         }
 
-        // show/hide column Watch-only
-        updateWatchOnlyColumn(_model->haveWatchOnly());
-
-        // Watch-only signal
-        connect(_model, SIGNAL(notifyWatchonlyChanged(bool)), this, SLOT(updateWatchOnlyColumn(bool)));
+        // hide Watch-only, Type, Status columns
+        publicLabelView->setColumnHidden(TransactionTableModel::Watchonly, true);
+        publicLabelView->setColumnHidden(TransactionTableModel::Type, true);
+        publicLabelView->setColumnHidden(TransactionTableModel::Status, true);
     }
 }
 
@@ -267,14 +256,6 @@ void PublicLabelView::chooseDate(int idx)
     }
 }
 
-void PublicLabelView::chooseWatchonly(int idx)
-{
-    if(!transactionProxyModel)
-        return;
-    transactionProxyModel->setWatchOnlyFilter(
-        (TransactionFilterProxy::WatchOnlyFilter)watchOnlyWidget->itemData(idx).toInt());
-}
-
 void PublicLabelView::changedPrefix(const QString &prefix)
 {
     if(!transactionProxyModel)
@@ -311,14 +292,9 @@ void PublicLabelView::exportClicked()
 
     // name, column, role
     writer.setModel(transactionProxyModel);
-    writer.addColumn(tr("Confirmed"), 0, TransactionTableModel::ConfirmedRole);
-    if (model && model->haveWatchOnly())
-        writer.addColumn(tr("Watch-only"), TransactionTableModel::Watchonly);
     writer.addColumn(tr("Date"), 0, TransactionTableModel::DateRole);
-    writer.addColumn(tr("Label"), 0, TransactionTableModel::LabelRole);
-    writer.addColumn(tr("Address"), 0, TransactionTableModel::AddressRole);
+    writer.addColumn(tr("Public Label"), 0, TransactionTableModel::AddressRole);
     writer.addColumn(BitcoinUnits::getAmountColumnTitle(model->getOptionsModel()->getDisplayUnit()), 0, TransactionTableModel::FormattedAmountRole);
-    writer.addColumn(tr("ID"), 0, TransactionTableModel::TxIDRole);
 
     if(!writer.write()) {
         Q_EMIT message(tr("Exporting Failed"), tr("There was an error trying to save the transaction history to %1.").arg(filename),
@@ -480,9 +456,4 @@ bool PublicLabelView::eventFilter(QObject *obj, QEvent *event)
     return QWidget::eventFilter(obj, event);
 }
 
-// show/hide column Watch-only
-void PublicLabelView::updateWatchOnlyColumn(bool fHaveWatchOnly)
-{
-    watchOnlyWidget->setVisible(fHaveWatchOnly);
-    publicLabelView->setColumnHidden(TransactionTableModel::Watchonly, !fHaveWatchOnly);
-}
+

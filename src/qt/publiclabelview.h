@@ -52,8 +52,8 @@ public:
 
     enum ColumnWidths
     {
-        STATUS_COLUMN_WIDTH = 30,
-        WATCHONLY_COLUMN_WIDTH = 23,
+        STATUS_COLUMN_WIDTH = 0,
+        WATCHONLY_COLUMN_WIDTH = 0,
         DATE_COLUMN_WIDTH = 150,
         TYPE_COLUMN_WIDTH = 0,
         AMOUNT_MINIMUM_COLUMN_WIDTH = 150,
@@ -66,7 +66,6 @@ private:
     QTableView *publicLabelView;
 
     QComboBox *dateWidget;
-    QComboBox *watchOnlyWidget;
     QLineEdit *addressWidget;
     QLineEdit *amountWidget;
 
@@ -96,7 +95,6 @@ private Q_SLOTS:
     void copyTxID();
     void copyTxHex();
     void openThirdPartyTxUrl(QString url);
-    void updateWatchOnlyColumn(bool fHaveWatchOnly);
 
 Q_SIGNALS:
     void doubleClicked(const QModelIndex&);
@@ -107,7 +105,6 @@ Q_SIGNALS:
 
 public Q_SLOTS:
     void chooseDate(int idx);
-    void chooseWatchonly(int idx);
     void changedPrefix(const QString &prefix);
     void changedAmount(const QString &amount);
     void exportClicked();

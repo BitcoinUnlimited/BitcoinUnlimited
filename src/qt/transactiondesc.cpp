@@ -58,6 +58,50 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
     CAmount nCredit = wtx.GetCredit(ISMINE_ALL);
     CAmount nDebit = wtx.GetDebit(ISMINE_ALL);
     CAmount nNet = nCredit - nDebit;
+    std::string labelPublic;
+    CTxOut txoutLabelPublic;
+
+    // description for top public lables
+    if (rec->type == TransactionRecord::TopPublicLabel)
+    {
+        for (const CTxOut &txout : wtx.vout)
+        {
+            // Include in description public label if it exists
+            labelPublic = getLabelPublic(txout.scriptPubKey);
+            if (labelPublic != "")
+            {
+                strHTML += "<b>" + tr("Top Public Label:") + "</b> " + labelPublic.c_str() + "<br>";
+                break;
+            }
+        }
+        strHTML += "<b>" + tr("Txs with matching unspent public labels") + ":</b><br>";
+
+        CAmount totalPublicLabelSatoshisUnspent = 0;
+        int countMatching = 0;
+        std::vector<std::pair<CWalletTx, int>> txoutMatchingPLs = wallet->GetTopPublicLabelTxs(labelPublic);
+        for (const std::pair<CWalletTx, int> &txoutPL : txoutMatchingPLs)
+        {
+            CTxOut txout = txoutPL.first.vout[txoutPL.second + 1];
+
+            // track total unspent satoshis with matchiing public label
+            totalPublicLabelSatoshisUnspent += txout.nValue;
+
+            // display address and unspent amount
+            CTxDestination address;
+            if (ExtractDestination(txout.scriptPubKey, address))
+            {
+                strHTML += "<b>" + tr("Unspent") + ":</b>" + BitcoinUnits::formatHtmlWithUnit(unit, txout.nValue, true) + "<br>";
+                strHTML += "<b>" + tr("Address") + ":</b> " + GUIUtil::HtmlEscape(EncodeDestination(address)) + "<br>";
+                countMatching += 1;
+            }
+        }
+        if (countMatching == 0)
+            strHTML += "None <br>";
+        else
+            // display network total including selected public label
+            strHTML += "<b>" + tr("Total unspent for public label") + ":</b>" + BitcoinUnits::formatHtmlWithUnit(unit, totalPublicLabelSatoshisUnspent, true) + "<br>";
+        return strHTML;
+    }
 
     strHTML += "<b>" + tr("Status") + ":</b> " + FormatTxStatus(wtx);
     int nRequests = wtx.GetRequestCount();
@@ -124,9 +168,13 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
     if (wtx.mapValue.count("to") && !wtx.mapValue["to"].empty())
     {
         // Include in description public label if it exists
-        std::string labelPublic = getLabelPublic(wtx.vout[0].scriptPubKey);
-        if (!labelPublic.empty())
+        std::string tmp_labelPublic = getLabelPublic(wtx.vout[0].scriptPubKey);
+        if (!tmp_labelPublic.empty())
+        {
+            txoutLabelPublic = wtx.vout[0];
+            labelPublic = tmp_labelPublic;
             strHTML += "<b>" + tr("Public label:") + "</b> " + labelPublic.c_str() + "<br>";
+        }
 
         // Online transaction
         CTxDestination address = DecodeDestination(rec->addresses.begin()->first);
@@ -171,26 +219,15 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
     {
         // Include in description public label if it exists. If there are multiple outputs then
         // only show the public label associated with this output we are viewing.
-        std::string labelPublic;
         CTxDestination address = DecodeDestination(rec->addresses.begin()->first);
         for (const CTxOut &txout : wtx.vout)
         {
             std::string tmp_labelPublic = getLabelPublic(txout.scriptPubKey);
             if (!tmp_labelPublic.empty())
-                labelPublic = tmp_labelPublic;
-
-            CTxDestination txout_address;
-            if (ExtractDestination(txout.scriptPubKey, txout_address))
             {
-                if (address == txout_address)
-                {
-                    // Include in description public label if it exists
-                    if (!labelPublic.empty())
-                    {
-                        strHTML += "<b>" + tr("Public label:") + "</b> " + labelPublic.c_str() + "<br>";
-                        labelPublic.clear();
-                    }
-                }
+                txoutLabelPublic = txout;
+                labelPublic = tmp_labelPublic;
+                strHTML += "<b>" + tr("Public label:") + "</b> " + labelPublic.c_str() + "<br>";
             }
         }
 
@@ -212,6 +249,15 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
         isminetype fAllToMe = ISMINE_SPENDABLE;
         for (const CTxOut &txout : wtx.vout)
         {
+            // Include in description public label if it exists
+            std::string tmp_labelPublic = getLabelPublic(txout.scriptPubKey);
+            if (tmp_labelPublic != "")
+            {
+                txoutLabelPublic = txout;
+                labelPublic = tmp_labelPublic;
+                strHTML += "<b>" + tr("Public label:") + "</b> " + labelPublic.c_str() + "<br>";
+            }
+
             isminetype mine = wallet->IsMine(txout);
             if (fAllToMe > mine)
                 fAllToMe = mine;
@@ -232,9 +278,13 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
 
                 {
                     // Include in description public label if it exists
-                    std::string labelPublic = getLabelPublic(txout.scriptPubKey);
-                    if (labelPublic != "")
+                    std::string tmp_labelPublic = getLabelPublic(txout.scriptPubKey);
+                    if (tmp_labelPublic != "")
+                    {
+                        txoutLabelPublic = txout;
+                        labelPublic = tmp_labelPublic;
                         strHTML += "<b>" + tr("Public label:") + "</b> " + labelPublic.c_str() + "<br>";
+                    }
 
                     if (!wtx.mapValue.count("to") || wtx.mapValue["to"].empty())
                     {
@@ -303,9 +353,13 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
                 if (wallet->IsMine(txout))
                 {
                     // Include in description public label if it exists
-                    std::string labelPublic = getLabelPublic(txout.scriptPubKey);
-                    if (!labelPublic.empty())
+                    std::string tmp_labelPublic = getLabelPublic(txout.scriptPubKey);
+                    if (!tmp_labelPublic.empty())
+                    {
+                        txoutLabelPublic = txout;
+                        labelPublic = tmp_labelPublic;
                         strHTML += "<b>" + tr("Public label:") + "</b> " + labelPublic.c_str() + "<br>";
+                    }
 
                     strHTML += "<b>" + tr("Credit") + ":</b> " +
                                BitcoinUnits::formatHtmlWithUnit(unit, wallet->GetCredit(txout, ISMINE_ALL)) + "<br>";

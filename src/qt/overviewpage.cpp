@@ -222,6 +222,7 @@ void OverviewPage::setWalletModel(WalletModel *model)
         filter->setDynamicSortFilter(true);
         filter->setSortRole(Qt::EditRole);
         filter->setShowInactive(false);
+        filter->setPublicLabelFilter(false);
         filter->sort(TransactionTableModel::Status, Qt::DescendingOrder);
 
         ui->listTransactions->setModel(filter.get());

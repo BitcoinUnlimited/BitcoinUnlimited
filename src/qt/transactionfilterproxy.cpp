@@ -46,7 +46,7 @@ bool TransactionFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex &
     if (!involvesWatchAddress && watchOnlyFilter == WatchOnlyFilter_Yes)
         return false;
     if (involvesPublicLabelAddress != publicLabelFilter)
-        return false;;
+        return false;
     if(datetime < dateFrom || datetime > dateTo)
         return false;
     if (!address.contains(addrPrefix, Qt::CaseInsensitive) && !label.contains(addrPrefix, Qt::CaseInsensitive))

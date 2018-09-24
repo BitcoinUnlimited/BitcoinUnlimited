@@ -84,6 +84,18 @@ bool CWalletDB::EraseTx(uint256 hash)
     return Erase(std::make_pair(std::string("tx"), hash));
 }
 
+bool CWalletDB::WriteTopPublicLabel(uint256 hash, const CWalletTx &wtx)
+{
+    nWalletDBUpdated++;
+    return Write(std::make_pair(std::string("pl"), hash), wtx);
+}
+
+bool CWalletDB::EraseTopPublicLabel(uint256 hash)
+{
+    nWalletDBUpdated++;
+    return Erase(std::make_pair(std::string("pl"), hash));
+}
+
 bool CWalletDB::WriteKey(const CPubKey &vchPubKey, const CPrivKey &vchPrivKey, const CKeyMetadata &keyMeta)
 {
     nWalletDBUpdated++;
@@ -144,6 +156,7 @@ bool CWalletDB::EraseWatchOnly(const CScript &dest)
     nWalletDBUpdated++;
     return Erase(std::make_pair(std::string("watchs"), *(const CScriptBase *)(&dest)));
 }
+
 
 bool CWalletDB::WriteBestBlock(const CBlockLocator &locator)
 {
@@ -388,7 +401,7 @@ bool ReadKeyValue(CWallet *pwallet,
             ssKey >> strAddress;
             ssValue >> pwallet->mapAddressBook[DecodeDestination(strAddress)].purpose;
         }
-        else if (strType == "tx")
+        else if (strType == "tx" || strType == "pl")
         {
             uint256 hash;
             ssKey >> hash;
@@ -422,7 +435,7 @@ bool ReadKeyValue(CWallet *pwallet,
             if (wtx.nOrderPos == -1)
                 wss.fAnyUnordered = true;
 
-            pwallet->AddToWallet(wtx, true, nullptr);
+            pwallet->AddToWallet(wtx, true, nullptr, strType == "tx" ? false : true);
         }
         else if (strType == "acentry")
         {
@@ -761,7 +774,7 @@ DBErrors CWalletDB::LoadWallet(CWallet *pwallet)
     return result;
 }
 
-DBErrors CWalletDB::FindWalletTx(CWallet *pwallet, vector<uint256> &vTxHash, vector<CWalletTx> &vWtx)
+DBErrors CWalletDB::FindWalletTx(CWallet *pwallet, vector<uint256> &vTxHash, vector<CWalletTx> &vWtx, std::string txType)
 {
     pwallet->vchDefaultKey = CPubKey();
     bool fNoncriticalErrors = false;
@@ -802,7 +815,7 @@ DBErrors CWalletDB::FindWalletTx(CWallet *pwallet, vector<uint256> &vTxHash, vec
 
             string strType;
             ssKey >> strType;
-            if (strType == "tx")
+            if (strType == txType)
             {
                 uint256 hash;
                 ssKey >> hash;
@@ -836,7 +849,7 @@ DBErrors CWalletDB::ZapSelectTx(CWallet *pwallet, vector<uint256> &vTxHashIn, ve
     // build list of wallet TXs and hashes
     vector<uint256> vTxHash;
     vector<CWalletTx> vWtx;
-    DBErrors err = FindWalletTx(pwallet, vTxHash, vWtx);
+    DBErrors err = FindWalletTx(pwallet, vTxHash, vWtx, "tx");
     if (err != DB_LOAD_OK)
     {
         return err;
@@ -877,19 +890,19 @@ DBErrors CWalletDB::ZapSelectTx(CWallet *pwallet, vector<uint256> &vTxHashIn, ve
     return DB_LOAD_OK;
 }
 
-DBErrors CWalletDB::ZapWalletTx(CWallet *pwallet, vector<CWalletTx> &vWtx)
+DBErrors CWalletDB::ZapWalletTx(CWallet *pwallet, vector<CWalletTx> &vWtx, std::string txType)
 {
     // build list of wallet TXs
     vector<uint256> vTxHash;
-    DBErrors err = FindWalletTx(pwallet, vTxHash, vWtx);
+    DBErrors err = FindWalletTx(pwallet, vTxHash, vWtx, txType);
     if (err != DB_LOAD_OK)
         return err;
 
     // erase each wallet TX
     for (uint256 &hash : vTxHash)
     {
-        if (!EraseTx(hash))
-            return DB_CORRUPT;
+        if (txType == "tx") if (!EraseTx(hash)) return DB_CORRUPT;
+        if (txType == "pl") if (!EraseTopPublicLabel(hash)) return DB_CORRUPT;
     }
 
     return DB_LOAD_OK;

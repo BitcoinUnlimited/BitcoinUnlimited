@@ -300,6 +300,7 @@ bool CWallet::RemoveWatchOnly(const CScript &dest)
 }
 
 bool CWallet::LoadWatchOnly(const CScript &dest) { return CCryptoKeyStore::AddWatchOnly(dest); }
+
 bool CWallet::Unlock(const SecureString &strWalletPassphrase)
 {
     CCrypter crypter;
@@ -582,6 +583,7 @@ void CWallet::AddToSpends(const uint256 &wtxid)
 {
     assert(mapWallet.count(wtxid));
     CWalletTx &thisTx = mapWallet[wtxid];
+
     if (thisTx.IsCoinBase()) // Coinbases don't spend anything!
         return;
 
@@ -724,39 +726,63 @@ void CWallet::MarkDirty()
     }
 }
 
-bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletDB *pwalletdb)
+bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletDB *pwalletdb, bool isTopPublicLabel)
 {
     uint256 hash = wtxIn.GetHash();
 
     LOCK2(cs_main, cs_wallet);
 
-    // if toppubliclabels mode and tx has a public label with unspent amounts then add to the public labels map
-    if (GetBoolArg("-toppubliclabels", false))
-     { if (UnspentPublicLabelAmount(wtxIn, "").first > 0) mapWalletPublicLabels[hash] = wtxIn; }
-
     if (fFromLoadWallet)
     {
-        mapWallet[hash] = wtxIn;
-        CWalletTx &wtx = mapWallet[hash];
-        wtx.BindWallet(this);
-        wtxOrdered.insert(make_pair(wtx.nOrderPos, TxPair(&wtx, (CAccountingEntry *)0)));
-        AddToSpends(hash);
-        for (const CTxIn &txin : wtx.vin)
+        if (!isTopPublicLabel)
         {
-            if (mapWallet.count(txin.prevout.hash))
+            mapWallet[hash] = wtxIn;
+            CWalletTx &wtx = mapWallet[hash];
+            wtx.BindWallet(this);
+            wtxOrdered.insert(make_pair(wtx.nOrderPos, TxPair(&wtx, (CAccountingEntry *)0)));
+            AddToSpends(hash);
+            for (const CTxIn &txin : wtx.vin)
             {
-                CWalletTx &prevtx = mapWallet[txin.prevout.hash];
-                if (prevtx.nIndex == -1 && !prevtx.hashUnset())
+                if (mapWallet.count(txin.prevout.hash))
                 {
-                    MarkConflicted(prevtx.hashBlock, wtx.GetHash());
+                    CWalletTx &prevtx = mapWallet[txin.prevout.hash];
+                    if (prevtx.nIndex == -1 && !prevtx.hashUnset())
+                    {
+                        MarkConflicted(prevtx.hashBlock, wtx.GetHash());
+                    }
                 }
+            }
+        }
+        else
+        {
+            // add tx to the top public labels map
+            mapWalletTopPublicLabels[hash] = wtxIn;
+            CWalletTx &wtx = mapWalletTopPublicLabels[hash];
+
+            // if tx is a top public label and -toppubliclabels mode is off
+            // or the unspent amount < mininum then remove the tx
+            CAmount minPublicLabelSatoshis = GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS);
+            CAmount unspentPublicLabelAmount = UnspentPublicLabelAmount(wtxIn, "").first;
+            if (minPublicLabelSatoshis == 0 || unspentPublicLabelAmount < minPublicLabelSatoshis)
+            {
+                LOGA("Top Public Label transaction found but it should be deleted. %s", wtxIn.GetHash().ToString());
+            }
+            else
+            {
+                wtx.BindWallet(this);
+                //wtxOrdered.insert(make_pair(wtx.nOrderPos, TxPair(&wtx, (CAccountingEntry *)0)));
             }
         }
     }
     else
     {
+        pair<map<uint256, CWalletTx>::iterator, bool> ret;
         // Inserts only if not already there, returns tx inserted or tx found
-        pair<map<uint256, CWalletTx>::iterator, bool> ret = mapWallet.insert(make_pair(hash, wtxIn));
+        if (isTopPublicLabel)
+            ret = mapWalletTopPublicLabels.insert(make_pair(hash, wtxIn));
+        else
+            ret = mapWallet.insert(make_pair(hash, wtxIn));
+
         CWalletTx &wtx = (*ret.first).second;
         wtx.BindWallet(this);
         bool fInsertedNew = ret.second;
@@ -809,7 +835,7 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
                     LOGA("AddToWallet(): found %s in block %s not in index\n", wtxIn.GetHash().ToString(),
                         wtxIn.hashBlock.ToString());
             }
-            AddToSpends(hash);
+            if (!isTopPublicLabel) AddToSpends(hash);
         }
 
         bool fUpdated = false;
@@ -854,9 +880,25 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
 
         // Write to disk
         if (fInsertedNew || fUpdated)
-            if (!wtx.WriteToDisk(pwalletdb))
-                return false;
-
+        {
+            if (isTopPublicLabel)
+                if (wtx.WriteTopPublicLabel(pwalletdb))
+                {
+                    //// debug print
+                    LOGA("AddToWallet TopPublicLabel %s  %s%s\n", wtxIn.GetHash().ToString(), (fInsertedNew ? "new" : ""),
+                        (fUpdated ? "update" : ""));
+                    return true;
+                }
+                else return false;
+            else if (wtx.WriteToDisk(pwalletdb))
+            {
+                //// debug print
+                LOGA("AddToWallet %s  %s%s\n", wtxIn.GetHash().ToString(), (fInsertedNew ? "new" : ""),
+                    (fUpdated ? "update" : ""));
+                return true;
+            }
+            else return false;
+        }
         // Break debit/credit balance caches:
         wtx.MarkDirty();
 
@@ -910,10 +952,15 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef &ptx, const CBlock 
 
     // If toppubliclabels mode then include public labels if they are unspent
     bool IsUnspentPublicLabel = false;
-    if (GetBoolArg("-toppubliclabels", false))
-        { if (UnspentPublicLabelAmount(*ptx, "").first > 0) IsUnspentPublicLabel = true; }
+    std::pair<CAmount, int> pltxout;
+    if (GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS) > 0)
+    {
+        CAmount minPublicLabelSatoshis = GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS);
+        pltxout = UnspentPublicLabelAmount(*ptx, "");
+        if (pltxout.first >= minPublicLabelSatoshis)
+            IsUnspentPublicLabel = true;
+    }
 
-    CAmount unspentPublicLabelAmount = UnspentPublicLabelAmount(*ptx, "").first;
     if (fExisted || IsMine(*ptx) || IsFromMe(*ptx) || IsUnspentPublicLabel)
     {
         CWalletTx wtx(this, *ptx);
@@ -1391,6 +1438,8 @@ void CWalletTx::GetAccountAmounts(const string &strAccount,
 
 
 bool CWalletTx::WriteToDisk(CWalletDB *pwalletdb) { return pwalletdb->WriteTx(GetHash(), *this); }
+bool CWalletTx::WriteTopPublicLabel(CWalletDB *pwalletdb) { return pwalletdb->WriteTopPublicLabel(GetHash(), *this); }
+
 /**
  * Scan the block chain (starting in pindexStart) for transactions
  * from or to us. If fUpdate is true, found transactions that already
@@ -1422,18 +1471,24 @@ int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
     {
         LOCK2(cs_main, cs_wallet);
 
-        // public labels with unspent utxos from any date/time may be tracked
-        if (!GetBoolArg("-toppubliclabels", false))
-            // no need to read and scan block, if block was created before
-            // our wallet birthday (as adjusted for block time variability)
-            while (pindex && nTimeFirstKey && (pindex->GetBlockTime() < (nTimeFirstKey - 7200)))
-                pindex = chainActive.Next(pindex);
+        // no need to read and scan block, if block was created before
+        // our wallet birthday (as adjusted for block time variability)
+        // in -toppubliclabels mode public labels with unspent utxos
+        // within 1 year are tracked so don't skip beyond then
+        while (pindex && nTimeFirstKey && (pindex->GetBlockTime() < (nTimeFirstKey - 7200))
+               && !((GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS) > 0)
+                        && (pindex->GetBlockTime() > (chainActive.Tip()->GetBlockTime() - 31557600))))
+            pindex = chainActive.Next(pindex);
+
+        LOGA("Rescanning last %i blocks (from block %i)...\n", chainActive.Height() - pindex->nHeight,
+            pindex->nHeight);
 
         // show rescan progress in GUI as dialog or on splashscreen, if -rescan on startup
         ShowProgress(_("Rescanning..."), 0);
         double dProgressStart = Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), pindex, false);
         double dProgressTip =
             Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), chainActive.Tip(), false);
+
         while (pindex)
         {
             if (pindex->nHeight % 100 == 0 && dProgressTip - dProgressStart > 0.0)
@@ -2590,7 +2645,7 @@ bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey)
 
             // Add tx to wallet, because if it has change it's also ours,
             // otherwise just for transaction history.
-            AddToWallet(wtxNew, false, pwalletdb);
+            AddToWallet(wtxNew, false, pwalletdb, false);
 
             // Notify that old coins are spent
             set<CWalletTx *> setCoins;
@@ -2629,11 +2684,11 @@ bool CWallet::AddAccountingEntry(const CAccountingEntry &acentry, CWalletDB &pwa
     return true;
 }
 
-std::vector<std::pair<CWalletTx, int>> CWallet::GetPublicLabelTxs(std::string& comparePublicLabel) const
+std::vector<std::pair<std::string, CAmount>> CWallet::GroupTopPublicLabels(int listLength)
 {
-    // Make a list of all public label txs with unspent outputs that match the specified public label
-    std::vector<std::pair<CWalletTx, int>> listPublicLabelTxs;
-    for (PAIRTYPE(uint256, CWalletTx) item: mapWalletPublicLabels)
+    // Make a list of all top public labels grouped by unspent outputs
+    std::map<std::string, CAmount> listTopPublicLabels;
+    for (PAIRTYPE(uint256, CWalletTx) item: mapWalletTopPublicLabels)
     {
         const uint256& wtxid = item.first;
         CWalletTx& wtx = item.second;
@@ -2641,19 +2696,71 @@ std::vector<std::pair<CWalletTx, int>> CWallet::GetPublicLabelTxs(std::string& c
 
         for (unsigned int i = 0; i < wtx.vout.size(); i++)
         {
-            CTxOut txout = wtx.vout[i];
-            std::string txPublicLabel = getLabelPublic(txout.scriptPubKey);
+            CTxOut txoutPL = wtx.vout[i];
+            std::string txPublicLabel = getLabelPublic(txoutPL.scriptPubKey);
+
+            if (txPublicLabel != "")
+            {
+                CTxOut txoutPLvalue = wtx.vout[i + 1];
+
+                std::map<std::string, CAmount>::iterator mi =  listTopPublicLabels.find(txPublicLabel);
+                if (mi != listTopPublicLabels.end())
+                    listTopPublicLabels[txPublicLabel] += txoutPLvalue.nValue;
+                else
+                    listTopPublicLabels.insert(make_pair(txPublicLabel, txoutPLvalue.nValue));
+            }
+        }
+    }
+
+    // copy to a vector for sorting by amount
+    std::vector<std::pair<std::string, CAmount>> sortedTopPublicLabels;
+    for (std::pair<std::string, CAmount> tplPair : listTopPublicLabels)
+        { sortedTopPublicLabels.push_back(make_pair(tplPair.first, tplPair.second)); }
+
+    // sort by satoshis descending
+    std::sort(sortedTopPublicLabels.begin(), sortedTopPublicLabels.end(),
+                [](std::pair<std::string, CAmount> &left, std::pair<std::string, CAmount> &right)
+                { return left.second > right.second; });
+
+    // only return the top items by listLength
+    for (std::vector<std::pair<std::string, CAmount>>::iterator si = sortedTopPublicLabels.begin(); si != sortedTopPublicLabels.end();)
+        { if (std::distance(sortedTopPublicLabels.begin(), si) > listLength) sortedTopPublicLabels.erase(si); else ++si; }
+
+    return sortedTopPublicLabels;
+}
+
+std::vector<std::pair<CWalletTx, int>> CWallet::GetTopPublicLabelTxs(const std::string comparePublicLabel)
+{
+    // Make a list of all public label txs with unspent outputs that match the specified public label
+    std::vector<std::pair<CWalletTx, int>> listPublicLabelTxs;
+    for (PAIRTYPE(uint256, CWalletTx) item: mapWalletTopPublicLabels)
+    {
+        const uint256& wtxid = item.first;
+        CWalletTx& wtx = item.second;
+        assert(wtx.GetHash() == wtxid);
+
+        for (unsigned int i = 0; i < wtx.vout.size(); i++)
+        {
+            CTxOut txoutPL = wtx.vout[i];
+            std::string txPublicLabel = getLabelPublic(txoutPL.scriptPubKey);
 
             if (txPublicLabel == comparePublicLabel)
             {
-                std::pair<CAmount, int> utxoPublicLabel = UnspentPublicLabelAmount(wtx, txPublicLabel);
-                txout.nValue = utxoPublicLabel.first;
-                // Add to list if the public label's buddy is unspent
-                if (txout.nValue > 0) listPublicLabelTxs.push_back(make_pair(wtx, utxoPublicLabel.second));
+                if (i + 1 < wtx.vout.size())
+                {
+                    CTxOut txoutPLvalue = wtx.vout[i + 1];
+                    // Add to list if the public label's buddy is unspent
+                    if (txoutPLvalue.nValue > 0) listPublicLabelTxs.push_back(make_pair(wtx, i));
+                }
             }
-
         }
     }
+
+    // sort by satoshis descending
+    std::sort(listPublicLabelTxs.begin(), listPublicLabelTxs.end(), 
+                [](std::pair<CWalletTx, int> &left, std::pair<CWalletTx, int> &right)
+                { return left.first.vout[left.second + 1].nValue > right.first.vout[right.second + 1].nValue; });
+
     return listPublicLabelTxs;
 }
 
@@ -2736,11 +2843,11 @@ DBErrors CWallet::ZapSelectTx(vector<uint256> &vHashIn, vector<uint256> &vHashOu
     return DB_LOAD_OK;
 }
 
-DBErrors CWallet::ZapWalletTx(std::vector<CWalletTx> &vWtx)
+DBErrors CWallet::ZapWalletTx(std::vector<CWalletTx> &vWtx, std::string txType)
 {
     if (!fFileBacked)
         return DB_LOAD_OK;
-    DBErrors nZapWalletTxRet = CWalletDB(strWalletFile, "cr+").ZapWalletTx(this, vWtx);
+    DBErrors nZapWalletTxRet = CWalletDB(strWalletFile, "cr+").ZapWalletTx(this, vWtx, txType);
     if (nZapWalletTxRet == DB_NEED_REWRITE)
     {
         if (CDB::Rewrite(strWalletFile, "\x04pool"))
@@ -2759,32 +2866,22 @@ DBErrors CWallet::ZapWalletTx(std::vector<CWalletTx> &vWtx)
     return DB_LOAD_OK;
 }
 
-void CWallet::ZapOldPublicLabels()
+void CWallet::ZapSpentTopPublicLabels()
 {
-    // Delete/remove all public label txs with zero unspent outputs
+    // Delete/remove all public label txs with spent outputs
     std::vector<CWalletTx> vWtx;
-    for (PAIRTYPE(uint256, CWalletTx) item: mapWalletPublicLabels)
+    CAmount minPublicLabelSatoshis = GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS);
+    for (PAIRTYPE(uint256, CWalletTx) item: mapWalletTopPublicLabels)
     {
         const uint256& wtxid = item.first;
         CWalletTx wtx = item.second;
         assert(wtx.GetHash() == wtxid);
-        CAmount totalUnspent = 0;
 
-        // scan outputs for public labels
-        for (unsigned int i = 0; i < wtx.vout.size(); i++)
-        {
-            CTxOut txout = wtx.vout[i];
-            std::string txPublicLabel = getLabelPublic(txout.scriptPubKey);
+        std::pair<CAmount, int> utxoPublicLabel = UnspentPublicLabelAmount(wtx, "");
+        if (utxoPublicLabel.first < minPublicLabelSatoshis) vWtx.push_back(wtx);
 
-            if (txPublicLabel != "")
-                    totalUnspent += UnspentPublicLabelAmount(wtx, txPublicLabel).first;
-
-        }
-
-        if (totalUnspent == 0) vWtx.push_back(wtx);
-    }
-
-    if (!vWtx.empty()) ZapWalletTx(vWtx);
+    } // for mapWalletTopPublicLabels
+    if (!vWtx.empty()) ZapWalletTx(vWtx, "pl");
 }
 
 
@@ -3411,7 +3508,22 @@ bool CWallet::InitLoadWallet()
         uiInterface.InitMessage(_("Zapping all transactions from wallet..."));
 
         CWallet *tempWallet = new CWallet(walletFile);
-        DBErrors nZapWalletRet = tempWallet->ZapWalletTx(vWtx);
+        DBErrors nZapWalletRet = tempWallet->ZapWalletTx(vWtx, "tx");
+        if (nZapWalletRet != DB_LOAD_OK)
+        {
+            return InitError(strprintf(_("Error loading %s: Wallet corrupted"), walletFile));
+        }
+
+        delete tempWallet;
+        tempWallet = nullptr;
+    }
+
+    if (GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS) == 0)
+    {
+        uiInterface.InitMessage(_("Zapping all top public label transactions from wallet..."));
+
+        CWallet *tempWallet = new CWallet(walletFile);
+        DBErrors nZapWalletRet = tempWallet->ZapWalletTx(vWtx, "pl");
         if (nZapWalletRet != DB_LOAD_OK)
         {
             return InitError(strprintf(_("Error loading %s: Wallet corrupted"), walletFile));
@@ -3503,6 +3615,14 @@ bool CWallet::InitLoadWallet()
                 strprintf(_("Error loading %s: You can't enable HD on a already existing non-HD wallet"), walletFile));
     }
 
+    // If -toppubliclabels mode and public labels map is empty then rescan to find public label transactions
+    if (GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS) > 0
+            && walletInstance->mapWalletTopPublicLabels.begin() == walletInstance->mapWalletTopPublicLabels.end())
+    {
+        if (SoftSetBoolArg("-rescan", true))
+            LOGA("%s: Top public labels mode (-toppubliclabels>0) but public labels map is empty so setting -rescan=1\n", __func__);
+    }
+
     LOGA(" wallet      %15dms\n", GetTimeMillis() - nStart);
 
     RegisterValidationInterface(walletInstance);
@@ -3519,6 +3639,34 @@ bool CWallet::InitLoadWallet()
         else
             pindexRescan = chainActive.Genesis();
     }
+
+    // Only maintain the top 20 public labels
+    if (GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS) > 0)
+    {
+        auto mwTPL = walletInstance->mapWalletTopPublicLabels;
+        std::vector<std::pair<std::string, CAmount>> publicLabelsGrouped = walletInstance->GroupTopPublicLabels(20);
+        for (auto it = mwTPL.begin(); it != mwTPL.end();++it)
+        {
+            CWalletTx wtxPL = it->second;
+            for (CTxOut txoutPL : wtxPL.vout)
+            {
+                std::string txPublicLabel = getLabelPublic(txoutPL.scriptPubKey);
+
+                if (txPublicLabel != "")
+                {
+                    auto plit = std::find_if( publicLabelsGrouped.begin(), publicLabelsGrouped.end(),
+                        [&txPublicLabel](const std::pair<std::string, CAmount>& element){ return element.first == txPublicLabel;} );
+
+                    if (plit == publicLabelsGrouped.end())
+                    {
+                        walletInstance->mapWalletTopPublicLabels.erase(it->first);
+                    }
+                }
+            }
+        }
+    }
+
+
     if (chainActive.Tip() && chainActive.Tip() != pindexRescan)
     {
         // We can't rescan beyond non-pruned blocks, stop and throw an error
@@ -3537,16 +3685,11 @@ bool CWallet::InitLoadWallet()
         }
 
         uiInterface.InitMessage(_("Rescanning..."));
-        LOGA("Rescanning last %i blocks (from block %i)...\n", chainActive.Height() - pindexRescan->nHeight,
-            pindexRescan->nHeight);
         nStart = GetTimeMillis();
         walletInstance->ScanForWalletTransactions(pindexRescan, true);
         LOGA(" rescan      %15dms\n", GetTimeMillis() - nStart);
         walletInstance->SetBestChain(chainActive.GetLocator());
         nWalletDBUpdated++;
-
-        // Clear spent public labels
-        walletInstance->ZapOldPublicLabels();
 
         // Restore wallet transaction metadata after -zapwallettxes=1
         if (GetBoolArg("-zapwallettxes", false) && GetArg("-zapwallettxes", "1") != "2")

@@ -280,8 +280,8 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
                         "(default: 0 = disable pruning blocks, >%u = target size in MiB to use for block files)"),
                     MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024))
         .addArg("reindex", optionalBool, _("Rebuild block chain index from current blk000??.dat files on startup"))
-        .addArg("toppubliclabels", optionalBool, strprintf(_("Track unspent public labels and show the Top Public "
-                        "Labels tab (default: %u). This mode requires -txindex."), DEFAULT_TOPPUBLICLABELS))
+        .addArg("toppubliclabels=<n>", requiredInt, strprintf(_("Track unspent public labels and show the Top Public "
+                        "Labels tab. Specify which public lables to track by minimum <n>umber of satoshis (default: %u). This mode requires -txindex."), DEFAULT_TOPPUBLICLABELS))
         .addArg("txindex", optionalBool,
             strprintf(_("Maintain a full transaction index, used by the getrawtransaction rpc call and -toppubliclabels (default: %u)"),
                     DEFAULT_TXINDEX));
