@@ -30,7 +30,7 @@ bool TransactionFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex &
     int type = index.data(TransactionTableModel::TypeRole).toInt();
     QDateTime datetime = index.data(TransactionTableModel::DateRole).toDateTime();
     bool involvesWatchAddress = index.data(TransactionTableModel::WatchonlyRole).toBool();
-    bool involvesPublicLabelAddress = index.data(TransactionTableModel::PublicLabelRole).toBool();
+    bool involvesPublicLabelAddress = type == TransactionRecord::TopPublicLabel;
 
     QString address = index.data(TransactionTableModel::AddressRole).toString();
     QString label = index.data(TransactionTableModel::LabelRole).toString();
@@ -45,7 +45,9 @@ bool TransactionFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex &
         return false;
     if (!involvesWatchAddress && watchOnlyFilter == WatchOnlyFilter_Yes)
         return false;
-    if (involvesPublicLabelAddress != publicLabelFilter)
+    if (!publicLabelFilter && involvesPublicLabelAddress)
+        return false;
+    if (publicLabelFilter && !involvesPublicLabelAddress)
         return false;
     if(datetime < dateFrom || datetime > dateTo)
         return false;
@@ -53,7 +55,7 @@ bool TransactionFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex &
         return false;
     if (amount < minAmount)
         return false;
-    if (type == TransactionRecord::TopPublicLabel)
+    if (publicLabelFilter && type == TransactionRecord::TopPublicLabel)
     {
         // Exclude public labels that are not in the Top 20
         auto plit = std::find_if( publicLabelsGrouped.begin(), publicLabelsGrouped.end(),

@@ -471,21 +471,14 @@ void SendCoinsDialog::setAddress(const QString &address)
         entry = addEntry();
     }
 
-    if (address != "") entry->setAddress(address);
+    entry->setAddress(address);
 }
 
 void SendCoinsDialog::setPublicLabel(const QString labelPublic)
 {
-    // Replace the first empty public label
-    for (int i = 0; ui->entries->count(); i++)
-    {
-        SendCoinsEntry *entry = qobject_cast<SendCoinsEntry*>(ui->entries->itemAt(i)->widget());
-        if (entry->isClearPublicLabel())
-        {
-            entry->setPublicLabel(labelPublic);
-            break;
-        }
-    }
+    // Replace the first public label
+    SendCoinsEntry *entry = qobject_cast<SendCoinsEntry*>(ui->entries->itemAt(0)->widget());
+    entry->setPublicLabel(labelPublic);
 }
 
 void SendCoinsDialog::pasteEntry(const SendCoinsRecipient &rv)

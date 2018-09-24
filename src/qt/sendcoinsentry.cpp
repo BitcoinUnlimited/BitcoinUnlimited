@@ -230,7 +230,7 @@ void SendCoinsEntry::setAddress(const QString &address)
 void SendCoinsEntry::setPublicLabel(const QString labelPublic)
 {
     ui->lineEditPublic->setText(labelPublic);
-    ui->payAmount->setFocus();
+    ui->payTo->setFocus();
 }
 
 bool SendCoinsEntry::isClear()

@@ -39,19 +39,16 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
     CAmount nNet = nCredit - nDebit;
     uint256 hash = wtx.GetHash();
     std::map<std::string, std::string> mapValue = wtx.mapValue;
-    AddressList listAllAddresses;
 
     // load all tx addresses for user display/filter
     // some outputs may be in the wallet because
     // they have public labels not because they are mine
-    isminetype fAllToMe = ISMINE_SPENDABLE;
-    bool involvesWatchAddress = false;
-    CTxDestination address;
+    AddressList listAllAddresses;
     for (const CTxOut& txout: wtx.vout)
     {
-        // get public label if it exists
+        CTxDestination address;
         std::string labelPublic = getLabelPublic(txout.scriptPubKey);
-        if (labelPublic != "")
+        if (isTopPublicLabel)
         {
             // use public label instead of address
             listAllAddresses.push_back(std::make_pair("<" + labelPublic + ">", txout.scriptPubKey));
@@ -62,24 +59,17 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             sub.credit = txout.nValue;
             sub.type = TransactionRecord::TopPublicLabel;
             sub.addresses.push_back(std::make_pair(labelPublic, txout.scriptPubKey));
-
             parts.append(sub);
-
         }
+        else if (labelPublic != "")
+            listAllAddresses.push_back(std::make_pair("<" + labelPublic + ">", txout.scriptPubKey));
         else if (ExtractDestination(txout.scriptPubKey, address))
             // a standard address
             listAllAddresses.push_back(std::make_pair(EncodeDestination(address), txout.scriptPubKey));
-
         else
             // add the unknown scriptPubKey as n/a - TODO could also skip these if there is no need to display/filter??
             listAllAddresses.push_back(std::make_pair("n/a", txout.scriptPubKey));
 
-        if (txout.nValue > 0)  // only checkout outputs which received bitcoin
-        {
-            isminetype mine = wallet->IsMine(txout);
-            if(mine & ISMINE_WATCH_ONLY) involvesWatchAddress = true;
-            if(fAllToMe > mine) fAllToMe = mine;
-        }
     } // end load all tx addresses for user display/filter
 
     if (isTopPublicLabel) return parts;
@@ -89,9 +79,9 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
         //
         // Credit
         //
-        std::string labelPublic = "";
         for (const CTxOut &txout : wtx.vout)
         {
+            std::string labelPublic = "";
             isminetype mine = wallet->IsMine(txout);
             if (mine)
             {
@@ -136,8 +126,6 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
 
                 parts.append(sub);
             }
-
-            labelPublic = "";
         }
     }
     else
