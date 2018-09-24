@@ -126,11 +126,11 @@ void WalletFrame::gotoReceiveCoinsPage()
         i.value()->gotoReceiveCoinsPage();
 }
 
-void WalletFrame::gotoSendCoinsPage(QString addr, QString labelPublic)
+void WalletFrame::gotoSendCoinsPage(QString labelPublic)
 {
     QMap<QString, WalletView *>::const_iterator i;
     for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
-        i.value()->gotoSendCoinsPage(addr, labelPublic);
+        i.value()->gotoSendCoinsPage(labelPublic);
 }
 
 void WalletFrame::gotoSignMessageTab(QString addr)

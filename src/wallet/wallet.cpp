@@ -3640,33 +3640,6 @@ bool CWallet::InitLoadWallet()
             pindexRescan = chainActive.Genesis();
     }
 
-    // Only maintain the top 20 public labels
-    if (GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS) > 0)
-    {
-        auto mwTPL = walletInstance->mapWalletTopPublicLabels;
-        std::vector<std::pair<std::string, CAmount>> publicLabelsGrouped = walletInstance->GroupTopPublicLabels(20);
-        for (auto it = mwTPL.begin(); it != mwTPL.end();++it)
-        {
-            CWalletTx wtxPL = it->second;
-            for (CTxOut txoutPL : wtxPL.vout)
-            {
-                std::string txPublicLabel = getLabelPublic(txoutPL.scriptPubKey);
-
-                if (txPublicLabel != "")
-                {
-                    auto plit = std::find_if( publicLabelsGrouped.begin(), publicLabelsGrouped.end(),
-                        [&txPublicLabel](const std::pair<std::string, CAmount>& element){ return element.first == txPublicLabel;} );
-
-                    if (plit == publicLabelsGrouped.end())
-                    {
-                        walletInstance->mapWalletTopPublicLabels.erase(it->first);
-                    }
-                }
-            }
-        }
-    }
-
-
     if (chainActive.Tip() && chainActive.Tip() != pindexRescan)
     {
         // We can't rescan beyond non-pruned blocks, stop and throw an error

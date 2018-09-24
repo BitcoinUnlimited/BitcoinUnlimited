@@ -78,8 +78,7 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, const Config *cfg, Q
     addWidget(sendCoinsPage);
 
     // Clicking on a transaction on the overview pre-selects the transaction on the transaction history page
-    connect(
-        overviewPage, SIGNAL(transactionClicked(QModelIndex)), transactionView, SLOT(focusTransaction(QModelIndex)));
+    connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), transactionView, SLOT(focusTransaction(QModelIndex)));
 
     // Double-clicking on a transaction on the transaction history or public label list page shows details
     connect(transactionView, SIGNAL(doubleClicked(QModelIndex)), transactionView, SLOT(showDetails()));
@@ -107,11 +106,10 @@ void WalletView::setBitcoinGUI(BitcoinGUI *gui)
         connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), gui, SLOT(gotoHistoryPage()));
 
         // Menu action Send public label on the public labe page sends you to the send tx page with the public label pre-filled
-        connect(publicLabelView, SIGNAL(menuActionSendPublicLabel(QString, QString)), gui, SLOT(gotoSendCoinsPage(QString, QString)));
+        connect(publicLabelView, SIGNAL(menuActionSendPublicLabel(QString)), gui, SLOT(gotoSendCoinsPage(QString)));
 
         // Receive and report messages
-        connect(
-            this, SIGNAL(message(QString, QString, unsigned int)), gui, SLOT(message(QString, QString, unsigned int)));
+        connect(this, SIGNAL(message(QString, QString, unsigned int)), gui, SLOT(message(QString, QString, unsigned int)));
 
         // Pass through encryption status changed signals
         connect(this, SIGNAL(encryptionStatusChanged(int)), gui, SLOT(setEncryptionStatus(int)));
@@ -205,24 +203,11 @@ void WalletView::gotoPublicLabelPage()
     setCurrentWidget(publicLabelPage);
 }
 void WalletView::gotoReceiveCoinsPage() { setCurrentWidget(receiveCoinsPage); }
-void WalletView::gotoSendCoinsPage(QString addr, QString labelPublic)
+void WalletView::gotoSendCoinsPage(QString labelPublic)
 {
     setCurrentWidget(sendCoinsPage);
 
-    // Add self address for public labels
-    if (addr.isEmpty() and !labelPublic.isEmpty())
-    {
-        CPubKey pubkey;
-        pubkey = walletModel->getNewPubKey();
-
-        if (pubkey.IsValid()) addr = QString::fromStdString(EncodeDestination(pubkey.GetID()));
-    }
-
-    if (!addr.isEmpty()) sendCoinsPage->setAddress(addr);
-
-    if (!labelPublic.isEmpty())
-        sendCoinsPage->setPublicLabel(labelPublic);
-
+    if (!labelPublic.isEmpty()) sendCoinsPage->setPublicLabel(labelPublic);
 }
 
 void WalletView::gotoSignMessageTab(QString addr)

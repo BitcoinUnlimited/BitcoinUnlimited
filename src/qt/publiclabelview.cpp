@@ -361,7 +361,7 @@ void PublicLabelView::fillSendCoinsPage()
     {
         // fill the Send form: Receive address from next self address, Public Label from pl list
         QString labelPublic = selection.at(0).data(TransactionTableModel::AddressRole).toString();
-        Q_EMIT menuActionSendPublicLabel("", labelPublic);
+        Q_EMIT menuActionSendPublicLabel(labelPublic);
     }
 }
 
