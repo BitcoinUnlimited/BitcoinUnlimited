@@ -30,6 +30,8 @@ bool TransactionFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex &
     int type = index.data(TransactionTableModel::TypeRole).toInt();
     QDateTime datetime = index.data(TransactionTableModel::DateRole).toDateTime();
     bool involvesWatchAddress = index.data(TransactionTableModel::WatchonlyRole).toBool();
+    bool involvesPublicLabelAddress = type == TransactionRecord::TopPublicLabel;
+
     QString address = index.data(TransactionTableModel::AddressRole).toString();
     QString label = index.data(TransactionTableModel::LabelRole).toString();
     qint64 amount = llabs(index.data(TransactionTableModel::AmountRole).toLongLong());
@@ -43,12 +45,24 @@ bool TransactionFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex &
         return false;
     if (!involvesWatchAddress && watchOnlyFilter == WatchOnlyFilter_Yes)
         return false;
-    if (datetime < dateFrom || datetime > dateTo)
+    if (!publicLabelFilter && involvesPublicLabelAddress)
+        return false;
+    if (publicLabelFilter && !involvesPublicLabelAddress)
+        return false;
+    if(datetime < dateFrom || datetime > dateTo)
         return false;
     if (!address.contains(addrPrefix, Qt::CaseInsensitive) && !label.contains(addrPrefix, Qt::CaseInsensitive))
         return false;
     if (amount < minAmount)
         return false;
+    if (publicLabelFilter && type == TransactionRecord::TopPublicLabel)
+    {
+        // Exclude public labels that are not in the Top 20
+        auto plit = std::find_if( publicLabelsGrouped.begin(), publicLabelsGrouped.end(),
+            [&address](const std::pair<std::string, CAmount>& element){ return element.first == address.toStdString();} );
+
+        if (plit == publicLabelsGrouped.end()) return false;
+    }
 
     return true;
 }
@@ -84,6 +98,18 @@ void TransactionFilterProxy::setWatchOnlyFilter(WatchOnlyFilter filter)
     invalidateFilter();
 }
 
+void TransactionFilterProxy::setPublicLabelFilter(bool filter)
+{
+    this->publicLabelFilter = filter;
+    invalidateFilter();
+}
+
+void TransactionFilterProxy::setTopPublicLabelsList(std::vector<std::pair<std::string, CAmount>> &_publicLabelsGrouped)
+{
+    this->publicLabelsGrouped = _publicLabelsGrouped;
+    invalidateFilter();
+}
+
 void TransactionFilterProxy::setLimit(int limit) { this->limitRows = limit; }
 void TransactionFilterProxy::setShowInactive(bool _showInactive)
 {
@@ -102,3 +128,4 @@ int TransactionFilterProxy::rowCount(const QModelIndex &parent) const
         return QSortFilterProxyModel::rowCount(parent);
     }
 }
+

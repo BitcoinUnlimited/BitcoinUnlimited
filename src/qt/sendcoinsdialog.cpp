@@ -322,8 +322,8 @@ void SendCoinsDialog::on_sendButton_clicked()
                 recipientElement.append(tr("<br><br><b>WARNING!!! DESTINATION IS A FREEZE ADDRESS<br>UNSPENDABLE "
                                            "UNTIL</b> %1 <br>*************************************************<br>")
                                             .arg(GUIUtil::HtmlEscape(rcp.freezeLockTime)));
-            }
 
+            }
         } // else if (!rcp.labelPublic.isEmpty())
 
 
@@ -472,6 +472,13 @@ void SendCoinsDialog::setAddress(const QString &address)
     }
 
     entry->setAddress(address);
+}
+
+void SendCoinsDialog::setPublicLabel(const QString labelPublic)
+{
+    // Replace the first public label
+    SendCoinsEntry *entry = qobject_cast<SendCoinsEntry*>(ui->entries->itemAt(0)->widget());
+    entry->setPublicLabel(labelPublic);
 }
 
 void SendCoinsDialog::pasteEntry(const SendCoinsRecipient &rv)

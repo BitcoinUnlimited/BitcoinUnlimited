@@ -30,7 +30,7 @@ bool TransactionRecord::showTransaction(const CWalletTx &wtx)
 /*
  * Decompose CWallet transaction to model transaction records.
  */
-QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *wallet, const CWalletTx &wtx)
+QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *wallet, const CWalletTx &wtx, bool isTopPublicLabel)
 {
     QList<TransactionRecord> parts;
     int64_t nTime = wtx.GetTxTime();
@@ -40,14 +40,48 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
     uint256 hash = wtx.GetHash();
     std::map<std::string, std::string> mapValue = wtx.mapValue;
 
+    // load all tx addresses for user display/filter
+    // some outputs may be in the wallet because
+    // they have public labels not because they are mine
+    AddressList listAllAddresses;
+    for (const CTxOut& txout: wtx.vout)
+    {
+        CTxDestination address;
+        std::string labelPublic = getLabelPublic(txout.scriptPubKey);
+        if (isTopPublicLabel)
+        {
+            // use public label instead of address
+            listAllAddresses.push_back(std::make_pair("<" + labelPublic + ">", txout.scriptPubKey));
+
+            // append public label
+            TransactionRecord sub(hash, nTime);
+            sub.idx = parts.size(); // sequence number
+            sub.credit = txout.nValue;
+            sub.type = TransactionRecord::TopPublicLabel;
+            sub.addresses.push_back(std::make_pair(labelPublic, txout.scriptPubKey));
+            parts.append(sub);
+        }
+        else if (labelPublic != "")
+            listAllAddresses.push_back(std::make_pair("<" + labelPublic + ">", txout.scriptPubKey));
+        else if (ExtractDestination(txout.scriptPubKey, address))
+            // a standard address
+            listAllAddresses.push_back(std::make_pair(EncodeDestination(address), txout.scriptPubKey));
+        else
+            // add the unknown scriptPubKey as n/a - TODO could also skip these if there is no need to display/filter??
+            listAllAddresses.push_back(std::make_pair("n/a", txout.scriptPubKey));
+
+    } // end load all tx addresses for user display/filter
+
+    if (isTopPublicLabel) return parts;
+
     if (nNet > 0 || wtx.IsCoinBase())
     {
         //
         // Credit
         //
-        std::string labelPublic = "";
         for (const CTxOut &txout : wtx.vout)
         {
+            std::string labelPublic = "";
             isminetype mine = wallet->IsMine(txout);
             if (mine)
             {
@@ -88,10 +122,10 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     sub.addresses.push_back(std::make_pair(mapValue["from"], txout.scriptPubKey));
                 }
 
+                sub.addresses = listAllAddresses;
+
                 parts.append(sub);
             }
-
-            labelPublic = "";
         }
     }
     else
@@ -113,9 +147,6 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             if (fAllToMe > mine)
                 fAllToMe = mine;
         }
-
-        // load all tx addresses for user display/filter
-        AddressList listAllAddresses;
 
         isminetype fAllFromMe = ISMINE_SPENDABLE;
         for (const CTxIn &txin : wtx.vin)
@@ -176,6 +207,8 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     sub.addresses.push_back(std::make_pair(mapValue["to"], txout.scriptPubKey));
                 }
 
+                sub.addresses = listAllAddresses;
+
                 CAmount nValue = txout.nValue;
                 /* Add fee to first output */
                 if (nTxFee > 0)
@@ -186,15 +219,42 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 sub.debit = -nValue;
 
                 parts.append(sub);
-            }
-        }
+            } // for
+        } // else if (fAllFromMe)
         else
         {
-            //
-            // Mixed debit transaction, can't break down payees
-            //
-            parts.append(TransactionRecord(hash, nTime, TransactionRecord::Other, listAllAddresses, nNet, 0));
-            parts.last().involvesWatchAddress = involvesWatchAddress;
+
+            // Check if at least one of the inputs/outputs are mine
+            // They could be public label txs that are not mine
+            bool atLeastOneMine = false;
+            for (const CTxIn& txin: wtx.vin)
+            {
+                isminetype mine = wallet->IsMine(txin);
+                if(mine)
+                {
+                    atLeastOneMine = true;
+                    break;
+                }
+            }
+            if (!atLeastOneMine)
+                for (const CTxOut& txout: wtx.vout)
+                {
+                    isminetype mine = wallet->IsMine(txout);
+                    if(mine)
+                    {
+                        atLeastOneMine = true;
+                        break;
+                    }
+                }
+
+            if (atLeastOneMine)
+            {
+                //
+                // Mixed debit transaction, can't break down payees
+                //
+                parts.append(TransactionRecord(hash, nTime, TransactionRecord::Other, listAllAddresses, nNet, 0));
+                parts.last().involvesWatchAddress = involvesWatchAddress;
+            }
         }
     }
 
