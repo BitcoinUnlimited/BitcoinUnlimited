@@ -27,7 +27,6 @@ bool TransactionRecord::showTransaction(const CWalletTx &wtx)
     return true;
 }
 
-
 /*
  * Decompose CWallet transaction to model transaction records.
  */
@@ -43,6 +42,8 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
     AddressList listAllAddresses;
 
     // load all tx addresses for user display/filter
+    // some outputs may be in the wallet because
+    // they have public labels not because they are mine
     isminetype fAllToMe = ISMINE_SPENDABLE;
     bool involvesWatchAddress = false;
     CTxDestination address;
@@ -79,7 +80,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             if(mine & ISMINE_WATCH_ONLY) involvesWatchAddress = true;
             if(fAllToMe > mine) fAllToMe = mine;
         }
-    }
+    } // end load all tx addresses for user display/filter
 
     if (nNet > 0 || wtx.IsCoinBase())
     {
@@ -93,7 +94,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             if (mine)
             {
                 TransactionRecord sub(hash, nTime);
-                CTxDestination _address;
+                CTxDestination address;
                 sub.idx = parts.size(); // sequence number
                 sub.credit = txout.nValue;
                 sub.involvesWatchAddress = mine & ISMINE_WATCH_ONLY;
@@ -111,8 +112,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     // Generated
                     sub.type = TransactionRecord::Generated;
                 }
-
-                else if (ExtractDestination(txout.scriptPubKey, _address) && wallet->IsMine(_address))
+                else if (ExtractDestination(txout.scriptPubKey, address) && wallet->IsMine(address))
                 {
                     // Received by Bitcoin Address
                     sub.type = TransactionRecord::RecvWithAddress;
@@ -121,7 +121,6 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     else
                         sub.addresses.push_back(
                             std::make_pair("<" + labelPublic + "> " + EncodeDestination(address), txout.scriptPubKey));
-
                 }
                 else
                 {
@@ -129,7 +128,6 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     // transaction
                     sub.type = TransactionRecord::RecvFromOther;
                     sub.addresses.push_back(std::make_pair(mapValue["from"], txout.scriptPubKey));
-
                 }
 
                 sub.addresses = listAllAddresses;
@@ -160,9 +158,6 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 fAllToMe = mine;
         }
 
-        // load all tx addresses for user display/filter
-        AddressList listAllAddresses;
-
         isminetype fAllFromMe = ISMINE_SPENDABLE;
         for (const CTxIn &txin : wtx.vin)
         {
@@ -173,7 +168,6 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 fAllFromMe = mine;
         }
 
-
         if (fAllFromMe && fAllToMe)
         {
             // Payment to self
@@ -183,7 +177,6 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
 
             // maybe pass to TransactionRecord as constructor argument
             parts.last().involvesWatchAddress = involvesWatchAddress;
-
         }
         else if (fAllFromMe)
         {
@@ -197,7 +190,6 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 const CTxOut &txout = wtx.vout[nOut];
 
                 if (wallet->IsMine(txout))
-
                 {
                     // Ignore parts sent to self, as this is usually the change
                     // from a transaction sent back to our own address.
@@ -212,20 +204,17 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 std::string labelPublic = getLabelPublic(txout.scriptPubKey);
                 if (labelPublic != "")
                     continue;
-
                 else if (ExtractDestination(txout.scriptPubKey, address))
                 {
                     // Sent to Bitcoin Address
                     sub.type = TransactionRecord::SendToAddress;
                     sub.addresses.push_back(std::make_pair(EncodeDestination(address), txout.scriptPubKey));
-
                 }
                 else
                 {
                     // Sent to IP, or other non-address transaction like OP_EVAL
                     sub.type = TransactionRecord::SendToOther;
                     sub.addresses.push_back(std::make_pair(mapValue["to"], txout.scriptPubKey));
-
                 }
 
                 sub.addresses = listAllAddresses;
@@ -246,6 +235,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
         {
 
             // Check if at least one of the inputs/outputs are mine
+            // They could be public label txs that are not mine
             bool atLeastOneMine = false;
             for (const CTxIn& txin: wtx.vin)
             {

@@ -18,7 +18,6 @@ class CWalletTx;
 
 // Addresses need to preserve their txout order for accurate display so implemented as list (instead of map)
 typedef std::pair<std::string, CScript> Address;
-
 typedef std::list<Address> AddressList;
 
 /** UI model for transaction status. The transaction status is the part of a transaction that will change over time.

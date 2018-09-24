@@ -40,7 +40,7 @@ SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *par
         ui->payToLayout->setSpacing(4);
     }
     ui->addAsLabel->setPlaceholderText(tr("Enter a private label for this address to add it to your address book"));
-    ui->lineEditPublic->setPlaceholderText(tr("Enter a public label for this transaction"));
+    ui->lineEditPublic->setPlaceholderText(tr("Enter a public label for this transaction. These are stored forever in the blockchain."));
 
 
     // normal bitcoin address field
