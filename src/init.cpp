@@ -959,8 +959,13 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         LOGA("Using %d transaction admission threads\n", numTxAdmissionThreads.Value());
     }
 
-    // Create the parallel block validator
-    PV.reset(new CParallelValidation(&threadGroup));
+    // -par=0 means autodetect, but passing 0 to the CParallelValidation constructor means no concurrency
+    int nPVThreads = GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
+    if (nPVThreads <= 0)
+        nPVThreads += GetNumCores();
+
+    // BU: create the parallel block validator
+    PV.reset(new CParallelValidation(nPVThreads, &threadGroup));
 
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
