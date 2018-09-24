@@ -51,6 +51,24 @@ PORT_RANGE = 5000
 
 debug_port_assignments = False
 
+class TimeoutException(Exception):
+    pass
+
+def SetupPythonLogConfig():
+    logOn = os.getenv("PYTHON_DEBUG")
+    level = logging.ERROR
+    if logOn=="ERROR":
+        level = logging.ERROR
+    if logOn=="WARN":
+        level = logging.WARN
+    if logOn=="DEBUG":
+        level = logging.DEBUG
+    if logOn == "1" or logOn == "INFO":
+        level = logging.INFO
+    logging.basicConfig(level=level, stream=sys.stdout, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+
+SetupPythonLogConfig()
+
 class UtilOptions:
     # this module-wide var is set from test_framework.py
     no_ipv6_rpc_listen = False
@@ -105,6 +123,21 @@ class NoConfigValue:
     """ Use to remove the specific configure parameter and value when writing to bitcoin.conf"""
     def __init__(self):
         pass
+
+def waitFor(timeout, fn, onError="timeout in waitFor", sleepAmt=1.0):
+    """  Repeatedly calls fn while it returns None, raising an assert after timeout.  If fn returns non None, return that result
+    """
+    timeout = float(timeout)
+    while 1:
+        result = fn()
+        if not (result is None or result is False):
+            return result
+        if timeout <= 0:
+            if callable(onError):
+                onError = onError()
+            raise TimeoutException(onError)
+        time.sleep(sleepAmt)
+        timeout -= sleepAmt
 
 def expectException(fn, ExcType, comparison=None):
     try:
@@ -317,7 +350,7 @@ def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None)
       regtestdir = os.path.join(datadir,"regtest")
       if not os.path.isdir(regtestdir):
           os.makedirs(regtestdir)
-      print(regtestdir, os.path.join(regtestdir, "wallet.dat"))
+      logging.info(regtestdir, os.path.join(regtestdir, "wallet.dat"))
       shutil.copyfile(wallet,os.path.join(regtestdir, "wallet.dat"))
 
     return datadir
@@ -360,16 +393,21 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
         or not os.path.isdir(os.path.join("cache","node2"))
         or not os.path.isdir(os.path.join("cache","node3"))):
 
+        logging.info("Creating 200 block testnet block blockchain in 'cache' directory")
         #find and delete old cache directories if any exist
         for i in range(4):
             if os.path.isdir(os.path.join("cache","node"+str(i))):
                 shutil.rmtree(os.path.join("cache","node"+str(i)))
+        for i in range(4):
+            if os.path.isdir(os.path.join("building_cache","node"+str(i))):
+                shutil.rmtree(os.path.join("building_cache","node"+str(i)))
 
         # Create cache directories, run bitcoinds:
+        logging.info("  starting 4 bitcoind")
         for i in range(4):
             for retry in range(4):
                 try:
-                    datadir=initialize_datadir("cache", i, bitcoinConfDict, wallets, bins)
+                    datadir=initialize_datadir("building_cache", i, bitcoinConfDict, wallets, bins)
                     if bins:
                         args = [ bins[i], "-keypool=1", "-datadir="+datadir ]
                     else:
@@ -377,21 +415,20 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
                     if i > 0:
                         args.append("-connect=127.0.0.1:"+str(p2p_port(0)))
                     bitcoind_processes[i] = subprocess.Popen(args)
-                    if os.getenv("PYTHON_DEBUG", ""):
-                        print("initialize_chain: bitcoind started, waiting for RPC to come up")
+                    logging.info("initialize_chain: bitcoind started, waiting for RPC to come up")
                     wait_for_bitcoind_start(bitcoind_processes[i], rpc_url(i), i)
-                    if os.getenv("PYTHON_DEBUG", ""):
-                        print("initialize_chain: RPC succesfully started")
+                    logging.info("initialize_chain: RPC succesfully started")
                     break
                 except Exception as exc:
                     logging.error("Error bringing up bitcoind #%d (initialize_chain, directory %s), this might be retried. Problem is:", i, test_dir)
-                    do_and_ignore_failure(bitcoind_processes[i].kill)
+                    do_and_ignore_failure(lambda x: bitcoind_processes[i].kill())
                     traceback.print_exc(file=sys.stdout)
                     remap_ports(i)
             else:
                 raise Exception("Couldn't start bitcoind even with retries on different ports (initialize_chain).")
 
         rpcs = []
+        logging.info("  connecting to bitcoinds")
         for i in range(4):
             try:
                 rpcs.append(get_rpc_proxy(rpc_url(i), i))
@@ -407,6 +444,7 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
         block_time = get_mocktime() - (201 * 10 * 60)
         for i in range(2):
             for peer in range(4):
+                logging.info("  generating blocks on node %d" % peer)
                 if rpcs[peer].miningCapable:   # if generate needs two parameters, then skip calling generate(1)
                     for j in range(25):
                         set_node_times(rpcs, block_time)
@@ -416,18 +454,22 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
                     sync_blocks(rpcs)
 
         # Shut them down, and clean up cache directories:
+        logging.info("  creating cache")
         stop_nodes(rpcs)
         wait_bitcoinds()
         disable_mocktime()
         for i in range(4):
             if bins:
                 if BCD_HUB_PATH in bins[i]:
-                    os.remove(log_filename("cache", i, HUB_LOG))
+                    os.remove(log_filename("building_cache", i, HUB_LOG))
                 else:
-                    os.remove(log_filename("cache", i, "debug.log"))
-            os.remove(log_filename("cache", i, "db.log"))
-            os.remove(log_filename("cache", i, "peers.dat"))
-            os.remove(log_filename("cache", i, "fee_estimates.dat"))
+                    os.remove(log_filename("building_cache", i, "debug.log"))
+            os.remove(log_filename("building_cache", i, "db.log"))
+            os.remove(log_filename("building_cache", i, "peers.dat"))
+            os.remove(log_filename("building_cache", i, "fee_estimates.dat"))
+
+        # it all worked, so move what we built into "cache"
+        os.rename("building_cache", "cache")
 
     for i in range(4):
         from_dir = os.path.join("cache", "node"+str(i))
@@ -476,17 +518,17 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
     if extra_args is not None: args.extend(extra_args)
     for retry in range(4):
         try:
+            logging.debug("executing: %s" % str(args))
             bitcoind_processes[i] = subprocess.Popen(args)
-            if os.getenv("PYTHON_DEBUG", ""):
-                print("start_node: bitcoind started, waiting for RPC to come up")
+            logging.debug("start_node: bitcoind started, waiting for RPC to come up")
             url = rpc_url(i, rpchost)
             wait_for_bitcoind_start(bitcoind_processes[i], url, i)
-            if os.getenv("PYTHON_DEBUG", ""):
-                print("start_node: RPC succesfully started")
+            # log all the info you need for debugging access
+            logging.info("Started %s %d as pid %d at %s dir %s  " % (binary, i, bitcoind_processes[i].pid, "127.0.0.1:"+str(p2p_port(i)), datadir))
             break
         except Exception as exc:
-            logging.error("Error bringing up bitcoind #%d (start_node, directory %s), this might be retried. Problem is:", i, dirname)
-            do_and_ignore_failure(bitcoind_processes[i].kill)
+            logging.error("Error bringing up bitcoind #%d (start_node, directory %s), this might be retried. Problem is: %s", i, dirname, str(exc))
+            do_and_ignore_failure(lambda x: bitcoind_processes[i].kill())
             traceback.print_exc(file=sys.stdout)
             remap_ports(i)
             fixup_ports_in_configfile(i)
@@ -947,7 +989,7 @@ def create_lots_of_big_transactions(node, txouts, utxos, num, fee):
         newtx = rawtx[0:92]
         newtx = newtx + txouts
         newtx = newtx + rawtx[94:]
-        signresult = node.signrawtransaction(newtx, None, None, "NONE")
+        signresult = node.signrawtransaction(newtx, None, None, "FORKID")
         txid = node.sendrawtransaction(signresult["hex"], True)
         txids.append(txid)
     return txids
@@ -977,3 +1019,20 @@ def get_bip135_status(node, key):
     info = node.getblockchaininfo()
     return info['bip135_forks'][key]
 # bip135 end
+
+def findBitcoind():
+    """Find the bitcoind executable if you build in typical out-of-source locations (debug or release)"""
+    here = os.path.dirname(os.path.abspath(__file__))
+    objpath = os.path.abspath(here + "/../../../src/bitcoind")
+    if not os.path.exists(objpath):
+        dbg = os.path.abspath(here + "/../../../debug/src/bitcoind")
+        rel = os.path.abspath(here + "/../../../release/src/bitcoind")
+        if os.path.exists(dbg):
+            logging.info("Running from the debug directory (%s)" % dbg)
+            objpath = os.path.dirname(dbg)
+        elif os.path.exists(rel):
+            logging.info("Running from the release directory (%s)" % rel)
+            objpath = os.path.dirname(rel)
+    else:
+        objpath = os.path.dirname(objpath)
+    return objpath

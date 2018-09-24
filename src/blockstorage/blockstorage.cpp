@@ -12,6 +12,7 @@
 #include "fs.h"
 #include "main.h"
 #include "sequential_files.h"
+#include "ui_interface.h"
 #include "undo.h"
 
 extern bool AbortNode(CValidationState &state, const std::string &strMessage, const std::string &userMessage = "");
@@ -137,6 +138,10 @@ void SyncStorage(const CChainParams &chainparams)
     {
         return;
     }
+
+    LOGA("Upgrading block database...\n");
+    uiInterface.InitMessage(_("Upgrading block database...This could take a while."));
+
     GetTempBlockDB(pblockdbsync, otherMode);
     AssertLockHeld(cs_main);
     if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
@@ -596,7 +601,7 @@ bool FlushStateToDiskInternal(CValidationState &state,
     static int64_t nSizeAfterLastFlush = 0;
     // The cache is close to the limit. Try to flush and trim.
     bool fCacheCritical = ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > nCoinCacheMaxSize * 0.995)) ||
-                          (cacheSize - nSizeAfterLastFlush > nMaxCacheIncreaseSinceLastFlush);
+                          (cacheSize - nSizeAfterLastFlush > (int64_t)nMaxCacheIncreaseSinceLastFlush);
     // It's been a while since we wrote the block index to disk. Do this frequently, so we don't need to redownload
     // after a crash.
     bool fPeriodicWrite =

@@ -20,6 +20,8 @@
 #include "utilstrencodings.h"
 #include "utiltime.h"
 
+#include <condition_variable>
+#include <mutex>
 #include <sstream>
 #include <stdarg.h>
 
@@ -366,10 +368,10 @@ static void MonitorLogfile()
     // Check if debug.log has been deleted or moved.
     // If so re-open
     static int existcounter = 1;
+    static fs::path fileName = GetDataDir() / "debug.log";
     existcounter++;
     if (existcounter % 63 == 0) // Check every 64 log msgs
     {
-        fs::path fileName = GetDataDir() / "debug.log";
         bool exists = boost::filesystem::exists(fileName);
         if (!exists)
             fReopenDebugLog = true;
@@ -1048,3 +1050,30 @@ int ScheduleBatchPriority(void)
     return 1;
 #endif
 }
+
+
+#ifdef DEBUG_PAUSE
+
+// To integrate well with gdb, we want to show what thread has paused.  This requires some linux-specific code
+// and headers.  To restrict accidental use of linux-specific code these headers are included here instead of at the
+// file's top.
+#ifdef __linux__
+#include <sys/syscall.h>
+#include <sys/types.h>
+#endif
+
+std::mutex dbgPauseMutex;
+std::condition_variable dbgPauseCond;
+void DbgPause()
+{
+#ifdef __linux__ // The thread ID returned by gettid is very useful since its shown in gdb
+    printf("\n!!! Process %d, Thread %ld (%lx) paused !!!\n", getpid(), syscall(SYS_gettid), pthread_self());
+#else
+    printf("\n!!! Process %d paused !!!\n", getpid());
+#endif
+    std::unique_lock<std::mutex> lk(dbgPauseMutex);
+    dbgPauseCond.wait(lk);
+}
+
+extern "C" void DbgResume() { dbgPauseCond.notify_all(); }
+#endif

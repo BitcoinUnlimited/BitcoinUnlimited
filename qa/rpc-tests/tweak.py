@@ -3,8 +3,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 import test_framework.loginit
-# This is a template to make creating new QA tests easy.
-# You can also use this template to quickly start and connect a few regtest nodes.
 
 import time
 import sys
@@ -15,7 +13,7 @@ import logging
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 
-class MyTest (BitcoinTestFramework):
+class TweakTest (BitcoinTestFramework):
 
     def setup_chain(self,bitcoinConfDict=None, wallets=None):
         print("Initializing test directory "+self.options.tmpdir)
@@ -61,11 +59,11 @@ class MyTest (BitcoinTestFramework):
 
 
 if __name__ == '__main__':
-    MyTest ().main ()
+    TweakTest ().main ()
 
 # Create a convenient function for an interactive python debugging session
 def Test():
-    t = MyTest()
+    t = TweakTest()
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...

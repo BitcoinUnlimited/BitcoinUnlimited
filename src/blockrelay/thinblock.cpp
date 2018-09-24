@@ -29,7 +29,7 @@
 static bool DEFAULT_BLOOM_FILTER_TARGETING = true;
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
 
-CThinBlock::CThinBlock(const CBlock &block, CBloomFilter &filter)
+CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter)
 {
     header = block.GetBlockHeader();
 
@@ -218,7 +218,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
 }
 
 
-CXThinBlock::CXThinBlock(const CBlock &block, CBloomFilter *filter)
+CXThinBlock::CXThinBlock(const CBlock &block, const CBloomFilter *filter)
 {
     header = block.GetBlockHeader();
     this->collision = false;
@@ -463,13 +463,14 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Check for Misbehaving and DOS
     // If they make more than 20 requests in 10 minutes then disconnect them
     {
-        LOCK(cs_vNodes);
         if (pfrom->nGetXBlockTxLastTime <= 0)
             pfrom->nGetXBlockTxLastTime = GetTime();
         uint64_t nNow = GetTime();
-        pfrom->nGetXBlockTxCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXBlockTxLastTime));
+        double tmp = pfrom->nGetXBlockTxCount;
+        while (!pfrom->nGetXBlockTxCount.compare_exchange_weak(
+            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXBlockTxLastTime)) + 1)))
+            ;
         pfrom->nGetXBlockTxLastTime = nNow;
-        pfrom->nGetXBlockTxCount += 1;
         LOG(THIN, "nGetXBlockTxCount is %f\n", pfrom->nGetXBlockTxCount);
         if (pfrom->nGetXBlockTxCount >= 20)
         {
@@ -1334,7 +1335,7 @@ bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
         // or backward by a random amount plus or minus 2 seconds.
         FastRandomContext insecure_rand(false);
         uint64_t nOffset = nTimeToWait - (8000 + (insecure_rand.rand64() % 4000) + 1);
-        mapThinBlockTimer[hash] = GetTimeMillis() + nOffset;
+        mapThinBlockTimer[hash] = std::make_pair(GetTimeMillis() + nOffset, false);
         LOG(THIN, "Starting Preferential Thinblock timer (%d millis)\n", nTimeToWait + nOffset);
     }
     else
@@ -1342,11 +1343,21 @@ bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
         // Check that we have not exceeded the 10 second limit.
         // If we have then we want to return false so that we can
         // proceed to download a regular block instead.
-        uint64_t elapsed = GetTimeMillis() - mapThinBlockTimer[hash];
-        if (elapsed > nTimeToWait)
+        auto iter =  mapThinBlockTimer.find(hash);
+        if (iter != mapThinBlockTimer.end())
         {
-            LOG(THIN, "Preferential Thinblock timer exceeded - downloading regular block instead\n");
-            return false;
+            int64_t elapsed = GetTimeMillis() - iter->second.first;
+            if (elapsed > (int64_t) nTimeToWait)
+            {
+                // Only print out the log entry once.  Because the thinblock timer will be hit
+                // many times when requesting a block we don't want to fill up the log file.
+                if (!iter->second.second)
+                {
+                    iter->second.second = true;
+                    LOG(THIN, "Preferential Thinblock timer exceeded - downloading regular block instead\n");
+                }
+                return false;
+            }
         }
     }
     return true;
@@ -1519,13 +1530,21 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
 {
     if (inv.type == MSG_XTHINBLOCK)
     {
-        CXThinBlock xThinBlock(*pblock, pfrom->pThinBlockFilter);
-        int nSizeBlock = pblock->GetBlockSize();
-        if (xThinBlock.collision ==
-            true) // If there is a cheapHash collision in this block then send a normal thinblock
+        CXThinBlock xThinBlock;
         {
-            CThinBlock thinBlock(*pblock, *pfrom->pThinBlockFilter);
-            int nSizeThinBlock = ::GetSerializeSize(xThinBlock, SER_NETWORK, PROTOCOL_VERSION);
+            LOCK(pfrom->cs_filter);
+            xThinBlock = CXThinBlock(*pblock, pfrom->pThinBlockFilter);
+        }
+        int nSizeBlock = pblock->GetBlockSize();
+        // If there is a cheapHash collision in this block then send a normal thinblock
+        if (xThinBlock.collision == true)
+        {
+            CThinBlock thinBlock;
+            {
+                LOCK(pfrom->cs_filter);
+                thinBlock = CThinBlock(*pblock, *pfrom->pThinBlockFilter);
+            }
+            int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);
             if (nSizeThinBlock < nSizeBlock)
             {
                 pfrom->PushMessage(NetMsgType::THINBLOCK, thinBlock);
@@ -1570,7 +1589,11 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
     }
     else if (inv.type == MSG_THINBLOCK)
     {
-        CThinBlock thinBlock(*pblock, *pfrom->pThinBlockFilter);
+        CThinBlock thinBlock;
+        {
+            LOCK(pfrom->cs_filter);
+            thinBlock = CThinBlock(*pblock, *pfrom->pThinBlockFilter);
+        }
         int nSizeBlock = pblock->GetBlockSize();
         int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);
         if (nSizeThinBlock < nSizeBlock)

@@ -29,8 +29,8 @@ static const int64_t nClientStartupTime = GetTime();
 static int64_t nLastBlockTipUpdateNotification = 0;
 
 ClientModel::ClientModel(OptionsModel *_optionsModel, UnlimitedModel *ul, QObject *parent)
-    : QObject(parent), unlimitedModel(ul), optionsModel(_optionsModel), peerTableModel(0), banTableModel(0),
-      pollTimer1(0), pollTimer2(0)
+    : QObject(parent), unlimitedModel(ul), lastBlockTime(0), optionsModel(_optionsModel), peerTableModel(0),
+      banTableModel(0), pollTimer1(0), pollTimer2(0)
 {
     peerTableModel = new PeerTableModel(this);
     banTableModel = new BanTableModel(this);
@@ -74,9 +74,11 @@ QDateTime ClientModel::getLastBlockDate() const
     LOCK(cs_main);
 
     if (chainActive.Tip())
-        return QDateTime::fromTime_t(chainActive.Tip()->GetBlockTime());
+        lastBlockTime = chainActive.Tip()->GetBlockTime();
+    else
+        lastBlockTime = Params().GenesisBlock().GetBlockTime(); // Genesis block's time of current network
 
-    return QDateTime::fromTime_t(Params().GenesisBlock().GetBlockTime()); // Genesis block's time of current network
+    return QDateTime::fromTime_t(lastBlockTime);
 }
 
 long ClientModel::getMempoolSize() const { return mempool.size(); }
@@ -103,6 +105,10 @@ void ClientModel::updateTimer1()
     // the following calls will acquire the required lock
     Q_EMIT mempoolSizeChanged(getMempoolSize(), getMempoolDynamicUsage());
     Q_EMIT transactionsPerSecondChanged(getTransactionsPerSecond());
+
+    // only request updates to time since last block if we aren't in initial sync
+    if (IsChainNearlySyncd())
+        Q_EMIT timeSinceLastBlockChanged(lastBlockTime);
 }
 
 void ClientModel::updateTimer2()
@@ -187,12 +193,13 @@ static void BlockTipChanged(ClientModel *clientmodel, bool initialSync, const CB
     if (initialSync)
         now = GetTimeMillis();
 
+    clientmodel->lastBlockTime = pIndex->GetBlockTime();
     // if we are in-sync, update the UI regardless of last update time
     if (!initialSync || now - nLastBlockTipUpdateNotification > MODEL_UPDATE_DELAY1)
     {
         // pass a async signal to the UI thread
         QMetaObject::invokeMethod(clientmodel, "numBlocksChanged", Qt::QueuedConnection, Q_ARG(int, pIndex->nHeight),
-            Q_ARG(QDateTime, QDateTime::fromTime_t(pIndex->GetBlockTime())),
+            Q_ARG(QDateTime, QDateTime::fromTime_t(clientmodel->lastBlockTime)),
             Q_ARG(double, clientmodel->getVerificationProgress(pIndex)));
         nLastBlockTipUpdateNotification = now;
     }

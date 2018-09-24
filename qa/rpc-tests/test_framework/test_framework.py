@@ -63,7 +63,7 @@ class BitcoinTestFramework(object):
         wallets: Pass a list of wallet filenames.  Each wallet file will be copied into the node's directory
         before starting the node.
         """
-        print("Initializing test directory ", self.options.tmpdir, "Bitcoin conf: ", str(bitcoinConfDict), "walletfiles: ", wallets)
+        logging.info("Initializing test directory %s Bitcoin conf: %s walletfiles: %s" % (self.options.tmpdir, str(bitcoinConfDict), wallets))
         initialize_chain(self.options.tmpdir,bitcoinConfDict, wallets, self.bins)
 
     def setup_nodes(self):
@@ -180,7 +180,7 @@ class BitcoinTestFramework(object):
         else:
             self.randomseed = int(time.time())
         random.seed(self.randomseed)
-        print("Random seed: %s" % self.randomseed)
+        logging.info("Random seed: %s" % self.randomseed)
 
         if self.options.tmpdir is None:
             self.options.tmpdir = os.path.join(self.options.tmppfx, str(self.options.port_seed))
@@ -199,7 +199,16 @@ class BitcoinTestFramework(object):
 
         success = False
         try:
-            os.makedirs(self.options.tmpdir, exist_ok=False)
+            try:
+                os.makedirs(self.options.tmpdir, exist_ok=False)
+            except FileExistsError as e:
+                assert (self.options.tmpdir.count(os.sep) >= 2) # sanity check that tmpdir is not the top level before I delete stuff
+                for n in range(0,8): # delete the nodeN directories so their contents dont affect the new test
+                    d = self.options.tmpdir + os.sep + ("node%d" % n)
+                    try:
+                        shutil.rmtree(d)
+                    except FileNotFoundError:
+                        pass
 
             # Not pretty but, I changed the function signature
             # of setup_chain to allow customization of the setup.
@@ -213,42 +222,42 @@ class BitcoinTestFramework(object):
             self.run_test()
             success = True
         except JSONRPCException as e:
-            print("JSONRPC error: "+e.error['message'])
+            logging.error("JSONRPC error: "+e.error['message'])
             typ, value, tb = sys.exc_info()
             traceback.print_tb(tb)
             if self.drop_to_pdb: pdb.post_mortem(tb)
         except AssertionError as e:
-            print("Assertion failed: " + str(e))
+            logging.error("Assertion failed: " + str(e))
             typ, value, tb = sys.exc_info()
             traceback.print_tb(tb)
             if self.drop_to_pdb: pdb.post_mortem(tb)
         except KeyError as e:
-            print("key not found: "+ str(e))
+            logging.error("key not found: "+ str(e))
             typ, value, tb = sys.exc_info()
             traceback.print_tb(tb)
             if self.drop_to_pdb: pdb.post_mortem(tb)
         except Exception as e:
-            print("Unexpected exception caught during testing: " + repr(e))
+            logging.error("Unexpected exception caught during testing: " + repr(e))
             typ, value, tb = sys.exc_info()
             traceback.print_tb(tb)
             if self.drop_to_pdb: pdb.post_mortem(tb)
         except KeyboardInterrupt as e:
-            print("Exiting after " + repr(e))
+            logging.error("Exiting after " + repr(e))
 
         if not self.options.noshutdown:
-            print("Stopping nodes")
+            logging.info("Stopping nodes")
             if hasattr(self, "nodes"):  # nodes may not exist if there's a startup error
                 stop_nodes(self.nodes)
             wait_bitcoinds()
         else:
-            print("Note: bitcoinds were not stopped and may still be running")
+            logging.warning("Note: bitcoinds were not stopped and may still be running")
 
         if not self.options.nocleanup and not self.options.noshutdown and success:
-            print("Cleaning up")
+            logging.info("Cleaning up")
             shutil.rmtree(self.options.tmpdir)
 
         else:
-            print("Not cleaning up dir %s" % self.options.tmpdir)
+            logging.info("Not cleaning up dir %s" % self.options.tmpdir)
             if os.getenv("PYTHON_DEBUG", ""):
                 # Dump the end of the debug logs, to aid in debugging rare
                 # travis failures.
@@ -261,10 +270,10 @@ class BitcoinTestFramework(object):
                     print("".join(deque(open(f), MAX_LINES_TO_PRINT)))
 
         if success:
-            print("Tests successful")
+            logging.info("Tests successful")
             sys.exit(0)
         else:
-            print("Failed")
+            logging.error("Failed")
             sys.exit(1)
 
 
@@ -289,7 +298,7 @@ class ComparisonTestFramework(BitcoinTestFramework):
                           help="bitcoind binary to use for reference nodes (if any)")
 
     def setup_chain(self,bitcoinConfDict=None, wallets=None):  # BU add config params
-        print("Initializing test directory ", self.options.tmpdir)
+        logging.info("Initializing test directory %s" % self.options.tmpdir)
         initialize_chain_clean(self.options.tmpdir, self.num_nodes,bitcoinConfDict, wallets)
 
     def setup_network(self):

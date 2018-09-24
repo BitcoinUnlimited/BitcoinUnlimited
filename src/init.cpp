@@ -39,6 +39,7 @@
 #include "script/sigcache.h"
 #include "script/standard.h"
 #include "torcontrol.h"
+#include "txadmission.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
@@ -192,7 +193,7 @@ void Shutdown()
     /// for example if the data directory was found to be locked.
     /// Be sure that anything that writes files or flushes caches only does this if the respective
     /// module was initialized.
-    RenameThread("bitcoin-shutoff");
+    RenameThread("shutoff");
     mempool.AddTransactionsUpdated(1);
 
     {
@@ -214,6 +215,7 @@ void Shutdown()
         pwalletMain->Flush(false);
 #endif
     GenerateBitcoins(false, 0, Params());
+    StopTxAdmission();
     StopNode();
     StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
@@ -392,7 +394,7 @@ void CleanupBlockRevFiles()
 void ThreadImport(std::vector<fs::path> vImportFiles)
 {
     const CChainParams &chainparams = Params();
-    RenameThread("bitcoin-loadblk");
+    RenameThread("loadblk");
     ScheduleBatchPriority();
 
     // -reindex
@@ -947,13 +949,25 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     }
     // bip135 end
 
-    // -par=0 means autodetect, but passing 0 to the CParallelValidation constructor means no concurrency
-    int nPVThreads = GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
-    if (nPVThreads <= 0)
-        nPVThreads += GetNumCores();
+    // Setup the number of p2p message processing threads used to process incoming messages
+    if (numMsgHandlerThreads.Value() == 0)
+    {
+        // Set the number of threads to half the available Cores.
+        int nThreads = std::max(GetNumCores() / 2, 1);
+        numMsgHandlerThreads.Set(nThreads);
+        LOGA("Using %d message handler threads\n", numMsgHandlerThreads.Value());
+    }
+    // Setup the number of transaction mempool admission threads
+    if (numTxAdmissionThreads.Value() == 0)
+    {
+        // Set the number of threads to half the available Cores.
+        int nThreads = std::max(GetNumCores() / 2, 1);
+        numTxAdmissionThreads.Set(nThreads);
+        LOGA("Using %d transaction admission threads\n", numTxAdmissionThreads.Value());
+    }
 
-    // BU: create the parallel block validator
-    PV.reset(new CParallelValidation(nPVThreads, &threadGroup));
+    // Create the parallel block validator
+    PV.reset(new CParallelValidation(&threadGroup));
 
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
@@ -1481,6 +1495,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
         StartTorControl(threadGroup, scheduler);
 
+    StartTxAdmission(threadGroup);
     StartNode(threadGroup, scheduler);
 
     // Monitor the chain, and alert if we get blocks much quicker or slower than expected

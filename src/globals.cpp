@@ -18,6 +18,7 @@
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "dosman.h"
+#include "fastfilter.h"
 #include "leakybucket.h"
 #include "main.h"
 #include "miner.h"
@@ -32,6 +33,7 @@
 #include "timedata.h"
 #include "tinyformat.h"
 #include "tweak.h"
+#include "txadmission.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "ui_interface.h"
@@ -100,12 +102,11 @@ std::set<int> setDirtyFileInfo GUARDED_BY(cs_main);
 /** Dirty block index entries. */
 std::set<CBlockIndex *> setDirtyBlockIndex GUARDED_BY(cs_main);
 
-CCriticalSection cs_recentRejects;
 /**
  * Filter for transactions that were recently rejected by
  * AcceptToMemoryPool. These are not rerequested until the chain tip
- * changes, at which point the entire filter is reset. Protected by
- * cs_main.
+ * changes, at which point the entire filter is reset. Does not need mutex
+ * protection.
  *
  * Without this filter we'd be re-requesting txs from each of our peers,
  * increasing bandwidth consumption considerably. For instance, with 100
@@ -121,7 +122,7 @@ CCriticalSection cs_recentRejects;
  *
  * Memory used: 1.7MB
  */
-std::unique_ptr<CRollingBloomFilter> recentRejects GUARDED_BY(cs_recentRejects);
+CRollingFastFilter<4 * 1024 * 1024> recentRejects;
 
 /**
  * Keep track of transaction which were recently in a block and don't
@@ -132,9 +133,9 @@ std::unique_ptr<CRollingBloomFilter> recentRejects GUARDED_BY(cs_recentRejects);
  * or fell out due to size limitations (in which case we'll get them again
  * if the user really cares and re-sends).
  *
- * Protected by cs_recentRejects.
+ * Does not need mutex protection.
  */
-std::unique_ptr<CRollingBloomFilter> txn_recently_in_block GUARDED_BY(cs_recentRejects);
+CRollingFastFilter<4 * 1024 * 1024> txRecentlyInBlock;
 
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
@@ -151,10 +152,6 @@ set<uint256> setUnVerifiedOrphanTxHash GUARDED_BY(cs_xval);
 CCriticalSection cs_vNodes;
 CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
-uint64_t CNode::nTotalBytesRecv = 0;
-uint64_t CNode::nTotalBytesSent = 0;
-CCriticalSection CNode::cs_totalBytesRecv;
-CCriticalSection CNode::cs_totalBytesSent;
 
 // critical sections from net.cpp
 CCriticalSection cs_setservAddNodeAddresses;
@@ -213,6 +210,32 @@ CNodeSignals g_signals;
 CAddrMan addrman;
 CDoSManager dosMan;
 
+// Transaction mempool admission globals
+
+// Transactions that are available to be added to the mempool, and protection
+CCriticalSection csTxInQ;
+CCond cvTxInQ;
+
+// Finds transactions that may conflict with other pending transactions
+CFastFilter<4 * 1024 * 1024> incomingConflicts GUARDED_BY(csTxInQ);
+
+// Tranactions that are waiting for validation and are known not to conflict with others
+std::queue<CTxInputData> txInQ GUARDED_BY(csTxInQ);
+
+// Transaction that cannot be processed in this round (may potentially conflict with other tx)
+std::queue<CTxInputData> txDeferQ GUARDED_BY(csTxInQ);
+
+// Transactions that have been validated and are waiting to be committed into the mempool
+CWaitableCriticalSection csCommitQ;
+CConditionVariable cvCommitQ GUARDED_BY(csCommitQ);
+std::map<uint256, CTxCommitData> txCommitQ;
+
+// Control the execution of the parallel tx validation and serial mempool commit phases
+CThreadCorral txProcessingCorral;
+
+
+// Configuration Tweaks
+
 CTweak<uint64_t> pruneIntervalTweak("prune.pruneInterval",
     "How much block data (in MiB) is written to disk before trying to prune our block storage",
     DEFAULT_PRUNE_INTERVAL);
@@ -224,6 +247,8 @@ CTweakRef<uint64_t> ebTweak("net.excessiveBlock",
 CTweak<uint64_t> blockSigopsPerMb("net.excessiveSigopsPerMb",
     "Excessive effort per block, denoted in cost (# inputs * txsize) per MB",
     BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
+CTweak<bool> ignoreNetTimeouts("net.ignoreTimeouts", "ignore inactivity timeouts, used during debugging", false);
+
 CTweak<uint64_t> blockMiningSigopsPerMb("mining.excessiveSigopsPerMb",
     "Excessive effort per block, denoted in cost (# inputs * txsize) per MB",
     BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
@@ -256,11 +281,6 @@ CTweak<uint64_t> miningForkMG("mining.forkBlockSize",
     "Set the maximum block generation size to this value at the time of the fork.",
     8000000);
 
-CTweak<bool> walletSignWithForkSig("wallet.useNewSig",
-    "Once the fork occurs, sign transactions using the new signature scheme so that they will only be valid on the "
-    "fork.",
-    true);
-
 CTweak<unsigned int> maxTxSize("net.excessiveTx", "Largest transaction size in bytes", DEFAULT_LARGEST_TRANSACTION);
 CTweakRef<unsigned int> eadTweak("net.excessiveAcceptDepth",
     "Excessive block chain acceptance depth in blocks",
@@ -291,6 +311,9 @@ CTweakRef<std::string> subverOverrideTweak("net.subversionOverride",
 CTweakRef<bool> enableDataSigVerifyTweak("consensus.enableDataSigVerify",
     "true if OP_DATASIGVERIFY is enabled.",
     &enableDataSigVerify);
+
+CTweak<unsigned int> numMsgHandlerThreads("net.msgHandlerThreads", "Max message handler threads", 0);
+CTweak<unsigned int> numTxAdmissionThreads("net.txAdmissionThreads", "Max transaction mempool admission threads", 0);
 
 CTweak<CAmount> maxTxFee("wallet.maxTxFee",
     "Maximum total fees to use in a single wallet transaction or raw transaction; setting this too low may abort large "

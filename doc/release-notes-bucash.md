@@ -12,9 +12,10 @@ Please report bugs using the issue tracker at github:
 This is a major release version based of Bitcoin Unlimited compatible
 with the Bitcoin Cash specifications you could find here:
 
-https://github.com/bitcoincashorg/spec/blob/master/uahf-technical-spec.md (Aug 1st Protocol Upgrade, bucash 1.1.0.0)
-https://github.com/bitcoincashorg/spec/blob/master/nov-13-hardfork-spec.md (Nov 13th Protocol Upgrade, bucash 1.1.2.0)
-https://github.com/bitcoincashorg/spec/blob/master/may-2018-hardfork.md (May 15th Protocol Upgrade, bucash 1.3.0.0, 1.3.0.1, 1.4.0.0)
+
+https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/uahf-technical-spec.md (Aug 1st '17 Protocol Upgrade, bucash 1.1.0.0)
+https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/nov-13-hardfork-spec.md (Nov 13th '17 Protocol Upgrade, bucash 1.1.2.0)
+https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/may-2018-hardfork.md (May 15th '18 Protocol Upgrade, bucash 1.3.0.0, 1.3.0.1, 1.4.0.0)
 
 A subsequent release containing the implementation of the November 2018 specification will be released soon after this one.
 

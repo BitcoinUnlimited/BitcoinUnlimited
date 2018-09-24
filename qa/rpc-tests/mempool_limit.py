@@ -51,3 +51,18 @@ class MempoolLimitTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     MempoolLimitTest().main()
+
+def Test():
+    t = MempoolLimitTest()
+    # t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["blk", "mempool", "net", "req"],
+        "logtimemicros": 1
+    }
+
+    flags = [] # ["--nocleanup", "--noshutdown"]
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmppfx=/ramdisk/test")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
+    t.main(flags, bitcoinConf, None)

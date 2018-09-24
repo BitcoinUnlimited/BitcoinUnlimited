@@ -141,6 +141,8 @@ def spendscript(*data):
     """Take binary data as parameters and return a spend script containing that data"""
     ret = []
     for d in data:
+        if type(d) is str:
+            d = unhexlify(d)
         assert type(d) is bytes, "There can only be data in spend scripts (no opcodes allowed)"
         l = len(d)
         if l == 0:  # push empty value onto the stack

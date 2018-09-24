@@ -103,8 +103,9 @@ BITCOIN_CORE_H = \
   blockrelay/graphene_set.h \
   blockrelay/thinblock.h \
   blockstorage/blockleveldb.h \
-  blockstorage/sequential_files.h \
   blockstorage/blockstorage.h \
+  blockstorage/dbabstract.h \
+  blockstorage/sequential_files.h \
   bitnodes.h \
   bloom.h \
   cashaddr.h \
@@ -133,6 +134,7 @@ BITCOIN_CORE_H = \
   dstencode.h \
   expedited.h \
   fast-cpp-csv-parser/csv.h \
+  fastfilter.h \
   forks_csv.h \
   fs.h \
   httprpc.h \
@@ -183,6 +185,7 @@ BITCOIN_CORE_H = \
   threadsafety.h \
   timedata.h \
   torcontrol.h \
+  txadmission.h \
   txdb.h \
   txmempool.h \
   txorphanpool.h \
@@ -268,6 +271,7 @@ libbitcoin_server_a_SOURCES = \
   script/ismine.cpp \
   timedata.cpp \
   torcontrol.cpp \
+  txadmission.cpp \
   txdb.cpp \
   txmempool.cpp \
   txorphanpool.cpp \

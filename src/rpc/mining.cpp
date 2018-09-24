@@ -20,6 +20,7 @@
 #include "parallel.h"
 #include "pow.h"
 #include "rpc/server.h"
+#include "txadmission.h"
 #include "txmempool.h"
 #include "ui_interface.h"
 #include "util.h"
@@ -121,8 +122,11 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
     UniValue blockHashes(UniValue::VARR);
     while (nHeight < nHeightEnd)
     {
-        std::unique_ptr<CBlockTemplate> pblocktemplate(
-            BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript));
+        std::unique_ptr<CBlockTemplate> pblocktemplate;
+        {
+            TxAdmissionPause lock; // flush any tx waiting to enter the mempool
+            pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript);
+        }
         if (!pblocktemplate.get())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
         CBlock *pblock = &pblocktemplate->block;
@@ -144,12 +148,6 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
         {
             continue;
         }
-
-
-        // We take a cs_main lock here even though it will also be aquired in ProcessNewBlock.  We want
-        // to make sure we give priority to our own blocks.  This is in order to prevent any other Parallel
-        // Blocks to validate when we've just mined one of our own blocks.
-        LOCK(cs_main);
 
         // In we are mining our own block or not running in parallel for any reason
         // we must terminate any block validation threads that are currently running,
@@ -525,12 +523,20 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
         if (coinbaseScript->reserveScript.empty())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
 
-        pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript, coinbaseSize);
+        {
+            TxAdmissionPause lock; // should be able to relax this later and just flush any pending tx
+            pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript, coinbaseSize);
+        }
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
         // Need to update only after we know CreateNewBlock succeeded
         pindexPrev = pindexPrevNew;
+    }
+    else
+    {
+        LOG(RPC, "skipped block template construction tx: %d, last: %d  now:%d start:%d",
+            mempool.GetTransactionsUpdated(), nTransactionsUpdatedLast, GetTime(), nStart);
     }
     CBlock *pblock = &pblocktemplate->block; // pointer for convenience
     const Consensus::Params &consensusParams = Params().GetConsensus();

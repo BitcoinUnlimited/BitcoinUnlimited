@@ -33,30 +33,40 @@ static void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlo
 static void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck> *pqueue)
 {
     ostringstream tName;
-    tName << "bitcoin-scriptchk" << i;
+    tName << "scriptchk" << i;
     RenameThread(tName.str().c_str());
     pqueue->Thread();
 }
 
-CParallelValidation::CParallelValidation(int threadCount, boost::thread_group *threadGroup)
-    : semThreadCount(nScriptCheckQueues)
+CParallelValidation::CParallelValidation(boost::thread_group *threadGroup) : semThreadCount(nScriptCheckQueues)
 {
-    // A single thread has no parallelism so just use the main thread.  Equivalent to parallel being turned off.
-    if (threadCount <= 1)
-        threadCount = 0;
-    else if (threadCount > MAX_SCRIPTCHECK_THREADS)
-        threadCount = MAX_SCRIPTCHECK_THREADS;
-    nThreads = threadCount;
+    // There are nScriptCheckQueues which are used to validate blocks in parallel. Each block
+    // that validates will use one script check queue which must *not* be shared with any other
+    // validating block. Furthermore, each script check queue has a number of threads which it
+    // controls and which do the actual validating of scripts.
 
-    LOGA("Using %d threads for script verification\n", threadCount);
+    // Determine the number of threads to use for each check queue.
+    //
+    //-par=0 means autodetect number of cores.
+    int nThreadCount = GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
+    if (nThreadCount <= 0)
+        nThreadCount += GetNumCores();
+    // A single thread has no parallelism so just use the main thread
+    // (Equivalent to parallel being turned off).
+    if (nThreadCount <= 1)
+        nThreadCount = 0;
+    else if (nThreadCount > MAX_SCRIPTCHECK_THREADS)
+        nThreadCount = MAX_SCRIPTCHECK_THREADS;
 
+    // Create each script check queue with all associated threads.
+    LOGA("Launching %d ScriptQueues each using %d threads for script verification\n", nScriptCheckQueues, nThreadCount);
     while (QueueCount() < nScriptCheckQueues)
     {
         auto queue = new CCheckQueue<CScriptCheck>(128);
-
-        for (unsigned int i = 0; i < nThreads; i++)
+        for (int i = 0; i < nThreadCount; i++)
+        {
             threadGroup->create_thread(boost::bind(&AddScriptCheckThreads, i + 1, queue));
-
+        }
         vQueues.push_back(queue);
     }
 }

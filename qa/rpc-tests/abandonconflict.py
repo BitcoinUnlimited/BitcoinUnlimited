@@ -105,13 +105,13 @@ class AbandonConflictTest(BitcoinTestFramework):
         # But if its received again then it is unabandoned
         # And since now in mempool, the change is available
         # But its child tx remains abandoned
-        self.nodes[0].sendrawtransaction(signed["hex"])
+        self.nodes[0].enqueuerawtransaction(signed["hex"],"flush")
         newbalance = self.nodes[0].getbalance()
         assert(newbalance == balance - Decimal("20") + Decimal("14.99998"))
         balance = newbalance
 
         # Send child tx again so its unabandoned
-        self.nodes[0].sendrawtransaction(signed2["hex"])
+        self.nodes[0].enqueuerawtransaction(signed2["hex"],"flush")
         newbalance = self.nodes[0].getbalance()
         assert(newbalance == balance - Decimal("10") - Decimal("14.99998") + Decimal("24.9996"))
         balance = newbalance
@@ -132,7 +132,7 @@ class AbandonConflictTest(BitcoinTestFramework):
         outputs[self.nodes[1].getnewaddress()] = Decimal("9.9999")
         tx = self.nodes[0].createrawtransaction(inputs, outputs)
         signed = self.nodes[0].signrawtransaction(tx)
-        self.nodes[1].sendrawtransaction(signed["hex"])
+        self.nodes[1].enqueuerawtransaction(signed["hex"],"flush")
         self.nodes[1].generate(1)
 
         connect_nodes(self.nodes[0], 1)
@@ -155,3 +155,20 @@ class AbandonConflictTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     AbandonConflictTest().main()
+
+def Test():
+    t = AbandonConflictTest()
+    bitcoinConf = {
+        "debug": ["rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "blockprioritysize": 2000000,  # we don't want any transactions rejected due to insufficient fees...
+        "blockminsize": 1000000,
+    }
+
+    flags = [] # ["--nocleanup", "--noshutdown"]
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmppfx=/ramdisk/test")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
+    t.main(flags, bitcoinConf, None)
+
+

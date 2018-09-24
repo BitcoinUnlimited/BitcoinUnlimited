@@ -100,3 +100,16 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     MempoolCoinbaseTest().main()
+
+def Test():
+    t = MempoolCoinbaseTest()
+    bitcoinConf = {
+        "debug": ["rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"],
+    }
+
+    flags = [] # ["--nocleanup", "--noshutdown"]
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmppfx=/ramdisk/test")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
+    t.main(flags, bitcoinConf, None)

@@ -234,14 +234,14 @@ bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Check for Misbehaving and DOS
     // If they make more than 20 requests in 10 minutes then disconnect them
     {
-        LOCK(cs_vNodes);
         if (pfrom->nGetGrapheneBlockTxLastTime <= 0)
             pfrom->nGetGrapheneBlockTxLastTime = GetTime();
         uint64_t nNow = GetTime();
-        pfrom->nGetGrapheneBlockTxCount *=
-            std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneBlockTxLastTime));
+        double tmp = pfrom->nGetGrapheneBlockTxCount;
+        while (!pfrom->nGetGrapheneBlockTxCount.compare_exchange_weak(
+            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneBlockTxLastTime)) + 1)))
+            ;
         pfrom->nGetGrapheneBlockTxLastTime = nNow;
-        pfrom->nGetGrapheneBlockTxCount += 1;
         LOG(GRAPHENE, "nGetGrapheneTxCount is %f\n", pfrom->nGetGrapheneBlockTxCount);
         if (pfrom->nGetGrapheneBlockTxCount >= 20)
         {
@@ -1179,7 +1179,7 @@ bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
         // or backward by a random amount plus or minus 2 seconds.
         FastRandomContext insecure_rand(false);
         uint64_t nOffset = nTimeToWait - (8000 + (insecure_rand.rand64() % 4000) + 1);
-        mapGrapheneBlockTimer[hash] = GetTimeMillis() + nOffset;
+        mapGrapheneBlockTimer[hash] = std::make_pair(GetTimeMillis() + nOffset, false);
         LOG(GRAPHENE, "Starting Preferential Graphene Block timer (%d millis)\n", nTimeToWait + nOffset);
     }
     else
@@ -1187,11 +1187,21 @@ bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
         // Check that we have not exceeded time limit.
         // If we have then we want to return false so that we can
         // proceed to download a regular block instead.
-        int64_t elapsed = GetTimeMillis() - mapGrapheneBlockTimer[hash];
-        if (elapsed > nTimeToWait)
+        auto iter =  mapGrapheneBlockTimer.find(hash);
+        if (iter != mapGrapheneBlockTimer.end())
         {
-            LOG(GRAPHENE, "Preferential Graphene Block timer exceeded\n");
-            return false;
+            int64_t elapsed = GetTimeMillis() - iter->second.first;
+            if (elapsed > nTimeToWait)
+            {
+                // Only print out the log entry once.  Because the graphene timer will be hit
+                // many times when requesting a block we don't want to fill up the log file.
+                if (!iter->second.second)
+                {
+                    iter->second.second = true;
+                    LOG(GRAPHENE, "Preferential Graphene Block timer exceeded\n");
+                }
+                return false;
+            }
         }
     }
     return true;
@@ -1439,13 +1449,14 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
     // Check for Misbehaving and DOS
     // If they make more than 20 requests in 10 minutes then disconnect them
     {
-        LOCK(cs_vNodes);
         if (pfrom->nGetGrapheneLastTime <= 0)
             pfrom->nGetGrapheneLastTime = GetTime();
         uint64_t nNow = GetTime();
-        pfrom->nGetGrapheneCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneLastTime));
+        double tmp = pfrom->nGetGrapheneCount;
+        while (!pfrom->nGetGrapheneCount.compare_exchange_weak(
+            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneLastTime)) + 1)))
+            ;
         pfrom->nGetGrapheneLastTime = nNow;
-        pfrom->nGetGrapheneCount += 1;
         LOG(GRAPHENE, "nGetGrapheneCount is %f\n", pfrom->nGetGrapheneCount);
         if (chainparams.NetworkIDString() == "main") // other networks have variable mining rates
         {

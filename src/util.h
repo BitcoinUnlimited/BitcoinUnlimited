@@ -31,6 +31,11 @@
 #include <boost/signals2/signal.hpp>
 #include <boost/thread/exceptions.hpp>
 
+#ifdef DEBUG
+#define DEBUG_ASSERTION
+#define DEBUG_PAUSE
+#endif
+
 #ifdef DEBUG_ASSERTION
 /// If DEBUG_ASSERTION is enabled this asserts when the predicate is false.
 //  If DEBUG_ASSERTION is disabled and the predicate is false, it executes the execInRelease statements.
@@ -50,6 +55,15 @@
             execInRelease;                                                                                    \
         }                                                                                                     \
     } while (0)
+#endif
+
+#ifdef DEBUG_PAUSE
+// Stops this thread by taking a semaphore
+// This should not be called as part of a release so during the non --enable-debug build
+// you will get an undefined symbol compilation error.
+void DbgPause();
+// Continue the thread.  Intended to be called manually from gdb
+extern "C" void DbgResume();
 #endif
 
 #define UNIQUE2(pfx, LINE) pfx##LINE
@@ -456,10 +470,9 @@ void RenameThread(const char *name);
  * .. and a wrapper that just calls func once
  */
 template <typename Callable>
-void TraceThread(const char *name, Callable func)
+void TraceThreads(const std::string &name, Callable func)
 {
-    std::string s = strprintf("bitcoin-%s", name);
-    RenameThread(s.c_str());
+    RenameThread(name.c_str());
     try
     {
         LOGA("%s thread start\n", name);
@@ -473,15 +486,22 @@ void TraceThread(const char *name, Callable func)
     }
     catch (const std::exception &e)
     {
-        PrintExceptionContinue(&e, name);
+        PrintExceptionContinue(&e, name.c_str());
         throw;
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, name);
+        PrintExceptionContinue(NULL, name.c_str());
         throw;
     }
 }
+
+template <typename Callable>
+void TraceThread(const char *name, Callable func)
+{
+    TraceThreads(std::string(name), func);
+}
+
 
 std::string CopyrightHolders(const std::string &strPrefix);
 

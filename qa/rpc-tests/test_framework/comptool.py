@@ -411,6 +411,7 @@ class TestManager(object):
                     invqueue = []
                 self.sync_transaction(tx.sha256, len(test_instance.blocks_and_transactions))
                 if (not self.check_mempool(tx.sha256, tx_outcome)):
+                    val = self.check_mempool(tx.sha256, tx_outcome)
                     raise AssertionError("Mempool test failed at test %d" % test_number)
 
             print("Test %d: PASS" % test_number, [ c.rpc.getblockcount() for c in self.connections ])

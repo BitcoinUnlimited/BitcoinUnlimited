@@ -19,6 +19,7 @@
 #include "streams.h"
 #include "sync.h"
 #include "tweak.h"
+#include "txadmission.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
@@ -31,6 +32,9 @@
 #include <univalue.h>
 
 #include <boost/thread/thread.hpp> // boost::thread::interrupt
+
+// In case of operator error, limit the rollback of a chain to 100 blocks
+static uint32_t nDefaultRollbackLimit = 100;
 
 using namespace std;
 
@@ -909,6 +913,44 @@ struct CompareBlocksByHeight
     }
 };
 
+static std::set<CBlockIndex *, CompareBlocksByHeight> GetChainTips()
+{
+    /*
+     * Idea:  the set of chain tips is chainActive.tip, plus orphan blocks which do not have another orphan building off
+     * of them.
+     * Algorithm:
+     *  - Make one pass through mapBlockIndex, picking out the orphan blocks, and also storing a set of the orphan
+     * block's pprev pointers.
+     *  - Iterate through the orphan blocks. If the block isn't pointed to by another orphan, it is a chain tip.
+     *  - add chainActive.Tip()
+     */
+    std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
+    std::set<CBlockIndex *> setOrphans;
+    std::set<CBlockIndex *> setPrevs;
+
+    for (const std::pair<const uint256, CBlockIndex *> &item : mapBlockIndex)
+    {
+        if (!chainActive.Contains(item.second))
+        {
+            setOrphans.insert(item.second);
+            setPrevs.insert(item.second->pprev);
+        }
+    }
+
+    for (auto &it : setOrphans)
+    {
+        if (setPrevs.erase(it) == 0)
+        {
+            setTips.insert(it);
+        }
+    }
+
+    // Always report the currently active tip.
+    setTips.insert(chainActive.Tip());
+
+    return setTips;
+}
+
 UniValue getchaintips(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -941,38 +983,9 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
 
     LOCK(cs_main);
 
-    /*
-     * Idea:  the set of chain tips is chainActive.tip, plus orphan blocks which do not have another orphan building off
-     * of them.
-     * Algorithm:
-     *  - Make one pass through mapBlockIndex, picking out the orphan blocks, and also storing a set of the orphan
-     * block's pprev pointers.
-     *  - Iterate through the orphan blocks. If the block isn't pointed to by another orphan, it is a chain tip.
-     *  - add chainActive.Tip()
-     */
-    std::set<const CBlockIndex *, CompareBlocksByHeight> setTips;
-    std::set<const CBlockIndex *> setOrphans;
-    std::set<const CBlockIndex *> setPrevs;
-
-    for (const PAIRTYPE(const uint256, CBlockIndex *) & item : mapBlockIndex)
-    {
-        if (!chainActive.Contains(item.second))
-        {
-            setOrphans.insert(item.second);
-            setPrevs.insert(item.second->pprev);
-        }
-    }
-
-    for (std::set<const CBlockIndex *>::iterator it = setOrphans.begin(); it != setOrphans.end(); ++it)
-    {
-        if (setPrevs.erase(*it) == 0)
-        {
-            setTips.insert(*it);
-        }
-    }
-
-    // Always report the currently active tip.
-    setTips.insert(chainActive.Tip());
+    // Get the set of chaintips
+    std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
+    setTips = GetChainTips();
 
     /* Construct the output array.  */
     UniValue res(UniValue::VARR);
@@ -1109,14 +1122,14 @@ UniValue invalidateblock(const UniValue &params, bool fHelp)
     uint256 hash(uint256S(strHash));
     CValidationState state;
 
-    {
-        LOCK(cs_main);
-        if (mapBlockIndex.count(hash) == 0)
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+    TxAdmissionPause txlock;
+    LOCK(cs_main);
 
-        CBlockIndex *pblockindex = mapBlockIndex[hash];
-        InvalidateBlock(state, Params().GetConsensus(), pblockindex);
-    }
+    if (mapBlockIndex.count(hash) == 0)
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+
+    CBlockIndex *pblockindex = mapBlockIndex[hash];
+    InvalidateBlock(state, Params().GetConsensus(), pblockindex);
 
     if (state.IsValid())
     {
@@ -1174,24 +1187,22 @@ UniValue reconsiderblock(const UniValue &params, bool fHelp)
 
 UniValue rollbackchain(const UniValue &params, bool fHelp)
 {
-    // In case of operator error, limit the rollback to 100 blocks
-    uint32_t nLimit = 100;
-
     if (fHelp || params.size() < 1 || params.size() > 2)
-        throw runtime_error(
-            "rollbackchain \"blockheight\"\n"
-            "\nRolls back the blockchain to the height indicated.\n"
-            "\nArguments:\n"
-            "1. blockheight   (int, required) the height that you want to roll the chain \
+        throw runtime_error("rollbackchain \"blockheight\"\n"
+                            "\nRolls back the blockchain to the height indicated.\n"
+                            "\nArguments:\n"
+                            "1. blockheight   (int, required) the height that you want to roll the chain \
                             back to (only maxiumum rollback of " +
-            std::to_string(nLimit) + " blocks allowed)\n"
-                                     "2. override      (boolean, optional, default=false) rollback more than the \
+                            std::to_string(nDefaultRollbackLimit) +
+                            " blocks allowed)\n"
+                            "2. override      (boolean, optional, default=false) rollback more than the \
                             allowed default limit of " +
-            std::to_string(nLimit) + " blocks)\n"
-                                     "\nResult:\n"
-                                     "\nExamples:\n" +
-            HelpExampleCli("rollbackchain", "\"501245\"") + HelpExampleCli("rollbackchain", "\"495623 true\"") +
-            HelpExampleRpc("rollbackchain", "\"blockheight\""));
+                            std::to_string(nDefaultRollbackLimit) + " blocks)\n"
+                                                                    "\nResult:\n"
+                                                                    "\nExamples:\n" +
+                            HelpExampleCli("rollbackchain", "\"501245\"") +
+                            HelpExampleCli("rollbackchain", "\"495623 true\"") +
+                            HelpExampleRpc("rollbackchain", "\"blockheight\""));
 
     int nRollBackHeight = params[0].get_int();
     bool fOverride = false;
@@ -1200,9 +1211,10 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
 
     LOCK(cs_main);
     uint32_t nRollBack = chainActive.Height() - nRollBackHeight;
-    if (nRollBack > nLimit && !fOverride)
+    if (nRollBack > nDefaultRollbackLimit && !fOverride)
         throw runtime_error("You are attempting to rollback the chain by " + std::to_string(nRollBack) +
-                            " blocks, however the limit is " + std::to_string(nLimit) + " blocks. Set " +
+                            " blocks, however the limit is " + std::to_string(nDefaultRollbackLimit) +
+                            " blocks. Set "
                             "the override to true if you want rollback more than the default");
 
     while (chainActive.Height() > nRollBackHeight)
@@ -1232,6 +1244,64 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
     return NullUniValue;
 }
 
+UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() > 1)
+        throw runtime_error("reconsidermostworkchain \"[override]\"\n"
+                            "\nWill rollback the chain if needed and then sync to the most work chain. If this\n"
+                            "client was not upgraded before a hard fork and marked the \"real\" chain as invalid,\n"
+                            "then this command should be run after upgrading the client so as to join the correct\n"
+                            "and most work chain\n"
+                            "\nArguments:\n"
+                            "1. override      (boolean, optional, default=false)"
+                            "\nResult:\n"
+                            "\nExamples:\n" +
+                            HelpExampleCli("reconsidermostworkchain", "") +
+                            HelpExampleCli("reconsidermostworkchain", "\"true\"") +
+                            HelpExampleRpc("reconsidermostworkchain", "\"true\""));
+
+    // Find pindex of most work chain regardless of whether is is valid or not.
+    LOCK(cs_main);
+
+    // Get the set of chaintips
+    std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
+    setTips = GetChainTips();
+
+    // Find the longest chaintip regardless if it is currently the active one.
+    CBlockIndex *pMostWork = chainActive.Tip();
+    for (CBlockIndex *pTip : setTips)
+    {
+        if (pMostWork->nChainWork < pTip->nChainWork)
+            pMostWork = pTip;
+    }
+
+    // If already on the longest chain then return
+    if (pMostWork == chainActive.Tip())
+        throw runtime_error("Nothing to do. Already on the correct chain.");
+
+    // Find where chainActive meets the most work chaintip
+    const CBlockIndex *pFork;
+    pFork = chainActive.FindFork(pMostWork);
+
+    // Rollback to the common forkheight so that both chains will be invalidated.
+    UniValue obj(UniValue::VARR);
+    obj.push_back(pFork->nHeight);
+    if (params.size() > 0)
+    {
+        // Set the rollbackchain override flag if there was one provided.
+        obj.push_back(params[0]);
+    }
+    rollbackchain(obj, false);
+
+    // If we got here then rollbackchain() was sucessful and we didn't throw an exception.
+    // Now reconsider the most work chain.
+    UniValue obj_hash(UniValue::VARR);
+    obj_hash.push_back(pMostWork->GetBlockHash().ToString());
+    reconsiderblock(obj_hash, false);
+
+    return NullUniValue;
+}
+
 static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
     //  --------------------- ------------------------  -----------------------  ----------
@@ -1247,6 +1317,7 @@ static const CRPCCommand commands[] = {
     /* Not shown in help */
     {"hidden", "invalidateblock", &invalidateblock, true}, {"hidden", "reconsiderblock", &reconsiderblock, true},
     {"hidden", "rollbackchain", &rollbackchain, true},
+    {"hidden", "reconsidermostworkchain", &reconsidermostworkchain, true},
 };
 
 void RegisterBlockchainRPCCommands(CRPCTable &table)

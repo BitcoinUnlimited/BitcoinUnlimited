@@ -125,7 +125,7 @@ double CGrapheneSet::OptimalSymDiff(uint64_t nBlockTxs, uint64_t nReceiverPoolTx
     auto fpr = [nReceiverPoolTx, nBlockAndReceiverPoolTx](uint64_t a) {
         float _fpr = a / float(nReceiverPoolTx - nBlockAndReceiverPoolTx);
 
-        return _fpr < 1.0 ? _fpr : FILTER_FPR_MAX;
+        return _fpr < FILTER_FPR_MAX ? _fpr : FILTER_FPR_MAX;
     };
 
     auto F = [nBlockTxs, fpr](

@@ -14,7 +14,7 @@
 Functionality to build scripts, as well as SignatureHash().
 """
 
-
+from sys import stdout
 from .mininode import CTransaction, CTxOut, hash256
 from binascii import hexlify
 
@@ -82,6 +82,14 @@ class CScriptOp(int):
             return True
         else:
             return False
+
+    def toHex(self):
+        """Return the hex representation of this opcode"""
+        return hexlify(self.to_bytes(1,"little")).decode()
+
+    def toBin(self):
+        """Return the binary representation of this opcode"""
+        return self.to_bytes(1,"little")
 
     def __str__(self):
         return repr(self)
@@ -801,6 +809,28 @@ class CScript(bytes):
                     ops.append(op)
 
         return "CScript([%s])" % ', '.join(ops)
+
+    def prettyprint(self, outfile = stdout):
+        indent = 0
+        newline = False
+        for op in iter(self):
+            if isinstance(op, bytes):
+                rop = hexlify(op).decode("ascii")
+            else:
+                rop = repr(op)
+
+            if op in [OP_ELSE, OP_ENDIF, OP_NOTIF, OP_IF] and not newline:
+                print(file = outfile)
+                newline = True
+            if op in [OP_ELSE, OP_ENDIF, OP_NOTIF]:
+                indent -=1
+            if newline:
+                print(4 * indent * " ", file = outfile, end = '')
+            newline = ("VERIFY" in rop or
+                       op in [OP_IF, OP_ELSE, OP_ENDIF, OP_NOTIF, OP_RETURN])
+            print(rop+" ", file = outfile, end='\n' if newline else '')
+            if op in [OP_ELSE, OP_IF]:
+                indent +=1
 
     def GetSigOpCount(self, fAccurate):
         """Get the SigOp count.

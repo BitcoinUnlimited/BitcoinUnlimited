@@ -111,7 +111,7 @@ public:
      *                          are created.
      * @param[in] threadGroup   The thread group threads will be created in
      */
-    CParallelValidation(int threadCount, boost::thread_group *threadGroup);
+    CParallelValidation(boost::thread_group *threadGroup);
 
     ~CParallelValidation();
 
