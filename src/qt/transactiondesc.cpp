@@ -91,6 +91,7 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
             {
                 strHTML += "<b>" + tr("Unspent") + ":</b>" + BitcoinUnits::formatHtmlWithUnit(unit, txout.nValue, true) + "<br>";
                 strHTML += "<b>" + tr("Address") + ":</b> " + GUIUtil::HtmlEscape(EncodeDestination(address)) + "<br>";
+                strHTML += "<b>" + tr("Date") + ":</b> " + (txoutPL.first.GetTxTime() ? GUIUtil::dateTimeStr(txoutPL.first.GetTxTime()) : "") + "<br>";
                 countMatching += 1;
             }
         }
