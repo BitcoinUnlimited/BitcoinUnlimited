@@ -84,7 +84,6 @@ bool isFreezeCLTV(const CKeyStore &keystore, const CScript &scriptPubKey, CScrip
         }
     }
     return false;
-
 }
 
 isminetype IsMine(const CKeyStore &keystore, const CTxDestination &dest, CBlockIndex *bestBlock)

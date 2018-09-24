@@ -53,7 +53,6 @@ public:
     {
     }
 
-
     // If from an unauthenticated payment request, this is used for storing
     // the addresses, e.g. address-A<br />address-B<br />address-C.
     // Info: As we don't need to process addresses in here when using
@@ -103,7 +102,6 @@ public:
         if (nVersion >= 2)
             READWRITE(sFreezeLockTime);
 
-
         if (ser_action.ForRead())
         {
             address = QString::fromStdString(sAddress);
@@ -115,7 +113,6 @@ public:
                 paymentRequest.parse(QByteArray::fromRawData(sPaymentRequest.data(), sPaymentRequest.size()));
             authenticatedMerchant = QString::fromStdString(sAuthenticatedMerchant);
         }
-
     }
 };
 
@@ -221,7 +218,6 @@ public:
     void getOutputs(const std::vector<COutPoint> &vOutpoints, std::vector<COutput> &vOutputs);
     bool isSpent(const COutPoint &outpoint) const;
     void listCoins(std::map<QString, std::vector<COutput> > &mapCoins) const;
-
 
     bool isLockedCoin(uint256 hash, unsigned int n) const;
     void lockCoin(COutPoint &output);

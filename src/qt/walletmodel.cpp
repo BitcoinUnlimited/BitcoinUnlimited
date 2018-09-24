@@ -134,7 +134,6 @@ void WalletModel::checkBalanceChanged()
 
         Q_EMIT balanceChanged(newBalance, newUnconfirmedBalance, newImmatureBalance, newWatchOnlyBalance,
             newWatchUnconfBalance, newWatchImmatureBalance);
-
     }
 }
 
@@ -212,7 +211,6 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
                 return InvalidAddress;
             }
             if (rcp.amount <= 0 && rcp.labelPublic == "")
-
             {
                 return InvalidAmount;
             }
@@ -227,7 +225,6 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
                 scriptPubKey = GetScriptLabelPublic(rcp.labelPublic.toStdString());
                 // remove duplicate address as rcp.adddress was copied in SendCoinsDialog::on_sendButton_clicked()
                 --nAddresses;
-
             }
 
             CRecipient recipient = {scriptPubKey, rcp.amount, rcp.fSubtractFeeFromAmount};
@@ -336,7 +333,6 @@ WalletModel::SendCoinsReturn WalletModel::sendCoins(WalletModelTransaction &tran
         // Set have watch only flag to true if sending to a coin freeze address
         if (!rcp.freezeLockTime.isEmpty())
             this->updateWatchOnlyFlag(true);
-
 
         // Don't touch the address book when we have a payment request
         if (!rcp.paymentRequest.IsInitialized())
@@ -534,7 +530,6 @@ bool WalletModel::getPubKey(const CKeyID &address, CPubKey &vchPubKeyOut) const
 }
 
 bool WalletModel::IsSpendable(const CTxDestination &dest) const { return wallet->IsMine(dest) & ISMINE_SPENDABLE; }
-
 // returns a list of COutputs from COutPoints
 void WalletModel::getOutputs(const std::vector<COutPoint> &vOutpoints, std::vector<COutput> &vOutputs)
 {

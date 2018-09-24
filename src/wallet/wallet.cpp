@@ -903,7 +903,8 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef &ptx, const CBlock 
     bool fExisted = mapWallet.count(ptx->GetHash()) != 0;
     if (fExisted && !fUpdate)
         return false;
-    if (fExisted || IsMine(*ptx) || IsFromMe(*ptx))
+    CAmount unspentPublicLabelAmount = UnspentPublicLabelAmount(*ptx, "").first;
+    if (fExisted || IsMine(*ptx) || IsFromMe(*ptx) || unspentPublicLabelAmount > 0)
     {
         CWalletTx wtx(this, *ptx);
 
@@ -1095,7 +1096,7 @@ isminetype CWallet::IsMine(const CTxIn &txin) const
     return ISMINE_NO;
 }
 
-bool CWallet::IsMine(const CTransaction& tx) const
+bool CWallet::IsMine(const CTransaction &tx) const
 {
     for (const CTxOut &txout : tx.vout)
     {
