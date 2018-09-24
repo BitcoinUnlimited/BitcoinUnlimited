@@ -495,7 +495,8 @@ QString TransactionTableModel::formatTxToAddress(const TransactionRecord *wtx, b
     if (label == "")
         return QString::fromStdString(addressList) + watchAddress;
     else
-        return label + watchAddress;
+        return label + " " + QString::fromStdString(addressList) + watchAddress;
+
 }
 
 QVariant TransactionTableModel::addressColor(const TransactionRecord *wtx) const

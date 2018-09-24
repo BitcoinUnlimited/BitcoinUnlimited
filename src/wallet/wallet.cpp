@@ -871,10 +871,6 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
             }
         }
 
-        // Only useful if debugging wallet
-        // LOGA("AddToWallet %s  %s%s\n", wtxIn.GetHash().ToString(), (fInsertedNew ? "new" : ""),
-        //    (fUpdated ? "update" : ""));
-
         // Write to disk
         if (fInsertedNew || fUpdated)
         {
@@ -971,7 +967,8 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef &ptx, const CBlock 
         // SetBestChain-mechanism
         CWalletDB walletdb(strWalletFile, "r+", false);
 
-        return AddToWallet(wtx, false, &walletdb);
+        if (IsUnspentPublicLabel) AddToWallet(wtx, false, &walletdb, true);
+        if (fExisted || IsMine(*ptx) || IsFromMe(*ptx) ) return AddToWallet(wtx, false, &walletdb, false);
     }
     return false;
 }
@@ -1158,6 +1155,42 @@ bool CWallet::IsMine(const CTransaction &tx) const
             return true;
 	}
     return false;
+}
+
+std::pair<CAmount, int> CWallet::UnspentPublicLabelAmount(const CTransaction& tx, const std::string comparePublicLabel) const
+{ // Returns unspent output amount associated with public label
+
+    // A public label exists BEFORE its txout buddy
+    bool nextIsPublicLabelBuddy = false;
+    int i = 0;
+    for (const CTxOut &txout : tx.vout)
+    {
+        // Speeds up the search but doesn't effect the result
+        if ((!nextIsPublicLabelBuddy && txout.nValue == 0) || (nextIsPublicLabelBuddy && txout.nValue > 0))
+        {
+            std::string txPublicLabel = getLabelPublic(txout.scriptPubKey);
+
+            if (nextIsPublicLabelBuddy)
+            {
+                // This is the target txout.nValue
+                CAmount nValue = IsSpent(tx.GetHash(), i) ? 0 : txout.nValue;
+                if (nValue > 0)
+                {
+                    // found unspent outputs related to public label
+                    return make_pair(nValue, i);
+                }
+
+            }
+            else if ((comparePublicLabel != "" && txPublicLabel == comparePublicLabel)  // matches the specified public label
+                     || (comparePublicLabel == "" && txPublicLabel != ""))              // matches for any public label
+            {
+                // if the public label exists the next txout.nValue is the target
+                nextIsPublicLabelBuddy = true;
+            }
+        }
+        i++;
+    }
+    return make_pair(0, NULL);
 }
 
 CAmount CWallet::GetCredit(const CTxOut &txout, const isminefilter &filter) const
