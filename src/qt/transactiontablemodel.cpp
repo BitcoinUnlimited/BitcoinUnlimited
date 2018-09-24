@@ -25,6 +25,9 @@
 #include <QDebug>
 #include <QIcon>
 #include <QList>
+#include <vector>
+#include <map>
+#include <set>
 
 // Amount column is right-aligned it contains numbers
 static int column_alignments[] = {
@@ -70,11 +73,21 @@ public:
 
             if (GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS) > 0)
             {
-                for (std::map<uint256, CWalletTx>::iterator it = wallet->mapWalletTopPublicLabels.begin(); it != wallet->mapWalletTopPublicLabels.end();++it)
+                // copy to a vector for sorting by datetime
+                std::vector<std::pair<int64_t, CWalletTx>> sortedTopPublicLabels;
+                for (PAIRTYPE(uint256, CWalletTx) item: wallet->mapWalletTopPublicLabels)
+                    { sortedTopPublicLabels.push_back(std::make_pair(item.second.GetTxTime(), item.second)); }
+
+                // sort txs by datetime descending
+                std::sort(sortedTopPublicLabels.begin(), sortedTopPublicLabels.end(),
+                            [](std::pair<int64_t, CWalletTx> &left, std::pair<int64_t, CWalletTx> &right)
+                            { return left.first < right.first; });
+
+                for (std::pair<int64_t, CWalletTx> it: sortedTopPublicLabels)
                 {
-                    if (TransactionRecord::showTransaction(it->second))
+                    if (TransactionRecord::showTransaction(it.second))
                     {
-                        QList<TransactionRecord> recList = TransactionRecord::decomposeTransaction(wallet, it->second, true);
+                        QList<TransactionRecord> recList = TransactionRecord::decomposeTransaction(wallet, it.second, true);
                         for (TransactionRecord &recNew: recList)
                         {
                             // Exclude public labels that already exist
