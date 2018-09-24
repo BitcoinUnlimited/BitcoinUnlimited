@@ -15,6 +15,7 @@
 #include "platformstyle.h"
 #include "receivefreezedialog.h"
 #include "receiverequestdialog.h"
+#include "receivefreezedialog.h"
 #include "recentrequeststablemodel.h"
 #include "unlimited.h"
 
@@ -27,6 +28,7 @@ ReceiveFreezeDialog *freezeDialog;
 #include <QMessageBox>
 #include <QScrollBar>
 #include <QTextDocument>
+#include <QCheckBox>
 
 ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, const Config *_cfg, QWidget *parent)
     : QDialog(parent), ui(new Ui::ReceiveCoinsDialog), columnResizingFixer(0), model(0), platformStyle(_platformStyle),
@@ -51,6 +53,7 @@ ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, cons
 
     // context menu actions
     QAction *copyURIAction = new QAction(tr("Copy URI"), this);
+    QAction *copyAddressAction = new QAction(tr("Copy address"), this);
     QAction *copyLabelAction = new QAction(tr("Copy label"), this);
     QAction *copyMessageAction = new QAction(tr("Copy message"), this);
     QAction *copyAmountAction = new QAction(tr("Copy amount"), this);
@@ -58,6 +61,7 @@ ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, cons
     // context menu
     contextMenu = new QMenu(this);
     contextMenu->addAction(copyURIAction);
+    contextMenu->addAction(copyAddressAction);
     contextMenu->addAction(copyLabelAction);
     contextMenu->addAction(copyMessageAction);
     contextMenu->addAction(copyAmountAction);
@@ -65,6 +69,7 @@ ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, cons
     // context menu signals
     connect(ui->recentRequestsView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(showMenu(QPoint)));
     connect(copyURIAction, SIGNAL(triggered()), this, SLOT(copyURI()));
+    connect(copyAddressAction, SIGNAL(triggered()), this, SLOT(copyAddress()));
     connect(copyLabelAction, SIGNAL(triggered()), this, SLOT(copyLabel()));
     connect(copyMessageAction, SIGNAL(triggered()), this, SLOT(copyMessage()));
     connect(copyAmountAction, SIGNAL(triggered()), this, SLOT(copyAmount()));
@@ -180,6 +185,56 @@ void ReceiveCoinsDialog::on_freezeCheck_clicked()
     }
 }
 
+void ReceiveCoinsDialog::on_freezeDialog_hide()
+{
+    freezeDialog->getFreezeLockTime(nFreezeLockTime);
+
+    if (nFreezeLockTime == 0)
+    {
+        // user cancelled freeze
+        ui->freezeCheck->setChecked(false);
+        ui->freezeCheck->setText("Coin Freeze");
+    }
+    else
+    {
+        // user selected freeze
+        ui->freezeCheck->setChecked(true);
+
+        QString freezeLabel;
+        if (nFreezeLockTime.getint64() < LOCKTIME_THRESHOLD)
+
+          {
+            uint64_t height = GetBlockchainHeight();
+            uint64_t freezeHeight = nFreezeLockTime.getint();
+            uint64_t approxTimeMs = ((freezeHeight-height)*10*60*1000) + QDateTime::currentDateTime().toMSecsSinceEpoch();
+            
+            freezeLabel = (QString)("block: ") +  QString::number(freezeHeight) + (QString)(" (approximately: ") + QDateTime::fromMSecsSinceEpoch(approxTimeMs).date().toString() + ")";
+          }
+        else
+            freezeLabel = QDateTime::fromMSecsSinceEpoch(nFreezeLockTime.getint64() * 1000).toString("yyyy/MM/dd hh:mm");
+        ui->freezeCheck->setText("Coin freeze until " + freezeLabel);
+    }
+}
+
+void ReceiveCoinsDialog::on_freezeCheck_clicked()
+{
+
+  if (ui->freezeCheck->isChecked())  // If the user clicked on coin freeze, bring up the freeze dialog box
+    {
+      if (!freezeDialog)
+        {
+          freezeDialog = new ReceiveFreezeDialog(this);
+          freezeDialog->setModel(model->getOptionsModel());
+        }
+      freezeDialog->show();
+    }
+  else  // if the user unchecked, then hide the freeze dialog if its still showing
+    {
+      if (freezeDialog) freezeDialog->hide();
+    }
+
+}
+
 void ReceiveCoinsDialog::on_receiveButton_clicked()
 {
     if (!model || !model->getOptionsModel() || !model->getAddressTableModel() || !model->getRecentRequestsTableModel())
@@ -190,6 +245,7 @@ void ReceiveCoinsDialog::on_receiveButton_clicked()
     QString sFreezeLockTime = "";
 
     if (ui->reuseAddress->isChecked())
+
     {
         /* Choose existing receiving address */
         AddressBookPage dlg(platformStyle, AddressBookPage::ForSelection, AddressBookPage::ReceivingTab, this);
@@ -225,6 +281,7 @@ void ReceiveCoinsDialog::on_receiveButton_clicked()
     }
     SendCoinsRecipient info(address, label, ui->reqAmount->value(), ui->reqMessage->text(), sFreezeLockTime, "");
     ReceiveRequestDialog *dialog = new ReceiveRequestDialog(cfg, this);
+
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setModel(model->getOptionsModel());
     dialog->setInfo(info);
@@ -339,6 +396,14 @@ void ReceiveCoinsDialog::showMenu(const QPoint &point)
 
 // context menu action: copy URI
 void ReceiveCoinsDialog::copyURI()
+// context menu action: copy address
+void ReceiveCoinsDialog::copyAddress()
+{
+    copyColumnToClipboard(RecentRequestsTableModel::Address);
+}
+
+// context menu action: copy label
+void ReceiveCoinsDialog::copyLabel()
 {
     QModelIndex sel = selectedRow();
     if (!sel.isValid())

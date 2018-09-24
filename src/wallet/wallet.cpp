@@ -272,6 +272,7 @@ bool CWallet::LoadFreezeScript(CPubKey newKey, CScriptNum nFreezeLockTime, std::
     address = EncodeDestination(CScriptID(freezeScript));
     LOGA("CLTV Freeze Script Load \n %s => %s \n ", ::ScriptToAsmStr(freezeScript), address.c_str());
     return true;
+
 }
 
 bool CWallet::AddWatchOnly(const CScript &dest)
@@ -1094,13 +1095,13 @@ isminetype CWallet::IsMine(const CTxIn &txin) const
     return ISMINE_NO;
 }
 
-bool CWallet::IsMine(const CTransaction &tx) const
+bool CWallet::IsMine(const CTransaction& tx) const
 {
     for (const CTxOut &txout : tx.vout)
     {
         if (IsMine(txout) != ISMINE_NO)
             return true;
-    }
+	}
     return false;
 }
 
@@ -1410,10 +1411,11 @@ int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
     {
         LOCK2(cs_main, cs_wallet);
 
+        // commented below out so that public labels with unspent utxos from any date/time may be tracked
         // no need to read and scan block, if block was created before
         // our wallet birthday (as adjusted for block time variability)
-        while (pindex && nTimeFirstKey && (pindex->GetBlockTime() < (nTimeFirstKey - 7200)))
-            pindex = chainActive.Next(pindex);
+        //while (pindex && nTimeFirstKey && (pindex->GetBlockTime() < (nTimeFirstKey - 7200)))
+        //    pindex = chainActive.Next(pindex);
 
         // show rescan progress in GUI as dialog or on splashscreen, if -rescan on startup
         ShowProgress(_("Rescanning..."), 0);
@@ -2615,6 +2617,34 @@ bool CWallet::AddAccountingEntry(const CAccountingEntry &acentry, CWalletDB &pwa
     return true;
 }
 
+std::vector<std::pair<CWalletTx, int>> CWallet::GetPublicLabelTxs(std::string& comparePublicLabel) const
+{
+    // Make a list of all public label txs with unspent outputs that match the specified public label
+    std::vector<std::pair<CWalletTx, int>> listPublicLabelTxs;
+    BOOST_FOREACH(PAIRTYPE(uint256, CWalletTx) item, mapWalletPublicLabels)
+    {
+        const uint256& wtxid = item.first;
+        CWalletTx& wtx = item.second;
+        assert(wtx.GetHash() == wtxid);
+
+        for (unsigned int i = 0; i < wtx.vout.size(); i++)
+        {
+            CTxOut txout = wtx.vout[i];
+            std::string txPublicLabel = getLabelPublic(txout.scriptPubKey);
+
+            if (txPublicLabel == comparePublicLabel)
+            {
+                std::pair<CAmount, int> utxoPublicLabel = UnspentPublicLabelAmount(wtx, txPublicLabel);
+                txout.nValue = utxoPublicLabel.first;
+                // Add to list if the public label's buddy is unspent
+                if (txout.nValue > 0) listPublicLabelTxs.push_back(make_pair(wtx, utxoPublicLabel.second));
+            }
+
+        }
+    }
+    return listPublicLabelTxs;
+}
+
 CAmount CWallet::GetRequiredFee(unsigned int nTxBytes)
 {
     return std::max(minTxFee.GetFee(nTxBytes), ::minRelayTxFee.GetFee(nTxBytes));
@@ -2715,6 +2745,34 @@ DBErrors CWallet::ZapWalletTx(std::vector<CWalletTx> &vWtx)
         return nZapWalletTxRet;
 
     return DB_LOAD_OK;
+}
+
+void CWallet::ZapOldPublicLabels()
+{
+    // Delete/remove all public label txs with zero unspent outputs
+    std::vector<CWalletTx> vWtx;
+    BOOST_FOREACH(PAIRTYPE(uint256, CWalletTx) item, mapWalletPublicLabels)
+    {
+        const uint256& wtxid = item.first;
+        CWalletTx wtx = item.second;
+        assert(wtx.GetHash() == wtxid);
+        CAmount totalUnspent = 0;
+
+        // scan outputs for public labels
+        for (unsigned int i = 0; i < wtx.vout.size(); i++)
+        {
+            CTxOut txout = wtx.vout[i];
+            std::string txPublicLabel = getLabelPublic(txout.scriptPubKey);
+
+            if (txPublicLabel != "")
+                    totalUnspent += UnspentPublicLabelAmount(wtx, txPublicLabel).first;
+
+        }
+
+        if (totalUnspent == 0) vWtx.push_back(wtx);
+    }
+
+    if (!vWtx.empty()) ZapWalletTx(vWtx);
 }
 
 
@@ -3474,6 +3532,9 @@ bool CWallet::InitLoadWallet()
         LOGA(" rescan      %15dms\n", GetTimeMillis() - nStart);
         walletInstance->SetBestChain(chainActive.GetLocator());
         nWalletDBUpdated++;
+
+        // Clear spent public labels
+        walletInstance->ZapOldPublicLabels();
 
         // Restore wallet transaction metadata after -zapwallettxes=1
         if (GetBoolArg("-zapwallettxes", false) && GetArg("-zapwallettxes", "1") != "2")

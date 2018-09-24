@@ -336,6 +336,7 @@ QString AddressTableModel::addRow(const QString &type,
     const QString &label,
     const QString &address,
     const CScriptNum nFreezeLockTime)
+
 {
     std::string strLabel = label.toStdString();
     std::string strAddress = address.toStdString();
@@ -386,6 +387,7 @@ QString AddressTableModel::addRow(const QString &type,
         }
         else
             strAddress = EncodeDestination(newKey.GetID());
+
     }
     else
     {
@@ -449,6 +451,7 @@ QString AddressTableModel::labelForFreeze(const QString &address) const
             else
                 return QDateTime::fromMSecsSinceEpoch(nFreezeLockTime.getint64() * 1000).toString();
         }
+
     }
     return QString();
 }

@@ -174,6 +174,7 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsi
             }
             else if (opcode2 == OP_DATA)
                 vSolutionsRet.push_back(vch1);
+
             else if (opcode1 != opcode2 || vch1 != vch2)
             {
                 // Others must match exactly

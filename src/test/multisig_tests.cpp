@@ -19,6 +19,7 @@
 
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h" // Freeze wallet test
+
 #endif
 
 #include <boost/test/unit_test.hpp>
@@ -236,6 +237,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1)
         BOOST_CHECK(addr == keyaddr[0]);
 #ifdef ENABLE_WALLET
         CBlockIndex *nullBestBlock = nullptr;
+
         BOOST_CHECK(IsMine(keystore, s, nullBestBlock));
         BOOST_CHECK(!IsMine(emptykeystore, s, nullBestBlock));
 #endif
@@ -252,6 +254,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1)
         BOOST_CHECK(addr == keyaddr[0]);
 #ifdef ENABLE_WALLET
         CBlockIndex *nullBestBlock = nullptr;
+
         BOOST_CHECK(IsMine(keystore, s, nullBestBlock));
         BOOST_CHECK(!IsMine(emptykeystore, s, nullBestBlock));
 #endif
@@ -267,6 +270,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1)
         BOOST_CHECK(!ExtractDestination(s, addr));
 #ifdef ENABLE_WALLET
         CBlockIndex *nullBestBlock = nullptr;
+
         BOOST_CHECK(IsMine(keystore, s, nullBestBlock));
         BOOST_CHECK(!IsMine(emptykeystore, s, nullBestBlock));
         BOOST_CHECK(!IsMine(partialkeystore, s, nullBestBlock));
@@ -287,6 +291,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1)
         BOOST_CHECK(nRequired == 1);
 #ifdef ENABLE_WALLET
         CBlockIndex *nullBestBlock = nullptr;
+
         BOOST_CHECK(IsMine(keystore, s, nullBestBlock));
         BOOST_CHECK(!IsMine(emptykeystore, s, nullBestBlock));
         BOOST_CHECK(!IsMine(partialkeystore, s, nullBestBlock));
@@ -356,6 +361,7 @@ BOOST_AUTO_TEST_CASE(cltv_freeze)
     // Create and unpack a CLTV script
     vector<valtype> solutions;
     txnouttype whichType;
+
     vector<CTxDestination> addresses;
     int nRequiredReturn;
     txnouttype type = TX_CLTV;
@@ -407,10 +413,12 @@ BOOST_AUTO_TEST_CASE(opreturn_send)
 
     CBasicKeyStore keystore;
 
+
     // Create and unpack a CLTV script
     vector<valtype> solutions;
     txnouttype whichType;
     vector<CTxDestination> addresses;
+
 
     string inMsg = "hello world", outMsg = "";
     CScript s = GetScriptLabelPublic(inMsg);
@@ -419,6 +427,7 @@ BOOST_AUTO_TEST_CASE(opreturn_send)
     BOOST_CHECK(inMsg == outMsg);
     BOOST_CHECK(Solver(s, whichType, solutions));
     BOOST_CHECK(whichType == TX_LABELPUBLIC);
+
 }
 #endif
 BOOST_AUTO_TEST_SUITE_END()

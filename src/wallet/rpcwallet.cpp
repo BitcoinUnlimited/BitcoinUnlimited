@@ -269,6 +269,7 @@ UniValue setaccount(const UniValue &params, bool fHelp)
 
     // Only add the account if the address is yours.
     if (IsMine(*pwalletMain, dest, chainActive.Tip()))
+
     {
         // Detect when changing the account of an address that is the 'unused
         // current key' of another account:
@@ -592,6 +593,7 @@ UniValue getreceivedbyaddress(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Bitcoin address");
     }
     CScript scriptPubKey = GetScriptForDestination(dest);
+
     if (!IsMine(*pwalletMain, scriptPubKey, chainActive.Tip()))
         return ValueFromAmount(0);
 
