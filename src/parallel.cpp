@@ -38,7 +38,8 @@ static void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck> *pqueue)
     pqueue->Thread();
 }
 
-CParallelValidation::CParallelValidation(boost::thread_group *threadGroup) : semThreadCount(nScriptCheckQueues)
+CParallelValidation::CParallelValidation(boost::thread_group *threadGroup)
+    : nThreads(0), semThreadCount(nScriptCheckQueues)
 {
     // There are nScriptCheckQueues which are used to validate blocks in parallel. Each block
     // that validates will use one script check queue which must *not* be shared with any other
@@ -48,22 +49,22 @@ CParallelValidation::CParallelValidation(boost::thread_group *threadGroup) : sem
     // Determine the number of threads to use for each check queue.
     //
     //-par=0 means autodetect number of cores.
-    int nThreadCount = GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
-    if (nThreadCount <= 0)
-        nThreadCount += GetNumCores();
+    nThreads = GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
+    if (nThreads <= 0)
+        nThreads += GetNumCores();
     // A single thread has no parallelism so just use the main thread
     // (Equivalent to parallel being turned off).
-    if (nThreadCount <= 1)
-        nThreadCount = 0;
-    else if (nThreadCount > MAX_SCRIPTCHECK_THREADS)
-        nThreadCount = MAX_SCRIPTCHECK_THREADS;
+    if (nThreads <= 1)
+        nThreads = 0;
+    else if (nThreads > MAX_SCRIPTCHECK_THREADS)
+        nThreads = MAX_SCRIPTCHECK_THREADS;
 
     // Create each script check queue with all associated threads.
-    LOGA("Launching %d ScriptQueues each using %d threads for script verification\n", nScriptCheckQueues, nThreadCount);
+    LOGA("Launching %d ScriptQueues each using %d threads for script verification\n", nScriptCheckQueues, nThreads);
     while (QueueCount() < nScriptCheckQueues)
     {
         auto queue = new CCheckQueue<CScriptCheck>(128);
-        for (int i = 0; i < nThreadCount; i++)
+        for (unsigned int i = 0; i < nThreads; i++)
         {
             threadGroup->create_thread(boost::bind(&AddScriptCheckThreads, i + 1, queue));
         }
