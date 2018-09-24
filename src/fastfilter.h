@@ -27,13 +27,12 @@ class uint256;
  * but "inserts" may be lost.  However, if you are using this class as an in-ram filter before doing a more expensive
  * operation, a lost insert may be acceptable.
  */
-template <unsigned int FILTER_SIZE>
+template <unsigned int FILTER_SIZE, unsigned int NUM_HASH_FNS = 16>
 class CFastFilter
 {
 protected:
+    // A bit vector containing the bloom filter data
     std::vector<unsigned char> vData;
-    unsigned int grabFrom;
-    unsigned int conflicts;
 
 public:
     enum
@@ -43,47 +42,76 @@ public:
 
     CFastFilter()
     {
+        static_assert((NUM_HASH_FNS > 1) && (NUM_HASH_FNS <= 16), "NUM_HASH_FNS must be between 2 and 16 inclusive");
         FastRandomContext insecure_rand;
         vData.resize(FILTER_BYTES);
-        // by sampling from a different part of the uint256, we make it harder for an attacker to generate collisions
-        grabFrom = (1 + (insecure_rand.rand32() % 6)) * 4; // should be 4 byte aligned for speed
     }
+
 
     // returns true IF this function made a change (i.e. the value was previously not set).
     bool checkAndSet(const uint256 &hash)
     {
-        const unsigned char *mem = hash.begin();
-        const uint32_t *pos = (const uint32_t *)&(mem[grabFrom]);
-        uint32_t idx = ((*pos) ^ mem[0]) & (FILTER_SIZE - 1);
+        const uint32_t *pos = (const uint32_t *)hash.begin();
+        bool unset = 0; // If any position is not set, then this will be true
+        for (register unsigned int i = 0; i < NUM_HASH_FNS / 2; i++, pos++)
+        {
+            register uint32_t val = *pos;
+            register uint32_t idx = val & (FILTER_SIZE - 1);
+            register uint32_t bit = (1 << (idx & 7));
+            idx >>= 3;
+            unset |= (0 == (vData[idx] & bit));
 
-        bool ret = vData[idx >> 3] & (1 << (idx & 7));
-        vData[idx >> 3] |= (1 << (idx & 7));
-        if (ret)
-            conflicts++;
-        return !ret;
+            val = __builtin_bswap32(val);
+            register uint32_t idx2 = val & (FILTER_SIZE - 1);
+            register uint32_t bit2 = (1 << (idx2 & 7));
+            idx2 >>= 3;
+
+            unset |= (0 == (vData[idx2] & bit2));
+
+            vData[idx] |= bit;
+            vData[idx2] |= bit2;
+        }
+        return unset;
     }
 
     void insert(const uint256 &hash)
     {
-        const unsigned char *mem = hash.begin();
-        const uint32_t *pos = (const uint32_t *)&(mem[grabFrom]);
-        uint32_t idx = ((*pos) ^ mem[0]) & (FILTER_SIZE - 1);
-        vData[idx >> 3] |= (1 << (idx & 7));
+        const uint32_t *pos = (const uint32_t *)hash.begin();
+        for (register unsigned int i = 0; i < NUM_HASH_FNS / 2; i++, pos++)
+        {
+            register uint32_t val = *pos;
+            register uint32_t idx = val & (FILTER_SIZE - 1);
+            val = __builtin_bswap32(val);
+            register uint32_t idx2 = val & (FILTER_SIZE - 1);
+
+            vData[idx >> 3] |= (1 << (idx & 7));
+            vData[idx2 >> 3] |= (1 << (idx2 & 7));
+        }
     }
+
     bool contains(const uint256 &hash) const
     {
-        const unsigned char *mem = hash.begin();
-        const uint32_t *pos = (const uint32_t *)&(mem[grabFrom]);
-        uint32_t idx = ((*pos) ^ mem[0]) & (FILTER_SIZE - 1);
-        return vData[idx >> 3] & (1 << (idx & 7));
+        const uint32_t *pos = (const uint32_t *)hash.begin();
+        bool unset = 0; // If any position is not set, then this will be true
+        for (register unsigned int i = 0; i < NUM_HASH_FNS / 2; i++, pos++)
+        {
+            register uint32_t val = *pos;
+            register uint32_t idx = val & (FILTER_SIZE - 1);
+            val = __builtin_bswap32(val);
+            register uint32_t idx2 = val & (FILTER_SIZE - 1);
+
+            unset |= (0 == (vData[idx >> 3] & (1 << (idx & 7))));
+            unset |= (0 == (vData[idx2 >> 3] & (1 << (idx2 & 7))));
+        }
+        return !unset;
     }
 
     void reset() { memset(&vData[0], 0, FILTER_BYTES); }
 };
 
 
-template <unsigned int FILTER_SIZE>
-class CRollingFastFilter : public CFastFilter<FILTER_SIZE>
+template <unsigned int FILTER_SIZE, unsigned int NUM_HASH_FNS = 16>
+class CRollingFastFilter : public CFastFilter<FILTER_SIZE, NUM_HASH_FNS>
 {
     unsigned int erase;
     unsigned int eraseAmt;
@@ -95,7 +123,8 @@ public:
         erase = insecure_rand.rand32() % CFastFilter<FILTER_SIZE>::FILTER_BYTES;
         eraseAmt = _eraseAmt;
     }
-    void insert(const uint256 &hash)
+
+    void roll(void)
     {
         // By clearing some entries each time, the filter's false positive rate is limited.
         // Every time insert is called 1 entry is added and eraseAmt*8 entries are cleared.
@@ -115,7 +144,11 @@ public:
             loc++;
             loc &= (CFastFilter<FILTER_SIZE>::FILTER_BYTES - 1); // wrap around
         }
+    }
 
+    void insert(const uint256 &hash)
+    {
+        roll();
         CFastFilter<FILTER_SIZE>::insert(hash);
     }
 };

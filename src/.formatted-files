@@ -397,6 +397,7 @@ primitives/transaction.h
 bench/bench_bitcoin.cpp
 bench/bench.cpp
 bench/bench.h
+bench/bloom.cpp
 bench/crypto_hash.cpp
 bench/Examples.cpp
 bench/verify_script.cpp
