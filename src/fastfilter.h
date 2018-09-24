@@ -95,7 +95,8 @@ public:
         erase = insecure_rand.rand32() % CFastFilter<FILTER_SIZE>::FILTER_BYTES;
         eraseAmt = _eraseAmt;
     }
-    void insert(const uint256 &hash)
+
+    void roll()
     {
         // By clearing some entries each time, the filter's false positive rate is limited.
         // Every time insert is called 1 entry is added and eraseAmt*8 entries are cleared.
@@ -115,7 +116,11 @@ public:
             loc++;
             loc &= (CFastFilter<FILTER_SIZE>::FILTER_BYTES - 1); // wrap around
         }
+    }
 
+    void insert(const uint256 &hash)
+    {
+        roll();
         CFastFilter<FILTER_SIZE>::insert(hash);
     }
 };

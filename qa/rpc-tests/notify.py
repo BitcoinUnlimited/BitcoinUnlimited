@@ -110,4 +110,4 @@ class NotifyTest(BitcoinTestFramework):
             raise AssertionError(self.touch_filename4 + "does not exist")
 
 if __name__ == '__main__':
-    NotifyTest().main()
+    NotifyTest().main(bitcoinConfDict={"debug": ["all"]})

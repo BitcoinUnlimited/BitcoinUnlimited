@@ -49,6 +49,9 @@ class thread_group;
 } // namespace boost
 
 extern CTweak<unsigned int> numMsgHandlerThreads;
+/** True (default) if filters should be used to eliminate duplicate INVs.  These filters can sometimes
+    incorrectly filter a non-duplicate. */
+extern CTweak<bool> invFiltering;
 
 /** Time between pings automatically sent out for latency probing and keepalive (in seconds). */
 static const int PING_INTERVAL = 2 * 60;
@@ -632,7 +635,7 @@ public:
     {
         {
             LOCK(cs_inventory);
-            if (inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash))
+            if (invFiltering.Value() && inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash))
                 return;
             vInventoryToSend.push_back(inv);
         }

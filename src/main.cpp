@@ -6395,7 +6395,7 @@ bool SendMessages(CNode *pto)
                         if (fChokeTxInv)
                             continue;
                         // skip if we already know about this one
-                        if (pto->filterInventoryKnown.contains(inv.hash))
+                        if (invFiltering.Value() && pto->filterInventoryKnown.contains(inv.hash))
                             continue;
                     }
                     vInvSend.push_back(inv);

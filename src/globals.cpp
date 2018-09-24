@@ -248,6 +248,9 @@ CTweak<uint64_t> blockSigopsPerMb("net.excessiveSigopsPerMb",
     "Excessive effort per block, denoted in cost (# inputs * txsize) per MB",
     BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
 CTweak<bool> ignoreNetTimeouts("net.ignoreTimeouts", "ignore inactivity timeouts, used during debugging", false);
+CTweak<bool> invFiltering("net.invFiltering",
+    "Use performance enhancing INV message filtering, but its possible to miss a transaction",
+    true);
 
 CTweak<uint64_t> blockMiningSigopsPerMb("mining.excessiveSigopsPerMb",
     "Excessive effort per block, denoted in cost (# inputs * txsize) per MB",

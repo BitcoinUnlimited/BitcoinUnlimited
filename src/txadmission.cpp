@@ -136,9 +136,10 @@ unsigned int TxAlreadyHave(const CInv &inv)
     {
     case MSG_TX:
     {
-        if (txRecentlyInBlock.contains(inv.hash))
+        bool filtering = invFiltering.Value();
+        if (filtering && txRecentlyInBlock.contains(inv.hash))
             return 1;
-        if (recentRejects.contains(inv.hash))
+        if (filtering && recentRejects.contains(inv.hash))
             return 2;
         if (mempool.exists(inv.hash))
             return 3;

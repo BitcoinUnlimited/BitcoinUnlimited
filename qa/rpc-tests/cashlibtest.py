@@ -28,7 +28,7 @@ class MyTest (BitcoinTestFramework):
         self.nodes = start_nodes(2, self.options.tmpdir)
         connect_nodes_bi(self.nodes, 0, 1)
         self.is_network_split = False
-        self.sync_all()
+        self.sync_blocks()
 
     def run_test(self):
         faulted = False
@@ -104,7 +104,7 @@ if __name__ == '__main__':
     path = os.path.dirname(env)
     try:
         cashlib.init(path + os.sep + ".libs" + os.sep + "libbitcoincash.so")
-        MyTest().main()
+        MyTest().main(bitcoinConfDict={"net.invFiltering":0})
     except OSError as e:
         print("Issue loading shared library.  This is expected during cross compilation since the native python will not load the .so: %s" % str(e))
 
@@ -115,6 +115,7 @@ def Test():
     t = MyTest()
     bitcoinConf = {
         "debug": ["rpc", "net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "net.invFiltering":0
     }
 
     flags = [] # ["--nocleanup", "--noshutdown"]

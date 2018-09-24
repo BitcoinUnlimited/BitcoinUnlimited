@@ -277,6 +277,10 @@ def sync_mempools(rpc_connections, wait=1,verbose=1):
     pools
     """
     count = 0
+    origTxFiltering = [ x.get("net.invFiltering") for x in rpc_connections]
+    for n in rpc_connections:
+        n.set("net.invFiltering=False")
+
     while True:
         count += 1
         pool = set(rpc_connections[0].getrawmempool())
@@ -304,6 +308,10 @@ def sync_mempools(rpc_connections, wait=1,verbose=1):
             rpc_connections[source].pushtx(destPeer['addr'])
             logging.info("sync_mempools: pushed tx from %d to %s" % (source, destPeer['addr']))
         time.sleep(wait)
+
+    for (n, val) in zip(rpc_connections, origTxFiltering):
+        if val:
+            n.set("net.invFiltering=%s" % val)
 
 def filterUnsupportedParams(defaults, param_keys=FILTER_PARAM_KEYS):
     """

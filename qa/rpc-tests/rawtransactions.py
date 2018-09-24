@@ -46,7 +46,6 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(),1.5)
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(),1.0)
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(),5.0)
-        self.sync_all()
         self.nodes[0].generate(5)
         self.sync_all()
 
