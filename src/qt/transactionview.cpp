@@ -196,6 +196,7 @@ void TransactionView::setModel(WalletModel *_model)
     if (_model)
     {
         transactionProxyModel = new TransactionFilterProxy(this);
+        transactionProxyModel->setPublicLabelFilter(false);
         transactionProxyModel->setSourceModel(_model->getTransactionTableModel());
         transactionProxyModel->setDynamicSortFilter(true);
         transactionProxyModel->setSortCaseSensitivity(Qt::CaseInsensitive);

@@ -388,6 +388,7 @@ public:
     bool IsTrusted() const;
 
     bool WriteToDisk(CWalletDB *pwalletdb);
+    bool WriteTopPublicLabel(CWalletDB *pwalletdb);
 
     int64_t GetTxTime() const;
     int GetRequestCount() const;
@@ -625,6 +626,8 @@ public:
     }
 
     std::map<uint256, CWalletTx> mapWallet;
+    std::map<uint256, CWalletTx> mapWalletTopPublicLabels;
+
     std::list<CAccountingEntry> laccentries;
 
     typedef std::pair<CWalletTx *, CAccountingEntry *> TxPair;
@@ -737,7 +740,7 @@ public:
     int64_t IncOrderPosNext(CWalletDB *pwalletdb = nullptr);
 
     void MarkDirty();
-    bool AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletDB *pwalletdb);
+    bool AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletDB *pwalletdb, bool isTopPublicLabel);
     void SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIndex = -1);
     bool AddToWalletIfInvolvingMe(const CTransactionRef &ptx, const CBlock *pblock, bool fUpdate, int txIndex = -1);
     int ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate = false);
@@ -799,6 +802,8 @@ public:
     int64_t GetOldestKeyPoolTime();
     void GetAllReserveKeys(std::set<CKeyID> &setAddress) const;
 
+    std::vector<std::pair<std::string, CAmount>> GroupTopPublicLabels(int listLength, std::string addrPrefix);
+    std::vector<std::pair<CWalletTx, int>> GetTopPublicLabelTxs(const std::string comparePublicLabel);
     std::set<std::set<CTxDestination> > GetAddressGroupings();
     std::map<CTxDestination, CAmount> GetAddressBalances();
 
@@ -809,6 +814,7 @@ public:
     isminetype IsMine(const CTxDestination &dest) const;
     bool IsMine(const CTransaction &tx) const;
 
+    std::pair<CAmount, int> UnspentPublicLabelAmount(const CTransaction& tx, const std::string comparePublicLabel) const;
     CAmount GetDebit(const CTxIn &txin, const isminefilter &filter) const;
     CAmount GetCredit(const CTxOut &txout, const isminefilter &filter) const;
     bool IsChange(const CTxOut &txout) const;
@@ -822,8 +828,9 @@ public:
     void SetBestChain(const CBlockLocator &loc);
 
     DBErrors LoadWallet(bool &fFirstRunRet);
-    DBErrors ZapWalletTx(std::vector<CWalletTx> &vWtx);
+    DBErrors ZapWalletTx(std::vector<CWalletTx> &vWtx, std::string txType);
     DBErrors ZapSelectTx(std::vector<uint256> &vHashIn, std::vector<uint256> &vHashOut);
+    void ZapSpentTopPublicLabels();
 
     bool SetAddressBook(const CTxDestination &address, const std::string &strName, const std::string &purpose);
 

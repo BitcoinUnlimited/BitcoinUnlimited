@@ -259,6 +259,14 @@ void BitcoinGUI::createActions()
     historyAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_4));
     tabGroup->addAction(historyAction);
 
+    publicLabelAction = new QAction(platformStyle->SingleColorIcon(":/icons/history"), tr("&Top Public Labels"), this);
+    publicLabelAction->setStatusTip(tr("Browse the top funded public labels"));
+    publicLabelAction->setToolTip(publicLabelAction->statusTip());
+    publicLabelAction->setCheckable(true);
+    publicLabelAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_5));
+    tabGroup->addAction(publicLabelAction);
+    if (GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS) == 0) { publicLabelAction->setVisible(false); }
+
 #ifdef ENABLE_WALLET
     // These showNormalIfMinimized are needed because Send Coins and Receive Coins
     // can be triggered from the tray menu, and need to show the GUI to be useful.
@@ -274,6 +282,8 @@ void BitcoinGUI::createActions()
     connect(receiveCoinsMenuAction, SIGNAL(triggered()), this, SLOT(gotoReceiveCoinsPage()));
     connect(historyAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
     connect(historyAction, SIGNAL(triggered()), this, SLOT(gotoHistoryPage()));
+    connect(publicLabelAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(publicLabelAction, SIGNAL(triggered()), this, SLOT(gotoPublicLabelPage()));
 #endif // ENABLE_WALLET
 
     quitAction = new QAction(platformStyle->TextColorIcon(":/icons/quit"), tr("E&xit"), this);
@@ -422,6 +432,7 @@ void BitcoinGUI::createToolBars()
         toolbar->addAction(sendCoinsAction);
         toolbar->addAction(receiveCoinsAction);
         toolbar->addAction(historyAction);
+        toolbar->addAction(publicLabelAction);
         overviewAction->setChecked(true);
     }
 }
@@ -505,6 +516,7 @@ void BitcoinGUI::setWalletActionsEnabled(bool enabled)
     receiveCoinsAction->setEnabled(enabled);
     receiveCoinsMenuAction->setEnabled(enabled);
     historyAction->setEnabled(enabled);
+    publicLabelAction->setEnabled(enabled);
     encryptWalletAction->setEnabled(enabled);
     backupWalletAction->setEnabled(enabled);
     changePassphraseAction->setEnabled(enabled);
@@ -634,6 +646,12 @@ void BitcoinGUI::gotoHistoryPage()
         walletFrame->gotoHistoryPage();
 }
 
+void BitcoinGUI::gotoPublicLabelPage()
+{
+    publicLabelAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoPublicLabelPage();
+}
+
 void BitcoinGUI::gotoReceiveCoinsPage()
 {
     receiveCoinsAction->setChecked(true);
@@ -641,7 +659,7 @@ void BitcoinGUI::gotoReceiveCoinsPage()
         walletFrame->gotoReceiveCoinsPage();
 }
 
-void BitcoinGUI::gotoSendCoinsPage(QString addr)
+void BitcoinGUI::gotoSendCoinsPage(QString addr, QString labelPublic)
 {
     sendCoinsAction->setChecked(true);
     if (walletFrame)

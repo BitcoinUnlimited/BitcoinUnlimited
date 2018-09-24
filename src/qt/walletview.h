@@ -18,6 +18,7 @@ class ReceiveCoinsDialog;
 class SendCoinsDialog;
 class SendCoinsRecipient;
 class TransactionView;
+class PublicLabelView;
 class WalletModel;
 class AddressBookPage;
 class Config;
@@ -63,12 +64,14 @@ private:
 
     OverviewPage *overviewPage;
     QWidget *transactionsPage;
+    QWidget *publicLabelPage;
     ReceiveCoinsDialog *receiveCoinsPage;
     SendCoinsDialog *sendCoinsPage;
     AddressBookPage *usedSendingAddressesPage;
     AddressBookPage *usedReceivingAddressesPage;
 
     TransactionView *transactionView;
+    PublicLabelView *publicLabelView;
 
     QProgressDialog *progressDialog;
     const PlatformStyle *platformStyle;
@@ -78,10 +81,12 @@ public Q_SLOTS:
     void gotoOverviewPage();
     /** Switch to history (transactions) page */
     void gotoHistoryPage();
+    /** Switch to public label page */
+    void gotoPublicLabelPage();
     /** Switch to receive coins page */
     void gotoReceiveCoinsPage();
     /** Switch to send coins page */
-    void gotoSendCoinsPage(QString addr = "");
+    void gotoSendCoinsPage(QString labelPublic);
 
     /** Show Sign/Verify Message dialog and switch to sign message tab */
     void gotoSignMessageTab(QString addr = "");
