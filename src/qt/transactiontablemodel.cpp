@@ -51,6 +51,7 @@ public:
     TransactionTablePriv(CWallet *_wallet, TransactionTableModel *_parent) : wallet(_wallet), parent(_parent) {}
     CWallet *wallet;
     TransactionTableModel *parent;
+    QString addrPrefix;
 
     /* Local cache of wallet.
      * As it is in the same order as the CWallet, by definition
@@ -74,7 +75,6 @@ public:
 
             if (GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS) > 0)
             {
-                std::vector<std::pair<std::string, CAmount>> publicLabelsGrouped = wallet->GroupTopPublicLabels(10);
                 for (std::map<uint256, CWalletTx>::iterator it = wallet->mapWalletTopPublicLabels.begin(); it != wallet->mapWalletTopPublicLabels.end();++it)
                 {
                     if (TransactionRecord::showTransaction(it->second))
@@ -82,13 +82,6 @@ public:
                         QList<TransactionRecord> recList = TransactionRecord::decomposeTransaction(wallet, it->second, true);
                         for (TransactionRecord &recNew: recList)
                         {
-                            // Exclude public labels that are not in the Top 20
-                            std::string txPublicLabel = recNew.addresses.begin()->first;
-                            auto plit = std::find_if( publicLabelsGrouped.begin(), publicLabelsGrouped.end(),
-                                [&txPublicLabel](const std::pair<std::string, CAmount>& element){ return element.first == txPublicLabel;} );
-
-                            if (plit == publicLabelsGrouped.end()) goto recNew_Next;
-
                             // Exclude public labels that already exist
                             for (const TransactionRecord &rec: cachedWallet)
                                 if (rec.addresses.begin()->first == recNew.addresses.begin()->first) goto recNew_Next;
@@ -309,6 +302,12 @@ void TransactionTableModel::updateConfirmations()
     //  visible rows.
     Q_EMIT dataChanged(index(0, Status), index(priv->size() - 1, Status));
     Q_EMIT dataChanged(index(0, ToAddress), index(priv->size() - 1, ToAddress));
+}
+
+std::vector<std::pair<std::string, CAmount>> TransactionTableModel::getTopPublicLabelsList(QString addrPrefix)
+{
+    // Build a list of the Top 20 public labels using the addrPrefix filter
+     return wallet->GroupTopPublicLabels(20, addrPrefix.toStdString());
 }
 
 int TransactionTableModel::rowCount(const QModelIndex &parent) const

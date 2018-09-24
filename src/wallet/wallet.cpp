@@ -35,6 +35,7 @@
 #include <assert.h>
 
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/algorithm/string/find.hpp>
 #include <boost/thread.hpp>
 
 using namespace std;
@@ -2684,7 +2685,7 @@ bool CWallet::AddAccountingEntry(const CAccountingEntry &acentry, CWalletDB &pwa
     return true;
 }
 
-std::vector<std::pair<std::string, CAmount>> CWallet::GroupTopPublicLabels(int listLength)
+std::vector<std::pair<std::string, CAmount>> CWallet::GroupTopPublicLabels(int listLength, std::string addrPrefix)
 {
     // Make a list of all top public labels grouped by unspent outputs
     std::map<std::string, CAmount> listTopPublicLabels;
@@ -2699,7 +2700,10 @@ std::vector<std::pair<std::string, CAmount>> CWallet::GroupTopPublicLabels(int l
             CTxOut txoutPL = wtx.vout[i];
             std::string txPublicLabel = getLabelPublic(txoutPL.scriptPubKey);
 
-            if (txPublicLabel != "")
+            // find case insenstive
+            bool foundPrefix = boost:: ifind_first(txPublicLabel, addrPrefix);
+
+            if (txPublicLabel != "" && (foundPrefix || addrPrefix.empty()))
             {
                 CTxOut txoutPLvalue = wtx.vout[i + 1];
 

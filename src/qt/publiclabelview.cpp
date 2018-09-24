@@ -135,7 +135,7 @@ PublicLabelView::PublicLabelView(const PlatformStyle *platformStyle, QWidget *pa
     connect(mapperThirdPartyTxUrls, SIGNAL(mapped(QString)), this, SLOT(openThirdPartyTxUrl(QString)));
 
     connect(dateWidget, SIGNAL(activated(int)), this, SLOT(chooseDate(int)));
-    connect(addressWidget, SIGNAL(textChanged(QString)), this, SLOT(changedPrefix(QString)));
+    connect(addressWidget, SIGNAL(editingFinished()), this, SLOT(changedPrefix()));
     connect(amountWidget, SIGNAL(textChanged(QString)), this, SLOT(changedAmount(QString)));
 
     connect(view, SIGNAL(doubleClicked(QModelIndex)), this, SIGNAL(doubleClicked(QModelIndex)));
@@ -155,14 +155,17 @@ void PublicLabelView::setModel(WalletModel *_model)
     this->model = _model;
     if(_model)
     {
+        TransactionTableModel *ttm = _model->getTransactionTableModel();
         transactionProxyModel = new TransactionFilterProxy(this);
         // only interested in txs which involve public labels
         transactionProxyModel->setPublicLabelFilter(true);
-        transactionProxyModel->setSourceModel(_model->getTransactionTableModel());
+        transactionProxyModel->setSourceModel(ttm);
         transactionProxyModel->setDynamicSortFilter(true);
         transactionProxyModel->setSortCaseSensitivity(Qt::CaseInsensitive);
         transactionProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
         transactionProxyModel->setSortRole(Qt::EditRole);
+        std::vector<std::pair<std::string, CAmount>> publicLabelsGrouped = ttm->getTopPublicLabelsList(QString());
+        transactionProxyModel->setTopPublicLabelsList(publicLabelsGrouped);
 
         publicLabelView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         publicLabelView->setModel(transactionProxyModel);
@@ -256,11 +259,13 @@ void PublicLabelView::chooseDate(int idx)
     }
 }
 
-void PublicLabelView::changedPrefix(const QString &prefix)
+void PublicLabelView::changedPrefix()
 {
     if(!transactionProxyModel)
         return;
-    transactionProxyModel->setAddressPrefix(prefix);
+    std::vector<std::pair<std::string, CAmount>> publicLabelsGrouped = this->model->getTransactionTableModel()->getTopPublicLabelsList(addressWidget->text());
+    transactionProxyModel->setTopPublicLabelsList(publicLabelsGrouped);
+    transactionProxyModel->setAddressPrefix(addressWidget->text());
 }
 
 void PublicLabelView::changedAmount(const QString &amount)

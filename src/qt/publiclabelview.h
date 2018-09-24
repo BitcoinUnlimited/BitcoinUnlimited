@@ -105,7 +105,7 @@ Q_SIGNALS:
 
 public Q_SLOTS:
     void chooseDate(int idx);
-    void changedPrefix(const QString &prefix);
+    void changedPrefix();
     void changedAmount(const QString &amount);
     void exportClicked();
     void focusTransaction(const QModelIndex&);
