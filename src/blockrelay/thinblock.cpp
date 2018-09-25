@@ -463,6 +463,7 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Check for Misbehaving and DOS
     // If they make more than 20 requests in 10 minutes then disconnect them
+    if (Params().NetworkIDString() != "regtest")
     {
         if (pfrom->nGetXBlockTxLastTime <= 0)
             pfrom->nGetXBlockTxLastTime = GetTime();

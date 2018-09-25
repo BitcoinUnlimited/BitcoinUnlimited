@@ -4418,6 +4418,7 @@ static bool BasicThinblockChecks(CNode *pfrom, const CChainParams &chainparams)
 
     // Check for Misbehaving and DOS
     // If they make more than 20 requests in 10 minutes then disconnect them
+    if (Params().NetworkIDString() != "regtest")
     {
         if (pfrom->nGetXthinLastTime <= 0)
             pfrom->nGetXthinLastTime = GetTime();
