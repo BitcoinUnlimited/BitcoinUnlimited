@@ -318,6 +318,9 @@ inline void LogWrite(const std::string &str)
 #define LOGA(...) Logging::LogWrite(__VA_ARGS__)
 //
 
+// Flush log file (if you know you are about to abort)
+void LogFlush();
+
 // Log tests:
 UniValue setlog(const UniValue &params, bool fHelp);
 // END logging.
@@ -487,11 +490,13 @@ void TraceThreads(const std::string &name, Callable func)
     catch (const std::exception &e)
     {
         PrintExceptionContinue(&e, name.c_str());
+        LogFlush();
         throw;
     }
     catch (...)
     {
         PrintExceptionContinue(NULL, name.c_str());
+        LogFlush();
         throw;
     }
 }

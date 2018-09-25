@@ -38,8 +38,7 @@ static void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck> *pqueue)
     pqueue->Thread();
 }
 
-CParallelValidation::CParallelValidation(boost::thread_group *threadGroup)
-    : nThreads(0), semThreadCount(nScriptCheckQueues)
+CParallelValidation::CParallelValidation() : nThreads(0), semThreadCount(nScriptCheckQueues)
 {
     // There are nScriptCheckQueues which are used to validate blocks in parallel. Each block
     // that validates will use one script check queue which must *not* be shared with any other
@@ -66,7 +65,7 @@ CParallelValidation::CParallelValidation(boost::thread_group *threadGroup)
         auto queue = new CCheckQueue<CScriptCheck>(128);
         for (unsigned int i = 0; i < nThreads; i++)
         {
-            threadGroup->create_thread(boost::bind(&AddScriptCheckThreads, i + 1, queue));
+            threadGroup.create_thread(boost::bind(&AddScriptCheckThreads, i + 1, queue));
         }
         vQueues.push_back(queue);
     }
@@ -74,6 +73,9 @@ CParallelValidation::CParallelValidation(boost::thread_group *threadGroup)
 
 CParallelValidation::~CParallelValidation()
 {
+    for (auto queue : vQueues)
+        queue->Shutdown();
+    threadGroup.join_all();
     for (auto queue : vQueues)
         delete queue;
 }
