@@ -230,19 +230,23 @@ void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
 
 void CommitTxToMempool()
 {
-    std::vector<uint256> whatChanged;
-    LOCK(cs_main); // cs_main must lock before csCommitQ
+    std::vector<uint256> vWhatChanged;
     {
+#ifdef ENABLE_WALLET
+        // cs_main is taken again in SyncWithWallets but must be locked before csCommitQ
+        // to maintain correct locking order.
+        LOCK(cs_main);
+#endif
         boost::unique_lock<boost::mutex> lock(csCommitQ);
         for (auto &it : txCommitQ)
         {
+            // This transaction has already been validated so store it directly into the mempool.
             CTxCommitData &data = it.second;
-            // Store transaction in memory
             mempool.addUnchecked(it.first, data.entry, !IsInitialBlockDownload());
 #ifdef ENABLE_WALLET
             SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
 #endif
-            whatChanged.push_back(data.hash);
+            vWhatChanged.push_back(data.hash);
 
             // Update txn per second only when a txn is valid and accepted to the mempool
             mempool.UpdateTransactionsPerSecond();
@@ -262,7 +266,7 @@ void CommitTxToMempool()
         }
         LOG(MEMPOOL, "Reset incoming filter\n");
     }
-    ProcessOrphans(whatChanged);
+    ProcessOrphans(vWhatChanged);
 }
 
 
