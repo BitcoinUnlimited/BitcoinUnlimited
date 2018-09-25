@@ -46,7 +46,6 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(),1.5)
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(),1.0)
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(),5.0)
-        self.sync_all()
         self.nodes[0].generate(5)
         self.sync_all()
 
@@ -85,7 +84,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         txId = self.nodes[0].sendtoaddress(mSigObj, 1.2)
         self.sync_all()
         self.nodes[0].generate(1)
-        self.sync_all()
+        self.sync_blocks()
         assert_equal(self.nodes[2].getbalance(), bal+Decimal('1.20000000')) #node2 has both keys of the 2of2 ms addr., tx should affect the balance
 
 
@@ -106,9 +105,8 @@ class RawTransactionsTest(BitcoinTestFramework):
         decTx = self.nodes[0].gettransaction(txId)
         rawTx = self.nodes[0].decoderawtransaction(decTx['hex'])
         sPK = rawTx['vout'][0]['scriptPubKey']['hex']
-        self.sync_all()
         self.nodes[0].generate(1)
-        self.sync_all()
+        self.sync_blocks()
 
         #THIS IS A INCOMPLETE FEATURE
         #NODE2 HAS TWO OF THREE KEY AND THE FUNDS SHOULD BE SPENDABLE AND COUNT AT BALANCE CALCULATION

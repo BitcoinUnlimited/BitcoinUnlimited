@@ -88,7 +88,7 @@ class MyTest (BitcoinTestFramework):
 
         tx2id = self.nodes[0].enqueuerawtransaction(hexlify(tx2.serialize()).decode("utf-8"))
         # Check that all tx were created, and commit them
-        waitFor(6, lambda: self.nodes[0].getmempoolinfo()["size"] == 2)
+        waitFor(20, lambda: self.nodes[0].getmempoolinfo()["size"] == 2)
         blk = self.nodes[0].generate(1)
         self.sync_blocks()
         assert self.nodes[0].getmempoolinfo()["size"] == 0

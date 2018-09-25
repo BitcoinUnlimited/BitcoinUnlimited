@@ -527,9 +527,10 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
             logging.info("Started %s %d as pid %d at %s dir %s  " % (binary, i, bitcoind_processes[i].pid, "127.0.0.1:"+str(p2p_port(i)), datadir))
             break
         except Exception as exc:
+            # this may not be an error because every once in a while bitcoind uses a port that's already in use.
             logging.error("Error bringing up bitcoind #%d (start_node, directory %s), this might be retried. Problem is: %s", i, dirname, str(exc))
             do_and_ignore_failure(lambda x: bitcoind_processes[i].kill())
-            traceback.print_exc(file=sys.stdout)
+            # commented out because looks like an error: traceback.print_exc(file=sys.stdout)
             remap_ports(i)
             fixup_ports_in_configfile(i)
     else:

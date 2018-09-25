@@ -268,11 +268,11 @@ class TestManager(object):
                     hsh = c.rpc.getbestblockhash()
                     print("Quick   RPC returns", hsh)
                     t = 0
-                    # give 20 seconds to sync, this is a pretty generous number.  How much time might it take
-                    # an underpowered test node running 4-6 copies of bitcoind to sync them?  
-                    while t < 10 and hsh != hex(blockhash)[2:]:  # hex(blockhash) returns "0x..." whereas hsh does not have the "0x"
+                    # give 60 seconds to sync, this is a pretty generous number.  How much time might it take
+                    # an underpowered test node running 16 copies of bitcoind (4 simultaneous tests with 4 nodes) to sync them?
+                    while t < 30 and hsh != hex(blockhash)[2:]:  # hex(blockhash) returns "0x..." whereas hsh does not have the "0x"
                         t += 1
-                        time.sleep(2) 
+                        time.sleep(2)
                         hsh = c.rpc.getbestblockhash()
                     if t == 10:
                         print("Delayed RPC returns", hsh)

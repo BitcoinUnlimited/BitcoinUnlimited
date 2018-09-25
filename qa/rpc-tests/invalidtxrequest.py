@@ -6,6 +6,7 @@ import test_framework.loginit
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.blocktools import *
+from test_framework.util import findBitcoind
 import time, os
 
 

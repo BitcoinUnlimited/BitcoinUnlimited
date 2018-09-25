@@ -549,6 +549,7 @@ public:
     // requires LOCK(cs_vRecvMsg)
     unsigned int GetTotalRecvSize()
     {
+        AssertLockHeld(cs_vRecvMsg);
         unsigned int total = 0;
         for (const CNetMessage &msg : vRecvMsg)
             total += msg.vRecv.size() + 24;
@@ -558,9 +559,9 @@ public:
     // requires LOCK(cs_vRecvMsg)
     bool ReceiveMsgBytes(const char *pch, unsigned int nBytes);
 
-    // requires LOCK(cs_vRecvMsg)
     void SetRecvVersion(int nVersionIn)
     {
+        LOCK(cs_vRecvMsg);
         nRecvVersion = nVersionIn;
         for (CNetMessage &msg : vRecvMsg)
             msg.SetVersion(nVersionIn);
@@ -622,20 +623,16 @@ public:
 
     void AddInventoryKnown(const CInv &inv)
     {
-        {
-            LOCK(cs_inventory);
-            filterInventoryKnown.insert(inv.hash);
-        }
+        LOCK(cs_inventory);
+        filterInventoryKnown.insert(inv.hash);
     }
 
     void PushInventory(const CInv &inv)
     {
-        {
-            LOCK(cs_inventory);
-            if (inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash))
-                return;
-            vInventoryToSend.push_back(inv);
-        }
+        LOCK(cs_inventory);
+        if (inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash))
+            return;
+        vInventoryToSend.push_back(inv);
     }
 
     void PushBlockHash(const uint256 &hash)
