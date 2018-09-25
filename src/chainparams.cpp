@@ -331,8 +331,8 @@ public:
         consensus.uahfHeight = 1155876;
         // Nov, 13 hard fork
         consensus.daaHeight = 1188697;
-        // May, 15 2018 hard fork - FIXME find out which is testnet fork height
-        // consensus.may2018Height = ;
+        // May, 15 2018 hard fork
+        consensus.may2018Height = 1233070;
         // Nov 15, 2018 hard fork
         consensus.nov2018ActivationTime = 1542300000;
 
