@@ -107,11 +107,15 @@ private:
     QString formatTooltip(const TransactionRecord *rec) const;
 #ifdef ENABLE_WALLET
     QString pickLabelWithAddress(AddressList listAddresses, std::string &address) const;
+
 #endif
 
     QVariant txStatusDecoration(const TransactionRecord *wtx) const;
     QVariant txWatchonlyDecoration(const TransactionRecord *wtx) const;
     QVariant txAddressDecoration(const TransactionRecord *wtx) const;
+
+    mutable QMap<std::string, CAmount> publicLabelTotals;
+    CAmount unspentPublicLabelTotal(std::string publicLabel) const;
 
 public Q_SLOTS:
     /* New transaction, or transaction changed status */
@@ -121,6 +125,10 @@ public Q_SLOTS:
     /** Updates the column title to "Amount (DisplayUnit)" and emits headerDataChanged() signal for table headers to
      * react. */
     void updateAmountColumnTitle();
+    void updateAddressColumnTitle();
+    void updatePublicLabelColumnTitle();
+    std::vector<std::pair<std::string, CAmount>> getTopPublicLabelsList(QString addrPrefix);
+
     /* Needed to update fProcessingQueuedTransactions through a QueuedConnection */
     void setProcessingQueuedTransactions(bool value) { fProcessingQueuedTransactions = value; }
     friend class TransactionTablePriv;

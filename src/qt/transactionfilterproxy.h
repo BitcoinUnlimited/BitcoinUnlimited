@@ -36,12 +36,15 @@ public:
 
     void setDateRange(const QDateTime &from, const QDateTime &to);
     void setAddressPrefix(const QString &addrPrefix);
+
     /**
       @note Type filter takes a bit field created with TYPE() or ALL_TYPES
      */
     void setTypeFilter(quint32 modes);
     void setMinAmount(const CAmount &minimum);
     void setWatchOnlyFilter(WatchOnlyFilter filter);
+    void setPublicLabelFilter(bool filter);
+    void setTopPublicLabelsList(std::vector<std::pair<std::string, CAmount>> &_publicLabelsGrouped);
 
     /** Set maximum number of rows returned, -1 if unlimited. */
     void setLimit(int limit);
@@ -58,12 +61,14 @@ private:
     QDateTime dateFrom;
     QDateTime dateTo;
     QString addrPrefix;
+    std::vector<std::pair<std::string, CAmount>> publicLabelsGrouped;
     quint32 typeFilter;
     WatchOnlyFilter watchOnlyFilter;
     bool publicLabelFilter;
     CAmount minAmount;
     int limitRows;
     bool showInactive;
+
 };
 
 #endif // BITCOIN_QT_TRANSACTIONFILTERPROXY_H
