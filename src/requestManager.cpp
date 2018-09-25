@@ -216,7 +216,8 @@ void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *
     // This is block and peer that was selected in FindNextBlocksToDownload() so we want to add it as a block
     // source first so that it gets requested first.
     LOCK(cs_objDownloader);
-    AskFor(objArray, from, priority);
+    if (from)
+        AskFor(objArray, from, priority);
 
     // Add the other peers as potential sources in the event the RequestManager needs to make a re-request
     // for this block. Only add NETWORK nodes that have block availability.
@@ -429,6 +430,15 @@ bool CUnknownObj::AddSource(CNode *from)
         return true;
     }
     return false;
+}
+
+void CRequestManager::RequestCorruptedBlock(const uint256 &blockHash)
+{
+    // set it to MSG_BLOCK here but it should get overwritten in RequestBlock
+    CInv obj(MSG_BLOCK, blockHash);
+    std::vector<CInv> vGetBlocks;
+    vGetBlocks.push_back(obj);
+    AskForDuringIBD(vGetBlocks, nullptr);
 }
 
 bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
