@@ -172,8 +172,8 @@ public:
     // of the same blocks.
     bool AlreadyAskedForBlock(const uint256 &hash);
 
-    // Indicate that we got this object, from and bytes are optional (for node performance tracking)
-    void Received(const CInv &obj, CNode *from, int bytes = 0);
+    // Indicate that we got this object
+    void Received(const CInv &obj, CNode *pfrom);
 
     // Indicate that we previously got this object
     void AlreadyReceived(CNode *pnode, const CInv &obj);

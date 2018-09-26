@@ -257,32 +257,29 @@ bool CRequestManager::AlreadyAskedForBlock(const uint256 &hash)
     return false;
 }
 
-// Indicate that we got this object, from and bytes are optional (for node performance tracking)
-void CRequestManager::Received(const CInv &obj, CNode *from, int bytes)
+// Indicate that we got this object.
+void CRequestManager::Received(const CInv &obj, CNode *pfrom)
 {
-    int64_t now = GetTimeMicros();
     LOCK(cs_objDownloader);
     if (obj.type == MSG_TX)
     {
         OdMap::iterator item = mapTxnInfo.find(obj.hash);
         if (item == mapTxnInfo.end())
-            return; // item has already been removed
+            return;
+
         LOG(REQ, "ReqMgr: TX received for %s.\n", item->second.obj.ToString().c_str());
-        from->txReqLatency << (now - item->second.lastRequestTime); // keep track of response latency of this node
-        // will be decremented in the item cleanup: if (inFlight) inFlight--;
-        cleanup(item); // remove the item
+        cleanup(item);
         receivedTxns += 1;
     }
-    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_THINBLOCK) || (obj.type == MSG_XTHINBLOCK))
+    else if (pfrom && (obj.type == MSG_BLOCK || obj.type == MSG_THINBLOCK || obj.type == MSG_XTHINBLOCK))
     {
         OdMap::iterator item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
-            return; // item has already been removed
+            return;
+
         LOG(BLK, "%s removed from request queue (received from %s).\n", item->second.obj.ToString().c_str(),
-            from->GetLogName());
-        // from->blkReqLatency << (now - item->second.lastRequestTime);  // keep track of response latency of this node
-        cleanup(item); // remove the item
-        // receivedTxns += 1;
+            pfrom->GetLogName());
+        cleanup(item);
     }
 }
 

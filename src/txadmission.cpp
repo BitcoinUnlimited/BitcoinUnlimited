@@ -12,6 +12,7 @@
 #include "init.h"
 #include "main.h" // for cs_main
 #include "net.h"
+#include "requestManager.h"
 #include "respend/respenddetector.h"
 #include "timedata.h"
 #include "txorphanpool.h"
@@ -237,6 +238,10 @@ void CommitTxToMempool()
 
             // Update txn per second only when a txn is valid and accepted to the mempool
             mempool.UpdateTransactionsPerSecond();
+
+            // Mark tx as received so we don't re-request it again if more INV's arrive later
+            CInv inv(MSG_TX, data.hash);
+            requester.Received(inv, nullptr);
         }
         txCommitQ.clear();
     }
@@ -348,6 +353,9 @@ void ThreadTxAdmission()
                     {
                         LOCK(orphanpool.cs); // WRITELOCK
                         orphanpool.AddOrphanTx(tx, txd.nodeId);
+
+                        // Mark tx as received so we don't re-request it again if more INV's arrive later
+                        requester.Received(inv, nullptr);
 
                         // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
                         static unsigned int nMaxOrphanTx =
