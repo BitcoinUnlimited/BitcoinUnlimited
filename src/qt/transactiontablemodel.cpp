@@ -154,42 +154,26 @@ public:
             if (showTransaction)
             {
                 LOCK2(cs_main, wallet->cs_wallet);
-                // run once for each mapWallet and mapWalletTopPublicLabels
-                for (int i=1; i <= 2; i++)
+                // Find transaction in wallet
+                std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(hash);
+                if (mi == wallet->mapWallet.end())
                 {
-                    std::map<uint256, CWalletTx> walletMap;
-                    if (i == 1) walletMap = wallet->mapWalletTopPublicLabels; else walletMap = wallet->mapWallet;
-                    // Find transaction in wallet
-                    std::map<uint256, CWalletTx>::iterator mi = walletMap.find(hash);
-                    if (mi == walletMap.end())
+                    qWarning()
+                        << "TransactionTablePriv::updateWallet: Warning: Got CT_NEW, but transaction is not in wallet";
+                    break;
+                }
+                // Added -- insert at the right position
+                QList<TransactionRecord> toInsert = TransactionRecord::decomposeTransaction(wallet, mi->second);
+                if (!toInsert.isEmpty()) /* only if something to insert */
+                {
+                    parent->beginInsertRows(QModelIndex(), lowerIndex, lowerIndex + toInsert.size() - 1);
+                    int insert_idx = lowerIndex;
+                    Q_FOREACH (const TransactionRecord &rec, toInsert)
                     {
-                        qWarning()
-                            << "TransactionTablePriv::updateWallet: Warning: Got CT_NEW, but transaction is not in wallet";
-                        break;
+                        cachedWallet.insert(insert_idx, rec);
+                        insert_idx += 1;
                     }
-                    // Added -- insert at the right position
-                    QList<TransactionRecord> toInsert = TransactionRecord::decomposeTransaction(wallet, mi->second, false);
-                    if (!toInsert.isEmpty()) /* only if something to insert */
-                    {
-                        parent->beginInsertRows(QModelIndex(), lowerIndex, lowerIndex + toInsert.size() - 1);
-                        int insert_idx = lowerIndex;
-                        Q_FOREACH (const TransactionRecord &recNew, toInsert)
-                        {
-                            if (walletMap == wallet->mapWalletTopPublicLabels)
-                            {
-                                // Exclude public labels that already exist
-                                for (const TransactionRecord &rec: cachedWallet)
-                                    if (rec.addresses.begin()->first == recNew.addresses.begin()->first) goto recNew_Next;
-                            }
-
-                            cachedWallet.insert(insert_idx, recNew);
-                            insert_idx += 1;
-
-                            recNew_Next: {}
-                            // Continue
-                        }
-                        parent->endInsertRows();
-                    }
+                    parent->endInsertRows();
                 }
             }
             break;
