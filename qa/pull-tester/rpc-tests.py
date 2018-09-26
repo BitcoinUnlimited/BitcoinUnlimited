@@ -487,7 +487,8 @@ class RPCTestHandler:
                     # seems to make the .join() logic to work, and in turn communicate() not to fail
                     # with a timeout, even though the thread is done reading (which was another cause
                     # of a hang)
-                    comms(0.1)
+                    if not got_outputs[0]:
+                        comms(0.1)
 
                     # .communicate() can only be called once and we have to keep in mind now that
                     # communication happened properly (and the files are closed). It _has_ to be called with a non-None
