@@ -134,7 +134,7 @@ public:
         consensus.daaHeight = 504031;
         // May, 15 2018 hard fork
         consensus.may2018Height = 530359;
-        // May, 15 2018 hard fork
+        // Nov, 15 2018 hard fork
         consensus.nov2018ActivationTime = 1542300000;
 
         /**
@@ -262,7 +262,7 @@ public:
         consensus.daaHeight = consensus.DifficultyAdjustmentInterval();
         // May, 15 2018 hard fork
         consensus.may2018Height = 0;
-        // May, 15 2018 hard fork
+        // Nov, 15 2018 hard fork
         consensus.nov2018ActivationTime = 1542300000;
 
         vFixedSeeds.clear();
@@ -436,7 +436,7 @@ public:
         consensus.daaHeight = 0;
         // May, 15 2018 hard fork is always 0 on regtest
         consensus.may2018Height = 0;
-        // May, 15 2018 hard fork
+        // Nov, 15 2018 hard fork
         consensus.nov2018ActivationTime = 1542300000;
 
         pchMessageStart[0] = 0xfa;

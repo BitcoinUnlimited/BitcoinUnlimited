@@ -23,7 +23,7 @@ BOOST_AUTO_TEST_CASE(rpc_excessive)
     BOOST_CHECK_NO_THROW(CallRPC("getminingmaxblock"));
 
     // Testing the parsing of input parameters of setexcessive block,
-    // this RPC set the value for EB and AD and expect exaclty 2 unsigned
+    // this RPC set the value for EB and AD and expect exactly 2 unsigned
     // integer parameter.
 
     // 1) RPC accept 2 parameters EB and AD and both has to be positive integer
@@ -45,7 +45,7 @@ BOOST_AUTO_TEST_CASE(rpc_excessive)
 
     // Testing the parsing of inputs parameters of setminingmaxblock,
     // this RPC call set the value in byte for the max size of produced
-    // block. It accepts exaclty one parameter (positive integer) bigger
+    // block. It accepts exactly one parameter (positive integer) bigger
     // than 100 bytes
 
     // Passing 0 params should fail
@@ -215,9 +215,9 @@ BOOST_AUTO_TEST_CASE(check_excessive_validator)
 
     // Tweaks validator is potentially executed twice for every set operation.
     // The first execution check the validity of the value we want to set the param to.
-    // The second execution happens only if the assignment happened succesfully and
+    // The second execution happens only if the assignment happened successfully and
     // could be used as notification update mechanism.
-    // Tthe first time with the 3rd par (validate) = true and the 2n with validate = false.
+    // The first time with the 3rd par (validate) = true and the 2nd with validate = false.
     // If validate is true, the function is given a candidate and decides whether to allow
     // the assignment to happen, if validate is false, an assignment has happened
     // and you have the opportunity to add side effects (update the GUI or something)
@@ -229,7 +229,7 @@ BOOST_AUTO_TEST_CASE(check_excessive_validator)
 
     // TEST 1): EB has to be always greater or equal to MG
     // TEST 2): EB has to be always greater or equal of MIN_EXCESSIVE_BLOCK_SIZE
-    // Test 2 will be perfomred in validateblocktemplate.py
+    // Test 2 will be performed in validateblocktemplate.py
 
     // TEST 1)
     // new EB = 31MB, old EB = 32MB, perform validation
