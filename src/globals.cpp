@@ -273,14 +273,6 @@ CTweak<uint64_t> miningForkTime("mining.forkNov2018Time",
 CTweak<bool> unsafeGetBlockTemplate("mining.unsafeGetBlockTemplate",
     "Allow getblocktemplate to succeed even if the chain tip is old or this node is not connected to other nodes",
     false);
-CTweak<uint64_t> miningForkEB("mining.forkExcessiveBlock",
-    "Set the excessive block to this value at the time of the fork.",
-    // May2018 HF proposed max block size, no need to change it for the November '18 since we are not going to have an
-    // blopck size increase
-    MIN_EXCESSIVE_BLOCK_SIZE);
-CTweak<uint64_t> miningForkMG("mining.forkBlockSize",
-    "Set the maximum block generation size to this value at the time of the fork.",
-    DEFAULT_BLOCK_MAX_SIZE);
 
 CTweak<unsigned int> maxTxSize("net.excessiveTx", "Largest transaction size in bytes", DEFAULT_LARGEST_TRANSACTION);
 CTweakRef<unsigned int> eadTweak("net.excessiveAcceptDepth",
