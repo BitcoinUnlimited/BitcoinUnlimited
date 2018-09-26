@@ -4541,8 +4541,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         UpdatePreferredDownload(pfrom, State(pfrom->GetId()));
 
         // Send VERACK handshake message
-        pfrom->PushMessage(NetMsgType::VERACK);
         pfrom->fVerackSent = true;
+        pfrom->PushMessage(NetMsgType::VERACK);
 
         // Change version
         pfrom->ssSend.SetVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
@@ -4665,8 +4665,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // The BUVERSION message is active from the protocol EXPEDITED_VERSION onwards.
         if (pfrom->nVersion >= EXPEDITED_VERSION)
         {
-            pfrom->PushMessage(NetMsgType::BUVERSION, GetListenPort());
             pfrom->fBUVersionSent = true;
+            pfrom->PushMessage(NetMsgType::BUVERSION, GetListenPort());
         }
     }
 
@@ -6132,6 +6132,8 @@ bool SendMessages(CNode *pto)
         }
 
         CNodeState &state = *State(pto->GetId());
+        if (&state == nullptr)
+            return true;
 
         // If a sync has been started check whether we received the first batch of headers requested within the timeout
         // period. If not then disconnect and ban the node and a new node will automatically be selected to start the

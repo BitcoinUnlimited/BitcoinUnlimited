@@ -553,9 +553,9 @@ void CNode::copyStats(CNodeStats &stats)
 }
 #undef X
 
-// requires LOCK(cs_vRecvMsg)
 bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 {
+    AssertLockHeld(cs_vRecvMsg);
     while (nBytes > 0)
     {
         // get current incomplete message, or create a new one
