@@ -2754,7 +2754,7 @@ std::vector<std::pair<std::string, CAmount>> CWallet::GroupTopPublicLabels(int l
 
     // sort by satoshis descending
     std::sort(sortedTopPublicLabels.begin(), sortedTopPublicLabels.end(),
-                [](std::pair<std::string, CAmount> &left, std::pair<std::string, CAmount> &right)
+                [](const std::pair<std::string, CAmount> left, const std::pair<std::string, CAmount> right)
                 { return left.second > right.second; });
 
     // only return the top items by listLength
@@ -2793,7 +2793,7 @@ std::vector<std::pair<CWalletTx, int>> CWallet::GetTopPublicLabelTxs(const std::
 
     // sort by satoshis descending
     std::sort(listPublicLabelTxs.begin(), listPublicLabelTxs.end(), 
-                [](std::pair<CWalletTx, int> &left, std::pair<CWalletTx, int> &right)
+                [](const std::pair<CWalletTx, int> left, const std::pair<CWalletTx, int> right)
                 { return left.first.vout[left.second + 1].nValue > right.first.vout[right.second + 1].nValue; });
 
     return listPublicLabelTxs;

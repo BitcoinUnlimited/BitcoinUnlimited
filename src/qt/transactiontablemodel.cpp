@@ -80,7 +80,7 @@ public:
 
                 // sort txs by datetime descending
                 std::sort(sortedTopPublicLabels.begin(), sortedTopPublicLabels.end(),
-                            [](std::pair<int64_t, CWalletTx> &left, std::pair<int64_t, CWalletTx> &right)
+                            [](const std::pair<int64_t, CWalletTx> left, const std::pair<int64_t, CWalletTx> right)
                             { return left.first < right.first; });
 
                 for (std::pair<int64_t, CWalletTx> it: sortedTopPublicLabels)
