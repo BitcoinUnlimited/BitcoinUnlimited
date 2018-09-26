@@ -138,6 +138,27 @@ def hash160(msg):
     h.update(hashlib.sha256(msg).digest())
     return h.digest()
 
+class CompactSize(int):
+    def serialize(self):
+        assert(self>=0)
+        if self<253:
+            return struct.pack("<B", self)
+        elif self<2**16:
+            return struct.pack("<B", 253) + struct.pack("<H", self)
+        elif self<2**32:
+            return struct.pack("<B", 254) + struct.pack("<I", self)
+        elif self<2**64:
+            return struct.pack("<B", 255) + struct.pack("<Q", self)
+
+    def deserialize(self, f):
+        self = struct.unpack("<B", f.read(1))[0]
+        if self == 253:
+            self = struct.unpack("<H", f.read(2))[0]
+        elif self == 254:
+            self = struct.unpack("<I", f.read(4))[0]
+        elif self == 255:
+            self = struct.unpack("<Q", f.read(8))[0]
+        return self
 
 def deser_string(f):
     """Convert an array of bytes in the bitcoin P2P protocol format into a string
