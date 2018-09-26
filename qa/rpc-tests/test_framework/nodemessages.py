@@ -885,6 +885,47 @@ class msg_verack(object):
     def __repr__(self):
         return "msg_verack()"
 
+class msg_xversion(object):
+    command = b"xversion"
+
+    def __init__(self, xver = {}):
+        self.xver = xver
+
+    def deserialize(self, f):
+        map_size = CompactSize().deserialize(f)
+        self.xver = {}
+        for i in range(map_size):
+            key = CompactSize().deserialize(f)
+            val_size = CompactSize().deserialize(f)
+            value = f.read(val_size)
+            self.xver[key] = value
+
+    def serialize(self):
+        res = CompactSize(len(self.xver)).serialize()
+        for k, v in self.xver.items():
+            res += CompactSize(k).serialize()
+            res += CompactSize(len(v)).serialize()
+            res += v
+        return res
+
+    def __repr__(self):
+        return "msg_xversion(%s)" % repr(self.xver)
+
+class msg_xverack(object):
+    command = b"xverack"
+
+    def __init__(self):
+        pass
+
+    def deserialize(self, f):
+        pass
+
+    def serialize(self):
+        return b""
+
+    def __repr__(self):
+        return "msg_xverack()"
+
 
 class msg_addr(object):
     command = b"addr"

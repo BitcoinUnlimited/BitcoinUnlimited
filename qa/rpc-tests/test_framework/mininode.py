@@ -62,6 +62,8 @@ mininode_socket_map = dict()
 class NodeConnCB(object):
     def __init__(self):
         self.verack_received = False
+        self.xverack_received = False
+        self.xver = {}
         # deliver_sleep_time is helpful for debugging race conditions in p2p
         # tests; it causes message delivery to sleep for the specified time
         # before acquiring the global lock and delivering the next message.
@@ -80,14 +82,20 @@ class NodeConnCB(object):
     # Tests may want to use this as a signal that the test can begin.
     # This can be called from the testing thread, so it needs to acquire the
     # global lock.
-    def wait_for_verack(self):
+    def wait_for(self, test_function):
         while True:
             if self.disconnected:
                 raise DisconnectedError()
             with mininode_lock:
-                if self.verack_received:
+                if test_function():
                     return
             time.sleep(0.05)
+
+    def wait_for_verack(self):
+        self.wait_for(lambda : self.verack_received)
+
+    def wait_for_xverack(self):
+        self.wait_for(lambda : self.xverack_received)
 
     def deliver(self, conn, message):
         deliver_sleep = self.get_deliver_sleep_time()
@@ -151,6 +159,14 @@ class NodeConnCB(object):
     def on_mempool(self, conn): pass
 
     def on_pong(self, conn, message): pass
+
+    def on_xverack(self, conn, message):
+        self.xverack_received = True
+        conn.send_message(msg_xverack())
+
+    def on_xversion(self, conn, message):
+        conn.xver = message
+
 
 # More useful callbacks and functions for NodeConnCB's which have a single NodeConn
 
@@ -220,6 +236,8 @@ class NodeConn(asyncore.dispatcher):
         b"reject": msg_reject,
         b"mempool": msg_mempool,
         b"sendheaders": msg_sendheaders,
+        b"xversion" : msg_xversion,
+        b"xverack" : msg_xverack
     }, bumessagemap)
 
     BTC_MAGIC_BYTES = {
