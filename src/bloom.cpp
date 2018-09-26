@@ -43,7 +43,11 @@ void CBloomFilter::setup(unsigned int nElements,
     isFull = vData.size() == 0;
     isEmpty = true;
 
+    // It would be more accurate to round not floor this.  However more hash funcs take more time
+    // so only round up if we end up calculating 0 hash funcs.
     nHashFuncs = (unsigned int)(vData.size() * 8 / nElements * LN2);
+    if (nHashFuncs == 0)
+        nHashFuncs = 1;
 
     if (fSizeConstrained)
         nHashFuncs = min(nHashFuncs, MAX_HASH_FUNCS);

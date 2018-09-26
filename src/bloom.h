@@ -44,7 +44,7 @@ enum bloomflags
  */
 class CBloomFilter
 {
-private:
+protected:
     std::vector<unsigned char> vData;
     bool isFull;
     bool isEmpty;

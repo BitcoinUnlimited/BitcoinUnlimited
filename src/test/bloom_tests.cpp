@@ -26,6 +26,23 @@ using namespace std;
 
 BOOST_FIXTURE_TEST_SUITE(bloom_tests, BasicTestingSetup)
 
+// Access protected members of the Bloom filter
+class CBloomFilterAccess : public CBloomFilter
+{
+public:
+    int hashFuncs() { return nHashFuncs; }
+    CBloomFilterAccess(unsigned int _nElements, double _nFPRate, unsigned int _nTweak, unsigned char _nFlagsIn)
+        : CBloomFilter(_nElements, _nFPRate, _nTweak, _nFlagsIn)
+    {
+    }
+};
+
+BOOST_AUTO_TEST_CASE(bloom_extreme_cases)
+{
+    CBloomFilterAccess filter(1000000, 0.0000001, 0, BLOOM_UPDATE_NONE);
+    BOOST_CHECK(filter.hashFuncs() == 1);
+}
+
 BOOST_AUTO_TEST_CASE(bloom_create_insert_serialize)
 {
     CBloomFilter filter(3, 0.01, 0, BLOOM_UPDATE_ALL);
