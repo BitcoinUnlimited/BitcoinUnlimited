@@ -334,10 +334,10 @@ void TransactionTableModel::updateConfirmations()
     Q_EMIT dataChanged(index(0, ToAddress), index(priv->size() - 1, ToAddress));
 }
 
-std::vector<std::pair<std::string, CAmount>> TransactionTableModel::getTopPublicLabelsList(QString addrPrefix)
+std::vector<std::pair<std::string, CAmount>> TransactionTableModel::getTopPublicLabelsList(QString addrPrefix, QDateTime* minDate, QDateTime* maxDate)
 {
     // Build a list of the Top 20 public labels using the addrPrefix filter
-     return wallet->GroupTopPublicLabels(20, addrPrefix.toStdString());
+     return wallet->GroupTopPublicLabels(20, addrPrefix.toStdString(), minDate->toMSecsSinceEpoch() / 1000, maxDate->toMSecsSinceEpoch() / 1000);
 }
 
 int TransactionTableModel::rowCount(const QModelIndex &parent) const

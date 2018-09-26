@@ -802,7 +802,7 @@ public:
     int64_t GetOldestKeyPoolTime();
     void GetAllReserveKeys(std::set<CKeyID> &setAddress) const;
 
-    std::vector<std::pair<std::string, CAmount>> GroupTopPublicLabels(int listLength, std::string addrPrefix);
+    std::vector<std::pair<std::string, CAmount>> GroupTopPublicLabels(int listLength, std::string addrPrefix, int64_t minDate, int64_t maxDate);
     std::vector<std::pair<CWalletTx, int>> GetTopPublicLabelTxs(const std::string comparePublicLabel);
     std::set<std::set<CTxDestination> > GetAddressGroupings();
     std::map<CTxDestination, CAmount> GetAddressBalances();

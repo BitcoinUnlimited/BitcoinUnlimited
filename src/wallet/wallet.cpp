@@ -2714,7 +2714,7 @@ bool CWallet::AddAccountingEntry(const CAccountingEntry &acentry, CWalletDB &pwa
     return true;
 }
 
-std::vector<std::pair<std::string, CAmount>> CWallet::GroupTopPublicLabels(int listLength, std::string addrPrefix)
+std::vector<std::pair<std::string, CAmount>> CWallet::GroupTopPublicLabels(int listLength, std::string addrPrefix, int64_t minDate, int64_t maxDate)
 {
     // Make a list of all top public labels grouped by unspent outputs
     std::map<std::string, CAmount> listTopPublicLabels;
@@ -2726,6 +2726,8 @@ std::vector<std::pair<std::string, CAmount>> CWallet::GroupTopPublicLabels(int l
 
         for (unsigned int i = 0; i < wtx.vout.size(); i++)
         {
+            // filter by date range
+            if (wtx.GetTxTime() < minDate || (wtx.GetTxTime() > maxDate && maxDate != 0)) continue;
             CTxOut txoutPL = wtx.vout[i];
             std::string txPublicLabel = getLabelPublic(txoutPL.scriptPubKey);
 
