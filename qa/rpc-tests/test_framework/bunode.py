@@ -102,8 +102,8 @@ class BUProtocolHandler(NodeConnCB):
         self.connection.send_message(msg)
 
     # Wrapper for the NodeConn's send_message function
-    def send_message(self, message):
-        self.connection.send_message(message)
+    def send_message(self, message, pushbuf = False):
+        self.connection.send_message(message, pushbuf)
 
     def on_inv(self, conn, message):
         self.last_inv.append(message)
