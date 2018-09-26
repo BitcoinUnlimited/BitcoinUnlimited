@@ -172,6 +172,9 @@ public:
     // of the same blocks.
     bool AlreadyAskedForBlock(const uint256 &hash);
 
+    // Update the response time for this transaction request
+    void UpdateTxnResponseTime(const CInv &obj, CNode *pfrom);
+
     // Indicate that we got this object
     void Received(const CInv &obj, CNode *pfrom);
 

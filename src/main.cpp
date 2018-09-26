@@ -5037,6 +5037,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         CInv inv(MSG_TX, txd.tx->GetHash());
         pfrom->AddInventoryKnown(inv);
+        requester.UpdateTxnResponseTime(inv, pfrom);
     }
 
 

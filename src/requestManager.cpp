@@ -257,6 +257,21 @@ bool CRequestManager::AlreadyAskedForBlock(const uint256 &hash)
     return false;
 }
 
+void CRequestManager::UpdateTxnResponseTime(const CInv &obj, CNode *pfrom)
+{
+    int64_t now = GetTimeMicros();
+    LOCK(cs_objDownloader);
+    if (pfrom && obj.type == MSG_TX)
+    {
+        OdMap::iterator item = mapTxnInfo.find(obj.hash);
+        if (item == mapTxnInfo.end())
+            return;
+
+        pfrom->txReqLatency << (now - item->second.lastRequestTime);
+        receivedTxns += 1;
+    }
+}
+
 // Indicate that we got this object.
 void CRequestManager::Received(const CInv &obj, CNode *pfrom)
 {
@@ -269,7 +284,6 @@ void CRequestManager::Received(const CInv &obj, CNode *pfrom)
 
         LOG(REQ, "ReqMgr: TX received for %s.\n", item->second.obj.ToString().c_str());
         cleanup(item);
-        receivedTxns += 1;
     }
     else if (pfrom && (obj.type == MSG_BLOCK || obj.type == MSG_THINBLOCK || obj.type == MSG_XTHINBLOCK))
     {
@@ -283,7 +297,7 @@ void CRequestManager::Received(const CInv &obj, CNode *pfrom)
     }
 }
 
-// Indicate that we got this object, from and bytes are optional (for node performance tracking)
+// Indicate that we got this object.
 void CRequestManager::AlreadyReceived(CNode *pnode, const CInv &obj)
 {
     LOCK(cs_objDownloader);
