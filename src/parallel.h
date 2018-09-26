@@ -81,7 +81,10 @@ private:
     std::vector<uint256> vPreviousBlock;
     // Vector of script check queues
     std::vector<CCheckQueue<CScriptCheck> *> vQueues;
+    // Number of threads
     unsigned int nThreads;
+    // All threads currently running
+    boost::thread_group threadGroup;
     // The semaphore limits the number of parallel validation threads
     CSemaphore semThreadCount;
 
@@ -111,7 +114,7 @@ public:
      *                          are created.
      * @param[in] threadGroup   The thread group threads will be created in
      */
-    CParallelValidation(boost::thread_group *threadGroup);
+    CParallelValidation();
 
     ~CParallelValidation();
 

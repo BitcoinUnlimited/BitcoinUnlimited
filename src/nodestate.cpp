@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "nodestate.h"
+#include "main.h"
 
 /**
 * Default constructor initializing all local member variables to "null" values
@@ -32,6 +33,7 @@ CNodeState::CNodeState(CAddress addrIn, std::string addrNameIn) : address(addrIn
 */
 CNodeState *State(NodeId nId)
 {
+    LOCK(cs_main);
     std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(nId);
     if (it == mapNodeState.end())
         return nullptr;

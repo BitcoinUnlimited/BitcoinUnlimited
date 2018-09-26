@@ -960,7 +960,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     }
 
     // Create the parallel block validator
-    PV.reset(new CParallelValidation(&threadGroup));
+    PV.reset(new CParallelValidation());
 
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);

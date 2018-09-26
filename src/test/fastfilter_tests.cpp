@@ -23,7 +23,7 @@ BOOST_AUTO_TEST_CASE(fastfilter_tests)
         arith_uint256 num(1);
         arith_uint256 origNum = num;
         int collisions = 0;
-        for (int i = 1; i < 20000; i++)
+        for (int i = 1; i < 50000; i++)
         {
             num += 1;
             uint256 t1 = ArithToUint256(num);
@@ -37,18 +37,18 @@ BOOST_AUTO_TEST_CASE(fastfilter_tests)
             BOOST_CHECK(filt.contains(tmp));
             BOOST_CHECK(!filt.checkAndSet(tmp));
         }
-        BOOST_CHECK(collisions < 400); // sanity check, actual result may vary
+        BOOST_CHECK(collisions < 10); // sanity check, actual result may vary
         // check them all again
         num = origNum;
         int numFalsePositives = 0;
-        for (int i = 1; i < 20000; i++)
+        for (int i = 1; i < 50000; i++)
         {
             num += 1;
             uint256 t1 = ArithToUint256(num);
             uint256 tmp = Hash(t1.begin(), t1.end());
             BOOST_CHECK(filt.contains(tmp));
         }
-        for (int i = 1; i < 20000; i++) // check a bunch of numbers we didn't add
+        for (int i = 1; i < 50000; i++) // check a bunch of numbers we didn't add
         {
             num += 1;
             uint256 t1 = ArithToUint256(num);
@@ -56,16 +56,18 @@ BOOST_AUTO_TEST_CASE(fastfilter_tests)
             if (filt.contains(tmp))
                 numFalsePositives++;
         }
-        BOOST_CHECK(numFalsePositives < 2000); // sanity check, actual result may vary
+        BOOST_CHECK(numFalsePositives < 10); // sanity check, actual result may vary
     }
 
 
     // Test the 4 MB filter since that's what we use
     {
-        CFastFilter<4 * 1024 * 1024> filt;
+        CFastFilter<4 * 1024 * 1024, 2> filt;
+        CFastFilter<4 * 1024 * 1024, 8> filt2;
 
         arith_uint256 num(0);
         int collisions = 0;
+        int collisions2 = 0;
         for (int i = 0; i < 100000; i++)
         {
             num += 1;
@@ -73,9 +75,13 @@ BOOST_AUTO_TEST_CASE(fastfilter_tests)
             uint256 tmp = Hash(t1.begin(), t1.end());
             if (!filt.checkAndSet(tmp))
                 collisions += 1;
+            if (!filt2.checkAndSet(tmp))
+                collisions2 += 1;
             BOOST_CHECK(filt.contains(tmp));
+            BOOST_CHECK(filt2.contains(tmp));
         }
-        BOOST_CHECK(collisions < 2000); // sanity check, actual result may vary
+        BOOST_CHECK(collisions < 100); // sanity check, actual result may vary
+        BOOST_CHECK(collisions2 < 10); // sanity check, actual result may vary
     }
 }
 
