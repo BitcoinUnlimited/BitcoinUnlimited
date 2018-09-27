@@ -9,18 +9,18 @@
 #include "askpassphrasedialog.h"
 #include "bitcoingui.h"
 #include "clientmodel.h"
+#include "dstencode.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
 #include "overviewpage.h"
 #include "platformstyle.h"
+#include "publiclabelview.h"
 #include "receivecoinsdialog.h"
 #include "sendcoinsdialog.h"
 #include "signverifymessagedialog.h"
 #include "transactiontablemodel.h"
 #include "transactionview.h"
-#include "publiclabelview.h"
 #include "walletmodel.h"
-#include "dstencode.h"
 
 #include "ui_interface.h"
 
@@ -55,7 +55,6 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, const Config *cfg, Q
     transactionsPage->setLayout(vbox);
 
 
-
     publicLabelPage = new QWidget(this);
     QVBoxLayout *vbox2 = new QVBoxLayout();
     publicLabelView = new PublicLabelView(platformStyle, this);
@@ -78,7 +77,8 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, const Config *cfg, Q
     addWidget(sendCoinsPage);
 
     // Clicking on a transaction on the overview pre-selects the transaction on the transaction history page
-    connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), transactionView, SLOT(focusTransaction(QModelIndex)));
+    connect(
+        overviewPage, SIGNAL(transactionClicked(QModelIndex)), transactionView, SLOT(focusTransaction(QModelIndex)));
 
     // Double-clicking on a transaction on the transaction history or public label list page shows details
     connect(transactionView, SIGNAL(doubleClicked(QModelIndex)), transactionView, SLOT(showDetails()));
@@ -92,9 +92,11 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, const Config *cfg, Q
         SIGNAL(message(QString, QString, unsigned int)));
     // Pass through messages from transactionView
 
-    connect(transactionView, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
+    connect(transactionView, SIGNAL(message(QString, QString, unsigned int)), this,
+        SIGNAL(message(QString, QString, unsigned int)));
     // Pass through messages from publicLabelView
-    connect(publicLabelView, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
+    connect(publicLabelView, SIGNAL(message(QString, QString, unsigned int)), this,
+        SIGNAL(message(QString, QString, unsigned int)));
 }
 
 WalletView::~WalletView() {}
@@ -105,11 +107,13 @@ void WalletView::setBitcoinGUI(BitcoinGUI *gui)
         // Clicking on a transaction on the overview page simply sends you to transaction history page
         connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), gui, SLOT(gotoHistoryPage()));
 
-        // Menu action Send public label on the public labe page sends you to the send tx page with the public label pre-filled
+        // Menu action Send public label on the public labe page sends you to the send tx page with the public label
+        // pre-filled
         connect(publicLabelView, SIGNAL(menuActionSendPublicLabel(QString)), gui, SLOT(gotoSendCoinsPage(QString)));
 
         // Receive and report messages
-        connect(this, SIGNAL(message(QString, QString, unsigned int)), gui, SLOT(message(QString, QString, unsigned int)));
+        connect(
+            this, SIGNAL(message(QString, QString, unsigned int)), gui, SLOT(message(QString, QString, unsigned int)));
 
         // Pass through encryption status changed signals
         connect(this, SIGNAL(encryptionStatusChanged(int)), gui, SLOT(setEncryptionStatus(int)));
@@ -207,7 +211,8 @@ void WalletView::gotoSendCoinsPage(QString labelPublic)
 {
     setCurrentWidget(sendCoinsPage);
 
-    if (!labelPublic.isEmpty()) sendCoinsPage->setPublicLabel(labelPublic);
+    if (!labelPublic.isEmpty())
+        sendCoinsPage->setPublicLabel(labelPublic);
 }
 
 void WalletView::gotoSignMessageTab(QString addr)

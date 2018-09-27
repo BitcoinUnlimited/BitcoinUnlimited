@@ -77,7 +77,7 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
 
         CAmount totalPublicLabelSatoshisUnspent = 0;
         int countMatching = 0;
-        std::vector<std::pair<CWalletTx, int>> txoutMatchingPLs = wallet->GetTopPublicLabelTxs(labelPublic);
+        std::vector<std::pair<CWalletTx, int> > txoutMatchingPLs = wallet->GetTopPublicLabelTxs(labelPublic);
         for (const std::pair<CWalletTx, int> &txoutPL : txoutMatchingPLs)
         {
             CTxOut txout = txoutPL.first.vout[txoutPL.second + 1];
@@ -89,9 +89,11 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
             CTxDestination address;
             if (ExtractDestination(txout.scriptPubKey, address))
             {
-                strHTML += "<b>" + tr("Unspent") + ":</b>" + BitcoinUnits::formatHtmlWithUnit(unit, txout.nValue, true) + "<br>";
+                strHTML += "<b>" + tr("Unspent") + ":</b>" +
+                           BitcoinUnits::formatHtmlWithUnit(unit, txout.nValue, true) + "<br>";
                 strHTML += "<b>" + tr("Address") + ":</b> " + GUIUtil::HtmlEscape(EncodeDestination(address)) + "<br>";
-                strHTML += "<b>" + tr("Date") + ":</b> " + (txoutPL.first.GetTxTime() ? GUIUtil::dateTimeStr(txoutPL.first.GetTxTime()) : "") + "<br>";
+                strHTML += "<b>" + tr("Date") + ":</b> " +
+                           (txoutPL.first.GetTxTime() ? GUIUtil::dateTimeStr(txoutPL.first.GetTxTime()) : "") + "<br>";
                 countMatching += 1;
             }
         }
@@ -99,7 +101,8 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
             strHTML += "None <br>";
         else
             // display network total including selected public label
-            strHTML += "<b>" + tr("Total unspent for public label") + ":</b>" + BitcoinUnits::formatHtmlWithUnit(unit, totalPublicLabelSatoshisUnspent, true) + "<br>";
+            strHTML += "<b>" + tr("Total unspent for public label") + ":</b>" +
+                       BitcoinUnits::formatHtmlWithUnit(unit, totalPublicLabelSatoshisUnspent, true) + "<br>";
         return strHTML;
     }
 

@@ -40,7 +40,8 @@ SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *par
         ui->payToLayout->setSpacing(4);
     }
     ui->addAsLabel->setPlaceholderText(tr("Enter a private label for this address to add it to your address book"));
-    ui->lineEditPublic->setPlaceholderText(tr("Enter a public label for this transaction. These are stored forever in the blockchain."));
+    ui->lineEditPublic->setPlaceholderText(
+        tr("Enter a public label for this transaction. These are stored forever in the blockchain."));
 
 
     // normal bitcoin address field
@@ -238,13 +239,8 @@ bool SendCoinsEntry::isClear()
     return ui->payTo->text().isEmpty() && ui->payTo_is->text().isEmpty() && ui->payTo_s->text().isEmpty();
 }
 
-bool SendCoinsEntry::isClearPublicLabel()
-{
-    return ui->lineEditPublic->text().isEmpty();
-}
-
+bool SendCoinsEntry::isClearPublicLabel() { return ui->lineEditPublic->text().isEmpty(); }
 void SendCoinsEntry::setFocus() { ui->payTo->setFocus(); }
-
 void SendCoinsEntry::updateDisplayUnit()
 {
     if (model && model->getOptionsModel())

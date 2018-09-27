@@ -802,8 +802,11 @@ public:
     int64_t GetOldestKeyPoolTime();
     void GetAllReserveKeys(std::set<CKeyID> &setAddress) const;
 
-    std::vector<std::pair<std::string, CAmount>> GroupTopPublicLabels(int listLength, std::string addrPrefix, int64_t minDate, int64_t maxDate);
-    std::vector<std::pair<CWalletTx, int>> GetTopPublicLabelTxs(const std::string comparePublicLabel);
+    std::vector<std::pair<std::string, CAmount> > GroupTopPublicLabels(int listLength,
+        std::string addrPrefix,
+        int64_t minDate,
+        int64_t maxDate);
+    std::vector<std::pair<CWalletTx, int> > GetTopPublicLabelTxs(const std::string comparePublicLabel);
     std::set<std::set<CTxDestination> > GetAddressGroupings();
     std::map<CTxDestination, CAmount> GetAddressBalances();
 
@@ -814,7 +817,8 @@ public:
     isminetype IsMine(const CTxDestination &dest) const;
     bool IsMine(const CTransaction &tx) const;
 
-    std::pair<CAmount, int> UnspentPublicLabelAmount(const CTransaction& tx, const std::string comparePublicLabel) const;
+    std::pair<CAmount, int> UnspentPublicLabelAmount(const CTransaction &tx,
+        const std::string comparePublicLabel) const;
     CAmount GetDebit(const CTxIn &txin, const isminefilter &filter) const;
     CAmount GetCredit(const CTxOut &txout, const isminefilter &filter) const;
     bool IsChange(const CTxOut &txout) const;

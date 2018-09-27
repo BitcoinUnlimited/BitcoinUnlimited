@@ -127,7 +127,9 @@ public Q_SLOTS:
     void updateAmountColumnTitle();
     void updateAddressColumnTitle();
     void updatePublicLabelColumnTitle();
-    std::vector<std::pair<std::string, CAmount>> getTopPublicLabelsList(QString addrPrefix, QDateTime* minDate, QDateTime* maxDate);
+    std::vector<std::pair<std::string, CAmount> > getTopPublicLabelsList(QString addrPrefix,
+        QDateTime *minDate,
+        QDateTime *maxDate);
 
     /* Needed to update fProcessingQueuedTransactions through a QueuedConnection */
     void setProcessingQueuedTransactions(bool value) { fProcessingQueuedTransactions = value; }

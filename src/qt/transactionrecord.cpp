@@ -30,7 +30,9 @@ bool TransactionRecord::showTransaction(const CWalletTx &wtx)
 /*
  * Decompose CWallet transaction to model transaction records.
  */
-QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *wallet, const CWalletTx &wtx, bool isTopPublicLabel)
+QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *wallet,
+    const CWalletTx &wtx,
+    bool isTopPublicLabel)
 {
     QList<TransactionRecord> parts;
     int64_t nTime = wtx.GetTxTime();
@@ -44,7 +46,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
     // some outputs may be in the wallet because
     // they have public labels not because they are mine
     AddressList listAllAddresses;
-    for (const CTxOut& txout: wtx.vout)
+    for (const CTxOut &txout : wtx.vout)
     {
         CTxDestination address;
         std::string labelPublic = getLabelPublic(txout.scriptPubKey);
@@ -72,7 +74,8 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
 
     } // end load all tx addresses for user display/filter
 
-    if (isTopPublicLabel) return parts;
+    if (isTopPublicLabel)
+        return parts;
 
     if (nNet > 0 || wtx.IsCoinBase())
     {
@@ -223,24 +226,23 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
         } // else if (fAllFromMe)
         else
         {
-
             // Check if at least one of the inputs/outputs are mine
             // They could be public label txs that are not mine
             bool atLeastOneMine = false;
-            for (const CTxIn& txin: wtx.vin)
+            for (const CTxIn &txin : wtx.vin)
             {
                 isminetype mine = wallet->IsMine(txin);
-                if(mine)
+                if (mine)
                 {
                     atLeastOneMine = true;
                     break;
                 }
             }
             if (!atLeastOneMine)
-                for (const CTxOut& txout: wtx.vout)
+                for (const CTxOut &txout : wtx.vout)
                 {
                     isminetype mine = wallet->IsMine(txout);
-                    if(mine)
+                    if (mine)
                     {
                         atLeastOneMine = true;
                         break;

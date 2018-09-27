@@ -64,7 +64,6 @@ public Q_SLOTS:
         const CAmount &watchImmatureBalance);
 
 
-
 private:
     Ui::SendCoinsDialog *ui;
     ClientModel *clientModel;

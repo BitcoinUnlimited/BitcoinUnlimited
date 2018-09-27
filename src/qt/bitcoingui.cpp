@@ -265,7 +265,10 @@ void BitcoinGUI::createActions()
     publicLabelAction->setCheckable(true);
     publicLabelAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_5));
     tabGroup->addAction(publicLabelAction);
-    if (GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS) == 0) { publicLabelAction->setVisible(false); }
+    if (GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS) == 0)
+    {
+        publicLabelAction->setVisible(false);
+    }
 
 #ifdef ENABLE_WALLET
     // These showNormalIfMinimized are needed because Send Coins and Receive Coins
@@ -649,7 +652,8 @@ void BitcoinGUI::gotoHistoryPage()
 void BitcoinGUI::gotoPublicLabelPage()
 {
     publicLabelAction->setChecked(true);
-    if (walletFrame) walletFrame->gotoPublicLabelPage();
+    if (walletFrame)
+        walletFrame->gotoPublicLabelPage();
 }
 
 void BitcoinGUI::gotoReceiveCoinsPage()

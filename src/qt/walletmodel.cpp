@@ -533,7 +533,8 @@ CPubKey WalletModel::getNewPubKey()
 {
     // Generate a new address to associate with a new send transaction
     CPubKey newKey;
-    if(wallet->GetKeyFromPool(newKey)) return newKey;
+    if (wallet->GetKeyFromPool(newKey))
+        return newKey;
 }
 
 bool WalletModel::IsSpendable(const CTxDestination &dest) const { return wallet->IsMine(dest) & ISMINE_SPENDABLE; }

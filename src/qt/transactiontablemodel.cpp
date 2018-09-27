@@ -25,9 +25,9 @@
 #include <QDebug>
 #include <QIcon>
 #include <QList>
-#include <vector>
 #include <map>
 #include <set>
+#include <vector>
 
 // Amount column is right-aligned it contains numbers
 static int column_alignments[] = {
@@ -74,39 +74,47 @@ public:
             if (GetArg("-toppubliclabels", DEFAULT_TOPPUBLICLABELS) > 0)
             {
                 // copy to a vector for sorting by datetime
-                std::vector<std::pair<int64_t, CWalletTx>> sortedTopPublicLabels;
-                for (PAIRTYPE(uint256, CWalletTx) item: wallet->mapWalletTopPublicLabels)
-                    { sortedTopPublicLabels.push_back(std::make_pair(item.second.GetTxTime(), item.second)); }
+                std::vector<std::pair<int64_t, CWalletTx> > sortedTopPublicLabels;
+                for (PAIRTYPE(uint256, CWalletTx) item : wallet->mapWalletTopPublicLabels)
+                {
+                    sortedTopPublicLabels.push_back(std::make_pair(item.second.GetTxTime(), item.second));
+                }
 
                 // sort txs by datetime descending
                 std::sort(sortedTopPublicLabels.begin(), sortedTopPublicLabels.end(),
-                            [](const std::pair<int64_t, CWalletTx> left, const std::pair<int64_t, CWalletTx> right)
-                            { return left.first < right.first; });
+                    [](const std::pair<int64_t, CWalletTx> left, const std::pair<int64_t, CWalletTx> right) {
+                        return left.first < right.first;
+                    });
 
-                for (std::pair<int64_t, CWalletTx> it: sortedTopPublicLabels)
+                for (std::pair<int64_t, CWalletTx> it : sortedTopPublicLabels)
                 {
                     if (TransactionRecord::showTransaction(it.second))
                     {
-                        QList<TransactionRecord> recList = TransactionRecord::decomposeTransaction(wallet, it.second, true);
-                        for (TransactionRecord &recNew: recList)
+                        QList<TransactionRecord> recList =
+                            TransactionRecord::decomposeTransaction(wallet, it.second, true);
+                        for (TransactionRecord &recNew : recList)
                         {
                             // Exclude public labels that already exist
-                            for (const TransactionRecord &rec: cachedWallet)
-                                if (rec.addresses.begin()->first == recNew.addresses.begin()->first) goto recNew_Next;
+                            for (const TransactionRecord &rec : cachedWallet)
+                                if (rec.addresses.begin()->first == recNew.addresses.begin()->first)
+                                    goto recNew_Next;
 
                             cachedWallet.append(recNew);
 
-                            recNew_Next: {}
+                        recNew_Next:
+                        {
+                        }
                             // Continue
                         }
                     }
                 }
             }
 
-            for (std::map<uint256, CWalletTx>::iterator it = wallet->mapWallet.begin(); it != wallet->mapWallet.end();++it)
+            for (std::map<uint256, CWalletTx>::iterator it = wallet->mapWallet.begin(); it != wallet->mapWallet.end();
+                 ++it)
             {
                 if (TransactionRecord::showTransaction(it->second))
-                                    cachedWallet.append(TransactionRecord::decomposeTransaction(wallet, it->second, false));
+                    cachedWallet.append(TransactionRecord::decomposeTransaction(wallet, it->second, false));
             }
         }
     }
@@ -235,7 +243,8 @@ public:
     {
         {
             LOCK2(cs_main, wallet->cs_wallet);
-            std::map<uint256, CWalletTx> walletMap = (rec->type == TransactionRecord::TopPublicLabel ? wallet->mapWalletTopPublicLabels : wallet->mapWallet);
+            std::map<uint256, CWalletTx> walletMap =
+                (rec->type == TransactionRecord::TopPublicLabel ? wallet->mapWalletTopPublicLabels : wallet->mapWallet);
             std::map<uint256, CWalletTx>::iterator mi = walletMap.find(rec->hash);
             if (mi != walletMap.end())
             {
@@ -248,7 +257,8 @@ public:
     QString getTxHex(TransactionRecord *rec)
     {
         LOCK2(cs_main, wallet->cs_wallet);
-        std::map<uint256, CWalletTx> walletMap = (rec->type == TransactionRecord::TopPublicLabel ? wallet->mapWalletTopPublicLabels : wallet->mapWallet);
+        std::map<uint256, CWalletTx> walletMap =
+            (rec->type == TransactionRecord::TopPublicLabel ? wallet->mapWalletTopPublicLabels : wallet->mapWallet);
         std::map<uint256, CWalletTx>::iterator mi = walletMap.find(rec->hash);
         if (mi != walletMap.end())
         {
@@ -305,7 +315,6 @@ void TransactionTableModel::updateTransaction(const QString &hash, int status, b
 
     priv->updateWallet(updated, status, showTransaction);
     publicLabelTotals.clear();
-
 }
 
 void TransactionTableModel::updateConfirmations()
@@ -318,10 +327,13 @@ void TransactionTableModel::updateConfirmations()
     Q_EMIT dataChanged(index(0, ToAddress), index(priv->size() - 1, ToAddress));
 }
 
-std::vector<std::pair<std::string, CAmount>> TransactionTableModel::getTopPublicLabelsList(QString addrPrefix, QDateTime* minDate, QDateTime* maxDate)
+std::vector<std::pair<std::string, CAmount> > TransactionTableModel::getTopPublicLabelsList(QString addrPrefix,
+    QDateTime *minDate,
+    QDateTime *maxDate)
 {
     // Build a list of the Top 20 public labels using the addrPrefix filter
-     return wallet->GroupTopPublicLabels(20, addrPrefix.toStdString(), minDate->toMSecsSinceEpoch() / 1000, maxDate->toMSecsSinceEpoch() / 1000);
+    return wallet->GroupTopPublicLabels(
+        20, addrPrefix.toStdString(), minDate->toMSecsSinceEpoch() / 1000, maxDate->toMSecsSinceEpoch() / 1000);
 }
 
 int TransactionTableModel::rowCount(const QModelIndex &parent) const
@@ -480,7 +492,6 @@ QString TransactionTableModel::formatTxToAddress(const TransactionRecord *wtx, b
         return QString::fromStdString(addressList) + watchAddress;
     else
         return label + " " + QString::fromStdString(addressList) + watchAddress;
-
 }
 
 QVariant TransactionTableModel::addressColor(const TransactionRecord *wtx) const
@@ -518,8 +529,7 @@ QString TransactionTableModel::formatTxAmount(const TransactionRecord *wtx,
     else
         amt = wtx->credit + wtx->debit;
 
-    QString str = BitcoinUnits::format(
-    walletModel->getOptionsModel()->getDisplayUnit(), amt, false, separators);
+    QString str = BitcoinUnits::format(walletModel->getOptionsModel()->getDisplayUnit(), amt, false, separators);
     if (showUnconfirmed && wtx->type != TransactionRecord::TopPublicLabel)
     {
         if (!wtx->status.countsForBalance)
@@ -584,11 +594,13 @@ QVariant TransactionTableModel::txWatchonlyDecoration(const TransactionRecord *w
 CAmount TransactionTableModel::unspentPublicLabelTotal(std::string publicLabel) const
 {
     // Returns the total of public label unspent amounts related to the specified public label string
-    if (publicLabelTotals.contains(publicLabel)) return publicLabelTotals[publicLabel];
+    if (publicLabelTotals.contains(publicLabel))
+        return publicLabelTotals[publicLabel];
 
     LOCK2(cs_main, wallet->cs_wallet);
     CAmount amt = 0;
-    for(std::map<uint256, CWalletTx>::iterator it = wallet->mapWalletTopPublicLabels.begin(); it != wallet->mapWalletTopPublicLabels.end(); ++it)
+    for (std::map<uint256, CWalletTx>::iterator it = wallet->mapWalletTopPublicLabels.begin();
+         it != wallet->mapWalletTopPublicLabels.end(); ++it)
     {
         CTransaction tx(it->second);
         amt += wallet->UnspentPublicLabelAmount(tx, publicLabel).first;
@@ -691,7 +703,8 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
         return column_alignments[index.column()];
     case Qt::ForegroundRole:
         // Non-confirmed (but not immature) as transactions are grey
-        if (!rec->status.countsForBalance && rec->status.status != TransactionStatus::Immature && rec->type != TransactionRecord::TopPublicLabel)
+        if (!rec->status.countsForBalance && rec->status.status != TransactionStatus::Immature &&
+            rec->type != TransactionRecord::TopPublicLabel)
         {
             return COLOR_UNCONFIRMED;
         }

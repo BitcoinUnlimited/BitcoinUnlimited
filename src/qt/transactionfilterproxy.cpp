@@ -49,7 +49,7 @@ bool TransactionFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex &
         return false;
     if (publicLabelFilter && !involvesPublicLabelAddress)
         return false;
-    if(datetime < dateFrom || datetime > dateTo)
+    if (datetime < dateFrom || datetime > dateTo)
         return false;
     if (!address.contains(addrPrefix, Qt::CaseInsensitive) && !label.contains(addrPrefix, Qt::CaseInsensitive))
         return false;
@@ -58,10 +58,13 @@ bool TransactionFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex &
     if (publicLabelFilter && type == TransactionRecord::TopPublicLabel)
     {
         // Exclude public labels that are not in the Top 20
-        auto plit = std::find_if( publicLabelsGrouped.begin(), publicLabelsGrouped.end(),
-            [&address](const std::pair<std::string, CAmount>& element){ return element.first == address.toStdString();} );
+        auto plit = std::find_if(publicLabelsGrouped.begin(), publicLabelsGrouped.end(),
+            [&address](const std::pair<std::string, CAmount> &element) {
+                return element.first == address.toStdString();
+            });
 
-        if (plit == publicLabelsGrouped.end()) return false;
+        if (plit == publicLabelsGrouped.end())
+            return false;
     }
 
     return true;
@@ -104,7 +107,7 @@ void TransactionFilterProxy::setPublicLabelFilter(bool filter)
     invalidateFilter();
 }
 
-void TransactionFilterProxy::setTopPublicLabelsList(std::vector<std::pair<std::string, CAmount>> &_publicLabelsGrouped)
+void TransactionFilterProxy::setTopPublicLabelsList(std::vector<std::pair<std::string, CAmount> > &_publicLabelsGrouped)
 {
     this->publicLabelsGrouped = _publicLabelsGrouped;
     invalidateFilter();
@@ -128,4 +131,3 @@ int TransactionFilterProxy::rowCount(const QModelIndex &parent) const
         return QSortFilterProxyModel::rowCount(parent);
     }
 }
-

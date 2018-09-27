@@ -774,7 +774,10 @@ DBErrors CWalletDB::LoadWallet(CWallet *pwallet)
     return result;
 }
 
-DBErrors CWalletDB::FindWalletTx(CWallet *pwallet, vector<uint256> &vTxHash, vector<CWalletTx> &vWtx, std::string txType)
+DBErrors CWalletDB::FindWalletTx(CWallet *pwallet,
+    vector<uint256> &vTxHash,
+    vector<CWalletTx> &vWtx,
+    std::string txType)
 {
     pwallet->vchDefaultKey = CPubKey();
     bool fNoncriticalErrors = false;
@@ -901,8 +904,12 @@ DBErrors CWalletDB::ZapWalletTx(CWallet *pwallet, vector<CWalletTx> &vWtx, std::
     // erase each wallet TX
     for (uint256 &hash : vTxHash)
     {
-        if (txType == "tx") if (!EraseTx(hash)) return DB_CORRUPT;
-        if (txType == "pl") if (!EraseTopPublicLabel(hash)) return DB_CORRUPT;
+        if (txType == "tx")
+            if (!EraseTx(hash))
+                return DB_CORRUPT;
+        if (txType == "pl")
+            if (!EraseTopPublicLabel(hash))
+                return DB_CORRUPT;
     }
 
     return DB_LOAD_OK;
