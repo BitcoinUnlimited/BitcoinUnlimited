@@ -285,14 +285,14 @@ void CRequestManager::Received(const CInv &obj, CNode *pfrom)
         LOG(REQ, "ReqMgr: TX received for %s.\n", item->second.obj.ToString().c_str());
         cleanup(item);
     }
-    else if (pfrom && (obj.type == MSG_BLOCK || obj.type == MSG_THINBLOCK || obj.type == MSG_XTHINBLOCK))
+    else if (obj.type == MSG_BLOCK || obj.type == MSG_THINBLOCK || obj.type == MSG_XTHINBLOCK)
     {
         OdMap::iterator item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
             return;
 
         LOG(BLK, "%s removed from request queue (received from %s).\n", item->second.obj.ToString().c_str(),
-            pfrom->GetLogName());
+            pfrom ? pfrom->GetLogName() : "unknown");
         cleanup(item);
     }
 }
