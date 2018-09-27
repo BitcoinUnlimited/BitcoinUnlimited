@@ -773,8 +773,8 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
     }
     else
     {
-        pair<map<uint256, CWalletTx>::iterator, bool> ret;
         // Inserts only if not already there, returns tx inserted or tx found
+        pair<map<uint256, CWalletTx>::iterator, bool> ret;
         if (isTopPublicLabel)
             ret = mapWalletTopPublicLabels.insert(make_pair(hash, wtxIn));
         else
@@ -880,7 +880,6 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
                     //// debug print
                     LOGA("AddToWallet TopPublicLabel %s  %s%s\n", wtxIn.GetHash().ToString(), (fInsertedNew ? "new" : ""),
                         (fUpdated ? "update" : ""));
-                    return true;
                 }
                 else return false;
             else if (wtx.WriteToDisk(pwalletdb))
@@ -888,7 +887,6 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
                 //// debug print
                 LOGA("AddToWallet %s  %s%s\n", wtxIn.GetHash().ToString(), (fInsertedNew ? "new" : ""),
                     (fUpdated ? "update" : ""));
-                return true;
             }
             else return false;
         }
