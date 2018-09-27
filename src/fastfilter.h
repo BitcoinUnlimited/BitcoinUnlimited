@@ -9,10 +9,10 @@
 #include "serialize.h"
 #include <vector>
 
-class COutPoint;
 class uint256;
 
-#define REL_PRIME 27061
+// Statically evaluated expression to return whether a number is a power of 2
+constexpr bool isPow2(unsigned int num) { return num && !(num & (num - 1)); }
 /**
  * FastFilter is a probabilistic filter.  The filter can answer whether an element
  * definitely is NOT in the set, but only that an element is LIKELY in the set.
@@ -23,9 +23,18 @@ class uint256;
  *
  * This class can be used anywhere a Bloom filter is used so long as the input data is random.
  *
- * This class is thread-safe in the sense that simultaneous calls to insert and contains will not crash,
+ * If NUM_HASH_FNS is 16 and FILTER_SIZE is >= 64k all bits in the uint256 input data will be used to set bits in
+ * the filter.  If these fields are set to lower numbers, fewer bits may be used (although in the NUM_HASH_FNS case
+ * execution will be faster).  Therefore, if this structure is used in an application that accepts externally created
+ * uint256 numbers that are sensitive to deliberately constructed collisions, be sure to keep NUM_HASH_FNS high enough
+ * that the creation of collisions in the used bits is not feasible.
+ *
+ * This class is thread-safe in the sense that simultaneous calls to member functions will not crash,
  * but "inserts" may be lost.  However, if you are using this class as an in-ram filter before doing a more expensive
  * operation, a lost insert may be acceptable.
+ *
+ * FILTER_SIZE must be a power of 2, and NUM_HASH_FNs may range from 2 to 16 inclusive.  Since hashes are calculated
+ * in pairs of 2, odd values of NUM_HASH_FNs are rounded down.
  */
 template <unsigned int FILTER_SIZE, unsigned int NUM_HASH_FNS = 16>
 class CFastFilter
@@ -43,6 +52,7 @@ public:
     CFastFilter()
     {
         static_assert((NUM_HASH_FNS > 1) && (NUM_HASH_FNS <= 16), "NUM_HASH_FNS must be between 2 and 16 inclusive");
+        static_assert(isPow2(FILTER_SIZE) && (FILTER_SIZE > 1), "FILTER_SIZE must be a power of 2 greater than 1");
         FastRandomContext insecure_rand;
         vData.resize(FILTER_BYTES);
     }
