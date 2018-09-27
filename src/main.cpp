@@ -1154,10 +1154,12 @@ static uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
 
-    // The Nov 15, 2018 HF enable sig push only.
+    // The Nov 15, 2018 HF enable sig push only and atrt enforcing also
+    // clean stack rules (see  BIP 62 for more details)
     if (IsNov152018Enabled(consensusparams, pindex->pprev))
     {
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
+        flags |= SCRIPT_VERIFY_CLEANSTACK;
     }
 
     return flags;
