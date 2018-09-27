@@ -238,10 +238,6 @@ void CommitTxToMempool()
 
             // Update txn per second only when a txn is valid and accepted to the mempool
             mempool.UpdateTransactionsPerSecond();
-
-            // Mark tx as received so we don't re-request it again if more INV's arrive later
-            CInv inv(MSG_TX, data.hash);
-            requester.Received(inv, nullptr);
         }
         txCommitQ.clear();
     }
@@ -354,9 +350,6 @@ void ThreadTxAdmission()
                         LOCK(orphanpool.cs); // WRITELOCK
                         orphanpool.AddOrphanTx(tx, txd.nodeId);
 
-                        // Mark tx as received so we don't re-request it again if more INV's arrive later
-                        requester.Received(inv, nullptr);
-
                         // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
                         static unsigned int nMaxOrphanTx =
                             (unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
@@ -398,6 +391,9 @@ void ThreadTxAdmission()
                     }
                 }
             }
+
+            // Mark tx as received regardless of whether it was a valid tx, orphan or invalid.
+            requester.Received(inv, nullptr);
         }
     }
 }
