@@ -180,25 +180,30 @@ void ThreadCommitToMempool()
             // cache.
             pcoinsTip->Trim(nCoinCacheMaxSize);
 
-            // move the previously deferred txs into active processing
-            std::queue<CTxInputData> wasDeferred;
+            // Move the previously deferred txns into active processing.
+            //
+            // Use a map to store the txns so that we end up removing duplicates which could have arrived
+            // from re-requests.
+            std::map<uint256, CTxInputData> mapWasDeferred;
             {
-                LOCK(csTxInQ);
                 // this could be a lot more efficient
+                LOCK(csTxInQ);
                 while (!txDeferQ.empty())
                 {
-                    wasDeferred.push(txDeferQ.front());
+                    const uint256 &hash = txDeferQ.front().tx->GetHash();
+                    mapWasDeferred.insert(std::pair<uint256, CTxInputData>(hash, txDeferQ.front()));
+
                     txDeferQ.pop();
+                    LOG(MEMPOOL, "popping txdeferQ, size %d : %s\n", txDeferQ.size(), hash.ToString());
                 }
             }
-            if (!wasDeferred.empty())
-                LOG(MEMPOOL, "%d tx were deferred\n", wasDeferred.size());
+            if (!mapWasDeferred.empty())
+                LOG(MEMPOOL, "%d tx were deferred\n", mapWasDeferred.size());
 
-            while (!wasDeferred.empty())
+            for (auto &it : mapWasDeferred)
             {
-                // LOG(MEMPOOL, "attempt enqueue deferred %s\n", wasDeferred.front().tx->GetHash().ToString());
-                EnqueueTxForAdmission(wasDeferred.front());
-                wasDeferred.pop();
+                LOG(MEMPOOL, "attempt enqueue deferred %s\n", it.first.ToString());
+                EnqueueTxForAdmission(it.second);
             }
         }
     }
