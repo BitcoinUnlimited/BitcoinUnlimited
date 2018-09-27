@@ -7,6 +7,8 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/test/unit_test.hpp>
 
+#include <sstream>
+
 using namespace std;
 
 // Defined in rpc_tests.cpp not bitcoin-cli.cpp
@@ -20,29 +22,52 @@ BOOST_AUTO_TEST_CASE(rpc_excessive)
 
     BOOST_CHECK_NO_THROW(CallRPC("getminingmaxblock"));
 
-    BOOST_CHECK_NO_THROW(CallRPC("setminingmaxblock 2000"));
+    // Testing the parsing of input parameters of setexcessive block,
+    // this RPC set the value for EB and AD and expect exactly 2 unsigned
+    // integer parameter.
+
+    // 1) RPC accept 2 parameters EB and AD and both has to be positive integer
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock not_uint"), runtime_error);
-    BOOST_CHECK_THROW(CallRPC("setexcessiveblock 4000000 not_uint"), boost::bad_lexical_cast);
-    BOOST_CHECK_THROW(CallRPC("setexcessiveblock 4000000 -1"), boost::bad_lexical_cast);
+    BOOST_CHECK_THROW(CallRPC("setexcessiveblock 36000000 not_uint"), boost::bad_lexical_cast);
+    BOOST_CHECK_THROW(CallRPC("setexcessiveblock 36000000 -1"), boost::bad_lexical_cast);
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock -1 0"), boost::bad_lexical_cast);
 
-    BOOST_CHECK_THROW(CallRPC("setexcessiveblock 1000 1"), runtime_error);
-    BOOST_CHECK_NO_THROW(CallRPC("setminingmaxblock 1000"));
-    BOOST_CHECK_NO_THROW(CallRPC("setexcessiveblock 1000 1"));
-
+    // 2) passing 3 params should raise an exception
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock 1000 0 0"), runtime_error);
 
+    // Testing the semantics of input parameters of setexcessive
+
+    // 1) EB must be bigger than 32MB and bigger than MG
+    BOOST_CHECK_NO_THROW(CallRPC("setminingmaxblock 33000000"));
+    BOOST_CHECK_THROW(CallRPC("setexcessiveblock 32000000 1"), runtime_error);
+    BOOST_CHECK_NO_THROW(CallRPC("setminingmaxblock 32000000"));
+    BOOST_CHECK_NO_THROW(CallRPC("setexcessiveblock 32000000 1"));
+
+    // Testing the parsing of inputs parameters of setminingmaxblock,
+    // this RPC call set the value in byte for the max size of produced
+    // block. It accepts exactly one parameter (positive integer) bigger
+    // than 100 bytes
+
+    // Passing 0 params should fail
     BOOST_CHECK_THROW(CallRPC("setminingmaxblock"), runtime_error);
-    BOOST_CHECK_THROW(CallRPC("setminingmaxblock 100000"), runtime_error);
-    BOOST_CHECK_THROW(CallRPC("setminingmaxblock not_uint"), boost::bad_lexical_cast);
-    BOOST_CHECK_THROW(CallRPC("setminingmaxblock -1"), boost::bad_lexical_cast);
-    BOOST_CHECK_THROW(CallRPC("setminingmaxblock 0"), runtime_error);
+    // Passing 2 parameters should throw an error
     BOOST_CHECK_THROW(CallRPC("setminingmaxblock 0 0"), runtime_error);
+
+    // Test the semantics of the parameters of setminingmaxblock
+
+    // MG can't be greater than EB
+    BOOST_CHECK_THROW(CallRPC("setminingmaxblock 33000000"), runtime_error);
+    // MG has to be an integer not a string
+    BOOST_CHECK_THROW(CallRPC("setminingmaxblock not_uint"), boost::bad_lexical_cast);
+    // MG has to be a positive integer
+    BOOST_CHECK_THROW(CallRPC("setminingmaxblock -1"), boost::bad_lexical_cast);
+    // MG has to be a positive integer greater than 100
+    BOOST_CHECK_THROW(CallRPC("setminingmaxblock 0"), runtime_error);
     BOOST_CHECK_NO_THROW(CallRPC("setminingmaxblock 1000"));
     BOOST_CHECK_NO_THROW(CallRPC("setminingmaxblock 101"));
 
     // Set it back to the expected values for other tests
-    BOOST_CHECK_NO_THROW(CallRPC("setexcessiveblock 16000000 12"));
+    BOOST_CHECK_NO_THROW(CallRPC("setexcessiveblock 32000000 12"));
     BOOST_CHECK_NO_THROW(CallRPC("setminingmaxblock 1000000"));
 }
 
@@ -184,49 +209,46 @@ BOOST_AUTO_TEST_CASE(check_validator_rule)
 
 BOOST_AUTO_TEST_CASE(check_excessive_validator)
 {
+    // Saving EB / MG default value
     uint64_t c_mgb = maxGeneratedBlock;
     uint64_t c_ebs = excessiveBlockSize;
 
+    // Tweaks validator is potentially executed twice for every set operation.
+    // The first execution check the validity of the value we want to set the param to.
+    // The second execution happens only if the assignment happened successfully and
+    // could be used as notification update mechanism.
+    // The first time with the 3rd par (validate) = true and the 2nd with validate = false.
+    // If validate is true, the function is given a candidate and decides whether to allow
+    // the assignment to happen, if validate is false, an assignment has happened
+    // and you have the opportunity to add side effects (update the GUI or something)
+    // if validate is true, the 2nd parameter represent the current value of the tweak
+    // whereas the 1st one is the value we want it to be changed to. If validate is false
+    // the assignment already happened hence the 2nd par is the new value (just set) and
+    // the 1st par the previous one.
+
+
+    // TEST 1): EB has to be always greater or equal to MG
+    // TEST 2): EB has to be always greater or equal of MIN_EXCESSIVE_BLOCK_SIZE
+    // Test 2 will be performed in validateblocktemplate.py
+
+    // TEST 1)
+    // new EB = 31MB, old EB = 32MB, perform validation
+
     // fudge global variables....
-    maxGeneratedBlock = 1000000;
-    excessiveBlockSize = 888;
-
-    unsigned int tmpExcessive = 1000000;
     std::string str;
+    std::ostringstream expected_ret;
+    maxGeneratedBlock = 32500000;
+    excessiveBlockSize = 33000000;
 
-    str = ExcessiveBlockValidator(tmpExcessive, NULL, true);
-    BOOST_CHECK(str.empty());
+    uint64_t tmpExcessive = 32000000;
+    expected_ret << "Sorry, your maximum mined block (" << maxGeneratedBlock
+                 << ") is larger than your proposed excessive size (" << tmpExcessive
+                 << ").  This would cause you to orphan your own blocks.";
 
-    excessiveBlockSize = 888;
-    str = ExcessiveBlockValidator(tmpExcessive, NULL, false);
-    BOOST_CHECK(str.empty());
+    str = ExcessiveBlockValidator(tmpExcessive, nullptr, true);
+    BOOST_CHECK(str == expected_ret.str());
 
-    str = ExcessiveBlockValidator(tmpExcessive, (uint64_t *)42, true);
-    BOOST_CHECK(str.empty());
-
-    tmpExcessive = maxGeneratedBlock + 1;
-
-    str = ExcessiveBlockValidator(tmpExcessive, NULL, true);
-    BOOST_CHECK(str.empty());
-
-    excessiveBlockSize = 888;
-    str = ExcessiveBlockValidator(tmpExcessive, NULL, false);
-    BOOST_CHECK(str.empty());
-
-    str = ExcessiveBlockValidator(tmpExcessive, (uint64_t *)42, true);
-    BOOST_CHECK(str.empty());
-
-    tmpExcessive = maxGeneratedBlock - 1;
-
-    str = ExcessiveBlockValidator(tmpExcessive, NULL, true);
-    BOOST_CHECK(!str.empty());
-
-    str = ExcessiveBlockValidator(tmpExcessive, NULL, false);
-    BOOST_CHECK(str.empty());
-
-    str = ExcessiveBlockValidator(tmpExcessive, (uint64_t *)42, true);
-    BOOST_CHECK(!str.empty());
-
+    // Restore default value for EB and MG
     maxGeneratedBlock = c_mgb;
     excessiveBlockSize = c_ebs;
 }
@@ -243,11 +265,11 @@ BOOST_AUTO_TEST_CASE(check_generated_block_validator)
     uint64_t tmpMGB = 1000000;
     std::string str;
 
-    str = MiningBlockSizeValidator(tmpMGB, NULL, true);
+    str = MiningBlockSizeValidator(tmpMGB, nullptr, true);
     BOOST_CHECK(str.empty());
 
     maxGeneratedBlock = 8888881;
-    str = MiningBlockSizeValidator(tmpMGB, NULL, false);
+    str = MiningBlockSizeValidator(tmpMGB, nullptr, false);
     BOOST_CHECK(str.empty());
 
     str = MiningBlockSizeValidator(tmpMGB, (uint64_t *)42, true);
@@ -255,11 +277,11 @@ BOOST_AUTO_TEST_CASE(check_generated_block_validator)
 
     tmpMGB = excessiveBlockSize - 1;
 
-    str = MiningBlockSizeValidator(tmpMGB, NULL, true);
+    str = MiningBlockSizeValidator(tmpMGB, nullptr, true);
     BOOST_CHECK(str.empty());
 
     maxGeneratedBlock = 8888881;
-    str = MiningBlockSizeValidator(tmpMGB, NULL, false);
+    str = MiningBlockSizeValidator(tmpMGB, nullptr, false);
     BOOST_CHECK(str.empty());
 
     str = MiningBlockSizeValidator(tmpMGB, (uint64_t *)42, true);
@@ -267,10 +289,10 @@ BOOST_AUTO_TEST_CASE(check_generated_block_validator)
 
     tmpMGB = excessiveBlockSize + 1;
 
-    str = MiningBlockSizeValidator(tmpMGB, NULL, true);
+    str = MiningBlockSizeValidator(tmpMGB, nullptr, true);
     BOOST_CHECK(!str.empty());
 
-    str = MiningBlockSizeValidator(tmpMGB, NULL, false);
+    str = MiningBlockSizeValidator(tmpMGB, nullptr, false);
     BOOST_CHECK(str.empty());
 
     str = MiningBlockSizeValidator(tmpMGB, (uint64_t *)42, true);

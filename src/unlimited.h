@@ -29,7 +29,12 @@ enum
     DEFAULT_EXCESSIVE_ACCEPT_DEPTH = 12, // Default is 12 to make it very expensive for a minority hash power to get
     // lucky, and potentially drive a block that the rest of the network sees as
     // "excessive" onto the blockchain.
-    DEFAULT_EXCESSIVE_BLOCK_SIZE = 8000000, // per UAHF spec REQ-4-1, EB has to be at least 8MB at startup
+
+    // per May, 15 '18 upgrade specification the min value for min value for max accepted block size, i.e. EB, is 32 MB
+    // (github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/may-2018-hardfork.md#summary)
+    MIN_EXCESSIVE_BLOCK_SIZE = 32000000,
+    MIN_EXCESSIVE_BLOCK_SIZE_REGTEST = 1000,
+    DEFAULT_EXCESSIVE_BLOCK_SIZE = MIN_EXCESSIVE_BLOCK_SIZE,
     DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER = 16, // Allowed messages lengths will be this * the excessive block size
     DEFAULT_COINBASE_RESERVE_SIZE = 1000,
     MAX_COINBASE_SCRIPTSIG_SIZE = 100,
@@ -273,10 +278,6 @@ void InterruptBlockValidationThreads();
 // Fork configuration
 /** This specifies the MTP time of the next fork */
 extern CTweak<uint64_t> miningForkTime;
-/** This specifies the minimum excessive block setting at the fork point */
-extern CTweak<uint64_t> miningForkEB;
-/** This specifies the minimum max block size at the fork point */
-extern CTweak<uint64_t> miningForkMG;
 
 // Mining-Candidate start
 /** Return a Merkle root given a Coinbase hash and Merkle proof */

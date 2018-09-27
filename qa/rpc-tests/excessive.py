@@ -74,15 +74,6 @@ class ExcessiveBlockTest (BitcoinTestFramework):
                 pdb.set_trace()
 
     def run_test(self):
-        # Temporary workaround for the may15th hardfork. These tests will not work if the fork is enabled
-        # because we are forcing an EB of 32MB after each block is mined which invalidates many of these tests.
-        # So we set the mocktime to sometime far in advance of the fork.
-        MAY152018_START_TIME = 1526400000;
-        self.nodes[0].setmocktime(MAY152018_START_TIME - 10000)
-        self.nodes[1].setmocktime(MAY152018_START_TIME - 10000)
-        self.nodes[2].setmocktime(MAY152018_START_TIME - 10000)
-        self.nodes[3].setmocktime(MAY152018_START_TIME - 10000)
-
         BitcoinTestFramework.run_test(self)
         self.testCli()
         self.testExcessiveSigops()
@@ -102,9 +93,9 @@ class ExcessiveBlockTest (BitcoinTestFramework):
 
     def testCli(self):
 
-        # Assumes the default excessive at 16MB and mining at 1MB
+        # Assumes the default excessive at 32MB and mining at 8MB
         try:
-            self.nodes[0].setminingmaxblock(32000000)
+            self.nodes[0].setminingmaxblock(33000000)
         except JSONRPCException as e:
             pass
         else:
@@ -209,19 +200,11 @@ class ExcessiveBlockTest (BitcoinTestFramework):
         logging.info("testExcessiveSigops: Cleaning up node state")
 
         # We are not testing excessively sized blocks so make these large
-        self.nodes[0].set("net.excessiveBlock=5000000")
-        self.nodes[1].set("net.excessiveBlock=5000000")
-        self.nodes[2].set("net.excessiveBlock=5000000")
-        self.nodes[3].set("net.excessiveBlock=5000000")
-        self.nodes[0].setminingmaxblock(5000000)
-        self.nodes[1].setminingmaxblock(5000000)
-        self.nodes[2].setminingmaxblock(5000000)
-        self.nodes[3].setminingmaxblock(5000000)
-        # Stagger the accept depths so we can see the block accepted stepwise
-        self.nodes[0].set("net.excessiveAcceptDepth=0")
-        self.nodes[1].set("net.excessiveAcceptDepth=1")
-        self.nodes[2].set("net.excessiveAcceptDepth=2")
-        self.nodes[3].set("net.excessiveAcceptDepth=3")
+        for i in range(0,3):
+            self.nodes[i].setminingmaxblock(5000000)
+            self.nodes[i].set("net.excessiveBlock=5000000")
+            # Stagger the accept depths so we can see the block accepted stepwise
+            self.nodes[i].set("net.excessiveAcceptDepth=%d"%(i))
 
         for n in self.nodes:
             n.generate(10)

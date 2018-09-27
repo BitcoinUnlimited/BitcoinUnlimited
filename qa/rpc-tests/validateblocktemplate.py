@@ -289,6 +289,12 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
         self.nodes[0].setexcessiveblock(1000, 12)
         expectException(lambda: self.nodes[0].validateblocktemplate(hexblk),
                         JSONRPCException, "invalid block: excessive")
+
+        logging.info("EB min value")
+        self.nodes[0].setminingmaxblock(1000)
+        expectException(lambda: self.nodes[0].setexcessiveblock(999, 12),
+                        JSONRPCException, "Sorry, your maximum mined block (1000) is larger than your proposed excessive size (999).  This would cause you to orphan your own blocks.")
+
         self.nodes[0].setexcessiveblock(16 * 1000 * 1000, 12)
         self.nodes[0].setminingmaxblock(1000 * 1000)
 

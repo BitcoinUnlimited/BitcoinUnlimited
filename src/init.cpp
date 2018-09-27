@@ -1285,16 +1285,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
             MilliSleep(10);
     }
 
-    // Set the EB and datacarrier size if we have restarted after the fork has already happened.
-    // It is possible that we need to override the old settings in QT and bitcoin.conf.
-    if (IsMay152018Enabled(chainparams.GetConsensus(), tip))
-    {
-        // Bump the accepted block size to 32MB
-        if (miningForkEB.Value() > excessiveBlockSize)
-            excessiveBlockSize = miningForkEB.Value();
-        settingsToUserAgentString();
-    }
-
     // ********************************************************* Step 10: network initialization
 
     RegisterNodeSignals(GetNodeSignals());

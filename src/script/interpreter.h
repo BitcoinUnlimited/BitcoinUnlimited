@@ -100,14 +100,18 @@ enum
 
     // Do we accept signature using SIGHASH_FORKID
     //
-    //
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
 
     // Enable Replay protection.
+    // This is just a placeholder, BU does not implement automatic reply protections
+    // as descurbed here:
+    // github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/may-2018-hardfork.md#automatic-replay-protection
+    // https:
     SCRIPT_ENABLE_REPLAY_PROTECTION = (1U << 17),
 
     // Enable new opcodes.
-    //
+    // Another placeholder, we used it during May '18 upgrade activation, but sincemay '18 got
+    // activated  there's no need to use it anymore
     SCRIPT_ENABLE_MAY152018_OPCODES = (1U << 18),
 };
 
