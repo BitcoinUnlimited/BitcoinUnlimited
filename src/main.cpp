@@ -6096,15 +6096,17 @@ bool SendMessages(CNode *pto)
                 pto->PushMessage(NetMsgType::ADDR, vAddr);
         }
 
-        CNodeState &state = *State(pto->GetId());
-        if (&state == nullptr)
+        CNodeState *state = State(pto->GetId());
+        if (state == nullptr)
+        {
             return true;
+        }
 
         // If a sync has been started check whether we received the first batch of headers requested within the timeout
         // period. If not then disconnect and ban the node and a new node will automatically be selected to start the
         // headers download.
-        if ((state.fSyncStarted) && (state.nSyncStartTime < GetTime() - INITIAL_HEADERS_TIMEOUT) &&
-            (!state.fFirstHeadersReceived) && !pto->fWhitelisted)
+        if ((state->fSyncStarted) && (state->nSyncStartTime < GetTime() - INITIAL_HEADERS_TIMEOUT) &&
+            (!state->fFirstHeadersReceived) && !pto->fWhitelisted)
         {
             // pto->fDisconnect = true;
             LOGA("Initial headers were either not received or not received before the timeout\n", pto->GetLogName());
@@ -6114,8 +6116,8 @@ bool SendMessages(CNode *pto)
         if (pindexBestHeader == nullptr)
             pindexBestHeader = chainActive.Tip();
         // Download if this is a nice peer, or we have no nice peers and this one might do.
-        bool fFetch = state.fPreferredDownload || (nPreferredDownload.load() == 0 && !pto->fOneShot);
-        if (!state.fSyncStarted && !fImporting && !fReindex)
+        bool fFetch = state->fPreferredDownload || (nPreferredDownload.load() == 0 && !pto->fOneShot);
+        if (!state->fSyncStarted && !fImporting && !fReindex)
         {
             // Only allow the downloading of headers from a single pruned peer.
             static int nSyncStartedPruned = 0;
@@ -6139,10 +6141,10 @@ bool SendMessages(CNode *pto)
                 // BU Bug fix for Core:  Don't start downloading headers unless our chain is shorter
                 if (pindexStart->nHeight < pto->nStartingHeight)
                 {
-                    state.fSyncStarted = true;
-                    state.nSyncStartTime = GetTime();
-                    state.fRequestedInitialBlockAvailability = true;
-                    state.nFirstHeadersExpectedHeight = pindexStart->nHeight;
+                    state->fSyncStarted = true;
+                    state->nSyncStartTime = GetTime();
+                    state->fRequestedInitialBlockAvailability = true;
+                    state->nFirstHeadersExpectedHeight = pindexStart->nHeight;
                     nSyncStarted++;
 
                     if (pto->fClient)
@@ -6159,12 +6161,12 @@ bool SendMessages(CNode *pto)
         // to update our block availability. We only want/need to do this only once per peer (if the initial batch of
         // headers has still not been etirely donwnloaded yet then the block availability will be updated during that
         // process rather than here).
-        if (IsInitialBlockDownload() && !state.fRequestedInitialBlockAvailability &&
-            state.pindexBestKnownBlock == nullptr && !fReindex && !fImporting)
+        if (IsInitialBlockDownload() && !state->fRequestedInitialBlockAvailability &&
+            state->pindexBestKnownBlock == nullptr && !fReindex && !fImporting)
         {
             if (!pto->fClient)
             {
-                state.fRequestedInitialBlockAvailability = true;
+                state->fRequestedInitialBlockAvailability = true;
 
                 // We only want one single header so we pass a null CBlockLocator.
                 pto->PushMessage(NetMsgType::GETHEADERS, CBlockLocator(), pindexBestHeader->GetBlockHash());
@@ -6201,7 +6203,7 @@ bool SendMessages(CNode *pto)
             }
 
             std::vector<CBlock> vHeaders;
-            bool fRevertToInv = (!state.fPreferHeaders || pto->vBlockHashesToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
+            bool fRevertToInv = (!state->fPreferHeaders || pto->vBlockHashesToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
             CBlockIndex *pBestIndex = nullptr; // last header queued for delivery
             requester.ProcessBlockAvailability(pto->id); // ensure pindexBestKnownBlock is up-to-date
 
@@ -6252,11 +6254,11 @@ bool SendMessages(CNode *pto)
                         // add this to the headers message
                         vHeaders.push_back(pindex->GetBlockHeader());
                     }
-                    else if (PeerHasHeader(&state, pindex))
+                    else if (PeerHasHeader(state, pindex))
                     {
                         continue; // keep looking for the first new block
                     }
-                    else if (pindex->pprev == NULL || PeerHasHeader(&state, pindex->pprev))
+                    else if (pindex->pprev == NULL || PeerHasHeader(state, pindex->pprev))
                     {
                         // Peer doesn't have this header but they do have the prior one.
                         // Start sending headers.
@@ -6302,7 +6304,7 @@ bool SendMessages(CNode *pto)
                         // If the peer announced this block to us, don't inv it back.
                         // (Since block announcements may not be via inv's, we can't solely rely on
                         // setInventoryKnown to track this.)
-                        if (!PeerHasHeader(&state, pindex))
+                        if (!PeerHasHeader(state, pindex))
                         {
                             pto->PushInventory(CInv(MSG_BLOCK, hashToAnnounce));
                             LOG(NET, "%s: sending inv peer=%d hash=%s\n", __func__, pto->id, hashToAnnounce.ToString());
@@ -6324,7 +6326,7 @@ bool SendMessages(CNode *pto)
                 }
                 LOCK(pto->cs_vSend);
                 pto->PushMessage(NetMsgType::HEADERS, vHeaders);
-                state.pindexBestHeaderSent = pBestIndex;
+                state->pindexBestHeaderSent = pBestIndex;
             }
         }
 
