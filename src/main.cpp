@@ -4332,7 +4332,11 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 if (!fPushed && inv.type == MSG_TX)
                 {
                     CTransactionRef ptx = nullptr;
-                    ptx = mempool.get(inv.hash);
+                    ptx = CommitQGet(inv.hash);
+                    if (!ptx)
+                    {
+                        ptx = mempool.get(inv.hash);
+                    }
                     if (ptx)
                     {
                         pfrom->PushMessage(NetMsgType::TX, ptx);
@@ -4383,6 +4387,7 @@ static bool BasicThinblockChecks(CNode *pfrom, const CChainParams &chainparams)
 
     // Check for Misbehaving and DOS
     // If they make more than 20 requests in 10 minutes then disconnect them
+    if (Params().NetworkIDString() != "regtest")
     {
         if (pfrom->nGetXthinLastTime <= 0)
             pfrom->nGetXthinLastTime = GetTime();

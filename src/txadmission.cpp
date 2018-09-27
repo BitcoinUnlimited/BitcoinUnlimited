@@ -42,6 +42,15 @@ bool CheckSequenceLocks(const CTransaction &tx,
     const Snapshot &ss);
 
 
+CTransactionRef CommitQGet(uint256 hash)
+{
+    boost::unique_lock<boost::mutex> lock(csCommitQ);
+    std::map<uint256, CTxCommitData>::iterator it = txCommitQ.find(hash);
+    if (it == txCommitQ.end())
+        return nullptr;
+    return it->second.entry.GetSharedTx();
+}
+
 void StartTxAdmission(boost::thread_group &threadGroup)
 {
     txHandlerSnap.Load(); // Get an initial view for the transaction processors
@@ -226,19 +235,23 @@ void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
 
 void CommitTxToMempool()
 {
-    std::vector<uint256> whatChanged;
-    LOCK(cs_main); // cs_main must lock before csCommitQ
+    std::vector<uint256> vWhatChanged;
     {
+#ifdef ENABLE_WALLET
+        // cs_main is taken again in SyncWithWallets but must be locked before csCommitQ
+        // to maintain correct locking order.
+        LOCK(cs_main);
+#endif
         boost::unique_lock<boost::mutex> lock(csCommitQ);
         for (auto &it : txCommitQ)
         {
+            // This transaction has already been validated so store it directly into the mempool.
             CTxCommitData &data = it.second;
-            // Store transaction in memory
             mempool.addUnchecked(it.first, data.entry, !IsInitialBlockDownload());
 #ifdef ENABLE_WALLET
             SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
 #endif
-            whatChanged.push_back(data.hash);
+            vWhatChanged.push_back(data.hash);
 
             // Update txn per second only when a txn is valid and accepted to the mempool
             mempool.UpdateTransactionsPerSecond();
@@ -258,7 +271,7 @@ void CommitTxToMempool()
         }
         LOG(MEMPOOL, "Reset incoming filter\n");
     }
-    ProcessOrphans(whatChanged);
+    ProcessOrphans(vWhatChanged);
 }
 
 
@@ -300,42 +313,9 @@ void ThreadTxAdmission()
             CInv inv(MSG_TX, tx->GetHash());
 
             std::vector<COutPoint> vCoinsToUncache;
-            {
-                // Check for recently rejected (and do other quick existence checks)
-                bool have = TxAlreadyHave(inv);
-                if (have)
-                {
-                    recentRejects.insert(tx->GetHash());
-
-                    if (txd.whitelisted && GetBoolArg("-whitelistforcerelay", DEFAULT_WHITELISTFORCERELAY))
-                    {
-                        // Always relay transactions received from whitelisted peers, even
-                        // if they were already in the mempool or rejected from it due
-                        // to policy, allowing the node to function as a gateway for
-                        // nodes hidden behind it.
-                        //
-                        // Never relay transactions that we would assign a non-zero DoS
-                        // score for, as we expect peers to do the same with us in that
-                        // case.
-                        int nDoS = 0;
-                        if (!state.IsInvalid(nDoS) || nDoS == 0)
-                        {
-                            LOGA("Force relaying tx %s from whitelisted peer=%s\n", tx->GetHash().ToString(),
-                                txd.nodeName);
-                            RelayTransaction(tx);
-                        }
-                        else
-                        {
-                            LOGA("Not relaying invalid transaction %s from whitelisted peer=%d (%s)\n",
-                                tx->GetHash().ToString(), txd.nodeName, FormatStateMessage(state));
-                        }
-                    }
-                    continue;
-                }
-            }
-
             bool isRespend = false;
-            if (ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false, false,
+            if (!TxAlreadyHave(inv) &&
+                ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false, false,
                     TransactionClass::DEFAULT, vCoinsToUncache, &isRespend))
             {
                 RelayTransaction(tx);
@@ -368,9 +348,36 @@ void ThreadTxAdmission()
                         LOG(MEMPOOL, "rejected orphan as likely contains old sighash");
                     }
                 }
-                else // If the problem wasn't that the tx is an orphan, then uncache the inputs since we likely won't
-                // need them again.
+                else
                 {
+                    recentRejects.insert(tx->GetHash());
+
+                    if (txd.whitelisted && GetBoolArg("-whitelistforcerelay", DEFAULT_WHITELISTFORCERELAY))
+                    {
+                        // Always relay transactions received from whitelisted peers, even
+                        // if they were already in the mempool or rejected from it due
+                        // to policy, allowing the node to function as a gateway for
+                        // nodes hidden behind it.
+                        //
+                        // Never relay transactions that we would assign a non-zero DoS
+                        // score for, as we expect peers to do the same with us in that
+                        // case.
+                        int nDoS = 0;
+                        if (!state.IsInvalid(nDoS) || nDoS == 0)
+                        {
+                            LOGA("Force relaying tx %s from whitelisted peer=%s\n", tx->GetHash().ToString(),
+                                txd.nodeName);
+                            RelayTransaction(tx);
+                        }
+                        else
+                        {
+                            LOGA("Not relaying invalid transaction %s from whitelisted peer=%d (%s)\n",
+                                tx->GetHash().ToString(), txd.nodeName, FormatStateMessage(state));
+                        }
+                    }
+
+                    // If the problem wasn't that the tx is an orphan, then uncache the inputs since we likely won't
+                    // need them again.
                     for (const COutPoint &remove : vCoinsToUncache)
                         pcoinsTip->Uncache(remove);
                 }
