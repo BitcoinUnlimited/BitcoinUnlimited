@@ -8,10 +8,10 @@
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "hash.h"
-#include "main.h"
 #include "pow.h"
 #include "ui_interface.h"
 #include "uint256.h"
+#include "validation/validation.h"
 
 #include <stdint.h>
 

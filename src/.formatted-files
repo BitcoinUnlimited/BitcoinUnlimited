@@ -152,6 +152,12 @@ utilstrencodings.cpp
 utilstrencodings.h
 utiltime.cpp
 utiltime.h
+validation/forks.cpp
+validation/forks.h
+validation/validation.cpp
+validation/validation.h
+validation/verifydb.cpp
+validation/verifydb.h
 validationinterface.cpp
 validationinterface.h
 versionbits.cpp

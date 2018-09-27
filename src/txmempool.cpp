@@ -10,6 +10,7 @@
 #include "consensus/tx_verify.h"
 #include "consensus/validation.h"
 #include "main.h"
+#include "parallel.h"
 #include "policy/fees.h"
 #include "streams.h"
 #include "timedata.h"
@@ -17,6 +18,7 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utiltime.h"
+#include "validation/validation.h"
 #include "version.h"
 
 using namespace std;

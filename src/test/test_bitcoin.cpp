@@ -24,6 +24,7 @@
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
+#include "validation/validation.h"
 #include <boost/program_options.hpp>
 #include <boost/test/unit_test.hpp>
 

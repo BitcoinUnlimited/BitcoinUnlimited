@@ -10,11 +10,13 @@
 #include "dosman.h"
 #include "net.h"
 #include "pow.h"
+#include "script/sigcache.h"
 #include "timedata.h"
 #include "txorphanpool.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utiltime.h"
+#include "validation/validation.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -36,6 +38,17 @@ static void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck> *pqueue)
     tName << "scriptchk" << i;
     RenameThread(tName.str().c_str());
     pqueue->Thread();
+}
+
+bool CScriptCheck::operator()()
+{
+    const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
+    CachingTransactionSignatureChecker checker(ptxTo, nIn, amount, nFlags, cacheStore);
+    if (!VerifyScript(scriptSig, scriptPubKey, nFlags, checker, &error, &sighashType))
+        return false;
+    if (resourceTracker)
+        resourceTracker->Update(ptxTo->GetHash(), checker.GetNumSigops(), checker.GetBytesHashed());
+    return true;
 }
 
 CParallelValidation::CParallelValidation() : nThreads(0), semThreadCount(nScriptCheckQueues)
