@@ -52,7 +52,7 @@ static const CRPCConvertParam vRPCConvertParams[] = {{"stop", 0}, {"setmocktime"
     {"verifychain", 1}, {"keypoolrefill", 0}, {"getrawmempool", 0}, {"estimatefee", 0}, {"estimatepriority", 0},
     {"estimatesmartfee", 0}, {"estimatesmartpriority", 0}, {"prioritisetransaction", 1}, {"prioritisetransaction", 2},
     {"setban", 2}, {"setban", 3}, {"rollbackchain", 0}, {"rollbackchain", 1}, {"reconsidermostworkchain", 0},
-    {"reconsidermostworkchain", 1}};
+    {"reconsidermostworkchain", 1}, {"getmempoolancestors", 1}, {"getmempooldescendants", 1}};
 
 class CRPCConvertTable
 {
