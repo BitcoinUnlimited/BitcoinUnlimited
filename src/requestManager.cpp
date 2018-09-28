@@ -257,36 +257,47 @@ bool CRequestManager::AlreadyAskedForBlock(const uint256 &hash)
     return false;
 }
 
-// Indicate that we got this object, from and bytes are optional (for node performance tracking)
-void CRequestManager::Received(const CInv &obj, CNode *from, int bytes)
+void CRequestManager::UpdateTxnResponseTime(const CInv &obj, CNode *pfrom)
 {
     int64_t now = GetTimeMicros();
+    LOCK(cs_objDownloader);
+    if (pfrom && obj.type == MSG_TX)
+    {
+        OdMap::iterator item = mapTxnInfo.find(obj.hash);
+        if (item == mapTxnInfo.end())
+            return;
+
+        pfrom->txReqLatency << (now - item->second.lastRequestTime);
+        receivedTxns += 1;
+    }
+}
+
+// Indicate that we got this object.
+void CRequestManager::Received(const CInv &obj, CNode *pfrom)
+{
     LOCK(cs_objDownloader);
     if (obj.type == MSG_TX)
     {
         OdMap::iterator item = mapTxnInfo.find(obj.hash);
         if (item == mapTxnInfo.end())
-            return; // item has already been removed
+            return;
+
         LOG(REQ, "ReqMgr: TX received for %s.\n", item->second.obj.ToString().c_str());
-        from->txReqLatency << (now - item->second.lastRequestTime); // keep track of response latency of this node
-        // will be decremented in the item cleanup: if (inFlight) inFlight--;
-        cleanup(item); // remove the item
-        receivedTxns += 1;
+        cleanup(item);
     }
-    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_THINBLOCK) || (obj.type == MSG_XTHINBLOCK))
+    else if (obj.type == MSG_BLOCK || obj.type == MSG_THINBLOCK || obj.type == MSG_XTHINBLOCK)
     {
         OdMap::iterator item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
-            return; // item has already been removed
+            return;
+
         LOG(BLK, "%s removed from request queue (received from %s).\n", item->second.obj.ToString().c_str(),
-            from->GetLogName());
-        // from->blkReqLatency << (now - item->second.lastRequestTime);  // keep track of response latency of this node
-        cleanup(item); // remove the item
-        // receivedTxns += 1;
+            pfrom ? pfrom->GetLogName() : "unknown");
+        cleanup(item);
     }
 }
 
-// Indicate that we got this object, from and bytes are optional (for node performance tracking)
+// Indicate that we got this object.
 void CRequestManager::AlreadyReceived(CNode *pnode, const CInv &obj)
 {
     LOCK(cs_objDownloader);

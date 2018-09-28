@@ -12,6 +12,7 @@
 #include "init.h"
 #include "main.h" // for cs_main
 #include "net.h"
+#include "requestManager.h"
 #include "respend/respenddetector.h"
 #include "timedata.h"
 #include "txorphanpool.h"
@@ -402,6 +403,9 @@ void ThreadTxAdmission()
                     }
                 }
             }
+
+            // Mark tx as received regardless of whether it was a valid tx, orphan or invalid.
+            requester.Received(inv, nullptr);
         }
     }
 }
