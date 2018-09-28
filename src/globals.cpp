@@ -218,6 +218,7 @@ CCond cvTxInQ;
 
 // Finds transactions that may conflict with other pending transactions
 CFastFilter<4 * 1024 * 1024> incomingConflicts GUARDED_BY(csTxInQ);
+std::set<COutPoint> setIncomingConflicts GUARDED_BY(csTxInQ);
 
 // Tranactions that are waiting for validation and are known not to conflict with others
 std::queue<CTxInputData> txInQ GUARDED_BY(csTxInQ);

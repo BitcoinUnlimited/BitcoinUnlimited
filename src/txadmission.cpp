@@ -114,16 +114,29 @@ void EnqueueTxForAdmission(CTxInputData &txd)
 {
     LOCK(csTxInQ);
     bool conflict = false;
-    for (auto inp : txd.tx->vin)
+    for (auto &input : txd.tx->vin)
     {
-        uint256 hash = inp.prevout.hash;
+        /* Temporarily disabled due to false positives causing the deferred queue to not empty correctly.
+           Will need to create a degraded mode which filters the false positives when we get a conflict.
+        uint256 hash = input.prevout.hash;
         unsigned char *first = hash.begin();
-        *first ^= (unsigned char)(inp.prevout.n & 255);
+        *first ^= (unsigned char)(input.prevout.n & 255);
         if (!incomingConflicts.checkAndSet(hash))
         {
             conflict = true;
             break;
         }
+        */
+
+        // This section is less efficient than using the fast filter above but does not suffer from false
+        // positives. TODO: create a degraded mode where we use the fast filter to find a conflict and if
+        // it does then switch to using a set until the next cycle clears the filter again.
+        if (setIncomingConflicts.count(input.prevout) > 0)
+        {
+            conflict = true;
+            break;
+        }
+        setIncomingConflicts.insert(input.prevout);
     }
     if (!conflict)
     {
@@ -261,9 +274,10 @@ void CommitTxToMempool()
 
     {
         LOCK(csTxInQ);
-        // Clear the filter of incoming conflicts, and put all queued tx on the deferred queue since they've been
-        // deferred
+        // Clear the filter and set of incoming conflicts, and put all queued tx on the deferred queue since
+        // they've been deferred
         incomingConflicts.reset();
+        setIncomingConflicts.clear();
         while (!txInQ.empty())
         {
             txDeferQ.push(txInQ.front());
