@@ -102,6 +102,7 @@ extern CRollingFastFilter<4 * 1024 * 1024> txRecentlyInBlock;
 
 // Finds transactions that may conflict with other pending transactions
 extern CFastFilter<4 * 1024 * 1024> incomingConflicts;
+extern std::set<COutPoint> setIncomingConflicts;
 
 // Transactions that are available to be added to the mempool, and protection
 extern CCriticalSection csTxInQ;
