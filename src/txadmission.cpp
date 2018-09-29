@@ -313,10 +313,11 @@ void ThreadTxAdmission()
             CTransactionRef &tx = txd.tx;
             CInv inv(MSG_TX, tx->GetHash());
 
+            if (!TxAlreadyHave(inv))
+            {
             std::vector<COutPoint> vCoinsToUncache;
             bool isRespend = false;
-            if (!TxAlreadyHave(inv) &&
-                ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false, false,
+                if (ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false, false,
                     TransactionClass::DEFAULT, vCoinsToUncache, &isRespend))
             {
                 RelayTransaction(tx);
@@ -406,6 +407,7 @@ void ThreadTxAdmission()
 
             // Mark tx as received regardless of whether it was a valid tx, orphan or invalid.
             requester.Received(inv, nullptr);
+            }
         }
     }
 }
