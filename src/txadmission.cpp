@@ -115,7 +115,7 @@ void EnqueueTxForAdmission(CTxInputData &txd)
 {
     LOCK(csTxInQ);
     bool conflict = false;
-    for (auto inp : txd.tx->vin)
+    for (auto &inp : txd.tx->vin)
     {
         uint256 hash = inp.prevout.hash;
         unsigned char *first = hash.begin();
