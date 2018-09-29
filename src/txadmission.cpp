@@ -372,7 +372,7 @@ void ThreadTxAdmission()
                         }
                         else
                         {
-                            LOGA("Not relaying invalid transaction %s from whitelisted peer=%d (%s)\n",
+                            LOGA("Not relaying invalid transaction %s from whitelisted peer=%s (%s)\n",
                                 tx->GetHash().ToString(), txd.nodeName, FormatStateMessage(state));
                         }
                     }
