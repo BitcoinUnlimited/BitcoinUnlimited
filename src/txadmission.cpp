@@ -334,7 +334,7 @@ void CommitTxToMempool()
         while (!txDeferQ.empty())
         {
             const uint256 &hash = txDeferQ.front().tx->GetHash();
-            mapWasDeferred.insert(std::pair<uint256, CTxInputData>(hash, txDeferQ.front()));
+            mapWasDeferred.emplace(hash, txDeferQ.front());
 
             txDeferQ.pop();
         }
@@ -1018,9 +1018,9 @@ TransactionClass ParseTransactionClass(const std::string &s)
 
 void ProcessOrphans(std::vector<uint256> &vWorkQueue)
 {
-    std::vector<uint256> vEraseQueue;
-
-    // Recursively process any orphan transactions that depended on this one
+    // Recursively process any orphan transactions that depended on this one.
+    // NOTE: you must not return early since EraseOrphansByTime() must always be checked
+    std::map<uint256, CTxInputData> mapEnqueue;
     {
         READLOCK(orphanpool.cs);
         std::set<NodeId> setMisbehaving;
@@ -1038,39 +1038,46 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
                 // we always erase orphans and any mapOrphanTransactionsByPrev at the same time, still we need to
                 // be sure.
                 bool fOk = true;
-                DbgAssert(orphanpool.mapOrphanTransactions.count(orphanHash), fOk = false);
+                std::map<uint256, CTxOrphanPool::COrphanTx>::iterator iter =
+                    orphanpool.mapOrphanTransactions.find(orphanHash);
+                DbgAssert(iter != orphanpool.mapOrphanTransactions.end(), fOk = false);
                 if (!fOk)
                     continue;
 
-                const CTransactionRef &orphanTx = orphanpool.mapOrphanTransactions[orphanHash].ptx;
-                NodeId fromPeer = orphanpool.mapOrphanTransactions[orphanHash].fromPeer;
                 // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
                 // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get
                 // anyone relaying LegitTxX banned)
                 CValidationState stateDummy;
 
-                if (setMisbehaving.count(fromPeer))
+                if (setMisbehaving.count(iter->second.fromPeer))
                     continue;
                 {
                     CTxInputData txd;
-                    txd.tx = orphanTx;
-                    txd.nodeId = fromPeer;
+                    txd.tx = iter->second.ptx;
+                    txd.nodeId = iter->second.fromPeer;
                     txd.nodeName = "orphan";
-                    LOG(MEMPOOL, "Resubmitting orphan tx: %s\n", orphanTx->GetHash().ToString().c_str());
-                    EnqueueTxForAdmission(txd);
+                    LOG(MEMPOOL, "Resubmitting orphan tx: %s\n", orphanHash.ToString());
+                    mapEnqueue.emplace(std::move(orphanHash), std::move(txd));
                 }
-                vEraseQueue.push_back(orphanHash);
             }
         }
     }
 
+    // First delete the orphans before enqueuing them otherwise we may end up putting them
+    // in the queue twice.
     {
         WRITELOCK(orphanpool.cs);
-        for (auto hash : vEraseQueue)
-            orphanpool.EraseOrphanTx(hash);
-        //  BU: Xtreme thinblocks - purge orphans that are too old
+        for (auto &it : mapEnqueue)
+        {
+            // If the orphan was not erased then it must already have been erased/enqueue'd by another thread
+            // so do not enqueue this orphan again.
+            if (!orphanpool.EraseOrphanTx(it.first))
+                mapEnqueue.erase(it.first);
+        }
         orphanpool.EraseOrphansByTime();
     }
+    for (auto &it : mapEnqueue)
+        EnqueueTxForAdmission(it.second);
 }
 
 

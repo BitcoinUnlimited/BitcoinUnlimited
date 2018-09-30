@@ -48,13 +48,13 @@ bool CTxOrphanPool::AddOrphanTx(const CTransactionRef &ptx, NodeId peer)
     return true;
 }
 
-void CTxOrphanPool::EraseOrphanTx(uint256 hash)
+bool CTxOrphanPool::EraseOrphanTx(uint256 hash)
 {
     AssertWriteLockHeld(cs);
 
     std::map<uint256, COrphanTx>::iterator it = mapOrphanTransactions.find(hash);
     if (it == mapOrphanTransactions.end())
-        return;
+        return false;
     for (const CTxIn &txin : it->second.ptx->vin)
     {
         std::map<uint256, std::set<uint256> >::iterator itPrev = mapOrphanTransactionsByPrev.find(txin.prevout.hash);
@@ -69,6 +69,7 @@ void CTxOrphanPool::EraseOrphanTx(uint256 hash)
     LOG(MEMPOOL, "Erased orphan tx %s of size %ld bytes, orphan pool bytes:%ld\n", it->second.ptx->GetHash().ToString(),
         it->second.nOrphanTxSize, nBytesOrphanPool);
     mapOrphanTransactions.erase(it);
+    return true;
 }
 
 void CTxOrphanPool::EraseOrphansByTime()

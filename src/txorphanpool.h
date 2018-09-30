@@ -46,7 +46,7 @@ public:
     bool AddOrphanTx(const CTransactionRef &ptx, NodeId peer);
 
     //! Erase an ophan tx from the orphan pool
-    void EraseOrphanTx(uint256 hash);
+    bool EraseOrphanTx(uint256 hash);
 
     //! Expire old orphans from the orphan pool
     void EraseOrphansByTime();
