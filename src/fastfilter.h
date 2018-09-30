@@ -29,12 +29,18 @@ constexpr bool isPow2(unsigned int num) { return num && !(num & (num - 1)); }
  * uint256 numbers that are sensitive to deliberately constructed collisions, be sure to keep NUM_HASH_FNS high enough
  * that the creation of collisions in the used bits is not feasible.
  *
+ * Note also that the input bits are used without obfuscation or mixing so if an attacker can control some input bits
+ * the attacker can cause collisions in some of the fast filter entries for his inputs.  This will cause higher false
+ * positive rates for these transactions.  For example, if the attacker can control 32 bits of the input, he can
+ * effectively reduce the number of hash functions in the fast filter by 2 because he has engineered a guaranteed
+ * collision for the two functions that use those bits.
+ *
  * This class is thread-safe in the sense that simultaneous calls to member functions will not crash,
  * but "inserts" may be lost.  However, if you are using this class as an in-ram filter before doing a more expensive
  * operation, a lost insert may be acceptable.
  *
- * FILTER_SIZE must be a power of 2, and NUM_HASH_FNs may range from 2 to 16 inclusive.  Since hashes are calculated
- * in pairs of 2, odd values of NUM_HASH_FNs are rounded down.
+ * FILTER_SIZE must be a power of 2, and NUM_HASH_FNS may range from 2 to 16 inclusive.  Since hashes are calculated
+ * in pairs of 2, odd values of NUM_HASH_FNS are rounded down.
  */
 template <unsigned int FILTER_SIZE, unsigned int NUM_HASH_FNS = 16>
 class CFastFilter
