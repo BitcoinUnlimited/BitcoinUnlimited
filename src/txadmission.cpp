@@ -115,7 +115,7 @@ void EnqueueTxForAdmission(CTxInputData &txd)
 {
     LOCK(csTxInQ);
     bool conflict = false;
-    for (auto inp : txd.tx->vin)
+    for (auto &inp : txd.tx->vin)
     {
         uint256 hash = inp.prevout.hash;
         unsigned char *first = hash.begin();
@@ -313,99 +313,102 @@ void ThreadTxAdmission()
             CTransactionRef &tx = txd.tx;
             CInv inv(MSG_TX, tx->GetHash());
 
-            std::vector<COutPoint> vCoinsToUncache;
-            bool isRespend = false;
-            if (!TxAlreadyHave(inv) &&
-                ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false, false,
-                    TransactionClass::DEFAULT, vCoinsToUncache, &isRespend))
+            if (!TxAlreadyHave(inv))
             {
-                RelayTransaction(tx);
-
-                // LOG(MEMPOOL, "AcceptToMemoryPool: peer=%s: accepted %s onto Q\n", txd.nodeName,
-                //    tx->GetHash().ToString());
-            }
-            else
-            {
-                if (fMissingInputs)
+                std::vector<COutPoint> vCoinsToUncache;
+                bool isRespend = false;
+                if (ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false, false,
+                        TransactionClass::DEFAULT, vCoinsToUncache, &isRespend))
                 {
-                    // If we've forked and this is probably not a valid tx, then skip adding it to the orphan pool
-                    if (!chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.Value()) ||
-                        IsTxProbablyNewSigHash(*tx))
-                    {
-                        LOCK(orphanpool.cs); // WRITELOCK
-                        orphanpool.AddOrphanTx(tx, txd.nodeId);
+                    RelayTransaction(tx);
 
-                        // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
-                        static unsigned int nMaxOrphanTx =
-                            (unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
-                        static uint64_t nMaxOrphanPoolSize = (uint64_t)std::max(
-                            (int64_t)0, (GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000 / 10));
-                        unsigned int nEvicted = orphanpool.LimitOrphanTxSize(nMaxOrphanTx, nMaxOrphanPoolSize);
-                        if (nEvicted > 0)
-                            LOG(MEMPOOL, "mapOrphan overflow, removed %u tx\n", nEvicted);
-                    }
-                    else
-                    {
-                        LOG(MEMPOOL, "rejected orphan as likely contains old sighash");
-                    }
+                    // LOG(MEMPOOL, "AcceptToMemoryPool: peer=%s: accepted %s onto Q\n", txd.nodeName,
+                    //    tx->GetHash().ToString());
                 }
                 else
                 {
-                    recentRejects.insert(tx->GetHash());
-
-                    if (txd.whitelisted && GetBoolArg("-whitelistforcerelay", DEFAULT_WHITELISTFORCERELAY))
+                    if (fMissingInputs)
                     {
-                        // Always relay transactions received from whitelisted peers, even
-                        // if they were already in the mempool or rejected from it due
-                        // to policy, allowing the node to function as a gateway for
-                        // nodes hidden behind it.
-                        //
-                        // Never relay transactions that we would assign a non-zero DoS
-                        // score for, as we expect peers to do the same with us in that
-                        // case.
-                        int nDoS = 0;
-                        if (!state.IsInvalid(nDoS) || nDoS == 0)
+                        // If we've forked and this is probably not a valid tx, then skip adding it to the orphan pool
+                        if (!chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.Value()) ||
+                            IsTxProbablyNewSigHash(*tx))
                         {
-                            LOGA("Force relaying tx %s from whitelisted peer=%s\n", tx->GetHash().ToString(),
-                                txd.nodeName);
-                            RelayTransaction(tx);
+                            LOCK(orphanpool.cs); // WRITELOCK
+                            orphanpool.AddOrphanTx(tx, txd.nodeId);
+
+                            // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
+                            static unsigned int nMaxOrphanTx = (unsigned int)std::max(
+                                (int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
+                            static uint64_t nMaxOrphanPoolSize = (uint64_t)std::max(
+                                (int64_t)0, (GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000 / 10));
+                            unsigned int nEvicted = orphanpool.LimitOrphanTxSize(nMaxOrphanTx, nMaxOrphanPoolSize);
+                            if (nEvicted > 0)
+                                LOG(MEMPOOL, "mapOrphan overflow, removed %u tx\n", nEvicted);
                         }
                         else
                         {
-                            LOGA("Not relaying invalid transaction %s from whitelisted peer=%s (%s)\n",
-                                tx->GetHash().ToString(), txd.nodeName, FormatStateMessage(state));
+                            LOG(MEMPOOL, "rejected orphan as likely contains old sighash");
                         }
                     }
-
-                    // If the problem wasn't that the tx is an orphan, then uncache the inputs since we likely won't
-                    // need them again.
-                    for (const COutPoint &remove : vCoinsToUncache)
-                        pcoinsTip->Uncache(remove);
-                }
-            }
-            int nDoS = 0;
-            if (state.IsInvalid(nDoS))
-            {
-                LOG(MEMPOOL, "%s from peer=%s was not accepted: %s\n", tx->GetHash().ToString(), txd.nodeName,
-                    FormatStateMessage(state));
-                if (state.GetRejectCode() < REJECT_INTERNAL) // Never send AcceptToMemoryPool's internal codes over P2P
-                {
-                    CNodeRef from = connmgr->FindNodeFromId(txd.nodeId);
-                    if (from)
+                    else
                     {
-                        std::string strCommand = NetMsgType::TX;
-                        from->PushMessage(NetMsgType::REJECT, strCommand, (unsigned char)state.GetRejectCode(),
-                            state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
-                        if (nDoS > 0)
+                        recentRejects.insert(tx->GetHash());
+
+                        if (txd.whitelisted && GetBoolArg("-whitelistforcerelay", DEFAULT_WHITELISTFORCERELAY))
                         {
-                            dosMan.Misbehaving(from.get(), nDoS);
+                            // Always relay transactions received from whitelisted peers, even
+                            // if they were already in the mempool or rejected from it due
+                            // to policy, allowing the node to function as a gateway for
+                            // nodes hidden behind it.
+                            //
+                            // Never relay transactions that we would assign a non-zero DoS
+                            // score for, as we expect peers to do the same with us in that
+                            // case.
+                            int nDoS = 0;
+                            if (!state.IsInvalid(nDoS) || nDoS == 0)
+                            {
+                                LOGA("Force relaying tx %s from whitelisted peer=%s\n", tx->GetHash().ToString(),
+                                    txd.nodeName);
+                                RelayTransaction(tx);
+                            }
+                            else
+                            {
+                                LOGA("Not relaying invalid transaction %s from whitelisted peer=%s (%s)\n",
+                                    tx->GetHash().ToString(), txd.nodeName, FormatStateMessage(state));
+                            }
+                        }
+
+                        // If the problem wasn't that the tx is an orphan, then uncache the inputs since we likely won't
+                        // need them again.
+                        for (const COutPoint &remove : vCoinsToUncache)
+                            pcoinsTip->Uncache(remove);
+                    }
+                }
+                int nDoS = 0;
+                if (state.IsInvalid(nDoS))
+                {
+                    LOG(MEMPOOL, "%s from peer=%s was not accepted: %s\n", tx->GetHash().ToString(), txd.nodeName,
+                        FormatStateMessage(state));
+                    if (state.GetRejectCode() <
+                        REJECT_INTERNAL) // Never send AcceptToMemoryPool's internal codes over P2P
+                    {
+                        CNodeRef from = connmgr->FindNodeFromId(txd.nodeId);
+                        if (from)
+                        {
+                            std::string strCommand = NetMsgType::TX;
+                            from->PushMessage(NetMsgType::REJECT, strCommand, (unsigned char)state.GetRejectCode(),
+                                state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
+                            if (nDoS > 0)
+                            {
+                                dosMan.Misbehaving(from.get(), nDoS);
+                            }
                         }
                     }
                 }
-            }
 
-            // Mark tx as received regardless of whether it was a valid tx, orphan or invalid.
-            requester.Received(inv, nullptr);
+                // Mark tx as received regardless of whether it was a valid tx, orphan or invalid.
+                requester.Received(inv, nullptr);
+            }
         }
     }
 }
