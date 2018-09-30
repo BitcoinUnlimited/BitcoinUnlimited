@@ -164,7 +164,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
         pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     {
-        LOCK(orphanpool.cs);
+        READLOCK(orphanpool.cs);
         LOCK(cs_xval);
         int missingCount = 0;
         int unnecessaryCount = 0;
@@ -256,7 +256,7 @@ CXThinBlock::CXThinBlock(const CBlock &block)
     vTxHashes.reserve(nTx);
     std::set<uint64_t> setPartialTxHash;
 
-    LOCK(orphanpool.cs);
+    READLOCK(orphanpool.cs);
     for (unsigned int i = 0; i < nTx; i++)
     {
         const uint256 hash256 = block.vtx[i]->GetHash();
@@ -386,7 +386,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Look for each transaction in our various pools and buffers.
     // With xThinBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
     {
-        LOCK(orphanpool.cs);
+        READLOCK(orphanpool.cs);
         LOCK(cs_xval);
         if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
             return false;
@@ -705,7 +705,7 @@ bool CXThinBlock::process(CNode *pfrom,
     bool fMerkleRootCorrect = true;
     {
         // Do the orphans first before taking the mempool.cs lock, so that we maintain correct locking order.
-        LOCK(orphanpool.cs);
+        READLOCK(orphanpool.cs);
         for (auto &mi : orphanpool.mapOrphanTransactions)
         {
             uint64_t cheapHash = mi.first.GetCheapHash();

@@ -187,7 +187,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     BOOST_CHECK(!ToMemPool(spends[2]));
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[2].vin[0].prevout)); // the only valid coin from the orphantx
     {
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         BOOST_CHECK(orphanpool.AddOrphanTx(MakeTransactionRef(spends[2]), 1));
     }
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout)); // valid coin from previous txn
@@ -197,7 +197,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
 
     // Remove valid orphans by time.  The coins should be removed from the coins cache
     {
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         SetMockTime(nStartTime + 3600 * DEFAULT_ORPHANPOOL_EXPIRY + 300);
         orphanpool.EraseOrphansByTime();
     }
@@ -208,7 +208,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     // Remove valid orphans by size.  The coins should be removed from the coins cache
     BOOST_CHECK(!ToMemPool(spends[2]));
     {
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         BOOST_CHECK(orphanpool.AddOrphanTx(MakeTransactionRef(spends[2]), 1));
     }
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout)); // valid coin from previous txn
@@ -217,7 +217,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[2].vin[0].prevout)); // the only valid coin from the orphantx
 
     {
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         orphanpool.LimitOrphanTxSize(0, 0);
     }
 
@@ -286,7 +286,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
 
     BOOST_CHECK(!ToMemPool(spends[4]));
     {
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         BOOST_CHECK(orphanpool.AddOrphanTx(MakeTransactionRef(spends[4]), 1));
     }
     BOOST_CHECK(!pcoinsTip->HaveCoinInCache(spends[4].vin[2].prevout));
@@ -297,7 +297,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     // would be if the orphan was moved into the mempool.
     // Result: All the coins should still be remaining in the coins cache.
     {
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         orphanpool.EraseOrphanTx(spends[4].GetHash());
     }
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[4].vin[0].prevout));

@@ -431,7 +431,7 @@ void CParallelValidation::ClearOrphanCache(const CBlockRef pblock)
 {
     if (!IsInitialBlockDownload())
     {
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         {
             // Erase any orphans that may have been in the previous block and arrived
             // after the previous block had already been processed.

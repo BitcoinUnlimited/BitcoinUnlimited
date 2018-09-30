@@ -3024,7 +3024,6 @@ ThresholdState VersionBitsTipState(const Consensus::Params &params, Consensus::D
 
 void MainCleanup()
 {
-    if (1)
     {
         LOCK(cs_main); // BU apply the appropriate lock so no contention during destruction
         // block headers
@@ -3034,9 +3033,8 @@ void MainCleanup()
         mapBlockIndex.clear();
     }
 
-    if (1)
     {
-        LOCK(orphanpool.cs); // BU apply the appropriate lock so no contention during destruction
+        WRITELOCK(orphanpool.cs); // BU apply the appropriate lock so no contention during destruction
         // orphan transactions
         orphanpool.mapOrphanTransactions.clear();
         orphanpool.mapOrphanTransactionsByPrev.clear();
