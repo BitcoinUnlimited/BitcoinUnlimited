@@ -57,10 +57,15 @@ CTransactionRef CommitQGet(uint256 hash)
 static inline uint256 IncomingConflictHash(const COutPoint &prevout)
 {
     uint256 hash = prevout.hash;
-    unsigned char *first = hash.begin();
-    *first ^= (unsigned char)(prevout.n & 255);
-    first += 8;
-    *first ^= (unsigned char)(prevout.n & 255);
+    uint32_t *first = (uint32_t *)hash.begin();
+    *first ^= (uint32_t)(prevout.n & 65535);
+    first += 2;
+    *first ^= (uint32_t)(prevout.n & 65535);
+    first += 2;
+    *first ^= (uint32_t)(prevout.n & 65535);
+    first += 2;
+    *first ^= (uint32_t)(prevout.n & 65535);
+
     return hash;
 }
 
