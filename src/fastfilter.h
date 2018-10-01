@@ -23,24 +23,25 @@ constexpr bool isPow2(unsigned int num) { return num && !(num & (num - 1)); }
  *
  * This class can be used anywhere a Bloom filter is used so long as the input data is random.
  *
- * If NUM_HASH_FNS is 16 and FILTER_SIZE is >= 64k all bits in the uint256 input data will be used to set bits in
- * the filter.  If these fields are set to lower numbers, fewer bits may be used (although in the NUM_HASH_FNS case
- * execution will be faster).  Therefore, if this structure is used in an application that accepts externally created
- * uint256 numbers that are sensitive to deliberately constructed collisions, be sure to keep NUM_HASH_FNS high enough
- * that the creation of collisions in the used bits is not feasible.
- *
- * Note also that the input bits are used without obfuscation or mixing so if an attacker can control some input bits
- * the attacker can cause collisions in some of the fast filter entries for his inputs.  This will cause higher false
- * positive rates for these transactions.  For example, if the attacker can control 32 bits of the input, he can
- * effectively reduce the number of hash functions in the fast filter by 2 because he has engineered a guaranteed
- * collision for the two functions that use those bits.
- *
+ * For a FILTER_SIZE <=64k, the number of bits of the 256-bit input the filter uses is (NUM_HASH_FNS *
+ * log2(FILTER_SIZE)). Note that this means that in this regime and for low values for NUM_HASH_FNS, it becomes
+ * comparatively easier for an attacker to create collisions on purpose. It is expected that an attacker that has enough
+ * processing power to control <n> bits of the input key can reduce the effective number of "hash function equivalents"
+ * by about <n> / log2(FILTER_SIZE). Therefore, if this structure is used in an application that accepts externally
+ * created uint256 numbers that are sensitive to deliberately constructed collisions, be sure to keep NUM_HASH_FNS high
+ * enough that the creation of a large number of collisions in the used bits is not feasible.
+
+ * Conversely, for a FILTER_SIZE > 64k a number of ((NUM_HASH_FNS/2) * (log2(FILTER_SIZE)-16) ) bits are reused for
+ * accessing the filter's table. This will correspondingly reduce the filter's security. Furthermore, properties of the
+ * resulting "hash function equivalents" wrt. expected collision rate have only been analyzed empirically so far. Be
+ * aware of this.
+
  * This class is thread-safe in the sense that simultaneous calls to member functions will not crash,
  * but "inserts" may be lost.  However, if you are using this class as an in-ram filter before doing a more expensive
  * operation, a lost insert may be acceptable.
  *
  * FILTER_SIZE must be a power of 2, and NUM_HASH_FNS may range from 2 to 16 inclusive.  Since hashes are calculated
- * in pairs of 2, odd values of NUM_HASH_FNS are rounded down.
+ * in pairs of 2, only even values for NUM_HASH_FNS are permitted.
  */
 template <unsigned int FILTER_SIZE, unsigned int NUM_HASH_FNS = 16>
 class CFastFilter
@@ -58,6 +59,7 @@ public:
     CFastFilter()
     {
         static_assert((NUM_HASH_FNS > 1) && (NUM_HASH_FNS <= 16), "NUM_HASH_FNS must be between 2 and 16 inclusive");
+        static_assert(!(NUM_HASH_FNS & 1), "NUM_HASH_FNS must be even.");
         static_assert(isPow2(FILTER_SIZE) && (FILTER_SIZE > 1), "FILTER_SIZE must be a power of 2 greater than 1");
         FastRandomContext insecure_rand;
         vData.resize(FILTER_BYTES);
