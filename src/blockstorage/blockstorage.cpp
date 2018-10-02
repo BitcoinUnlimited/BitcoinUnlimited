@@ -14,6 +14,7 @@
 #include "sequential_files.h"
 #include "ui_interface.h"
 #include "undo.h"
+#include "validation/validation.h"
 
 extern bool AbortNode(CValidationState &state, const std::string &strMessage, const std::string &userMessage = "");
 extern bool fCheckForPruning;
@@ -768,4 +769,149 @@ void PruneAndFlush()
     CValidationState state;
     fCheckForPruning = true;
     FlushStateToDisk(state, FLUSH_STATE_NONE);
+}
+
+bool FindBlockPos(CValidationState &state,
+    CDiskBlockPos &pos,
+    unsigned int nAddSize,
+    unsigned int nHeight,
+    uint64_t nTime,
+    bool fKnown)
+{
+    // nDataPos for blockdb is a flag, just set to 1 to indicate we have that data. nFile is unused.
+    if (pblockdb)
+    {
+        pos.nFile = 1;
+        pos.nPos = nAddSize;
+        if (CheckDiskSpace(nAddSize))
+        {
+            nDBUsedSpace += nAddSize;
+            if (fPruneMode && nDBUsedSpace >= nPruneTarget)
+            {
+                fCheckForPruning = true;
+            }
+        }
+        else
+        {
+            return state.Error("out of disk space");
+        }
+        return true;
+    }
+
+    LOCK(cs_LastBlockFile);
+
+    unsigned int nFile = fKnown ? pos.nFile : nLastBlockFile;
+    if (vinfoBlockFile.size() <= nFile)
+    {
+        vinfoBlockFile.resize(nFile + 1);
+    }
+
+    if (!fKnown)
+    {
+        while (vinfoBlockFile[nFile].nSize + nAddSize >= MAX_BLOCKFILE_SIZE)
+        {
+            nFile++;
+            if (vinfoBlockFile.size() <= nFile)
+            {
+                vinfoBlockFile.resize(nFile + 1);
+            }
+        }
+        pos.nFile = nFile;
+        pos.nPos = vinfoBlockFile[nFile].nSize;
+    }
+
+    if ((int)nFile != nLastBlockFile)
+    {
+        if (!fKnown)
+        {
+            LOGA("Leaving block file %i: %s\n", nLastBlockFile, vinfoBlockFile[nLastBlockFile].ToString());
+        }
+        FlushBlockFile(!fKnown);
+        nLastBlockFile = nFile;
+    }
+
+    vinfoBlockFile[nFile].AddBlock(nHeight, nTime);
+    if (fKnown)
+        vinfoBlockFile[nFile].nSize = std::max(pos.nPos + nAddSize, vinfoBlockFile[nFile].nSize);
+    else
+        vinfoBlockFile[nFile].nSize += nAddSize;
+
+    if (!fKnown)
+    {
+        unsigned int nOldChunks = (pos.nPos + BLOCKFILE_CHUNK_SIZE - 1) / BLOCKFILE_CHUNK_SIZE;
+        unsigned int nNewChunks = (vinfoBlockFile[nFile].nSize + BLOCKFILE_CHUNK_SIZE - 1) / BLOCKFILE_CHUNK_SIZE;
+        if (nNewChunks > nOldChunks)
+        {
+            if (fPruneMode)
+            {
+                fCheckForPruning = true;
+            }
+            if (CheckDiskSpace(nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos))
+            {
+                FILE *file = OpenBlockFile(pos);
+                if (file)
+                {
+                    LOGA("Pre-allocating up to position 0x%x in blk%05u.dat\n", nNewChunks * BLOCKFILE_CHUNK_SIZE,
+                        pos.nFile);
+                    AllocateFileRange(file, pos.nPos, nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos);
+                    fclose(file);
+                }
+            }
+            else
+                return state.Error("out of disk space");
+        }
+    }
+
+    setDirtyFileInfo.insert(nFile);
+    return true;
+}
+
+bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigned int nAddSize)
+{
+    // nUndoPos for blockdb is a flag, set it to 1 to inidicate we have the data
+    if (pblockdb)
+    {
+        pos.nPos = 1;
+        if (!CheckDiskSpace(nAddSize))
+        {
+            return state.Error("out of disk space");
+        }
+        return true;
+    }
+
+    pos.nFile = nFile;
+
+    LOCK(cs_LastBlockFile);
+
+    unsigned int nNewSize;
+    pos.nPos = vinfoBlockFile[nFile].nUndoSize;
+    nNewSize = vinfoBlockFile[nFile].nUndoSize += nAddSize;
+    setDirtyFileInfo.insert(nFile);
+
+    unsigned int nOldChunks = (pos.nPos + UNDOFILE_CHUNK_SIZE - 1) / UNDOFILE_CHUNK_SIZE;
+    unsigned int nNewChunks = (nNewSize + UNDOFILE_CHUNK_SIZE - 1) / UNDOFILE_CHUNK_SIZE;
+    if (nNewChunks > nOldChunks)
+    {
+        if (fPruneMode)
+        {
+            fCheckForPruning = true;
+        }
+        if (CheckDiskSpace(nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos))
+        {
+            FILE *file = OpenUndoFile(pos);
+            if (file)
+            {
+                LOGA(
+                    "Pre-allocating up to position 0x%x in rev%05u.dat\n", nNewChunks * UNDOFILE_CHUNK_SIZE, pos.nFile);
+                AllocateFileRange(file, pos.nPos, nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos);
+                fclose(file);
+            }
+        }
+        else
+        {
+            return state.Error("out of disk space");
+        }
+    }
+
+    return true;
 }

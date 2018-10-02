@@ -25,6 +25,7 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "validation/validation.h"
 #include "validationinterface.h"
 
 #include <stdint.h>

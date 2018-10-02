@@ -6,8 +6,10 @@
 #include "coins.h"
 
 #include "consensus/consensus.h"
+#include "consensus/validation.h"
 #include "memusage.h"
 #include "random.h"
+#include "undo.h"
 #include "util.h"
 
 #include <assert.h>
@@ -149,18 +151,6 @@ void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin &&coin, bool possi
     cachedCoinsUsage += it->second.coin.DynamicMemoryUsage();
     if (nBestCoinHeight < it->second.coin.nHeight)
         nBestCoinHeight = it->second.coin.nHeight;
-}
-
-void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight)
-{
-    bool fCoinbase = tx.IsCoinBase();
-    const uint256 &txid = tx.GetHash();
-    for (size_t i = 0; i < tx.vout.size(); ++i)
-    {
-        // Pass fCoinbase as the possible_overwrite flag to AddCoin, in order to correctly
-        // deal with the pre-BIP30 occurrances of duplicate coinbase transactions.
-        cache.AddCoin(COutPoint(txid, i), Coin(tx.vout[i], nHeight, fCoinbase), fCoinbase);
-    }
 }
 
 void CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin *moveout)
@@ -561,4 +551,38 @@ CoinModifier::~CoinModifier()
     coin = nullptr;
     cache->cs_utxo.unlock();
     LeaveCritical();
+}
+
+void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight)
+{
+    bool fCoinbase = tx.IsCoinBase();
+    const uint256 &txid = tx.GetHash();
+    for (size_t i = 0; i < tx.vout.size(); ++i)
+    {
+        // Pass fCoinbase as the possible_overwrite flag to AddCoin, in order to correctly
+        // deal with the pre-BIP30 occurrances of duplicate coinbase transactions.
+        cache.AddCoin(COutPoint(txid, i), Coin(tx.vout[i], nHeight, fCoinbase), fCoinbase);
+    }
+}
+
+void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache &inputs, CTxUndo &txundo, int nHeight)
+{
+    // mark inputs spent
+    if (!tx.IsCoinBase())
+    {
+        txundo.vprevout.reserve(tx.vin.size());
+        for (const CTxIn &txin : tx.vin)
+        {
+            txundo.vprevout.emplace_back();
+            inputs.SpendCoin(txin.prevout, &txundo.vprevout.back());
+        }
+    }
+    // add outputs
+    AddCoins(inputs, tx, nHeight);
+}
+
+void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache &inputs, int nHeight)
+{
+    CTxUndo txundo;
+    UpdateCoins(tx, state, inputs, txundo, nHeight);
 }

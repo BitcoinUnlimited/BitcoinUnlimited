@@ -27,6 +27,7 @@
 #include "unlimited.h"
 #include "util.h"
 #include "utilmoneystr.h"
+#include "validation/validation.h"
 #include "validationinterface.h"
 
 #include <boost/thread.hpp>

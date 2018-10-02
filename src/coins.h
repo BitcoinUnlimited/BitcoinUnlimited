@@ -23,6 +23,9 @@
 
 #include <unordered_map>
 
+class CTxUndo;
+class CValidationState;
+
 struct CCoinsStats
 {
     int nHeight;
@@ -399,5 +402,13 @@ protected:
 // TODO: pass in a boolean to limit these possible overwrites to known
 // (pre-BIP34) cases.
 void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight);
+
+/** Apply the effects of this transaction on the UTXO set represented by view */
+void UpdateCoins(const CTransaction &tx,
+    CValidationState &state,
+    CCoinsViewCache &inputs,
+    CTxUndo &txundo,
+    int nHeight);
+void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache &inputs, int nHeight);
 
 #endif // BITCOIN_COINS_H
