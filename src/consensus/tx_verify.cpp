@@ -163,6 +163,11 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vin-empty");
     if (tx.vout.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty");
+    // Check that the transaction doesn't have an excessive number of sigops
+    unsigned int nSigOps = GetLegacySigOpCount(tx);
+    if (nSigOps > MAX_TX_SIGOPS)
+        return state.DoS(10, false, REJECT_INVALID, "bad-txns-too-many-sigops");
+
     // Size limits
     // BU: size limits removed
     // if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)

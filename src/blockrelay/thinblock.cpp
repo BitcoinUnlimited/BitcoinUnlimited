@@ -26,6 +26,7 @@
 #include "txorphanpool.h"
 #include "util.h"
 #include "utiltime.h"
+#include "validation/validation.h"
 
 static bool DEFAULT_BLOOM_FILTER_TARGETING = true;
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);

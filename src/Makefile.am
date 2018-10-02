@@ -199,6 +199,9 @@ BITCOIN_CORE_H = \
   util.h \
   utilmoneystr.h \
   utiltime.h \
+  validation/forks.h \
+  validation/validation.h \
+  validation/verifydb.h \
   validationinterface.h \
   versionbits.h \
   wallet/crypter.h \
@@ -279,6 +282,9 @@ libbitcoin_server_a_SOURCES = \
   uahf_fork.cpp \
   unlimited.cpp \
   requestManager.cpp \
+  validation/forks.cpp \
+  validation/validation.cpp \
+  validation/verifydb.cpp \
   validationinterface.cpp \
   versionbits.cpp \
   $(BITCOIN_CORE_H)

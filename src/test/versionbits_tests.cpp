@@ -12,6 +12,7 @@
 #include "random.h"
 #include "test/test_bitcoin.h"
 #include "test/test_random.h"
+#include "validation/validation.h"
 
 #include <boost/test/unit_test.hpp>
 

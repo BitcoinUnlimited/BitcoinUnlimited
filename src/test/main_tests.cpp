@@ -5,6 +5,7 @@
 
 #include "main.h"
 #include "chainparams.h"
+#include "validation/validation.h"
 
 #include "test/test_bitcoin.h"
 
