@@ -69,17 +69,17 @@ public:
     {
         const uint32_t *pos = (const uint32_t *)hash.begin();
         bool unset = 0; // If any position is not set, then this will be true
-        for (register unsigned int i = 0; i < NUM_HASH_FNS / 2; i++, pos++)
+        for (unsigned int i = 0; i < NUM_HASH_FNS / 2; i++, pos++)
         {
-            register uint32_t val = *pos;
-            register uint32_t idx = val & (FILTER_SIZE - 1);
-            register uint32_t bit = (1 << (idx & 7));
+            uint32_t val = *pos;
+            uint32_t idx = val & (FILTER_SIZE - 1);
+            uint32_t bit = (1 << (idx & 7));
             idx >>= 3;
             unset |= (0 == (vData[idx] & bit));
 
             val = __builtin_bswap32(val);
-            register uint32_t idx2 = val & (FILTER_SIZE - 1);
-            register uint32_t bit2 = (1 << (idx2 & 7));
+            uint32_t idx2 = val & (FILTER_SIZE - 1);
+            uint32_t bit2 = (1 << (idx2 & 7));
             idx2 >>= 3;
 
             unset |= (0 == (vData[idx2] & bit2));
@@ -93,12 +93,12 @@ public:
     void insert(const uint256 &hash)
     {
         const uint32_t *pos = (const uint32_t *)hash.begin();
-        for (register unsigned int i = 0; i < NUM_HASH_FNS / 2; i++, pos++)
+        for (unsigned int i = 0; i < NUM_HASH_FNS / 2; i++, pos++)
         {
-            register uint32_t val = *pos;
-            register uint32_t idx = val & (FILTER_SIZE - 1);
+            uint32_t val = *pos;
+            uint32_t idx = val & (FILTER_SIZE - 1);
             val = __builtin_bswap32(val);
-            register uint32_t idx2 = val & (FILTER_SIZE - 1);
+            uint32_t idx2 = val & (FILTER_SIZE - 1);
 
             vData[idx >> 3] |= (1 << (idx & 7));
             vData[idx2 >> 3] |= (1 << (idx2 & 7));
@@ -109,12 +109,12 @@ public:
     {
         const uint32_t *pos = (const uint32_t *)hash.begin();
         bool unset = 0; // If any position is not set, then this will be true
-        for (register unsigned int i = 0; i < NUM_HASH_FNS / 2; i++, pos++)
+        for (unsigned int i = 0; i < NUM_HASH_FNS / 2; i++, pos++)
         {
-            register uint32_t val = *pos;
-            register uint32_t idx = val & (FILTER_SIZE - 1);
+            uint32_t val = *pos;
+            uint32_t idx = val & (FILTER_SIZE - 1);
             val = __builtin_bswap32(val);
-            register uint32_t idx2 = val & (FILTER_SIZE - 1);
+            uint32_t idx2 = val & (FILTER_SIZE - 1);
 
             unset |= (0 == (vData[idx >> 3] & (1 << (idx & 7))));
             unset |= (0 == (vData[idx2 >> 3] & (1 << (idx2 & 7))));
