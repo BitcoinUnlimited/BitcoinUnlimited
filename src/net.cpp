@@ -529,6 +529,7 @@ void CNode::copyStats(CNodeStats &stats)
     X(nSendBytes);
     X(nRecvBytes);
     X(fWhitelisted);
+    X(fSupportsCompactBlocks);
 
     // It is common for nodes with good ping times to suddenly become lagged,
     // due to a new block arriving or other large transfer.
@@ -2826,6 +2827,9 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nMisbehavior = 0;
     fShouldBan = false;
     fCurrentlyConnected = false;
+
+    // For statistics only, BU doesn't support CB protocol
+    fSupportsCompactBlocks = false;
 
     // BU instrumentation
     std::string xmledName;

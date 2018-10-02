@@ -1340,6 +1340,19 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         State(pfrom->GetId())->fPreferHeaders = true;
     }
 
+    // Processing this message type for statistics purposes only, BU currently doesn't support CB protocol
+    // Ignore this message if sent from a node advertising a version earlier than the first CB release (70014)
+    else if (strCommand == NetMsgType::SENDCMPCT && pfrom->nVersion >= 70014)
+    {
+        bool fHighBandwidth = false;
+        uint64_t nVersion = 0;
+        vRecv >> fHighBandwidth >> nVersion;
+
+        // BCH network currently only supports version 1 (v2 is segwit support on BTC)
+        // May need to be updated in the future if other clients deploy a new version
+        pfrom->fSupportsCompactBlocks = nVersion == 1;
+    }
+
     else if (strCommand == NetMsgType::INV)
     {
         if (fImporting || fReindex)

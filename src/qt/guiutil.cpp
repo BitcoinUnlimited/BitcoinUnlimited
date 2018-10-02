@@ -935,14 +935,17 @@ QString formatDurationStr(int secs)
     return strList.join(" ");
 }
 
-QString formatServicesStr(quint64 mask)
+QString formatServicesStr(quint64 mask, const QStringList &additionalServices)
 {
     QStringList strList;
 
-    // Just scan the last 8 bits for now.
-    for (int i = 0; i < 8; i++)
+    // Scan and process until we reach the highest set bit
+    for (int i = 0; i < 32; i++)
     {
-        uint64_t check = 1 << i;
+        uint64_t check = 1ULL << i;
+        if (check > mask)
+            break;
+
         if (mask & check)
         {
             switch (check)
@@ -976,6 +979,10 @@ QString formatServicesStr(quint64 mask)
             }
         }
     }
+
+    // Adds in additional services not denoted by nServices bits
+    if (additionalServices.size())
+        strList.append(additionalServices);
 
     if (strList.size())
         return strList.join(", ");

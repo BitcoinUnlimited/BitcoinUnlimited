@@ -209,7 +209,7 @@ QString boostPathToQString(const fs::path &path);
 QString formatDurationStr(int secs);
 
 /* Format CNodeStats.nServices bitmask into a user-readable string */
-QString formatServicesStr(quint64 mask);
+QString formatServicesStr(quint64 mask, const QStringList &additionalServices);
 
 /* Format a CNodeCombinedStats.dPingTime into a user-readable string or display N/A, if 0*/
 QString formatPingTime(double dPingTime);
