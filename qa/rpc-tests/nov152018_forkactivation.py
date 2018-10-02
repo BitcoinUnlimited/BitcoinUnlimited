@@ -13,12 +13,11 @@ from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.blocktools import create_coinbase, create_block
 from test_framework.mininode import *
 from test_framework.script import *
-from test_framework.cdefs import MIN_TX_SIZE
 from collections import deque
 
 # far into the future
-MAGNETIC_ANOMALY_START_TIME = 2000000000
-
+NOV152018_START_TIME = 2000000000
+MIN_TX_SIZE = 100;
 
 class PreviousSpendableOutput():
 
@@ -36,8 +35,7 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
         self.tip = None
         self.blocks = {}
         self.extra_args = [['-whitelist=127.0.0.1',
-                            "-magneticanomalyactivationtime=%d" % MAGNETIC_ANOMALY_START_TIME,
-                            "-replayprotectionactivationtime=%d" % (2 * MAGNETIC_ANOMALY_START_TIME)]]
+                            "-mining.forkNov2018Time=%d" % NOV152018_START_TIME]]
 
     def run_test(self):
         self.test = TestManager(self, self.options.tmpdir)
@@ -45,7 +43,10 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
         # Start up network handling in another thread
         NetworkThread().start()
         # Set the blocksize to 2MB as initial condition
-        self.nodes[0].setmocktime(MAGNETIC_ANOMALY_START_TIME)
+        self.nodes[0].setmocktime(NOV152018_START_TIME)
+        self.nodes[0].set("mining.forkNov2018Time=%d" % (NOV152018_START_TIME))
+        self.nodes[1].setmocktime(NOV152018_START_TIME)
+        self.nodes[1].set("mining.forkNov2018Time=%d" % (NOV152018_START_TIME))
         self.test.run()
 
     def add_transactions_to_block(self, block, tx_list):
@@ -131,6 +132,8 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
         return block
 
     def get_tests(self):
+        self.set_test_params()
+
         node = self.nodes[0]
         self.genesis_hash = int(node.getbestblockhash(), 16)
         self.block_heights[self.genesis_hash] = 0
@@ -145,8 +148,11 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
             return PreviousSpendableOutput(spendable_outputs.pop(0).vtx[0], 0)
 
         # returns a test case that asserts that the current tip was accepted
-        def accepted():
-            return TestInstance([[self.tip, True]])
+        def accepted(newtip=None):
+            if newtip == None:
+                return TestInstance([[self.tip, True]])
+            else:
+                return TestInstance([[newtip, True]])
 
         # returns a test case that asserts that the current tip was rejected
         def rejected(reject=None):
@@ -203,7 +209,7 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
 
         # Start moving MTP forward
         bfork = block(5555)
-        bfork.nTime = MAGNETIC_ANOMALY_START_TIME - 1
+        bfork.nTime = NOV152018_START_TIME - 1
         update_block(5555)
         yield accepted()
 
@@ -215,7 +221,7 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
 
         # Check that the MTP is just before the configured fork point.
         assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'],
-                     MAGNETIC_ANOMALY_START_TIME - 1)
+                     NOV152018_START_TIME - 1)
 
         # Check that block with small transactions, non push only signatures and
         # non clean stack are still accepted.
@@ -226,22 +232,27 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
 
         # Now MTP is exactly the fork time. Small transaction are now rejected.
         assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'],
-                     MAGNETIC_ANOMALY_START_TIME)
+                     NOV152018_START_TIME)
 
-        # Now that the for activated, it is not possible to have
+        # Now that the fork activated, it is not possible to have
         # small transactions anymore.
+        bestblockhash = self.nodes[0].getbestblockhash()
         small_tx_block = block(4445, out[1], MIN_TX_SIZE - 1)
         assert_equal(len(small_tx_block.vtx[1].serialize()), MIN_TX_SIZE - 1)
-        yield rejected(RejectResult(16, b'bad-txns-undersize'))
+        #check that this block was rejected.
+        yield rejected()
+        #yield rejected(RejectResult(16, b'bad-txns-undersize'))
+        assert_equal(bestblockhash, self.nodes[0].getbestblockhash())
+
 
         # Rewind bad block.
         tip(4444)
 
-        # Now that the for activated, it is not possible to have
+        # Now that the fork activated, it is not possible to have
         # non push only transactions.
         non_pushonly_tx_block = block(4446, out[1], MIN_TX_SIZE, False)
         assert_equal(len(small_tx_block.vtx[1].serialize()), MIN_TX_SIZE - 1)
-        yield rejected(RejectResult(16, b'blk-bad-inputs'))
+        yield rejected(RejectResult(16, b'bad-blk-signatures'))
 
         # Rewind bad block.
         tip(4444)
@@ -258,7 +269,6 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
         large_tx_block = block(3333, out[1], MIN_TX_SIZE)
         assert_equal(len(large_tx_block.vtx[1].serialize()), MIN_TX_SIZE)
         yield accepted()
-
 
 if __name__ == '__main__':
     MagneticAnomalyActivationTest().main()
