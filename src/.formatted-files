@@ -18,6 +18,14 @@ bitcoin-miner.cpp
 bitcoin-tx.cpp
 bitnodes.cpp
 bitnodes.h
+blockrelay/graphene.h
+blockrelay/graphene.cpp
+blockrelay/graphene_set.h
+blockrelay/graphene_set.cpp
+blockrelay/thinblock.h
+blockrelay/thinblock.cpp
+blockrelay/blockrelay_common.h
+blockrelay/blockrelay_common.cpp
 blockstorage/blockleveldb.cpp
 blockstorage/blockleveldb.h
 blockstorage/dbabstract.h
