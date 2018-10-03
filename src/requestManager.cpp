@@ -235,7 +235,7 @@ void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *
         ProcessBlockAvailability(pnode->id);
 
         // check block availability for this peer and only askfor a block if it is available.
-        CNodeState *state = State(pnode->id);
+        CNodeState *state = nodestate.State(pnode->id);
         if (state != nullptr)
         {
             if (state->pindexBestKnownBlock != nullptr &&
@@ -935,7 +935,7 @@ void CRequestManager::ProcessBlockAvailability(NodeId nodeid)
 {
     LOCK(cs_main); // TODO fine grained lock around mapBlockIndex
 
-    CNodeState *state = State(nodeid);
+    CNodeState *state = nodestate.State(nodeid);
     DbgAssert(state != nullptr, return );
 
     if (!state->hashLastUnknownBlock.IsNull())
@@ -958,7 +958,7 @@ void CRequestManager::UpdateBlockAvailability(NodeId nodeid, const uint256 &hash
 {
     AssertLockHeld(cs_main);
 
-    CNodeState *state = State(nodeid);
+    CNodeState *state = nodestate.State(nodeid);
     DbgAssert(state != nullptr, return );
 
     ProcessBlockAvailability(nodeid);
@@ -1018,7 +1018,7 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
 
     NodeId nodeid = node->GetId();
     vBlocks.reserve(vBlocks.size() + count);
-    CNodeState *state = State(nodeid);
+    CNodeState *state = nodestate.State(nodeid);
     DbgAssert(state != nullptr, return );
 
     // Make sure pindexBestKnownBlock is up to date, we'll need it.

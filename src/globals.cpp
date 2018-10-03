@@ -72,8 +72,7 @@ CCriticalSection cs_rpcWarmup;
 
 CCriticalSection cs_main;
 BlockMap mapBlockIndex GUARDED_BY(cs_main);
-CChain chainActive GUARDED_BY(cs_main);
-std::map<NodeId, CNodeState> mapNodeState GUARDED_BY(cs_main); // nodestate.h
+CChain chainActive GUARDED_BY(cs_main); // however, chainActive.Tip() is lock free
 // BU variables moved to globals.cpp
 // - moved CCriticalSection cs_main;
 // - moved BlockMap mapBlockIndex;
@@ -363,6 +362,7 @@ CTweak<double> dMinLimiterTxFee("minlimitertxfee",
     DEFAULT_MINLIMITERTXFEE);
 
 CRequestManager requester; // after the maps nodes and tweaks
+CState nodestate;
 
 CStatHistory<unsigned int> txAdded; //"memPool/txAdded");
 CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize; // "memPool/size",STAT_OP_AVE);
