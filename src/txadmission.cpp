@@ -368,11 +368,6 @@ void ThreadTxAdmission()
                     {
                         if (fMissingInputs)
                         {
-                            // If we've forked and this is probably not a valid tx, then skip adding it to the orphan
-                            // pool
-                            if (!chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.Value()) ||
-                                IsTxProbablyNewSigHash(*tx))
-                            {
                                 LOCK(orphanpool.cs); // WRITELOCK
                                 orphanpool.AddOrphanTx(tx, txd.nodeId);
 
@@ -384,11 +379,6 @@ void ThreadTxAdmission()
                                 unsigned int nEvicted = orphanpool.LimitOrphanTxSize(nMaxOrphanTx, nMaxOrphanPoolSize);
                                 if (nEvicted > 0)
                                     LOG(MEMPOOL, "mapOrphan overflow, removed %u tx\n", nEvicted);
-                            }
-                            else
-                            {
-                                LOG(MEMPOOL, "rejected orphan as likely contains old sighash");
-                            }
                         }
                         else
                         {
