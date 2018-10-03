@@ -186,6 +186,12 @@ void ThreadCommitToMempool()
             boost::unique_lock<boost::mutex> lock(csCommitQ);
             do
             {
+                // We do the flush here because it requires us to take a cs_main lock but since
+                // the flush is only periodic we can check less frequently here without creating
+                // a great deal of contention for cs_main or interruption to message processing.
+                CValidationState state;
+                FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
+
                 cvCommitQ.timed_wait(lock, boost::posix_time::milliseconds(2000));
             } while (txCommitQ.empty() && txDeferQ.empty());
         }
@@ -194,16 +200,14 @@ void ThreadCommitToMempool()
             boost::this_thread::interruption_point();
 
             CORRAL(txProcessingCorral, CORRAL_TX_COMMITMENT);
-            LOCK(cs_main);
             CommitTxToMempool();
+
             mempool.check(pcoinsTip);
             LOG(MEMPOOL, "MemoryPool sz %u txn, %u kB\n", mempool.size(), mempool.DynamicMemoryUsage() / 1000);
             // BU - Xtreme Thinblocks - trim the orphan pool by entry time and do not allow it to be overidden.
             LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
                 GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
 
-            CValidationState state;
-            FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
             // The flush to disk above is only periodic therefore we need to continuously trim any excess from the
             // cache.
             pcoinsTip->Trim(nCoinCacheMaxSize);
