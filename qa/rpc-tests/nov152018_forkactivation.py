@@ -67,12 +67,12 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
         coinbase.rehash()
         if spend == None:
             # We need to have something to spend to fill the block.
-            block = create_block(base_block_hash, coinbase, block_time)
+            newblock = create_block(base_block_hash, coinbase, block_time)
         else:
             # all but one satoshi to fees
             coinbase.vout[0].nValue += spend.tx.vout[spend.n].nValue - 1
             coinbase.rehash()
-            block = create_block(base_block_hash, coinbase, block_time)
+            newblock = create_block(base_block_hash, coinbase, block_time)
 
             # Make sure we have plenty enough to spend going forward.
             spendable_outputs = deque([spend])
@@ -120,19 +120,19 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
             tx.rehash()
 
             # Add the transaction to the block
-            self.add_transactions_to_block(block, [tx])
+            self.add_transactions_to_block(newblock, [tx])
 
             # Now that we added a bunch of transaction, we need to recompute
             # the merkle root.
-            block.hashMerkleRoot = block.calc_merkle_root()
+            newblock.hashMerkleRoot = newblock.calc_merkle_root()
 
         # Do PoW, which is cheap on regnet
-        block.solve()
-        self.tip = block
-        self.block_heights[block.sha256] = height
+        newblock.solve()
+        self.tip = newblock
+        self.block_heights[newblock.sha256] = height
         assert number not in self.blocks
-        self.blocks[number] = block
-        return block
+        self.blocks[number] = newblock
+        return newblock
 
     def get_tests(self):
         self.set_test_params()
@@ -170,18 +170,18 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
 
         # adds transactions to the block and updates state
         def update_block(block_number, new_transactions=[]):
-            block = self.blocks[block_number]
-            self.add_transactions_to_block(block, new_transactions)
-            old_sha256 = block.sha256
-            block.hashMerkleRoot = block.calc_merkle_root()
-            block.solve()
+            newblock = self.blocks[block_number]
+            self.add_transactions_to_block(newblock, new_transactions)
+            old_sha256 = newblock.sha256
+            newblock.hashMerkleRoot = newblock.calc_merkle_root()
+            newblock.solve()
             # Update the internal state just like in next_block
-            self.tip = block
-            if block.sha256 != old_sha256:
-                self.block_heights[block.sha256] = self.block_heights[old_sha256]
+            self.tip = newblock
+            if newblock.sha256 != old_sha256:
+                self.block_heights[newblock.sha256] = self.block_heights[old_sha256]
                 del self.block_heights[old_sha256]
-            self.blocks[block_number] = block
-            return block
+            self.blocks[block_number] = newblock
+            return newblock
 
         # shorthand for functions
         block = self.next_block
