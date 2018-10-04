@@ -373,27 +373,17 @@ void ThreadTxAdmission()
                     {
                         if (fMissingInputs)
                         {
-                            // If we've forked and this is probably not a valid tx, then skip adding it to the orphan
-                            // pool
-                            if (!chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.Value()) ||
-                                IsTxProbablyNewSigHash(*tx))
-                            {
-                                LOCK(orphanpool.cs); // WRITELOCK
-                                orphanpool.AddOrphanTx(tx, txd.nodeId);
+                            LOCK(orphanpool.cs); // WRITELOCK
+                            orphanpool.AddOrphanTx(tx, txd.nodeId);
 
-                                // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
-                                static unsigned int nMaxOrphanTx = (unsigned int)std::max(
-                                    (int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
-                                static uint64_t nMaxOrphanPoolSize = (uint64_t)std::max(
-                                    (int64_t)0, (GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000 / 10));
-                                unsigned int nEvicted = orphanpool.LimitOrphanTxSize(nMaxOrphanTx, nMaxOrphanPoolSize);
-                                if (nEvicted > 0)
-                                    LOG(MEMPOOL, "mapOrphan overflow, removed %u tx\n", nEvicted);
-                            }
-                            else
-                            {
-                                LOG(MEMPOOL, "rejected orphan as likely contains old sighash");
-                            }
+                            // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
+                            static const unsigned int nMaxOrphanTx = (unsigned int)std::max(
+                                (int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
+                            static const uint64_t nMaxOrphanPoolSize = (uint64_t)std::max(
+                                (int64_t)0, (GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000 / 10));
+                            unsigned int nEvicted = orphanpool.LimitOrphanTxSize(nMaxOrphanTx, nMaxOrphanPoolSize);
+                            if (nEvicted > 0)
+                                LOG(MEMPOOL, "mapOrphan overflow, removed %u tx\n", nEvicted);
                         }
                         else
                         {
