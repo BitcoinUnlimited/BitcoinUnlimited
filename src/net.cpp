@@ -1038,7 +1038,7 @@ static void AcceptConnection(const ListenSocket &hListenSocket)
         mapInboundConnectionTracker[ipAddress].nLastConnectionTime = GetTime();
 
         LOG(EVICT, "Number of connection attempts is %f for %s\n", nConnections, addr.ToString());
-        if (nConnections > 4 && !whitelisted)
+        if (nConnections > 4 && !whitelisted && !addr.IsLocal()) // local connections are auto-whitelisted
         {
             int nHoursToBan = 4;
             dosMan.Ban((CNetAddr)addr, BanReasonNodeMisbehaving, nHoursToBan * 60 * 60);

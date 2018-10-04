@@ -194,6 +194,17 @@ def uint256_from_str(s):
         r += t[i] << (i * 32)
     return r
 
+def uint256_from_bigendian(s):
+    """Decode a uint256 from a big-endian byte array or hex string (lexical order is big-endian)
+    """
+    if type(s) is str:
+        s = unhexlify(s)
+    r = 0
+    t = struct.unpack(">QQQQ", s[:32])
+    for i in t:
+        r = (r << 64) | i
+    return r
+
 
 def uint256_from_compact(c):
     nbytes = (c >> 24) & 0xFF
@@ -420,9 +431,7 @@ class CBlockLocator(object):
 class COutPoint(object):
     def __init__(self, hash=0, n=0):
         if type(hash) is str:
-            t = bytearray(unhexlify(hash))
-            t.reverse()
-            hash = uint256_from_str(t)
+            hash = uint256_from_bigendian(hash)
         if type(hash) is bytes:
             hash = uint256_from_str(hash)
         self.hash = hash

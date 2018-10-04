@@ -176,6 +176,14 @@ public:
         std::lock_guard<std::mutex> lck(cs_tweak);
         return *value;
     }
+
+    CTweakRef &operator=(const DataType &d)
+    {
+        std::lock_guard<std::mutex> lck(cs_tweak);
+        if (value)
+            *value = d;
+        return *this;
+    }
 };
 
 /** A configuration parameter that is automatically hooked up to
@@ -227,6 +235,13 @@ public:
     {
         std::lock_guard<std::mutex> lck(cs_tweak);
         return value;
+    }
+
+    CTweak &operator=(const DataType &d)
+    {
+        std::lock_guard<std::mutex> lck(cs_tweak);
+        value = d;
+        return *this;
     }
 };
 
