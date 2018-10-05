@@ -1576,7 +1576,9 @@ static void DNSAddressSeed()
             vector<CNetAddr> vIPs;
             vector<CAddress> vAdd;
             uint64_t requiredServiceBits = NODE_NETWORK;
-            if (LookupHost(GetDNSHost(seed, requiredServiceBits).c_str(), vIPs, 0, true))
+            // Limits number of IPs learned from a DNS seed
+            unsigned int nMaxIPs = 256;
+            if (LookupHost(GetDNSHost(seed, requiredServiceBits).c_str(), vIPs, nMaxIPs, true))
             {
                 for (const CNetAddr &ip : vIPs)
                 {
