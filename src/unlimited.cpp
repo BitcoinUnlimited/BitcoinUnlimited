@@ -917,7 +917,7 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
         }
     }
 
-    LOGA("Acceptable block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " Sig:%d\n", block.nVersion, block.nTime,
+    LOG(BLK, "Acceptable block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " Sig:%d\n", block.nVersion, block.nTime,
         blockSize, nTx, nSigOps);
     return false;
 }

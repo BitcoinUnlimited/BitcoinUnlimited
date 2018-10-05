@@ -201,6 +201,8 @@ public:
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
 
+    // Number of signature operation according to GetLegacySigOpCount
+    uint64_t nSigOps;
 
     void SetNull()
     {
@@ -216,6 +218,7 @@ public:
         nChainTx = 0;
         nStatus = 0;
         nSequenceId = 0;
+        nSigOps = 0;
 
         nVersion = 0;
         hashMerkleRoot = uint256();

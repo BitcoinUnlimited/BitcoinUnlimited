@@ -1530,28 +1530,28 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
             return error("CheckBlock(): CheckTransaction of %s failed with %s", tx->GetHash().ToString(),
                 FormatStateMessage(state));
 
+    // count the number of transactions in case the CheckExcessive function wants to use this as criteria
+    uint64_t nLargestTx = 0; // BU: track the longest transaction
+    uint64_t nTxSize;
     uint64_t nSigOps = 0;
-    // Count the number of transactions in case the CheckExcessive function wants to use this as criteria
-    uint64_t nTx = 0;
-    uint64_t nLargestTx = 0;
 
     for (const auto &tx : block.vtx)
     {
-        nTx++;
         nSigOps += GetLegacySigOpCount(*tx);
         if (tx->GetTxSize() > nLargestTx)
             nLargestTx = tx->GetTxSize();
     }
+    block.nSigOps = nSigOps;
 
     // BU only enforce sigops during block generation not acceptance
-    if (fConservative && (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS))
+    if (fConservative && (block.nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS))
         return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"), REJECT_INVALID, "bad-blk-sigops", true);
 
     if (fCheckPOW && fCheckMerkleRoot)
         block.fChecked = true;
 
     // BU: Check whether this block exceeds what we want to relay.
-    block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nSigOps, nTx, nLargestTx);
+    block.fExcessive = CheckExcessive(block, block.GetBlockSize(), block.nSigOps, block.vtx.size(), nLargestTx);
 
     return true;
 }
@@ -1569,6 +1569,7 @@ bool ReceivedBlockTransactions(const CBlock &block,
     pindexNew->nDataPos = pos.nPos;
     pindexNew->nUndoPos = 0;
     pindexNew->nStatus |= BLOCK_HAVE_DATA;
+    pindexNew->nSigOps = block.nSigOps;
 
     if (block.fExcessive)
     {
@@ -2793,12 +2794,14 @@ void UpdateTip(CBlockIndex *pindexNew)
 
     cvBlockChange.notify_all();
 
-    LOGA("%s: new best=%s  height=%d bits=%d log2_work=%.8g  tx=%lu  date=%s progress=%f  cache=%.1fMiB(%utxo)\n",
+    LOGA("%s: new best=%s  height=%d bits=%d log2_work=%.8g  tx=%lu  date=%s progress=%f  cache=%.1fMiB(%utxo)  "
+         "nTx=%" PRIu64 "  nSigOps=%d\n",
         __func__, chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(), chainActive.Tip()->nBits,
         log(chainActive.Tip()->nChainWork.getdouble()) / log(2.0), (unsigned long)chainActive.Tip()->nChainTx,
         DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
         Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), chainActive.Tip()),
-        pcoinsTip->DynamicMemoryUsage() * (1.0 / (1 << 20)), pcoinsTip->GetCacheSize());
+        pcoinsTip->DynamicMemoryUsage() * (1.0 / (1 << 20)), pcoinsTip->GetCacheSize(), chainActive.Tip()->nTx,
+        chainActive.Tip()->nSigOps);
 
     if (!IsInitialBlockDownload())
     {

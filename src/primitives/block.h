@@ -81,6 +81,7 @@ public:
     // 0.11: mutable std::vector<uint256> vMerkleTree;
     mutable bool fChecked;
     mutable bool fExcessive; // BU: is the block "excessive" (bigger than this node prefers to accept)
+    mutable uint64_t nSigOps;
 
     CBlock() { SetNull(); }
     CBlock(const CBlockHeader &header)
@@ -162,6 +163,7 @@ public:
         fChecked = false;
         fExcessive = false;
         nBlockSize = 0;
+        nSigOps = 0;
     }
 
     CBlockHeader GetBlockHeader() const
