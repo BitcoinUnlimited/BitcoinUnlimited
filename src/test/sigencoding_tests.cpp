@@ -4,6 +4,7 @@
 
 #include <vector>
 #include "test/test_bitcoin.h"
+#include "test/test_random.h"
 #include "script/interpreter.h"
 #include "script/sighashtype.h"
 #include <boost/test/unit_test.hpp>
@@ -18,15 +19,32 @@ static valtype SignatureWithHashType(valtype vchSig, SigHashType sigHash) {
     return vchSig;
 }
 
+static valtype randomHashTypes() {
+    valtype res;
+    for (size_t i=0; i < 16; i++)
+        res.emplace_back(insecure_rand() & 0xff);
+    return res;
+}
+
 static void
 CheckSignatureErrorForAllSigHashType(const valtype &vchSig, uint32_t flags,
                                      const ScriptError expected_error) {
-    for (int i = 0; i <= 0xff; i++) {
+    for (int i : randomHashTypes()) {
         ScriptError err = SCRIPT_ERR_OK;
         valtype sig = SignatureWithHashType(vchSig, SigHashType(i));
         BOOST_CHECK(!CheckSignatureEncoding(sig, flags, &err));
         BOOST_CHECK_EQUAL(err, expected_error);
     }
+}
+
+// create a random selection of flags to check for
+static std::vector<uint32_t> randomFlags() {
+    std::vector<uint32_t> res;
+    for (size_t i = 0; i < 100; i++) {
+        uint32_t val = insecure_rand();
+        res.emplace_back(val & ((1U<<17) - 1));
+    }
+    return res;
 }
 
 static void CheckSignatureEncodingWithSigHashType(const valtype &vchSig,
@@ -75,7 +93,7 @@ static void CheckSignatureEncodingWithSigHashType(const valtype &vchSig,
         /*
         BOOST_CHECK_EQUAL(CheckSignatureEncoding(invalidSig, flags, &err),
                           !hasStrictEnc);
-        
+
         if (hasStrictEnc) {
             BOOST_CHECK_EQUAL(err,
                               hasForkId ? SCRIPT_ERR_MUST_USE_FORKID
@@ -171,7 +189,7 @@ BOOST_AUTO_TEST_CASE(checksignatureencoding_test) {
 
     // If we add many more flags, this loop can get too expensive, but we can
     // rewrite in the future to randomly pick a set of flags to evaluate.
-    for (uint32_t flags = 0; flags < (1U << 17); flags++) {
+    for (uint32_t flags : randomFlags()) {
         ScriptError err = SCRIPT_ERR_OK;
 
         // Empty sig is always valid.
@@ -330,7 +348,7 @@ BOOST_AUTO_TEST_CASE(checkpubkeyencoding_test) {
 
     // If we add many more flags, this loop can get too expensive, but we can
     // rewrite in the future to randomly pick a set of flags to evaluate.
-    for (uint32_t flags = 0; flags < (1U << 17); flags++) {
+    for (uint32_t flags : randomFlags()) {
         ScriptError err = SCRIPT_ERR_OK;
 
         // Compressed pubkeys are always valid.
