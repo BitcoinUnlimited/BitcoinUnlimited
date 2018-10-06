@@ -211,7 +211,6 @@ void ThreadCommitToMempool()
             CommitTxToMempool();
             mempool.check(pcoinsTip);
             LOG(MEMPOOL, "MemoryPool sz %u txn, %u kB\n", mempool.size(), mempool.DynamicMemoryUsage() / 1000);
-            // BU - Xtreme Thinblocks - trim the orphan pool by entry time and do not allow it to be overidden.
             LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
                 GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
 
