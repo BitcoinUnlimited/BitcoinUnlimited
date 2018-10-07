@@ -5,15 +5,15 @@
 """
 This test checks activation of OP_CHECKDATASIG
 """
-
+import test_framework.loginit
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import satoshi_round, assert_equal, assert_raises_rpc_error
+from test_framework.util import satoshi_round, assert_equal, assert_raises_rpc_error, start_node
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.blocktools import *
 from test_framework.script import *
 
 # far into the future
-MAGNETIC_ANOMALY_START_TIME = 2000000000
+NOV152018_START_TIME = 2000000000
 
 # Error due to invalid opcodes
 BAD_OPCODE_ERROR = b'mandatory-script-verify-flag-failed (Opcode missing or not understood)'
@@ -22,20 +22,23 @@ RPC_BAD_OPCODE_ERROR = "16: " + \
 
 
 class PreviousSpendableOutput():
-
     def __init__(self, tx=CTransaction(), n=-1):
         self.tx = tx
         self.n = n  # the output we're spending
 
 
 class CheckDataSigActivationTest(ComparisonTestFramework):
-
-    def set_test_params(self):
+    def __init__(self):
+        super().__init__()
         self.num_nodes = 1
         self.setup_clean_chain = True
-        self.extra_args = [['-whitelist=127.0.0.1',
-                            "-magneticanomalyactivationtime=%d" % MAGNETIC_ANOMALY_START_TIME,
-                            "-replayprotectionactivationtime=%d" % (2 * MAGNETIC_ANOMALY_START_TIME)]]
+
+    def setup_network(self):
+        self.nodes = []
+        self.nodes.append(start_node(0, self.options.tmpdir,
+                                 ['-debug', '-whitelist=127.0.0.1',
+                                  "-consensus.forkNov2018Time=%d" % NOV152018_START_TIME]))
+        self.is_network_split = False
 
     def create_checkdatasig_tx(self, count):
         node = self.nodes[0]
@@ -55,8 +58,8 @@ class CheckDataSigActivationTest(ComparisonTestFramework):
         for _ in range(count):
             tx.vout.append(CTxOut(value, CScript(
                 [signature, message, pubkey, OP_CHECKDATASIG])))
-        tx.vout[0].nValue -= node.calculate_fee(tx)
-        tx_signed = node.signrawtransaction(ToHex(tx))["hex"]
+        tx.vout[0].nValue -= min(value/100, 1000) #node.calculate_fee(tx.toHex())
+        tx_signed = node.signrawtransaction(tx.toHex())["hex"]
         return tx_signed
 
     def run_test(self):
@@ -94,12 +97,12 @@ class CheckDataSigActivationTest(ComparisonTestFramework):
             tx.vin = [CTxIn(COutPoint(outpoint.tx.sha256, outpoint.n))]
             tx.vout = [CTxOut(out.nValue, CScript([])),
                        CTxOut(0, CScript([random.getrandbits(800), OP_RETURN]))]
-            tx.vout[0].nValue -= node.calculate_fee(tx)
+            tx.vout[0].nValue -= min(tx.vout[0].nValue/100, 1000) # node.calculate_fee(tx)
             tx.rehash()
             return tx
 
         # Check that transactions using checkdatasig are not accepted yet.
-        self.log.info("Try to use the checkdatasig opcodes before activation")
+        logging.info("Try to use the checkdatasig opcodes before activation")
 
         tx0 = spend_checkdatasig()
         tx0_hex = ToHex(tx0)
@@ -107,8 +110,8 @@ class CheckDataSigActivationTest(ComparisonTestFramework):
                                 node.sendrawtransaction, tx0_hex)
 
         # Push MTP forward just before activation.
-        self.log.info("Pushing MTP just before the activation and check again")
-        node.setmocktime(MAGNETIC_ANOMALY_START_TIME)
+        logging.info("Pushing MTP just before the activation and check again")
+        node.setmocktime(NOV152018_START_TIME)
 
         # returns a test case that asserts that the current tip was accepted
         def accepted(tip):
@@ -137,12 +140,12 @@ class CheckDataSigActivationTest(ComparisonTestFramework):
             return block
 
         for i in range(6):
-            b = next_block(MAGNETIC_ANOMALY_START_TIME + i - 1)
+            b = next_block(NOV152018_START_TIME + i - 1)
             yield accepted(b)
 
         # Check again just before the activation time
         assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'],
-                     MAGNETIC_ANOMALY_START_TIME - 1)
+                     NOV152018_START_TIME - 1)
         assert_raises_rpc_error(-26, RPC_BAD_OPCODE_ERROR,
                                 node.sendrawtransaction, tx0_hex)
 
@@ -151,31 +154,31 @@ class CheckDataSigActivationTest(ComparisonTestFramework):
             block.hashMerkleRoot = block.calc_merkle_root()
             block.solve()
 
-        b = next_block(MAGNETIC_ANOMALY_START_TIME + 6)
+        b = next_block(NOV152018_START_TIME + 6)
         add_tx(b, tx0)
-        yield rejected(b, RejectResult(16, b'blk-bad-inputs'))
+        yield rejected(b, RejectResult(16, b'bad-blk-signatures'))
 
-        self.log.info("Activates checkdatasig")
-        fork_block = next_block(MAGNETIC_ANOMALY_START_TIME + 6)
+        logging.info("Activates checkdatasig")
+        fork_block = next_block(NOV152018_START_TIME + 6)
         yield accepted(fork_block)
 
         assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'],
-                     MAGNETIC_ANOMALY_START_TIME)
+                     NOV152018_START_TIME)
 
         tx0id = node.sendrawtransaction(tx0_hex)
         assert(tx0id in set(node.getrawmempool()))
 
         # Transactions can also be included in blocks.
-        magneticanomalyblock = next_block(MAGNETIC_ANOMALY_START_TIME + 7)
-        add_tx(magneticanomalyblock, tx0)
-        yield accepted(magneticanomalyblock)
+        nov152018forkblock = next_block(NOV152018_START_TIME + 7)
+        add_tx(nov152018forkblock, tx0)
+        yield accepted(nov152018forkblock)
 
-        self.log.info("Cause a reorg that deactivate the checkdatasig opcodes")
+        logging.info("Cause a reorg that deactivate the checkdatasig opcodes")
 
         # Invalidate the checkdatasig block, ensure tx0 gets back to the mempool.
         assert(tx0id not in set(node.getrawmempool()))
 
-        node.invalidateblock(format(magneticanomalyblock.sha256, 'x'))
+        node.invalidateblock(format(nov152018forkblock.sha256, 'x'))
         assert(tx0id in set(node.getrawmempool()))
 
         node.invalidateblock(format(fork_block.sha256, 'x'))
