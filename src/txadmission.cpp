@@ -362,7 +362,7 @@ void ThreadTxAdmission()
                         // speed up tx chunk processing when there is nothing else to do
                         if (acceptedSomething)
                             cvCommitQ.notify_all();
-                        continue;
+                        break;
                     }
 
                     // Make a copy so we can pop and release
