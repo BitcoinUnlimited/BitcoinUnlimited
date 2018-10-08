@@ -353,17 +353,20 @@ void ThreadTxAdmission()
 
             for (unsigned int txPerRoundCount = 0; txPerRoundCount < minTxPerRound; txPerRoundCount++)
             {
-                { // tx must be popped within the TX_PROCESSING corral or the state break between processing
-                    // and commitment will not be clean
+                // tx must be popped within the TX_PROCESSING corral or the state break between processing
+                // and commitment will not be clean
+                {
                     CCriticalBlock lock(csTxInQ, "csTxInQ", __FILE__, __LINE__);
                     if (txInQ.empty())
                     {
                         // speed up tx chunk processing when there is nothing else to do
                         if (acceptedSomething)
                             cvCommitQ.notify_all();
-                        continue; // abort back into wait loop if another thread got my tx
+                        continue;
                     }
-                    txd = txInQ.front(); // make copy so I can pop & release
+
+                    // Make a copy so we can pop and release
+                    txd = txInQ.front();
                     txInQ.pop();
                 }
 
