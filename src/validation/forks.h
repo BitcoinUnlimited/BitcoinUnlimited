@@ -9,11 +9,11 @@
 #include "consensus/params.h"
 
 /** Check is Cash HF has activated. */
-bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev);
+bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
-bool IsNov152018Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev);
+bool IsNov152018Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
 /** Test if fork is active */
-bool IsNov152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev);
+bool IsNov152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
 #endif
