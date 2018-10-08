@@ -141,16 +141,24 @@ void EnqueueTxForAdmission(CTxInputData &txd)
             break;
         }
     }
+
+    // If there is no conflict then the transaction is ready for validation and can be placed in the processing
+    // queue. However, if there is a conflict then this could be a double spend, so defer the transaction until the
+    // transaction it conflicts with has been fully processed.
     if (!conflict)
     {
         // LOG(MEMPOOL, "Enqueue for processing %x\n", txd.tx->GetHash().ToString());
-        txInQ.push(txd); // add this transaction onto the processing queue
+        txInQ.push(txd); // add this transaction onto the processing queue.
         cvTxInQ.notify_one();
     }
     else
     {
         // LOG(MEMPOOL, "Fastfilter collision, deferred %x\n", txd.tx->GetHash().ToString());
         txDeferQ.push(txd);
+
+        // By notifying the commitQ, the deferred queue can be processed right way which helps
+        // to forward double spends as quickly as possible.
+        cvCommitQ.notify_one();
     }
 }
 
@@ -203,7 +211,6 @@ void ThreadCommitToMempool()
             CommitTxToMempool();
             mempool.check(pcoinsTip);
             LOG(MEMPOOL, "MemoryPool sz %u txn, %u kB\n", mempool.size(), mempool.DynamicMemoryUsage() / 1000);
-            // BU - Xtreme Thinblocks - trim the orphan pool by entry time and do not allow it to be overidden.
             LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
                 GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
 
