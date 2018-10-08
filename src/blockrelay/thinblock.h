@@ -61,7 +61,8 @@ public:
     bool collision;
 
 public:
-    CXThinBlock(const CBlock &block, const CBloomFilter *filter); // Use the filter to determine which txns the client has
+    // Use the filter to determine which txns the client has
+    CXThinBlock(const CBlock &block, const CBloomFilter *filter);
     CXThinBlock(const CBlock &block); // Assume client has all of the transactions (except coinbase)
     CXThinBlock() {}
     /**

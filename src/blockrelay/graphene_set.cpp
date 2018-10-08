@@ -268,9 +268,7 @@ std::vector<unsigned char> CGrapheneSet::EncodeRank(std::vector<uint64_t> items,
     return encoded;
 }
 
-std::vector<uint64_t> CGrapheneSet::DecodeRank(std::vector<unsigned char> encoded,
-    size_t nItems,
-    uint16_t nBitsPerItem)
+std::vector<uint64_t> CGrapheneSet::DecodeRank(std::vector<unsigned char> encoded, size_t nItems, uint16_t nBitsPerItem)
 {
     size_t nEncodedWords = int(ceil(nBitsPerItem * nItems / float(WORD_BITS)));
 
