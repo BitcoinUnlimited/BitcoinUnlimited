@@ -148,7 +148,7 @@ void EnqueueTxForAdmission(CTxInputData &txd)
     if (!conflict)
     {
         // LOG(MEMPOOL, "Enqueue for processing %x\n", txd.tx->GetHash().ToString());
-        txInQ.push(txd);
+        txInQ.push(txd); // add this transaction onto the processing queue.
         cvTxInQ.notify_one();
     }
     else
