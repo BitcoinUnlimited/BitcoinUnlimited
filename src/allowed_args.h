@@ -48,6 +48,7 @@ class AllowedArgs
 {
 protected:
     std::map<std::string, CheckValueFunc> m_args;
+    std::map<std::string, bool> m_optional;
     std::list<HelpComponent> m_helpList;
     // If true, unrecognized switches are ignored.
     bool m_permit_unrecognized;
@@ -74,6 +75,8 @@ public:
      *     Examples: "?,help,h", "pid=<file>".
      * @param checkValueFunc Verification function for the argument value.
      * @param strHelp The help text.
+     * @param disabledParam True if parameters is not in effect to to disabled
+     *     functionality. i.e. binarties built w/ --disable-binaries
      * @param helpDebug If true, the help text for this arg will only be shown
      *     on -help-debug.
      * @return This instance.
@@ -81,6 +84,7 @@ public:
     AllowedArgs &addArg(const std::string &strArgs,
         CheckValueFunc checkValueFunc,
         const std::string &strHelp,
+        bool disabledParam = false,
         bool helpDebug = false);
 
     /**
@@ -90,7 +94,8 @@ public:
      */
     AllowedArgs &addDebugArg(const std::string &strArgsDefinition,
         CheckValueFunc checkValueFunc,
-        const std::string &strHelp);
+        const std::string &strHelp,
+        bool disabledParam = false);
 
     /**
      * @return The map of argument names to CheckValueFuncs.
