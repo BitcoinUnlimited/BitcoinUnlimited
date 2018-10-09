@@ -358,7 +358,6 @@ wallet/wallet.cpp
 wallet/walletdb.cpp
 wallet/walletdb.h
 wallet/wallet.h
-wallet/wallet_ismine.cpp
 zmq/zmqabstractnotifier.cpp
 zmq/zmqabstractnotifier.h
 zmq/zmqconfig.h
