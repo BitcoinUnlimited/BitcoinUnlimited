@@ -386,7 +386,8 @@ void ThreadTxAdmission()
                     }
                     else
                     {
-                        LOG(MEMPOOL, "Rejected tx: %s(%d): %s. peer %s  hash %s \n", state.GetRejectReason(), state.GetRejectCode(), state.GetDebugMessage(), txd.nodeName, tx->GetHash().ToString());
+                        LOG(MEMPOOL, "Rejected tx: %s(%d): %s. peer %s  hash %s \n", state.GetRejectReason(),
+                            state.GetRejectCode(), state.GetDebugMessage(), txd.nodeName, tx->GetHash().ToString());
 
                         if (fMissingInputs)
                         {
