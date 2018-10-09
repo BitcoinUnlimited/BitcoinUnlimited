@@ -11,7 +11,7 @@ main,2,opcodes_mul_shift_invert,1535760000,1567296000, 12960, 9720, 0, 7776000, 
 main,3,unrestricted_script_instructions,1535760000,1567296000, 12960, 9720, 0, 7776000, true
 main,4,op_checkdatasig,1535760000,1567296000, 12960, 9720, 0, 7776000, true
 main,5,tx_min_size_100,1535760000,1567296000, 12960, 9720, 0, 7776000, true
-main,6,enforce_lexicographical_tx_order,1535760000,1567296000, 12960, 9720, 0, 7776000, true
+main,6,enforce_CTOR,1535760000,1567296000, 12960, 9720, 0, 7776000, true
 main,7,enforce_scriptsig_push_only,1535760000,1567296000, 12960, 9720, 0, 7776000, true
 ;
 ; test network (testnet), 75% @ 2016 blocks:
@@ -23,7 +23,7 @@ test,2,opcodes_mul_shift_invert,1535760000,1567296000, 2016, 1512, 0, 604800, tr
 test,3,unrestricted_script_instructions,1535760000,1567296000, 2016, 1512, 0, 604800, true
 test,4,op_checkdatasig,1535760000,1567296000, 2016, 1512, 0, 604800, true
 test,5,tx_min_size_100,1535760000,1567296000, 2016, 1512, 0, 604800, true
-test,6,enforce_lexicographical_tx_order,1535760000,1567296000, 2016, 1512, 0, 604800, true
+test,6,enforce_CTOR,1535760000,1567296000, 2016, 1512, 0, 604800, true
 test,7,enforce_scriptsig_push_only,1535760000,1567296000, 2016, 1512, 0, 604800, true
 ;
 test,28,testdummy,1199145601,1230767999,2016,1512,2016,0,true
@@ -36,7 +36,7 @@ regtest,2,opcodes_mul_shift_invert,1535566484,1567296000, 100, 75, 0, 60, true
 regtest,3,unrestricted_script_instructions,1535566484,1567296000, 100, 75, 0, 60, true
 regtest,4,op_checkdatasig,1535566484,1567296000, 100, 75, 0, 60, true
 regtest,5,tx_min_size_100,1535566484,1567296000, 100, 75, 0, 60, true
-regtest,6,enforce_lexicographical_tx_order,1535566484,1567296000, 100, 75, 0, 60, true
+regtest,6,enforce_CTOR,1535566484,1567296000, 100, 75, 0, 60, true
 regtest,7,enforce_scriptsig_push_only,1535566484,1567296000, 100, 75, 0, 60, true
 ;
 regtest,28,testdummy,0,999999999999,144,108,108,0,true
