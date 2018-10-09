@@ -2829,6 +2829,12 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
         }
     }
 
+    // these bloom filters stop us from doing duplicate work on tx we already know about.
+    // but since we rewound, we need to do this duplicate work -- clear them so tx we have already processed
+    // can be processed again.
+    txRecentlyInBlock.reset();
+    recentRejects.reset();
+
     // Update chainActive and related variables.
     UpdateTip(pindexDelete->pprev);
     // Let wallets know transactions went from 1-confirmed to
