@@ -365,12 +365,6 @@ pblockOut -A copy of the block if not NULL
 */
 UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *pblockOut)
 {
-    {
-        // This code flushes pending tx out to the mempool
-        // For lowest latency, should we just go with the tx we have in the mempool?
-        TxAdmissionPause lock;
-        CommitTxToMempool();
-    }
     LOCK(cs_main);
 
     std::string strMode = "template";

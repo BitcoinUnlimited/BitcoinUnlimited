@@ -2829,21 +2829,6 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
         }
     }
 
-    // Resurrect mempool transactions from the disconnected block but do not do this step if we are
-    // rolling back the chain using the "rollbackchain" rpc command.
-    if (!fRollBack)
-    {
-        for (const auto &ptx : block.vtx)
-        {
-            CTxInputData txd;
-            txd.tx = ptx;
-            txd.nodeId = -1;
-            txd.nodeName = "rollback";
-            txd.whitelisted = false;
-            EnqueueTxForAdmission(txd);
-        }
-    }
-
     // Update chainActive and related variables.
     UpdateTip(pindexDelete->pprev);
     // Let wallets know transactions went from 1-confirmed to
@@ -2851,6 +2836,24 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     for (const auto &ptx : block.vtx)
     {
         SyncWithWallets(ptx, nullptr, -1);
+    }
+
+    // Resurrect mempool transactions from the disconnected block but do not do this step if we are
+    // rolling back the chain using the "rollbackchain" rpc command.
+    if (!fRollBack)
+    {
+        for (const auto &ptx : block.vtx)
+        {
+            if (!ptx->IsCoinBase())
+            {
+                CTxInputData txd;
+                txd.tx = ptx;
+                txd.nodeId = -1;
+                txd.nodeName = "rollback";
+                txd.whitelisted = false;
+                EnqueueTxForAdmission(txd);
+            }
+        }
     }
 
     return true;
