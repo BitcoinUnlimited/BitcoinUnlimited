@@ -354,10 +354,8 @@ std::string gbt_vb_name(const Consensus::DeploymentPos pos)
 }
 
 // Sets the version bits in a block
-static void UtilMkBlockTmplVersionBits(std::set<std::string> setClientRules,
+static int32_t UtilMkBlockTmplVersionBits(int32_t version, std::set<std::string> setClientRules,
     CBlockIndex *pindexPrev,
-    int64_t coinbaseSize,
-    CBlock *pblock,
     UniValue *paRules,
     UniValue *pvbavailable)
 {
@@ -375,7 +373,7 @@ static void UtilMkBlockTmplVersionBits(std::set<std::string> setClientRules,
             break;
         case THRESHOLD_LOCKED_IN:
             // Ensure bit is set in block version
-            pblock->nVersion |= VersionBitsMask(consensusParams, pos);
+            version |= VersionBitsMask(consensusParams, pos);
         // FALLTHROUGH
         // to get vbavailable set...
         case THRESHOLD_STARTED:
@@ -390,7 +388,7 @@ static void UtilMkBlockTmplVersionBits(std::set<std::string> setClientRules,
                 if (!vbinfo.gbt_force)
                 {
                     // If the client doesn't support this, don't indicate it in the [default] version
-                    pblock->nVersion &= ~VersionBitsMask(consensusParams, pos);
+                    version &= ~VersionBitsMask(consensusParams, pos);
                 }
             }
             break;
@@ -418,6 +416,7 @@ static void UtilMkBlockTmplVersionBits(std::set<std::string> setClientRules,
         }
         }
     }
+    return version;
 }
 
 
@@ -468,7 +467,7 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     UniValue aRules(UniValue::VARR);
     UniValue vbavailable(UniValue::VOBJ);
 
-    UtilMkBlockTmplVersionBits(setClientRules, pindexPrev, coinbaseSize, pblock, &aRules, &vbavailable);
+    pblock->nVersion = UtilMkBlockTmplVersionBits(pblock->nVersion, setClientRules, pindexPrev, &aRules, &vbavailable);
 
     UniValue aux(UniValue::VOBJ);
     // COINBASE_FLAGS were assigned in CreateNewBlock() in the steps above.  Now we can use it here.
@@ -716,7 +715,7 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
     if (pblockOut != nullptr)
     {
         // Make a block.
-        UtilMkBlockTmplVersionBits(setClientRules, pindexPrev, coinbaseSize, pblock, nullptr, nullptr);
+        pblock->nVersion = UtilMkBlockTmplVersionBits(pblock->nVersion, setClientRules, pindexPrev, nullptr, nullptr);
         *pblockOut = *pblock;
         return UniValue();
     }
