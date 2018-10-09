@@ -572,13 +572,15 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET &hSocketRe
             if (getsockopt(hSocket, SOL_SOCKET, SO_ERROR, &nRet, &nRetSize) == SOCKET_ERROR)
 #endif
             {
-                LOGA("getsockopt() for %s failed: %s\n", addrConnect.ToString(), NetworkErrorString(WSAGetLastError()));
+                LOG(NET, "getsockopt() for %s failed: %s\n", addrConnect.ToString(),
+                    NetworkErrorString(WSAGetLastError()));
                 CloseSocket(hSocket);
                 return false;
             }
             if (nRet != 0)
             {
-                LOGA("connect() to %s failed after select(): %s\n", addrConnect.ToString(), NetworkErrorString(nRet));
+                LOG(NET, "connect() to %s failed after select(): %s\n", addrConnect.ToString(),
+                    NetworkErrorString(nRet));
                 CloseSocket(hSocket);
                 return false;
             }
