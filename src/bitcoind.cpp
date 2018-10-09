@@ -203,6 +203,41 @@ bool AppInit(int argc, char *argv[])
 
         // Set this early so that parameter interactions go to console
         InitLogging();
+
+        // Print command line as well as argument maps into log file
+        {
+            std::string cmdline_log;
+            for (int i = 0; i < argc; i++)
+                cmdline_log += tfm::format("%s ", argv[i]);
+            LOGA("Command line: %s\n", cmdline_log);
+
+            LOGA("Single entry arguments:\n");
+            for (const auto &arg : mapArgs)
+                LOGA(tfm::format("        %s='%s'\n", arg.first, arg.second));
+            LOGA("\n");
+            bool print_multi_args = false;
+            for (const auto &arg : mapMultiArgs)
+                if (arg.second.size() > 1)
+                {
+                    print_multi_args = true;
+                    break;
+                }
+            if (print_multi_args)
+            {
+                LOGA("Multiple entry arguments:\n");
+                for (const auto &arg : mapMultiArgs)
+                {
+                    if (arg.second.size() < 2)
+                        continue;
+                    std::string entry_log = tfm::format("        %s = [", arg.first);
+                    for (const auto &entry : arg.second)
+                        entry_log += tfm::format("'%s', ", entry);
+                    LOGA(entry_log.substr(0, entry_log.size() - 2) + "]\n");
+                }
+                LOGA("\n");
+            }
+        }
+
         InitParameterInteraction();
         fRet = AppInit2(config, threadGroup, scheduler);
     }
