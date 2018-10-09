@@ -2833,28 +2833,15 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     // rolling back the chain using the "rollbackchain" rpc command.
     if (!fRollBack)
     {
-        std::vector<uint256> vHashUpdate;
         for (const auto &ptx : block.vtx)
         {
-            // ignore validation errors in resurrected transactions
-            std::list<CTransactionRef> removed;
-            CValidationState stateDummy;
-            if (ptx->IsCoinBase() ||
-                !AcceptToMemoryPool(mempool, stateDummy, ptx, AreFreeTxnsDisallowed(), nullptr, true))
-            {
-                mempool.removeRecursive(*ptx, removed);
-            }
-            else if (mempool.exists(ptx->GetHash()))
-            {
-                vHashUpdate.push_back(ptx->GetHash());
-            }
+            CTxInputData txd;
+            txd.tx = ptx;
+            txd.nodeId = -1;
+            txd.nodeName = "rollback";
+            txd.whitelisted = false;
+            EnqueueTxForAdmission(txd);
         }
-        // AcceptToMemoryPool/addUnchecked all assume that new mempool entries have
-        // no in-mempool children, which is generally not true when adding
-        // previously-confirmed transactions back to the mempool.
-        // UpdateTransactionsFromBlock finds descendants of any transactions in this
-        // block that were added back and cleans up the mempool state.
-        mempool.UpdateTransactionsFromBlock(vHashUpdate);
     }
 
     // Update chainActive and related variables.

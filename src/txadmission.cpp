@@ -153,7 +153,7 @@ void EnqueueTxForAdmission(CTxInputData &txd)
     }
     else
     {
-        // LOG(MEMPOOL, "Fastfilter collision, deferred %x\n", txd.tx->GetHash().ToString());
+        LOG(MEMPOOL, "Fastfilter collision, deferred %x\n", txd.tx->GetHash().ToString());
         txDeferQ.push(txd);
 
         // By notifying the commitQ, the deferred queue can be processed right way which helps
@@ -248,6 +248,7 @@ void CommitTxToMempool()
         LOCK(cs_main);
 #endif
         boost::unique_lock<boost::mutex> lock(csCommitQ);
+        LOG(MEMPOOL, "txadmission committing %d tx\n", txCommitQ.size());
         for (auto &it : txCommitQ)
         {
             // This transaction has already been validated so store it directly into the mempool.
@@ -380,11 +381,13 @@ void ThreadTxAdmission()
                         acceptedSomething = true;
                         RelayTransaction(tx);
 
-                        // LOG(MEMPOOL, "AcceptToMemoryPool: peer=%s: accepted %s onto Q\n", txd.nodeName,
-                        //    tx->GetHash().ToString());
+                        // LOG(MEMPOOL, "Accepted tx: peer=%s: accepted %s onto Q\n", txd.nodeName,
+                        //     tx->GetHash().ToString());
                     }
                     else
                     {
+                        LOG(MEMPOOL, "Rejected tx: %s(%d): %s. peer %s  hash %s \n", state.GetRejectReason(), state.GetRejectCode(), state.GetDebugMessage(), txd.nodeName, tx->GetHash().ToString());
+
                         if (fMissingInputs)
                         {
                             LOCK(orphanpool.cs); // WRITELOCK
