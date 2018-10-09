@@ -148,7 +148,7 @@ std::string CTransaction::ToString() const
     return str;
 }
 
-uint64_t CTransaction::GetTxSize() const
+size_t CTransaction::GetTxSize() const
 { 
     if (_nTxSize == 0)
         _nTxSize = ::GetSerializeSize(*this, SER_NETWORK, CTransaction::CURRENT_VERSION);

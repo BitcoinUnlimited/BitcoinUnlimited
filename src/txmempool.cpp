@@ -26,7 +26,6 @@ CTxMemPoolEntry::CTxMemPoolEntry()
     : tx(), nFee(), nTime(0), entryPriority(0), entryHeight(0), hadNoDependencies(0), inChainInputValue(0),
       spendsCoinbase(false), sigOpCount(0), lockPoints()
 {
-    nTxSize = 0;
     nModSize = 0;
     nUsageSize = 0;
     nCountWithDescendants = 0;
@@ -48,12 +47,11 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx,
       hadNoDependencies(poolHasNoInputsOf), inChainInputValue(_inChainInputValue), spendsCoinbase(_spendsCoinbase),
       sigOpCount(_sigOps), lockPoints(lp)
 {
-    nTxSize = tx->GetTxSize();
-    nModSize = tx->CalculateModifiedSize(nTxSize);
+    nModSize = tx->CalculateModifiedSize(tx->GetTxSize());
     nUsageSize = RecursiveDynamicUsage(*tx);
 
     nCountWithDescendants = 1;
-    nSizeWithDescendants = nTxSize;
+    nSizeWithDescendants = tx->GetTxSize();
     nModFeesWithDescendants = nFee;
     CAmount nValueIn = tx->GetValueOut() + nFee;
     assert(inChainInputValue <= nValueIn);
@@ -61,7 +59,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx,
     feeDelta = 0;
 
     nCountWithAncestors = 1;
-    nSizeWithAncestors = nTxSize;
+    nSizeWithAncestors = tx->GetTxSize();
     nModFeesWithAncestors = nFee;
     nSigOpCountWithAncestors = sigOpCount;
 }
