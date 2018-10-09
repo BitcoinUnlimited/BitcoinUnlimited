@@ -353,6 +353,172 @@ std::string gbt_vb_name(const Consensus::DeploymentPos pos)
     return s;
 }
 
+// Sets the version bits in a block
+static void UtilMkBlockTmplVersionBits(std::set<std::string> setClientRules,
+    CBlockIndex *pindexPrev,
+    int64_t coinbaseSize,
+    CBlock *pblock,
+    UniValue *paRules,
+    UniValue *pvbavailable)
+{
+    const Consensus::Params &consensusParams = Params().GetConsensus();
+
+    for (int j = 0; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++j)
+    {
+        Consensus::DeploymentPos pos = Consensus::DeploymentPos(j);
+        ThresholdState state = VersionBitsState(pindexPrev, consensusParams, pos, versionbitscache);
+        switch (state)
+        {
+        case THRESHOLD_DEFINED:
+        case THRESHOLD_FAILED:
+            // Not exposed to GBT at all
+            break;
+        case THRESHOLD_LOCKED_IN:
+            // Ensure bit is set in block version
+            pblock->nVersion |= VersionBitsMask(consensusParams, pos);
+        // FALLTHROUGH
+        // to get vbavailable set...
+        case THRESHOLD_STARTED:
+        {
+            const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
+            if (pvbavailable != nullptr)
+            {
+                pvbavailable->push_back(Pair(gbt_vb_name(pos), consensusParams.vDeployments[pos].bit));
+            }
+            if (setClientRules.find(vbinfo.name) == setClientRules.end())
+            {
+                if (!vbinfo.gbt_force)
+                {
+                    // If the client doesn't support this, don't indicate it in the [default] version
+                    pblock->nVersion &= ~VersionBitsMask(consensusParams, pos);
+                }
+            }
+            break;
+        }
+        case THRESHOLD_ACTIVE:
+        {
+            // Add to rules only
+            const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
+            if (paRules != nullptr)
+            {
+                paRules->push_back(gbt_vb_name(pos));
+            }
+            if (setClientRules.find(vbinfo.name) == setClientRules.end())
+            {
+                // Not supported by the client; make sure it's safe to proceed
+                if (!vbinfo.gbt_force)
+                {
+                    // If we do anything other than throw an exception here, be sure version/force isn't sent to old
+                    // clients
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,
+                        strprintf("Support for '%s' rule requires explicit client support", vbinfo.name));
+                }
+            }
+            break;
+        }
+        }
+    }
+}
+
+
+static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
+    CBlockIndex *pindexPrev,
+    int64_t coinbaseSize,
+    std::unique_ptr<CBlockTemplate> &pblocktemplate,
+    const int nMaxVersionPreVB,
+    const unsigned int nTransactionsUpdatedLast)
+{
+    CBlock *pblock = &pblocktemplate->block; // pointer for convenience
+    UniValue aCaps(UniValue::VARR);
+    aCaps.push_back("proposal");
+
+    UniValue transactions(UniValue::VARR);
+    map<uint256, int64_t> setTxIndex;
+    int i = 0;
+    for (const auto &it : pblock->vtx)
+    {
+        const CTransaction &tx = *it;
+        uint256 txHash = tx.GetHash();
+        setTxIndex[txHash] = i++;
+
+        if (tx.IsCoinBase())
+            continue;
+
+        UniValue entry(UniValue::VOBJ);
+
+        entry.push_back(Pair("data", EncodeHexTx(tx)));
+
+        entry.push_back(Pair("hash", txHash.GetHex()));
+
+        UniValue deps(UniValue::VARR);
+        for (const CTxIn &in : tx.vin)
+        {
+            if (setTxIndex.count(in.prevout.hash))
+                deps.push_back(setTxIndex[in.prevout.hash]);
+        }
+        entry.push_back(Pair("depends", deps));
+
+        int index_in_template = i - 1;
+        entry.push_back(Pair("fee", pblocktemplate->vTxFees[index_in_template]));
+        entry.push_back(Pair("sigops", pblocktemplate->vTxSigOps[index_in_template]));
+
+        transactions.push_back(entry);
+    }
+
+    UniValue aRules(UniValue::VARR);
+    UniValue vbavailable(UniValue::VOBJ);
+
+    UtilMkBlockTmplVersionBits(setClientRules, pindexPrev, coinbaseSize, pblock, &aRules, &vbavailable);
+
+    UniValue aux(UniValue::VOBJ);
+    // COINBASE_FLAGS were assigned in CreateNewBlock() in the steps above.  Now we can use it here.
+    aux.push_back(Pair("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end())));
+
+    arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
+
+    UniValue aMutable(UniValue::VARR);
+    aMutable.push_back("time");
+    aMutable.push_back("transactions");
+    aMutable.push_back("prevblock");
+
+    UniValue result(UniValue::VOBJ);
+    result.push_back(Pair("capabilities", aCaps));
+    result.push_back(Pair("version", pblock->nVersion));
+    result.push_back(Pair("rules", aRules));
+    result.push_back(Pair("vbavailable", vbavailable));
+    result.push_back(Pair("vbrequired", int(0)));
+
+    if (nMaxVersionPreVB >= 2)
+    {
+        // If VB is supported by the client, nMaxVersionPreVB is -1, so we won't get here
+        // Because BIP 34 changed how the generation transaction is serialised, we can only use version/force back to v2
+        // blocks
+        // This is safe to do [otherwise-]unconditionally only because we are throwing an exception above if a non-force
+        // deployment gets activated
+        // Note that this can probably also be removed entirely after the first BIP9/BIP135 non-force deployment
+        // (ie, segwit) gets activated
+        aMutable.push_back("version/force");
+    }
+
+    result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
+    result.push_back(Pair("transactions", transactions));
+    result.push_back(Pair("coinbaseaux", aux));
+    result.push_back(Pair("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue));
+    result.push_back(
+        Pair("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast)));
+    result.push_back(Pair("target", hashTarget.GetHex()));
+    result.push_back(Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1));
+    result.push_back(Pair("mutable", aMutable));
+    result.push_back(Pair("noncerange", "00000000ffffffff"));
+    result.push_back(Pair("sigoplimit", (int64_t)BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS));
+    result.push_back(Pair("sizelimit", (int64_t)maxGeneratedBlock));
+    result.push_back(Pair("curtime", pblock->GetBlockTime()));
+    result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
+    // BU get the height directly from the block because pindexPrev could change if another block has come in.
+    result.push_back(Pair("height", (int64_t)(pblock->GetHeight())));
+
+    return result;
+}
 
 /*
 Inputs:
@@ -360,9 +526,10 @@ params
 coinbaseSize -Set the size of coinbase if >=0
 
 Outputs:
-JSON -returns UniValue
+returns JSON if pblockOut is NULL
 pblockOut -A copy of the block if not NULL
 */
+
 UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *pblockOut)
 {
     LOCK(cs_main);
@@ -546,144 +713,19 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
     UpdateTime(pblock, consensusParams, pindexPrev);
     pblock->nNonce = 0;
 
-    UniValue aCaps(UniValue::VARR);
-    aCaps.push_back("proposal");
-
-    UniValue transactions(UniValue::VARR);
-    map<uint256, int64_t> setTxIndex;
-    int i = 0;
-    for (const auto &it : pblock->vtx)
-    {
-        const CTransaction &tx = *it;
-        uint256 txHash = tx.GetHash();
-        setTxIndex[txHash] = i++;
-
-        if (tx.IsCoinBase())
-            continue;
-
-        UniValue entry(UniValue::VOBJ);
-
-        entry.push_back(Pair("data", EncodeHexTx(tx)));
-
-        entry.push_back(Pair("hash", txHash.GetHex()));
-
-        UniValue deps(UniValue::VARR);
-        for (const CTxIn &in : tx.vin)
-        {
-            if (setTxIndex.count(in.prevout.hash))
-                deps.push_back(setTxIndex[in.prevout.hash]);
-        }
-        entry.push_back(Pair("depends", deps));
-
-        int index_in_template = i - 1;
-        entry.push_back(Pair("fee", pblocktemplate->vTxFees[index_in_template]));
-        entry.push_back(Pair("sigops", pblocktemplate->vTxSigOps[index_in_template]));
-
-        transactions.push_back(entry);
-    }
-
-    UniValue aux(UniValue::VOBJ);
-    // COINBASE_FLAGS were assigned in CreateNewBlock() in the steps above.  Now we can use it here.
-    aux.push_back(Pair("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end())));
-
-    arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
-
-    UniValue aMutable(UniValue::VARR);
-    aMutable.push_back("time");
-    aMutable.push_back("transactions");
-    aMutable.push_back("prevblock");
-
-    UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("capabilities", aCaps));
-
-    UniValue aRules(UniValue::VARR);
-    UniValue vbavailable(UniValue::VOBJ);
-    for (int j = 0; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++j)
-    {
-        Consensus::DeploymentPos pos = Consensus::DeploymentPos(j);
-        ThresholdState state = VersionBitsState(pindexPrev, consensusParams, pos, versionbitscache);
-        switch (state)
-        {
-        case THRESHOLD_DEFINED:
-        case THRESHOLD_FAILED:
-            // Not exposed to GBT at all
-            break;
-        case THRESHOLD_LOCKED_IN:
-            // Ensure bit is set in block version
-            pblock->nVersion |= VersionBitsMask(consensusParams, pos);
-        // FALLTHROUGH
-        // to get vbavailable set...
-        case THRESHOLD_STARTED:
-        {
-            const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
-            vbavailable.push_back(Pair(gbt_vb_name(pos), consensusParams.vDeployments[pos].bit));
-            if (setClientRules.find(vbinfo.name) == setClientRules.end())
-            {
-                if (!vbinfo.gbt_force)
-                {
-                    // If the client doesn't support this, don't indicate it in the [default] version
-                    pblock->nVersion &= ~VersionBitsMask(consensusParams, pos);
-                }
-            }
-            break;
-        }
-        case THRESHOLD_ACTIVE:
-        {
-            // Add to rules only
-            const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
-            aRules.push_back(gbt_vb_name(pos));
-            if (setClientRules.find(vbinfo.name) == setClientRules.end())
-            {
-                // Not supported by the client; make sure it's safe to proceed
-                if (!vbinfo.gbt_force)
-                {
-                    // If we do anything other than throw an exception here, be sure version/force isn't sent to old
-                    // clients
-                    throw JSONRPCError(RPC_INVALID_PARAMETER,
-                        strprintf("Support for '%s' rule requires explicit client support", vbinfo.name));
-                }
-            }
-            break;
-        }
-        }
-    }
-    result.push_back(Pair("version", pblock->nVersion));
-    result.push_back(Pair("rules", aRules));
-    result.push_back(Pair("vbavailable", vbavailable));
-    result.push_back(Pair("vbrequired", int(0)));
-
-    if (nMaxVersionPreVB >= 2)
-    {
-        // If VB is supported by the client, nMaxVersionPreVB is -1, so we won't get here
-        // Because BIP 34 changed how the generation transaction is serialised, we can only use version/force back to v2
-        // blocks
-        // This is safe to do [otherwise-]unconditionally only because we are throwing an exception above if a non-force
-        // deployment gets activated
-        // Note that this can probably also be removed entirely after the first BIP9/BIP135 non-force deployment
-        // (ie, segwit) gets activated
-        aMutable.push_back("version/force");
-    }
-
-    result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
-    result.push_back(Pair("transactions", transactions));
-    result.push_back(Pair("coinbaseaux", aux));
-    result.push_back(Pair("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue));
-    result.push_back(
-        Pair("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast)));
-    result.push_back(Pair("target", hashTarget.GetHex()));
-    result.push_back(Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1));
-    result.push_back(Pair("mutable", aMutable));
-    result.push_back(Pair("noncerange", "00000000ffffffff"));
-    result.push_back(Pair("sigoplimit", (int64_t)BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS));
-    result.push_back(Pair("sizelimit", (int64_t)maxGeneratedBlock));
-    result.push_back(Pair("curtime", pblock->GetBlockTime()));
-    result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
-    // BU get the height directly from the block because pindexPrev could change if another block has come in.
-    result.push_back(Pair("height", (int64_t)(pblock->GetHeight())));
-
     if (pblockOut != nullptr)
+    {
+        // Make a block.
+        UtilMkBlockTmplVersionBits(setClientRules, pindexPrev, coinbaseSize, pblock, nullptr, nullptr);
         *pblockOut = *pblock;
-    return result;
+        return UniValue();
+    }
+    else
+    {
+        // Or create JSON:
+        return MkFullMiningCandidateJson(
+            setClientRules, pindexPrev, coinbaseSize, pblocktemplate, nMaxVersionPreVB, nTransactionsUpdatedLast);
+    }
 }
 
 UniValue getblocktemplate(const UniValue &params, bool fHelp)
