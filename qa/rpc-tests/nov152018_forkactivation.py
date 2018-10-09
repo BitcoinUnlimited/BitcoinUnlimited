@@ -35,7 +35,7 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
         self.tip = None
         self.blocks = {}
         self.extra_args = [['-whitelist=127.0.0.1',
-                            "-mining.forkNov2018Time=%d" % NOV152018_START_TIME]]
+                            "-consensus.forkNov2018Time=%d" % NOV152018_START_TIME]]
 
     def run_test(self):
         self.test = TestManager(self, self.options.tmpdir)
@@ -44,9 +44,9 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
         NetworkThread().start()
         # Set the blocksize to 2MB as initial condition
         self.nodes[0].setmocktime(NOV152018_START_TIME)
-        self.nodes[0].set("mining.forkNov2018Time=%d" % (NOV152018_START_TIME))
+        self.nodes[0].set("consensus.forkNov2018Time=%d" % (NOV152018_START_TIME))
         self.nodes[1].setmocktime(NOV152018_START_TIME)
-        self.nodes[1].set("mining.forkNov2018Time=%d" % (NOV152018_START_TIME))
+        self.nodes[1].set("consensus.forkNov2018Time=%d" % (NOV152018_START_TIME))
         self.test.run()
 
     def add_transactions_to_block(self, block, tx_list):
@@ -246,7 +246,6 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
         yield rejected()
         #yield rejected(RejectResult(16, b'bad-txns-undersize'))
         assert_equal(bestblockhash, self.nodes[0].getbestblockhash())
-
 
         # Rewind bad block.
         tip(4444)
