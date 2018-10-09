@@ -144,7 +144,6 @@ proxyType proxyInfo[NET_MAX];
 proxyType nameProxy;
 CCriticalSection cs_proxyInfos;
 
-
 CCriticalSection cs_xval;
 set<uint256> setPreVerifiedTxHash GUARDED_BY(cs_xval);
 set<uint256> setUnVerifiedOrphanTxHash GUARDED_BY(cs_xval);
@@ -266,7 +265,7 @@ CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
     &nMaxDatacarrierBytes,
     &MaxDataCarrierValidator);
 
-CTweak<uint64_t> miningForkTime("mining.forkNov2018Time",
+CTweak<uint64_t> miningForkTime("consensus.forkNov2018Time",
     "Time in seconds since the epoch to initiate a hard fork scheduled on 15th Nov 2018.",
     1542300000); // Thu Nov 15 17:40:00 CET 2018
 
@@ -304,6 +303,11 @@ CTweakRef<std::string> subverOverrideTweak("net.subversionOverride",
 CTweakRef<bool> enableDataSigVerifyTweak("consensus.enableDataSigVerify",
     "true if OP_DATASIGVERIFY is enabled.",
     &enableDataSigVerify);
+
+CTweak<bool> enableCanonicalTxOrder("consensus.enableCanonicalTxOrder",
+    "True if canonical transaction ordering is enabled.  Reflects the actual state so may be switched on or off by"
+    " fork time flags and blockchain reorganizations.",
+    false);
 
 CTweak<unsigned int> numMsgHandlerThreads("net.msgHandlerThreads", "Max message handler threads", 0);
 CTweak<unsigned int> numTxAdmissionThreads("net.txAdmissionThreads", "Max transaction mempool admission threads", 0);

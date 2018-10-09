@@ -329,6 +329,7 @@ void ThreadTxAdmission()
 
     while (!ShutdownRequested())
     {
+        bool acceptedSomething = false;
         boost::this_thread::interruption_point();
 
         bool fMissingInputs = false;
@@ -356,7 +357,12 @@ void ThreadTxAdmission()
                     // and commitment will not be clean
                     CCriticalBlock lock(csTxInQ, "csTxInQ", __FILE__, __LINE__);
                     if (txInQ.empty())
+                    {
+                        // speed up tx chunk processing when there is nothing else to do
+                        if (acceptedSomething)
+                            cvCommitQ.notify_all();
                         continue; // abort back into wait loop if another thread got my tx
+                    }
                     txd = txInQ.front(); // make copy so I can pop & release
                     txInQ.pop();
                 }
@@ -371,6 +377,7 @@ void ThreadTxAdmission()
                     if (ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false,
                             false, TransactionClass::DEFAULT, vCoinsToUncache, &isRespend))
                     {
+                        acceptedSomething = true;
                         RelayTransaction(tx);
 
                         // LOG(MEMPOOL, "AcceptToMemoryPool: peer=%s: accepted %s onto Q\n", txd.nodeName,

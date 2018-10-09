@@ -39,19 +39,35 @@ public:
     }
 
     void SetNull() { memset(data, 0, sizeof(data)); }
-    friend inline bool operator==(const base_blob &a, const base_blob &b)
+    //! Compare in lexical (string) byte ordering
+    inline int LexicalCompare(const base_blob &other) const { return memcmp(data, other.data, sizeof(data)); }
+    //! Numerical comparison returns -1 if this is < other, 1 if this > other, 0 if equal
+    inline int Compare(const base_blob &other) const
     {
-        return memcmp(a.data, b.data, sizeof(a.data)) == 0;
-    }
-    friend inline bool operator!=(const base_blob &a, const base_blob &b)
-    {
-        return memcmp(a.data, b.data, sizeof(a.data)) != 0;
-    }
-    friend inline bool operator<(const base_blob &a, const base_blob &b)
-    {
-        return memcmp(a.data, b.data, sizeof(a.data)) < 0;
+        for (size_t i = 0; i < sizeof(data); i++)
+        {
+            uint8_t a = data[sizeof(data) - 1 - i];
+            uint8_t b = other.data[sizeof(data) - 1 - i];
+            if (a > b)
+            {
+                return 1;
+            }
+            if (a < b)
+            {
+                return -1;
+            }
+        }
+        return 0;
     }
 
+    //! Check equality (lexical compare is used since it is faster)
+    friend inline bool operator==(const base_blob &a, const base_blob &b) { return a.LexicalCompare(b) == 0; }
+    //! Check for non-equality (lexical compare is used since it is faster)
+    friend inline bool operator!=(const base_blob &a, const base_blob &b) { return a.LexicalCompare(b) != 0; }
+    //! Returns true if a is numerically less than b
+    friend inline bool operator<(const base_blob &a, const base_blob &b) { return a.Compare(b) < 0; }
+    //! Returns true if a is numerically greater than b
+    friend inline bool operator>(const base_blob &a, const base_blob &b) { return a.Compare(b) > 0; }
     std::string GetHex() const;
     void SetHex(const char *psz);
     void SetHex(const std::string &str);

@@ -184,6 +184,12 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     return tmpl;
 }
 
+struct NumericallyLessTxHashComparator
+{
+public:
+    bool operator()(const CTransactionRef &a, const CTransactionRef &b) const { return a->GetHash() < b->GetHash(); }
+};
+
 std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn,
     bool blockstreamCoreCompatible,
     int64_t coinbaseSize)
@@ -227,6 +233,26 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         nLastBlockSize = nBlockSize;
         LOGA("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
             nBlockSigOps);
+
+        bool canonical = enableCanonicalTxOrder.Value();
+        if (IsNov152018Scheduled())
+        {
+            if (IsNov152018Enabled(chainparams.GetConsensus(), pindexPrev))
+            {
+                canonical = true;
+            }
+            else
+            {
+                canonical = false;
+            }
+        }
+
+        // sort tx if there are any and the feature is enabled
+        if (canonical && pblock->vtx.size() > 1)
+        {
+            const auto &start = pblock->vtx.begin() + 1;
+            std::sort(start, pblock->vtx.end(), NumericallyLessTxHashComparator());
+        }
 
         // Create coinbase transaction.
         pblock->vtx[0] =

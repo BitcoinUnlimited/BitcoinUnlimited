@@ -36,7 +36,7 @@ class MyTest (BitcoinTestFramework):
         # If not, the framework assumes this partition: (0,1) and (2,3)
         # For more complex partitions, you can't use the self.sync* member functions
         self.is_network_split=False
-        self.sync_all()
+        self.sync_blocks()
 
     def run_test (self):
 

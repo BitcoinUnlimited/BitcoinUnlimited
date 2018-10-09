@@ -259,6 +259,19 @@ def sync_blocks(rpc_connections, wait=1,verbose=1):
             break
         time.sleep(wait)
 
+def sync_blocks_to(height, rpc_connections, wait=1,verbose=1):
+    """
+    Wait until all passed nodes have the passed "height" block count
+    """
+    heights = [ height ]*len(rpc_connections)
+    while True:
+        counts = [ x.getblockcount() for x in rpc_connections ]
+        if verbose:
+            logging.info("sync blocks to %d: %s" % (height, str(counts)))
+        if counts == heights:
+            break
+        time.sleep(wait)
+
 def hub_is_running(node_num):
     """
     Check if hub is running
@@ -586,13 +599,41 @@ def wait_bitcoinds():
         bitcoind.wait(timeout=BITCOIND_PROC_WAIT_TIMEOUT)
     bitcoind_processes.clear()
 
-def connect_nodes(from_connection, node_num):
-    ip_port = "127.0.0.1:"+str(p2p_port(node_num))
+def connect_nodes(from_connection, node_num_or_str):
+    """Connect the passed node to another node specified either by node index or by ip address:port string
+    """
+    if type(node_num_or_str) is int:
+        ip_port = "127.0.0.1:"+str(p2p_port(node_num_or_str))
+    else:
+        ip_port = node_num_or_str
     from_connection.addnode(ip_port, "onetry")
     # poll until version handshake complete to avoid race conditions
     # with transaction relaying
     while any(peer['version'] == 0 for peer in from_connection.getpeerinfo()):
         time.sleep(0.1)
+
+def disconnect_nodes(from_connection, node_num_or_str):
+    """Disconnect a particular node from this one.  Provide the node index or its ip address:port as a string
+    """
+    if type(node_num_or_str) is int:
+        ip_port = "127.0.0.1:"+str(p2p_port(node_num_or_str))
+    else:
+        ip_port = node_num_or_str
+    from_connection.disconnectnode(ip_port)
+    try:
+        while from_connection.getpeerinfo(ip_port):
+            time.sleep(0.1)
+    except JSONRPCException as e:
+        pass # once connection is dropped, we'll get an exception
+
+def disconnect_all(node):
+    """Disconnect all peers from the passed node"""
+    peers = node.getpeerinfo()
+    for p in peers:
+        node.disconnectnode(p["addr"])
+    while len(node.getpeerinfo())!=0:
+        time.sleep(0.1)
+
 
 def connect_nodes_bi(nodes, a, b):
     connect_nodes(nodes[a], b)

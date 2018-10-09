@@ -565,7 +565,7 @@ void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight)
     }
 }
 
-void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache &inputs, CTxUndo &txundo, int nHeight)
+void SpendCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache &inputs, CTxUndo &txundo, int nHeight)
 {
     // mark inputs spent
     if (!tx.IsCoinBase())
@@ -577,6 +577,12 @@ void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCach
             inputs.SpendCoin(txin.prevout, &txundo.vprevout.back());
         }
     }
+}
+
+void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache &inputs, CTxUndo &txundo, int nHeight)
+{
+    // mark inputs spent
+    SpendCoins(tx, state, inputs, txundo, nHeight);
     // add outputs
     AddCoins(inputs, tx, nHeight);
 }
