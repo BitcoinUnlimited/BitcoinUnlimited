@@ -323,12 +323,12 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         tx.vout[0].nValue = 1 * CENT;
         tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         orphanpool.AddOrphanTx(MakeTransactionRef(tx), i);
     }
 
     {
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         orphanpool.LimitOrphanTxSize(50, 8900);
         BOOST_CHECK_EQUAL(orphanpool.mapOrphanTransactions.size(), 50);
         orphanpool.LimitOrphanTxSize(50, 6300);
@@ -351,7 +351,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         tx.vout[0].nValue = 1 * CENT;
         tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         orphanpool.AddOrphanTx(MakeTransactionRef(tx), i);
     }
 
@@ -369,7 +369,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
         SignSignature(keystore, txPrev, tx, 0);
 
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         orphanpool.AddOrphanTx(MakeTransactionRef(tx), i);
     }
 
@@ -394,7 +394,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         for (unsigned int j = 1; j < tx.vin.size(); j++)
             tx.vin[j].scriptSig = tx.vin[0].scriptSig;
 
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         // BU, we keep orphans up to the configured memory limit to help xthin compression so this should succeed
         // whereas it fails in other clients
         BOOST_CHECK(orphanpool.AddOrphanTx(MakeTransactionRef(tx), i));
@@ -402,7 +402,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
 
     // Test LimitOrphanTxSize() function: limit by number of txns
     {
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         orphanpool.LimitOrphanTxSize(40, 10000000);
         BOOST_CHECK_EQUAL(orphanpool.mapOrphanTransactions.size(), 40);
         orphanpool.LimitOrphanTxSize(10, 10000000);
@@ -414,7 +414,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
 
     // Test EraseOrphansByTime():
     {
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         int64_t nStartTime = GetTime();
         orphanpool.SetLastOrphanCheck(nStartTime);
         SetMockTime(nStartTime); // Overrides future calls to GetTime()

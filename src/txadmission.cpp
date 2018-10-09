@@ -387,7 +387,7 @@ void ThreadTxAdmission()
                     {
                         if (fMissingInputs)
                         {
-                            LOCK(orphanpool.cs); // WRITELOCK
+                            WRITELOCK(orphanpool.cs); // WRITELOCK
                             orphanpool.AddOrphanTx(tx, txd.nodeId);
 
                             // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
@@ -924,7 +924,7 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
 
     // Recursively process any orphan transactions that depended on this one
     {
-        LOCK(orphanpool.cs); // TODO READLOCK()
+        READLOCK(orphanpool.cs);
         std::set<NodeId> setMisbehaving;
         for (unsigned int i = 0; i < vWorkQueue.size(); i++)
         {
@@ -968,7 +968,7 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
     }
 
     {
-        LOCK(orphanpool.cs); // TODO WRITELOCK
+        WRITELOCK(orphanpool.cs);
         for (auto hash : vEraseQueue)
             orphanpool.EraseOrphanTx(hash);
         //  BU: Xtreme thinblocks - purge orphans that are too old

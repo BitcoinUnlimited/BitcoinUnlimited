@@ -162,7 +162,8 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Look for each transaction in our various pools and buffers.
     // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
     {
-        LOCK2(orphanpool.cs, cs_xval);
+        READLOCK(orphanpool.cs);
+        LOCK(cs_xval);
         if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
             return false;
     }
@@ -473,7 +474,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
     bool fMerkleRootCorrect = true;
     {
         // Do the orphans first before taking the mempool.cs lock, so that we maintain correct locking order.
-        LOCK(orphanpool.cs);
+        READLOCK(orphanpool.cs);
         for (auto &kv : orphanpool.mapOrphanTransactions)
         {
             uint64_t cheapHash = kv.first.GetCheapHash();
@@ -1545,7 +1546,7 @@ void RequestFailoverBlock(CNode *pfrom, uint256 blockHash)
 
         std::vector<uint256> vOrphanHashes;
         {
-            LOCK(orphanpool.cs);
+            READLOCK(orphanpool.cs);
             for (auto &mi : orphanpool.mapOrphanTransactions)
                 vOrphanHashes.emplace_back(mi.first);
         }
