@@ -354,7 +354,8 @@ std::string gbt_vb_name(const Consensus::DeploymentPos pos)
 }
 
 // Sets the version bits in a block
-static int32_t UtilMkBlockTmplVersionBits(int32_t version, std::set<std::string> setClientRules,
+static int32_t UtilMkBlockTmplVersionBits(int32_t version,
+    std::set<std::string> setClientRules,
     CBlockIndex *pindexPrev,
     UniValue *paRules,
     UniValue *pvbavailable)
