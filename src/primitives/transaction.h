@@ -175,7 +175,7 @@ private:
     /** Memory only. */
     const uint256 hash;
     void UpdateHash() const;
-    mutable size_t _nTxSize; // Serialized transaction size in bytes
+    mutable size_t nTxSize; // Serialized transaction size in bytes
 
 public:
     // Default transaction version.
@@ -235,10 +235,10 @@ public:
     // inputs must be known to compute value in.
 
     // Compute priority, given priority of inputs and (optionally) tx size
-    double ComputePriority(double dPriorityInputs, unsigned int nTxSize = 0) const;
+    double ComputePriority(double dPriorityInputs, unsigned int nSize = 0) const;
 
     // Compute modified tx size for priority calculation (optionally given tx size)
-    unsigned int CalculateModifiedSize(unsigned int nTxSize = 0) const;
+    unsigned int CalculateModifiedSize(unsigned int nSize = 0) const;
 
     bool IsCoinBase() const { return (vin.size() == 1 && vin[0].prevout.IsNull()); }
     friend bool operator==(const CTransaction &a, const CTransaction &b) { return a.hash == b.hash; }
@@ -246,7 +246,7 @@ public:
     std::string ToString() const;
 
     // Return the size of the transaction in bytes.
-    uint64_t GetTxSize() const;
+    size_t GetTxSize() const;
 };
 
 /** A mutable version of CTransaction. */

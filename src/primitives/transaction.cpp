@@ -63,15 +63,15 @@ CMutableTransaction::CMutableTransaction(const CTransaction &tx)
 
 uint256 CMutableTransaction::GetHash() const { return SerializeHash(*this); }
 void CTransaction::UpdateHash() const { *const_cast<uint256 *>(&hash) = SerializeHash(*this); }
-CTransaction::CTransaction() : _nTxSize(0), nVersion(CTransaction::CURRENT_VERSION), vin(), vout(), nLockTime(0) {}
+CTransaction::CTransaction() : nTxSize(0), nVersion(CTransaction::CURRENT_VERSION), vin(), vout(), nLockTime(0) {}
 CTransaction::CTransaction(const CMutableTransaction &tx)
-    : _nTxSize(0), nVersion(tx.nVersion), vin(tx.vin), vout(tx.vout), nLockTime(tx.nLockTime)
+    : nTxSize(0), nVersion(tx.nVersion), vin(tx.vin), vout(tx.vout), nLockTime(tx.nLockTime)
 {
     UpdateHash();
 }
 
 CTransaction::CTransaction(CMutableTransaction &&tx)
-    : _nTxSize(0), nVersion(tx.nVersion), vin(std::move(tx.vin)), vout(std::move(tx.vout)), nLockTime(tx.nLockTime)
+    : nTxSize(0), nVersion(tx.nVersion), vin(std::move(tx.vin)), vout(std::move(tx.vout)), nLockTime(tx.nLockTime)
 {
     UpdateHash();
 }
@@ -109,31 +109,31 @@ CAmount CTransaction::GetValueOut() const
     return nValueOut;
 }
 
-double CTransaction::ComputePriority(double dPriorityInputs, unsigned int nTxSize) const
+double CTransaction::ComputePriority(double dPriorityInputs, unsigned int nSize) const
 {
-    nTxSize = CalculateModifiedSize(nTxSize);
-    if (nTxSize == 0)
+    nSize = CalculateModifiedSize(nSize);
+    if (nSize == 0)
         return 0.0;
 
-    return dPriorityInputs / nTxSize;
+    return dPriorityInputs / nSize;
 }
 
-unsigned int CTransaction::CalculateModifiedSize(unsigned int nTxSize) const
+unsigned int CTransaction::CalculateModifiedSize(unsigned int nSize) const
 {
     // In order to avoid disincentivizing cleaning up the UTXO set we don't count
     // the constant overhead for each txin and up to 110 bytes of scriptSig (which
     // is enough to cover a compressed pubkey p2sh redemption) for priority.
     // Providing any more cleanup incentive than making additional inputs free would
     // risk encouraging people to create junk outputs to redeem later.
-    if (nTxSize == 0)
-        nTxSize = GetTxSize();
+    if (nSize == 0)
+        nSize = GetTxSize();
     for (std::vector<CTxIn>::const_iterator it(vin.begin()); it != vin.end(); ++it)
     {
         unsigned int offset = 41U + std::min(110U, (unsigned int)it->scriptSig.size());
-        if (nTxSize > offset)
-            nTxSize -= offset;
+        if (nSize > offset)
+            nSize -= offset;
     }
-    return nTxSize;
+    return nSize;
 }
 
 std::string CTransaction::ToString() const
@@ -150,7 +150,7 @@ std::string CTransaction::ToString() const
 
 size_t CTransaction::GetTxSize() const
 { 
-    if (_nTxSize == 0)
-        _nTxSize = ::GetSerializeSize(*this, SER_NETWORK, CTransaction::CURRENT_VERSION);
-    return _nTxSize;
+    if (nTxSize == 0)
+        nTxSize = ::GetSerializeSize(*this, SER_NETWORK, CTransaction::CURRENT_VERSION);
+    return nTxSize;
 }
