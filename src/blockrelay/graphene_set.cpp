@@ -56,11 +56,11 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
 
     // Construct Bloom filter
     pSetFilter = new CBloomFilter(
-        nItems, fpr, insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
+    static_cast<unsigned int>(nItems), fpr, insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
     LOG(GRAPHENE, "fp rate: %f Num elements in bloom filter: %d\n", fpr, nItems);
 
     // Construct IBLT
-    uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
+    uint64_t nIbltCells = (uint64_t) std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
     pSetIblt = new CIblt(nIbltCells);
     std::map<uint64_t, uint256> mapCheapHashes;
 
@@ -86,12 +86,12 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
 
         mapCheapHashes.clear();
 
-        std::vector<uint64_t> cheapHashes;
+        std::vector<uint64_t> cheapHashes(_itemHashes.size());
         for (const uint256 &itemHash : _itemHashes)
             cheapHashes.push_back(mapItemHashes[itemHash]);
 
         std::vector<uint64_t> sortedIdxs = ArgSort(cheapHashes);
-        uint8_t nBits = ceil(log2(cheapHashes.size()));
+        auto nBits = static_cast<uint8_t>(ceil(log2(cheapHashes.size())));
 
         encodedRank = CGrapheneSet::EncodeRank(sortedIdxs, nBits);
     }
@@ -132,10 +132,10 @@ double CGrapheneSet::OptimalSymDiff(uint64_t nBlockTxs, uint64_t nReceiverPoolTx
         uint64_t a) { return floor(FILTER_CELL_SIZE * (-1 / LN2SQUARED * nBlockTxs * log(fpr(a)) / 8)); };
 
     auto L = [](uint64_t a) {
-        uint8_t n_iblt_hash = CIblt::OptimalNHash(a);
+        auto n_iblt_hash = static_cast<uint8_t>(CIblt::OptimalNHash(a));
         float iblt_overhead = CIblt::OptimalOverhead(a);
-        uint64_t padded_cells = (int)(iblt_overhead * a);
-        uint64_t cells = n_iblt_hash * int(ceil(padded_cells / float(n_iblt_hash)));
+        auto padded_cells = (uint64_t)(iblt_overhead * a);
+        uint64_t cells = n_iblt_hash * (uint64_t)int(ceil(padded_cells / float(n_iblt_hash)));
 
         return IBLT_CELL_SIZE * cells;
     };
@@ -229,7 +229,7 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(std::set<uint64_t> &receiverSet, c
         return receiverSetItems;
 
     // Place items in order
-    uint8_t nBits = ceil(log2(receiverSetItems.size()));
+    auto nBits = static_cast<uint8_t>(ceil(log2(receiverSetItems.size())));
     std::vector<uint64_t> itemRank = CGrapheneSet::DecodeRank(encodedRank, receiverSetItems.size(), nBits);
     std::sort(receiverSetItems.begin(), receiverSetItems.end(), [](uint64_t i1, uint64_t i2) { return i1 < i2; });
     std::vector<uint64_t> orderedSetItems(itemRank.size(), 0);
@@ -242,7 +242,7 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(std::set<uint64_t> &receiverSet, c
 std::vector<unsigned char> CGrapheneSet::EncodeRank(std::vector<uint64_t> items, uint16_t nBitsPerItem)
 {
     size_t nItems = items.size();
-    size_t nEncodedWords = int(ceil(nBitsPerItem * nItems / float(WORD_BITS)));
+    auto nEncodedWords = static_cast<size_t>(int(ceil(nBitsPerItem * nItems / float(WORD_BITS))));
     std::vector<unsigned char> encoded(nEncodedWords, 0);
 
     // form boolean array (low-order first)
@@ -254,7 +254,7 @@ std::vector<unsigned char> CGrapheneSet::EncodeRank(std::vector<uint64_t> items,
         assert(ceil(log2(item)) <= nBitsPerItem);
 
         for (uint16_t j = 0; j < nBitsPerItem; j++)
-            bits[j + i * nBitsPerItem] = (item >> j) & 1;
+            bits[j + i * nBitsPerItem] = static_cast<bool>((item >> j) & 1);
     }
 
     // encode boolean array
@@ -270,7 +270,7 @@ std::vector<unsigned char> CGrapheneSet::EncodeRank(std::vector<uint64_t> items,
 
 std::vector<uint64_t> CGrapheneSet::DecodeRank(std::vector<unsigned char> encoded, size_t nItems, uint16_t nBitsPerItem)
 {
-    size_t nEncodedWords = int(ceil(nBitsPerItem * nItems / float(WORD_BITS)));
+    auto nEncodedWords = static_cast<size_t>(int(ceil(nBitsPerItem * nItems / float(WORD_BITS))));
 
     // decode into boolean array (low-order first)
     std::unique_ptr<bool[]> bits(new bool[nEncodedWords * WORD_BITS]);
@@ -280,7 +280,7 @@ std::vector<uint64_t> CGrapheneSet::DecodeRank(std::vector<unsigned char> encode
         unsigned char word = encoded[i];
 
         for (size_t j = 0; j < WORD_BITS; j++)
-            bits[j + i * WORD_BITS] = (word >> j) & 1;
+            bits[j + i * WORD_BITS] = static_cast<bool>((word >> j) & 1);
     }
 
     // convert boolean to item array
