@@ -158,15 +158,13 @@ void UpdatePreferredDownload(CNode *node, CNodeState *state)
 void InitializeNode(const CNode *pnode)
 {
     // Add an entry to the nodestate map
-    LOCK(cs_main);
-    mapNodeState.emplace_hint(mapNodeState.end(), std::piecewise_construct, std::forward_as_tuple(pnode->GetId()),
-        std::forward_as_tuple(pnode->addr, pnode->addrName));
+    nodestate.InitializeNodeState(pnode);
 }
 
 void FinalizeNode(NodeId nodeid)
 {
     LOCK(cs_main);
-    CNodeState *state = State(nodeid);
+    CNodeState *state = nodestate.State(nodeid);
     DbgAssert(state != nullptr, return );
 
     if (state->fSyncStarted)
@@ -184,9 +182,9 @@ void FinalizeNode(NodeId nodeid)
     }
     nPreferredDownload.fetch_sub(state->fPreferredDownload);
 
-    mapNodeState.erase(nodeid);
+    nodestate.RemoveNodeState(nodeid);
     requester.RemoveNodeState(nodeid);
-    if (mapNodeState.empty())
+    if (nodestate.Empty())
     {
         // Do a consistency check after the last peer is removed.  Force consistent state if production code
         DbgAssert(requester.MapBlocksInFlightEmpty(), requester.MapBlocksInFlightClear());
@@ -221,7 +219,7 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)
         return false;
 
     LOCK(cs_main);
-    CNodeState *state = State(nodeid);
+    CNodeState *state = nodestate.State(nodeid);
     DbgAssert(state != nullptr, return false);
 
     stats.nMisbehavior = node->nMisbehavior;
@@ -1108,7 +1106,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->fClient = !(pfrom->nServices & NODE_NETWORK);
 
         // Potentially mark this peer as a preferred download peer.
-        UpdatePreferredDownload(pfrom, State(pfrom->GetId()));
+        UpdatePreferredDownload(pfrom, nodestate.State(pfrom->GetId()));
 
         // Send VERACK handshake message
         pfrom->fVerackSent = true;
@@ -1337,7 +1335,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::SENDHEADERS)
     {
         LOCK(cs_main);
-        State(pfrom->GetId())->fPreferHeaders = true;
+        nodestate.State(pfrom->GetId())->fPreferHeaders = true;
     }
 
     // Processing this message type for statistics purposes only, BU currently doesn't support CB protocol
@@ -1561,8 +1559,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         vRecv >> locator >> hashStop;
 
         LOCK(cs_main);
-        CNodeState *nodestate = State(pfrom->GetId());
-        CBlockIndex *pindex = NULL;
+        CNodeState *state = nodestate.State(pfrom->GetId());
+        CBlockIndex *pindex = nullptr;
         if (locator.IsNull())
         {
             // If locator is null, return the hashStop block
@@ -1594,7 +1592,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // if our peer has chainActive.Tip() (and thus we are sending an empty
         // headers message). In both cases it's safe to update
         // pindexBestHeaderSent to be our tip.
-        nodestate->pindexBestHeaderSent = pindex ? pindex : chainActive.Tip();
+        state->pindexBestHeaderSent = pindex ? pindex : chainActive.Tip();
         pfrom->PushMessage(NetMsgType::HEADERS, vHeaders);
     }
 
@@ -1791,7 +1789,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexLast), uint256());
 
             {
-                CNodeState *state = State(pfrom->GetId());
+                CNodeState *state = nodestate.State(pfrom->GetId());
                 DbgAssert(state != nullptr, );
                 if (state)
                     state->nSyncStartTime = GetTime(); // reset the time because more headers needed
@@ -1820,7 +1818,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     if (!pnode->fClient && pnode != pfrom)
                     {
                         LOCK(cs_main);
-                        CNodeState *state = State(pfrom->GetId());
+                        CNodeState *state = nodestate.State(pfrom->GetId());
                         DbgAssert(state != nullptr, ); // do not return, we need to release refs later.
                         if (state == nullptr)
                             continue;
@@ -1844,26 +1842,26 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
 
         bool fCanDirectFetch = CanDirectFetch(chainparams.GetConsensus());
-        CNodeState *nodestate = State(pfrom->GetId());
-        DbgAssert(nodestate != nullptr, return false);
+        CNodeState *state = nodestate.State(pfrom->GetId());
+        DbgAssert(state != nullptr, return false);
 
         // During the initial peer handshake we must receive the initial headers which should be greater
         // than or equal to our block height at the time of requesting GETHEADERS. This is because the peer has
         // advertised a height >= to our own. Furthermore, because the headers max returned is as much as 2000 this
         // could not be a mainnet re-org.
-        if (!nodestate->fFirstHeadersReceived)
+        if (!state->fFirstHeadersReceived)
         {
             // We want to make sure that the peer doesn't just send us any old valid header. The block height of the
             // last header they send us should be equal to our block height at the time we made the GETHEADERS request.
-            if (pindexLast && nodestate->nFirstHeadersExpectedHeight <= pindexLast->nHeight)
+            if (pindexLast && state->nFirstHeadersExpectedHeight <= pindexLast->nHeight)
             {
-                nodestate->fFirstHeadersReceived = true;
+                state->fFirstHeadersReceived = true;
                 LOG(NET, "Initial headers received for peer=%s\n", pfrom->GetLogName());
             }
 
             // Allow for very large reorgs (> 2000 blocks) on the nol test chain or other test net.
             if (Params().NetworkIDString() != "main" && Params().NetworkIDString() != "regtest")
-                nodestate->fFirstHeadersReceived = true;
+                state->fFirstHeadersReceived = true;
         }
 
         // update the syncd status.  This should come before we make calls to requester.AskFor().
@@ -2110,7 +2108,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         {
             LOCK(cs_main);
-            CNodeState *state = State(pfrom->GetId());
+            CNodeState *state = nodestate.State(pfrom->GetId());
             DbgAssert(state != nullptr, );
             if (state)
                 state->nSyncStartTime = GetTime(); // reset the getheaders time because block can consume all bandwidth
@@ -2714,7 +2712,7 @@ bool SendMessages(CNode *pto)
                 pto->PushMessage(NetMsgType::ADDR, vAddr);
         }
 
-        CNodeState *state = State(pto->GetId());
+        CNodeState *state = nodestate.State(pto->GetId());
         if (state == nullptr)
         {
             return true;

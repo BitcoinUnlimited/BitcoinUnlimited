@@ -515,7 +515,7 @@ void UnloadBlockIndex()
     requester.MapBlocksInFlightClear();
     setDirtyBlockIndex.clear();
     setDirtyFileInfo.clear();
-    mapNodeState.clear();
+    nodestate.Clear();
     versionbitscache.Clear();
     for (int b = 0; b < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; b++)
     {
