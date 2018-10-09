@@ -1412,7 +1412,7 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
         {
             if (tx->GetTxSize() < MIN_TX_SIZE)
                 return state.DoS(10, error("%s: contains transactions that are too small", __func__), REJECT_INVALID,
-                    "bad-txns-undersize");
+                    "txn-undersize");
         }
     }
 
@@ -1753,7 +1753,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
 
     // The Nov 15, 2018 HF enable sig push only and atrt enforcing also
     // clean stack rules (see  BIP 62 for more details)
-    if (IsNov152018Enabled(consensusparams, pindex->pprev))
+    if (IsNov152018Scheduled() && IsNov152018Enabled(consensusparams, pindex->pprev))
     {
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
         flags |= SCRIPT_VERIFY_CLEANSTACK;

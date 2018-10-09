@@ -571,7 +571,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     if (IsNov152018Scheduled() && IsNov152018Enabled(chainparams.GetConsensus(), chainActive.Tip()))
     {
         if (tx->GetTxSize() < MIN_TX_SIZE)
-            return state.DoS(0, false, REJECT_NONSTANDARD, "txn-undersize");
+            return state.DoS(0, false, REJECT_INVALID, "txn-undersize");
     }
 
     // is it already in the memory pool?
