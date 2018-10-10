@@ -92,14 +92,13 @@ enum
     // Signature(s) must be empty vector if an CHECK(MULTI)SIG operation failed
     SCRIPT_VERIFY_NULLFAIL = (1U << 14),
 
+    // Public keys in scripts must be compressed
+    //
+    SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE = (1U << 15),
 
     // Do we accept signature using SIGHASH_FORKID
     //
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
-
-    // Public keys in scripts must be compressed
-    //
-    SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE = (1U << 15),
 
     // Enable Replay protection.
     // This is just a placeholder, BU does not implement automatic reply protections
@@ -212,7 +211,7 @@ bool VerifyScript(const CScript &scriptSig,
     ScriptError *error = NULL,
     unsigned char *sighashtype = NULL);
 
-// string prefixed to data when validating signed messages  via RPC call.  This ensures
+// string prefixed to data when validating signed messages via RPC call.  This ensures
 // that the signature was intended for use on this blockchain.
 extern const std::string strMessageMagic;
 
