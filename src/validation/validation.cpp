@@ -1406,6 +1406,14 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
             return state.DoS(
                 10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
         }
+
+        // Make sure tx size is acceptable after Nov 15, 2018 fork
+        if (IsNov152018Scheduled() && IsNov152018Enabled(consensusParams, chainActive.Tip()))
+        {
+            if (tx->GetTxSize() < MIN_TX_SIZE)
+                return state.DoS(10, error("%s: contains transactions that are too small", __func__), REJECT_INVALID,
+                    "txn-undersize");
+        }
     }
 
     // Enforce block nVersion=2 rule that the coinbase starts with serialized block height
@@ -1741,6 +1749,14 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     {
         flags |= SCRIPT_VERIFY_LOW_S;
         flags |= SCRIPT_VERIFY_NULLFAIL;
+    }
+
+    // The Nov 15, 2018 HF enable sig push only and atrt enforcing also
+    // clean stack rules (see  BIP 62 for more details)
+    if (IsNov152018Scheduled() && IsNov152018Enabled(consensusparams, pindex->pprev))
+    {
+        flags |= SCRIPT_VERIFY_SIGPUSHONLY;
+        flags |= SCRIPT_VERIFY_CLEANSTACK;
     }
 
     return flags;
