@@ -1757,6 +1757,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     {
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
         flags |= SCRIPT_VERIFY_CLEANSTACK;
+        flags |= SCRIPT_ENABLE_CHECKDATASIG;
     }
 
     return flags;
