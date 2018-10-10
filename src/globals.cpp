@@ -41,6 +41,7 @@
 #include "utilstrencodings.h"
 #include "validationinterface.h"
 #include "version.h"
+#include "versionbits.h"
 
 #include <atomic>
 #include <boost/lexical_cast.hpp>
@@ -233,6 +234,12 @@ CThreadCorral txProcessingCorral;
 
 
 // Configuration Tweaks
+
+std::string bip135Vote;
+CTweakRef<std::string> bip135VoteTweak("mining.vote",
+    "Comma separated list of features to vote for in a block's nVersion field (as per BIP135)",
+    &bip135Vote,
+    &Bip135VoteValidator);
 
 CTweak<uint64_t> pruneIntervalTweak("prune.pruneInterval",
     "How much block data (in MiB) is written to disk before trying to prune our block storage",

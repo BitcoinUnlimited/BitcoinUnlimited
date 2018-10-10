@@ -97,6 +97,23 @@ A python based test of these interfaces is located at qa/rpc-tests/miningtest.py
 Exactly the same as ***submitblock***.  None means successful, error string or JSONRPCException if there is a problem.
 
 
+BIP135-based feature voting
+--------------------------------------------------
+
+BIP135 is an enhancement of BIP9, allowing miners to vote for features by setting certain bits in the version field of solved blocks.
+The definition of the meaning of the bits in the version field changes and is found in config/forks.csv.  You may define your own bits, however
+such a definition is not valuable unless the vast majority of miners agree to honor those bit definitions.
+Detailed information is available in doc/bip135-genvoting.md.
+
+Miners may enable voting for certain features via the "mining.vote" configuration parameter.  Provide a comma separate list of feature names.
+For example, if forks.csv defines three features "f0", "f1" and "f2", you might vote for "f1" and "f2" via the following configuration setting:
+
+```
+mining.vote=f0,f1
+```
+
+This parameter can be accessed or changed at any time via the "get" and "set" RPC calls.
+
 Setting your excessive block size and accept depth
 --------------------------------------------------
 

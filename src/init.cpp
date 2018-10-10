@@ -943,6 +943,11 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
             return InitError(strprintf(_("Deployment configuration file '%s' not found"), ForksCsvFile));
         }
     }
+
+    // assign votes based on the initial configuration of mining.vote
+    ClearBip135Votes();
+    AssignBip135Votes(bip135Vote, 1);
+
     // bip135 end
 
     // Setup the number of p2p message processing threads used to process incoming messages

@@ -180,6 +180,7 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
+    'bip135basic',
     'ctor',
     'nov152018_forkactivation',
     'blockstorage',

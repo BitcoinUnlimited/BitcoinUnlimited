@@ -203,22 +203,26 @@ std::string SubverValidator(const std::string &value, std::string *item, bool va
     return std::string();
 }
 
+std::string Bip135VoteValidator(const std::string &value, std::string *item, bool validate)
+{
+    if (validate)
+    {
+        bool categoriesValid = AssignBip135Votes(value, -1);
+        if (!categoriesValid)
+            return std::string("Invalid/unknown features specified");
+    }
+    else // Do what is needed to use the new value already stored in item
+    {
+        ClearBip135Votes();
+        AssignBip135Votes(*item, 1);
+        SignalBlockTemplateChange();
+    }
+    return std::string();
+}
+
 
 // Push all transactions in the mempool to another node
 void UnlimitedPushTxns(CNode *dest);
-
-int32_t UnlimitedComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Params &params, uint32_t nTime)
-{
-    if (blockVersion != 0) // BU: allow override of block version
-    {
-        return blockVersion;
-    }
-
-    int32_t nVersion = ComputeBlockVersion(pindexPrev, params);
-
-    return nVersion;
-}
-
 
 void UpdateSendStats(CNode *pfrom, const char *strCommand, int msgSize, int64_t nTime)
 {

@@ -391,6 +391,8 @@ static int32_t UtilMkBlockTmplVersionBits(int32_t version,
                     // If the client doesn't support this, don't indicate it in the [default] version
                     version &= ~VersionBitsMask(consensusParams, pos);
                 }
+                if (vbinfo.myVote == true) // let the client vote for this feature
+                    version |= VersionBitsMask(consensusParams, pos);
             }
             break;
         }
@@ -530,6 +532,14 @@ returns JSON if pblockOut is NULL
 pblockOut -A copy of the block if not NULL
 */
 
+bool forceTemplateRecalc GUARDED_BY(cs_main) = false;
+// force block template recalculation
+void SignalBlockTemplateChange()
+{
+    LOCK(cs_main);
+
+    forceTemplateRecalc = true;
+}
 UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *pblockOut)
 {
     LOCK(cs_main);
@@ -668,9 +678,10 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
     static CBlockIndex *pindexPrev = NULL;
     static int64_t nStart = 0;
     static std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
-    if (pindexPrev != chainActive.Tip() ||
+    if (pindexPrev != chainActive.Tip() || forceTemplateRecalc ||
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5))
     {
+        forceTemplateRecalc = false;
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
         pindexPrev = NULL;
 
