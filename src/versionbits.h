@@ -37,7 +37,7 @@ typedef std::map<const CBlockIndex *, ThresholdState> ThresholdConditionCache;
 struct ForkDeploymentInfo
 {
     /** Deployment name */
-    char *name; // bip135: removed const to allow update from CSV
+    const char *name;
     /** Whether GBT clients can safely ignore this rule in simplified usage */
     bool gbt_force;
 };
