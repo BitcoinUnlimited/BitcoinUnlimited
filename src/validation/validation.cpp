@@ -83,6 +83,10 @@ std::atomic<int64_t> nTimeBestReceived{0};
 CBlockIndex *pindexBestForkTip = nullptr;
 CBlockIndex *pindexBestForkBase = nullptr;
 
+std::set<uint256> setOrphanHeaders;
+std::map<uint256, CBlock> mapOrphanBlocks;
+std::multimap<uint256, CBlock> mapOrphanBlocksByPrev;
+
 extern uint64_t nBlockSequenceId;
 extern bool fCheckForPruning;
 extern std::map<uint256, NodeId> mapBlockSource;
@@ -196,9 +200,11 @@ bool AcceptBlockHeader(const CBlockHeader &block,
         CBlockIndex *pindexPrev = NULL;
         BlockMap::iterator mi = mapBlockIndex.find(block.hashPrevBlock);
         if (mi == mapBlockIndex.end())
+        {
             return state.DoS(10, error("%s: previous block %s not found while accepting %s", __func__,
                                      block.hashPrevBlock.ToString(), hash.ToString()),
                 0, "bad-prevblk");
+        }
         pindexPrev = (*mi).second;
         assert(pindexPrev);
         if (pindexPrev->nStatus & BLOCK_FAILED_MASK)
@@ -3387,6 +3393,28 @@ bool ActivateBestChain(CValidationState &returnedState,
     return result;
 }
 
+void ProcessOrphanBlocks(uint256 besthash, CValidationState &state, const CChainParams &chainparams)
+{
+    std::vector<uint256> blocksToProcess;
+    blocksToProcess.push_back(besthash);
+    for (unsigned int i = 0; i < blocksToProcess.size(); i++)
+    {
+        uint256 hashPrev = blocksToProcess[i];
+        for (std::multimap<uint256, CBlock>::iterator mi = mapOrphanBlocksByPrev.lower_bound(hashPrev);
+             mi != mapOrphanBlocksByPrev.upper_bound(hashPrev); ++mi)
+        {
+            CBlock pblockOrphan = (*mi).second;
+            CBlockIndex *pindex = nullptr;
+            if (AcceptBlock(pblockOrphan, state, chainparams, &pindex, true, nullptr))
+            {
+                blocksToProcess.push_back(pblockOrphan.GetHash());
+            }
+            mapOrphanBlocks.erase(pblockOrphan.GetHash());
+        }
+        mapOrphanBlocksByPrev.erase(hashPrev);
+    }
+}
+
 bool ProcessNewBlock(CValidationState &state,
     const CChainParams &chainparams,
     CNode *pfrom,
@@ -3430,7 +3458,7 @@ bool ProcessNewBlock(CValidationState &state,
         }
 
         // Store to disk
-        CBlockIndex *pindex = NULL;
+        CBlockIndex *pindex = nullptr;
         bool ret = AcceptBlock(*pblock, state, chainparams, &pindex, fRequested, dbp);
         if (pindex && pfrom)
         {
@@ -3445,10 +3473,20 @@ bool ProcessNewBlock(CValidationState &state,
 
         if (!ret)
         {
-            // BU TODO: if block comes out of order (before its parent) this will happen.  We should cache the block
-            // until the parents arrive.
+            arith_uint256 currentWork = chainActive.Tip()->nChainWork;
+            arith_uint256 nextPossibleWork = currentWork + GetBlockProof(*pblock);
+            // cap work change at 10% variance
+            if (mapOrphanBlocks.count(hash) == 0 && nextPossibleWork > currentWork * 0.9 &&
+                nextPossibleWork < currentWork * 1.1)
+            {
+                mapOrphanBlocks.insert(std::make_pair(hash, *pblock));
+                mapOrphanBlocksByPrev.insert(std::make_pair(pblock->hashPrevBlock, *pblock));
+                return true;
+            }
             return error("%s: AcceptBlock FAILED", __func__);
         }
+        // try to process any blocks that depend on this one
+        ProcessOrphanBlocks(hash, state, chainparams);
     }
     if (!ActivateBestChain(state, chainparams, pblock, fParallel))
     {

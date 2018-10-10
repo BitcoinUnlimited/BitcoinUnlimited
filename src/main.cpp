@@ -751,13 +751,15 @@ std::string GetWarnings(const std::string &strFor)
 // Messages
 //
 
+extern std::map<uint256, CBlock> mapOrphanBlocks;
+
 bool AlreadyHaveBlock(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
 {
     // The Request Manager functionality requires that we return true only when we actually have received
     // the block and not when we have received the header only.  Otherwise the request manager may not
     // be able to update its block source in order to make re-requests.
     BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
-    if (mi == mapBlockIndex.end())
+    if (mi == mapBlockIndex.end() && mapOrphanBlocks.count(inv.hash) == 0)
         return false;
     if (!(mi->second->nStatus & BLOCK_HAVE_DATA))
         return false;
