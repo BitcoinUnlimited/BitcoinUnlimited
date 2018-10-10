@@ -35,6 +35,7 @@
 #include "timedata.h"
 #include "tinyformat.h"
 #include "tweak.h"
+#include "txadmission.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "ui_interface.h"
@@ -1740,7 +1741,6 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
     UniValue ret(UniValue::VOBJ);
     CMiningCandidate candid;
     int64_t coinbaseSize = -1; // If -1 then not used to set coinbase size
-    LOCK(cs_main);
 
     if (fHelp || params.size() > 1)
     {
@@ -2059,6 +2059,9 @@ extern std::map<std::pair<void *, void *>, LockStack> lockorders;
 extern std::vector<std::string> vUseDNSSeeds;
 extern std::list<CNode *> vNodesDisconnected;
 extern std::set<CNetAddr> setservAddNodeAddresses;
+extern std::map<uint256, CTxCommitData> txCommitQ;
+extern std::queue<CTxInputData> txDeferQ;
+extern std::queue<CTxInputData> txInQ;
 extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
@@ -2117,6 +2120,10 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.push_back(Pair("xpeditedBlk", (uint64_t)nExpeditedBlocks));
     ret.push_back(Pair("xpeditedBlkUp", (uint64_t)nExpeditedUpstream));
     ret.push_back(Pair("xpeditedTxn", (uint64_t)nExpeditedTxs));
+
+    ret.push_back(Pair("txCommitQ", (uint64_t)txCommitQ.size()));
+    ret.push_back(Pair("txInQ", (uint64_t)txInQ.size()));
+    ret.push_back(Pair("txDeferQ", (uint64_t)txDeferQ.size()));
 
 #ifdef DEBUG_LOCKORDER
     ret.push_back(Pair("lockorders", (uint64_t)lockorders.size()));

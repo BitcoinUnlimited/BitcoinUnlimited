@@ -690,10 +690,8 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
         if (coinbaseScript->reserveScript.empty())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
 
-        {
-            TxAdmissionPause lock; // should be able to relax this later and just flush any pending tx
-            pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript, coinbaseSize);
-        }
+
+        pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript, coinbaseSize);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -857,12 +855,6 @@ UniValue SubmitBlock(CBlock &block)
     submitblock_StateCatcher sc(block.GetHash());
     LOG(RPC, "Received block %s via RPC.\n", block.GetHash().ToString());
     RegisterValidationInterface(&sc);
-
-
-    // We take a cs_main lock here even though it will also be aquired in ProcessNewBlock.  We want
-    // to make sure we give priority to our own blocks.  This is in order to prevent any other Parallel
-    // Blocks to validate when we've just mined one of our own blocks.
-    LOCK(cs_main);
 
     // In we are mining our own block or not running in parallel for any reason
     // we must terminate any block validation threads that are currently running,

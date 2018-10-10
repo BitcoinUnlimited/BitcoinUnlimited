@@ -2829,33 +2829,11 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
         }
     }
 
-    // Resurrect mempool transactions from the disconnected block but do not do this step if we are
-    // rolling back the chain using the "rollbackchain" rpc command.
-    if (!fRollBack)
-    {
-        std::vector<uint256> vHashUpdate;
-        for (const auto &ptx : block.vtx)
-        {
-            // ignore validation errors in resurrected transactions
-            std::list<CTransactionRef> removed;
-            CValidationState stateDummy;
-            if (ptx->IsCoinBase() ||
-                !AcceptToMemoryPool(mempool, stateDummy, ptx, AreFreeTxnsDisallowed(), nullptr, true))
-            {
-                mempool.removeRecursive(*ptx, removed);
-            }
-            else if (mempool.exists(ptx->GetHash()))
-            {
-                vHashUpdate.push_back(ptx->GetHash());
-            }
-        }
-        // AcceptToMemoryPool/addUnchecked all assume that new mempool entries have
-        // no in-mempool children, which is generally not true when adding
-        // previously-confirmed transactions back to the mempool.
-        // UpdateTransactionsFromBlock finds descendants of any transactions in this
-        // block that were added back and cleans up the mempool state.
-        mempool.UpdateTransactionsFromBlock(vHashUpdate);
-    }
+    // these bloom filters stop us from doing duplicate work on tx we already know about.
+    // but since we rewound, we need to do this duplicate work -- clear them so tx we have already processed
+    // can be processed again.
+    txRecentlyInBlock.reset();
+    recentRejects.reset();
 
     // Update chainActive and related variables.
     UpdateTip(pindexDelete->pprev);
@@ -2864,6 +2842,24 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     for (const auto &ptx : block.vtx)
     {
         SyncWithWallets(ptx, nullptr, -1);
+    }
+
+    // Resurrect mempool transactions from the disconnected block but do not do this step if we are
+    // rolling back the chain using the "rollbackchain" rpc command.
+    if (!fRollBack)
+    {
+        for (const auto &ptx : block.vtx)
+        {
+            if (!ptx->IsCoinBase())
+            {
+                CTxInputData txd;
+                txd.tx = ptx;
+                txd.nodeId = -1;
+                txd.nodeName = "rollback";
+                txd.whitelisted = false;
+                EnqueueTxForAdmission(txd);
+            }
+        }
     }
 
     return true;
