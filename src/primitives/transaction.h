@@ -13,6 +13,7 @@
 #include "tweak.h"
 #include "uint256.h"
 
+#include <atomic>
 #include <memory>
 
 extern CTweak<unsigned int> nDustThreshold;
@@ -175,7 +176,8 @@ private:
     /** Memory only. */
     const uint256 hash;
     void UpdateHash() const;
-    mutable size_t nTxSize; // Serialized transaction size in bytes
+    mutable std::atomic<size_t> nTxSize; // Serialized transaction size in bytes.
+
 
 public:
     // Default transaction version.
@@ -204,6 +206,7 @@ public:
     CTransaction(const CMutableTransaction &tx);
     CTransaction(CMutableTransaction &&tx);
 
+    CTransaction(const CTransaction &tx);
     CTransaction &operator=(const CTransaction &tx);
 
     ADD_SERIALIZE_METHODS;
