@@ -325,8 +325,8 @@ void CommitTxToMempool()
 
 void ThreadTxAdmission()
 {
-    // Process at least this many transactions before letting the commit thread take over
-    const int minTxPerRound = 200;
+    // Process at most this many transactions before letting the commit thread take over
+    const int maxTxPerRound = 200;
 
     while (!ShutdownRequested())
     {
@@ -352,19 +352,22 @@ void ThreadTxAdmission()
         {
             CORRAL(txProcessingCorral, CORRAL_TX_PROCESSING);
 
-            for (unsigned int txPerRoundCount = 0; txPerRoundCount < minTxPerRound; txPerRoundCount++)
+            for (unsigned int txPerRoundCount = 0; txPerRoundCount < maxTxPerRound; txPerRoundCount++)
             {
-                { // tx must be popped within the TX_PROCESSING corral or the state break between processing
-                    // and commitment will not be clean
+                // tx must be popped within the TX_PROCESSING corral or the state break between processing
+                // and commitment will not be clean
+                {
                     CCriticalBlock lock(csTxInQ, "csTxInQ", __FILE__, __LINE__);
                     if (txInQ.empty())
                     {
                         // speed up tx chunk processing when there is nothing else to do
                         if (acceptedSomething)
                             cvCommitQ.notify_all();
-                        continue; // abort back into wait loop if another thread got my tx
+                        break;
                     }
-                    txd = txInQ.front(); // make copy so I can pop & release
+
+                    // Make a copy so we can pop and release
+                    txd = txInQ.front();
                     txInQ.pop();
                 }
 
