@@ -75,14 +75,12 @@ static const bool DEFAULT_UPNP = USE_UPNP;
 #else
 static const bool DEFAULT_UPNP = false;
 #endif
-/** The maximum number of entries in mapAskFor */
-static const size_t MAPASKFOR_MAX_SZ = MAX_INV_SZ;
-/** The maximum number of entries in setAskFor (larger due to getdata latency)*/
-static const size_t SETASKFOR_MAX_SZ = 2 * MAX_INV_SZ;
 /** The maximum number of peer connections to maintain. */
 static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
-/** BU: The maximum numer of outbound peer connections */
+/** BU: The maximum number of outbound peer connections */
 static const unsigned int DEFAULT_MAX_OUTBOUND_CONNECTIONS = 16;
+/** Limits number of IPs learned from a DNS seed */
+static const unsigned int MAX_DNS_SEEDED_IPS = 256;
 /** BU: The minimum number of xthin nodes to connect */
 static const uint8_t MIN_XTHIN_NODES = 8;
 /** BU: The daily maximum disconnects while searching for xthin nodes to connect */
