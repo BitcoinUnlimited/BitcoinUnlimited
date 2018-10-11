@@ -316,6 +316,7 @@ BOOST_AUTO_TEST_CASE(versionbits_computeblockversion)
     // Set up the testdummy bits for this test
     VersionBitsDeploymentInfo[Consensus::DEPLOYMENT_TESTDUMMY].name = "testdummy";
     VersionBitsDeploymentInfo[Consensus::DEPLOYMENT_TESTDUMMY].gbt_force = false;
+    VersionBitsDeploymentInfo[Consensus::DEPLOYMENT_TESTDUMMY].myVote = true;
 
     // Use the TESTDUMMY deployment for testing purposes.
     int64_t bit = mainnetParams.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit;

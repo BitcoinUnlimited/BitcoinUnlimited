@@ -1066,15 +1066,28 @@ int32_t ComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Para
         // guard this because not all deployments have window/threshold
         if (IsConfiguredDeployment(params, i))
         {
+            const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[i];
             ThresholdState state = VersionBitsState(pindexPrev, params, (Consensus::DeploymentPos)i, versionbitscache);
             // activate the bits that are STARTED or LOCKED_IN according to their deployments
-            if (state == THRESHOLD_LOCKED_IN || state == THRESHOLD_STARTED)
+            if (state == THRESHOLD_LOCKED_IN || (state == THRESHOLD_STARTED && vbinfo.myVote == true))
             {
                 nVersion |= VersionBitsMask(params, (Consensus::DeploymentPos)i);
             }
         }
         // bip135 end
     }
+
+    return nVersion;
+}
+
+int32_t UnlimitedComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Params &params, uint32_t nTime)
+{
+    if (blockVersion != 0) // BU: allow override of block version
+    {
+        return blockVersion;
+    }
+
+    int32_t nVersion = ComputeBlockVersion(pindexPrev, params);
 
     return nVersion;
 }

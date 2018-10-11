@@ -262,6 +262,8 @@ std::string OutboundConnectionValidator(const int &value, int *item, bool valida
 std::string MaxDataCarrierValidator(const unsigned int &value, unsigned int *item, bool validate);
 std::string SubverValidator(const std::string &value, std::string *item, bool validate);
 std::string MiningBlockSizeValidator(const uint64_t &value, uint64_t *item, bool validate);
+// validator for the voting tweak
+std::string Bip135VoteValidator(const std::string &value, std::string *item, bool validate);
 
 extern CTweak<unsigned int> maxTxSize;
 extern CTweak<uint64_t> blockSigopsPerMb;

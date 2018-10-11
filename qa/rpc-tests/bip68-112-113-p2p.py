@@ -209,11 +209,8 @@ class BIP68_112_113Test(ComparisonTestFramework):
         self.tip = int("0x" + self.nodes[0].getbestblockhash(), 0)
         self.nodeaddress = self.nodes[0].getnewaddress()
 
-        assert_equal(get_bip9_status(self.nodes[0], 'csv')['status'], 'defined')
         test_blocks = self.generate_blocks(61, 4)
         yield TestInstance(test_blocks, sync_every_block=True) # 1
-        # Advanced from DEFINED to STARTED, height = 143
-        assert_equal(get_bip9_status(self.nodes[0], 'csv')['status'], 'started')
 
         # Fail to achieve LOCKED_IN 100 out of 144 signal bit 0
         # using a variety of bits to simulate multiple parallel softforks
@@ -222,8 +219,6 @@ class BIP68_112_113Test(ComparisonTestFramework):
         test_blocks = self.generate_blocks(50, 536871169, test_blocks) # 0x20000101 (signalling ready)
         test_blocks = self.generate_blocks(24, 536936448, test_blocks) # 0x20010000 (signalling not)
         yield TestInstance(test_blocks, sync_every_block=False) # 2
-        # Failed to advance past STARTED, height = 287
-        assert_equal(get_bip9_status(self.nodes[0], 'csv')['status'], 'started')
 
         # 108 out of 144 signal bit 0 to achieve lock-in
         # using a variety of bits to simulate multiple parallel softforks
@@ -232,8 +227,6 @@ class BIP68_112_113Test(ComparisonTestFramework):
         test_blocks = self.generate_blocks(50, 536871169, test_blocks) # 0x20000101 (signalling ready)
         test_blocks = self.generate_blocks(10, 536936448, test_blocks) # 0x20010000 (signalling not)
         yield TestInstance(test_blocks, sync_every_block=False) # 3
-        # Advanced from STARTED to LOCKED_IN, height = 431
-        assert_equal(get_bip9_status(self.nodes[0], 'csv')['status'], 'locked_in')
 
         # 140 more version 4 blocks
         test_blocks = self.generate_blocks(140, 4)
@@ -276,8 +269,6 @@ class BIP68_112_113Test(ComparisonTestFramework):
         # 2 more version 4 blocks
         test_blocks = self.generate_blocks(2, 4)
         yield TestInstance(test_blocks, sync_every_block=False) # 5
-        # Not yet advanced to ACTIVE, height = 574 (will activate for block 576, not 575)
-        assert_equal(get_bip9_status(self.nodes[0], 'csv')['status'], 'locked_in')
 
         # Test both version 1 and version 2 transactions for all tests
         # BIP113 test transaction will be modified before each use to put in appropriate block time
@@ -354,8 +345,6 @@ class BIP68_112_113Test(ComparisonTestFramework):
         # 1 more version 4 block to get us to height 575 so the fork should now be active for the next block
         test_blocks = self.generate_blocks(1, 4)
         yield TestInstance(test_blocks, sync_every_block=False) # 8
-        assert_equal(get_bip9_status(self.nodes[0], 'csv')['status'], 'active')
-
 
         #################################
         ### After Soft Forks Activate ###
@@ -531,3 +520,19 @@ class BIP68_112_113Test(ComparisonTestFramework):
 
 if __name__ == '__main__':
     BIP68_112_113Test().main()
+
+def Test():
+    t = ExcessiveBlockTest(True)
+    # t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["rpc", "net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "blockprioritysize": 2000000,  # we don't want any transactions rejected due to insufficient fees...
+        "blockminsize": 1000000
+    }
+
+    flags = [] # ["--nocleanup", "--noshutdown"]
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmppfx=/ramdisk/test")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
+    t.main(flags, bitcoinConf, None)
