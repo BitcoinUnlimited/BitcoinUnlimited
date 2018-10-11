@@ -2490,12 +2490,10 @@ void NetCleanup()
 
 void RelayTransaction(const CTransactionRef &ptx, const bool fRespend)
 {
-    // TODO call a GetSize() function that caches the tx size
-    uint64_t len = ::GetSerializeSize(*ptx, SER_NETWORK, PROTOCOL_VERSION);
-    if (len > maxTxSize.Value())
+    if (ptx->GetTxSize() > maxTxSize.Value())
     {
         LOGA("Will not announce (INV) excessive transaction %s.  Size: %llu, Limit: %llu\n", ptx->GetHash().ToString(),
-            len, (uint64_t)maxTxSize.Value());
+            ptx->GetTxSize(), (uint64_t)maxTxSize.Value());
         return;
     }
 
