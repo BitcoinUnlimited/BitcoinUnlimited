@@ -306,10 +306,6 @@ CTweakRef<std::string> subverOverrideTweak("net.subversionOverride",
     &subverOverride,
     &SubverValidator);
 
-CTweakRef<bool> enableDataSigVerifyTweak("consensus.enableDataSigVerify",
-    "true if OP_DATASIGVERIFY is enabled.",
-    &enableDataSigVerify);
-
 CTweak<bool> enableCanonicalTxOrder("consensus.enableCanonicalTxOrder",
     "True if canonical transaction ordering is enabled.  Reflects the actual state so may be switched on or off by"
     " fork time flags and blockchain reorganizations.",

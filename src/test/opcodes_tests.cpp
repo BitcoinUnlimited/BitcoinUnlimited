@@ -14,9 +14,10 @@
 typedef std::vector<uint8_t> valtype;
 typedef std::vector<valtype> stacktype;
 
-std::array<uint32_t, 3> flagset{{0, STANDARD_SCRIPT_VERIFY_FLAGS, MANDATORY_SCRIPT_VERIFY_FLAGS}};
+BOOST_FIXTURE_TEST_SUITE(nov152018_opcodes_tests, BasicTestingSetup)
 
-BOOST_FIXTURE_TEST_SUITE(may152018_opcodes_tests, BasicTestingSetup)
+std::array<uint32_t, 3> flagset{
+    {0, STANDARD_SCRIPT_VERIFY_FLAGS, MANDATORY_SCRIPT_VERIFY_FLAGS}};
 
 /**
  * General utility functions to check for script passing/failing.

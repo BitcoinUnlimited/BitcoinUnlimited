@@ -41,7 +41,8 @@ string FormatScript(const CScript &script)
                 ret += strprintf("%i ", op - OP_1NEGATE - 1);
                 continue;
             }
-            else if (op >= OP_NOP && op <= OP_NOP10)
+
+            if (op >= OP_NOP && op < FIRST_UNDEFINED_OP_VALUE)
             {
                 string str(GetOpName(op));
                 if (str.substr(0, 3) == string("OP_"))
