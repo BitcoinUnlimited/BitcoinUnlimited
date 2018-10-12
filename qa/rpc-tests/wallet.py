@@ -132,8 +132,8 @@ class WalletTest (BitcoinTestFramework):
             txns_to_send.append(self.nodes[0].signrawtransaction(raw_tx))
 
         # Have node 1 (miner) send the transactions
-        self.nodes[1].sendrawtransaction(txns_to_send[0]["hex"], True)
-        self.nodes[1].sendrawtransaction(txns_to_send[1]["hex"], True)
+        self.nodes[1].enqueuerawtransaction(txns_to_send[0]["hex"])
+        self.nodes[1].enqueuerawtransaction(txns_to_send[1]["hex"], "flush")
 
         # Have node1 mine a block to confirm transactions:
         self.nodes[1].generate(1)
@@ -472,8 +472,12 @@ if __name__ == '__main__':
 def Test():
     t = WalletTest()
     bitcoinConf = {
-        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],  # "lck"
-        "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
+        "debug": ["rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"],
     }
-    # "--tmpdir=/ramdisk/test", "--srcdir=../../debug/src"
-    t.main(["--nocleanup", "--noshutdown"], bitcoinConf, None)
+
+    flags = [] # ["--nocleanup", "--noshutdown"]
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmppfx=/ramdisk/test")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
+    t.main(flags, bitcoinConf, None)

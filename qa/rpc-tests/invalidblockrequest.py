@@ -22,7 +22,7 @@ re-requested.
 # Use the ComparisonTestFramework with 1 node: only use --testbinary.
 class InvalidBlockRequestTest(ComparisonTestFramework):
 
-    ''' Can either run this test as 1 node with expected answers, or two and compare them. 
+    ''' Can either run this test as 1 node with expected answers, or two and compare them.
         Change the "outcome" variable from each TestInstance object to only do the comparison. '''
     def __init__(self):
         self.num_nodes = 1
@@ -70,7 +70,7 @@ class InvalidBlockRequestTest(ComparisonTestFramework):
         Now we use merkle-root malleability to generate an invalid block with
         same blockheader.
         Manufacture a block with 3 transactions (coinbase, spend of prior
-        coinbase, spend of that spend).  Duplicate the 3rd transaction to 
+        coinbase, spend of that spend).  Duplicate the 3rd transaction to
         leave merkle root and blockheader unchanged but invalidate the block.
         '''
         block2 = create_block(self.tip, create_coinbase(height), self.block_time)
@@ -94,7 +94,16 @@ class InvalidBlockRequestTest(ComparisonTestFramework):
         assert(block2_orig.vtx != block2.vtx)
 
         self.tip = block2.sha256
-        yield TestInstance([[block2, RejectResult(16, b'bad-txns-duplicate')], [block2_orig, True]])
+        yield TestInstance([[block2, RejectResult(16, b'bad-txns-duplicate')]])
+        # Check transactions for duplicate inputs
+        # self.log.info("Test duplicate input block.")
+        block2_dup = copy.deepcopy(block2_orig)
+        block2_dup.vtx[2].vin.append(block2_dup.vtx[2].vin[0])
+        block2_dup.vtx[2].rehash()
+        block2_dup.hashMerkleRoot = block2_dup.calc_merkle_root()
+        block2_dup.rehash()
+        block2_dup.solve()
+        yield TestInstance([[block2_dup, RejectResult(16, b'bad-txns-inputs-duplicate')], [block2_orig, True]])
         height += 1
 
         '''

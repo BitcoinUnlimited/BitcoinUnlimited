@@ -133,7 +133,9 @@ public:
         // Nov, 13 2017 hard fork
         consensus.daaHeight = 504031;
         // May, 15 2018 hard fork
-        consensus.may2018activationTime = 1526400000;
+        consensus.may2018Height = 530359;
+        // Nov, 15 2018 hard fork
+        consensus.nov2018ActivationTime = 1542300000;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -234,8 +236,8 @@ public:
         consensus.BIP65Height = 0;
         consensus.BIP66Height = 0;
         consensus.powLimit = uint256S("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
-        consensus.nPowTargetSpacing = 10 * 60;
+        consensus.nPowTargetTimespan = 14 * 24 * 60 * 60 / 10; // two weeks
+        consensus.nPowTargetSpacing = 1 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = false;
 
@@ -257,9 +259,11 @@ public:
         // Aug, 1 2017 hard fork
         consensus.uahfHeight = 0;
         // Nov, 13 hard fork
-        consensus.daaHeight = 0;
+        consensus.daaHeight = consensus.DifficultyAdjustmentInterval();
         // May, 15 2018 hard fork
-        consensus.may2018activationTime = 1526400000;
+        consensus.may2018Height = 0;
+        // Nov, 15 2018 hard fork
+        consensus.nov2018ActivationTime = 1542300000;
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -283,7 +287,7 @@ public:
         fTestnetToBeDeprecatedFieldRPC = false;
 
         checkpointData = (CCheckpointData){
-            boost::assign::map_list_of(0, uint256S("0000000000000000000000000000000000000000000000000000000000000000")),
+            boost::assign::map_list_of(0, uint256S("0000000057e31bd2066c939a63b7b8623bd0f10d8c001304bdfc1a7902ae6d35")),
             0, 0, 0};
     }
 };
@@ -328,7 +332,10 @@ public:
         // Nov, 13 hard fork
         consensus.daaHeight = 1188697;
         // May, 15 2018 hard fork
-        consensus.may2018activationTime = 1526400000;
+        consensus.may2018Height = 1233070;
+        // Nov 15, 2018 hard fork
+        consensus.nov2018ActivationTime = 1542300000;
+
 
         pchMessageStart[0] = 0x0b;
         pchMessageStart[1] = 0x11;
@@ -427,8 +434,10 @@ public:
         consensus.uahfHeight = 0;
         // Nov, 13 hard fork is always on on regtest.
         consensus.daaHeight = 0;
-        // May, 15 2018 hard fork
-        consensus.may2018activationTime = 1526400000;
+        // May, 15 2018 hard fork is always 0 on regtest
+        consensus.may2018Height = 0;
+        // Nov, 15 2018 hard fork
+        consensus.nov2018ActivationTime = 1542300000;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;

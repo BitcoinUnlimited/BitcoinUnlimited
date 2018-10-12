@@ -65,10 +65,7 @@ class BIP66Test(ComparisonTestFramework):
         outputs = { to_address : amount }
         rawtx = node.createrawtransaction(inputs, outputs)
         signresult = node.signrawtransaction(rawtx)
-        tx = CTransaction()
-        f = BytesIO(hex_str_to_bytes(signresult['hex']))
-        tx.deserialize(f)
-        return tx
+        return CTransaction().deserialize(signresult['hex'])
 
     def get_tests(self):
 

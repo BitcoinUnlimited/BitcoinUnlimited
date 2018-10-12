@@ -5,6 +5,8 @@
 #include "unlimited.h"
 
 #include "base58.h"
+#include "blockrelay/graphene.h"
+#include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
 #include "cashaddrenc.h"
 #include "chain.h"
@@ -19,7 +21,6 @@
 #include "dosman.h"
 #include "dstencode.h"
 #include "expedited.h"
-#include "graphene.h"
 #include "hash.h"
 #include "leakybucket.h"
 #include "miner.h"
@@ -31,16 +32,17 @@
 #include "rpc/server.h"
 #include "script/standard.h"
 #include "stat.h"
-#include "thinblock.h"
 #include "timedata.h"
 #include "tinyformat.h"
 #include "tweak.h"
+#include "txadmission.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
+#include "validation/validation.h"
 #include "validationinterface.h"
 #include "version.h"
 
@@ -80,6 +82,7 @@ bool MiningAndExcessiveBlockValidatorRule(const uint64_t newExcessiveBlockSize, 
     LOGA("newMiningBlockSize: %d - newExcessiveBlockSize: %d\n", newMiningBlockSize, newExcessiveBlockSize);
     return (newMiningBlockSize <= newExcessiveBlockSize);
 }
+
 std::string AcceptDepthValidator(const unsigned int &value, unsigned int *item, bool validate)
 {
     if (!validate)
@@ -99,6 +102,23 @@ std::string ExcessiveBlockValidator(const uint64_t &value, uint64_t *item, bool 
             ret << "Sorry, your maximum mined block (" << maxGeneratedBlock
                 << ") is larger than your proposed excessive size (" << value
                 << ").  This would cause you to orphan your own blocks.";
+            return ret.str();
+        }
+        if ((value < MIN_EXCESSIVE_BLOCK_SIZE) &&
+            ((Params().NetworkIDString() == "main") || (Params().NetworkIDString() == "test")))
+        {
+            std::ostringstream ret;
+            ret << Params().NetworkIDString() << "Sorry, your proposed excessive block size (" << value
+                << ") is smaller than the minimum EB size (" << MIN_EXCESSIVE_BLOCK_SIZE
+                << ").  This would cause you to orphan blocks from the rest of the net.";
+            return ret.str();
+        }
+        if ((value < MIN_EXCESSIVE_BLOCK_SIZE_REGTEST) && (Params().NetworkIDString() == "regtest"))
+        {
+            std::ostringstream ret;
+            ret << Params().NetworkIDString() << "Sorry, your proposed excessive block size (" << value
+                << ") is smaller than the minimum EB size (" << MIN_EXCESSIVE_BLOCK_SIZE_REGTEST
+                << ").  This would cause you to orphan blocks from the rest of the net.";
             return ret.str();
         }
     }
@@ -183,22 +203,26 @@ std::string SubverValidator(const std::string &value, std::string *item, bool va
     return std::string();
 }
 
+std::string Bip135VoteValidator(const std::string &value, std::string *item, bool validate)
+{
+    if (validate)
+    {
+        bool categoriesValid = AssignBip135Votes(value, -1);
+        if (!categoriesValid)
+            return std::string("Invalid/unknown features specified");
+    }
+    else // Do what is needed to use the new value already stored in item
+    {
+        ClearBip135Votes();
+        AssignBip135Votes(*item, 1);
+        SignalBlockTemplateChange();
+    }
+    return std::string();
+}
+
 
 // Push all transactions in the mempool to another node
 void UnlimitedPushTxns(CNode *dest);
-
-int32_t UnlimitedComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Params &params, uint32_t nTime)
-{
-    if (blockVersion != 0) // BU: allow override of block version
-    {
-        return blockVersion;
-    }
-
-    int32_t nVersion = ComputeBlockVersion(pindexPrev, params);
-
-    return nVersion;
-}
-
 
 void UpdateSendStats(CNode *pfrom, const char *strCommand, int msgSize, int64_t nTime)
 {
@@ -347,7 +371,6 @@ UniValue pushtx(const UniValue &params, bool fHelp)
 
 void UnlimitedPushTxns(CNode *dest)
 {
-    // LOCK2(cs_main, pfrom->cs_filter);
     LOCK(dest->cs_filter);
     std::vector<uint256> vtxid;
     mempool.queryHashes(vtxid);
@@ -355,11 +378,11 @@ void UnlimitedPushTxns(CNode *dest)
     for (uint256 &hash : vtxid)
     {
         CInv inv(MSG_TX, hash);
-        CTransaction tx;
-        bool fInMemPool = mempool.lookup(hash, tx);
-        if (!fInMemPool)
+        CTransactionRef ptx = nullptr;
+        ptx = mempool.get(hash);
+        if (ptx == nullptr)
             continue; // another thread removed since queryHashes, maybe...
-        if ((dest->pfilter && dest->pfilter->IsRelevantAndUpdate(tx)) || (!dest->pfilter))
+        if ((dest->pfilter && dest->pfilter->IsRelevantAndUpdate(*ptx)) || (!dest->pfilter))
             vInv.push_back(inv);
         if (vInv.size() == MAX_INV_SZ)
         {
@@ -1334,13 +1357,16 @@ void LoadFilter(CNode *pfrom, CBloomFilter *filter)
         dosMan.Misbehaving(pfrom, 100);
     else
     {
-        LOCK(pfrom->cs_filter);
-        delete pfrom->pThinBlockFilter;
-        pfrom->pThinBlockFilter = new CBloomFilter(*filter);
+        uint64_t nSizeFilter;
+        {
+            LOCK(pfrom->cs_filter);
+            nSizeFilter = ::GetSerializeSize(*pfrom->pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION);
+            thindata.UpdateInBoundBloomFilter(nSizeFilter);
+            delete pfrom->pThinBlockFilter;
+            pfrom->pThinBlockFilter = new CBloomFilter(*filter);
+        }
+        LOG(THIN, "Thinblock Bloom filter size: %d\n", nSizeFilter);
     }
-    uint64_t nSizeFilter = ::GetSerializeSize(*pfrom->pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION);
-    LOG(THIN, "Thinblock Bloom filter size: %d\n", nSizeFilter);
-    thindata.UpdateInBoundBloomFilter(nSizeFilter);
 }
 
 // Similar to TestBlockValidity but is very conservative in parameters (used in mining)
@@ -1718,15 +1744,34 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
     CMiningCandidate candid;
-    LOCK(cs_main);
+    int64_t coinbaseSize = -1; // If -1 then not used to set coinbase size
 
-    if (fHelp || params.size() > 0)
+    if (fHelp || params.size() > 1)
     {
         throw runtime_error("getminingcandidate"
                             "\nReturns Mining-Candidate protocol data.\n"
-                            "\nArguments: None\n");
+                            "\nArguments:\n"
+                            "1. \"coinbasesize\" (int, optional) Get a fixed size coinbase transaction.\n" +
+                            HelpExampleCli("", "") + HelpExampleCli("coinbasesize", "100"));
     }
-    mkblocktemplate(params, &candid.block);
+
+    if (params.size() == 1)
+    {
+        coinbaseSize = params[0].get_int64();
+        if (coinbaseSize < 0)
+        {
+            throw std::runtime_error("Requested coinbase size is less than 0");
+        }
+
+        if (coinbaseSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
+        {
+            throw std::runtime_error(
+                strprintf("Requested coinbase size too big. Max allowed: %u", BLOCKSTREAM_CORE_MAX_BLOCK_SIZE));
+        }
+    }
+
+    mkblocktemplate(UniValue(UniValue::VARR), coinbaseSize, &candid.block);
+
     ret = MkMiningCandidateJson(candid);
     return ret;
 }
@@ -2018,12 +2063,15 @@ extern std::map<std::pair<void *, void *>, LockStack> lockorders;
 extern std::vector<std::string> vUseDNSSeeds;
 extern std::list<CNode *> vNodesDisconnected;
 extern std::set<CNetAddr> setservAddNodeAddresses;
+extern std::map<uint256, CTxCommitData> txCommitQ;
+extern std::queue<CTxInputData> txDeferQ;
+extern std::queue<CTxInputData> txInQ;
 extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
     ret.push_back(Pair("time", GetTime()));
-    ret.push_back(Pair("requester.mapTxnInfo", requester.mapTxnInfo.size()));
-    ret.push_back(Pair("requester.mapBlkInfo", requester.mapBlkInfo.size()));
+    ret.push_back(Pair("requester.mapTxnInfo", (uint64_t)requester.mapTxnInfo.size()));
+    ret.push_back(Pair("requester.mapBlkInfo", (uint64_t)requester.mapBlkInfo.size()));
     unsigned long int max = 0;
     unsigned long int size = 0;
     for (CRequestManager::OdMap::iterator i = requester.mapTxnInfo.begin(); i != requester.mapTxnInfo.end(); i++)
@@ -2048,28 +2096,28 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.push_back(Pair("requester.mapBlkInfo.maxobj", max));
     ret.push_back(Pair("requester.mapBlkInfo.totobj", size));
 
-    ret.push_back(Pair("mapBlockIndex", mapBlockIndex.size()));
+    ret.push_back(Pair("mapBlockIndex", (int64_t)mapBlockIndex.size()));
     // CChain
     {
         LOCK(cs_xval);
-        ret.push_back(Pair("setPreVerifiedTxHash", setPreVerifiedTxHash.size()));
-        ret.push_back(Pair("setUnVerifiedOrphanTxHash", setUnVerifiedOrphanTxHash.size()));
+        ret.push_back(Pair("setPreVerifiedTxHash", (int64_t)setPreVerifiedTxHash.size()));
+        ret.push_back(Pair("setUnVerifiedOrphanTxHash", (int64_t)setUnVerifiedOrphanTxHash.size()));
     }
-    ret.push_back(Pair("mapLocalHost", mapLocalHost.size()));
-    ret.push_back(Pair("CDoSManager::vWhitelistedRange", dosMan.vWhitelistedRange.size()));
-    ret.push_back(Pair("mapInboundConnectionTracker", mapInboundConnectionTracker.size()));
-    ret.push_back(Pair("vUseDNSSeeds", vUseDNSSeeds.size()));
-    ret.push_back(Pair("vAddedNodes", vAddedNodes.size()));
-    ret.push_back(Pair("setservAddNodeAddresses", setservAddNodeAddresses.size()));
-    ret.push_back(Pair("statistics", statistics.size()));
-    ret.push_back(Pair("tweaks", tweaks.size()));
-    ret.push_back(Pair("mapRelay", mapRelay.size()));
-    ret.push_back(Pair("vRelayExpiration", vRelayExpiration.size()));
-    ret.push_back(Pair("vNodes", vNodes.size()));
-    ret.push_back(Pair("vNodesDisconnected", vNodesDisconnected.size()));
+    ret.push_back(Pair("mapLocalHost", (int64_t)mapLocalHost.size()));
+    ret.push_back(Pair("CDoSManager::vWhitelistedRange", (int64_t)dosMan.vWhitelistedRange.size()));
+    ret.push_back(Pair("mapInboundConnectionTracker", (int64_t)mapInboundConnectionTracker.size()));
+    ret.push_back(Pair("vUseDNSSeeds", (int64_t)vUseDNSSeeds.size()));
+    ret.push_back(Pair("vAddedNodes", (int64_t)vAddedNodes.size()));
+    ret.push_back(Pair("setservAddNodeAddresses", (int64_t)setservAddNodeAddresses.size()));
+    ret.push_back(Pair("statistics", (int64_t)statistics.size()));
+    ret.push_back(Pair("tweaks", (int64_t)tweaks.size()));
+    ret.push_back(Pair("mapRelay", (int64_t)mapRelay.size()));
+    ret.push_back(Pair("vRelayExpiration", (int64_t)vRelayExpiration.size()));
+    ret.push_back(Pair("vNodes", (int64_t)vNodes.size()));
+    ret.push_back(Pair("vNodesDisconnected", (int64_t)vNodesDisconnected.size()));
     // CAddrMan
-    ret.push_back(Pair("mapOrphanTransactions", orphanpool.mapOrphanTransactions.size()));
-    ret.push_back(Pair("mapOrphanTransactionsByPrev", orphanpool.mapOrphanTransactionsByPrev.size()));
+    ret.push_back(Pair("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size()));
+    ret.push_back(Pair("mapOrphanTransactionsByPrev", (int64_t)orphanpool.mapOrphanTransactionsByPrev.size()));
 
     uint32_t nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream;
     connmgr->ExpeditedNodeCounts(nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream);
@@ -2077,8 +2125,12 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.push_back(Pair("xpeditedBlkUp", (uint64_t)nExpeditedUpstream));
     ret.push_back(Pair("xpeditedTxn", (uint64_t)nExpeditedTxs));
 
+    ret.push_back(Pair("txCommitQ", (uint64_t)txCommitQ.size()));
+    ret.push_back(Pair("txInQ", (uint64_t)txInQ.size()));
+    ret.push_back(Pair("txDeferQ", (uint64_t)txDeferQ.size()));
+
 #ifdef DEBUG_LOCKORDER
-    ret.push_back(Pair("lockorders", lockorders.size()));
+    ret.push_back(Pair("lockorders", (uint64_t)lockorders.size()));
 #endif
 
     LOCK(cs_vNodes);
@@ -2093,26 +2145,30 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         UniValue node(UniValue::VOBJ);
         disconnected += (inode.fDisconnect) ? 1 : 0;
 
-        node.push_back(Pair("vSendMsg", inode.vSendMsg.size()));
-        node.push_back(Pair("vRecvGetData", inode.vRecvGetData.size()));
-        node.push_back(Pair("vRecvMsg", inode.vRecvMsg.size()));
-        if (inode.pfilter)
+        node.push_back(Pair("vSendMsg", (int64_t)inode.vSendMsg.size()));
+        node.push_back(Pair("vRecvGetData", (int64_t)inode.vRecvGetData.size()));
+        node.push_back(Pair("vRecvMsg", (int64_t)inode.vRecvMsg.size()));
         {
-            node.push_back(Pair("pfilter", ::GetSerializeSize(*inode.pfilter, SER_NETWORK, PROTOCOL_VERSION)));
+            LOCK(inode.cs_filter);
+            if (inode.pfilter)
+            {
+                node.push_back(
+                    Pair("pfilter", (int64_t)::GetSerializeSize(*inode.pfilter, SER_NETWORK, PROTOCOL_VERSION)));
+            }
+            if (inode.pThinBlockFilter)
+            {
+                node.push_back(Pair("pThinBlockFilter",
+                    (int64_t)::GetSerializeSize(*inode.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION)));
+            }
         }
-        if (inode.pThinBlockFilter)
-        {
-            node.push_back(
-                Pair("pThinBlockFilter", ::GetSerializeSize(*inode.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION)));
-        }
-        node.push_back(Pair("thinblock.vtx", inode.thinBlock.vtx.size()));
+        node.push_back(Pair("thinblock.vtx", (int64_t)inode.thinBlock.vtx.size()));
         uint64_t thinBlockSize = ::GetSerializeSize(inode.thinBlock, SER_NETWORK, PROTOCOL_VERSION);
         totalThinBlockSize += thinBlockSize;
         node.push_back(Pair("thinblock.size", thinBlockSize));
-        node.push_back(Pair("thinBlockHashes", inode.thinBlockHashes.size()));
-        node.push_back(Pair("xThinBlockHashes", inode.xThinBlockHashes.size()));
-        node.push_back(Pair("vAddrToSend", inode.vAddrToSend.size()));
-        node.push_back(Pair("vInventoryToSend", inode.vInventoryToSend.size()));
+        node.push_back(Pair("thinBlockHashes", (int64_t)inode.thinBlockHashes.size()));
+        node.push_back(Pair("xThinBlockHashes", (int64_t)inode.xThinBlockHashes.size()));
+        node.push_back(Pair("vAddrToSend", (int64_t)inode.vAddrToSend.size()));
+        node.push_back(Pair("vInventoryToSend", (int64_t)inode.vInventoryToSend.size()));
         ret.push_back(Pair(inode.addrName, node));
     }
     ret.push_back(Pair("totalThinBlockSize", totalThinBlockSize));

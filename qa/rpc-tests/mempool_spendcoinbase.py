@@ -28,9 +28,8 @@ class MempoolSpendCoinbaseTest(BitcoinTestFramework):
         self.is_network_split = False
 
     def run_test(self):
-        chain_height = self.nodes[0].getblockcount()
-        assert_equal(chain_height, 200)
         node0_address = self.nodes[0].getnewaddress()
+        waitFor(30, lambda : self.nodes[0].getblockcount() == 200, "Restoration of cached blockchain failed")
 
         # Coinbase at height chain_height-100+1 ok in mempool, should
         # get mined. Coinbase at height chain_height-100+2 is

@@ -10,6 +10,7 @@
 #include "bloom.h"
 #include "chainparams.h"
 #include "compat.h"
+#include "fastfilter.h"
 #include "fs.h"
 #include "hash.h"
 #include "iblt.h"
@@ -47,6 +48,8 @@ namespace boost
 class thread_group;
 } // namespace boost
 
+extern CTweak<unsigned int> numMsgHandlerThreads;
+
 /** Time between pings automatically sent out for latency probing and keepalive (in seconds). */
 static const int PING_INTERVAL = 2 * 60;
 /** Time after which to disconnect, after waiting for a ping response (or inactivity). */
@@ -72,14 +75,12 @@ static const bool DEFAULT_UPNP = USE_UPNP;
 #else
 static const bool DEFAULT_UPNP = false;
 #endif
-/** The maximum number of entries in mapAskFor */
-static const size_t MAPASKFOR_MAX_SZ = MAX_INV_SZ;
-/** The maximum number of entries in setAskFor (larger due to getdata latency)*/
-static const size_t SETASKFOR_MAX_SZ = 2 * MAX_INV_SZ;
 /** The maximum number of peer connections to maintain. */
 static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
-/** BU: The maximum numer of outbound peer connections */
+/** BU: The maximum number of outbound peer connections */
 static const unsigned int DEFAULT_MAX_OUTBOUND_CONNECTIONS = 16;
+/** Limits number of IPs learned from a DNS seed */
+static const unsigned int MAX_DNS_SEEDED_IPS = 256;
 /** BU: The minimum number of xthin nodes to connect */
 static const uint8_t MIN_XTHIN_NODES = 8;
 /** BU: The daily maximum disconnects while searching for xthin nodes to connect */
@@ -100,8 +101,15 @@ static const size_t DEFAULT_MAXSENDBUFFER = 1 * 1000;
 unsigned int ReceiveFloodSize();
 unsigned int SendBufferSize();
 
+// Node IDs are currently signed but only values greater than zero are returned.  Zero or negative can be used as a
+// sentinel value.
+typedef int NodeId;
+
 void AddOneShot(const std::string &strDest);
+// Find a node by name.  Returns a null ref if no node found
 CNodeRef FindNodeRef(const std::string &addrName);
+// Find a node by id.  Returns a null ref if no node found
+CNodeRef FindNodeRef(const NodeId id);
 int DisconnectSubNetNodes(const CSubNet &subNet);
 bool OpenNetworkConnection(const CAddress &addrConnect,
     bool fCountFailure,
@@ -115,10 +123,6 @@ bool BindListenPort(const CService &bindAddr, std::string &strError, bool fWhite
 void StartNode(boost::thread_group &threadGroup, CScheduler &scheduler);
 bool StopNode();
 int SocketSendData(CNode *pnode);
-
-// Node IDs are currently signed but only values greater than zero are returned.  Zero or negative can be used as a
-// sentinel value.
-typedef int NodeId;
 
 struct CombinerAll
 {
@@ -190,7 +194,7 @@ extern int nMaxConnections;
 extern int nMinXthinNodes;
 extern std::vector<CNode *> vNodes;
 extern CCriticalSection cs_vNodes;
-extern std::map<CInv, CDataStream> mapRelay;
+extern std::map<CInv, CTransactionRef> mapRelay;
 extern std::deque<std::pair<int64_t, CInv> > vRelayExpiration;
 extern CCriticalSection cs_mapRelay;
 
@@ -231,6 +235,8 @@ public:
     double dPingWait;
     double dPingMin;
     std::string addrLocal;
+    //! Whether this peer supports CompactBlocks (for statistics only, BU doesn't support CB protocol)
+    bool fSupportsCompactBlocks;
 };
 
 
@@ -248,6 +254,15 @@ public:
 
     int64_t nTime; // time (in microseconds) of message receipt.
 
+    // default constructor builds an empty message object to accept assignment of real messages
+    CNetMessage() : hdrbuf(0, 0), hdr({0, 0, 0, 0}), vRecv(0, 0)
+    {
+        in_data = false;
+        nHdrPos = 0;
+        nDataPos = 0;
+        nTime = 0;
+    }
+
     CNetMessage(const CMessageHeader::MessageStartChars &pchMessageStartIn, int nTypeIn, int nVersionIn)
         : hdrbuf(nTypeIn, nVersionIn), hdr(pchMessageStartIn), vRecv(nTypeIn, nVersionIn)
     {
@@ -258,6 +273,8 @@ public:
         nTime = 0;
     }
 
+    // Returns true if this message has been completely received.  This is determined by checking the message size
+    // field in the header against the number of payload bytes in this object.
     bool complete() const
     {
         if (!in_data)
@@ -265,6 +282,9 @@ public:
         return (hdr.nMessageSize == nDataPos);
     }
 
+    // Returns the size of this message including header.  If the message is still being received
+    // this call returns only what has been received.
+    unsigned int size() const { return ((in_data) ? sizeof(CMessageHeader) : hdrbuf.size()) + nDataPos; }
     void SetVersion(int nVersionIn)
     {
         hdrbuf.SetVersion(nVersionIn);
@@ -319,18 +339,23 @@ public:
         }
     };
 
+    // This is shared-locked whenever messages are processed.
+    // Take it exclusive-locked to finish all ongoing processing
+    CSharedCriticalSection csMsgSerializer;
     // socket
     uint64_t nServices;
     SOCKET hSocket;
     CDataStream ssSend;
-    size_t nSendSize; // total size of all vSendMsg entries
+    std::atomic<uint64_t> nSendSize; // total size in bytes of all vSendMsg entries
     size_t nSendOffset; // offset inside the first vSendMsg already sent
     uint64_t nSendBytes;
     std::deque<CSerializeData> vSendMsg;
     CCriticalSection cs_vSend;
 
+    CCriticalSection csRecvGetData;
     std::deque<CInv> vRecvGetData;
     std::deque<CNetMessage> vRecvMsg;
+    CStatHistory<uint64_t> currentRecvMsgSize;
     CCriticalSection cs_vRecvMsg;
     uint64_t nRecvBytes;
     int nRecvVersion;
@@ -400,10 +425,10 @@ public:
     CCriticalSection cs_mapthinblocksinflight;
     std::map<uint256, CThinBlockInFlight> mapThinBlocksInFlight GUARDED_BY(cs_mapthinblocksinflight);
 
-    double nGetXBlockTxCount; // Count how many get_xblocktx requests are made
-    uint64_t nGetXBlockTxLastTime; // The last time a get_xblocktx request was made
-    double nGetXthinCount; // Count how many get_xthin requests are made
-    uint64_t nGetXthinLastTime; // The last time a get_xthin request was made
+    std::atomic<double> nGetXBlockTxCount; // Count how many get_xblocktx requests are made
+    std::atomic<uint64_t> nGetXBlockTxLastTime; // The last time a get_xblocktx request was made
+    std::atomic<double> nGetXthinCount; // Count how many get_xthin requests are made
+    std::atomic<uint64_t> nGetXthinLastTime; // The last time a get_xthin request was made
     uint32_t nXthinBloomfilterSize; // The maximum xthin bloom filter size (in bytes) that our peer will accept.
     // BUIP010 Xtreme Thinblocks: end section
 
@@ -422,10 +447,10 @@ public:
     CCriticalSection cs_mapgrapheneblocksinflight;
     std::map<uint256, CGrapheneBlockInFlight> mapGrapheneBlocksInFlight GUARDED_BY(cs_mapgrapheneblocksinflight);
 
-    double nGetGrapheneBlockTxCount; // Count how many get_xblocktx requests are made
-    uint64_t nGetGrapheneBlockTxLastTime; // The last time a get_xblocktx request was made
-    double nGetGrapheneCount; // Count how many get_graphene requests are made
-    uint64_t nGetGrapheneLastTime; // The last time a get_graphene request was made
+    std::atomic<double> nGetGrapheneBlockTxCount; // Count how many get_xblocktx requests are made
+    std::atomic<uint64_t> nGetGrapheneBlockTxLastTime; // The last time a get_xblocktx request was made
+    std::atomic<double> nGetGrapheneCount; // Count how many get_graphene requests are made
+    std::atomic<uint64_t> nGetGrapheneLastTime; // The last time a get_graphene request was made
     uint32_t nGrapheneBloomfilterSize; // The maximum graphene bloom filter size (in bytes) that our peer will accept.
     // BUIPXXX Graphene blocks: end section
 
@@ -434,6 +459,9 @@ public:
     std::atomic<int64_t> nMaxBlocksInTransit;
 
     unsigned short addrFromPort;
+
+    //! Whether this peer supports CompactBlocks (for statistics only, BU doesn't support CB protocol)
+    std::atomic<bool> fSupportsCompactBlocks;
 
 protected:
     // Basic fuzz-testing
@@ -447,7 +475,7 @@ public:
     int nStartingHeight;
 
     // flood relay
-    std::vector<CAddress> vAddrToSend;
+    std::vector<CAddress> vAddrToSend GUARDED_BY(cs_vSend);
     CRollingBloomFilter addrKnown;
     bool fGetAddr;
     std::set<uint256> setKnown;
@@ -455,7 +483,7 @@ public:
     int64_t nNextLocalAddrSend;
 
     // inventory based relay
-    CRollingBloomFilter filterInventoryKnown;
+    CRollingFastFilter<4 * 1024 * 1024> filterInventoryKnown;
     std::vector<CInv> vInventoryToSend;
     CCriticalSection cs_inventory;
     int64_t nNextInvSend;
@@ -501,16 +529,14 @@ public:
 
 private:
     // Network usage totals
-    static CCriticalSection cs_totalBytesRecv;
-    static CCriticalSection cs_totalBytesSent;
-    static uint64_t nTotalBytesRecv;
-    static uint64_t nTotalBytesSent;
+    static std::atomic<uint64_t> nTotalBytesRecv;
+    static std::atomic<uint64_t> nTotalBytesSent;
 
     // outbound limit & stats
-    static uint64_t nMaxOutboundTotalBytesSentInCycle;
-    static uint64_t nMaxOutboundCycleStartTime;
-    static uint64_t nMaxOutboundLimit;
-    static uint64_t nMaxOutboundTimeframe;
+    static std::atomic<uint64_t> nMaxOutboundTotalBytesSentInCycle;
+    static std::atomic<uint64_t> nMaxOutboundCycleStartTime;
+    static std::atomic<uint64_t> nMaxOutboundLimit;
+    static std::atomic<uint64_t> nMaxOutboundTimeframe;
 
     CNode(const CNode &);
     void operator=(const CNode &);
@@ -526,6 +552,7 @@ public:
     // requires LOCK(cs_vRecvMsg)
     unsigned int GetTotalRecvSize()
     {
+        AssertLockHeld(cs_vRecvMsg);
         unsigned int total = 0;
         for (const CNetMessage &msg : vRecvMsg)
             total += msg.vRecv.size() + 24;
@@ -535,9 +562,9 @@ public:
     // requires LOCK(cs_vRecvMsg)
     bool ReceiveMsgBytes(const char *pch, unsigned int nBytes);
 
-    // requires LOCK(cs_vRecvMsg)
     void SetRecvVersion(int nVersionIn)
     {
+        LOCK(cs_vRecvMsg);
         nRecvVersion = nVersionIn;
         for (CNetMessage &msg : vRecvMsg)
             msg.SetVersion(nVersionIn);
@@ -579,6 +606,7 @@ public:
     void AddAddressKnown(const CAddress &_addr) { addrKnown.insert(_addr.GetKey()); }
     void PushAddress(const CAddress &_addr, FastRandomContext &insecure_rand)
     {
+        LOCK(cs_vSend);
         // Known checking here is only to save space from duplicates.
         // SendMessages will filter it again for knowns that were added
         // after addresses were pushed.
@@ -598,20 +626,16 @@ public:
 
     void AddInventoryKnown(const CInv &inv)
     {
-        {
-            LOCK(cs_inventory);
-            filterInventoryKnown.insert(inv.hash);
-        }
+        LOCK(cs_inventory);
+        filterInventoryKnown.insert(inv.hash);
     }
 
     void PushInventory(const CInv &inv)
     {
-        {
-            LOCK(cs_inventory);
-            if (inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash))
-                return;
-            vInventoryToSend.push_back(inv);
-        }
+        LOCK(cs_inventory);
+        if (inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash))
+            return;
+        vInventoryToSend.push_back(inv);
     }
 
     void PushBlockHash(const uint256 &hash)
@@ -915,8 +939,11 @@ public:
     ~CNodeRef() { Release(); }
     CNode &operator*() const { return *_pnode; };
     CNode *operator->() const { return _pnode; };
+    // Returns true if this reference is not null
     explicit operator bool() const { return _pnode; }
+    // Access the raw pointer
     CNode *get() const { return _pnode; }
+    // Assignment -- destroys any reference to the current node and adds a ref to the new one
     CNodeRef &operator=(CNode *pnode)
     {
         if (pnode != _pnode)
@@ -927,6 +954,7 @@ public:
         }
         return *this;
     }
+    // Assignment -- destroys any reference to the current node and adds a ref to the new one
     CNodeRef &operator=(const CNodeRef &other) { return operator=(other._pnode); }
 private:
     CNode *_pnode;
@@ -935,8 +963,7 @@ private:
 typedef std::vector<CNodeRef> VNodeRefs;
 
 class CTransaction;
-void RelayTransaction(const CTransaction &tx, const bool fRespend = false);
-void RelayTransaction(const CTransaction &tx, const CDataStream &ss, const bool fRespend = false);
+void RelayTransaction(const CTransactionRef &ptx, const bool fRespend = false);
 
 /** Access to the (IP) address database (peers.dat) */
 class CAddrDB

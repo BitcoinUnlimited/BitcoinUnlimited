@@ -23,6 +23,9 @@
 
 #include <unordered_map>
 
+class CTxUndo;
+class CValidationState;
+
 struct CCoinsStats
 {
     int nHeight;
@@ -155,7 +158,7 @@ private:
 class CCoinsView
 {
 public:
-    mutable CCriticalSection cs_utxo;
+    mutable CSharedCriticalSection cs_utxo;
 
     //! Retrieve the Coin (unspent transaction output) for a given outpoint.
     virtual bool GetCoin(const COutPoint &outpoint, Coin &coin) const;
@@ -165,7 +168,12 @@ public:
     virtual bool HaveCoin(const COutPoint &outpoint) const;
 
     //! Retrieve the block hash whose state this CCoinsView currently represents
-    virtual uint256 GetBestBlock() const;
+    virtual uint256 _GetBestBlock() const;
+    uint256 GetBestBlock() const
+    {
+        READLOCK(cs_utxo);
+        return _GetBestBlock();
+    }
 
     //! Do a bulk modification (multiple Coin changes + BestBlock change).
     //! The passed mapCoins can be modified.
@@ -194,7 +202,7 @@ public:
     CCoinsViewBacked(CCoinsView *viewIn);
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
-    uint256 GetBestBlock() const override;
+    uint256 _GetBestBlock() const override;
     void SetBackend(CCoinsView &viewIn);
     bool BatchWrite(CCoinsMap &mapCoins,
         const uint256 &hashBlock,
@@ -204,10 +212,59 @@ public:
     size_t EstimateSize() const override;
 };
 
+class CCoinsViewCache;
+
+/**
+ * A reference to a mutable cache entry. Encapsulating it allows us to run
+ *  cleanup code after the modification is finished, and keeping track of
+ *  concurrent modifications.
+ */
+class CoinModifier
+{
+protected:
+    const CCoinsViewCache *cache;
+    CCoinsMap::const_iterator it;
+    const Coin *coin;
+
+public:
+    operator bool() const { return coin != nullptr; }
+    const Coin *operator->() { return coin; }
+    const Coin &operator*() { return *coin; }
+    CoinModifier(const CCoinsViewCache &cacheObj, const COutPoint &output);
+    ~CoinModifier();
+    friend class CCoinsViewCache;
+};
+
+
+/**
+ * A reference to an immutable cache entry.  This class holds the appropriate lock for you
+ * while you access the underlying data.
+ */
+class CoinAccessor
+{
+protected:
+    const CCoinsViewCache *cache;
+    CCoinsMap::const_iterator it;
+    const Coin *coin;
+    CDeferredSharedLocker lock;
+
+public:
+    operator bool() const { return coin != nullptr; }
+    const Coin *operator->() { return coin; }
+    const Coin &operator*() { return *coin; }
+    CoinAccessor(const CCoinsViewCache &cacheObj, const COutPoint &output);
+    // finds the first unspent output in this tx (slow)
+    CoinAccessor(const CCoinsViewCache &cacheObj, const uint256 &txid);
+    ~CoinAccessor();
+    friend class CCoinsViewCache;
+};
 
 /** CCoinsView that adds a memory cache for transactions to another CCoinsView */
 class CCoinsViewCache : public CCoinsViewBacked
 {
+    friend class CoinAccessor;
+    friend class CoinModifier;
+
 protected:
     /**
      * Make mutable so that we can "fill the cache" even from Get-methods
@@ -216,7 +273,7 @@ protected:
     mutable uint256 hashBlock;
     mutable uint64_t nBestCoinHeight;
     mutable CCoinsMap cacheCoins;
-
+    mutable CSharedCriticalSection csCacheInsert;
     /* Cached dynamic memory usage for the inner Coin objects. */
     mutable size_t cachedCoinsUsage;
 
@@ -228,6 +285,7 @@ public:
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const;
     bool HaveCoin(const COutPoint &outpoint) const;
     uint256 GetBestBlock() const;
+    uint256 _GetBestBlock() const;
     void SetBestBlock(const uint256 &hashBlock);
     bool BatchWrite(CCoinsMap &mapCoins,
         const uint256 &hashBlock,
@@ -246,7 +304,7 @@ public:
      * more efficient than GetCoin. Modifications to other cache entries are
      * allowed while accessing the returned pointer.
      */
-    const Coin &AccessCoin(const COutPoint &output) const;
+    const Coin &_AccessCoin(const COutPoint &output) const;
 
     /**
      * Add a coin. Set potential_overwrite to true if a non-pruned version may
@@ -273,7 +331,7 @@ public:
      */
     void Clear()
     {
-        LOCK(cs_utxo);
+        WRITELOCK(cs_utxo);
         cacheCoins.clear();
     }
 
@@ -302,6 +360,7 @@ public:
 
     //! Calculate the size of the cache (in bytes)
     size_t DynamicMemoryUsage() const;
+    size_t _DynamicMemoryUsage() const;
 
     //! Recalculate and Reset the size of cachedCoinsUsage
     size_t ResetCachedCoinUsage() const;
@@ -326,8 +385,10 @@ public:
      */
     double GetPriority(const CTransaction &tx, int nHeight, CAmount &inChainInputValue) const;
 
-private:
-    CCoinsMap::iterator FetchCoin(const COutPoint &outpoint) const;
+protected:
+    // returns an iterator pointing to the coin and lock is taken (caller must unlock when finished with iterator)
+    // If lock is nullptr, the writelock must already be taken.
+    CCoinsMap::iterator FetchCoin(const COutPoint &outpoint, CDeferredSharedLocker *lock) const;
 
     /**
      * By making the copy constructor private, we prevent accidentally using it when one intends to create a cache on
@@ -342,7 +403,17 @@ private:
 // (pre-BIP34) cases.
 void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight);
 
-//! Utility function to find any unspent output with a given txid.
-const Coin &AccessByTxid(const CCoinsViewCache &cache, const uint256 &txid);
+//! Mark a transaction's inputs as spent in the passed CCoinsViewCache, and create the needed undo information.
+void SpendCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache &utxo, CTxUndo &txundo, int nHeight);
+
+/** Apply the effects of this transaction on the UTXO set represented by view.  This function is equivalent to
+SpendCoins(...); AddCoins(...);
+*/
+void UpdateCoins(const CTransaction &tx,
+    CValidationState &state,
+    CCoinsViewCache &inputs,
+    CTxUndo &txundo,
+    int nHeight);
+void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache &inputs, int nHeight);
 
 #endif // BITCOIN_COINS_H

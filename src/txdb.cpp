@@ -8,10 +8,10 @@
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "hash.h"
-#include "main.h"
 #include "pow.h"
 #include "ui_interface.h"
 #include "uint256.h"
+#include "validation/validation.h"
 
 #include <stdint.h>
 
@@ -29,9 +29,6 @@ static const char DB_BEST_BLOCK = 'B';
 static const char DB_FLAG = 'F';
 static const char DB_REINDEX_FLAG = 'R';
 static const char DB_LAST_BLOCK = 'l';
-
-// to distinguish best block for a specific DB type, values correspond to enum vaue (blockdb_wrapper.h)
-static const char DB_BEST_BLOCK_BLOCKDB = 'D';
 
 
 namespace
@@ -66,68 +63,113 @@ CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe)
 
 bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const
 {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
     return db.Read(CoinEntry(&outpoint), coin);
 }
 
 bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const
 {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
     return db.Exists(CoinEntry(&outpoint));
 }
 
 uint256 CCoinsViewDB::GetBestBlock() const
 {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
+    return _GetBestBlock();
+}
+
+uint256 CCoinsViewDB::_GetBestBlock() const
+{
+    AssertLockHeld(cs_utxo);
     uint256 hashBestChain;
-    if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+    std::string strmode = std::to_string(static_cast<int32_t>(BLOCK_DB_MODE));
+    if (pblockdb)
     {
-        hashBestChain = GetBestBlockSeq();
-    }
-    else if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
-    {
-        hashBestChain = GetBestBlockDb();
+        // just use the int that is the db mode as its key for the best block it has
+        if (!db.Read(strmode, hashBestChain))
+            return uint256();
     }
     else
     {
-        return uint256();
+        if (!db.Read(DB_BEST_BLOCK, hashBestChain))
+            return uint256();
     }
     return hashBestChain;
 }
 
-uint256 CCoinsViewDB::GetBestBlockSeq() const
+uint256 CCoinsViewDB::GetBestBlock(BlockDBMode mode) const
 {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
+    return _GetBestBlock(mode);
+}
+
+uint256 CCoinsViewDB::_GetBestBlock(BlockDBMode mode) const
+{
+    AssertLockHeld(cs_utxo);
     uint256 hashBestChain;
-    if (!db.Read(DB_BEST_BLOCK, hashBestChain))
-        return uint256();
+    // if override isnt end, override the fetch to get the best block of a specific mode
+    if (mode != END_STORAGE_OPTIONS)
+    {
+        std::string strmode = std::to_string(static_cast<int32_t>(mode));
+        if (mode == SEQUENTIAL_BLOCK_FILES)
+        {
+            if (!db.Read(DB_BEST_BLOCK, hashBestChain))
+                return uint256();
+        }
+        else
+        {
+            if (!db.Read(strmode, hashBestChain))
+                return uint256();
+        }
+    }
     return hashBestChain;
 }
 
-void CCoinsViewDB::WriteBestBlockSeq(const uint256 &hashBlock)
+void CCoinsViewDB::WriteBestBlock(const uint256 &hashBlock)
 {
-    LOCK(cs_utxo);
+    WRITELOCK(cs_utxo);
+    _WriteBestBlock(hashBlock);
+}
+
+void CCoinsViewDB::_WriteBestBlock(const uint256 &hashBlock)
+{
+    AssertWriteLockHeld(cs_utxo);
+    std::string strmode = std::to_string(static_cast<int32_t>(BLOCK_DB_MODE));
     if (!hashBlock.IsNull())
     {
-        db.Write(DB_BEST_BLOCK, hashBlock);
+        if (pblockdb)
+        {
+            // just use the int that is the db mode as its key for the best block it has
+            db.Write(strmode, hashBlock);
+        }
+        else // sequential files doesnt use the int of its mode for backwards compatibility reasons
+        {
+            db.Write(DB_BEST_BLOCK, hashBlock);
+        }
     }
 }
 
-uint256 CCoinsViewDB::GetBestBlockDb() const
+void CCoinsViewDB::WriteBestBlock(const uint256 &hashBlock, BlockDBMode mode)
 {
-    LOCK(cs_utxo);
-    uint256 hashBestChain;
-    if (!db.Read(DB_BEST_BLOCK_BLOCKDB, hashBestChain))
-        return uint256();
-    return hashBestChain;
+    WRITELOCK(cs_utxo);
+    _WriteBestBlock(hashBlock);
 }
 
-void CCoinsViewDB::WriteBestBlockDb(const uint256 &hashBlock)
+void CCoinsViewDB::_WriteBestBlock(const uint256 &hashBlock, BlockDBMode mode)
 {
-    LOCK(cs_utxo);
-    if (!hashBlock.IsNull())
+    AssertWriteLockHeld(cs_utxo);
+    if (mode != END_STORAGE_OPTIONS)
     {
-        db.Write(DB_BEST_BLOCK_BLOCKDB, hashBlock);
+        std::string strmode = std::to_string(static_cast<int32_t>(mode));
+        if (mode == SEQUENTIAL_BLOCK_FILES)
+        {
+            db.Write(DB_BEST_BLOCK, hashBlock);
+        }
+        else
+        {
+            db.Write(strmode, hashBlock);
+        }
     }
 }
 
@@ -136,7 +178,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
     const uint64_t nBestCoinHeight,
     size_t &nChildCachedCoinsUsage)
 {
-    LOCK(cs_utxo);
+    WRITELOCK(cs_utxo);
     CDBBatch batch(db);
     size_t count = 0;
     size_t changed = 0;
@@ -193,10 +235,8 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
             it++;
         count++;
     }
-    if (!hashBlock.IsNull() && BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
-        batch.Write(DB_BEST_BLOCK, hashBlock);
-    else if (!hashBlock.IsNull() && BLOCK_DB_MODE == DB_BLOCK_STORAGE)
-        batch.Write(DB_BEST_BLOCK_BLOCKDB, hashBlock);
+    if (!hashBlock.IsNull())
+        _WriteBestBlock(hashBlock);
 
     bool ret = db.WriteBatch(batch);
     LOG(COINDB, "Committing %u changed transactions (out of %u) to coin database with %u batch writes...\n",
@@ -206,13 +246,13 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
 
 size_t CCoinsViewDB::EstimateSize() const
 {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
     return db.EstimateSize(DB_COIN, (char)(DB_COIN + 1));
 }
 
 size_t CCoinsViewDB::TotalWriteBufferSize() const
 {
-    LOCK(cs_utxo);
+    READLOCK(cs_utxo);
     return db.TotalWriteBufferSize();
 }
 
@@ -716,7 +756,7 @@ void CacheSizeCalculations(int64_t _nTotalCache,
     // If we are in block db storage mode then calculated the level db cache size for the block and undo caches.
     // As a safeguard make them at least as large as the _nBlockTreeDBCache;
     _nTotalCache -= _nBlockTreeDBCache;
-    if (BLOCK_DB_MODE == DB_BLOCK_STORAGE)
+    if (BLOCK_DB_MODE == LEVELDB_BLOCK_STORAGE)
     {
         // use up to 5% for the level db block cache but no bigger than 256MB
         _nBlockDBCache = _nTotalCache * 0.05;

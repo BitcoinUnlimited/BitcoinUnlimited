@@ -2,7 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "graphene.h"
+#include "blockrelay/graphene.h"
+#include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "connmgr.h"
@@ -14,12 +15,13 @@
 #include "policy/policy.h"
 #include "pow.h"
 #include "requestManager.h"
-#include "thinblock.h"
 #include "timedata.h"
+#include "txadmission.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "util.h"
 #include "utiltime.h"
+#include "validation/validation.h"
 
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
 
@@ -160,7 +162,8 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Look for each transaction in our various pools and buffers.
     // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
     {
-        LOCK2(orphanpool.cs, cs_xval);
+        READLOCK(orphanpool.cs);
+        LOCK(cs_xval);
         if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
             return false;
     }
@@ -184,7 +187,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
         // for compression statistics, we have to add up the size of grapheneblock and the re-requested grapheneBlockTx.
         int nSizeGrapheneBlockTx = msgSize;
-        int blockSize = ::GetSerializeSize(pfrom->grapheneBlock, SER_NETWORK, CBlock::CURRENT_VERSION);
+        int blockSize = pfrom->grapheneBlock.GetBlockSize();
         LOG(GRAPHENE, "Reassembled grblktx for %s (%d bytes). Message was %d bytes (graphene block) and %d bytes "
                       "(re-requested tx), compression ratio %3.2f, peer=%s\n",
             pfrom->grapheneBlock.GetHash().ToString(), blockSize, pfrom->nSizeGrapheneBlock, nSizeGrapheneBlockTx,
@@ -233,15 +236,16 @@ bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Check for Misbehaving and DOS
     // If they make more than 20 requests in 10 minutes then disconnect them
+    if (Params().NetworkIDString() != "regtest")
     {
-        LOCK(cs_vNodes);
         if (pfrom->nGetGrapheneBlockTxLastTime <= 0)
             pfrom->nGetGrapheneBlockTxLastTime = GetTime();
         uint64_t nNow = GetTime();
-        pfrom->nGetGrapheneBlockTxCount *=
-            std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneBlockTxLastTime));
+        double tmp = pfrom->nGetGrapheneBlockTxCount;
+        while (!pfrom->nGetGrapheneBlockTxCount.compare_exchange_weak(
+            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneBlockTxLastTime)) + 1)))
+            ;
         pfrom->nGetGrapheneBlockTxLastTime = nNow;
-        pfrom->nGetGrapheneBlockTxCount += 1;
         LOG(GRAPHENE, "nGetGrapheneTxCount is %f\n", pfrom->nGetGrapheneBlockTxCount);
         if (pfrom->nGetGrapheneBlockTxCount >= 20)
         {
@@ -470,7 +474,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
     bool fMerkleRootCorrect = true;
     {
         // Do the orphans first before taking the mempool.cs lock, so that we maintain correct locking order.
-        LOCK(orphanpool.cs);
+        READLOCK(orphanpool.cs);
         for (auto &kv : orphanpool.mapOrphanTransactions)
         {
             uint64_t cheapHash = kv.first.GetCheapHash();
@@ -626,7 +630,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
     // We now have all the transactions that are in this block
     pfrom->grapheneBlockWaitingForTxns = -1;
-    int blockSize = ::GetSerializeSize(pfrom->grapheneBlock, SER_NETWORK, CBlock::CURRENT_VERSION);
+    int blockSize = pfrom->grapheneBlock.GetBlockSize();
     LOG(GRAPHENE,
         "Reassembled graphene block for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
         pfrom->grapheneBlock.GetHash().ToString(), blockSize, pfrom->nSizeGrapheneBlock,
@@ -644,6 +648,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount)
 {
+    AssertLockHeld(orphanpool.cs);
     AssertLockHeld(cs_xval);
 
     // We must have all the full tx hashes by this point.  We first check for any repeating
@@ -687,16 +692,31 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         CTransactionRef ptx = nullptr;
         if (!hash.IsNull())
         {
+            // Check the commit queue first. If we check the mempool first and it's not in there then when we release
+            // the lock on the mempool it may get transfered from the commitQ to the mempool before we have time to
+            // grab the lock on the commitQ and we'll think we don't have the transaction.
+            // the mempool.
             bool inMemPool = false;
-            ptx = mempool.get(hash);
+            bool inCommitQ = false;
+            ptx = CommitQGet(hash);
             if (ptx)
-                inMemPool = true;
+            {
+                inCommitQ = true;
+            }
+            else
+            {
+                // if it's not in the mempool then check the commitQ
+                ptx = mempool.get(hash);
+                if (ptx)
+                    inMemPool = true;
+            }
 
             bool inMissingTx = pfrom->mapMissingTx.count(hash.GetCheapHash()) > 0;
             bool inAdditionalTxs = mapAdditionalTxs.count(hash) > 0;
             bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
 
-            if ((inMemPool && inMissingTx) || (inOrphanCache && inMissingTx) || (inAdditionalTxs && inMissingTx))
+            if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx) ||
+                (inAdditionalTxs && inMissingTx))
                 unnecessaryCount++;
 
             if (inAdditionalTxs)
@@ -706,7 +726,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
                 ptx = orphanpool.mapOrphanTransactions[hash].ptx;
                 setUnVerifiedOrphanTxHash.insert(hash);
             }
-            else if (inMemPool && fXVal)
+            else if ((inMemPool || inCommitQ) && fXVal)
                 setPreVerifiedTxHash.insert(hash);
             else if (inMissingTx)
                 ptx = pfrom->mapMissingTx[hash.GetCheapHash()];
@@ -1179,7 +1199,7 @@ bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
         // or backward by a random amount plus or minus 2 seconds.
         FastRandomContext insecure_rand(false);
         uint64_t nOffset = nTimeToWait - (8000 + (insecure_rand.rand64() % 4000) + 1);
-        mapGrapheneBlockTimer[hash] = GetTimeMillis() + nOffset;
+        mapGrapheneBlockTimer[hash] = std::make_pair(GetTimeMillis() + nOffset, false);
         LOG(GRAPHENE, "Starting Preferential Graphene Block timer (%d millis)\n", nTimeToWait + nOffset);
     }
     else
@@ -1187,11 +1207,21 @@ bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
         // Check that we have not exceeded time limit.
         // If we have then we want to return false so that we can
         // proceed to download a regular block instead.
-        int64_t elapsed = GetTimeMillis() - mapGrapheneBlockTimer[hash];
-        if (elapsed > nTimeToWait)
+        auto iter = mapGrapheneBlockTimer.find(hash);
+        if (iter != mapGrapheneBlockTimer.end())
         {
-            LOG(GRAPHENE, "Preferential Graphene Block timer exceeded\n");
-            return false;
+            int64_t elapsed = GetTimeMillis() - iter->second.first;
+            if (elapsed > nTimeToWait)
+            {
+                // Only print out the log entry once.  Because the graphene timer will be hit
+                // many times when requesting a block we don't want to fill up the log file.
+                if (!iter->second.second)
+                {
+                    iter->second.second = true;
+                    LOG(GRAPHENE, "Preferential Graphene Block timer exceeded\n");
+                }
+                return false;
+            }
         }
     }
     return true;
@@ -1439,13 +1469,14 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
     // Check for Misbehaving and DOS
     // If they make more than 20 requests in 10 minutes then disconnect them
     {
-        LOCK(cs_vNodes);
         if (pfrom->nGetGrapheneLastTime <= 0)
             pfrom->nGetGrapheneLastTime = GetTime();
         uint64_t nNow = GetTime();
-        pfrom->nGetGrapheneCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneLastTime));
+        double tmp = pfrom->nGetGrapheneCount;
+        while (!pfrom->nGetGrapheneCount.compare_exchange_weak(
+            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneLastTime)) + 1)))
+            ;
         pfrom->nGetGrapheneLastTime = nNow;
-        pfrom->nGetGrapheneCount += 1;
         LOG(GRAPHENE, "nGetGrapheneCount is %f\n", pfrom->nGetGrapheneCount);
         if (chainparams.NetworkIDString() == "main") // other networks have variable mining rates
         {
@@ -1491,7 +1522,17 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
     return true;
 }
 
-CMemPoolInfo GetGrapheneMempoolInfo() { return CMemPoolInfo(mempool.size()); }
+CMemPoolInfo GetGrapheneMempoolInfo()
+{
+    // We need the number of transactions in the mempool and orphanpools but also the number
+    // in the txCommitQ that have been processed and valid, and which will be in the mempool shortly.
+    uint64_t nCommitQ = 0;
+    {
+        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        nCommitQ = txCommitQ.size();
+    }
+    return CMemPoolInfo(mempool.size() + orphanpool.GetOrphanPoolSize() + nCommitQ);
+}
 void RequestFailoverBlock(CNode *pfrom, uint256 blockHash)
 {
     if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable())
@@ -1505,7 +1546,7 @@ void RequestFailoverBlock(CNode *pfrom, uint256 blockHash)
 
         std::vector<uint256> vOrphanHashes;
         {
-            LOCK(orphanpool.cs);
+            READLOCK(orphanpool.cs);
             for (auto &mi : orphanpool.mapOrphanTransactions)
                 vOrphanHashes.emplace_back(mi.first);
         }

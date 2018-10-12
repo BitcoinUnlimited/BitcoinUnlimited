@@ -16,14 +16,10 @@ enum FlushStateMode
     FLUSH_STATE_ALWAYS
 };
 
-enum BlockDBMode
-{
-    SEQUENTIAL_BLOCK_FILES, // 0
-    DB_BLOCK_STORAGE // 1
-};
 
 static const BlockDBMode DEFAULT_BLOCK_DB_MODE = SEQUENTIAL_BLOCK_FILES;
 extern BlockDBMode BLOCK_DB_MODE;
+extern CDatabaseAbstract *pblockdb;
 
 void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache,
     const int64_t &_nBlockDBCache,
@@ -73,6 +69,15 @@ bool FlushStateToDisk(CValidationState &state, FlushStateMode mode);
 void FlushStateToDisk();
 /** Prune block files and flush state to disk. */
 void PruneAndFlush();
+
+bool FindBlockPos(CValidationState &state,
+    CDiskBlockPos &pos,
+    unsigned int nAddSize,
+    unsigned int nHeight,
+    uint64_t nTime,
+    bool fKnown = false);
+
+bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigned int nAddSize);
 
 
 extern BlockDBMode BLOCK_DB_MODE;

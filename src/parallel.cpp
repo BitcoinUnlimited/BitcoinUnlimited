@@ -4,17 +4,19 @@
 
 #include "parallel.h"
 
+#include "blockrelay/graphene.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "dosman.h"
-#include "graphene.h"
 #include "net.h"
 #include "pow.h"
+#include "script/sigcache.h"
 #include "timedata.h"
 #include "txorphanpool.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utiltime.h"
+#include "validation/validation.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -33,36 +35,60 @@ static void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlo
 static void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck> *pqueue)
 {
     ostringstream tName;
-    tName << "bitcoin-scriptchk" << i;
+    tName << "scriptchk" << i;
     RenameThread(tName.str().c_str());
     pqueue->Thread();
 }
 
-CParallelValidation::CParallelValidation(int threadCount, boost::thread_group *threadGroup)
-    : semThreadCount(nScriptCheckQueues)
+bool CScriptCheck::operator()()
 {
-    // A single thread has no parallelism so just use the main thread.  Equivalent to parallel being turned off.
-    if (threadCount <= 1)
-        threadCount = 0;
-    else if (threadCount > MAX_SCRIPTCHECK_THREADS)
-        threadCount = MAX_SCRIPTCHECK_THREADS;
-    nThreads = threadCount;
+    const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
+    CachingTransactionSignatureChecker checker(ptxTo, nIn, amount, nFlags, cacheStore);
+    if (!VerifyScript(scriptSig, scriptPubKey, nFlags, checker, &error, &sighashType))
+        return false;
+    if (resourceTracker)
+        resourceTracker->Update(ptxTo->GetHash(), checker.GetNumSigops(), checker.GetBytesHashed());
+    return true;
+}
 
-    LOGA("Using %d threads for script verification\n", threadCount);
+CParallelValidation::CParallelValidation() : nThreads(0), semThreadCount(nScriptCheckQueues)
+{
+    // There are nScriptCheckQueues which are used to validate blocks in parallel. Each block
+    // that validates will use one script check queue which must *not* be shared with any other
+    // validating block. Furthermore, each script check queue has a number of threads which it
+    // controls and which do the actual validating of scripts.
 
+    // Determine the number of threads to use for each check queue.
+    //
+    //-par=0 means autodetect number of cores.
+    nThreads = GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
+    if (nThreads <= 0)
+        nThreads += GetNumCores();
+    // A single thread has no parallelism so just use the main thread
+    // (Equivalent to parallel being turned off).
+    if (nThreads <= 1)
+        nThreads = 0;
+    else if (nThreads > MAX_SCRIPTCHECK_THREADS)
+        nThreads = MAX_SCRIPTCHECK_THREADS;
+
+    // Create each script check queue with all associated threads.
+    LOGA("Launching %d ScriptQueues each using %d threads for script verification\n", nScriptCheckQueues, nThreads);
     while (QueueCount() < nScriptCheckQueues)
     {
         auto queue = new CCheckQueue<CScriptCheck>(128);
-
         for (unsigned int i = 0; i < nThreads; i++)
-            threadGroup->create_thread(boost::bind(&AddScriptCheckThreads, i + 1, queue));
-
+        {
+            threadGroup.create_thread(boost::bind(&AddScriptCheckThreads, i + 1, queue));
+        }
         vQueues.push_back(queue);
     }
 }
 
 CParallelValidation::~CParallelValidation()
 {
+    for (auto queue : vQueues)
+        queue->Shutdown();
+    threadGroup.join_all();
     for (auto queue : vQueues)
         delete queue;
 }
@@ -405,7 +431,7 @@ void CParallelValidation::ClearOrphanCache(const CBlockRef pblock)
 {
     if (!IsInitialBlockDownload())
     {
-        LOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs);
         {
             // Erase any orphans that may have been in the previous block and arrived
             // after the previous block had already been processed.

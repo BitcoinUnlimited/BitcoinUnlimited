@@ -58,6 +58,8 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
         for node in self.nodes:
             node.invalidateblock(blocks[0])
 
+        time.sleep(3) # wait for tx processing threads to put them back into the mempool
+
         # mempool should be empty, all txns confirmed
         assert_equal(set(self.nodes[0].getrawmempool()), set(spends1_id+spends2_id))
         for txid in spends1_id+spends2_id:

@@ -15,7 +15,7 @@
 class CCoinsViewCache;
 
 /** Default for -blockmaxsize and -blockminsize, which control the range of sizes the mining code will create **/
-static const unsigned int DEFAULT_BLOCK_MAX_SIZE = 2000000;
+static const unsigned int DEFAULT_BLOCK_MAX_SIZE = 8000000;
 static const unsigned int DEFAULT_BLOCK_MIN_SIZE = 0;
 
 /** Default for -blockprioritysize, a 5% maximum space for zero/low-fee transactions **/
@@ -53,6 +53,13 @@ static const unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS =
 
 /** Used as the flags parameter to sequence and nLocktime checks in non-consensus code. */
 static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS = LOCKTIME_VERIFY_SEQUENCE | LOCKTIME_MEDIAN_TIME_PAST;
+
+/**
+ * Used as the flags parameters to check for sigops as if OP_CHECKDATASIG is
+ * enabled. Can be removed after OP_CHECKDATASIG is activated as the flag is
+ * made standard.
+ */
+static const uint32_t STANDARD_CHECKDATASIG_VERIFY_FLAGS = STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_CHECKDATASIG;
 
 bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType);
 /**

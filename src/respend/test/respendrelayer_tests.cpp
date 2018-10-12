@@ -20,11 +20,13 @@ BOOST_AUTO_TEST_CASE(not_interesting)
     CTxMemPool::txiter dummy;
     bool lookAtMore;
 
-    lookAtMore = r.AddOutpointConflict(COutPoint{}, dummy, CTransaction{}, true /* seen before */, false);
+    lookAtMore =
+        r.AddOutpointConflict(COutPoint{}, dummy, MakeTransactionRef(CTransaction{}), true /* seen before */, false);
     BOOST_CHECK(lookAtMore);
     BOOST_CHECK(!r.IsInteresting());
 
-    lookAtMore = r.AddOutpointConflict(COutPoint{}, dummy, CTransaction{}, false, true /* is equivalent */);
+    lookAtMore =
+        r.AddOutpointConflict(COutPoint{}, dummy, MakeTransactionRef(CTransaction{}), false, true /* is equivalent */);
     BOOST_CHECK(lookAtMore);
     BOOST_CHECK(!r.IsInteresting());
 }
@@ -35,7 +37,7 @@ BOOST_AUTO_TEST_CASE(is_interesting)
     CTxMemPool::txiter dummy;
     bool lookAtMore;
 
-    lookAtMore = r.AddOutpointConflict(COutPoint{}, dummy, CTransaction{}, false, false);
+    lookAtMore = r.AddOutpointConflict(COutPoint{}, dummy, MakeTransactionRef(CTransaction{}), false, false);
     BOOST_CHECK(!lookAtMore);
     BOOST_CHECK(r.IsInteresting());
 }
@@ -56,7 +58,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
 
     // Create a "not interesting" respend
     RespendRelayer r;
-    r.AddOutpointConflict(COutPoint{}, dummy, respend, true, false);
+    r.AddOutpointConflict(COutPoint{}, dummy, MakeTransactionRef(respend), true, false);
     r.Trigger();
     BOOST_CHECK_EQUAL(size_t(0), node.vInventoryToSend.size());
     r.SetValid(true);
@@ -64,7 +66,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     BOOST_CHECK_EQUAL(size_t(0), node.vInventoryToSend.size());
 
     // Create an interesting, but invalid respend
-    r.AddOutpointConflict(COutPoint{}, dummy, respend, false, false);
+    r.AddOutpointConflict(COutPoint{}, dummy, MakeTransactionRef(respend), false, false);
     BOOST_CHECK(r.IsInteresting());
     r.SetValid(false);
     r.Trigger();

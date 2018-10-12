@@ -53,6 +53,15 @@ class MyTest (BitcoinTestFramework):
         del c["prevhash"]
         expectException(lambda: node.submitminingsolution(c), JSONRPCException)
 
+        # ask for a valid coinbase size
+        c = node.getminingcandidate(1050)
+		
+        # ask for a coinbase size that is too big
+        expectException(lambda: node.getminingcandidate(1000000000000000), JSONRPCException)
+               
+        # ask for a coinbase size that is too small
+        expectException(lambda: node.getminingcandidate(-1), JSONRPCException)
+        
         # the most awful mining algorithm: just submit with an arbitrary nonce
         # (works because testnet accepts almost anything)
         nonce = 0
@@ -91,8 +100,7 @@ class MyTest (BitcoinTestFramework):
         assert_equal(0x123456, block["version"])
 
         # change the coinbase
-        tx = CTransaction()
-        tx.deserialize(BytesIO(unhexlify(c["coinbase"])))
+        tx = CTransaction().deserialize(c["coinbase"])
         tx.vout[0].scriptPubKey = CScript([OP_1])
 
         nonce = 0
@@ -115,6 +123,45 @@ class MyTest (BitcoinTestFramework):
         block.deserialize(BytesIO(unhexlify(blockhex)))
         assert_equal(block.vtx[0].vout[0].scriptPubKey, CScript([OP_1]))
 
+        #### Test that a dynamic relay policy change does not effect the mining
+        #    of txns currently in the mempool.
+        self.nodes[0].generate(5);
+        self.sync_all()
+        
+        # Add a few txns to the mempool and mine them with the default fee
+        self.nodes[0].set("minlimitertxfee=0")
+        self.nodes[1].set("minlimitertxfee=0")
+        self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
+        self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
+        self.sync_all()
+        assert_equal(str(self.nodes[0].getnetworkinfo()["relayfee"]), "0E-8")
+        assert_equal(self.nodes[0].getmempoolinfo()["size"], 2)
+        assert_equal(self.nodes[0].getmempoolinfo()["mempoolminfee"], 0)
+        self.nodes[0].generate(1);
+        self.sync_all()
+        assert_equal(self.nodes[0].getmempoolinfo()["size"], 0)
+        assert_equal(self.nodes[0].getmempoolinfo()["mempoolminfee"], 0)
+
+        # Add a few txns to the mempool, then increase the relayfee beyond what the txns would pay
+        # and mine a block. All txns should be mined and removed from the
+        self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
+        self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
+        self.sync_all()
+        assert_equal(self.nodes[0].getmempoolinfo()["size"], 2)
+        assert_equal(self.nodes[0].getmempoolinfo()["mempoolminfee"], 0)
+
+        # Make the minlimitertxfee so high it would be higher than any possible fee.
+        self.nodes[0].set("minlimitertxfee=1000")
+        self.nodes[1].set("minlimitertxfee=1000")
+        self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
+        self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
+        self.sync_all()
+        assert_equal(str(self.nodes[0].getnetworkinfo()["relayfee"]), "0.01000000")
+        self.nodes[0].generate(1);
+        self.sync_all()
+        print(str(self.nodes[0].getmempoolinfo()["mempoolminfee"]))
+        assert_equal(self.nodes[0].getmempoolinfo()["size"], 0)
+
 
 if __name__ == '__main__':
     MyTest().main()
@@ -136,7 +183,7 @@ def Test():
 
     # Execution is much faster if a ramdisk is used, so use it if one exists in a typical location
     if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmpdir=/ramdisk/test")
+        flags.append("--tmppfx=/ramdisk/test")
 
     # Out-of-source builds are awkward to start because they need an additional flag
     # automatically add this flag during testing for common out-of-source locations

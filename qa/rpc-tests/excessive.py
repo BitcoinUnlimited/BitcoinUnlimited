@@ -74,15 +74,6 @@ class ExcessiveBlockTest (BitcoinTestFramework):
                 pdb.set_trace()
 
     def run_test(self):
-        # Temporary workaround for the may15th hardfork. These tests will not work if the fork is enabled
-        # because we are forcing an EB of 32MB after each block is mined which invalidates many of these tests.
-        # So we set the mocktime to sometime far in advance of the fork.
-        MAY152018_START_TIME = 1526400000;
-        self.nodes[0].setmocktime(MAY152018_START_TIME - 10000)
-        self.nodes[1].setmocktime(MAY152018_START_TIME - 10000)
-        self.nodes[2].setmocktime(MAY152018_START_TIME - 10000)
-        self.nodes[3].setmocktime(MAY152018_START_TIME - 10000)
-
         BitcoinTestFramework.run_test(self)
         self.testCli()
         self.testExcessiveSigops()
@@ -102,9 +93,9 @@ class ExcessiveBlockTest (BitcoinTestFramework):
 
     def testCli(self):
 
-        # Assumes the default excessive at 16MB and mining at 1MB
+        # Assumes the default excessive at 32MB and mining at 8MB
         try:
-            self.nodes[0].setminingmaxblock(32000000)
+            self.nodes[0].setminingmaxblock(33000000)
         except JSONRPCException as e:
             pass
         else:
@@ -152,11 +143,10 @@ class ExcessiveBlockTest (BitcoinTestFramework):
                 n = 0
             if count > amt:
                 break
-        self.sync_all()
         logging.info("mine blocks")
         node.generate(1)  # mine all the created transactions
         logging.info("sync all blocks and mempools")
-        self.sync_all()
+        self.sync_blocks()
 
     def expectHeights(self, blockHeights, waittime=10):
         loop = 0
@@ -210,19 +200,11 @@ class ExcessiveBlockTest (BitcoinTestFramework):
         logging.info("testExcessiveSigops: Cleaning up node state")
 
         # We are not testing excessively sized blocks so make these large
-        self.nodes[0].set("net.excessiveBlock=5000000")
-        self.nodes[1].set("net.excessiveBlock=5000000")
-        self.nodes[2].set("net.excessiveBlock=5000000")
-        self.nodes[3].set("net.excessiveBlock=5000000")
-        self.nodes[0].setminingmaxblock(5000000)
-        self.nodes[1].setminingmaxblock(5000000)
-        self.nodes[2].setminingmaxblock(5000000)
-        self.nodes[3].setminingmaxblock(5000000)
-        # Stagger the accept depths so we can see the block accepted stepwise
-        self.nodes[0].set("net.excessiveAcceptDepth=0")
-        self.nodes[1].set("net.excessiveAcceptDepth=1")
-        self.nodes[2].set("net.excessiveAcceptDepth=2")
-        self.nodes[3].set("net.excessiveAcceptDepth=3")
+        for i in range(0,3):
+            self.nodes[i].setminingmaxblock(5000000)
+            self.nodes[i].set("net.excessiveBlock=5000000")
+            # Stagger the accept depths so we can see the block accepted stepwise
+            self.nodes[i].set("net.excessiveAcceptDepth=%d"%(i))
 
         for n in self.nodes:
             n.generate(10)
@@ -230,7 +212,7 @@ class ExcessiveBlockTest (BitcoinTestFramework):
 
         self.nodes[0].generate(100)  # create a lot of BTC for spending
 
-        self.sync_all()
+        self.sync_blocks()
 
         self.nodes[0].set("net.excessiveSigopsPerMb=100")  # Set low so txns will fail if its used
         self.nodes[1].set("net.excessiveSigopsPerMb=5000")
@@ -374,11 +356,10 @@ class ExcessiveBlockTest (BitcoinTestFramework):
                             n = 0
                         if count > 50:  # We don't need any more
                             break
-                    self.sync_all()
                     logging.info("mine blocks")
                     self.nodes[0].generate(5)  # mine all the created transactions
                     logging.info("sync all blocks and mempools")
-                    self.sync_all()
+                    self.sync_blocks()
 
                     wallet = self.nodes[0].listunspent()
                     wallet.sort(key=lambda x: x["amount"], reverse=True)
@@ -453,7 +434,7 @@ class ExcessiveBlockTest (BitcoinTestFramework):
                     wlen = len(wallet)
 
                 self.nodes[0].generate(1)
-                self.sync_all()
+                self.sync_blocks()
 
                 logging.info("Building > 1MB block...")
                 # Set the excessive transaction size larger for this node so we can
@@ -522,7 +503,7 @@ class ExcessiveBlockTest (BitcoinTestFramework):
                 self.sync_all()
             self.nodes[0].generate(100)
 
-        self.sync_all()
+        self.sync_blocks()
 
         # Set the accept depth at 1, 2, and 3 and watch each nodes resist the chain for that long
         self.nodes[0].setminingmaxblock(5000)  # keep the generated blocks within 16*the EB so no disconnects
@@ -564,7 +545,7 @@ class ExcessiveBlockTest (BitcoinTestFramework):
 
         logging.info("node3")
         self.nodes[0].generate(1)
-        self.sync_all()
+        self.sync_blocks()
         counts = [x.getblockcount() for x in self.nodes]
         assert_equal(counts, [base + 4] * 4)
 
@@ -573,7 +554,7 @@ class ExcessiveBlockTest (BitcoinTestFramework):
         logging.info("Test immediate propagation of additional excessively sized block, due to prior excessive")
         self.repeatTx(8, self.nodes[0], addr, .001)
         self.nodes[0].generate(1)
-        self.sync_all()
+        self.sync_blocks()
         counts = [x.getblockcount() for x in self.nodes]
         assert_equal(counts, [base + 5] * 4)
 
@@ -586,7 +567,6 @@ class ExcessiveBlockTest (BitcoinTestFramework):
         sync_blocks(self.nodes)
         self.repeatTx(8, self.nodes[0], addr, .001)
         base = self.nodes[0].getblockcount()
-        print("base: %d" % base)
         self.generateAndPrintBlock(self.nodes[0])
         time.sleep(2)  # give blocks a chance to fully propagate
         counts = [x.getblockcount() for x in self.nodes]
@@ -655,9 +635,11 @@ class ExcessiveBlockTest (BitcoinTestFramework):
 
             addrs = [x.getnewaddress() for x in self.nodes]
             ntxs = 0
-            for i in range(0, random.randint(1, 200)):
+            for i in range(0, random.randint(1, 20)):
                 try:
-                    self.nodes[random.randint(0, 3)].sendtoaddress(addrs[random.randint(0, 3)], .1)
+                    n = random.randint(0, 3)
+                    logging.info("%s: Send to %d" % (ntxs, n))
+                    self.nodes[n].sendtoaddress(addrs[random.randint(0, 3)], .1)
                     ntxs += 1
                 except JSONRPCException:  # could be spent all the txouts
                     pass
@@ -708,11 +690,18 @@ def info(type, value, tb):
 
 sys.excepthook = info
 
-
 def Test():
     t = ExcessiveBlockTest(True)
+    # t.drop_to_pdb = True
     bitcoinConf = {
-        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],  # "lck"
-        "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
+        "debug": ["rpc", "net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "blockprioritysize": 2000000,  # we don't want any transactions rejected due to insufficient fees...
+        "blockminsize": 1000000
     }
-    t.main(["--tmpdir=/ramdisk/test", "--nocleanup", "--noshutdown"], bitcoinConf, None)
+
+    flags = [] # ["--nocleanup", "--noshutdown"]
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmppfx=/ramdisk/test")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
+    t.main(flags, bitcoinConf, None)

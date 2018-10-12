@@ -14,7 +14,7 @@
 Functionality to build scripts, as well as SignatureHash().
 """
 
-
+from sys import stdout
 from .mininode import CTransaction, CTxOut, hash256
 from binascii import hexlify
 
@@ -82,6 +82,14 @@ class CScriptOp(int):
             return True
         else:
             return False
+
+    def toHex(self):
+        """Return the hex representation of this opcode"""
+        return hexlify(self.to_bytes(1,"little")).decode()
+
+    def toBin(self):
+        """Return the binary representation of this opcode"""
+        return self.to_bytes(1,"little")
 
     def __str__(self):
         return repr(self)
@@ -224,6 +232,8 @@ OP_CHECKSIG = CScriptOp(0xac)
 OP_CHECKSIGVERIFY = CScriptOp(0xad)
 OP_CHECKMULTISIG = CScriptOp(0xae)
 OP_CHECKMULTISIGVERIFY = CScriptOp(0xaf)
+OP_CHECKDATASIG = CScriptOp(0xba)
+OP_CHECKDATASIGVERIFY = CScriptOp(0xbb)
 
 # expansion
 OP_NOP1 = CScriptOp(0xb0)
@@ -352,6 +362,8 @@ VALID_OPCODES = {
     OP_CHECKSIGVERIFY,
     OP_CHECKMULTISIG,
     OP_CHECKMULTISIGVERIFY,
+    OP_CHECKDATASIG,
+    OP_CHECKDATASIGVERIFY,
 
     OP_NOP1,
     OP_CHECKLOCKTIMEVERIFY,
@@ -472,6 +484,8 @@ OPCODE_NAMES.update({
     OP_CHECKSIGVERIFY : 'OP_CHECKSIGVERIFY',
     OP_CHECKMULTISIG : 'OP_CHECKMULTISIG',
     OP_CHECKMULTISIGVERIFY : 'OP_CHECKMULTISIGVERIFY',
+    OP_CHECKDATASIG : 'OP_CHECKDATASIG',
+    OP_CHECKDATASIGVERIFY : 'OP_CHECKDATASIGVERIFY',
     OP_NOP1 : 'OP_NOP1',
     OP_CHECKLOCKTIMEVERIFY : 'OP_CHECKLOCKTIMEVERIFY',
     OP_CHECKSEQUENCEVERIFY : 'OP_CHECKSEQUENCEVERIFY',
@@ -591,6 +605,8 @@ OPCODES_BY_NAME = {
     'OP_CHECKSIGVERIFY' : OP_CHECKSIGVERIFY,
     'OP_CHECKMULTISIG' : OP_CHECKMULTISIG,
     'OP_CHECKMULTISIGVERIFY' : OP_CHECKMULTISIGVERIFY,
+    'OP_CHECKDATASIG' : OP_CHECKDATASIG,
+    'OP_CHECKDATASIGVERIFY' : OP_CHECKDATASIGVERIFY,
     'OP_NOP1' : OP_NOP1,
     'OP_CHECKLOCKTIMEVERIFY' : OP_CHECKLOCKTIMEVERIFY,
     'OP_CHECKSEQUENCEVERIFY' : OP_CHECKSEQUENCEVERIFY,
@@ -802,6 +818,28 @@ class CScript(bytes):
 
         return "CScript([%s])" % ', '.join(ops)
 
+    def prettyprint(self, outfile = stdout):
+        indent = 0
+        newline = False
+        for op in iter(self):
+            if isinstance(op, bytes):
+                rop = hexlify(op).decode("ascii")
+            else:
+                rop = repr(op)
+
+            if op in [OP_ELSE, OP_ENDIF, OP_NOTIF, OP_IF] and not newline:
+                print(file = outfile)
+                newline = True
+            if op in [OP_ELSE, OP_ENDIF, OP_NOTIF]:
+                indent -=1
+            if newline:
+                print(4 * indent * " ", file = outfile, end = '')
+            newline = ("VERIFY" in rop or
+                       op in [OP_IF, OP_ELSE, OP_ENDIF, OP_NOTIF, OP_RETURN])
+            print(rop+" ", file = outfile, end='\n' if newline else '')
+            if op in [OP_ELSE, OP_IF]:
+                indent +=1
+
     def GetSigOpCount(self, fAccurate):
         """Get the SigOp count.
 
@@ -812,7 +850,8 @@ class CScript(bytes):
         n = 0
         lastOpcode = OP_INVALIDOPCODE
         for (opcode, data, sop_idx) in self.raw_iter():
-            if opcode in (OP_CHECKSIG, OP_CHECKSIGVERIFY):
+            if opcode in (OP_CHECKSIG, OP_CHECKSIGVERIFY,
+                          OP_CHECKDATASIG, OP_CHECKDATASIGVERIFY):
                 n += 1
             elif opcode in (OP_CHECKMULTISIG, OP_CHECKMULTISIGVERIFY):
                 if fAccurate and (OP_1 <= lastOpcode <= OP_16):

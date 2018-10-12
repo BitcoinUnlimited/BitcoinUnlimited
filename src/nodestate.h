@@ -7,11 +7,12 @@
 #ifndef BITCOIN_NODESTATE_H
 #define BITCOIN_NODESTATE_H
 
+#include "main.h" // for cs_main
 #include "net.h" // For NodeId
 
 /**
 * Maintain validation-specific state about nodes, protected by cs_main, instead
-* by CNode's own locks. This simplifies asynchronous operation, where
+* of by CNode's own locks. This simplifies asynchronous operation, where
 * processing of incoming data is done after the ProcessMessage call returns,
 * and we're no longer holding the node's locks.
 */
@@ -48,10 +49,36 @@ struct CNodeState
     CNodeState(CAddress addrIn, std::string addrNameIn);
 };
 
-/** Map maintaining per-node state. Requires cs_main. */
-extern std::map<NodeId, CNodeState> mapNodeState;
+class CState
+{
+protected:
+    /** Map maintaining per-node state. Requires cs_main. */
+    std::map<NodeId, CNodeState> mapNodeState;
 
-// Requires cs_main.
-extern CNodeState *State(NodeId nId);
+public:
+    /** Return a node ref for an node id */
+    CNodeState *State(const NodeId id);
+
+    /** Add a nodestate from the map */
+    void InitializeNodeState(const CNode *pnode);
+
+    /** Delete a nodestate from the map */
+    void RemoveNodeState(const NodeId id);
+
+    /** Clear the entire nodestate map */
+    void Clear()
+    {
+        LOCK(cs_main);
+        mapNodeState.clear();
+    }
+
+    /** Is mapNodestate empty */
+    bool Empty()
+    {
+        LOCK(cs_main);
+        return mapNodeState.empty();
+    }
+};
+extern CState nodestate;
 
 #endif // BITCOIN_NODESTATE_H

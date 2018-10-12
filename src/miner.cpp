@@ -24,10 +24,10 @@
 #include "script/standard.h"
 #include "timedata.h"
 #include "txmempool.h"
-#include "uahf_fork.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utilmoneystr.h"
+#include "validation/validation.h"
 #include "validationinterface.h"
 
 #include <boost/thread.hpp>
@@ -57,7 +57,7 @@ class ScoreCompare
 {
 public:
     ScoreCompare() {}
-    bool operator()(const CTxMemPool::txiter a, const CTxMemPool::txiter b)
+    bool operator()(const CTxMemPool::txiter a, const CTxMemPool::txiter b) const
     {
         return CompareTxMemPoolEntryByScore()(*b, *a); // Convert to less than
     }
@@ -80,7 +80,7 @@ int64_t UpdateTime(CBlockHeader *pblock, const Consensus::Params &consensusParam
 
 BlockAssembler::BlockAssembler(const CChainParams &_chainparams)
     : chainparams(_chainparams), nBlockSize(0), nBlockTx(0), nBlockSigOps(0), nFees(0), nHeight(0), nLockTimeCutoff(0),
-      lastFewTxs(0), blockFinished(false), uahfChainBlock(false)
+      lastFewTxs(0), blockFinished(false)
 {
     // Largest block you're willing to create:
     nBlockMaxSize = maxGeneratedBlock;
@@ -95,11 +95,11 @@ BlockAssembler::BlockAssembler(const CChainParams &_chainparams)
     nBlockMinSize = std::min(nBlockMaxSize, nBlockMinSize);
 }
 
-void BlockAssembler::resetBlock(const CScript &scriptPubKeyIn)
+void BlockAssembler::resetBlock(const CScript &scriptPubKeyIn, int64_t coinbaseSize)
 {
     inBlock.clear();
 
-    nBlockSize = reserveBlockSize(scriptPubKeyIn); // Core: 1000
+    nBlockSize = reserveBlockSize(scriptPubKeyIn, coinbaseSize); // Core: 1000
     nBlockSigOps = 100; // Reserve 100 sigops for miners to use in their coinbase transaction
 
     // These counters do not include coinbase tx
@@ -110,25 +110,37 @@ void BlockAssembler::resetBlock(const CScript &scriptPubKeyIn)
     blockFinished = false;
 }
 
-uint64_t BlockAssembler::reserveBlockSize(const CScript &scriptPubKeyIn)
+uint64_t BlockAssembler::reserveBlockSize(const CScript &scriptPubKeyIn, int64_t coinbaseSize)
 {
     CBlockHeader h;
-    uint64_t nHeaderSize, nCoinbaseSize;
+    uint64_t nHeaderSize, nCoinbaseSize, nCoinbaseReserve;
 
     // BU add the proper block size quantity to the actual size
     nHeaderSize = ::GetSerializeSize(h, SER_NETWORK, PROTOCOL_VERSION);
     assert(nHeaderSize == 80); // BU always 80 bytes
     nHeaderSize += 5; // tx count varint - 5 bytes is enough for 4 billion txs; 3 bytes for 65535 txs
 
+
     // This serializes with output value, a fixed-length 8 byte field, of zero and height, a serialized CScript
-    // signed integer taking up 4 bytes for heights 32768-8388607 (around the year 2167) after which it will use 5.
+    // signed integer taking up 4 bytes for heights 32768-8388607 (around the year 2167) after which it will use 5
     nCoinbaseSize = ::GetSerializeSize(coinbaseTx(scriptPubKeyIn, 400000, 0), SER_NETWORK, PROTOCOL_VERSION);
+
+    if (coinbaseSize >= 0) // Explicit size of coinbase has been requested
+    {
+        nCoinbaseReserve = (uint64_t)coinbaseSize;
+    }
+    else
+    {
+        nCoinbaseReserve = coinbaseReserve.Value();
+    }
 
     // BU Miners take the block we give them, wipe away our coinbase and add their own.
     // So if their reserve choice is bigger then our coinbase then use that.
-    return nHeaderSize + std::max(nCoinbaseSize, coinbaseReserve.Value());
-}
+    nCoinbaseSize = std::max(nCoinbaseSize, nCoinbaseReserve);
 
+
+    return nHeaderSize + nCoinbaseSize;
+}
 CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _nHeight, CAmount nValue)
 {
     CMutableTransaction tx;
@@ -151,32 +163,47 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _n
     {
         COINBASE_FLAGS.resize(MAX_COINBASE_SCRIPTSIG_SIZE - tx.vin[0].scriptSig.size());
     }
+
     tx.vin[0].scriptSig = tx.vin[0].scriptSig + COINBASE_FLAGS;
 
+    // Make sure the coinbase is big enough.
+    uint64_t nCoinbaseSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
+    if (nCoinbaseSize < MIN_TX_SIZE && IsNov152018Scheduled() &&
+        IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
+    {
+        tx.vin[0].scriptSig << std::vector<uint8_t>(MIN_TX_SIZE - nCoinbaseSize - 1);
+    }
 
     return MakeTransactionRef(std::move(tx));
 }
 
-std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn)
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, int64_t coinbaseSize)
 {
     std::unique_ptr<CBlockTemplate> tmpl(nullptr);
 
     if (nBlockMaxSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
-        tmpl = CreateNewBlock(scriptPubKeyIn, false);
+        tmpl = CreateNewBlock(scriptPubKeyIn, false, coinbaseSize);
 
     // If the block is too small we need to drop back to the 1MB ruleset
     if ((!tmpl) || (tmpl->block.GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
     {
-        tmpl = CreateNewBlock(scriptPubKeyIn, true);
+        tmpl = CreateNewBlock(scriptPubKeyIn, true, coinbaseSize);
     }
 
     return tmpl;
 }
 
-std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn,
-    bool blockstreamCoreCompatible)
+struct NumericallyLessTxHashComparator
 {
-    resetBlock(scriptPubKeyIn);
+public:
+    bool operator()(const CTransactionRef &a, const CTransactionRef &b) const { return a->GetHash() < b->GetHash(); }
+};
+
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn,
+    bool blockstreamCoreCompatible,
+    int64_t coinbaseSize)
+{
+    resetBlock(scriptPubKeyIn, coinbaseSize);
 
     // The constructed block template
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
@@ -196,8 +223,6 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         READLOCK(mempool.cs);
         nHeight = pindexPrev->nHeight + 1;
 
-        uahfChainBlock = IsUAHFforkActiveOnNextBlock(pindexPrev->nHeight);
-
         pblock->nTime = GetAdjustedTime();
         pblock->nVersion = UnlimitedComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), pblock->nTime);
         // -regtest only: allow overriding block.nVersion with
@@ -206,7 +231,6 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
             pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
 
         const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
-
         nLockTimeCutoff =
             (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
 
@@ -218,6 +242,26 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         LOGA("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
             nBlockSigOps);
 
+        bool canonical = enableCanonicalTxOrder.Value();
+        if (IsNov152018Scheduled())
+        {
+            if (IsNov152018Enabled(chainparams.GetConsensus(), pindexPrev))
+            {
+                canonical = true;
+            }
+            else
+            {
+                canonical = false;
+            }
+        }
+
+        // sort tx if there are any and the feature is enabled
+        if (canonical && pblock->vtx.size() > 1)
+        {
+            const auto &start = pblock->vtx.begin() + 1;
+            std::sort(start, pblock->vtx.end(), NumericallyLessTxHashComparator());
+        }
+
         // Create coinbase transaction.
         pblock->vtx[0] =
             coinbaseTx(scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
@@ -228,7 +272,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
         pblock->nNonce = 0;
-        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(*pblock->vtx[0]);
+        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(*pblock->vtx[0], STANDARD_CHECKDATASIG_VERIFY_FLAGS);
     }
 
     CValidationState state;
@@ -331,6 +375,13 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
     if (!IsFinalTx(iter->GetTx(), nHeight, nLockTimeCutoff))
         return false;
 
+    // Make sure tx size is acceptable after Nov 15, 2018 fork
+    if (IsNov152018Scheduled() && IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
+    {
+        if (iter->GetTxSize() < MIN_TX_SIZE)
+            return false;
+    }
+
     return true;
 }
 
@@ -387,16 +438,6 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
             continue;
         }
 
-        // Reject the tx if we are on the fork, but the tx is not fork-signed
-        if (uahfChainBlock && !IsTxUAHFOnly(*iter))
-        {
-            continue;
-        }
-        // if tx is not applicable to this (unforked) chain, skip it
-        if (!uahfChainBlock && IsTxUAHFOnly(*iter))
-        {
-            continue;
-        }
 
         // If tx is dependent on other mempool txs which haven't yet been included
         // then put it in the waitSet
@@ -404,13 +445,6 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
         {
             waitSet.insert(iter);
             continue;
-        }
-
-        // If the fee rate is below the min fee rate for mining, then we're done
-        // adding txs based on score (fee rate)
-        if (iter->GetModifiedFee() < ::minRelayTxFee.GetFee(iter->GetTxSize()) && nBlockSize >= nBlockMinSize)
-        {
-            return;
         }
 
         // If this tx fits in the block add it, otherwise keep looping
@@ -481,17 +515,6 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
         if (isStillDependent(iter))
         {
             waitPriMap.insert(std::make_pair(iter, actualPriority));
-            continue;
-        }
-
-        // Reject the tx if we are on the fork, but the tx is not fork-signed
-        if (uahfChainBlock && !IsTxUAHFOnly(*iter))
-        {
-            continue;
-        }
-        // if tx is not applicable to this (unforked) chain, skip it
-        if (!uahfChainBlock && IsTxUAHFOnly(*iter))
-        {
             continue;
         }
 

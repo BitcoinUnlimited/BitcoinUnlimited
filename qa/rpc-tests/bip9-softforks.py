@@ -52,18 +52,13 @@ class BIP9SoftForksTest(ComparisonTestFramework):
         inputs = [{ "txid" : from_txid, "vout" : 0}]
         outputs = { to_address : amount }
         rawtx = node.createrawtransaction(inputs, outputs)
-        tx = CTransaction()
-        f = BytesIO(hex_str_to_bytes(rawtx))
-        tx.deserialize(f)
+        tx = CTransaction().deserialize(rawtx)
         tx.nVersion = 2
         return tx
 
     def sign_transaction(self, node, tx):
         signresult = node.signrawtransaction(bytes_to_hex_str(tx.serialize()))
-        tx = CTransaction()
-        f = BytesIO(hex_str_to_bytes(signresult['hex']))
-        tx.deserialize(f)
-        return tx
+        return CTransaction().deserialize(signresult['hex'])
 
     def generate_blocks(self, number, version, test_blocks = []):
         for i in range(number):

@@ -44,8 +44,14 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
         connect_nodes(self.nodes[0], 1)
 
     def run_test(self):
-        # Generate enough blocks to trigger certain block votes
-        self.nodes[0].generate(1150)
+        # Generate enough blocks to trigger certain block votes and activate BIP65 (version 4 blocks)
+        if 1:
+            amt = 1352 - self.nodes[0].getblockcount()
+            for i in range(int(amt/100)):
+               self.nodes[0].generate(100)
+               self.sync_all()
+
+        self.nodes[0].generate(1352 - self.nodes[0].getblockcount())
         self.sync_all()
 
         logging.info("not on chain tip")
@@ -67,7 +73,7 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
                         JSONRPCException, "invalid block: does not build on chain tip")
 
         logging.info("time too far in the past")
-        block = create_block(tip, coinbase, cur_time)
+        block = create_block(tip, coinbase, cur_time - 100)
         block.nVersion = 0x20000000
         block.rehash()
         hexblk = ToHex(block)
@@ -283,6 +289,12 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
         self.nodes[0].setexcessiveblock(1000, 12)
         expectException(lambda: self.nodes[0].validateblocktemplate(hexblk),
                         JSONRPCException, "invalid block: excessive")
+
+        logging.info("EB min value")
+        self.nodes[0].setminingmaxblock(1000)
+        expectException(lambda: self.nodes[0].setexcessiveblock(999, 12),
+                        JSONRPCException, "Sorry, your maximum mined block (1000) is larger than your proposed excessive size (999).  This would cause you to orphan your own blocks.")
+
         self.nodes[0].setexcessiveblock(16 * 1000 * 1000, 12)
         self.nodes[0].setminingmaxblock(1000 * 1000)
 
@@ -321,26 +333,42 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
             expectException(lambda: n.validateblocktemplate(hexblk), JSONRPCException,
                             "invalid block: bad-blk-sigops")
 
-
 def Test():
-    try:
-        t = ValidateblocktemplateTest()
-        bitcoinConf = {
-        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],  # "lck"
+    t = ValidateblocktemplateTest()
+    bitcoinConf = {
+        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
-        }
-#    t.main(["--tmpdir=/ramdisk/test", "--nocleanup", "--noshutdown"], bitcoinConf, None)
-        t.main(["--tmpdir=/ramdisk/test","--nocleanup", "--noshutdown"], bitcoinConf, None)
-    except Exception as e:
-        print(str(e))
-        pdb.pm()
+    }
 
+    flags = []
+    # you may want these additional flags:
+    # flags.append("--nocleanup")
+    # flags.append("--noshutdown")
+
+    # Execution is much faster if a ramdisk is used, so use it if one exists in a typical location
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmppfx=/ramdisk/test")
+
+    # Out-of-source builds are awkward to start because they need an additional flag
+    # automatically add this flag during testing for common out-of-source locations
+    here = os.path.dirname(os.path.abspath(__file__))
+    if not os.path.exists(os.path.abspath(here + "/../../src/bitcoind")):
+        dbg = os.path.abspath(here + "/../../debug/src/bitcoind")
+        rel = os.path.abspath(here + "/../../release/src/bitcoind")
+        if os.path.exists(dbg):
+            print("Running from the debug directory (%s)" % dbg)
+            flags.append("--srcdir=%s" % os.path.dirname(dbg))
+        elif os.path.exists(rel):
+            print("Running from the release directory (%s)" % rel)
+            flags.append("--srcdir=%s" % os.path.dirname(rel))
+
+    t.main(flags, bitcoinConf, None)
 
 if __name__ == '__main__':
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"]
     }
-    args = []
+    args = sys.argv
     if "--no-ipv6-rpc-listen":
         args.append("--no-ipv6-rpc-listen")
     ValidateblocktemplateTest().main(args,bitcoinConf)

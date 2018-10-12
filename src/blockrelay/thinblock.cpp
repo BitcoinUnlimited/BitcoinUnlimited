@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "connmgr.h"
@@ -19,17 +20,18 @@
 #include "policy/policy.h"
 #include "pow.h"
 #include "requestManager.h"
-#include "thinblock.h"
 #include "timedata.h"
+#include "txadmission.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "util.h"
 #include "utiltime.h"
+#include "validation/validation.h"
 
 static bool DEFAULT_BLOOM_FILTER_TARGETING = true;
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
 
-CThinBlock::CThinBlock(const CBlock &block, CBloomFilter &filter)
+CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter)
 {
     header = block.GetBlockHeader();
 
@@ -162,7 +164,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
         pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     {
-        LOCK(orphanpool.cs);
+        READLOCK(orphanpool.cs);
         LOCK(cs_xval);
         int missingCount = 0;
         int unnecessaryCount = 0;
@@ -218,7 +220,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
 }
 
 
-CXThinBlock::CXThinBlock(const CBlock &block, CBloomFilter *filter)
+CXThinBlock::CXThinBlock(const CBlock &block, const CBloomFilter *filter)
 {
     header = block.GetBlockHeader();
     this->collision = false;
@@ -254,7 +256,7 @@ CXThinBlock::CXThinBlock(const CBlock &block)
     vTxHashes.reserve(nTx);
     std::set<uint64_t> setPartialTxHash;
 
-    LOCK(orphanpool.cs);
+    READLOCK(orphanpool.cs);
     for (unsigned int i = 0; i < nTx; i++)
     {
         const uint256 hash256 = block.vtx[i]->GetHash();
@@ -384,7 +386,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Look for each transaction in our various pools and buffers.
     // With xThinBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
     {
-        LOCK(orphanpool.cs);
+        READLOCK(orphanpool.cs);
         LOCK(cs_xval);
         if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
             return false;
@@ -462,14 +464,16 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Check for Misbehaving and DOS
     // If they make more than 20 requests in 10 minutes then disconnect them
+    if (Params().NetworkIDString() != "regtest")
     {
-        LOCK(cs_vNodes);
         if (pfrom->nGetXBlockTxLastTime <= 0)
             pfrom->nGetXBlockTxLastTime = GetTime();
         uint64_t nNow = GetTime();
-        pfrom->nGetXBlockTxCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXBlockTxLastTime));
+        double tmp = pfrom->nGetXBlockTxCount;
+        while (!pfrom->nGetXBlockTxCount.compare_exchange_weak(
+            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXBlockTxLastTime)) + 1)))
+            ;
         pfrom->nGetXBlockTxLastTime = nNow;
-        pfrom->nGetXBlockTxCount += 1;
         LOG(THIN, "nGetXBlockTxCount is %f\n", pfrom->nGetXBlockTxCount);
         if (pfrom->nGetXBlockTxCount >= 20)
         {
@@ -701,7 +705,7 @@ bool CXThinBlock::process(CNode *pfrom,
     bool fMerkleRootCorrect = true;
     {
         // Do the orphans first before taking the mempool.cs lock, so that we maintain correct locking order.
-        LOCK(orphanpool.cs);
+        READLOCK(orphanpool.cs);
         for (auto &mi : orphanpool.mapOrphanTransactions)
         {
             uint64_t cheapHash = mi.first.GetCheapHash();
@@ -848,6 +852,7 @@ bool CXThinBlock::process(CNode *pfrom,
 
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount)
 {
+    AssertLockHeld(orphanpool.cs);
     AssertLockHeld(cs_xval);
 
     // We must have all the full tx hashes by this point.  We first check for any duplicate
@@ -883,15 +888,29 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         CTransactionRef ptx = nullptr;
         if (!hash.IsNull())
         {
+            // Check the commit queue first. If we check the mempool first and it's not in there then when we release
+            // the lock on the mempool it may get transfered from the commitQ to the mempool before we have time to
+            // grab the lock on the commitQ and we'll think we don't have the transaction.
+            // the mempool.
             bool inMemPool = false;
-            ptx = mempool.get(hash);
+            bool inCommitQ = false;
+            ptx = CommitQGet(hash);
             if (ptx)
-                inMemPool = true;
+            {
+                inCommitQ = true;
+            }
+            else
+            {
+                // if it's not in the mempool then check the commitQ
+                ptx = mempool.get(hash);
+                if (ptx)
+                    inMemPool = true;
+            }
 
             bool inMissingTx = pfrom->mapMissingTx.count(hash.GetCheapHash()) > 0;
             bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
 
-            if ((inMemPool && inMissingTx) || (inOrphanCache && inMissingTx))
+            if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx))
                 unnecessaryCount++;
 
             if (inOrphanCache)
@@ -899,7 +918,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
                 ptx = orphanpool.mapOrphanTransactions[hash].ptx;
                 setUnVerifiedOrphanTxHash.insert(hash);
             }
-            else if (inMemPool && fXVal)
+            else if ((inMemPool || inCommitQ) && fXVal)
                 setPreVerifiedTxHash.insert(hash);
             else if (inMissingTx)
                 ptx = pfrom->mapMissingTx[hash.GetCheapHash()];
@@ -1334,7 +1353,7 @@ bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
         // or backward by a random amount plus or minus 2 seconds.
         FastRandomContext insecure_rand(false);
         uint64_t nOffset = nTimeToWait - (8000 + (insecure_rand.rand64() % 4000) + 1);
-        mapThinBlockTimer[hash] = GetTimeMillis() + nOffset;
+        mapThinBlockTimer[hash] = std::make_pair(GetTimeMillis() + nOffset, false);
         LOG(THIN, "Starting Preferential Thinblock timer (%d millis)\n", nTimeToWait + nOffset);
     }
     else
@@ -1342,11 +1361,21 @@ bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
         // Check that we have not exceeded the 10 second limit.
         // If we have then we want to return false so that we can
         // proceed to download a regular block instead.
-        uint64_t elapsed = GetTimeMillis() - mapThinBlockTimer[hash];
-        if (elapsed > nTimeToWait)
+        auto iter = mapThinBlockTimer.find(hash);
+        if (iter != mapThinBlockTimer.end())
         {
-            LOG(THIN, "Preferential Thinblock timer exceeded - downloading regular block instead\n");
-            return false;
+            int64_t elapsed = GetTimeMillis() - iter->second.first;
+            if (elapsed > (int64_t)nTimeToWait)
+            {
+                // Only print out the log entry once.  Because the thinblock timer will be hit
+                // many times when requesting a block we don't want to fill up the log file.
+                if (!iter->second.second)
+                {
+                    iter->second.second = true;
+                    LOG(THIN, "Preferential Thinblock timer exceeded - downloading regular block instead\n");
+                }
+                return false;
+            }
         }
     }
     return true;
@@ -1519,13 +1548,21 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
 {
     if (inv.type == MSG_XTHINBLOCK)
     {
-        CXThinBlock xThinBlock(*pblock, pfrom->pThinBlockFilter);
-        int nSizeBlock = pblock->GetBlockSize();
-        if (xThinBlock.collision ==
-            true) // If there is a cheapHash collision in this block then send a normal thinblock
+        CXThinBlock xThinBlock;
         {
-            CThinBlock thinBlock(*pblock, *pfrom->pThinBlockFilter);
-            int nSizeThinBlock = ::GetSerializeSize(xThinBlock, SER_NETWORK, PROTOCOL_VERSION);
+            LOCK(pfrom->cs_filter);
+            xThinBlock = CXThinBlock(*pblock, pfrom->pThinBlockFilter);
+        }
+        int nSizeBlock = pblock->GetBlockSize();
+        // If there is a cheapHash collision in this block then send a normal thinblock
+        if (xThinBlock.collision == true)
+        {
+            CThinBlock thinBlock;
+            {
+                LOCK(pfrom->cs_filter);
+                thinBlock = CThinBlock(*pblock, *pfrom->pThinBlockFilter);
+            }
+            int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);
             if (nSizeThinBlock < nSizeBlock)
             {
                 pfrom->PushMessage(NetMsgType::THINBLOCK, thinBlock);
@@ -1570,7 +1607,11 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
     }
     else if (inv.type == MSG_THINBLOCK)
     {
-        CThinBlock thinBlock(*pblock, *pfrom->pThinBlockFilter);
+        CThinBlock thinBlock;
+        {
+            LOCK(pfrom->cs_filter);
+            thinBlock = CThinBlock(*pblock, *pfrom->pThinBlockFilter);
+        }
         int nSizeBlock = pblock->GetBlockSize();
         int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);
         if (nSizeThinBlock < nSizeBlock)
@@ -1807,11 +1848,22 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
             }
         }
     }
-    else // Add all the transaction hashes currently in the mempool
+    else
     {
         std::vector<uint256> vMempoolHashes;
+
+        // Add all the transaction hashes currently in the mempool
         mempool.queryHashes(vMempoolHashes);
         setHighScoreMemPoolHashes.insert(vMempoolHashes.begin(), vMempoolHashes.end());
+    }
+
+    // Also add all the transaction hashes currently in the txCommitQ
+    {
+        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        for (auto &it : txCommitQ)
+        {
+            setHighScoreMemPoolHashes.insert(it.first);
+        }
     }
 
     LOG(THIN, "Bloom Filter Targeting completed in:%d (ms)\n", GetTimeMillis() - nStartTimer);
@@ -1841,8 +1893,10 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
 
     // Count up all the transactions that we'll be putting into the filter, removing any duplicates
     for (const uint256 &txHash : setHighScoreMemPoolHashes)
+    {
         if (setPriorityMemPoolHashes.count(txHash))
             setPriorityMemPoolHashes.erase(txHash);
+    }
 
     unsigned int nSelectedTxHashes =
         setHighScoreMemPoolHashes.size() + vOrphanHashes.size() + setPriorityMemPoolHashes.size();

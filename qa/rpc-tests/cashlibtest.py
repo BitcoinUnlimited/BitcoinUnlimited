@@ -22,7 +22,7 @@ class MyTest (BitcoinTestFramework):
 
     def setup_chain(self, bitcoinConfDict=None, wallets=None):
         print("Initializing test directory " + self.options.tmpdir)
-        initialize_chain(self.options.tmpdir)
+        initialize_chain(self.options.tmpdir, bitcoinConfDict, wallets)
 
     def setup_network(self, split=False):
         self.nodes = start_nodes(2, self.options.tmpdir)
@@ -31,7 +31,6 @@ class MyTest (BitcoinTestFramework):
         self.sync_all()
 
     def run_test(self):
-
         faulted = False
         try:
             cashlib.spendscript(OP_1)
@@ -76,7 +75,7 @@ class MyTest (BitcoinTestFramework):
             n += 1
 
         txhex = hexlify(tx.serialize()).decode("utf-8")
-        txid = self.nodes[0].sendrawtransaction(txhex)
+        txid = self.nodes[0].enqueuerawtransaction(txhex)
 
         assert txid == hexlify(cashlib.txid(txhex)[::-1]).decode("utf-8")
 
@@ -87,12 +86,10 @@ class MyTest (BitcoinTestFramework):
         sig2 = cashlib.signTxInput(tx2, 0, amt, output, destPrivKey, sighashtype)
         tx2.vin[0].scriptSig = cashlib.spendscript(sig2, destPubKey)
 
-        tx2id = self.nodes[0].sendrawtransaction(hexlify(tx2.serialize()).decode("utf-8"))
-
+        tx2id = self.nodes[0].enqueuerawtransaction(hexlify(tx2.serialize()).decode("utf-8"))
         # Check that all tx were created, and commit them
-        assert self.nodes[0].getmempoolinfo()["size"] == 2
-        self.nodes[0].generate(1)
-
+        waitFor(20, lambda: self.nodes[0].getmempoolinfo()["size"] == 2)
+        blk = self.nodes[0].generate(1)
         self.sync_blocks()
         assert self.nodes[0].getmempoolinfo()["size"] == 0
         assert self.nodes[1].getmempoolinfo()["size"] == 0
@@ -117,37 +114,13 @@ if __name__ == '__main__':
 def Test():
     t = MyTest()
     bitcoinConf = {
-        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
-        "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
+        "debug": ["rpc", "net", "blk", "thin", "mempool", "req", "bench", "evict"],
     }
 
-    flags = []
-    # you may want these additional flags:
-    # flags.append("--nocleanup")
-    # flags.append("--noshutdown")
-
-    # Execution is much faster if a ramdisk is used, so use it if one exists in a typical location
+    flags = [] # ["--nocleanup", "--noshutdown"]
     if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmpdir=/ramdisk/test")
-
-    # Out-of-source builds are awkward to start because they need an additional flag
-    # automatically add this flag during testing for common out-of-source locations
-
-    objpath = None
-    here = os.path.dirname(os.path.abspath(__file__))
-    if not os.path.exists(os.path.abspath(here + "/../../src/bitcoind")):
-        dbg = os.path.abspath(here + "/../../debug/src/bitcoind")
-        rel = os.path.abspath(here + "/../../release/src/bitcoind")
-        if os.path.exists(dbg):
-            print("Running from the debug directory (%s)" % dbg)
-            flags.append("--srcdir=%s" % os.path.dirname(dbg))
-            objpath = os.path.dirname(dbg)
-        elif os.path.exists(rel):
-            print("Running from the release directory (%s)" % rel)
-            flags.append("--srcdir=%s" % os.path.dirname(rel))
-            objpath = os.path.dirname(rel)
-        cashlib.init(objpath + os.sep + ".libs" + os.sep + "libbitcoincash.so")
-    else:
-        cashlib.init(os.path.abspath(here + "/../../src/.libs/libbitcoincash.so"))
-
+        flags.append("--tmpdir=/ramdisk/test/cashlibtest")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
+    cashlib.init(binpath + os.sep + ".libs" + os.sep + "libbitcoincash.so")
     t.main(flags, bitcoinConf, None)

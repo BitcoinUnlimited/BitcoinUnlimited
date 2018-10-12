@@ -31,6 +31,11 @@
 #include <boost/signals2/signal.hpp>
 #include <boost/thread/exceptions.hpp>
 
+#ifdef DEBUG
+#define DEBUG_ASSERTION
+#define DEBUG_PAUSE
+#endif
+
 #ifdef DEBUG_ASSERTION
 /// If DEBUG_ASSERTION is enabled this asserts when the predicate is false.
 //  If DEBUG_ASSERTION is disabled and the predicate is false, it executes the execInRelease statements.
@@ -50,6 +55,15 @@
             execInRelease;                                                                                    \
         }                                                                                                     \
     } while (0)
+#endif
+
+#ifdef DEBUG_PAUSE
+// Stops this thread by taking a semaphore
+// This should not be called as part of a release so during the non --enable-debug build
+// you will get an undefined symbol compilation error.
+void DbgPause();
+// Continue the thread.  Intended to be called manually from gdb
+extern "C" void DbgResume();
 #endif
 
 #define UNIQUE2(pfx, LINE) pfx##LINE
@@ -158,8 +172,10 @@ enum
     ZMQ = 0x2000000,
     QT = 0x4000000,
     IBD = 0x8000000,
+
     GRAPHENE = 0x10000000,
-    RESPEND = 0x20000000
+    RESPEND = 0x20000000,
+    WB = 0x40000000 // weak blocks
 };
 
 // Add corresponding lower case string for the category:
@@ -171,7 +187,7 @@ enum
             {MEMPOOLREJ, "mempoolrej"}, {BLK, "blk"}, {EVICT, "evict"}, {PARALLEL, "parallel"}, {RAND, "rand"}, \
             {REQ, "req"}, {BLOOM, "bloom"}, {LCK, "lck"}, {PROXY, "proxy"}, {DBASE, "dbase"},                   \
             {SELECTCOINS, "selectcoins"}, {ESTIMATEFEE, "estimatefee"}, {QT, "qt"}, {IBD, "ibd"},               \
-            {GRAPHENE, "graphene"}, {RESPEND, "respend"},                                                       \
+            {GRAPHENE, "graphene"}, {RESPEND, "respend"}, {WB, "weakblocks"},                                   \
         {                                                                                                       \
             ZMQ, "zmq"                                                                                          \
         }                                                                                                       \
@@ -301,6 +317,9 @@ inline void LogWrite(const std::string &str)
  */
 #define LOGA(...) Logging::LogWrite(__VA_ARGS__)
 //
+
+// Flush log file (if you know you are about to abort)
+void LogFlush();
 
 // Log tests:
 UniValue setlog(const UniValue &params, bool fHelp);
@@ -442,9 +461,8 @@ bool SoftSetArg(const std::string &strArg, const std::string &strValue);
 bool SoftSetBoolArg(const std::string &strArg, bool fValue);
 
 /**
- * Return the number of physical cores available on the current system.
- * @note This does not count virtual cores, such as those provided by HyperThreading
- * when boost is newer than 1.56.
+ * Return the number of cores available on the current system.
+ * @note This does count virtual cores, such as those provided by HyperThreading.
  */
 int GetNumCores();
 
@@ -455,10 +473,9 @@ void RenameThread(const char *name);
  * .. and a wrapper that just calls func once
  */
 template <typename Callable>
-void TraceThread(const char *name, Callable func)
+void TraceThreads(const std::string &name, Callable func)
 {
-    std::string s = strprintf("bitcoin-%s", name);
-    RenameThread(s.c_str());
+    RenameThread(name.c_str());
     try
     {
         LOGA("%s thread start\n", name);
@@ -472,15 +489,24 @@ void TraceThread(const char *name, Callable func)
     }
     catch (const std::exception &e)
     {
-        PrintExceptionContinue(&e, name);
+        PrintExceptionContinue(&e, name.c_str());
+        LogFlush();
         throw;
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, name);
+        PrintExceptionContinue(NULL, name.c_str());
+        LogFlush();
         throw;
     }
 }
+
+template <typename Callable>
+void TraceThread(const char *name, Callable func)
+{
+    TraceThreads(std::string(name), func);
+}
+
 
 std::string CopyrightHolders(const std::string &strPrefix);
 
@@ -489,5 +515,14 @@ The first argument (the pattern) might contain '?' and '*' wildcards and
 the second argument will be matched to this pattern. Returns true iff the string
 matches pattern. */
 bool wildmatch(std::string pattern, std::string test);
+
+/**
+ * On platforms that support it, tell the kernel the calling thread is
+ * CPU-intensive and non-interactive. See SCHED_BATCH in sched(7) for details.
+ *
+ * @return The return value of sched_setschedule(), or 1 on systems without
+ * sched_setchedule().
+ */
+int ScheduleBatchPriority(void);
 
 #endif // BITCOIN_UTIL_H

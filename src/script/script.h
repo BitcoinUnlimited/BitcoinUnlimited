@@ -19,9 +19,6 @@
 #include <string>
 #include <vector>
 
-// Set to true to enable OP_DATASIGVERIFY
-extern bool enableDataSigVerify;
-
 // Maximum number of bytes pushable to the stack
 static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520;
 
@@ -169,7 +166,6 @@ enum opcodetype
     OP_CHECKSIGVERIFY = 0xad,
     OP_CHECKMULTISIG = 0xae,
     OP_CHECKMULTISIGVERIFY = 0xaf,
-    OP_DATASIGVERIFY = 0xbb,
 
     // expansion
     OP_NOP1 = 0xb0,
@@ -184,6 +180,10 @@ enum opcodetype
     OP_NOP8 = 0xb7,
     OP_NOP9 = 0xb8,
     OP_NOP10 = 0xb9,
+
+    // More crypto
+    OP_CHECKDATASIG = 0xba,
+    OP_CHECKDATASIGVERIFY = 0xbb,
 
     // The first op_code value after all defined opcodes
     FIRST_UNDEFINED_OP_VALUE,
@@ -599,13 +599,13 @@ public:
      * counted more accurately, assuming they are of the form
      *  ... OP_N CHECKMULTISIG ...
      */
-    unsigned int GetSigOpCount(bool fAccurate) const;
+    unsigned int GetSigOpCount(const uint32_t flags, bool fAccurate) const;
 
     /**
      * Accurately count sigOps, including sigOps in
      * pay-to-script-hash transactions:
      */
-    unsigned int GetSigOpCount(const CScript &scriptSig) const;
+    unsigned int GetSigOpCount(const uint32_t flags, const CScript &scriptSig) const;
 
     bool IsPayToScriptHash() const;
 

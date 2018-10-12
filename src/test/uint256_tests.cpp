@@ -111,26 +111,30 @@ BOOST_AUTO_TEST_CASE(basics) // constructors, equality, inequality
 BOOST_AUTO_TEST_CASE(comparison) // <= >= < >
 {
     uint256 LastL;
-    for (int i = 255; i >= 0; --i)
+    // Set every bit in a uint256 starting from the LSB, and verify that the value is less than
+    // that of the previous bit set.
+    for (int i = 0; i < 256; ++i)
     {
         uint256 TmpL;
-        *(TmpL.begin() + (i >> 3)) |= 1 << (7 - (i & 7));
+        *(TmpL.begin() + (i >> 3)) = 1 << (i & 7);
         BOOST_CHECK(LastL < TmpL);
         LastL = TmpL;
     }
 
     BOOST_CHECK(ZeroL < R1L);
-    BOOST_CHECK(R2L < R1L);
+    BOOST_CHECK(R2L > R1L);
     BOOST_CHECK(ZeroL < OneL);
     BOOST_CHECK(OneL < MaxL);
     BOOST_CHECK(R1L < MaxL);
     BOOST_CHECK(R2L < MaxL);
 
     uint160 LastS;
-    for (int i = 159; i >= 0; --i)
+    // Set every bit in a uint160 starting from the LSB, and verify that the value is less than
+    // that of the previous bit set.
+    for (int i = 0; i < 160; ++i)
     {
         uint160 TmpS;
-        *(TmpS.begin() + (i >> 3)) |= 1 << (7 - (i & 7));
+        *(TmpS.begin() + (i >> 3)) = 1 << (i & 7);
         BOOST_CHECK(LastS < TmpS);
         LastS = TmpS;
     }

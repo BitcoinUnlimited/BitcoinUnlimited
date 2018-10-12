@@ -26,7 +26,7 @@ public:
 
     bool AddOutpointConflict(const COutPoint &out,
         const CTxMemPool::txiter mempoolEntry,
-        const CTransaction &respendTx,
+        const CTransactionRef &respendTx,
         bool fRespentBefore,
         bool fIsEquivalent) override
     {
@@ -82,7 +82,7 @@ BOOST_AUTO_TEST_CASE(not_a_respend)
 
     // Nothing in mempool, can't be a respend.
     {
-        RespendDetector detector(mempool, tx1, {dummyaction});
+        RespendDetector detector(mempool, MakeTransactionRef(tx1), {dummyaction});
         BOOST_CHECK(!detector.IsRespend());
         BOOST_CHECK_EQUAL(0, dummyaction->addOutpointCalls);
     }
@@ -91,7 +91,7 @@ BOOST_AUTO_TEST_CASE(not_a_respend)
     mempool.addUnchecked(tx1.GetHash(), entry.FromTx(tx1));
 
     // tx2 is not a respend of tx1
-    RespendDetector detector(mempool, tx2, {dummyaction});
+    RespendDetector detector(mempool, MakeTransactionRef(tx2), {dummyaction});
     BOOST_CHECK(!detector.IsRespend());
     BOOST_CHECK_EQUAL(0, dummyaction->addOutpointCalls);
 }
@@ -104,7 +104,7 @@ BOOST_AUTO_TEST_CASE(only_script_differs)
 
     TestMemPoolEntryHelper entry;
     mempool.addUnchecked(tx1.GetHash(), entry.FromTx(tx1));
-    RespendDetector detector(mempool, tx2, {dummyaction});
+    RespendDetector detector(mempool, MakeTransactionRef(tx2), {dummyaction});
     BOOST_CHECK(detector.IsRespend());
     // when only the script differs, the isEquivalent flag should be set
     BOOST_CHECK(dummyaction->isEquivalent);
@@ -121,7 +121,7 @@ BOOST_AUTO_TEST_CASE(seen_before)
     mempool.addUnchecked(tx1.GetHash(), entry.FromTx(tx1));
 
     {
-        RespendDetector detector(mempool, tx2, {dummyaction});
+        RespendDetector detector(mempool, MakeTransactionRef(tx2), {dummyaction});
         BOOST_CHECK(detector.IsRespend());
         BOOST_CHECK(!dummyaction->isEquivalent);
         BOOST_CHECK(!dummyaction->respentBefore);
@@ -134,7 +134,7 @@ BOOST_AUTO_TEST_CASE(seen_before)
     CMutableTransaction tx3 = tx1;
     tx3.vout[0].scriptPubKey = CreateRandomTx().vout[0].scriptPubKey;
     {
-        RespendDetector detector(mempool, tx3, {dummyaction});
+        RespendDetector detector(mempool, MakeTransactionRef(tx3), {dummyaction});
         BOOST_CHECK(detector.IsRespend());
         BOOST_CHECK(!dummyaction->isEquivalent);
         BOOST_CHECK(dummyaction->respentBefore);
@@ -145,7 +145,7 @@ BOOST_AUTO_TEST_CASE(triggers_actions)
 {
     // Actions should trigger when RespendDetector goes out of scope.
     {
-        RespendDetector detector(mempool, CTransaction{}, {dummyaction});
+        RespendDetector detector(mempool, MakeTransactionRef(CTransaction{}), {dummyaction});
         BOOST_CHECK(!dummyaction->triggered);
     }
     BOOST_CHECK(dummyaction->triggered);
@@ -156,7 +156,8 @@ BOOST_AUTO_TEST_CASE(is_interesting)
     // Respend is interesting when at least one action finds it interesting.
     auto action1 = new DummyRespendAction;
     auto action2 = new DummyRespendAction;
-    RespendDetector detector(mempool, CTransaction{}, {RespendActionPtr(action1), RespendActionPtr(action2)});
+    RespendDetector detector(
+        mempool, MakeTransactionRef(CTransaction{}), {RespendActionPtr(action1), RespendActionPtr(action2)});
 
     action1->returnInteresting = false;
     action2->returnInteresting = false;
@@ -170,7 +171,8 @@ BOOST_AUTO_TEST_CASE(set_valid)
 {
     auto action1 = new DummyRespendAction;
     auto action2 = new DummyRespendAction;
-    RespendDetector detector(mempool, CTransaction{}, {RespendActionPtr(action1), RespendActionPtr(action2)});
+    RespendDetector detector(
+        mempool, MakeTransactionRef(CTransaction{}), {RespendActionPtr(action1), RespendActionPtr(action2)});
 
     detector.SetValid(true);
     BOOST_CHECK(action1->valid);

@@ -97,6 +97,21 @@ bool static IsCompressedOrUncompressedPubKey(const valtype &vchPubKey)
     return true;
 }
 
+static bool IsCompressedPubKey(const valtype &vchPubKey)
+{
+    if (vchPubKey.size() != 33)
+    {
+        //  Non-canonical public key: invalid length for compressed key
+        return false;
+    }
+    if (vchPubKey[0] != 0x02 && vchPubKey[0] != 0x03)
+    {
+        //  Non-canonical public key: invalid prefix for compressed key
+        return false;
+    }
+    return true;
+}
+
 /**
  * A canonical signature exists of: <30> <total len> <02> <len R> <R> <02> <len S> <S> <hashtype>
  * Where R and S are not negative (their first byte has its highest bit not set), and not
@@ -187,13 +202,177 @@ bool static IsValidSignatureEncoding(const std::vector<unsigned char> &sig)
     return true;
 }
 
-bool static IsLowDERSignature(const valtype &vchSig, ScriptError *serror)
+
+//! Check signature encoding without sighash byte
+//! This is a copy of Bitcoin ABC's code, written mainly by deadalnix, from
+//! revision: f8283a3f284fc4722c1d6583b8746a17831d3bd0
+/**
+ * A canonical signature exists of: <30> <total len> <02> <len R> <R> <02> <len
+ * S> <S> <hashtype>, where R and S are not negative (their first byte has its
+ * highest bit not set), and not excessively padded (do not start with a 0 byte,
+ * unless an otherwise negative number follows, in which case a single 0 byte is
+ * necessary and even required).
+ *
+ * See https://bitcointalk.org/index.php?topic=8392.msg127623#msg127623
+ *
+ * This function is consensus-critical since BIP66.
+ */
+bool IsValidSignatureEncodingWithoutSigHash(const valtype &sig)
 {
-    if (!IsValidSignatureEncoding(vchSig))
+    // Format: 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S]
+    // * total-length: 1-byte length descriptor of everything that follows,
+    // excluding the sighash byte.
+    // * R-length: 1-byte length descriptor of the R value that follows.
+    // * R: arbitrary-length big-endian encoded R value. It must use the
+    // shortest possible encoding for a positive integers (which means no null
+    // bytes at the start, except a single one when the next byte has its
+    // highest bit set).
+    // * S-length: 1-byte length descriptor of the S value that follows.
+    // * S: arbitrary-length big-endian encoded S value. The same rules apply.
+
+    // Minimum and maximum size constraints.
+    if (sig.size() < 8 || sig.size() > 72)
     {
-        return set_error(serror, SCRIPT_ERR_SIG_DER);
+        return false;
     }
-    std::vector<unsigned char> vchSigCopy(vchSig.begin(), vchSig.begin() + vchSig.size() - 1);
+
+    //
+    // Check that the signature is a compound structure of proper size.
+    //
+
+    // A signature is of type 0x30 (compound).
+    if (sig[0] != 0x30)
+    {
+        return false;
+    }
+
+    // Make sure the length covers the entire signature.
+    // Remove:
+    // * 1 byte for the coupound type.
+    // * 1 byte for the length of the signature.
+    if (sig[1] != sig.size() - 2)
+    {
+        return false;
+    }
+
+    //
+    // Check that R is an positive integer of sensible size.
+    //
+
+    // Check whether the R element is an integer.
+    if (sig[2] != 0x02)
+    {
+        return false;
+    }
+
+    // Extract the length of the R element.
+    const uint32_t lenR = sig[3];
+
+    // Zero-length integers are not allowed for R.
+    if (lenR == 0)
+    {
+        return false;
+    }
+
+    // Negative numbers are not allowed for R.
+    if (sig[4] & 0x80)
+    {
+        return false;
+    }
+
+    // Make sure the length of the R element is consistent with the signature
+    // size.
+    // Remove:
+    // * 1 byte for the coumpound type.
+    // * 1 byte for the length of the signature.
+    // * 2 bytes for the integer type of R and S.
+    // * 2 bytes for the size of R and S.
+    // * 1 byte for S itself.
+    if (lenR > (sig.size() - 7))
+    {
+        return false;
+    }
+
+    // Null bytes at the start of R are not allowed, unless R would otherwise be
+    // interpreted as a negative number.
+    //
+    // /!\ This check can only be performed after we checked that lenR is
+    //     consistent with the size of the signature or we risk to access out of
+    //     bound elements.
+    if (lenR > 1 && (sig[4] == 0x00) && !(sig[5] & 0x80))
+    {
+        return false;
+    }
+
+    //
+    // Check that S is an positive integer of sensible size.
+    //
+
+    // S's definition starts after R's definition:
+    // * 1 byte for the coumpound type.
+    // * 1 byte for the length of the signature.
+    // * 1 byte for the size of R.
+    // * lenR bytes for R itself.
+    // * 1 byte to get to S.
+    const uint32_t startS = lenR + 4;
+
+    // Check whether the S element is an integer.
+    if (sig[startS] != 0x02)
+    {
+        return false;
+    }
+
+    // Extract the length of the S element.
+    const uint32_t lenS = sig[startS + 1];
+
+    // Zero-length integers are not allowed for S.
+    if (lenS == 0)
+    {
+        return false;
+    }
+
+    // Negative numbers are not allowed for S.
+    if (sig[startS + 2] & 0x80)
+    {
+        return false;
+    }
+
+    // Verify that the length of S is consistent with the size of the signature
+    // including metadatas:
+    // * 1 byte for the integer type of S.
+    // * 1 byte for the size of S.
+    if (size_t(startS + lenS + 2) != sig.size())
+    {
+        return false;
+    }
+
+    // Null bytes at the start of S are not allowed, unless S would otherwise be
+    // interpreted as a negative number.
+    //
+    // /!\ This check can only be performed after we checked that lenR and lenS
+    //     are consistent with the size of the signature or we risk to access
+    //     out of bound elements.
+    if (lenS > 1 && (sig[startS + 2] == 0x00) && !(sig[startS + 3] & 0x80))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool static IsLowDERSignature(const valtype &vchSig, ScriptError *serror, const bool check_sighash)
+{
+    if (check_sighash)
+    {
+        if (!IsValidSignatureEncoding(vchSig))
+            return set_error(serror, SCRIPT_ERR_SIG_DER);
+    }
+    else
+    {
+        if (!IsValidSignatureEncodingWithoutSigHash(vchSig))
+            return set_error(serror, SCRIPT_ERR_SIG_DER);
+    }
+    std::vector<unsigned char> vchSigCopy(vchSig.begin(), vchSig.begin() + vchSig.size() - (check_sighash ? 1 : 0));
     if (!CPubKey::CheckLowS(vchSigCopy))
     {
         return set_error(serror, SCRIPT_ERR_SIG_HIGH_S);
@@ -224,7 +403,10 @@ static bool IsDefinedHashtypeSignature(const valtype &vchSig)
     return true;
 }
 
-bool CheckSignatureEncoding(const vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror)
+static bool CheckSignatureEncodingSigHashChoice(const vector<unsigned char> &vchSig,
+    unsigned int flags,
+    ScriptError *serror,
+    const bool check_sighash)
 {
     // Empty signature. Not strictly DER encoded, but allowed to provide a
     // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
@@ -232,28 +414,56 @@ bool CheckSignatureEncoding(const vector<unsigned char> &vchSig, unsigned int fl
     {
         return true;
     }
-    if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC)) != 0 &&
-        !IsValidSignatureEncoding(vchSig))
+    if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC)) != 0)
     {
-        return set_error(serror, SCRIPT_ERR_SIG_DER);
+        if (check_sighash)
+        {
+            if (!IsValidSignatureEncoding(vchSig))
+                return set_error(serror, SCRIPT_ERR_SIG_DER);
+        }
+        else
+        {
+            if (!IsValidSignatureEncodingWithoutSigHash(vchSig))
+                return set_error(serror, SCRIPT_ERR_SIG_DER);
+        }
     }
-    else if ((flags & SCRIPT_VERIFY_LOW_S) != 0 && !IsLowDERSignature(vchSig, serror))
+    if ((flags & SCRIPT_VERIFY_LOW_S) != 0 && !IsLowDERSignature(vchSig, serror, check_sighash))
     {
         // serror is set
         return false;
     }
-    else if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 && !IsDefinedHashtypeSignature(vchSig))
+    else if (check_sighash && ((flags & SCRIPT_VERIFY_STRICTENC) != 0) && !IsDefinedHashtypeSignature(vchSig))
     {
         return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
     }
     return true;
 }
 
-bool static CheckPubKeyEncoding(const valtype &vchSig, unsigned int flags, ScriptError *serror)
+
+// For CHECKSIG etc.
+bool CheckSignatureEncoding(const vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror)
 {
-    if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 && !IsCompressedOrUncompressedPubKey(vchSig))
+    return CheckSignatureEncodingSigHashChoice(vchSig, flags, serror, true);
+}
+
+// For CHECKDATASIG / CHECKDATASIGVERIFY
+bool CheckDataSignatureEncoding(const valtype &vchSig, uint32_t flags, ScriptError *serror)
+{
+    return CheckSignatureEncodingSigHashChoice(vchSig, flags, serror, false);
+}
+
+bool CheckPubKeyEncoding(const valtype &vchPubKey, unsigned int flags, ScriptError *serror)
+{
+    if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 && !IsCompressedOrUncompressedPubKey(vchPubKey))
     {
         return set_error(serror, SCRIPT_ERR_PUBKEYTYPE);
+    }
+
+    // Only compressed keys are accepted when
+    // SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE is enabled.
+    if (flags & SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE && !IsCompressedPubKey(vchPubKey))
+    {
+        return set_error(serror, SCRIPT_ERR_NONCOMPRESSED_PUBKEY);
     }
     return true;
 }
@@ -305,21 +515,6 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
     case OP_RSHIFT:
         // Disabled opcodes
         return true;
-
-    case OP_CAT:
-    case OP_SPLIT:
-    case OP_AND:
-    case OP_OR:
-    case OP_XOR:
-    case OP_NUM2BIN:
-    case OP_BIN2NUM:
-    case OP_DIV:
-    case OP_MOD:
-        // Opcodes that have been reenabled.
-        if ((flags & SCRIPT_ENABLE_MAY152018_OPCODES) == 0)
-        {
-            return true;
-        }
 
     default:
         break;
@@ -1072,44 +1267,6 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                 }
                 break;
 
-                case OP_DATASIGVERIFY:
-                {
-                    if (!enableDataSigVerify)
-                        return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
-                    if (stack.size() < 3)
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-
-                    valtype &data = stacktop(-3);
-                    valtype &vchSigAndType = stacktop(-2);
-                    valtype &vchAddr = stacktop(-1);
-
-                    if (vchAddr.size() != 20)
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-
-                    if (vchSigAndType.size() != 66)
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-
-                    if (vchSigAndType[65] == DATASIG_COMPACT_ECDSA)
-                    {
-                        vchSigAndType.resize(65); // chop off the type byte
-                        CHashWriter ss(SER_GETHASH, 0);
-                        ss << strMessageMagic << data;
-
-                        CPubKey pubkey;
-                        if (!pubkey.RecoverCompact(ss.GetHash(), vchSigAndType))
-                            return set_error(serror, SCRIPT_ERR_VERIFY);
-                        CKeyID id = pubkey.GetID();
-                        if (id != uint160(vchAddr))
-                            return set_error(serror, SCRIPT_ERR_VERIFY);
-                    }
-                    else // No other signature types currently supported
-                    {
-                        return set_error(serror, SCRIPT_ERR_VERIFY);
-                    }
-                    popstack(stack);
-                    popstack(stack);
-                }
-                break;
                 case OP_CHECKSIG:
                 case OP_CHECKSIGVERIFY:
                 {
@@ -1274,6 +1431,63 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                 }
                 break;
 
+                case OP_CHECKDATASIG:
+                case OP_CHECKDATASIGVERIFY:
+                {
+                    // Make sure this remains an error before activation.
+                    if (!(flags & SCRIPT_ENABLE_CHECKDATASIG))
+                        return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
+
+                    // (sig message pubkey -- bool)
+                    if (stack.size() < 3)
+                    {
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                    }
+
+                    valtype &vchSig = stacktop(-3);
+                    valtype &vchMessage = stacktop(-2);
+                    valtype &vchPubKey = stacktop(-1);
+
+                    if (!CheckDataSignatureEncoding(vchSig, flags, serror) ||
+                        !CheckPubKeyEncoding(vchPubKey, flags, serror))
+                    {
+                        // serror is set
+                        return false;
+                    }
+
+                    bool fSuccess = false;
+                    if (vchSig.size())
+                    {
+                        valtype vchHash(32);
+                        CSHA256().Write(vchMessage.data(), vchMessage.size()).Finalize(vchHash.data());
+                        uint256 messagehash(vchHash);
+
+                        CPubKey pubkey(vchPubKey);
+                        fSuccess = pubkey.Verify(messagehash, vchSig);
+                    }
+
+                    if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) && vchSig.size())
+                    {
+                        return set_error(serror, SCRIPT_ERR_SIG_NULLFAIL);
+                    }
+
+                    popstack(stack);
+                    popstack(stack);
+                    popstack(stack);
+                    stack.push_back(fSuccess ? vchTrue : vchFalse);
+                    if (opcode == OP_CHECKDATASIGVERIFY)
+                    {
+                        if (fSuccess)
+                        {
+                            popstack(stack);
+                        }
+                        else
+                        {
+                            return set_error(serror, SCRIPT_ERR_CHECKDATASIGVERIFY);
+                        }
+                    }
+                }
+                break;
 
                 //
                 // Byte string operations

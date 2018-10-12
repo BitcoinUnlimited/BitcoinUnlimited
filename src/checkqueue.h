@@ -60,8 +60,11 @@ private:
      */
     unsigned int nTodo;
 
-    //! Whether we're shutting down.
+    //! Whether we're shutting down this round of parallel validation
     std::atomic<bool> fQuit;
+
+    //! Exit this thread
+    std::atomic<bool> fExit;
 
     //! The maximum number of elements to be processed in one batch
     unsigned int nBatchSize;
@@ -105,6 +108,8 @@ private:
                 // logically, the do loop starts here
                 while (queue.empty())
                 {
+                    if (fExit)
+                        return fAllOk;
                     if ((fMaster) && nTodo == 0)
                     {
                         nTotal--;
@@ -148,7 +153,7 @@ private:
 public:
     //! Create a new check queue
     CCheckQueue(unsigned int nBatchSizeIn)
-        : nIdle(0), nTotal(0), fAllOk(true), nTodo(0), fQuit(false), nBatchSize(nBatchSizeIn)
+        : nIdle(0), nTotal(0), fAllOk(true), nTodo(0), fQuit(false), fExit(false), nBatchSize(nBatchSizeIn)
     {
     }
 
@@ -158,6 +163,13 @@ public:
     bool Wait() { return Loop(true); }
     //! Quit execution of any remaining checks.
     void Quit(bool flag = true) { fQuit = flag; }
+    //! All threads exit
+    void Shutdown()
+    {
+        fExit = true;
+        condWorker.notify_all();
+        condMaster.notify_all();
+    }
     //! Add a batch of checks to the queue
     void Add(std::vector<T> &vChecks)
     {

@@ -12,6 +12,7 @@
 #include "random.h"
 #include "test/test_bitcoin.h"
 #include "test/test_random.h"
+#include "validation/validation.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -311,6 +312,11 @@ BOOST_AUTO_TEST_CASE(versionbits_computeblockversion)
     // Check that ComputeBlockVersion will set the appropriate bit correctly
     // on mainnet.
     const Consensus::Params &mainnetParams = Params(CBaseChainParams::MAIN).GetConsensus();
+
+    // Set up the testdummy bits for this test
+    VersionBitsDeploymentInfo[Consensus::DEPLOYMENT_TESTDUMMY].name = "testdummy";
+    VersionBitsDeploymentInfo[Consensus::DEPLOYMENT_TESTDUMMY].gbt_force = false;
+    VersionBitsDeploymentInfo[Consensus::DEPLOYMENT_TESTDUMMY].myVote = true;
 
     // Use the TESTDUMMY deployment for testing purposes.
     int64_t bit = mainnetParams.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit;

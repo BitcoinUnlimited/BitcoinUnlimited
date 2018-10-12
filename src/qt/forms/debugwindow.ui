@@ -96,7 +96,7 @@
        <item row="12" column="0">
         <widget class="QLabel" name="labelLastBlockTime">
          <property name="text">
-          <string>Last block time</string>
+          <string>Last block time (time since)</string>
          </property>
         </widget>
        </item>
@@ -1129,9 +1129,6 @@
          <property name="alignment">
           <set>Qt::AlignHCenter|Qt::AlignTop</set>
          </property>
-         <property name="wordWrap">
-          <bool>true</bool>
-         </property>
          <property name="textInteractionFlags">
           <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
          </property>
@@ -1233,6 +1230,9 @@
             <property name="textFormat">
              <enum>Qt::PlainText</enum>
             </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
             <property name="textInteractionFlags">
              <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
             </property>
@@ -1255,6 +1255,9 @@
             </property>
             <property name="textFormat">
              <enum>Qt::PlainText</enum>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
             </property>
             <property name="textInteractionFlags">
              <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>

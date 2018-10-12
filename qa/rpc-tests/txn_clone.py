@@ -13,7 +13,7 @@ from test_framework.util import *
 import pdb
 import traceback
 
-class TxnMallTest(BitcoinTestFramework):
+class TxnCloneTest(BitcoinTestFramework):
 
     def add_options(self, parser):
         parser.add_option("--mineblock", dest="mine_block", default=False, action="store_true",
@@ -21,7 +21,7 @@ class TxnMallTest(BitcoinTestFramework):
 
     def setup_network(self):
         # Start with split network:
-        return super(TxnMallTest, self).setup_network(True)
+        return super(TxnCloneTest, self).setup_network(True)
 
     def run_test(self):
         # All nodes should start with 1,250 BTC:
@@ -84,7 +84,7 @@ class TxnMallTest(BitcoinTestFramework):
 
         # Use a different signature hash type to sign.  This creates an equivalent but malleated clone.
         # Don't send the clone anywhere yet
-        tx1_clone = self.nodes[0].signrawtransaction(clone_raw, None, None, "ALL|ANYONECANPAY")
+        tx1_clone = self.nodes[0].signrawtransaction(clone_raw, None, None, "ALL|ANYONECANPAY|FORKID")
         assert_equal(tx1_clone["complete"], True)
 
         # Have node0 mine a block, if requested:
@@ -133,7 +133,7 @@ class TxnMallTest(BitcoinTestFramework):
         tx1 = self.nodes[0].gettransaction(txid1)
         tx1_clone = self.nodes[0].gettransaction(txid1_clone)
         tx2 = self.nodes[0].gettransaction(txid2)
-        
+
         # Verify expected confirmations
         assert_equal(tx1["confirmations"], -2)
         assert_equal(tx1_clone["confirmations"], 2)
@@ -164,13 +164,19 @@ class TxnMallTest(BitcoinTestFramework):
         assert_equal(self.nodes[1].getbalance("from0", 0), -(tx1["amount"] + tx2["amount"]))
 
 if __name__ == '__main__':
-    TxnMallTest().main()
+    TxnCloneTest().main()
 
 def Test():
-    t = TxnMallTest()
+    t = TxnCloneTest()
     t.drop_to_pdb = True
     bitcoinConf = {
-        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],  # "lck"
-        "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
+        "debug": ["blk", "mempool", "net", "req"],
+        "logtimemicros": 1
     }
-    t.main(["--tmpdir=/ramdisk/test","--nocleanup","--noshutdown"], bitcoinConf, None)  # , "--tracerpc"])
+
+    flags = [] # ["--nocleanup", "--noshutdown"]
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmppfx=/ramdisk/test")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
+    t.main(flags, bitcoinConf, None)

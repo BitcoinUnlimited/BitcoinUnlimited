@@ -111,7 +111,7 @@ public:
         LockInfo(const char *f, unsigned int l) : file(f), line(l) {}
     };
 
-    boost::mutex setlock;
+    std::mutex setlock;
     std::map<uint64_t, LockInfo> sharedowners;
     const char *name;
     uint64_t exclusiveOwner;
@@ -172,6 +172,17 @@ public:
     }
     ~CDeferredSharedLocker() { unlock(); }
 };
+
+// This class unlocks a shared lock for the duration of its life
+class CSharedUnlocker
+{
+    CSharedCriticalSection &cs;
+
+public:
+    CSharedUnlocker(CSharedCriticalSection &c) : cs(c) { cs.unlock_shared(); }
+    ~CSharedUnlocker() { cs.lock_shared(); }
+};
+
 
 /** Wrapped boost mutex: supports waiting but not recursive locking */
 typedef AnnotatedMixin<boost::mutex> CWaitableCriticalSection;

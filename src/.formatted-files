@@ -18,8 +18,17 @@ bitcoin-miner.cpp
 bitcoin-tx.cpp
 bitnodes.cpp
 bitnodes.h
+blockrelay/graphene.h
+blockrelay/graphene.cpp
+blockrelay/graphene_set.h
+blockrelay/graphene_set.cpp
+blockrelay/thinblock.h
+blockrelay/thinblock.cpp
+blockrelay/blockrelay_common.h
+blockrelay/blockrelay_common.cpp
 blockstorage/blockleveldb.cpp
 blockstorage/blockleveldb.h
+blockstorage/dbabstract.h
 blockstorage/sequential_files.cpp
 blockstorage/sequential_files.h
 blockstorage/blockstorage.cpp
@@ -64,10 +73,8 @@ dstencode.cpp
 dstencode.h
 expedited.cpp
 expedited.h
+fastfilter.h
 globals.cpp
-graphene.cpp
-graphene.h
-graphene_set.h
 hash.cpp
 hash.h
 httprpc.cpp
@@ -124,8 +131,6 @@ stat.h
 streams.h
 sync.cpp
 sync.h
-thinblock.cpp
-thinblock.h
 threadsafety.h
 timedata.cpp
 timedata.h
@@ -133,6 +138,8 @@ torcontrol.cpp
 torcontrol.h
 tweak.cpp
 tweak.h
+txadmission.cpp
+txadmission.h
 txdb.cpp
 txdb.h
 txmempool.cpp
@@ -153,6 +160,12 @@ utilstrencodings.cpp
 utilstrencodings.h
 utiltime.cpp
 utiltime.h
+validation/forks.cpp
+validation/forks.h
+validation/validation.cpp
+validation/validation.h
+validation/verifydb.cpp
+validation/verifydb.h
 validationinterface.cpp
 validationinterface.h
 versionbits.cpp
@@ -279,6 +292,7 @@ test/bswap_tests.cpp
 test/cashaddr_tests.cpp
 test/cashaddrenc_tests.cpp
 test/checkblock_tests.cpp
+test/checkdatasig_tests.cpp
 test/Checkpoints_tests.cpp
 test/coins_tests.cpp
 test/compress_tests.cpp
@@ -288,6 +302,7 @@ test/DoS_tests.cpp
 test/excessiveblock_test.cpp
 test/exploit_tests.cpp
 test/fork_tests.cpp
+test/fastfilter_tests.cpp
 test/getarg_tests.cpp
 test/hash_tests.cpp
 test/key_tests.cpp
@@ -313,7 +328,9 @@ test/script_P2SH_tests.cpp
 test/script_tests.cpp
 test/serialize_tests.cpp
 test/sighash_tests.cpp
+test/sighashtype_tests.cpp
 test/sigopcount_tests.cpp
+test/sigencoding_tests.cpp
 test/skiplist_tests.cpp
 test/stat_tests.cpp
 test/streams_tests.cpp
@@ -344,7 +361,6 @@ wallet/wallet.cpp
 wallet/walletdb.cpp
 wallet/walletdb.h
 wallet/wallet.h
-wallet/wallet_ismine.cpp
 zmq/zmqabstractnotifier.cpp
 zmq/zmqabstractnotifier.h
 zmq/zmqconfig.h
@@ -397,6 +413,7 @@ primitives/transaction.h
 bench/bench_bitcoin.cpp
 bench/bench.cpp
 bench/bench.h
+bench/bloom.cpp
 bench/crypto_hash.cpp
 bench/Examples.cpp
 bench/verify_script.cpp

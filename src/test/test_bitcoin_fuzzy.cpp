@@ -7,12 +7,12 @@
 #endif
 
 #include "addrman.h"
+#include "blockrelay/graphene.h"
 #include "cashaddr.h"
 #include "chain.h"
 #include "coins.h"
 #include "compressor.h"
 #include "consensus/merkle.h"
-#include "graphene.h"
 #include "net.h"
 #include "primitives/block.h"
 #include "protocol.h"

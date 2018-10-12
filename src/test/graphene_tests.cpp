@@ -1,5 +1,5 @@
+#include "blockrelay/graphene_set.h"
 #include "bloom.h"
-#include "graphene_set.h"
 #include "hash.h"
 #include "serialize.h"
 #include "streams.h"
@@ -130,7 +130,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_finds_optimal_settings)
     int a = 1;
     for (a = 1; a < m - mu; a++)
     {
-        CBloomFilter filter(n, fpr(a), insecure_rand.rand32(), BLOOM_UPDATE_ALL, std::numeric_limits<uint32_t>::max());
+        CBloomFilter filter(n, fpr(a), insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
         CIblt iblt(a);
 
         size_t filterBytes = ::GetSerializeSize(filter, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;

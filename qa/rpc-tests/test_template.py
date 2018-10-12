@@ -20,7 +20,7 @@ class MyTest (BitcoinTestFramework):
     def setup_chain(self,bitcoinConfDict=None, wallets=None):
         print("Initializing test directory "+self.options.tmpdir)
         # pick this one to start from the cached 4 node 100 blocks mined configuration
-        # initialize_chain(self.options.tmpdir)
+        # initialize_chain(self.options.tmpdir, bitcoinConfDict, wallets)
         # pick this one to start at 0 mined blocks
         initialize_chain_clean(self.options.tmpdir, 4, bitcoinConfDict, wallets)
         # Number of nodes to initialize ----------> ^
@@ -36,7 +36,7 @@ class MyTest (BitcoinTestFramework):
         # If not, the framework assumes this partition: (0,1) and (2,3)
         # For more complex partitions, you can't use the self.sync* member functions
         self.is_network_split=False
-        self.sync_all()
+        self.sync_blocks()
 
     def run_test (self):
 
@@ -90,7 +90,7 @@ def Test():
 
     # Execution is much faster if a ramdisk is used, so use it if one exists in a typical location
     if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmpdir=/ramdisk/test")
+        flags.append("--tmppfx=/ramdisk/test")
 
     # Out-of-source builds are awkward to start because they need an additional flag
     # automatically add this flag during testing for common out-of-source locations

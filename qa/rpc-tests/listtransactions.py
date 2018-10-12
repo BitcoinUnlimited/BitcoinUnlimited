@@ -13,10 +13,7 @@ from io import BytesIO
 
 
 def txFromHex(hexstring):
-    tx = CTransaction()
-    f = BytesIO(hex_str_to_bytes(hexstring))
-    tx.deserialize(f)
-    return tx
+    return CTransaction().deserialize(hexstring)
 
 
 class ListTransactionsTest(BitcoinTestFramework):
@@ -178,5 +175,5 @@ def Test():
         "debug": ["all"],
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
-    # "--tmpdir=/ramdisk/test", "--nocleanup", "--noshutdown"
+    # "--tmppfx=/ramdisk/test", "--nocleanup", "--noshutdown"
     t.main([], bitcoinConf, None)

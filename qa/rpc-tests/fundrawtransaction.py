@@ -465,7 +465,8 @@ class RawTransactionsTest(BitcoinTestFramework):
         fundedTx = self.nodes[2].fundrawtransaction(rawTx)
 
         signedTx = self.nodes[2].signrawtransaction(fundedTx['hex'])
-        txId = self.nodes[2].sendrawtransaction(signedTx['hex'])
+        txId = self.nodes[2].enqueuerawtransaction(signedTx['hex'], "flush")
+        
         self.sync_all()
         self.nodes[1].generate(1)
         self.sync_all()
@@ -526,7 +527,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         #now we need to unlock
         self.nodes[1].walletpassphrase("test", 100)
         signedTx = self.nodes[1].signrawtransaction(fundedTx['hex'])
-        txId = self.nodes[1].sendrawtransaction(signedTx['hex'])
+        txId = self.nodes[1].enqueuerawtransaction(signedTx['hex'],"flush")
         self.sync_all()
         self.nodes[1].generate(1)
         self.sync_all()
@@ -590,7 +591,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         rawTx = self.nodes[1].createrawtransaction(inputs, outputs)
         fundedTx = self.nodes[1].fundrawtransaction(rawTx)
         fundedAndSignedTx = self.nodes[1].signrawtransaction(fundedTx['hex'])
-        txId = self.nodes[1].sendrawtransaction(fundedAndSignedTx['hex'])
+        txId = self.nodes[1].enqueuerawtransaction(fundedAndSignedTx['hex'], "flush")
         self.sync_all()
         self.nodes[0].generate(1)
         self.sync_all()
@@ -650,7 +651,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         assert(not signedtx["complete"])
         signedtx = self.nodes[0].signrawtransaction(signedtx["hex"])
         assert(signedtx["complete"])
-        self.nodes[0].sendrawtransaction(signedtx["hex"])
+        self.nodes[0].enqueuerawtransaction(signedtx["hex"],"flush")
 
         self.nodes[0].generate(1)
         self.sync_all()
@@ -675,3 +676,17 @@ class RawTransactionsTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     RawTransactionsTest().main(None,{"keypool":1})
+
+def Test():
+    t = RawTransactionsTest()
+    bitcoinConf = {
+        "debug": ["rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "keypool":1
+    }
+
+    flags = [] # ["--nocleanup", "--noshutdown"]
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmppfx=/ramdisk/test")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
+    t.main(flags, bitcoinConf, None)

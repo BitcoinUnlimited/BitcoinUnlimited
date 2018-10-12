@@ -26,6 +26,23 @@ using namespace std;
 
 BOOST_FIXTURE_TEST_SUITE(bloom_tests, BasicTestingSetup)
 
+// Access protected members of the Bloom filter
+class CBloomFilterAccess : public CBloomFilter
+{
+public:
+    int hashFuncs() { return nHashFuncs; }
+    CBloomFilterAccess(unsigned int _nElements, double _nFPRate, unsigned int _nTweak, unsigned char _nFlagsIn)
+        : CBloomFilter(_nElements, _nFPRate, _nTweak, _nFlagsIn)
+    {
+    }
+};
+
+BOOST_AUTO_TEST_CASE(bloom_extreme_cases)
+{
+    CBloomFilterAccess filter(1000000, 0.0000001, 0, BLOOM_UPDATE_NONE);
+    BOOST_CHECK(filter.hashFuncs() == 1);
+}
+
 BOOST_AUTO_TEST_CASE(bloom_create_insert_serialize)
 {
     CBloomFilter filter(3, 0.01, 0, BLOOM_UPDATE_ALL);
@@ -855,12 +872,15 @@ BOOST_AUTO_TEST_CASE(rolling_bloom)
         if (i >= 100)
             BOOST_CHECK(rb1.contains(data[i - 100]));
         rb1.insert(data[i]);
+        BOOST_CHECK(rb1.contains(data[i]));
     }
 
     // Insert 999 more random entries:
     for (int i = 0; i < 999; i++)
     {
-        rb1.insert(RandomData());
+        std::vector<unsigned char> d = RandomData();
+        rb1.insert(d);
+        BOOST_CHECK(rb1.contains(d));
     }
     // Sanity check to make sure the filter isn't just filling up:
     nHits = 0;
@@ -991,12 +1011,14 @@ BOOST_AUTO_TEST_CASE(bloom_full_and_size_tests)
     {
         // a rolling bloom filter can be constructed with much larger size than a regular one
         CRollingBloomFilter rollbloom(120000, 0.000001);
-        BOOST_CHECK(rollbloom.vDataTotalSize() > 800000);
+        printf("Roll Bloom filter size: %u\n", rollbloom.vDataSize());
+        BOOST_CHECK(rollbloom.vDataSize() > 150000);
     }
 
     {
         // a regular one, not so much
         CBloomFilter filter(120000, 0.000001, 0, 0);
+        printf("Bloom filter size: %u\n", filter.vDataSize());
         BOOST_CHECK(filter.vDataSize() < 50000);
     }
 }

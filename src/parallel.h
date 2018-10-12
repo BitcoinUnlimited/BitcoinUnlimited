@@ -18,6 +18,37 @@
 
 #include <boost/thread.hpp>
 
+/**
+ * Class that keeps track of number of signature operations
+ * and bytes hashed to compute signature hashes.
+ */
+class ValidationResourceTracker
+{
+private:
+    mutable CCriticalSection cs;
+    uint64_t nSigops;
+    uint64_t nSighashBytes;
+
+public:
+    ValidationResourceTracker() : nSigops(0), nSighashBytes(0) {}
+    void Update(const uint256 &txid, uint64_t nSigopsIn, uint64_t nSighashBytesIn)
+    {
+        LOCK(cs);
+        nSigops += nSigopsIn;
+        nSighashBytes += nSighashBytesIn;
+        return;
+    }
+    uint64_t GetSigOps() const
+    {
+        LOCK(cs);
+        return nSigops;
+    }
+    uint64_t GetSighashBytes() const
+    {
+        LOCK(cs);
+        return nSighashBytes;
+    }
+};
 
 /**
  * Closure representing one script verification
@@ -81,7 +112,10 @@ private:
     std::vector<uint256> vPreviousBlock;
     // Vector of script check queues
     std::vector<CCheckQueue<CScriptCheck> *> vQueues;
+    // Number of threads
     unsigned int nThreads;
+    // All threads currently running
+    boost::thread_group threadGroup;
     // The semaphore limits the number of parallel validation threads
     CSemaphore semThreadCount;
 
@@ -111,7 +145,7 @@ public:
      *                          are created.
      * @param[in] threadGroup   The thread group threads will be created in
      */
-    CParallelValidation(int threadCount, boost::thread_group *threadGroup);
+    CParallelValidation();
 
     ~CParallelValidation();
 

@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "nodestate.h"
+#include "main.h"
 
 /**
 * Default constructor initializing all local member variables to "null" values
@@ -30,10 +31,36 @@ CNodeState::CNodeState(CAddress addrIn, std::string addrNameIn) : address(addrIn
 * @param[in] pnode  The NodeId to return CNodeState* for
 * @return CNodeState* matching the NodeId, or nullptr if NodeId is not matched
 */
-CNodeState *State(NodeId nId)
+CNodeState *CState::State(const NodeId id)
 {
-    std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(nId);
+    LOCK(cs_main);
+    std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(id);
     if (it == mapNodeState.end())
         return nullptr;
     return &it->second;
+}
+
+/**
+* Initialize the CNodeState for the specified NodeId.
+*
+* @param[in] pnode  The NodeId
+* @return none
+*/
+void CState::InitializeNodeState(const CNode *pnode)
+{
+    LOCK(cs_main);
+    mapNodeState.emplace_hint(mapNodeState.end(), std::piecewise_construct, std::forward_as_tuple(pnode->GetId()),
+        std::forward_as_tuple(pnode->addr, pnode->addrName));
+}
+
+/**
+* Remove the CNodeState for the specified NodeId.
+*
+* @param[in] pnode  The NodeId
+* @return none
+*/
+void CState::RemoveNodeState(const NodeId id)
+{
+    LOCK(cs_main);
+    mapNodeState.erase(id);
 }

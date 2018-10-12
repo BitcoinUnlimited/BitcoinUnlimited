@@ -19,18 +19,24 @@
 #include "streams.h"
 #include "sync.h"
 #include "tweak.h"
+#include "txadmission.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "validation/validation.h"
+#include "validation/verifydb.h"
 
 #include <stdint.h>
 
 #include <univalue.h>
 
 #include <boost/thread/thread.hpp> // boost::thread::interrupt
+
+// In case of operator error, limit the rollback of a chain to 100 blocks
+static uint32_t nDefaultRollbackLimit = 100;
 
 using namespace std;
 
@@ -188,6 +194,77 @@ UniValue getdifficulty(const UniValue &params, bool fHelp)
     return GetDifficulty();
 }
 
+std::string EntryDescriptionString()
+{
+    return "    \"size\" : n,             (numeric) transaction size in bytes\n"
+           "    \"fee\" : n,              (numeric) transaction fee in " +
+           CURRENCY_UNIT +
+           "\n"
+           "    \"modifiedfee\" : n,      (numeric) transaction fee with fee deltas used for mining priority\n"
+           "    \"time\" : n,             (numeric) local time transaction entered pool in seconds since 1 Jan 1970 "
+           "GMT\n"
+           "    \"height\" : n,           (numeric) block height when transaction entered pool\n"
+           "    \"startingpriority\" : n, (numeric) priority when transaction entered pool\n"
+           "    \"currentpriority\" : n,  (numeric) transaction priority now\n"
+           "    \"descendantcount\" : n,  (numeric) number of in-mempool descendant transactions (including this "
+           "one)\n"
+           "    \"descendantsize\" : n,   (numeric) size of in-mempool descendants (including this one)\n"
+           "    \"descendantfees\" : n,   (numeric) modified fees (see above) of in-mempool descendants (including "
+           "this one)\n"
+           "    \"ancestorcount\" : n,    (numeric) number of in-mempool ancestor transactions (including this one)\n"
+           "    \"ancestorsize\" : n,     (numeric) size of in-mempool ancestors (including this one)\n"
+           "    \"ancestorfees\" : n,     (numeric) modified fees (see above) of in-mempool ancestors (including this "
+           "one)\n"
+           "    \"depends\" : [           (array) unconfirmed transactions used as inputs for this transaction\n"
+           "        \"transactionid\",    (string) parent transaction id\n"
+           "       ... ]\n"
+           "    \"spentby\" : [           (array) unconfirmed transactions spending outputs from this transaction\n"
+           "        \"transactionid\",    (string) child transaction id\n"
+           "       ... ]\n";
+}
+
+void entryToJSON(UniValue &info, const CTxMemPoolEntry &e)
+{
+    AssertLockHeld(mempool.cs);
+
+    info.push_back(Pair("size", (int)e.GetTxSize()));
+    info.push_back(Pair("fee", ValueFromAmount(e.GetFee())));
+    info.push_back(Pair("modifiedfee", ValueFromAmount(e.GetModifiedFee())));
+    info.push_back(Pair("time", e.GetTime()));
+    info.push_back(Pair("height", (int)e.GetHeight()));
+    info.push_back(Pair("startingpriority", e.GetPriority(e.GetHeight())));
+    info.push_back(Pair("currentpriority", e.GetPriority(chainActive.Height())));
+    info.push_back(Pair("descendantcount", e.GetCountWithDescendants()));
+    info.push_back(Pair("descendantsize", e.GetSizeWithDescendants()));
+    info.push_back(Pair("descendantfees", e.GetModFeesWithDescendants()));
+    info.push_back(Pair("ancestorcount", e.GetCountWithAncestors()));
+    info.push_back(Pair("ancestorsize", e.GetSizeWithAncestors()));
+    info.push_back(Pair("ancestorfees", e.GetModFeesWithAncestors()));
+    const CTransaction &tx = e.GetTx();
+    set<string> setDepends;
+    for (const CTxIn &txin : tx.vin)
+    {
+        if (mempool._exists(txin.prevout.hash))
+            setDepends.insert(txin.prevout.hash.ToString());
+    }
+
+    UniValue depends(UniValue::VARR);
+    for (const string &dep : setDepends)
+    {
+        depends.push_back(dep);
+    }
+    info.push_back(Pair("depends", depends));
+
+    UniValue spent(UniValue::VARR);
+    const CTxMemPool::txiter &it = mempool.mapTx.find(tx.GetHash());
+    const CTxMemPool::setEntries &setChildren = mempool.GetMemPoolChildren(it);
+    for (const CTxMemPool::txiter &childiter : setChildren)
+    {
+        spent.push_back(childiter->GetTx().GetHash().ToString());
+    }
+    info.push_back(Pair("spentby", spent));
+}
+
 UniValue mempoolToJSON(bool fVerbose = false)
 {
     if (fVerbose)
@@ -198,31 +275,7 @@ UniValue mempoolToJSON(bool fVerbose = false)
         {
             const uint256 &hash = e.GetTx().GetHash();
             UniValue info(UniValue::VOBJ);
-            info.push_back(Pair("size", (int)e.GetTxSize()));
-            info.push_back(Pair("fee", ValueFromAmount(e.GetFee())));
-            info.push_back(Pair("modifiedfee", ValueFromAmount(e.GetModifiedFee())));
-            info.push_back(Pair("time", e.GetTime()));
-            info.push_back(Pair("height", (int)e.GetHeight()));
-            info.push_back(Pair("startingpriority", e.GetPriority(e.GetHeight())));
-            info.push_back(Pair("currentpriority", e.GetPriority(chainActive.Height())));
-            info.push_back(Pair("descendantcount", e.GetCountWithDescendants()));
-            info.push_back(Pair("descendantsize", e.GetSizeWithDescendants()));
-            info.push_back(Pair("descendantfees", e.GetModFeesWithDescendants()));
-            const CTransaction &tx = e.GetTx();
-            set<string> setDepends;
-            for (const CTxIn &txin : tx.vin)
-            {
-                if (mempool._exists(txin.prevout.hash))
-                    setDepends.insert(txin.prevout.hash.ToString());
-            }
-
-            UniValue depends(UniValue::VARR);
-            for (const string &dep : setDepends)
-            {
-                depends.push_back(dep);
-            }
-
-            info.push_back(Pair("depends", depends));
+            entryToJSON(info, e);
             o.push_back(Pair(hash.ToString(), info));
         }
         return o;
@@ -256,28 +309,10 @@ UniValue getrawmempool(const UniValue &params, bool fHelp)
             "]\n"
             "\nResult: (for verbose = true):\n"
             "{                           (json object)\n"
-            "  \"transactionid\" : {       (json object)\n"
-            "    \"size\" : n,             (numeric) transaction size in bytes\n"
-            "    \"fee\" : n,              (numeric) transaction fee in " +
-            CURRENCY_UNIT +
-            "\n"
-            "    \"modifiedfee\" : n,      (numeric) transaction fee with fee deltas used for mining priority\n"
-            "    \"time\" : n,             (numeric) local time transaction entered pool in seconds since 1 Jan 1970 "
-            "GMT\n"
-            "    \"height\" : n,           (numeric) block height when transaction entered pool\n"
-            "    \"startingpriority\" : n, (numeric) priority when transaction entered pool\n"
-            "    \"currentpriority\" : n,  (numeric) transaction priority now\n"
-            "    \"descendantcount\" : n,  (numeric) number of in-mempool descendant transactions (including this "
-            "one)\n"
-            "    \"descendantsize\" : n,   (numeric) size of in-mempool descendants (including this one)\n"
-            "    \"descendantfees\" : n,   (numeric) modified fees (see above) of in-mempool descendants (including "
-            "this one)\n"
-            "    \"depends\" : [           (array) unconfirmed transactions used as inputs for this transaction\n"
-            "        \"transactionid\",    (string) parent transaction id\n"
-            "       ... ]\n"
-            "  }, ...\n"
-            "}\n"
-            "\nExamples\n" +
+            "  \"transactionid\" : {       (json object)\n" +
+            EntryDescriptionString() + "  }, ...\n"
+                                       "}\n"
+                                       "\nExamples\n" +
             HelpExampleCli("getrawmempool", "true") + HelpExampleRpc("getrawmempool", "true"));
 
     LOCK(cs_main);
@@ -287,6 +322,177 @@ UniValue getrawmempool(const UniValue &params, bool fHelp)
         fVerbose = params[0].get_bool();
 
     return mempoolToJSON(fVerbose);
+}
+
+UniValue getmempoolancestors(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)
+    {
+        throw runtime_error(
+            "getmempoolancestors txid (verbose)\n"
+            "\nIf txid is in the mempool, returns all in-mempool ancestors.\n"
+            "\nArguments:\n"
+            "1. \"txid\"                   (string, required) The transaction id (must be in mempool)\n"
+            "2. verbose                  (boolean, optional, default=false) true for a json object, false for array of "
+            "transaction ids\n"
+            "\nResult (for verbose=false):\n"
+            "[                       (json array of strings)\n"
+            "  \"transactionid\"           (string) The transaction id of an in-mempool ancestor transaction\n"
+            "  ,...\n"
+            "]\n"
+            "\nResult (for verbose=true):\n"
+            "{                           (json object)\n"
+            "  \"transactionid\" : {       (json object)\n" +
+            EntryDescriptionString() + "  }, ...\n"
+                                       "}\n"
+                                       "\nExamples\n" +
+            HelpExampleCli("getmempoolancestors", "\"mytxid\"") + HelpExampleRpc("getmempoolancestors", "\"mytxid\""));
+    }
+
+    bool fVerbose = false;
+    if (params.size() > 1)
+        fVerbose = params[1].get_bool();
+
+    uint256 paramhash = ParseHashV(params[0], "parameter 1");
+
+    READLOCK(mempool.cs);
+
+    CTxMemPool::txiter it = mempool.mapTx.find(paramhash);
+    if (it == mempool.mapTx.end())
+    {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction not in mempool");
+    }
+
+    CTxMemPool::setEntries setAncestors;
+    uint64_t noLimit = std::numeric_limits<uint64_t>::max();
+    std::string dummy;
+    mempool._CalculateMemPoolAncestors(*it, setAncestors, noLimit, noLimit, noLimit, noLimit, dummy, false);
+
+    if (!fVerbose)
+    {
+        UniValue o(UniValue::VARR);
+        for (CTxMemPool::txiter ancestorIt : setAncestors)
+        {
+            o.push_back(ancestorIt->GetTx().GetHash().ToString());
+        }
+
+        return o;
+    }
+    else
+    {
+        UniValue o(UniValue::VOBJ);
+        for (CTxMemPool::txiter ancestorIt : setAncestors)
+        {
+            const CTxMemPoolEntry &e = *ancestorIt;
+            const uint256 &hash = e.GetTx().GetHash();
+            UniValue info(UniValue::VOBJ);
+            entryToJSON(info, e);
+            o.push_back(Pair(hash.ToString(), info));
+        }
+        return o;
+    }
+}
+
+UniValue getmempooldescendants(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)
+    {
+        throw runtime_error(
+            "getmempooldescendants txid (verbose)\n"
+            "\nIf txid is in the mempool, returns all in-mempool descendants.\n"
+            "\nArguments:\n"
+            "1. \"txid\"                   (string, required) The transaction id (must be in mempool)\n"
+            "2. verbose                  (boolean, optional, default=false) true for a json object, false for array of "
+            "transaction ids\n"
+            "\nResult (for verbose=false):\n"
+            "[                       (json array of strings)\n"
+            "  \"transactionid\"           (string) The transaction id of an in-mempool descendant transaction\n"
+            "  ,...\n"
+            "]\n"
+            "\nResult (for verbose=true):\n"
+            "{                           (json object)\n"
+            "  \"transactionid\" : {       (json object)\n" +
+            EntryDescriptionString() + "  }, ...\n"
+                                       "}\n"
+                                       "\nExamples\n" +
+            HelpExampleCli("getmempooldescendants", "\"mytxid\"") +
+            HelpExampleRpc("getmempooldescendants", "\"mytxid\""));
+    }
+
+    bool fVerbose = false;
+    if (params.size() > 1)
+        fVerbose = params[1].get_bool();
+
+    uint256 paramhash = ParseHashV(params[0], "parameter 1");
+
+    WRITELOCK(mempool.cs);
+
+    CTxMemPool::txiter it = mempool.mapTx.find(paramhash);
+    if (it == mempool.mapTx.end())
+    {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction not in mempool");
+    }
+
+    CTxMemPool::setEntries setDescendants;
+    mempool._CalculateDescendants(it, setDescendants);
+    // CTxMemPool::CalculateDescendants will include the given tx
+    setDescendants.erase(it);
+
+    if (!fVerbose)
+    {
+        UniValue o(UniValue::VARR);
+        for (CTxMemPool::txiter descendantIt : setDescendants)
+        {
+            o.push_back(descendantIt->GetTx().GetHash().ToString());
+        }
+
+        return o;
+    }
+    else
+    {
+        UniValue o(UniValue::VOBJ);
+        for (CTxMemPool::txiter descendantIt : setDescendants)
+        {
+            const CTxMemPoolEntry &e = *descendantIt;
+            const uint256 &hash = e.GetTx().GetHash();
+            UniValue info(UniValue::VOBJ);
+            entryToJSON(info, e);
+            o.push_back(Pair(hash.ToString(), info));
+        }
+        return o;
+    }
+}
+
+UniValue getmempoolentry(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+    {
+        throw runtime_error("getmempoolentry txid\n"
+                            "\nReturns mempool data for given transaction\n"
+                            "\nArguments:\n"
+                            "1. \"txid\"                   (string, required) The transaction id (must be in mempool)\n"
+                            "\nResult:\n"
+                            "{                           (json object)\n" +
+                            EntryDescriptionString() + "}\n"
+                                                       "\nExamples\n" +
+                            HelpExampleCli("getmempoolentry", "\"mytxid\"") +
+                            HelpExampleRpc("getmempoolentry", "\"mytxid\""));
+    }
+
+    uint256 hash = ParseHashV(params[0], "parameter 1");
+
+    READLOCK(mempool.cs);
+
+    CTxMemPool::txiter it = mempool.mapTx.find(hash);
+    if (it == mempool.mapTx.end())
+    {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction not in mempool");
+    }
+
+    const CTxMemPoolEntry &e = *it;
+    UniValue info(UniValue::VOBJ);
+    entryToJSON(info, e);
+    return info;
 }
 
 UniValue getblockhash(const UniValue &params, bool fHelp)
@@ -909,6 +1115,44 @@ struct CompareBlocksByHeight
     }
 };
 
+static std::set<CBlockIndex *, CompareBlocksByHeight> GetChainTips()
+{
+    /*
+     * Idea:  the set of chain tips is chainActive.tip, plus orphan blocks which do not have another orphan building off
+     * of them.
+     * Algorithm:
+     *  - Make one pass through mapBlockIndex, picking out the orphan blocks, and also storing a set of the orphan
+     * block's pprev pointers.
+     *  - Iterate through the orphan blocks. If the block isn't pointed to by another orphan, it is a chain tip.
+     *  - add chainActive.Tip()
+     */
+    std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
+    std::set<CBlockIndex *> setOrphans;
+    std::set<CBlockIndex *> setPrevs;
+
+    for (const std::pair<const uint256, CBlockIndex *> &item : mapBlockIndex)
+    {
+        if (!chainActive.Contains(item.second))
+        {
+            setOrphans.insert(item.second);
+            setPrevs.insert(item.second->pprev);
+        }
+    }
+
+    for (auto &it : setOrphans)
+    {
+        if (setPrevs.erase(it) == 0)
+        {
+            setTips.insert(it);
+        }
+    }
+
+    // Always report the currently active tip.
+    setTips.insert(chainActive.Tip());
+
+    return setTips;
+}
+
 UniValue getchaintips(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -941,38 +1185,9 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
 
     LOCK(cs_main);
 
-    /*
-     * Idea:  the set of chain tips is chainActive.tip, plus orphan blocks which do not have another orphan building off
-     * of them.
-     * Algorithm:
-     *  - Make one pass through mapBlockIndex, picking out the orphan blocks, and also storing a set of the orphan
-     * block's pprev pointers.
-     *  - Iterate through the orphan blocks. If the block isn't pointed to by another orphan, it is a chain tip.
-     *  - add chainActive.Tip()
-     */
-    std::set<const CBlockIndex *, CompareBlocksByHeight> setTips;
-    std::set<const CBlockIndex *> setOrphans;
-    std::set<const CBlockIndex *> setPrevs;
-
-    for (const PAIRTYPE(const uint256, CBlockIndex *) & item : mapBlockIndex)
-    {
-        if (!chainActive.Contains(item.second))
-        {
-            setOrphans.insert(item.second);
-            setPrevs.insert(item.second->pprev);
-        }
-    }
-
-    for (std::set<const CBlockIndex *>::iterator it = setOrphans.begin(); it != setOrphans.end(); ++it)
-    {
-        if (setPrevs.erase(*it) == 0)
-        {
-            setTips.insert(*it);
-        }
-    }
-
-    // Always report the currently active tip.
-    setTips.insert(chainActive.Tip());
+    // Get the set of chaintips
+    std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
+    setTips = GetChainTips();
 
     /* Construct the output array.  */
     UniValue res(UniValue::VARR);
@@ -1109,14 +1324,14 @@ UniValue invalidateblock(const UniValue &params, bool fHelp)
     uint256 hash(uint256S(strHash));
     CValidationState state;
 
-    {
-        LOCK(cs_main);
-        if (mapBlockIndex.count(hash) == 0)
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+    TxAdmissionPause txlock;
+    LOCK(cs_main);
 
-        CBlockIndex *pblockindex = mapBlockIndex[hash];
-        InvalidateBlock(state, Params().GetConsensus(), pblockindex);
-    }
+    if (mapBlockIndex.count(hash) == 0)
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+
+    CBlockIndex *pblockindex = mapBlockIndex[hash];
+    InvalidateBlock(state, Params().GetConsensus(), pblockindex);
 
     if (state.IsValid())
     {
@@ -1174,24 +1389,22 @@ UniValue reconsiderblock(const UniValue &params, bool fHelp)
 
 UniValue rollbackchain(const UniValue &params, bool fHelp)
 {
-    // In case of operator error, limit the rollback to 100 blocks
-    uint32_t nLimit = 100;
-
     if (fHelp || params.size() < 1 || params.size() > 2)
-        throw runtime_error(
-            "rollbackchain \"blockheight\"\n"
-            "\nRolls back the blockchain to the height indicated.\n"
-            "\nArguments:\n"
-            "1. blockheight   (int, required) the height that you want to roll the chain \
+        throw runtime_error("rollbackchain \"blockheight\"\n"
+                            "\nRolls back the blockchain to the height indicated.\n"
+                            "\nArguments:\n"
+                            "1. blockheight   (int, required) the height that you want to roll the chain \
                             back to (only maxiumum rollback of " +
-            std::to_string(nLimit) + " blocks allowed)\n"
-                                     "2. override      (boolean, optional, default=false) rollback more than the \
+                            std::to_string(nDefaultRollbackLimit) +
+                            " blocks allowed)\n"
+                            "2. override      (boolean, optional, default=false) rollback more than the \
                             allowed default limit of " +
-            std::to_string(nLimit) + " blocks)\n"
-                                     "\nResult:\n"
-                                     "\nExamples:\n" +
-            HelpExampleCli("rollbackchain", "\"501245\"") + HelpExampleCli("rollbackchain", "\"495623 true\"") +
-            HelpExampleRpc("rollbackchain", "\"blockheight\""));
+                            std::to_string(nDefaultRollbackLimit) + " blocks)\n"
+                                                                    "\nResult:\n"
+                                                                    "\nExamples:\n" +
+                            HelpExampleCli("rollbackchain", "\"501245\"") +
+                            HelpExampleCli("rollbackchain", "\"495623 true\"") +
+                            HelpExampleRpc("rollbackchain", "\"blockheight\""));
 
     int nRollBackHeight = params[0].get_int();
     bool fOverride = false;
@@ -1200,9 +1413,10 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
 
     LOCK(cs_main);
     uint32_t nRollBack = chainActive.Height() - nRollBackHeight;
-    if (nRollBack > nLimit && !fOverride)
+    if (nRollBack > nDefaultRollbackLimit && !fOverride)
         throw runtime_error("You are attempting to rollback the chain by " + std::to_string(nRollBack) +
-                            " blocks, however the limit is " + std::to_string(nLimit) + " blocks. Set " +
+                            " blocks, however the limit is " + std::to_string(nDefaultRollbackLimit) +
+                            " blocks. Set "
                             "the override to true if you want rollback more than the default");
 
     while (chainActive.Height() > nRollBackHeight)
@@ -1232,6 +1446,64 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
     return NullUniValue;
 }
 
+UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() > 1)
+        throw runtime_error("reconsidermostworkchain \"[override]\"\n"
+                            "\nWill rollback the chain if needed and then sync to the most work chain. If this\n"
+                            "client was not upgraded before a hard fork and marked the \"real\" chain as invalid,\n"
+                            "then this command should be run after upgrading the client so as to join the correct\n"
+                            "and most work chain\n"
+                            "\nArguments:\n"
+                            "1. override      (boolean, optional, default=false)"
+                            "\nResult:\n"
+                            "\nExamples:\n" +
+                            HelpExampleCli("reconsidermostworkchain", "") +
+                            HelpExampleCli("reconsidermostworkchain", "\"true\"") +
+                            HelpExampleRpc("reconsidermostworkchain", "\"true\""));
+
+    // Find pindex of most work chain regardless of whether is is valid or not.
+    LOCK(cs_main);
+
+    // Get the set of chaintips
+    std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
+    setTips = GetChainTips();
+
+    // Find the longest chaintip regardless if it is currently the active one.
+    CBlockIndex *pMostWork = chainActive.Tip();
+    for (CBlockIndex *pTip : setTips)
+    {
+        if (pMostWork->nChainWork < pTip->nChainWork)
+            pMostWork = pTip;
+    }
+
+    // If already on the longest chain then return
+    if (pMostWork == chainActive.Tip())
+        throw runtime_error("Nothing to do. Already on the correct chain.");
+
+    // Find where chainActive meets the most work chaintip
+    const CBlockIndex *pFork;
+    pFork = chainActive.FindFork(pMostWork);
+
+    // Rollback to the common forkheight so that both chains will be invalidated.
+    UniValue obj(UniValue::VARR);
+    obj.push_back(pFork->nHeight);
+    if (params.size() > 0)
+    {
+        // Set the rollbackchain override flag if there was one provided.
+        obj.push_back(params[0]);
+    }
+    rollbackchain(obj, false);
+
+    // If we got here then rollbackchain() was sucessful and we didn't throw an exception.
+    // Now reconsider the most work chain.
+    UniValue obj_hash(UniValue::VARR);
+    obj_hash.push_back(pMostWork->GetBlockHash().ToString());
+    reconsiderblock(obj_hash, false);
+
+    return NullUniValue;
+}
+
 static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
     //  --------------------- ------------------------  -----------------------  ----------
@@ -1239,7 +1511,10 @@ static const CRPCCommand commands[] = {
     {"blockchain", "getbestblockhash", &getbestblockhash, true}, {"blockchain", "getblockcount", &getblockcount, true},
     {"blockchain", "getblock", &getblock, true}, {"blockchain", "getblockhash", &getblockhash, true},
     {"blockchain", "getblockheader", &getblockheader, true}, {"blockchain", "getchaintips", &getchaintips, true},
-    {"blockchain", "getdifficulty", &getdifficulty, true}, {"blockchain", "getmempoolinfo", &getmempoolinfo, true},
+    {"blockchain", "getdifficulty", &getdifficulty, true},
+    {"blockchain", "getmempoolancestors", &getmempoolancestors, true},
+    {"blockchain", "getmempooldescendants", &getmempooldescendants, true},
+    {"blockchain", "getmempoolentry", &getmempoolentry, true}, {"blockchain", "getmempoolinfo", &getmempoolinfo, true},
     {"blockchain", "getorphanpoolinfo", &getorphanpoolinfo, true},
     {"blockchain", "getrawmempool", &getrawmempool, true}, {"blockchain", "gettxout", &gettxout, true},
     {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true}, {"blockchain", "verifychain", &verifychain, true},
@@ -1247,6 +1522,7 @@ static const CRPCCommand commands[] = {
     /* Not shown in help */
     {"hidden", "invalidateblock", &invalidateblock, true}, {"hidden", "reconsiderblock", &reconsiderblock, true},
     {"hidden", "rollbackchain", &rollbackchain, true},
+    {"hidden", "reconsidermostworkchain", &reconsidermostworkchain, true},
 };
 
 void RegisterBlockchainRPCCommands(CRPCTable &table)

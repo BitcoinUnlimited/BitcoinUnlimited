@@ -113,9 +113,6 @@ static const unsigned int MAX_REJECT_MESSAGE_LENGTH = 111;
 static const unsigned int AVG_LOCAL_ADDRESS_BROADCAST_INTERVAL = 24 * 24 * 60;
 /** Average delay between peer address broadcasts in seconds. */
 static const unsigned int AVG_ADDRESS_BROADCAST_INTERVAL = 30;
-/** Average delay between trickled inventory broadcasts in seconds.
- *  Blocks, whitelisted receivers, and a random 25% of transactions bypass this. */
-static const unsigned int AVG_INVENTORY_BROADCAST_INTERVAL = 5;
 /** Block download timeout base, expressed in millionths of the block interval (i.e. 10 min) */
 static const int64_t BLOCK_DOWNLOAD_TIMEOUT_BASE = 1000000;
 /** Additional block download timeout per parallel downloading peer (i.e. 5 min) */
@@ -126,6 +123,8 @@ static const uint32_t INITIAL_HEADERS_TIMEOUT = 120;
 static const uint32_t MAX_UNCONNECTED_HEADERS = 144;
 /** The maximum length of time, in seconds, we keep unconnected headers in the cache **/
 static const uint32_t UNCONNECTED_HEADERS_TIMEOUT = 120;
+/** Maximum number of INV's that can be send in one message */
+static const int MAX_INV_TO_SEND = 1000;
 
 /** The maximum number of free transactions (in KB) that can enter the mempool per minute.
  *  For a 1MB block we allow 15KB of free transactions per 1 minute.
@@ -150,7 +149,7 @@ static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 8;
 
 static const bool DEFAULT_PEERBLOOMFILTERS = true;
 static const bool DEFAULT_USE_THINBLOCKS = true;
-static const bool DEFAULT_USE_GRAPHENE_BLOCKS = false;
+static const bool DEFAULT_USE_GRAPHENE_BLOCKS = true;
 
 static const bool DEFAULT_REINDEX = false;
 static const bool DEFAULT_DISCOVER = true;
@@ -172,6 +171,7 @@ struct BlockHasher
     size_t operator()(const uint256 &hash) const { return hash.GetCheapHash(); }
 };
 
+extern CTweak<bool> enableCanonicalTxOrder;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
 typedef boost::unordered_map<uint256, CBlockIndex *, BlockHasher> BlockMap;
@@ -239,55 +239,17 @@ void RegisterNodeSignals(CNodeSignals &nodeSignals);
 /** Unregister a network node */
 void UnregisterNodeSignals(CNodeSignals &nodeSignals);
 
-/**
- * Process an incoming block. This only returns after the best known valid
- * block is made active. Note that it does not, however, guarantee that the
- * specific block passed to it has been checked for validity!
- *
- * @param[out]  state   This may be set to an Error state if any error occurred processing it, including during
- * validation/connection/etc of otherwise unrelated blocks during reorganisation; or it may be set to an Invalid state
- * if pblock is itself invalid (but this is not guaranteed even when the block is checked). If you want to *possibly*
- * get feedback on whether pblock is valid, you must also install a CValidationInterface (see validationinterface.h) -
- * this will have its BlockChecked method called whenever *any* block completes validation.
- * @param[in]   pfrom   The node which we are receiving the block from; it is added to mapBlockSource and may be
- * penalised if the block is invalid.
- * @param[in]   pblock  The block we want to process.
- * @param[in]   fForceProcessing Process this block even if unrequested; used for non-network block sources and
- * whitelisted peers.
- * @param[out]  dbp     If pblock is stored to disk (or already there), this will be set to its location.
- * @return True if state.IsValid()
- */
-bool ProcessNewBlock(CValidationState &state,
-    const CChainParams &chainparams,
-    CNode *pfrom,
-    const CBlock *pblock,
-    bool fForceProcessing,
-    CDiskBlockPos *dbp,
-    bool fParallel);
-/** Disconnect the current chainActive.Tip() */
-bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusParams, const bool fRollBack = false);
+
 /** Check whether enough disk space is available for an incoming block */
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 /** Import blocks from an external file */
 bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskBlockPos *dbp = nullptr);
-/** Initialize a new block tree database + block data on disk */
-bool InitBlockIndex(const CChainParams &chainparams);
-/** Load the block tree and coins database from disk */
-bool LoadBlockIndex();
-/** Unload database information */
-void UnloadBlockIndex();
 /** Process protocol messages received from a given node */
 bool ProcessMessages(CNode *pfrom);
 /** Do we already have this transaction or has it been seen in a block */
 bool AlreadyHaveTx(const CInv &inv);
 /** Do we already have this block on disk */
 bool AlreadyHaveBlock(const CInv &inv);
-bool AcceptBlockHeader(const CBlockHeader &block,
-    CValidationState &state,
-    const CChainParams &chainparams,
-    CBlockIndex **ppindex = nullptr);
-
-bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigned int nAddSize);
 
 /** Process a single protocol messages received from a given node */
 bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived);
@@ -321,48 +283,15 @@ bool GetTransaction(const uint256 &hash,
     const Consensus::Params &params,
     uint256 &hashBlock,
     bool fAllowSlow = false);
-/** Find the best known block, and make it the tip of the block chain */
-bool ActivateBestChain(CValidationState &state,
-    const CChainParams &chainparams,
-    const CBlock *pblock = nullptr,
-    bool fParallel = false);
-CAmount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
 
-/** Create a new block index entry for a given block hash */
-CBlockIndex *InsertBlockIndex(uint256 hash);
 /** Get statistics from node state */
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats);
-
-/** Check is Cash HF has activated. */
-bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev);
 
 /**
    Determine whether free transactions are subject to rate limiting. If -limitfreerelay is not zero then rate limiting
    for free txns will be in effect. If it is zero, then no free transactions will be allowed to enter the memory pool.
  */
 bool AreFreeTxnsDisallowed();
-
-/** Communicate what class of transaction is acceptable to add to the memory pool
- */
-enum class TransactionClass
-{
-    INVALID,
-    DEFAULT,
-    STANDARD,
-    NONSTANDARD
-};
-
-TransactionClass ParseTransactionClass(const std::string &s);
-
-/** (try to) add transaction to memory pool **/
-bool AcceptToMemoryPool(CTxMemPool &pool,
-    CValidationState &state,
-    const CTransactionRef &ptx,
-    bool fLimitFree,
-    bool *pfMissingInputs,
-    bool fOverrideMempoolLimit = false,
-    bool fRejectAbsurdFee = false,
-    TransactionClass allowedTx = TransactionClass::DEFAULT);
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);
@@ -379,25 +308,6 @@ struct CNodeStateStats
 };
 
 /**
- * Check whether all inputs of this transaction are valid (no double spends, scripts & sigs, amounts)
- * This does not modify the UTXO set. If pvChecks is not NULL, script checks are pushed onto it
- * instead of being performed inline.
- */
-bool CheckInputs(const CTransaction &tx,
-    CValidationState &state,
-    const CCoinsViewCache &view,
-    bool fScriptChecks,
-    unsigned int flags,
-    bool cacheStore,
-    ValidationResourceTracker *resourceTracker,
-    std::vector<CScriptCheck> *pvChecks = nullptr,
-    unsigned char *sighashType = nullptr);
-
-
-/** Apply the effects of this transaction on the UTXO set represented by view */
-void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache &inputs, int nHeight);
-
-/**
  * Check if transaction will be final in the next block to be created.
  *
  * Calls IsFinalTx() with current block height and appropriate block time.
@@ -411,136 +321,15 @@ bool CheckFinalTx(const CTransaction &tx, int flags = -1);
  */
 bool TestLockPointValidity(const LockPoints *lp);
 
-/*
- * Check if transaction will be BIP 68 final in the next block to be created.
- *
- * Simulates calling SequenceLocks() with data from the tip of the current active chain.
- * Optionally stores in LockPoints the resulting height and time calculated and the hash
- * of the block needed for calculation or skips the calculation and uses the LockPoints
- * passed in for evaluation.
- * The LockPoints should not be considered valid if CheckSequenceLocks returns false.
- *
- * See consensus/consensus.h for flag definitions.
- */
-bool CheckSequenceLocks(const CTransaction &tx,
-    int flags,
-    LockPoints *lp = nullptr,
-    bool useExistingLockPoints = false);
-
-/**
- * Class that keeps track of number of signature operations
- * and bytes hashed to compute signature hashes.
- */
-class ValidationResourceTracker
-{
-private:
-    mutable CCriticalSection cs;
-    uint64_t nSigops;
-    uint64_t nSighashBytes;
-
-public:
-    ValidationResourceTracker() : nSigops(0), nSighashBytes(0) {}
-    void Update(const uint256 &txid, uint64_t nSigopsIn, uint64_t nSighashBytesIn)
-    {
-        LOCK(cs);
-        nSigops += nSigopsIn;
-        nSighashBytes += nSighashBytesIn;
-        return;
-    }
-    uint64_t GetSigOps() const
-    {
-        LOCK(cs);
-        return nSigops;
-    }
-    uint64_t GetSighashBytes() const
-    {
-        LOCK(cs);
-        return nSighashBytes;
-    }
-};
-
-
-/** Functions for validating blocks and updating the block tree */
-
-/** Undo the effects of this block (with given index) on the UTXO set represented by coins.
- *  In case pfClean is provided, operation will try to be tolerant about errors, and *pfClean
- *  will be true if no problems were found. Otherwise, the return value will be false in case
- *  of problems. Note that in any case, coins may be modified. */
-bool DisconnectBlock(const CBlock &block,
-    CValidationState &state,
-    const CBlockIndex *pindex,
-    CCoinsViewCache &coins,
-    bool *pfClean = nullptr);
-
-/** Apply the effects of this block (with given index) on the UTXO set represented by coins */
-bool ConnectBlock(const CBlock &block,
-    CValidationState &state,
-    CBlockIndex *pindex,
-    CCoinsViewCache &view,
-    const CChainParams &chainparams,
-    bool fJustCheck = false,
-    bool fParallel = false);
-
-/** Context-independent validity checks */
-bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state, bool fCheckPOW = true);
-// BU: returns the blocksize if block is valid.  Otherwise 0
-bool CheckBlock(const CBlock &block,
-    CValidationState &state,
-    bool fCheckPOW = true,
-    bool fCheckMerkleRoot = true,
-    bool conservative = false);
-
-/** Context-dependent validity checks */
-bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex *pindexPrev);
-bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIndex *pindexPrev);
-
-/** Check a block is completely valid from start to finish (only works on top of our current best block, with cs_main
- * held) */
-bool TestBlockValidity(CValidationState &state,
-    const CChainParams &chainparams,
-    const CBlock &block,
-    CBlockIndex *pindexPrev,
-    bool fCheckPOW = true,
-    bool fCheckMerkleRoot = true);
-
 // Checks that the provided block is consistent with the chainparam's checkpoints
 bool CheckAgainstCheckpoint(unsigned int height, const uint256 &hash, const CChainParams &chainparams);
 
 /** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
 bool AcceptBlock(CBlock &block, CValidationState &state, CBlockIndex **pindex, bool fRequested, CDiskBlockPos *dbp);
 
-/** RAII wrapper for VerifyDB: Verify consistency of the block and coin databases */
-class CVerifyDB
-{
-public:
-    CVerifyDB();
-    ~CVerifyDB();
-    bool VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview, int nCheckLevel, int nCheckDepth);
-};
-
 /** Find the last common block between the parameter chain and a locator. */
 CBlockIndex *FindForkInGlobalIndex(const CChain &chain, const CBlockLocator &locator);
 
-/** Mark a block as invalid. */
-bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensusParams, CBlockIndex *pindex);
-
-/** Remove invalidity status from a block and its descendants. */
-bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex);
-
-bool FindBlockPos(CValidationState &state,
-    CDiskBlockPos &pos,
-    unsigned int nAddSize,
-    unsigned int nHeight,
-    uint64_t nTime,
-    bool fKnown);
-
-/** Mark a block as having its data received and checked (up to BLOCK_VALID_TRANSACTIONS). */
-bool ReceivedBlockTransactions(const CBlock &block,
-    CValidationState &state,
-    CBlockIndex *pindexNew,
-    const CDiskBlockPos &pos);
-
-CBlockIndex *AddToBlockIndex(const CBlockHeader &block);
 
 /** The currently-connected chain of blocks (protected by cs_main). */
 extern CChain chainActive;
@@ -559,11 +348,6 @@ extern int nLastBlockFile;
 
 extern VersionBitsCache versionbitscache;
 
-/**
- * Determine what nVersion a new block should use.
- */
-int32_t ComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Params &params);
-
 /** Reject codes greater or equal to this can be returned by AcceptToMemPool
  * for transactions, to signal internal conditions. They cannot and should not
  * be sent over the P2P network.
@@ -577,11 +361,6 @@ static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 static const unsigned int REJECT_CONFLICT = 0x102;
 /** Transaction cannot be committed on my fork */
 static const unsigned int REJECT_WRONG_FORK = 0x103;
-
-CBlockIndex *FindMostWorkChain();
-
-/** Test if fork is active */
-bool IsMay152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexPrev);
 
 // BU cleaning up at destuction time creates many global variable dependencies.  Instead clean up in a function called
 // in main()

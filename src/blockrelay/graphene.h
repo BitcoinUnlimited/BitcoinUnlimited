@@ -5,10 +5,10 @@
 #ifndef BITCOIN_GRAPHENE_H
 #define BITCOIN_GRAPHENE_H
 
+#include "blockrelay/graphene_set.h"
 #include "bloom.h"
 #include "config.h"
 #include "consensus/validation.h"
-#include "graphene_set.h"
 #include "iblt.h"
 #include "primitives/block.h"
 #include "protocol.h"
@@ -179,7 +179,7 @@ private:
     std::atomic<uint64_t> nGrapheneBlockBytes{0};
 
     CCriticalSection cs_mapGrapheneBlockTimer; // locks mapGrapheneBlockTimer
-    std::map<uint256, uint64_t> mapGrapheneBlockTimer;
+    std::map<uint256, std::pair<uint64_t, bool> > mapGrapheneBlockTimer;
 
     CCriticalSection cs_graphenestats; // locks everything below this point
 

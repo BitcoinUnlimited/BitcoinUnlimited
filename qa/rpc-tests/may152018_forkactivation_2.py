@@ -35,9 +35,7 @@ class May152018ActivationTest(ComparisonTestFramework):
 
     def set_test_params(self):
         self.setup_clean_chain = True
-        self.extra_args = [['-whitelist=127.0.0.1',
-                            "-may152018activationtime=%d" % MAY152018_START_TIME,
-                            "-replayprotectionactivationtime=%d" % (2 * MAY152018_START_TIME)]]
+        self.extra_args = [['-whitelist=127.0.0.1']]
 
     def create_and_tx(self, count):
         node = self.nodes[0]

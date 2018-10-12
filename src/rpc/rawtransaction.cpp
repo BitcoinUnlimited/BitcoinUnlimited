@@ -23,6 +23,7 @@
 #include "script/script_error.h"
 #include "script/sign.h"
 #include "script/standard.h"
+#include "txadmission.h"
 #include "txmempool.h"
 #include "uahf_fork.h"
 #include "uint256.h"
@@ -71,7 +72,7 @@ void ScriptPubKeyToJSON(const CScript &scriptPubKey, UniValue &out, bool fInclud
 void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry)
 {
     entry.push_back(Pair("txid", tx.GetHash().GetHex()));
-    entry.push_back(Pair("size", (int)::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION)));
+    entry.push_back(Pair("size", (int)tx.GetTxSize()));
     entry.push_back(Pair("version", tx.nVersion));
     entry.push_back(Pair("locktime", (int64_t)tx.nLockTime));
     UniValue vin(UniValue::VARR);
@@ -267,11 +268,10 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
     }
     else
     {
-        LOCK(pcoinsTip->cs_utxo);
-        const Coin &coin = AccessByTxid(*pcoinsTip, oneTxid);
-        if (!coin.IsSpent() && coin.nHeight > 0 && coin.nHeight <= chainActive.Height())
+        CoinAccessor coin(*pcoinsTip, oneTxid);
+        if (coin && !coin->IsSpent() && coin->nHeight > 0 && coin->nHeight <= chainActive.Height())
         {
-            pblockindex = chainActive[coin.nHeight];
+            pblockindex = chainActive[coin->nHeight];
         }
     }
 
@@ -709,11 +709,11 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         view.SetBackend(viewMempool); // temporarily switch cache backend to db+mempool view
 
         {
-            LOCK(view.cs_utxo);
+            WRITELOCK(view.cs_utxo);
             for (const CTxIn &txin : mergedTx.vin)
             {
                 // Load entries from viewChain into view; can fail.
-                view.AccessCoin(txin.prevout);
+                view._AccessCoin(txin.prevout);
             }
         }
 
@@ -770,16 +770,16 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             std::vector<unsigned char> pkData(ParseHexO(prevOut, "scriptPubKey"));
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
+            Coin newcoin;
             {
-                LOCK(view.cs_utxo);
-                const Coin &coin = view.AccessCoin(out);
-                if (!coin.IsSpent() && coin.out.scriptPubKey != scriptPubKey)
+                CoinAccessor coin(view, out);
+
+                if (!coin->IsSpent() && coin->out.scriptPubKey != scriptPubKey)
                 {
                     std::string err("Previous output scriptPubKey mismatch:\n");
-                    err = err + ScriptToAsmStr(coin.out.scriptPubKey) + "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
+                    err = err + ScriptToAsmStr(coin->out.scriptPubKey) + "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
                     throw JSONRPCError(RPC_DESERIALIZATION_ERROR, err);
                 }
-                Coin newcoin;
                 newcoin.out.scriptPubKey = scriptPubKey;
                 newcoin.out.nValue = 0;
                 if (prevOut.exists("amount"))
@@ -787,8 +787,8 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
                     newcoin.out.nValue = AmountFromValue(find_value(prevOut, "amount"));
                 }
                 newcoin.nHeight = 1;
-                view.AddCoin(out, std::move(newcoin), true);
             }
+            view.AddCoin(out, std::move(newcoin), true);
 
             // if redeemScript given and not using the local wallet (private keys
             // given), add redeemScript to the tempKeystore so it can be signed:
@@ -813,8 +813,8 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     const CKeyStore &keystore = tempKeystore;
 #endif
 
-    int nHashType = SIGHASH_ALL;
-    bool pickedForkId = false;
+    bool fForkId = true;
+    int nHashType = SIGHASH_ALL | SIGHASH_FORKID;
     if (params.size() > 3 && !params[3].isNull())
     {
         std::string strHashType = params[3].get_str();
@@ -834,27 +834,17 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             else if (boost::iequals(s, "ANYONECANPAY"))
                 nHashType |= SIGHASH_ANYONECANPAY;
             else if (boost::iequals(s, "FORKID"))
-            {
-                pickedForkId = true;
                 nHashType |= SIGHASH_FORKID;
-            }
             else if (boost::iequals(s, "NOFORKID"))
             {
-                pickedForkId = true;
+                // Still support signing legacy chain transactions
+                fForkId = false;
                 nHashType &= ~SIGHASH_FORKID;
             }
             else
             {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid sighash param");
             }
-        }
-    }
-    if (!pickedForkId) // If the user didn't specify, use the configured default for the hash type
-    {
-        if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
-        {
-            nHashType |= SIGHASH_FORKID;
-            pickedForkId = true;
         }
     }
 
@@ -869,23 +859,22 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
     {
-        LOCK(view.cs_utxo);
         CTxIn &txin = mergedTx.vin[i];
-        const Coin &coin = view.AccessCoin(txin.prevout);
-        if (coin.IsSpent())
+        CoinAccessor coin(view, txin.prevout);
+        if (coin->IsSpent())
         {
             TxInErrorToJSON(txin, vErrors, "Input not found or already spent");
             continue;
         }
-        const CScript &prevPubKey = coin.out.scriptPubKey;
-        const CAmount &amount = coin.out.nValue;
+        const CScript &prevPubKey = coin->out.scriptPubKey;
+        const CAmount &amount = coin->out.nValue;
 
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if (!fHashSingle || (i < mergedTx.vout.size()))
             SignSignature(keystore, prevPubKey, mergedTx, i, amount, nHashType);
 
         // ... and merge in other signatures:
-        if (pickedForkId)
+        if (fForkId)
         {
             for (const CMutableTransaction &txv : txVariants)
             {
@@ -902,6 +891,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         }
         else
         {
+            // Still support signing legacy chain transactions
             for (const CMutableTransaction &txv : txVariants)
             {
                 txin.scriptSig = CombineSignatures(prevPubKey, TransactionSignatureChecker(&txConst, i, amount, 0),
@@ -934,7 +924,9 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
         throw runtime_error(
             "sendrawtransaction \"hexstring\" ( allowhighfees, allownonstandard )\n"
             "\nSubmits raw transaction (serialized, hex-encoded) to local node and network.\n"
-            "\nAlso see createrawtransaction and signrawtransaction calls.\n"
+            "This API does not return until the transaction has been fully validated, and raises\n"
+            "an exception if submission was unsuccessful.\n"
+            "\nAlso see enqueuerawtransaction, createrawtransaction and signrawtransaction calls.\n"
             "\nArguments:\n"
             "1. \"hexstring\"    (string, required) The hex string of the raw transaction)\n"
             "2. allowhighfees    (boolean, optional, default=false) Allow high fees\n"
@@ -950,7 +942,6 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
             "\nSend the transaction (signed hex)\n" + HelpExampleCli("sendrawtransaction", "\"signedhex\"") +
             "\nAs a json rpc call\n" + HelpExampleRpc("sendrawtransaction", "\"signedhex\""));
 
-    LOCK(cs_main);
     RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VBOOL)(UniValue::VSTR));
 
     // parse hex string from parameter
@@ -979,11 +970,10 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
     CCoinsViewCache &view = *pcoinsTip;
     bool fHaveChain = false;
     {
-        LOCK(view.cs_utxo);
         for (size_t o = 0; !fHaveChain && o < tx.vout.size(); o++)
         {
-            const Coin &existingCoin = view.AccessCoin(COutPoint(hashTx, o));
-            fHaveChain = !existingCoin.IsSpent();
+            CoinAccessor existingCoin(view, COutPoint(hashTx, o));
+            fHaveChain = !existingCoin->IsSpent();
         }
     }
     bool fHaveMempool = mempool.exists(hashTx);
@@ -1017,10 +1007,55 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
     {
         throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "transaction already in block chain");
     }
-    RelayTransaction(*ptx);
-
     return hashTx.GetHex();
 }
+
+
+UniValue enqueuerawtransaction(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)
+        throw runtime_error(
+            "enqueuerawtransaction \"hexstring\" ( options )\n"
+            "\nSubmits raw transaction (serialized, hex-encoded) to local node and network.\n"
+            "This RPC by default does not wait for transaction validation and so is very fast.\n"
+            "\nAlso see sendrawtransaction, createrawtransaction and signrawtransaction calls.\n"
+            "\nArguments:\n"
+            "1. \"hexstring\"    (string, required) The hex string of the raw transaction)\n"
+            "2. \"options\"      (string, optional) \"flush\" to wait for every enqueued transaction to be handled\n"
+            "\nResult:\n"
+            "\"hex\"             (string) The transaction hash in hex\n"
+            "\nExamples:\n"
+            "\nCreate a transaction\n" +
+            HelpExampleCli("createrawtransaction",
+                "\"[{\\\"txid\\\" : \\\"mytxid\\\",\\\"vout\\\":0}]\" \"{\\\"myaddress\\\":0.01}\"") +
+            "Sign the transaction, and get back the hex\n" + HelpExampleCli("signrawtransaction", "\"myhex\"") +
+            "\nSend the transaction (signed hex)\n" + HelpExampleCli("enqueuerawtransaction", "\"signedhex\"") +
+            "\nAs a json rpc call\n" + HelpExampleRpc("enqueuerawtransaction", "\"signedhex\""));
+
+    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR));
+
+    CTransaction tx;
+    if (!DecodeHexTx(tx, params[0].get_str())) // parse hex string from parameter
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+
+    CTxInputData txd;
+    txd.tx = MakeTransactionRef(std::move(tx));
+    txd.nodeId = -1;
+    txd.nodeName = "rpc";
+    txd.whitelisted = false;
+    EnqueueTxForAdmission(txd);
+
+    if (params.size() > 1)
+    {
+        if (params[1].get_str() == "flush")
+        {
+            FlushTxAdmission();
+        }
+    }
+
+    return txd.tx->GetHash().GetHex();
+}
+
 
 static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
@@ -1030,6 +1065,7 @@ static const CRPCCommand commands[] = {
     {"rawtransactions", "decoderawtransaction", &decoderawtransaction, true},
     {"rawtransactions", "decodescript", &decodescript, true},
     {"rawtransactions", "sendrawtransaction", &sendrawtransaction, false},
+    {"rawtransactions", "enqueuerawtransaction", &enqueuerawtransaction, false},
     {"rawtransactions", "signrawtransaction", &signrawtransaction, false}, /* uses wallet if enabled */
 
     {"blockchain", "gettxoutproof", &gettxoutproof, true}, {"blockchain", "verifytxoutproof", &verifytxoutproof, true},

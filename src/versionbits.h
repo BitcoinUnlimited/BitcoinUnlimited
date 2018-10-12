@@ -37,9 +37,11 @@ typedef std::map<const CBlockIndex *, ThresholdState> ThresholdConditionCache;
 struct ForkDeploymentInfo
 {
     /** Deployment name */
-    char *name; // bip135: removed const to allow update from CSV
+    const char *name;
     /** Whether GBT clients can safely ignore this rule in simplified usage */
     bool gbt_force;
+    /** What is this client's vote? */
+    bool myVote;
 };
 
 extern struct ForkDeploymentInfo VersionBitsDeploymentInfo[];
@@ -83,5 +85,21 @@ ThresholdState VersionBitsState(const CBlockIndex *pindexPrev,
     Consensus::DeploymentPos pos,
     VersionBitsCache &cache);
 uint32_t VersionBitsMask(const Consensus::Params &params, Consensus::DeploymentPos pos);
+
+// tweak to configure and dynamically change what you are voting for
+extern std::string bip135Vote;
+
+// Set the specified feature to the vote.  Pass vote=-1 to check existence of feature.
+// Pass vote=1 to start voting or vote=0 stop voting.
+// returns false if the feature is not defined.
+bool AssignBip135Vote(const std::string &feature, int vote);
+// Set all votes to false
+void ClearBip135Votes();
+
+// Set the specified comma separated features to the vote.  Pass vote=-1 to check existence of all features.
+// Pass vote=1 to start voting or vote=0 stop voting.
+// returns false if any feature is not defined.
+bool AssignBip135Votes(const std::string &features, int vote);
+
 
 #endif

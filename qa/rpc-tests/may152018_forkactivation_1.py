@@ -145,7 +145,7 @@ def Test():
     # "--srcdir=<out-of-source-build-dir>/debug/src"
     flags = []
     if os.path.isdir("/ramdisk/test"):  # execution is much faster if a ramdisk is used
-        flags.append("--tmpdir=/ramdisk/test")
+        flags.append("--tmppfx=/ramdisk/test")
 
     here = os.path.dirname(os.path.abspath(__file__))
     if not os.path.exists(os.path.abspath(here + "/../../src/bitcoind")):

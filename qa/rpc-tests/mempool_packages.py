@@ -54,7 +54,7 @@ class MempoolPackagesTest(BitcoinTestFramework):
             value = sent_value
             chain.append(txid)
 
-        # Check mempool has MAX_ANCESTORS transactions in it, and descendant
+        # Check mempool has MAX_ANCESTORS transactions in it, and descendant and ancestor
         # count and fees should look correct
         mempool = self.nodes[0].getrawmempool(True)
         assert_equal(len(mempool), MAX_ANCESTORS)
@@ -62,7 +62,18 @@ class MempoolPackagesTest(BitcoinTestFramework):
         descendant_fees = 0
         descendant_size = 0
 
+        ancestor_size = sum([mempool[tx]['size'] for tx in mempool])
+        ancestor_count = MAX_ANCESTORS
+        ancestor_fees = sum([mempool[tx]['fee'] for tx in mempool])
+
+        descendants = []
+        ancestors = list(chain)
         for x in reversed(chain):
+            # Check that getmempoolentry is consistent with getrawmempool
+            entry = self.nodes[0].getmempoolentry(x)
+            assert_equal(entry, mempool[x])
+
+            # Check that the descendant calculations are correct
             assert_equal(mempool[x]['descendantcount'], descendant_count)
             descendant_fees += mempool[x]['fee']
             assert_equal(mempool[x]['modifiedfee'], mempool[x]['fee'])
@@ -70,6 +81,56 @@ class MempoolPackagesTest(BitcoinTestFramework):
             descendant_size += mempool[x]['size']
             assert_equal(mempool[x]['descendantsize'], descendant_size)
             descendant_count += 1
+
+            # Check that ancestor calculations are correct
+            assert_equal(mempool[x]['ancestorcount'], ancestor_count)
+            assert_equal(mempool[x]['ancestorfees'], ancestor_fees * COIN)
+            assert_equal(mempool[x]['ancestorsize'], ancestor_size)
+            ancestor_size -= mempool[x]['size']
+            ancestor_fees -= mempool[x]['fee']
+            ancestor_count -= 1
+
+            # Check that parent/child list is correct
+            assert_equal(mempool[x]['spentby'], descendants[-1:])
+            assert_equal(mempool[x]['depends'], ancestors[-2:-1])
+
+            # Check that getmempooldescendants is correct
+            assert_equal(sorted(descendants), sorted(self.nodes[0].getmempooldescendants(x)))
+
+            # Check getmempooldescendants verbose output is correct
+            for descendant, dinfo in self.nodes[0].getmempooldescendants(x, True).items():
+                assert_equal(dinfo['depends'], [chain[chain.index(descendant)-1]])
+                if dinfo['descendantcount'] > 1:
+                    assert_equal(dinfo['spentby'], [chain[chain.index(descendant)+1]])
+                else:
+                    assert_equal(dinfo['spentby'], [])
+            descendants.append(x)
+
+            # Check that getmempoolancestors is correct
+            ancestors.remove(x)
+            assert_equal(sorted(ancestors), sorted(self.nodes[0].getmempoolancestors(x)))
+
+            # Check that getmempoolancestors verbose output is correct
+            for ancestor, ainfo in self.nodes[0].getmempoolancestors(x, True).items():
+                assert_equal(ainfo['spentby'], [chain[chain.index(ancestor)+1]])
+                if ainfo['ancestorcount'] > 1:
+                    assert_equal(ainfo['depends'], [chain[chain.index(ancestor)-1]])
+                else:
+                    assert_equal(ainfo['depends'], [])
+
+
+        # Check that getmempoolancestors/getmempooldescendants correctly handle verbose=true
+        v_ancestors = self.nodes[0].getmempoolancestors(chain[-1], True)
+        assert_equal(len(v_ancestors), len(chain)-1)
+        for x in v_ancestors.keys():
+            assert_equal(mempool[x], v_ancestors[x])
+        assert(chain[-1] not in v_ancestors.keys())
+
+        v_descendants = self.nodes[0].getmempooldescendants(chain[0], True)
+        assert_equal(len(v_descendants), len(chain)-1)
+        for x in v_descendants.keys():
+            assert_equal(mempool[x], v_descendants[x])
+        assert(chain[0] not in v_descendants.keys())
 
         # Check that descendant modified fees includes fee deltas from
         # prioritisetransaction
@@ -119,6 +180,7 @@ class MempoolPackagesTest(BitcoinTestFramework):
         vout = utxo[1]['vout']
 
         transaction_package = []
+        tx_children = []
         # First create one parent tx with 10 children
         (txid, sent_value) = self.chain_transaction(self.nodes[0], txid, vout, value, fee, 10)
         parent_transaction = txid
@@ -129,11 +191,17 @@ class MempoolPackagesTest(BitcoinTestFramework):
             utxo = transaction_package.pop(0)
             try:
                 (txid, sent_value) = self.chain_transaction(self.nodes[0], utxo['txid'], utxo['vout'], utxo['amount'], fee, 10)
+                if utxo['txid'] is parent_transaction:
+                    tx_children.append(txid)
                 for j in range(10):
                     transaction_package.append({'txid': txid, 'vout': j, 'amount': sent_value})
                 if i == MAX_DESCENDANTS - 2:
                     mempool = self.nodes[0].getrawmempool(True)
                     assert_equal(mempool[parent_transaction]['descendantcount'], MAX_DESCENDANTS)
+                    assert_equal(sorted(mempool[parent_transaction]['spentby']), sorted(tx_children))
+
+                    for child in tx_children:
+                        assert_equal(mempool[child]['depends'], [parent_transaction])
             except JSONRPCException as e:
                 print(e.error['message'])
                 assert_equal(i, MAX_DESCENDANTS - 1)
@@ -202,7 +270,7 @@ class MempoolPackagesTest(BitcoinTestFramework):
         signedtx = self.nodes[0].signrawtransaction(rawtx)
         txid = self.nodes[0].sendrawtransaction(signedtx['hex'])
         sync_mempools(self.nodes)
-        
+
         # Now try to disconnect the tip on each node...
         self.nodes[1].invalidateblock(self.nodes[1].getbestblockhash())
         self.nodes[0].invalidateblock(self.nodes[0].getbestblockhash())

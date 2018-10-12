@@ -31,9 +31,9 @@ class RelayLimiter
 {
 public:
     RelayLimiter() : respendCount(0), lastRespendTime(0) {}
-    bool HasLimitExceeded(const CTransaction &doubleSpend)
+    bool HasLimitExceeded(const CTransactionRef &pDoubleSpend)
     {
-        unsigned int size = ::GetSerializeSize(doubleSpend, SER_NETWORK, PROTOCOL_VERSION);
+        unsigned int size = pDoubleSpend->GetTxSize();
 
         std::lock_guard<std::mutex> lock(cs);
         int64_t limit = GetArg("-limitrespendrelay", DEFAULT_LIMITRESPENDRELAY);
@@ -58,7 +58,7 @@ private:
 RespendRelayer::RespendRelayer() : interesting(false), valid(false) {}
 bool RespendRelayer::AddOutpointConflict(const COutPoint &,
     const CTxMemPool::txiter,
-    const CTransaction &respendTx,
+    const CTransactionRef &pRespendTx,
     bool seenBefore,
     bool isEquivalent)
 {
@@ -68,13 +68,13 @@ bool RespendRelayer::AddOutpointConflict(const COutPoint &,
     // Is static to hold relay statistics
     static RelayLimiter limiter;
 
-    if (limiter.HasLimitExceeded(respendTx))
+    if (limiter.HasLimitExceeded(pRespendTx))
     {
         // we won't relay this tx, so no no need to look at more outputs.
         return false;
     }
 
-    respend = respendTx;
+    pRespend = pRespendTx;
     interesting = true;
     return false;
 }
@@ -86,7 +86,7 @@ void RespendRelayer::Trigger()
     if (!valid || !interesting)
         return;
 
-    RelayTransaction(respend, true);
+    RelayTransaction(pRespend, true);
 }
 
 } // ns respend

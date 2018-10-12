@@ -10,7 +10,7 @@ cache:
 
 env:
   global:
-    - MAKEJOBS=-j3
+    - MAKEJOBS=-j2
     - RUN_TESTS=false
     - RUN_FORMATTING_CHECK=false
     - CHECK_DOC=0
@@ -138,7 +138,7 @@ after_script:
     - echo $TRAVIS_COMMIT_LOG
 
 after_failure:
-    - for i in `find /home/travis/ -name debug.log`; do echo $i; echo "-----"; cat $i; done
-    - for i in `find /tmp/ -name debug.log`; do echo $i; echo "-----"; cat $i; done
+    - for i in `find /home/travis/ -name debug.log`; do echo $i; echo "-----"; tail -100 $i; done
+    - for i in `find /tmp/ -name debug.log`; do echo $i; echo "-----"; tail -100 $i; done
     - for i in `find /home/travis/ -name bitcoin.conf`; do echo $i; echo "-----"; cat $i; done
     - for i in `find /tmp/ -name bitcoin.conf`; do echo $i; echo "-----"; cat $i; done

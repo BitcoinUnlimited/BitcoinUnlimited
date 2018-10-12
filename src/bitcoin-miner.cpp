@@ -88,7 +88,9 @@ public:
             .addArg("duration=<n>", ::AllowedArgs::requiredInt,
                 _("Number of seconds to mine a particular block candidate (default: 30). Value must be an integer"))
             .addArg("nblocks=<n>", ::AllowedArgs::requiredInt,
-                _("Number of blocks to mine (default: mine forever / -1). Value must be an integer"));
+                _("Number of blocks to mine (default: mine forever / -1). Value must be an integer"))
+            .addArg("coinbasesize=<n>", ::AllowedArgs::requiredInt,
+                _("Get a fixed size coinbase Tx (default: do not use / 0). Value must be an integer"));
     }
 };
 
@@ -253,7 +255,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
 
     uint32_t startNonce = header.nNonce = std::rand();
 
-    printf("Mining: id: %lx parent: %s bits: %x difficulty: %3.2f time: %d\n", (uint64_t)params["id"].get_int64(),
+    printf("Mining: id: %x parent: %s bits: %x difficulty: %3.2f time: %d\n", (unsigned int)params["id"].get_int64(),
         header.hashPrevBlock.ToString().c_str(), header.nBits, GetDifficulty(header.nBits), header.nTime);
 
     int64_t start = GetTime();
@@ -308,7 +310,7 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
         fprintf(stderr, "Block Candidate rejected. Error: %s\n", result.get_str().c_str());
         // Print some debug info if the block is rejected
         UniValue dbg = solution[0].get_obj();
-        fprintf(stderr, "id: %ld  time: %d  nonce: %d  version: 0x%x\n", dbg["id"].get_int64(),
+        fprintf(stderr, "id: %d  time: %d  nonce: %d  version: 0x%x\n", (unsigned int)dbg["id"].get_int64(),
             (uint32_t)dbg["time"].get_int64(), (uint32_t)dbg["nonce"].get_int64(), (uint32_t)dbg["version"].get_int());
         fprintf(stderr, "coinbase: %s\n", dbg["coinbase"].get_str().c_str());
     }
@@ -333,6 +335,13 @@ int CpuMiner(void)
 {
     int searchDuration = GetArg("-duration", 30);
     int nblocks = GetArg("-nblocks", -1); //-1 mine forever
+    int coinbasesize = GetArg("-coinbasesize", 0);
+
+    if (coinbasesize < 0)
+    {
+        printf("Negative coinbasesize not reasonable/supported.\n");
+        return 0;
+    }
 
     UniValue mineresult;
     bool found = false;
@@ -357,7 +366,7 @@ int CpuMiner(void)
             {
                 try
                 {
-                    UniValue params;
+                    UniValue params(UniValue::VARR);
                     if (found)
                     {
                         // Submit the solution.
@@ -370,6 +379,10 @@ int CpuMiner(void)
 
                     if (!found)
                     {
+                        if (coinbasesize > 0)
+                        {
+                            params.push_back(UniValue(coinbasesize));
+                        }
                         reply = CallRPC("getminingcandidate", params);
                     }
 

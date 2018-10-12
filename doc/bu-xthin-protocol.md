@@ -130,7 +130,7 @@ New Enumerated message types
 
 Two new enumerated messages types are added.  MSG_THINBLOCK and MSG_XTHINBLOCK and are used
 for creating inventory messages which are either requested by GETDATA for the MSG_THINBLOCK, or
-appended to the GET_XTHIN message, as in the case of teh MSG_XTHINBLOCK inventory message.
+appended to the GET_XTHIN message, as in the case of the MSG_XTHINBLOCK inventory message.
 
 They are as follows:
 

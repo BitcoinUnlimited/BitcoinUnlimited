@@ -30,7 +30,9 @@ std::vector<RespendActionPtr> CreateDefaultActions()
     return actions;
 }
 
-RespendDetector::RespendDetector(const CTxMemPool &pool, const CTransaction &tx, std::vector<RespendActionPtr> _actions)
+RespendDetector::RespendDetector(const CTxMemPool &pool,
+    const CTransactionRef &ptx,
+    std::vector<RespendActionPtr> _actions)
     : actions(_actions)
 {
     {
@@ -40,7 +42,7 @@ RespendDetector::RespendDetector(const CTxMemPool &pool, const CTransaction &tx,
             respentBefore.reset(new CRollingBloomFilter(MAX_RESPEND_BLOOM, 0.01));
         }
     }
-    CheckForRespend(pool, tx);
+    CheckForRespend(pool, ptx);
 }
 
 RespendDetector::~RespendDetector()
@@ -60,11 +62,11 @@ RespendDetector::~RespendDetector()
     }
 }
 
-void RespendDetector::CheckForRespend(const CTxMemPool &pool, const CTransaction &tx)
+void RespendDetector::CheckForRespend(const CTxMemPool &pool, const CTransactionRef &ptx)
 {
     READLOCK(pool.cs); // protect pool.mapNextTx
 
-    for (const CTxIn &in : tx.vin)
+    for (const CTxIn &in : ptx->vin)
     {
         const COutPoint outpoint = in.prevout;
 
@@ -89,7 +91,7 @@ void RespendDetector::CheckForRespend(const CTxMemPool &pool, const CTransaction
         {
             // Actions can return true if they want to check more
             // outpoints for conflicts.
-            bool m = a->AddOutpointConflict(outpoint, poolIter, tx, seen, tx.IsEquivalentTo(poolIter->GetTx()));
+            bool m = a->AddOutpointConflict(outpoint, poolIter, ptx, seen, ptx->IsEquivalentTo(poolIter->GetTx()));
             collectMore = collectMore || m;
         }
         if (!collectMore)

@@ -91,6 +91,7 @@ class NotifyTest(BitcoinTestFramework):
         # mine a block. Both nodes should have created a file: newfile1 and newfile3.
         self.nodes[1].generate(1)
         self.sync_all()
+        time.sleep(1)
 
         # check blocknotify - both nodes should have run the blocknotify command.
         if not os.path.isfile(self.touch_filename1):

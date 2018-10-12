@@ -22,6 +22,8 @@ const char *ScriptErrorString(const ScriptError serror)
         return "Script failed an OP_CHECKMULTISIGVERIFY operation";
     case SCRIPT_ERR_CHECKSIGVERIFY:
         return "Script failed an OP_CHECKSIGVERIFY operation";
+    case SCRIPT_ERR_CHECKDATASIGVERIFY:
+        return "Script failed an OP_CHECKDATASIGVERIFY operation";
     case SCRIPT_ERR_NUMEQUALVERIFY:
         return "Script failed an OP_NUMEQUALVERIFY operation";
     case SCRIPT_ERR_SCRIPT_SIZE:
@@ -83,6 +85,8 @@ const char *ScriptErrorString(const ScriptError serror)
         return "NOPx reserved for soft-fork upgrades";
     case SCRIPT_ERR_PUBKEYTYPE:
         return "Public key is neither compressed or uncompressed";
+    case SCRIPT_ERR_NONCOMPRESSED_PUBKEY:
+        return "Using non-compressed public key";
     case SCRIPT_ERR_UNKNOWN_ERROR:
     case SCRIPT_ERR_ERROR_COUNT:
     default:

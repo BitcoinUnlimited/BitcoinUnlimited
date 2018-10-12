@@ -20,6 +20,8 @@
 #include "utilstrencodings.h"
 #include "utiltime.h"
 
+#include <condition_variable>
+#include <mutex>
 #include <sstream>
 #include <stdarg.h>
 
@@ -42,6 +44,7 @@
 
 #include <algorithm>
 #include <fcntl.h>
+#include <sched.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 
@@ -89,6 +92,7 @@
 #include <openssl/conf.h>
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
+#include <thread>
 
 std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args)
 {
@@ -364,13 +368,21 @@ static void MonitorLogfile()
     // Check if debug.log has been deleted or moved.
     // If so re-open
     static int existcounter = 1;
+    static fs::path fileName = GetDataDir() / "debug.log";
     existcounter++;
     if (existcounter % 63 == 0) // Check every 64 log msgs
     {
-        fs::path fileName = GetDataDir() / "debug.log";
         bool exists = boost::filesystem::exists(fileName);
         if (!exists)
             fReopenDebugLog = true;
+    }
+}
+
+void LogFlush()
+{
+    if (fPrintToDebugLog)
+    {
+        fflush(fileout);
     }
 }
 
@@ -930,15 +942,7 @@ void SetThreadPriority(int nPriority)
 #endif // WIN32
 }
 
-int GetNumCores()
-{
-#if BOOST_VERSION >= 105600
-    return boost::thread::physical_concurrency();
-#else // Must fall back to hardware_concurrency, which unfortunately counts virtual cores
-    return boost::thread::hardware_concurrency();
-#endif
-}
-
+int GetNumCores() { return std::thread::hardware_concurrency(); }
 std::string CopyrightHolders(const std::string &strPrefix)
 {
     std::string strCopyrightHolders = strPrefix + _(COPYRIGHT_HOLDERS);
@@ -1039,3 +1043,45 @@ bool wildmatch(string pattern, string test)
         test = test.substr(1);
     }
 }
+
+int ScheduleBatchPriority(void)
+{
+#ifdef SCHED_BATCH
+    const static sched_param param{0};
+    if (int ret = pthread_setschedparam(pthread_self(), SCHED_BATCH, &param))
+    {
+        LOGA("Failed to pthread_setschedparam: %s\n", strerror(errno));
+        return ret;
+    }
+    return 0;
+#else
+    return 1;
+#endif
+}
+
+
+#ifdef DEBUG_PAUSE
+
+// To integrate well with gdb, we want to show what thread has paused.  This requires some linux-specific code
+// and headers.  To restrict accidental use of linux-specific code these headers are included here instead of at the
+// file's top.
+#ifdef __linux__
+#include <sys/syscall.h>
+#include <sys/types.h>
+#endif
+
+std::mutex dbgPauseMutex;
+std::condition_variable dbgPauseCond;
+void DbgPause()
+{
+#ifdef __linux__ // The thread ID returned by gettid is very useful since its shown in gdb
+    printf("\n!!! Process %d, Thread %ld (%lx) paused !!!\n", getpid(), syscall(SYS_gettid), pthread_self());
+#else
+    printf("\n!!! Process %d paused !!!\n", getpid());
+#endif
+    std::unique_lock<std::mutex> lk(dbgPauseMutex);
+    dbgPauseCond.wait(lk);
+}
+
+extern "C" void DbgResume() { dbgPauseCond.notify_all(); }
+#endif

@@ -29,12 +29,6 @@ enum
     SIGHASH_ANYONECANPAY = 0x80,
 };
 
-/** Data signature types (for OP_DATASIGVERIFY) */
-enum
-{
-    DATASIG_COMPACT_ECDSA = 1,
-};
-
 /** Script verification flags */
 enum
 {
@@ -98,20 +92,34 @@ enum
     // Signature(s) must be empty vector if an CHECK(MULTI)SIG operation failed
     SCRIPT_VERIFY_NULLFAIL = (1U << 14),
 
-    // Do we accept signature using SIGHASH_FORKID
+    // Public keys in scripts must be compressed
     //
+    SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE = (1U << 15),
+
+    // Do we accept signature using SIGHASH_FORKID
     //
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
 
     // Enable Replay protection.
+    // This is just a placeholder, BU does not implement automatic reply protections
+    // as descurbed here:
+    // github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/may-2018-hardfork.md#automatic-replay-protection
+    // https:
     SCRIPT_ENABLE_REPLAY_PROTECTION = (1U << 17),
 
-    // Enable new opcodes.
+    // Is OP_CHECKDATASIG and variant are enabled.
     //
-    SCRIPT_ENABLE_MAY152018_OPCODES = (1U << 18),
+    SCRIPT_ENABLE_CHECKDATASIG = (1U << 18),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);
+
+/**
+ * Check that the signature provided on some data is properly encoded.
+ * Signatures passed to OP_CHECKDATASIG and its verify variant must be checked
+ * using this function.
+ */
+bool CheckDataSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags, ScriptError *serror);
 
 // WARNING:
 // SIGNATURE_HASH_ERROR represents the special value of uint256(1) that is used by the legacy SignatureHash
@@ -203,8 +211,10 @@ bool VerifyScript(const CScript &scriptSig,
     ScriptError *error = NULL,
     unsigned char *sighashtype = NULL);
 
-// string prefixed to data when validating signed messages either via DATASIGVERIFY or RPC call.  This ensures
+// string prefixed to data when validating signed messages via RPC call.  This ensures
 // that the signature was intended for use on this blockchain.
 extern const std::string strMessageMagic;
+
+bool CheckPubKeyEncoding(const std::vector<uint8_t> &vchSig, unsigned int flags, ScriptError *serror);
 
 #endif // BITCOIN_SCRIPT_INTERPRETER_H

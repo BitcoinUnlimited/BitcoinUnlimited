@@ -101,7 +101,7 @@ framework_opts = ('--tracerpc',
                   '--nocleanup',
                   '--no-ipv6-rpc-listen',
                   '--srcdir',
-                  '--tmpdir',
+                  '--tmppfx',
                   '--coveragedir',
                   '--randomseed',
                   '--testbinary',
@@ -180,14 +180,17 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
+    'bip135basic',
+    'ctor',
+    'nov152018_forkactivation',
     'blockstorage',
     'miningtest',
     'grapheneblocks',
     'cashlibtest',
     'tweak',
     'notify',
-    'may152018_forkactivation_1',
-    'may152018_forkactivation_2',
+    Disabled('may152018_forkactivation_1','May 2018 already activated, use it as template to test future upgrade activation'),
+    Disabled('may152018_forkactivation_2','May 2018 already activated, use it as template to test future upgrade activation'),
     'bip68-112-113-p2p',
     'validateblocktemplate',
     'parallel',
@@ -204,6 +207,7 @@ testScripts = [ RpcTest(t) for t in [
     'getchaintips',
     'rawtransactions',
     'rest',
+    'mempool_accept',
     'mempool_spendcoinbase',
     'mempool_reorg',
     'mempool_limit',
@@ -229,7 +233,8 @@ testScripts = [ RpcTest(t) for t in [
     'abandonconflict',
     'p2p-versionbits-warning',
     'importprunedfunds',
-    'thinblocks'
+    'thinblocks',
+    'checkdatasig-activation'
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
@@ -451,6 +456,7 @@ class RPCTestHandler:
             log_stdout = tempfile.SpooledTemporaryFile(max_size=2**16, mode="w+")
             log_stderr = tempfile.SpooledTemporaryFile(max_size=2**16, mode="w+")
             got_outputs = [False]
+            print("Starting %s" % t)
             self.jobs.append((t,
                               time.time(),
                               subprocess.Popen((RPC_TESTS_DIR + t).split() + self.flags.split() + port_seed,
@@ -475,7 +481,6 @@ class RPCTestHandler:
                     log_stdout.write(stdout_data)
                     log_stderr.write(stderr_data)
 
-
                 # Poll for new data on stdout and stderr. This is also necessary as to not block
                 # the subprocess when the stdout or stderr pipe is full.
                 try:
@@ -486,7 +491,8 @@ class RPCTestHandler:
                     # seems to make the .join() logic to work, and in turn communicate() not to fail
                     # with a timeout, even though the thread is done reading (which was another cause
                     # of a hang)
-                    comms(0.1)
+                    if not got_outputs[0]:
+                        comms(0.1)
 
                     # .communicate() can only be called once and we have to keep in mind now that
                     # communication happened properly (and the files are closed). It _has_ to be called with a non-None
@@ -499,7 +505,7 @@ class RPCTestHandler:
 
                 if proc.poll() is not None:
                     if not got_outputs[0]:
-                        comms(3)
+                        comms(30)
                     log_stdout.seek(0), log_stderr.seek(0)
                     stdout = log_stdout.read()
                     stderr = log_stderr.read()

@@ -26,13 +26,13 @@ enum DeploymentPos
     // NOTE: Also add new deployments to VersionBitsDeploymentInfo in versionbits.cpp
     DEPLOYMENT_CSV = 0, // bit 0 - deployment of BIP68, BIP112, and BIP113.
     // begin unassigned bits. Rename bits when allocated.
-    DEPLOYMENT_UNASSIGNED_BIT_1,
-    DEPLOYMENT_UNASSIGNED_BIT_2,
-    DEPLOYMENT_UNASSIGNED_BIT_3,
-    DEPLOYMENT_UNASSIGNED_BIT_4,
-    DEPLOYMENT_UNASSIGNED_BIT_5,
-    DEPLOYMENT_UNASSIGNED_BIT_6,
-    DEPLOYMENT_UNASSIGNED_BIT_7,
+    DEPLOYMENT_128MB_BLOCK,
+    DEPLOYMENT_MUL_SHIFT_INVERT,
+    DEPLOYMENT_UNLIMITED_SCRIPT_OPCODES,
+    DEPLOYMENT_CHECKDATASIG,
+    DEPLOYMENT_100BYTE_MIN_TX,
+    DEPLOYMENT_CTOR,
+    DEPLOYMENT_SCRIPTSIG_PUSH_ONLY,
     DEPLOYMENT_UNASSIGNED_BIT_8,
     DEPLOYMENT_UNASSIGNED_BIT_9,
     DEPLOYMENT_UNASSIGNED_BIT_10,
@@ -145,8 +145,10 @@ struct Params
     int uahfHeight;
     /** Block height at which the new DAA becomes active */
     int daaHeight;
-    /** May 15, 2018 Activation time */
-    int may2018activationTime;
+    /** May 15, 2018 block height at which the fork activated */
+    int may2018Height;
+    /** Nov 15, 2018 activation time */
+    int nov2018ActivationTime;
 };
 } // namespace Consensus
 

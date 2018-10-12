@@ -125,33 +125,32 @@ bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int> *prevHeig
 // previous outputs are the most relevant, but not actually checked.
 // The purpose of this is to limit the outputs of transactions so that other transactions' "prevout"
 // is reasonably sized.
-unsigned int GetLegacySigOpCount(const CTransaction &tx)
+unsigned int GetLegacySigOpCount(const CTransaction &tx, const uint32_t flags)
 {
     unsigned int nSigOps = 0;
     for (const auto &txin : tx.vin)
     {
-        nSigOps += txin.scriptSig.GetSigOpCount(false);
+        nSigOps += txin.scriptSig.GetSigOpCount(flags, false);
     }
     for (const auto &txout : tx.vout)
     {
-        nSigOps += txout.scriptPubKey.GetSigOpCount(false);
+        nSigOps += txout.scriptPubKey.GetSigOpCount(flags, false);
     }
     return nSigOps;
 }
 
-unsigned int GetP2SHSigOpCount(const CTransaction &tx, const CCoinsViewCache &inputs)
+unsigned int GetP2SHSigOpCount(const CTransaction &tx, const CCoinsViewCache &inputs, const uint32_t flags)
 {
-    if (tx.IsCoinBase())
+    if ((flags && SCRIPT_VERIFY_P2SH) == 0 || tx.IsCoinBase())
         return 0;
 
     unsigned int nSigOps = 0;
     {
-        LOCK(inputs.cs_utxo);
         for (unsigned int i = 0; i < tx.vin.size(); i++)
         {
-            const CTxOut &prevout = inputs.AccessCoin(tx.vin[i].prevout).out;
-            if (prevout.scriptPubKey.IsPayToScriptHash())
-                nSigOps += prevout.scriptPubKey.GetSigOpCount(tx.vin[i].scriptSig);
+            CoinAccessor coin(inputs, tx.vin[i].prevout);
+            if (coin && coin->out.scriptPubKey.IsPayToScriptHash())
+                nSigOps += coin->out.scriptPubKey.GetSigOpCount(flags, tx.vin[i].scriptSig);
         }
     }
     return nSigOps;
@@ -164,6 +163,11 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vin-empty");
     if (tx.vout.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty");
+    // Check that the transaction doesn't have an excessive number of sigops
+    unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+    if (nSigOps > MAX_TX_SIGOPS)
+        return state.DoS(10, false, REJECT_INVALID, "bad-txns-too-many-sigops");
+
     // Size limits
     // BU: size limits removed
     // if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
@@ -214,16 +218,6 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
  */
 static int GetSpendHeight(const CCoinsViewCache &inputs)
 {
-    AssertLockHeld(inputs.cs_utxo);
-
-    // Must leave cs_utxo in order to maintain correct locking order with cs_main. We re-aquire
-    // cs_utxo when we leave this scope.
-    LEAVE_CRITICAL_SECTION(inputs.cs_utxo);
-
-    // Scope guard to make sure cs_utxo gets locked upon leaving ths scope whether or not we throw an exception.
-    BOOST_SCOPE_EXIT(&inputs) { ENTER_CRITICAL_SECTION(inputs.cs_utxo); }
-    BOOST_SCOPE_EXIT_END
-
     LOCK(cs_main);
     BlockMap::iterator i = mapBlockIndex.find(inputs.GetBestBlock());
     if (i != mapBlockIndex.end())
@@ -250,11 +244,11 @@ bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, c
     CAmount nFees = 0;
     int nSpendHeight = -1;
     {
-        LOCK(inputs.cs_utxo);
         for (unsigned int i = 0; i < tx.vin.size(); i++)
         {
             const COutPoint &prevout = tx.vin[i].prevout;
-            const Coin &coin = inputs.AccessCoin(prevout);
+            Coin coin;
+            inputs.GetCoin(prevout, coin); // Make a copy so I don't hold the utxo lock
             assert(!coin.IsSpent());
 
             // If prev is coinbase, check that it's matured

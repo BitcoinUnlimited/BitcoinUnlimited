@@ -67,6 +67,7 @@ BITCOIN_TESTS =\
   test/bip32_tests.cpp \
   test/bloom_tests.cpp \
   test/checkblock_tests.cpp \
+  test/checkdatasig_tests.cpp \
   test/Checkpoints_tests.cpp \
   test/bswap_tests.cpp \
   test/cashaddr_tests.cpp \
@@ -78,6 +79,7 @@ BITCOIN_TESTS =\
   test/DoS_tests.cpp \
   test/dstencode_tests.cpp \
   test/exploit_tests.cpp \
+  test/fastfilter_tests.cpp \
   test/forkscsv_tests.cpp \
   test/getarg_tests.cpp \
   test/graphene_tests.cpp \
@@ -106,7 +108,9 @@ BITCOIN_TESTS =\
   test/script_tests.cpp \
   test/scriptnum_tests.cpp \
   test/serialize_tests.cpp \
+  test/sigencoding_tests.cpp \
   test/sighash_tests.cpp \
+  test/sighashtype_tests.cpp \
   test/sigopcount_tests.cpp \
   test/skiplist_tests.cpp \
   test/streams_tests.cpp \

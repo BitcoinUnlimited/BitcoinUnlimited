@@ -70,8 +70,7 @@ bool IsStandardTx(const CTransaction &tx, std::string &reason)
     // almost as much to process as they cost the sender in fees, because
     // computing signature hashes is O(ninputs*txsize). Limiting transactions
     // to MAX_STANDARD_TX_SIZE mitigates CPU exhaustion attacks.
-    unsigned int sz = ::GetSerializeSize(tx, SER_NETWORK, CTransaction::CURRENT_VERSION);
-    if (sz >= MAX_STANDARD_TX_SIZE)
+    if (tx.GetTxSize() >= MAX_STANDARD_TX_SIZE)
     {
         reason = "tx-size";
         return false;
@@ -141,8 +140,8 @@ bool AreInputsStandard(const CTransaction &tx, const CCoinsViewCache &mapInputs)
     {
         txnouttype whichType;
         {
-            LOCK(mapInputs.cs_utxo);
-            const CTxOut &prev = mapInputs.AccessCoin(tx.vin[i].prevout).out;
+            CoinAccessor coin(mapInputs, tx.vin[i].prevout);
+            const CTxOut &prev = coin->out;
 
             std::vector<std::vector<unsigned char> > vSolutions;
             // get the scriptPubKey corresponding to this input:
@@ -160,7 +159,7 @@ bool AreInputsStandard(const CTransaction &tx, const CCoinsViewCache &mapInputs)
             if (stack.empty())
                 return false;
             CScript subscript(stack.back().begin(), stack.back().end());
-            if (subscript.GetSigOpCount(true) > MAX_P2SH_SIGOPS)
+            if (subscript.GetSigOpCount(STANDARD_CHECKDATASIG_VERIFY_FLAGS, true) > MAX_P2SH_SIGOPS)
             {
                 return false;
             }

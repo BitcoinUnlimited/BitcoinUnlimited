@@ -3,12 +3,13 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "requestManager.h"
+#include "blockrelay/graphene.h"
+#include "blockrelay/thinblock.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "consensus/consensus.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
-#include "graphene.h"
 #include "leakybucket.h"
 #include "main.h"
 #include "net.h"
@@ -17,7 +18,6 @@
 #include "primitives/block.h"
 #include "rpc/server.h"
 #include "stat.h"
-#include "thinblock.h"
 #include "tinyformat.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
@@ -150,7 +150,10 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
     {
         // Don't allow the in flight requests to grow unbounded.
         if (mapTxnInfo.size() >= (size_t)(MAX_INV_SZ * 2 * GetArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE)))
+        {
+            LOG(REQ, "Tx request buffer full: Dropping request for %s", obj.hash.ToString());
             return;
+        }
 
         uint256 temp = obj.hash;
         OdMap::value_type v(temp, CUnknownObj());
@@ -208,12 +211,13 @@ void CRequestManager::AskFor(const std::vector<CInv> &objArray, CNode *from, uns
 void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *from, unsigned int priority)
 {
     // must maintain correct locking order:  cs_main, then cs_objDownloader, then cs_vNodes.
-    AssertLockHeld(cs_main);
+    LOCK(cs_main);
 
     // This is block and peer that was selected in FindNextBlocksToDownload() so we want to add it as a block
     // source first so that it gets requested first.
     LOCK(cs_objDownloader);
-    AskFor(objArray, from, priority);
+    if (from)
+        AskFor(objArray, from, priority);
 
     // Add the other peers as potential sources in the event the RequestManager needs to make a re-request
     // for this block. Only add NETWORK nodes that have block availability.
@@ -231,7 +235,7 @@ void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *
         ProcessBlockAvailability(pnode->id);
 
         // check block availability for this peer and only askfor a block if it is available.
-        CNodeState *state = State(pnode->id);
+        CNodeState *state = nodestate.State(pnode->id);
         if (state != nullptr)
         {
             if (state->pindexBestKnownBlock != nullptr &&
@@ -253,36 +257,47 @@ bool CRequestManager::AlreadyAskedForBlock(const uint256 &hash)
     return false;
 }
 
-// Indicate that we got this object, from and bytes are optional (for node performance tracking)
-void CRequestManager::Received(const CInv &obj, CNode *from, int bytes)
+void CRequestManager::UpdateTxnResponseTime(const CInv &obj, CNode *pfrom)
 {
     int64_t now = GetTimeMicros();
+    LOCK(cs_objDownloader);
+    if (pfrom && obj.type == MSG_TX)
+    {
+        OdMap::iterator item = mapTxnInfo.find(obj.hash);
+        if (item == mapTxnInfo.end())
+            return;
+
+        pfrom->txReqLatency << (now - item->second.lastRequestTime);
+        receivedTxns += 1;
+    }
+}
+
+// Indicate that we got this object.
+void CRequestManager::Received(const CInv &obj, CNode *pfrom)
+{
     LOCK(cs_objDownloader);
     if (obj.type == MSG_TX)
     {
         OdMap::iterator item = mapTxnInfo.find(obj.hash);
         if (item == mapTxnInfo.end())
-            return; // item has already been removed
+            return;
+
         LOG(REQ, "ReqMgr: TX received for %s.\n", item->second.obj.ToString().c_str());
-        from->txReqLatency << (now - item->second.lastRequestTime); // keep track of response latency of this node
-        // will be decremented in the item cleanup: if (inFlight) inFlight--;
-        cleanup(item); // remove the item
-        receivedTxns += 1;
+        cleanup(item);
     }
-    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_THINBLOCK) || (obj.type == MSG_XTHINBLOCK))
+    else if (obj.type == MSG_BLOCK || obj.type == MSG_THINBLOCK || obj.type == MSG_XTHINBLOCK)
     {
         OdMap::iterator item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
-            return; // item has already been removed
+            return;
+
         LOG(BLK, "%s removed from request queue (received from %s).\n", item->second.obj.ToString().c_str(),
-            from->GetLogName());
-        // from->blkReqLatency << (now - item->second.lastRequestTime);  // keep track of response latency of this node
-        cleanup(item); // remove the item
-        // receivedTxns += 1;
+            pfrom ? pfrom->GetLogName() : "unknown");
+        cleanup(item);
     }
 }
 
-// Indicate that we got this object, from and bytes are optional (for node performance tracking)
+// Indicate that we got this object.
 void CRequestManager::AlreadyReceived(CNode *pnode, const CInv &obj)
 {
     LOCK(cs_objDownloader);
@@ -428,6 +443,15 @@ bool CUnknownObj::AddSource(CNode *from)
     return false;
 }
 
+void CRequestManager::RequestCorruptedBlock(const uint256 &blockHash)
+{
+    // set it to MSG_BLOCK here but it should get overwritten in RequestBlock
+    CInv obj(MSG_BLOCK, blockHash);
+    std::vector<CInv> vGetBlocks;
+    vGetBlocks.push_back(obj);
+    AskForDuringIBD(vGetBlocks, nullptr);
+}
+
 bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
 {
     CInv inv2(obj);
@@ -506,7 +530,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                 inv2.type = MSG_XTHINBLOCK;
                 std::vector<uint256> vOrphanHashes;
                 {
-                    LOCK(orphanpool.cs);
+                    READLOCK(orphanpool.cs);
                     for (auto &mi : orphanpool.mapOrphanTransactions)
                         vOrphanHashes.emplace_back(mi.first);
                 }
@@ -530,7 +554,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                 inv2.type = MSG_XTHINBLOCK;
                 std::vector<uint256> vOrphanHashes;
                 {
-                    LOCK(orphanpool.cs);
+                    READLOCK(orphanpool.cs);
                     for (auto &mi : orphanpool.mapOrphanTransactions)
                         vOrphanHashes.emplace_back(mi.first);
                 }
@@ -804,9 +828,10 @@ void CRequestManager::SendRequests()
                 if (item.availableFrom.empty())
                 {
                     // TODO: tell someone about this issue, look in a random node, or something.
+                    LOG(REQ, "No sources for %s.  Dropping\n", item.obj.ToString().c_str());
                     cleanup(itemIter); // right now we give up requesting it if we have no other sources...
                 }
-                else // Ok, we have at least on source so request this item.
+                else // Ok, we have at least one source so request this item.
                 {
                     CNodeRequestData next;
                     // Go thru the availableFrom list, looking for the first node that isn't disconnected
@@ -908,9 +933,9 @@ void CRequestManager::SendRequests()
 // Check whether the last unknown block a peer advertised is not yet known.
 void CRequestManager::ProcessBlockAvailability(NodeId nodeid)
 {
-    AssertLockHeld(cs_main);
+    LOCK(cs_main); // TODO fine grained lock around mapBlockIndex
 
-    CNodeState *state = State(nodeid);
+    CNodeState *state = nodestate.State(nodeid);
     DbgAssert(state != nullptr, return );
 
     if (!state->hashLastUnknownBlock.IsNull())
@@ -933,7 +958,7 @@ void CRequestManager::UpdateBlockAvailability(NodeId nodeid, const uint256 &hash
 {
     AssertLockHeld(cs_main);
 
-    CNodeState *state = State(nodeid);
+    CNodeState *state = nodestate.State(nodeid);
     DbgAssert(state != nullptr, return );
 
     ProcessBlockAvailability(nodeid);
@@ -956,8 +981,6 @@ void CRequestManager::UpdateBlockAvailability(NodeId nodeid, const uint256 &hash
 
 void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
 {
-    AssertLockHeld(cs_main);
-
     int nBlocksInFlight = mapRequestManagerNodeState[pto->GetId()].nBlocksInFlight;
     if (!pto->fDisconnectRequest && !pto->fDisconnect && !pto->fClient &&
         nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
@@ -990,14 +1013,12 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
 // at most count entries.
 void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, std::vector<CBlockIndex *> &vBlocks)
 {
-    AssertLockHeld(cs_main);
-
     if (count == 0)
         return;
 
     NodeId nodeid = node->GetId();
     vBlocks.reserve(vBlocks.size() + count);
-    CNodeState *state = State(nodeid);
+    CNodeState *state = nodestate.State(nodeid);
     DbgAssert(state != nullptr, return );
 
     // Make sure pindexBestKnownBlock is up to date, we'll need it.
@@ -1009,6 +1030,8 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
         // This peer has nothing interesting.
         return;
     }
+
+    LOCK(cs_main);
 
     if (state->pindexLastCommonBlock == nullptr)
     {

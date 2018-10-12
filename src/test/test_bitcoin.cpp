@@ -24,6 +24,7 @@
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
+#include "validation/validation.h"
 #include <boost/program_options.hpp>
 #include <boost/test/unit_test.hpp>
 
@@ -64,7 +65,10 @@ TestingSetup::TestingSetup(const std::string &chainName) : BasicTestingSetup(cha
     bool worked = InitBlockIndex(chainparams);
     assert(worked);
 
-    PV.reset(new CParallelValidation(3, &threadGroup));
+    // Make sure there are 3 script check threads running for each queue
+    SoftSetArg("-par", std::to_string(3));
+    PV.reset(new CParallelValidation());
+
     RegisterNodeSignals(GetNodeSignals());
 }
 

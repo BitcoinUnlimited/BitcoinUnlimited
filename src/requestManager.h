@@ -172,14 +172,20 @@ public:
     // of the same blocks.
     bool AlreadyAskedForBlock(const uint256 &hash);
 
-    // Indicate that we got this object, from and bytes are optional (for node performance tracking)
-    void Received(const CInv &obj, CNode *from, int bytes = 0);
+    // Update the response time for this transaction request
+    void UpdateTxnResponseTime(const CInv &obj, CNode *pfrom);
+
+    // Indicate that we got this object
+    void Received(const CInv &obj, CNode *pfrom);
 
     // Indicate that we previously got this object
     void AlreadyReceived(CNode *pnode, const CInv &obj);
 
     // Indicate that getting this object was rejected
     void Rejected(const CInv &obj, CNode *from, unsigned char reason = 0);
+
+    // request a block by its hash
+    void RequestCorruptedBlock(const uint256 &blockHash);
 
     // Resets the last request time to zero when a node disconnects and has blocks in flight.
     void ResetLastBlockRequestTime(const uint256 &hash);

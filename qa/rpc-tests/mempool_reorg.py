@@ -87,6 +87,8 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
 
         for node in self.nodes:
             node.invalidateblock(last_block[0])
+
+        time.sleep(3) # wait for tx processing threads to put them back into the mempool
         assert_equal(set(self.nodes[0].getrawmempool()), {spend_101_id, spend_102_1_id, spend_103_1_id})
 
         # Use invalidateblock to re-org back and make all those coinbase spends
@@ -100,3 +102,17 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     MempoolCoinbaseTest().main()
+
+def Test():
+    t = MempoolCoinbaseTest()
+    t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"],
+    }
+
+    flags = [] # ["--nocleanup", "--noshutdown"]
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmpdir=/ramdisk/test/ma")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
+    t.main(flags, bitcoinConf, None)
