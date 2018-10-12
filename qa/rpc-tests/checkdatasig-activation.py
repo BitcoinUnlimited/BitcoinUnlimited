@@ -7,7 +7,7 @@ This test checks activation of OP_CHECKDATASIG
 """
 import test_framework.loginit
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import satoshi_round, assert_equal, assert_raises_rpc_error, start_node
+from test_framework.util import waitFor, satoshi_round, assert_equal, assert_raises_rpc_error, start_node
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.blocktools import *
 from test_framework.script import *
@@ -178,10 +178,10 @@ class CheckDataSigActivationTest(ComparisonTestFramework):
         assert(tx0id not in set(node.getrawmempool()))
 
         node.invalidateblock(format(nov152018forkblock.sha256, 'x'))
-        assert(tx0id in set(node.getrawmempool()))
+        waitFor(3, lambda: tx0id in set(node.getrawmempool()), "Transaction shoud be included in the mempool")
 
         node.invalidateblock(format(fork_block.sha256, 'x'))
-        assert(tx0id not in set(node.getrawmempool()))
+        waitFor(3, lambda: tx0id not in set(node.getrawmempool()), "Transaction should not be included in the memopool")
 
 
 if __name__ == '__main__':
