@@ -575,7 +575,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     // Only accept nLockTime-using transactions that can be mined in the next
     // block; we don't want our mempool filled up with transactions that can't
     // be mined yet.
-    if (!CheckFinalTx(*tx, STANDARD_LOCKTIME_VERIFY_FLAGS))
+    if (!CheckFinalTx(*tx, STANDARD_LOCKTIME_VERIFY_FLAGS, ss))
         return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
 
     // Make sure tx size is acceptable after Nov 15, 2018 fork
