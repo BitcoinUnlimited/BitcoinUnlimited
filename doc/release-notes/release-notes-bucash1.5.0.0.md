@@ -48,7 +48,7 @@ Main Changes
 
 - Implementation of November 2018 upgrades feature (see the [specification](https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2018-nov-upgrade.md) for more details)
 - CTOR, CDSV, CLEAN_STACK, FORCE_PUSH, 100 byte TXN SIZE (as a sublist)
-- Add configuration parameters to allow miners to specify their [BIP135](https://github.com/bitcoin/bips/blob/master/bip-0135.mediawiki) votes. See this [guide](https://github.com/BitcoinUnlimited/BitcoinUnlimited/blob/master/doc/bip135-guide.md) from more details
+- Add configuration parameters to allow miners to specify their [BIP135](https://github.com/bitcoin/bips/blob/master/bip-0135.mediawiki) votes. See this [guide](../bip135-guide.md) from more details
 - Multithreaded transaction admission to the mempool (ATMP)
 - Parallelize message processing
 - Fastfilters: a faster than Bloom Filter probabilistic data structure

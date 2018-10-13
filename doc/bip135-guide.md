@@ -17,7 +17,7 @@ It is important to understand that a BIP135 vote for a feature is a vote of **_N
 
 The voting is configured to require a 3 month period of 75% hash power voting yes, and then a 3 month "grace" period (where developers can implement the feature if they have not already done so).  So the earliest a feature can activate is 6 months from now.
 
-The configuration is defined in `config/forks.csv` in the source tree, and `share/forks.csv` in the binary distribution. 
+The configuration is defined in [`config/forks.csv`](https://github.com/BitcoinUnlimited/BitcoinUnlimited/blob/release/config/forks.csv) in the source tree, and `share/forks.csv` in the binary distribution. 
 
 chainname | bit | name | starttime | timeout | windowsize | threshold | minlockedblocks | minlockedtime | gbtforce
 --- | --- | --- | --- | --- | --- | --- | --- | --- | ---
