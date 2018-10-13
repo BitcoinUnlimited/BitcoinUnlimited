@@ -1345,7 +1345,7 @@ bool HaveGrapheneNodes()
     return false;
 }
 
-bool IsGrapheneBlockEnabled() { return GetBoolArg("-use-grapheneblocks", false); }
+bool IsGrapheneBlockEnabled() { return GetBoolArg("-use-grapheneblocks", DEFAULT_USE_GRAPHENE_BLOCKS); }
 bool CanGrapheneBlockBeDownloaded(CNode *pto)
 {
     LOCK(pto->cs_mapgrapheneblocksinflight);
