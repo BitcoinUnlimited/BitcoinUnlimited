@@ -77,7 +77,7 @@ public:
         READWRITE(nBlockTxs);
         // This logic assumes a smallest transaction size of 100 bytes.  This is optimistic for realistic transactions
         // and the downside for pathological blocks is just that graphene won't work so we fall back to xthin
-        if (nBlockTxs > excessiveBlockSize / 100)
+        if (nBlockTxs > (excessiveBlockSize * maxMessageSizeMultiplier / 100))
             throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
         if (!pGrapheneSet)
             pGrapheneSet = new CGrapheneSet();
