@@ -51,7 +51,7 @@ Main Changes
     - CDSV: OP_CHECKDATASIG[VERIFY]
     - CLEAN_STACK: Enforce "clean stack" rule
     - FORCE_PUSH: Enforce "push only" rule for scriptSig
-    - 00 byte MIN TXN SIZE: Enforce minimum transaction size
+    - 100 byte MIN TXN SIZE: Enforce minimum transaction size
 - Add configuration parameters to allow miners to specify their [BIP135](https://github.com/bitcoin/bips/blob/master/bip-0135.mediawiki) votes. See this [guide](https://github.com/BitcoinUnlimited/BitcoinUnlimited/blob/master/doc/bip135-guide.md) from more details
 - Multithreaded transaction admission to the mempool (ATMP)
 - Parallelize message processing
