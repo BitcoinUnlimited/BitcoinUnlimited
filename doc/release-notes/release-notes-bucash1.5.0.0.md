@@ -56,7 +56,6 @@ Main Changes
 - Add tracking of ancestor packages and expose ancestor/descendant information over RPC
 - Remove trickle login in dealing with transactions INV
 - Implement shared lock semantics for the UTXO
-- Turn Graphene on by default
 
 Commit details
 -------
