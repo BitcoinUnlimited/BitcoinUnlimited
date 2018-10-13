@@ -13,10 +13,10 @@ This is a major release version based of Bitcoin Unlimited compatible
 with the Bitcoin Cash specifications you could find here:
 
 
-https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/uahf-technical-spec.md (Aug 1st '17 Protocol Upgrade, bucash 1.1.0.0)
-https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/nov-13-hardfork-spec.md (Nov 13th '17 Protocol Upgrade, bucash 1.1.2.0)
-https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/may-2018-hardfork.md (May 15th '18 Protocol Upgrade, bucash 1.3.0.0, 1.3.0.1, 1.4.0.0)
-https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2018-nov-upgrade.md (Nov 15th '18 Protocol Upgradem, bucash 1.5.0.0)
+- https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/uahf-technical-spec.md (Aug 1st '17 Protocol Upgrade, bucash 1.1.0.0)
+- https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/nov-13-hardfork-spec.md (Nov 13th '17 Protocol Upgrade, bucash 1.1.2.0)
+- https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/may-2018-hardfork.md (May 15th '18 Protocol Upgrade, bucash 1.3.0.0, 1.3.0.1, 1.4.0.0)
+- https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2018-nov-upgrade.md (Nov 15th '18 Protocol Upgradem, bucash 1.5.0.0)
 
 Upgrading
 ---------
@@ -47,16 +47,19 @@ Main Changes
 ------------
 
 - Implementation of November 2018 upgrades feature (see the [specification](https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2018-nov-upgrade.md) for more details)
-- CTOR, CDSV, CLEAN_STACK, FORCE_PUSH, 100 byte TXN SIZE (as a sublist)
-- Add configuration parameters to allow miners to specify their [BIP135](https://github.com/bitcoin/bips/blob/master/bip-0135.mediawiki) votes. See this [guide]() from more details
-- Multithreaded transaction admissio to the mempool (ATMP)
+    - CTOR: Canonical Transaction Ordering
+    - CDSV: OP_CHECKDATASIG[VERIFY]
+    - CLEAN_STACK: Enforce "clean stack" rule
+    - FORCE_PUSH: Enforce "push only" rule for scriptSig
+    - 00 byte MIN TXN SIZE: Enforce minimum transaction size
+- Add configuration parameters to allow miners to specify their [BIP135](https://github.com/bitcoin/bips/blob/master/bip-0135.mediawiki) votes. See this [guide](https://github.com/BitcoinUnlimited/BitcoinUnlimited/blob/master/doc/bip135-guide.md) from more details
+- Multithreaded transaction admission to the mempool (ATMP)
 - Parallelize message processing
 - Fastfilters: a faster than Bloom Filter probabilistic data structure
 - Various improvements to the Request Manager
 - Add tracking of ancestor packages and expose ancestor/descendant information over RPC
-- Remove trickle login in dealing with transactions INV
+- Remove trickle logic in dealing with transactions INV
 - Implement shared lock semantics for the UTXO
-- Turn Graphene on by default
 
 Commit details
 -------
