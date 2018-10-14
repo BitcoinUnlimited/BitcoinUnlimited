@@ -459,9 +459,9 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
     CBloomFilter filterMemPool;
 
     // Ask for Graphene blocks
-    if (IsGrapheneBlockEnabled() && IsChainNearlySyncd())
+    if (IsChainNearlySyncd() && IsGrapheneBlockEnabled() && HaveGrapheneNodes())
     {
-        if (HaveGrapheneNodes() && graphenedata.CheckGrapheneBlockTimer(obj.hash))
+        if (graphenedata.CheckGrapheneBlockTimer(obj.hash))
         {
             // Must download a graphene block from a graphene enabled peer.
             // We can only request one graphene block per peer at a time.
@@ -515,13 +515,14 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         }
     }
 
+
     // Ask for XTHIN's if Graphene is not enabled, or, ask for XTHIN's if graphene is enabled
     // but the grapheneblock timer has lapsed.
-    if ((IsThinBlocksEnabled() && IsChainNearlySyncd() && !IsGrapheneBlockEnabled()) ||
-        (IsThinBlocksEnabled() && IsChainNearlySyncd() && IsGrapheneBlockEnabled() &&
-            !graphenedata.CheckGrapheneBlockTimer(obj.hash)))
+if(IsChainNearlySyncd() && IsThinBlocksEnabled() && HaveThinblockNodes())
+{
+    if (!IsGrapheneBlockEnabled() || (IsGrapheneBlockEnabled() && !graphenedata.CheckGrapheneBlockTimer(obj.hash)))
     {
-        if (HaveThinblockNodes() && thindata.CheckThinblockTimer(obj.hash))
+        if (thindata.CheckThinblockTimer(obj.hash))
         {
             // Must download an xthinblock from a XTHIN peer.
             // We can only request one xthinblock per peer at a time.
@@ -581,11 +582,12 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
             }
         }
     }
+}
 
     // Request a full block if graphene and thinblocks is turned off.  Also we must request a full block
     // if we've fallen behind from the state of being fully syncd, furthermore, this is crucial for initial
     // sync to function as this is the only way we request full blocks near the end of the initial sync process.
-    if (!IsChainNearlySyncd() || (!IsGrapheneBlockEnabled() && !IsThinBlocksEnabled()))
+    if (!IsChainNearlySyncd() || (!IsGrapheneBlockEnabled() && !IsThinBlocksEnabled()) || (!HaveThinblockNodes() && !HaveGrapheneNodes()))
     {
         std::vector<CInv> vToFetch;
         inv2.type = MSG_BLOCK;
@@ -593,7 +595,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
 
         MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
         pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
-        LOG(THIN, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+        LOG(THIN|GRAPHENE, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
         return true;
     }
     return false; // no block was requested
