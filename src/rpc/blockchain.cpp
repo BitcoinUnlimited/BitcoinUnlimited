@@ -938,31 +938,35 @@ static UniValue SoftForkDesc(const std::string &name,
 
 
 static void pushBackThresholdStatus(UniValue &rv,
-                                    const Consensus::Params &consensusParams,
-                                    const ThresholdState thresholdState,
-                                    Consensus::DeploymentPos id,
-                                    VersionBitBIP versionBitBIP) {
-    if (versionBitBIP == BIP_135) {
-        rv.pushKV("bit", (int) id);
+    const Consensus::Params &consensusParams,
+    const ThresholdState thresholdState,
+    Consensus::DeploymentPos id,
+    VersionBitBIP versionBitBIP)
+{
+    if (versionBitBIP == BIP_135)
+    {
+        rv.pushKV("bit", (int)id);
     }
-    switch (thresholdState) {
-        case THRESHOLD_DEFINED:
-            rv.pushKV("status", "defined");
-            break;
-        case THRESHOLD_STARTED:
-            rv.pushKV("status", "started");
-            break;
-        case THRESHOLD_LOCKED_IN:
-            rv.pushKV("status", "locked_in");
-            break;
-        case THRESHOLD_ACTIVE:
-            rv.pushKV("status", "active");
-            break;
-        case THRESHOLD_FAILED:
-            rv.pushKV("status", "failed");
-            break;
+    switch (thresholdState)
+    {
+    case THRESHOLD_DEFINED:
+        rv.pushKV("status", "defined");
+        break;
+    case THRESHOLD_STARTED:
+        rv.pushKV("status", "started");
+        break;
+    case THRESHOLD_LOCKED_IN:
+        rv.pushKV("status", "locked_in");
+        break;
+    case THRESHOLD_ACTIVE:
+        rv.pushKV("status", "active");
+        break;
+    case THRESHOLD_FAILED:
+        rv.pushKV("status", "failed");
+        break;
     }
-    if (versionBitBIP == BIP_009 && THRESHOLD_STARTED == thresholdState) {
+    if (versionBitBIP == BIP_009 && THRESHOLD_STARTED == thresholdState)
+    {
         rv.pushKV("bit", consensusParams.vDeployments[id].bit);
     }
     rv.pushKV("startTime", consensusParams.vDeployments[id].nStartTime);

@@ -30,9 +30,10 @@ enum ThresholdState
 };
 
 // used in pushBackThresholdStatus to determine when/how to insert the bit id
-enum VersionBitBIP {
+enum VersionBitBIP
+{
     BIP_009, // Version bits with timeout and delay
-    BIP_135  // Generalized version bits voting
+    BIP_135 // Generalized version bits voting
 };
 
 // A map that gives the state for blocks whose height is a multiple of Period().
