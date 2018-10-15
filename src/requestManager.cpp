@@ -587,8 +587,13 @@ if(IsChainNearlySyncd() && IsThinBlocksEnabled() && HaveThinblockNodes())
     // Request a full block if graphene and thinblocks is turned off.  Also we must request a full block
     // if we've fallen behind from the state of being fully syncd, furthermore, this is crucial for initial
     // sync to function as this is the only way we request full blocks near the end of the initial sync process.
-    if (!IsChainNearlySyncd() || (!IsGrapheneBlockEnabled() && !IsThinBlocksEnabled()) || (!HaveThinblockNodes() && !HaveGrapheneNodes()))
+    if (!IsChainNearlySyncd() || (!IsGrapheneBlockEnabled() && !IsThinBlocksEnabled()) || (!HaveThinblockNodes() && !HaveGrapheneNodes()) ||
+       (!IsGrapheneBlockEnabled() && HaveGrapheneNodes() &&
+          IsThinBlocksEnabled() && !HaveThinblockNodes()) ||
+       (IsGrapheneBlockEnabled() && !HaveGrapheneNodes() &&
+          !IsThinBlocksEnabled() && HaveThinblockNodes()))
     {
+
         std::vector<CInv> vToFetch;
         inv2.type = MSG_BLOCK;
         vToFetch.push_back(inv2);
