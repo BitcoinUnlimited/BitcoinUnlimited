@@ -516,6 +516,19 @@ bool GetBoolArg(const std::string &strArg, bool fDefault)
     return fDefault;
 }
 
+// You can set the args directly, using SetArg which always will update the value or you can use
+// SoftSetArg which will only set the value if it hasn't already been set and return success/fail.
+void SetArg(const std::string &strArg, const std::string &strValue)
+{
+    mapArgs[strArg] = strValue;
+}
+void SetBoolArg(const std::string &strArg, bool fValue)
+{
+    if (fValue)
+        SetArg(strArg, std::string("1"));
+    else
+        SetArg(strArg, std::string("0"));
+}
 bool SoftSetArg(const std::string &strArg, const std::string &strValue)
 {
     if (mapArgs.count(strArg))
@@ -523,7 +536,6 @@ bool SoftSetArg(const std::string &strArg, const std::string &strValue)
     mapArgs[strArg] = strValue;
     return true;
 }
-
 bool SoftSetBoolArg(const std::string &strArg, bool fValue)
 {
     if (fValue)
