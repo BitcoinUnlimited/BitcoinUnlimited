@@ -152,6 +152,13 @@ void StartShutdown() { exit(0); }
 bool ShutdownRequested() { return false; }
 using namespace boost::program_options;
 
+CService ipaddress(uint32_t i, uint32_t port)
+{
+    struct in_addr s;
+    s.s_addr = i;
+    return CService(CNetAddr(s), port);
+}
+
 struct StartupShutdown
 {
     StartupShutdown()

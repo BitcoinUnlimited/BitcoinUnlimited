@@ -4,6 +4,7 @@
 #include "chainparamsbase.h"
 #include "fs.h"
 #include "key.h"
+#include "net.h"
 #include "pubkey.h"
 #include "txdb.h"
 #include "txmempool.h"
@@ -120,5 +121,6 @@ struct TestMemPoolEntryHelper
 // define an implicit conversion here so that uint256 may be used directly in BOOST_CHECK_*
 std::ostream &operator<<(std::ostream &os, const uint256 &num);
 
+CService ipaddress(uint32_t i, uint32_t port);
 
 #endif
