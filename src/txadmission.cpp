@@ -273,6 +273,13 @@ void CommitTxToMempool()
             txDeferQ.push(txInQ.front());
             txInQ.pop();
         }
+        // If the chain is now syncd and there are txns in the wait queue then add these also to the deferred queue.
+        // The wait queue is not very active and it will typically have just 1 or 2 txns in it, if any at all.
+        while (IsChainSyncd() && !txWaitNextBlockQ.empty())
+        {
+            txDeferQ.push(txWaitNextBlockQ.front());
+            txWaitNextBlockQ.pop();
+        }
 
         // Move the previously deferred txns into active processing.
 
@@ -384,6 +391,21 @@ void ThreadTxAdmission()
                         // LOG(MEMPOOL, "Accepted tx: peer=%s: accepted %s onto Q\n", txd.nodeName,
                         //     tx->GetHash().ToString());
                     }
+                    else if (state.GetRejectCode() == REJECT_WAITING)
+                    {
+                        // If the chain is not sync'd entirely then we'll defer this tx until
+                        // the new block is processed.
+                        LOCK(csTxInQ);
+                        if (txWaitNextBlockQ.size() <= (10 * excessiveBlockSize / 1000000))
+                        {
+                            txWaitNextBlockQ.push(txd);
+                            LOG(MEMPOOL, "Tx is waiting on next block : %s\n", tx->GetHash().ToString(),
+                                state.GetRejectReason());
+                        }
+                        else
+                            LOG(MEMPOOL, "WaitNexBlockQueue is full : %s\n", tx->GetHash().ToString(),
+                                state.GetRejectReason());
+                    }
                     else
                     {
                         LOG(MEMPOOL, "Rejected tx: %s(%d): %s. peer %s  hash %s \n", state.GetRejectReason(),
@@ -391,7 +413,7 @@ void ThreadTxAdmission()
 
                         if (fMissingInputs)
                         {
-                            WRITELOCK(orphanpool.cs); // WRITELOCK
+                            WRITELOCK(orphanpool.cs);
                             orphanpool.AddOrphanTx(tx, txd.nodeId);
 
                             // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
@@ -441,8 +463,9 @@ void ThreadTxAdmission()
                         // only when it's finally accepted into the mempool.
                         requester.Received(inv, nullptr);
                     }
+
                     int nDoS = 0;
-                    if (state.IsInvalid(nDoS))
+                    if (state.IsInvalid(nDoS) && state.GetRejectCode() != REJECT_WAITING)
                     {
                         LOG(MEMPOOL, "%s from peer=%s was not accepted: %s\n", tx->GetHash().ToString(), txd.nodeName,
                             FormatStateMessage(state));
@@ -576,7 +599,12 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     // block; we don't want our mempool filled up with transactions that can't
     // be mined yet.
     if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &ss))
-        return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
+    {
+        if (!IsChainSyncd() && IsChainNearlySyncd())
+            return state.DoS(0, false, REJECT_WAITING, "non-final");
+        else
+            return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
+    }
 
     // Make sure tx size is acceptable after Nov 15, 2018 fork
     if (IsNov152018Scheduled() && IsNov152018Enabled(chainparams.GetConsensus(), chainActive.Tip()))
@@ -896,7 +924,11 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             if (!pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize,
                     nLimitDescendants, nLimitDescendantSize, errString))
             {
-                return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
+                // If the chain is not sync'd entirely then we'll defer this tx until the new block is processed.
+                if (!IsChainSyncd() && IsChainNearlySyncd())
+                    return state.DoS(0, false, REJECT_WAITING, "too-long-mempool-chain");
+                else
+                    return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
             }
         }
 

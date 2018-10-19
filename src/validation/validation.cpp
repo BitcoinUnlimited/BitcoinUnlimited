@@ -287,7 +287,7 @@ CBlockIndex *AddToBlockIndex(const CBlockHeader &block)
     pindexNew->RaiseValidity(BLOCK_VALID_TREE);
 
     if ((!(pindexNew->nStatus & BLOCK_FAILED_MASK)) &&
-        (pindexBestHeader == NULL || pindexBestHeader->nChainWork < pindexNew->nChainWork))
+        (pindexBestHeader.load() == nullptr || pindexBestHeader.load()->nChainWork < pindexNew->nChainWork))
         pindexBestHeader = pindexNew;
 
     setDirtyBlockIndex.insert(pindexNew);
@@ -415,7 +415,7 @@ bool LoadBlockIndexDB()
         if (pindex->pprev)
             pindex->BuildSkip();
         if (pindex->IsValid(BLOCK_VALID_TREE) &&
-            (pindexBestHeader == nullptr || CBlockIndexWorkComparator()(pindexBestHeader, pindex)))
+            (pindexBestHeader.load() == nullptr || CBlockIndexWorkComparator()(pindexBestHeader.load(), pindex)))
             pindexBestHeader = pindex;
     }
 
@@ -2424,13 +2424,14 @@ bool ConnectBlock(const CBlock &block,
     // download we don't need to check most of those scripts except for the most
     // recent ones.
     bool fScriptChecks = true;
-    if (pindexBestHeader)
+    if (pindexBestHeader.load())
     {
         if (fReindex || fImporting)
             fScriptChecks = !fCheckpointsEnabled || block.nTime > timeBarrier;
         else
-            fScriptChecks = !fCheckpointsEnabled || block.nTime > timeBarrier ||
-                            (uint32_t)pindex->nHeight > pindexBestHeader->nHeight - (144 * checkScriptDays.Value());
+            fScriptChecks =
+                !fCheckpointsEnabled || block.nTime > timeBarrier ||
+                (uint32_t)pindex->nHeight > pindexBestHeader.load()->nHeight - (144 * checkScriptDays.Value());
     }
 
     // Create a vector for storing hashes that will be deleted from the unverified and perverified txn sets.

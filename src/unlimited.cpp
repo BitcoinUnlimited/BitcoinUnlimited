@@ -1327,7 +1327,7 @@ void IsInitialBlockDownloadInit(bool *fInit)
 
     const CChainParams &chainParams = Params();
     LOCK(cs_main);
-    if (!pindexBestHeader)
+    if (!pindexBestHeader.load())
     {
         // Not nearly synced if we don't have any blocks!
         fIsInitialBlockDownload.store(true);
@@ -1353,9 +1353,9 @@ void IsInitialBlockDownloadInit(bool *fInit)
         return;
     }
 
-    bool state =
-        (chainActive.Height() < pindexBestHeader->nHeight - 24 * 6 ||
-            std::max(chainActive.Tip()->GetBlockTime(), pindexBestHeader->GetBlockTime()) < GetTime() - nMaxTipAge);
+    bool state = (chainActive.Height() < pindexBestHeader.load()->nHeight - 24 * 6 ||
+                  std::max(chainActive.Tip()->GetBlockTime(), pindexBestHeader.load()->GetBlockTime()) <
+                      GetTime() - nMaxTipAge);
     if (!state)
         fInitialSyncComplete = true;
     fIsInitialBlockDownload.store(state);
@@ -1368,14 +1368,14 @@ bool IsInitialBlockDownload() { return fIsInitialBlockDownload.load(); }
 void IsChainNearlySyncdInit()
 {
     LOCK(cs_main);
-    if (!pindexBestHeader)
+    if (!pindexBestHeader.load())
     {
         // Not nearly synced if we don't have any blocks!
         fIsChainNearlySyncd.store(false);
     }
     else
     {
-        if (chainActive.Height() < pindexBestHeader->nHeight - 2)
+        if (chainActive.Height() < pindexBestHeader.load()->nHeight - 2)
             fIsChainNearlySyncd.store(false);
         else
             fIsChainNearlySyncd.store(true);
@@ -1385,6 +1385,11 @@ void IsChainNearlySyncdInit()
 bool IsChainNearlySyncd() { return fIsChainNearlySyncd.load(); }
 // Used for unit tests to artificially set the state of chain sync
 void IsChainNearlySyncdSet(bool fSync) { fIsChainNearlySyncd.store(fSync); }
+bool IsChainSyncd()
+{
+    // lock free since both are atomics
+    return pindexBestHeader.load() == chainActive.Tip();
+}
 uint64_t LargestBlockSeen(uint64_t nBlockSize)
 {
     // C++98 lacks the capability to do static initialization properly
@@ -1998,7 +2003,7 @@ UniValue validatechainhistory(const UniValue &params, bool fHelp)
                             "\nUpdates a chain's valid/invalid status based on parent blocks.\n");
 
     std::stack<CBlockIndex *> stk;
-    CBlockIndex *pos = pindexBestHeader;
+    CBlockIndex *pos = pindexBestHeader.load();
     bool failedChain = false;
     UniValue ret = NullUniValue;
 
