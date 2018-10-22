@@ -2447,14 +2447,7 @@ bool ConnectBlock(const CBlock &block,
     if (IsNov152018Scheduled())
     {
         // pindex-pprev != null because pindex is not genesis block (or fn would have returned above)
-        if (IsNov152018Enabled(chainparams.GetConsensus(), pindex->pprev))
-        {
-            canonical = true;
-        }
-        else
-        {
-            canonical = false;
-        }
+        canonical = IsNov152018Enabled(chainparams.GetConsensus(), pindex->pprev);
     }
 
     if (canonical)
@@ -2750,17 +2743,9 @@ void UpdateTip(CBlockIndex *pindexNew)
         CheckAndAlertUnknownVersionbits(chainParams, chainActive.Tip());
     }
 
-    if (IsNov152018Scheduled()) // Set the global variables based on the fork state of the NEXT block
-    {
-        if (IsNov152018Enabled(chainParams.GetConsensus(), pindexNew))
-        {
-            enableCanonicalTxOrder = true;
-        }
-        else
-        {
-            enableCanonicalTxOrder = false;
-        }
-    }
+    // Set the global variables based on the fork state of the NEXT block
+    enableCanonicalTxOrder = IsNov152018Scheduled() && IsNov152018Enabled(chainParams.GetConsensus(), pindexNew);
+
     if (IsSv2018Scheduled())
     {
         if (IsSv2018Enabled(chainParams.GetConsensus(), pindexNew))
