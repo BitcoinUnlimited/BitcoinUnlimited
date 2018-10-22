@@ -293,6 +293,17 @@ UniValue mempoolToJSON(bool fVerbose = false)
     }
 }
 
+UniValue orphanpoolToJSON()
+{
+    vector<uint256> vHashes;
+    orphanpool.QueryHashes(vHashes);
+
+    UniValue a(UniValue::VARR);
+    for (const uint256 &hash : vHashes)
+        a.push_back(hash.ToString());
+
+    return a;
+}
 UniValue getrawmempool(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() > 1)
@@ -322,6 +333,22 @@ UniValue getrawmempool(const UniValue &params, bool fHelp)
         fVerbose = params[0].get_bool();
 
     return mempoolToJSON(fVerbose);
+}
+
+UniValue getraworphanpool(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() > 0)
+        throw runtime_error("getraworphanpool\n"
+                            "\nReturns all transaction ids in orphan pool as a json array of string transaction ids.\n"
+                            "\nResult:\n"
+                            "[                     (json array of string)\n"
+                            "  \"transactionid\"     (string) The transaction id\n"
+                            "  ,...\n"
+                            "]\n"
+                            "\nExamples\n" +
+                            HelpExampleCli("getraworphanpool", "") + HelpExampleRpc("getraworphanpool", ""));
+
+    return orphanpoolToJSON();
 }
 
 UniValue getmempoolancestors(const UniValue &params, bool fHelp)
@@ -1516,8 +1543,9 @@ static const CRPCCommand commands[] = {
     {"blockchain", "getmempooldescendants", &getmempooldescendants, true},
     {"blockchain", "getmempoolentry", &getmempoolentry, true}, {"blockchain", "getmempoolinfo", &getmempoolinfo, true},
     {"blockchain", "getorphanpoolinfo", &getorphanpoolinfo, true},
-    {"blockchain", "getrawmempool", &getrawmempool, true}, {"blockchain", "gettxout", &gettxout, true},
-    {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true}, {"blockchain", "verifychain", &verifychain, true},
+    {"blockchain", "getrawmempool", &getrawmempool, true}, {"blockchain", "getraworphanpool", &getraworphanpool, true},
+    {"blockchain", "gettxout", &gettxout, true}, {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true},
+    {"blockchain", "verifychain", &verifychain, true},
 
     /* Not shown in help */
     {"hidden", "invalidateblock", &invalidateblock, true}, {"hidden", "reconsiderblock", &reconsiderblock, true},
