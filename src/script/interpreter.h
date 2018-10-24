@@ -204,12 +204,14 @@ public:
 bool EvalScript(std::vector<std::vector<unsigned char> > &stack,
     const CScript &script,
     unsigned int flags,
+    unsigned int maxOps,
     const BaseSignatureChecker &checker,
     ScriptError *error = NULL,
     unsigned char *sighashtype = NULL);
 bool VerifyScript(const CScript &scriptSig,
     const CScript &scriptPubKey,
     unsigned int flags,
+    unsigned int maxOps,
     const BaseSignatureChecker &checker,
     ScriptError *error = NULL,
     unsigned char *sighashtype = NULL);

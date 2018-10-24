@@ -876,6 +876,7 @@ bool CheckInputs(const CTransaction &tx,
     const CCoinsViewCache &inputs,
     bool fScriptChecks,
     unsigned int flags,
+    unsigned int maxOps,
     bool cacheStore,
     ValidationResourceTracker *resourceTracker,
     std::vector<CScriptCheck> *pvChecks,
@@ -920,7 +921,7 @@ bool CheckInputs(const CTransaction &tx,
                 const CAmount amount = coin->out.nValue;
 
                 // Verify signature
-                CScriptCheck check(resourceTracker, scriptPubKey, amount, tx, i, flags, cacheStore);
+                CScriptCheck check(resourceTracker, scriptPubKey, amount, tx, i, flags, maxOps, cacheStore);
                 if (pvChecks)
                 {
                     pvChecks->push_back(CScriptCheck());
@@ -938,7 +939,7 @@ bool CheckInputs(const CTransaction &tx,
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
                         CScriptCheck check2(nullptr, scriptPubKey, amount, tx, i,
-                            (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS), cacheStore);
+                            (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS), maxOps, cacheStore);
                         if (check2())
                             return state.Invalid(
                                 false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
@@ -1772,6 +1773,11 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_VERIFY_CLEANSTACK;
         flags |= SCRIPT_ENABLE_CHECKDATASIG;
     }
+    // The SV Nov 15, 2018 HF rules
+    if (IsSv2018Scheduled() && IsSv2018Enabled(consensusparams, pindex->pprev))
+    {
+        flags |= SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES;
+    }
 
     return flags;
 }
@@ -2134,8 +2140,8 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                         std::vector<CScriptCheck> vChecks;
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
-                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, fCacheResults, &resourceTracker,
-                                PV->ThreadCount() ? &vChecks : NULL))
+                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
+                                &resourceTracker, PV->ThreadCount() ? &vChecks : NULL))
                         {
                             return error("ConnectBlockDTOR(): CheckInputs on %s failed with %s",
                                 tx.GetHash().ToString(), FormatStateMessage(state));
@@ -2373,8 +2379,8 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                         std::vector<CScriptCheck> vChecks;
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
-                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, fCacheResults, &resourceTracker,
-                                PV->ThreadCount() ? &vChecks : NULL))
+                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
+                                &resourceTracker, PV->ThreadCount() ? &vChecks : NULL))
                         {
                             return error("ConnectBlock(): CheckInputs on %s failed with %s", tx.GetHash().ToString(),
                                 FormatStateMessage(state));
@@ -2820,6 +2826,19 @@ void UpdateTip(CBlockIndex *pindexNew)
             enableCanonicalTxOrder = false;
         }
     }
+    if (IsSv2018Scheduled())
+    {
+        if (IsSv2018Enabled(chainParams.GetConsensus(), pindexNew))
+        {
+            maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
+            excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
+        }
+        else // if blockchain reorg we may need to back it out
+        {
+            maxScriptOps = MAX_OPS_PER_SCRIPT;
+            excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
+        }
+    }
 }
 
 /** Disconnect chainActive's tip. You probably want to call mempool.removeForReorg and manually re-limit mempool size
@@ -2854,6 +2873,14 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     {
         if (IsNov152018Enabled(consensusParams, pindexDelete) &&
             !IsNov152018Enabled(consensusParams, pindexDelete->pprev))
+        {
+            mempool.clear();
+        }
+    }
+    // Same if we undid the SV hard fork
+    if (IsSv2018Scheduled())
+    {
+        if (IsSv2018Enabled(consensusParams, pindexDelete) && !IsSv2018Enabled(consensusParams, pindexDelete->pprev))
         {
             mempool.clear();
         }

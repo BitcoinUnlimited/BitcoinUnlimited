@@ -424,6 +424,19 @@ void UnlimitedSetup(void)
     excessiveAcceptDepth = GetArg("-excessiveacceptdepth", excessiveAcceptDepth);
     LoadTweaks(); // The above options are deprecated so the same parameter defined as a tweak will override them
 
+    // If the user configures it to 1, assume this means default
+    if (miningForkTime.Value() == 1)
+        miningForkTime = Params().GetConsensus().nov2018ActivationTime;
+    if (miningSvForkTime.Value() == 1)
+        miningSvForkTime = Params().GetConsensus().nov2018ActivationTime;
+
+    if (miningForkTime.Value() != 0 && miningSvForkTime.Value() != 0)
+    {
+        LOGA("Both the SV and ABC forks are enabled.  You must choose one.");
+        printf("Both the SV and ABC forks are enabled.  You must choose one.\n");
+        exit(1);
+    }
+
     if (maxGeneratedBlock > excessiveBlockSize)
     {
         LOGA("Reducing the maximum mined block from the configured %d to your excessive block size %d.  Otherwise "

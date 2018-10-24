@@ -604,6 +604,7 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
 bool EvalScript(vector<vector<unsigned char> > &stack,
     const CScript &script,
     unsigned int flags,
+    unsigned int maxOps,
     const BaseSignatureChecker &checker,
     ScriptError *serror,
     unsigned char *sighashtype)
@@ -629,7 +630,7 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
     if (script.size() > MAX_SCRIPT_SIZE)
         return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
-    int nOpCount = 0;
+    unsigned int nOpCount = 0;
     bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
     try
     {
@@ -646,7 +647,7 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                 return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
 
             // Note how OP_RESERVED does not count towards the opcode limit.
-            if (opcode > OP_16 && ++nOpCount > MAX_OPS_PER_SCRIPT)
+            if (opcode > OP_16 && ++nOpCount > maxOps)
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
 
             // Some opcodes are disabled.
@@ -1116,6 +1117,21 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                 }
                 break;
 
+                case OP_INVERT:
+                {
+                    // (x -- out)
+                    if (stack.size() < 1)
+                    {
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                    }
+                    valtype &vch1 = stacktop(-1);
+                    // To avoid allocating, we modify vch1 in place
+                    for (size_t i = 0; i < vch1.size(); i++)
+                    {
+                        vch1[i] = ~vch1[i];
+                    }
+                }
+                break;
 
                 case OP_LSHIFT:
                 {
@@ -1156,22 +1172,6 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                     popstack(stack);
                     popstack(stack);
                     stack.push_back(RShift(vch1, n.getint()));
-                }
-                break;
-
-                case OP_INVERT:
-                {
-                    // (x -- out)
-                    if (stack.size() < 1)
-                    {
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                    }
-                    valtype &vch1 = stacktop(-1);
-                    // To avoid allocating, we modify vch1 in place
-                    for (size_t i = 0; i < vch1.size(); i++)
-                    {
-                        vch1[i] = ~vch1[i];
-                    }
                 }
                 break;
 
@@ -1469,7 +1469,7 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                     if (nKeysCount < 0 || nKeysCount > MAX_PUBKEYS_PER_MULTISIG)
                         return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
                     nOpCount += nKeysCount;
-                    if (nOpCount > MAX_OPS_PER_SCRIPT)
+                    if (nOpCount > maxOps)
                         return set_error(serror, SCRIPT_ERR_OP_COUNT);
                     int ikey = ++i;
                     // ikey2 is the position of last non-signature item in the stack. Top stack item = 1.
@@ -1910,6 +1910,7 @@ bool TransactionSignatureChecker::CheckSequence(const CScriptNum &nSequence) con
 bool VerifyScript(const CScript &scriptSig,
     const CScript &scriptPubKey,
     unsigned int flags,
+    unsigned int maxOps,
     const BaseSignatureChecker &checker,
     ScriptError *serror,
     unsigned char *sighashtype)
@@ -1922,12 +1923,12 @@ bool VerifyScript(const CScript &scriptSig,
     }
 
     vector<vector<unsigned char> > stack, stackCopy;
-    if (!EvalScript(stack, scriptSig, flags, checker, serror, sighashtype))
+    if (!EvalScript(stack, scriptSig, flags, maxOps, checker, serror, sighashtype))
         // serror is set
         return false;
     if (flags & SCRIPT_VERIFY_P2SH)
         stackCopy = stack;
-    if (!EvalScript(stack, scriptPubKey, flags, checker, serror, sighashtype))
+    if (!EvalScript(stack, scriptPubKey, flags, maxOps, checker, serror, sighashtype))
         // serror is set
         return false;
     if (stack.empty())
@@ -1954,7 +1955,7 @@ bool VerifyScript(const CScript &scriptSig,
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         popstack(stack);
 
-        if (!EvalScript(stack, pubKey2, flags, checker, serror, sighashtype))
+        if (!EvalScript(stack, pubKey2, flags, maxOps, checker, serror, sighashtype))
             // serror is set
             return false;
         if (stack.empty())

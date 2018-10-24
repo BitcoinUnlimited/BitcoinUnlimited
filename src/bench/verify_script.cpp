@@ -84,7 +84,7 @@ static void VerifyScriptBench(benchmark::State &state)
     while (state.KeepRunning())
     {
         ScriptError err;
-        bool success = VerifyScript(txSpend.vin[0].scriptSig, txCredit.vout[0].scriptPubKey, flags,
+        bool success = VerifyScript(txSpend.vin[0].scriptSig, txCredit.vout[0].scriptPubKey, flags, MAX_OPS_PER_SCRIPT,
             MutableTransactionSignatureChecker(&txSpend, 0, txCredit.vout[0].nValue), &err);
         assert(err == SCRIPT_ERR_OK);
         assert(success);

@@ -33,7 +33,8 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack,
     {
         ScriptError err = SCRIPT_ERR_OK;
         stacktype stack{original_stack};
-        bool r = EvalScript(stack, script, flags | upgradeFlag, sigchecker, &err);
+        bool r =
+            EvalScript(stack, script, flags | upgradeFlag, MAX_OPS_PER_SCRIPT,sigchecker, &err);
         BOOST_CHECK(r);
         BOOST_CHECK(stack == expected);
 
@@ -42,7 +43,7 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack,
         if(upgradeFlag)
         {
             stack = original_stack;
-            r = EvalScript(stack, script, flags, sigchecker, &err);
+            r = EvalScript(stack, script, flags, MAX_OPS_PER_SCRIPT, sigchecker, &err);
             BOOST_CHECK(!r);
             BOOST_CHECK_EQUAL(err, SCRIPT_ERR_DISABLED_OPCODE);
         }
@@ -55,7 +56,7 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
     BaseSignatureChecker sigchecker;
     ScriptError err = SCRIPT_ERR_OK;
     stacktype stack{original_stack};
-    bool r = EvalScript(stack, script, flags | upgradeFlag, sigchecker, &err);
+    bool r = EvalScript(stack, script, flags | upgradeFlag, MAX_OPS_PER_SCRIPT,sigchecker, &err);
     BOOST_CHECK(!r);
     BOOST_CHECK_EQUAL(err, expected_error);
 
@@ -64,7 +65,7 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
     if(upgradeFlag)
     {
         stack = original_stack;
-        r = EvalScript(stack, script, flags, sigchecker, &err);
+        r = EvalScript(stack, script, flags, MAX_OPS_PER_SCRIPT, sigchecker, &err);
         BOOST_CHECK(!r);
         BOOST_CHECK_EQUAL(err, SCRIPT_ERR_DISABLED_OPCODE);
     }

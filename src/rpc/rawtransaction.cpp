@@ -884,6 +884,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             }
             ScriptError serror = SCRIPT_ERR_OK;
             if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_SIGHASH_FORKID,
+                    maxScriptOps.Value(),
                     MutableTransactionSignatureChecker(&mergedTx, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID), &serror))
             {
                 TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
@@ -898,7 +899,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
                     txin.scriptSig, txv.vin[i].scriptSig);
             }
             ScriptError serror = SCRIPT_ERR_OK;
-            if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS,
+            if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, maxScriptOps.Value(),
                     MutableTransactionSignatureChecker(&mergedTx, i, amount, 0), &serror))
             {
                 TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));

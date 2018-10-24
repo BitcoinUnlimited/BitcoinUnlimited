@@ -149,8 +149,9 @@ bool ProduceSignature(const BaseSignatureCreator &creator, const CScript &fromPu
     }
 
     // Test solution
-    return VerifyScript(
-        scriptSig, fromPubKey, STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_SIGHASH_FORKID, creator.Checker());
+    // We can hard-code maxOps because this client has not templates capable of producing and signing longer scripts.
+    return VerifyScript(scriptSig, fromPubKey, STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_SIGHASH_FORKID,
+        MAX_OPS_PER_SCRIPT, creator.Checker());
 }
 
 bool SignSignature(const CKeyStore &keystore,
@@ -311,9 +312,11 @@ CScript CombineSignatures(const CScript &scriptPubKey,
     Solver(scriptPubKey, txType, vSolutions);
 
     vector<valtype> stack1;
-    EvalScript(stack1, scriptSig1, SCRIPT_VERIFY_STRICTENC, BaseSignatureChecker());
+    // scriptSig should have no ops in them, only data pushes.  Send MAX_OPS_PER_SCRIPT to mirror existing
+    // behavior exactly.
+    EvalScript(stack1, scriptSig1, SCRIPT_VERIFY_STRICTENC, MAX_OPS_PER_SCRIPT, BaseSignatureChecker());
     vector<valtype> stack2;
-    EvalScript(stack2, scriptSig2, SCRIPT_VERIFY_STRICTENC, BaseSignatureChecker());
+    EvalScript(stack2, scriptSig2, SCRIPT_VERIFY_STRICTENC, MAX_OPS_PER_SCRIPT, BaseSignatureChecker());
 
     return CombineSignatures(scriptPubKey, checker, txType, vSolutions, stack1, stack2);
 }
