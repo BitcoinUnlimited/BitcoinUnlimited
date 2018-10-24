@@ -220,6 +220,30 @@ std::string Bip135VoteValidator(const std::string &value, std::string *item, boo
     return std::string();
 }
 
+// Ensure that only one fork can be active at a time, update the UA string, and convert values of 1 to the
+// fork time default.
+std::string ForkValidator(const uint64_t &value, CTweak<uint64_t> *item, bool validate)
+{
+    if (validate)
+    {
+        if (value != 0 && ((item == &miningForkTime && miningSvForkTime.Value() != 0) ||
+                              (item == &miningSvForkTime && miningForkTime.Value() != 0)))
+        {
+            std::ostringstream ret;
+            ret << "Only one fork can be enabled at a time";
+            return ret.str();
+        }
+    }
+    else // If it was just turned "on" then set to the default activation time.
+    {
+        if (item->Value() == 1)
+        {
+            *item = Params().GetConsensus().nov2018ActivationTime;
+        }
+        settingsToUserAgentString();
+    }
+    return std::string();
+}
 
 // Push all transactions in the mempool to another node
 void UnlimitedPushTxns(CNode *dest);
@@ -398,6 +422,10 @@ void settingsToUserAgentString()
 {
     BUComments.clear();
 
+    std::string flavor;
+    if (miningSvForkTime.Value() != 0)
+        BUComments.push_back("SV");
+
     std::stringstream ebss;
     ebss << (excessiveBlockSize / 100000);
     std::string eb = ebss.str();
@@ -423,6 +451,19 @@ void UnlimitedSetup(void)
     excessiveBlockSize = GetArg("-excessiveblocksize", excessiveBlockSize);
     excessiveAcceptDepth = GetArg("-excessiveacceptdepth", excessiveAcceptDepth);
     LoadTweaks(); // The above options are deprecated so the same parameter defined as a tweak will override them
+
+    // If the user configures it to 1, assume this means default
+    if (miningForkTime.Value() == 1)
+        miningForkTime = Params().GetConsensus().nov2018ActivationTime;
+    if (miningSvForkTime.Value() == 1)
+        miningSvForkTime = Params().GetConsensus().nov2018ActivationTime;
+
+    if (miningForkTime.Value() != 0 && miningSvForkTime.Value() != 0)
+    {
+        LOGA("Both the SV and ABC forks are enabled.  You must choose one.");
+        printf("Both the SV and ABC forks are enabled.  You must choose one.\n");
+        exit(1);
+    }
 
     if (maxGeneratedBlock > excessiveBlockSize)
     {
@@ -1393,9 +1434,9 @@ bool TestConservativeBlockValidity(CValidationState &state,
     // NOTE: CheckBlockHeader is called by CheckBlock
     if (!ContextualCheckBlockHeader(block, state, pindexPrev))
         return false;
-    if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot, true))
+    if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot))
         return false;
-    if (!ContextualCheckBlock(block, state, pindexPrev))
+    if (!ContextualCheckBlock(block, state, pindexPrev, true))
         return false;
     if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true))
         return false;

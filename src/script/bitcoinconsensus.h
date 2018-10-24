@@ -60,6 +60,7 @@ EXPORT_SYMBOL int bitcoinconsensus_verify_script(const unsigned char *scriptPubK
     unsigned int txToLen,
     unsigned int nIn,
     unsigned int flags,
+    unsigned int maxOps,
     bitcoinconsensus_error *err);
 
 EXPORT_SYMBOL unsigned int bitcoinconsensus_version();

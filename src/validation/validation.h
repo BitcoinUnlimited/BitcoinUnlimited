@@ -59,6 +59,7 @@ bool CheckInputs(const CTransaction &tx,
     const CCoinsViewCache &view,
     bool fScriptChecks,
     unsigned int flags,
+    unsigned int maxOps,
     bool cacheStore,
     ValidationResourceTracker *resourceTracker,
     std::vector<CScriptCheck> *pvChecks = nullptr,
@@ -107,14 +108,13 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
 void InvalidChainFound(CBlockIndex *pindexNew);
 
 /** Context-dependent validity block checks */
-bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIndex *pindexPrev);
+bool ContextualCheckBlock(const CBlock &block,
+    CValidationState &state,
+    CBlockIndex *pindexPrev,
+    const bool fConservative = false);
 
 // BU: returns the blocksize if block is valid.  Otherwise 0
-bool CheckBlock(const CBlock &block,
-    CValidationState &state,
-    bool fCheckPOW = true,
-    bool fCheckMerkleRoot = true,
-    bool conservative = false);
+bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
 
 /** Mark a block as having its data received and checked (up to BLOCK_VALID_TRANSACTIONS). */
 bool ReceivedBlockTransactions(const CBlock &block,

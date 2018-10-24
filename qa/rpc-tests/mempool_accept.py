@@ -212,6 +212,7 @@ class MyTest (BitcoinTestFramework):
     def conflictTest(self, dests0, dests1, wallet, numNodes=2):
         """Tests issuing a bunch of conflicting transactions.  Expects that you give it a wallet with lots of free UTXO, and nothing in the mempool
         """
+        logging.info("conflict test")
         assert(self.nodes[0].getmempoolinfo()["size"] == 0)  # Expects a clean mempool
         if 1:  # test many conflicts
             NTX = 50
@@ -227,7 +228,7 @@ class MyTest (BitcoinTestFramework):
 
             for n in self.nodes:
                 waitFor(30, lambda: True if n.getmempoolinfo()["size"] >= NTX - 5 else None)
-            time.sleep(5)
+            time.sleep(1)
             # we have to allow < because bloom filter false positives in the node's
             # sending logic may cause it to not get an INV
             for n in self.nodes:
@@ -235,7 +236,7 @@ class MyTest (BitcoinTestFramework):
             self.commitMempool()  # clear out this test
 
         if 1:  # test 2 conflicting transactions
-            NTX = 100
+            NTX = 25
             wallet2 = []
             gtx2 = []
             amt = createTx(dests0, wallet[0:NTX], 1, NTX, 1, wallet2, gtx2)
@@ -259,7 +260,7 @@ class MyTest (BitcoinTestFramework):
 
             waitFor(30, lambda: True if self.nodes[0].getmempoolinfo()["size"] >= NTX else None)
             waitFor(30, lambda: True if self.nodes[1].getmempoolinfo()["size"] >= NTX else None)
-            time.sleep(4)  # see if any conflicts will be added to the mempool
+            time.sleep(2)  # see if any conflicts will be added to the mempool
 
             assert(self.nodes[0].getmempoolinfo()["size"] == NTX)
             assert(self.nodes[1].getmempoolinfo()["size"] == NTX)
@@ -267,7 +268,7 @@ class MyTest (BitcoinTestFramework):
             NTX1 = NTX
 
             # test conflicting tx sent to different nodes
-            NTX = 200
+            NTX = 50
             wallet2 = []
             gtx2 = []
             amt = createTx(dests0, wallet[0:NTX], 1, NTX, 1, wallet2, gtx2)
@@ -294,13 +295,13 @@ class MyTest (BitcoinTestFramework):
             # complete
             waitFor(30, lambda: True if self.nodes[0].getmempoolinfo()["size"] >= NTX + NTX1 else None)
             waitFor(30, lambda: True if self.nodes[1].getmempoolinfo()["size"] >= NTX + NTX1 else None)
-
-            time.sleep(4)  # see if any conflicts will be added to the mempool
+            time.sleep(2)  # see if any conflicts will be added to the mempool
             assert(self.nodes[0].getmempoolinfo()["size"] == NTX + NTX1)
             assert(self.nodes[1].getmempoolinfo()["size"] == NTX + NTX1)
 
             # forget about the tx I used
             wallet = wallet[NTX:]
+            logging.info("conflict test done")
 
     def commitMempool(self):
         """Commit all the tx in mempools on all nodes into blocks"""
@@ -313,7 +314,7 @@ class MyTest (BitcoinTestFramework):
         decContext = decimal.getcontext().prec
         decimal.getcontext().prec = 8 + 8  # 8 digits to get to 21million, and each bitcoin is 100 million satoshis
 
-        self.nodes[0].generate(200)
+        self.nodes[0].generate(152)
         self.sync_blocks()
 
         # Get some addresses
@@ -321,7 +322,7 @@ class MyTest (BitcoinTestFramework):
         dests0 = [PayDest(self.nodes[0]) for x in range(20)]
 
         # Create 51 transaction and ensure that they get synced
-        NTX = 101
+        NTX = 51
         (amt, wallet) = self.threadedCreateTx(dests1, None, 0, NTX)
         assert(amt == NTX)
         waitFor(10, lambda: True if self.nodes[0].getmempoolinfo()["size"] >= NTX else None)
@@ -336,7 +337,7 @@ class MyTest (BitcoinTestFramework):
         self.commitMempool()
 
         # Create 500 transaction and ensure that they get synced
-        NTX = 500
+        NTX = 500 if self.bigTest else 100
         start = time.monotonic()
         (amt, wallet) = self.threadedCreateTx(dests0, wallet, 1, NTX)
         end = time.monotonic()
@@ -392,24 +393,25 @@ class MyTest (BitcoinTestFramework):
         end = time.monotonic()
         logging.info("synced %d tx in %s seconds.  Speed %f tx/sec" % (NTX, end - start, float(NTX) / (end - start)))
 
-        # Start up node 4
-        self.nodes.append(start_node(3, self.options.tmpdir))
-        connect_nodes_bi(self.nodes, 0, 3)
-        connect_nodes_bi(self.nodes, 1, 3)
-        connect_nodes_bi(self.nodes, 2, 3)
-        sync_blocks(self.nodes)
+        if self.bigTest:
+            # Start up node 4
+            self.nodes.append(start_node(3, self.options.tmpdir))
+            connect_nodes_bi(self.nodes, 0, 3)
+            connect_nodes_bi(self.nodes, 1, 3)
+            connect_nodes_bi(self.nodes, 2, 3)
+            sync_blocks(self.nodes)
 
-        # Push all tx to node 4 from many nodes
-        destName = "127.0.0.1:" + str(p2p_port(3))
+            # Push all tx to node 4 from many nodes
+            destName = "127.0.0.1:" + str(p2p_port(3))
 
-        start = time.monotonic()
-        self.nodes[0].pushtx(destName)
-        self.nodes[1].pushtx(destName)
-        self.nodes[2].pushtx(destName)
-        mp = waitFor(120, lambda: [x.getmempoolinfo() for x in self.nodes]
-                     if NTX - self.nodes[3].getmempoolinfo()["size"] < 30 else None)
-        end = time.monotonic()
-        logging.info("synced %d tx in %s seconds.  Speed %f tx/sec" % (NTX, end - start, float(NTX) / (end - start)))
+            start = time.monotonic()
+            self.nodes[0].pushtx(destName)
+            self.nodes[1].pushtx(destName)
+            self.nodes[2].pushtx(destName)
+            mp = waitFor(120, lambda: [x.getmempoolinfo() for x in self.nodes]
+                         if NTX - self.nodes[3].getmempoolinfo()["size"] < 30 else None)
+            end = time.monotonic()
+            logging.info("synced %d tx in %s seconds.  Speed %f tx/sec" % (NTX, end - start, float(NTX) / (end - start)))
 
 
 if __name__ == '__main__':

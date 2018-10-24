@@ -55,7 +55,7 @@ class WalletTest (BitcoinTestFramework):
         connect_nodes_bi(self.nodes,1,2)
         connect_nodes_bi(self.nodes,0,2)
         self.is_network_split=False
-        self.sync_all()
+        self.sync_blocks()
 
     def run_test (self):
 
@@ -72,9 +72,9 @@ class WalletTest (BitcoinTestFramework):
         assert_equal(walletinfo['immature_balance'], 50)
         assert_equal(walletinfo['balance'], 0)
 
-        self.sync_all()
+        self.sync_blocks()
         self.nodes[1].generate(101)
-        self.sync_all()
+        self.sync_blocks()
 
         assert_equal(self.nodes[0].getbalance(), 50)
         assert_equal(self.nodes[1].getbalance(), 50)

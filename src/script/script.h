@@ -25,6 +25,8 @@ static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520;
 
 // Maximum number of non-push operations per script
 static const int MAX_OPS_PER_SCRIPT = 201;
+static const int SV_MAX_OPS_PER_SCRIPT = 500;
+
 
 // Maximum number of public keys per multisig
 static const int MAX_PUBKEYS_PER_MULTISIG = 20;
@@ -248,7 +250,6 @@ public:
     inline bool operator<(const int64_t &rhs) const { return m_value < rhs; }
     inline bool operator>=(const int64_t &rhs) const { return m_value >= rhs; }
     inline bool operator>(const int64_t &rhs) const { return m_value > rhs; }
-
     inline bool operator==(const CScriptNum &rhs) const { return operator==(rhs.m_value); }
     inline bool operator!=(const CScriptNum &rhs) const { return operator!=(rhs.m_value); }
     inline bool operator<=(const CScriptNum &rhs) const { return operator<=(rhs.m_value); }
@@ -261,12 +262,8 @@ public:
     inline CScriptNum operator-(const CScriptNum &rhs) const { return operator-(rhs.m_value); }
     inline CScriptNum operator/(const int64_t &rhs) const { return CScriptNum(m_value / rhs); }
     inline CScriptNum operator/(const CScriptNum &rhs) const { return operator/(rhs.m_value); }
-    inline CScriptNum operator*(const int64_t &rhs) const {
-        return CScriptNum(m_value * rhs);
-    }
-    inline CScriptNum operator*(const CScriptNum &rhs) const {
-        return operator*(rhs.m_value);
-    }
+    inline CScriptNum operator*(const int64_t &rhs) const { return CScriptNum(m_value * rhs); }
+    inline CScriptNum operator*(const CScriptNum &rhs) const { return operator*(rhs.m_value); }
     inline CScriptNum operator%(const int64_t &rhs) const { return CScriptNum(m_value % rhs); }
     inline CScriptNum operator%(const CScriptNum &rhs) const { return operator%(rhs.m_value); }
     inline CScriptNum &operator+=(const CScriptNum &rhs) { return operator+=(rhs.m_value); }

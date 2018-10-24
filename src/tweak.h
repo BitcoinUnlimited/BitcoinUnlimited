@@ -23,7 +23,7 @@ extern CTweakMap tweaks;
 class CTweakBase
 {
 public:
-    mutable std::mutex cs_tweak;
+    mutable std::recursive_mutex cs_tweak;
 
     CTweakBase(){};
     virtual std::string GetName() const = 0; // Returns the name of this statistic
@@ -101,11 +101,6 @@ inline void fill(const UniValue &v, bool &output)
 template <class DataType>
 class CTweakRef : public CTweakBase
 {
-private:
-    const std::string name;
-    const std::string help;
-    DataType *value;
-
 public:
     // Validation and assignment notification function.
     // If "validate" is true, then return nonempty error string if this field
@@ -116,8 +111,13 @@ public:
     // want to give some kind of ACK message to the user.
     typedef std::string (*EventFn)(const DataType &value, DataType *item, bool validate);
 
+protected:
+    const std::string name;
+    const std::string help;
+    DataType *value;
     EventFn eventCb;
 
+public:
     ~CTweakRef()
     {
         if (name.size())
@@ -140,12 +140,12 @@ public:
     virtual std::string GetHelp() const { return help; }
     virtual UniValue Get() const
     {
-        std::lock_guard<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::recursive_mutex> lck(cs_tweak);
         return UniValue(*value);
     }
     virtual std::string Validate(const UniValue &val)
     {
-        std::lock_guard<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::recursive_mutex> lck(cs_tweak);
         if (eventCb)
         {
             DataType candidate;
@@ -159,7 +159,7 @@ public:
 
     virtual UniValue Set(const UniValue &v) // Returns NullUnivalue or an error string
     {
-        std::lock_guard<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::recursive_mutex> lck(cs_tweak);
         DataType prior = *value;
         fill(v, *value);
         if (eventCb)
@@ -173,13 +173,13 @@ public:
 
     virtual DataType Value() const
     {
-        std::lock_guard<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::recursive_mutex> lck(cs_tweak);
         return *value;
     }
 
     CTweakRef &operator=(const DataType &d)
     {
-        std::lock_guard<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::recursive_mutex> lck(cs_tweak);
         if (value)
             *value = d;
         return *this;
@@ -192,10 +192,21 @@ public:
 template <class DataType>
 class CTweak : public CTweakBase
 {
-private:
+public:
+    // Validation and assignment notification function.
+    // If "validate" is true, then return nonempty error string if this field
+    // can't be set to this value (value parameter contains the candidate
+    // value).
+    // If "validate" is false, this is a notification that this item has been set
+    // (value parameter contains the old value).  You can return a string if you
+    // want to give some kind of ACK message to the user.
+    typedef std::string (*EventFn)(const DataType &value, CTweak<DataType> *item, bool validate);
+
+protected:
     const std::string name;
     const std::string help;
     DataType value;
+    EventFn eventCb;
 
 public:
     ~CTweak()
@@ -204,13 +215,14 @@ public:
             tweaks.erase(CTweakKey(name));
     }
 
-    CTweak(const char *namep, const char *helpp, DataType v = DataType()) : name(namep), help(helpp), value(v)
+    CTweak(const char *namep, const char *helpp, DataType v = DataType(), EventFn callback = nullptr)
+        : name(namep), help(helpp), value(v), eventCb(callback)
     {
         tweaks[CTweakKey(name)] = this;
     }
 
-    CTweak(const std::string &namep, const std::string &helpp, DataType v = DataType())
-        : name(namep), help(helpp), value(v)
+    CTweak(const std::string &namep, const std::string &helpp, DataType v = DataType(), EventFn callback = nullptr)
+        : name(namep), help(helpp), value(v), eventCb(callback)
     {
         tweaks[CTweakKey(name)] = this;
     }
@@ -219,27 +231,47 @@ public:
     virtual std::string GetHelp() const { return help; }
     virtual UniValue Get() const
     {
-        std::lock_guard<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::recursive_mutex> lck(cs_tweak);
         return UniValue(value);
     }
-    virtual UniValue Set(const UniValue &v)
-    {
-        std::lock_guard<std::mutex> lck(cs_tweak);
-        fill(v, value);
 
-        // Returns NullUnivalue or an error string
+    virtual UniValue Set(const UniValue &v) // Returns NullUnivalue or an error string
+    {
+        std::lock_guard<std::recursive_mutex> lck(cs_tweak);
+        DataType prior = value;
+        fill(v, value);
+        if (eventCb)
+        {
+            std::string result = eventCb(prior, this, false);
+            if (!result.empty())
+                return UniValue(result);
+        }
         return NullUniValue;
     }
 
+    virtual std::string Validate(const UniValue &val)
+    {
+        std::lock_guard<std::recursive_mutex> lck(cs_tweak);
+        if (eventCb)
+        {
+            DataType candidate;
+            fill(val, candidate);
+            std::string result = eventCb(candidate, this, true);
+            if (!result.empty())
+                return result;
+        }
+        return std::string();
+    };
+
     virtual DataType Value() const
     {
-        std::lock_guard<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::recursive_mutex> lck(cs_tweak);
         return value;
     }
 
     CTweak &operator=(const DataType &d)
     {
-        std::lock_guard<std::mutex> lck(cs_tweak);
+        std::lock_guard<std::recursive_mutex> lck(cs_tweak);
         value = d;
         return *this;
     }

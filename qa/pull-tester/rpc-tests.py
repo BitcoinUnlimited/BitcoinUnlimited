@@ -191,7 +191,6 @@ testScripts = [ RpcTest(t) for t in [
     'notify',
     Disabled('may152018_forkactivation_1','May 2018 already activated, use it as template to test future upgrade activation'),
     Disabled('may152018_forkactivation_2','May 2018 already activated, use it as template to test future upgrade activation'),
-    'bip68-112-113-p2p',
     'validateblocktemplate',
     'parallel',
     'wallet',
@@ -218,7 +217,6 @@ testScripts = [ RpcTest(t) for t in [
     'merkle_blocks',
     'fundrawtransaction',
     'signrawtransactions',
-    'walletbackup',
     'nodehandling',
     'reindex',
     'decodescript',
@@ -238,6 +236,8 @@ testScripts = [ RpcTest(t) for t in [
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
+    'walletbackup',
+    'bip68-112-113-p2p',
     'limits',
     'weirdtx',
     'txPerf',

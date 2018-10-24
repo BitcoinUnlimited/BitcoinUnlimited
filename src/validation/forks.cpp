@@ -39,3 +39,23 @@ bool IsNov152018Next(const Consensus::Params &consensusparams, const CBlockIndex
     }
     return pindexTip->forkAtNextBlock(miningForkTime.Value());
 }
+
+
+bool IsSv2018Scheduled() { return miningSvForkTime.Value() != 0; }
+bool IsSv2018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+{
+    if (pindexTip == nullptr)
+    {
+        return false;
+    }
+    return pindexTip->IsforkActiveOnNextBlock(miningSvForkTime.Value());
+}
+
+bool IsSv2018Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+{
+    if (pindexTip == nullptr)
+    {
+        return false;
+    }
+    return pindexTip->forkAtNextBlock(miningSvForkTime.Value());
+}
