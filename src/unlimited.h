@@ -300,7 +300,6 @@ extern CTweakRef<uint64_t> miningForkTime;
 /** This specifies the MTP time of the SV fork */
 extern CTweakRef<uint64_t> miningSvForkTime;
 
-
 // Mining-Candidate start
 /** Return a Merkle root given a Coinbase hash and Merkle proof */
 uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &merkleProof);

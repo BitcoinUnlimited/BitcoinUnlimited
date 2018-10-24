@@ -34,7 +34,7 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack,
         ScriptError err = SCRIPT_ERR_OK;
         stacktype stack{original_stack};
         bool r =
-            EvalScript(stack, script, flags | upgradeFlag, MAX_OPS_PER_SCRIPT,sigchecker, &err);
+            EvalScript(stack, script, flags | upgradeFlag, MAX_OPS_PER_SCRIPT, sigchecker, &err);
         BOOST_CHECK(r);
         BOOST_CHECK(stack == expected);
 
@@ -56,7 +56,7 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
     BaseSignatureChecker sigchecker;
     ScriptError err = SCRIPT_ERR_OK;
     stacktype stack{original_stack};
-    bool r = EvalScript(stack, script, flags | upgradeFlag, MAX_OPS_PER_SCRIPT,sigchecker, &err);
+    bool r = EvalScript(stack, script, flags | upgradeFlag, MAX_OPS_PER_SCRIPT, sigchecker, &err);
     BOOST_CHECK(!r);
     BOOST_CHECK_EQUAL(err, expected_error);
 
@@ -921,22 +921,22 @@ static void CheckDivMod(const valtype &a, const valtype &b,
 
         if (flags & SCRIPT_VERIFY_MINIMALDATA) {
             CheckError(flags, {a, {0x00}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_NUMBER_BAD_ENCODING);
             CheckError(flags, {a, {0x80}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_NUMBER_BAD_ENCODING);
             CheckError(flags, {a, {0x00, 0x00}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_NUMBER_BAD_ENCODING);
             CheckError(flags, {a, {0x00, 0x80}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_NUMBER_BAD_ENCODING);
 
             CheckError(flags, {b, {0x00}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_NUMBER_BAD_ENCODING);
             CheckError(flags, {b, {0x80}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_NUMBER_BAD_ENCODING);
             CheckError(flags, {b, {0x00, 0x00}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_NUMBER_BAD_ENCODING);
             CheckError(flags, {b, {0x00, 0x80}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_NUMBER_BAD_ENCODING);
         } else {
             CheckError(flags, {a, {0x00}}, CScript() << OP_DIV,
                        SCRIPT_ERR_DIV_BY_ZERO);
@@ -991,11 +991,11 @@ BOOST_AUTO_TEST_CASE(div_and_mod_opcode_tests) {
     // CheckOps not valid numbers
     CheckDivModError(
         {{0x01, 0x02, 0x03, 0x04, 0x05}, {0x01, 0x02, 0x03, 0x04, 0x05}},
-        SCRIPT_ERR_UNKNOWN_ERROR);
+        SCRIPT_ERR_NUMBER_OVERFLOW);
     CheckDivModError({{0x01, 0x02, 0x03, 0x04, 0x05}, {0x01}},
-                     SCRIPT_ERR_UNKNOWN_ERROR);
+                     SCRIPT_ERR_NUMBER_OVERFLOW);
     CheckDivModError({{0x01, 0x05}, {0x01, 0x02, 0x03, 0x04, 0x05}},
-                     SCRIPT_ERR_UNKNOWN_ERROR);
+                     SCRIPT_ERR_NUMBER_OVERFLOW);
 
     // 0x185377af / 0x85f41b01 = -4
     // 0x185377af % 0x85f41b01 = 0x00830bab

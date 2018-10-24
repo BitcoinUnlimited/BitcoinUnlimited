@@ -10,6 +10,7 @@
 
 #include "crypto/common.h"
 #include "prevector.h"
+#include "script_error.h"
 
 #include <assert.h>
 #include <climits>
@@ -207,7 +208,8 @@ const char *GetOpName(opcodetype opcode);
 class scriptnum_error : public std::runtime_error
 {
 public:
-    explicit scriptnum_error(const std::string &str) : std::runtime_error(str) {}
+    ScriptError errNum;
+    explicit scriptnum_error(ScriptError errnum, const std::string &str) : std::runtime_error(str), errNum(errnum) {}
 };
 
 class CScriptNum
@@ -230,11 +232,11 @@ public:
     {
         if (vch.size() > nMaxNumSize)
         {
-            throw scriptnum_error("script number overflow");
+            throw scriptnum_error(SCRIPT_ERR_NUMBER_OVERFLOW, "script number overflow");
         }
         if (fRequireMinimal && !IsMinimallyEncoded(vch, nMaxNumSize))
         {
-            throw scriptnum_error("non-minimally encoded script number");
+            throw scriptnum_error(SCRIPT_ERR_NUMBER_BAD_ENCODING, "non-minimally encoded script number");
         }
         m_value = set_vch(vch);
     }
