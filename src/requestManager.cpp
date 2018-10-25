@@ -520,7 +520,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
     // but the grapheneblock timer has lapsed.
     if (IsChainNearlySyncd() && IsThinBlocksEnabled() && HaveThinblockNodes())
     {
-        if (!IsGrapheneBlockEnabled() || (IsGrapheneBlockEnabled() && !graphenedata.CheckGrapheneBlockTimer(obj.hash)))
+        if (!IsGrapheneBlockEnabled() || !graphenedata.CheckGrapheneBlockTimer(obj.hash))
         {
             if (thindata.CheckThinblockTimer(obj.hash))
             {
