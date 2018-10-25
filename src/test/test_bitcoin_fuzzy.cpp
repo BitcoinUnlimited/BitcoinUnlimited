@@ -528,7 +528,8 @@ protected:
 
         try
         {
-            gs = std::make_shared<CGrapheneSet>(nReceiverUniverseItems, itemHashes, ordered, fDeterministic);
+            gs = std::make_shared<CGrapheneSet>(
+                nReceiverUniverseItems, nReceiverUniverseItems, itemHashes, ordered, fDeterministic);
 
             while (!ds->empty())
             {

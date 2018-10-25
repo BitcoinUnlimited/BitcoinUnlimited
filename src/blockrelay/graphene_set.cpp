@@ -15,6 +15,7 @@
 #include <numeric>
 
 CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
+    uint64_t nSenderUniverseItems,
     const std::vector<uint256> &_itemHashes,
     bool _ordered,
     bool fDeterministic)
@@ -29,30 +30,37 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
 
     FastRandomContext insecure_rand(fDeterministic);
 
+    // Infer various receiver quantities
+    uint64_t nReceiverExcessItems =
+        std::min((int)nReceiverUniverseItems, std::max(0, (int)(nSenderUniverseItems - nItems)));
+    uint64_t nReceiverMissingItems = std::max(1, (int)(nItems - (nReceiverUniverseItems - nReceiverExcessItems)));
+
+    LOG(GRAPHENE, "receiver expected to have at most %d excess txs in mempool\n", nReceiverExcessItems);
+    LOG(GRAPHENE, "receiver expected to be missing at most %d txs from block\n", nReceiverMissingItems);
+
     // Optimal symmetric differences between receiver and sender IBLTs
     // This is the parameter "a" from the graphene paper
-    double optSymDiff = 1;
+    double optSymDiff = std::max(1, (int)nReceiverMissingItems);
     try
     {
-        if (nItems < nReceiverUniverseItems + 1)
-            optSymDiff = OptimalSymDiff(nItems, nReceiverUniverseItems);
+        if (nItems <= nReceiverUniverseItems + nReceiverMissingItems)
+            optSymDiff = OptimalSymDiff(nItems, nReceiverUniverseItems, nReceiverExcessItems, nReceiverMissingItems);
     }
     catch (const std::runtime_error &e)
     {
         LOG(GRAPHENE, "failed to optimize symmetric difference for graphene: %s\n", e.what());
     }
 
-    // Sender's estimate of number of items in both block and receiver mempool
-    // This is the parameter "mu" from the graphene paper
-    uint64_t nItemIntersect = std::min(nItems, nReceiverUniverseItems) - 1;
-
     // Set false positive rate for Bloom filter based on optSymDiff
     double fpr;
-    uint64_t nReceiverExcessItems = nReceiverUniverseItems - nItemIntersect;
     if (optSymDiff >= nReceiverExcessItems)
         fpr = FILTER_FPR_MAX;
     else
         fpr = optSymDiff / float(nReceiverExcessItems);
+
+    // So far we have only made room for false positives in the IBLT
+    // Make more room for missing items
+    optSymDiff += nReceiverMissingItems;
 
     // Construct Bloom filter
     pSetFilter = new CBloomFilter(
@@ -63,6 +71,8 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
     pSetIblt = new CIblt(nIbltCells);
     std::map<uint64_t, uint256> mapCheapHashes;
+
+    LOG(GRAPHENE, "constructed IBLT with %d cells\n", nIbltCells);
 
     for (const uint256 &itemHash : _itemHashes)
     {
@@ -98,7 +108,10 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
 }
 
 
-double CGrapheneSet::OptimalSymDiff(uint64_t nBlockTxs, uint64_t nReceiverPoolTx)
+double CGrapheneSet::OptimalSymDiff(uint64_t nBlockTxs,
+    uint64_t nReceiverPoolTx,
+    uint64_t nReceiverExcessTxs,
+    uint64_t nReceiverMissingTxs)
 {
     /* Optimal symmetric difference between block txs and receiver mempool txs passing
      * though filter to use for IBLT.
@@ -109,21 +122,17 @@ double CGrapheneSet::OptimalSymDiff(uint64_t nBlockTxs, uint64_t nReceiverPoolTx
      * The total size in bytes of a graphene block is given by T(a) = F(a) + L(a) as defined
      * in the code below. (Note that meta parameters for the Bloom Filter and IBLT are ignored).
      */
-    assert(nReceiverPoolTx >= nBlockTxs - 1); // Assume reciever is missing only one tx
+    assert(nReceiverExcessTxs <= nReceiverPoolTx); // Excess contained in mempool
+    assert(nReceiverMissingTxs <= nBlockTxs); // Can't be missing more txs than are in block
 
     if (nReceiverPoolTx > LARGE_MEM_POOL_SIZE)
         throw std::runtime_error("Receiver mempool is too large for optimization");
 
-    // Because we assumed the receiver is only missing only one tx
-    uint64_t nBlockAndReceiverPoolTx = nBlockTxs - 1;
+    auto fpr = [nReceiverExcessTxs](uint64_t a) {
+        if (nReceiverExcessTxs == 0)
+            return FILTER_FPR_MAX;
 
-    // Techinically there should be no symdiff here, but we need to have at least one entry in
-    // the IBLT, otherwise the Bloom filter must have fpr = 0
-    if (nReceiverPoolTx == nBlockAndReceiverPoolTx)
-        return 1;
-
-    auto fpr = [nReceiverPoolTx, nBlockAndReceiverPoolTx](uint64_t a) {
-        float _fpr = a / float(nReceiverPoolTx - nBlockAndReceiverPoolTx);
+        float _fpr = a / float(nReceiverExcessTxs);
 
         return _fpr < FILTER_FPR_MAX ? _fpr : FILTER_FPR_MAX;
     };
@@ -166,6 +175,7 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(const std::vector<uint256> &receiv
     CIblt localIblt((*pSetIblt));
     localIblt.reset();
 
+    int passedFilter = 0;
     for (const uint256 &itemHash : receiverItemHashes)
     {
         uint64_t cheapHash = itemHash.GetCheapHash();
@@ -180,8 +190,10 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(const std::vector<uint256> &receiv
         {
             receiverSet.insert(cheapHash);
             localIblt.insert(cheapHash, IBLT_NULL_VALUE);
+            passedFilter += 1;
         }
     }
+    LOG(GRAPHENE, "%d txs passed receiver Bloom filter\n", passedFilter);
 
     mapCheapHashes.clear();
     return Reconcile(receiverSet, localIblt);
@@ -203,6 +215,7 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(const std::map<uint64_t, uint256> 
             localIblt.insert(entry.first, IBLT_NULL_VALUE);
         }
     }
+
     return Reconcile(receiverSet, localIblt);
 }
 
@@ -214,6 +227,8 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(std::set<uint64_t> &receiverSet, c
 
     if (!((*pSetIblt) - localIblt).listEntries(senderHas, receiverHas))
         throw std::runtime_error("Graphene set IBLT did not decode");
+
+    LOG(GRAPHENE, "senderHas: %d, receiverHas: %d\n", senderHas.size(), receiverHas.size());
 
     // Remove false positives from receiverSet
     for (const std::pair<uint64_t, std::vector<uint8_t> > &kv : receiverHas)

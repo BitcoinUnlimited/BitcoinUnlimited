@@ -27,7 +27,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
 
 CMemPoolInfo::CMemPoolInfo(uint64_t _nTx) : nTx(_nTx) {}
 CMemPoolInfo::CMemPoolInfo() { this->nTx = 0; }
-CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx)
+CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx, uint64_t nSenderMempoolPlusBlock)
 {
     header = pblock->GetBlockHeader();
     nBlockTxs = pblock->vtx.size();
@@ -41,7 +41,7 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPool
             vAdditionalTxs.push_back(tx);
     }
 
-    pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, blockHashes, true);
+    pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, true);
 }
 
 CGrapheneBlock::~CGrapheneBlock()
@@ -1396,7 +1396,10 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
     {
         try
         {
-            CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx);
+            uint64_t nSenderMempoolPlusBlock =
+                std::max(0, (int)(GetGrapheneMempoolInfo().nTx + pblock->vtx.size() - 1)); // exclude coinbase
+
+            CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx, nSenderMempoolPlusBlock);
             int nSizeBlock = pblock->GetBlockSize();
             int nSizeGrapheneBlock = ::GetSerializeSize(grapheneBlock, SER_NETWORK, PROTOCOL_VERSION);
 
