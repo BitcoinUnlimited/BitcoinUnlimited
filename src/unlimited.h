@@ -269,6 +269,8 @@ std::string SubverValidator(const std::string &value, std::string *item, bool va
 std::string MiningBlockSizeValidator(const uint64_t &value, uint64_t *item, bool validate);
 // validator for the voting tweak
 std::string Bip135VoteValidator(const std::string &value, std::string *item, bool validate);
+// ensure that only 1 fork is active
+std::string ForkValidator(const uint64_t &value, CTweak<uint64_t> *item, bool validate);
 
 extern CTweak<unsigned int> maxTxSize;
 extern CTweak<uint64_t> blockSigopsPerMb;

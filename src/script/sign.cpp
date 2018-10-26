@@ -149,7 +149,9 @@ bool ProduceSignature(const BaseSignatureCreator &creator, const CScript &fromPu
     }
 
     // Test solution
-    // We can hard-code maxOps because this client has not templates capable of producing and signing longer scripts.
+    // We can hard-code maxOps because this client has no templates capable of producing and signing longer scripts.
+    // Additionally, while this constant is currently being raised it will eventually settle to a very high const
+    // value.  There is no reason to break layering by using the tweak only to take that out later.
     return VerifyScript(scriptSig, fromPubKey, STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_SIGHASH_FORKID,
         MAX_OPS_PER_SCRIPT, creator.Checker());
 }
