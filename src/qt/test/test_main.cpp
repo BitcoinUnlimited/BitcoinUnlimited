@@ -8,12 +8,12 @@
 #endif
 
 #include "bitcoinaddressvalidatortests.h"
-#include "guiutiltests.h"
 #include "util.h"
 #include "uritests.h"
 #include "compattests.h"
 
 #ifdef ENABLE_WALLET
+#include "guiutiltests.h"
 #include "paymentservertests.h"
 #endif
 
@@ -47,11 +47,12 @@ int main(int argc, char *argv[])
     PaymentServerTests test2;
     if (QTest::qExec(&test2) != 0)
         fInvalid = true;
-#endif
+
     GUIUtilTests test5;
     if (QTest::qExec(&test5) != 0) fInvalid = true;
     BitcoinAddressValidatorTests test6;
     if (QTest::qExec(&test6) != 0) fInvalid = true;
+#endif
 
     return fInvalid;
 }
