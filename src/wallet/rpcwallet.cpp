@@ -14,6 +14,7 @@
 #include "rpc/server.h"
 #include "script/sign.h"
 #include "timedata.h"
+#include "txadmission.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "wallet.h"

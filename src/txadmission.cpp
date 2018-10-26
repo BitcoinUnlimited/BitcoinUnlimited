@@ -37,7 +37,6 @@ void ThreadCommitToMempool();
 void ThreadTxAdmission();
 void ProcessOrphans(std::vector<uint256> &vWorkQueue);
 
-bool CheckFinalTx(const CTransaction &tx, int flags, const Snapshot &ss);
 bool CheckSequenceLocks(const CTransaction &tx,
     int flags,
     LockPoints *lp,
@@ -575,7 +574,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     // Only accept nLockTime-using transactions that can be mined in the next
     // block; we don't want our mempool filled up with transactions that can't
     // be mined yet.
-    if (!CheckFinalTx(*tx, STANDARD_LOCKTIME_VERIFY_FLAGS, ss))
+    if (!CheckFinalTx(*tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &ss))
         return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
 
     // Make sure tx size is acceptable after Nov 15, 2018 fork
@@ -1094,7 +1093,7 @@ bool CheckSequenceLocks(const CTransaction &tx,
     return EvaluateSequenceLocks(index, lockPair);
 }
 
-bool CheckFinalTx(const CTransaction &tx, int flags, const Snapshot &ss)
+bool CheckFinalTx(const CTransaction &tx, int flags, const Snapshot *ss)
 {
     // By convention a negative value for flags indicates that the
     // current network-enforced consensus rules should be used. In
@@ -1110,14 +1109,15 @@ bool CheckFinalTx(const CTransaction &tx, int flags, const Snapshot &ss)
     // evaluated is what is used. Thus if we want to know if a
     // transaction can be part of the *next* block, we need to call
     // IsFinalTx() with one more than chainActive.Height().
-    const int nBlockHeight = ss.tipHeight + 1;
+    const int nBlockHeight = (ss != nullptr) ? ss->tipHeight + 1 : chainActive.Height() + 1;
 
     // BIP113 will require that time-locked transactions have nLockTime set to
     // less than the median time of the previous block they're contained in.
     // When the next block is created its previous block will be the current
     // chain tip, so we use that to calculate the median time passed to
     // IsFinalTx() if LOCKTIME_MEDIAN_TIME_PAST is set.
-    const int64_t nBlockTime = (flags & LOCKTIME_MEDIAN_TIME_PAST) ? ss.tipMedianTimePast : GetAdjustedTime();
+    const int64_t nMedianTimePast = (ss != nullptr) ? ss->tipMedianTimePast :  chainActive.Tip()->GetMedianTimePast();
+    const int64_t nBlockTime = (flags & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : GetAdjustedTime();
 
     return IsFinalTx(tx, nBlockHeight, nBlockTime);
 }

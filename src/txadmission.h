@@ -162,6 +162,15 @@ unsigned int TxAlreadyHave(const CInv &inv);
 // threads from adding new tx into the q.
 void CommitTxToMempool();
 
+/**
+ * Check if transaction will be final in the next block to be created.
+ *
+ * Calls IsFinalTx() with current block height and appropriate block time.
+ *
+ * See consensus/consensus.h for flag definitions.
+ */
+bool CheckFinalTx(const CTransaction &tx, int flags = -1, const Snapshot *ss = nullptr);
+
 
 // This needs to be held whenever the chain state changes (block added or chain rewind) so that
 // transactions are not processed during chain state updates and so once the chain state is updated we can
