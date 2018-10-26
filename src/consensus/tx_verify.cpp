@@ -19,13 +19,13 @@
 #include <boost/scope_exit.hpp>
 
 
-bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
+bool IsFinalTx(const CTransactionRef &tx, int nBlockHeight, int64_t nBlockTime)
 {
-    if (tx.nLockTime == 0)
+    if (tx->nLockTime == 0)
         return true;
-    if ((int64_t)tx.nLockTime < ((int64_t)tx.nLockTime < LOCKTIME_THRESHOLD ? (int64_t)nBlockHeight : nBlockTime))
+    if ((int64_t)tx->nLockTime < ((int64_t)tx->nLockTime < LOCKTIME_THRESHOLD ? (int64_t)nBlockHeight : nBlockTime))
         return true;
-    for (const CTxIn &txin : tx.vin)
+    for (const CTxIn &txin : tx->vin)
     {
         if (!(txin.nSequence == CTxIn::SEQUENCE_FINAL))
             return false;

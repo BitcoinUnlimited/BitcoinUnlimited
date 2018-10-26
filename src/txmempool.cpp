@@ -720,18 +720,18 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
     list<CTransaction> transactionsToRemove;
     for (indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
     {
-        const CTransaction &tx = it->GetTx();
+        const CTransactionRef tx = it->GetSharedTx();
         LockPoints lp = it->GetLockPoints();
         bool validLP = TestLockPointValidity(&lp);
-        if (!CheckFinalTx(tx, flags) || !CheckSequenceLocks(tx, flags, &lp, validLP))
+        if (!CheckFinalTx(tx, flags) || !CheckSequenceLocks(*tx, flags, &lp, validLP))
         {
             // Note if CheckSequenceLocks fails the LockPoints may still be invalid
             // So it's critical that we remove the tx and not depend on the LockPoints.
-            transactionsToRemove.push_back(tx);
+            transactionsToRemove.push_back(*tx);
         }
         else if (it->GetSpendsCoinbase())
         {
-            for (const CTxIn &txin : tx.vin)
+            for (const CTxIn &txin : tx->vin)
             {
                 indexed_transaction_set::const_iterator it2 = mapTx.find(txin.prevout.hash);
                 if (it2 != mapTx.end())
@@ -742,7 +742,7 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
                 if (coin->IsSpent() ||
                     (coin->IsCoinBase() && ((signed long)nMemPoolHeight) - coin->nHeight < COINBASE_MATURITY))
                 {
-                    transactionsToRemove.push_back(tx);
+                    transactionsToRemove.push_back(*tx);
                     break;
                 }
             }

@@ -5,12 +5,13 @@
 #ifndef BITCOIN_CONSENSUS_TX_VERIFY_H
 #define BITCOIN_CONSENSUS_TX_VERIFY_H
 
+#include "primitives/transaction.h"
+
 #include <stdint.h>
 #include <vector>
 
 class CBlockIndex;
 class CCoinsViewCache;
-class CTransaction;
 class CValidationState;
 
 /** Transaction validation functions */
@@ -50,7 +51,7 @@ unsigned int GetP2SHSigOpCount(const CTransaction &tx, const CCoinsViewCache &ma
  * Check if transaction is final and can be included in a block with the
  * specified height and time. Consensus critical.
  */
-bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime);
+bool IsFinalTx(const CTransactionRef &tx, int nBlockHeight, int64_t nBlockTime);
 
 /**
  * Calculates the block height and previous block's median time past at

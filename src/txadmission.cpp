@@ -574,7 +574,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     // Only accept nLockTime-using transactions that can be mined in the next
     // block; we don't want our mempool filled up with transactions that can't
     // be mined yet.
-    if (!CheckFinalTx(*tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &ss))
+    if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &ss))
         return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
 
     // Make sure tx size is acceptable after Nov 15, 2018 fork
@@ -1093,7 +1093,7 @@ bool CheckSequenceLocks(const CTransaction &tx,
     return EvaluateSequenceLocks(index, lockPair);
 }
 
-bool CheckFinalTx(const CTransaction &tx, int flags, const Snapshot *ss)
+bool CheckFinalTx(const CTransactionRef &tx, int flags, const Snapshot *ss)
 {
     // By convention a negative value for flags indicates that the
     // current network-enforced consensus rules should be used. In

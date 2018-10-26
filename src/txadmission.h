@@ -169,7 +169,7 @@ void CommitTxToMempool();
  *
  * See consensus/consensus.h for flag definitions.
  */
-bool CheckFinalTx(const CTransaction &tx, int flags = -1, const Snapshot *ss = nullptr);
+bool CheckFinalTx(const CTransactionRef &tx, int flags = -1, const Snapshot *ss = nullptr);
 
 
 // This needs to be held whenever the chain state changes (block added or chain rewind) so that
