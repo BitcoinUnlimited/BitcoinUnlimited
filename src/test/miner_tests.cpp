@@ -413,7 +413,8 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     BOOST_CHECK(CheckFinalTx(MakeTransactionRef(tx), flags)); // Locktime passes
     BOOST_CHECK(!TestSequenceLocks(tx, flags)); // Sequence locks fail
     // Sequence locks pass on 2nd block
-    BOOST_CHECK(SequenceLocks(tx, flags, &prevheights, CreateBlockIndex(chainActive.Tip()->nHeight + 2)));
+    BOOST_CHECK(
+        SequenceLocks(MakeTransactionRef(tx), flags, &prevheights, CreateBlockIndex(chainActive.Tip()->nHeight + 2)));
 
     // relative time locked
     tx.vin[0].prevout.hash = txFirst[1]->GetHash();
@@ -431,7 +432,8 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++)
         chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime += 512; // Trick the MedianTimePast
     // Sequence locks pass 512 seconds later
-    BOOST_CHECK(SequenceLocks(tx, flags, &prevheights, CreateBlockIndex(chainActive.Tip()->nHeight + 1)));
+    BOOST_CHECK(
+        SequenceLocks(MakeTransactionRef(tx), flags, &prevheights, CreateBlockIndex(chainActive.Tip()->nHeight + 1)));
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++)
         chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime -= 512; // undo tricked MTP
 

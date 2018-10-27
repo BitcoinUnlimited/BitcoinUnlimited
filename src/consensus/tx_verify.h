@@ -69,6 +69,6 @@ bool EvaluateSequenceLocks(const CBlockIndex &block, std::pair<int, int64_t> loc
  * Check if transaction is final per BIP 68 sequence numbers and can be included in a block.
  * Consensus critical. Takes as input a list of heights at which tx's inputs (in order) confirmed.
  */
-bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int> *prevHeights, const CBlockIndex &block);
+bool SequenceLocks(const CTransactionRef &tx, int flags, std::vector<int> *prevHeights, const CBlockIndex &block);
 
 #endif // BITCOIN_CONSENSUS_TX_VERIFY_H

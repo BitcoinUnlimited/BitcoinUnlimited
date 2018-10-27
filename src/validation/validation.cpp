@@ -1981,6 +1981,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
         for (unsigned int i = 0; i < block.vtx.size(); i++)
         {
             const CTransaction &tx = *(block.vtx[i]);
+            const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
             nSigOps += GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
@@ -2016,7 +2017,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                     }
                 }
 
-                if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex))
+                if (!SequenceLocks(txref, nLockTimeFlags, &prevheights, *pindex))
                 {
                     return state.DoS(100, error("%s: contains a non-BIP68-final transaction", __func__), REJECT_INVALID,
                         "bad-txns-nonfinal");
@@ -2222,6 +2223,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
         for (unsigned int i = 0; i < block.vtx.size(); i++)
         {
             const CTransaction &tx = *(block.vtx[i]);
+            const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
             nSigOps += GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
@@ -2255,7 +2257,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                     }
                 }
 
-                if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex))
+                if (!SequenceLocks(txref, nLockTimeFlags, &prevheights, *pindex))
                 {
                     return state.DoS(100, error("%s: contains a non-BIP68-final transaction", __func__), REJECT_INVALID,
                         "bad-txns-nonfinal");

@@ -115,9 +115,9 @@ bool EvaluateSequenceLocks(const CBlockIndex &block, std::pair<int, int64_t> loc
     return true;
 }
 
-bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int> *prevHeights, const CBlockIndex &block)
+bool SequenceLocks(const CTransactionRef &tx, int flags, std::vector<int> *prevHeights, const CBlockIndex &block)
 {
-    return EvaluateSequenceLocks(block, CalculateSequenceLocks(MakeTransactionRef(tx), flags, prevHeights, block));
+    return EvaluateSequenceLocks(block, CalculateSequenceLocks(tx, flags, prevHeights, block));
 }
 
 // BU: This code is completely inaccurate if its used to determine the approximate time of transaction
