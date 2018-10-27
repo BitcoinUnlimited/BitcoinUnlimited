@@ -764,7 +764,8 @@ UniValue getbalance(const UniValue &params, bool fHelp)
              ++it)
         {
             const CWalletTx &wtx = (*it).second;
-            if (!CheckFinalTx(MakeTransactionRef(wtx)) || wtx.GetBlocksToMaturity() > 0 || wtx.GetDepthInMainChain() < 0)
+            if (!CheckFinalTx(MakeTransactionRef(wtx)) || wtx.GetBlocksToMaturity() > 0 ||
+                wtx.GetDepthInMainChain() < 0)
                 continue;
 
             CAmount allFee;
