@@ -37,13 +37,6 @@ void ThreadCommitToMempool();
 void ThreadTxAdmission();
 void ProcessOrphans(std::vector<uint256> &vWorkQueue);
 
-bool CheckSequenceLocks(const CTransaction &tx,
-    int flags,
-    LockPoints *lp,
-    bool useExistingLockPoints,
-    const Snapshot &ss);
-
-
 CTransactionRef CommitQGet(uint256 hash)
 {
     boost::unique_lock<boost::mutex> lock(csCommitQ);
@@ -659,7 +652,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             // be mined yet.
             // Must keep pool.cs for this unless we change CheckSequenceLocks to take a
             // CoinsViewCache instead of create its own
-            if (!CheckSequenceLocks(*tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp, false, ss))
+            if (!CheckSequenceLocks(*tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp, false, &ss))
                 return state.DoS(0, false, REJECT_NONSTANDARD, "non-BIP68-final");
         }
 
@@ -1014,11 +1007,13 @@ bool CheckSequenceLocks(const CTransaction &tx,
     int flags,
     LockPoints *lp,
     bool useExistingLockPoints,
-    const Snapshot &ss)
+    const Snapshot *ss)
 {
+    if (ss == nullptr)
+        AssertLockHeld(cs_main);
     AssertLockHeld(mempool.cs);
 
-    CBlockIndex *tip = ss.tip;
+    CBlockIndex *tip = (ss != nullptr) ? ss->tip : chainActive.Tip();
     CBlockIndex index;
     index.pprev = tip;
     // CheckSequenceLocks() uses chainActive.Height()+1 to evaluate
@@ -1039,7 +1034,8 @@ bool CheckSequenceLocks(const CTransaction &tx,
     else
     {
         // pcoinsTip contains the UTXO set for chainActive.Tip()
-        CCoinsViewMemPool &viewMemPool(*ss.cvMempool);
+        CCoinsViewMemPool tmpView(pcoinsTip, mempool);
+        CCoinsViewMemPool &viewMemPool = (ss != nullptr) ? *ss->cvMempool : tmpView;
         std::vector<int> prevheights;
         prevheights.resize(tx.vin.size());
         for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++)
@@ -1116,7 +1112,7 @@ bool CheckFinalTx(const CTransactionRef &tx, int flags, const Snapshot *ss)
     // When the next block is created its previous block will be the current
     // chain tip, so we use that to calculate the median time passed to
     // IsFinalTx() if LOCKTIME_MEDIAN_TIME_PAST is set.
-    const int64_t nMedianTimePast = (ss != nullptr) ? ss->tipMedianTimePast :  chainActive.Tip()->GetMedianTimePast();
+    const int64_t nMedianTimePast = (ss != nullptr) ? ss->tipMedianTimePast : chainActive.Tip()->GetMedianTimePast();
     const int64_t nBlockTime = (flags & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : GetAdjustedTime();
 
     return IsFinalTx(tx, nBlockHeight, nBlockTime);
