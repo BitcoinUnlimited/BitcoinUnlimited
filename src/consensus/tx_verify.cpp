@@ -33,12 +33,12 @@ bool IsFinalTx(const CTransactionRef &tx, int nBlockHeight, int64_t nBlockTime)
     return true;
 }
 
-std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx,
+std::pair<int, int64_t> CalculateSequenceLocks(const CTransactionRef &tx,
     int flags,
     std::vector<int> *prevHeights,
     const CBlockIndex &block)
 {
-    assert(prevHeights->size() == tx.vin.size());
+    assert(prevHeights->size() == tx->vin.size());
 
     // Will be set to the equivalent height- and time-based nLockTime
     // values that would be necessary to satisfy all relative lock-
@@ -51,7 +51,7 @@ std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx,
     // tx.nVersion is signed integer so requires cast to unsigned otherwise
     // we would be doing a signed comparison and half the range of nVersion
     // wouldn't support BIP 68.
-    bool fEnforceBIP68 = static_cast<uint32_t>(tx.nVersion) >= 2 && flags & LOCKTIME_VERIFY_SEQUENCE;
+    bool fEnforceBIP68 = static_cast<uint32_t>(tx->nVersion) >= 2 && flags & LOCKTIME_VERIFY_SEQUENCE;
 
     // Do not enforce sequence numbers as a relative lock time
     // unless we have been instructed to
@@ -60,9 +60,9 @@ std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx,
         return std::make_pair(nMinHeight, nMinTime);
     }
 
-    for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++)
+    for (size_t txinIndex = 0; txinIndex < tx->vin.size(); txinIndex++)
     {
-        const CTxIn &txin = tx.vin[txinIndex];
+        const CTxIn &txin = tx->vin[txinIndex];
 
         // Sequence numbers with the most significant bit set are not
         // treated as relative lock-times, nor are they given any
@@ -117,7 +117,7 @@ bool EvaluateSequenceLocks(const CBlockIndex &block, std::pair<int, int64_t> loc
 
 bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int> *prevHeights, const CBlockIndex &block)
 {
-    return EvaluateSequenceLocks(block, CalculateSequenceLocks(tx, flags, prevHeights, block));
+    return EvaluateSequenceLocks(block, CalculateSequenceLocks(MakeTransactionRef(tx), flags, prevHeights, block));
 }
 
 // BU: This code is completely inaccurate if its used to determine the approximate time of transaction

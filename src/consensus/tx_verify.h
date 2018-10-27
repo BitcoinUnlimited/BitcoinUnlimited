@@ -59,7 +59,7 @@ bool IsFinalTx(const CTransactionRef &tx, int nBlockHeight, int64_t nBlockTime);
  * Also removes from the vector of input heights any entries which did not
  * correspond to sequence locked inputs as they do not affect the calculation.
  */
-std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx,
+std::pair<int, int64_t> CalculateSequenceLocks(const CTransactionRef &tx,
     int flags,
     std::vector<int> *prevHeights,
     const CBlockIndex &block);

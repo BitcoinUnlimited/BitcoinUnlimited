@@ -1056,7 +1056,7 @@ bool CheckSequenceLocks(const CTransactionRef &tx,
                 prevheights[txinIndex] = coin.nHeight;
             }
         }
-        lockPair = CalculateSequenceLocks(*tx, flags, &prevheights, index);
+        lockPair = CalculateSequenceLocks(tx, flags, &prevheights, index);
         if (lp)
         {
             lp->height = lockPair.first;
