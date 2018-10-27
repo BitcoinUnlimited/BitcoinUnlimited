@@ -78,7 +78,7 @@ CBlockIndex CreateBlockIndex(int nHeight)
 bool TestSequenceLocks(const CTransaction &tx, int flags)
 {
     READLOCK(mempool.cs);
-    return CheckSequenceLocks(tx, flags);
+    return CheckSequenceLocks(MakeTransactionRef(tx), flags);
 }
 
 // NOTE: These tests rely on CreateNewBlock doing its own self-validation!

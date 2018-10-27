@@ -182,7 +182,7 @@ bool CheckFinalTx(const CTransactionRef &tx, int flags = -1, const Snapshot *ss 
  *
  * See consensus/consensus.h for flag definitions.
  */
-bool CheckSequenceLocks(const CTransaction &tx,
+bool CheckSequenceLocks(const CTransactionRef &tx,
     int flags,
     LockPoints *lp = nullptr,
     bool useExistingLockPoints = false,

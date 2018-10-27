@@ -652,7 +652,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             // be mined yet.
             // Must keep pool.cs for this unless we change CheckSequenceLocks to take a
             // CoinsViewCache instead of create its own
-            if (!CheckSequenceLocks(*tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp, false, &ss))
+            if (!CheckSequenceLocks(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp, false, &ss))
                 return state.DoS(0, false, REJECT_NONSTANDARD, "non-BIP68-final");
         }
 
@@ -1003,7 +1003,7 @@ void Snapshot::Load(void)
     cvMempool = new CCoinsViewMemPool(coins, mempool);
 }
 
-bool CheckSequenceLocks(const CTransaction &tx,
+bool CheckSequenceLocks(const CTransactionRef &tx,
     int flags,
     LockPoints *lp,
     bool useExistingLockPoints,
@@ -1037,10 +1037,10 @@ bool CheckSequenceLocks(const CTransaction &tx,
         CCoinsViewMemPool tmpView(pcoinsTip, mempool);
         CCoinsViewMemPool &viewMemPool = (ss != nullptr) ? *ss->cvMempool : tmpView;
         std::vector<int> prevheights;
-        prevheights.resize(tx.vin.size());
-        for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++)
+        prevheights.resize(tx->vin.size());
+        for (size_t txinIndex = 0; txinIndex < tx->vin.size(); txinIndex++)
         {
-            const CTxIn &txin = tx.vin[txinIndex];
+            const CTxIn &txin = tx->vin[txinIndex];
             Coin coin;
             if (!viewMemPool.GetCoin(txin.prevout, coin))
             {
@@ -1056,7 +1056,7 @@ bool CheckSequenceLocks(const CTransaction &tx,
                 prevheights[txinIndex] = coin.nHeight;
             }
         }
-        lockPair = CalculateSequenceLocks(tx, flags, &prevheights, index);
+        lockPair = CalculateSequenceLocks(*tx, flags, &prevheights, index);
         if (lp)
         {
             lp->height = lockPair.first;
