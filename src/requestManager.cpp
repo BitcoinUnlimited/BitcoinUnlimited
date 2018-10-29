@@ -834,6 +834,11 @@ void CRequestManager::SendRequests()
         ++sendIter; // move it forward up here in case we need to erase the item we are working with.
         CUnknownObj &item = itemIter->second;
 
+        // If we've already received the item and it's in processing then skip it here so we don't
+        // end up re-requesting it again.
+        if (item.fProcessing)
+            continue;
+
         // if never requested then lastRequestTime==0 so this will always be true
         if (now - item.lastRequestTime > _txReqRetryInterval)
         {
