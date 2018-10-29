@@ -1139,7 +1139,6 @@ AC_SUBST(ZMQ_LIBS)
 AC_SUBST(PROTOBUF_LIBS)
 AC_SUBST(QR_LIBS)
 AC_CONFIG_FILES([Makefile src/Makefile share/setup.nsi share/qt/Info.plist src/test/buildenv.py])
-AC_CONFIG_FILES([qa/pull-tester/run-bitcoind-for-test.sh],[chmod +x qa/pull-tester/run-bitcoind-for-test.sh])
 AC_CONFIG_FILES([qa/pull-tester/tests_config.py],[chmod +x qa/pull-tester/tests_config.py])
 AC_CONFIG_LINKS([qa/pull-tester/rpc-tests.py:qa/pull-tester/rpc-tests.py])
 
