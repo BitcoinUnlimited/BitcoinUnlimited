@@ -27,6 +27,7 @@ class BlockchainTest(BitcoinTestFramework):
         - reconsidermostworkchain
         - getmempoolinfo
         - getorphanpoolinfo
+        - getraworphanpool
 
     """
 
@@ -282,6 +283,9 @@ class BlockchainTest(BitcoinTestFramework):
         res2 = node.getorphanpoolinfo()
         assert_equal(res2['size'], 0)
         assert_equal(res2['bytes'], 0)
+
+        res3 = node.getraworphanpool()
+        assert_equal(len(res3), 0)
 
 
 if __name__ == '__main__':
