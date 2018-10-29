@@ -675,11 +675,11 @@ void CRequestManager::SendRequests()
     {
         now = GetTimeMicros();
         OdMap::iterator itemIter = sendBlkIter;
-        CUnknownObj &item = itemIter->second;
-
-        ++sendBlkIter; // move it forward up here in case we need to erase the item we are working with.
         if (itemIter == mapBlkInfo.end())
             break;
+
+        ++sendBlkIter; // move it forward up here in case we need to erase the item we are working with.
+        CUnknownObj &item = itemIter->second;
 
         // if never requested then lastRequestTime==0 so this will always be true
         if (now - item.lastRequestTime > _blkReqRetryInterval)
@@ -828,11 +828,11 @@ void CRequestManager::SendRequests()
     {
         now = GetTimeMicros();
         OdMap::iterator itemIter = sendIter;
-        CUnknownObj &item = itemIter->second;
-
-        ++sendIter; // move it forward up here in case we need to erase the item we are working with.
         if (itemIter == mapTxnInfo.end())
             break;
+
+        ++sendIter; // move it forward up here in case we need to erase the item we are working with.
+        CUnknownObj &item = itemIter->second;
 
         // if never requested then lastRequestTime==0 so this will always be true
         if (now - item.lastRequestTime > _txReqRetryInterval)
