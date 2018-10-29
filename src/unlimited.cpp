@@ -1320,6 +1320,8 @@ void IsChainNearlySyncdInit()
 }
 
 bool IsChainNearlySyncd() { return fIsChainNearlySyncd.load(); }
+// Used for unit tests to artificially set the state of chain sync
+void IsChainNearlySyncdSet(bool fSync) { fIsChainNearlySyncd.store(fSync); }
 uint64_t LargestBlockSeen(uint64_t nBlockSize)
 {
     // C++98 lacks the capability to do static initialization properly

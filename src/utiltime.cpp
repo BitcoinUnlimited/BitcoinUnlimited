@@ -30,6 +30,9 @@ int64_t GetTime()
 void SetMockTime(int64_t nMockTimeIn) { nMockTime = nMockTimeIn; }
 int64_t GetTimeMillis()
 {
+    if (nMockTime)
+        return nMockTime * 1000;
+
     int64_t now = (boost::posix_time::microsec_clock::universal_time() -
                       boost::posix_time::ptime(boost::gregorian::date(1970, 1, 1)))
                       .total_milliseconds();

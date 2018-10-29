@@ -208,6 +208,7 @@ extern void IsInitialBlockDownloadInit(bool *fInit = nullptr);
 // Check whether we are nearly sync'd.  Used primarily to determine whether an xthin can be retrieved.
 extern bool IsChainNearlySyncd();
 extern void IsChainNearlySyncdInit();
+extern void IsChainNearlySyncdSet(bool fSync);
 extern uint64_t LargestBlockSeen(uint64_t nBlockSize = 0);
 extern int GetBlockchainHeight();
 

@@ -119,7 +119,6 @@ protected:
 #ifdef DEBUG
     friend UniValue getstructuresizes(const UniValue &params, bool fHelp);
 #endif
-
     // map of transactions
     typedef std::map<uint256, CUnknownObj> OdMap;
     OdMap mapTxnInfo;
@@ -141,9 +140,6 @@ protected:
     void cleanup(OdMap::iterator &item);
     CLeakyBucket requestPacer;
 
-    // Request a single block.
-    bool RequestBlock(CNode *pfrom, CInv obj);
-
 public:
     CRequestManager();
 
@@ -155,6 +151,9 @@ public:
      *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
      *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
     std::atomic<unsigned int> BLOCK_DOWNLOAD_WINDOW{1024};
+
+    // Request a single block.
+    bool RequestBlock(CNode *pfrom, CInv obj);
 
     // Get this object from somewhere, asynchronously.
     void AskFor(const CInv &obj, CNode *from, unsigned int priority = 0);
