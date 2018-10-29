@@ -73,6 +73,7 @@ public:
     typedef std::list<CNodeRequestData> ObjectSourceList;
     CInv obj;
     bool rateLimited;
+    bool fProcessing; // object was received but is still being processed
     int64_t lastRequestTime; // In microseconds, 0 means no request
     unsigned int outstandingReqs;
     ObjectSourceList availableFrom;
@@ -81,6 +82,7 @@ public:
     CUnknownObj()
     {
         rateLimited = false;
+        fProcessing = false;
         outstandingReqs = 0;
         lastRequestTime = 0;
         priority = 0;
@@ -174,6 +176,9 @@ public:
 
     // Update the response time for this transaction request
     void UpdateTxnResponseTime(const CInv &obj, CNode *pfrom);
+
+    // Indicate that we are processing this object.
+    void Processing(const CInv &obj, CNode *pfrom);
 
     // Indicate that we got this object
     void Received(const CInv &obj, CNode *pfrom);

@@ -272,6 +272,32 @@ void CRequestManager::UpdateTxnResponseTime(const CInv &obj, CNode *pfrom)
     }
 }
 
+// Indicate that we are processing this object.
+void CRequestManager::Processing(const CInv &obj, CNode *pfrom)
+{
+    LOCK(cs_objDownloader);
+    if (obj.type == MSG_TX)
+    {
+        OdMap::iterator item = mapTxnInfo.find(obj.hash);
+        if (item == mapTxnInfo.end())
+            return;
+
+        item->second.fProcessing = true;
+        LOG(REQ, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
+            pfrom ? pfrom->GetLogName() : "unknown");
+    }
+    else if (obj.type == MSG_BLOCK || obj.type == MSG_THINBLOCK || obj.type == MSG_XTHINBLOCK)
+    {
+        OdMap::iterator item = mapBlkInfo.find(obj.hash);
+        if (item == mapBlkInfo.end())
+            return;
+
+        item->second.fProcessing = true;
+        LOG(BLK, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
+            pfrom ? pfrom->GetLogName() : "unknown");
+    }
+}
+
 // Indicate that we got this object.
 void CRequestManager::Received(const CInv &obj, CNode *pfrom)
 {
