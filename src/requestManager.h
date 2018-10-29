@@ -60,7 +60,8 @@ public:
     bool operator<(const CNodeRequestData &rhs) const { return desirability < rhs.desirability; }
 };
 
-struct MatchCNodeRequestData // Compare a CNodeRequestData object to a node
+// Compare a CNodeRequestData object to a node
+struct MatchCNodeRequestData
 {
     CNode *node;
     MatchCNodeRequestData(CNode *n) : node(n){};
