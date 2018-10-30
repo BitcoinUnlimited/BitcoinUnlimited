@@ -1068,6 +1068,28 @@ int ScheduleBatchPriority(void)
 #endif
 }
 
+std::string toString(uint64_t value, const std::map<uint64_t, std::string> bitmap)
+{
+    if (bitmap.count(value))
+        return bitmap.at(value);
+
+    int mask = 1;
+    std::string result;
+
+    while (value)
+    {
+        if ((value & 1) && bitmap.count(mask))
+        {
+            if (result.size())
+                result += " | " + bitmap.at(mask);
+            else
+                result = bitmap.at(mask);
+        }
+        value >>= 1;
+        mask <<= 1;
+    }
+    return result;
+}
 
 #ifdef DEBUG_PAUSE
 

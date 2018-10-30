@@ -823,4 +823,21 @@ BOOST_AUTO_TEST_CASE(splitbycommaandremovespaces)
     BOOST_CHECK_EQUAL(r[3], "four");
 }
 
+BOOST_AUTO_TEST_CASE(enum_toString)
+{
+    std::map<uint64_t, std::string> map1 = {{1, "ONE"}, {2, "TWO"}, {4, "FOUR"}};
+    std::map<uint64_t, std::string> map2 = {{1, "ONE"}, {2, "TWO"}, {4, "FOUR"}, {7, "ALL"}};
+
+    BOOST_CHECK_EQUAL(toString(0, {}), "");
+    BOOST_CHECK_EQUAL(toString(1, {}), "");
+    BOOST_CHECK_EQUAL(toString(123, {}), "");
+    BOOST_CHECK_EQUAL(toString(1, {{1, "1"}}), "1");
+    BOOST_CHECK_EQUAL(toString(1, map1), "ONE");
+    BOOST_CHECK_EQUAL(toString(3, map1), "ONE | TWO");
+    BOOST_CHECK_EQUAL(toString(5, map1), "ONE | FOUR");
+    BOOST_CHECK_EQUAL(toString(6, map2), "TWO | FOUR");
+    BOOST_CHECK_EQUAL(toString(7, map1), "ONE | TWO | FOUR");
+    BOOST_CHECK_EQUAL(toString(7, map2), "ALL");
+}
+
 BOOST_AUTO_TEST_SUITE_END()
