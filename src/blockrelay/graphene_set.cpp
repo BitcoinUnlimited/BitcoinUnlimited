@@ -32,7 +32,10 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
 
     // Infer various receiver quantities
     uint64_t nReceiverExcessItems =
-        std::min((int)nReceiverUniverseItems, std::max(0, (int)(nSenderUniverseItems - nItems)));
+        std::max((int)(nReceiverUniverseItems - nItems), (int)(nSenderUniverseItems - nItems));
+    nReceiverExcessItems = std::max(0, (int)nReceiverExcessItems); // must be non-negative
+    nReceiverExcessItems =
+        std::min((int)nReceiverUniverseItems, (int)nReceiverExcessItems); // must not exceed total mempool size
     uint64_t nReceiverMissingItems = std::max(1, (int)(nItems - (nReceiverUniverseItems - nReceiverExcessItems)));
 
     LOG(GRAPHENE, "receiver expected to have at most %d excess txs in mempool\n", nReceiverExcessItems);
