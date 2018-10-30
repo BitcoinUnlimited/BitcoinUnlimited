@@ -985,6 +985,76 @@ static bool BasicThinblockChecks(CNode *pfrom, const CChainParams &chainparams)
     return true;
 }
 
+
+static bool ensureConnectionState(const std::string msg,
+    const ConnectionStateIncoming &expected_incoming,
+    const ConnectionStateOutgoing &expected_outgoing,
+    CNode *peer)
+{
+    if (!((uint64_t)expected_incoming & (uint64_t)peer->state_incoming) ||
+        !((uint64_t)expected_outgoing & (uint64_t)peer->state_outgoing))
+    {
+        // FIXME: note review ban always now
+        dosMan.Misbehaving(peer, 100);
+        peer->fDisconnect = true;
+
+        return error("%s message received unexpectedly from peer=%s version=%s state_incoming=%s state_outgoing=%s",
+            msg, peer->GetLogName(), peer->cleanSubVer, toString(peer->state_incoming), toString(peer->state_outgoing));
+    }
+    else
+        return true;
+}
+
+static void handleAddressAfterInit(CNode *pfrom)
+{
+    if (!pfrom->fInbound)
+    {
+        // Advertise our address
+        if (fListen && !IsInitialBlockDownload())
+        {
+            CAddress addr = GetLocalAddress(&pfrom->addr);
+            FastRandomContext insecure_rand;
+            if (addr.IsRoutable())
+            {
+                LOG(NET, "ProcessMessages: advertising address %s\n", addr.ToString());
+                pfrom->PushAddress(addr, insecure_rand);
+            }
+            else if (IsPeerAddrLocalGood(pfrom))
+            {
+                addr.SetIP(pfrom->addrLocal);
+                LOG(NET, "ProcessMessages: advertising address %s\n", addr.ToString());
+                pfrom->PushAddress(addr, insecure_rand);
+            }
+        }
+
+        // Get recent addresses
+        if (pfrom->fOneShot || pfrom->nVersion >= CADDR_TIME_VERSION || addrman.size() < 1000)
+        {
+            pfrom->PushMessage(NetMsgType::GETADDR);
+            pfrom->fGetAddr = true;
+        }
+        addrman.Good(pfrom->addr);
+    }
+    else
+    {
+        if (((CNetAddr)pfrom->addr) == (CNetAddr)pfrom->addrFrom_advertised)
+        {
+            addrman.Add(pfrom->addrFrom_advertised, pfrom->addrFrom_advertised);
+            addrman.Good(pfrom->addrFrom_advertised);
+        }
+    }
+}
+
+static void enableSendHeaders(CNode *pfrom)
+{
+    // Tell our peer we prefer to receive headers rather than inv's
+    // We send this to non-NODE NETWORK peers as well, because even
+    // non-NODE NETWORK peers can announce blocks (such as pruning
+    // nodes)
+    if (pfrom->nVersion >= SENDHEADERS_VERSION)
+        pfrom->PushMessage(NetMsgType::SENDHEADERS);
+}
+
 bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived)
 {
     int64_t receiptTime = GetTime();
@@ -1016,22 +1086,31 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
     }
 
+    /* Special handling for xversion messages, as they are optional but still
+     have to be properly sequenced to be at the beginning of a connection. So
+     if anything but an xversion comes in whilst in
+     SENT_VERACK_READY_FOR_POTENTIAL_XVERSION, transition to READY state and
+     thus disallow any further incoming xversions. */
+    if (pfrom->state_incoming == ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION &&
+        strCommand != NetMsgType::XVERSION && strCommand != NetMsgType::VERACK)
+    {
+        LOG(NET, "This node does not support XVERSION as it did not send it at the right time but answered with %s "
+                 "instead. peer=%s version=%s\n",
+            strCommand, pfrom->GetLogName(), pfrom->cleanSubVer);
 
+        pfrom->state_incoming = ConnectionStateIncoming::READY;
+        handleAddressAfterInit(pfrom);
+        enableSendHeaders(pfrom);
+    }
+    // ------------------------- BEGIN INITIAL COMMAND SET PROCESSING
     if (strCommand == NetMsgType::VERSION)
     {
-        // Each connection can only send one version message
-        if (pfrom->nVersion != 0)
-        {
-            pfrom->PushMessage(
-                NetMsgType::REJECT, strCommand, REJECT_DUPLICATE, std::string("Duplicate version message"));
-            pfrom->fDisconnect = true;
-            return error("Duplicate version message received - disconnecting peer=%s version=%s", pfrom->GetLogName(),
-                pfrom->cleanSubVer);
-        }
+        if (!ensureConnectionState(
+                strCommand, ConnectionStateIncoming::CONNECTED_WAIT_VERSION, ConnectionStateOutgoing::ANY, pfrom))
+            return false;
 
         int64_t nTime;
         CAddress addrMe;
-        CAddress addrFrom;
         uint64_t nNonce = 1;
         vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
 
@@ -1046,7 +1125,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
 
         if (!vRecv.empty())
-            vRecv >> addrFrom >> nNonce;
+            vRecv >> pfrom->addrFrom_advertised >> nNonce;
         if (!vRecv.empty())
         {
             vRecv >> LIMITED_STRING(pfrom->strSubVer, MAX_SUBVERSION_LENGTH);
@@ -1083,48 +1162,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         UpdatePreferredDownload(pfrom, nodestate.State(pfrom->GetId()));
 
         // Send VERACK handshake message
-        pfrom->fVerackSent = true;
         pfrom->PushMessage(NetMsgType::VERACK);
 
         // Change version
         pfrom->ssSend.SetVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
-
-        if (!pfrom->fInbound)
-        {
-            // Advertise our address
-            if (fListen && !IsInitialBlockDownload())
-            {
-                CAddress addr = GetLocalAddress(&pfrom->addr);
-                FastRandomContext insecure_rand;
-                if (addr.IsRoutable())
-                {
-                    LOG(NET, "ProcessMessages: advertising address %s\n", addr.ToString());
-                    pfrom->PushAddress(addr, insecure_rand);
-                }
-                else if (IsPeerAddrLocalGood(pfrom))
-                {
-                    addr.SetIP(pfrom->addrLocal);
-                    LOG(NET, "ProcessMessages: advertising address %s\n", addr.ToString());
-                    pfrom->PushAddress(addr, insecure_rand);
-                }
-            }
-
-            // Get recent addresses
-            if (pfrom->fOneShot || pfrom->nVersion >= CADDR_TIME_VERSION || addrman.size() < 1000)
-            {
-                pfrom->PushMessage(NetMsgType::GETADDR);
-                pfrom->fGetAddr = true;
-            }
-            addrman.Good(pfrom->addr);
-        }
-        else
-        {
-            if (((CNetAddr)pfrom->addr) == (CNetAddr)addrFrom)
-            {
-                addrman.Add(addrFrom, addrFrom);
-                addrman.Good(addrFrom);
-            }
-        }
 
         LOG(NET, "receive version message: %s: version %d, blocks=%d, us=%s, peer=%s\n", pfrom->cleanSubVer,
             pfrom->nVersion, pfrom->nStartingHeight, addrMe.ToString(), pfrom->GetLogName());
@@ -1145,6 +1186,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 pfrom->fDisconnect = true;
             }
         }
+        pfrom->state_incoming = ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION;
     }
 
     /* Since we are processing messages in multiple threads, we may process them out of order.  Does enforcing this
@@ -1161,65 +1203,37 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     else if (strCommand == NetMsgType::VERACK)
     {
-        // If we haven't sent a VERSION message yet then we should not get a VERACK message.
-        if (pfrom->tVersionSent < 0)
-        {
-            pfrom->fDisconnect = true;
-            return error("VERACK received but we never sent a VERSION message - disconnecting peer=%s version=%s",
-                pfrom->GetLogName(), pfrom->cleanSubVer);
-        }
-        if (pfrom->fSuccessfullyConnected)
-        {
-            pfrom->fDisconnect = true;
-            return error("duplicate VERACK received - disconnecting peer=%s version=%s", pfrom->GetLogName(),
-                pfrom->cleanSubVer);
-        }
+        if (!ensureConnectionState(
+                strCommand, ConnectionStateIncoming::ANY, ConnectionStateOutgoing::SENT_VERSION, pfrom))
+            return false;
 
-        pfrom->fSuccessfullyConnected = true;
         pfrom->SetRecvVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
-
-        // Mark this node as currently connected, so we update its timestamp later.
-        if (pfrom->fNetworkNode)
-            pfrom->fCurrentlyConnected = true;
-
-        if (pfrom->nVersion >= SENDHEADERS_VERSION)
-        {
-            // Tell our peer we prefer to receive headers rather than inv's
-            // We send this to non-NODE NETWORK peers as well, because even
-            // non-NODE NETWORK peers can announce blocks (such as pruning
-            // nodes)
-
-            pfrom->PushMessage(NetMsgType::SENDHEADERS);
-        }
-
-        // Tell the peer what maximum xthin bloom filter size we will consider acceptable.
-        if (pfrom->ThinBlockCapable() && IsThinBlocksEnabled())
-        {
-            pfrom->PushMessage(NetMsgType::FILTERSIZEXTHIN, nXthinBloomFilterSize);
-        }
 
         // BU expedited procecessing requires the exchange of the listening port id
         // The former BUVERSION message has now been integrated into the xmap field in CXVersionMessage.
 
+        // prepare xversion message. This *must* be the next message after the verack has been received,
+        // if it comes at all.
+        CXVersionMessage xver;
+        xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
+        pfrom->PushMessage(NetMsgType::XVERSION, xver);
+
 
         if (pfrom->nVersion >= EXPEDITED_VERSION)
-        {
-            if (!pfrom->fBUVersionSent)
-            {
-                // prepare xversion message
-                CXVersionMessage xver;
-                xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
-                pfrom->PushMessage(NetMsgType::XVERSION, xver);
+            // also send legacy message (at least for now)
+            pfrom->PushMessage(NetMsgType::BUVERSION, GetListenPort());
+        pfrom->state_outgoing = ConnectionStateOutgoing::READY;
 
-                // and also send legacy message (at least for now)
-                pfrom->PushMessage(NetMsgType::BUVERSION, GetListenPort());
-                pfrom->fBUVersionSent = true;
-            }
+        // Tell the peer what maximum xthin bloom filter size we will consider acceptable.
+        // FIXME: integrate into xversion as well
+        if (pfrom->ThinBlockCapable() && IsThinBlocksEnabled())
+        {
+            pfrom->PushMessage(NetMsgType::FILTERSIZEXTHIN, nXthinBloomFilterSize);
         }
     }
 
 
-    else if (!pfrom->fSuccessfullyConnected && GetTime() - pfrom->tVersionSent > VERACK_TIMEOUT &&
+    else if (!pfrom->successfullyConnected() && GetTime() - pfrom->tVersionSent > VERACK_TIMEOUT &&
              pfrom->tVersionSent >= 0)
     {
         // If verack is not received within timeout then disconnect.
@@ -1238,8 +1252,81 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         return true; // return true so we don't get any process message failures in the log.
     }
+    // BUVERSION is used to pass BU specific version information similar to NetMsgType::VERSION
+    // and is exchanged after the VERSION and VERACK are both sent and received.
+    else if (strCommand == NetMsgType::BUVERSION)
+    {
+        if (!ensureConnectionState(strCommand,
+                ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION | ConnectionStateIncoming::READY,
+                ConnectionStateOutgoing::READY, pfrom))
+            return false;
 
+        // Each connection can only send one version message
+        if (pfrom->addrFromPort != 0)
+        {
+            LOG(NET, "Ignoring duplicate BUVERSION or extra addrFromPort setting. peer=%s version=%s\n",
+                pfrom->GetLogName(), pfrom->cleanSubVer);
+            unsigned short dummy;
+            vRecv >> dummy;
+        }
+        else
+        {
+            // addrFromPort is needed for connecting and initializing Xpedited forwarding.
+            vRecv >> pfrom->addrFromPort;
+            pfrom->PushMessage(NetMsgType::BUVERACK);
+        }
+    }
+    // Final handshake for BU specific version information similar to NetMsgType::VERACK
+    else if (strCommand == NetMsgType::BUVERACK)
+    {
+        if (!ensureConnectionState(strCommand,
+                ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION | ConnectionStateIncoming::READY,
+                ConnectionStateOutgoing::READY, pfrom))
+            return false;
 
+        // This step done after final handshake
+        CheckAndRequestExpeditedBlocks(pfrom);
+    }
+    else if (strCommand == NetMsgType::XVERSION)
+    {
+        if (!ensureConnectionState(strCommand, ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION,
+                ConnectionStateOutgoing::ANY, pfrom))
+            return false;
+        vRecv >> pfrom->xVersion;
+
+        if (pfrom->addrFromPort == 0)
+        {
+            pfrom->addrFromPort = pfrom->xVersion.as_u64c(XVer::BU_LISTEN_PORT) & 0xffff;
+        }
+        else
+        {
+            LOG(NET, "Encountered odd node that sent BUVERSION before XVERSION. Ignoring duplicate addrFromPort "
+                     "setting. peer=%s version=%s\n",
+                pfrom->GetLogName(), pfrom->cleanSubVer);
+        }
+        pfrom->PushMessage(NetMsgType::XVERACK);
+        pfrom->state_incoming = ConnectionStateIncoming::READY;
+        handleAddressAfterInit(pfrom);
+        enableSendHeaders(pfrom);
+    }
+    else if (strCommand == NetMsgType::XVERACK)
+    {
+        if (!ensureConnectionState(strCommand, ConnectionStateIncoming::ANY, ConnectionStateOutgoing::READY, pfrom))
+            return false;
+
+        // This step done after final handshake
+        CheckAndRequestExpeditedBlocks(pfrom);
+    }
+
+    // ------------------------- END INITIAL COMMAND SET PROCESSING
+    else if (!pfrom->successfullyConnected())
+    {
+        LOG(NET, "Ignoring command %s that comes in before initial handshake is finished. peer=%s version=%s\n",
+            strCommand, pfrom->GetLogName(), pfrom->cleanSubVer);
+
+        // Ignore any other commands early in the handshake
+        return false;
+    }
     else if (strCommand == NetMsgType::ADDR)
     {
         std::vector<CAddress> vAddr;
@@ -1971,86 +2058,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
     }
 
-
-    // BUVERSION is used to pass BU specific version information similar to NetMsgType::VERSION
-    // and is exchanged after the VERSION and VERACK are both sent and received.
-    else if (strCommand == NetMsgType::BUVERSION)
-    {
-        // If we never sent a VERACK message then we should not get a BUVERSION message.
-        if (!pfrom->fVerackSent)
-        {
-            dosMan.Misbehaving(pfrom, 100);
-            return error("BUVERSION received but we never sent a VERACK message - banning peer=%s version=%s",
-                pfrom->GetLogName(), pfrom->cleanSubVer);
-        }
-        // Each connection can only send one version message
-        if (pfrom->addrFromPort != 0)
-        {
-            LOG(NET, "Ignoring duplicate BUVERSION or extra addrFromPort setting. peer=%s version=%s\n",
-                pfrom->GetLogName(), pfrom->cleanSubVer);
-            return false;
-        }
-
-        // addrFromPort is needed for connecting and initializing Xpedited forwarding.
-        vRecv >> pfrom->addrFromPort;
-        pfrom->PushMessage(NetMsgType::BUVERACK);
-    }
-    // Final handshake for BU specific version information similar to NetMsgType::VERACK
-    else if (strCommand == NetMsgType::BUVERACK)
-    {
-        // If we never sent a BUVERSION message then we should not get a VERACK message.
-        if (!pfrom->fBUVersionSent)
-        {
-            dosMan.Misbehaving(pfrom, 100);
-            return error("BUVERACK received but we never sent a BUVERSION message - banning peer=%s version=%s",
-                pfrom->GetLogName(), pfrom->cleanSubVer);
-        }
-
-        // This step done after final handshake
-        CheckAndRequestExpeditedBlocks(pfrom);
-    }
-    else if (strCommand == NetMsgType::XVERSION)
-    {
-        if (!pfrom->fVerackSent)
-        {
-            dosMan.Misbehaving(pfrom, 100);
-            return error("XVERSION received but we never sent a VERACK message - banning peer=%s version=%s",
-                pfrom->GetLogName(), pfrom->cleanSubVer);
-        }
-
-        if (pfrom->xVersionReceived)
-        {
-            dosMan.Misbehaving(pfrom, 100);
-            return error("XVERSION received but we already got one - banning peer=%s version=%s", pfrom->GetLogName(),
-                pfrom->cleanSubVer);
-        }
-        vRecv >> pfrom->xVersion;
-        pfrom->xVersionReceived = true;
-        if (pfrom->addrFromPort == 0)
-        {
-            pfrom->addrFromPort = pfrom->xVersion.as_u64c(XVer::BU_LISTEN_PORT) & 0xffff;
-        }
-        else
-        {
-            LOG(NET, "Encountered odd node that sent BUVERSION before XVERSION. Ignoring duplicate addrFromPort "
-                     "setting. peer=%s version=%s\n",
-                pfrom->GetLogName(), pfrom->cleanSubVer);
-        }
-        pfrom->PushMessage(NetMsgType::XVERACK);
-    }
-    else if (strCommand == NetMsgType::XVERACK)
-    {
-        // If we never sent a BUVERSION message then we should not get a VERACK message.
-        if (!pfrom->fBUVersionSent)
-        {
-            dosMan.Misbehaving(pfrom, 100);
-            return error("XVERACK received but we never sent an XVERSION message - banning peer=%s version=%s",
-                pfrom->GetLogName(), pfrom->cleanSubVer);
-        }
-
-        // This step done after final handshake
-        CheckAndRequestExpeditedBlocks(pfrom);
-    }
     else if (strCommand == NetMsgType::XTHINBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsThinBlocksEnabled())
     {
@@ -2631,7 +2638,7 @@ bool SendMessages(CNode *pto)
 
         // Now exit early if disconnecting or the version handshake is not complete.  We must not send PING or other
         // connection maintenance messages before the handshake is done.
-        if (pto->fDisconnect || !pto->fSuccessfullyConnected)
+        if (pto->fDisconnect || !pto->successfullyConnected())
             return true;
 
         //

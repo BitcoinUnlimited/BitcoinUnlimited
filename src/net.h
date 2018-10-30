@@ -22,6 +22,7 @@
 #include "streams.h"
 #include "sync.h"
 #include "uint256.h"
+#include "util.h" // FIXME: reduce scope
 
 #include <atomic>
 #include <deque>
@@ -212,6 +213,7 @@ struct LocalServiceInfo
 extern CCriticalSection cs_mapLocalHost;
 extern std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
 
+
 class CNodeStats
 {
 public:
@@ -306,6 +308,44 @@ public:
 };
 #endif
 
+
+// clang-format off
+
+
+/*! Corresponding ConnectionStateOutgoing, this is used to track incoming versioning information from a peer. */
+enum class ConnectionStateIncoming : uint8_t {
+    //! initial state after TCP connection is up - waiting for version message
+    CONNECTED_WAIT_VERSION                       = 0x01,
+    //! Sent verack message - ready for xversion (or any other message, aborting the xversion-handling process)
+    SENT_VERACK_READY_FOR_POTENTIAL_XVERSION     = 0x02,
+    //! Sent xverack and am thus ready for general data transfer
+    READY                                        = 0x04,
+    //! placeholder value to allow any when checking for a particular state
+    ANY                                          = 0xff
+};
+ConnectionStateIncoming operator|(const ConnectionStateIncoming& a, const ConnectionStateIncoming& b);
+/** This is enum is used to track the state of the versioning information
+    that has been sent to the remote node. */
+enum class ConnectionStateOutgoing : uint8_t {
+    //! initial state after TCP connection is up
+    CONNECTED     = 0x01,
+    //! the VERSION message has been sent
+    SENT_VERSION  = 0x02,
+    //! Connection is ready for general data transfer into peer's direction (and the xversion as well as BU version has been sent)
+    READY         = 0x04,
+    //! placeholder value to allow any when checking for a particular state
+    ANY           = 0xff
+};
+// clang-format on
+
+//! ConnectionStateIncoming enum to string
+std::string toString(const ConnectionStateIncoming &state) PURE_FUNCTION;
+std::ostream &operator<<(std::ostream &os, const ConnectionStateIncoming &state);
+
+//! ConnectionStateOutgoing enum to string
+std::string toString(const ConnectionStateOutgoing &state) PURE_FUNCTION;
+std::ostream &operator<<(std::ostream &os, const ConnectionStateOutgoing &state);
+
 /** Information about a peer */
 class CNode
 {
@@ -368,12 +408,23 @@ public:
     int64_t nTimeConnected;
     int64_t nTimeOffset;
     CAddress addr;
+
+    //! The address the remote peer advertised it its version message
+    CAddress addrFrom_advertised;
+
     std::string addrName;
     const char *currentCommand; // if in the middle of the send, this is the command type
     CService addrLocal;
     int nVersion;
+
+    //! The state of informing the remote peer of our version information
+    ConnectionStateOutgoing state_outgoing;
+
+    //! The state of being informed by the remote peer of his version information
+    ConnectionStateIncoming state_incoming;
+
     CXVersionMessage xVersion;
-    bool xVersionReceived;
+
     // strSubVer is whatever byte array we read from the wire. However, this field is intended
     // to be printed out, displayed to humans in various forms and so on. So we sanitize it and
     // store the sanitized version in cleanSubVer. The original should be used when dealing with
@@ -387,9 +438,12 @@ public:
     bool fAutoOutbound; // any outbound node not connected with -addnode, connect-thinblock or -connect
     bool fNetworkNode; // any outbound node
     int64_t tVersionSent;
-    bool fVerackSent;
-    bool fBUVersionSent; // this goes for both BUVERSION and XVERSION here in BU
-    bool fSuccessfullyConnected;
+
+    bool successfullyConnected() const
+    {
+        return (state_outgoing == ConnectionStateOutgoing::READY && state_incoming == ConnectionStateIncoming::READY);
+    }
+
     std::atomic<bool> fDisconnect;
     std::atomic<bool> fDisconnectRequest;
     // We use fRelayTxes for two purposes -
@@ -410,8 +464,6 @@ public:
     std::atomic<int> nMisbehavior;
     //! Whether this peer should be disconnected and banned (unless whitelisted).
     bool fShouldBan;
-    //! Whether we have a fully established connection.
-    bool fCurrentlyConnected;
 
     // BUIP010 Xtreme Thinblocks: begin section
     CBlock thinBlock;
