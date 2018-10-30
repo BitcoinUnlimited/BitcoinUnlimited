@@ -540,7 +540,9 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
     const uint32_t cds_flag =
         IsNov152018Enabled(chainparams.GetConsensus(), chainActive.Tip()) ? SCRIPT_ENABLE_CHECKDATASIG : 0;
-    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | cds_flag;
+    const uint32_t svflag =
+        IsSv2018Enabled(chainparams.GetConsensus(), chainActive.Tip()) ? SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES : 0;
+    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | cds_flag | svflag;
 
     // LOG(MEMPOOL, "Mempool: Considering Tx %s\n", tx->GetHash().ToString());
 
@@ -849,7 +851,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         unsigned char sighashType = 0;
-        if (!CheckInputs(*tx, state, view, true, flags, true, &resourceTracker, nullptr, &sighashType))
+        if (!CheckInputs(
+                *tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr, &sighashType))
         {
             LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", tx->GetHash().ToString().c_str());
             return false;
@@ -866,8 +869,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(*tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | cds_flag, true, nullptr, nullptr,
-                &sighashType2))
+        if (!CheckInputs(*tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | cds_flag, maxScriptOps.Value(), true,
+                nullptr, nullptr, &sighashType2))
         {
             return error(
                 "%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",

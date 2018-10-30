@@ -110,6 +110,9 @@ enum
     // Is OP_CHECKDATASIG and variant are enabled.
     //
     SCRIPT_ENABLE_CHECKDATASIG = (1U << 18),
+
+    // Are OP_INVERT, OP_MUL, OP_LSHIFT, OP_RSHIFT enabled?
+    SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES = (1U << 19)
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);
@@ -201,12 +204,14 @@ public:
 bool EvalScript(std::vector<std::vector<unsigned char> > &stack,
     const CScript &script,
     unsigned int flags,
+    unsigned int maxOps,
     const BaseSignatureChecker &checker,
     ScriptError *error = NULL,
     unsigned char *sighashtype = NULL);
 bool VerifyScript(const CScript &scriptSig,
     const CScript &scriptPubKey,
     unsigned int flags,
+    unsigned int maxOps,
     const BaseSignatureChecker &checker,
     ScriptError *error = NULL,
     unsigned char *sighashtype = NULL);

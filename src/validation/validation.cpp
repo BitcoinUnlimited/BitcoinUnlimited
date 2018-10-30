@@ -25,6 +25,8 @@
 
 #include <boost/scope_exit.hpp>
 
+uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &consensusparams);
+
 struct CBlockIndexWorkComparator
 {
     bool operator()(CBlockIndex *pa, CBlockIndex *pb) const
@@ -876,6 +878,7 @@ bool CheckInputs(const CTransaction &tx,
     const CCoinsViewCache &inputs,
     bool fScriptChecks,
     unsigned int flags,
+    unsigned int maxOps,
     bool cacheStore,
     ValidationResourceTracker *resourceTracker,
     std::vector<CScriptCheck> *pvChecks,
@@ -920,7 +923,7 @@ bool CheckInputs(const CTransaction &tx,
                 const CAmount amount = coin->out.nValue;
 
                 // Verify signature
-                CScriptCheck check(resourceTracker, scriptPubKey, amount, tx, i, flags, cacheStore);
+                CScriptCheck check(resourceTracker, scriptPubKey, amount, tx, i, flags, maxOps, cacheStore);
                 if (pvChecks)
                 {
                     pvChecks->push_back(CScriptCheck());
@@ -938,7 +941,7 @@ bool CheckInputs(const CTransaction &tx,
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
                         CScriptCheck check2(nullptr, scriptPubKey, amount, tx, i,
-                            (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS), cacheStore);
+                            (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS), maxOps, cacheStore);
                         if (check2())
                             return state.Invalid(
                                 false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
@@ -1392,7 +1395,10 @@ void InvalidChainFound(CBlockIndex *pindexNew)
     CheckForkWarningConditions();
 }
 
-bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIndex *const pindexPrev)
+bool ContextualCheckBlock(const CBlock &block,
+    CValidationState &state,
+    CBlockIndex *const pindexPrev,
+    const bool fConservative)
 {
     const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
     const Consensus::Params &consensusParams = Params().GetConsensus();
@@ -1477,10 +1483,39 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
         }
     }
 
+    CBlockIndex indexDummy(block);
+    indexDummy.pprev = pindexPrev;
+    indexDummy.nHeight = pindexPrev == nullptr ? 1 : pindexPrev->nHeight + 1;
+
+    const uint32_t flags = GetBlockScriptFlags(&indexDummy, Params().GetConsensus());
+
+
+    uint64_t nSigOps = 0;
+    // Count the number of transactions in case the CheckExcessive function wants to use this as criteria
+    uint64_t nTx = 0;
+    uint64_t nLargestTx = 0;
+
+    for (const auto &tx : block.vtx)
+    {
+        nTx++;
+
+        nSigOps += GetLegacySigOpCount(*tx, flags);
+        if (tx->GetTxSize() > nLargestTx)
+            nLargestTx = tx->GetTxSize();
+    }
+
+    // BU only enforce sigops during block generation not acceptance
+    if (fConservative && (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS))
+        return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"), REJECT_INVALID, "bad-blk-sigops", true);
+
+    // BU: Check whether this block exceeds what we want to relay.
+    block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nSigOps, nTx, nLargestTx);
+
+
     return true;
 }
 
-bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bool fCheckMerkleRoot, bool fConservative)
+bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bool fCheckMerkleRoot)
 {
     // These are checks that are independent of context.
 
@@ -1530,30 +1565,9 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
             return error("CheckBlock(): CheckTransaction of %s failed with %s", tx->GetHash().ToString(),
                 FormatStateMessage(state));
 
-    uint64_t nSigOps = 0;
-    // Count the number of transactions in case the CheckExcessive function wants to use this as criteria
-    uint64_t nTx = 0;
-    uint64_t nLargestTx = 0;
-
-    for (const auto &tx : block.vtx)
-    {
-        nTx++;
-
-        nSigOps += GetLegacySigOpCount(*tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
-        if (tx->GetTxSize() > nLargestTx)
-            nLargestTx = tx->GetTxSize();
-    }
-
-    // BU only enforce sigops during block generation not acceptance
-    if (fConservative && (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS))
-        return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"), REJECT_INVALID, "bad-blk-sigops", true);
 
     if (fCheckPOW && fCheckMerkleRoot)
         block.fChecked = true;
-
-    // BU: Check whether this block exceeds what we want to relay.
-    block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nSigOps, nTx, nLargestTx);
-
     return true;
 }
 
@@ -1771,6 +1785,11 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
         flags |= SCRIPT_VERIFY_CLEANSTACK;
         flags |= SCRIPT_ENABLE_CHECKDATASIG;
+    }
+    // The SV Nov 15, 2018 HF rules
+    if (IsSv2018Scheduled() && IsSv2018Enabled(consensusparams, pindex->pprev))
+    {
+        flags |= SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES;
     }
 
     return flags;
@@ -2063,7 +2082,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             const CTransaction &tx = *(block.vtx[i]);
 
             nInputs += tx.vin.size();
-            nSigOps += GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+            nSigOps += GetLegacySigOpCount(tx, flags);
             // if (nSigOps > MAX_BLOCK_SIGOPS)
             //    return state.DoS(100, error("ConnectBlock(): too many sigops"),
             //                    REJECT_INVALID, "bad-blk-sigops");
@@ -2107,7 +2126,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                     // Add in sigops done by pay-to-script-hash inputs;
                     // this is to prevent a "rogue miner" from creating
                     // an incredibly-expensive-to-validate block.
-                    nSigOps += GetP2SHSigOpCount(tx, view, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+                    nSigOps += GetP2SHSigOpCount(tx, view, flags);
                     // if (nSigOps > MAX_BLOCK_SIGOPS)
                     //    return state.DoS(100, error("ConnectBlock(): too many sigops"),
                     //                     REJECT_INVALID, "bad-blk-sigops");
@@ -2134,8 +2153,8 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                         std::vector<CScriptCheck> vChecks;
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
-                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, fCacheResults, &resourceTracker,
-                                PV->ThreadCount() ? &vChecks : NULL))
+                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
+                                &resourceTracker, PV->ThreadCount() ? &vChecks : NULL))
                         {
                             return error("ConnectBlockDTOR(): CheckInputs on %s failed with %s",
                                 tx.GetHash().ToString(), FormatStateMessage(state));
@@ -2304,7 +2323,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             const CTransaction &tx = *(block.vtx[i]);
 
             nInputs += tx.vin.size();
-            nSigOps += GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+            nSigOps += GetLegacySigOpCount(tx, flags);
 
             if (!tx.IsCoinBase())
             {
@@ -2346,7 +2365,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                     // Add in sigops done by pay-to-script-hash inputs;
                     // this is to prevent a "rogue miner" from creating
                     // an incredibly-expensive-to-validate block.
-                    nSigOps += GetP2SHSigOpCount(tx, view, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+                    nSigOps += GetP2SHSigOpCount(tx, view, flags);
                     // if (nSigOps > MAX_BLOCK_SIGOPS)
                     //    return state.DoS(100, error("ConnectBlock(): too many sigops"),
                     //                     REJECT_INVALID, "bad-blk-sigops");
@@ -2373,8 +2392,8 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                         std::vector<CScriptCheck> vChecks;
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
-                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, fCacheResults, &resourceTracker,
-                                PV->ThreadCount() ? &vChecks : NULL))
+                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
+                                &resourceTracker, PV->ThreadCount() ? &vChecks : NULL))
                         {
                             return error("ConnectBlock(): CheckInputs on %s failed with %s", tx.GetHash().ToString(),
                                 FormatStateMessage(state));
@@ -2820,6 +2839,19 @@ void UpdateTip(CBlockIndex *pindexNew)
             enableCanonicalTxOrder = false;
         }
     }
+    if (IsSv2018Scheduled())
+    {
+        if (IsSv2018Enabled(chainParams.GetConsensus(), pindexNew))
+        {
+            maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
+            excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
+        }
+        else // if blockchain reorg we may need to back it out
+        {
+            maxScriptOps = MAX_OPS_PER_SCRIPT;
+            excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
+        }
+    }
 }
 
 /** Disconnect chainActive's tip. You probably want to call mempool.removeForReorg and manually re-limit mempool size
@@ -2854,6 +2886,14 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     {
         if (IsNov152018Enabled(consensusParams, pindexDelete) &&
             !IsNov152018Enabled(consensusParams, pindexDelete->pprev))
+        {
+            mempool.clear();
+        }
+    }
+    // Same if we undid the SV hard fork
+    if (IsSv2018Scheduled())
+    {
+        if (IsSv2018Enabled(consensusParams, pindexDelete) && !IsSv2018Enabled(consensusParams, pindexDelete->pprev))
         {
             mempool.clear();
         }

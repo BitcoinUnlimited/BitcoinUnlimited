@@ -42,7 +42,7 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey, bool f
     txTo.vin[0].scriptSig = scriptSig;
     txTo.vout[0].nValue = 1;
 
-    return VerifyScript(scriptSig, scriptPubKey, fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE,
+    return VerifyScript(scriptSig, scriptPubKey, fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE, MAX_OPS_PER_SCRIPT,
         MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue), &err);
 }
 
@@ -117,7 +117,8 @@ BOOST_AUTO_TEST_CASE(sign)
 
             const CTxOut &output = txFrom.vout[txTo[i].vin[0].prevout.n];
             bool sigOK = CScriptCheck(nullptr, output.scriptPubKey, output.nValue, txTo[i], 0,
-                SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID, false)();
+                SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID, MAX_OPS_PER_SCRIPT,
+                false)();
             if (i == j)
                 BOOST_CHECK_MESSAGE(sigOK, strprintf("VerifySignature %d %d", i, j));
             else
