@@ -252,6 +252,11 @@ void CommitTxToMempool()
             vWhatChanged.push_back(data.hash);
             // Update txn per second only when a txn is valid and accepted to the mempool
             mempool.UpdateTransactionsPerSecond();
+
+            // Indicate that this tx was fully processed/accepted and can now be removed from the
+            // request manager.
+            CInv inv(MSG_TX, data.hash);
+            requester.Received(inv, nullptr);
         }
         txCommitQ.clear();
     }
@@ -431,6 +436,10 @@ void ThreadTxAdmission()
                             for (const COutPoint &remove : vCoinsToUncache)
                                 pcoinsTip->Uncache(remove);
                         }
+
+                        // Mark tx as received if invalid or an orphan. If it's a valid Tx we mark it received
+                        // only when it's finally accepted into the mempool.
+                        requester.Received(inv, nullptr);
                     }
                     int nDoS = 0;
                     if (state.IsInvalid(nDoS))
@@ -453,9 +462,6 @@ void ThreadTxAdmission()
                             }
                         }
                     }
-
-                    // Mark tx as received regardless of whether it was a valid tx, orphan or invalid.
-                    requester.Received(inv, nullptr);
                 }
             }
         }

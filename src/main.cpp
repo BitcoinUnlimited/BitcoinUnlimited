@@ -1582,12 +1582,17 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // Put the tx on the tx admission queue for processing
         CTxInputData txd;
         vRecv >> txd.tx;
+
+        // Indicate that the tx was received and is now in the commitQ but not necessarily in the mempool.
+        CInv inv(MSG_TX, txd.tx->GetHash());
+        requester.Processing(inv, pfrom);
+
+        // Enqueue the transaction
         txd.nodeId = pfrom->id;
         txd.nodeName = pfrom->GetLogName();
         txd.whitelisted = pfrom->fWhitelisted;
         EnqueueTxForAdmission(txd);
 
-        CInv inv(MSG_TX, txd.tx->GetHash());
         pfrom->AddInventoryKnown(inv);
         requester.UpdateTxnResponseTime(inv, pfrom);
     }

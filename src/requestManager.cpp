@@ -272,6 +272,32 @@ void CRequestManager::UpdateTxnResponseTime(const CInv &obj, CNode *pfrom)
     }
 }
 
+// Indicate that we are processing this object.
+void CRequestManager::Processing(const CInv &obj, CNode *pfrom)
+{
+    LOCK(cs_objDownloader);
+    if (obj.type == MSG_TX)
+    {
+        OdMap::iterator item = mapTxnInfo.find(obj.hash);
+        if (item == mapTxnInfo.end())
+            return;
+
+        item->second.fProcessing = true;
+        LOG(REQ, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
+            pfrom ? pfrom->GetLogName() : "unknown");
+    }
+    else if (obj.type == MSG_BLOCK || obj.type == MSG_THINBLOCK || obj.type == MSG_XTHINBLOCK)
+    {
+        OdMap::iterator item = mapBlkInfo.find(obj.hash);
+        if (item == mapBlkInfo.end())
+            return;
+
+        item->second.fProcessing = true;
+        LOG(BLK, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
+            pfrom ? pfrom->GetLogName() : "unknown");
+    }
+}
+
 // Indicate that we got this object.
 void CRequestManager::Received(const CInv &obj, CNode *pfrom)
 {
@@ -654,11 +680,11 @@ void CRequestManager::SendRequests()
     {
         now = GetTimeMicros();
         OdMap::iterator itemIter = sendBlkIter;
-        CUnknownObj &item = itemIter->second;
-
-        ++sendBlkIter; // move it forward up here in case we need to erase the item we are working with.
         if (itemIter == mapBlkInfo.end())
             break;
+
+        ++sendBlkIter; // move it forward up here in case we need to erase the item we are working with.
+        CUnknownObj &item = itemIter->second;
 
         // if never requested then lastRequestTime==0 so this will always be true
         if (now - item.lastRequestTime > _blkReqRetryInterval)
@@ -807,11 +833,16 @@ void CRequestManager::SendRequests()
     {
         now = GetTimeMicros();
         OdMap::iterator itemIter = sendIter;
-        CUnknownObj &item = itemIter->second;
-
-        ++sendIter; // move it forward up here in case we need to erase the item we are working with.
         if (itemIter == mapTxnInfo.end())
             break;
+
+        ++sendIter; // move it forward up here in case we need to erase the item we are working with.
+        CUnknownObj &item = itemIter->second;
+
+        // If we've already received the item and it's in processing then skip it here so we don't
+        // end up re-requesting it again.
+        if (item.fProcessing)
+            continue;
 
         // if never requested then lastRequestTime==0 so this will always be true
         if (now - item.lastRequestTime > _txReqRetryInterval)
