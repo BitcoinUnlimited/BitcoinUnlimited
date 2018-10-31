@@ -74,7 +74,6 @@ class MyTest (BitcoinTestFramework):
         self.nodes[2].set(FORK_CFG + "=0", "consensus.enableCanonicalTxOrder=1")
         self.nodes[3].set(FORK_CFG + "=0", "consensus.enableCanonicalTxOrder=1")
 
-
         waitFor(30, lambda: self.nodes[2].getmempoolinfo()["size"] >= 20)
 
         preForkHash = self.nodes[0].getbestblockhash()
@@ -131,7 +130,7 @@ class MyTest (BitcoinTestFramework):
             for i in range(3):
                 self.nodes[0].sendtoaddress(addr[0], 4-i)
             self.nodes[0].generate(1)
-        connect_nodes(self.nodes[0], 1)
+        connect_nodes_bi(self.nodes,0,1)
 
         waitFor(10, lambda: self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
@@ -146,7 +145,7 @@ class MyTest (BitcoinTestFramework):
             for i in range(3):
                 self.nodes[2].sendtoaddress(addr[2], 4-i)
             self.nodes[2].generate(1)
-        connect_nodes(self.nodes[2], 3)
+        connect_nodes_bi(self.nodes,2,3)
         #print(self.nodes[2].getbestblockhash())
         #print(self.nodes[3].getbestblockhash())
         #print(self.nodes[2].getchaintips())
