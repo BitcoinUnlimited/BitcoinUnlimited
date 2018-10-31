@@ -41,7 +41,7 @@ static const CRPCConvertParam vRPCConvertParams[] = {{"stop", 0}, {"setmocktime"
     {"getbalance", 2}, {"getblockhash", 0}, {"move", 2}, {"move", 3}, {"sendfrom", 2}, {"sendfrom", 3},
     {"listtransactions", 1}, {"listtransactions", 2}, {"listtransactions", 3}, {"listtransactionsfrom", 1},
     {"listtransactionsfrom", 2}, {"listtransactionsfrom", 3}, {"listaccounts", 0}, {"listaccounts", 1},
-    {"walletpassphrase", 1}, {"getblocktemplate", 0}, {"submitminingsolution", 0}, {"listsinceblock", 1},
+    {"walletpassphrase", 1}, {"getblocktemplate", 0}, {"getminingcandidate", 0}, {"submitminingsolution", 0}, {"listsinceblock", 1},
     {"listsinceblock", 2}, {"sendmany", 1}, {"sendmany", 2}, {"sendmany", 4}, {"addmultisigaddress", 0},
     {"addmultisigaddress", 1}, {"createmultisig", 0}, {"createmultisig", 1}, {"listunspent", 0}, {"listunspent", 1},
     {"listunspent", 2}, {"getblock", 1}, {"getblock", 2}, {"getblockheader", 1}, {"gettransaction", 1},
