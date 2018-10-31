@@ -9,6 +9,7 @@
 #include "dstencode.h"
 #include "main.h"
 #include "timedata.h"
+#include "txadmission.h"
 
 #include <stdint.h>
 
@@ -219,7 +220,7 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     status.depth = wtx.GetDepthInMainChain();
     status.cur_num_blocks = chainActive.Height();
 
-    if (!CheckFinalTx(wtx))
+    if (!CheckFinalTx(MakeTransactionRef(wtx)))
     {
         if (wtx.nLockTime < LOCKTIME_THRESHOLD)
         {

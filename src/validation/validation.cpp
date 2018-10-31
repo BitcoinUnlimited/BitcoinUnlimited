@@ -1214,86 +1214,6 @@ CBlockIndex *FindMostWorkChain()
     DbgAssert(0, return NULL); // should never get here
 }
 
-bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints *lp, bool useExistingLockPoints)
-{
-    AssertLockHeld(cs_main);
-    AssertLockHeld(mempool.cs);
-
-    CBlockIndex *tip = chainActive.Tip();
-    CBlockIndex index;
-    index.pprev = tip;
-    // CheckSequenceLocks() uses chainActive.Height()+1 to evaluate
-    // height based locks because when SequenceLocks() is called within
-    // ConnectBlock(), the height of the block *being*
-    // evaluated is what is used.
-    // Thus if we want to know if a transaction can be part of the
-    // *next* block, we need to use one more than chainActive.Height()
-    index.nHeight = tip->nHeight + 1;
-
-    std::pair<int, int64_t> lockPair;
-    if (useExistingLockPoints)
-    {
-        assert(lp);
-        lockPair.first = lp->height;
-        lockPair.second = lp->time;
-    }
-    else
-    {
-        // pcoinsTip contains the UTXO set for chainActive.Tip()
-        CCoinsViewMemPool viewMemPool(pcoinsTip, mempool);
-        std::vector<int> prevheights;
-        prevheights.resize(tx.vin.size());
-        for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++)
-        {
-            const CTxIn &txin = tx.vin[txinIndex];
-            Coin coin;
-            if (!viewMemPool.GetCoin(txin.prevout, coin))
-            {
-                return error("%s: Missing input", __func__);
-            }
-            if (coin.nHeight == MEMPOOL_HEIGHT)
-            {
-                // Assume all mempool transaction confirm in the next block
-                prevheights[txinIndex] = tip->nHeight + 1;
-            }
-            else
-            {
-                prevheights[txinIndex] = coin.nHeight;
-            }
-        }
-        lockPair = CalculateSequenceLocks(tx, flags, &prevheights, index);
-        if (lp)
-        {
-            lp->height = lockPair.first;
-            lp->time = lockPair.second;
-            // Also store the hash of the block with the highest height of
-            // all the blocks which have sequence locked prevouts.
-            // This hash needs to still be on the chain
-            // for these LockPoint calculations to be valid
-            // Note: It is impossible to correctly calculate a maxInputBlock
-            // if any of the sequence locked inputs depend on unconfirmed txs,
-            // except in the special case where the relative lock time/height
-            // is 0, which is equivalent to no sequence lock. Since we assume
-            // input height of tip+1 for mempool txs and test the resulting
-            // lockPair from CalculateSequenceLocks against tip+1.  We know
-            // EvaluateSequenceLocks will fail if there was a non-zero sequence
-            // lock on a mempool input, so we can use the return value of
-            // CheckSequenceLocks to indicate the LockPoints validity
-            int maxInputHeight = 0;
-            for (int height : prevheights)
-            {
-                // Can ignore mempool inputs since we'll fail if they had non-zero locks
-                if (height != tip->nHeight + 1)
-                {
-                    maxInputHeight = std::max(maxInputHeight, height);
-                }
-            }
-            lp->maxInputBlock = tip->GetAncestor(maxInputHeight);
-        }
-    }
-    return EvaluateSequenceLocks(index, lockPair);
-}
-
 bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensusParams, CBlockIndex *pindex)
 {
     AssertLockHeld(cs_main);
@@ -1420,7 +1340,7 @@ bool ContextualCheckBlock(const CBlock &block,
     // Check that all transactions are finalized
     for (const auto &tx : block.vtx)
     {
-        if (!IsFinalTx(*tx, nHeight, nLockTimeCutoff))
+        if (!IsFinalTx(tx, nHeight, nLockTimeCutoff))
         {
             return state.DoS(
                 10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
@@ -2080,6 +2000,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
         for (unsigned int i = 0; i < block.vtx.size(); i++)
         {
             const CTransaction &tx = *(block.vtx[i]);
+            const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
             nSigOps += GetLegacySigOpCount(tx, flags);
@@ -2115,7 +2036,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                     }
                 }
 
-                if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex))
+                if (!SequenceLocks(txref, nLockTimeFlags, &prevheights, *pindex))
                 {
                     return state.DoS(100, error("%s: contains a non-BIP68-final transaction", __func__), REJECT_INVALID,
                         "bad-txns-nonfinal");
@@ -2321,6 +2242,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
         for (unsigned int i = 0; i < block.vtx.size(); i++)
         {
             const CTransaction &tx = *(block.vtx[i]);
+            const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
             nSigOps += GetLegacySigOpCount(tx, flags);
@@ -2354,7 +2276,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                     }
                 }
 
-                if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex))
+                if (!SequenceLocks(txref, nLockTimeFlags, &prevheights, *pindex))
                 {
                     return state.DoS(100, error("%s: contains a non-BIP68-final transaction", __func__), REJECT_INVALID,
                         "bad-txns-nonfinal");

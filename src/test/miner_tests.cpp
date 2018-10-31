@@ -13,6 +13,7 @@
 #include "main.h"
 #include "pubkey.h"
 #include "script/standard.h"
+#include "txadmission.h"
 #include "txmempool.h"
 #include "uint256.h"
 #include "util.h"
@@ -77,7 +78,7 @@ CBlockIndex CreateBlockIndex(int nHeight)
 bool TestSequenceLocks(const CTransaction &tx, int flags)
 {
     READLOCK(mempool.cs);
-    return CheckSequenceLocks(tx, flags);
+    return CheckSequenceLocks(MakeTransactionRef(tx), flags);
 }
 
 // NOTE: These tests rely on CreateNewBlock doing its own self-validation!
@@ -409,10 +410,11 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.nLockTime = 0;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(100000000L).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
-    BOOST_CHECK(CheckFinalTx(tx, flags)); // Locktime passes
+    BOOST_CHECK(CheckFinalTx(MakeTransactionRef(tx), flags)); // Locktime passes
     BOOST_CHECK(!TestSequenceLocks(tx, flags)); // Sequence locks fail
     // Sequence locks pass on 2nd block
-    BOOST_CHECK(SequenceLocks(tx, flags, &prevheights, CreateBlockIndex(chainActive.Tip()->nHeight + 2)));
+    BOOST_CHECK(
+        SequenceLocks(MakeTransactionRef(tx), flags, &prevheights, CreateBlockIndex(chainActive.Tip()->nHeight + 2)));
 
     // relative time locked
     tx.vin[0].prevout.hash = txFirst[1]->GetHash();
@@ -424,13 +426,14 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     prevheights[0] = baseheight + 2;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Time(GetTime()).FromTx(tx));
-    BOOST_CHECK(CheckFinalTx(tx, flags)); // Locktime passes
+    BOOST_CHECK(CheckFinalTx(MakeTransactionRef(tx), flags)); // Locktime passes
     BOOST_CHECK(!TestSequenceLocks(tx, flags)); // Sequence locks fail
 
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++)
         chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime += 512; // Trick the MedianTimePast
     // Sequence locks pass 512 seconds later
-    BOOST_CHECK(SequenceLocks(tx, flags, &prevheights, CreateBlockIndex(chainActive.Tip()->nHeight + 1)));
+    BOOST_CHECK(
+        SequenceLocks(MakeTransactionRef(tx), flags, &prevheights, CreateBlockIndex(chainActive.Tip()->nHeight + 1)));
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++)
         chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime -= 512; // undo tricked MTP
 
@@ -441,10 +444,11 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.nLockTime = chainActive.Tip()->nHeight + 1;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Time(GetTime()).FromTx(tx));
-    BOOST_CHECK(!CheckFinalTx(tx, flags)); // Locktime fails
+    BOOST_CHECK(!CheckFinalTx(MakeTransactionRef(tx), flags)); // Locktime fails
     BOOST_CHECK(TestSequenceLocks(tx, flags)); // Sequence locks pass
     // Locktime passes on 2nd block
-    BOOST_CHECK(IsFinalTx(tx, chainActive.Tip()->nHeight + 2, chainActive.Tip()->GetMedianTimePast()));
+    BOOST_CHECK(
+        IsFinalTx(MakeTransactionRef(tx), chainActive.Tip()->nHeight + 2, chainActive.Tip()->GetMedianTimePast()));
 
     // absolute time locked
     tx.vin[0].prevout.hash = txFirst[3]->GetHash();
@@ -453,17 +457,18 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     prevheights[0] = baseheight + 4;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Time(GetTime()).FromTx(tx));
-    BOOST_CHECK(!CheckFinalTx(tx, flags)); // Locktime fails
+    BOOST_CHECK(!CheckFinalTx(MakeTransactionRef(tx), flags)); // Locktime fails
     BOOST_CHECK(TestSequenceLocks(tx, flags)); // Sequence locks pass
     // Locktime passes 1 second later
-    BOOST_CHECK(IsFinalTx(tx, chainActive.Tip()->nHeight + 2, chainActive.Tip()->GetMedianTimePast() + 1));
+    BOOST_CHECK(
+        IsFinalTx(MakeTransactionRef(tx), chainActive.Tip()->nHeight + 2, chainActive.Tip()->GetMedianTimePast() + 1));
 
     // mempool-dependent transactions (not added)
     tx.vin[0].prevout.hash = hash;
     prevheights[0] = chainActive.Tip()->nHeight + 1;
     tx.nLockTime = 0;
     tx.vin[0].nSequence = 0;
-    BOOST_CHECK(CheckFinalTx(tx, flags)); // Locktime passes
+    BOOST_CHECK(CheckFinalTx(MakeTransactionRef(tx), flags)); // Locktime passes
     BOOST_CHECK(TestSequenceLocks(tx, flags)); // Sequence locks pass
     tx.vin[0].nSequence = 1;
     BOOST_CHECK(!TestSequenceLocks(tx, flags)); // Sequence locks fail
