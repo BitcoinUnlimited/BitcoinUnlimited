@@ -223,7 +223,8 @@ void Shutdown()
     StopNode();
     StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
-    if (fDumpMempoolLater && GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
+    if (fDumpMempoolLater && GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
+    {
         DumpMempool();
     }
 
