@@ -702,7 +702,7 @@ public:
     CTransactionRef get(const uint256 &hash) const;
     CTransactionRef _get(const uint256 &hash) const;
     TxMempoolInfo info(const uint256 &hash) const;
-    std::vector<TxMempoolInfo> infoAll() const;
+    std::vector<TxMempoolInfo> AllTxMempoolInfo() const;
 
     /** Estimate fee rate needed to get into the next nBlocks
      *  If no answer can be given at nBlocks, return an estimate

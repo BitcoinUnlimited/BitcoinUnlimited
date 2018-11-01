@@ -728,7 +728,8 @@ void MainCleanup()
     }
 }
 
-static const uint64_t MEMPOOL_DUMP_VERSION = 1;
+// Version is current unix epoch time. Nov 1, 2018 at 12am
+static const uint64_t MEMPOOL_DUMP_VERSION = 1541030400;
 
 bool LoadMempool(void)
 {
@@ -743,7 +744,6 @@ bool LoadMempool(void)
 
     int64_t count = 0;
     int64_t skipped = 0;
-    int64_t failed = 0;
     int64_t nNow = GetTime();
 
     try
@@ -771,19 +771,15 @@ bool LoadMempool(void)
             {
                 mempool.PrioritiseTransaction(tx.GetHash(), tx.GetHash().ToString(), prioritydummy, amountdelta);
             }
-            CValidationState state;
             if (nTime + nExpiryTimeout > nNow)
             {
-                LOCK(cs_main);
-                AcceptToMemoryPoolWithTime(mempool, state, tx, true, NULL, nTime);
-                if (state.IsValid())
-                {
-                    ++count;
-                }
-                else
-                {
-                    ++failed;
-                }
+                CTxInputData txd;
+                txd.tx = MakeTransactionRef(tx);
+                txd.nodeId = -1;
+                txd.nodeName = "none";
+                txd.whitelisted = false;
+                EnqueueTxForAdmission(txd);
+                ++count;
             }
             else
             {
@@ -804,7 +800,7 @@ bool LoadMempool(void)
         return false;
     }
 
-    LOGA("Imported mempool transactions from disk: %i successes, %i failed, %i expired\n", count, failed, skipped);
+    LOGA("Imported mempool transactions from disk: %i successes, %i expired\n", count, skipped);
     return true;
 }
 
@@ -813,15 +809,15 @@ void DumpMempool(void)
     int64_t start = GetTimeMicros();
 
     std::map<uint256, CAmount> mapDeltas;
-    std::vector<TxMempoolInfo> vinfo;
+    std::vector<TxMempoolInfo> vInfo;
 
     {
-        LOCK(mempool.cs);
+        READLOCK(mempool.cs);
         for (const auto &i : mempool.mapDeltas)
         {
             mapDeltas[i.first] = i.second.first;
         }
-        vinfo = mempool.infoAll();
+        vInfo = mempool.AllTxMempoolInfo();
     }
 
     int64_t mid = GetTimeMicros();
@@ -839,12 +835,12 @@ void DumpMempool(void)
         uint64_t version = MEMPOOL_DUMP_VERSION;
         file << version;
 
-        file << (uint64_t)vinfo.size();
-        for (const auto &i : vinfo)
+        file << (uint64_t)vInfo.size();
+        for (const auto &i : vInfo)
         {
             file << *(i.tx);
             file << (int64_t)i.nTime;
-            file << (int64_t)i.nFeeDelta;
+            file << (int64_t)i.feeDelta;
             mapDeltas.erase(i.tx->GetHash());
         }
 

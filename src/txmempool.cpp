@@ -1145,6 +1145,25 @@ CTransactionRef CTxMemPool::get(const uint256 &hash) const
     return _get(hash);
 }
 
+static TxMempoolInfo GetInfo(CTxMemPool::indexed_transaction_set::const_iterator it)
+{
+    AssertLockHeld(cs);
+    return TxMempoolInfo{
+        it->GetSharedTx(), it->GetTime(), CFeeRate(it->GetFee(), it->GetTxSize()), it->GetModifiedFee() - it->GetFee()};
+}
+
+std::vector<TxMempoolInfo> CTxMemPool::AllTxMempoolInfo() const
+{
+    AssertLockHeld(cs);
+    std::vector<TxMempoolInfo> vInfo;
+    vInfo.reserve(mapTx.size());
+    for (indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
+    {
+        vInfo.push_back(GetInfo(it));
+    }
+    return vInfo;
+}
+
 void CTxMemPool::PrioritiseTransaction(const uint256 hash,
     const string strHash,
     double dPriorityDelta,
