@@ -2134,6 +2134,31 @@ bool OpenNetworkConnection(const CAddress &addrConnect,
 }
 
 
+static bool threadProcessMessages(CNode *pnode)
+{
+    bool fSleep = true;
+    // Receive messages from the net layer and put them into the receive queue.
+    if (!g_signals.ProcessMessages(pnode))
+        pnode->fDisconnect = true;
+
+    // Discover if there's more work to be done
+    if (pnode->nSendSize < SendBufferSize())
+    {
+        { // If already locked some other thread is working on it, so no work for this thread
+            TRY_LOCK(pnode->csRecvGetData, lockRecv);
+            if (lockRecv && (!pnode->vRecvGetData.empty()))
+                fSleep = false;
+        }
+        if (fSleep)
+        { // If already locked some other thread is working on it, so no work for this thread
+            TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
+            if (lockRecv && (!pnode->vRecvMsg.empty() && pnode->vRecvMsg[0].complete()))
+                fSleep = false;
+        }
+    }
+    return fSleep;
+}
+
 void ThreadMessageHandler()
 {
     boost::mutex condition_mutex;
@@ -2173,31 +2198,34 @@ void ThreadMessageHandler()
             if (pnode->fDisconnect)
                 continue;
 
-            // Receive messages from the net layer and put them into the receive queue.
-            if (!g_signals.ProcessMessages(pnode))
-                pnode->fDisconnect = true;
-
-            // Discover if there's more work to be done
-            if (pnode->nSendSize < SendBufferSize())
+            if (pnode->successfullyConnected())
             {
-                { // If already locked some other thread is working on it, so no work for this thread
-                    TRY_LOCK(pnode->csRecvGetData, lockRecv);
-                    if (lockRecv && (!pnode->vRecvGetData.empty()))
-                        fSleep = false;
-                }
-                if (fSleep)
-                { // If already locked some other thread is working on it, so no work for this thread
-                    TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                    if (lockRecv && (!pnode->vRecvMsg.empty() && pnode->vRecvMsg[0].complete()))
-                        fSleep = false;
-                }
+                // parallel processing
+                fSleep &= threadProcessMessages(pnode);
+            }
+            else
+            {
+                // serial processing during setup
+                TRY_LOCK(pnode->csSerialPhase, lockSerial);
+                if (lockSerial)
+                    fSleep &= threadProcessMessages(pnode);
             }
             boost::this_thread::interruption_point();
 
             // Put transaction and block requests into the request manager
             // and all other requests into the send queue.
-            g_signals.SendMessages(pnode);
-
+            if (pnode->successfullyConnected())
+            {
+                // parallel processing
+                g_signals.SendMessages(pnode);
+            }
+            else
+            {
+                // serial processing during setup
+                TRY_LOCK(pnode->csSerialPhase, lockSerial);
+                if (lockSerial)
+                    g_signals.SendMessages(pnode);
+            }
             boost::this_thread::interruption_point();
         }
 

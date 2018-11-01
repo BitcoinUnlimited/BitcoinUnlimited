@@ -423,6 +423,9 @@ public:
     //! The state of being informed by the remote peer of his version information
     ConnectionStateIncoming state_incoming;
 
+    //! used to make processing serial when version handshake is taking place
+    CCriticalSection csSerialPhase;
+
     CXVersionMessage xVersion;
 
     // strSubVer is whatever byte array we read from the wire. However, this field is intended
