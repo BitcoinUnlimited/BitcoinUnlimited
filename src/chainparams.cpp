@@ -19,6 +19,9 @@
 
 #include "chainparamsseeds.h"
 
+uint64_t nMiningSvForkTime = 0;
+uint64_t nMiningForkTime = 1542300000;
+
 CBlock CreateGenesisBlock(CScript prefix,
     const std::string &comment,
     const CScript &genesisOutputScript,

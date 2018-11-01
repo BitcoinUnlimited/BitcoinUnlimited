@@ -170,8 +170,6 @@ set<CNetAddr> setservAddNodeAddresses;
 uint64_t maxGeneratedBlock = DEFAULT_BLOCK_MAX_SIZE;
 uint64_t excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
 unsigned int excessiveAcceptDepth = DEFAULT_EXCESSIVE_ACCEPT_DEPTH;
-uint64_t nMiningSvForkTime = 0;
-uint64_t nMiningForkTime = 1542300000;
 unsigned int maxMessageSizeMultiplier = DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER;
 int nMaxOutConnections = DEFAULT_MAX_OUTBOUND_CONNECTIONS;
 

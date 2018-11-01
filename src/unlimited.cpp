@@ -226,7 +226,7 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
 {
     if (validate)
     {
-        if (value != 0 && nMiningSvForkTime != 0)
+        if (value != 0 && miningSvForkTime.Value() != 0)
         {
             std::ostringstream ret;
             ret << "Only one fork can be enabled at a time";
@@ -250,7 +250,7 @@ std::string ForkTimeValidatorSV(const uint64_t &value, uint64_t *item, bool vali
 {
     if (validate)
     {
-        if (value != 0 && nMiningForkTime != 0)
+        if (value != 0 && miningForkTime.Value() != 0)
         {
             std::ostringstream ret;
             ret << "Only one fork can be enabled at a time";
@@ -445,7 +445,7 @@ void settingsToUserAgentString()
     BUComments.clear();
 
     std::string flavor;
-    if (nMiningSvForkTime != 0)
+    if (miningSvForkTime.Value() != 0)
         BUComments.push_back("SV");
 
     std::stringstream ebss;
@@ -475,12 +475,12 @@ void UnlimitedSetup(void)
     LoadTweaks(); // The above options are deprecated so the same parameter defined as a tweak will override them
 
     // If the user configures it to 1, assume this means default
-    if (nMiningForkTime == 1)
-        nMiningForkTime = Params().GetConsensus().nov2018ActivationTime;
-    if (nMiningSvForkTime == 1)
-        nMiningSvForkTime = Params().GetConsensus().nov2018ActivationTime;
+    if (miningForkTime.Value() == 1)
+        miningForkTime = Params().GetConsensus().nov2018ActivationTime;
+    if (miningSvForkTime.Value() == 1)
+        miningSvForkTime = Params().GetConsensus().nov2018ActivationTime;
 
-    if (nMiningForkTime != 0 && nMiningSvForkTime != 0)
+    if (miningForkTime.Value() != 0 && miningSvForkTime.Value() != 0)
     {
         LOGA("Both the SV and ABC forks are enabled.  You must choose one.");
         printf("Both the SV and ABC forks are enabled.  You must choose one.\n");
