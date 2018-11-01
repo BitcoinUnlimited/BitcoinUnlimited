@@ -170,6 +170,8 @@ set<CNetAddr> setservAddNodeAddresses;
 uint64_t maxGeneratedBlock = DEFAULT_BLOCK_MAX_SIZE;
 uint64_t excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
 unsigned int excessiveAcceptDepth = DEFAULT_EXCESSIVE_ACCEPT_DEPTH;
+uint64_t nMiningSvForkTime = 0;
+uint64_t nMiningForkTime = 1542300000;
 unsigned int maxMessageSizeMultiplier = DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER;
 int nMaxOutConnections = DEFAULT_MAX_OUTBOUND_CONNECTIONS;
 
@@ -271,17 +273,17 @@ CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
     &nMaxDatacarrierBytes,
     &MaxDataCarrierValidator);
 
-CTweak<uint64_t> miningForkTime("consensus.forkNov2018Time",
+CTweakRef<uint64_t> miningForkTime("consensus.forkNov2018Time",
     "Time in seconds since the epoch to initiate the Bitcoin ABC hard fork scheduled on 15th Nov 2018.  A setting of 1 "
     "will turn on the fork at the appropriate time.",
-    1542300000,
-    ForkValidator); // Thu Nov 15 17:40:00 CET 2018
+    &nMiningForkTime,
+    &ForkTimeValidator); // Thu Nov 15 17:40:00 CET 2018
 
-CTweak<uint64_t> miningSvForkTime("consensus.svForkNov2018Time",
+CTweakRef<uint64_t> miningSvForkTime("consensus.svForkNov2018Time",
     "Time in seconds since the epoch to initiate the Bitcoin SV defined hard fork scheduled on 15th Nov 2018.  A "
     "setting of 1 will turn on the fork at the appropriate time.",
-    0,
-    ForkValidator); // Thu Nov 15 17:40:00 CET 2018
+    &nMiningSvForkTime,
+    &ForkTimeValidatorSV); // Thu Nov 15 17:40:00 CET 2018
 
 CTweak<uint64_t> maxScriptOps("consensus.maxScriptOps",
     "Maximum number of script operations allowed.  Stack pushes are excepted.",
