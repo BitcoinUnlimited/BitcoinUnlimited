@@ -81,6 +81,13 @@ extern uint64_t maxGeneratedBlock;
 extern uint64_t excessiveBlockSize;
 extern unsigned int excessiveAcceptDepth;
 extern unsigned int maxMessageSizeMultiplier;
+
+// Fork configuration
+/** This specifies the MTP time of the next fork */
+extern uint64_t nMiningForkTime;
+/** This specifies the MTP time of the SV fork */
+extern uint64_t nMiningSvForkTime;
+
 /** BU Default maximum number of Outbound connections to simultaneously allow*/
 extern int nMaxOutConnections;
 
@@ -270,7 +277,8 @@ std::string MiningBlockSizeValidator(const uint64_t &value, uint64_t *item, bool
 // validator for the voting tweak
 std::string Bip135VoteValidator(const std::string &value, std::string *item, bool validate);
 // ensure that only 1 fork is active
-std::string ForkValidator(const uint64_t &value, CTweak<uint64_t> *item, bool validate);
+std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool validate);
+std::string ForkTimeValidatorSV(const uint64_t &value, uint64_t *item, bool validate);
 
 extern CTweak<unsigned int> maxTxSize;
 extern CTweak<uint64_t> blockSigopsPerMb;
@@ -284,11 +292,13 @@ extern std::list<CStatBase *> mallocedStats;
 extern CCriticalSection cs_blockvalidationthread;
 void InterruptBlockValidationThreads();
 
+
 // Fork configuration
 /** This specifies the MTP time of the next fork */
-extern CTweak<uint64_t> miningForkTime;
+extern CTweakRef<uint64_t> miningForkTime;
 /** This specifies the MTP time of the SV fork */
-extern CTweak<uint64_t> miningSvForkTime;
+extern CTweakRef<uint64_t> miningSvForkTime;
+
 
 // Mining-Candidate start
 /** Return a Merkle root given a Coinbase hash and Merkle proof */
