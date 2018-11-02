@@ -354,10 +354,4 @@ public:
 };
 #endif
 
-/** Dump the mempool to disk. */
-bool DumpMempool();
-
-/** Load the mempool from disk. */
-bool LoadMempool();
-
 #endif // BITCOIN_MAIN_H

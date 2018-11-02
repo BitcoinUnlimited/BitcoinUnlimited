@@ -36,6 +36,12 @@ inline bool AllowFree(double dPriority)
 /** Fake height value used in Coin to signify they are only in the memory pool (since 0.8) */
 static const uint32_t MEMPOOL_HEIGHT = 0x7FFFFFFF;
 
+/** Dump the mempool to disk. */
+bool DumpMempool();
+
+/** Load the mempool from disk. */
+bool LoadMempool();
+
 struct LockPoints
 {
     // Will be set to the blockchain height and median time past
