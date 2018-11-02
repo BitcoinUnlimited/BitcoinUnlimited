@@ -210,8 +210,8 @@ def getFrameworks(binaryPath, verbose):
             sys.stderr.write(o_stderr)
             sys.stderr.flush()
             raise RuntimeError("otool failed with return code %d" % otool.returncode)
-    
-    otoolLines = o_stdout.split("\n")
+
+    otoolLines = o_stdout.decode().split("\n")
     otoolLines.pop(0) # First line is the inspected binary
     if ".framework" in binaryPath or binaryPath.endswith(".dylib"):
         otoolLines.pop(0) # Frameworks and dylibs list themselves as a dependency.
@@ -676,7 +676,7 @@ if verbose >= 2:
     print("+ Installing qt.conf +")
 
 f = open(os.path.join(applicationBundle.resourcesPath, "qt.conf"), "wb")
-f.write(qt_conf)
+f.write(qt_conf.encode())
 f.close()
 
 # ------------------------------------------------
@@ -791,7 +791,7 @@ if config.dmg is not None:
         except subprocess.CalledProcessError as e:
             sys.exit(e.returncode)
         
-        m = re.search("/Volumes/(.+$)", output)
+        m = re.search("/Volumes/(.+$)", output.decode())
         disk_root = m.group(0)
         disk_name = m.group(1)
         
@@ -852,7 +852,7 @@ if config.dmg is not None:
             "items_positions" : "\n                   ".join(items_positions)
             }
         if "window_bounds" in fancy:
-            params["window.bounds"] = ",".join([str(p) for p in fancy["window_bounds"]])
+            params["window_bounds"] = ",".join([str(p) for p in fancy["window_bounds"]])
         if "icon_size" in fancy:
             params["icon_size"] = str(fancy["icon_size"])
         if bg_path is not None:
@@ -868,7 +868,7 @@ if config.dmg is not None:
             print(s)
 
         p = subprocess.Popen(['osascript', '-'], stdin=subprocess.PIPE)
-        p.communicate(input=s)
+        p.communicate(input=s.encode('utf-8'))
         if p.returncode:
             print("Error running osascript.")
 
