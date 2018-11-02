@@ -1386,7 +1386,7 @@ void CRequestManager::MapBlocksInFlightClear()
 void CRequestManager::GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, NodeId nodeid)
 {
     LOCK(cs_objDownloader);
-    for (auto iter : mapRequestManagerNodeState[nodeid].vBlocksInFlight)
+    for (auto &iter : mapRequestManagerNodeState[nodeid].vBlocksInFlight)
     {
         vBlocksInFlight.emplace_back(iter.hash);
     }
