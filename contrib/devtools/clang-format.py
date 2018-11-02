@@ -20,6 +20,8 @@ import tempfile
 # A set of versions known to produce the same output
 tested_versions = ['3.8.0',
                    '3.8.1',  # 3.8.1-12ubuntu1 on yakkety works
+                   '3.9.0',
+                   '3.9.1',
                   ]
 accepted_file_extensions = ('.h', '.cpp') # Files to format
 trailing_comment_exe = "trailing-comment.py"
