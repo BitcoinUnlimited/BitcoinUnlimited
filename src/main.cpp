@@ -159,6 +159,9 @@ void InitializeNode(const CNode *pnode)
 {
     // Add an entry to the nodestate map
     nodestate.InitializeNodeState(pnode);
+
+    // Add an entry to requestmanager nodestate map
+    requester.InitializeNodeState(pnode->GetId());
 }
 
 void FinalizeNode(NodeId nodeid)

@@ -59,7 +59,6 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
 {
     // Test the requesting of blocks/graphenblocks/thinblocks with varying node configurations.
     // This tests all the code paths within RequestBlock() in the request manager.
-    LOCK(cs_vNodes);
 
     // create dummy test addrs
     CAddress addr_xthin(ipaddress(0xa0b0c001, 10000));
@@ -73,11 +72,19 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     dummyNodeXthin.nVersion = MIN_PEER_PROTO_VERSION;
     dummyNodeXthin.fSuccessfullyConnected = true;
     dummyNodeXthin.nServices |= NODE_XTHIN;
+    dummyNodeXthin.id = 1;
     dummyNodeGraphene.nVersion = MIN_PEER_PROTO_VERSION;
     dummyNodeGraphene.fSuccessfullyConnected = true;
     dummyNodeGraphene.nServices |= NODE_GRAPHENE;
+    dummyNodeGraphene.id = 2;
     dummyNodeNone.nVersion = MIN_PEER_PROTO_VERSION;
     dummyNodeNone.fSuccessfullyConnected = true;
+    dummyNodeNone.id = 3;
+
+    // Initialize Nodes
+    GetNodeSignals().InitializeNode(&dummyNodeXthin);
+    GetNodeSignals().InitializeNode(&dummyNodeGraphene);
+    GetNodeSignals().InitializeNode(&dummyNodeNone);
 
     // Create basic Inv for requesting blocks. This simulates an entry in the request manager for a block
     // download.
@@ -92,10 +99,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     IsChainNearlySyncdSet(false);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
-    vNodes.push_back(&dummyNodeXthin);
-    vNodes.push_back(&dummyNodeGraphene);
-    vNodes.push_back(&dummyNodeNone);
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeXthin);
+        vNodes.push_back(&dummyNodeGraphene);
+        vNodes.push_back(&dummyNodeNone);
+    }
     requester.RequestBlock(&dummyNodeXthin, inv);
     BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg).compare("getdata") != 0);
 
@@ -110,31 +119,39 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
-    vNodes.pop_back();
-    vNodes.pop_back();
-    vNodes.pop_back();
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
     // Chains IS sync'd,  No graphene nodes, No Thinblock nodes, Thinblocks OFF, Graphene OFF
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", false);
     SetBoolArg("-use-thinblocks", false);
-    vNodes.push_back(&dummyNodeNone);
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeNone);
+    }
     requester.RequestBlock(&dummyNodeNone, inv);
     BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
 
     thindata.ClearThinBlockTimer(inv.hash);
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeNone);
-    vNodes.pop_back();
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+    }
     // Chains IS sync'd,  HAVE graphene nodes, NO Thinblock nodes, Thinblocks OFF, Graphene OFF
     IsChainNearlySyncdSet(true);
     SetBoolArg("use-grapheneblocks", false);
     SetBoolArg("-use-thinblocks", false);
-    vNodes.push_back(&dummyNodeGraphene);
-    vNodes.push_back(&dummyNodeNone);
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeGraphene);
+        vNodes.push_back(&dummyNodeNone);
+    }
     requester.RequestBlock(&dummyNodeNone, inv);
     BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
 
@@ -142,30 +159,38 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
-    vNodes.pop_back();
-    vNodes.pop_back();
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
     // Chains IS sync'd,  NO graphene nodes, NO Thinblock nodes, Thinblocks ON, Graphene OFF
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", false);
     SetBoolArg("-use-thinblocks", true);
-    vNodes.push_back(&dummyNodeNone);
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeNone);
+    }
     requester.RequestBlock(&dummyNodeNone, inv);
     BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
 
     thindata.ClearThinBlockTimer(inv.hash);
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeNone);
-    vNodes.pop_back();
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+    }
     // Chains IS sync'd,  HAVE graphene nodes, NO Thinblock nodes, Thinblocks ON, Graphene OFF
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", false);
     SetBoolArg("-use-thinblocks", true);
-    vNodes.push_back(&dummyNodeGraphene);
-    vNodes.push_back(&dummyNodeNone);
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeGraphene);
+        vNodes.push_back(&dummyNodeNone);
+    }
     requester.RequestBlock(&dummyNodeNone, inv);
     BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
 
@@ -173,16 +198,20 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
-    vNodes.pop_back();
-    vNodes.pop_back();
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
     // Chains IS sync'd,  NO graphene nodes, HAVE Thinblock nodes, Thinblocks OFF, Graphene ON
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", false);
-    vNodes.push_back(&dummyNodeXthin);
-    vNodes.push_back(&dummyNodeNone);
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeXthin);
+        vNodes.push_back(&dummyNodeNone);
+    }
     requester.RequestBlock(&dummyNodeNone, inv);
     BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
 
@@ -190,37 +219,47 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
-    vNodes.pop_back();
-    vNodes.pop_back();
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
     // Chains IS sync'd,  NO graphene nodes, NO Thinblock nodes, Thinblocks OFF, Graphene ON
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", false);
-    vNodes.push_back(&dummyNodeNone);
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeNone);
+    }
     requester.RequestBlock(&dummyNodeNone, inv);
     BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
 
     thindata.ClearThinBlockTimer(inv.hash);
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeNone);
-    vNodes.pop_back();
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+    }
     // Chains IS sync'd,  NO graphene nodes, NO Thinblock nodes, Thinblocks ON, Graphene ON
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
-    vNodes.push_back(&dummyNodeNone);
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeNone);
+    }
     requester.RequestBlock(&dummyNodeNone, inv);
     BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
 
     thindata.ClearThinBlockTimer(inv.hash);
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeNone);
-    vNodes.pop_back();
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+    }
     // Chains IS sync'd,  HAVE graphene nodes, NO Thinblock nodes, Thinblocks ON, Graphene ON
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
@@ -234,9 +273,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
-    vNodes.pop_back();
-    vNodes.pop_back();
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
     // Chains IS sync'd,  HAVE graphene nodes, NO Thinblock nodes, Thinblocks OFF, Graphene ON
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
@@ -251,9 +292,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
-    vNodes.pop_back();
-    vNodes.pop_back();
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
     // Chains IS sync'd,  HAVE graphene nodes, HAVE Thinblock nodes, Thinblocks ON, Graphene ON
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
@@ -268,17 +311,22 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
-    vNodes.pop_back();
-    vNodes.pop_back();
-    vNodes.pop_back();
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
 
     // Chains IS sync'd,  NO graphene nodes, HAVE Thinblock nodes, Thinblocks ON, Graphene OFF
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", false);
     SetBoolArg("-use-thinblocks", true);
-    vNodes.push_back(&dummyNodeXthin);
-    vNodes.push_back(&dummyNodeNone);
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeXthin);
+        vNodes.push_back(&dummyNodeNone);
+    }
     requester.RequestBlock(&dummyNodeXthin, inv);
     BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg).compare("get_xthin") != 0);
 
@@ -286,8 +334,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
-    vNodes.pop_back();
-    vNodes.pop_back();
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
 
     /******************************
      * Check full blocks are downloaded when no block announcements come from a graphene or thinblock peer
@@ -298,10 +349,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
-    vNodes.push_back(&dummyNodeGraphene);
-    vNodes.push_back(&dummyNodeXthin);
-    vNodes.push_back(&dummyNodeNone);
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeGraphene);
+        vNodes.push_back(&dummyNodeXthin);
+        vNodes.push_back(&dummyNodeNone);
+    }
     // Set mocktime
     nTime = GetTime();
     SetMockTime(nTime);
@@ -326,9 +379,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
-    vNodes.pop_back();
-    vNodes.pop_back();
-    vNodes.pop_back();
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
 
     /******************************
      * Check full blocks are downloaded when graphene is off but thinblock timer is exceeded
@@ -338,9 +394,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", false);
     SetBoolArg("-use-thinblocks", true);
-    vNodes.push_back(&dummyNodeGraphene);
-    vNodes.push_back(&dummyNodeXthin);
-    vNodes.push_back(&dummyNodeNone);
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeGraphene);
+        vNodes.push_back(&dummyNodeXthin);
+        vNodes.push_back(&dummyNodeNone);
+    }
 
     // Set mocktime
     nTime = GetTime();
@@ -360,9 +419,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
-    vNodes.pop_back();
-    vNodes.pop_back();
-    vNodes.pop_back();
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
 
     /******************************
      * Check Xthin is downloaded when graphene timer is exceeded and we have a block available from an
@@ -373,9 +435,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
-    vNodes.push_back(&dummyNodeGraphene);
-    vNodes.push_back(&dummyNodeXthin);
-    vNodes.push_back(&dummyNodeNone);
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeGraphene);
+        vNodes.push_back(&dummyNodeXthin);
+        vNodes.push_back(&dummyNodeNone);
+    }
 
     // Set mocktime
     nTime = GetTime();
@@ -395,10 +460,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
-    vNodes.pop_back();
-    vNodes.pop_back();
-    vNodes.pop_back();
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
 
     /******************************
      * Check a Graphene block is downloaded when Graphene timer is exceeded but then we get an announcement
@@ -409,9 +476,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
-    vNodes.push_back(&dummyNodeGraphene);
-    vNodes.push_back(&dummyNodeXthin);
-    vNodes.push_back(&dummyNodeNone);
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeGraphene);
+        vNodes.push_back(&dummyNodeXthin);
+        vNodes.push_back(&dummyNodeNone);
+    }
 
     // Set mocktime
     nTime = GetTime();
@@ -431,9 +501,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
-    vNodes.pop_back();
-    vNodes.pop_back();
-    vNodes.pop_back();
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
 
     /******************************
      * Check a full block is downloaded when Graphene timer is exceeded but then we get an announcement
@@ -446,9 +519,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", false);
-    vNodes.push_back(&dummyNodeGraphene);
-    vNodes.push_back(&dummyNodeXthin);
-    vNodes.push_back(&dummyNodeNone);
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeGraphene);
+        vNodes.push_back(&dummyNodeXthin);
+        vNodes.push_back(&dummyNodeNone);
+    }
 
     // Set mocktime
     nTime = GetTime();
@@ -471,10 +547,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
-    vNodes.pop_back();
-    vNodes.pop_back();
-    vNodes.pop_back();
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
 
     /******************************
      * Check an Xthin is downloaded when Graphene timer is exceeded but then we get an announcement
@@ -487,10 +565,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
-    vNodes.push_back(&dummyNodeGraphene);
-    vNodes.push_back(&dummyNodeXthin);
-    vNodes.push_back(&dummyNodeNone);
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeGraphene);
+        vNodes.push_back(&dummyNodeXthin);
+        vNodes.push_back(&dummyNodeNone);
+    }
     // Set mocktime
     nTime = GetTime();
     SetMockTime(nTime);
@@ -512,9 +592,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
-    vNodes.pop_back();
-    vNodes.pop_back();
-    vNodes.pop_back();
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
 
     /******************************
      * Check a Xthin is is downloaded when thinblock timer is exceeded but then we get an announcement
@@ -525,10 +608,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", false);
     SetBoolArg("-use-thinblocks", true);
-    vNodes.push_back(&dummyNodeGraphene);
-    vNodes.push_back(&dummyNodeXthin);
-    vNodes.push_back(&dummyNodeNone);
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeGraphene);
+        vNodes.push_back(&dummyNodeXthin);
+        vNodes.push_back(&dummyNodeNone);
+    }
     // Set mocktime
     nTime = GetTime();
     SetMockTime(nTime);
@@ -547,10 +632,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
-    vNodes.pop_back();
-    vNodes.pop_back();
-    vNodes.pop_back();
-
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
     /******************************
      * Check a Xthin is is downloaded when thinblock timer is exceeded but then we get an announcement
      * from a thinblock peer, and then request from that thinblock peer before we request from any others.
@@ -561,9 +648,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", false);
     SetBoolArg("-use-thinblocks", true);
-    vNodes.push_back(&dummyNodeGraphene);
-    vNodes.push_back(&dummyNodeXthin);
-    vNodes.push_back(&dummyNodeNone);
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeGraphene);
+        vNodes.push_back(&dummyNodeXthin);
+        vNodes.push_back(&dummyNodeNone);
+    }
 
     // Set mocktime
     nTime = GetTime();
@@ -585,9 +675,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
-    vNodes.pop_back();
-    vNodes.pop_back();
-    vNodes.pop_back();
+    {
+        LOCK(cs_vNodes);
+        vNodes.pop_back();
+        vNodes.pop_back();
+        vNodes.pop_back();
+    }
 
 
     // Final cleanup: Unset mocktime

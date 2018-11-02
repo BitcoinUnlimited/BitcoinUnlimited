@@ -225,6 +225,13 @@ public:
     void GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, NodeId nodeid);
     int GetNumBlocksInFlight(NodeId nodeid);
 
+    // Add entry to the requestmanager nodestate map
+    void InitializeNodeState(NodeId nodeid)
+    {
+        LOCK(cs_objDownloader);
+        mapRequestManagerNodeState.emplace(nodeid, CRequestManagerNodeState());
+    }
+
     // Remove a request manager node from the nodestate map.
     void RemoveNodeState(NodeId nodeid)
     {
