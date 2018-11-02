@@ -1042,9 +1042,7 @@ UniValue enqueuerawtransaction(const UniValue &params, bool fHelp)
 
     CTxInputData txd;
     txd.tx = MakeTransactionRef(std::move(tx));
-    txd.nodeId = -1;
     txd.nodeName = "rpc";
-    txd.whitelisted = false;
     EnqueueTxForAdmission(txd);
 
     if (params.size() > 1)

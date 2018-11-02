@@ -775,9 +775,6 @@ bool LoadMempool(void)
             {
                 CTxInputData txd;
                 txd.tx = MakeTransactionRef(tx);
-                txd.nodeId = -1;
-                txd.nodeName = "none";
-                txd.whitelisted = false;
                 EnqueueTxForAdmission(txd);
                 ++count;
             }
