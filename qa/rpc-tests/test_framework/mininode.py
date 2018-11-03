@@ -36,6 +36,7 @@ from threading import RLock
 from threading import Thread
 import logging
 import copy
+import traceback
 
 from .nodemessages import *
 from .bumessages import *
@@ -98,6 +99,7 @@ class NodeConnCB(object):
                 getattr(self, fn)(conn, message)
             except:
                 print("ERROR delivering %s (%s) to %s" % (repr(message), sys.exc_info()[0], fn))
+                traceback.print_exc()
 
     def on_version(self, conn, message):
         if message.nVersion >= 209:
