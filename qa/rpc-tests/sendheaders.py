@@ -125,8 +125,8 @@ class BaseNode(NodeConnCB):
         self.connection.send_message(msg)
 
     # Wrapper for the NodeConn's send_message function
-    def send_message(self, message):
-        self.connection.send_message(message)
+    def send_message(self, message, pushbuf = False):
+        self.connection.send_message(message, pushbuf)
 
     def on_inv(self, conn, message):
         self.last_inv.append(message)
@@ -340,6 +340,13 @@ class SendHeadersTest(BitcoinTestFramework):
         # Test logic begins here
         inv_node.wait_for_verack()
         test_node.wait_for_verack()
+
+        inv_node.send_message(msg_xversion(), True)
+        test_node.send_message(msg_xversion(), True)
+
+        # Test logic begins here
+        inv_node.wait_for_xverack()
+        test_node.wait_for_xverack()
 
         tip = int(self.nodes[0].getbestblockhash(), 16)
 
