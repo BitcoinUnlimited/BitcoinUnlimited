@@ -76,8 +76,16 @@ UniValue getinfo(const UniValue &params, bool fHelp)
             "\nExamples:\n" +
             HelpExampleCli("getinfo", "") + HelpExampleRpc("getinfo", ""));
 
+    // Get size of vNodes first to avoid any locking order mixups
+    // when/if cs_main as well as cs_wallet are taken
+    int nNodes = 0;
+    {
+        LOCK(cs_vNodes);
+        nNodes = vNodes.size();
+    }
+
 #ifdef ENABLE_WALLET
-    LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);
+    LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : nullptr);
 #else
     LOCK(cs_main);
 #endif
@@ -97,7 +105,7 @@ UniValue getinfo(const UniValue &params, bool fHelp)
 #endif
     obj.push_back(Pair("blocks", (int)chainActive.Height()));
     obj.push_back(Pair("timeoffset", GetTimeOffset()));
-    obj.push_back(Pair("connections", (int)vNodes.size()));
+    obj.push_back(Pair("connections", nNodes));
     obj.push_back(Pair("proxy", (proxy.IsValid() ? proxy.proxy.ToStringIPPort() : string())));
     obj.push_back(Pair("difficulty", (double)GetDifficulty()));
     obj.push_back(Pair("testnet", Params().TestnetToBeDeprecatedFieldRPC()));
@@ -203,7 +211,7 @@ UniValue validateaddress(const UniValue &params, bool fHelp)
             HelpExampleRpc("validateaddress", "\"1PSSGeFHDnKNxiEyFrD1wcEaHr9hrQDDWc\""));
 
 #ifdef ENABLE_WALLET
-    LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);
+    LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : nullptr);
 #else
     LOCK(cs_main);
 #endif
