@@ -20,7 +20,7 @@ with the Bitcoin Cash specifications you could find here:
 This release will also implement a set of consensus changes proposed by an alternative implementation, Bitcoin SV,
 see [SV release notes for ver 0.1.0](https://github.com/bitcoin-sv/bitcoin-sv/blob/master/doc/release-notes.md) for more details.
 Such set of features is **disabled by default**, the default policy is to activate the set of changes as defined by the bitcoincash.org
-[specification](https://github.com/bitcoin-sv/bitcoin-sv/blob/master/doc/release-notes.md).
+[specification](https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2018-nov-upgrade.md).
 
 To configure your BUcash client so that it will activate the protocol upgrade proposed by SV you need to add `consensus.forkNov2018Time=0` and `consensus.svForkNov2018Time=1`
 in your `bitcoin.conf` file. Trying to activate both protocol upgrades at the same time will lead to the client to exit with this error
