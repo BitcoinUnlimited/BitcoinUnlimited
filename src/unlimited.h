@@ -34,6 +34,7 @@ enum
     // (github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/may-2018-hardfork.md#summary)
     MIN_EXCESSIVE_BLOCK_SIZE = 32000000,
     MIN_EXCESSIVE_BLOCK_SIZE_REGTEST = 1000,
+    SV_EXCESSIVE_BLOCK_SIZE = 128000000,
     DEFAULT_EXCESSIVE_BLOCK_SIZE = MIN_EXCESSIVE_BLOCK_SIZE,
     DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER = 16, // Allowed messages lengths will be this * the excessive block size
     DEFAULT_COINBASE_RESERVE_SIZE = 1000,
@@ -80,6 +81,13 @@ extern uint64_t maxGeneratedBlock;
 extern uint64_t excessiveBlockSize;
 extern unsigned int excessiveAcceptDepth;
 extern unsigned int maxMessageSizeMultiplier;
+
+// Fork configuration
+/** This specifies the MTP time of the next fork */
+extern uint64_t nMiningForkTime;
+/** This specifies the MTP time of the SV fork */
+extern uint64_t nMiningSvForkTime;
+
 /** BU Default maximum number of Outbound connections to simultaneously allow*/
 extern int nMaxOutConnections;
 
@@ -92,6 +100,9 @@ extern CTweak<uint64_t> checkScriptDays;
 
 // Allow getblocktemplate to succeed even if this node chain tip blocks are old or this node is not connected
 extern CTweak<bool> unsafeGetBlockTemplate;
+
+// The maximum number of allowed script operations (consensus param)
+extern CTweak<uint64_t> maxScriptOps;
 
 // print out a configuration warning during initialization
 // bool InitWarning(const std::string &str);
@@ -208,6 +219,7 @@ extern void IsInitialBlockDownloadInit(bool *fInit = nullptr);
 // Check whether we are nearly sync'd.  Used primarily to determine whether an xthin can be retrieved.
 extern bool IsChainNearlySyncd();
 extern void IsChainNearlySyncdInit();
+extern void IsChainNearlySyncdSet(bool fSync);
 extern uint64_t LargestBlockSeen(uint64_t nBlockSize = 0);
 extern int GetBlockchainHeight();
 
@@ -264,6 +276,9 @@ std::string SubverValidator(const std::string &value, std::string *item, bool va
 std::string MiningBlockSizeValidator(const uint64_t &value, uint64_t *item, bool validate);
 // validator for the voting tweak
 std::string Bip135VoteValidator(const std::string &value, std::string *item, bool validate);
+// ensure that only 1 fork is active
+std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool validate);
+std::string ForkTimeValidatorSV(const uint64_t &value, uint64_t *item, bool validate);
 
 extern CTweak<unsigned int> maxTxSize;
 extern CTweak<uint64_t> blockSigopsPerMb;
@@ -277,9 +292,13 @@ extern std::list<CStatBase *> mallocedStats;
 extern CCriticalSection cs_blockvalidationthread;
 void InterruptBlockValidationThreads();
 
+
 // Fork configuration
 /** This specifies the MTP time of the next fork */
-extern CTweak<uint64_t> miningForkTime;
+extern CTweakRef<uint64_t> miningForkTime;
+/** This specifies the MTP time of the SV fork */
+extern CTweakRef<uint64_t> miningSvForkTime;
+
 
 // Mining-Candidate start
 /** Return a Merkle root given a Coinbase hash and Merkle proof */

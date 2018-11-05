@@ -6,9 +6,10 @@
 This test checks that simple features of the magnetic anomaly fork
 activates properly. More complex features are given their own tests.
 """
+import os
 
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import assert_equal, assert_raises_rpc_error
+from test_framework.util import assert_equal, assert_raises_rpc_error, findBitcoind, JSONRPCException
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.blocktools import create_coinbase, create_block
 from test_framework.mininode import *
@@ -38,6 +39,27 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
                             "-consensus.forkNov2018Time=%d" % NOV152018_START_TIME]]
 
     def run_test(self):
+
+        # Check configuration settings
+        self.nodes[0].set("consensus.forkNov2018Time=1")
+        assert(self.nodes[0].get("consensus.forkNov2018Time")["consensus.forkNov2018Time"] == 1542300000)
+        try:
+            self.nodes[0].set("consensus.svForkNov2018Time=1")
+            assert(0)  # should have thrown exception, can't set both ABC and SV forks at the same time
+        except JSONRPCException as e:
+            pass
+        # now set SV fork & check the default
+        self.nodes[0].set("consensus.forkNov2018Time=0")
+        self.nodes[0].set("consensus.svForkNov2018Time=1")
+        assert(self.nodes[0].get("consensus.svForkNov2018Time")["consensus.svForkNov2018Time"] == 1542300000)
+        subver = self.nodes[0].getnetworkinfo()["subversion"]
+        assert("SV" in subver)
+
+        self.nodes[0].set("consensus.svForkNov2018Time=0")
+        subver = self.nodes[0].getnetworkinfo()["subversion"]
+        assert(not "SV" in subver)
+
+        # Run TestManager based tests
         self.test = TestManager(self, self.options.tmpdir)
         self.test.add_all_connections(self.nodes)
         # Start up network handling in another thread

@@ -149,7 +149,7 @@ static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 8;
 
 static const bool DEFAULT_PEERBLOOMFILTERS = true;
 static const bool DEFAULT_USE_THINBLOCKS = true;
-static const bool DEFAULT_USE_GRAPHENE_BLOCKS = false;
+static const bool DEFAULT_USE_GRAPHENE_BLOCKS = true;
 
 static const bool DEFAULT_REINDEX = false;
 static const bool DEFAULT_DISCOVER = true;
@@ -306,15 +306,6 @@ struct CNodeStateStats
     int nCommonHeight;
     std::vector<int> vHeightInFlight;
 };
-
-/**
- * Check if transaction will be final in the next block to be created.
- *
- * Calls IsFinalTx() with current block height and appropriate block time.
- *
- * See consensus/consensus.h for flag definitions.
- */
-bool CheckFinalTx(const CTransaction &tx, int flags = -1);
 
 /**
  * Test whether the LockPoints height and time are still valid on the current chain

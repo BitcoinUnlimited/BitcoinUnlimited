@@ -26,7 +26,9 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
+#ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
+#endif
 
 // These globals are needed here so bitcoin-cli can link
 const std::string CURRENCY_UNIT = "BCH";
@@ -418,6 +420,7 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
                 DEFAULT_MAX_UPLOAD_TARGET));
 }
 
+#ifdef ENABLE_WALLET
 static void addWalletOptions(AllowedArgs &allowedArgs)
 {
     allowedArgs.addHeader(_("Wallet options:"))
@@ -486,6 +489,7 @@ static void addWalletOptions(AllowedArgs &allowedArgs)
             _("Use Bitcoin Cash Address for destination encoding (Activates by default Jan 14, 2017)"),
             walletParamOptional);
 }
+#endif
 
 static void addZmqOptions(AllowedArgs &allowedArgs)
 {
@@ -518,10 +522,12 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addDebugArg("checkpoints", optionalBool,
             strprintf("Disable expensive verification for known chain history (default: %u)",
                          DEFAULT_CHECKPOINTS_ENABLED))
+#ifdef ENABLE_WALLET
         .addDebugArg("dblogsize=<n>", requiredInt,
             strprintf("Flush wallet database activity from memory to disk log every <n> megabytes (default: %u)",
                          DEFAULT_WALLET_DBLOGSIZE),
             walletParamOptional)
+#endif
         .addDebugArg("disablesafemode", optionalBool,
             strprintf("Disable safemode, override a real safe mode event (default: %u)", DEFAULT_DISABLE_SAFEMODE))
         .addDebugArg("testsafemode", optionalBool, strprintf("Force safe mode (default: %u)", DEFAULT_TESTSAFEMODE))
@@ -529,9 +535,11 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addDebugArg("fuzzmessagestest=<n>", requiredInt, "Randomly fuzz 1 of every <n> network messages")
         .addDebugArg("pvtest", optionalBool,
             strprintf("Slow down input checking to 1 every second (default: %u)", DEFAULT_PV_TESTMODE))
+#ifdef ENABLE_WALLET
         .addDebugArg("flushwallet", optionalBool,
             strprintf("Run a thread to flush wallet periodically (default: %u)", DEFAULT_FLUSHWALLET),
             walletParamOptional)
+#endif
         .addDebugArg("stopafterblockimport", optionalBool,
             strprintf("Stop running after importing blocks from disk (default: %u)", DEFAULT_STOPAFTERBLOCKIMPORT))
         .addDebugArg("limitancestorcount=<n>", requiredInt,
@@ -581,9 +589,11 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addDebugArg("printpriority", optionalBool,
             strprintf("Log transaction priority and fee per kB when mining blocks (default: %u)",
                          DEFAULT_PRINTPRIORITY))
+#ifdef ENABLE_WALLET
         .addDebugArg("privdb", optionalBool,
             strprintf("Sets the DB_PRIVATE flag in the wallet db environment (default: %u)", DEFAULT_WALLET_PRIVDB),
             walletParamOptional)
+#endif
         .addArg(
             "shrinkdebugfile", optionalBool, _("Shrink debug.log file on client startup (default: 1 when no -debug)"));
 }
@@ -743,7 +753,9 @@ static void addAllNodeOptions(AllowedArgs &allowedArgs, HelpMessageMode mode, CT
     addConfigurationLocationOptions(allowedArgs);
     addGeneralOptions(allowedArgs, mode);
     addConnectionOptions(allowedArgs);
+#ifdef ENABLE_WALLET
     addWalletOptions(allowedArgs);
+#endif
     addZmqOptions(allowedArgs);
     addDebuggingOptions(allowedArgs, mode);
     addChainSelectionOptions(allowedArgs);

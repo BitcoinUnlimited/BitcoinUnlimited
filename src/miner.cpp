@@ -372,7 +372,7 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
     // Must check that lock times are still valid
     // This can be removed once MTP is always enforced
     // as long as reorgs keep the mempool consistent.
-    if (!IsFinalTx(iter->GetTx(), nHeight, nLockTimeCutoff))
+    if (!IsFinalTx(iter->GetSharedTx(), nHeight, nLockTimeCutoff))
         return false;
 
     // Make sure tx size is acceptable after Nov 15, 2018 fork

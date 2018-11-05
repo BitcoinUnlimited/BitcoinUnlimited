@@ -347,7 +347,10 @@ enum
     // do not actually support. Other service bits should be allocated via the
     // BUIP process.
 
-    NODE_WEAKBLOCKS = (1 << 7)
+    NODE_WEAKBLOCKS = (1 << 7),
+
+    // NODE_CF indicates the node is capable of serving compact block filters to SPV clients.
+    NODE_CF = (1 << 8)
 };
 
 /** A CService with information about it as peer */

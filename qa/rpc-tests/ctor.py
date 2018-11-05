@@ -74,7 +74,6 @@ class MyTest (BitcoinTestFramework):
         self.nodes[2].set(FORK_CFG + "=0", "consensus.enableCanonicalTxOrder=1")
         self.nodes[3].set(FORK_CFG + "=0", "consensus.enableCanonicalTxOrder=1")
 
-
         waitFor(30, lambda: self.nodes[2].getmempoolinfo()["size"] >= 20)
 
         preForkHash = self.nodes[0].getbestblockhash()
@@ -122,39 +121,38 @@ class MyTest (BitcoinTestFramework):
         # dtor rollback test
         disconnect_all(self.nodes[1])
         disconnect_all(self.nodes[0])
-        for j in range(10):
+        for j in range(5):
             for i in range(3):
                 self.nodes[1].sendtoaddress(addr[1], 4-i)
             self.nodes[1].generate(1)
 
-        for j in range(9):
+        for j in range(4):
             for i in range(3):
                 self.nodes[0].sendtoaddress(addr[0], 4-i)
             self.nodes[0].generate(1)
-        connect_nodes(self.nodes[0], 1)
-        
+        connect_nodes_bi(self.nodes,0,1)
+
         waitFor(10, lambda: self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
         # ctor rollback test
         disconnect_all(self.nodes[3])
-        for j in range(10):
+        for j in range(5):
             for i in range(3):
                 self.nodes[3].sendtoaddress(addr[3], 4-i)
             self.nodes[3].generate(1)
 
-        for j in range(9):
+        for j in range(4):
             for i in range(3):
                 self.nodes[2].sendtoaddress(addr[2], 4-i)
             self.nodes[2].generate(1)
-        connect_nodes(self.nodes[2], 3)
+        connect_nodes_bi(self.nodes,2,3)
         #print(self.nodes[2].getbestblockhash())
         #print(self.nodes[3].getbestblockhash())
         #print(self.nodes[2].getchaintips())
         waitFor(10, lambda: self.nodes[2].getbestblockhash() == self.nodes[3].getbestblockhash())
 
-        
         # push the dtor chain beyond ctor
-        for i in range(0,50):
+        for i in range(0,30):
             self.nodes[0].sendtoaddress(addr[0], 1)
             self.nodes[0].generate(1)
 
@@ -163,7 +161,7 @@ class MyTest (BitcoinTestFramework):
         ctorTipHeight = self.nodes[3].getblockcount()
         dtorTip = self.nodes[0].getbestblockhash()
         dtorTipHeight = self.nodes[0].getblockcount()
-        
+
         self.nodes.append(start_node(4, self.options.tmpdir))
         self.nodes[4].set(FORK_CFG + "=0", "consensus.enableCanonicalTxOrder=1")
         for i in range(5):
@@ -185,7 +183,7 @@ class MyTest (BitcoinTestFramework):
 
         # make the new fork longer than current
         for n in range(10):
-            time.sleep(1)
+            time.sleep(.1)
             rollbackNode.generate(1)
 
         preFork = rollbackNode.generate(1)[0] # will be a dtor block

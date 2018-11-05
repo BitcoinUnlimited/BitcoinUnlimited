@@ -154,7 +154,11 @@ bool AreInputsStandard(const CTransaction &tx, const CCoinsViewCache &mapInputs)
         {
             std::vector<std::vector<unsigned char> > stack;
             // convert the scriptSig into a stack, so we can inspect the redeemScript
-            if (!EvalScript(stack, tx.vin[i].scriptSig, SCRIPT_VERIFY_NONE, BaseSignatureChecker(), 0))
+            // This is only parsing the scriptSig which should not have any non-push opcodes in it anyway,
+            // and it matches the P2SH script template, so we know that it won't have any ops, only pushes
+            // so pass MAX_OPS_PER_SCRIPT for the max number of ops to match prior behavior exactly
+            if (!EvalScript(
+                    stack, tx.vin[i].scriptSig, SCRIPT_VERIFY_NONE, MAX_OPS_PER_SCRIPT, BaseSignatureChecker(), 0))
                 return false;
             if (stack.empty())
                 return false;

@@ -37,14 +37,6 @@ void ThreadCommitToMempool();
 void ThreadTxAdmission();
 void ProcessOrphans(std::vector<uint256> &vWorkQueue);
 
-bool CheckFinalTx(const CTransaction &tx, int flags, const Snapshot &ss);
-bool CheckSequenceLocks(const CTransaction &tx,
-    int flags,
-    LockPoints *lp,
-    bool useExistingLockPoints,
-    const Snapshot &ss);
-
-
 CTransactionRef CommitQGet(uint256 hash)
 {
     boost::unique_lock<boost::mutex> lock(csCommitQ);
@@ -260,6 +252,11 @@ void CommitTxToMempool()
             vWhatChanged.push_back(data.hash);
             // Update txn per second only when a txn is valid and accepted to the mempool
             mempool.UpdateTransactionsPerSecond();
+
+            // Indicate that this tx was fully processed/accepted and can now be removed from the
+            // request manager.
+            CInv inv(MSG_TX, data.hash);
+            requester.Received(inv, nullptr);
         }
         txCommitQ.clear();
     }
@@ -439,6 +436,10 @@ void ThreadTxAdmission()
                             for (const COutPoint &remove : vCoinsToUncache)
                                 pcoinsTip->Uncache(remove);
                         }
+
+                        // Mark tx as received if invalid or an orphan. If it's a valid Tx we mark it received
+                        // only when it's finally accepted into the mempool.
+                        requester.Received(inv, nullptr);
                     }
                     int nDoS = 0;
                     if (state.IsInvalid(nDoS))
@@ -461,9 +462,6 @@ void ThreadTxAdmission()
                             }
                         }
                     }
-
-                    // Mark tx as received regardless of whether it was a valid tx, orphan or invalid.
-                    requester.Received(inv, nullptr);
                 }
             }
         }
@@ -540,7 +538,9 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
     const uint32_t cds_flag =
         IsNov152018Enabled(chainparams.GetConsensus(), chainActive.Tip()) ? SCRIPT_ENABLE_CHECKDATASIG : 0;
-    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | cds_flag;
+    const uint32_t svflag =
+        IsSv2018Enabled(chainparams.GetConsensus(), chainActive.Tip()) ? SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES : 0;
+    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | cds_flag | svflag;
 
     // LOG(MEMPOOL, "Mempool: Considering Tx %s\n", tx->GetHash().ToString());
 
@@ -575,7 +575,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     // Only accept nLockTime-using transactions that can be mined in the next
     // block; we don't want our mempool filled up with transactions that can't
     // be mined yet.
-    if (!CheckFinalTx(*tx, STANDARD_LOCKTIME_VERIFY_FLAGS, ss))
+    if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &ss))
         return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
 
     // Make sure tx size is acceptable after Nov 15, 2018 fork
@@ -660,7 +660,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             // be mined yet.
             // Must keep pool.cs for this unless we change CheckSequenceLocks to take a
             // CoinsViewCache instead of create its own
-            if (!CheckSequenceLocks(*tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp, false, ss))
+            if (!CheckSequenceLocks(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp, false, &ss))
                 return state.DoS(0, false, REJECT_NONSTANDARD, "non-BIP68-final");
         }
 
@@ -849,7 +849,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         unsigned char sighashType = 0;
-        if (!CheckInputs(*tx, state, view, true, flags, true, &resourceTracker, nullptr, &sighashType))
+        if (!CheckInputs(
+                *tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr, &sighashType))
         {
             LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", tx->GetHash().ToString().c_str());
             return false;
@@ -866,8 +867,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(*tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | cds_flag, true, nullptr, nullptr,
-                &sighashType2))
+        if (!CheckInputs(*tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | cds_flag, maxScriptOps.Value(), true,
+                nullptr, nullptr, &sighashType2))
         {
             return error(
                 "%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
@@ -1011,15 +1012,17 @@ void Snapshot::Load(void)
     cvMempool = new CCoinsViewMemPool(coins, mempool);
 }
 
-bool CheckSequenceLocks(const CTransaction &tx,
+bool CheckSequenceLocks(const CTransactionRef &tx,
     int flags,
     LockPoints *lp,
     bool useExistingLockPoints,
-    const Snapshot &ss)
+    const Snapshot *ss)
 {
+    if (ss == nullptr)
+        AssertLockHeld(cs_main);
     AssertLockHeld(mempool.cs);
 
-    CBlockIndex *tip = ss.tip;
+    CBlockIndex *tip = (ss != nullptr) ? ss->tip : chainActive.Tip();
     CBlockIndex index;
     index.pprev = tip;
     // CheckSequenceLocks() uses chainActive.Height()+1 to evaluate
@@ -1040,12 +1043,13 @@ bool CheckSequenceLocks(const CTransaction &tx,
     else
     {
         // pcoinsTip contains the UTXO set for chainActive.Tip()
-        CCoinsViewMemPool &viewMemPool(*ss.cvMempool);
+        CCoinsViewMemPool tmpView(pcoinsTip, mempool);
+        CCoinsViewMemPool &viewMemPool = (ss != nullptr) ? *ss->cvMempool : tmpView;
         std::vector<int> prevheights;
-        prevheights.resize(tx.vin.size());
-        for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++)
+        prevheights.resize(tx->vin.size());
+        for (size_t txinIndex = 0; txinIndex < tx->vin.size(); txinIndex++)
         {
-            const CTxIn &txin = tx.vin[txinIndex];
+            const CTxIn &txin = tx->vin[txinIndex];
             Coin coin;
             if (!viewMemPool.GetCoin(txin.prevout, coin))
             {
@@ -1094,7 +1098,7 @@ bool CheckSequenceLocks(const CTransaction &tx,
     return EvaluateSequenceLocks(index, lockPair);
 }
 
-bool CheckFinalTx(const CTransaction &tx, int flags, const Snapshot &ss)
+bool CheckFinalTx(const CTransactionRef &tx, int flags, const Snapshot *ss)
 {
     // By convention a negative value for flags indicates that the
     // current network-enforced consensus rules should be used. In
@@ -1110,14 +1114,15 @@ bool CheckFinalTx(const CTransaction &tx, int flags, const Snapshot &ss)
     // evaluated is what is used. Thus if we want to know if a
     // transaction can be part of the *next* block, we need to call
     // IsFinalTx() with one more than chainActive.Height().
-    const int nBlockHeight = ss.tipHeight + 1;
+    const int nBlockHeight = (ss != nullptr) ? ss->tipHeight + 1 : chainActive.Height() + 1;
 
     // BIP113 will require that time-locked transactions have nLockTime set to
     // less than the median time of the previous block they're contained in.
     // When the next block is created its previous block will be the current
     // chain tip, so we use that to calculate the median time passed to
     // IsFinalTx() if LOCKTIME_MEDIAN_TIME_PAST is set.
-    const int64_t nBlockTime = (flags & LOCKTIME_MEDIAN_TIME_PAST) ? ss.tipMedianTimePast : GetAdjustedTime();
+    const int64_t nMedianTimePast = (ss != nullptr) ? ss->tipMedianTimePast : chainActive.Tip()->GetMedianTimePast();
+    const int64_t nBlockTime = (flags & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : GetAdjustedTime();
 
     return IsFinalTx(tx, nBlockHeight, nBlockTime);
 }

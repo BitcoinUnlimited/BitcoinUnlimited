@@ -1690,7 +1690,7 @@ bool CWalletTx::InMempool() const
 bool CWalletTx::IsTrusted() const
 {
     // Quick answer in most cases
-    if (!CheckFinalTx(*this))
+    if (!CheckFinalTx(MakeTransactionRef(*this)))
         return false;
     int nDepth = GetDepthInMainChain();
     if (nDepth >= 1)
@@ -1880,7 +1880,7 @@ void CWallet::AvailableCoins(vector<COutput> &vCoins,
             const uint256 &wtxid = it->first;
             const CWalletTx *pcoin = &(*it).second;
 
-            if (!CheckFinalTx(*pcoin))
+            if (!CheckFinalTx(MakeTransactionRef(*pcoin)))
                 continue;
 
             if (fOnlyConfirmed && !pcoin->IsTrusted())
@@ -2928,7 +2928,7 @@ std::map<CTxDestination, CAmount> CWallet::GetAddressBalances()
         {
             CWalletTx *pcoin = &walletEntry.second;
 
-            if (!CheckFinalTx(*pcoin) || !pcoin->IsTrusted())
+            if (!CheckFinalTx(MakeTransactionRef(*pcoin)) || !pcoin->IsTrusted())
                 continue;
 
             if (pcoin->IsCoinBase() && pcoin->GetBlocksToMaturity() > 0)

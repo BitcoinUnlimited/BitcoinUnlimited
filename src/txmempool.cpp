@@ -14,6 +14,7 @@
 #include "policy/fees.h"
 #include "streams.h"
 #include "timedata.h"
+#include "txadmission.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -719,18 +720,18 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
     list<CTransaction> transactionsToRemove;
     for (indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
     {
-        const CTransaction &tx = it->GetTx();
+        const CTransactionRef tx = it->GetSharedTx();
         LockPoints lp = it->GetLockPoints();
         bool validLP = TestLockPointValidity(&lp);
         if (!CheckFinalTx(tx, flags) || !CheckSequenceLocks(tx, flags, &lp, validLP))
         {
             // Note if CheckSequenceLocks fails the LockPoints may still be invalid
             // So it's critical that we remove the tx and not depend on the LockPoints.
-            transactionsToRemove.push_back(tx);
+            transactionsToRemove.push_back(*tx);
         }
         else if (it->GetSpendsCoinbase())
         {
-            for (const CTxIn &txin : tx.vin)
+            for (const CTxIn &txin : tx->vin)
             {
                 indexed_transaction_set::const_iterator it2 = mapTx.find(txin.prevout.hash);
                 if (it2 != mapTx.end())
@@ -741,7 +742,7 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
                 if (coin->IsSpent() ||
                     (coin->IsCoinBase() && ((signed long)nMemPoolHeight) - coin->nHeight < COINBASE_MATURITY))
                 {
-                    transactionsToRemove.push_back(tx);
+                    transactionsToRemove.push_back(*tx);
                     break;
                 }
             }
@@ -942,7 +943,8 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         else
         {
             CValidationState state;
-            assert(CheckInputs(tx, state, mempoolDuplicate, false, 0, false, NULL));
+            // Use the largest maxOps since this code is not meant to validate that constraint
+            assert(CheckInputs(tx, state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, NULL));
             UpdateCoins(tx, state, mempoolDuplicate, 1000000);
         }
     }
@@ -960,7 +962,8 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         }
         else
         {
-            assert(CheckInputs(entry->GetTx(), state, mempoolDuplicate, false, 0, false, NULL));
+            // Use the largest maxOps since this code is not meant to validate that constraint
+            assert(CheckInputs(entry->GetTx(), state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, NULL));
             UpdateCoins(entry->GetTx(), state, mempoolDuplicate, 1000000);
             stepsSinceLastRemove = 0;
         }

@@ -25,7 +25,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         connect_nodes_bi(self.nodes,0,3)
 
         self.is_network_split=False
-        self.sync_all()
+        self.sync_blocks()
 
     def run_test(self):
         print("Mining blocks...")
@@ -47,9 +47,9 @@ class RawTransactionsTest(BitcoinTestFramework):
             feeTolerance = 0.00000001
 
         self.nodes[2].generate(1)
-        self.sync_all()
+        self.sync_blocks()
         self.nodes[0].generate(121)
-        self.sync_all()
+        self.sync_blocks()
 
         watchonly_address = self.nodes[0].getnewaddress()
         watchonly_pubkey = self.nodes[0].validateaddress(watchonly_address)["pubkey"]
@@ -62,9 +62,8 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 1.0)
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 5.0)
 
-        self.sync_all()
         self.nodes[0].generate(1)
-        self.sync_all()
+        self.sync_blocks()
 
         ###############
         # simple test #

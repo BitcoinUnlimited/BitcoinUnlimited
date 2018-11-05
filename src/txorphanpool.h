@@ -54,6 +54,9 @@ public:
     //! Limit the orphan pool size by either number of transactions or the max orphan pool size allowed.
     unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t nMaxBytes);
 
+    //! Return all the transaction hashes for transactions currently in the orphan pool.
+    void QueryHashes(std::vector<uint256> &vHashes);
+
     //! Set the last orphan check time (used primarily in testing)
     void SetLastOrphanCheck(int64_t nTime) { nLastOrphanCheck = nTime; }
     //! Orphan pool current number of transactions

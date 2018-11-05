@@ -59,6 +59,7 @@ bool CheckInputs(const CTransaction &tx,
     const CCoinsViewCache &view,
     bool fScriptChecks,
     unsigned int flags,
+    unsigned int maxOps,
     bool cacheStore,
     ValidationResourceTracker *resourceTracker,
     std::vector<CScriptCheck> *pvChecks = nullptr,
@@ -85,36 +86,19 @@ int32_t ComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Para
 
 CBlockIndex *FindMostWorkChain();
 
-/*
- * Check if transaction will be BIP 68 final in the next block to be created.
- *
- * Simulates calling SequenceLocks() with data from the tip of the current active chain.
- * Optionally stores in LockPoints the resulting height and time calculated and the hash
- * of the block needed for calculation or skips the calculation and uses the LockPoints
- * passed in for evaluation.
- * The LockPoints should not be considered valid if CheckSequenceLocks returns false.
- *
- * See consensus/consensus.h for flag definitions.
- */
-bool CheckSequenceLocks(const CTransaction &tx,
-    int flags,
-    LockPoints *lp = nullptr,
-    bool useExistingLockPoints = false);
-
 /** Mark a block as invalid. */
 bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensusParams, CBlockIndex *pindex);
 
 void InvalidChainFound(CBlockIndex *pindexNew);
 
 /** Context-dependent validity block checks */
-bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIndex *pindexPrev);
+bool ContextualCheckBlock(const CBlock &block,
+    CValidationState &state,
+    CBlockIndex *pindexPrev,
+    const bool fConservative = false);
 
 // BU: returns the blocksize if block is valid.  Otherwise 0
-bool CheckBlock(const CBlock &block,
-    CValidationState &state,
-    bool fCheckPOW = true,
-    bool fCheckMerkleRoot = true,
-    bool conservative = false);
+bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
 
 /** Mark a block as having its data received and checked (up to BLOCK_VALID_TRANSACTIONS). */
 bool ReceivedBlockTransactions(const CBlock &block,

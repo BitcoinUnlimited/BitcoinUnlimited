@@ -349,8 +349,8 @@ protected:
         ScriptError error;
         unsigned char sighashtype;
         CScript script_sig(scriptsig_raw), script_pubkey(scriptpubkey_raw);
-        const bool result =
-            VerifyScript(script_sig, script_pubkey, flags, BaseSignatureChecker(), &error, &sighashtype);
+        const bool result = VerifyScript(
+            script_sig, script_pubkey, flags, MAX_OPS_PER_SCRIPT, BaseSignatureChecker(), &error, &sighashtype);
 
         if (produce_output)
         {

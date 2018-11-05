@@ -350,39 +350,38 @@ CScript GetScriptForFreeze(CScriptNum nFreezeLockTime, const CPubKey &pubKey)
  */
 CScript GetScriptLabelPublic(const string &labelPublic)
 {
-    int64_t nLabelPublic;
-    // string hexMsg = HexStr(labelPublic);
-    nLabelPublic = int64_t(labelPublic.c_str());
-    if (nLabelPublic > 0)
+    int sizeLabelPublic = labelPublic.size();
+
+    CScript scriptDataPublic;
+
+    if (sizeLabelPublic <= 0)
     {
-        int sizeLabelPublic = labelPublic.size();
-
-        CScript scriptDataPublic;
-
-        if (sizeLabelPublic <= 75)
-            // length byte + data (https://en.bitcoin.it/wiki/Script);
-            // scriptDataPublic = bytearray((sizeLabelPublic,))+ labelPublic;
-            scriptDataPublic = CScript() << OP_RETURN << CScriptNum(sizeLabelPublic)
-                                         << std::vector<unsigned char>(labelPublic.begin(), labelPublic.end());
-
-        else if (sizeLabelPublic <= 256)
-            // OP_PUSHDATA1 format
-            // scriptDataPublic = "\x4c" + bytearray((metadata_len,)) + labelPublic;
-            scriptDataPublic = CScript() << OP_RETURN << OP_PUSHDATA1 << CScriptNum(sizeLabelPublic)
-                                         << std::vector<unsigned char>(labelPublic.begin(), labelPublic.end());
-
-        else
-            // OP_PUSHDATA2 format
-            // scriptDataPublic = "\x4d"+ bytearray((sizeLabelPublic%256,)) + bytearray((int(sizeLabelPublic/256),)) +
-            // labelPublic;
-            scriptDataPublic = CScript() << OP_RETURN << OP_PUSHDATA2 << CScriptNum(sizeLabelPublic % 256)
-                                         << CScriptNum(int(sizeLabelPublic / 256))
-                                         << std::vector<unsigned char>(labelPublic.begin(), labelPublic.end());
-
-        return scriptDataPublic;
+        scriptDataPublic = CScript();
+    }
+    else if (sizeLabelPublic <= 75)
+    {
+        // length byte + data (https://en.bitcoin.it/wiki/Script);
+        // scriptDataPublic = bytearray((sizeLabelPublic,))+ labelPublic;
+        scriptDataPublic = CScript() << OP_RETURN << CScriptNum(sizeLabelPublic)
+                                     << std::vector<unsigned char>(labelPublic.begin(), labelPublic.end());
+    }
+    else if (sizeLabelPublic <= 256)
+    {
+        // OP_PUSHDATA1 format
+        // scriptDataPublic = "\x4c" + bytearray((metadata_len,)) + labelPublic;
+        scriptDataPublic = CScript() << OP_RETURN << OP_PUSHDATA1 << CScriptNum(sizeLabelPublic)
+                                     << std::vector<unsigned char>(labelPublic.begin(), labelPublic.end());
     }
     else
-        return CScript();
+    {
+        // OP_PUSHDATA2 format
+        // scriptDataPublic = "\x4d"+ bytearray((sizeLabelPublic%256,)) + bytearray((int(sizeLabelPublic/256),)) +
+        // labelPublic;
+        scriptDataPublic = CScript() << OP_RETURN << OP_PUSHDATA2 << CScriptNum(sizeLabelPublic % 256)
+                                     << CScriptNum(int(sizeLabelPublic / 256))
+                                     << std::vector<unsigned char>(labelPublic.begin(), labelPublic.end());
+    }
+    return scriptDataPublic;
 }
 
 bool IsValidDestination(const CTxDestination &dest) { return dest.which() != 0; }

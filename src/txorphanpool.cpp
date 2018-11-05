@@ -123,3 +123,10 @@ unsigned int CTxOrphanPool::LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t
     }
     return nEvicted;
 }
+
+void CTxOrphanPool::QueryHashes(std::vector<uint256> &vHashes)
+{
+    READLOCK(cs);
+    for (auto &it : mapOrphanTransactions)
+        vHashes.push_back(it.first);
+}

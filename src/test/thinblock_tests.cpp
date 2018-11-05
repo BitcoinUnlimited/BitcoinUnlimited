@@ -94,13 +94,6 @@ CBlock TestBlock()
     return block;
 };
 
-CService ipaddress2(uint32_t i, uint32_t port)
-{
-    struct in_addr s;
-    s.s_addr = i;
-    return CService(CNetAddr(s), port);
-}
-
 
 BOOST_FIXTURE_TEST_SUITE(thinblock_tests, TestingSetup)
 
@@ -108,7 +101,7 @@ BOOST_AUTO_TEST_CASE(thinblock_test)
 {
     CBloomFilter filter;
     std::vector<uint256> vOrphanHashes;
-    CAddress addr1(ipaddress2(0xa0b0c001, 10000));
+    CAddress addr1(ipaddress(0xa0b0c001, 10000));
     CNode dummyNode1(INVALID_SOCKET, addr1, "", true);
 
     // Create 10 random hashes to seed the orphanhash vector.  This way we will create a bloom filter

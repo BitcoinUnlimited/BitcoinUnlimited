@@ -60,7 +60,8 @@ public:
     bool operator<(const CNodeRequestData &rhs) const { return desirability < rhs.desirability; }
 };
 
-struct MatchCNodeRequestData // Compare a CNodeRequestData object to a node
+// Compare a CNodeRequestData object to a node
+struct MatchCNodeRequestData
 {
     CNode *node;
     MatchCNodeRequestData(CNode *n) : node(n){};
@@ -73,6 +74,7 @@ public:
     typedef std::list<CNodeRequestData> ObjectSourceList;
     CInv obj;
     bool rateLimited;
+    bool fProcessing; // object was received but is still being processed
     int64_t lastRequestTime; // In microseconds, 0 means no request
     unsigned int outstandingReqs;
     ObjectSourceList availableFrom;
@@ -81,6 +83,7 @@ public:
     CUnknownObj()
     {
         rateLimited = false;
+        fProcessing = false;
         outstandingReqs = 0;
         lastRequestTime = 0;
         priority = 0;
@@ -119,7 +122,6 @@ protected:
 #ifdef DEBUG
     friend UniValue getstructuresizes(const UniValue &params, bool fHelp);
 #endif
-
     // map of transactions
     typedef std::map<uint256, CUnknownObj> OdMap;
     OdMap mapTxnInfo;
@@ -141,9 +143,6 @@ protected:
     void cleanup(OdMap::iterator &item);
     CLeakyBucket requestPacer;
 
-    // Request a single block.
-    bool RequestBlock(CNode *pfrom, CInv obj);
-
 public:
     CRequestManager();
 
@@ -155,6 +154,9 @@ public:
      *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
      *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
     std::atomic<unsigned int> BLOCK_DOWNLOAD_WINDOW{1024};
+
+    // Request a single block.
+    bool RequestBlock(CNode *pfrom, CInv obj);
 
     // Get this object from somewhere, asynchronously.
     void AskFor(const CInv &obj, CNode *from, unsigned int priority = 0);
@@ -174,6 +176,9 @@ public:
 
     // Update the response time for this transaction request
     void UpdateTxnResponseTime(const CInv &obj, CNode *pfrom);
+
+    // Indicate that we are processing this object.
+    void Processing(const CInv &obj, CNode *pfrom);
 
     // Indicate that we got this object
     void Received(const CInv &obj, CNode *pfrom);
@@ -219,6 +224,13 @@ public:
     // Methods for handling mapRequestManagerNodeState which is protected.
     void GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, NodeId nodeid);
     int GetNumBlocksInFlight(NodeId nodeid);
+
+    // Add entry to the requestmanager nodestate map
+    void InitializeNodeState(NodeId nodeid)
+    {
+        LOCK(cs_objDownloader);
+        mapRequestManagerNodeState.emplace(nodeid, CRequestManagerNodeState());
+    }
 
     // Remove a request manager node from the nodestate map.
     void RemoveNodeState(NodeId nodeid)

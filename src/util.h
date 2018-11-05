@@ -443,6 +443,24 @@ int64_t GetArg(const std::string &strArg, int64_t nDefault);
 bool GetBoolArg(const std::string &strArg, bool fDefault);
 
 /**
+ * Set an argument
+ *
+ * @param strArg Argument to set (e.g. "-foo")
+ * @param strValue Value (e.g. "1")
+ * @return none
+ */
+void SetArg(const std::string &strArg, const std::string &strValue);
+
+/**
+ * Set a boolean argument
+ *
+ * @param strArg Argument to set (e.g. "-foo")
+ * @param fValue Value (e.g. false)
+ * @return none
+ */
+void SetBoolArg(const std::string &strArg, bool fValue);
+
+/**
  * Set an argument if it doesn't already have a value
  *
  * @param strArg Argument to set (e.g. "-foo")

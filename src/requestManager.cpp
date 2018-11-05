@@ -272,6 +272,32 @@ void CRequestManager::UpdateTxnResponseTime(const CInv &obj, CNode *pfrom)
     }
 }
 
+// Indicate that we are processing this object.
+void CRequestManager::Processing(const CInv &obj, CNode *pfrom)
+{
+    LOCK(cs_objDownloader);
+    if (obj.type == MSG_TX)
+    {
+        OdMap::iterator item = mapTxnInfo.find(obj.hash);
+        if (item == mapTxnInfo.end())
+            return;
+
+        item->second.fProcessing = true;
+        LOG(REQ, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
+            pfrom ? pfrom->GetLogName() : "unknown");
+    }
+    else if (obj.type == MSG_BLOCK || obj.type == MSG_THINBLOCK || obj.type == MSG_XTHINBLOCK)
+    {
+        OdMap::iterator item = mapBlkInfo.find(obj.hash);
+        if (item == mapBlkInfo.end())
+            return;
+
+        item->second.fProcessing = true;
+        LOG(BLK, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
+            pfrom ? pfrom->GetLogName() : "unknown");
+    }
+}
+
 // Indicate that we got this object.
 void CRequestManager::Received(const CInv &obj, CNode *pfrom)
 {
@@ -459,9 +485,9 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
     CBloomFilter filterMemPool;
 
     // Ask for Graphene blocks
-    if (IsGrapheneBlockEnabled() && IsChainNearlySyncd())
+    if (IsChainNearlySyncd() && IsGrapheneBlockEnabled() && HaveGrapheneNodes())
     {
-        if (HaveGrapheneNodes() && graphenedata.CheckGrapheneBlockTimer(obj.hash))
+        if (graphenedata.CheckGrapheneBlockTimer(obj.hash))
         {
             // Must download a graphene block from a graphene enabled peer.
             // We can only request one graphene block per peer at a time.
@@ -515,69 +541,71 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         }
     }
 
+
     // Ask for XTHIN's if Graphene is not enabled, or, ask for XTHIN's if graphene is enabled
     // but the grapheneblock timer has lapsed.
-    if ((IsThinBlocksEnabled() && IsChainNearlySyncd() && !IsGrapheneBlockEnabled()) ||
-        (IsThinBlocksEnabled() && IsChainNearlySyncd() && IsGrapheneBlockEnabled() &&
-            !graphenedata.CheckGrapheneBlockTimer(obj.hash)))
+    if (IsChainNearlySyncd() && IsThinBlocksEnabled() && HaveThinblockNodes())
     {
-        if (HaveThinblockNodes() && thindata.CheckThinblockTimer(obj.hash))
+        if (!IsGrapheneBlockEnabled() || !graphenedata.CheckGrapheneBlockTimer(obj.hash))
         {
-            // Must download an xthinblock from a XTHIN peer.
-            // We can only request one xthinblock per peer at a time.
-            if (CanThinBlockBeDownloaded(pfrom))
+            if (thindata.CheckThinblockTimer(obj.hash))
             {
-                inv2.type = MSG_XTHINBLOCK;
-                std::vector<uint256> vOrphanHashes;
+                // Must download an xthinblock from a XTHIN peer.
+                // We can only request one xthinblock per peer at a time.
+                if (CanThinBlockBeDownloaded(pfrom))
                 {
-                    READLOCK(orphanpool.cs);
-                    for (auto &mi : orphanpool.mapOrphanTransactions)
-                        vOrphanHashes.emplace_back(mi.first);
-                }
-                BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
-                ss << inv2;
-                ss << filterMemPool;
+                    inv2.type = MSG_XTHINBLOCK;
+                    std::vector<uint256> vOrphanHashes;
+                    {
+                        READLOCK(orphanpool.cs);
+                        for (auto &mi : orphanpool.mapOrphanTransactions)
+                            vOrphanHashes.emplace_back(mi.first);
+                    }
+                    BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
+                    ss << inv2;
+                    ss << filterMemPool;
 
-                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
-                AddThinBlockInFlight(pfrom, inv2.hash);
-                pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
-                return true;
-            }
-        }
-        else
-        {
-            // Try to download a thinblock if possible otherwise just download a regular block.
-            // We can only request one xthinblock per peer at a time.
-            if (CanThinBlockBeDownloaded(pfrom))
-            {
-                inv2.type = MSG_XTHINBLOCK;
-                std::vector<uint256> vOrphanHashes;
-                {
-                    READLOCK(orphanpool.cs);
-                    for (auto &mi : orphanpool.mapOrphanTransactions)
-                        vOrphanHashes.emplace_back(mi.first);
+                    MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
+                    AddThinBlockInFlight(pfrom, inv2.hash);
+                    pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
+                    LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+                    return true;
                 }
-                BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
-                ss << inv2;
-                ss << filterMemPool;
-
-                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
-                AddThinBlockInFlight(pfrom, inv2.hash);
-                pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
-                return true;
             }
             else
             {
-                std::vector<CInv> vToFetch;
-                inv2.type = MSG_BLOCK;
-                vToFetch.push_back(inv2);
+                // Try to download a thinblock if possible otherwise just download a regular block.
+                // We can only request one xthinblock per peer at a time.
+                if (CanThinBlockBeDownloaded(pfrom))
+                {
+                    inv2.type = MSG_XTHINBLOCK;
+                    std::vector<uint256> vOrphanHashes;
+                    {
+                        READLOCK(orphanpool.cs);
+                        for (auto &mi : orphanpool.mapOrphanTransactions)
+                            vOrphanHashes.emplace_back(mi.first);
+                    }
+                    BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
+                    ss << inv2;
+                    ss << filterMemPool;
 
-                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
-                pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
-                LOG(THIN, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
-                return true;
+                    MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
+                    AddThinBlockInFlight(pfrom, inv2.hash);
+                    pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
+                    LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+                    return true;
+                }
+                else
+                {
+                    std::vector<CInv> vToFetch;
+                    inv2.type = MSG_BLOCK;
+                    vToFetch.push_back(inv2);
+
+                    MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
+                    pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
+                    LOG(THIN, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+                    return true;
+                }
             }
         }
     }
@@ -585,7 +613,10 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
     // Request a full block if graphene and thinblocks is turned off.  Also we must request a full block
     // if we've fallen behind from the state of being fully syncd, furthermore, this is crucial for initial
     // sync to function as this is the only way we request full blocks near the end of the initial sync process.
-    if (!IsChainNearlySyncd() || (!IsGrapheneBlockEnabled() && !IsThinBlocksEnabled()))
+    if (!IsChainNearlySyncd() || (!IsGrapheneBlockEnabled() && !IsThinBlocksEnabled()) ||
+        (!HaveThinblockNodes() && !HaveGrapheneNodes()) ||
+        (!IsGrapheneBlockEnabled() && HaveGrapheneNodes() && IsThinBlocksEnabled() && !HaveThinblockNodes()) ||
+        (IsGrapheneBlockEnabled() && !HaveGrapheneNodes() && !IsThinBlocksEnabled() && HaveThinblockNodes()))
     {
         std::vector<CInv> vToFetch;
         inv2.type = MSG_BLOCK;
@@ -593,7 +624,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
 
         MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
         pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
-        LOG(THIN, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+        LOG(THIN | GRAPHENE, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
         return true;
     }
     return false; // no block was requested
@@ -649,11 +680,11 @@ void CRequestManager::SendRequests()
     {
         now = GetTimeMicros();
         OdMap::iterator itemIter = sendBlkIter;
-        CUnknownObj &item = itemIter->second;
-
-        ++sendBlkIter; // move it forward up here in case we need to erase the item we are working with.
         if (itemIter == mapBlkInfo.end())
             break;
+
+        ++sendBlkIter; // move it forward up here in case we need to erase the item we are working with.
+        CUnknownObj &item = itemIter->second;
 
         // if never requested then lastRequestTime==0 so this will always be true
         if (now - item.lastRequestTime > _blkReqRetryInterval)
@@ -802,11 +833,16 @@ void CRequestManager::SendRequests()
     {
         now = GetTimeMicros();
         OdMap::iterator itemIter = sendIter;
-        CUnknownObj &item = itemIter->second;
-
-        ++sendIter; // move it forward up here in case we need to erase the item we are working with.
         if (itemIter == mapTxnInfo.end())
             break;
+
+        ++sendIter; // move it forward up here in case we need to erase the item we are working with.
+        CUnknownObj &item = itemIter->second;
+
+        // If we've already received the item and it's in processing then skip it here so we don't
+        // end up re-requesting it again.
+        if (item.fProcessing)
+            continue;
 
         // if never requested then lastRequestTime==0 so this will always be true
         if (now - item.lastRequestTime > _txReqRetryInterval)
@@ -1350,7 +1386,7 @@ void CRequestManager::MapBlocksInFlightClear()
 void CRequestManager::GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, NodeId nodeid)
 {
     LOCK(cs_objDownloader);
-    for (auto iter : mapRequestManagerNodeState[nodeid].vBlocksInFlight)
+    for (auto &iter : mapRequestManagerNodeState[nodeid].vBlocksInFlight)
     {
         vBlocksInFlight.emplace_back(iter.hash);
     }
