@@ -1,0 +1,20 @@
+version: '3'
+
+services:
+  node1:
+    image: 'img-bucash-ubu18-linux64'
+    networks:
+      - private
+  node2:
+    image: 'img-bucash-ubu18-linux64'
+    networks:
+      - private
+  node3:
+    image: 'img-bucash-ubu18-linux64'
+    networks:
+      - private
+
+networks:
+  private:
+    internal: true
+

@@ -42,3 +42,15 @@ example -p 8333:1234 will map the port 8333 internal to the docker container to 
 
 ## To connect to the container in a bash shell
 `docker exec -it <container name> bash`
+
+
+
+
+
+
+## Internal private testing network with Docker Compose
+The docker-compose.yml file can be used to launch multiple nodes in their own containers that are connected by an internal private network inside docker for testing p2p functions such as message relay or handshakes. By default the yml file will start up 3 containers each with a linux64 node. You can add more nodes by simply extending the list of containers to be started up. If you wish to change to another image that isnt linux64 simply change the image name for a conatiner to a different image name. 
+
+To start simply run `docker-compose up`
+
+NOTE: You will probably have to use the addnode command or create config files to connect the nodes in the docker network once they have all been created. 
