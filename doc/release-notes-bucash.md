@@ -17,7 +17,7 @@ with the Bitcoin Cash specifications you could find here:
 - https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/may-2018-hardfork.md (May 15th '18 Protocol Upgrade, bucash 1.3.0.0, 1.3.0.1, 1.4.0.0)
 - https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2018-nov-upgrade.md (Nov 15th '18 Protocol Upgrade, bucash 1.5.0.0, 1.5.0.1)
 
-This release will also implements also a set of consensus changes proposed by an alternative implementation, Bitcoin SV,
+This release will also implement a set of consensus changes proposed by an alternative implementation, Bitcoin SV,
 see [SV release notes for ver 0.1.0](https://github.com/bitcoin-sv/bitcoin-sv/blob/master/doc/release-notes.md) for more details.
 Such set of features is **disabled by default**, the default policy is to activate the set of changes as defined by the bitcoincash.org
 [specification](https://github.com/bitcoin-sv/bitcoin-sv/blob/master/doc/release-notes.md).
