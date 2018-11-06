@@ -64,7 +64,12 @@ It is perhaps confusing that the ABC feature set configuration flag is called `c
 
 ### SV HARD FORK
 
-It has not yet been announced when or how SV will fork, to the specificity required for implementation.  Enabling the SV hard fork will be delivered in a subsequent release, as soon as we learn the details.
+To configure your BUcash client so that it will activate the protocol upgrade proposed by SV you need to add there two lines to your `bitcoin.conf` file:
+
+```
+consensus.forkNov2018Time=0
+consensus.svForkNov2018Time=1
+```
 
 ## COMPATIBILITY OF FORK-SETTING AND BIP135 VOTES
 
