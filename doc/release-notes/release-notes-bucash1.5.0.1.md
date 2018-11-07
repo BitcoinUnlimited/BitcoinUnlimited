@@ -54,7 +54,7 @@ the rules activated Nov 13th 2017, May 15th 2018 and Nov 15th 2018 protocol upgr
 Main Changes
 ------------
 
-- Implementation of Bitcoin SV November 2018 features (see the [SV release notes for ver 0.1.0](https://github.com/bitcoin-sv/bitcoin-sv/blob/master/doc/release-notes.md)), **disable by default**
+- Implementation of Bitcoin SV November 2018 features (see the [SV upgrade specs](https://docs.google.com/document/d/1hqyhsaahjiZdIi9Rh0Sj-Vhvrn94FmTjNWm59mMMn_Q/)), **disable by default**
     - OP_MUL, OP_INVERT, OP_LSHIFT, OP_RSHIFT
     - Increase max number of op_codes per script to 500
     - Increase max block size to 128MB
