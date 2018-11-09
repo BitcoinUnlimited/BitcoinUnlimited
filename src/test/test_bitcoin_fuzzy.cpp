@@ -25,6 +25,7 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include "version.h"
+#include "policy/policy.h"
 
 #include <cstdio>
 #include <stdint.h>
@@ -339,7 +340,6 @@ protected:
         unsigned int flags;
 
         *ds >> flags;
-        *ds >> stack;
         *ds >> scriptsig_raw;
         *ds >> scriptpubkey_raw;
 
@@ -348,7 +348,8 @@ protected:
 
         ScriptError error;
         unsigned char sighashtype;
-        CScript script_sig(scriptsig_raw), script_pubkey(scriptpubkey_raw);
+        CScript script_sig(scriptsig_raw.begin(), scriptsig_raw.end());
+        CScript script_pubkey(scriptpubkey_raw.begin(), scriptpubkey_raw.end());
         const bool result = VerifyScript(
             script_sig, script_pubkey, flags, MAX_OPS_PER_SCRIPT, BaseSignatureChecker(), &error, &sighashtype);
 
