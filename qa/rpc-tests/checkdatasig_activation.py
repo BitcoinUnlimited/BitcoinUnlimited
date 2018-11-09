@@ -5,7 +5,7 @@
 """
 This test checks activation of OP_CHECKDATASIG
 """
-import os
+import os, random, string
 from test_framework.util import findBitcoind, expectException, JSONRPCException
 import test_framework.loginit
 from test_framework.test_framework import ComparisonTestFramework
@@ -87,9 +87,15 @@ class CheckDataSigActivationTest(ComparisonTestFramework):
         expectException(lambda: node.signdata(addr,"hash", "ba0d"), JSONRPCException) # its hex but wrong length
         expectException(lambda: node.signdata(addr,"hash", "z"*32), JSONRPCException) # not hex correct length 
 
-        # good signatures
-        sig = node.signdata(addr,"string", "foo")
+        # check same sig for same input of different format (works because using rfc6979 deterministic sigs)
+        s = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(20))
+        sig0 = node.signdata(addr,"string", s)
+        sig1 = node.signdata(addr,"hex", hexlify(s.encode()).decode())
+        sig2 = node.signdata(addr,"hash", hexlify(sha256(s.encode())).decode())
+        assert_equal(sig0, sig1)
+        assert_equal(sig0, sig2)
 
+        # good signatures
         node.importprivatekeys("no-rescan", 'cU4WAhpniFvwT8Z13MjNyE1tkzp8n7wDPwwe8WzqqBAejZXq948J')
         sig = node.signdata('bchreg:qq3srvg7hrzf9wu5h33du5l7n3fpx7jw5gdhhk390u',"string", "foo")
         assert_equal(sig, '3045022100C4EB26D78AE898C72EF959A96DE51B423563E384A72B580493C9195F8811D36602201CC6561EAFAC7C9BC55B80D2605C1EBF9ACAB9AD80F0A08247370D2ED2B9408A')

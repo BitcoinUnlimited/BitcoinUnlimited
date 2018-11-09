@@ -568,8 +568,10 @@ UniValue signdata(const UniValue &params, bool fHelp)
         throw runtime_error(
             "signdata \"bitcoinaddress\" \"msgFormat\" \"message\"\n"
             "\nSign message for use with the CHECKDATASIG instruction."
-            "\nAs per the CHECKDATASIG operation, this RPC normally signs the SHA256 of the provided message\n"
-            "\nunless the 'hash' message format is specified.\n" +
+            "\nAs per the CHECKDATASIG operation, this RPC normally signs the SHA256 of"
+            "\nthe provided message unless the 'hash' message format is specified."
+            "\nIf using the 'hash' message format, provide the hex encoded SHA256 hash"
+            "\nof the message intended to be passed to CHECKDATASIG.\n" +
             HelpRequiringPassphrase() +
             "\n"
             "\nArguments:\n"
@@ -584,10 +586,13 @@ UniValue signdata(const UniValue &params, bool fHelp)
             "\nExamples:\n"
             "\nUnlock the wallet for 30 seconds\n" +
             HelpExampleCli("walletpassphrase", "\"mypassphrase\" 30") + "\nCreate the signature\n" +
-            HelpExampleCli("signdata", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\" \"string\" \"my message\"") +
-            HelpExampleCli("signdata", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\" \"hex\" \"01020304\"") +
+            HelpExampleCli(
+                "signdata", "\"bitcoincash:qq5lslagrktm5qtxfw4ltpd5krehhrh595fc04hv0k\" \"string\" \"my message\"") +
+            HelpExampleCli(
+                "signdata", "\"bitcoincash:qq5lslagrktm5qtxfw4ltpd5krehhrh595fc04hv0k\" \"hex\" \"01020304\"") +
             "\nAs json rpc\n" +
-            HelpExampleRpc("signdata", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\", \"string\", \"my message\""));
+            HelpExampleRpc(
+                "signdata", "\"bitcoincash:qq5lslagrktm5qtxfw4ltpd5krehhrh595fc04hv0k\", \"string\", \"my message\""));
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
 
