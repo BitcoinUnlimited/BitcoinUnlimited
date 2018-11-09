@@ -5,6 +5,8 @@
 """
 This test checks activation of OP_CHECKDATASIG
 """
+import os, random, string
+from test_framework.util import findBitcoind, expectException, JSONRPCException
 import test_framework.loginit
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import waitFor, satoshi_round, assert_equal, assert_raises_rpc_error, start_node
@@ -49,11 +51,22 @@ class CheckDataSigActivationTest(ComparisonTestFramework):
         value = int(satoshi_round(utxo["amount"]) * COIN) // count
         tx.vin = [CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]))]
         tx.vout = []
-        signature = bytearray.fromhex(
-            '30440220256c12175e809381f97637933ed6ab97737d263eaaebca6add21bced67fd12a402205ce29ecc1369d6fc1b51977ed38faaf41119e3be1d7edfafd7cfaf0b6061bd07')
-        message = bytearray.fromhex('')
-        pubkey = bytearray.fromhex(
-            '038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508')
+
+        # test using the signdata rpc
+        addr = node.getnewaddress()
+        msg = "Joo Janta 200 Super-Chromatic Peril Sensitive Sunglasses"
+        message = bytearray(msg.encode())
+        rpc = node.signdata(addr, "string", msg,"verbose")
+
+        signature = bytearray.fromhex(rpc["signature"])
+        pubkey = bytearray.fromhex(rpc["pubkey"])
+
+        # test with hard-coded values
+        #signature = bytearray.fromhex(
+        #    '30440220256c12175e809381f97637933ed6ab97737d263eaaebca6add21bced67fd12a402205ce29ecc1369d6fc1b51977ed38faaf41119e3be1d7edfafd7cfaf0b6061bd07')
+        #pubkey = bytearray.fromhex(
+        #    '038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508')
+
         for _ in range(count):
             tx.vout.append(CTxOut(value, CScript(
                 [signature, message, pubkey, OP_CHECKDATASIG])))
@@ -61,7 +74,40 @@ class CheckDataSigActivationTest(ComparisonTestFramework):
         tx_signed = node.signrawtransaction(tx.toHex())["hex"]
         return tx_signed
 
+    def testDatasigRpc(self):
+        node = self.nodes[0]
+        # bad address
+        expectException(lambda: node.signdata("bad","string", "foo"), JSONRPCException)
+        # address I can't sign
+        expectException(lambda: node.signdata('bchreg:qq0ndugr327fwxucntduem4t3jvvmjtdevmdry0lqc',"string", "foo"), JSONRPCException)
+        addr = node.getnewaddress()
+        # bad message format
+        expectException(lambda: node.signdata(addr,"bad", "foo"), JSONRPCException)
+        expectException(lambda: node.signdata(addr,"hex", "zzbad"), JSONRPCException)
+        expectException(lambda: node.signdata(addr,"hash", "ba0d"), JSONRPCException) # its hex but wrong length
+        expectException(lambda: node.signdata(addr,"hash", "z"*32), JSONRPCException) # not hex correct length 
+
+        # check same sig for same input of different format (works because using rfc6979 deterministic sigs)
+        s = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(20))
+        sig0 = node.signdata(addr,"string", s)
+        sig1 = node.signdata(addr,"hex", hexlify(s.encode()).decode())
+        sig2 = node.signdata(addr,"hash", hexlify(sha256(s.encode())).decode())
+        assert_equal(sig0, sig1)
+        assert_equal(sig0, sig2)
+
+        # good signatures
+        node.importprivatekeys("no-rescan", 'cU4WAhpniFvwT8Z13MjNyE1tkzp8n7wDPwwe8WzqqBAejZXq948J')
+        sig = node.signdata('bchreg:qq3srvg7hrzf9wu5h33du5l7n3fpx7jw5gdhhk390u',"string", "foo")
+        assert_equal(sig, '3045022100C4EB26D78AE898C72EF959A96DE51B423563E384A72B580493C9195F8811D36602201CC6561EAFAC7C9BC55B80D2605C1EBF9ACAB9AD80F0A08247370D2ED2B9408A')
+        sig2 = node.signdata('bchreg:qq3srvg7hrzf9wu5h33du5l7n3fpx7jw5gdhhk390u',"hex", "0102030405060708090a")
+        assert_equal(sig2, '304502210085626204B90AF4B62546037A89786B279BBB59D003A6D767630386B173905C8A0220740EC7B0743E94C4B9427FCCE1E1CB327CB0605501BF447E697E0206E14FBE58')
+
+        # If I use the "hash" format and calculate the sha256 myself, it ought to create the same signature as "signdata"
+        assert_equal(sig, node.signdata('bchreg:qq3srvg7hrzf9wu5h33du5l7n3fpx7jw5gdhhk390u',"hash", hexlify(sha256(b"foo")).decode()))
+
+        
     def run_test(self):
+        self.testDatasigRpc()
         self.test = TestManager(self, self.options.tmpdir)
         self.test.add_all_connections(self.nodes)
         # Start up network handling in another thread
@@ -186,3 +232,19 @@ class CheckDataSigActivationTest(ComparisonTestFramework):
 
 if __name__ == '__main__':
     CheckDataSigActivationTest().main()
+
+# Create a convenient function for an interactive python debugging session
+def Test():
+    t = CheckDataSigActivationTest()
+    t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["blk", "mempool", "net", "req"],
+        "logtimemicros": 1
+    }
+
+    flags = ["--nocleanup", "--noshutdown"]
+    if os.path.isdir("/ramdisk/test"):
+        flags.append("--tmpdir=/ramdisk/test/ma")
+    binpath = findBitcoind()
+    flags.append("--srcdir=%s" % binpath)
+    t.main(flags, bitcoinConf, None)

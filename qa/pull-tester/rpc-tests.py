@@ -232,7 +232,7 @@ testScripts = [ RpcTest(t) for t in [
     'p2p-versionbits-warning',
     'importprunedfunds',
     'thinblocks',
-    'checkdatasig-activation'
+    'checkdatasig_activation'
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [

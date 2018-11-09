@@ -27,7 +27,11 @@ protected:
     uint8_t data[WIDTH];
 
 public:
-    base_blob() { memset(data, 0, sizeof(data)); }
+    base_blob()
+    {
+        static_assert((BITS & 7) == 0, "Number of bits must fit in byte boundaries");
+        memset(data, 0, sizeof(data));
+    }
     explicit base_blob(const std::vector<unsigned char> &vch);
 
     bool IsNull() const
@@ -78,6 +82,15 @@ public:
     const unsigned char *begin() const { return &data[0]; }
     const unsigned char *end() const { return &data[WIDTH]; }
     unsigned int size() const { return sizeof(data); }
+    void reverse()
+    {
+        uint8_t tmp[WIDTH];
+        for (int i = 0; i < WIDTH; i++)
+            tmp[i] = data[WIDTH - 1 - i];
+        for (int i = 0; i < WIDTH; i++)
+            data[i] = tmp[i];
+    }
+
     uint64_t GetUint64(int pos) const
     {
         const uint8_t *ptr = data + pos * 8;

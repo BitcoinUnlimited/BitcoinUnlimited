@@ -56,6 +56,20 @@ bool IsHex(const string &str)
     return (str.size() > 0) && (str.size() % 2 == 0);
 }
 
+static const char *hexxlat = "0123456789ABCDEF";
+std::string GetHex(const unsigned char *data, unsigned int len)
+{
+    std::string ret;
+    ret.reserve(2 * len);
+    for (unsigned int i = 0; i < len; i++)
+    {
+        unsigned char val = data[i];
+        ret.push_back(hexxlat[val >> 4]);
+        ret.push_back(hexxlat[val & 15]);
+    }
+    return ret;
+}
+
 vector<unsigned char> ParseHex(const char *psz)
 {
     // convert hex dump to vector
