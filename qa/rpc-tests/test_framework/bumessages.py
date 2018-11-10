@@ -6,7 +6,6 @@ class msg_buversion(object):
 
     def __init__(self, addrFromPort=None):
         self.addrFromPort = addrFromPort
-        pass
 
     def deserialize(self, f):
         self.addrFromPort = struct.unpack("<H", f.read(2))[0]
