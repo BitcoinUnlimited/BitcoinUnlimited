@@ -8,6 +8,8 @@ import time
 from codecs import encode
 from threading import RLock
 from io import BytesIO
+import copy
+
 MY_VERSION = 60001  # past bip-31 for ping/pong
 MY_SUBVERSION = b"/python-mininode-tester:0.0.3/"
 
@@ -1257,3 +1259,8 @@ def Test():
     import doctest
     import sys
     print(doctest.testmod(sys.modules[__name__],verbose=True))
+
+## py.test code
+def testCTransactionCopyConstruct():
+    a = CTransaction()
+    b = CTransaction(a)
