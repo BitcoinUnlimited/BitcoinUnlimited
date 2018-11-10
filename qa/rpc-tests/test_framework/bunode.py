@@ -283,10 +283,10 @@ class BasicBUCashNode():
         self.nthin = 0
         self.nxthin = 0
 
-    def connect(self, id, ip, port, rpc=None, protohandler=None):
+    def connect(self, id, ip, port, rpc=None, protohandler=None, send_initial_version = True):
         if not protohandler:
             protohandler = BUProtocolHandler()
-        conn = NodeConn(ip, port, rpc, protohandler, bitcoinCash=True)
+        conn = NodeConn(ip, port, rpc, protohandler, bitcoinCash=True, send_initial_version = send_initial_version)
         protohandler.add_connection(conn)
         protohandler.add_parent(self)
         self.cnxns[id] = protohandler

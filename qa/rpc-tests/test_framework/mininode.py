@@ -252,7 +252,7 @@ class NodeConn(asyncore.dispatcher):
         "regtest": b"\xda\xb5\xbf\xfa",
     }
 
-    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=1, bitcoinCash=True):
+    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=1, bitcoinCash=True, send_initial_version = True):
         self.bitcoinCash = bitcoinCash
         if self.bitcoinCash:
             self.MAGIC_BYTES = self.CASH_MAGIC_BYTES
@@ -273,14 +273,15 @@ class NodeConn(asyncore.dispatcher):
         self.cb = callback
         self.disconnect = False
         self.curIndex = 0
-        # stuff version msg into sendbuf
-        vt = msg_version()
-        vt.nServices = services
-        vt.addrTo.ip = self.dstaddr
-        vt.addrTo.port = self.dstport
-        vt.addrFrom.ip = "0.0.0.0"
-        vt.addrFrom.port = 0
-        self.send_message(vt, True)
+        if send_initial_version:
+            # stuff version msg into sendbuf
+            vt = msg_version()
+            vt.nServices = services
+            vt.addrTo.ip = self.dstaddr
+            vt.addrTo.port = self.dstport
+            vt.addrFrom.ip = "0.0.0.0"
+            vt.addrFrom.port = 0
+            self.send_message(vt, True)
         print('MiniNode: Connecting to Bitcoin Node IP # ' + dstaddr + ':'
               + str(dstport))
         try:
