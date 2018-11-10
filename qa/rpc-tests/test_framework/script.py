@@ -878,7 +878,7 @@ def FindAndDelete(script, sig):
     return CScript(r)
 
 
-def SignatureHash(script, txTo, inIdx, hashtype):
+def SignatureHashLegacy(script, txTo, inIdx, hashtype):
     """Consensus-correct SignatureHash
 
     Returns (hash, err) to precisely match the consensus-critical behavior of
