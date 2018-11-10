@@ -682,6 +682,61 @@ class CTransaction(object):
         else:
             return 32 * b"\x00"
 
+    def SignatureHashLegacy(self, script, inIdx, hashtype):
+        """Consensus-correct SignatureHash (legacy variant)
+
+        Returns (hash, err) to precisely match the consensus-critical behavior of
+        the SIGHASH_SINGLE bug. (inIdx is *not* checked for validity)
+        """
+        from .script import FindAndDelete, CScript, OP_CODESEPARATOR
+
+        HASH_ONE = b'\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+
+        if inIdx >= len(self.vin):
+            return (HASH_ONE, "inIdx %d out of range (%d)" % (inIdx, len(self.vin)))
+
+        # create copy as it is going to be modified with FindAndDelete(..)
+        txtmp = CTransaction(self)
+
+        for txin in txtmp.vin:
+            txin.scriptSig = b''
+        txtmp.vin[inIdx].scriptSig = FindAndDelete(script, CScript([OP_CODESEPARATOR]))
+
+        if (hashtype & 0x1f) == SIGHASH_NONE:
+            txtmp.vout = []
+
+            for i in range(len(txtmp.vin)):
+                if i != inIdx:
+                    txtmp.vin[i].nSequence = 0
+
+        elif (hashtype & 0x1f) == SIGHASH_SINGLE:
+            outIdx = inIdx
+            if outIdx >= len(txtmp.vout):
+                return (HASH_ONE, "outIdx %d out of range (%d)" % (outIdx, len(txtmp.vout)))
+
+            tmp = txtmp.vout[outIdx]
+            txtmp.vout = []
+            for i in range(outIdx):
+                txtmp.vout.append(CTxOut())
+            txtmp.vout.append(tmp)
+
+            for i in range(len(txtmp.vin)):
+                if i != inIdx:
+                    txtmp.vin[i].nSequence = 0
+
+        if hashtype & SIGHASH_ANYONECANPAY:
+            tmp = txtmp.vin[inIdx]
+            txtmp.vin = []
+            txtmp.vin.append(tmp)
+
+        s = txtmp.serialize()
+        s += struct.pack(b"<I", hashtype)
+
+        hash = hash256(s)
+
+        return (hash, None)
+
+
 
 class CBlockHeader(object):
     def __init__(self, header=None):

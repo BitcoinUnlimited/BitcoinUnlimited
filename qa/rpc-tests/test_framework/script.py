@@ -878,57 +878,6 @@ def FindAndDelete(script, sig):
     return CScript(r)
 
 
-def SignatureHashLegacy(script, txTo, inIdx, hashtype):
-    """Consensus-correct SignatureHash
-
-    Returns (hash, err) to precisely match the consensus-critical behavior of
-    the SIGHASH_SINGLE bug. (inIdx is *not* checked for validity)
-    """
-    HASH_ONE = b'\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
-
-    if inIdx >= len(txTo.vin):
-        return (HASH_ONE, "inIdx %d out of range (%d)" % (inIdx, len(txTo.vin)))
-    txtmp = CTransaction(txTo)
-
-    for txin in txtmp.vin:
-        txin.scriptSig = b''
-    txtmp.vin[inIdx].scriptSig = FindAndDelete(script, CScript([OP_CODESEPARATOR]))
-
-    if (hashtype & 0x1f) == SIGHASH_NONE:
-        txtmp.vout = []
-
-        for i in range(len(txtmp.vin)):
-            if i != inIdx:
-                txtmp.vin[i].nSequence = 0
-
-    elif (hashtype & 0x1f) == SIGHASH_SINGLE:
-        outIdx = inIdx
-        if outIdx >= len(txtmp.vout):
-            return (HASH_ONE, "outIdx %d out of range (%d)" % (outIdx, len(txtmp.vout)))
-
-        tmp = txtmp.vout[outIdx]
-        txtmp.vout = []
-        for i in range(outIdx):
-            txtmp.vout.append(CTxOut())
-        txtmp.vout.append(tmp)
-
-        for i in range(len(txtmp.vin)):
-            if i != inIdx:
-                txtmp.vin[i].nSequence = 0
-
-    if hashtype & SIGHASH_ANYONECANPAY:
-        tmp = txtmp.vin[inIdx]
-        txtmp.vin = []
-        txtmp.vin.append(tmp)
-
-    s = txtmp.serialize()
-    s += struct.pack(b"<I", hashtype)
-
-    hash = hash256(s)
-
-    return (hash, None)
-
-
 ## py.test code
 def testScriptRepr():
     x = CScript([OP_CHECKDATASIG])+b"\x11\x22\x33"
