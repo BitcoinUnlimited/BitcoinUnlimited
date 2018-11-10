@@ -144,7 +144,6 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     {
         graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
 
-        dosMan.Misbehaving(pfrom, 100);
         return error("Merkle root for %s does not match computed merkle root, peer=%s", inv.hash.ToString(),
             pfrom->GetLogName());
     }
