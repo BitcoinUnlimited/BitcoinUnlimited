@@ -264,8 +264,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
-    vNodes.push_back(&dummyNodeGraphene);
-    vNodes.push_back(&dummyNodeNone);
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeGraphene);
+        vNodes.push_back(&dummyNodeNone);
+    }
     requester.RequestBlock(&dummyNodeGraphene, inv);
     BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg).compare("get_graphene") != 0);
 
@@ -283,8 +286,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", false);
     BOOST_CHECK(IsThinBlocksEnabled() == false);
-    vNodes.push_back(&dummyNodeGraphene);
-    vNodes.push_back(&dummyNodeNone);
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeGraphene);
+        vNodes.push_back(&dummyNodeNone);
+    }
     requester.RequestBlock(&dummyNodeGraphene, inv);
     BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg).compare("get_graphene") != 0);
 
@@ -301,9 +307,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
-    vNodes.push_back(&dummyNodeGraphene);
-    vNodes.push_back(&dummyNodeXthin);
-    vNodes.push_back(&dummyNodeNone);
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(&dummyNodeGraphene);
+        vNodes.push_back(&dummyNodeXthin);
+        vNodes.push_back(&dummyNodeNone);
+    }
 
     requester.RequestBlock(&dummyNodeGraphene, inv);
     BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg).compare("get_graphene") != 0);
