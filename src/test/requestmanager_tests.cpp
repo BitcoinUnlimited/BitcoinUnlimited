@@ -119,6 +119,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -139,6 +140,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thindata.ClearThinBlockTimer(inv.hash);
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeNone);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -159,6 +161,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -178,6 +181,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thindata.ClearThinBlockTimer(inv.hash);
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeNone);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -198,6 +202,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -219,6 +224,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -238,6 +244,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thindata.ClearThinBlockTimer(inv.hash);
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeNone);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -256,10 +263,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thindata.ClearThinBlockTimer(inv.hash);
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeNone);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
     }
+
     // Chains IS sync'd,  HAVE graphene nodes, NO Thinblock nodes, Thinblocks ON, Graphene ON
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
@@ -276,6 +285,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -298,6 +308,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -320,6 +331,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -343,6 +355,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -388,6 +401,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -428,6 +442,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -469,6 +484,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -510,6 +526,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -556,6 +573,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -601,12 +619,14 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
         vNodes.pop_back();
         vNodes.pop_back();
     }
+
 
     /******************************
      * Check a Xthin is is downloaded when thinblock timer is exceeded but then we get an announcement
@@ -641,6 +661,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
@@ -679,18 +700,19 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     requester.RequestBlock(&dummyNodeXthin, inv);
     BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg).compare("getdata") != 0);
 
+
     thindata.ClearThinBlockTimer(inv.hash);
     graphenedata.ClearGrapheneBlockTimer(inv.hash);
     ClearBlocksInFlight(dummyNodeGraphene);
     ClearBlocksInFlight(dummyNodeNone);
     ClearBlocksInFlight(dummyNodeXthin);
+    requester.MapBlocksInFlightClear();
     {
         LOCK(cs_vNodes);
         vNodes.pop_back();
         vNodes.pop_back();
         vNodes.pop_back();
     }
-
 
     // Final cleanup: Unset mocktime
     SetMockTime(0);
