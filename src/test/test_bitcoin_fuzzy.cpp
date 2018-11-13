@@ -14,6 +14,7 @@
 #include "compressor.h"
 #include "consensus/merkle.h"
 #include "net.h"
+#include "policy/policy.h"
 #include "primitives/block.h"
 #include "protocol.h"
 #include "pubkey.h"
@@ -25,7 +26,6 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include "version.h"
-#include "policy/policy.h"
 
 #include <cstdio>
 #include <stdint.h>
