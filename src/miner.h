@@ -69,13 +69,13 @@ private:
     /** Clear the block's state and prepare for assembling a new block */
     void resetBlock(const CScript &scriptPubKeyIn, int64_t coinbaseSize = -1);
     /** Add a tx to the block */
-    void AddToBlock(CBlockTemplate *, CTxMemPool::txiter iter);
+    void AddToBlock(std::vector<const CTxMemPoolEntry *> *vtxe, CTxMemPool::txiter iter);
 
     // Methods for how to add transactions to a block.
     /** Add transactions based on modified feerate */
-    void addScoreTxs(CBlockTemplate *);
+    void addScoreTxs(std::vector<const CTxMemPoolEntry *> *vtxe);
     /** Add transactions based on tx "priority" */
-    void addPriorityTxs(CBlockTemplate *);
+    void addPriorityTxs(std::vector<const CTxMemPoolEntry *> *vtxe);
 
     // helper function for addScoreTxs and addPriorityTxs
     bool IsIncrementallyGood(uint64_t nExtraSize, unsigned int nExtraSigOps);
