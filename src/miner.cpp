@@ -196,7 +196,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
 struct NumericallyLessTxHashComparator
 {
 public:
-    bool operator()(const CTxMemPoolEntry *a, const CTxMemPoolEntry *b) const { return a->GetTx().GetHash() < b->GetTx().GetHash(); }
+    bool operator()(const CTxMemPoolEntry *a, const CTxMemPoolEntry *b) const
+    {
+        return a->GetTx().GetHash() < b->GetTx().GetHash();
+    }
 };
 
 std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn,
@@ -234,9 +237,9 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         nLockTimeCutoff =
             (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
 
-        std::vector<const CTxMemPoolEntry*> txs;
-        addPriorityTxs(&txs);
-        addScoreTxs(&txs);
+        std::vector<const CTxMemPoolEntry *> vtxe;
+        addPriorityTxs(&vtxe);
+        addScoreTxs(&vtxe);
 
         nLastBlockTx = nBlockTx;
         nLastBlockSize = nBlockSize;
@@ -259,14 +262,14 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         // sort tx if there are any and the feature is enabled
         if (canonical)
         {
-            std::sort(txs.begin(), txs.end(), NumericallyLessTxHashComparator());
+            std::sort(vtxe.begin(), vtxe.end(), NumericallyLessTxHashComparator());
         }
 
-        for (auto& tx: txs)
+        for (auto &txe : vtxe)
         {
-            pblocktemplate->block.vtx.push_back(tx->GetSharedTx());
-            pblocktemplate->vTxFees.push_back(tx->GetFee());
-            pblocktemplate->vTxSigOps.push_back(tx->GetSigOpCount());
+            pblocktemplate->block.vtx.push_back(txe->GetSharedTx());
+            pblocktemplate->vTxFees.push_back(txe->GetFee());
+            pblocktemplate->vTxSigOps.push_back(txe->GetSigOpCount());
         }
 
         // Create coinbase transaction.
@@ -392,10 +395,10 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
     return true;
 }
 
-void BlockAssembler::AddToBlock(std::vector<const CTxMemPoolEntry*> *txs, CTxMemPool::txiter iter)
+void BlockAssembler::AddToBlock(std::vector<const CTxMemPoolEntry *> *vtxe, CTxMemPool::txiter iter)
 {
-    const CTxMemPoolEntry& tmp = *iter;
-    txs->push_back(&tmp);
+    const CTxMemPoolEntry &tmp = *iter;
+    vtxe->push_back(&tmp);
     nBlockSize += iter->GetTxSize();
     ++nBlockTx;
     nBlockSigOps += iter->GetSigOpCount();
@@ -414,7 +417,7 @@ void BlockAssembler::AddToBlock(std::vector<const CTxMemPoolEntry*> *txs, CTxMem
     }
 }
 
-void BlockAssembler::addScoreTxs(std::vector<const CTxMemPoolEntry*> *txs)
+void BlockAssembler::addScoreTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
 {
     std::priority_queue<CTxMemPool::txiter, std::vector<CTxMemPool::txiter>, ScoreCompare> clearedTxs;
     CTxMemPool::setEntries waitSet;
@@ -456,7 +459,7 @@ void BlockAssembler::addScoreTxs(std::vector<const CTxMemPoolEntry*> *txs)
         // If this tx fits in the block add it, otherwise keep looping
         if (TestForBlock(iter))
         {
-            AddToBlock(txs, iter);
+            AddToBlock(vtxe, iter);
 
             // This tx was successfully added, so
             // add transactions that depend on this one to the priority queue to try again
@@ -472,7 +475,7 @@ void BlockAssembler::addScoreTxs(std::vector<const CTxMemPoolEntry*> *txs)
     }
 }
 
-void BlockAssembler::addPriorityTxs(std::vector<const CTxMemPoolEntry*> *txs)
+void BlockAssembler::addPriorityTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
 {
     // How much of the block should be dedicated to high-priority transactions,
     // included regardless of the fees they pay
@@ -527,7 +530,7 @@ void BlockAssembler::addPriorityTxs(std::vector<const CTxMemPoolEntry*> *txs)
         // If this tx fits in the block add it, otherwise keep looping
         if (TestForBlock(iter))
         {
-            AddToBlock(txs, iter);
+            AddToBlock(vtxe, iter);
 
             // If now that this txs is added we've surpassed our desired priority size
             // or have dropped below the AllowFreeThreshold, then we're done adding priority txs
