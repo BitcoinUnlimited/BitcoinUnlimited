@@ -182,6 +182,7 @@ if ENABLE_ZMQ:
 testScripts = [ RpcTest(t) for t in [
     'bip135basic',
     'ctor',
+    'mining_ctor',
     'nov152018_forkactivation',
     'blockstorage',
     'miningtest',
