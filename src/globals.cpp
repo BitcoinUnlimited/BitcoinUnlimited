@@ -78,7 +78,7 @@ CChain chainActive GUARDED_BY(cs_main); // however, chainActive.Tip() is lock fr
 // - moved CCriticalSection cs_main;
 // - moved BlockMap mapBlockIndex;
 // - movedCChain chainActive;
-CBlockIndex *pindexBestHeader GUARDED_BY(cs_main) = nullptr;
+std::atomic<CBlockIndex *> pindexBestHeader{nullptr};
 CFeeRate minRelayTxFee GUARDED_BY(cs_main) = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
 // The allowed size of the in memory UTXO cache
 int64_t nCoinCacheMaxSize GUARDED_BY(cs_main) = 0;
@@ -223,6 +223,12 @@ std::queue<CTxInputData> txInQ GUARDED_BY(csTxInQ);
 
 // Transaction that cannot be processed in this round (may potentially conflict with other tx)
 std::queue<CTxInputData> txDeferQ GUARDED_BY(csTxInQ);
+
+// Transactions that arrive when the chain is not syncd can be place here at times when we've received
+// the block announcement but havn't yet downloaded the block and updated the tip. In this case there can
+// be txns that are perfectly valid yet are flagged as being non-final or has too many ancestors.
+std::queue<CTxInputData> txWaitNextBlockQ GUARDED_BY(csTxInQ);
+;
 
 // Transactions that have been validated and are waiting to be committed into the mempool
 CWaitableCriticalSection csCommitQ;

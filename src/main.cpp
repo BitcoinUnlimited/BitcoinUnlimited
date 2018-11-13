@@ -773,7 +773,7 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         // chain if they are valid, and no more than a month older (both in time, and in
                         // best equivalent proof of work) than the best header chain we know about.
                         fSend = mi->second->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
-                                (pindexBestHeader->GetBlockTime() - mi->second->GetBlockTime() < nOneMonth) &&
+                                (pindexBestHeader.load()->GetBlockTime() - mi->second->GetBlockTime() < nOneMonth) &&
                                 (GetBlockProofEquivalentTime(
                                      *pindexBestHeader, *mi->second, *pindexBestHeader, consensusParams) < nOneMonth);
                         if (!fSend)
@@ -799,7 +799,7 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 static const int nOneWeek = 7 * 24 * 60 * 60; // assume > 1 week = historical
                 if (fSend && CNode::OutboundTargetReached(true) &&
                     (((pindexBestHeader != nullptr) &&
-                         (pindexBestHeader->GetBlockTime() - mi->second->GetBlockTime() > nOneWeek)) ||
+                         (pindexBestHeader.load()->GetBlockTime() - mi->second->GetBlockTime() > nOneWeek)) ||
                         inv.type == MSG_FILTERED_BLOCK) &&
                     !pfrom->fWhitelisted)
                 {
@@ -1809,7 +1809,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                             pnode->PushMessage(NetMsgType::GETHEADERS, CBlockLocator(), pindexLast->GetBlockHash());
                             LOG(NET | BLK, "Requesting header for blockavailability, peer=%s block=%s height=%d\n",
                                 pnode->GetLogName(), pindexLast->GetBlockHash().ToString().c_str(),
-                                pindexBestHeader->nHeight);
+                                pindexBestHeader.load()->nHeight);
                         }
                     }
                 }
@@ -2142,15 +2142,26 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         std::vector<uint256> vtxid;
         mempool.queryHashes(vtxid);
         std::vector<CInv> vInv;
+
+        // Because we have to take cs_filter after mempool.cs, in order to maintain locking order, we
+        // need find out if a filter is present first before later doing the mempool.get().
+        bool fHaveFilter = false;
+        {
+            LOCK(pfrom->cs_filter);
+            fHaveFilter = pfrom->pfilter ? true : false;
+        }
+
         for (uint256 &hash : vtxid)
         {
             CInv inv(MSG_TX, hash);
-            if (pfrom->pfilter)
+            if (fHaveFilter)
             {
                 CTransactionRef ptx = nullptr;
                 ptx = mempool.get(inv.hash);
                 if (ptx == nullptr)
                     continue; // another thread removed since queryHashes, maybe...
+
+                LOCK(pfrom->cs_filter);
                 if (!pfrom->pfilter->IsRelevantAndUpdate(*ptx))
                     continue;
             }
@@ -2764,9 +2775,10 @@ bool SendMessages(CNode *pto)
                 state->fRequestedInitialBlockAvailability = true;
 
                 // We only want one single header so we pass a null CBlockLocator.
-                pto->PushMessage(NetMsgType::GETHEADERS, CBlockLocator(), pindexBestHeader->GetBlockHash());
+                pto->PushMessage(NetMsgType::GETHEADERS, CBlockLocator(), pindexBestHeader.load()->GetBlockHash());
                 LOG(NET | BLK, "Requesting header for initial blockavailability, peer=%s block=%s height=%d\n",
-                    pto->GetLogName(), pindexBestHeader->GetBlockHash().ToString().c_str(), pindexBestHeader->nHeight);
+                    pto->GetLogName(), pindexBestHeader.load()->GetBlockHash().ToString(),
+                    pindexBestHeader.load()->nHeight);
             }
         }
 
