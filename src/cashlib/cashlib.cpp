@@ -60,20 +60,6 @@ bool DecodeHexTx(CTransaction &tx, const std::string &strHexTx)
     return true;
 }
 #endif
-
-static const char *hexxlat = "0123456789ABCDEF";
-std::string GetHex(unsigned char *data, unsigned int len)
-{
-    std::string ret;
-    ret.reserve(2 * len);
-    for (unsigned int i = 0; i < len; i++)
-    {
-        unsigned char val = data[i];
-        ret.push_back(hexxlat[val >> 4]);
-        ret.push_back(hexxlat[val & 15]);
-    }
-    return ret;
-}
 }
 
 /** Convert binary data to a hex string.  The provided result buffer must be 2*length+1 bytes.

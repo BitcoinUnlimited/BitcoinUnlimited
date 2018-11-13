@@ -17,6 +17,7 @@ Functionality to build scripts, as well as SignatureHash().
 from sys import stdout
 from .mininode import CTransaction, CTxOut, hash256
 from binascii import hexlify
+from .constants import (SIGHASH_ALL, SIGHASH_NONE, SIGHASH_SINGLE, SIGHASH_FORKID, SIGHASH_ANYONECANPAY)
 
 import sys
 bchr = chr
@@ -790,11 +791,9 @@ class CScript(bytes):
                     yield CScriptOp(opcode)
 
     def __repr__(self):
-        # For Python3 compatibility add b before strings so testcases don't
-        # need to change
         def _repr(o):
             if isinstance(o, bytes):
-                return b"x('%s')" % hexlify(o).decode('ascii')
+                return "x('%s')" % hexlify(o).decode('ascii')
             else:
                 return repr(o)
 
@@ -860,12 +859,6 @@ class CScript(bytes):
                     n += 20
             lastOpcode = opcode
         return n
-
-
-SIGHASH_ALL = 1
-SIGHASH_NONE = 2
-SIGHASH_SINGLE = 3
-SIGHASH_ANYONECANPAY = 0x80
 
 def FindAndDelete(script, sig):
     """Consensus critical, see FindAndDelete() in Satoshi codebase"""
@@ -934,3 +927,10 @@ def SignatureHash(script, txTo, inIdx, hashtype):
     hash = hash256(s)
 
     return (hash, None)
+
+
+## py.test code
+def testScriptRepr():
+    x = CScript([OP_CHECKDATASIG])+b"\x11\x22\x33"
+    # make sure repr doesn't fail
+    assert "112233" in repr(x)

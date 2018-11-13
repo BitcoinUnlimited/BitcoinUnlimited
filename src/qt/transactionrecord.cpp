@@ -208,7 +208,7 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     // Determine transaction status
 
     // Find the block the tx is in
-    CBlockIndex *pindex = NULL;
+    CBlockIndex *pindex = nullptr;
     BlockMap::iterator mi = mapBlockIndex.find(wtx.hashBlock);
     if (mi != mapBlockIndex.end())
         pindex = (*mi).second;
@@ -283,11 +283,6 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     }
 }
 
-bool TransactionRecord::statusUpdateNeeded()
-{
-    AssertLockHeld(cs_main);
-    return status.cur_num_blocks != chainActive.Height();
-}
-
+bool TransactionRecord::statusUpdateNeeded() { return status.cur_num_blocks != chainActive.Height(); }
 QString TransactionRecord::getTxID() const { return QString::fromStdString(hash.ToString()); }
 int TransactionRecord::getOutputIndex() const { return idx; }

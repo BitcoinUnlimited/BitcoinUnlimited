@@ -551,6 +551,7 @@ class CTransaction(object):
         if self.sha256 is None:
             self.sha256 = uint256_from_str(hash256(self.serialize()))
         self.hash = encode(hash256(self.serialize())[::-1], 'hex_codec').decode('ascii')
+        return self.hash
 
     def is_valid(self):
         self.calc_sha256()
@@ -631,6 +632,7 @@ class CBlockHeader(object):
             r += struct.pack("<I", self.nNonce)
             self.sha256 = uint256_from_str(hash256(r))
             self.hash = encode(hash256(r)[::-1], 'hex_codec').decode('ascii')
+        return self.hash
 
     def gethash(self):
         self.calc_sha256()

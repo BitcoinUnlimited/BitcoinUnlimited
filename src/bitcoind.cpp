@@ -213,7 +213,16 @@ bool AppInit(int argc, char *argv[])
 
             LOGA("Single entry arguments:\n");
             for (const auto &arg : mapArgs)
-                LOGA(tfm::format("        %s='%s'\n", arg.first, arg.second));
+            {
+                std::string strKey = arg.first;
+                std::string strValue = arg.second;
+                if (strKey == "-rpcpassword" || strKey == "-rpcuser")
+                {
+                    // don't print username or password to the log file
+                    strValue = "xxxxxxxx";
+                }
+                LOGA(tfm::format("        %s='%s'\n", strKey, strValue));
+            }
             LOGA("\n");
             bool print_multi_args = false;
             for (const auto &arg : mapMultiArgs)

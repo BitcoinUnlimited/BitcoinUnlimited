@@ -187,9 +187,11 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
         // We have all the transactions now that are in this block: try to reassemble and process.
         pfrom->thinBlockWaitingForTxns = -1;
         int blockSize = pfrom->thinBlock.GetBlockSize();
+        float nCompressionRatio = 0.0;
+        if (nSizeThinBlock > 0)
+            nCompressionRatio = (float)blockSize / (float)nSizeThinBlock;
         LOG(THIN, "Reassembled thinblock for %s (%d bytes). Message was %d bytes, compression ratio %3.2f peer=%s\n",
-            pfrom->thinBlock.GetHash().ToString(), blockSize, nSizeThinBlock,
-            ((float)blockSize) / ((float)nSizeThinBlock), pfrom->GetLogName());
+            pfrom->thinBlock.GetHash().ToString(), blockSize, nSizeThinBlock, nCompressionRatio, pfrom->GetLogName());
 
         // Update run-time statistics of thin block bandwidth savings
         thindata.UpdateInBound(nSizeThinBlock, blockSize);

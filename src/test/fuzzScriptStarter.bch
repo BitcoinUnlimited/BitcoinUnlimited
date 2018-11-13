@@ -1,0 +1,81 @@
+def t0()
+{
+  OP_1
+  OP_12
+  OP_MUL
+  OP_2
+  OP_LSHIFT
+  OP_6
+  OP_INVERT
+}
+
+def t1()
+{
+  OP_1
+  OP_RSHIFT
+  OP_6
+  OP_INVERT
+  0x12345678
+  OP_BIN2NUM
+  OP_AND
+}
+
+def t2()
+{
+  0x0100
+  OP_BIN2NUM
+  0x10
+  OP_BIN2NUM
+  OP_DIV
+  OP_2
+  OP_MOD
+}
+
+def t3()
+{
+  0x0100
+  OP_BIN2NUM
+  0x10
+  OP_BIN2NUM
+  OP_SUB
+  OP_2
+  OP_ADD
+  OP_BOOLAND
+  OP_BOOLOR
+}
+
+def t4()
+{
+    repeat(100)
+    {
+        OP_MUL
+        OP_DUP
+        OP_1
+        OP_RSHIFT
+    }
+}
+
+def t5()
+{
+    repeat(100)
+    {
+        OP_MUL
+        OP_DUP
+        OP_DUP
+        OP_RSHIFT
+    }
+}
+
+def input()
+{
+    OP_3
+    OP_5
+}
+
+scriptify!("out0", t0())
+scriptify!("out1", t1())
+scriptify!("out2", t2())
+scriptify!("out3", t3())
+scriptify!("out4", t4())
+scriptify!("out5", t5())
+scriptify!("inp", input())

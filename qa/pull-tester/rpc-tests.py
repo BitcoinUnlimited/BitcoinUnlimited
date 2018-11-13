@@ -182,6 +182,7 @@ if ENABLE_ZMQ:
 testScripts = [ RpcTest(t) for t in [
     'bip135basic',
     'ctor',
+    'mining_ctor',
     'nov152018_forkactivation',
     'blockstorage',
     'miningtest',
@@ -232,7 +233,7 @@ testScripts = [ RpcTest(t) for t in [
     'p2p-versionbits-warning',
     'importprunedfunds',
     'thinblocks',
-    'checkdatasig-activation'
+    'checkdatasig_activation'
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [

@@ -515,7 +515,8 @@ UniValue signmessage(const UniValue &params, bool fHelp)
     if (fHelp || params.size() != 2)
         throw runtime_error(
             "signmessage \"bitcoinaddress\" \"message\"\n"
-            "\nSign a message with the private key of an address" +
+            "\nSign a message with the private key of an address.  This is NOT compatible with CHECKDATASIG"
+            "\n (use signdata instead)." +
             HelpRequiringPassphrase() +
             "\n"
             "\nArguments:\n"
@@ -557,6 +558,109 @@ UniValue signmessage(const UniValue &params, bool fHelp)
 
     return EncodeBase64(&vchSig[0], vchSig.size());
 }
+
+UniValue signdata(const UniValue &params, bool fHelp)
+{
+    if (!EnsureWalletIsAvailable(fHelp))
+        return NullUniValue;
+
+    if (fHelp || params.size() < 3 || params.size() > 4)
+        throw runtime_error(
+            "signdata \"bitcoinaddress\" \"msgFormat\" \"message\"\n"
+            "\nSign message for use with the CHECKDATASIG instruction."
+            "\nAs per the CHECKDATASIG operation, this RPC normally signs the SHA256 of"
+            "\nthe provided message unless the 'hash' message format is specified."
+            "\nIf using the 'hash' message format, provide the hex encoded SHA256 hash"
+            "\nof the message intended to be passed to CHECKDATASIG.\n" +
+            HelpRequiringPassphrase() +
+            "\n"
+            "\nArguments:\n"
+            "1. \"bitcoinaddress\"  (string, required) The bitcoin address to use for the private key.\n"
+            "2. \"msgFormat\"       (string, required) Use \"string\", \"hex\", or \"hash\" to specify the message "
+            "encoding.\n"
+            "3. \"message\"         (string, required) The message to create a signature of.\n"
+            "4. \"verbose\"         (string, optional) pass 'verbose' to return additional info.\n"
+            "\nResult:\n"
+            "\"signature\"          (string) The signature of the message encoded in hex\n"
+            "\nif 'verbose', return a dictionary containing the signature, pubkey and pubkey hash in hex format.\n"
+            "\nExamples:\n"
+            "\nUnlock the wallet for 30 seconds\n" +
+            HelpExampleCli("walletpassphrase", "\"mypassphrase\" 30") + "\nCreate the signature\n" +
+            HelpExampleCli(
+                "signdata", "\"bitcoincash:qq5lslagrktm5qtxfw4ltpd5krehhrh595fc04hv0k\" \"string\" \"my message\"") +
+            HelpExampleCli(
+                "signdata", "\"bitcoincash:qq5lslagrktm5qtxfw4ltpd5krehhrh595fc04hv0k\" \"hex\" \"01020304\"") +
+            "\nAs json rpc\n" +
+            HelpExampleRpc(
+                "signdata", "\"bitcoincash:qq5lslagrktm5qtxfw4ltpd5krehhrh595fc04hv0k\", \"string\", \"my message\""));
+
+    LOCK2(cs_main, pwalletMain->cs_wallet);
+
+    EnsureWalletIsUnlocked();
+
+    string strAddress = params[0].get_str();
+    string datatype = params[1].get_str();
+    string strMessage = params[2].get_str();
+    bool verbose = false;
+    if (params.size() > 3)
+        verbose = (params[3].get_str() == "verbose");
+
+    CTxDestination dest = DecodeDestination(strAddress);
+    if (!IsValidDestination(dest))
+        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid address");
+
+    const CKeyID *keyID = boost::get<CKeyID>(&dest);
+    if (!keyID)
+        throw JSONRPCError(RPC_TYPE_ERROR, "Address does not refer to key");
+
+    CKey key;
+    if (!pwalletMain->GetKey(*keyID, key))
+        throw JSONRPCError(RPC_WALLET_ERROR, "Private key not available");
+
+    uint256 hash;
+    if (datatype == "string")
+    {
+        CSHA256().Write((const unsigned char *)strMessage.c_str(), strMessage.size()).Finalize(hash.begin());
+    }
+    else if (datatype == "hex")
+    {
+        if (!IsHex(strMessage))
+            throw JSONRPCError(RPC_TYPE_ERROR, "Message is not hex data");
+        auto data = ParseHex(strMessage.c_str());
+        CSHA256().Write(data.data(), data.size()).Finalize(hash.begin());
+    }
+    else if (datatype == "hash")
+    {
+        if (!IsHex(strMessage))
+            throw JSONRPCError(RPC_TYPE_ERROR, "Message is not hex data");
+        if (strMessage.size() != 2 * sizeof(uint256))
+            throw JSONRPCError(RPC_TYPE_ERROR, "Message is not a hex hash");
+        hash.SetHex(strMessage);
+        // bitcoind reads hashes backwards.  By reversing here, we ensure that
+        // signdata(addr, "string", "foo") == signdata(addr, "hash", normalSHA256("foo"))
+        hash.reverse();
+    }
+    else
+    {
+        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid message format");
+    }
+    std::vector<uint8_t> sig;
+    key.Sign(hash, sig);
+    if (sig.empty())
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Sign failed");
+    if (verbose)
+    {
+        UniValue ret(UniValue::VOBJ);
+        ret.push_back(Pair("msghash", hash.ToString()));
+        ret.push_back(Pair("signature", GetHex(sig.data(), sig.size())));
+        ret.push_back(Pair("pubkeyhash", keyID->GetHex()));
+        CPubKey pub = key.GetPubKey();
+        ret.push_back(Pair("pubkey", GetHex(pub.begin(), pub.size())));
+        return ret;
+    }
+    return UniValue(GetHex(sig.data(), sig.size()));
+}
+
 
 UniValue getreceivedbyaddress(const UniValue &params, bool fHelp)
 {
@@ -2828,6 +2932,7 @@ static const CRPCCommand commands[] = {
     {"wallet",                "setaccount",               &setaccount,               true},
     {"wallet",                "settxfee",                 &settxfee,                 true},
     {"wallet",                "signmessage",              &signmessage,              true},
+    {"wallet",                "signdata",                 &signdata,                 true},
     {"wallet",                "walletlock",               &walletlock,               true},
     {"wallet",                "walletpassphrasechange",   &walletpassphrasechange,   true},
     {"wallet",                "walletpassphrase",         &walletpassphrase,         true},
