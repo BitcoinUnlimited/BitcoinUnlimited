@@ -901,7 +901,7 @@ bool CheckInputs(const CTransaction &tx,
 {
     if (!tx.IsCoinBase())
     {
-        if (!Consensus::CheckTxInputs(tx, state, inputs))
+        if (!Consensus::CheckTxInputs(MakeTransactionRef(tx), state, inputs))
             return false;
         if (pvChecks)
             pvChecks->reserve(tx.vin.size());

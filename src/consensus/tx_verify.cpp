@@ -233,20 +233,20 @@ static int GetSpendHeight(const CCoinsViewCache &inputs)
     throw std::runtime_error("GetSpendHeight(): best block does not exist");
 }
 
-bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, const CCoinsViewCache &inputs)
+bool Consensus::CheckTxInputs(const CTransactionRef &tx, CValidationState &state, const CCoinsViewCache &inputs)
 {
     // This doesn't trigger the DoS code on purpose; if it did, it would make it easier
     // for an attacker to attempt to split the network.
-    if (!inputs.HaveInputs(tx))
+    if (!inputs.HaveInputs(*tx))
         return state.Invalid(false, 0, "", "Inputs unavailable");
 
     CAmount nValueIn = 0;
     CAmount nFees = 0;
     int nSpendHeight = -1;
     {
-        for (unsigned int i = 0; i < tx.vin.size(); i++)
+        for (unsigned int i = 0; i < tx->vin.size(); i++)
         {
-            const COutPoint &prevout = tx.vin[i].prevout;
+            const COutPoint &prevout = tx->vin[i].prevout;
             Coin coin;
             inputs.GetCoin(prevout, coin); // Make a copy so I don't hold the utxo lock
             assert(!coin.IsSpent());
@@ -285,12 +285,12 @@ bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, c
         }
     }
 
-    if (nValueIn < tx.GetValueOut())
+    if (nValueIn < tx->GetValueOut())
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-belowout", false,
-            strprintf("value in (%s) < value out (%s)", FormatMoney(nValueIn), FormatMoney(tx.GetValueOut())));
+            strprintf("value in (%s) < value out (%s)", FormatMoney(nValueIn), FormatMoney(tx->GetValueOut())));
 
     // Tally transaction fees
-    CAmount nTxFee = nValueIn - tx.GetValueOut();
+    CAmount nTxFee = nValueIn - tx->GetValueOut();
     if (nTxFee < 0)
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-fee-negative");
     nFees += nTxFee;

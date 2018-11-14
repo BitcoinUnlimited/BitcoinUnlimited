@@ -26,7 +26,7 @@ namespace Consensus
  * This does not modify the UTXO set. This does not check scripts and sigs.
  * Preconditions: tx.IsCoinBase() is false.
  */
-bool CheckTxInputs(const CTransaction &tx, CValidationState &state, const CCoinsViewCache &inputs);
+bool CheckTxInputs(const CTransactionRef &tx, CValidationState &state, const CCoinsViewCache &inputs);
 } // namespace Consensus
 
 /** Auxiliary functions for transaction validation (ideally should not be exposed) */
