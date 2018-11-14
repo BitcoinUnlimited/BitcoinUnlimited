@@ -1502,7 +1502,7 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
 
     // Check transactions
     for (const auto &tx : block.vtx)
-        if (!CheckTransaction(*tx, state))
+        if (!CheckTransaction(tx, state))
             return error("CheckBlock(): CheckTransaction of %s failed with %s", tx->GetHash().ToString(),
                 FormatStateMessage(state));
 

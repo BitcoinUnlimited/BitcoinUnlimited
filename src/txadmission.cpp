@@ -590,7 +590,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
     // LOG(MEMPOOL, "Mempool: Considering Tx %s\n", tx->GetHash().ToString());
 
-    if (!CheckTransaction(*tx, state))
+    if (!CheckTransaction(tx, state))
     {
         if (state.GetDebugMessage() == "")
             state.SetDebugMessage("CheckTransaction failed");

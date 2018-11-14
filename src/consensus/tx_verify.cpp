@@ -156,15 +156,15 @@ unsigned int GetP2SHSigOpCount(const CTransactionRef &tx, const CCoinsViewCache 
     return nSigOps;
 }
 
-bool CheckTransaction(const CTransaction &tx, CValidationState &state)
+bool CheckTransaction(const CTransactionRef &tx, CValidationState &state)
 {
     // Basic checks that don't depend on any context
-    if (tx.vin.empty())
+    if (tx->vin.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vin-empty");
-    if (tx.vout.empty())
+    if (tx->vout.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty");
     // Check that the transaction doesn't have an excessive number of sigops
-    unsigned int nSigOps = GetLegacySigOpCount(MakeTransactionRef(tx), STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+    unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
     if (nSigOps > MAX_TX_SIGOPS)
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-too-many-sigops");
 
@@ -175,7 +175,7 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
 
     // Check for negative or overflow output values
     CAmount nValueOut = 0;
-    for (const CTxOut &txout : tx.vout)
+    for (const CTxOut &txout : tx->vout)
     {
         if (txout.nValue < 0)
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-vout-negative");
@@ -188,22 +188,22 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
 
     // Check for duplicate inputs
     std::set<COutPoint> vInOutPoints;
-    for (const CTxIn &txin : tx.vin)
+    for (const CTxIn &txin : tx->vin)
     {
         if (vInOutPoints.count(txin.prevout))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputs-duplicate");
         vInOutPoints.insert(txin.prevout);
     }
 
-    if (tx.IsCoinBase())
+    if (tx->IsCoinBase())
     {
         // BU convert 100 to a constant so we can use it during generation
-        if (tx.vin[0].scriptSig.size() < 2 || tx.vin[0].scriptSig.size() > MAX_COINBASE_SCRIPTSIG_SIZE)
+        if (tx->vin[0].scriptSig.size() < 2 || tx->vin[0].scriptSig.size() > MAX_COINBASE_SCRIPTSIG_SIZE)
             return state.DoS(100, false, REJECT_INVALID, "bad-cb-length");
     }
     else
     {
-        for (const CTxIn &txin : tx.vin)
+        for (const CTxIn &txin : tx->vin)
             if (txin.prevout.IsNull())
                 return state.DoS(10, false, REJECT_INVALID, "bad-txns-prevout-null");
     }
