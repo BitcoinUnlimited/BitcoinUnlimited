@@ -29,7 +29,7 @@ static std::vector<unsigned char> Serialize(const CScript &s)
 
 uint64_t GetTransactionSigOpCount(const CTransaction &tx, const CCoinsViewCache &coins, const uint32_t flags)
 {
-    return GetLegacySigOpCount(tx, flags) + GetP2SHSigOpCount(tx, coins, flags);
+    return GetLegacySigOpCount(MakeTransactionRef(tx), flags) + GetP2SHSigOpCount(MakeTransactionRef(tx), coins, flags);
 }
 
 // FIXME: This should be properly factored out of unlimited.cpp as well

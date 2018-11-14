@@ -1440,7 +1440,7 @@ bool ContextualCheckBlock(const CBlock &block,
     {
         nTx++;
 
-        nSigOps += GetLegacySigOpCount(*tx, flags);
+        nSigOps += GetLegacySigOpCount(tx, flags);
         if (tx->GetTxSize() > nLargestTx)
             nLargestTx = tx->GetTxSize();
     }
@@ -2024,7 +2024,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
-            nSigOps += GetLegacySigOpCount(tx, flags);
+            nSigOps += GetLegacySigOpCount(txref, flags);
             // if (nSigOps > MAX_BLOCK_SIGOPS)
             //    return state.DoS(100, error("ConnectBlock(): too many sigops"),
             //                    REJECT_INVALID, "bad-blk-sigops");
@@ -2070,7 +2070,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                     // Add in sigops done by pay-to-script-hash inputs;
                     // this is to prevent a "rogue miner" from creating
                     // an incredibly-expensive-to-validate block.
-                    nSigOps += GetP2SHSigOpCount(tx, view, flags);
+                    nSigOps += GetP2SHSigOpCount(txref, view, flags);
                 }
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();
@@ -2275,7 +2275,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
-            nSigOps += GetLegacySigOpCount(tx, flags);
+            nSigOps += GetLegacySigOpCount(txref, flags);
 
             if (!tx.IsCoinBase())
             {
@@ -2318,7 +2318,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                     // Add in sigops done by pay-to-script-hash inputs;
                     // this is to prevent a "rogue miner" from creating
                     // an incredibly-expensive-to-validate block.
-                    nSigOps += GetP2SHSigOpCount(tx, view, flags);
+                    nSigOps += GetP2SHSigOpCount(txref, view, flags);
                 }
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();

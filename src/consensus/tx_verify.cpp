@@ -125,32 +125,32 @@ bool SequenceLocks(const CTransactionRef &tx, int flags, std::vector<int> *prevH
 // previous outputs are the most relevant, but not actually checked.
 // The purpose of this is to limit the outputs of transactions so that other transactions' "prevout"
 // is reasonably sized.
-unsigned int GetLegacySigOpCount(const CTransaction &tx, const uint32_t flags)
+unsigned int GetLegacySigOpCount(const CTransactionRef &tx, const uint32_t flags)
 {
     unsigned int nSigOps = 0;
-    for (const auto &txin : tx.vin)
+    for (const auto &txin : tx->vin)
     {
         nSigOps += txin.scriptSig.GetSigOpCount(flags, false);
     }
-    for (const auto &txout : tx.vout)
+    for (const auto &txout : tx->vout)
     {
         nSigOps += txout.scriptPubKey.GetSigOpCount(flags, false);
     }
     return nSigOps;
 }
 
-unsigned int GetP2SHSigOpCount(const CTransaction &tx, const CCoinsViewCache &inputs, const uint32_t flags)
+unsigned int GetP2SHSigOpCount(const CTransactionRef &tx, const CCoinsViewCache &inputs, const uint32_t flags)
 {
-    if ((flags && SCRIPT_VERIFY_P2SH) == 0 || tx.IsCoinBase())
+    if ((flags && SCRIPT_VERIFY_P2SH) == 0 || tx->IsCoinBase())
         return 0;
 
     unsigned int nSigOps = 0;
     {
-        for (unsigned int i = 0; i < tx.vin.size(); i++)
+        for (unsigned int i = 0; i < tx->vin.size(); i++)
         {
-            CoinAccessor coin(inputs, tx.vin[i].prevout);
+            CoinAccessor coin(inputs, tx->vin[i].prevout);
             if (coin && coin->out.scriptPubKey.IsPayToScriptHash())
-                nSigOps += coin->out.scriptPubKey.GetSigOpCount(flags, tx.vin[i].scriptSig);
+                nSigOps += coin->out.scriptPubKey.GetSigOpCount(flags, tx->vin[i].scriptSig);
         }
     }
     return nSigOps;
@@ -164,7 +164,7 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
     if (tx.vout.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty");
     // Check that the transaction doesn't have an excessive number of sigops
-    unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+    unsigned int nSigOps = GetLegacySigOpCount(MakeTransactionRef(tx), STANDARD_CHECKDATASIG_VERIFY_FLAGS);
     if (nSigOps > MAX_TX_SIGOPS)
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-too-many-sigops");
 
