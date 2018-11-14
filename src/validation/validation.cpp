@@ -888,7 +888,7 @@ void CheckBlockIndex(const Consensus::Params &consensusParams)
 // Transactions
 //
 
-bool CheckInputs(const CTransaction &tx,
+bool CheckInputs(const CTransactionRef &tx,
     CValidationState &state,
     const CCoinsViewCache &inputs,
     bool fScriptChecks,
@@ -899,12 +899,12 @@ bool CheckInputs(const CTransaction &tx,
     std::vector<CScriptCheck> *pvChecks,
     unsigned char *sighashType)
 {
-    if (!tx.IsCoinBase())
+    if (!tx->IsCoinBase())
     {
-        if (!Consensus::CheckTxInputs(MakeTransactionRef(tx), state, inputs))
+        if (!Consensus::CheckTxInputs(tx, state, inputs))
             return false;
         if (pvChecks)
-            pvChecks->reserve(tx.vin.size());
+            pvChecks->reserve(tx->vin.size());
 
         // The first loop above does all the inexpensive checks.
         // Only if ALL inputs pass do we perform expensive ECDSA signature checks.
@@ -918,9 +918,9 @@ bool CheckInputs(const CTransaction &tx,
         // this optimisation would allow an invalid chain to be accepted.
         if (fScriptChecks)
         {
-            for (unsigned int i = 0; i < tx.vin.size(); i++)
+            for (unsigned int i = 0; i < tx->vin.size(); i++)
             {
-                const COutPoint &prevout = tx.vin[i].prevout;
+                const COutPoint &prevout = tx->vin[i].prevout;
                 CoinAccessor coin(inputs, prevout);
 
                 if (coin->IsSpent())
@@ -938,7 +938,7 @@ bool CheckInputs(const CTransaction &tx,
                 const CAmount amount = coin->out.nValue;
 
                 // Verify signature
-                CScriptCheck check(resourceTracker, scriptPubKey, amount, tx, i, flags, maxOps, cacheStore);
+                CScriptCheck check(resourceTracker, scriptPubKey, amount, *tx, i, flags, maxOps, cacheStore);
                 if (pvChecks)
                 {
                     pvChecks->push_back(CScriptCheck());
@@ -955,7 +955,7 @@ bool CheckInputs(const CTransaction &tx,
                         // arguments; if so, don't trigger DoS protection to
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
-                        CScriptCheck check2(nullptr, scriptPubKey, amount, tx, i,
+                        CScriptCheck check2(nullptr, scriptPubKey, amount, *tx, i,
                             (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS), maxOps, cacheStore);
                         if (check2())
                             return state.Invalid(
@@ -2094,7 +2094,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                         std::vector<CScriptCheck> vChecks;
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
-                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
+                        if (!CheckInputs(txref, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
                                 &resourceTracker, PV->ThreadCount() ? &vChecks : NULL))
                         {
                             return error("%s: block %s CheckInputs on %s failed with %s", __func__,
@@ -2342,7 +2342,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                         std::vector<CScriptCheck> vChecks;
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
-                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
+                        if (!CheckInputs(txref, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
                                 &resourceTracker, PV->ThreadCount() ? &vChecks : nullptr))
                         {
                             return error("%s: block %s CheckInputs on %s failed with %s", __func__,
