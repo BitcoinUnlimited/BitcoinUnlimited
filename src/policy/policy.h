@@ -72,6 +72,6 @@ bool IsStandardTx(const CTransaction &tx, std::string &reason);
  * @param[in] mapInputs    Map of previous transactions that have outputs we're spending
  * @return True if all inputs (scriptSigs) use only standard transaction forms
  */
-bool AreInputsStandard(const CTransaction &tx, const CCoinsViewCache &mapInputs);
+bool AreInputsStandard(const CTransactionRef &tx, const CCoinsViewCache &mapInputs);
 
 #endif // BITCOIN_POLICY_POLICY_H

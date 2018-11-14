@@ -131,16 +131,16 @@ bool IsStandardTx(const CTransaction &tx, std::string &reason)
     return true;
 }
 
-bool AreInputsStandard(const CTransaction &tx, const CCoinsViewCache &mapInputs)
+bool AreInputsStandard(const CTransactionRef &tx, const CCoinsViewCache &mapInputs)
 {
-    if (tx.IsCoinBase())
+    if (tx->IsCoinBase())
         return true; // Coinbases don't use vin normally
 
-    for (unsigned int i = 0; i < tx.vin.size(); i++)
+    for (unsigned int i = 0; i < tx->vin.size(); i++)
     {
         txnouttype whichType;
         {
-            CoinAccessor coin(mapInputs, tx.vin[i].prevout);
+            CoinAccessor coin(mapInputs, tx->vin[i].prevout);
             const CTxOut &prev = coin->out;
 
             std::vector<std::vector<unsigned char> > vSolutions;
@@ -158,7 +158,7 @@ bool AreInputsStandard(const CTransaction &tx, const CCoinsViewCache &mapInputs)
             // and it matches the P2SH script template, so we know that it won't have any ops, only pushes
             // so pass MAX_OPS_PER_SCRIPT for the max number of ops to match prior behavior exactly
             if (!EvalScript(
-                    stack, tx.vin[i].scriptSig, SCRIPT_VERIFY_NONE, MAX_OPS_PER_SCRIPT, BaseSignatureChecker(), 0))
+                    stack, tx->vin[i].scriptSig, SCRIPT_VERIFY_NONE, MAX_OPS_PER_SCRIPT, BaseSignatureChecker(), 0))
                 return false;
             if (stack.empty())
                 return false;
