@@ -462,8 +462,7 @@ private:
 
     void trackPackageRemoved(const CFeeRate &rate);
 
-    boost::mutex cs_txPerSec;
-    double nTxPerSec; // BU: tx's per second accepted into the mempool
+    std::atomic<double> nTxPerSec{0}; // tx's per second accepted into the mempool
 
 public:
     static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12; // public only for testing
@@ -686,12 +685,7 @@ public:
         return (mapTx.count(hash) != 0);
     }
     bool _exists(const uint256 &hash) const { return (mapTx.count(hash) != 0); }
-    double TransactionsPerSecond()
-    {
-        boost::mutex::scoped_lock lock(cs_txPerSec);
-        return nTxPerSec;
-    }
-
+    double TransactionsPerSecond() { return nTxPerSec.load(); }
     bool exists(const COutPoint &outpoint) const
     {
         READLOCK(cs);

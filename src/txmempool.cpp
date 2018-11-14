@@ -1438,24 +1438,24 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpends
 
 void CTxMemPool::UpdateTransactionsPerSecond()
 {
-    boost::mutex::scoped_lock lock(cs_txPerSec);
-
+    static std::atomic<double> nTxnsProcessed{0};
     static int64_t nLastTime = GetTime();
+
     double nSecondsToAverage = 60; // Length of time in seconds to smooth the tx rate over
     int64_t nNow = GetTime();
 
-    // Decay the previous tx rate.
-    int64_t nDeltaTime = nNow - nLastTime;
-    if (nDeltaTime > 0)
+    double nNewTxns = 0.0;
+    double nOldTxns = 0.0;
+    do
     {
-        nTxPerSec -= (nTxPerSec / nSecondsToAverage) * nDeltaTime;
-        nLastTime = nNow;
-    }
+        // decay the number of transactions over nSecondsToAverage and then add "1" for
+        // the new transaction.
+        nOldTxns = nTxnsProcessed.load();
+        nNewTxns = nOldTxns * std::pow(1.0 - 1.0 / nSecondsToAverage, (double)(nNow - nLastTime)) + 1;
+    } while (!nTxnsProcessed.compare_exchange_weak(nOldTxns, nNewTxns));
+    nLastTime = nNow;
 
-    // Add the new tx to the rate
-    nTxPerSec += 1 / nSecondsToAverage; // The amount that the new tx will add to the tx rate
-    if (nTxPerSec < 0)
-        nTxPerSec = 0;
+    nTxPerSec.store(nNewTxns / nSecondsToAverage);
 }
 
 SaltedTxidHasher::SaltedTxidHasher()
