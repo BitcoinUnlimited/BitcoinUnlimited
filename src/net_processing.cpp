@@ -1626,7 +1626,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     continue; // another thread removed since queryHashes, maybe...
 
                 LOCK(pfrom->cs_filter);
-                if (!pfrom->pfilter->IsRelevantAndUpdate(*ptx))
+                if (!pfrom->pfilter->IsRelevantAndUpdate(ptx))
                     continue;
             }
             vInv.push_back(inv);

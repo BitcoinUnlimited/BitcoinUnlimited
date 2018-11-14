@@ -7,12 +7,12 @@
 #define BITCOIN_BLOOM_H
 
 #include "consensus/consensus.h"
+#include "primitives/transaction.h"
 #include "serialize.h"
 
 #include <vector>
 
 class COutPoint;
-class CTransaction;
 class uint256;
 
 //! 20,000 items with fp rate < 0.1% or 10,000 items and <0.0001%
@@ -137,7 +137,7 @@ public:
     bool IsWithinSizeConstraints() const;
 
     //! Also adds any outputs which match the filter to the filter (to match their spending txes)
-    bool IsRelevantAndUpdate(const CTransaction &tx);
+    bool IsRelevantAndUpdate(const CTransactionRef &tx);
 };
 
 /**
