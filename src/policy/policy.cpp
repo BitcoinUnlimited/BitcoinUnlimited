@@ -58,9 +58,9 @@ bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType)
     return whichType != TX_NONSTANDARD;
 }
 
-bool IsStandardTx(const CTransaction &tx, std::string &reason)
+bool IsStandardTx(const CTransactionRef &tx, std::string &reason)
 {
-    if (tx.nVersion > CTransaction::MAX_STANDARD_VERSION || tx.nVersion < 1)
+    if (tx->nVersion > CTransaction::MAX_STANDARD_VERSION || tx->nVersion < 1)
     {
         reason = "version";
         return false;
@@ -70,13 +70,13 @@ bool IsStandardTx(const CTransaction &tx, std::string &reason)
     // almost as much to process as they cost the sender in fees, because
     // computing signature hashes is O(ninputs*txsize). Limiting transactions
     // to MAX_STANDARD_TX_SIZE mitigates CPU exhaustion attacks.
-    if (tx.GetTxSize() >= MAX_STANDARD_TX_SIZE)
+    if (tx->GetTxSize() >= MAX_STANDARD_TX_SIZE)
     {
         reason = "tx-size";
         return false;
     }
 
-    for (const CTxIn &txin : tx.vin)
+    for (const CTxIn &txin : tx->vin)
     {
         // Biggest 'standard' txin is a 15-of-15 P2SH multisig with compressed
         // keys. (remember the 520 byte limit on redeemScript size) That works
@@ -99,7 +99,7 @@ bool IsStandardTx(const CTransaction &tx, std::string &reason)
 
     unsigned int nDataOut = 0;
     txnouttype whichType;
-    for (const CTxOut &txout : tx.vout)
+    for (const CTxOut &txout : tx->vout)
     {
         if (!::IsStandard(txout.scriptPubKey, whichType))
         {

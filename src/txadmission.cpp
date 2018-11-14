@@ -610,7 +610,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         fRequireStandard = true;
     else if (allowedTx == TransactionClass::NONSTANDARD)
         fRequireStandard = false;
-    if (fRequireStandard && !IsStandardTx(*tx, reason))
+    if (fRequireStandard && !IsStandardTx(tx, reason))
     {
         state.SetDebugMessage("IsStandardTx failed");
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);

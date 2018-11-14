@@ -333,29 +333,29 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
     string reason;
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // Check dust with default threshold:
     nDustThreshold.Set(DEFAULT_DUST_THRESHOLD);
     // dust:
     t.vout[0].nValue = nDustThreshold.Value() - 1;
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
     // not dust:
     t.vout[0].nValue = nDustThreshold.Value();
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // Check dust with odd threshold
     nDustThreshold.Set(1234);
     // dust:
     t.vout[0].nValue = 1234 - 1;
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
     // not dust:
     t.vout[0].nValue = 1234;
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
     nDustThreshold.Set(DEFAULT_DUST_THRESHOLD);
 
     t.vout[0].scriptPubKey = CScript() << OP_1;
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // MAX_OP_RETURN_RELAY-byte TX_NULL_DATA (standard)
     nMaxDatacarrierBytes = MAX_OP_RETURN_RELAY;
@@ -369,7 +369,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
                                                                 "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
                                                                 "2312acbd");
     BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY, t.vout[0].scriptPubKey.size());
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // MAX_OP_RETURN_RELAY+1-byte TX_NULL_DATA (non-standard)
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
@@ -382,30 +382,30 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
                                                                 "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
                                                                 "2312acbdab");
     BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY + 1, t.vout[0].scriptPubKey.size());
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // Data payload can be encoded in any way...
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("");
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("00") << ParseHex("01");
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
     // OP_RESERVED *is* considered to be a PUSHDATA type opcode by IsPushOnly()!
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << OP_RESERVED << -1 << 0 << ParseHex("01") << 2 << 3 << 4 << 5 << 6
                                        << 7 << 8 << 9 << 10 << 11 << 12 << 13 << 14 << 15 << 16;
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
     t.vout[0].scriptPubKey =
         CScript() << OP_RETURN << 0 << ParseHex("01") << 2
                   << ParseHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // ...so long as it only contains PUSHDATA's
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << OP_RETURN;
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // TX_NULL_DATA w/o PUSHDATA
     t.vout.resize(1);
     t.vout[0].scriptPubKey = CScript() << OP_RETURN;
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // Only one TX_NULL_DATA permitted in all cases
     t.vout.resize(2);
@@ -415,17 +415,17 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout[1].scriptPubKey =
         CScript() << OP_RETURN
                   << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38");
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     t.vout[0].scriptPubKey =
         CScript() << OP_RETURN
                   << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38");
     t.vout[1].scriptPubKey = CScript() << OP_RETURN;
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     t.vout[0].scriptPubKey = CScript() << OP_RETURN;
     t.vout[1].scriptPubKey = CScript() << OP_RETURN;
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
