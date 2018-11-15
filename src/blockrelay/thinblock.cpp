@@ -74,24 +74,18 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
 
     // Is there a previous block or header to connect with?
+    CBlockIndex *pprev = LookupBlockIndex(thinBlock.header.hashPrevBlock);
+    if (!pprev)
+        return error("thinblock from peer %s will not connect, unknown previous block %s", pfrom->GetLogName(),
+            thinBlock.header.hashPrevBlock.ToString());
+
+    CValidationState state;
+    if (!ContextualCheckBlockHeader(thinBlock.header, state, pprev))
     {
-        LOCK(cs_main);
-        uint256 prevHash = thinBlock.header.hashPrevBlock;
-        BlockMap::iterator mi = mapBlockIndex.find(prevHash);
-        if (mi == mapBlockIndex.end())
-        {
-            return error("thinblock from peer %s will not connect, unknown previous block %s", pfrom->GetLogName(),
-                prevHash.ToString());
-        }
-        CBlockIndex *pprev = mi->second;
-        CValidationState state;
-        if (!ContextualCheckBlockHeader(thinBlock.header, state, pprev))
-        {
-            // Thin block does not fit within our blockchain
-            dosMan.Misbehaving(pfrom, 100);
-            return error(
-                "thinblock from peer %s contextual error: %s", pfrom->GetLogName(), state.GetRejectReason().c_str());
-        }
+        // Thin block does not fit within our blockchain
+        dosMan.Misbehaving(pfrom, 100);
+        return error(
+            "thinblock from peer %s contextual error: %s", pfrom->GetLogName(), state.GetRejectReason().c_str());
     }
 
     CInv inv(MSG_BLOCK, thinBlock.header.GetHash());
@@ -484,40 +478,37 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         }
     }
 
+    std::vector<CTransaction> vTx;
+    CBlockIndex *hdr = LookupBlockIndex(inv.hash);
+    if (!hdr)
     {
-        LOCK(cs_main);
-        std::vector<CTransaction> vTx;
-        BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
-        if (mi == mapBlockIndex.end())
+        dosMan.Misbehaving(pfrom, 20);
+        return error("Requested block is not available");
+    }
+    else
+    {
+        CBlock block;
+        const Consensus::Params &consensusParams = Params().GetConsensus();
+        if (!ReadBlockFromDisk(block, hdr, consensusParams))
         {
-            dosMan.Misbehaving(pfrom, 20);
-            return error("Requested block is not available");
+            // We do not assign misbehavior for not being able to read a block from disk because we already
+            // know that the block is in the block index from the step above. Secondly, a failure to read may
+            // be our own issue or the remote peer's issue in requesting too early.  We can't know at this point.
+            return error("Cannot load block from disk -- Block txn request possibly received before assembled");
         }
         else
         {
-            CBlock block;
-            const Consensus::Params &consensusParams = Params().GetConsensus();
-            if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
+            for (unsigned int i = 0; i < block.vtx.size(); i++)
             {
-                // We do not assign misbehavior for not being able to read a block from disk because we already
-                // know that the block is in the block index from the step above. Secondly, a failure to read may
-                // be our own issue or the remote peer's issue in requesting too early.  We can't know at this point.
-                return error("Cannot load block from disk -- Block txn request possibly received before assembled");
-            }
-            else
-            {
-                for (unsigned int i = 0; i < block.vtx.size(); i++)
-                {
-                    uint64_t cheapHash = block.vtx[i]->GetHash().GetCheapHash();
-                    if (thinRequestBlockTx.setCheapHashesToRequest.count(cheapHash))
-                        vTx.push_back(*block.vtx[i]);
-                }
+                uint64_t cheapHash = block.vtx[i]->GetHash().GetCheapHash();
+                if (thinRequestBlockTx.setCheapHashesToRequest.count(cheapHash))
+                    vTx.push_back(*block.vtx[i]);
             }
         }
-        CXThinBlockTx thinBlockTx(thinRequestBlockTx.blockhash, vTx);
-        pfrom->PushMessage(NetMsgType::XBLOCKTX, thinBlockTx);
-        pfrom->txsSent += vTx.size();
     }
+    CXThinBlockTx thinBlockTx(thinRequestBlockTx.blockhash, vTx);
+    pfrom->PushMessage(NetMsgType::XBLOCKTX, thinBlockTx);
+    pfrom->txsSent += vTx.size();
 
     return true;
 }
@@ -555,8 +546,6 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
     vRecv >> thinBlock;
 
     {
-        LOCK(cs_main);
-
         // Message consistency checking (FIXME: some redundancy here with AcceptBlockHeader)
         if (!IsThinBlockValid(pfrom, thinBlock.vMissingTx, thinBlock.header))
         {
@@ -568,16 +557,13 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         }
 
         // Is there a previous block or header to connect with?
+        if (!LookupBlockIndex(thinBlock.header.hashPrevBlock))
         {
-            uint256 prevHash = thinBlock.header.hashPrevBlock;
-            BlockMap::iterator mi = mapBlockIndex.find(prevHash);
-            if (mi == mapBlockIndex.end())
-            {
-                return error("xthinblock from peer %s will not connect, unknown previous block %s", pfrom->GetLogName(),
-                    prevHash.ToString());
-            }
+            return error("xthinblock from peer %s will not connect, unknown previous block %s", pfrom->GetLogName(),
+                thinBlock.header.hashPrevBlock.ToString());
         }
 
+        LOCK(cs_main);
         CValidationState state;
         CBlockIndex *pIndex = nullptr;
         if (!AcceptBlockHeader(thinBlock.header, state, Params(), &pIndex))

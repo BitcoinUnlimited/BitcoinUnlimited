@@ -177,11 +177,10 @@ bool AcceptBlockHeader(const CBlockHeader &block,
     CBlockIndex *pindex = NULL;
     if (hash != chainparams.GetConsensus().hashGenesisBlock)
     {
-        BlockMap::iterator miSelf = mapBlockIndex.find(hash);
-        if (miSelf != mapBlockIndex.end())
+        pindex = LookupBlockIndex(hash);
+        if (pindex)
         {
             // Block header is already known.
-            pindex = miSelf->second;
             if (ppindex)
                 *ppindex = pindex;
             if (pindex->nStatus & BLOCK_FAILED_MASK)
@@ -195,14 +194,11 @@ bool AcceptBlockHeader(const CBlockHeader &block,
             return false;
 
         // Get prev block index
-        CBlockIndex *pindexPrev = NULL;
-        BlockMap::iterator mi = mapBlockIndex.find(block.hashPrevBlock);
-        if (mi == mapBlockIndex.end())
+        CBlockIndex *pindexPrev = LookupBlockIndex(block.hashPrevBlock);
+        if (!pindexPrev)
             return state.DoS(10, error("%s: previous block %s not found while accepting %s", __func__,
                                      block.hashPrevBlock.ToString(), hash.ToString()),
                 0, "bad-prevblk");
-        pindexPrev = (*mi).second;
-        assert(pindexPrev);
         if (pindexPrev->nStatus & BLOCK_FAILED_MASK)
             return state.DoS(100,
                 error("%s: previous block %s is invalid", __func__, pindexPrev->GetBlockHash().GetHex().c_str()),
@@ -258,6 +254,7 @@ void PruneBlockIndexCandidates()
 
 CBlockIndex *AddToBlockIndex(const CBlockHeader &block)
 {
+    WRITELOCK(cs_mapBlockIndex);
     // Check for duplicate
     uint256 hash = block.GetHash();
     BlockMap::iterator it = mapBlockIndex.find(hash);
@@ -295,10 +292,20 @@ CBlockIndex *AddToBlockIndex(const CBlockHeader &block)
     return pindexNew;
 }
 
-CBlockIndex *InsertBlockIndex(uint256 hash)
+CBlockIndex *LookupBlockIndex(const uint256 &hash)
+{
+    READLOCK(cs_mapBlockIndex);
+    BlockMap::iterator mi = mapBlockIndex.find(hash);
+    if (mi == mapBlockIndex.end())
+        return nullptr;
+    return mi->second; // I can return this CBlockIndex because header pointers are never deleted
+}
+
+CBlockIndex *InsertBlockIndex(const uint256 &hash)
 {
     if (hash.IsNull())
-        return NULL;
+        return nullptr;
+    WRITELOCK(cs_mapBlockIndex);
 
     // Return existing
     BlockMap::iterator mi = mapBlockIndex.find(hash);
@@ -317,12 +324,13 @@ CBlockIndex *InsertBlockIndex(uint256 hash)
 
 bool LoadBlockIndexDB()
 {
-    AssertLockHeld(cs_main);
     const CChainParams &chainparams = Params();
     if (!pblocktree->LoadBlockIndexGuts())
     {
         return false;
     }
+    LOCK(cs_main);
+    WRITELOCK(cs_mapBlockIndex);
 
     /** This sync method will break on pruned nodes so we cant use if pruned*/
     // Check whether we have ever pruned block & undo files
@@ -501,34 +509,41 @@ void UnloadBlockIndex()
 
     nPreferredDownload.store(0);
 
-    LOCK(cs_main);
-    nBlockSequenceId = 1;
-    nSyncStarted = 0;
-    nLastBlockFile = 0;
-    mapUnConnectedHeaders.clear();
-    setBlockIndexCandidates.clear();
-    chainActive.SetTip(nullptr);
-    pindexBestInvalid = nullptr;
-    pindexBestHeader = nullptr;
-    mempool.clear();
-    mapBlocksUnlinked.clear();
-    vinfoBlockFile.clear();
-    mapBlockSource.clear();
-    requester.MapBlocksInFlightClear();
-    setDirtyBlockIndex.clear();
-    setDirtyFileInfo.clear();
-    nodestate.Clear();
-    versionbitscache.Clear();
-    for (int b = 0; b < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; b++)
     {
-        warningcache[b].clear();
+        LOCK(cs_main);
+        nBlockSequenceId = 1;
+        nSyncStarted = 0;
+        nLastBlockFile = 0;
+        mapUnConnectedHeaders.clear();
+        setBlockIndexCandidates.clear();
+        chainActive.SetTip(nullptr);
+        pindexBestInvalid = nullptr;
+        pindexBestHeader = nullptr;
+        mempool.clear();
+        mapBlocksUnlinked.clear();
+        vinfoBlockFile.clear();
+        mapBlockSource.clear();
+        requester.MapBlocksInFlightClear();
+        setDirtyBlockIndex.clear();
+        setDirtyFileInfo.clear();
+        nodestate.Clear();
+        versionbitscache.Clear();
+        for (int b = 0; b < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; b++)
+        {
+            warningcache[b].clear();
+        }
     }
 
-    for (BlockMap::value_type &entry : mapBlockIndex)
     {
-        delete entry.second;
+        WRITELOCK(cs_mapBlockIndex);
+
+        for (BlockMap::value_type &entry : mapBlockIndex)
+        {
+            delete entry.second;
+        }
+        mapBlockIndex.clear();
     }
-    mapBlockIndex.clear();
+
     fHavePruned = false;
 
     recentRejects.reset();
@@ -536,7 +551,6 @@ void UnloadBlockIndex()
 
 bool LoadBlockIndex()
 {
-    LOCK(cs_main);
     // Load block index from databases
     if (!fReindex && !LoadBlockIndexDB())
         return false;
@@ -605,6 +619,7 @@ void CheckBlockIndex(const Consensus::Params &consensusParams)
 
     LOCK(cs_main);
 
+    READLOCK(cs_mapBlockIndex);
     // During a reindex, we read the genesis block and call CheckBlockIndex before ActivateBestChain,
     // so we have the genesis block in mapBlockIndex but no active chain.  (A few of the tests when
     // iterating the block tree require that chainActive has been initialized.)
@@ -978,6 +993,7 @@ bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex)
 
     int nHeight = pindex->nHeight;
 
+    READLOCK(cs_mapBlockIndex);
     // Remove the invalidity flag from this block and all its descendants.
     BlockMap::iterator it = mapBlockIndex.begin();
     while (it != mapBlockIndex.end())
@@ -1243,15 +1259,18 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
 
     // The resulting new best tip may not be in setBlockIndexCandidates anymore, so
     // add it again.
-    BlockMap::iterator it = mapBlockIndex.begin();
-    while (it != mapBlockIndex.end())
     {
-        if (it->second->IsValid(BLOCK_VALID_TRANSACTIONS) && it->second->nChainTx &&
-            !setBlockIndexCandidates.value_comp()(it->second, chainActive.Tip()))
+        READLOCK(cs_mapBlockIndex);
+        BlockMap::iterator it = mapBlockIndex.begin();
+        while (it != mapBlockIndex.end())
         {
-            setBlockIndexCandidates.insert(it->second);
+            if (it->second->IsValid(BLOCK_VALID_TRANSACTIONS) && it->second->nChainTx &&
+                !setBlockIndexCandidates.value_comp()(it->second, chainActive.Tip()))
+            {
+                setBlockIndexCandidates.insert(it->second);
+            }
+            it++;
         }
-        it++;
     }
 
     InvalidChainFound(pindex);
@@ -3291,22 +3310,19 @@ bool ActivateBestChain(CValidationState &returnedState,
         {
             if (pblock->GetBlockHeader().hashPrevBlock == *pindexOldTip->phashBlock)
             {
-                BlockMap::iterator mi = mapBlockIndex.find(pblock->GetHash());
-                if (mi == mapBlockIndex.end())
+                pindexMostWork = LookupBlockIndex(pblock->GetHash());
+                if (!pindexMostWork)
                 {
                     LOGA("Could not find block in mapBlockIndex: %s\n", pblock->GetHash().ToString());
                     return false;
                 }
-                else
+
+                // Because we are potentially working with a block that is not the pindexMostWork as returned by
+                // FindMostWorkChain() but rather are forcing it to point to this block we must check again if
+                // this block has enough work to advance the tip.
+                if (pindexMostWork->nChainWork <= pindexOldTip->nChainWork)
                 {
-                    // Because we are potentially working with a block that is not the pindexMostWork as returned by
-                    // FindMostWorkChain() but rather are forcing it to point to this block we must check again if
-                    // this block has enough work to advance the tip.
-                    pindexMostWork = (*mi).second;
-                    if (pindexMostWork->nChainWork <= pindexOldTip->nChainWork)
-                    {
-                        return false;
-                    }
+                    return false;
                 }
             }
         }

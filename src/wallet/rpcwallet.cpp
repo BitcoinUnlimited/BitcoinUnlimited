@@ -17,6 +17,7 @@
 #include "txadmission.h"
 #include "util.h"
 #include "utilmoneystr.h"
+#include "validation/validation.h"
 #include "wallet.h"
 #include "walletdb.h"
 
@@ -67,7 +68,9 @@ void WalletTxToJSON(const CWalletTx &wtx, UniValue &entry)
     {
         entry.push_back(Pair("blockhash", wtx.hashBlock.GetHex()));
         entry.push_back(Pair("blockindex", wtx.nIndex));
-        entry.push_back(Pair("blocktime", mapBlockIndex[wtx.hashBlock]->GetBlockTime()));
+        auto *tmp = LookupBlockIndex(wtx.hashBlock);
+        if (tmp)
+            entry.push_back(Pair("blocktime", tmp->GetBlockTime()));
     }
     else
     {
@@ -2014,9 +2017,7 @@ UniValue listsinceblock(const UniValue &params, bool fHelp)
         uint256 blockId;
 
         blockId.SetHex(params[0].get_str());
-        BlockMap::iterator it = mapBlockIndex.find(blockId);
-        if (it != mapBlockIndex.end())
-            pindex = it->second;
+        pindex = LookupBlockIndex(blockId);
     }
 
     if (params.size() > 1)

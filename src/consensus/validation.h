@@ -85,6 +85,7 @@ public:
     unsigned int GetRejectCode() const { return chRejectCode; }
     std::string GetRejectReason() const { return strRejectReason; }
     std::string GetDebugMessage() const { return strDebugMessage; }
+    void SetDebugMessage(const std::string &s) { strDebugMessage = s; }
 };
 
 #endif // BITCOIN_CONSENSUS_VALIDATION_H
