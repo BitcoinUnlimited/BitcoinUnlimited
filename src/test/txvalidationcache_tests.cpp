@@ -47,24 +47,36 @@ BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup)
         sighashType |= SIGHASH_FORKID;
 
     // Create a double-spend of mature coinbase txn:
-    std::vector<CMutableTransaction> spends;
-    spends.resize(2);
+    std::vector<CMutableTransaction> prespends;
+    prespends.resize(2);
     for (int i = 0; i < 2; i++)
     {
-        spends[i].vin.resize(1);
-        spends[i].vin[0].prevout.hash = coinbaseTxns[0].GetHash();
-        spends[i].vin[0].prevout.n = 0;
-        spends[i].vout.resize(1);
-        spends[i].vout[0].nValue = 11 * CENT;
-        spends[i].vout[0].scriptPubKey = scriptPubKey;
+        prespends[i].vin.resize(1);
+        prespends[i].vin[0].prevout.hash = coinbaseTxns[0].GetHash();
+        prespends[i].vin[0].prevout.n = 0;
+        prespends[i].vout.resize(1);
+        prespends[i].vout[0].nValue = 11 * CENT;
+        prespends[i].vout[0].scriptPubKey = scriptPubKey;
 
         // Sign:
         std::vector<unsigned char> vchSig;
-        uint256 hash = SignatureHash(scriptPubKey, spends[i], 0, sighashType, coinbaseTxns[0].vout[0].nValue, 0);
+        uint256 hash = SignatureHash(scriptPubKey, prespends[i], 0, sighashType, coinbaseTxns[0].vout[0].nValue, 0);
         BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
         BOOST_CHECK(coinbaseKey.Sign(hash, vchSig));
         vchSig.push_back((unsigned char)sighashType);
-        spends[i].vin[0].scriptSig << vchSig;
+        prespends[i].vin[0].scriptSig << vchSig;
+    }
+
+    // put the transactions in LTOR ordering before creating and processing a block
+    std::vector<CMutableTransaction> spends;
+    if(prespends[0].GetHash() > prespends[1].GetHash())
+    {
+        spends.push_back(prespends[1]);
+        spends.push_back(prespends[0]);
+    }
+    else
+    {
+        spends = prespends;
     }
 
     CBlock block;
