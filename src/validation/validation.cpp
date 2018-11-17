@@ -1350,8 +1350,10 @@ bool ContextualCheckBlock(const CBlock &block,
         if (IsNov152018Scheduled() && IsNov152018Enabled(consensusParams, chainActive.Tip()))
         {
             if (tx->GetTxSize() < MIN_TX_SIZE)
+            {
                 return state.DoS(10, error("%s: contains transactions that are too small", __func__), REJECT_INVALID,
                     "txn-undersize");
+            }
         }
     }
 
