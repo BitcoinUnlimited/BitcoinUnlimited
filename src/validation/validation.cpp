@@ -106,6 +106,11 @@ std::atomic<int64_t> nTimeBestReceived{0};
 
 CBlockIndex *pindexBestForkTip = nullptr;
 CBlockIndex *pindexBestForkBase = nullptr;
+/**
+ * The best finalized block.
+ * This block cannot be reorged in any way, shape or form.
+ */
+CBlockIndex const *pindexFinalized;
 
 extern uint64_t nBlockSequenceId;
 extern bool fCheckForPruning;
@@ -1333,6 +1338,16 @@ CBlockIndex *FindMostWorkChain()
             if (it == setBlockIndexCandidates.rend())
                 return nullptr;
             pindexNew = *it;
+        }
+
+        // If this block will cause a finalized block to be reorged, then we
+        // mark it as invalid.
+        if (pindexFinalized && !AreOnTheSameFork(pindexNew, pindexFinalized))
+        {
+            LOGA("Mark block %s invalid because it forks prior to the "
+                 "finalization point %d.\n",
+                pindexNew->GetBlockHash().ToString(), pindexFinalized->nHeight);
+            pindexNew->nStatus = pindexNew->nStatus.withFailed();
         }
 
         // Check whether all blocks on the path between the currently active chain and the candidate are valid.
@@ -3156,6 +3171,12 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     txRecentlyInBlock.reset();
     recentRejects.reset();
 
+    // If the tip is finalized, then undo it.
+    if (pindexFinalized == pindexDelete)
+    {
+        pindexFinalized = pindexDelete->pprev;
+    }
+
     // Update chainActive and related variables.
     UpdateTip(pindexDelete->pprev);
     // Let wallets know transactions went from 1-confirmed to
@@ -3871,6 +3892,44 @@ bool ProcessNewBlock(CValidationState &state,
 
     LOCK(cs_blockvalidationtime);
     nBlockValidationTime << (end - start);
+    return true;
+}
+
+bool FinalizeBlock(const Config &config, CValidationState &state, CBlockIndex *pindex)
+{
+    AssertLockHeld(cs_main);
+    if (pindex->nStatus.isInvalid())
+    {
+        // We try to finalize an invalid block.
+        return state.DoS(100,
+            error("%s: Trying to finalize invalid block %s", __func__, pindex->GetBlockHash().ToString()),
+            REJECT_INVALID, "finalize-invalid-block");
+    }
+
+    // Check that the request is consistent with current finalization.
+    if (pindexFinalized && !AreOnTheSameFork(pindex, pindexFinalized))
+    {
+        return state.DoS(20, error("%s: Trying to finalize block %s which conflicts "
+                                   "with already finalized block",
+                                 __func__, pindex->GetBlockHash().ToString()),
+            REJECT_AGAINST_FINALIZED, "bad-fork-prior-finalized");
+    }
+
+    // We have a valid candidate, make sure it is not parked.
+    pindexFinalized = pindex;
+    if (pindex->nStatus.isOnParkedChain())
+    {
+        UnparkBlock(pindex);
+    }
+
+    // If the finalized block is not on the active chain, we need to rewind.
+    if (!AreOnTheSameFork(pindex, chainActive.Tip()))
+    {
+        const CBlockIndex *pindexFork = chainActive.FindFork(pindex);
+        CBlockIndex *pindexToInvalidate = chainActive.Tip()->GetAncestor(pindexFork->nHeight + 1);
+        return InvalidateBlock(config, state, pindexToInvalidate);
+    }
+
     return true;
 }
 
