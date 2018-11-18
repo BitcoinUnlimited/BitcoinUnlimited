@@ -31,6 +31,7 @@
 
 extern CTweak<unsigned int> unconfPushAction;
 void ProcessOrphans(std::vector<uint256> &vWorkQueue);
+static bool FinalizeBlockInternal(CValidationState &state, CBlockIndex *pindex);
 
 class Hasher
 {
@@ -635,6 +636,7 @@ void UnloadBlockIndex()
         chainActive.SetTip(nullptr);
         pindexBestInvalid = nullptr;
         pindexBestHeader = nullptr;
+        pindexFinalized = nullptr;
         ResetASERTAnchorBlockCache();
         mapBlocksUnlinked.clear();
         vinfoBlockFile.clear();
@@ -3269,6 +3271,16 @@ bool ConnectTip(CValidationState &state,
         assert(result);
         LOG(BENCH, "      - Update Coins %.3fms\n", GetStopwatchMicros() - nStart);
 
+        // Update the finalized block.
+        int32_t nHeightToFinalize = pindexNew->nHeight - GetArg("-maxreorgdepth", DEFAULT_MAX_REORG_DEPTH);
+        CBlockIndex *pindexToFinalize = pindexNew->GetAncestor(nHeightToFinalize);
+        if (pindexToFinalize && !FinalizeBlockInternal(state, pindexToFinalize))
+        {
+            state.SetCorruptionPossible();
+            return error("ConnectTip(): FinalizeBlock %s failed (%s)", pindexNew->GetBlockHash().ToString(),
+                FormatStateMessage(state));
+        }
+
         mapBlockSource.erase(pindexNew->GetBlockHash());
         nTime3 = GetStopwatchMicros();
         nTimeConnectTotal += nTime3 - nTime2;
@@ -3899,7 +3911,7 @@ bool ProcessNewBlock(CValidationState &state,
     return true;
 }
 
-bool FinalizeBlock(CValidationState &state, CBlockIndex *pindex)
+static bool FinalizeBlockInternal(CValidationState &state, CBlockIndex *pindex)
 {
     {
         READLOCK(cs_mapBlockIndex);
@@ -3923,6 +3935,13 @@ bool FinalizeBlock(CValidationState &state, CBlockIndex *pindex)
 
     // We have a valid candidate
     pindexFinalized = pindex;
+    return true;
+}
+
+bool FinalizeBlockAndInvalidate(CValidationState &state, CBlockIndex *pindex)
+{
+    if (!FinalizeBlockInternal(state, pindex))
+        return false;
 
     // If the finalized block is not on the active chain, we need to rewind.
     if (!AreOnTheSameFork(pindex, chainActive.Tip()))

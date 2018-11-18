@@ -1576,7 +1576,7 @@ UniValue finalizeblock(const UniValue &params, bool fHelp)
 
             pblockindex = mapBlockIndex[hash];
         }
-        FinalizeBlock(state, pblockindex);
+        FinalizeBlockAndInvalidate(state, pblockindex);
     }
 
     if (state.IsValid())

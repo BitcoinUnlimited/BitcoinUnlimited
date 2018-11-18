@@ -18,6 +18,9 @@
 
 extern std::atomic<uint64_t> nBlockSizeAtChainTip;
 
+/** Default for -maxreorgdepth */
+static const int DEFAULT_MAX_REORG_DEPTH = 10;
+
 enum DisconnectResult
 {
     DISCONNECT_OK, // All good.
@@ -168,7 +171,7 @@ bool ProcessNewBlock(CValidationState &state,
  * Mark a block as finalized.
  * A finalized block can not be reorged in any way.
  */
-bool FinalizeBlock(CValidationState &state, CBlockIndex *pindex);
+bool FinalizeBlockAndInvalidate(CValidationState &state, CBlockIndex *pindex);
 
 //! Check whether the block associated with this index entry is pruned or not.
 bool IsBlockPruned(const CBlockIndex *pblockindex);
