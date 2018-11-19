@@ -2215,7 +2215,14 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
         for (unsigned int i = 0; i < block.vtx.size(); i++)
         {
             const CTransaction &tx = *(block.vtx[i]);
-            AddCoins(view, tx, pindex->nHeight);
+            try
+            {
+                AddCoins(view, tx, pindex->nHeight);
+            }
+            catch (std::logic_error &e)
+            {
+                return state.DoS(100, error("CanonicalConnectBlock: repeated-tx"), REJECT_INVALID, "repeated-txn");
+            }
 
             if (i == 1)
             {
