@@ -623,7 +623,7 @@ CLEANFILES += zmq/*.gcda zmq/*.gcno
 
 DISTCLEANFILES = obj/build.h xversionkeys.h
 
-EXTRA_DIST = leveldb $(CTAES_DIST)
+EXTRA_DIST = leveldb $(CTAES_DIST) $(srcdir)/xversionkeys.dat $(top_srcdir)/contrib/devtools/xversionkeys.py
 
 clean-local:
 	-$(MAKE) -C secp256k1 clean
