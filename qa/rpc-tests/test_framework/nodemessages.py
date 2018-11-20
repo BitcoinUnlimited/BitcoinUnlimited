@@ -1083,22 +1083,6 @@ class msg_getaddr(object):
         return "msg_getaddr()"
 
 
-class msg_ping_prebip31(object):
-    command = b"ping"
-
-    def __init__(self):
-        pass
-
-    def deserialize(self, f):
-        pass
-
-    def serialize(self):
-        return b""
-
-    def __repr__(self):
-        return "msg_ping() (pre-bip31)"
-
-
 class msg_ping(object):
     command = b"ping"
 

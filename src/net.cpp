@@ -1389,7 +1389,7 @@ void ThreadSocketHandler()
                     if (ignoreNetTimeouts.Value() == false)
                         pnode->fDisconnect = true;
                 }
-                else if (nTime - pnode->nLastRecv > (pnode->nVersion > BIP0031_VERSION ? TIMEOUT_INTERVAL : 90 * 60))
+                else if (nTime - pnode->nLastRecv > TIMEOUT_INTERVAL)
                 {
                     LOG(NET, "Node %s socket receive timeout: %is\n", pnode->GetLogName(), nTime - pnode->nLastRecv);
                     if (ignoreNetTimeouts.Value() == false)

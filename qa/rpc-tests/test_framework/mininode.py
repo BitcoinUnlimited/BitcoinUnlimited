@@ -41,8 +41,6 @@ import traceback
 from .nodemessages import *
 from .bumessages import *
 
-BIP0031_VERSION = 60000
-
 MAX_INV_SZ = 50000
 MAX_BLOCK_SIZE = 1000000
 
@@ -147,8 +145,7 @@ class NodeConnCB(object):
     def on_getheaders(self, conn, message): pass
 
     def on_ping(self, conn, message):
-        if conn.ver_send > BIP0031_VERSION:
-            conn.send_message(msg_pong(message.nonce))
+        conn.send_message(msg_pong(message.nonce))
 
     def on_reject(self, conn, message): pass
 
@@ -429,9 +426,6 @@ class NodeConn(asyncore.dispatcher):
             self.last_sent = time.time()
 
     def got_message(self, message):
-        if message.command == b"version":
-            if message.nVersion <= BIP0031_VERSION:
-                self.messagemap[b'ping'] = msg_ping_prebip31
         if self.last_sent + 30 * 60 < time.time():
             self.send_message(self.messagemap[b'ping']())
         self.show_debug_msg("Recv %s" % repr(message))
