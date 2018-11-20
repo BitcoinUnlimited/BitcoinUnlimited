@@ -399,11 +399,11 @@ void ThreadTxAdmission()
                         if (txWaitNextBlockQ.size() <= (10 * excessiveBlockSize / 1000000))
                         {
                             txWaitNextBlockQ.push(txd);
-                            LOG(MEMPOOL, "Tx is waiting on next block : %s\n", tx->GetHash().ToString(),
+                            LOG(MEMPOOL, "Tx %s is waiting on next block, reason:%s\n", tx->GetHash().ToString(),
                                 state.GetRejectReason());
                         }
                         else
-                            LOG(MEMPOOL, "WaitNexBlockQueue is full : %s\n", tx->GetHash().ToString(),
+                            LOG(MEMPOOL, "WaitNexBlockQueue is full - tx:%s reason:%s\n", tx->GetHash().ToString(),
                                 state.GetRejectReason());
                     }
                     else
