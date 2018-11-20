@@ -354,13 +354,9 @@ static void handleAddressAfterInit(CNode *pfrom)
                 pfrom->PushAddress(addr, insecure_rand);
             }
         }
-
         // Get recent addresses
-        if (pfrom->fOneShot || pfrom->nVersion >= CADDR_TIME_VERSION || addrman.size() < 1000)
-        {
-            pfrom->PushMessage(NetMsgType::GETADDR);
-            pfrom->fGetAddr = true;
-        }
+        pfrom->PushMessage(NetMsgType::GETADDR);
+        pfrom->fGetAddr = true;
         addrman.Good(pfrom->addr);
     }
     else
@@ -679,7 +675,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         vRecv >> vAddr;
 
         // Don't want addr from older versions unless seeding
-        if (pfrom->nVersion < CADDR_TIME_VERSION && addrman.size() > 1000)
+        if (addrman.size() > 1000)
             return true;
         if (vAddr.size() > 1000)
         {
@@ -717,8 +713,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     std::multimap<uint256, CNode *> mapMix;
                     for (CNode *pnode : vNodes)
                     {
-                        if (pnode->nVersion < CADDR_TIME_VERSION)
-                            continue;
                         unsigned int nPointer;
                         memcpy(&nPointer, &pnode, sizeof(nPointer));
                         uint256 hashKey = ArithToUint256(UintToArith256(hashRand) ^ nPointer);
