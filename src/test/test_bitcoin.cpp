@@ -87,10 +87,7 @@ TestingSetup::~TestingSetup()
 struct NumericallyLessTxHashComparator
 {
 public:
-    bool operator()(const CTransactionRef& a, const CTransactionRef& b) const
-    {
-        return a->GetHash() < b->GetHash();
-    }
+    bool operator()(const CTransactionRef &a, const CTransactionRef &b) const { return a->GetHash() < b->GetHash(); }
 };
 
 TestChain100Setup::TestChain100Setup() : TestingSetup(CBaseChainParams::REGTEST)
