@@ -877,7 +877,6 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
  */
 bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef &ptx, const CBlock *pblock, bool fUpdate, int txIndex)
 {
-    AssertLockHeld(cs_main);
     AssertLockHeld(cs_wallet);
 
     if (pblock)

@@ -1058,6 +1058,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     LOGA("* Using %.1fMiB for in-memory UTXO set\n", nCoinCacheMaxSize * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
+    StartTxAdmission(threadGroup);
     while (!fLoaded)
     {
         bool fReset = fReindex;
@@ -1262,6 +1263,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 
     uiInterface.InitMessage(_("Activating best chain..."));
     // scan for better chains in the block chain database, that are not yet connected in the active best chain
+
     CValidationState state;
     if (!ActivateBestChain(state, chainparams))
     {
@@ -1486,7 +1488,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
         StartTorControl(threadGroup, scheduler);
 
-    StartTxAdmission(threadGroup);
     StartNode(threadGroup, scheduler);
 
 // Monitor the chain, and alert if we get blocks much quicker or slower than expected

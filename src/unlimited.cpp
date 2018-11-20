@@ -2133,7 +2133,7 @@ extern std::map<std::pair<void *, void *>, LockStack> lockorders;
 extern std::vector<std::string> vUseDNSSeeds;
 extern std::list<CNode *> vNodesDisconnected;
 extern std::set<CNetAddr> setservAddNodeAddresses;
-extern std::map<uint256, CTxCommitData> txCommitQ;
+extern std::map<uint256, CTxCommitData> *txCommitQ;
 extern std::queue<CTxInputData> txDeferQ;
 extern std::queue<CTxInputData> txInQ;
 extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
@@ -2195,7 +2195,8 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.push_back(Pair("xpeditedBlkUp", (uint64_t)nExpeditedUpstream));
     ret.push_back(Pair("xpeditedTxn", (uint64_t)nExpeditedTxs));
 
-    ret.push_back(Pair("txCommitQ", (uint64_t)txCommitQ.size()));
+    if (txCommitQ)
+        ret.push_back(Pair("txCommitQ", (uint64_t)txCommitQ->size()));
     ret.push_back(Pair("txInQ", (uint64_t)txInQ.size()));
     ret.push_back(Pair("txDeferQ", (uint64_t)txDeferQ.size()));
 

@@ -40,8 +40,8 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue);
 CTransactionRef CommitQGet(uint256 hash)
 {
     boost::unique_lock<boost::mutex> lock(csCommitQ);
-    std::map<uint256, CTxCommitData>::iterator it = txCommitQ.find(hash);
-    if (it == txCommitQ.end())
+    std::map<uint256, CTxCommitData>::iterator it = txCommitQ->find(hash);
+    if (it == txCommitQ->end())
         return nullptr;
     return it->second.entry.GetSharedTx();
 }
@@ -63,6 +63,9 @@ static inline uint256 IncomingConflictHash(const COutPoint &prevout)
 
 void StartTxAdmission(boost::thread_group &threadGroup)
 {
+    if (txCommitQ == nullptr)
+        txCommitQ = new std::map<uint256, CTxCommitData>();
+
     txHandlerSnap.Load(); // Get an initial view for the transaction processors
 
     // Start incoming transaction processing threads
@@ -102,7 +105,7 @@ void FlushTxAdmission()
             do // wait for the commit thread to commit everything
             {
                 cvCommitQ.timed_wait(lock, boost::posix_time::milliseconds(100));
-            } while (!txCommitQ.empty());
+            } while (!txCommitQ->empty());
         }
 
         { // block everything and check
@@ -113,7 +116,7 @@ void FlushTxAdmission()
             }
             {
                 boost::unique_lock<boost::mutex> lock(csCommitQ);
-                empty &= txCommitQ.empty();
+                empty &= txCommitQ->empty();
             }
         }
     }
@@ -167,8 +170,8 @@ unsigned int TxAlreadyHave(const CInv &inv)
             return 2;
         {
             boost::unique_lock<boost::mutex> lock(csCommitQ);
-            const auto &elem = txCommitQ.find(inv.hash);
-            if (elem != txCommitQ.end())
+            const auto &elem = txCommitQ->find(inv.hash);
+            if (elem != txCommitQ->end())
             {
                 return 5;
             }
@@ -192,25 +195,32 @@ void ThreadCommitToMempool()
             do
             {
                 cvCommitQ.timed_wait(lock, boost::posix_time::milliseconds(2000));
-            } while (txCommitQ.empty() && txDeferQ.empty());
+            } while (txCommitQ->empty() && txDeferQ.empty());
         }
 
         {
             boost::this_thread::interruption_point();
 
             CORRAL(txProcessingCorral, CORRAL_TX_COMMITMENT);
-            LOCK(cs_main);
-            CommitTxToMempool();
-            mempool.check(pcoinsTip);
-            LOG(MEMPOOL, "MemoryPool sz %u txn, %u kB\n", mempool.size(), mempool.DynamicMemoryUsage() / 1000);
-            LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
-                GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+            {
+                LOCK(cs_main);
+                CommitTxToMempool();
+                LOG(MEMPOOL, "MemoryPool sz %u txn, %u kB\n", mempool.size(), mempool.DynamicMemoryUsage() / 1000);
+                LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
+                    GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
 
-            CValidationState state;
-            FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
-            // The flush to disk above is only periodic therefore we need to continuously trim any excess from the
-            // cache.
-            pcoinsTip->Trim(nCoinCacheMaxSize);
+                CValidationState state;
+                FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
+                // The flush to disk above is only periodic therefore we need to continuously trim any excess from the
+                // cache.
+                pcoinsTip->Trim(nCoinCacheMaxSize);
+            }
+
+            // CheckInputs needs cs_main (for static int GetSpendHeight(const CCoinsViewCache &inputs)), but it has
+            // improper order with mempool so skip assert until cs_main dependency removed
+            // LOCK(cs_main);
+
+            mempool.check(pcoinsTip);
         }
     }
 }
@@ -233,33 +243,45 @@ void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
 void CommitTxToMempool()
 {
     std::vector<uint256> vWhatChanged;
+    std::map<uint256, CTxCommitData> *q;
     {
+        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        LOG(MEMPOOL, "txadmission committing %d tx\n", txCommitQ->size());
+        q = txCommitQ;
+        txCommitQ = new std::map<uint256, CTxCommitData>();
+    }
+
+    // These transactions have already been validated so store them directly into the mempool.
+    for (auto &it : *q)
+    {
+        CTxCommitData &data = it.second;
+        mempool.addUnchecked(it.first, data.entry, !IsInitialBlockDownload());
+        vWhatChanged.push_back(data.hash);
+        // Update txn per second only when a txn is valid and accepted to the mempool
+        mempool.UpdateTransactionsPerSecond();
+
+        // Indicate that this tx was fully processed/accepted and can now be removed from the
+        // request manager.
+        CInv inv(MSG_TX, data.hash);
+        requester.Received(inv, nullptr);
+    }
+
 #ifdef ENABLE_WALLET
+    {
         // cs_main is taken again in SyncWithWallets but must be locked before csCommitQ
         // to maintain correct locking order.
         LOCK(cs_main);
-#endif
-        boost::unique_lock<boost::mutex> lock(csCommitQ);
-        LOG(MEMPOOL, "txadmission committing %d tx\n", txCommitQ.size());
-        for (auto &it : txCommitQ)
-        {
-            // This transaction has already been validated so store it directly into the mempool.
-            CTxCommitData &data = it.second;
-            mempool.addUnchecked(it.first, data.entry, !IsInitialBlockDownload());
-#ifdef ENABLE_WALLET
-            SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
-#endif
-            vWhatChanged.push_back(data.hash);
-            // Update txn per second only when a txn is valid and accepted to the mempool
-            mempool.UpdateTransactionsPerSecond();
 
-            // Indicate that this tx was fully processed/accepted and can now be removed from the
-            // request manager.
-            CInv inv(MSG_TX, data.hash);
-            requester.Received(inv, nullptr);
+        for (auto &it : *q)
+        {
+            CTxCommitData &data = it.second;
+            SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
         }
-        txCommitQ.clear();
     }
+#endif
+    q->clear();
+    delete q;
+
 
     std::map<uint256, CTxInputData> mapWasDeferred;
     {
@@ -934,7 +956,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
         {
             boost::unique_lock<boost::mutex> lock(csCommitQ);
-            txCommitQ[eData.hash] = eData;
+            (*txCommitQ)[eData.hash] = eData;
         }
     }
     uint64_t interval = (GetStopwatch() - start) / 1000;
