@@ -543,4 +543,24 @@ bool wildmatch(std::string pattern, std::string test);
  */
 int ScheduleBatchPriority(void);
 
+
+//! short hand for declaring pure function
+#define PURE_FUNCTION __attribute__((pure))
+
+/** Function for converting enums and integers represented as OR-ed bitmasks into
+    human-readable string representations.
+
+    For an (up to 64-bit) unsigned integer and a map of bit values to
+    strings, this will produce a string that is a C++ representation of
+    OR-ing the strings to produce the given integer. Examples:
+
+    toString(5, {{1, "ONE"}, {2, "TWO"}, {4, "FOUR"}} -> "ONE | FOUR"
+    toString(7, {{1, "ONE"}, {2, "TWO"}, {4, "FOUR"}, {7, "ALL"}) -> "ALL"
+
+    The current implementation is nothing fancy yet and will expect the
+    map to contains values with a single bit set or comprehensive 'any'
+    values that are returned preferably.
+    It will put print lower bit values first into the resulting string.
+*/
+std::string toString(uint64_t value, const std::map<uint64_t, std::string> bitmap) PURE_FUNCTION;
 #endif // BITCOIN_UTIL_H

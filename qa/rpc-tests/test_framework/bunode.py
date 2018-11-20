@@ -102,8 +102,8 @@ class BUProtocolHandler(NodeConnCB):
         self.connection.send_message(msg)
 
     # Wrapper for the NodeConn's send_message function
-    def send_message(self, message):
-        self.connection.send_message(message)
+    def send_message(self, message, pushbuf = False):
+        self.connection.send_message(message, pushbuf)
 
     def on_inv(self, conn, message):
         self.last_inv.append(message)
@@ -283,10 +283,10 @@ class BasicBUCashNode():
         self.nthin = 0
         self.nxthin = 0
 
-    def connect(self, id, ip, port, rpc=None, protohandler=None):
+    def connect(self, id, ip, port, rpc=None, protohandler=None, send_initial_version = True):
         if not protohandler:
             protohandler = BUProtocolHandler()
-        conn = NodeConn(ip, port, rpc, protohandler, bitcoinCash=True)
+        conn = NodeConn(ip, port, rpc, protohandler, bitcoinCash=True, send_initial_version = send_initial_version)
         protohandler.add_connection(conn)
         protohandler.add_parent(self)
         self.cnxns[id] = protohandler

@@ -280,6 +280,7 @@ extern const char *XPEDITEDTXN;
  */
 extern const char *BUVERSION;
 
+
 /**
  * BU specific version information similar to NetMsgType::VERACK
  * @since protocol version 80002.
@@ -296,7 +297,20 @@ extern const char *BUVERACK;
  * message for reporting which of our peers have announced they have CB enabled
  */
 extern const char *SENDCMPCT;
+
+/**
+ * Cash specific version information extending NetMsgType::VERSION
+ * @since protocol version FIXME.
+ */
+extern const char *XVERSION;
+
+/**
+ * Cash specific acknowledgement of xversion
+ * @since protocol version FIXME.
+ */
+extern const char *XVERACK;
 };
+
 
 /* Get a vector of all valid message types (see above) */
 const std::vector<std::string> &getAllNetMessageTypes();

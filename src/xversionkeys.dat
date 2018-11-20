@@ -1,0 +1,28 @@
+# (C)opyright 2018 the Bitcoin Cash developers
+#
+# XVersion key and type table
+# This is auto-processed into e.g. xversionkeys.h by
+# the contrib/devtools/xversionkeys.py script
+# This file has to have ASCII encoding!
+
+# value types so far:
+# vector: any sized vector<uint8_t> (no further interpretation)
+# u64c: unsigned 64-bit integer, compact size encoded within the vector<uint8_t> value
+#
+# special value types by implementations are to be prefixed with the implementation's
+# short handle in lowercase and an underscore, so e.g. abc_integer, xt_string, bcash_address
+
+#parsing marker (KEY for now)
+#   key name
+#    type of key ('i'nitial or 'c'hangeable?) (only i supported for now)
+#                                             16 bit prefix (currently)
+#                                                                      16 bit suffix  <value type>
+
+# this is the listening
+KEY i BU_LISTEN_PORT                            0x0002                   0x0000         u64c
+KEY i BU_GRAPHENE_VERSION_SUPPORTED             0x0002                   0x0001         u64c
+# KEY i ABC_...                                0x0000                   ...
+# KEY i XT_DOUBLESPEND_FORWARDING_SCHEME       0x0003                   ...            vector
+# ...
+# 0xffff: special namespace for versioning xversion message itself
+# KEY i XVER_...                               0xffff

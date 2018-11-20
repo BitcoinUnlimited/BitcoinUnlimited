@@ -70,15 +70,18 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     CNode dummyNodeGraphene(INVALID_SOCKET, addr_graphene, "", true);
     CNode dummyNodeNone(INVALID_SOCKET, addr_none, "", true);
     dummyNodeXthin.nVersion = MIN_PEER_PROTO_VERSION;
-    dummyNodeXthin.fSuccessfullyConnected = true;
+    dummyNodeXthin.state_incoming = ConnectionStateIncoming::READY;
+    dummyNodeXthin.state_outgoing = ConnectionStateOutgoing::READY;
     dummyNodeXthin.nServices |= NODE_XTHIN;
     dummyNodeXthin.id = 1;
     dummyNodeGraphene.nVersion = MIN_PEER_PROTO_VERSION;
-    dummyNodeGraphene.fSuccessfullyConnected = true;
+    dummyNodeGraphene.state_incoming = ConnectionStateIncoming::READY;
+    dummyNodeGraphene.state_outgoing = ConnectionStateOutgoing::READY;
     dummyNodeGraphene.nServices |= NODE_GRAPHENE;
     dummyNodeGraphene.id = 2;
     dummyNodeNone.nVersion = MIN_PEER_PROTO_VERSION;
-    dummyNodeNone.fSuccessfullyConnected = true;
+    dummyNodeNone.state_incoming = ConnectionStateIncoming::READY;
+    dummyNodeNone.state_outgoing = ConnectionStateOutgoing::READY;
     dummyNodeNone.id = 3;
 
     // Initialize Nodes

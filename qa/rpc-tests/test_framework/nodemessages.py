@@ -138,6 +138,27 @@ def hash160(msg):
     h.update(hashlib.sha256(msg).digest())
     return h.digest()
 
+class CompactSize(int):
+    def serialize(self):
+        assert(self>=0)
+        if self<253:
+            return struct.pack("<B", self)
+        elif self<2**16:
+            return struct.pack("<B", 253) + struct.pack("<H", self)
+        elif self<2**32:
+            return struct.pack("<B", 254) + struct.pack("<I", self)
+        elif self<2**64:
+            return struct.pack("<B", 255) + struct.pack("<Q", self)
+
+    def deserialize(self, f):
+        self = struct.unpack("<B", f.read(1))[0]
+        if self == 253:
+            self = struct.unpack("<H", f.read(2))[0]
+        elif self == 254:
+            self = struct.unpack("<I", f.read(4))[0]
+        elif self == 255:
+            self = struct.unpack("<Q", f.read(8))[0]
+        return self
 
 def deser_string(f):
     """Convert an array of bytes in the bitcoin P2P protocol format into a string
@@ -865,6 +886,47 @@ class msg_verack(object):
 
     def __repr__(self):
         return "msg_verack()"
+
+class msg_xversion(object):
+    command = b"xversion"
+
+    def __init__(self, xver = {}):
+        self.xver = xver
+
+    def deserialize(self, f):
+        map_size = CompactSize().deserialize(f)
+        self.xver = {}
+        for i in range(map_size):
+            key = CompactSize().deserialize(f)
+            val_size = CompactSize().deserialize(f)
+            value = f.read(val_size)
+            self.xver[key] = value
+
+    def serialize(self):
+        res = CompactSize(len(self.xver)).serialize()
+        for k, v in self.xver.items():
+            res += CompactSize(k).serialize()
+            res += CompactSize(len(v)).serialize()
+            res += v
+        return res
+
+    def __repr__(self):
+        return "msg_xversion(%s)" % repr(self.xver)
+
+class msg_xverack(object):
+    command = b"xverack"
+
+    def __init__(self):
+        pass
+
+    def deserialize(self, f):
+        pass
+
+    def serialize(self):
+        return b""
+
+    def __repr__(self):
+        return "msg_xverack()"
 
 
 class msg_addr(object):

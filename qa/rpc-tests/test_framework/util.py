@@ -570,8 +570,12 @@ def start_nodes(num_nodes, dirname, extra_args=None, rpchost=None, binary=None,t
         raise
     return rpcs
 
+def node_regtest_dir(dirname, n_node):
+    return os.path.join(dirname, "node"+str(n_node), "regtest")
+
 def log_filename(dirname, n_node, logname):
-    return os.path.join(dirname, "node"+str(n_node), "regtest", logname)
+    return os.path.join(node_regtest_dir(dirname, n_node), logname)
+
 
 def stop_node(node, i):
     try:
