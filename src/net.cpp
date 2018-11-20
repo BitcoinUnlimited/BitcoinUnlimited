@@ -3011,9 +3011,12 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
     UpdateSendStats(this, currentCommand, nSize + CMessageHeader::HEADER_SIZE, GetTimeMicros());
 
     // Set the checksum
-    uint256 hash = Hash(ssSend.begin() + CMessageHeader::HEADER_SIZE, ssSend.end());
-    unsigned int nChecksum = 0;
-    memcpy(&nChecksum, &hash, sizeof(nChecksum));
+    uint32_t nChecksum = 0; // If we can skip the checksum, we send 0 instead
+    if (!skipChecksum)
+    {
+        uint256 hash = Hash(ssSend.begin() + CMessageHeader::HEADER_SIZE, ssSend.end());
+        memcpy(&nChecksum, &hash, sizeof(nChecksum));
+    }
     assert(ssSend.size() >= CMessageHeader::CHECKSUM_OFFSET + sizeof(nChecksum));
     memcpy((char *)&ssSend[CMessageHeader::CHECKSUM_OFFSET], &nChecksum, sizeof(nChecksum));
 
