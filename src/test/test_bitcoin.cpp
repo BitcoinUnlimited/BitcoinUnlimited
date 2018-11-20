@@ -84,6 +84,12 @@ TestingSetup::~TestingSetup()
     fs::remove_all(pathTemp);
 }
 
+struct NumericallyLessTxHashComparator
+{
+public:
+    bool operator()(const CTransactionRef &a, const CTransactionRef &b) const { return a->GetHash() < b->GetHash(); }
+};
+
 TestChain100Setup::TestChain100Setup() : TestingSetup(CBaseChainParams::REGTEST)
 {
     // Generate a 100-block chain:
@@ -113,6 +119,9 @@ CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransa
     block.vtx.resize(1);
     for (const CMutableTransaction &tx : txns)
         block.vtx.push_back(MakeTransactionRef(tx));
+
+    // enfore LTOR ordering of transactions
+    std::sort(block.vtx.begin() + 1, block.vtx.end(), NumericallyLessTxHashComparator());
 
     // IncrementExtraNonce creates a valid coinbase and merkleRoot
     unsigned int extraNonce = 0;
