@@ -29,12 +29,11 @@ class MyTest (BitcoinTestFramework):
         self.nodes = start_nodes(2, self.options.tmpdir)
         connect_nodes_bi(self.nodes, 0, 1)
         self.is_network_split = False
-        self.sync_all()
+        sync_blocks(self.nodes)
 
     def run_test(self):
 
         node = self.nodes[0]
-
         node.generate(100)
         # generate enough blocks so that nodes[0] has a balance
 
@@ -101,12 +100,13 @@ class MyTest (BitcoinTestFramework):
 
         # change the coinbase
         tx = CTransaction().deserialize(c["coinbase"])
-        tx.vout[0].scriptPubKey = CScript([OP_1])
-
+        tx.vout[0].scriptPubKey = CScript(([OP_NOP] * 50) + [OP_1])  # 50 no-ops because tx must be 100 bytes or more
         nonce = 0
         c["id"] = id
         while 1:
             nonce += 1
+            if (nonce&127)==0:
+                logging.info("simple mining nonce: " + str(nonce))
             c = node.getminingcandidate()
             del c["merkleProof"]
             del c["prevhash"]
@@ -121,7 +121,7 @@ class MyTest (BitcoinTestFramework):
         blockhex = node.getblock(node.getbestblockhash(), False)
         block = CBlock()
         block.deserialize(BytesIO(unhexlify(blockhex)))
-        assert_equal(block.vtx[0].vout[0].scriptPubKey, CScript([OP_1]))
+        assert_equal(block.vtx[0].vout[0].scriptPubKey, CScript(([OP_NOP] * 50) + [OP_1]))
 
         #### Test that a dynamic relay policy change does not effect the mining
         #    of txns currently in the mempool.

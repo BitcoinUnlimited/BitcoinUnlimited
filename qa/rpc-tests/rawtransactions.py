@@ -53,7 +53,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         # sendrawtransaction with missing input #
         #########################################
         inputs  = [ {'txid' : "1d1d4e24ed99057e84c3f80fd8fbec79ed9e1acee37da269356ecea000000000", 'vout' : 1}] #won't exists
-        outputs = { self.nodes[0].getnewaddress() : 4.998 }
+        outputs = { self.nodes[0].getnewaddress() : 3.998, self.nodes[0].getnewaddress() : 1.0 }
         rawtx   = self.nodes[2].createrawtransaction(inputs, outputs)
         rawtx   = self.nodes[2].signrawtransaction(rawtx)
 
@@ -273,7 +273,7 @@ def Test():
 
     flags = [] # ["--nocleanup", "--noshutdown"]
     if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmppfx=/ramdisk/test")
+        flags.append("--tmpdir=/ramdisk/test/t")
     binpath = findBitcoind()
     flags.append("--srcdir=%s" % binpath)
     t.main(flags, bitcoinConf, None)

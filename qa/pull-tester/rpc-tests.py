@@ -183,7 +183,7 @@ testScripts = [ RpcTest(t) for t in [
     'bip135basic',
     'ctor',
     'mining_ctor',
-    'nov152018_forkactivation',
+    Disabled('nov152018_forkactivation','Nov 2018 already activated'),
     'blockstorage',
     'miningtest',
     'grapheneblocks',

@@ -214,7 +214,7 @@ class MyTest (BitcoinTestFramework):
 
 
 if __name__ == '__main__':
-    MyTest ().main (bitcoinConfDict={"limitdescendantsize": 50})
+    MyTest ().main (bitcoinConfDict={"limitdescendantsize": 50,FORK_CFG: 0})
 
 # Create a convenient function for an interactive python debugging session
 def Test():
@@ -222,7 +222,8 @@ def Test():
     t.drop_to_pdb=True
     bitcoinConf = {
         "debug": ["all", "net", "blk", "thin", "mempool", "req", "bench", "evict"],
-        "limitdescendantsize": 50 # allow lots of child tx so we can tease apart ctor vs dependent order
+        "limitdescendantsize": 50, # allow lots of child tx so we can tease apart ctor vs dependent order
+        FORK_CFG: 0 # start with automatic fork off
     }
 
 
