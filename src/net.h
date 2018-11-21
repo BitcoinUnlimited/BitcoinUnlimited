@@ -409,6 +409,9 @@ public:
     int64_t nTimeOffset;
     CAddress addr;
 
+    //! set to true if this node is ok with no message checksum
+    bool skipChecksum;
+
     //! The address the remote peer advertised it its version message
     CAddress addrFrom_advertised;
 

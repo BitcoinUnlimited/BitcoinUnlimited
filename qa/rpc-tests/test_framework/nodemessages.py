@@ -906,6 +906,8 @@ class msg_xversion(object):
         res = CompactSize(len(self.xver)).serialize()
         for k, v in self.xver.items():
             res += CompactSize(k).serialize()
+            if type(v) is int:  # serialize integers in compact format inside the vector
+                v = CompactSize(v).serialize()
             res += CompactSize(len(v)).serialize()
             res += v
         return res

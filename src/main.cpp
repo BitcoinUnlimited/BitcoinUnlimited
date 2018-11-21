@@ -1216,6 +1216,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // if it comes at all.
         CXVersionMessage xver;
         xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
+        xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
         pfrom->PushMessage(NetMsgType::XVERSION, xver);
 
 
@@ -1293,7 +1294,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 ConnectionStateOutgoing::ANY, pfrom))
             return false;
         vRecv >> pfrom->xVersion;
-
+        pfrom->skipChecksum = (pfrom->xVersion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM) == 1);
         if (pfrom->addrFromPort == 0)
         {
             pfrom->addrFromPort = pfrom->xVersion.as_u64c(XVer::BU_LISTEN_PORT) & 0xffff;
@@ -2545,15 +2546,20 @@ bool ProcessMessages(CNode *pfrom)
         // Message size
         unsigned int nMessageSize = hdr.nMessageSize;
 
-        // Checksum
         CDataStream &vRecv = msg.vRecv;
-        uint256 hash = Hash(vRecv.begin(), vRecv.begin() + nMessageSize);
-        unsigned int nChecksum = ReadLE32((unsigned char *)&hash);
-        if (nChecksum != hdr.nChecksum)
+
+        // Checksum
+        // For optimization a 0 checksum means no checksum calculated -- TCP already has one.
+        if (hdr.nChecksum != 0)
         {
-            LOGA("%s(%s, %u bytes): CHECKSUM ERROR nChecksum=%08x hdr.nChecksum=%08x\n", __func__,
-                SanitizeString(strCommand), nMessageSize, nChecksum, hdr.nChecksum);
-            continue;
+            uint256 hash = Hash(vRecv.begin(), vRecv.begin() + nMessageSize);
+            unsigned int nChecksum = ReadLE32((unsigned char *)&hash);
+            if (nChecksum != hdr.nChecksum)
+            {
+                LOGA("%s(%s, %u bytes): CHECKSUM ERROR nChecksum=%08x hdr.nChecksum=%08x\n", __func__,
+                    SanitizeString(strCommand), nMessageSize, nChecksum, hdr.nChecksum);
+                continue;
+            }
         }
 
         // Process message

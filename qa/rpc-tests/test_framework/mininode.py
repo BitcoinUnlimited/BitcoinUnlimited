@@ -273,6 +273,8 @@ class NodeConn(asyncore.dispatcher):
         self.cb = callback
         self.disconnect = False
         self.curIndex = 0
+        self.allow0Checksum = False
+        self.num0Checksums = 0
         if send_initial_version:
             # stuff version msg into sendbuf
             vt = msg_version()
@@ -383,7 +385,13 @@ class NodeConn(asyncore.dispatcher):
                     th = sha256(msg)
                     h = sha256(th)
                     if checksum != h[:4]:
-                        raise ValueError("got bad checksum " + repr(self.recvbuf))
+                        if checksum == b'\x00\x00\x00\x00':
+                            if self.allow0Checksum:
+                                self.num0Checksums += 1
+                            else:
+                                raise ValueError("got zero checksum")
+                        else:
+                            raise ValueError("got bad checksum " + repr(self.recvbuf))
                     self.recvbuf = self.recvbuf[4 + 12 + 4 + 4 + msglen:]
                 if command in self.messagemap:
                     f = BytesIO(msg)
