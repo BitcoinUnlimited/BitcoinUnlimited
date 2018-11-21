@@ -290,6 +290,7 @@ class BasicBUCashNode():
         protohandler.add_connection(conn)
         protohandler.add_parent(self)
         self.cnxns[id] = protohandler
+        return conn
 
     def on_block(self, frm, message):
         print("got block")
