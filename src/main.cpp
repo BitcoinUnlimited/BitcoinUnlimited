@@ -1216,7 +1216,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // if it comes at all.
         CXVersionMessage xver;
         xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
-        xver.set_u64c(XVer::BU_MSG_CHECKSUM, 1); // we will ignore 0 value msg checksums
+        xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
         pfrom->PushMessage(NetMsgType::XVERSION, xver);
 
 
@@ -1294,7 +1294,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 ConnectionStateOutgoing::ANY, pfrom))
             return false;
         vRecv >> pfrom->xVersion;
-        pfrom->skipChecksum = (pfrom->xVersion.as_u64c(XVer::BU_MSG_CHECKSUM) == 1);
+        pfrom->skipChecksum = (pfrom->xVersion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM) == 1);
         if (pfrom->addrFromPort == 0)
         {
             pfrom->addrFromPort = pfrom->xVersion.as_u64c(XVer::BU_LISTEN_PORT) & 0xffff;
