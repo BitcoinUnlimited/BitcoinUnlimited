@@ -223,6 +223,9 @@ obj/build.h: FORCE
 	  $(abs_top_srcdir)
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
+xversionkeys.h:
+	$(PYTHON) $(top_srcdir)/contrib/devtools/xversionkeys.py > $(abs_top_builddir)/src/xversionkeys.h < $(srcdir)/xversionkeys.dat
+
 BUILT_SOURCES= xversionkeys.h
 
 # server: shared between bitcoind and bitcoin-qt
@@ -473,10 +476,6 @@ libbitcoin_cli_a_SOURCES = \
 
 nodist_libbitcoin_util_a_SOURCES = $(srcdir)/obj/build.h
 #
-
-# xversionkeys.h rule
-xversionkeys.h:	$(srcdir)/xversionkeys.dat $(top_srcdir)/contrib/devtools/xversionkeys.py
-	python3 $(top_srcdir)/contrib/devtools/xversionkeys.py > $(abs_top_builddir)/src/xversionkeys.h < $<
 
 # bitcoind binary #
 bitcoind_SOURCES = bitcoind.cpp
