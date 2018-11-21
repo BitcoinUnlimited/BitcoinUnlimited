@@ -50,16 +50,6 @@ void UnlimitedModel::Init()
     unsigned int tmpExcessiveBlockSize = excessiveBlockSize;
     unsigned int tmpMaxGeneratedBlock = maxGeneratedBlock;
 
-    if (!settings.contains("excessiveBlockSize"))
-        settings.setValue("excessiveBlockSize", QString::number(excessiveBlockSize));
-    else
-        tmpExcessiveBlockSize = settings.value("excessiveBlockSize").toInt();
-
-    if (!settings.contains("excessiveAcceptDepth"))
-        settings.setValue("excessiveAcceptDepth", QString::number(excessiveAcceptDepth));
-    else
-        excessiveAcceptDepth = settings.value("excessiveAcceptDepth").toInt();
-
     if (!settings.contains("maxGeneratedBlock"))
         settings.setValue("maxGeneratedBlock", QString::number(maxGeneratedBlock));
     else
@@ -76,13 +66,7 @@ void UnlimitedModel::Init()
     else
     {
         miningBlockSize.Set(tmpMaxGeneratedBlock);
-        ebTweak.Set(tmpExcessiveBlockSize);
     }
-
-    if (!SoftSetArg("-excessiveblocksize", boost::lexical_cast<std::string>(excessiveBlockSize)))
-        addOverriddenOption("-excessiveblocksize");
-    if (!SoftSetArg("-excessiveacceptdepth", boost::lexical_cast<std::string>(excessiveAcceptDepth)))
-        addOverriddenOption("-excessiveacceptdepth");
 
     bool inUse = settings.value("fUseReceiveShaping").toBool();
     int64_t burstKB = settings.value("nReceiveBurst").toLongLong();
@@ -132,10 +116,6 @@ QVariant UnlimitedModel::data(const QModelIndex &index, int role) const
         {
         case MaxGeneratedBlock:
             return QVariant((qulonglong)maxGeneratedBlock);
-        case ExcessiveBlockSize:
-            return QVariant((qulonglong)excessiveBlockSize);
-        case ExcessiveAcceptDepth:
-            return QVariant(excessiveAcceptDepth);
         case UseReceiveShaping:
             return settings.value("fUseReceiveShaping");
         case UseSendShaping:
@@ -173,26 +153,6 @@ bool UnlimitedModel::setData(const QModelIndex &index, const QVariant &value, in
             {
                 settings.setValue("maxGeneratedBlock", value);
                 miningBlockSize.Set(mgb);
-            }
-        }
-        break;
-        case ExcessiveBlockSize:
-        {
-            unsigned int ebs = value.toUInt(&successful);
-            if (successful && (settings.value("excessiveBlockSize") != value))
-            {
-                settings.setValue("excessiveBlockSize", value);
-                ebTweak.Set(ebs); // equivalant to: excessiveBlockSize = ebs;
-            }
-        }
-        break;
-        case ExcessiveAcceptDepth:
-        {
-            unsigned int ead = value.toUInt(&successful);
-            if (successful && settings.value("excessiveAcceptDepth") != value)
-            {
-                settings.setValue("excessiveAcceptDepth", value);
-                excessiveAcceptDepth = ead;
             }
         }
         break;
