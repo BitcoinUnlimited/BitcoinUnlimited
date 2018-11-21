@@ -668,12 +668,12 @@ public:
     /** BU: Every transaction that is accepted into the mempool will call this method to update the current value*/
     void UpdateTransactionsPerSecond();
 
-    unsigned long size()
+    unsigned long size() const
     {
         READLOCK(cs);
         return mapTx.size();
     }
-    unsigned long _size() { return mapTx.size(); }
+    unsigned long _size() const { return mapTx.size(); }
     uint64_t GetTotalTxSize()
     {
         READLOCK(cs);

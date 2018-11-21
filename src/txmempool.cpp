@@ -784,33 +784,101 @@ void CTxMemPool::_removeConflicts(const CTransaction &tx, std::list<CTransaction
     }
 }
 
-/**
- * Called when a block is connected. Removes from mempool and updates the miner fee estimator.
- */
+
+// transactions need to be removed from the mempool in ancestor-first order so that
+// descendant/ancestor counts remain correct.  This is accomplished by looking at the
+// data in mapLinks and only removing transactions with no ancestors.
+// If a transaction has an ancestor, it is placed on a deferred map: ancestor->descendant list.
+// Whenever a tx is removed from the mempool, any of its descendants are placed back onto the
+// queue of tx that are removable.
 void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
     unsigned int nBlockHeight,
     std::list<CTransactionRef> &conflicts,
     bool fCurrentEstimate)
 {
-    WRITELOCK(cs);
-    std::vector<CTxMemPoolEntry> entries;
-    for (const auto &tx : vtx)
-    {
-        uint256 hash = tx->GetHash();
+    typedef std::map<txiter, std::vector<txiter>, CompareIteratorByHash> DeferredMap;
 
-        indexed_transaction_set::iterator i = mapTx.find(hash);
-        if (i != mapTx.end())
-            entries.push_back(*i);
-    }
+    WRITELOCK(cs);
+    std::vector<txiter> entriesToRemove;
+    std::vector<CTxMemPoolEntry> entries;
+
+    DeferredMap deferred;
+    std::queue<txiter> ready;
+
     for (const auto &tx : vtx)
     {
-        txiter it = mapTx.find(tx->GetHash());
-        if (it != mapTx.end())
+        setEntries descendants;
+        uint256 hash = tx->GetHash();
+        txiter i = mapTx.find(hash);
+        if (i == mapTx.end())
+            continue; // not in the mempool
+        ready.push(i);
+    }
+
+    while (!ready.empty())
+    {
+        txiter nextTx = ready.front();
+        ready.pop();
+
+        const auto &links = mapLinks.find(nextTx);
+        if (links == mapLinks.end())
         {
+            DbgAssert(!"should never happen", );
+            continue;
+        }
+        if (links->second.parents.empty()) // This tx has no ancestors, so its ready to be removed
+        {
+            entries.push_back(*nextTx); // save tx for estimator adjustment at the bottom
+
+            // place any tx that were deferred because this tx was required back onto the ready Q
+            DeferredMap::iterator deferredSet = deferred.find(nextTx);
+            if (deferredSet != deferred.end())
+            {
+                for (auto j = deferredSet->second.begin(); j != deferredSet->second.end(); ++j)
+                {
+                    ready.push(*j);
+                }
+                deferred.erase(deferredSet);
+            }
+            // Remove this tx from the mempool
             setEntries stage;
-            stage.insert(it);
+            stage.insert(nextTx); // nextTx is invalid now
             _RemoveStaged(stage, true);
         }
+        else // This tx has ancestors, so put it in the deferred queue waiting for them
+        {
+            auto tmp = links->second.parents.begin();
+            if (tmp != links->second.parents.end())
+            {
+                txiter t = *tmp;
+                std::vector<txiter> &vec = deferred[t];
+                vec.push_back(nextTx);
+            }
+            else // an empty txiter should never be part of the parents
+            {
+                DbgAssert("tx parents is corrupt!", ready.push(nextTx));
+            }
+        }
+
+        // If we run out of tx in the ready queue, grab everything that was deferred
+        // and put them back in the ready q
+        if (ready.empty() && !deferred.empty())
+        {
+            DbgAssert(!"Impossible tx topology", );
+            for (auto i = deferred.begin(); i != deferred.end(); ++i)
+            {
+                for (auto j = i->second.begin(); j != i->second.end(); ++j)
+                {
+                    ready.push(*j);
+                }
+            }
+            deferred.clear();
+        }
+    }
+
+    // Remove conflicting tx
+    for (const auto &tx : vtx)
+    {
         _removeConflicts(*tx, conflicts);
         _ClearPrioritisation(tx->GetHash());
     }
