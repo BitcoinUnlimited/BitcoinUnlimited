@@ -921,7 +921,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
     uint64_t checkTotal = 0;
     uint64_t innerUsage = 0;
 
-    WRITELOCK(cs);
+    READLOCK(cs);
     LOG(MEMPOOL, "Checking mempool with %u transactions and %u inputs\n", (unsigned int)mapTx.size(),
         (unsigned int)mapNextTx.size());
 
@@ -1015,7 +1015,9 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         {
             CValidationState state;
             // Use the largest maxOps since this code is not meant to validate that constraint
-            assert(CheckInputs(tx, state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, NULL));
+            // takes cs_main so comment out for now
+            // TODO: put back when not taking main:
+            // assert(CheckInputs(tx, state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, NULL));
             UpdateCoins(tx, state, mempoolDuplicate, 1000000);
         }
     }

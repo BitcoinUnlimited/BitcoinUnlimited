@@ -1534,7 +1534,7 @@ CMemPoolInfo GetGrapheneMempoolInfo()
     uint64_t nCommitQ = 0;
     {
         boost::unique_lock<boost::mutex> lock(csCommitQ);
-        nCommitQ = txCommitQ.size();
+        nCommitQ = txCommitQ->size();
     }
     return CMemPoolInfo(mempool.size() + orphanpool.GetOrphanPoolSize() + nCommitQ);
 }

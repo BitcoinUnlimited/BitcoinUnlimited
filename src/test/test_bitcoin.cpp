@@ -21,6 +21,7 @@
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "test/testutil.h"
+#include "txadmission.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
@@ -62,6 +63,7 @@ TestingSetup::TestingSetup(const std::string &chainName) : BasicTestingSetup(cha
     pblocktree = new CBlockTreeDB(1 << 20, "", true);
     pcoinsdbview = new CCoinsViewDB(1 << 23, true);
     pcoinsTip = new CCoinsViewCache(pcoinsdbview);
+    txCommitQ = new std::map<uint256, CTxCommitData>();
     bool worked = InitBlockIndex(chainparams);
     assert(worked);
 

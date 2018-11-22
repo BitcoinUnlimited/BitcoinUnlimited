@@ -135,14 +135,11 @@ int nLastBlockFile = 0;
 
 namespace
 {
-int GetHeight()
+int GetHeight() { return chainActive.Height(); }
+void UpdatePreferredDownload(CNode *node)
 {
-    LOCK(cs_main);
-    return chainActive.Height();
-}
-
-void UpdatePreferredDownload(CNode *node, CNodeState *state)
-{
+    CNodeStateAccessor state(nodestate, node->GetId());
+    DbgAssert(state != nullptr, return );
     nPreferredDownload.fetch_sub(state->fPreferredDownload);
 
     // Whether this node should be marked as a preferred download node.
@@ -168,13 +165,17 @@ void InitializeNode(const CNode *pnode)
 
 void FinalizeNode(NodeId nodeid)
 {
+    {
+        CNodeStateAccessor state(nodestate, nodeid);
+        DbgAssert(state != nullptr, return );
+
+        if (state->fSyncStarted)
+            nSyncStarted--;
+
+        nPreferredDownload.fetch_sub(state->fPreferredDownload);
+    }
+
     LOCK(cs_main);
-    CNodeState *state = nodestate.State(nodeid);
-    DbgAssert(state != nullptr, return );
-
-    if (state->fSyncStarted)
-        nSyncStarted--;
-
     std::vector<uint256> vBlocksInFlight;
     requester.GetBlocksInFlight(vBlocksInFlight, nodeid);
     for (const uint256 &hash : vBlocksInFlight)
@@ -185,7 +186,6 @@ void FinalizeNode(NodeId nodeid)
         // Reset all requests times to zero so that we can immediately re-request these blocks
         requester.ResetLastBlockRequestTime(hash);
     }
-    nPreferredDownload.fetch_sub(state->fPreferredDownload);
 
     nodestate.RemoveNodeState(nodeid);
     requester.RemoveNodeState(nodeid);
@@ -198,7 +198,7 @@ void FinalizeNode(NodeId nodeid)
 }
 
 // Requires cs_main
-bool PeerHasHeader(CNodeState *state, CBlockIndex *pindex)
+bool PeerHasHeader(const CNodeState *state, CBlockIndex *pindex)
 {
     if (pindex == nullptr)
         return false;
@@ -223,8 +223,7 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)
     if (!node)
         return false;
 
-    LOCK(cs_main);
-    CNodeState *state = nodestate.State(nodeid);
+    CNodeStateAccessor state(nodestate, nodeid);
     DbgAssert(state != nullptr, return false);
 
     stats.nMisbehavior = node->nMisbehavior;
@@ -963,9 +962,9 @@ static bool BasicThinblockChecks(CNode *pfrom, const CChainParams &chainparams)
     // If they make more than 20 requests in 10 minutes then disconnect them
     if (Params().NetworkIDString() != "regtest")
     {
-        if (pfrom->nGetXthinLastTime <= 0)
-            pfrom->nGetXthinLastTime = GetTime();
         uint64_t nNow = GetTime();
+        if (pfrom->nGetXthinLastTime <= 0)
+            pfrom->nGetXthinLastTime = nNow;
         double tmp = pfrom->nGetXthinCount;
         while (!pfrom->nGetXthinCount.compare_exchange_weak(
             tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXthinLastTime)) + 1)))
@@ -1159,7 +1158,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->fClient = !(pfrom->nServices & NODE_NETWORK);
 
         // Potentially mark this peer as a preferred download peer.
-        UpdatePreferredDownload(pfrom, nodestate.State(pfrom->GetId()));
+        UpdatePreferredDownload(pfrom);
 
         // Send VERACK handshake message
         pfrom->PushMessage(NetMsgType::VERACK);
@@ -1402,8 +1401,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     else if (strCommand == NetMsgType::SENDHEADERS)
     {
-        LOCK(cs_main);
-        nodestate.State(pfrom->GetId())->fPreferHeaders = true;
+        CNodeStateAccessor(nodestate, pfrom->GetId())->fPreferHeaders = true;
     }
 
     // Processing this message type for statistics purposes only, BU currently doesn't support CB protocol
@@ -1626,8 +1624,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         uint256 hashStop;
         vRecv >> locator >> hashStop;
 
-        LOCK(cs_main);
-        CNodeState *state = nodestate.State(pfrom->GetId());
+        LOCK(cs_main); // for mapBlockIndex and chainActive
+        CNodeStateAccessor state(nodestate, pfrom->GetId());
         CBlockIndex *pindex = nullptr;
         if (locator.IsNull())
         {
@@ -1862,10 +1860,11 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexLast), uint256());
 
             {
-                CNodeState *state = nodestate.State(pfrom->GetId());
+                int64_t now = GetTime();
+                CNodeStateAccessor state(nodestate, pfrom->GetId());
                 DbgAssert(state != nullptr, );
-                if (state)
-                    state->nSyncStartTime = GetTime(); // reset the time because more headers needed
+                if (state != nullptr)
+                    state->nSyncStartTime = now; // reset the time because more headers needed
             }
 
             // During the process of IBD we need to update block availability for every connected peer. To do that we
@@ -1890,14 +1889,18 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 {
                     if (!pnode->fClient && pnode != pfrom)
                     {
-                        LOCK(cs_main);
-                        CNodeState *state = nodestate.State(pfrom->GetId());
-                        DbgAssert(state != nullptr, ); // do not return, we need to release refs later.
-                        if (state == nullptr)
-                            continue;
+                        bool ask = false;
+                        {
+                            CNodeStateAccessor state(nodestate, pfrom->GetId());
+                            DbgAssert(state != nullptr, ); // do not return, we need to release refs later.
+                            if (state == nullptr)
+                                continue;
 
-                        if (state->pindexBestKnownBlock == nullptr ||
-                            pindexLast->nChainWork > state->pindexBestKnownBlock->nChainWork)
+                            ask = (state->pindexBestKnownBlock == nullptr ||
+                                   pindexLast->nChainWork > state->pindexBestKnownBlock->nChainWork);
+                        } // let go of the CNodeState lock before we PushMessage since that is trapping op.
+
+                        if (ask)
                         {
                             // We only want one single header so we pass a null for CBlockLocator.
                             pnode->PushMessage(NetMsgType::GETHEADERS, CBlockLocator(), pindexLast->GetBlockHash());
@@ -1915,26 +1918,30 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
 
         bool fCanDirectFetch = CanDirectFetch(chainparams.GetConsensus());
-        CNodeState *state = nodestate.State(pfrom->GetId());
-        DbgAssert(state != nullptr, return false);
 
-        // During the initial peer handshake we must receive the initial headers which should be greater
-        // than or equal to our block height at the time of requesting GETHEADERS. This is because the peer has
-        // advertised a height >= to our own. Furthermore, because the headers max returned is as much as 2000 this
-        // could not be a mainnet re-org.
-        if (!state->fFirstHeadersReceived)
         {
-            // We want to make sure that the peer doesn't just send us any old valid header. The block height of the
-            // last header they send us should be equal to our block height at the time we made the GETHEADERS request.
-            if (pindexLast && state->nFirstHeadersExpectedHeight <= pindexLast->nHeight)
-            {
-                state->fFirstHeadersReceived = true;
-                LOG(NET, "Initial headers received for peer=%s\n", pfrom->GetLogName());
-            }
+            CNodeStateAccessor state(nodestate, pfrom->GetId());
+            DbgAssert(state != nullptr, return false);
 
-            // Allow for very large reorgs (> 2000 blocks) on the nol test chain or other test net.
-            if (Params().NetworkIDString() != "main" && Params().NetworkIDString() != "regtest")
-                state->fFirstHeadersReceived = true;
+            // During the initial peer handshake we must receive the initial headers which should be greater
+            // than or equal to our block height at the time of requesting GETHEADERS. This is because the peer has
+            // advertised a height >= to our own. Furthermore, because the headers max returned is as much as 2000 this
+            // could not be a mainnet re-org.
+            if (!state->fFirstHeadersReceived)
+            {
+                // We want to make sure that the peer doesn't just send us any old valid header. The block height of the
+                // last header they send us should be equal to our block height at the time we made the GETHEADERS
+                // request.
+                if (pindexLast && state->nFirstHeadersExpectedHeight <= pindexLast->nHeight)
+                {
+                    state->fFirstHeadersReceived = true;
+                    LOG(NET, "Initial headers received for peer=%s\n", pfrom->GetLogName());
+                }
+
+                // Allow for very large reorgs (> 2000 blocks) on the nol test chain or other test net.
+                if (Params().NetworkIDString() != "main" && Params().NetworkIDString() != "regtest")
+                    state->fFirstHeadersReceived = true;
+            }
         }
 
         // update the syncd status.  This should come before we make calls to requester.AskFor().
@@ -2138,12 +2145,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 SendExpeditedBlock(*pblock, pfrom);
         }
 
-        {
-            LOCK(cs_main);
-            CNodeState *state = nodestate.State(pfrom->GetId());
+        { // reset the getheaders time because block can consume all bandwidth
+            int64_t now = GetTime();
+            CNodeStateAccessor state(nodestate, pfrom->GetId());
             DbgAssert(state != nullptr, );
-            if (state)
-                state->nSyncStartTime = GetTime(); // reset the getheaders time because block can consume all bandwidth
+            if (state != nullptr)
+                state->nSyncStartTime = now; // reset the time because more headers needed
         }
         pfrom->nPingUsecStart = GetTimeMicros(); // Reset ping time because block can consume all bandwidth
 
@@ -2760,10 +2767,15 @@ bool SendMessages(CNode *pto)
                 pto->PushMessage(NetMsgType::ADDR, vAddr);
         }
 
-        CNodeState *state = nodestate.State(pto->GetId());
-        if (state == nullptr)
+        CNodeState statem(CAddress(), "");
+        const CNodeState *state = &statem;
         {
-            return true;
+            CNodeStateAccessor stateAccess(nodestate, pto->GetId());
+            if (state == nullptr)
+            {
+                return true;
+            }
+            statem = *stateAccess;
         }
 
         // If a sync has been started check whether we received the first batch of headers requested within the timeout
@@ -2805,10 +2817,11 @@ bool SendMessages(CNode *pto)
                 // BU Bug fix for Core:  Don't start downloading headers unless our chain is shorter
                 if (pindexStart->nHeight < pto->nStartingHeight)
                 {
-                    state->fSyncStarted = true;
-                    state->nSyncStartTime = GetTime();
-                    state->fRequestedInitialBlockAvailability = true;
-                    state->nFirstHeadersExpectedHeight = pindexStart->nHeight;
+                    CNodeStateAccessor modableState(nodestate, pto->GetId());
+                    modableState->fSyncStarted = true;
+                    modableState->nSyncStartTime = GetTime();
+                    modableState->fRequestedInitialBlockAvailability = true;
+                    modableState->nFirstHeadersExpectedHeight = pindexStart->nHeight;
                     nSyncStarted++;
 
                     if (pto->fClient)
@@ -2830,7 +2843,7 @@ bool SendMessages(CNode *pto)
         {
             if (!pto->fClient)
             {
-                state->fRequestedInitialBlockAvailability = true;
+                CNodeStateAccessor(nodestate, pto->GetId())->fRequestedInitialBlockAvailability = true;
 
                 // We only want one single header so we pass a null CBlockLocator.
                 pto->PushMessage(NetMsgType::GETHEADERS, CBlockLocator(), pindexBestHeader.load()->GetBlockHash());
@@ -2870,7 +2883,10 @@ bool SendMessages(CNode *pto)
             std::vector<CBlock> vHeaders;
             bool fRevertToInv = (!state->fPreferHeaders || pto->vBlockHashesToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
             CBlockIndex *pBestIndex = nullptr; // last header queued for delivery
-            requester.ProcessBlockAvailability(pto->id); // ensure pindexBestKnownBlock is up-to-date
+            {
+                LOCK(cs_main);
+                requester.ProcessBlockAvailability(pto->id); // ensure pindexBestKnownBlock is up-to-date
+            }
 
             if (!fRevertToInv)
             {
@@ -2989,9 +3005,11 @@ bool SendMessages(CNode *pto)
                     LOG(NET, "%s: sending header %s to peer=%d\n", __func__, vHeaders.front().GetHash().ToString(),
                         pto->id);
                 }
-                LOCK(pto->cs_vSend);
-                pto->PushMessage(NetMsgType::HEADERS, vHeaders);
-                state->pindexBestHeaderSent = pBestIndex;
+                {
+                    LOCK(pto->cs_vSend);
+                    pto->PushMessage(NetMsgType::HEADERS, vHeaders);
+                }
+                CNodeStateAccessor(nodestate, pto->GetId())->pindexBestHeaderSent = pBestIndex;
             }
         }
 
@@ -3056,9 +3074,15 @@ bool SendMessages(CNode *pto)
             }
         }
 
-        // Request the next blocks. Mostly this will get exucuted during IBD but sometimes even
-        // when the chain is syncd a block will get request via this method.
-        requester.RequestNextBlocksToDownload(pto);
+        {
+            TRY_LOCK(cs_main, locked);
+            if (locked)
+            { // I don't need to deal w/ blocks as often as tx and this is time consuming
+                // Request the next blocks. Mostly this will get executed during IBD but sometimes even
+                // when the chain is syncd a block will get request via this method.
+                requester.RequestNextBlocksToDownload(pto);
+            }
+        }
     }
     return true;
 }

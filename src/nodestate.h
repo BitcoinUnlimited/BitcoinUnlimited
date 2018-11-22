@@ -54,10 +54,12 @@ class CState
 protected:
     /** Map maintaining per-node state. Requires cs_main. */
     std::map<NodeId, CNodeState> mapNodeState;
+    CCriticalSection cs;
+    friend class CNodeStateAccessor;
 
 public:
-    /** Return a node ref for an node id */
-    CNodeState *State(const NodeId id);
+    /** Return a node pointer for an node id (does not lock -- use CNodeStateAccessor) */
+    CNodeState *_GetNodeState(const NodeId id);
 
     /** Add a nodestate from the map */
     void InitializeNodeState(const CNode *pnode);
@@ -68,17 +70,45 @@ public:
     /** Clear the entire nodestate map */
     void Clear()
     {
-        LOCK(cs_main);
+        LOCK(cs);
         mapNodeState.clear();
     }
 
     /** Is mapNodestate empty */
     bool Empty()
     {
-        LOCK(cs_main);
+        LOCK(cs);
         return mapNodeState.empty();
     }
 };
+
+class CState;
+
+class CNodeStateAccessor
+{
+    CCriticalSection *cs;
+    CNodeState *obj;
+
+public:
+    CNodeStateAccessor(CCriticalSection *_cs, CNodeState *_obj) : cs(_cs), obj(_obj) { cs->lock(); }
+    CNodeStateAccessor(CState &ns, const NodeId id)
+    {
+        cs = &ns.cs;
+        cs->lock();
+        obj = ns._GetNodeState(id);
+    }
+
+    CNodeState *operator->() { return obj; }
+    CNodeState &operator*() { return *obj; }
+    bool operator!=(void *ptr) { return obj != ptr; }
+    bool operator==(void *ptr) { return obj == ptr; }
+    ~CNodeStateAccessor()
+    {
+        obj = nullptr;
+        cs->unlock();
+    }
+};
+
 extern CState nodestate;
 
 #endif // BITCOIN_NODESTATE_H

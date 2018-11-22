@@ -122,7 +122,7 @@ extern std::queue<CTxInputData> txWaitNextBlockQ;
 // Transactions that are validated and can be committed to the mempool, and protection
 extern CWaitableCriticalSection csCommitQ;
 extern CConditionVariable cvCommitQ;
-extern std::map<uint256, CTxCommitData> txCommitQ;
+extern std::map<uint256, CTxCommitData> *txCommitQ;
 
 // returns a transaction ref, if it exists in the commitQ
 CTransactionRef CommitQGet(uint256 hash);

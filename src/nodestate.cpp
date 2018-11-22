@@ -31,9 +31,8 @@ CNodeState::CNodeState(CAddress addrIn, std::string addrNameIn) : address(addrIn
 * @param[in] pnode  The NodeId to return CNodeState* for
 * @return CNodeState* matching the NodeId, or nullptr if NodeId is not matched
 */
-CNodeState *CState::State(const NodeId id)
+CNodeState *CState::_GetNodeState(const NodeId id)
 {
-    LOCK(cs_main);
     std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(id);
     if (it == mapNodeState.end())
         return nullptr;
@@ -48,7 +47,7 @@ CNodeState *CState::State(const NodeId id)
 */
 void CState::InitializeNodeState(const CNode *pnode)
 {
-    LOCK(cs_main);
+    LOCK(cs);
     mapNodeState.emplace_hint(mapNodeState.end(), std::piecewise_construct, std::forward_as_tuple(pnode->GetId()),
         std::forward_as_tuple(pnode->addr, pnode->addrName));
 }
@@ -61,6 +60,6 @@ void CState::InitializeNodeState(const CNode *pnode)
 */
 void CState::RemoveNodeState(const NodeId id)
 {
-    LOCK(cs_main);
+    LOCK(cs);
     mapNodeState.erase(id);
 }
