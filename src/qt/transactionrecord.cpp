@@ -10,6 +10,7 @@
 #include "main.h"
 #include "timedata.h"
 #include "txadmission.h"
+#include "validation/validation.h"
 
 #include <stdint.h>
 
@@ -208,10 +209,7 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     // Determine transaction status
 
     // Find the block the tx is in
-    CBlockIndex *pindex = nullptr;
-    BlockMap::iterator mi = mapBlockIndex.find(wtx.hashBlock);
-    if (mi != mapBlockIndex.end())
-        pindex = (*mi).second;
+    CBlockIndex *pindex = LookupBlockIndex(wtx.hashBlock);
 
     // Sort order, unrecorded transactions sort to the top
     status.sortKey = strprintf("%010d-%01d-%010u-%03d", (pindex ? pindex->nHeight : std::numeric_limits<int>::max()),

@@ -28,6 +28,7 @@
 #include "uahf_fork.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
+#include "validation/validation.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #endif
@@ -111,10 +112,9 @@ void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry)
     if (!hashBlock.IsNull())
     {
         entry.push_back(Pair("blockhash", hashBlock.GetHex()));
-        BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
-        if (mi != mapBlockIndex.end() && (*mi).second)
+        CBlockIndex *pindex = LookupBlockIndex(hashBlock);
+        if (pindex)
         {
-            CBlockIndex *pindex = (*mi).second;
             if (chainActive.Contains(pindex))
             {
                 entry.push_back(Pair("confirmations", 1 + chainActive.Height() - pindex->nHeight));
@@ -254,20 +254,19 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
         oneTxid = hash;
     }
 
-    LOCK(cs_main);
-
     CBlockIndex *pblockindex = nullptr;
 
     uint256 hashBlock;
     if (params.size() > 1)
     {
         hashBlock = uint256S(params[1].get_str());
-        if (!mapBlockIndex.count(hashBlock))
+        pblockindex = LookupBlockIndex(hashBlock);
+        if (!pblockindex)
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-        pblockindex = mapBlockIndex[hashBlock];
     }
     else
     {
+        LOCK(cs_main);
         CoinAccessor coin(*pcoinsTip, oneTxid);
         if (coin && !coin->IsSpent() && coin->nHeight > 0 && coin->nHeight <= chainActive.Height())
         {
@@ -280,9 +279,9 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
         CTransactionRef tx;
         if (!GetTransaction(oneTxid, tx, Params().GetConsensus(), hashBlock, false) || hashBlock.IsNull())
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction not yet in block");
-        if (!mapBlockIndex.count(hashBlock))
+        pblockindex = LookupBlockIndex(hashBlock);
+        if (!pblockindex)
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Transaction index corrupt");
-        pblockindex = mapBlockIndex[hashBlock];
     }
 
     CBlock block;
@@ -327,11 +326,13 @@ UniValue verifytxoutproof(const UniValue &params, bool fHelp)
     if (merkleBlock.txn.ExtractMatches(vMatch, vIndex) != merkleBlock.header.hashMerkleRoot)
         return res;
 
-    LOCK(cs_main);
+    auto *pindex = LookupBlockIndex(merkleBlock.header.GetHash());
 
-    if (!mapBlockIndex.count(merkleBlock.header.GetHash()) ||
-        !chainActive.Contains(mapBlockIndex[merkleBlock.header.GetHash()]))
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found in chain");
+    {
+        LOCK(cs_main);
+        if (!pindex || !chainActive.Contains(pindex))
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found in chain");
+    }
 
     for (const uint256 &hash : vMatch)
         res.push_back(hash.GetHex());

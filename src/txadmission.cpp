@@ -430,8 +430,9 @@ void ThreadTxAdmission()
                     }
                     else
                     {
-                        LOG(MEMPOOL, "Rejected tx: %s(%d): %s. peer %s  hash %s \n", state.GetRejectReason(),
-                            state.GetRejectCode(), state.GetDebugMessage(), txd.nodeName, tx->GetHash().ToString());
+                        LOG(MEMPOOL, "Rejected tx: %s(%d) %s: %s. peer %s  hash %s \n", state.GetRejectReason(),
+                            state.GetRejectCode(), fMissingInputs ? "orphan" : "", state.GetDebugMessage(),
+                            txd.nodeName, tx->GetHash().ToString());
 
                         if (fMissingInputs)
                         {
@@ -590,7 +591,11 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     // LOG(MEMPOOL, "Mempool: Considering Tx %s\n", tx->GetHash().ToString());
 
     if (!CheckTransaction(*tx, state))
+    {
+        if (state.GetDebugMessage() == "")
+            state.SetDebugMessage("CheckTransaction failed");
         return false;
+    }
 
     // Coinbase is only valid in a block, not as a loose transaction
     if (tx->IsCoinBase())
@@ -606,7 +611,10 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     else if (allowedTx == TransactionClass::NONSTANDARD)
         fRequireStandard = false;
     if (fRequireStandard && !IsStandardTx(*tx, reason))
+    {
+        state.SetDebugMessage("IsStandardTx failed");
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
+    }
 
     // Don't relay version 2 transactions until CSV is active, and we can be
     // sure that such transactions will be mined (unless we're on
@@ -692,6 +700,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 }
                 if (*pfMissingInputs == true)
                 {
+                    state.SetDebugMessage("Inputs are missing");
                     return false; // state.Invalid(false, REJECT_MISSING_INPUTS, "bad-txns-missing-inputs", "Inputs
                     // unavailable in ParallelAcceptToMemoryPool", false);
                 }
@@ -903,6 +912,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 *tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr, &sighashType))
         {
             LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", tx->GetHash().ToString().c_str());
+            if (state.GetDebugMessage() == "")
+                state.SetDebugMessage("CheckInputs failed");
             return false;
         }
         entry.UpdateRuntimeSigOps(resourceTracker.GetSigOps(), resourceTracker.GetSighashBytes());
@@ -917,9 +928,12 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(*tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | cds_flag, maxScriptOps.Value(), true,
-                nullptr, nullptr, &sighashType2))
+        if (!CheckInputs(*tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | cds_flag | svflag,
+                maxScriptOps.Value(), true, nullptr, nullptr, &sighashType2))
         {
+            if (state.GetDebugMessage() == "")
+                state.SetDebugMessage("CheckInputs failed against mandatory but not standard flags");
+
             return error(
                 "%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
                 __func__, hash.ToString(), FormatStateMessage(state));

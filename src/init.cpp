@@ -1110,10 +1110,13 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
                     break;
                 }
 
-                // If the loaded chain has a wrong genesis, bail out immediately
-                // (we're likely using a testnet datadir, or the other way around).
-                if (!mapBlockIndex.empty() && mapBlockIndex.count(chainparams.GetConsensus().hashGenesisBlock) == 0)
-                    return InitError(_("Incorrect or no genesis block found. Wrong datadir for network?"));
+                {
+                    READLOCK(cs_mapBlockIndex);
+                    // If the loaded chain has a wrong genesis, bail out immediately
+                    // (we're likely using a testnet datadir, or the other way around).
+                    if (!mapBlockIndex.empty() && mapBlockIndex.count(chainparams.GetConsensus().hashGenesisBlock) == 0)
+                        return InitError(_("Incorrect or no genesis block found. Wrong datadir for network?"));
+                }
 
                 // Initialize the block index (no-op if non-empty database was already loaded)
                 if (!InitBlockIndex(chainparams))
@@ -1474,11 +1477,12 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     RandAddSeedPerfmon();
 
     //// debug print
-    LOGA("mapBlockIndex.size() = %u\n", mapBlockIndex.size());
     {
-        LOCK(cs_main);
-        LOGA("nBestHeight = %d\n", chainActive.Height());
+        READLOCK(cs_mapBlockIndex);
+        LOGA("mapBlockIndex.size() = %u\n", mapBlockIndex.size());
     }
+
+    LOGA("nBestHeight = %d\n", chainActive.Height());
 #ifdef ENABLE_WALLET
     LOGA("setKeyPool.size() = %u\n", pwalletMain ? pwalletMain->setKeyPool.size() : 0);
     LOGA("mapWallet.size() = %u\n", pwalletMain ? pwalletMain->mapWallet.size() : 0);

@@ -256,41 +256,39 @@ bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         }
     }
 
+    CBlockIndex *blkHdr = LookupBlockIndex(inv.hash);
+    if (!blkHdr)
     {
-        LOCK(cs_main);
-        std::vector<CTransaction> vTx;
-        BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
-        if (mi == mapBlockIndex.end())
+        dosMan.Misbehaving(pfrom, 20);
+        return error("Requested block is not available");
+    }
+
+    std::vector<CTransaction> vTx;
+
+    {
+        CBlock block;
+        const Consensus::Params &consensusParams = Params().GetConsensus();
+        if (!ReadBlockFromDisk(block, blkHdr, consensusParams))
         {
-            dosMan.Misbehaving(pfrom, 20);
-            return error("Requested block is not available");
+            // We do not assign misbehavior for not being able to read a block from disk because we already
+            // know that the block is in the block index from the step above. Secondly, a failure to read may
+            // be our own issue or the remote peer's issue in requesting too early.  We can't know at this point.
+            return error("Cannot load block from disk -- Block txn request possibly received before assembled");
         }
         else
         {
-            CBlock block;
-            const Consensus::Params &consensusParams = Params().GetConsensus();
-            if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
+            for (auto &tx : block.vtx)
             {
-                // We do not assign misbehavior for not being able to read a block from disk because we already
-                // know that the block is in the block index from the step above. Secondly, a failure to read may
-                // be our own issue or the remote peer's issue in requesting too early.  We can't know at this point.
-                return error("Cannot load block from disk -- Block txn request possibly received before assembled");
-            }
-            else
-            {
-                for (auto &tx : block.vtx)
-                {
-                    uint64_t cheapHash = tx->GetHash().GetCheapHash();
+                uint64_t cheapHash = tx->GetHash().GetCheapHash();
 
-                    if (grapheneRequestBlockTx.setCheapHashesToRequest.count(cheapHash))
-                        vTx.push_back(*tx);
-                }
+                if (grapheneRequestBlockTx.setCheapHashesToRequest.count(cheapHash))
+                    vTx.push_back(*tx);
             }
         }
-        CGrapheneBlockTx grapheneBlockTx(grapheneRequestBlockTx.blockhash, vTx);
-        pfrom->PushMessage(NetMsgType::GRAPHENETX, grapheneBlockTx);
-        pfrom->txsSent += vTx.size();
     }
+    CGrapheneBlockTx grapheneBlockTx(grapheneRequestBlockTx.blockhash, vTx);
+    pfrom->PushMessage(NetMsgType::GRAPHENETX, grapheneBlockTx);
+    pfrom->txsSent += vTx.size();
 
     return true;
 }
@@ -327,29 +325,25 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
     CGrapheneBlock grapheneBlock;
     vRecv >> grapheneBlock;
 
+    // Message consistency checking (FIXME: some redundancy here with AcceptBlockHeader)
+    if (!IsGrapheneBlockValid(pfrom, grapheneBlock.header))
+    {
+        dosMan.Misbehaving(pfrom, 100);
+        LOGA("Received an invalid %s from peer %s\n", strCommand, pfrom->GetLogName());
+
+        graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
+        return false;
+    }
+
+    // Is there a previous block or header to connect with?
+    if (!LookupBlockIndex(grapheneBlock.header.hashPrevBlock))
+    {
+        return error("Graphene block from peer %s will not connect, unknown previous block %s", pfrom->GetLogName(),
+            grapheneBlock.header.hashPrevBlock.ToString());
+    }
+
     {
         LOCK(cs_main);
-
-        // Message consistency checking (FIXME: some redundancy here with AcceptBlockHeader)
-        if (!IsGrapheneBlockValid(pfrom, grapheneBlock.header))
-        {
-            dosMan.Misbehaving(pfrom, 100);
-            LOGA("Received an invalid %s from peer %s\n", strCommand, pfrom->GetLogName());
-
-            graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
-            return false;
-        }
-
-        // Is there a previous block or header to connect with?
-        {
-            uint256 prevHash = grapheneBlock.header.hashPrevBlock;
-            BlockMap::iterator mi = mapBlockIndex.find(prevHash);
-            if (mi == mapBlockIndex.end())
-            {
-                return error("Graphene block from peer %s will not connect, unknown previous block %s",
-                    pfrom->GetLogName(), prevHash.ToString());
-            }
-        }
 
         CValidationState state;
         CBlockIndex *pIndex = nullptr;
@@ -1507,15 +1501,12 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
 
     CBlock block;
     {
-        LOCK(cs_main);
-        BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
-        if (mi == mapBlockIndex.end())
-        {
+        auto *hdr = LookupBlockIndex(inv.hash);
+        if (!hdr)
             return error("Peer %s requested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
-        }
 
         const Consensus::Params &consensusParams = Params().GetConsensus();
-        if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
+        if (!ReadBlockFromDisk(block, hdr, consensusParams))
         {
             // We don't have the block yet, although we know about it.
             return error("Peer %s requested block %s that cannot be read", pfrom->GetLogName(), inv.hash.ToString());

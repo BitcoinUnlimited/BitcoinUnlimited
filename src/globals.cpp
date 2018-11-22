@@ -72,6 +72,7 @@ int64_t nTimeOffset = 0;
 CCriticalSection cs_rpcWarmup;
 
 CCriticalSection cs_main;
+CSharedCriticalSection cs_mapBlockIndex;
 BlockMap mapBlockIndex GUARDED_BY(cs_main);
 CChain chainActive GUARDED_BY(cs_main); // however, chainActive.Tip() is lock free
 // BU variables moved to globals.cpp

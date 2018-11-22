@@ -73,7 +73,7 @@ static const CAmount HIGH_MAX_TX_FEE = 100 * HIGH_TX_FEE_PER_KB;
  *  limit by number if transactions if they wish by modifying -maxorphantx=<n> if
  *  the have a need to.
  */
-static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 120000;
+static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 1000000;
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
 static const unsigned int DEFAULT_ANCESTOR_LIMIT = 25;
 /** Default for -limitancestorsize, maximum kilobytes of tx + all in-mempool ancestors */
@@ -175,7 +175,9 @@ extern CTweak<bool> enableCanonicalTxOrder;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
 typedef boost::unordered_map<uint256, CBlockIndex *, BlockHasher> BlockMap;
+extern CSharedCriticalSection cs_mapBlockIndex;
 extern BlockMap mapBlockIndex;
+
 extern uint64_t nLastBlockTx;
 extern uint64_t nLastBlockSize;
 extern CWaitableCriticalSection csBestBlock;

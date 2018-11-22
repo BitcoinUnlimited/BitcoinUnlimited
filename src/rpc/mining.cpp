@@ -572,16 +572,17 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
             if (!DecodeHexBlk(block, dataval.get_str()))
                 throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
 
-            uint256 hash = block.GetHash();
-            BlockMap::iterator mi = mapBlockIndex.find(hash);
-            if (mi != mapBlockIndex.end())
             {
-                CBlockIndex *pindex = mi->second;
-                if (pindex->IsValid(BLOCK_VALID_SCRIPTS))
-                    return "duplicate";
-                if (pindex->nStatus & BLOCK_FAILED_MASK)
-                    return "duplicate-invalid";
-                return "duplicate-inconclusive";
+                uint256 hash = block.GetHash();
+                CBlockIndex *pindex = LookupBlockIndex(hash);
+                if (pindex)
+                {
+                    if (pindex->IsValid(BLOCK_VALID_SCRIPTS))
+                        return "duplicate";
+                    if (pindex->nStatus & BLOCK_FAILED_MASK)
+                        return "duplicate-invalid";
+                    return "duplicate-inconclusive";
+                }
             }
 
             CBlockIndex *const pindexPrev = chainActive.Tip();
@@ -849,11 +850,9 @@ UniValue SubmitBlock(CBlock &block)
     uint256 hash = block.GetHash();
     bool fBlockPresent = false;
     {
-        LOCK(cs_main);
-        BlockMap::iterator mi = mapBlockIndex.find(hash);
-        if (mi != mapBlockIndex.end())
+        CBlockIndex *pindex = LookupBlockIndex(hash);
+        if (pindex)
         {
-            CBlockIndex *pindex = mi->second;
             if (pindex->IsValid(BLOCK_VALID_SCRIPTS))
                 return "duplicate";
             if (pindex->nStatus & BLOCK_FAILED_MASK)

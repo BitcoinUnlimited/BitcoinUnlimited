@@ -232,6 +232,8 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)
 
     std::vector<uint256> vBlocksInFlight;
     requester.GetBlocksInFlight(vBlocksInFlight, nodeid);
+
+    READLOCK(cs_mapBlockIndex);
     for (const uint256 &hash : vBlocksInFlight)
     {
         // lookup block by hash to find height
@@ -267,6 +269,7 @@ void UnregisterNodeSignals(CNodeSignals &nodeSignals)
 CBlockIndex *FindForkInGlobalIndex(const CChain &chain, const CBlockLocator &locator)
 {
     // Find the first block the caller has in the main chain
+    READLOCK(cs_mapBlockIndex);
     for (const uint256 &hash : locator.vHave)
     {
         BlockMap::iterator mi = mapBlockIndex.find(hash);
@@ -603,7 +606,7 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
                 // detect out of order blocks, and store them for later
                 uint256 hash = block.GetHash();
                 if (hash != chainparams.GetConsensus().hashGenesisBlock &&
-                    mapBlockIndex.find(block.hashPrevBlock) == mapBlockIndex.end())
+                    LookupBlockIndex(block.hashPrevBlock) == nullptr)
                 {
                     LOG(REINDEX, "%s: Out of order block %s (created %s), parent %s not known\n", __func__,
                         hash.ToString(), DateTimeStrFormat("%Y-%m-%d", block.nTime), block.hashPrevBlock.ToString());
@@ -613,7 +616,8 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
                 }
 
                 // process in case the block isn't known yet
-                if (mapBlockIndex.count(hash) == 0 || (mapBlockIndex[hash]->nStatus & BLOCK_HAVE_DATA) == 0)
+                auto *pindex = LookupBlockIndex(hash);
+                if (pindex == nullptr || (pindex->nStatus & BLOCK_HAVE_DATA) == 0)
                 {
                     CValidationState state;
                     if (ProcessNewBlock(state, chainparams, NULL, &block, true, dbp, false))
@@ -621,11 +625,9 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
                     if (state.IsError())
                         break;
                 }
-                else if (hash != chainparams.GetConsensus().hashGenesisBlock &&
-                         mapBlockIndex[hash]->nHeight % 1000 == 0)
+                else if (hash != chainparams.GetConsensus().hashGenesisBlock && pindex->nHeight % 1000 == 0)
                 {
-                    LOG(REINDEX, "Block Import: already had block %s at height %d\n", hash.ToString(),
-                        mapBlockIndex[hash]->nHeight);
+                    LOG(REINDEX, "Block Import: already had block %s at height %d\n", hash.ToString(), pindex->nHeight);
                 }
 
                 // Recursively process earlier encountered successors of this block
@@ -726,8 +728,9 @@ std::string GetWarnings(const std::string &strFor)
 // Messages
 //
 
-bool AlreadyHaveBlock(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+bool AlreadyHaveBlock(const CInv &inv)
 {
+    READLOCK(cs_mapBlockIndex);
     // The Request Manager functionality requires that we return true only when we actually have received
     // the block and not when we have received the header only.  Otherwise the request manager may not
     // be able to update its block source in order to make re-requests.
@@ -749,7 +752,10 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
     {
         // Don't bother if send buffer is too full to respond anyway
         if (pfrom->nSendSize >= SendBufferSize())
+        {
+            LOG(REQ, "Dropping %d getdata requests.  Send buffer is too large: %d\n", vInv.size(), pfrom->nSendSize);
             break;
+        }
 
         const CInv inv = vInv.front();
         vInv.pop_front();
@@ -758,12 +764,12 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             gotWorkDone = true;
             if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK)
             {
-                LOCK(cs_main);
                 bool fSend = false;
-                BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
-                if (mi != mapBlockIndex.end())
+                auto *mi = LookupBlockIndex(inv.hash);
+                if (mi)
                 {
-                    if (chainActive.Contains(mi->second))
+                    LOCK(cs_main);
+                    if (chainActive.Contains(mi))
                     {
                         fSend = true;
                     }
@@ -773,10 +779,10 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         // To prevent fingerprinting attacks, only send blocks outside of the active
                         // chain if they are valid, and no more than a month older (both in time, and in
                         // best equivalent proof of work) than the best header chain we know about.
-                        fSend = mi->second->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
-                                (pindexBestHeader.load()->GetBlockTime() - mi->second->GetBlockTime() < nOneMonth) &&
+                        fSend = mi->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
+                                (pindexBestHeader.load()->GetBlockTime() - mi->GetBlockTime() < nOneMonth) &&
                                 (GetBlockProofEquivalentTime(
-                                     *pindexBestHeader, *mi->second, *pindexBestHeader, consensusParams) < nOneMonth);
+                                     *pindexBestHeader, *mi, *pindexBestHeader, consensusParams) < nOneMonth);
                         if (!fSend)
                         {
                             LOGA("%s: ignoring request from peer=%s for old block that isn't in the main chain\n",
@@ -784,12 +790,12 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         }
                         else
                         { // BU: don't relay excessive blocks that are not on the active chain
-                            if (mi->second->nStatus & BLOCK_EXCESSIVE)
+                            if (mi->nStatus & BLOCK_EXCESSIVE)
                                 fSend = false;
                             if (!fSend)
                                 LOGA("%s: ignoring request from peer=%s for excessive block of height %d not on "
                                      "the main chain\n",
-                                    __func__, pfrom->GetLogName(), mi->second->nHeight);
+                                    __func__, pfrom->GetLogName(), mi->nHeight);
                         }
                         // BU: in the future we can throttle old block requests by setting send=false if we are out of
                         // bandwidth
@@ -800,7 +806,7 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 static const int nOneWeek = 7 * 24 * 60 * 60; // assume > 1 week = historical
                 if (fSend && CNode::OutboundTargetReached(true) &&
                     (((pindexBestHeader != nullptr) &&
-                         (pindexBestHeader.load()->GetBlockTime() - mi->second->GetBlockTime() > nOneWeek)) ||
+                         (pindexBestHeader.load()->GetBlockTime() - mi->GetBlockTime() > nOneWeek)) ||
                         inv.type == MSG_FILTERED_BLOCK) &&
                     !pfrom->fWhitelisted)
                 {
@@ -812,15 +818,15 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 }
                 // Pruned nodes may have deleted the block, so check whether
                 // it's available before trying to send.
-                if (fSend && (mi->second->nStatus & BLOCK_HAVE_DATA))
+                if (fSend && (mi->nStatus & BLOCK_HAVE_DATA))
                 {
                     // Send block from disk
                     CBlock block;
-                    if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
+                    if (!ReadBlockFromDisk(block, mi, consensusParams))
                     {
                         // its possible that I know about it but haven't stored it yet
                         LOG(THIN, "unable to load block %s from disk\n",
-                            (*mi).second->phashBlock ? (*mi).second->phashBlock->ToString() : "");
+                            mi->phashBlock ? mi->phashBlock->ToString() : "");
                         // no response
                     }
                     else
@@ -1624,41 +1630,44 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         uint256 hashStop;
         vRecv >> locator >> hashStop;
 
-        LOCK(cs_main); // for mapBlockIndex and chainActive
-        CNodeStateAccessor state(nodestate, pfrom->GetId());
         CBlockIndex *pindex = nullptr;
         if (locator.IsNull())
         {
-            // If locator is null, return the hashStop block
-            BlockMap::iterator mi = mapBlockIndex.find(hashStop);
-            if (mi == mapBlockIndex.end())
+            pindex = LookupBlockIndex(hashStop);
+            if (!pindex)
                 return true;
-            pindex = (*mi).second;
-        }
-        else
-        {
-            // Find the last block the caller has in the main chain
-            pindex = FindForkInGlobalIndex(chainActive, locator);
-            if (pindex)
-                pindex = chainActive.Next(pindex);
         }
 
-        // we must use CBlocks, as CBlockHeaders won't include the 0x00 nTx count at the end
         std::vector<CBlock> vHeaders;
-        int nLimit = MAX_HEADERS_RESULTS;
-        LOG(NET, "getheaders height %d for block %s from peer %s\n", (pindex ? pindex->nHeight : -1),
-            hashStop.ToString(), pfrom->GetLogName());
-        for (; pindex; pindex = chainActive.Next(pindex))
         {
-            vHeaders.push_back(pindex->GetBlockHeader());
-            if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
-                break;
+            LOCK(cs_main); // for chainActive
+            if (!locator.IsNull())
+            {
+                // Find the last block the caller has in the main chain
+                pindex = FindForkInGlobalIndex(chainActive, locator);
+                if (pindex)
+                    pindex = chainActive.Next(pindex);
+            }
+
+            // we must use CBlocks, as CBlockHeaders won't include the 0x00 nTx count at the end
+            int nLimit = MAX_HEADERS_RESULTS;
+            LOG(NET, "getheaders height %d for block %s from peer %s\n", (pindex ? pindex->nHeight : -1),
+                hashStop.ToString(), pfrom->GetLogName());
+            for (; pindex; pindex = chainActive.Next(pindex))
+            {
+                vHeaders.push_back(pindex->GetBlockHeader());
+                if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
+                    break;
+            }
         }
         // pindex can be NULL either if we sent chainActive.Tip() OR
         // if our peer has chainActive.Tip() (and thus we are sending an empty
         // headers message). In both cases it's safe to update
         // pindexBestHeaderSent to be our tip.
-        state->pindexBestHeaderSent = pindex ? pindex : chainActive.Tip();
+        {
+            CNodeStateAccessor state(nodestate, pfrom->GetId());
+            state->pindexBestHeaderSent = pindex ? pindex : chainActive.Tip();
+        }
         pfrom->PushMessage(NetMsgType::HEADERS, vHeaders);
     }
 
@@ -1738,8 +1747,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             // check that the first header has a previous block in the blockindex.
             if (hashLastBlock.IsNull())
             {
-                BlockMap::iterator mi = mapBlockIndex.find(header.hashPrevBlock);
-                if (mi != mapBlockIndex.end())
+                if (LookupBlockIndex(header.hashPrevBlock))
                     hashLastBlock = header.hashPrevBlock;
             }
 
@@ -2025,9 +2033,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // Validates that the filter is reasonably sized.
         LoadFilter(pfrom, &filterMemPool);
         {
-            LOCK(cs_main);
-            BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
-            if (mi == mapBlockIndex.end())
+            auto *invIndex = LookupBlockIndex(inv.hash);
+            if (!invIndex)
             {
                 dosMan.Misbehaving(pfrom, 100);
                 return error("Peer %srequested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
@@ -2035,7 +2042,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             CBlock block;
             const Consensus::Params &consensusParams = Params().GetConsensus();
-            if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
+            if (!ReadBlockFromDisk(block, invIndex, consensusParams))
             {
                 // We don't have the block yet, although we know about it.
                 return error(
@@ -2097,12 +2104,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     // BUIPXXX Graphene blocks: begin section
     else if (strCommand == NetMsgType::GET_GRAPHENE && !fImporting && !fReindex && IsGrapheneBlockEnabled())
     {
+        LOCK(pfrom->cs_graphene);
         return HandleGrapheneBlockRequest(vRecv, pfrom, chainparams);
     }
 
     else if (strCommand == NetMsgType::GRAPHENEBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsGrapheneBlockEnabled())
     {
+        LOCK(pfrom->cs_graphene);
         return CGrapheneBlock::HandleMessage(vRecv, pfrom, strCommand, 0);
     }
 
@@ -2110,6 +2119,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::GET_GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsGrapheneBlockEnabled())
     {
+        LOCK(pfrom->cs_graphene);
         return CRequestGrapheneBlockTx::HandleMessage(vRecv, pfrom);
     }
 
@@ -2117,6 +2127,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsGrapheneBlockEnabled())
     {
+        LOCK(pfrom->cs_graphene);
         return CGrapheneBlockTx::HandleMessage(vRecv, pfrom);
     }
     // BUIPXXX Graphene blocks: end section
@@ -2898,12 +2909,12 @@ bool SendMessages(CNode *pto)
                 {
                     CBlockIndex *pindex = nullptr;
                     {
-                        LOCK(cs_main);
-                        BlockMap::iterator mi = mapBlockIndex.find(hash);
                         // BU skip blocks that we don't know about.  was: assert(mi != mapBlockIndex.end());
-                        if (mi == mapBlockIndex.end())
+                        pindex = LookupBlockIndex(hash);
+                        if (!pindex)
                             continue;
-                        pindex = mi->second;
+
+                        LOCK(cs_main);
                         if (chainActive[pindex->nHeight] != pindex)
                         {
                             // Bail out if we reorged away from this block
@@ -2966,15 +2977,14 @@ bool SendMessages(CNode *pto)
                     {
                         CBlockIndex *pindex = nullptr;
                         {
-                            LOCK(cs_main);
-                            BlockMap::iterator mi = mapBlockIndex.find(hashToAnnounce);
-                            if (mi == mapBlockIndex.end())
+                            pindex = LookupBlockIndex(hashToAnnounce);
+                            if (!pindex)
                                 continue;
-                            pindex = mi->second;
 
                             // Warn if we're announcing a block that is not on the main chain.
                             // This should be very rare and could be optimized out.
                             // Just log for now.
+                            LOCK(cs_main);
                             if (chainActive[pindex->nHeight] != pindex)
                             {
                                 LOG(NET, "Announcing block %s not on main chain (tip=%s)\n", hashToAnnounce.ToString(),
@@ -3070,7 +3080,10 @@ bool SendMessages(CNode *pto)
             {
                 LOCK(pto->cs_vSend);
                 if (!vInvSend.empty())
+                {
                     pto->PushMessage(NetMsgType::INV, vInvSend);
+                    vInvSend.clear();
+                }
             }
         }
 
@@ -3096,7 +3109,7 @@ ThresholdState VersionBitsTipState(const Consensus::Params &params, Consensus::D
 void MainCleanup()
 {
     {
-        LOCK(cs_main); // BU apply the appropriate lock so no contention during destruction
+        WRITELOCK(cs_mapBlockIndex); // BU apply the appropriate lock so no contention during destruction
         // block headers
         BlockMap::iterator it1 = mapBlockIndex.begin();
         for (; it1 != mapBlockIndex.end(); it1++)

@@ -580,8 +580,6 @@ UniValue getblockheader(const UniValue &params, bool fHelp)
             HelpExampleCli("getblockheader", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\"") +
             HelpExampleRpc("getblockheader", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\""));
 
-    LOCK(cs_main);
-
     std::string strHash = params[0].get_str();
     uint256 hash(uint256S(strHash));
 
@@ -589,10 +587,9 @@ UniValue getblockheader(const UniValue &params, bool fHelp)
     if (params.size() > 1)
         fVerbose = params[1].get_bool();
 
-    if (mapBlockIndex.count(hash) == 0)
+    CBlockIndex *pblockindex = LookupBlockIndex(hash);
+    if (!pblockindex)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-
-    CBlockIndex *pblockindex = mapBlockIndex[hash];
 
     if (!fVerbose)
     {
@@ -650,11 +647,9 @@ UniValue getblock(const UniValue &params, bool fHelp)
             HelpExampleCli("getblock", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\"") +
             HelpExampleRpc("getblock", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\""));
 
-    LOCK(cs_main);
 
     std::string strHash = params[0].get_str();
     uint256 hash(uint256S(strHash));
-    CBlockIndex *pblockindex = NULL;
     bool fVerbose = true;
     bool fListTxns = true;
     if (params.size() > 1)
@@ -662,11 +657,13 @@ UniValue getblock(const UniValue &params, bool fHelp)
     if (params.size() == 3)
         fListTxns = params[2].get_bool();
 
-    if (mapBlockIndex.count(hash) == 0)
+    CBlockIndex *pblockindex = LookupBlockIndex(hash);
+    if (!pblockindex)
     {
         arith_uint256 h = UintToArith256(hash);
         if (h.bits() < 65)
         {
+            LOCK(cs_main);
             uint64_t height = boost::lexical_cast<unsigned int>(strHash);
             if (height > (uint64_t)chainActive.Height())
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block index out of range");
@@ -674,10 +671,6 @@ UniValue getblock(const UniValue &params, bool fHelp)
         }
         else
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-    }
-    else
-    {
-        pblockindex = mapBlockIndex[hash];
     }
 
     CBlock block;
@@ -728,10 +721,9 @@ static bool GetUTXOStats(CCoinsView *view, CCoinsStats &stats)
 
     CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
     stats.hashBlock = pcursor->GetBestBlock();
-    {
-        LOCK(cs_main);
-        stats.nHeight = mapBlockIndex.find(stats.hashBlock)->second->nHeight;
-    }
+
+    CBlockIndex *pindex = LookupBlockIndex(stats.hashBlock);
+    stats.nHeight = pindex->nHeight;
     ss << stats.hashBlock;
     uint256 prevkey;
     std::map<uint32_t, Coin> outputs;
@@ -837,7 +829,7 @@ UniValue gettxout(const UniValue &params, bool fHelp)
             HelpExampleCli("listunspent", "") + "\nView the details\n" + HelpExampleCli("gettxout", "\"txid\" 1") +
             "\nAs a json rpc call\n" + HelpExampleRpc("gettxout", "\"txid\", 1"));
 
-    LOCK(cs_main);
+    LOCK(cs_main); // for pcoinsTip
 
     UniValue ret(UniValue::VOBJ);
 
@@ -868,8 +860,7 @@ UniValue gettxout(const UniValue &params, bool fHelp)
         }
     }
 
-    BlockMap::iterator it = mapBlockIndex.find(pcoinsTip->GetBestBlock());
-    CBlockIndex *pindex = it->second;
+    CBlockIndex *pindex = LookupBlockIndex(pcoinsTip->GetBestBlock());
     ret.push_back(Pair("bestblock", pindex->GetBlockHash().GetHex()));
     if (coin.nHeight == MEMPOOL_HEIGHT)
     {
@@ -1157,6 +1148,8 @@ static std::set<CBlockIndex *, CompareBlocksByHeight> GetChainTips()
     std::set<CBlockIndex *> setOrphans;
     std::set<CBlockIndex *> setPrevs;
 
+    AssertLockHeld(cs_main); // for chainActive
+    READLOCK(cs_mapBlockIndex);
     for (const std::pair<const uint256, CBlockIndex *> &item : mapBlockIndex)
     {
         if (!chainActive.Contains(item.second))
@@ -1352,12 +1345,13 @@ UniValue invalidateblock(const UniValue &params, bool fHelp)
     CValidationState state;
 
     TxAdmissionPause txlock;
-    LOCK(cs_main);
 
-    if (mapBlockIndex.count(hash) == 0)
+    CBlockIndex *pblockindex = LookupBlockIndex(hash);
+    if (!pblockindex)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
 
-    CBlockIndex *pblockindex = mapBlockIndex[hash];
+    LOCK(cs_main);
+
     InvalidateBlock(state, Params().GetConsensus(), pblockindex);
 
     if (state.IsValid())
@@ -1390,12 +1384,12 @@ UniValue reconsiderblock(const UniValue &params, bool fHelp)
     uint256 hash(uint256S(strHash));
     CValidationState state;
 
+    CBlockIndex *pblockindex = LookupBlockIndex(hash);
+    if (!pblockindex)
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+
     {
         LOCK(cs_main);
-        if (mapBlockIndex.count(hash) == 0)
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-
-        CBlockIndex *pblockindex = mapBlockIndex[hash];
         ReconsiderBlock(state, pblockindex);
     }
 

@@ -68,9 +68,10 @@ int GetTotalBlocksEstimate(const CCheckpointData &data)
     return checkpoints.rbegin()->first;
 }
 
+#if 0 // UNUSED
 CBlockIndex *GetLastCheckpoint(const CCheckpointData &data)
 {
-    AssertLockHeld(cs_main); // for mapBlockIndex
+    AssertLockHeld(cs_mapBlockIndex);
     const MapCheckpoints &checkpoints = data.mapCheckpoints;
     for (auto i = checkpoints.rbegin(); i != checkpoints.rend(); i++)
     {
@@ -81,5 +82,5 @@ CBlockIndex *GetLastCheckpoint(const CCheckpointData &data)
     }
     return NULL;
 }
-
+#endif
 } // namespace Checkpoints

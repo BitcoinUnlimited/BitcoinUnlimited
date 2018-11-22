@@ -36,7 +36,11 @@ bool AcceptBlockHeader(const CBlockHeader &block,
 CBlockIndex *AddToBlockIndex(const CBlockHeader &block);
 
 /** Create a new block index entry for a given block hash */
-CBlockIndex *InsertBlockIndex(uint256 hash);
+CBlockIndex *InsertBlockIndex(const uint256 &hash);
+
+/** Look up the block index entry for a given block hash. returns nullptr if it does not exist */
+CBlockIndex *LookupBlockIndex(const uint256 &hash);
+
 
 /** Unload database information */
 void UnloadBlockIndex();

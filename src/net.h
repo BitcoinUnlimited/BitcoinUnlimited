@@ -95,8 +95,8 @@ static const bool DEFAULT_FORCEBITNODES = false;
 // BITCOINUNLIMITED END
 
 static const bool DEFAULT_FORCEDNSSEED = false;
-static const size_t DEFAULT_MAXRECEIVEBUFFER = 5 * 1000;
-static const size_t DEFAULT_MAXSENDBUFFER = 1 * 1000;
+static const size_t DEFAULT_MAXRECEIVEBUFFER = 10 * 1000;
+static const size_t DEFAULT_MAXSENDBUFFER = 10 * 1000;
 
 unsigned int ReceiveFloodSize();
 unsigned int SendBufferSize();
@@ -492,6 +492,7 @@ public:
     // BUIP010 Xtreme Thinblocks: end section
 
     // BUIPXXX Graphene blocks: begin section
+    CCriticalSection cs_graphene;
     CBlock grapheneBlock;
     std::vector<uint256> grapheneBlockHashes;
     std::map<uint64_t, uint32_t> grapheneMapHashOrderIndex;
