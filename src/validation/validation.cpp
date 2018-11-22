@@ -3956,6 +3956,12 @@ bool FinalizeBlockAndInvalidate(CValidationState &state, CBlockIndex *pindex)
     return true;
 }
 
+const CBlockIndex *GetFinalizedBlock()
+{
+    AssertLockHeld(cs_main);
+    return pindexFinalized;
+}
+
 bool IsBlockPruned(const CBlockIndex *pblockindex)
 {
     READLOCK(cs_mapBlockIndex); // for nStatus

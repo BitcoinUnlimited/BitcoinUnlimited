@@ -173,6 +173,9 @@ bool ProcessNewBlock(CValidationState &state,
  */
 bool FinalizeBlockAndInvalidate(CValidationState &state, CBlockIndex *pindex);
 
+/** Get the the block index for the currently finalized block */
+const CBlockIndex *GetFinalizedBlock();
+
 //! Check whether the block associated with this index entry is pruned or not.
 bool IsBlockPruned(const CBlockIndex *pblockindex);
 
