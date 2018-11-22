@@ -856,7 +856,10 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
             }
             else // an empty txiter should never be part of the parents
             {
-                DbgAssert("tx parents is corrupt!", ready.push(nextTx));
+                DbgAssert("tx parents is corrupt!", {
+                    links->second.parents.clear();
+                    ready.push(nextTx);
+                });
             }
         }
 
