@@ -3076,8 +3076,7 @@ bool SendMessages(CNode *pto)
 
         {
             TRY_LOCK(cs_main, locked);
-            static int rarely = 0;
-            if (locked && ((++rarely) & 7) == 0)
+            if (locked)
             { // I don't need to deal w/ blocks as often as tx and this is time consuming
                 // Request the next blocks. Mostly this will get executed during IBD but sometimes even
                 // when the chain is syncd a block will get request via this method.
