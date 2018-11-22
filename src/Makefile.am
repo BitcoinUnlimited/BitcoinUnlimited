@@ -223,7 +223,7 @@ obj/build.h: FORCE
 	  $(abs_top_srcdir)
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
-xversionkeys.h:
+xversionkeys.h: FORCE
 	$(PYTHON) $(top_srcdir)/contrib/devtools/xversionkeys.py > $(abs_top_builddir)/src/xversionkeys.h < $(srcdir)/xversionkeys.dat
 
 BUILT_SOURCES= xversionkeys.h
