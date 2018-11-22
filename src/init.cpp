@@ -1481,10 +1481,8 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         READLOCK(cs_mapBlockIndex);
         LOGA("mapBlockIndex.size() = %u\n", mapBlockIndex.size());
     }
-    {
-        LOCK(cs_main);
-        LOGA("nBestHeight = %d\n", chainActive.Height());
-    }
+
+    LOGA("nBestHeight = %d\n", chainActive.Height());
 #ifdef ENABLE_WALLET
     LOGA("setKeyPool.size() = %u\n", pwalletMain ? pwalletMain->setKeyPool.size() : 0);
     LOGA("mapWallet.size() = %u\n", pwalletMain ? pwalletMain->mapWallet.size() : 0);
