@@ -38,6 +38,7 @@ static bool noui_ThreadSafeMessageBox(const std::string &message, const std::str
     if (!fSecure)
         LOGA("%s: %s\n", strCaption, message);
     fprintf(stderr, "%s: %s\n", strCaption.c_str(), message.c_str());
+    fprintf(stderr, "Data directory: %s\n", GetDataDir().string().c_str());
     return false;
 }
 
