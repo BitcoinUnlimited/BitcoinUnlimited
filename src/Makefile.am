@@ -151,6 +151,7 @@ BITCOIN_CORE_H = \
   merkleblock.h \
   miner.h \
   net.h \
+  net_processing.h \
   nodestate.h \
   leakybucket.h \
   netaddress.h \
@@ -261,6 +262,7 @@ libbitcoin_server_a_SOURCES = \
   merkleblock.cpp \
   miner.cpp \
   net.cpp \
+  net_processing.cpp \
   nodestate.cpp \
   noui.cpp \
   parallel.cpp \

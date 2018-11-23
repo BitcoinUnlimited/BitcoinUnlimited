@@ -105,6 +105,8 @@ netbase.cpp
 netbase.h
 net.cpp
 net.h
+net_processing.cpp
+net_processing.h
 nodestate.cpp
 nodestate.h
 noui.cpp
