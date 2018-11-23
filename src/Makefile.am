@@ -151,6 +151,7 @@ BITCOIN_CORE_H = \
   merkleblock.h \
   miner.h \
   net.h \
+  net_processing.h \
   nodestate.h \
   leakybucket.h \
   netaddress.h \
@@ -204,6 +205,8 @@ BITCOIN_CORE_H = \
   validation/verifydb.h \
   validationinterface.h \
   versionbits.h \
+  xversionmessage.h \
+  xversionkeys.h \
   wallet/crypter.h \
   wallet/db.h \
   wallet/rpcwallet.h \
@@ -220,6 +223,11 @@ obj/build.h: FORCE
 	@$(top_srcdir)/share/genbuild.sh $(abs_top_builddir)/src/obj/build.h \
 	  $(abs_top_srcdir)
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
+
+xversionkeys.h: FORCE
+	$(PYTHON) $(top_srcdir)/contrib/devtools/xversionkeys.py > $(abs_top_builddir)/src/xversionkeys.h < $(srcdir)/xversionkeys.dat
+
+BUILT_SOURCES= xversionkeys.h
 
 # server: shared between bitcoind and bitcoin-qt
 libbitcoin_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
@@ -254,6 +262,7 @@ libbitcoin_server_a_SOURCES = \
   merkleblock.cpp \
   miner.cpp \
   net.cpp \
+  net_processing.cpp \
   nodestate.cpp \
   noui.cpp \
   parallel.cpp \
@@ -287,6 +296,7 @@ libbitcoin_server_a_SOURCES = \
   validation/verifydb.cpp \
   validationinterface.cpp \
   versionbits.cpp \
+  xversionmessage.cpp \
   $(BITCOIN_CORE_H)
 
 if ENABLE_ZMQ
@@ -612,9 +622,9 @@ CLEANFILES += wallet/*.gcda wallet/*.gcno
 CLEANFILES += wallet/test/*.gcda wallet/test/*.gcno
 CLEANFILES += zmq/*.gcda zmq/*.gcno
 
-DISTCLEANFILES = obj/build.h
+DISTCLEANFILES = obj/build.h xversionkeys.h
 
-EXTRA_DIST = leveldb $(CTAES_DIST)
+EXTRA_DIST = leveldb $(CTAES_DIST) $(srcdir)/xversionkeys.dat $(top_srcdir)/contrib/devtools/xversionkeys.py
 
 clean-local:
 	-$(MAKE) -C secp256k1 clean

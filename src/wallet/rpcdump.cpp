@@ -17,6 +17,8 @@
 #include "sync.h"
 #include "util.h"
 #include "utiltime.h"
+#include "validation/validation.h"
+
 #include "wallet.h"
 
 #include <fstream>
@@ -462,10 +464,9 @@ UniValue importprunedfunds(const UniValue &params, bool fHelp)
     unsigned int txnIndex = 0;
     if (merkleBlock.txn.ExtractMatches(vMatch, vIndex) == merkleBlock.header.hashMerkleRoot)
     {
-        LOCK(cs_main);
-
-        if (!mapBlockIndex.count(merkleBlock.header.GetHash()) ||
-            !chainActive.Contains(mapBlockIndex[merkleBlock.header.GetHash()]))
+        auto *tmp = LookupBlockIndex(merkleBlock.header.GetHash());
+        LOCK(cs_main); // for chainActive
+        if (!tmp || !chainActive.Contains(tmp))
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found in chain");
 
         vector<uint256>::const_iterator it;

@@ -24,13 +24,13 @@ from test_framework.blocktools import *
 # or a list to create multiple outputs
 
 
-def create_broken_transaction(prevtx, n, sig, value):
+def create_broken_transaction(prevtx, n, sig, value, out=PADDED_ANY_SPEND):
     if not type(value) is list:
         value = [value]
     tx = CTransaction()
     tx.vin.append(CTxIn(COutPoint(prevtx.sha256, n), sig, 0xffffffff))
     for v in value:
-        tx.vout.append(CTxOut(v, b""))
+        tx.vout.append(CTxOut(v, out))
     tx.calc_sha256()
     return tx
 
@@ -152,7 +152,7 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
         prev_block = block
         # out_value is less than 50BTC because regtest halvings happen every 150 blocks, and is in Satoshis
         out_value = block.vtx[0].vout[0].nValue
-        tx1 = create_transaction(prev_block.vtx[0], 0, b'\x51', [int(out_value / 2), int(out_value / 2)])
+        tx1 = create_transaction(prev_block.vtx[0], 0, b'\x61'*50 + b'\x51', [int(out_value / 2), int(out_value / 2)])
         height = self.nodes[0].getblockcount()
         tip = int(self.nodes[0].getblockhash(height), 16)
         coinbase = create_coinbase(height + 1)
@@ -195,8 +195,10 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
         coinbase = create_coinbase(height + 1)
         next_time = cur_time + 1200
 
+        op1 = OP_1.toBin()
+
         logging.info("inputs below outputs")
-        tx6 = create_transaction(prev_block.vtx[0], 0, b'\x51', [out_value + 1000])
+        tx6 = create_transaction(prev_block.vtx[0], 0, op1, [out_value + 1000])
         block = create_block(tip, coinbase, next_time, [tx6])
         block.nVersion = 0x20000000
         block.rehash()
@@ -204,7 +206,7 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
         expectException(lambda: self.nodes[0].validateblocktemplate(hexblk),
                         JSONRPCException, "invalid block: bad-txns-in-belowout")
 
-        tx5 = create_transaction(prev_block.vtx[0], 0, b'\x51', [int(21000001 * COIN)])
+        tx5 = create_transaction(prev_block.vtx[0], 0, op1, [int(21000001 * COIN)])
         logging.info("money range")
         block = create_block(tip, coinbase, next_time, [tx5])
         block.nVersion = 0x20000000
@@ -214,7 +216,7 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
                         JSONRPCException, "invalid block: bad-txns-vout-toolarge")
 
         logging.info("bad tx offset")
-        tx_bad = create_broken_transaction(prev_block.vtx[0], 1, b'\x51', [int(out_value / 4)])
+        tx_bad = create_broken_transaction(prev_block.vtx[0], 1, op1, [int(out_value / 4)])
         block = create_block(tip, coinbase, next_time, [tx_bad])
         block.nVersion = 0x20000000
         block.rehash()
@@ -223,7 +225,7 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
                         JSONRPCException, "invalid block: bad-txns-inputs-missingorspent")
 
         logging.info("bad tx offset largest number")
-        tx_bad = create_broken_transaction(prev_block.vtx[0], 0xffffffff, b'\x51', [int(out_value / 4)])
+        tx_bad = create_broken_transaction(prev_block.vtx[0], 0xffffffff, op1, [int(out_value / 4)])
         block = create_block(tip, coinbase, next_time, [tx_bad])
         block.nVersion = 0x20000000
         block.rehash()
@@ -231,17 +233,18 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
         expectException(lambda: self.nodes[0].validateblocktemplate(hexblk),
                         JSONRPCException, "invalid block: bad-txns-inputs-missingorspent")
 
+
         logging.info("double tx")
-        tx2 = create_transaction(prev_block.vtx[0], 0, b'\x51', [int(out_value / 4)])
+        tx2 = create_transaction(prev_block.vtx[0], 0, op1, [int(out_value / 4)])
         block = create_block(tip, coinbase, next_time, [tx2, tx2])
         block.nVersion = 0x20000000
         block.rehash()
         hexblk = ToHex(block)
         expectException(lambda: self.nodes[0].validateblocktemplate(hexblk),
-                        JSONRPCException, "invalid block: bad-txns-inputs-missingorspent")
+                        JSONRPCException, "repeated-txn")
 
-        tx3 = create_transaction(prev_block.vtx[0], 0, b'\x51', [int(out_value / 9), int(out_value / 10)])
-        tx4 = create_transaction(prev_block.vtx[0], 0, b'\x51', [int(out_value / 8), int(out_value / 7)])
+        tx3 = create_transaction(prev_block.vtx[0], 0, op1, [int(out_value / 9), int(out_value / 10)])
+        tx4 = create_transaction(prev_block.vtx[0], 0, op1, [int(out_value / 8), int(out_value / 7)])
         logging.info("double spend")
         block = create_block(tip, coinbase, next_time, [tx3, tx4])
         block.nVersion = 0x20000000
@@ -250,7 +253,17 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
         expectException(lambda: self.nodes[0].validateblocktemplate(hexblk),
                         JSONRPCException, "invalid block: bad-txns-inputs-missingorspent")
 
-        tx_good = create_transaction(prev_block.vtx[0], 0, b'\x51', [int(out_value / 50)] * 50)
+        txes = [tx3, tx4]
+        txes.sort(key=lambda x: x.hash, reverse=True)
+        logging.info("bad tx ordering")
+        block = create_block(tip, coinbase, next_time, txes, ctor=False)
+        block.nVersion = 0x20000000
+        block.rehash()
+        hexblk = ToHex(block)
+        expectException(lambda: self.nodes[0].validateblocktemplate(hexblk),
+                        JSONRPCException, "invalid block: bad-txn-order")
+
+        tx_good = create_transaction(prev_block.vtx[0], 0, b'\x51', [int(out_value / 50)] * 50, out=b"")
         logging.info("good tx")
         block = create_block(tip, coinbase, next_time, [tx_good])
         block.nVersion = 0x20000000
@@ -275,7 +288,7 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
         txl = []
         for i in range(0, 50):
             ov = block.vtx[1].vout[i].nValue
-            txl.append(create_transaction(block.vtx[1], i, b'\x51', [int(ov / 50)] * 50))
+            txl.append(create_transaction(block.vtx[1], i, op1, [int(ov / 50)] * 50))
         block = create_block(tip, coinbase, next_time, txl)
         block.nVersion = 0x20000000
         block.rehash()

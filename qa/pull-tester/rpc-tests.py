@@ -183,8 +183,8 @@ testScripts = [ RpcTest(t) for t in [
     'bip135basic',
     'ctor',
     'mining_ctor',
-    'nov152018_forkactivation',
-    'blockstorage',
+    Disabled('nov152018_forkactivation','Nov 2018 already activated'),
+     Disabled('blockstorage','fixme'),
     'miningtest',
     'grapheneblocks',
     'cashlibtest',
@@ -233,7 +233,8 @@ testScripts = [ RpcTest(t) for t in [
     'p2p-versionbits-warning',
     'importprunedfunds',
     'thinblocks',
-    'checkdatasig_activation'
+    'checkdatasig_activation',
+    'xversion'
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [

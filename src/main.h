@@ -73,7 +73,7 @@ static const CAmount HIGH_MAX_TX_FEE = 100 * HIGH_TX_FEE_PER_KB;
  *  limit by number if transactions if they wish by modifying -maxorphantx=<n> if
  *  the have a need to.
  */
-static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 120000;
+static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 1000000;
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
 static const unsigned int DEFAULT_ANCESTOR_LIMIT = 25;
 /** Default for -limitancestorsize, maximum kilobytes of tx + all in-mempool ancestors */
@@ -175,7 +175,9 @@ extern CTweak<bool> enableCanonicalTxOrder;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
 typedef boost::unordered_map<uint256, CBlockIndex *, BlockHasher> BlockMap;
+extern CSharedCriticalSection cs_mapBlockIndex;
 extern BlockMap mapBlockIndex;
+
 extern uint64_t nLastBlockTx;
 extern uint64_t nLastBlockSize;
 extern CWaitableCriticalSection csBestBlock;
@@ -244,25 +246,10 @@ void UnregisterNodeSignals(CNodeSignals &nodeSignals);
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 /** Import blocks from an external file */
 bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskBlockPos *dbp = nullptr);
-/** Process protocol messages received from a given node */
-bool ProcessMessages(CNode *pfrom);
 /** Do we already have this transaction or has it been seen in a block */
 bool AlreadyHaveTx(const CInv &inv);
 /** Do we already have this block on disk */
 bool AlreadyHaveBlock(const CInv &inv);
-
-/** Process a single protocol messages received from a given node */
-bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived);
-
-/**
- * Send queued protocol messages to be sent to a give node.
- *
- * @param[in]   pto             The node which we are sending messages to.
- */
-bool SendMessages(CNode *pto);
-// BU: moves to parallel.h
-/** Run an instance of the script checking thread */
-// void ThreadScriptCheck();
 
 /** Try to detect Partition (network isolation) attacks against us */
 void PartitionCheck(bool (*initialDownloadCheck)(),

@@ -218,7 +218,7 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
  */
 static int GetSpendHeight(const CCoinsViewCache &inputs)
 {
-    LOCK(cs_main);
+    READLOCK(cs_mapBlockIndex);
     BlockMap::iterator i = mapBlockIndex.find(inputs.GetBestBlock());
     if (i != mapBlockIndex.end())
     {

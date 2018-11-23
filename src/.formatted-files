@@ -105,6 +105,8 @@ netbase.cpp
 netbase.h
 net.cpp
 net.h
+net_processing.cpp
+net_processing.h
 nodestate.cpp
 nodestate.h
 noui.cpp
@@ -171,6 +173,8 @@ validationinterface.h
 versionbits.cpp
 versionbits.h
 version.h
+xversionmessage.h
+xversionmessage.cpp
 qt/addressbookpage.cpp
 qt/addressbookpage.h
 qt/addresstablemodel.cpp

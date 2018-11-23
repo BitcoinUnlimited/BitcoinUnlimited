@@ -24,6 +24,7 @@
 #include "unlimited.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "validation/validation.h"
 #include "validationinterface.h"
 #include "version.h"
 #include <boost/accumulators/accumulators.hpp>
@@ -90,7 +91,7 @@ CRequestManagerNodeState::CRequestManagerNodeState()
 CRequestManager::CRequestManager()
     : inFlightTxns("reqMgr/inFlight", STAT_OP_MAX), receivedTxns("reqMgr/received"), rejectedTxns("reqMgr/rejected"),
       droppedTxns("reqMgr/dropped", STAT_KEEP), pendingTxns("reqMgr/pending", STAT_KEEP),
-      requestPacer(512, 256) // Max and average # of requests that can be made per second
+      requestPacer(15000, 10000) // Max and average # of requests that can be made per second
 {
     inFlight = 0;
     nOutbound = 0;
@@ -235,7 +236,7 @@ void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *
         ProcessBlockAvailability(pnode->id);
 
         // check block availability for this peer and only askfor a block if it is available.
-        CNodeState *state = nodestate.State(pnode->id);
+        CNodeStateAccessor state(nodestate, pnode->id);
         if (state != nullptr)
         {
             if (state->pindexBestKnownBlock != nullptr &&
@@ -969,20 +970,17 @@ void CRequestManager::SendRequests()
 // Check whether the last unknown block a peer advertised is not yet known.
 void CRequestManager::ProcessBlockAvailability(NodeId nodeid)
 {
-    LOCK(cs_main); // TODO fine grained lock around mapBlockIndex
-
-    CNodeState *state = nodestate.State(nodeid);
+    CNodeStateAccessor state(nodestate, nodeid);
     DbgAssert(state != nullptr, return );
 
     if (!state->hashLastUnknownBlock.IsNull())
     {
-        BlockMap::iterator itOld = mapBlockIndex.find(state->hashLastUnknownBlock);
-        if (itOld != mapBlockIndex.end() && itOld->second->nChainWork > 0)
+        auto *pindex = LookupBlockIndex(state->hashLastUnknownBlock);
+        if (pindex && pindex->nChainWork > 0)
         {
-            if (state->pindexBestKnownBlock == nullptr ||
-                itOld->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
+            if (state->pindexBestKnownBlock == nullptr || pindex->nChainWork >= state->pindexBestKnownBlock->nChainWork)
             {
-                state->pindexBestKnownBlock = itOld->second;
+                state->pindexBestKnownBlock = pindex;
             }
             state->hashLastUnknownBlock.SetNull();
         }
@@ -992,20 +990,19 @@ void CRequestManager::ProcessBlockAvailability(NodeId nodeid)
 // Update tracking information about which blocks a peer is assumed to have.
 void CRequestManager::UpdateBlockAvailability(NodeId nodeid, const uint256 &hash)
 {
-    AssertLockHeld(cs_main);
+    auto *pindex = LookupBlockIndex(hash);
 
-    CNodeState *state = nodestate.State(nodeid);
+    CNodeStateAccessor state(nodestate, nodeid);
     DbgAssert(state != nullptr, return );
 
     ProcessBlockAvailability(nodeid);
 
-    BlockMap::iterator it = mapBlockIndex.find(hash);
-    if (it != mapBlockIndex.end() && it->second->nChainWork > 0)
+    if (pindex && pindex->nChainWork > 0)
     {
         // An actually better block was announced.
-        if (state->pindexBestKnownBlock == nullptr || it->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
+        if (state->pindexBestKnownBlock == nullptr || pindex->nChainWork >= state->pindexBestKnownBlock->nChainWork)
         {
-            state->pindexBestKnownBlock = it->second;
+            state->pindexBestKnownBlock = pindex;
         }
     }
     else
@@ -1054,11 +1051,13 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
 
     NodeId nodeid = node->GetId();
     vBlocks.reserve(vBlocks.size() + count);
-    CNodeState *state = nodestate.State(nodeid);
-    DbgAssert(state != nullptr, return );
 
     // Make sure pindexBestKnownBlock is up to date, we'll need it.
+    LOCK(cs_main);
     ProcessBlockAvailability(nodeid);
+
+    CNodeStateAccessor state(nodestate, nodeid);
+    DbgAssert(state != nullptr, return );
 
     if (state->pindexBestKnownBlock == nullptr ||
         state->pindexBestKnownBlock->nChainWork < chainActive.Tip()->nChainWork)
@@ -1067,7 +1066,6 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
         return;
     }
 
-    LOCK(cs_main);
 
     if (state->pindexLastCommonBlock == nullptr)
     {

@@ -21,6 +21,7 @@
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "test/testutil.h"
+#include "txadmission.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
@@ -62,6 +63,7 @@ TestingSetup::TestingSetup(const std::string &chainName) : BasicTestingSetup(cha
     pblocktree = new CBlockTreeDB(1 << 20, "", true);
     pcoinsdbview = new CCoinsViewDB(1 << 23, true);
     pcoinsTip = new CCoinsViewCache(pcoinsdbview);
+    txCommitQ = new std::map<uint256, CTxCommitData>();
     bool worked = InitBlockIndex(chainparams);
     assert(worked);
 
@@ -83,6 +85,12 @@ TestingSetup::~TestingSetup()
     delete pblocktree;
     fs::remove_all(pathTemp);
 }
+
+struct NumericallyLessTxHashComparator
+{
+public:
+    bool operator()(const CTransactionRef &a, const CTransactionRef &b) const { return a->GetHash() < b->GetHash(); }
+};
 
 TestChain100Setup::TestChain100Setup() : TestingSetup(CBaseChainParams::REGTEST)
 {
@@ -113,6 +121,9 @@ CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransa
     block.vtx.resize(1);
     for (const CMutableTransaction &tx : txns)
         block.vtx.push_back(MakeTransactionRef(tx));
+
+    // enfore LTOR ordering of transactions
+    std::sort(block.vtx.begin() + 1, block.vtx.end(), NumericallyLessTxHashComparator());
 
     // IncrementExtraNonce creates a valid coinbase and merkleRoot
     unsigned int extraNonce = 0;

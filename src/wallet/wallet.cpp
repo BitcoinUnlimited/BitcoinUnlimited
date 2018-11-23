@@ -31,6 +31,7 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "utilmoneystr.h"
+#include "validation/validation.h"
 
 #include <assert.h>
 
@@ -728,7 +729,7 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
 {
     uint256 hash = wtxIn.GetHash();
 
-    LOCK2(cs_main, cs_wallet);
+    LOCK(cs_wallet);
     if (fFromLoadWallet)
     {
         mapWallet[hash] = wtxIn;
@@ -764,7 +765,8 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
             wtx.nTimeSmart = wtx.nTimeReceived;
             if (!wtxIn.hashUnset())
             {
-                if (mapBlockIndex.count(wtxIn.hashBlock))
+                CBlockIndex *tmp = nullptr;
+                if ((tmp = LookupBlockIndex(wtxIn.hashBlock)) != nullptr)
                 {
                     int64_t latestNow = wtx.nTimeReceived;
                     int64_t latestEntry = 0;
@@ -797,7 +799,7 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
                         }
                     }
 
-                    int64_t blocktime = mapBlockIndex[wtxIn.hashBlock]->GetBlockTime();
+                    int64_t blocktime = tmp->GetBlockTime();
                     wtx.nTimeSmart = std::max(latestEntry, std::min(blocktime, latestNow));
                 }
                 else
@@ -877,7 +879,6 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
  */
 bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef &ptx, const CBlock *pblock, bool fUpdate, int txIndex)
 {
-    AssertLockHeld(cs_main);
     AssertLockHeld(cs_wallet);
 
     if (pblock)
@@ -985,12 +986,12 @@ bool CWallet::AbandonTransaction(const uint256 &hashTx)
 
 void CWallet::MarkConflicted(const uint256 &hashBlock, const uint256 &hashTx)
 {
-    LOCK2(cs_main, cs_wallet);
+    LOCK2(cs_main, cs_wallet); // cs_main needed for chainActive
 
     int conflictconfirms = 0;
-    if (mapBlockIndex.count(hashBlock))
+    CBlockIndex *pindex = LookupBlockIndex(hashBlock);
+    if (pindex)
     {
-        CBlockIndex *pindex = mapBlockIndex[hashBlock];
         if (chainActive.Contains(pindex))
         {
             conflictconfirms = -(chainActive.Height() - pindex->nHeight + 1);
@@ -3254,6 +3255,7 @@ void CWallet::GetKeyBirthTimes(std::map<CKeyID, int64_t> &mapKeyBirth) const
     if (mapKeyFirstBlock.empty())
         return;
 
+    READLOCK(cs_mapBlockIndex);
     // find first block that affects those keys, if there are any left
     std::vector<CKeyID> vAffected;
     for (std::map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); it++)
@@ -3580,7 +3582,7 @@ CWalletKey::CWalletKey(int64_t nExpires)
 
 int CMerkleTx::SetMerkleBranch(const CBlock &block, int txIdx)
 {
-    AssertLockHeld(cs_main);
+    AssertLockHeld(cs_main); // for chainActive
     // if a bad txIdx is passed, then in release builds set the tx index to "I don't know". In debug builds assert.
     DbgAssert(txIdx >= -1, txIdx = -1);
     CBlock blockTmp;
@@ -3604,10 +3606,7 @@ int CMerkleTx::SetMerkleBranch(const CBlock &block, int txIdx)
     }
 
     // Is the tx in a block that's in the main chain
-    BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
-    if (mi == mapBlockIndex.end())
-        return 0;
-    const CBlockIndex *pindex = (*mi).second;
+    const CBlockIndex *pindex = LookupBlockIndex(hashBlock);
     if (!pindex || !chainActive.Contains(pindex))
         return 0;
 
@@ -3619,13 +3618,9 @@ int CMerkleTx::GetDepthInMainChain(const CBlockIndex *&pindexRet) const
     if (hashUnset())
         return 0;
 
-    LOCK(cs_main);
-
     // Find the block it claims to be in
-    BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
-    if (mi == mapBlockIndex.end())
-        return 0;
-    CBlockIndex *pindex = (*mi).second;
+    const CBlockIndex *pindex = LookupBlockIndex(hashBlock);
+    LOCK(cs_main);
     if (!pindex || !chainActive.Contains(pindex))
         return 0;
 

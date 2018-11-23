@@ -16,6 +16,7 @@
 #include "sync.h"
 #include "txmempool.h"
 #include "utilstrencodings.h"
+#include "validation/validation.h"
 #include "version.h"
 
 #include <boost/algorithm/string.hpp>
@@ -157,9 +158,8 @@ static bool rest_headers(HTTPRequest *req, const std::string &strURIPart)
     std::vector<const CBlockIndex *> headers;
     headers.reserve(count);
     {
+        const CBlockIndex *pindex = LookupBlockIndex(hash);
         LOCK(cs_main);
-        BlockMap::const_iterator it = mapBlockIndex.find(hash);
-        const CBlockIndex *pindex = (it != mapBlockIndex.end()) ? it->second : NULL;
         while (pindex != NULL && chainActive.Contains(pindex))
         {
             headers.push_back(pindex);
@@ -226,19 +226,15 @@ static bool rest_block(HTTPRequest *req, const std::string &strURIPart, bool sho
         return RESTERR(req, HTTP_BAD_REQUEST, "Invalid hash: " + hashStr);
 
     CBlock block;
-    CBlockIndex *pblockindex = NULL;
-    {
-        LOCK(cs_main);
-        if (mapBlockIndex.count(hash) == 0)
-            return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
+    CBlockIndex *pblockindex = LookupBlockIndex(hash);
+    if (!pblockindex)
+        return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
 
-        pblockindex = mapBlockIndex[hash];
-        if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
-            return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not available (pruned data)");
+    if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
+        return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not available (pruned data)");
 
-        if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
-            return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
-    }
+    if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+        return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
 
     CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
     ssBlock << block;

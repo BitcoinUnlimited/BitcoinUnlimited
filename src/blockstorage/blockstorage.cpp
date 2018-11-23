@@ -180,10 +180,11 @@ void SyncStorage(const CChainParams &chainparams)
                 }
                 continue;
             }
-            BlockMap::iterator it;
-            it = mapBlockIndex.find(item.second.GetBlockHash());
-            if (it == mapBlockIndex.end())
+
+            index = LookupBlockIndex(item.second.GetBlockHash());
+            if (!index)
             {
+                // TODO only one thread should create a new pindex at a time.
                 CBlockIndex *pindexNew = InsertBlockIndex(item.second.GetBlockHash());
                 pindexNew->pprev = InsertBlockIndex(item.second.hashPrev);
                 pindexNew->nHeight = item.second.nHeight;
@@ -198,10 +199,6 @@ void SyncStorage(const CChainParams &chainparams)
                 pindexNew->nStatus = item.second.nStatus;
                 pindexNew->nTx = item.second.nTx;
                 index = pindexNew;
-            }
-            else
-            {
-                index = it->second;
             }
 
             // Update the block data
@@ -358,9 +355,9 @@ void SyncStorage(const CChainParams &chainparams)
                 }
                 continue;
             }
-            BlockMap::iterator iter;
-            iter = mapBlockIndex.find(item.second.GetBlockHash());
-            if (iter == mapBlockIndex.end())
+
+            index = LookupBlockIndex(item.second.GetBlockHash());
+            if (index)
             {
                 CBlockIndex *pindexNew = InsertBlockIndex(item.second.GetBlockHash());
                 pindexNew->pprev = InsertBlockIndex(item.second.hashPrev);
@@ -378,10 +375,6 @@ void SyncStorage(const CChainParams &chainparams)
                 pindexNew->nStatus = item.second.nStatus;
                 pindexNew->nTx = item.second.nTx;
                 index = pindexNew;
-            }
-            else
-            {
-                index = iter->second;
             }
 
             // Update the block data

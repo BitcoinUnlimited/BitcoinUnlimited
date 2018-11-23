@@ -72,6 +72,7 @@ int64_t nTimeOffset = 0;
 CCriticalSection cs_rpcWarmup;
 
 CCriticalSection cs_main;
+CSharedCriticalSection cs_mapBlockIndex;
 BlockMap mapBlockIndex GUARDED_BY(cs_main);
 CChain chainActive GUARDED_BY(cs_main); // however, chainActive.Tip() is lock free
 // BU variables moved to globals.cpp
@@ -233,7 +234,7 @@ std::queue<CTxInputData> txWaitNextBlockQ GUARDED_BY(csTxInQ);
 // Transactions that have been validated and are waiting to be committed into the mempool
 CWaitableCriticalSection csCommitQ;
 CConditionVariable cvCommitQ GUARDED_BY(csCommitQ);
-std::map<uint256, CTxCommitData> txCommitQ;
+std::map<uint256, CTxCommitData> *txCommitQ = nullptr;
 
 // Control the execution of the parallel tx validation and serial mempool commit phases
 CThreadCorral txProcessingCorral;

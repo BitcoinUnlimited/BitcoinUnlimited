@@ -2007,21 +2007,19 @@ UniValue validatechainhistory(const UniValue &params, bool fHelp)
     bool failedChain = false;
     UniValue ret = NullUniValue;
 
-    LOCK(cs_main);
-
     if (params.size() >= 1)
     {
         std::string strHash = params[0].get_str();
         uint256 hash(uint256S(strHash));
 
-        if (mapBlockIndex.count(hash) == 0)
+        if ((pos = LookupBlockIndex(hash)) == 0)
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-
-        CBlock block;
-        pos = mapBlockIndex[hash];
     }
 
     LOGA("validatechainhistory starting at %d %s\n", pos->nHeight, pos->phashBlock->ToString());
+
+    LOCK(cs_main); // modifying contents of CBlockIndex
+
     while (pos && !failedChain)
     {
         // LOGA("validate %d %s\n", pos->nHeight, pos->phashBlock->ToString());
@@ -2081,26 +2079,24 @@ UniValue validateblocktemplate(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
 
     CBlockIndex *pindexPrev = nullptr;
+
+    pindexPrev = LookupBlockIndex(block.hashPrevBlock);
+    if (!pindexPrev)
+        throw runtime_error("invalid block: unknown parent");
+
+    if (pindexPrev != chainActive.Tip())
     {
-        LOCK(cs_main);
+        throw runtime_error("invalid block: does not build on chain tip");
+    }
 
-        BlockMap::iterator i = mapBlockIndex.find(block.hashPrevBlock);
-        if (i == mapBlockIndex.end())
-        {
-            throw runtime_error("invalid block: unknown parent");
-        }
+    DbgAssert(pindexPrev, throw runtime_error("invalid block: unknown parent"));
 
-        pindexPrev = i->second;
+    const CChainParams &chainparams = Params();
+    CValidationState state;
 
-        if (pindexPrev != chainActive.Tip())
-        {
-            throw runtime_error("invalid block: does not build on chain tip");
-        }
+    {
+        LOCK(cs_main); // to freeze the state during block validity test
 
-        DbgAssert(pindexPrev, throw runtime_error("invalid block: unknown parent"));
-
-        const CChainParams &chainparams = Params();
-        CValidationState state;
         if (block.GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
         {
             if (!TestConservativeBlockValidity(state, chainparams, block, pindexPrev, false, true))
@@ -2133,7 +2129,7 @@ extern std::map<std::pair<void *, void *>, LockStack> lockorders;
 extern std::vector<std::string> vUseDNSSeeds;
 extern std::list<CNode *> vNodesDisconnected;
 extern std::set<CNetAddr> setservAddNodeAddresses;
-extern std::map<uint256, CTxCommitData> txCommitQ;
+extern std::map<uint256, CTxCommitData> *txCommitQ;
 extern std::queue<CTxInputData> txDeferQ;
 extern std::queue<CTxInputData> txInQ;
 extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
@@ -2195,7 +2191,8 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.push_back(Pair("xpeditedBlkUp", (uint64_t)nExpeditedUpstream));
     ret.push_back(Pair("xpeditedTxn", (uint64_t)nExpeditedTxs));
 
-    ret.push_back(Pair("txCommitQ", (uint64_t)txCommitQ.size()));
+    if (txCommitQ)
+        ret.push_back(Pair("txCommitQ", (uint64_t)txCommitQ->size()));
     ret.push_back(Pair("txInQ", (uint64_t)txInQ.size()));
     ret.push_back(Pair("txDeferQ", (uint64_t)txDeferQ.size()));
 
