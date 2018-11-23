@@ -246,25 +246,10 @@ void UnregisterNodeSignals(CNodeSignals &nodeSignals);
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 /** Import blocks from an external file */
 bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskBlockPos *dbp = nullptr);
-/** Process protocol messages received from a given node */
-bool ProcessMessages(CNode *pfrom);
 /** Do we already have this transaction or has it been seen in a block */
 bool AlreadyHaveTx(const CInv &inv);
 /** Do we already have this block on disk */
 bool AlreadyHaveBlock(const CInv &inv);
-
-/** Process a single protocol messages received from a given node */
-bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived);
-
-/**
- * Send queued protocol messages to be sent to a give node.
- *
- * @param[in]   pto             The node which we are sending messages to.
- */
-bool SendMessages(CNode *pto);
-// BU: moves to parallel.h
-/** Run an instance of the script checking thread */
-// void ThreadScriptCheck();
 
 /** Try to detect Partition (network isolation) attacks against us */
 void PartitionCheck(bool (*initialDownloadCheck)(),
