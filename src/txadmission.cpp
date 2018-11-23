@@ -928,8 +928,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | cds_flag | svflag,
-                maxScriptOps.Value(), true, nullptr, nullptr, &sighashType2))
+        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | cds_flag | svflag, maxScriptOps.Value(),
+                true, nullptr, nullptr, &sighashType2))
         {
             if (state.GetDebugMessage() == "")
                 state.SetDebugMessage("CheckInputs failed against mandatory but not standard flags");
