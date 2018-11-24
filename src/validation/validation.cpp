@@ -32,7 +32,8 @@
 extern CTweak<unsigned int> unconfPushAction;
 extern CTweak<int> maxReorgDepth;
 void ProcessOrphans(std::vector<uint256> &vWorkQueue);
-static bool FinalizeBlockInternal(CValidationState &state, CBlockIndex *pindex);
+static bool FinalizeBlockInternal(CValidationState &state, const CBlockIndex *pindex);
+static const CBlockIndex *FindBlockToFinalize(const CBlockIndex *pindexNew);
 
 class Hasher
 {
@@ -112,7 +113,7 @@ CBlockIndex *pindexBestForkBase = nullptr;
  * The best finalized block.
  * This block cannot be reorged in any way, shape or form.
  */
-CBlockIndex const *pindexFinalized;
+CBlockIndex const *pindexFinalized GUARDED_BY(cs_main);
 
 extern uint64_t nBlockSequenceId;
 extern bool fCheckForPruning;
@@ -329,6 +330,7 @@ CBlockIndex *AddToBlockIndex(const CBlockHeader &block)
     // to avoid miners withholding blocks but broadcasting headers, to get a
     // competitive advantage.
     pindexNew->nSequenceId = 0;
+    pindexNew->nTimeReceived = GetTime();
     BlockMap::iterator mi = mapBlockIndex.insert(std::make_pair(hash, pindexNew)).first;
     pindexNew->phashBlock = &((*mi).first);
     BlockMap::iterator miPrev = mapBlockIndex.find(block.hashPrevBlock);
@@ -3274,8 +3276,7 @@ bool ConnectTip(CValidationState &state,
         // Update the finalized block.
         if (maxReorgDepth.Value() >= 0)
         {
-            int32_t nHeightToFinalize = pindexNew->nHeight - maxReorgDepth.Value();
-            CBlockIndex *pindexToFinalize = pindexNew->GetAncestor(nHeightToFinalize);
+            const CBlockIndex *pindexToFinalize = FindBlockToFinalize(pindexNew);
             if (pindexToFinalize && !FinalizeBlockInternal(state, pindexToFinalize))
             {
                 state.SetCorruptionPossible();
@@ -3914,7 +3915,7 @@ bool ProcessNewBlock(CValidationState &state,
     return true;
 }
 
-static bool FinalizeBlockInternal(CValidationState &state, CBlockIndex *pindex)
+static bool FinalizeBlockInternal(CValidationState &state, const CBlockIndex *pindex)
 {
     if (pindex != chainActive.Genesis())
     {
@@ -3950,6 +3951,53 @@ static bool FinalizeBlockInternal(CValidationState &state, CBlockIndex *pindex)
         pindexFinalized = pindex;
     }
     return true;
+}
+
+static const CBlockIndex *FindBlockToFinalize(const CBlockIndex *pindexNew)
+{
+    AssertLockHeld(cs_main);
+
+    const int32_t maxreorgdepth = maxReorgDepth.Value();
+
+    const int64_t finalizationdelay = GetArg("-finalizationdelay", DEFAULT_MIN_FINALIZATION_DELAY);
+
+    // Find our candidate.
+    // If maxreorgdepth is < 0 pindex will be null and auto finalization
+    // disabled
+    const CBlockIndex *pindex = pindexNew->GetAncestor(pindexNew->nHeight - maxreorgdepth);
+
+    int64_t now = GetTime();
+
+    // If the finalization delay is not expired since the startup time,
+    // finalization should be avoided. Header receive time is not saved to disk
+    // and so cannot be anterior to startup time.
+    if (now < (GetStartupTime() + finalizationdelay))
+    {
+        return nullptr;
+    }
+
+    // While our candidate is not eligible (finalization delay not expired), try
+    // the previous one.
+    while (pindex && (pindex != pindexFinalized))
+    {
+        // Check that the block to finalize is known for a long enough time.
+        // This test will ensure that an attacker could not cause a block to
+        // finalize by forking the chain with a depth > maxreorgdepth.
+        // If the block is loaded from disk, header receive time is 0 and the
+        // block will be finalized. This is safe because the delay since the
+        // node startup is already expired.
+        auto headerReceivedTime = pindex->GetHeaderReceivedTime();
+
+        // If finalization delay is <= 0, finalization always occurs immediately
+        if (now >= (headerReceivedTime + finalizationdelay))
+        {
+            return pindex;
+        }
+
+        pindex = pindex->pprev;
+    }
+
+    return nullptr;
 }
 
 bool FinalizeBlockAndInvalidate(CValidationState &state, CBlockIndex *pindex)

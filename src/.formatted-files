@@ -335,6 +335,7 @@ test/electrumrpcinfo_tests.cpp
 test/electrumserver_tests.cpp
 test/excessiveblock_test.cpp
 test/exploit_tests.cpp
+test/finalization_tests.cpp
 test/fork_tests.cpp
 test/fastfilter_tests.cpp
 test/getarg_tests.cpp

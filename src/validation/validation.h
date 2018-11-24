@@ -20,6 +20,13 @@ extern std::atomic<uint64_t> nBlockSizeAtChainTip;
 
 /** Default for -blockchain.maxReorgDepth */
 static const int DEFAULT_MAX_REORG_DEPTH = 10;
+/**
+ * Default for -finalizationdelay
+ * This is the minimum time between a block header reception and the block
+ * finalization.
+ * This value should be >> block propagation and validation time
+ */
+static const int64_t DEFAULT_MIN_FINALIZATION_DELAY = 2 * 60 * 60;
 
 enum DisconnectResult
 {

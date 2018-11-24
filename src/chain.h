@@ -204,6 +204,8 @@ public:
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
 
+    //! (memory only) The time (in seconds) the block header was added to the index.
+    uint64_t nTimeReceived;
 
     void SetNull()
     {
@@ -219,6 +221,7 @@ public:
         nChainTx = 0;
         nStatus = 0;
         nSequenceId = 0;
+        nTimeReceived = 0;
 
         nVersion = 0;
         hashMerkleRoot = uint256();
@@ -318,6 +321,8 @@ public:
         return pbegin[(pend - pbegin) / 2];
     }
 
+    /** Return the time the header was added to the blockindex */
+    int64_t GetHeaderReceivedTime() const { return nTimeReceived; }
     std::string ToString() const
     {
         return strprintf("CBlockIndex(pprev=%p, nHeight=%d, merkle=%s, hashBlock=%s)", pprev, nHeight,
