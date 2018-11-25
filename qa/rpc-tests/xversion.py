@@ -17,6 +17,7 @@ from test_framework.mininode import NetworkThread
 from test_framework.nodemessages import *
 from test_framework.bumessages import *
 from test_framework.bunode import BasicBUCashNode, BUProtocolHandler
+from test_framework import xversion
 
 class XVersionTestProtoHandler(BUProtocolHandler):
     def __init__(self):
@@ -118,7 +119,7 @@ class XVersionTest(BitcoinTestFramework):
 
         # test that it contains the BU_LISTEN_PORT (replacement for buversion message)
         # FIXME: use proper constant
-        assert 1<<17 in conn.remote_xversion.xver.keys()
+        assert xversion.key("BU_LISTEN_PORT") in conn.remote_xversion.xver.keys()
 
         # Likewise, check that the remote end got our message
         node = self.nodes[0]

@@ -17,6 +17,7 @@ from test_framework.mininode import NetworkThread
 from test_framework.nodemessages import *
 from test_framework.bumessages import *
 from test_framework.bunode import BasicBUCashNode, BUProtocolHandler
+from test_framework import xversion
 
 class NodeProtoHandler(BUProtocolHandler):
     def __init__(self):
@@ -99,7 +100,7 @@ class MyTest(BitcoinTestFramework):
         conn.send_message(msg_verack())
 
         # now it is time for xversion
-        conn.send_message(msg_xversion({0x00020002 : 1}))
+        conn.send_message(msg_xversion({xversion.key("BU_MSG_IGNORE_CHECKSUM") : 1}))
 
         # send extra buversion and buverack, shouldn't harm
         conn.send_message(msg_buversion(addrFromPort = 12345))
