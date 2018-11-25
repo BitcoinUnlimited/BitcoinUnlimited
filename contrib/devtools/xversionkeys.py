@@ -6,6 +6,8 @@
 import time
 from sys import stdin, stdout
 import shlex
+import argparse
+import pickle
 
 valueTypes = ["u64c", "vector"]
 
@@ -105,5 +107,18 @@ namespace XVer
 
 
 if __name__ == "__main__":
-    table = readTable(stdin)
-    writeTableCPPH(stdout, table)
+    parser = argparse.ArgumentParser(description='Process the xversion descriptor file')
+    parser.add_argument('infile', help='Input file (usually xversionkeys.dat)')
+    parser.add_argument('--headerfile', help='Output header file (usually xversionkeys.h)')
+    parser.add_argument('--picklefile', help='Output pickle file with the data from xversionkeys.dat')
+    args = parser.parse_args()
+
+    table = readTable(open(args.infile, "r"))
+
+    if args.headerfile is not None:
+        with open(args.headerfile, "w") as outf:
+            writeTableCPPH(outf, table)
+
+    if args.picklefile is not None:
+        with open(args.picklefile, "wb") as outf:
+            pickle.dump(table, outf)

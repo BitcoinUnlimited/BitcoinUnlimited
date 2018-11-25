@@ -225,7 +225,12 @@ obj/build.h: FORCE
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
 xversionkeys.h: FORCE
-	$(PYTHON) $(top_srcdir)/contrib/devtools/xversionkeys.py > $(abs_top_builddir)/src/xversionkeys.h < $(srcdir)/xversionkeys.dat
+	$(PYTHON) $(top_srcdir)/contrib/devtools/xversionkeys.py $(srcdir)/xversionkeys.dat --headerfile $@
+
+$(XVERSION_PICKLE): $(srcdir)/xversionkeys.dat $(abs_top_builddir)/src/xversionkeys.h
+	$(PYTHON) $(top_srcdir)/contrib/devtools/xversionkeys.py $(srcdir)/xversionkeys.dat --picklefile $@
+
+all-local: $(XVERSION_PICKLE)
 
 BUILT_SOURCES= xversionkeys.h
 
@@ -622,7 +627,9 @@ CLEANFILES += wallet/*.gcda wallet/*.gcno
 CLEANFILES += wallet/test/*.gcda wallet/test/*.gcno
 CLEANFILES += zmq/*.gcda zmq/*.gcno
 
-DISTCLEANFILES = obj/build.h xversionkeys.h
+XVERSION_PICKLE = $(top_srcdir)/qa/rpc-tests/test_framework/xversion.pickle
+
+DISTCLEANFILES = obj/build.h xversionkeys.h $(XVERSION_PICKLE)
 
 EXTRA_DIST = leveldb $(CTAES_DIST) $(srcdir)/xversionkeys.dat $(top_srcdir)/contrib/devtools/xversionkeys.py
 
