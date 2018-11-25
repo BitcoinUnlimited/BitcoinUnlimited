@@ -441,8 +441,14 @@ public:
     bool fOneShot;
     bool fClient;
     bool fInbound;
-    bool fAutoOutbound; // any outbound node not connected with -addnode, connect-thinblock or -connect
+    bool fAutoOutbound; // any outbound node not connected with -addnode or -connect
     bool fNetworkNode; // any outbound node
+
+    // During IBD -addnode or -connect peers may be slow, however we can not auto-disconnect
+    // them because we will only try to reconnect again. By setting this flag to false, a slow
+    //  -addnode or -connect node will not cause issues with IBD.
+    std::atomic<bool> fCanRequestBlocksDuringIBD;
+
     int64_t tVersionSent;
 
     bool successfullyConnected() const

@@ -2849,6 +2849,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     fInbound = fInboundIn;
     fAutoOutbound = false;
     fNetworkNode = false;
+    fCanRequestBlocksDuringIBD = true;
     tVersionSent = -1;
     fDisconnect = false;
     fDisconnectRequest = false;

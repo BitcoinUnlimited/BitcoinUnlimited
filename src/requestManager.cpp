@@ -1014,6 +1014,9 @@ void CRequestManager::UpdateBlockAvailability(NodeId nodeid, const uint256 &hash
 
 void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
 {
+    if (IsInitialBlockDownload() && !pto->fCanRequestBlocksDuringIBD)
+        return;
+
     int nBlocksInFlight = mapRequestManagerNodeState[pto->GetId()].nBlocksInFlight;
     if (!pto->fDisconnectRequest && !pto->fDisconnect && !pto->fClient &&
         nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
@@ -1254,14 +1257,29 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 // disconnecting.
                 //
                 // We disconnect a peer only if their average response time is more than 4 times the overall average.
+                //
+                // -addnode peers are treated differently in that we won't disconnect them but rather mark them as not
+                // useful, during IBD.  This is because, if we disconnect them they will just get re-connected shortly
+                // and which then will likely result in another disconnect.
                 if (nOutbound >= nMaxOutConnections - 1 && IsInitialBlockDownload() && nIterations > nOverallRange &&
                     pnode->nAvgBlkResponseTime > nOverallAverageResponseTime * 4)
                 {
-                    LOG(IBD, "disconnecting %s because too slow , overall avg %d peer avg %d\n", pnode->GetLogName(),
-                        nOverallAverageResponseTime, pnode->nAvgBlkResponseTime);
-                    pnode->InitiateGracefulDisconnect();
-                    // We must not return here but continue in order
-                    // to update the vBlocksInFlight stats.
+                    if (!pnode->fInbound && !pnode->fAutoOutbound)
+                    {
+                        // Do not disconnect peers that are -addnode or -connect. Keep them connected but
+                        // stop requesting from them during IBD.
+                        pnode->fCanRequestBlocksDuringIBD = false;
+                        LOG(IBD, "Peer %s can not be used for IDB because it is too slow. Overall avg %d peer avg %d\n",
+                            pnode->GetLogName(), nOverallAverageResponseTime, pnode->nAvgBlkResponseTime);
+                    }
+                    else
+                    {
+                        LOG(IBD, "disconnecting %s because too slow , overall avg %d peer avg %d\n",
+                            pnode->GetLogName(), nOverallAverageResponseTime, pnode->nAvgBlkResponseTime);
+                        pnode->InitiateGracefulDisconnect();
+                        // We must not return here but continue in order
+                        // to update the vBlocksInFlight stats.
+                    }
                 }
             }
 
