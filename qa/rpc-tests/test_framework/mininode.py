@@ -274,6 +274,7 @@ class NodeConn(asyncore.dispatcher):
         self.disconnect = False
         self.curIndex = 0
         self.allow0Checksum = False
+        self.produce0Checksum = False
         self.num0Checksums = 0
         if send_initial_version:
             # stuff version msg into sendbuf
@@ -420,9 +421,12 @@ class NodeConn(asyncore.dispatcher):
         tmsg += b"\x00" * (12 - len(command))
         tmsg += struct.pack("<I", len(data))
         if self.ver_send >= 209:
-            th = sha256(data)
-            h = sha256(th)
-            tmsg += h[:4]
+            if self.produce0Checksum:
+                tmsg += b"\x00" * 4
+            else:
+                th = sha256(data)
+                h = sha256(th)
+                tmsg += h[:4]
         tmsg += data
         with mininode_lock:
             self.sendbuf += tmsg
