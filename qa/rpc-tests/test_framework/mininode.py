@@ -292,6 +292,7 @@ class NodeConn(asyncore.dispatcher):
         except:
             self.handle_close()
         self.rpc = rpc
+        self.exceptions = []
 
     def show_debug_msg(self, msg):
         self.log.debug(msg)
@@ -406,6 +407,7 @@ class NodeConn(asyncore.dispatcher):
                     # pdb.set_trace()
         except Exception as e:
             print('got_data:', repr(e))
+            self.exceptions.append(e)
             #import traceback
             #traceback.print_tb(sys.exc_info()[2])
             #pdb.post_mortem(e.__traceback__)
