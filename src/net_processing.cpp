@@ -674,9 +674,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         std::vector<CAddress> vAddr;
         vRecv >> vAddr;
 
-        // Don't want addr from older versions unless seeding
-        if (addrman.size() > 1000)
-            return true;
         if (vAddr.size() > 1000)
         {
             dosMan.Misbehaving(pfrom, 20);
