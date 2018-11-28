@@ -77,7 +77,6 @@ class MyTest(BitcoinTestFramework):
         self.hndlr = pynode.connect(0, '127.0.0.1', p2p_port(0), self.nodes[0],
                        protohandler =NodeProtoHandler(),
                        send_initial_version = send_initial_version)
-        self.hndlr.allow0Checksum = True
 
         return pynode.cnxns[0]
 
@@ -90,29 +89,46 @@ class MyTest(BitcoinTestFramework):
         logging.info("Testing xversion handling")
 
         # test regular set up including xversion
-        conn = self.restart_node()
-        conn.allow0Checksum = True
-        nt = NetworkThread()
-        nt.start()
+        def chksumTest(chksum_zero_recv, chksum_zero_recv_advertise, chksum_zero_send):
+            conn = self.restart_node()
+            self.hndlr.allow0Checksum = chksum_zero_recv
+            self.hndlr.produce0Checksum = chksum_zero_send
+            nt = NetworkThread()
+            nt.start()
 
-        conn.wait_for_verack()
-        conn.send_message(msg_verack())
+            conn.wait_for_verack()
+            conn.send_message(msg_verack())
 
-        # now it is time for xversion
-        conn.send_message(msg_xversion({0x00020002 : 1}))
+            # now it is time for xversion
+            conn.send_message(msg_xversion({0x00020002 : int(chksum_zero_recv_advertise)}))
 
-        # send extra buversion and buverack, shouldn't harm
-        conn.send_message(msg_buversion(addrFromPort = 12345))
-        conn.send_message(msg_buverack())
-        conn.wait_for(lambda : conn.remote_xversion)
+            # send extra buversion and buverack, shouldn't harm
+            conn.send_message(msg_buversion(addrFromPort = 12345))
+            conn.send_message(msg_buverack())
+            conn.wait_for(lambda : conn.remote_xversion)
+            if len(self.hndlr.exceptions):
+                return
+            conn.send_message(msg_ping())
+            conn.wait_for(lambda : conn.pong_received)
+            # check that we are getting 0-value checksums from the BU node
+            if chksum_zero_recv:
+                assert(self.hndlr.num0Checksums > 0)
+            else:
+                assert(self.hndlr.num0Checksums == 0)
+            conn.connection.disconnect_node()
+            return nt
 
-        conn.send_message(msg_ping())
-        conn.wait_for(lambda : conn.pong_received)
-        # check that we are getting 0-value checksums from the BU node
-        assert(self.hndlr.num0Checksums > 0)
+        for x in [False, True]:
+            for y in [False, True]:
+                print("At test:", x, y)
+                nt = chksumTest(x, x, y)
+                nt.join()
+                assert not len(self.hndlr.exceptions)
 
-        conn.connection.disconnect_node()
-        nt.join()
+        # test mininode itself
+        nt = chksumTest(False, True, True)
+        assert len(self.hndlr.exceptions) > 0
+        print("(Above exceptions are expected)")
 
 if __name__ == '__main__':
     xvt = MyTest()
