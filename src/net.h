@@ -429,7 +429,11 @@ public:
     //! used to make processing serial when version handshake is taking place
     CCriticalSection csSerialPhase;
 
+    //! the intial xversion message sent in the handshake
     CXVersionMessage xVersion;
+
+    //! seperate xmap for changing the value of changeable keys
+    XVersionMap xState;
 
     // strSubVer is whatever byte array we read from the wire. However, this field is intended
     // to be printed out, displayed to humans in various forms and so on. So we sanitize it and
