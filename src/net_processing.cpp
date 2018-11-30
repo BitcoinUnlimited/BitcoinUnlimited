@@ -653,7 +653,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         for (auto entry : pfrom->xVersion.xmap)
         {
             auto iter = XVer::keytype.find(entry.first);
-            if (iter != XVer::keytype.end() && iter->second == "c")
+            if (iter != XVer::keytype.end() && iter->second == XVer::keyTypes::changeable)
             {
                 pfrom->xState.emplace(entry);
             }
@@ -686,7 +686,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     pfrom->GetLogName());
                 return false;
             }
-            else if (iter->second != "c")
+            else if (iter->second != XVer::keyTypes::changeable)
             {
                 pfrom->fDisconnect = true;
                 LOG(NET, "ERROR: disconnecting - peer=%s attempting to update non-changeable xversion value\n",
