@@ -107,10 +107,10 @@ namespace XVer
     print("}; // enum keyTypes\n\n\n", file = outfile)
 
     # map keys to their expected value type
-    print("const std::unordered_map<uint64_t, std::string> keytype = {", file = outfile)
+    print("const std::unordered_map<uint64_t, keyTypes> keytype = {", file = outfile)
     for k in sorted(table.keys()):
         x = table[k]
-        print ("    {%40s, %42s }," % (x["name"], '"'+x["keytype"]+'"'), file = outfile)
+        print ("    {%40s, %42s }," % (x["name"], x["keytype"]), file = outfile)
     print("}; // const unordered_map keytype\n\n\n", file = outfile)
 
     print(
