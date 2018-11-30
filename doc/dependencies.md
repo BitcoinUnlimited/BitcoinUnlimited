@@ -9,7 +9,7 @@ These are the dependencies currently used by Bitcoin Unlimited. You can find ins
 | ccache | [3.4.2](https://ccache.samba.org/download.html) |  | No |  |  |
 | Clang |  | [3.4+](http://llvm.org/releases/download.html) (C++14 support) |  |  |  |
 | D-Bus | [1.10.19](https://cgit.freedesktop.org/dbus/dbus/tree/NEWS?h=dbus-1.10) |  | No | Yes |  |
-| Expat | [2.2.5](https://libexpat.github.io/) |  | No | Yes |  |
+| Expat | [2.2.6](https://libexpat.github.io/) |  | No | Yes |  |
 | fontconfig | [2.12.1](https://www.freedesktop.org/software/fontconfig/release/) |  | No | Yes |  |
 | FreeType | [2.7.1](http://download.savannah.gnu.org/releases/freetype) |  | No |  |  |
 | GCC |  | [5+](https://gcc.gnu.org/) |  |  |  |
