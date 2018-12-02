@@ -1439,18 +1439,17 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpends
 void CTxMemPool::UpdateTransactionsPerSecond()
 {
     static std::atomic<double> nTxnsProcessed{0};
-    static std::atomic<int64_t> nLastTime{GetTime()};
+    static std::atomic<int64_t> nLastTime{GetTimeMicros()};
+    static double nSecondsToAverage = 60 * 1000 * 1000; // Time in microseconds to smooth the tx rate over
 
-    double nSecondsToAverage = 60; // Length of time in seconds to smooth the tx rate over
-    int64_t nNow = GetTime();
-
+    int64_t nNow = GetTimeMicros();
     double nNewTxns = 0.0;
     double nOldTxns = nTxnsProcessed.load();
     do
     {
         // decay the number of transactions over nSecondsToAverage and then add "1" for
         // the new transaction.
-        nNewTxns = nOldTxns * std::pow(1.0 - 1.0 / nSecondsToAverage, (double)(nNow - nLastTime)) + 1;
+        nNewTxns = nOldTxns * std::pow(1.0 - 1.0 / nSecondsToAverage, (double)(nNow - nLastTime)) + 1000000;
     } while (!nTxnsProcessed.compare_exchange_weak(nOldTxns, nNewTxns));
 
     int64_t tmpTime = nLastTime;
