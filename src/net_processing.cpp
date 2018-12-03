@@ -650,14 +650,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                      "setting. peer=%s version=%s\n",
                 pfrom->GetLogName(), pfrom->cleanSubVer);
         }
-        for (auto entry : pfrom->xVersion.xmap)
-        {
-            auto iter = XVer::keytype.find(entry.first);
-            if (iter != XVer::keytype.end() && iter->second == XVer::keyTypes::changeable)
-            {
-                pfrom->xState.emplace(entry);
-            }
-        }
         pfrom->PushMessage(NetMsgType::XVERACK);
         pfrom->state_incoming = ConnectionStateIncoming::READY;
         handleAddressAfterInit(pfrom);
@@ -681,23 +673,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             auto iter = XVer::keytype.find(entry.first);
             if (iter == XVer::keytype.end())
             {
-                pfrom->fDisconnect = true;
-                LOG(NET, "ERROR: disconnecting - peer=%s attempting to update non-existing xversion value\n",
-                    pfrom->GetLogName());
-                return false;
+                continue;
             }
-            else if (iter->second != XVer::keyTypes::changeable)
+            else if (iter->second == XVer::keyTypes::changeable)
             {
-                pfrom->fDisconnect = true;
-                LOG(NET, "ERROR: disconnecting - peer=%s attempting to update non-changeable xversion value\n",
-                    pfrom->GetLogName());
-                return false;
+                pfrom->xVersion.xmap[entry.first] = xUpdate.xmap[entry.first];
             }
-        }
-        // no issues? continue and actually update
-        for (auto entry : xUpdate.xmap)
-        {
-            pfrom->xState[entry.first] = xUpdate.xmap[entry.first];
         }
     }
 
