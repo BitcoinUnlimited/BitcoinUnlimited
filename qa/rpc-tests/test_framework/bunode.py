@@ -25,6 +25,7 @@ class BUProtocolHandler(NodeConnCB):
         self.last_headers = None
         self.last_block = None
         self.ping_counter = 1
+        self.pong_counter = 0
         self.last_pong = msg_pong(0)
         self.last_getdata = []
         self.sleep_time = 0.05
@@ -150,6 +151,7 @@ class BUProtocolHandler(NodeConnCB):
 
     def on_pong(self, conn, message):
         self.last_pong = message
+        self.pong_counter += 1
         if self.parent and hasattr(self.parent, "on_pong"):
             self.parent.on_pong(self,message)
 

@@ -40,10 +40,6 @@ class NodeProtoHandler(BUProtocolHandler):
         self.show_debug_msg("xversion received\n")
         self.remote_xversion = message
 
-    def on_pong(self, conn, message):
-        self.show_debug_msg("pong received\n")
-        self.pong_received += 1
-
 
 class MyTest(BitcoinTestFramework):
     def __init__(self):
@@ -107,7 +103,7 @@ class MyTest(BitcoinTestFramework):
         conn.wait_for(lambda : conn.remote_xversion)
 
         conn.send_message(msg_ping())
-        conn.wait_for(lambda : conn.pong_received)
+        conn.wait_for(lambda : conn.pong_counter)
         # check that we are getting 0-value checksums from the BU node
         assert(self.hndlr.num0Checksums > 0)
 
