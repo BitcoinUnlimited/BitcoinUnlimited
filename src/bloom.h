@@ -7,13 +7,15 @@
 #define BITCOIN_BLOOM_H
 
 #include "consensus/consensus.h"
-#include "primitives/transaction.h"
 #include "serialize.h"
 
 #include <vector>
 
 class COutPoint;
 class uint256;
+class CTransaction;
+
+typedef std::shared_ptr<const CTransaction> CTransactionRef;
 
 //! 20,000 items with fp rate < 0.1% or 10,000 items and <0.0001%
 static const unsigned int MAX_HASH_FUNCS = 50;
