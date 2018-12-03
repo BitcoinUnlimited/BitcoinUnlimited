@@ -640,8 +640,15 @@ def disconnect_all(node):
 
 
 def connect_nodes_bi(nodes, a, b):
+    """ Connect nodes a and b bidirectionally. """
     connect_nodes(nodes[a], b)
     connect_nodes(nodes[b], a)
+
+def connect_nodes_full(nodes):
+    """ Connect the given set of nodes in all directions, to form a full graph. """
+    for i in range(len(nodes)):
+        for j in range(i+1, len(nodes)):
+            connect_nodes_bi(nodes, i, j)
 
 def interconnect_nodes(nodes):
     """Connect every node in this list to every other node in the list"""
