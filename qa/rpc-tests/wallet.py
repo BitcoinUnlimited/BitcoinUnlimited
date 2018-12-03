@@ -51,9 +51,7 @@ class WalletTest (BitcoinTestFramework):
     def setup_network(self, split=False):
         self.node_args = [['-usehd=0'], ['-usehd=0'], ['-usehd=0']]
         self.nodes = start_nodes(3, self.options.tmpdir, self.node_args)
-        connect_nodes_bi(self.nodes,0,1)
-        connect_nodes_bi(self.nodes,1,2)
-        connect_nodes_bi(self.nodes,0,2)
+        connect_nodes_full(self.nodes)
         self.is_network_split=False
         self.sync_blocks()
 
@@ -232,9 +230,7 @@ class WalletTest (BitcoinTestFramework):
         stop_nodes(self.nodes)
         wait_bitcoinds()
         self.nodes = start_nodes(3, self.options.tmpdir, [["-walletbroadcast=0", "-usehd=0"],["-walletbroadcast=0", "-usehd=0"],["-walletbroadcast=0", "-usehd=0"]])
-        connect_nodes_bi(self.nodes,0,1)
-        connect_nodes_bi(self.nodes,1,2)
-        connect_nodes_bi(self.nodes,0,2)
+        connect_nodes_full(self.nodes)
         self.sync_all()
 
         txIdNotBroadcasted  = self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 2)
@@ -259,9 +255,7 @@ class WalletTest (BitcoinTestFramework):
         wait_bitcoinds()
         self.node_args = [['-usehd=0'], ['-usehd=0'], ['-usehd=0']]
         self.nodes = start_nodes(3, self.options.tmpdir, self.node_args)
-        connect_nodes_bi(self.nodes,0,1)
-        connect_nodes_bi(self.nodes,1,2)
-        connect_nodes_bi(self.nodes,0,2)
+        connect_nodes_full(self.nodes)
         sync_blocks(self.nodes)
 
         self.nodes[0].generate(1)

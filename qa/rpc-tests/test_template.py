@@ -31,7 +31,7 @@ class MyTest (BitcoinTestFramework):
         # Note for this template I readied 4 nodes but only started 2
 
         # Now interconnect the nodes
-        connect_nodes_bi(self.nodes,0,1)
+        connect_nodes_full(self.nodes)
         # Let the framework know if the network is fully connected.
         # If not, the framework assumes this partition: (0,1) and (2,3)
         # For more complex partitions, you can't use the self.sync* member functions

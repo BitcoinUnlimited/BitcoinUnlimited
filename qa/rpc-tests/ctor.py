@@ -25,9 +25,7 @@ class MyTest (BitcoinTestFramework):
     def setup_network(self, split=False):
         self.nodes = start_nodes(4, self.options.tmpdir)
         # Now interconnect the nodes
-        connect_nodes_bi(self.nodes,0,1)
-        connect_nodes_bi(self.nodes,0,2)
-        connect_nodes_bi(self.nodes,1,2)
+        connect_nodes_full(self.nodes[:3])
         connect_nodes_bi(self.nodes,2,3)
         self.is_network_split=False
         self.sync_blocks()

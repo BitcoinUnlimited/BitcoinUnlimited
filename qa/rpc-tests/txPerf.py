@@ -35,9 +35,7 @@ class TransactionPerformanceTest(BitcoinTestFramework):
         #self.nodes.append(proxy)
 
         # Connect each node to the other
-        connect_nodes_bi(self.nodes,0,1)
-        connect_nodes_bi(self.nodes,1,2)
-        connect_nodes_bi(self.nodes,0,2)
+        connect_nodes_full(self.nodes)
 
         self.is_network_split=False
         self.sync_all()
@@ -125,7 +123,7 @@ class TransactionPerformanceTest(BitcoinTestFramework):
             elapsedTime = time.time() - startTime
             logging.info("Sync time: %f" % elapsedTime)
             print("[ 'sync',",txLen,",",len(inp),",",len(outp),",",elapsedTime,"],",file=fil)
-            
+
         print("]",file=fil)
         fil.close()
 
@@ -133,8 +131,8 @@ class TransactionPerformanceTest(BitcoinTestFramework):
     def largeOutput(self):
         """This times the validation of 1 to many and many to 1 transactions.  Its not needed to be run as a daily unit test"""
         print("synchronizing")
-        self.sync_all()    
-        node = self.nodes[0]        
+        self.sync_all()
+        node = self.nodes[0]
         start = time.time()
         print("generating addresses")
         if 1:
@@ -154,7 +152,7 @@ class TransactionPerformanceTest(BitcoinTestFramework):
         txLen = len(binascii.unhexlify(txn))  # Get the actual transaction size for better tx fee estimation the next time around
         print("[ 'gen',",txLen,",",len(inp),",",len(outp), "],")
 
-        startTime = time.time()          
+        startTime = time.time()
         node.generate(1)
         elapsedTime = time.time() - startTime
         print ("Generate time: ", elapsedTime)
@@ -163,7 +161,7 @@ class TransactionPerformanceTest(BitcoinTestFramework):
         self.sync_all()
         elapsedTime = time.time() - startTime
         print("Sync     time: ", elapsedTime)
-        
+
         # Now join with a tx with a huge number of inputs
        	wallet = self.nodes[0].listunspent()
         wallet.sort(key=lambda x: x["amount"])
@@ -171,8 +169,8 @@ class TransactionPerformanceTest(BitcoinTestFramework):
         (txn,inp,outp,txid) = split_transaction(node, wallet[0:10000], [addrs[0]], txfee=DEFAULT_TX_FEE_PER_BYTE, sendtx=True)
         txLen = len(binascii.unhexlify(txn))  # Get the actual transaction size for better tx fee estimation the next time around
         print("[ 'gen',",txLen,",",len(inp),",",len(outp), "],")
-      
-            
+
+
 
     def run_test(self):
         TEST_SIZE=200  # To collect a lot of data points, set the TEST_SIZE to 2000
@@ -187,7 +185,7 @@ class TransactionPerformanceTest(BitcoinTestFramework):
 
         # This times the validation of 1 to many and many to 1 transactions.  Its not needed to be run as a unit test
         # self.largeOutput()
-    
+
         print("Generating new addresses... will take awhile")
         start = time.time()
         addrs = [ self.nodes[0].getnewaddress() for _ in range(TEST_SIZE+1)]
@@ -209,13 +207,13 @@ class TransactionPerformanceTest(BitcoinTestFramework):
 
         self.nodes[0].generate(1)
         self.sync_all()
-     
+
         wallet = self.nodes[0].listunspent()
         wallet.sort(key=lambda x: x["amount"],reverse=True)
 
         logging.info("wallet length: %d" % len(wallet))
         logging.info("addrs length: %d" % len(addrs))
-       
+
         # To collect a lot of data points, set the interval to 100 or even 10 and run overnight
         interval = 100 # TEST_SIZE/2
 
@@ -231,12 +229,10 @@ if __name__ == '__main__':
     }
     tpt.main(["--nocleanup"],bitcoinConf)
 
-def Test():    
+def Test():
     tpt = TransactionPerformanceTest()
     bitcoinConf = {
     "debug":["bench"],
     "blockprioritysize":2000000  # we don't want any transactions rejected due to insufficient fees...
     }
     tpt.main(["--nocleanup","--tmppfx=/ramdisk/test"],bitcoinConf)
-       
-    
