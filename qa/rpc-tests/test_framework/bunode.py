@@ -287,6 +287,21 @@ class BUProtocolHandler(NodeConnCB):
         getblocks_message.locator.vHave = locator
         self.send_message(getblocks_message)
 
+
+class VersionlessProtoHandler(BUProtocolHandler):
+    """ Variant of the BUProtocolHandler that avoids auto-sending and reacting to
+version messages. Useful for testing that part of the P2P handshake. """
+    def __init__(self):
+        BUProtocolHandler.__init__(self)
+
+    def on_version(self, conn, message):
+        self.show_debug_msg("version received\n")
+        self.remoteVersion = message.nVersion
+
+    def on_verack(self, conn, message):
+        self.show_debug_msg("verack received\n")
+        self.verack_received = True
+
 class BasicBUCashNode():
     def __init__(self):
         self.cnxns = {}
