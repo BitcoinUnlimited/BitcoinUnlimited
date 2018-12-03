@@ -20,7 +20,6 @@ from test_framework.bunode import BasicBUCashNode, BUProtocolHandler
 
 class XVersionTestProtoHandler(BUProtocolHandler):
     def __init__(self):
-        self.remote_xversion = None
         BUProtocolHandler.__init__(self)
 
     def on_version(self, conn, message):
@@ -30,14 +29,6 @@ class XVersionTestProtoHandler(BUProtocolHandler):
     def on_verack(self, conn, message):
         self.show_debug_msg("verack received\n")
         self.verack_received = True
-
-    def on_xverack(self, conn, message):
-        self.show_debug_msg("xverack received\n")
-        self.xverack_received = True
-
-    def on_xversion(self, conn, message):
-        self.show_debug_msg("xversion received\n")
-        self.remote_xversion = message
 
 class XVersionTest(BitcoinTestFramework):
     def __init__(self):

@@ -33,6 +33,7 @@ class BUProtocolHandler(NodeConnCB):
         self.last_getheaders = None
         self.disconnected = False
         self.remoteVersion = 0
+        self.remote_xversion = None
         self.buverack_received = False
         self.parent = None
         self.requestOnInv = 0
@@ -77,6 +78,14 @@ class BUProtocolHandler(NodeConnCB):
     def on_buverack(self, conn, message):
         self.show_debug_msg("BU version ACK\n")
         self.buverack_received = True
+
+    def on_xverack(self, conn, message):
+        self.show_debug_msg("xverack received\n")
+        self.xverack_received = True
+
+    def on_xversion(self, conn, message):
+        self.show_debug_msg("xversion received\n")
+        self.remote_xversion = message
 
     def add_connection(self, conn):
         self.connection = conn
