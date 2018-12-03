@@ -1438,7 +1438,7 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpends
 
 void CTxMemPool::UpdateTransactionsPerSecond()
 {
-    boost::mutex::scoped_lock lock(cs_txPerSec);
+    std::lock_guard<std::mutex> lock(cs_txPerSec);
 
     static int64_t nLastTime = GetTime();
     double nSecondsToAverage = 60; // Length of time in seconds to smooth the tx rate over
