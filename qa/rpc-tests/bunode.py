@@ -122,7 +122,7 @@ class BUProtocolHandler(NodeConnCB):
                 if self.requestOnInv & REQ_XTHINBLOCK:
                     msg = msg_getdata(CInv(CInv.MSG_XTHINBLOCK, inv.hash))
                     self.send_message(msg)
-                    self.show_debug_msg("requested xtinblock")
+                    self.show_debug_msg("requested xthinblock")
 
     def on_headers(self, conn, message):
         self.last_headers = message
