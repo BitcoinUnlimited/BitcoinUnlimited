@@ -529,10 +529,5 @@ def Test():
         "blockprioritysize": 2000000,  # we don't want any transactions rejected due to insufficient fees...
         "blockminsize": 1000000
     }
-
-    flags = [] # ["--nocleanup", "--noshutdown"]
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmppfx=/ramdisk/test")
-    binpath = findBitcoind()
-    flags.append("--srcdir=%s" % binpath)
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)

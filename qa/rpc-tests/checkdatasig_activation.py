@@ -9,7 +9,7 @@ import os, random, string
 from test_framework.util import findBitcoind, expectException, JSONRPCException
 import test_framework.loginit
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import waitFor, satoshi_round, assert_equal, assert_raises_rpc_error, start_node
+from test_framework.util import waitFor, satoshi_round, assert_equal, assert_raises_rpc_error, start_node, standardFlags
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.blocktools import *
 from test_framework.script import *
@@ -85,7 +85,7 @@ class CheckDataSigActivationTest(ComparisonTestFramework):
         expectException(lambda: node.signdata(addr,"bad", "foo"), JSONRPCException)
         expectException(lambda: node.signdata(addr,"hex", "zzbad"), JSONRPCException)
         expectException(lambda: node.signdata(addr,"hash", "ba0d"), JSONRPCException) # its hex but wrong length
-        expectException(lambda: node.signdata(addr,"hash", "z"*32), JSONRPCException) # not hex correct length 
+        expectException(lambda: node.signdata(addr,"hash", "z"*32), JSONRPCException) # not hex correct length
 
         # check same sig for same input of different format (works because using rfc6979 deterministic sigs)
         s = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(20))
@@ -105,7 +105,7 @@ class CheckDataSigActivationTest(ComparisonTestFramework):
         # If I use the "hash" format and calculate the sha256 myself, it ought to create the same signature as "signdata"
         assert_equal(sig, node.signdata('bchreg:qq3srvg7hrzf9wu5h33du5l7n3fpx7jw5gdhhk390u',"hash", hexlify(sha256(b"foo")).decode()))
 
-        
+
     def run_test(self):
         self.testDatasigRpc()
         self.test = TestManager(self, self.options.tmpdir)
@@ -242,9 +242,5 @@ def Test():
         "logtimemicros": 1
     }
 
-    flags = ["--nocleanup", "--noshutdown"]
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmpdir=/ramdisk/test/ma")
-    binpath = findBitcoind()
-    flags.append("--srcdir=%s" % binpath)
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)

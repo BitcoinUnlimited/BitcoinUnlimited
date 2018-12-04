@@ -126,9 +126,5 @@ def Test():
         "debug": ["blk", "mempool", "net", "req"],
         "mining.vote":"bip135test7"
     }
-    flags = []
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmpdir=/ramdisk/test/ma")
-    binpath = findBitcoind()
-    flags.append("--srcdir=%s" % binpath)
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)
