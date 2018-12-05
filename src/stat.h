@@ -681,4 +681,47 @@ public:
 CStatBase *GetStat(char *name);
 
 
+/** Calculate exponential moving average from time-wise unevenly spaced
+updates with a number of discrete events, such as transaction rate from
+incoming transaction counts. Will automatically decay the returned value upon
+querying. Properly locked and thus thread-safe.
+
+Initial conditions: When an initial update is made, it is assumed to be the
+rate for the full averaging interval until the next update comes in. So for
+the first .update(..), this estimator behaves like an ordinary average.
+*/
+class ExponentialMovingAverage
+{
+public:
+    /** Construct and set averaging parameters.
+        \param _interval: Averaging interval. This is the interval for one 1/e decay in seconds.
+        \param _time_units: Scaling factor to scale internal time units to a second
+    */
+    ExponentialMovingAverage(const double _interval = 60.0, const size_t _time_units = 1000000);
+    //! Update the internal average with the given number of counts as of now.
+    void update(const size_t counts);
+    /*! Read out counts and decay internal rate variable. */
+    double value();
+
+private:
+    //! Rate since at last readout / update
+    double rate = 0;
+
+    //! Last update (in GetTimeMicros())
+    int64_t last_update = 0;
+
+    //! Averaging interval
+    double interval;
+
+    //! Time units as set by constructor
+    int64_t time_units;
+
+protected:
+    //! Function used for time calculations. Can be overwritten e.g. for unit testing
+    virtual int64_t time();
+    //! Lock for serializing updates
+    std::mutex cs;
+};
+
+
 #endif

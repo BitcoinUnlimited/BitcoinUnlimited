@@ -279,6 +279,7 @@ libbitcoin_server_a_SOURCES = \
   respend/respendlogger.cpp \
   respend/respendrelayer.cpp \
   respend/respenddetector.cpp \
+  stat.cpp \
   script/sigcache.cpp \
   script/ismine.cpp \
   timedata.cpp \

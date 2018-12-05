@@ -4,6 +4,7 @@
 
 #include "stat.h"
 #include "test/test_bitcoin.h"
+#include <cmath>
 
 #include <boost/test/unit_test.hpp>
 
@@ -129,6 +130,49 @@ BOOST_AUTO_TEST_CASE(stat_empty_construct)
         BOOST_CHECK((*stats)() == 0UL);
         delete stats;
     }
+}
+
+// test class of ExpMovAvg, with option to mock the time
+class TestExponentialMovingAverage : public ExponentialMovingAverage
+{
+public:
+    TestExponentialMovingAverage()
+        : ExponentialMovingAverage(3.0, // 3s decay time
+              1000 // unit 'milliseconds'
+              )
+    {
+    }
+    void set_time(const int64_t _t) { t = _t; }
+protected:
+    int64_t t = 0;
+    int64_t time() { return t; }
+};
+
+BOOST_AUTO_TEST_CASE(stat_expmovavg, *boost::unit_test::tolerance(1e-4))
+{
+    TestExponentialMovingAverage ema;
+    ema.set_time(1);
+    BOOST_CHECK_EQUAL(ema.value(), 0.0);
+    ema.update(3);
+    BOOST_CHECK_EQUAL(ema.value(), 1.0);
+    BOOST_CHECK_EQUAL(ema.value(), 1.0); // no decay as no time increment is happening
+    ema.set_time(3001); // decay to one e-th
+    BOOST_CHECK_EQUAL(ema.value(), 1.0 / exp(1));
+    ema.set_time(6001); // decay to one exp(2)-th
+    BOOST_CHECK_EQUAL(ema.value(), exp(-2));
+
+    size_t i;
+    // check averaging works o.k.
+    for (i = 0; i < 1000000; i++)
+    {
+        ema.update(5);
+        ema.set_time(i);
+    }
+    BOOST_CHECK_CLOSE(ema.value(), 5000.0, 1.0);
+
+    // and still decays exponentially
+    ema.set_time(i + 3000);
+    BOOST_CHECK_CLOSE(ema.value(), 5000.0 * exp(-1.0), 1.0);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
