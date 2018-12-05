@@ -522,7 +522,7 @@ if __name__ == '__main__':
     BIP68_112_113Test().main()
 
 def Test():
-    t = ExcessiveBlockTest(True)
+    t = BIP68_112_113Test()
     # t.drop_to_pdb = True
     bitcoinConf = {
         "debug": ["rpc", "net", "blk", "thin", "mempool", "req", "bench", "evict"],
