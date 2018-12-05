@@ -2042,8 +2042,9 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                     {
                         return false;
                     }
-                    return state.DoS(100, error("ConnectBlockDTOR(): inputs missing/spent"), REJECT_INVALID,
-                        "bad-txns-inputs-missingorspent");
+                    return state.DoS(100, error("ConnectBlockDTOR(): %s inputs missing/spent in tx %d %s",
+                                              block.GetHash().ToString(), i, tx.GetHash().ToString()),
+                        REJECT_INVALID, "bad-txns-inputs-missingorspent");
                 }
 
                 // Check that transaction is BIP68 final
