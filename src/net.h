@@ -336,6 +336,7 @@ enum class ConnectionStateOutgoing : uint8_t {
     //! placeholder value to allow any when checking for a particular state
     ANY           = 0xff
 };
+ConnectionStateOutgoing operator|(const ConnectionStateOutgoing& a, const ConnectionStateOutgoing& b);
 // clang-format on
 
 //! ConnectionStateIncoming enum to string
