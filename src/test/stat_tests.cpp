@@ -148,18 +148,18 @@ protected:
     int64_t time() { return t; }
 };
 
-BOOST_AUTO_TEST_CASE(stat_expmovavg, *boost::unit_test::tolerance(1e-4))
+BOOST_AUTO_TEST_CASE(stat_expmovavg)
 {
     TestExponentialMovingAverage ema;
     ema.set_time(1);
-    BOOST_CHECK_EQUAL(ema.value(), 0.0);
+    BOOST_CHECK_CLOSE(ema.value(), 0.0, 1e-4);
     ema.update(3);
-    BOOST_CHECK_EQUAL(ema.value(), 1.0);
-    BOOST_CHECK_EQUAL(ema.value(), 1.0); // no decay as no time increment is happening
+    BOOST_CHECK_CLOSE(ema.value(), 1.0, 1e-4);
+    BOOST_CHECK_CLOSE(ema.value(), 1.0, 1e-5); // no decay as no time increment is happening
     ema.set_time(3001); // decay to one e-th
-    BOOST_CHECK_EQUAL(ema.value(), 1.0 / exp(1));
+    BOOST_CHECK_CLOSE(ema.value(), 1.0 / exp(1), 1e-4);
     ema.set_time(6001); // decay to one exp(2)-th
-    BOOST_CHECK_EQUAL(ema.value(), exp(-2));
+    BOOST_CHECK_CLOSE(ema.value(), exp(-2), 1e-4);
 
     size_t i;
     // check averaging works o.k.
