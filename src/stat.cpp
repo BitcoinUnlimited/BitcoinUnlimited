@@ -26,5 +26,7 @@ void ExponentialMovingAverage::update(const size_t counts) {
 
 double ExponentialMovingAverage::value() {
     update(0); // decay rate to current value
+
+    std::lock_guard<std::mutex> lock(cs);
     return rate;
 }
