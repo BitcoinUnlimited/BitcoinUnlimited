@@ -6,6 +6,7 @@
 
 #include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene.h"
+#include "blockrelay/compactblock.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "dosman.h"
@@ -650,6 +651,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     {
         thindata.ResetThinBlockBytes();
         graphenedata.ResetGrapheneBlockBytes();
+        compactdata.ResetCompactBlockBytes();
 
         LOCK(cs_xval);
         setPreVerifiedTxHash.clear();

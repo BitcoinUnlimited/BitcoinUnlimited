@@ -657,8 +657,10 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
               "although it can impact performance. (default: 0)"))
         .addArg("use-grapheneblocks", optionalBool,
             strprintf(_("Enable graphene to speed up the relay of blocks (default: %d)"), DEFAULT_USE_GRAPHENE_BLOCKS))
+        .addArg("use-compactblocks", optionalBool,
+            strprintf(_("Enable compact blocks to speed up the relay of blocks (default: %d)"), DEFAULT_USE_COMPACT_BLOCKS))
         .addArg("preferential-timer=<millisec>", requiredInt,
-            strprintf(_("Set graphene and thinblock preferential timer duration (default: %u). Use 0 to disable it."),
+            strprintf(_("Set graphene, thinblock and compactblock preferential timer duration (default: %u). Use 0 to disable it."),
                     DEFAULT_PREFERENTIAL_TIMER));
 }
 

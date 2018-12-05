@@ -11,6 +11,7 @@
 
 bool IsThinBlockEnabled();
 bool IsGrapheneBlockEnabled();
+bool IsCompactBlocksEnabled();
 
 // Update the counters for how many peers we have connected.
 void ThinTypeRelay::AddThinTypePeers(CNode *pfrom)
@@ -75,7 +76,7 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
         uint64_t nIntervalLen = 2 * (nTimeToWait * 0.2);
         int64_t nOffset = nTimeToWait - (nStartInterval + (insecure_rand.rand64() % nIntervalLen) + 1);
         mapBlockRelayTimer.emplace(hash, std::make_pair(GetTimeMillis() + nOffset, false));
-        LOG(GRAPHENE, "Starting Preferential block relay timer (%d millis)\n", nTimeToWait + nOffset);
+        LOG(THIN | GRAPHENE | CMPCT, "Starting Preferential Block Relay timer (%d millis)\n", nTimeToWait + nOffset);
     }
     else
     {
@@ -93,7 +94,7 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
                 if (!iter->second.second)
                 {
                     iter->second.second = true;
-                    LOG(THIN | GRAPHENE,
+                    LOG(THIN | GRAPHENE | CMPCT,
                         "Preferential BlockRelay timer exceeded - downloading regular block instead\n");
                 }
                 return true;
@@ -105,23 +106,61 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
 
 bool ThinTypeRelay::IsBlockRelayTimerEnabled()
 {
-    // Only engage the timer if at least one thin type relay is active.
-    if (!IsThinBlocksEnabled() && !IsGrapheneBlockEnabled())
+    // Only engage the timer if at least one thin type relay is active. If all three types
+    // are either all active, or all inactive, then we do not need the timer. Generally speaking
+    // all three type will be active and we can return early.
+    if (IsThinBlocksEnabled() && IsGrapheneBlockEnabled() && IsCompactBlocksEnabled())
+        return false;
+    else if (!IsThinBlocksEnabled() && !IsGrapheneBlockEnabled() && !IsCompactBlocksEnabled())
         return false;
 
-    // Under certain conditions the thin relay timer is not relevant.
+    // Under certain conditions the thin relay timer is not relevant. These are all variants of
+    // having a thin type enabled but not having those type of peers, or the reverse, having a
+    // thin type disabled but then having those peers connected.
     bool fHaveThinBlockPeers = false;
     bool fHaveGraphenePeers = false;
+    bool fHaveCompactBlockPeers = false;
     if (nThinBlockPeers > 0)
         fHaveThinBlockPeers = true;
     if (nGraphenePeers > 0)
         fHaveGraphenePeers = true;
+    if (nCompactBlockPeers > 0)
+        fHaveCompactBlockPeers = true;
 
-    if (!fHaveGraphenePeers && !fHaveThinBlockPeers)
+    if (!fHaveGraphenePeers && !fHaveThinBlockPeers && !fHaveCompactBlockPeers)
         return false;
-    else if (IsGrapheneBlockEnabled() && !fHaveGraphenePeers && !IsThinBlocksEnabled() && fHaveThinBlockPeers)
+    else if (IsGrapheneBlockEnabled() && !fHaveGraphenePeers && !IsThinBlocksEnabled() && fHaveThinBlockPeers &&
+             !IsCompactBlocksEnabled() && fHaveCompactBlockPeers)
         return false;
-    else if (!IsGrapheneBlockEnabled() && fHaveGraphenePeers && IsThinBlocksEnabled() && !fHaveThinBlockPeers)
+    else if (IsGrapheneBlockEnabled() && !fHaveGraphenePeers && !IsThinBlocksEnabled() && fHaveThinBlockPeers &&
+             IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
+        return false;
+    else if (IsGrapheneBlockEnabled() && !fHaveGraphenePeers && !IsThinBlocksEnabled() && fHaveThinBlockPeers &&
+             !IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
+        return false;
+    else if (!IsGrapheneBlockEnabled() && fHaveGraphenePeers && IsThinBlocksEnabled() && !fHaveThinBlockPeers &&
+             !IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
+        return false;
+    else if (!IsGrapheneBlockEnabled() && fHaveGraphenePeers && IsThinBlocksEnabled() && !fHaveThinBlockPeers &&
+             !IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
+        return false;
+    else if (!IsGrapheneBlockEnabled() && fHaveGraphenePeers && !IsThinBlocksEnabled() && !fHaveThinBlockPeers &&
+             !IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
+        return false;
+    else if (!IsGrapheneBlockEnabled() && !fHaveGraphenePeers && IsThinBlocksEnabled() && !fHaveThinBlockPeers &&
+             !IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
+        return false;
+    else if (!IsGrapheneBlockEnabled() && !fHaveGraphenePeers && !IsThinBlocksEnabled() && fHaveThinBlockPeers &&
+             !IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
+        return false;
+    else if (!IsGrapheneBlockEnabled() && !fHaveGraphenePeers && !IsThinBlocksEnabled() && fHaveThinBlockPeers &&
+             IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
+        return false;
+    else if (!IsGrapheneBlockEnabled() && fHaveGraphenePeers && IsThinBlocksEnabled() && !fHaveThinBlockPeers &&
+             IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
+        return false;
+    else if (!IsGrapheneBlockEnabled() && fHaveGraphenePeers && !IsThinBlocksEnabled() && !fHaveThinBlockPeers &&
+             IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
         return false;
 
     return true;
@@ -133,7 +172,7 @@ void ThinTypeRelay::ClearBlockRelayTimer(const uint256 &hash)
     if (mapBlockRelayTimer.count(hash))
     {
         mapBlockRelayTimer.erase(hash);
-        LOG(THIN | GRAPHENE, "Clearing Preferential BlockRelay timer\n");
+        LOG(THIN | GRAPHENE | CMPCT, "Clearing Preferential BlockRelay timer\n");
     }
 }
 
@@ -228,7 +267,7 @@ void ThinTypeRelay::CheckForThinTypeDownloadTimeout(CNode *pfrom)
         {
             if (!pfrom->fWhitelisted && Params().NetworkIDString() != "regtest")
             {
-                LOG(THIN | GRAPHENE,
+                LOG(THIN | GRAPHENE | CMPCT,
                     "ERROR: Disconnecting peer %s due to thinblock download timeout exceeded (%d secs)\n",
                     pfrom->GetLogName(), (GetTime() - range.first->second.nRequestTime));
                 pfrom->fDisconnect = true;

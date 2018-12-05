@@ -104,12 +104,7 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
 
     // Check if we've already received this block and have it on disk
-    bool fAlreadyHave = false;
-    {
-        LOCK(cs_main);
-        fAlreadyHave = AlreadyHaveBlock(inv);
-    }
-    if (fAlreadyHave)
+    if (AlreadyHaveBlock(inv))
     {
         requester.AlreadyReceived(pfrom, inv);
         thindata.ClearThinBlockData(pfrom, inv.hash);
@@ -318,12 +313,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
 
     // Check if we've already received this block and have it on disk
-    bool fAlreadyHave = false;
-    {
-        LOCK(cs_main);
-        fAlreadyHave = AlreadyHaveBlock(inv);
-    }
-    if (fAlreadyHave)
+    if (AlreadyHaveBlock(inv))
     {
         requester.AlreadyReceived(pfrom, inv);
         thindata.ClearThinBlockData(pfrom, inv.hash);

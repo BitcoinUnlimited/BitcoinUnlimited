@@ -4,6 +4,7 @@
 
 #include "requestManager.h"
 #include "blockrelay/blockrelay_common.h"
+#include "blockrelay/compactblock.h"
 #include "blockrelay/graphene.h"
 #include "blockrelay/thinblock.h"
 #include "chain.h"
@@ -495,7 +496,6 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
 {
     CInv inv2(obj);
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-    CBloomFilter filterMemPool;
 
     if (IsChainNearlySyncd() &&
         (!thinrelay.HasBlockRelayTimerExpired(obj.hash) || !thinrelay.IsBlockRelayTimerEnabled()))
@@ -550,6 +550,34 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                 return true;
             }
         }
+
+        // Ask for a compact block if Graphene or xthin is not possible.
+        // Must download an xthinblock from a xthin peer.
+        if (IsCompactBlocksEnabled() && pfrom->CompactBlockCapable())
+        {
+            // We can only request one thin type block per peer at a time.
+            LOCK(thinrelay.cs_inflight);
+            if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::CMPCTBLOCK))
+            {
+                // must maintain locking order cs_objDownloder -> cs_inflight, but we also must
+                // ensure that cs_inflight is locked for the duration of both IsThinTypeBlockInFlight()
+                // and AddThinTypeBlockInFlight, or we could end up downloading two of the same block
+                // caused by the multi-threading in message sending and processing.
+                thinrelay.AddThinTypeBlockInFlight(pfrom, inv2.hash, NetMsgType::CMPCTBLOCK);
+                {
+                    LEAVE_CRITICAL_SECTION(thinrelay.cs_inflight);
+                    MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
+
+                    std::vector<CInv> vGetData;
+                    inv2.type = MSG_CMPCT_BLOCK;
+                    vGetData.push_back(inv2);
+                    pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+                    LOG(CMPCT, "Requesting compact block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+                    ENTER_CRITICAL_SECTION(thinrelay.cs_inflight);
+                }
+                return true;
+            }
+        }
     }
 
     // Request a full block if the BlockRelayTimer has expired.
@@ -561,7 +589,8 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
 
         MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
         pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
-        LOG(THIN | GRAPHENE, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+        LOG(THIN | GRAPHENE | CMPCT, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(),
+            pfrom->GetLogName());
         return true;
     }
     return false; // no block was requested
@@ -1262,6 +1291,11 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
             if (thinrelay.IsThinTypeBlockInFlight(pnode, NetMsgType::GRAPHENEBLOCK))
             {
                 graphenedata.UpdateResponseTime(nResponseTime);
+            }
+            // Update CompactBlock stats
+            if (thinrelay.IsThinTypeBlockInFlight(pnode, NetMsgType::CMPCTBLOCK))
+            {
+                compactdata.UpdateResponseTime(nResponseTime);
             }
         }
 

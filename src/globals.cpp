@@ -10,6 +10,7 @@
 
 #include "addrman.h"
 #include "blockrelay/blockrelay_common.h"
+#include "blockrelay/compactblock.h"
 #include "blockrelay/graphene.h"
 #include "blockrelay/thinblock.h"
 #include "chain.h"
@@ -404,6 +405,7 @@ CStatHistory<uint64_t> nBlockValidationTime("blockValidationTime", STAT_OP_MAX |
 // Single classes for gather thin type block relay statistics
 CThinBlockData thindata;
 CGrapheneBlockData graphenedata;
+CCompactBlockData compactdata;
 ThinTypeRelay thinrelay;
 
 uint256 bitcoinCashForkBlockHash = uint256S("000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec");

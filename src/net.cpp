@@ -2876,13 +2876,31 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nPingUsecTime = 0;
     fPingQueued = false;
     nMinPingUsecTime = std::numeric_limits<int64_t>::max();
-    thinBlockWaitingForTxns = -1; // BUIP010 Xtreme Thinblocks
-    nXthinBloomfilterSize = 0;
-    addrFromPort = 0; // BU
+
+    // xthinblocks
     nLocalThinBlockBytes = 0;
+    nSizeThinBlock = 0;
+    thinBlockWaitingForTxns = -1;
+    nXthinBloomfilterSize = 0;
+    addrFromPort = 0;
+
+    // graphene
+    nLocalGrapheneBlockBytes = 0;
+    nSizeGrapheneBlock = 0;
+    grapheneBlockWaitingForTxns = -1;
+
+    // compact blocks
+    nLocalCompactBlockBytes = 0;
+    nSizeCompactBlock = 0;
+    compactBlockWaitingForTxns = -1;
+    shorttxidk0 = 0;
+    shorttxidk1 = 0;
+
+    // performance tracking
     nAvgBlkResponseTime = -1.0;
     nMaxBlocksInTransit = 16;
 
+    // for misbehavior
     nMisbehavior = 0;
     fShouldBan = false;
 

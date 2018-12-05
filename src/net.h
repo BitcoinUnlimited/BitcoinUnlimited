@@ -7,6 +7,7 @@
 #ifndef BITCOIN_NET_H
 #define BITCOIN_NET_H
 
+#include "blockrelay/compactblock.h"
 #include "bloom.h"
 #include "chainparams.h"
 #include "compat.h"
@@ -486,6 +487,22 @@ public:
     uint32_t nGrapheneBloomfilterSize; // The maximum graphene bloom filter size (in bytes) that our peer will accept.
     // BUIPXXX Graphene blocks: end section
 
+    // Compact Blocks : begin
+    CCriticalSection cs_compactblock;
+    CBlock compactBlock;
+    std::map<uint64_t, CTransactionRef> mapMissingCompactBlockTx;
+    uint64_t nLocalCompactBlockBytes; // the bytes used in creating this cmpctblock, updated dynamically
+    uint64_t nSizeCompactBlock; // Original on-wire size of the block. Just used for reporting
+    int compactBlockWaitingForTxns; // if -1 then not currently waiting
+
+    std::vector<uint64_t> vShortCompactBlockHashes;
+    std::vector<uint256> vCompactBlockHashes;
+
+    uint64_t shorttxidk0;
+    uint64_t shorttxidk1;
+
+    // Compact Blocks : end
+
     CCriticalSection cs_nAvgBlkResponseTime;
     double nAvgBlkResponseTime;
     std::atomic<int64_t> nMaxBlocksInTransit;
@@ -631,6 +648,13 @@ public:
     bool GrapheneCapable()
     {
         if (nServices & NODE_GRAPHENE)
+            return true;
+        return false;
+    }
+
+    bool CompactBlockCapable()
+    {
+        if (fSupportsCompactBlocks)
             return true;
         return false;
     }
