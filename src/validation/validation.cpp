@@ -2042,7 +2042,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                     {
                         return false;
                     }
-                    return state.DoS(100, error("ConnectBlockDTOR(): %s inputs missing/spent in tx %d %s",
+                    return state.DoS(100, error("ConnectBlockDTOR(): block %s inputs missing/spent in tx %d %s",
                                               block.GetHash().ToString(), i, tx.GetHash().ToString()),
                         REJECT_INVALID, "bad-txns-inputs-missingorspent");
                 }
@@ -2289,7 +2289,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                     {
                         return false;
                     }
-                    return state.DoS(100, error("CanonicalConnectBlock: %s inputs missing/spent in tx %d %s",
+                    return state.DoS(100, error("CanonicalConnectBlock: block %s inputs missing/spent in tx %d %s",
                                               block.GetHash().ToString(), i, tx.GetHash().ToString()),
                         REJECT_INVALID, "bad-txns-inputs-missingorspent");
                 }
