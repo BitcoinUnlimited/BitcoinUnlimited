@@ -2060,8 +2060,9 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
 
                 if (!SequenceLocks(txref, nLockTimeFlags, &prevheights, *pindex))
                 {
-                    return state.DoS(100, error("%s: contains a non-BIP68-final transaction", __func__), REJECT_INVALID,
-                        "bad-txns-nonfinal");
+                    return state.DoS(100, error("%s: block %s contains a non-BIP68-final transaction", __func__,
+                                              block.GetHash().ToString()),
+                        REJECT_INVALID, "bad-txns-nonfinal");
                 }
 
                 if (fStrictPayToScriptHash)
@@ -2099,8 +2100,8 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                         if (!CheckInputs(tx, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
                                 &resourceTracker, PV->ThreadCount() ? &vChecks : NULL))
                         {
-                            return error("ConnectBlockDTOR(): CheckInputs on %s failed with %s",
-                                tx.GetHash().ToString(), FormatStateMessage(state));
+                            return error("%s: block %s CheckInputs on %s failed with %s", __func__,
+                                block.GetHash().ToString(), tx.GetHash().ToString(), FormatStateMessage(state));
                         }
                         control.Add(vChecks);
                         nChecked++;
@@ -2241,7 +2242,9 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             }
             catch (std::logic_error &e)
             {
-                return state.DoS(100, error("CanonicalConnectBlock: repeated-tx"), REJECT_INVALID, "repeated-txn");
+                return state.DoS(100,
+                    error("%s: block %s repeated-tx %s", __func__, block.GetHash().ToString(), tx.GetHash().ToString()),
+                    REJECT_INVALID, "repeated-txn");
             }
 
             if (i == 1)
@@ -2253,8 +2256,9 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                 uint256 curTxHash = tx.GetHash();
                 if (curTxHash < prevTxHash)
                 {
-                    return state.DoS(100, error("CanonicalConnectBlock: lexical misordering tx %d (%s < %s)", i,
-                                              curTxHash.ToString(), prevTxHash.ToString()),
+                    return state.DoS(100,
+                        error("%s: block %s lexical misordering tx %d (%s < %s)", __func__, block.GetHash().ToString(),
+                                         i, curTxHash.ToString(), prevTxHash.ToString()),
                         REJECT_INVALID, "bad-txn-order");
                 }
                 prevTxHash = curTxHash;
@@ -2289,7 +2293,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                     {
                         return false;
                     }
-                    return state.DoS(100, error("CanonicalConnectBlock: block %s inputs missing/spent in tx %d %s",
+                    return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
                                               block.GetHash().ToString(), i, tx.GetHash().ToString()),
                         REJECT_INVALID, "bad-txns-inputs-missingorspent");
                 }
@@ -2307,8 +2311,9 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
 
                 if (!SequenceLocks(txref, nLockTimeFlags, &prevheights, *pindex))
                 {
-                    return state.DoS(100, error("%s: contains a non-BIP68-final transaction", __func__), REJECT_INVALID,
-                        "bad-txns-nonfinal");
+                    return state.DoS(100, error("%s: block %s contains a non-BIP68-final transaction", __func__,
+                                              block.GetHash().ToString()),
+                        REJECT_INVALID, "bad-txns-nonfinal");
                 }
 
                 if (fStrictPayToScriptHash)
@@ -2344,10 +2349,10 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
                         if (!CheckInputs(tx, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
-                                &resourceTracker, PV->ThreadCount() ? &vChecks : NULL))
+                                &resourceTracker, PV->ThreadCount() ? &vChecks : nullptr))
                         {
-                            return error("ConnectBlock(): CheckInputs on %s failed with %s", tx.GetHash().ToString(),
-                                FormatStateMessage(state));
+                            return error("%s: block %s CheckInputs on %s failed with %s", __func__,
+                                block.GetHash().ToString(), tx.GetHash().ToString(), FormatStateMessage(state));
                         }
                         control.Add(vChecks);
                         nChecked++;
