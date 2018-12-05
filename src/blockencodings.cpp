@@ -138,7 +138,7 @@ ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs &c
             break;
     }
 
-    LOGA(CMPCT, "Initialized PartiallyDownloadedBlock for block %s using a cmpctblock of size %lu\n",
+    LOG(CMPCT, "Initialized PartiallyDownloadedBlock for block %s using a cmpctblock of size %lu\n",
         cmpctblock.header.GetHash().ToString(), ::GetSerializeSize(cmpctblock, SER_NETWORK, PROTOCOL_VERSION));
 
     return READ_STATUS_OK;
@@ -184,14 +184,13 @@ ReadStatus PartiallyDownloadedBlock::FillBlock(CBlock &block, const std::vector<
         return READ_STATUS_INVALID;
     }
 
-    LOGA(CMPCT,
+    LOG(CMPCT,
         "Successfully reconstructed block %s with %lu txn prefilled, %lu txn from mempool and %lu txn requested\n",
         header.GetHash().ToString(), prefilled_count, mempool_count, vtx_missing.size());
     if (vtx_missing.size() < 5)
     {
         for (const CTransaction &tx : vtx_missing)
-            LOGA(
-                CMPCT, "Reconstructed block %s required tx %s\n", header.GetHash().ToString(), tx.GetHash().ToString());
+            LOG(CMPCT, "Reconstructed block %s required tx %s\n", header.GetHash().ToString(), tx.GetHash().ToString());
     }
 
     return READ_STATUS_OK;
