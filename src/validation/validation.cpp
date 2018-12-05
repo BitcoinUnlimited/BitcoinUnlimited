@@ -2042,7 +2042,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                     {
                         return false;
                     }
-                    return state.DoS(100, error("ConnectBlockDTOR(): block %s inputs missing/spent in tx %d %s",
+                    return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
                                               block.GetHash().ToString(), i, tx.GetHash().ToString()),
                         REJECT_INVALID, "bad-txns-inputs-missingorspent");
                 }
