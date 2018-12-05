@@ -359,6 +359,11 @@ ConnectionStateIncoming operator|(const ConnectionStateIncoming &a, const Connec
     return (ConnectionStateIncoming)((uint64_t)a | (uint64_t)b);
 }
 
+ConnectionStateOutgoing operator|(const ConnectionStateOutgoing &a, const ConnectionStateOutgoing &b)
+{
+    return (ConnectionStateOutgoing)((uint64_t)a | (uint64_t)b);
+}
+
 std::string toString(const ConnectionStateIncoming &state) { return toString((uint64_t)state, bitMeaningsCSI); }
 std::ostream &operator<<(std::ostream &os, const ConnectionStateIncoming &state) { return (os << toString(state)); }
 std::string toString(const ConnectionStateOutgoing &state) { return toString((uint64_t)state, bitMeaningsCSO); }
