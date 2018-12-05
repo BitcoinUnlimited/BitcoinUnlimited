@@ -664,6 +664,45 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CheckAndRequestExpeditedBlocks(pfrom);
     }
 
+
+    // XVERSION NOTICE: If you read this code as a reference to implement
+    // xversion, *please* refrain from sending 'sendheaders' or
+    // 'filtersizexthin' during the initial handshake to allow further
+    // simplification and streamlining of the connection handshake down the
+    // road. Allowing receipt of 'sendheaders'/'filtersizexthin' here is to
+    // allow connection with BUCash 1.5.0.x nodes that introduced parallelized
+    // message processing but not the state machine for (x)version
+    // serialization.  This is valid protocol behavior (as in not breaking any
+    // existing implementation) but likely still makes sense to be phased out
+    // down the road.
+    else if (strCommand == NetMsgType::SENDHEADERS)
+    {
+        CNodeStateAccessor(nodestate, pfrom->GetId())->fPreferHeaders = true;
+    }
+
+    else if (strCommand == NetMsgType::FILTERSIZEXTHIN)
+    {
+        if (pfrom->ThinBlockCapable())
+        {
+            vRecv >> pfrom->nXthinBloomfilterSize;
+
+            // As a safeguard don't allow a smaller max bloom filter size than the default max size.
+            if (!pfrom->nXthinBloomfilterSize || (pfrom->nXthinBloomfilterSize < SMALLEST_MAX_BLOOM_FILTER_SIZE))
+            {
+                pfrom->PushMessage(
+                    NetMsgType::REJECT, strCommand, REJECT_INVALID, std::string("filter size was too small"));
+                LOG(NET, "Disconnecting %s: bloom filter size too small\n", pfrom->GetLogName());
+                pfrom->fDisconnect = true;
+                return false;
+            }
+        }
+        else
+        {
+            pfrom->fDisconnect = true;
+            return false;
+        }
+    }
+
     // ------------------------- END INITIAL COMMAND SET PROCESSING
     else if (!pfrom->successfullyConnected())
     {
@@ -743,11 +782,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             LOG(NET, "Disconnecting %s: one shot\n", pfrom->GetLogName());
             pfrom->fDisconnect = true;
         }
-    }
-
-    else if (strCommand == NetMsgType::SENDHEADERS)
-    {
-        CNodeStateAccessor(nodestate, pfrom->GetId())->fPreferHeaders = true;
     }
 
     // Processing this message type for statistics purposes only, BU currently doesn't support CB protocol
@@ -1734,28 +1768,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->fRelayTxes = true;
     }
 
-    else if (strCommand == NetMsgType::FILTERSIZEXTHIN)
-    {
-        if (pfrom->ThinBlockCapable())
-        {
-            vRecv >> pfrom->nXthinBloomfilterSize;
-
-            // As a safeguard don't allow a smaller max bloom filter size than the default max size.
-            if (!pfrom->nXthinBloomfilterSize || (pfrom->nXthinBloomfilterSize < SMALLEST_MAX_BLOOM_FILTER_SIZE))
-            {
-                pfrom->PushMessage(
-                    NetMsgType::REJECT, strCommand, REJECT_INVALID, std::string("filter size was too small"));
-                LOG(NET, "Disconnecting %s: bloom filter size too small\n", pfrom->GetLogName());
-                pfrom->fDisconnect = true;
-                return false;
-            }
-        }
-        else
-        {
-            pfrom->fDisconnect = true;
-            return false;
-        }
-    }
 
     else if (strCommand == NetMsgType::REJECT)
     {
