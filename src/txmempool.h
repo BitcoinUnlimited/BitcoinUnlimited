@@ -14,6 +14,7 @@
 #include "coins.h"
 #include "primitives/transaction.h"
 #include "random.h"
+#include "stat.h"
 #include "sync.h"
 
 #undef foreach
@@ -462,8 +463,7 @@ private:
 
     void trackPackageRemoved(const CFeeRate &rate);
 
-    std::mutex cs_txPerSec;
-    double nTxPerSec; // BU: tx's per second accepted into the mempool
+    ExponentialMovingAverage txn_ema_rate; // BU: tx's per second accepted into the mempool
 
 public:
     static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12; // public only for testing
@@ -686,12 +686,7 @@ public:
         return (mapTx.count(hash) != 0);
     }
     bool _exists(const uint256 &hash) const { return (mapTx.count(hash) != 0); }
-    double TransactionsPerSecond()
-    {
-        std::lock_guard<std::mutex> lock(cs_txPerSec);
-        return nTxPerSec;
-    }
-
+    double TransactionsPerSecond() { return txn_ema_rate.value(); }
     bool exists(const COutPoint &outpoint) const
     {
         READLOCK(cs);
