@@ -522,17 +522,12 @@ if __name__ == '__main__':
     BIP68_112_113Test().main()
 
 def Test():
-    t = ExcessiveBlockTest(True)
+    t = BIP68_112_113Test()
     # t.drop_to_pdb = True
     bitcoinConf = {
         "debug": ["rpc", "net", "blk", "thin", "mempool", "req", "bench", "evict"],
         "blockprioritysize": 2000000,  # we don't want any transactions rejected due to insufficient fees...
         "blockminsize": 1000000
     }
-
-    flags = [] # ["--nocleanup", "--noshutdown"]
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmppfx=/ramdisk/test")
-    binpath = findBitcoind()
-    flags.append("--srcdir=%s" % binpath)
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)

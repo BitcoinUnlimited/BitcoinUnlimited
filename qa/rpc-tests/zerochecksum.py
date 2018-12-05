@@ -129,15 +129,6 @@ def Test():
     }
 
     # you may want these flags:
-    flags = ["--nocleanup", "--noshutdown"]
-
-    # Execution is much faster if a ramdisk is used, so use it if one exists in a typical location
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmpdir=/ramdisk/test/ma")
-
-    # Out-of-source builds are awkward to start because they need an additional flag
-    # automatically add this flag during testing for common out-of-source locations
-    binpath = findBitcoind()
-    flags.append("--srcdir=%s" % binpath)
-    # start the test
+    flags = standardFlags()
+    flags.extend(["--nocleanup", "--noshutdown"])
     t.main(flags, bitcoinConf, None)

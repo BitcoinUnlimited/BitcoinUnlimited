@@ -149,11 +149,5 @@ def Test():
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
 
-    # you may want these additional flags:
-    # "--srcdir=<out-of-source-build-dir>/debug/src"
-    # "--tmppfx=/ramdisk/test"
-    flags = []  # "--nocleanup", "--noshutdown"
-    if os.path.isdir("/ramdisk/test"):  # execution is much faster if a ramdisk is used
-        flags.append("--tmppfx=/ramdisk/test")
-
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)
