@@ -544,6 +544,47 @@ void UnlimitedSetup(void)
     // Start Internal CPU miner
     // Generate coins in the background
     GenerateBitcoins(GetBoolArg("-gen", DEFAULT_GENERATE), GetArg("-genproclimit", DEFAULT_GENERATE_THREADS), Params());
+
+
+    // Modify checkpoints depending on whether BCH or SV fork
+    if (Params().NetworkIDString() == "main")
+    {
+        CCheckpointData &checkpoints = ModifiableParams().ModifiableCheckpoints();
+        if (nMiningSvForkTime == 0)
+        {
+            // Nov 15th 2018 activate LTOR, DSV op_code
+            checkpoints.mapCheckpoints[556767] =
+                uint256S("0000000000000000004626ff6e3b936941d341c5932ece4357eeccac44e6d56c");
+            // * UNIX timestamp of last checkpoint block
+            checkpoints.nTimeLastCheckpoint = 1542304936;
+            // * total number of transactions between genesis and last checkpoint
+            checkpoints.nTransactionsLastCheckpoint = 265567564;
+            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
+            checkpoints.fTransactionsPerDay = 280000.0;
+        }
+        else if (nMiningSvForkTime != 0)
+        {
+            // Nov 15th 2018 SV fork, 128MB blocks, re-enable bitcoin 0.1.0 op_codes
+            checkpoints.mapCheckpoints[556767] =
+                uint256S("000000000000000001d956714215d96ffc00e0afda4cd0a96c96f8d802b1662b");
+            // * UNIX timestamp of last checkpoint block
+            checkpoints.nTimeLastCheckpoint = 1542305817;
+            // * total number of transactions between genesis and last checkpoint
+            checkpoints.nTransactionsLastCheckpoint = 265615408;
+            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
+            checkpoints.fTransactionsPerDay = 280000.0;
+        }
+        else
+        {
+            // unknown scenario, dont update these values or add a new checkpoint
+            // * UNIX timestamp of last checkpoint block
+            checkpoints.nTimeLastCheckpoint = 1526410186;
+            // * total number of transactions between genesis and last checkpoint
+            checkpoints.nTransactionsLastCheckpoint = 249416375;
+            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
+            checkpoints.fTransactionsPerDay = 280000.0;
+        }
+    }
 }
 
 FILE *blockReceiptLog = nullptr;

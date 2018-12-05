@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Satoshi Nakamoto
+﻿// Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
@@ -216,36 +216,7 @@ public:
         checkpoints[504031] = uint256S("0x0000000000000000011ebf65b60d0a3de80b8175be709d653b4c1a1beeb6ab9c");
         // May 15th 2018 re-enable op_codes and 32 MB max block size
         checkpoints[530359] = uint256S("0x0000000000000000011ada8bd08f46074f44a8f155396f43e38acf9501c49103");
-        // add checkpoint on non BSV fork only
-        if (nMiningSvForkTime == 0)
-        {
-            // Nov 15th 2018 activate LTOR, DSV op_code
-            checkpoints[556767] = uint256S("0000000000000000004626ff6e3b936941d341c5932ece4357eeccac44e6d56c");
-            checkpointData.nTimeLastCheckpoint = 1542304936; // * UNIX timestamp of last checkpoint block
-            // * total number of transactions between genesis and last checkpoint
-            checkpointData.nTransactionsLastCheckpoint = 265567564;
-            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
-            checkpointData.fTransactionsPerDay = 280000.0;
-        }
-        else if (nMiningSvForkTime != 0)
-        {
-            // Nov 15th 2018 SV fork, 128MB blocks, re-enable bitcoin 0.1.0 op_codes
-            checkpoints[556767] = uint256S("000000000000000001d956714215d96ffc00e0afda4cd0a96c96f8d802b1662b");
-            checkpointData.nTimeLastCheckpoint = 1542305817; // * UNIX timestamp of last checkpoint block
-            // * total number of transactions between genesis and last checkpoint
-            checkpointData.nTransactionsLastCheckpoint = 265615408;
-            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
-            checkpointData.fTransactionsPerDay = 280000.0;
-        }
-        else
-        {
-            // unknown scenario, dont update these values or add a new checkpoint
-            checkpointData.nTimeLastCheckpoint = 1526410186; // * UNIX timestamp of last checkpoint block
-            // * total number of transactions between genesis and last checkpoint
-            checkpointData.nTransactionsLastCheckpoint = 249416375;
-            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
-            checkpointData.fTransactionsPerDay = 280000.0;
-        }
+
         // clang-format on
     }
 };
