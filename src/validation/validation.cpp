@@ -2071,9 +2071,6 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                     // this is to prevent a "rogue miner" from creating
                     // an incredibly-expensive-to-validate block.
                     nSigOps += GetP2SHSigOpCount(tx, view, flags);
-                    // if (nSigOps > MAX_BLOCK_SIGOPS)
-                    //    return state.DoS(100, error("ConnectBlock(): too many sigops"),
-                    //                     REJECT_INVALID, "bad-blk-sigops");
                 }
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();
@@ -2322,9 +2319,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                     // this is to prevent a "rogue miner" from creating
                     // an incredibly-expensive-to-validate block.
                     nSigOps += GetP2SHSigOpCount(tx, view, flags);
-                    // if (nSigOps > MAX_BLOCK_SIGOPS)
-                    //    return state.DoS(100, error("ConnectBlock(): too many sigops"),
-                    //                     REJECT_INVALID, "bad-blk-sigops");
                 }
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();
