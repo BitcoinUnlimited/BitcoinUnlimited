@@ -22,7 +22,7 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action, int nType, int nVersion)
+    inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(tx); // TODO: Compress tx encoding
     }
@@ -38,7 +38,7 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action, int nType, int nVersion)
+    inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(blockhash);
         uint64_t indexes_size = (uint64_t)indexes.size();
@@ -91,7 +91,7 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action, int nType, int nVersion)
+    inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(blockhash);
         uint64_t txn_size = (uint64_t)txn.size();
@@ -125,7 +125,7 @@ struct PrefilledTransaction
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action, int nType, int nVersion)
+    inline void SerializationOp(Stream &s, Operation ser_action)
     {
         uint64_t idx = index;
         READWRITE(COMPACTSIZE(idx));
@@ -171,7 +171,7 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action, int nType, int nVersion)
+    inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(header);
         READWRITE(nonce);
