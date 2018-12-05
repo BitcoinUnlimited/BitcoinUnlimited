@@ -78,7 +78,7 @@ ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs &c
             // have neither a prefilled txn or a shorttxid!
             return READ_STATUS_INVALID;
         }
-        txn_available[lastprefilledindex] = std::make_shared<CTransaction>(cmpctblock.prefilledtxn[i].tx);
+        txn_available[lastprefilledindex] = MakeTransactionRef(cmpctblock.prefilledtxn[i].tx);
     }
     prefilled_count = cmpctblock.prefilledtxn.size();
 
