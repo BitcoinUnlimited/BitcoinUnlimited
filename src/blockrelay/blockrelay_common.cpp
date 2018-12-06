@@ -61,7 +61,7 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
     LOCK(cs_blockrelaytimer);
     if (!mapBlockRelayTimer.count(hash))
     {
-        // The timeout limit is a random number belonging to graphene-timer +/- 20%
+        // The timeout limit is a random number +/- 20%.
         // This way a node connected to this one may download the block
         // before the other node and thus be able to serve the other with
         // a graphene block, rather than both nodes timing out and downloading
@@ -88,12 +88,13 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
             int64_t elapsed = GetTimeMillis() - iter->second.first;
             if (elapsed > (int64_t)nTimeToWait)
             {
-                // Only print out the log entry once.  Because the graphene timer will be hit
+                // Only print out the log entry once.  Because the thinblock timer will be hit
                 // many times when requesting a block we don't want to fill up the log file.
                 if (!iter->second.second)
                 {
                     iter->second.second = true;
-                    LOG(GRAPHENE | THIN, "Preferential block relay timer exceeded\n");
+                    LOG(THIN | GRAPHENE,
+                        "Preferential BlockRelay timer exceeded - downloading regular block instead\n");
                 }
                 return true;
             }
