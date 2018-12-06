@@ -16,28 +16,7 @@ from test_framework.util import *
 from test_framework.mininode import NetworkThread
 from test_framework.nodemessages import *
 from test_framework.bumessages import *
-from test_framework.bunode import BasicBUCashNode, BUProtocolHandler
-
-class XVersionTestProtoHandler(BUProtocolHandler):
-    def __init__(self):
-        self.remote_xversion = None
-        BUProtocolHandler.__init__(self)
-
-    def on_version(self, conn, message):
-        self.show_debug_msg("version received\n")
-        self.remoteVersion = message.nVersion
-
-    def on_verack(self, conn, message):
-        self.show_debug_msg("verack received\n")
-        self.verack_received = True
-
-    def on_xverack(self, conn, message):
-        self.show_debug_msg("xverack received\n")
-        self.xverack_received = True
-
-    def on_xversion(self, conn, message):
-        self.show_debug_msg("xversion received\n")
-        self.remote_xversion = message
+from test_framework.bunode import BasicBUCashNode,  VersionlessProtoHandler
 
 class XVersionTest(BitcoinTestFramework):
     def __init__(self):
@@ -69,7 +48,7 @@ class XVersionTest(BitcoinTestFramework):
         self.pynode = pynode = BasicBUCashNode()
 
         pynode.connect(0, '127.0.0.1', p2p_port(0), self.nodes[0],
-                       protohandler = XVersionTestProtoHandler(),
+                       protohandler = VersionlessProtoHandler(),
                        send_initial_version = send_initial_version)
         return pynode.cnxns[0]
 

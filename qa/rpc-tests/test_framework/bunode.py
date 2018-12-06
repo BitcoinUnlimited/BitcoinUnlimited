@@ -25,6 +25,7 @@ class BUProtocolHandler(NodeConnCB):
         self.last_headers = None
         self.last_block = None
         self.ping_counter = 1
+        self.pong_counter = 0
         self.last_pong = msg_pong(0)
         self.last_getdata = []
         self.sleep_time = 0.05
@@ -32,6 +33,7 @@ class BUProtocolHandler(NodeConnCB):
         self.last_getheaders = None
         self.disconnected = False
         self.remoteVersion = 0
+        self.remote_xversion = None
         self.buverack_received = False
         self.parent = None
         self.requestOnInv = 0
@@ -76,6 +78,14 @@ class BUProtocolHandler(NodeConnCB):
     def on_buverack(self, conn, message):
         self.show_debug_msg("BU version ACK\n")
         self.buverack_received = True
+
+    def on_xverack(self, conn, message):
+        self.show_debug_msg("xverack received\n")
+        self.xverack_received = True
+
+    def on_xversion(self, conn, message):
+        self.show_debug_msg("xversion received\n")
+        self.remote_xversion = message
 
     def add_connection(self, conn):
         self.connection = conn
@@ -150,6 +160,7 @@ class BUProtocolHandler(NodeConnCB):
 
     def on_pong(self, conn, message):
         self.last_pong = message
+        self.pong_counter += 1
         if self.parent and hasattr(self.parent, "on_pong"):
             self.parent.on_pong(self,message)
 
@@ -275,6 +286,21 @@ class BUProtocolHandler(NodeConnCB):
         getblocks_message = msg_getblocks()
         getblocks_message.locator.vHave = locator
         self.send_message(getblocks_message)
+
+
+class VersionlessProtoHandler(BUProtocolHandler):
+    """ Variant of the BUProtocolHandler that avoids auto-sending and reacting to
+version messages. Useful for testing that part of the P2P handshake. """
+    def __init__(self):
+        BUProtocolHandler.__init__(self)
+
+    def on_version(self, conn, message):
+        self.show_debug_msg("version received\n")
+        self.remoteVersion = message.nVersion
+
+    def on_verack(self, conn, message):
+        self.show_debug_msg("verack received\n")
+        self.verack_received = True
 
 class BasicBUCashNode():
     def __init__(self):

@@ -16,10 +16,9 @@ from test_framework.util import *
 from test_framework.mininode import NetworkThread
 from test_framework.nodemessages import *
 from test_framework.bumessages import *
-from test_framework.bunode import BasicBUCashNode, VersionlessProtoHandler
+from test_framework.bunode import BasicBUCashNode,  VersionlessProtoHandler
 
-
-class MyTest(BitcoinTestFramework):
+class PingEarlyTest(BitcoinTestFramework):
     def __init__(self):
         self.nodes = []
         BitcoinTestFramework.__init__(self)
@@ -48,61 +47,22 @@ class MyTest(BitcoinTestFramework):
         self.nodes = [ start_node(0, self.options.tmpdir, ["-debug"]) ]
         self.pynode = pynode = BasicBUCashNode()
 
-        self.hndlr = pynode.connect(0, '127.0.0.1', p2p_port(0), self.nodes[0],
-                       protohandler =VersionlessProtoHandler(),
+        pynode.connect(0, '127.0.0.1', p2p_port(0), self.nodes[0],
+                       protohandler = VersionlessProtoHandler(),
                        send_initial_version = send_initial_version)
-        self.hndlr.allow0Checksum = True
-
         return pynode.cnxns[0]
 
-    def network_and_finish(self):
-        nt = NetworkThread()
-        nt.start()
-        nt.join()
-
     def run_test(self):
-        logging.info("Testing xversion handling")
+        logging.info("Testing early ping replies")
 
-        # test regular set up including xversion
-        conn = self.restart_node()
-        conn.allow0Checksum = True
+        conn = self.restart_node(send_initial_version = False)
+        conn.send_message(msg_ping(), pushbuf=True)
         nt = NetworkThread()
         nt.start()
-
-        conn.wait_for_verack()
-        conn.send_message(msg_verack())
-
-        # now it is time for xversion
-        conn.send_message(msg_xversion({0x00020002 : 1}))
-
-        # send extra buversion and buverack, shouldn't harm
-        conn.send_message(msg_buversion(addrFromPort = 12345))
-        conn.send_message(msg_buverack())
-        conn.wait_for(lambda : conn.remote_xversion)
-
-        conn.send_message(msg_ping())
         conn.wait_for(lambda : conn.pong_counter)
-        # check that we are getting 0-value checksums from the BU node
-        assert(self.hndlr.num0Checksums > 0)
-
         conn.connection.disconnect_node()
         nt.join()
 
 if __name__ == '__main__':
-    xvt = MyTest()
+    xvt = PingEarlyTest()
     xvt.main()
-
-# Create a convenient function for an interactive python debugging session
-def Test():
-    t = MyTest()
-    bitcoinConf = {
-        "debug": ["blk", "mempool", "net", "req"],
-        "blockprioritysize": 2000000,  # we don't want any transactions rejected due to insufficient fees...
-        "net.ignoreTimeouts": 1,
-        "logtimemicros": 1
-    }
-
-    # you may want these flags:
-    flags = standardFlags()
-    flags.extend(["--nocleanup", "--noshutdown"])
-    t.main(flags, bitcoinConf, None)
