@@ -1228,6 +1228,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         {
             maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
             excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
+            settingsToUserAgentString();
         }
     }
 
