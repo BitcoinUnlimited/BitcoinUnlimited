@@ -1221,6 +1221,17 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
 
+    // Set EB and MAX_OPS_PER_SCRIPT for the SV chain
+    if (IsSv2018Scheduled())
+    {
+        if (IsSv2018Enabled(Params().GetConsensus(), chainActive.Tip()))
+        {
+            maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
+            excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
+        }
+    }
+
+
 // ********************************************************* Step 7: load wallet
 
 #ifdef ENABLE_WALLET
