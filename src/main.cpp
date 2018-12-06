@@ -8,6 +8,7 @@
 
 #include "addrman.h"
 #include "arith_uint256.h"
+#include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
@@ -144,6 +145,10 @@ void InitializeNode(const CNode *pnode)
 
 void FinalizeNode(NodeId nodeid)
 {
+    // Decrement thin type peer counters
+    thinrelay.RemoveThinTypePeers(&(*connmgr->FindNodeFromId(nodeid)));
+
+    // Update node state
     {
         CNodeStateAccessor state(nodestate, nodeid);
         DbgAssert(state != nullptr, return );
