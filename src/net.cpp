@@ -2979,7 +2979,7 @@ void CNode::BeginMessage(const char *pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSen
     ENTER_CRITICAL_SECTION(cs_vSend);
     assert(ssSend.size() == 0);
     ssSend << CMessageHeader(GetMagic(Params()), pszCommand, 0);
-    LOG(NET, "sending msg: %s ", SanitizeString(pszCommand));
+    LOG(NET, "sending msg: %s to %s\n", SanitizeString(pszCommand), GetLogName());
     currentCommand = pszCommand;
 }
 
