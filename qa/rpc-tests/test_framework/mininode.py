@@ -81,13 +81,14 @@ class NodeConnCB(object):
     # This can be called from the testing thread, so it needs to acquire the
     # global lock.
     def wait_for(self, test_function):
-        while True:
+        for i in range(200):
             if self.disconnected:
                 raise DisconnectedError()
             with mininode_lock:
                 if test_function():
                     return
             time.sleep(0.05)
+        raise TimeoutError("Waiting for %s timed out." % repr(test_function))
 
     def wait_for_verack(self):
         self.wait_for(lambda : self.verack_received)
