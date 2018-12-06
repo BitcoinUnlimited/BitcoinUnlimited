@@ -65,10 +65,8 @@ bool PeerHasHeader(const CNodeState *state, CBlockIndex *pindex)
     return false;
 }
 
-bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParams, std::deque<CInv> &vInv)
+void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParams, std::deque<CInv> &vInv)
 {
-    bool gotWorkDone = false;
-
     std::vector<CInv> vNotFound;
 
     while (!vInv.empty())
@@ -84,7 +82,6 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
         vInv.pop_front();
         {
             boost::this_thread::interruption_point();
-            gotWorkDone = true;
             if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK)
             {
                 bool fSend = false;
@@ -275,7 +272,6 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
         // having to download the entire memory pool.
         pfrom->PushMessage(NetMsgType::NOTFOUND, vNotFound);
     }
-    return gotWorkDone;
 }
 
 
@@ -1834,13 +1830,12 @@ bool ProcessMessages(CNode *pfrom)
     //  (x) data
     //
     bool fOk = true;
-    bool gotWorkDone = false;
 
     {
         TRY_LOCK(pfrom->csRecvGetData, locked);
         if (locked && !pfrom->vRecvGetData.empty())
         {
-            gotWorkDone |= ProcessGetData(pfrom, chainparams.GetConsensus(), pfrom->vRecvGetData);
+            ProcessGetData(pfrom, chainparams.GetConsensus(), pfrom->vRecvGetData);
         }
     }
 
@@ -1869,7 +1864,6 @@ bool ProcessMessages(CNode *pfrom)
             pfrom->vRecvMsg.pop_front();
             pfrom->currentRecvMsgSize -= msg.size();
             msgsProcessed++;
-            gotWorkDone = true;
         }
 
         // if (fDebug)
