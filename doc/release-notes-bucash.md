@@ -41,11 +41,12 @@ chain after the upgrade. For more detail please look at `reconsidermostworkchain
 Bug Fixed in 1.5.1.0-rc2
 ------------------------
 
-- Making Xversion more permission in the initial handshake
-- Set EB properly while in SV mode
+- Making Xversion more permissive in the initial handshake
+- Set Excessive Block Size (EB) properly while in SV mode
 - Ensure that blk files storage operate on an append-only basis
-- Various minor fixes/improvements to thwe python QA framework
+- Various minor fixes/improvements to the python QA framework
 - Reduce the last of thinblock/preferential timer to 1 sec from 10 sec.
+- Fixed connection drop bug where a ping that happened soon after initial connection would be ignored, causing an eventual ping timeout.
 
 Main Changes in 1.5.1
 ---------------------
