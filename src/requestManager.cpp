@@ -497,19 +497,29 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
             LOCK(thinrelay.cs_inflight);
             if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::GRAPHENEBLOCK))
             {
-                // Instead of building a bloom filter here as we would for an xthin, we actually
-                // just need to fill in CMempoolInfo
-                inv2.type = MSG_GRAPHENEBLOCK;
-                CMemPoolInfo receiverMemPoolInfo = GetGrapheneMempoolInfo();
-                ss << inv2;
-                ss << receiverMemPoolInfo;
-                graphenedata.UpdateOutBoundMemPoolInfo(
-                    ::GetSerializeSize(receiverMemPoolInfo, SER_NETWORK, PROTOCOL_VERSION));
-
-                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
+                // must maintain locking order cs_objDownloder -> cs_inflight, but we also must
+                // ensure that cs_inflight is locked for the duration of both IsThinTypeBlockInFlight()
+                // and AddThinTypeBlockInFlight, or we could end up downloading two of the same block
+                // caused by the multi-threading in message sending and processing.
                 thinrelay.AddThinTypeBlockInFlight(pfrom, inv2.hash, NetMsgType::GRAPHENEBLOCK);
-                pfrom->PushMessage(NetMsgType::GET_GRAPHENE, ss);
-                LOG(GRAPHENE, "Requesting graphene block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+                {
+                    LEAVE_CRITICAL_SECTION(thinrelay.cs_inflight);
+                    MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
+
+                    // Instead of building a bloom filter here as we would for an xthin, we actually
+                    // just need to fill in CMempoolInfo
+                    inv2.type = MSG_GRAPHENEBLOCK;
+                    CMemPoolInfo receiverMemPoolInfo = GetGrapheneMempoolInfo();
+                    ss << inv2;
+                    ss << receiverMemPoolInfo;
+                    graphenedata.UpdateOutBoundMemPoolInfo(
+                        ::GetSerializeSize(receiverMemPoolInfo, SER_NETWORK, PROTOCOL_VERSION));
+
+                    pfrom->PushMessage(NetMsgType::GET_GRAPHENE, ss);
+                    LOG(GRAPHENE, "Requesting graphene block %s from peer %s\n", inv2.hash.ToString(),
+                        pfrom->GetLogName());
+                    ENTER_CRITICAL_SECTION(thinrelay.cs_inflight);
+                }
                 return true;
             }
         }
@@ -523,21 +533,30 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
             LOCK(thinrelay.cs_inflight);
             if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::XTHINBLOCK))
             {
-                inv2.type = MSG_XTHINBLOCK;
-                std::vector<uint256> vOrphanHashes;
-                {
-                    READLOCK(orphanpool.cs);
-                    for (auto &mi : orphanpool.mapOrphanTransactions)
-                        vOrphanHashes.emplace_back(mi.first);
-                }
-                BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
-                ss << inv2;
-                ss << filterMemPool;
-
-                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
+                // must maintain locking order cs_objDownloder -> cs_inflight, but we also must
+                // ensure that cs_inflight is locked for the duration of both IsThinTypeBlockInFlight()
+                // and AddThinTypeBlockInFlight, or we could end up downloading two of the same block
+                // caused by the multi-threading in message sending and processing.
                 thinrelay.AddThinTypeBlockInFlight(pfrom, inv2.hash, NetMsgType::XTHINBLOCK);
-                pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+                {
+                    LEAVE_CRITICAL_SECTION(thinrelay.cs_inflight);
+                    MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
+
+                    inv2.type = MSG_XTHINBLOCK;
+                    std::vector<uint256> vOrphanHashes;
+                    {
+                        READLOCK(orphanpool.cs);
+                        for (auto &mi : orphanpool.mapOrphanTransactions)
+                            vOrphanHashes.emplace_back(mi.first);
+                    }
+                    BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
+                    ss << inv2;
+                    ss << filterMemPool;
+
+                    pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
+                    LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+                    ENTER_CRITICAL_SECTION(thinrelay.cs_inflight);
+                }
                 return true;
             }
         }
@@ -552,8 +571,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
 
         MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
         pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
-        LOG(THIN | GRAPHENE, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(),
-            pfrom->GetLogName());
+        LOG(THIN | GRAPHENE, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
         return true;
     }
     return false; // no block was requested
