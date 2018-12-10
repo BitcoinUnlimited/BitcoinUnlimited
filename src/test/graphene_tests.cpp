@@ -10,6 +10,22 @@
 #include <cmath>
 #include <iostream>
 
+size_t ProjectedGrapheneSizeBytes(uint64_t nBlockTxs, uint64_t nExcessTxs, uint64_t nSymDiff)
+{
+    const int SERIALIZATION_OVERHEAD = 11;
+    FastRandomContext insecure_rand(true);
+    auto fpr = [nExcessTxs](int a) { return a / float(nExcessTxs); };
+
+    CBloomFilter filter(
+        nBlockTxs, fpr(nSymDiff), insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
+    CIblt iblt(nSymDiff);
+
+    size_t filterBytes = ::GetSerializeSize(filter, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
+    size_t ibltBytes = ::GetSerializeSize(iblt, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
+
+    return filterBytes + ibltBytes;
+}
+
 // Create a deterministic hash by providing an index
 uint256 GetHash(unsigned int nIndex)
 {
@@ -112,39 +128,57 @@ BOOST_AUTO_TEST_CASE(graphene_set_decodes_multiple_sizes)
     }
 }
 
-BOOST_AUTO_TEST_CASE(graphene_set_finds_optimal_settings)
+BOOST_AUTO_TEST_CASE(graphene_set_finds_brute_force_opt_for_small_blocks)
 {
-    const int SERIALIZATION_OVERHEAD = 11;
-    FastRandomContext insecure_rand(true);
     CGrapheneSet grapheneSet;
 
-    int m = 5000;
-    int mu = 2999;
-    int n = 3000;
-
-    auto fpr = [m, mu](int a) { return a / float(m - mu); };
+    int n = (int)std::floor(APPROX_NITEMS_THRESH / 2);
+    int mu = 100;
+    int m = (int)std::floor(n / 8) + mu;
 
     int best_a = 1;
     size_t best_size = std::numeric_limits<size_t>::max();
     int a = 1;
     for (a = 1; a < m - mu; a++)
     {
-        CBloomFilter filter(
-            n, fpr(a), insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
-        CIblt iblt(a);
+        size_t totalBytes = ProjectedGrapheneSizeBytes(n, m - mu, a);
 
-        size_t filterBytes = ::GetSerializeSize(filter, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
-        size_t ibltBytes = ::GetSerializeSize(iblt, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
-        size_t total = filterBytes + ibltBytes;
-
-        if (total < best_size)
+        if (totalBytes < best_size)
         {
-            best_size = total;
+            best_size = totalBytes;
             best_a = a;
         }
     }
 
     BOOST_CHECK_EQUAL(grapheneSet.OptimalSymDiff(n, m, m - mu, 1), best_a);
+}
+
+BOOST_AUTO_TEST_CASE(graphene_set_finds_approx_opt_for_large_blocks)
+{
+    int n = 4 * APPROX_NITEMS_THRESH;
+    int mu = 1000;
+    int m = APPROX_NITEMS_THRESH + mu;
+    CGrapheneSet grapheneSet;
+    auto approxSymDiff = [n]() {
+        return std::max(
+            1.0, std::round(FILTER_CELL_SIZE * n / (8 * IBLT_CELL_SIZE * IBLT_DEFAULT_OVERHEAD * LN2SQUARED)));
+    };
+
+    BOOST_CHECK_EQUAL(approxSymDiff(), grapheneSet.OptimalSymDiff(n, m, m - mu, 0));
+}
+
+BOOST_AUTO_TEST_CASE(graphene_set_approx_opt_close_to_optimal)
+{
+    int n = APPROX_NITEMS_THRESH;
+    int mu = 100;
+    int m = (int)std::ceil(n / APPROX_NEXCESS_RATE) + mu;
+    CGrapheneSet grapheneSet;
+
+    float totalBytesApprox = (float)ProjectedGrapheneSizeBytes(n, m - mu, grapheneSet.ApproxOptimalSymDiff(n));
+    float totalBytesBrute =
+        (float)ProjectedGrapheneSizeBytes(n, m - mu, grapheneSet.BruteForceSymDiff(n, m, m - mu, 0));
+
+    BOOST_CHECK_CLOSE(totalBytesApprox, totalBytesBrute, 10);
 }
 
 BOOST_AUTO_TEST_CASE(graphene_set_decodes_empty_intersection)

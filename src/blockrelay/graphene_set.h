@@ -25,6 +25,9 @@ const float FILTER_FPR_MAX = 0.999;
 const uint8_t IBLT_CELL_MINIMUM = 2;
 const std::vector<uint8_t> IBLT_NULL_VALUE = {};
 const unsigned char WORD_BITS = 8;
+const uint16_t APPROX_NITEMS_THRESH = 600;
+const uint8_t APPROX_NEXCESS_RATE = 4;
+const float IBLT_DEFAULT_OVERHEAD = 1.5;
 
 
 class CGrapheneSet
@@ -57,6 +60,26 @@ public:
 
     /* Optimal symmetric difference between block txs and receiver mempool txs passing
      * though filter to use for IBLT.
+     */
+    double OptimalSymDiff(uint64_t nBlockTxs,
+        uint64_t nReceiverPoolTx,
+        uint64_t nReceiverExcessTxs = 0,
+        uint64_t nReceiverMissingTxs = 1);
+
+    /* Approximation to the optimal symmetric difference between block txs and receiver
+     * mempool txs passing through filter to use for IBLT.
+     *
+     * This method is called by OptimalSymDiff provided that:
+     * 1) nBlockTxs >= APPROX_NITEMS_THRESH
+     * 2) nReceiverExcessTxs >= nBlockTxs / APPROX_NEXCESS_RATE
+     *
+     * For details see
+     * https://github.com/bissias/graphene-experiments/blob/master/jupyter/graphene_size_optimization.ipynb
+     */
+    double ApproxOptimalSymDiff(uint64_t nBlockTxs);
+
+    /* Brute force search for optimal symmetric difference between block txs and receiver
+     * mempool txs passing though filter to use for IBLT.
      *
      * Let a be defined as the size of the symmetric difference between items in the
      * sender and receiver IBLTs.
@@ -64,10 +87,10 @@ public:
      * The total size in bytes of a graphene block is given by T(a) = F(a) + L(a) as defined
      * in the code below. (Note that meta parameters for the Bloom Filter and IBLT are ignored).
      */
-    double OptimalSymDiff(uint64_t nBlockTxs,
+    double BruteForceSymDiff(uint64_t nBlockTxs,
         uint64_t nReceiverPoolTx,
-        uint64_t nReceiverExcessTxs = 0,
-        uint64_t nReceiverMissingTxs = 1);
+        uint64_t nReceiverExcessTxs,
+        uint64_t nReceiverMissingTxs);
 
     // Pass the transaction hashes that the local machine has to reconcile with the remote and return a list
     // of cheap hashes in the block in the correct order
