@@ -58,20 +58,20 @@ Main Changes in 1.5.1
 Commit details
 -------
 
-`4699c035f` Add rc tag to BU version if rc is higher than 0 (#1519) (Andrea Suisani)
-`3918ad3ea` Allow early pings and include a functional test for that (#1517) (awemany)
-`068467377` Set EB and max script ops for the SV chain on startup. (#1518) (Peter Tschipper)
-`2ab8b61d0` Add more log info to "missing or spent" error condition in ConnectBlockDependencyOrdering (#1513) (Andrea Suisani)
-`ded3d6258` Remove old version code (#1486) (Greg Griffith)
-`7e93e1242` Integration tests: Factor out some common boilerplate code (#1512) (awemany)
-`705d745c6` .gitignore: Add output from running txPerf (#1508) (awemany)
-`5664663ad` Making xversion more permissive (#1515) (awemany)
-`cdb1eb498` Reduce preferential Graphene/Xthin timers to 1 second each (#1511) (Jonathan Toomim)
-`c891c1478` Make checkpoints modifiable and modify them for the BCH/SV chains (#1509) (Peter Tschipper)
-`f11092713` add missing DB_LAST_BLOCK write in WriteBatchSync (#1504) (Greg Griffith)
-`fb330abb1` Replace FORCE rule in src/Makefile.am (#1500) (awemany)
-`8dd66ed4d` Simplify RPC tests by cleaning up connect_nodes_bi calls (#1506) (awemany)
-`1c774653c` BUCash release notes for version 1.5.1.0 Release Candidate 1 (Andrea Suisani)
+- `4699c035f` Add rc tag to BU version if rc is higher than 0 (#1519) (Andrea Suisani)
+- `3918ad3ea` Allow early pings and include a functional test for that (#1517) (awemany)
+- `068467377` Set EB and max script ops for the SV chain on startup. (#1518) (Peter Tschipper)
+- `2ab8b61d0` Add more log info to "missing or spent" error condition in ConnectBlockDependencyOrdering (#1513) (Andrea Suisani)
+- `ded3d6258` Remove old version code (#1486) (Greg Griffith)
+- `7e93e1242` Integration tests: Factor out some common boilerplate code (#1512) (awemany)
+- `705d745c6` .gitignore: Add output from running txPerf (#1508) (awemany)
+- `5664663ad` Making xversion more permissive (#1515) (awemany)
+- `cdb1eb498` Reduce preferential Graphene/Xthin timers to 1 second each (#1511) (Jonathan Toomim)
+- `c891c1478` Make checkpoints modifiable and modify them for the BCH/SV chains (#1509) (Peter Tschipper)
+- `f11092713` add missing DB_LAST_BLOCK write in WriteBatchSync (#1504) (Greg Griffith)
+- `fb330abb1` Replace FORCE rule in src/Makefile.am (#1500) (awemany)
+- `8dd66ed4d` Simplify RPC tests by cleaning up connect_nodes_bi calls (#1506) (awemany)
+- `1c774653c` BUCash release notes for version 1.5.1.0 Release Candidate 1 (Andrea Suisani)
 
 Credits
 =======
