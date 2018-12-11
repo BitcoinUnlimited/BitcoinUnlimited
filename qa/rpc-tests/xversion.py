@@ -131,6 +131,22 @@ class XVersionTest(BitcoinTestFramework):
         assert len(xv_map) == 1
         assert unhexlify(list(xv_map.values())[0]) == b"test string"
 
+        # send xupdate to test what would happen if someone tries to update non-chaneable key
+        conn.send_message(msg_xupdate({1000 : b"test string changed"}))
+        # some arbitrary sleep time
+        time.sleep(3);
+
+        # nothing should have changed, 1000 is not listed as a changeable key
+        node = self.nodes[0]
+        peer_info = node.getpeerinfo()
+        assert len(peer_info) == 1
+        assert "xversion_map" in peer_info[0]
+        xv_map = peer_info[0]["xversion_map"]
+        assert len(xv_map) == 1
+        assert unhexlify(list(xv_map.values())[0]) == b"test string"
+
+        # TODO appent to this test to test a changeable key once one has been implemented in the node
+
         conn.connection.disconnect_node()
         nt.join()
 
