@@ -115,44 +115,39 @@ bool HandleExpeditedBlock(CDataStream &vRecv, CNode *pfrom)
     }
 }
 
-void ActuallySendExpreditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *skip)
+static void ActuallySendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *pskip)
 {
     VNodeRefs vNodeRefs(connmgr->ExpeditedBlockNodes());
-
     for (CNodeRef &nodeRef : vNodeRefs)
     {
-        CNode *n = nodeRef.get();
+        CNode *pnode = nodeRef.get();
 
-        if (n->fDisconnect)
+        if (pnode->fDisconnect)
         {
-            connmgr->RemovedNode(n);
+            connmgr->RemovedNode(pnode);
         }
-        else if (n != skip) // Don't send back to the sending node to avoid looping
+        else if (pnode != pskip) // Don't send back to the sending node to avoid looping
         {
-            LOG(THIN, "Sending expedited block %s to %s\n", thinBlock.header.GetHash().ToString(), n->GetLogName());
+            LOG(THIN, "Sending expedited block %s to %s\n", thinBlock.header.GetHash().ToString(), pnode->GetLogName());
 
-            n->PushMessage(NetMsgType::XPEDITEDBLK, (unsigned char)EXPEDITED_MSG_XTHIN, hops, thinBlock);
-            n->blocksSent += 1;
+            pnode->PushMessage(NetMsgType::XPEDITEDBLK, (unsigned char)EXPEDITED_MSG_XTHIN, hops, thinBlock);
+            pnode->blocksSent += 1;
         }
     }
 }
 
-void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *skip)
+void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *pskip)
 {
     LOCK(connmgr->cs_expedited);
     if (!IsRecentlyExpeditedAndStore(thinBlock.header.GetHash()))
     {
-        ActuallySendExpreditedBlock(thinBlock, hops, skip);
+        ActuallySendExpeditedBlock(thinBlock, hops, pskip);
     }
+    // else nothing else to do
 }
 
-void SendExpeditedBlock(const CBlock &block, const CNode *skip)
+void SendExpeditedBlock(const CBlock &block, const CNode *pskip)
 {
-    LOCK(connmgr->cs_expedited);
-    if (!IsRecentlyExpeditedAndStore(block.GetHash()))
-    {
-        CXThinBlock thinBlock(block);
-        ActuallySendExpreditedBlock(thinBlock, 0, skip);
-    }
-    // else, nothing to do
+    CXThinBlock thinBlock(block);
+    SendExpeditedBlock(thinBlock, 0, pskip);
 }
