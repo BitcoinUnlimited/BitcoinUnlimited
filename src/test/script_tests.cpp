@@ -35,7 +35,7 @@
 using namespace std;
 
 // Uncomment if you want to output updated JSON tests.
-// #define UPDATE_JSON_TESTS
+#define UPDATE_JSON_TESTS
 
 static const unsigned int flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID;
 
@@ -184,6 +184,13 @@ void DoTest(const CScript &scriptPubKey,
     BOOST_CHECK_MESSAGE(err == scriptError, std::string(FormatScriptError(err)) + " where " +
                                                 std::string(FormatScriptError((ScriptError_t)scriptError)) +
                                                 " expected: " + message);
+    if (err != scriptError)
+    {
+        printf("error2\n");
+        VerifyScript(scriptSig, scriptPubKey, flags, MAX_OPS_PER_SCRIPT,
+            MutableTransactionSignatureChecker(&tx, 0, txCredit.vout[0].nValue, flags), &err);
+        
+    }
 #if defined(HAVE_CONSENSUS_LIB)
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
     stream << tx2;
@@ -1911,6 +1918,7 @@ BOOST_AUTO_TEST_CASE(script_build)
             .EditPush(64, "01", "41")
             .ScriptError(SCRIPT_ERR_EVAL_FALSE));
 
+#if 0 // TBD when ALLOW_SEGWIT_RECOVERY is implemented
     // Tests SCRIPT_ALLOW_SEGWIT_RECOVERY
     const uint32_t allowSegwitRecoveryFlags = SCRIPT_VERIFY_CLEANSTACK |
                                               SCRIPT_VERIFY_P2SH |
@@ -2018,7 +2026,8 @@ BOOST_AUTO_TEST_CASE(script_build)
                     allowSegwitRecoveryFlags, true)
             .PushRedeem()
             .ScriptError(SCRIPT_ERR_CLEANSTACK));
-
+#endif
+    
     std::set<std::string> tests_set;
 
     {

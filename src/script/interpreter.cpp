@@ -498,8 +498,17 @@ static bool CheckSignatureEncodingSigHashChoice(const vector<unsigned char> &vch
     {
         if (vchSig.size() == 64 + (check_sighash==true) ? 1:0)  // 64 sig length plus 1 sighashtype
          {
-         // In a generic-signature context, 64-byte signatures are interpreted
-         // as Schnorr signatures (always correctly encoded) when flag set.
+             // In a generic-signature context, 64-byte signatures are interpreted
+             // as Schnorr signatures (always correctly encoded) when flag set.
+             if (check_sighash && ((flags & SCRIPT_VERIFY_STRICTENC) != 0))
+             {
+                 if (!IsDefinedHashtypeSignature(vchSig))
+                     return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
+
+                 // schnorr sigs must use forkid sighash if forkid flag set
+                 if ((flags & SCRIPT_ENABLE_SIGHASH_FORKID) && ((vchSig[64] & SIGHASH_FORKID) == 0))
+                     return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
+             }
              return true;
          }
     }
