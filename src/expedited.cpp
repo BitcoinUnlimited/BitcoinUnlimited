@@ -9,6 +9,7 @@
 #include "dosman.h"
 #include "expedited.h"
 #include "main.h" // Misbehaving, cs_main
+#include "validation/validation.h"
 
 
 #define NUM_XPEDITED_STORE 10
@@ -136,8 +137,30 @@ static void ActuallySendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hop
     }
 }
 
-void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *pskip)
+void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, CNode *pskip)
 {
+    {
+        LOCK(cs_main);
+
+        // Check we have a valid header with correct timestamp
+        CValidationState state;
+        CBlockIndex *pindex = nullptr;
+        if (!AcceptBlockHeader(thinBlock.header, state, Params(), &pindex))
+        {
+            LOGA("Received an invalid expedited header from peer %s\n", pskip ? pskip->GetLogName() : "none");
+            return;
+        }
+
+        // Validate that the header has enough proof of work to advance the chain or at least be equal
+        // to the current chain tip in case of a re-org.
+        if (!pindex || pindex->nChainWork < chainActive.Tip()->nChainWork)
+        {
+            LOGA("Not sending expedited block %s from peer %s, does not extend longest chain\n",
+                thinBlock.header.GetHash().ToString(), pskip ? pskip->GetLogName() : "none");
+            return;
+        }
+    }
+
     LOCK(connmgr->cs_expedited);
     if (!IsRecentlyExpeditedAndStore(thinBlock.header.GetHash()))
     {
@@ -146,7 +169,7 @@ void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode 
     // else nothing else to do
 }
 
-void SendExpeditedBlock(const CBlock &block, const CNode *pskip)
+void SendExpeditedBlock(const CBlock &block, CNode *pskip)
 {
     CXThinBlock thinBlock(block);
     SendExpeditedBlock(thinBlock, 0, pskip);
