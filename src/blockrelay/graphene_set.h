@@ -25,8 +25,8 @@ const float FILTER_FPR_MAX = 0.999;
 const uint8_t IBLT_CELL_MINIMUM = 2;
 const std::vector<uint8_t> IBLT_NULL_VALUE = {};
 const unsigned char WORD_BITS = 8;
-const uint16_t APPROX_NITEMS_THRESH = 600;
-const uint8_t APPROX_NEXCESS_RATE = 4;
+const uint16_t APPROX_ITEMS_THRESH = 600;
+const uint8_t APPROX_EXCESS_RATE = 4;
 const float IBLT_DEFAULT_OVERHEAD = 1.5;
 
 
@@ -70,8 +70,8 @@ public:
      * mempool txs passing through filter to use for IBLT.
      *
      * This method is called by OptimalSymDiff provided that:
-     * 1) nBlockTxs >= APPROX_NITEMS_THRESH
-     * 2) nReceiverExcessTxs >= nBlockTxs / APPROX_NEXCESS_RATE
+     * 1) nBlockTxs >= APPROX_ITEMS_THRESH
+     * 2) nReceiverExcessTxs >= nBlockTxs / APPROX_EXCESS_RATE
      *
      * For details see
      * https://github.com/bissias/graphene-experiments/blob/master/jupyter/graphene_size_optimization.ipynb

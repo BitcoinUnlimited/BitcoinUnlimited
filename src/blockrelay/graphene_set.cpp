@@ -119,7 +119,7 @@ double CGrapheneSet::OptimalSymDiff(uint64_t nBlockTxs,
     /* Optimal symmetric difference between block txs and receiver mempool txs passing
      * though filter to use for IBLT.
      */
-    if (nBlockTxs >= APPROX_NITEMS_THRESH && nReceiverExcessTxs >= nBlockTxs / APPROX_NEXCESS_RATE)
+    if (nBlockTxs >= APPROX_ITEMS_THRESH && nReceiverExcessTxs >= nBlockTxs / APPROX_EXCESS_RATE)
         return ApproxOptimalSymDiff(nBlockTxs);
     else
         return BruteForceSymDiff(nBlockTxs, nReceiverPoolTx, nReceiverExcessTxs, nReceiverMissingTxs);
@@ -132,13 +132,13 @@ double CGrapheneSet::ApproxOptimalSymDiff(uint64_t nBlockTxs)
      * mempool txs passing through filter to use for IBLT.
      *
      * This method is called by OptimalSymDiff provided that:
-     * 1) nBlockTxs >= APPROX_NITEMS_THRESH
-     * 2) nReceiverExcessTxs >= nBlockTxs / APPROX_NEXCESS_RATE
+     * 1) nBlockTxs >= APPROX_ITEMS_THRESH
+     * 2) nReceiverExcessTxs >= nBlockTxs / APPROX_EXCESS_RATE
      *
      * For details see
      * https://github.com/bissias/graphene-experiments/blob/master/jupyter/graphene_size_optimization.ipynb
      */
-    assert(nBlockTxs >= APPROX_NITEMS_THRESH);
+    assert(nBlockTxs >= APPROX_ITEMS_THRESH);
 
     return std::max(
         1.0, std::round(FILTER_CELL_SIZE * nBlockTxs / (8 * IBLT_CELL_SIZE * IBLT_DEFAULT_OVERHEAD * LN2SQUARED)));

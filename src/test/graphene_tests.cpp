@@ -132,7 +132,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_finds_brute_force_opt_for_small_blocks)
 {
     CGrapheneSet grapheneSet;
 
-    int n = (int)std::floor(APPROX_NITEMS_THRESH / 2);
+    int n = (int)std::floor(APPROX_ITEMS_THRESH / 2);
     int mu = 100;
     int m = (int)std::floor(n / 8) + mu;
 
@@ -155,9 +155,9 @@ BOOST_AUTO_TEST_CASE(graphene_set_finds_brute_force_opt_for_small_blocks)
 
 BOOST_AUTO_TEST_CASE(graphene_set_finds_approx_opt_for_large_blocks)
 {
-    int n = 4 * APPROX_NITEMS_THRESH;
+    int n = 4 * APPROX_ITEMS_THRESH;
     int mu = 1000;
-    int m = APPROX_NITEMS_THRESH + mu;
+    int m = APPROX_ITEMS_THRESH + mu;
     CGrapheneSet grapheneSet;
     auto approxSymDiff = [n]() {
         return std::max(
@@ -169,9 +169,9 @@ BOOST_AUTO_TEST_CASE(graphene_set_finds_approx_opt_for_large_blocks)
 
 BOOST_AUTO_TEST_CASE(graphene_set_approx_opt_close_to_optimal)
 {
-    int n = APPROX_NITEMS_THRESH;
+    int n = APPROX_ITEMS_THRESH;
     int mu = 100;
-    int m = (int)std::ceil(n / APPROX_NEXCESS_RATE) + mu;
+    int m = (int)std::ceil(n / APPROX_EXCESS_RATE) + mu;
     CGrapheneSet grapheneSet;
 
     float totalBytesApprox = (float)ProjectedGrapheneSizeBytes(n, m - mu, grapheneSet.ApproxOptimalSymDiff(n));
