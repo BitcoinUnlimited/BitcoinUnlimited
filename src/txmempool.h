@@ -462,7 +462,7 @@ private:
 
     void trackPackageRemoved(const CFeeRate &rate);
 
-    boost::mutex cs_txPerSec;
+    std::mutex cs_txPerSec;
     double nTxPerSec; // BU: tx's per second accepted into the mempool
 
 public:
@@ -688,7 +688,7 @@ public:
     bool _exists(const uint256 &hash) const { return (mapTx.count(hash) != 0); }
     double TransactionsPerSecond()
     {
-        boost::mutex::scoped_lock lock(cs_txPerSec);
+        std::lock_guard<std::mutex> lock(cs_txPerSec);
         return nTxPerSec;
     }
 
