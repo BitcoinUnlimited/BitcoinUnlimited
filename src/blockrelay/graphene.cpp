@@ -1396,8 +1396,7 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
     {
         try
         {
-            uint64_t nSenderMempoolPlusBlock =
-                std::max(0, (int)(GetGrapheneMempoolInfo().nTx + pblock->vtx.size() - 1)); // exclude coinbase
+            uint64_t nSenderMempoolPlusBlock = GetGrapheneMempoolInfo().nTx + pblock->vtx.size() - 1; // exclude coinbase
 
             CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx, nSenderMempoolPlusBlock);
             int nSizeBlock = pblock->GetBlockSize();

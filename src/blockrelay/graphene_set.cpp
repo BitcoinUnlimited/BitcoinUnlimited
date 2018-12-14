@@ -43,7 +43,7 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
 
     // Optimal symmetric differences between receiver and sender IBLTs
     // This is the parameter "a" from the graphene paper
-    double optSymDiff = std::max(1, (int)nReceiverMissingItems);
+    double optSymDiff = nReceiverMissingItems;
     try
     {
         if (nItems <= nReceiverUniverseItems + nReceiverMissingItems)
