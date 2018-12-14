@@ -1017,7 +1017,8 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
             // Use the largest maxOps since this code is not meant to validate that constraint
             // takes cs_main so comment out for now
             // TODO: put back when not taking main:
-            // assert(CheckInputs(tx, state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, NULL));
+            // assert(CheckInputs(
+            //    MakeTransactionRef(tx), state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, nullptr));
             UpdateCoins(tx, state, mempoolDuplicate, 1000000);
         }
     }
@@ -1036,7 +1037,8 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         else
         {
             // Use the largest maxOps since this code is not meant to validate that constraint
-            assert(CheckInputs(entry->GetTx(), state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, NULL));
+            assert(CheckInputs(
+                entry->GetSharedTx(), state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, nullptr));
             UpdateCoins(entry->GetTx(), state, mempoolDuplicate, 1000000);
             stepsSinceLastRemove = 0;
         }

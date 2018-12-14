@@ -428,7 +428,7 @@ void UnlimitedPushTxns(CNode *dest)
         ptx = mempool.get(hash);
         if (ptx == nullptr)
             continue; // another thread removed since queryHashes, maybe...
-        if ((dest->pfilter && dest->pfilter->IsRelevantAndUpdate(*ptx)) || (!dest->pfilter))
+        if ((dest->pfilter && dest->pfilter->IsRelevantAndUpdate(ptx)) || (!dest->pfilter))
             vInv.push_back(inv);
         if (vInv.size() == MAX_INV_SZ)
         {

@@ -2586,7 +2586,7 @@ void RelayTransaction(const CTransactionRef &ptx, const bool fRespend)
         {
             // Relaying double spends to SPV clients is an easy attack vector,
             // and therefore only relay txns that are not potential double spends.
-            if (!fRespend && pnode->pfilter->IsRelevantAndUpdate(*ptx))
+            if (!fRespend && pnode->pfilter->IsRelevantAndUpdate(ptx))
                 pnode->PushInventory(inv);
         }
         else
