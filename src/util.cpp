@@ -337,30 +337,32 @@ void OpenDebugLog()
  * suppress printing of the timestamp when multiple calls are made that don't
  * end in a newline. Initialize it to true, and hold it, in the calling context.
  */
-static std::string LogTimestampStr(const std::string &str, bool *fStartedNewLine)
+static std::string LogTimestampStr(const std::string &str, std::string &logbuf)
 {
-    string strStamped;
-
-    if (!fLogTimestamps)
-        return str;
-
-    if (*fStartedNewLine)
+    if (!logbuf.size())
     {
         int64_t nTimeMicros = GetLogTimeMicros();
-        strStamped = DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nTimeMicros / 1000000);
-        if (fLogTimeMicros)
-            strStamped += strprintf(".%06d", nTimeMicros % 1000000);
-        strStamped += ' ' + str;
+        if (fLogTimestamps)
+        {
+            logbuf = DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nTimeMicros / 1000000);
+            if (fLogTimeMicros)
+                logbuf += strprintf(".%06d", nTimeMicros % 1000000);
+        }
+        logbuf += ' ' + str;
     }
     else
-        strStamped = str;
+    {
+        logbuf += str;
+    }
 
-    if (!str.empty() && str[str.size() - 1] == '\n')
-        *fStartedNewLine = true;
+    if (logbuf.size() && logbuf[logbuf.size() - 1] == '\n')
+    {
+        std::string result = logbuf;
+        logbuf.clear();
+        return result;
+    }
     else
-        *fStartedNewLine = false;
-
-    return strStamped;
+        return "";
 }
 
 static void MonitorLogfile()
@@ -389,9 +391,11 @@ void LogFlush()
 int LogPrintStr(const std::string &str)
 {
     int ret = 0; // Returns total number of characters written
-    static bool fStartedNewLine = true;
+    thread_local std::string logbuf;
+    string strTimestamped = LogTimestampStr(str, logbuf);
 
-    string strTimestamped = LogTimestampStr(str, &fStartedNewLine);
+    if (!strTimestamped.size())
+        return 0;
 
     if (fPrintToConsole)
     {
