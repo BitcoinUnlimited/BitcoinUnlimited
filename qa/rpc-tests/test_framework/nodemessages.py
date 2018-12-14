@@ -8,7 +8,14 @@ import time
 from codecs import encode
 from threading import RLock
 from io import BytesIO
+import copy
+
 MY_VERSION = 60001  # past bip-31 for ping/pong
+
+from .constants import SIGHASH_ALL, \
+    SIGHASH_FORKID, SIGHASH_ANYONECANPAY, \
+    SIGHASH_SINGLE, SIGHASH_NONE
+
 MY_SUBVERSION = b"/python-mininode-tester:0.0.3/"
 
 COIN = 100000000  # 1 btc in satoshis
@@ -595,6 +602,140 @@ class CTransaction(object):
     def __repr__(self):
         return "CTransaction(nVersion=%i vin=%s vout=%s nLockTime=%i)" \
             % (self.nVersion, repr(self.vin), repr(self.vout), self.nLockTime)
+
+    def SignatureHash(self, in_number, scriptCode, nValue, hashcode = SIGHASH_ALL | SIGHASH_FORKID, single = False, debug=False):
+        """Calculate hash digest for given input, using SIGHASH_FORKID
+        (Bitcoin Cash signing). Returns it in binary, little-endian.
+
+        txin is the corresponding input CTransaction. Supplying it is
+        necessary to include the scriptPubKey in the hashed output.
+
+        If single is True, just a single invocation of SHA256 is done,
+        instead of the usual, expected double hashing. This is to aid
+        applications such as CHECKDATASIG(VERIFY).
+        """
+        hashdata = struct.pack("<I", self.nVersion)
+
+        h_prevouts = self.hashPrevouts(hashcode)
+        if debug:
+            print("Hash prevouts:", hexlify(h_prevouts[::-1]))
+        hashdata += h_prevouts
+
+        h_sequence = self.hashSequence(hashcode)
+        if debug:
+            print("Hash sequence:", hexlify(h_sequence[::-1]))
+
+        hashdata += h_sequence
+        hashdata += self.vin[in_number].prevout.serialize()
+
+
+        # FIXME: long scriptPubKeys not supported yet
+        assert 75 >= len(scriptCode) > 0
+        hashdata += struct.pack("<B", len(scriptCode))
+        hashdata += scriptCode
+        hashdata += struct.pack("<Q", nValue)
+        hashdata += struct.pack("<I", self.vin[in_number].nSequence)
+
+        h_outputs = self.hashOutputs(hashcode, in_number)
+        if debug:
+            print("Hash outputs:", hexlify(h_outputs[::-1]))
+        hashdata += h_outputs
+        hashdata += struct.pack("<I", self.nLockTime)
+        hashdata += struct.pack("<I", hashcode)
+
+        if debug:
+            print("Hash all data:", hexlify(hashdata))
+        if single:
+            return sha256(hashdata)
+        else:
+            return hash256(hashdata)
+
+    def hashPrevouts(self, hashcode):
+        if hashcode & SIGHASH_ANYONECANPAY:
+            return 32 * b"\x00"
+        else:
+            op_ser = b""
+            for inp in self.vin:
+                op_ser += inp.prevout.serialize()
+            return hash256(op_ser)
+
+    def hashSequence(self, hashcode):
+        if (hashcode & SIGHASH_ANYONECANPAY or
+            hashcode & 0x1f == SIGHASH_SINGLE or
+            hashcode & 0x1f == SIGHASH_NONE):
+            return 32 * b"\x00"
+        else:
+            seq_ser = b""
+            for inp in self.vin:
+                seq_ser += struct.pack("<I", inp.nSequence)
+            return hash256(seq_ser)
+
+    def hashOutputs(self, hashcode, in_number):
+        if hashcode & 0x1f == SIGHASH_SINGLE and in_number < len(self.vout):
+            return hash256(self.vout[in_number].serialize())
+        elif ((not (hashcode & 0x1f == SIGHASH_SINGLE)) and
+              (not (hashcode & 0x1f == SIGHASH_NONE))):
+            out_ser = b""
+            for out in self.vout:
+                out_ser += out.serialize()
+            return hash256(out_ser)
+        else:
+            return 32 * b"\x00"
+
+    def SignatureHashLegacy(self, script, inIdx, hashtype):
+        """Consensus-correct SignatureHash (legacy variant)
+
+        Returns (hash, err) to precisely match the consensus-critical behavior of
+        the SIGHASH_SINGLE bug. (inIdx is *not* checked for validity)
+        """
+        from .script import FindAndDelete, CScript, OP_CODESEPARATOR
+
+        HASH_ONE = b'\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+
+        if inIdx >= len(self.vin):
+            return (HASH_ONE, "inIdx %d out of range (%d)" % (inIdx, len(self.vin)))
+
+        # create copy as it is going to be modified with FindAndDelete(..)
+        txtmp = CTransaction(self)
+
+        for txin in txtmp.vin:
+            txin.scriptSig = b''
+        txtmp.vin[inIdx].scriptSig = FindAndDelete(script, CScript([OP_CODESEPARATOR]))
+
+        if (hashtype & 0x1f) == SIGHASH_NONE:
+            txtmp.vout = []
+
+            for i in range(len(txtmp.vin)):
+                if i != inIdx:
+                    txtmp.vin[i].nSequence = 0
+
+        elif (hashtype & 0x1f) == SIGHASH_SINGLE:
+            outIdx = inIdx
+            if outIdx >= len(txtmp.vout):
+                return (HASH_ONE, "outIdx %d out of range (%d)" % (outIdx, len(txtmp.vout)))
+
+            tmp = txtmp.vout[outIdx]
+            txtmp.vout = []
+            for i in range(outIdx):
+                txtmp.vout.append(CTxOut())
+            txtmp.vout.append(tmp)
+
+            for i in range(len(txtmp.vin)):
+                if i != inIdx:
+                    txtmp.vin[i].nSequence = 0
+
+        if hashtype & SIGHASH_ANYONECANPAY:
+            tmp = txtmp.vin[inIdx]
+            txtmp.vin = []
+            txtmp.vin.append(tmp)
+
+        s = txtmp.serialize()
+        s += struct.pack(b"<I", hashtype)
+
+        hash = hash256(s)
+
+        return (hash, None)
+
 
 
 class CBlockHeader(object):
@@ -1241,3 +1382,8 @@ def Test():
     import doctest
     import sys
     print(doctest.testmod(sys.modules[__name__],verbose=True))
+
+## py.test code
+def testCTransactionCopyConstruct():
+    a = CTransaction()
+    b = CTransaction(a)
