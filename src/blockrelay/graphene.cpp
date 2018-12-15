@@ -41,7 +41,10 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPool
             vAdditionalTxs.push_back(tx);
     }
 
-    pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, true);
+    if (enableCanonicalTxOrder.Value())
+        pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, false);
+    else
+        pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, true);
 }
 
 CGrapheneBlock::~CGrapheneBlock()
@@ -125,13 +128,25 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             pfrom->GetLogName());
     }
 
+    size_t pt = pfrom->grapheneBlockHashes.size() - grapheneBlockTx.vMissingTx.size();
     for (const CTransaction &tx : grapheneBlockTx.vMissingTx)
     {
         pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
         uint256 hash = tx.GetHash();
         uint64_t cheapHash = hash.GetCheapHash();
-        pfrom->grapheneBlockHashes[pfrom->grapheneMapHashOrderIndex[cheapHash]] = hash;
+
+        // Insert in arbitrary order if canonical ordering is enabled
+        if (enableCanonicalTxOrder.Value())
+            pfrom->grapheneBlockHashes[pt++] = hash;
+        // Otherwise, use ordering information
+        else
+            pfrom->grapheneBlockHashes[pfrom->grapheneMapHashOrderIndex[cheapHash]] = hash;
+    }
+    // Sort order transactions if canonical ordering is enabled
+    if (enableCanonicalTxOrder.Value()){
+        // coinbase is always first
+        std::sort(pfrom->grapheneBlockHashes.begin()+1, pfrom->grapheneBlockHashes.end());
     }
 
     LOG(GRAPHENE, "Got %d Re-requested txs from peer=%s\n", grapheneBlockTx.vMissingTx.size(), pfrom->GetLogName());
@@ -496,6 +511,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
         }
 
         // Add full transactions included in the block
+        CTransactionRef coinbase = nullptr;
         if (!collision)
         {
             for (auto &tx : vAdditionalTxs)
@@ -503,11 +519,17 @@ bool CGrapheneBlock::process(CNode *pfrom,
                 const uint256 &hash = tx->GetHash();
                 uint64_t cheapHash = hash.GetCheapHash();
 
+                if (tx->IsCoinBase())
+                    coinbase = tx;
+
                 auto ir = mapPartialTxHash.insert(std::make_pair(cheapHash, hash));
                 if (!ir.second)
                     collision = true;
             }
         }
+
+        if (coinbase == NULL)
+            throw std::runtime_error("No coinbase transaction found in graphene block");
 
         if (!collision)
         {
@@ -515,14 +537,30 @@ bool CGrapheneBlock::process(CNode *pfrom,
             {
                 std::vector<uint64_t> blockCheapHashes = pGrapheneSet->Reconcile(mapPartialTxHash);
 
+                // Ensure coinbase is first
+                if (blockCheapHashes[0] != coinbase->GetHash().GetCheapHash())
+                {
+                    auto it = std::find(blockCheapHashes.begin(), blockCheapHashes.end(), coinbase->GetHash().GetCheapHash());
+
+                    if (it == blockCheapHashes.end())
+                        throw std::runtime_error("No coinbase transaction found in graphene block");
+
+                    auto idx = std::distance(blockCheapHashes.begin(), it);
+
+                    blockCheapHashes[idx] = blockCheapHashes[0];    
+                    blockCheapHashes[0] = coinbase->GetHash().GetCheapHash();   
+                }
+
                 // Sort out what hashes we have from the complete set of cheapHashes
                 uint64_t nGrapheneTxsPossessed = 0;
                 for (size_t i = 0; i < blockCheapHashes.size(); i++)
                 {
                     uint64_t cheapHash = blockCheapHashes[i];
 
-                    // Update mapHashOrderIndex so it is available if we later receive missing txs
-                    pfrom->grapheneMapHashOrderIndex[cheapHash] = i;
+                    // If canonical order is not enabled, update mapHashOrderIndex so it is available if we 
+                    // later receive missing txs
+                    if (!enableCanonicalTxOrder.Value())
+                        pfrom->grapheneMapHashOrderIndex[cheapHash] = i;
 
                     const auto &elem = mapPartialTxHash.find(cheapHash);
                     if (elem != mapPartialTxHash.end())
@@ -536,6 +574,12 @@ bool CGrapheneBlock::process(CNode *pfrom,
                         pfrom->grapheneBlockHashes.push_back(nullhash);
                         setHashesToRequest.insert(cheapHash);
                     }
+                }
+
+                // Sort order transactions if canonical order is enabled
+                if (enableCanonicalTxOrder.Value()){
+                    // coinbase is always first
+                    std::sort(pfrom->grapheneBlockHashes.begin()+1, pfrom->grapheneBlockHashes.end());
                 }
 
                 graphenedata.AddGrapheneBlockBytes(nGrapheneTxsPossessed * sizeof(uint64_t), pfrom);
