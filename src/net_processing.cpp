@@ -677,6 +677,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
             else if (iter->second == XVer::keyType::changeable)
             {
+                LOCK(pfrom->cs_xversion);
                 pfrom->xVersion.xmap[entry.first] = xUpdate.xmap[entry.first];
             }
         }
