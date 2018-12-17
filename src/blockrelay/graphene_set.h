@@ -50,6 +50,7 @@ public:
     // The default constructor is for 2-phase construction via deserialization
     CGrapheneSet() : ordered(false), nReceiverUniverseItems(0), pSetFilter(nullptr), pSetIblt(nullptr) {}
     CGrapheneSet(size_t _nReceiverUniverseItems,
+        uint64_t nSenderUniverseItems,
         const std::vector<uint256> &_itemHashes,
         bool _ordered = false,
         bool fDeterministic = false);
@@ -63,7 +64,10 @@ public:
      * The total size in bytes of a graphene block is given by T(a) = F(a) + L(a) as defined
      * in the code below. (Note that meta parameters for the Bloom Filter and IBLT are ignored).
      */
-    double OptimalSymDiff(uint64_t nBlockTxs, uint64_t nReceiverPoolTx);
+    double OptimalSymDiff(uint64_t nBlockTxs,
+        uint64_t nReceiverPoolTx,
+        uint64_t nReceiverExcessTxs = 0,
+        uint64_t nReceiverMissingTxs = 1);
 
     // Pass the transaction hashes that the local machine has to reconcile with the remote and return a list
     // of cheap hashes in the block in the correct order
