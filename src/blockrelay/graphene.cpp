@@ -22,6 +22,7 @@
 #include "util.h"
 #include "utiltime.h"
 #include "validation/validation.h"
+#include "xversionkeys.h"
 
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
 
@@ -136,17 +137,18 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         uint256 hash = tx.GetHash();
         uint64_t cheapHash = hash.GetCheapHash();
 
-        // Insert in arbitrary order if canonical ordering is enabled
-        if (enableCanonicalTxOrder.Value())
+        // Insert in arbitrary order if canonical ordering is enabled and xversion is recent enough
+        if (enableCanonicalTxOrder.Value() && pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) >= 1)
             pfrom->grapheneBlockHashes[pt++] = hash;
         // Otherwise, use ordering information
         else
             pfrom->grapheneBlockHashes[pfrom->grapheneMapHashOrderIndex[cheapHash]] = hash;
     }
-    // Sort order transactions if canonical ordering is enabled
-    if (enableCanonicalTxOrder.Value()){
+    // Sort order transactions if canonical ordering is enabled and xversion is recent enough
+    if (enableCanonicalTxOrder.Value() && pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) >= 1)
+    {
         // coinbase is always first
-        std::sort(pfrom->grapheneBlockHashes.begin()+1, pfrom->grapheneBlockHashes.end());
+        std::sort(pfrom->grapheneBlockHashes.begin() + 1, pfrom->grapheneBlockHashes.end());
     }
 
     LOG(GRAPHENE, "Got %d Re-requested txs from peer=%s\n", grapheneBlockTx.vMissingTx.size(), pfrom->GetLogName());
@@ -540,15 +542,16 @@ bool CGrapheneBlock::process(CNode *pfrom,
                 // Ensure coinbase is first
                 if (blockCheapHashes[0] != coinbase->GetHash().GetCheapHash())
                 {
-                    auto it = std::find(blockCheapHashes.begin(), blockCheapHashes.end(), coinbase->GetHash().GetCheapHash());
+                    auto it =
+                        std::find(blockCheapHashes.begin(), blockCheapHashes.end(), coinbase->GetHash().GetCheapHash());
 
                     if (it == blockCheapHashes.end())
                         throw std::runtime_error("No coinbase transaction found in graphene block");
 
                     auto idx = std::distance(blockCheapHashes.begin(), it);
 
-                    blockCheapHashes[idx] = blockCheapHashes[0];    
-                    blockCheapHashes[0] = coinbase->GetHash().GetCheapHash();   
+                    blockCheapHashes[idx] = blockCheapHashes[0];
+                    blockCheapHashes[0] = coinbase->GetHash().GetCheapHash();
                 }
 
                 // Sort out what hashes we have from the complete set of cheapHashes
@@ -557,9 +560,10 @@ bool CGrapheneBlock::process(CNode *pfrom,
                 {
                     uint64_t cheapHash = blockCheapHashes[i];
 
-                    // If canonical order is not enabled, update mapHashOrderIndex so it is available if we 
-                    // later receive missing txs
-                    if (!enableCanonicalTxOrder.Value())
+                    // If canonical order is not enabled or xversion is less than 1, update mapHashOrderIndex so
+                    // it is available if we later receive missing txs
+                    if (!enableCanonicalTxOrder.Value() ||
+                        pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) < 1)
                         pfrom->grapheneMapHashOrderIndex[cheapHash] = i;
 
                     const auto &elem = mapPartialTxHash.find(cheapHash);
@@ -576,10 +580,11 @@ bool CGrapheneBlock::process(CNode *pfrom,
                     }
                 }
 
-                // Sort order transactions if canonical order is enabled
-                if (enableCanonicalTxOrder.Value()){
+                // Sort order transactions if canonical order is enabled and graphene version is late enough
+                if (enableCanonicalTxOrder.Value() && pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) >= 1)
+                {
                     // coinbase is always first
-                    std::sort(pfrom->grapheneBlockHashes.begin()+1, pfrom->grapheneBlockHashes.end());
+                    std::sort(pfrom->grapheneBlockHashes.begin() + 1, pfrom->grapheneBlockHashes.end());
                 }
 
                 graphenedata.AddGrapheneBlockBytes(nGrapheneTxsPossessed * sizeof(uint64_t), pfrom);
