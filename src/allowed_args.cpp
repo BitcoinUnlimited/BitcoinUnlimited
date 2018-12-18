@@ -305,6 +305,9 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
 #ifndef WIN32
         .addArg("pid=<file>", requiredStr, strprintf(_("Specify pid file (default: %s)"), BITCOIN_PID_FILENAME))
 #endif
+        .addArg("persistmempool={true,false,0,1}", optionalBool,
+            strprintf(_("Whether to save the mempool on shutdown and load on restart (default: %u)"),
+                    DEFAULT_PERSIST_MEMPOOL))
         .addArg("prune=<n>", requiredInt,
             strprintf(_("Reduce storage requirements by pruning (deleting) old blocks. This mode is incompatible with "
                         "-txindex and -rescan. "

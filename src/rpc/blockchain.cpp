@@ -1525,6 +1525,24 @@ UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
     return NullUniValue;
 }
 
+UniValue savemempool(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+    {
+        throw std::runtime_error("savemempool\n"
+                                 "\nDumps the mempool to disk.\n"
+                                 "\nExamples:\n" +
+                                 HelpExampleCli("savemempool", "") + HelpExampleRpc("savemempool", ""));
+    }
+
+    if (!DumpMempool())
+    {
+        throw JSONRPCError(RPC_MISC_ERROR, "Unable to dump mempool to disk");
+    }
+
+    return NullUniValue;
+}
+
 static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
     //  --------------------- ------------------------  -----------------------  ----------
@@ -1539,7 +1557,7 @@ static const CRPCCommand commands[] = {
     {"blockchain", "getorphanpoolinfo", &getorphanpoolinfo, true},
     {"blockchain", "getrawmempool", &getrawmempool, true}, {"blockchain", "getraworphanpool", &getraworphanpool, true},
     {"blockchain", "gettxout", &gettxout, true}, {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true},
-    {"blockchain", "verifychain", &verifychain, true},
+    {"blockchain", "savemempool", &savemempool, true}, {"blockchain", "verifychain", &verifychain, true},
 
     /* Not shown in help */
     {"hidden", "invalidateblock", &invalidateblock, true}, {"hidden", "reconsiderblock", &reconsiderblock, true},

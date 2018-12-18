@@ -411,6 +411,7 @@ void BitcoinApplication::requestShutdown()
 
     // Show a simple window indicating shutdown status
     ShutdownWindow::showShutdownWindow(window);
+    StartShutdown();
 
     // Request shutdown from core thread
     Q_EMIT requestedShutdown();

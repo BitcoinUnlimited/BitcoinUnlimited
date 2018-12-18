@@ -60,6 +60,8 @@ public:
     NodeId nodeId; // hold the id so I don't keep a ref to the node
     bool whitelisted;
     std::string nodeName;
+
+    CTxInputData() : nodeId(-1), whitelisted(false), nodeName("none") {}
 };
 
 // Tracks data about transactions that are ready to be committed to the mempool

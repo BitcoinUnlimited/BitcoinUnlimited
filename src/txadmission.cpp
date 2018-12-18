@@ -1045,7 +1045,6 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
                     txd.tx = orphanTx;
                     txd.nodeId = fromPeer;
                     txd.nodeName = "orphan";
-                    txd.whitelisted = false;
                     LOG(MEMPOOL, "Resubmitting orphan tx: %s\n", orphanTx->GetHash().ToString().c_str());
                     EnqueueTxForAdmission(txd);
                 }

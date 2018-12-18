@@ -2875,9 +2875,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
             {
                 CTxInputData txd;
                 txd.tx = ptx;
-                txd.nodeId = -1;
                 txd.nodeName = "rollback";
-                txd.whitelisted = false;
                 EnqueueTxForAdmission(txd);
             }
         }
