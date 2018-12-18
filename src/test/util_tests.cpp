@@ -822,6 +822,13 @@ BOOST_AUTO_TEST_CASE(splitbycommaandremovespaces)
     BOOST_CHECK_EQUAL(r[1], "two");
     BOOST_CHECK_EQUAL(r[2], "three");
     BOOST_CHECK_EQUAL(r[3], "four");
+
+    std::vector<std::string> inp2{"one", "two, two  ", "f o u r"};
+    const std::vector<std::string> r3 = splitByCommasAndRemoveSpaces(inp2, true);
+    BOOST_CHECK_EQUAL(r3.size(), 3);
+    BOOST_CHECK_EQUAL(r3[0], "four");
+    BOOST_CHECK_EQUAL(r3[1], "one");
+    BOOST_CHECK_EQUAL(r3[2], "two");
 }
 
 BOOST_AUTO_TEST_CASE(enum_toString)

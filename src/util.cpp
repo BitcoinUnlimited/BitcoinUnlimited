@@ -94,7 +94,8 @@
 #include <openssl/rand.h>
 #include <thread>
 
-std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args)
+std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args,
+    bool removeDuplicates /* false */)
 {
     std::vector<std::string> result;
     for (std::string arg : args)
@@ -110,6 +111,13 @@ std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::str
             if (c != ' ')
                 arg_nospace += c;
         result.push_back(arg_nospace);
+    }
+
+    // remove duplicates from the list of debug categories
+    if (removeDuplicates)
+    {
+        std::sort(result.begin(), result.end());
+        result.erase(std::unique(result.begin(), result.end()), result.end());
     }
     return result;
 }
@@ -184,7 +192,7 @@ void LogInit()
 {
     string category = "";
     uint64_t catg = NONE;
-    const vector<string> categories = splitByCommasAndRemoveSpaces(mapMultiArgs["-debug"]);
+    const vector<string> categories = splitByCommasAndRemoveSpaces(mapMultiArgs["-debug"], true);
 
     // enable all when given -debug=1 or -debug
     if (categories.size() == 1 && (categories[0] == "" || categories[0] == "1"))
