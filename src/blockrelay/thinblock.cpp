@@ -1325,12 +1325,14 @@ std::string CThinBlockData::FullTxToString()
 bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
 {
     // Base time used to calculate the random timeout value.
-    static uint64_t nTimeToWait = 1000;
+    static uint64_t nTimeToWait = GetArg("-preferential-timer", DEFAULT_PREFERENTIAL_TIMER);
+    if (nTimeToWait == 0)
+        return false;
 
     LOCK(cs_mapThinBlockTimer);
     if (!mapThinBlockTimer.count(hash))
     {
-        // The timeout limit is a random number between 0.8 and 1.2 seconds.
+        // The timeout limit is a random number belonging to thinblock-timer +/- 20%
         // This way a node connected to this one may download the block
         // before the other node and thus be able to serve the other with
         // a graphene block, rather than both nodes timing out and downloading
@@ -1338,9 +1340,11 @@ bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
         // where we receive full blocks from peers that don't support graphene.
         //
         // To make the timeout random we adjust the start time of the timer forward
-        // or backward by a random amount plus or minus 0.2 seconds.
+        // or backward by a random amount plus or minus 20% of preferential timer in milliseconds.
         FastRandomContext insecure_rand(false);
-        uint64_t nOffset = nTimeToWait - (800 + (insecure_rand.rand64() % 400) + 1);
+        uint64_t nStartInterval = nTimeToWait * 0.8;
+        uint64_t nIntervalLen = 2 * (nTimeToWait * 0.2);
+        int64_t nOffset = nTimeToWait - (nStartInterval + (insecure_rand.rand64() % nIntervalLen) + 1);
         mapThinBlockTimer[hash] = std::make_pair(GetTimeMillis() + nOffset, false);
         LOG(THIN, "Starting Preferential Thinblock timer (%d millis)\n", nTimeToWait + nOffset);
     }
