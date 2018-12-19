@@ -1327,10 +1327,7 @@ bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
     // Base time used to calculate the random timeout value.
     static uint64_t nTimeToWait = GetArg("-preferential-timer", DEFAULT_PREFERENTIAL_TIMER);
     if (nTimeToWait == 0)
-    {
-        LOG(THIN, "Thinblock preferential times is disabled\n");
         return false;
-    }
 
     LOCK(cs_mapThinBlockTimer);
     if (!mapThinBlockTimer.count(hash))

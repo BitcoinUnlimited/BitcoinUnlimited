@@ -1184,10 +1184,7 @@ bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
     // Base time used to calculate the random timeout value.
     static uint64_t nTimeToWait = GetArg("-preferential-timer", DEFAULT_PREFERENTIAL_TIMER);
     if (nTimeToWait == 0)
-    {
-        LOG(GRAPHENE, "Graphene preferential times is disabled\n");
         return false;
-    }
 
     LOCK(cs_mapGrapheneBlockTimer);
     if (!mapGrapheneBlockTimer.count(hash))
