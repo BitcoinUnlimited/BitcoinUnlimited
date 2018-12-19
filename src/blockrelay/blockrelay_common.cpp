@@ -56,7 +56,7 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
     // Base time used to calculate the random timeout value.
     static uint64_t nTimeToWait = GetArg("-preferential-timer", DEFAULT_PREFERENTIAL_TIMER);
     if (nTimeToWait == 0)
-        return false;
+        return true;
 
     LOCK(cs_blockrelaytimer);
     if (!mapBlockRelayTimer.count(hash))
@@ -74,7 +74,7 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
         uint64_t nStartInterval = nTimeToWait * 0.8;
         uint64_t nIntervalLen = 2 * (nTimeToWait * 0.2);
         int64_t nOffset = nTimeToWait - (nStartInterval + (insecure_rand.rand64() % nIntervalLen) + 1);
-        mapBlockRelayTimer[hash] = std::make_pair(GetTimeMillis() + nOffset, false);
+        mapBlockRelayTimer.emplace(hash, std::make_pair(GetTimeMillis() + nOffset, false));
         LOG(GRAPHENE, "Starting Preferential block relay timer (%d millis)\n", nTimeToWait + nOffset);
     }
     else
@@ -95,11 +95,11 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
                     iter->second.second = true;
                     LOG(GRAPHENE | THIN, "Preferential block relay timer exceeded\n");
                 }
-                return false;
+                return true;
             }
         }
     }
-    return true;
+    return false;
 }
 
 bool ThinTypeRelay::IsBlockRelayTimerEnabled()
