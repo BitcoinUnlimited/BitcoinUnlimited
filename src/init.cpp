@@ -1232,6 +1232,15 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         }
     }
 
+    // Set enableCanonicalTxOrder for the BCH early in the bootstrap phase
+    if (IsNov152018Scheduled())
+    {
+        if (IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
+        {
+            enableCanonicalTxOrder = true;
+        }
+    }
+
 
 // ********************************************************* Step 7: load wallet
 
