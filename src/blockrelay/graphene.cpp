@@ -1201,7 +1201,7 @@ bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
         FastRandomContext insecure_rand(false);
         uint64_t nStartInterval = nTimeToWait * 0.8;
         uint64_t nIntervalLen = 2 * (nTimeToWait * 0.2);
-        uint64_t nOffset = nTimeToWait - (nStartInterval + (insecure_rand.rand64() % nIntervalLen) + 1);
+        int64_t nOffset = nTimeToWait - (nStartInterval + (insecure_rand.rand64() % nIntervalLen) + 1);
         mapGrapheneBlockTimer[hash] = std::make_pair(GetTimeMillis() + nOffset, false);
         LOG(GRAPHENE, "Starting Preferential Graphene Block timer (%d millis)\n", nTimeToWait + nOffset);
     }
