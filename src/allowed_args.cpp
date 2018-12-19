@@ -649,9 +649,6 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
                         "but the data rate will not exceed this parameter (default: %u)"),
                     DEFAULT_MAX_SEND_BURST))
         .addArg("use-thinblocks", optionalBool, _("Enable thin blocks to speed up the relay of blocks (default: 1)"))
-        .addArg("thinblock-timer=<millisec>", requiredInt,
-            strprintf(_("Set thinblock preferential timer duration (default: %u). Use 0 to disable it."),
-                    DEFAULT_THINBLOCK_TIMER))
         .addArg("xthinbloomfiltersize=<n>", requiredInt,
             strprintf(_("The maximum xthin bloom filter size that our node will accept in Bytes (default: %u)"),
                     SMALLEST_MAX_BLOOM_FILTER_SIZE))
@@ -660,9 +657,9 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
               "although it can impact performance. (default: 0)"))
         .addArg("use-grapheneblocks", optionalBool,
             strprintf(_("Enable graphene to speed up the relay of blocks (default: %d)"), DEFAULT_USE_GRAPHENE_BLOCKS))
-        .addArg("graphene-timer=<millisec>", requiredInt,
-            strprintf(_("Set graphene preferential timer duration (default: %u). Use 0 to disable it."),
-                    DEFAULT_GRAPHENE_TIMER));
+        .addArg("preferential-timer=<millisec>", requiredInt,
+            strprintf(_("Set graphene and thinblock preferential timer duration (default: %u). Use 0 to disable it."),
+                    DEFAULT_PREFERENTIAL_TIMER));
 }
 
 static void addBlockCreationOptions(AllowedArgs &allowedArgs)

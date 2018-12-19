@@ -1325,7 +1325,7 @@ std::string CThinBlockData::FullTxToString()
 bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
 {
     // Base time used to calculate the random timeout value.
-    static uint64_t nTimeToWait = GetArg("-thinblock-timer", DEFAULT_THINBLOCK_TIMER);
+    static uint64_t nTimeToWait = GetArg("-preferential-timer", DEFAULT_PREFERENTIAL_TIMER);
     if (nTimeToWait == 0)
     {
         LOG(THIN, "Thinblock preferential times is disabled\n");
@@ -1343,7 +1343,7 @@ bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
         // where we receive full blocks from peers that don't support graphene.
         //
         // To make the timeout random we adjust the start time of the timer forward
-        // or backward by a random amount plus or minus 20% of thinblock-timer in seconds.
+        // or backward by a random amount plus or minus 20% of preferential timer in milliseconds.
         FastRandomContext insecure_rand(false);
         uint64_t nStartInterval = nTimeToWait * 0.8;
         uint64_t nIntervalLen = 2 * (nTimeToWait * 0.2);

@@ -1182,7 +1182,7 @@ std::string CGrapheneBlockData::ReRequestedTxToString()
 bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
 {
     // Base time used to calculate the random timeout value.
-    static uint64_t nTimeToWait = GetArg("-graphene-timer", DEFAULT_GRAPHENE_TIMER);
+    static uint64_t nTimeToWait = GetArg("-preferential-timer", DEFAULT_PREFERENTIAL_TIMER);
     if (nTimeToWait == 0)
     {
         LOG(GRAPHENE, "Graphene preferential times is disabled\n");
@@ -1200,7 +1200,7 @@ bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
         // where we receive full blocks from peers that don't support graphene.
         //
         // To make the timeout random we adjust the start time of the timer forward
-        // or backward by a random amount plus or minus 0.2 seconds.
+        // or backward by a random amount plus or minus 20% of preferential timer in milliseconds.
         FastRandomContext insecure_rand(false);
         uint64_t nStartInterval = nTimeToWait * 0.8;
         uint64_t nIntervalLen = 2 * (nTimeToWait * 0.2);
