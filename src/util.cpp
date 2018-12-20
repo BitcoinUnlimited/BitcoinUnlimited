@@ -391,8 +391,8 @@ void LogFlush()
 int LogPrintStr(const std::string &str)
 {
     int ret = 0; // Returns total number of characters written
-    thread_local std::string logbuf;
-    string strTimestamped = LogTimestampStr(str, logbuf);
+    std::string logbuf;
+    std::string strTimestamped = LogTimestampStr(str, logbuf);
 
     if (!strTimestamped.size())
         return 0;
