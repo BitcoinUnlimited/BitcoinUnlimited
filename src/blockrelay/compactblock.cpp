@@ -307,19 +307,29 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
         {
             // Start gathering the full tx hashes. If some are not available then add them to setHashesToRequest.
             uint256 nullhash;
-            int i = 1;
             for (const uint64_t &cheapHash : pfrom->vShortCompactBlockHashes)
             {
                 if (mapPartialTxHash.find(cheapHash) != mapPartialTxHash.end())
                 {
                     pfrom->vCompactBlockHashes.push_back(mapPartialTxHash[cheapHash]);
-                    //LOG(CMPCT, "tx%d hash in block: %s\n", i++, mapPartialTxHash[cheapHash].ToString());
                 }
                 else
                 {
                     pfrom->vCompactBlockHashes.push_back(nullhash); // placeholder
                     setHashesToRequest.insert(cheapHash);
-                    //LOG(CMPCT, "adding to sethashes to request\n");
+
+                    // If there are more hashes to request than available indices then we will not be able to
+                    // reconstruct the compact block so just send a full block.
+                    if (setHashesToRequest.size() > std::numeric_limits<uint16_t>::max())
+                    {
+                        // Since we can't process this compactblock then clear out the data from memory
+                        compactdata.ClearCompactBlockData(pfrom, header.GetHash());
+
+                        std::vector<CInv> vGetData;
+                        vGetData.push_back(CInv(MSG_BLOCK, header.GetHash()));
+                        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+                        return error("Too many re-requested hashes for compactblock: requesting a full block");
+                    }
                 }
             }
 
@@ -370,7 +380,8 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
 
     pfrom->compactBlockWaitingForTxns = missingCount;
     LOG(CMPCT, "compactblock waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n",
-        pfrom->compactBlockWaitingForTxns, unnecessaryCount, pfrom->compactBlock.vtx.size(), pfrom->mapMissingTx.size());
+        pfrom->compactBlockWaitingForTxns, unnecessaryCount, pfrom->compactBlock.vtx.size(),
+        pfrom->mapMissingTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
@@ -1215,13 +1226,13 @@ bool IsCompactBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissing
     // Check that that there is at least one txn in the xthin and that the first txn is the coinbase
     if (vMissingTx.empty())
     {
-        return error("No Transactions found in compactblock %s from peer %s", header.GetHash().ToString(),
-            pfrom->GetLogName());
+        return error(
+            "No Transactions found in compactblock %s from peer %s", header.GetHash().ToString(), pfrom->GetLogName());
     }
     if (!vMissingTx[0].IsCoinBase())
     {
-        return error("First txn is not coinbase for compactblock %s from peer %s",
-            header.GetHash().ToString(), pfrom->GetLogName());
+        return error("First txn is not coinbase for compactblock %s from peer %s", header.GetHash().ToString(),
+            pfrom->GetLogName());
     }
 
     // check block header
