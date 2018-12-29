@@ -414,10 +414,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
         // Request full block if this one isn't extending the best chain
         if (pIndex->nChainWork <= chainActive.Tip()->nChainWork)
         {
-            std::vector<CInv> vGetData;
-            vGetData.push_back(inv);
-            pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-
+            thinrelay.RequestBlock(pfrom, inv.hash);
             graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
 
             LOGA("%s %s from peer %s received but does not extend longest chain; requesting full block\n", strCommand,
@@ -1504,7 +1501,7 @@ CMemPoolInfo GetGrapheneMempoolInfo()
     }
     return CMemPoolInfo(mempool.size() + orphanpool.GetOrphanPoolSize() + nCommitQ);
 }
-void RequestFailoverBlock(CNode *pfrom, uint256 blockHash)
+void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash)
 {
     if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable() &&
         !thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::XTHINBLOCK))
@@ -1512,7 +1509,7 @@ void RequestFailoverBlock(CNode *pfrom, uint256 blockHash)
         LOG(GRAPHENE, "Requesting xthin block as failover from peer %s\n", pfrom->GetLogName());
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         CBloomFilter filterMemPool;
-        CInv inv2(MSG_XTHINBLOCK, blockHash);
+        CInv inv(MSG_XTHINBLOCK, blockhash);
 
         if (!thinrelay.AddThinTypeBlockInFlight(pfrom, inv2.hash, NetMsgType::XTHINBLOCK))
             return;
@@ -1523,16 +1520,14 @@ void RequestFailoverBlock(CNode *pfrom, uint256 blockHash)
             for (auto &mi : orphanpool.mapOrphanTransactions)
                 vOrphanHashes.emplace_back(mi.first);
         }
-        BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
-        ss << inv2;
+        BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv.hash, pfrom);
+        ss << inv;
         ss << filterMemPool;
         pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
     }
     else
     {
         LOG(GRAPHENE, "Requesting full block as failover from peer %s\n", pfrom->GetLogName());
-        std::vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_BLOCK, blockHash));
-        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+        thinrelay.RequestBlock(pfrom, blockhash);
     }
 }

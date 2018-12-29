@@ -302,6 +302,6 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
 bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header);
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);
 CMemPoolInfo GetGrapheneMempoolInfo();
-void RequestFailoverBlock(CNode *pfrom, uint256 blockHash);
+void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash);
 
 #endif // BITCOIN_GRAPHENE_H

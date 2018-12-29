@@ -325,9 +325,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
                         // Since we can't process this compactblock then clear out the data from memory
                         compactdata.ClearCompactBlockData(pfrom, header.GetHash());
 
-                        std::vector<CInv> vGetData;
-                        vGetData.push_back(CInv(MSG_BLOCK, header.GetHash()));
-                        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+                        thinrelay.RequestBlock(pfrom, header.GetHash());
                         return error("Too many re-requested hashes for compactblock: requesting a full block");
                     }
                 }
@@ -363,10 +361,6 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
     // block which has the full Tx hash data rather than just the truncated hash.
     if (_collision || !fMerkleRootCorrect)
     {
-        std::vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_BLOCK, header.GetHash()));
-        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-
         if (!fMerkleRootCorrect)
             return error(
                 "mismatched merkle root on compactblock: rerequesting a full block, peer=%s", pfrom->GetLogName());
@@ -375,6 +369,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
                 "TX HASH COLLISION for compactblock: re-requesting a full block, peer=%s", pfrom->GetLogName());
 
         compactdata.ClearCompactBlockData(pfrom, header.GetHash());
+        thinrelay.RequestBlock(pfrom, header.GetHash());
         return true;
     }
 
@@ -415,9 +410,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
         // Since we can't process this compactblock then clear out the data from memory
         compactdata.ClearCompactBlockData(pfrom, header.GetHash());
 
-        std::vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_BLOCK, header.GetHash()));
-        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+        thinrelay.RequestBlock(pfrom, header.GetHash());
         return error("Still missing transactions for compactblock: re-requesting a full block");
     }
 
@@ -615,9 +608,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         // Since we can't process this compactblock then clear out the data from memory
         compactdata.ClearCompactBlockData(pfrom, inv.hash);
 
-        std::vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_BLOCK, compactReReqResponse.blockhash));
-        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+        thinrelay.RequestBlock(pfrom, inv.hash);
         return error("Still missing transactions after reconstructing block, peer=%s: re-requesting a full block",
             pfrom->GetLogName());
     }

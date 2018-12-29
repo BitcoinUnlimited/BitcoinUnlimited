@@ -278,3 +278,10 @@ void ThinTypeRelay::CheckForThinTypeDownloadTimeout(CNode *pfrom)
         range.first++;
     }
 }
+
+void ThinTypeRelay::RequestBlock(CNode *pfrom, const uint256 &hash)
+{
+    std::vector<CInv> vGetData;
+    vGetData.push_back(CInv(MSG_BLOCK, hash));
+    pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+}

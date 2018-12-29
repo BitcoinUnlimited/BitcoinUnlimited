@@ -56,6 +56,7 @@ public:
     bool AddThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType);
     void ClearThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash);
     void CheckForThinTypeDownloadTimeout(CNode *pfrom);
+    void RequestBlock(CNode *pfrom, const uint256 &hash);
 };
 extern ThinTypeRelay thinrelay;
 

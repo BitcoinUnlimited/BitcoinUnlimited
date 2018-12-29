@@ -196,15 +196,15 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
         // finish reassembling the block, we need to re-request the full regular block
         LOG(THIN, "Missing %d Thinblock transactions, re-requesting a regular block from peer=%s\n",
             pfrom->thinBlockWaitingForTxns, pfrom->GetLogName());
+        thinrelay.RequestBlock(pfrom, header.GetHash());
+
         thindata.UpdateInBoundReRequestedTx(pfrom->thinBlockWaitingForTxns);
         thindata.ClearThinBlockData(pfrom, header.GetHash());
-
-        std::vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_BLOCK, header.GetHash()));
-        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-
-        LOCK(cs_xval);
-        setPreVerifiedTxHash.clear(); // Xpress Validation - clear the set since we do not do XVal on regular blocks
+        {
+            // Clear the set since we do not use XVal for full blocks
+            LOCK(cs_xval);
+            setPreVerifiedTxHash.clear();
+        }
     }
 
     return true;
@@ -385,9 +385,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         // Since we can't process this thinblock then clear out the data from memory
         thindata.ClearThinBlockData(pfrom, inv.hash);
 
-        std::vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_BLOCK, thinBlockTx.blockhash));
-        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+        thinrelay.RequestBlock(pfrom, inv.hash);
         return error("Still missing transactions after reconstructing block, peer=%s: re-requesting a full block",
             pfrom->GetLogName());
     }
@@ -596,12 +594,8 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         // Request full block if it isn't extending the best chain
         if (pIndex->nChainWork <= chainActive.Tip()->nChainWork)
         {
-            std::vector<CInv> vGetData;
-            vGetData.push_back(inv);
-            pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-
+            thinrelay.RequestBlock(pfrom, thinBlock.header.GetHash());
             thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
-
             LOGA("%s %s from peer %s received but does not extend longest chain; requesting full block\n", strCommand,
                 inv.hash.ToString(), pfrom->GetLogName());
             return true;
@@ -768,16 +762,13 @@ bool CXThinBlock::process(CNode *pfrom,
     // thinblock which has the full Tx hash data rather than just the truncated hash.
     if (_collision || !fMerkleRootCorrect)
     {
-        std::vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_THINBLOCK, header.GetHash()));
-        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-
         if (!fMerkleRootCorrect)
             return error(
                 "mismatched merkle root on xthinblock: rerequesting a thinblock, peer=%s", pfrom->GetLogName());
         else
             return error("TX HASH COLLISION for xthinblock: re-requesting a thinblock, peer=%s", pfrom->GetLogName());
 
+        thinrelay.RequestBlock(pfrom, header.GetHash());
         thindata.ClearThinBlockData(pfrom, header.GetHash());
         return true;
     }
@@ -803,12 +794,9 @@ bool CXThinBlock::process(CNode *pfrom,
     // and re-request a full block (This should never happen because we just checked the various pools).
     if (missingCount > 0)
     {
-        // Since we can't process this thinblock then clear out the data from memory
+        // Since we can't process this thinblock then clear out the data from memory and request a full block
         thindata.ClearThinBlockData(pfrom, header.GetHash());
-
-        std::vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_BLOCK, header.GetHash()));
-        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+        thinrelay.RequestBlock(pfrom,  header.GetHash());
         return error("Still missing transactions for xthinblock: re-requesting a full block");
     }
 
