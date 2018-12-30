@@ -45,20 +45,21 @@ cd "$DEPS_ROOT"
 # don't download if already downloaded
 if [ ! -e hexdump.zip ]
 then
-	wget --no-check-certificate https://github.com/wahern/hexdump/archive/rel-20160408.zip -O "$DEPS_ROOT/hexdump.zip"
+	wget --no-check-certificate https://github.com/wahern/hexdump/archive/67157e987d04fba9e4df733a97b410fffb8dfbdf.zip -O "$DEPS_ROOT/hexdump.zip"
 	# Verify downloaded file's hash
 	# NOTE: This hash was self computed as it was not provided by the author
 	# v2016.04.08 sha256=ad2bf521260826e57b8268c8f12810935fcb5a0616137643b6b260ee43034632
-	check_hash ad2bf521260826e57b8268c8f12810935fcb5a0616137643b6b260ee43034632 "$DEPS_ROOT/hexdump.zip"
+	# v2018.12.21 sha256=B582A18D70C51EFE49B482D08FDFAFD35DC4CB0C31DF1DA4F8777DC649893D78
+	check_hash B582A18D70C51EFE49B482D08FDFAFD35DC4CB0C31DF1DA4F8777DC649893D78 "$DEPS_ROOT/hexdump.zip"
 fi
 # don't extract if already extracted
 cd "$PATH_DEPS"
-if [ ! -d hexdump-master ]
+if [ ! -d hexdump-67157e987d04fba9e4df733a97b410fffb8dfbdf ]
 then
 	cd "$DEPS_ROOT"
 	"$CMD_7ZIP" x hexdump.zip -aoa -o"$PATH_DEPS"
 fi
-cd "$PATH_DEPS/hexdump-master"
+cd "$PATH_DEPS/hexdump-67157e987d04fba9e4df733a97b410fffb8dfbdf"
 gcc -std=gnu99 -g -O2 -Wall -Wextra -Werror -Wno-unused-variable -Wno-unused-parameter hexdump.c -DHEXDUMP_MAIN -o "$MSYS_BIN/hexdump.exe"
 
 
