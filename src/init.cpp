@@ -47,6 +47,7 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
+#include "validation/dynamicsize.h"
 #include "validation/validation.h"
 #include "validation/verifydb.h"
 #include "validationinterface.h"
@@ -1512,6 +1513,9 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     {
         READLOCK(cs_mapBlockIndex);
         LOGA("mapBlockIndex.size() = %u\n", mapBlockIndex.size());
+        // clear the size tracker
+        sizeTracker.SetNull();
+        sizeTracker.Load();
     }
 
     LOGA("nBestHeight = %d\n", chainActive.Height());

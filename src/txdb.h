@@ -132,6 +132,9 @@ public:
 
     //! Return the current memory allocated for the write buffers
     size_t TotalWriteBufferSize() const;
+
+    bool GetBlockSizes(uint64_t &quarter_size_total, uint64_t &year_size_total);
+    void WriteBlockSizes(const uint64_t &quarter_size_total, const uint64_t &year_size_total);
 };
 
 /** Specialization of CCoinsViewCursor to iterate over a CCoinsViewDB */

@@ -42,6 +42,7 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
+#include "validation/dynamicsize.h"
 #include "validation/validation.h"
 #include "validationinterface.h"
 #include "version.h"
@@ -1024,6 +1025,57 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
     LOGA("Acceptable block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " Sig:%d\n", block.nVersion, block.nTime,
         blockSize, nTx, nSigOps);
     return false;
+}
+
+bool CheckDynamic(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, uint64_t nTx, uint64_t largestTx)
+{
+    if (blockSize > sizeTracker.GetMaxBlockSize())
+    {
+        LOGA("Excessive block: Rejecting block with ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " Sig:%d  :too many bytes\n",
+            block.nVersion, block.nTime, blockSize, nTx, nSigOps);
+        return false;
+    }
+
+    if (blockSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
+    {
+        // Check transaction size to limit sighash
+        if (largestTx > maxTxSize.Value())
+        {
+            LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
+                 " largest TX:%d  :tx too large.  Expected less than: %d\n",
+                block.nVersion, block.nTime, blockSize, nTx, largestTx, maxTxSize.Value());
+            return false;
+        }
+
+        // check proportional sigops
+        uint64_t blockMbSize =
+            1 + ((blockSize - 1) /
+                    1000000); // block size in megabytes rounded up. 1-1000000 -> 1, 1000001-2000000 -> 2, etc.
+        if (nSigOps > blockSigopsPerMb.Value() * blockMbSize)
+        {
+            LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
+                 " Sig:%d  :too many sigops.  Expected less than: %d\n",
+                block.nVersion, block.nTime, blockSize, nTx, nSigOps, blockSigopsPerMb.Value() * blockMbSize);
+            return false;
+        }
+    }
+    else
+    {
+        // Within a 1MB block transactions can be 1MB, so nothing to check WRT transaction size
+
+        // Check max sigops
+        if (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS)
+        {
+            LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
+                 " Sig:%d  :too many sigops.  Expected < 1MB defined constant: %d\n",
+                block.nVersion, block.nTime, blockSize, nTx, nSigOps, BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
+            return false;
+        }
+    }
+
+    LOGA("Acceptable block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " Sig:%d\n", block.nVersion, block.nTime,
+        blockSize, nTx, nSigOps);
+    return true;
 }
 
 extern UniValue getminercomment(const UniValue &params, bool fHelp)

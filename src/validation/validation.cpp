@@ -13,6 +13,7 @@
 #include "consensus/merkle.h"
 #include "consensus/tx_verify.h"
 #include "dosman.h"
+#include "dynamicsize.h"
 #include "expedited.h"
 #include "init.h"
 #include "requestManager.h"
@@ -1449,6 +1450,9 @@ bool ContextualCheckBlock(const CBlock &block,
 
     // BU: Check whether this block exceeds what we want to relay.
     block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nSigOps, nTx, nLargestTx);
+    
+    // after activation we would use CheckDynamic instead of CheckExcessive
+    // return CheckExcessive(block, block.GetBlockSize(), nSigOps, nTx, nLargestTx);
 
 
     return true;
@@ -2583,6 +2587,10 @@ bool ConnectBlock(const CBlock &block,
             setUnVerifiedOrphanTxHash.erase(hash);
         }
     }
+    // adjust the dynamic block size here as written in spec
+    sizeTracker.AddBlockSize(block.GetBlockSize());
+    // update disk state
+    sizeTracker.Store();
     return true;
 }
 

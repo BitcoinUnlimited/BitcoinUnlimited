@@ -200,6 +200,7 @@ BITCOIN_CORE_H = \
   util.h \
   utilmoneystr.h \
   utiltime.h \
+  validation/dynamicsize.h \
   validation/forks.h \
   validation/validation.h \
   validation/verifydb.h \
@@ -291,6 +292,7 @@ libbitcoin_server_a_SOURCES = \
   uahf_fork.cpp \
   unlimited.cpp \
   requestManager.cpp \
+  validation/dynamicsize.cpp \
   validation/forks.cpp \
   validation/validation.cpp \
   validation/verifydb.cpp \

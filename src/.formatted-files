@@ -162,6 +162,8 @@ utilstrencodings.cpp
 utilstrencodings.h
 utiltime.cpp
 utiltime.h
+validation/dynamicsize.cpp
+validation/dynamicsize.h
 validation/forks.cpp
 validation/forks.h
 validation/validation.cpp
