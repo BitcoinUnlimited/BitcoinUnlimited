@@ -458,7 +458,6 @@ static UniValue GetNetworksInfo()
     return networks;
 }
 
-// BitcoinUnlimited BUIP010 : Start
 static UniValue GetThinBlockStats()
 {
     UniValue obj(UniValue::VOBJ);
@@ -480,9 +479,7 @@ static UniValue GetThinBlockStats()
     }
     return obj;
 }
-// BitcoinUnlimited BUIP010 : End
 
-// BitcoinUnlimited BUIPXXX : Start
 static UniValue GetGrapheneStats()
 {
     UniValue obj(UniValue::VOBJ);
@@ -504,7 +501,26 @@ static UniValue GetGrapheneStats()
     }
     return obj;
 }
-// BitcoinUnlimited BUIPXXX : End
+
+static UniValue GetCompactBlockStats()
+{
+    UniValue obj(UniValue::VOBJ);
+    bool enabled = IsCompactBlocksEnabled();
+    obj.push_back(Pair("enabled", enabled));
+    if (enabled)
+    {
+        obj.push_back(Pair("summary", compactdata.ToString()));
+        obj.push_back(Pair("mempool_limiter", compactdata.MempoolLimiterBytesSavedToString()));
+        obj.push_back(Pair("inbound_percent", compactdata.InBoundPercentToString()));
+        obj.push_back(Pair("outbound_percent", compactdata.OutBoundPercentToString()));
+        obj.push_back(Pair("response_time", compactdata.ResponseTimeToString()));
+        obj.push_back(Pair("validation_time", compactdata.ValidationTimeToString()));
+        obj.push_back(Pair("compact_block_size", compactdata.CompactBlockToString()));
+        obj.push_back(Pair("compact_full_tx", compactdata.FullTxToString()));
+        obj.push_back(Pair("rerequested", compactdata.ReRequestedTxToString()));
+    }
+    return obj;
+}
 
 UniValue getnetworkinfo(const UniValue &params, bool fHelp)
 {
@@ -576,12 +592,9 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
         }
     }
     obj.pushKV("localaddresses", localAddresses);
-    // BitcoinUnlimited BUIP010: Start
     obj.pushKV("thinblockstats", GetThinBlockStats());
-    // BitcoinUnlimited BUIP010: End
-    //// BitcoinUnlimited BUIPXXX: Start
     obj.pushKV("grapheneblockstats", GetGrapheneStats());
-    // BitcoinUnlimited BUIPXXX: End
+    obj.pushKV("compactblockstats", GetCompactBlockStats());
     obj.pushKV("warnings", GetWarnings("statusbar"));
     return obj;
 }

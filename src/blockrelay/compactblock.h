@@ -281,11 +281,11 @@ struct CompactBlockQuickStats
     double fLast24hRerequestTxPercent;
 };
 
-// This class stores statistics for thin block derived protocols.
+// This class stores statistics for compact block derived protocols.
 class CCompactBlockData
 {
 private:
-    /* The sum total of all bytes for thinblocks currently in process of being reconstructed */
+    /* The sum total of all bytes for compactblocks currently in process of being reconstructed */
     std::atomic<uint64_t> nCompactBlockBytes{0};
 
     CCriticalSection cs_compactblockstats; // locks everything below this point
@@ -326,13 +326,13 @@ private:
     double average(std::map<int64_t, uint64_t> &map);
 
     /**
-      Calculate total bandwidth savings for using XThin.
-      Requires lock on cs_thinblockstats be held external to this call. */
-    double computeTotalBandwidthSavingsInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats);
+      Calculate total bandwidth savings.
+      Requires lock on cs_compactblockstats be held external to this call. */
+    double computeTotalBandwidthSavingsInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_compactblockstats);
 
     /**
-      Calculate last 24-hour "compression" percent for XThin
-      Requires lock on cs_thinblockstats be held external to this call.
+      Calculate last 24-hour "compression" percentage
+      Requires lock on cs_compactblockstats be held external to this call.
 
       NOTE: The thinblock and bloom filter maps should be from opposite directions
             For example inbound block map paired wtih outbound bloom filter map
@@ -342,14 +342,14 @@ private:
       @param [mapCompactBlocks] a statistics array of inbound/outbound XThin blocks
      */
     double compute24hAverageCompressionInternal(std::map<int64_t, std::pair<uint64_t, uint64_t> > &mapCompactBlocks)
-        EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats);
+        EXCLUSIVE_LOCKS_REQUIRED(cs_compactblockstats);
 
     /**
-      Calculate last 24-hour transaction re-request percent for inbound XThin
-      Requires lock on cs_thinblockstats be held external to this call.
+      Calculate last 24-hour transaction re-request percent for inbound compactblock
+      Requires lock on cs_compactblockstats be held external to this call.
 
       Side-effect: This method calls expireStats() on mapCompactBlocksInBoundReRequestedTx */
-    double compute24hInboundRerequestTxPercentInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_thinblockstats);
+    double compute24hInboundRerequestTxPercentInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_compactblockstats);
 
 protected:
     //! Virtual method so it can be overridden for better unit testing

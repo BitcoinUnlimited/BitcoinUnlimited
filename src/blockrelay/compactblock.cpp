@@ -916,7 +916,7 @@ std::string CCompactBlockData::ToString()
     return ss.str();
 }
 
-// Calculate the xthin percentage compression over the last 24 hours for inbound blocks
+// Calculate the percentage compression over the last 24 hours for inbound blocks
 std::string CCompactBlockData::InBoundPercentToString()
 {
     LOCK(cs_compactblockstats);
@@ -933,7 +933,7 @@ std::string CCompactBlockData::InBoundPercentToString()
     return ss.str();
 }
 
-// Calculate the xthin percentage compression over the last 24 hours for outbound blocks
+// Calculate the percentage compression over the last 24 hours for outbound blocks
 std::string CCompactBlockData::OutBoundPercentToString()
 {
     LOCK(cs_compactblockstats);
@@ -950,7 +950,7 @@ std::string CCompactBlockData::OutBoundPercentToString()
     return ss.str();
 }
 
-// Calculate the xthin average response time over the last 24 hours
+// Calculate the average response time over the last 24 hours
 std::string CCompactBlockData::ResponseTimeToString()
 {
     LOCK(cs_compactblockstats);
@@ -986,7 +986,7 @@ std::string CCompactBlockData::ResponseTimeToString()
     return ss.str();
 }
 
-// Calculate the xthin average validation time over the last 24 hours
+// Calculate the average validation time over the last 24 hours
 std::string CCompactBlockData::ValidationTimeToString()
 {
     LOCK(cs_compactblockstats);
@@ -1022,7 +1022,7 @@ std::string CCompactBlockData::ValidationTimeToString()
     return ss.str();
 }
 
-// Calculate the xthin transaction re-request ratio and counter over the last 24 hours
+// Calculate the transaction re-request ratio and counter over the last 24 hours
 std::string CCompactBlockData::ReRequestedTxToString()
 {
     LOCK(cs_compactblockstats);
@@ -1193,10 +1193,13 @@ void SendCompactBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
         uint64_t nSizeCompactBlock = ::GetSerializeSize(compactBlock, SER_NETWORK, PROTOCOL_VERSION);
 
         // Send a compact block
+        compactdata.UpdateOutBound(nSizeCompactBlock, nSizeBlock);
         pfrom->PushMessage(NetMsgType::CMPCTBLOCK, compactBlock);
         LOG(CMPCT, "Sent compact block - compactblock size: %d vs block size: %d peer: %s\n", nSizeCompactBlock,
             nSizeBlock, pfrom->GetLogName());
 
+        compactdata.UpdateCompactBlock(nSizeCompactBlock);
+        compactdata.UpdateFullTx(::GetSerializeSize(compactBlock.prefilledtxn, SER_NETWORK, PROTOCOL_VERSION));
         pfrom->blocksSent += 1;
     }
 }
