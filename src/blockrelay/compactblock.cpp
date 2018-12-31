@@ -134,14 +134,7 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     vRecv >> compactBlock;
 
     // Message consistency checking
-    try
-    {
-        validateCompactBlock(compactBlock);
-    }
-    catch (std::exception &e)
-    {
-        return error("compact block invalid\n");
-    }
+    IsCompactBlockValid(pfrom, compactBlock);
 
     // Is there a previous block or header to connect with?
     CBlockIndex *pprev = LookupBlockIndex(compactBlock.header.hashPrevBlock);
@@ -1209,30 +1202,20 @@ void SendCompactBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
 }
 
 
-bool IsCompactBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header)
+bool IsCompactBlockValid(CNode *pfrom, const CompactBlock &compactBlock)
 {
-    // Check that that there is at least one txn in the xthin and that the first txn is the coinbase
-    if (vMissingTx.empty())
-    {
-        return error(
-            "No Transactions found in compactblock %s from peer %s", header.GetHash().ToString(), pfrom->GetLogName());
-    }
-    if (!vMissingTx[0].IsCoinBase())
-    {
-        return error("First txn is not coinbase for compactblock %s from peer %s", header.GetHash().ToString(),
-            pfrom->GetLogName());
-    }
+    validateCompactBlock(compactBlock);
 
     // check block header
     CValidationState state;
-    if (!CheckBlockHeader(header, state, true))
+    if (!CheckBlockHeader(compactBlock.header, state, true))
     {
-        return error("Received invalid header for compactblock %s from peer %s", header.GetHash().ToString(),
+        return error("Received invalid header for compactblock %s from peer %s", compactBlock.header.GetHash().ToString(),
             pfrom->GetLogName());
     }
     if (state.Invalid())
     {
-        return error("Received invalid header for compactblock %s from peer %s", header.GetHash().ToString(),
+        return error("Received invalid header for compactblock %s from peer %s", compactBlock.header.GetHash().ToString(),
             pfrom->GetLogName());
     }
 

@@ -390,7 +390,7 @@ extern CCompactBlockData compactdata; // Singleton class
 bool IsCompactBlocksEnabled();
 bool ClearLargestCompactBlockAndDisconnect(CNode *pfrom);
 void SendCompactBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
-bool IsCompactBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header);
+bool IsCompactBlockValid(CNode *pfrom, const CompactBlock &cmpctblock);
 
 // Xpress Validation: begin
 // Transactions that have already been accepted into the memory pool do not need to be
