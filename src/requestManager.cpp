@@ -175,7 +175,7 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
         // Got the data, now add the node as a source
         data.AddSource(from);
     }
-    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_THINBLOCK) || (obj.type == MSG_XTHINBLOCK))
+    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_CMPCT_BLOCK) || (obj.type == MSG_XTHINBLOCK))
     {
         uint256 temp = obj.hash;
         OdMap::value_type v(temp, CUnknownObj());
@@ -300,7 +300,7 @@ void CRequestManager::Processing(const CInv &obj, CNode *pfrom)
         LOG(REQ, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
             pfrom ? pfrom->GetLogName() : "unknown");
     }
-    else if (obj.type == MSG_BLOCK || obj.type == MSG_THINBLOCK || obj.type == MSG_XTHINBLOCK)
+    else if (obj.type == MSG_BLOCK || obj.type == MSG_CMPCT_BLOCK || obj.type == MSG_XTHINBLOCK)
     {
         OdMap::iterator item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
@@ -325,7 +325,7 @@ void CRequestManager::Received(const CInv &obj, CNode *pfrom)
         LOG(REQ, "ReqMgr: TX received for %s.\n", item->second.obj.ToString().c_str());
         cleanup(item);
     }
-    else if (obj.type == MSG_BLOCK || obj.type == MSG_THINBLOCK || obj.type == MSG_XTHINBLOCK)
+    else if (obj.type == MSG_BLOCK || obj.type == MSG_CMPCT_BLOCK || obj.type == MSG_XTHINBLOCK)
     {
         OdMap::iterator item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
@@ -378,7 +378,7 @@ void CRequestManager::Rejected(const CInv &obj, CNode *from, unsigned char reaso
 
         rejectedTxns += 1;
     }
-    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_THINBLOCK) || (obj.type == MSG_XTHINBLOCK))
+    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_CMPCT_BLOCK) || (obj.type == MSG_XTHINBLOCK))
     {
         item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())

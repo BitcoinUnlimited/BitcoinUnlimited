@@ -160,12 +160,13 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                             pfrom->blocksSent += 1;
                             pfrom->PushMessage(NetMsgType::BLOCK, block);
                         }
-                        else if (inv.type == MSG_THINBLOCK)
+                        // Only send a full thinblock if they do not have a BU_XTHIN_VERSION. 
+                        else if (inv.type == MSG_THINBLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) < 2)
                         {
                             LOG(THIN, "Sending thinblock via getdata message\n");
                             SendXThinBlock(MakeBlockRef(block), pfrom, inv);
                         }
-                        else if (inv.type == MSG_CMPCT_BLOCK)
+                        else if (inv.type == MSG_CMPCT_BLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) >= 2)
                         {
                             LOG(CMPCT, "Sending compact block via getdata message\n");
                             SendCompactBlock(MakeBlockRef(block), pfrom, inv);
@@ -265,7 +266,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             // priority messages and we don't want to sit here processing a large number of messages
             // while we hold the cs_main lock, but rather allow these messages to be sent first and
             // process the return message before potentially reading from the queue again.
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK)
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
                 break;
         }
     }
@@ -563,6 +564,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
         xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
         xver.set_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED, 1);
+        xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
         pfrom->PushMessage(NetMsgType::XVERSION, xver);
 
 
@@ -651,6 +653,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                      "setting. peer=%s version=%s\n",
                 pfrom->GetLogName(), pfrom->cleanSubVer);
         }
+
         pfrom->PushMessage(NetMsgType::XVERACK);
         pfrom->state_incoming = ConnectionStateIncoming::READY;
         handleAddressAfterInit(pfrom);
@@ -972,7 +975,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
 
             // Make basic checks
-            if (inv.type == MSG_THINBLOCK)
+            if (inv.type == MSG_THINBLOCK  && !pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION))
             {
                 if (!BasicThinblockChecks(pfrom, chainparams))
                     return false;
@@ -1438,14 +1441,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CBloomFilter filterMemPool;
         CInv inv;
         vRecv >> inv >> filterMemPool;
-        if (!((inv.type == MSG_XTHINBLOCK) || (inv.type == MSG_THINBLOCK)))
+        if (inv.type != MSG_XTHINBLOCK)
         {
             dosMan.Misbehaving(pfrom, 100);
             return error("message inv invalid type = %u", inv.type);
         }
 
         // Message consistency checking
-        if (!((inv.type == MSG_XTHINBLOCK) || (inv.type == MSG_THINBLOCK)) || inv.hash.IsNull())
+        if (inv.type != MSG_XTHINBLOCK || inv.hash.IsNull())
         {
             dosMan.Misbehaving(pfrom, 100);
             return error("invalid get_xthin type=%u hash=%s", inv.type, inv.hash.ToString());
