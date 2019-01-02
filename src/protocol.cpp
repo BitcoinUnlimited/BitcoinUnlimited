@@ -43,6 +43,7 @@ const char *XTHINBLOCK = "xthinblock";
 const char *XBLOCKTX = "xblocktx";
 const char *GET_XBLOCKTX = "get_xblocktx";
 const char *GET_XTHIN = "get_xthin";
+const char *GET_THIN = "get_thin";
 // BUIP010 Xtreme Thinblocks - end section
 // BUIPXXX Graphene - begin section
 const char *GRAPHENEBLOCK = "grblk";
@@ -81,7 +82,7 @@ const static std::string allNetMessageTypes[] = {
     NetMsgType::BLOCK, NetMsgType::GETADDR, NetMsgType::MEMPOOL, NetMsgType::PING, NetMsgType::PONG,
     NetMsgType::NOTFOUND, NetMsgType::FILTERLOAD, NetMsgType::FILTERADD, NetMsgType::FILTERCLEAR,
     NetMsgType::FILTERSIZEXTHIN, NetMsgType::REJECT, NetMsgType::SENDHEADERS, NetMsgType::THINBLOCK,
-    NetMsgType::XTHINBLOCK, NetMsgType::XBLOCKTX, NetMsgType::GET_XBLOCKTX, NetMsgType::GET_XTHIN,
+    NetMsgType::XTHINBLOCK, NetMsgType::XBLOCKTX, NetMsgType::GET_XBLOCKTX, NetMsgType::GET_XTHIN, NetMsgType::GET_THIN,
     NetMsgType::GRAPHENEBLOCK, NetMsgType::GRAPHENETX, NetMsgType::GET_GRAPHENETX, NetMsgType::GET_GRAPHENE,
     NetMsgType::XPEDITEDREQUEST, NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTxn, NetMsgType::BUVERSION,
     NetMsgType::BUVERACK, NetMsgType::XVERSION, NetMsgType::XVERACK, NetMsgType::XUPDATE, NetMsgType::SENDCMPCT,

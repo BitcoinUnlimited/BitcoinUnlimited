@@ -160,7 +160,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                             pfrom->blocksSent += 1;
                             pfrom->PushMessage(NetMsgType::BLOCK, block);
                         }
-                        // Only send a full thinblock if they do not have a BU_XTHIN_VERSION. 
+                        // Only send a full thinblock if they do not have a BU_XTHIN_VERSION.
                         else if (inv.type == MSG_THINBLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) < 2)
                         {
                             LOG(THIN, "Sending thinblock via getdata message\n");
@@ -975,7 +975,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
 
             // Make basic checks
-            if (inv.type == MSG_THINBLOCK  && !pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION))
+            if (inv.type == MSG_THINBLOCK && !pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION))
             {
                 if (!BasicThinblockChecks(pfrom, chainparams))
                     return false;
@@ -1441,11 +1441,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CBloomFilter filterMemPool;
         CInv inv;
         vRecv >> inv >> filterMemPool;
-        if (inv.type != MSG_XTHINBLOCK)
-        {
-            dosMan.Misbehaving(pfrom, 100);
-            return error("message inv invalid type = %u", inv.type);
-        }
 
         // Message consistency checking
         if (inv.type != MSG_XTHINBLOCK || inv.hash.IsNull())
@@ -1479,8 +1474,40 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
         }
     }
+    else if (strCommand == NetMsgType::GET_THIN && !fImporting && !fReindex && IsThinBlocksEnabled())
+    {
+        if (!BasicThinblockChecks(pfrom, chainparams))
+            return false;
 
+        CInv inv;
+        vRecv >> inv;
 
+        // Message consistency checking
+        if (inv.type != MSG_THINBLOCK || inv.hash.IsNull())
+        {
+            dosMan.Misbehaving(pfrom, 100);
+            return error("invalid get_thin type=%u hash=%s", inv.type, inv.hash.ToString());
+        }
+
+        auto *invIndex = LookupBlockIndex(inv.hash);
+        if (!invIndex)
+        {
+            dosMan.Misbehaving(pfrom, 100);
+            return error("Peer %srequested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
+        }
+
+        CBlock block;
+        const Consensus::Params &consensusParams = Params().GetConsensus();
+        if (!ReadBlockFromDisk(block, invIndex, consensusParams))
+        {
+            // We don't have the block yet, although we know about it.
+            return error("Peer %s requested block %s that cannot be read", pfrom->GetLogName(), inv.hash.ToString());
+        }
+        else
+        {
+            SendXThinBlock(MakeBlockRef(block), pfrom, inv);
+        }
+    }
     else if (strCommand == NetMsgType::XPEDITEDREQUEST)
     {
         return HandleExpeditedRequest(vRecv, pfrom);

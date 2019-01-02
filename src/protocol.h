@@ -160,6 +160,10 @@ extern const char *GET_XBLOCKTX;
  */
 extern const char *GET_XTHIN;
 /**
+ * The get_thin message is a request for a thinblock with the full 256 bit tx hashes.
+ */
+extern const char *GET_THIN;
+/**
  * The grapheneblock message transmits a single serialized graphene block.
  */
 extern const char *GRAPHENEBLOCK;

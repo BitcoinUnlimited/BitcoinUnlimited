@@ -640,10 +640,11 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                 // of a previous GET_XTHIN/HEADER requests and result in a DOS if the block returns out of order and
                 // with no headers in the block index or the setblockindexcandidates.
                 if ((strCommand == NetMsgType::GET_XTHIN && Params().NetworkIDString() == "main") ||
-                    strCommand == NetMsgType::XTHINBLOCK || strCommand == NetMsgType::THINBLOCK ||
-                    strCommand == NetMsgType::XBLOCKTX || strCommand == NetMsgType::GET_XBLOCKTX ||
-                    strCommand == NetMsgType::GET_GRAPHENE || strCommand == NetMsgType::GRAPHENEBLOCK ||
-                    strCommand == NetMsgType::GRAPHENETX || strCommand == NetMsgType::GET_GRAPHENETX)
+                    strCommand == NetMsgType::GET_THIN || strCommand == NetMsgType::XTHINBLOCK ||
+                    strCommand == NetMsgType::THINBLOCK || strCommand == NetMsgType::XBLOCKTX ||
+                    strCommand == NetMsgType::GET_XBLOCKTX || strCommand == NetMsgType::GET_GRAPHENE ||
+                    strCommand == NetMsgType::GRAPHENEBLOCK || strCommand == NetMsgType::GRAPHENETX ||
+                    strCommand == NetMsgType::GET_GRAPHENETX)
                 {
                     LOG(THIN | GRAPHENE, "ReceiveMsgBytes %s\n", strCommand);
 
@@ -3048,10 +3049,10 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
 
         // If the message is a priority message then move to the front of the deque
         if (strcmp(strCommand, NetMsgType::GET_XTHIN) == 0 || strcmp(strCommand, NetMsgType::XTHINBLOCK) == 0 ||
-            strcmp(strCommand, NetMsgType::THINBLOCK) == 0 || strcmp(strCommand, NetMsgType::XBLOCKTX) == 0 ||
-            strcmp(strCommand, NetMsgType::GET_XBLOCKTX) == 0 || strcmp(strCommand, NetMsgType::GET_GRAPHENE) == 0 ||
-            strcmp(strCommand, NetMsgType::GRAPHENEBLOCK) == 0 || strcmp(strCommand, NetMsgType::GRAPHENETX) == 0 ||
-            strcmp(strCommand, NetMsgType::GET_GRAPHENETX) == 0)
+            strcmp(strCommand, NetMsgType::GET_THIN) == 0 || strcmp(strCommand, NetMsgType::THINBLOCK) == 0 ||
+            strcmp(strCommand, NetMsgType::XBLOCKTX) == 0 || strcmp(strCommand, NetMsgType::GET_XBLOCKTX) == 0 ||
+            strcmp(strCommand, NetMsgType::GET_GRAPHENE) == 0 || strcmp(strCommand, NetMsgType::GRAPHENEBLOCK) == 0 ||
+            strcmp(strCommand, NetMsgType::GRAPHENETX) == 0 || strcmp(strCommand, NetMsgType::GET_GRAPHENETX) == 0)
         {
             it = vSendMsg.insert(vSendMsg.begin(), CSerializeData());
             LOG(THIN, "Send Queue: pushed %s to the front of the queue\n", strCommand);

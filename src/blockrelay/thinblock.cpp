@@ -28,6 +28,7 @@
 #include "util.h"
 #include "utiltime.h"
 #include "validation/validation.h"
+#include "xversionkeys.h"
 
 static bool DEFAULT_BLOOM_FILTER_TARGETING = true;
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
@@ -768,7 +769,7 @@ bool CXThinBlock::process(CNode *pfrom,
         else
             return error("TX HASH COLLISION for xthinblock: re-requesting a thinblock, peer=%s", pfrom->GetLogName());
 
-        thinrelay.RequestBlock(pfrom, header.GetHash());
+        RequestThinBlock(pfrom, header.GetHash());
         thindata.ClearThinBlockData(pfrom, header.GetHash());
         return true;
     }
@@ -1509,6 +1510,19 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
         return;
     }
     pfrom->blocksSent += 1;
+}
+
+void RequestThinBlock(CNode *pfrom, const uint256 &hash)
+{
+    CInv inv(MSG_THINBLOCK, hash);
+    if (pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) >= 2)
+    {
+        pfrom->PushMessage(NetMsgType::GET_THIN, inv);
+    }
+    else
+    {
+        pfrom->PushMessage(NetMsgType::GETDATA, inv);
+    }
 }
 
 bool IsThinBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header)
