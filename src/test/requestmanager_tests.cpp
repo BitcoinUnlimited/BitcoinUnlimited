@@ -124,7 +124,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-compactblocks", true);
     thinrelay.AddThinTypePeers(&dummyNodeGraphene);
     thinrelay.AddThinTypePeers(&dummyNodeXthin);
-    thinrelay.AddThinTypePeers(&dummyNodeCmpct, true);
+    thinrelay.AddCompactBlockPeer(&dummyNodeCmpct);
     thinrelay.AddThinTypePeers(&dummyNodeNone);
 
     requester.RequestBlock(&dummyNodeXthin, inv);
@@ -530,7 +530,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-grapheneblocks", false);
     SetBoolArg("-use-thinblocks", false);
     SetBoolArg("-use-compactblocks", true);
-    thinrelay.AddThinTypePeers(&dummyNodeCmpct, true);
+    thinrelay.AddCompactBlockPeer(&dummyNodeCmpct);
     thinrelay.AddThinTypePeers(&dummyNodeNone);
 
     requester.RequestBlock(&dummyNodeCmpct, inv);
@@ -548,7 +548,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
     SetBoolArg("-use-compactblocks", true);
-    thinrelay.AddThinTypePeers(&dummyNodeCmpct, true);
+    thinrelay.AddCompactBlockPeer(&dummyNodeCmpct);
     thinrelay.AddThinTypePeers(&dummyNodeNone);
 
     requester.RequestBlock(&dummyNodeCmpct, inv);
@@ -575,7 +575,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-compactblocks", true);
     thinrelay.AddThinTypePeers(&dummyNodeGraphene);
     thinrelay.AddThinTypePeers(&dummyNodeXthin);
-    thinrelay.AddThinTypePeers(&dummyNodeCmpct, true);
+    thinrelay.AddCompactBlockPeer(&dummyNodeCmpct);
     thinrelay.AddThinTypePeers(&dummyNodeNone);
 
     requester.RequestBlock(&dummyNodeNone, inv);
@@ -604,7 +604,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-compactblocks", true);
     thinrelay.AddThinTypePeers(&dummyNodeGraphene);
     thinrelay.AddThinTypePeers(&dummyNodeXthin);
-thinrelay.AddThinTypePeers(&dummyNodeCmpct, true);
+    thinrelay.AddCompactBlockPeer(&dummyNodeCmpct);
     thinrelay.AddThinTypePeers(&dummyNodeNone);
 
     // Set mocktime
@@ -802,7 +802,7 @@ thinrelay.AddThinTypePeers(&dummyNodeCmpct, true);
     SetBoolArg("-use-compactblocks", true);
     thinrelay.AddThinTypePeers(&dummyNodeGraphene);
     thinrelay.AddThinTypePeers(&dummyNodeXthin);
-    thinrelay.AddThinTypePeers(&dummyNodeCmpct, true);
+    thinrelay.AddCompactBlockPeer(&dummyNodeCmpct);
     thinrelay.AddThinTypePeers(&dummyNodeNone);
 
     // Set mocktime

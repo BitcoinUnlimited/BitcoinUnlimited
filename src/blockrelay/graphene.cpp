@@ -1503,10 +1503,9 @@ CMemPoolInfo GetGrapheneMempoolInfo()
 }
 void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash)
 {
-    LOCK(thinrelay.cs_inflight);
     if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable())
     {
-        if (!thinrelay.AddThinTypeBlockInFlight(pfrom, inv2.hash, NetMsgType::XTHINBLOCK))
+        if (!thinrelay.AddThinTypeBlockInFlight(pfrom, blockhash, NetMsgType::XTHINBLOCK))
             return;
 
         LOG(GRAPHENE | THIN, "Requesting xthin block as failover from peer %s\n", pfrom->GetLogName());
@@ -1525,15 +1524,16 @@ void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash)
         ss << filterMemPool;
         pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
     }
-    else if (IsCompactBlocksEnabled() && pfrom->CompactBlockCapable() &&
-        !thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::CMPCTBLOCK))
+    else if (IsCompactBlocksEnabled() && pfrom->CompactBlockCapable())
     {
+        if (!thinrelay.AddThinTypeBlockInFlight(pfrom, blockhash, NetMsgType::CMPCTBLOCK))
+            return;
+
         LOG(GRAPHENE | CMPCT, "Requesting a compact block as failover from peer %s\n", pfrom->GetLogName());
         CInv inv(MSG_CMPCT_BLOCK, blockhash);
         std::vector<CInv> vGetData;
         vGetData.push_back(inv);
         pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-        thinrelay.AddThinTypeBlockInFlight(pfrom, inv.hash, NetMsgType::CMPCTBLOCK);
     }
     else
     {

@@ -534,6 +534,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
             {
                 MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
 
+                CBloomFilter filterMemPool;
                 inv2.type = MSG_XTHINBLOCK;
                 std::vector<uint256> vOrphanHashes;
                 {
@@ -556,25 +557,15 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         if (IsCompactBlocksEnabled() && pfrom->CompactBlockCapable())
         {
             // We can only request one thin type block per peer at a time.
-            LOCK(thinrelay.cs_inflight);
-            if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::CMPCTBLOCK))
+            if (thinrelay.AddThinTypeBlockInFlight(pfrom, inv2.hash, NetMsgType::CMPCTBLOCK))
             {
-                // must maintain locking order cs_objDownloder -> cs_inflight, but we also must
-                // ensure that cs_inflight is locked for the duration of both IsThinTypeBlockInFlight()
-                // and AddThinTypeBlockInFlight, or we could end up downloading two of the same block
-                // caused by the multi-threading in message sending and processing.
-                thinrelay.AddThinTypeBlockInFlight(pfrom, inv2.hash, NetMsgType::CMPCTBLOCK);
-                {
-                    LEAVE_CRITICAL_SECTION(thinrelay.cs_inflight);
-                    MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
+                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
 
-                    std::vector<CInv> vGetData;
-                    inv2.type = MSG_CMPCT_BLOCK;
-                    vGetData.push_back(inv2);
-                    pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-                    LOG(CMPCT, "Requesting compact block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
-                    ENTER_CRITICAL_SECTION(thinrelay.cs_inflight);
-                }
+                std::vector<CInv> vGetData;
+                inv2.type = MSG_CMPCT_BLOCK;
+                vGetData.push_back(inv2);
+                pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+                LOG(CMPCT, "Requesting compact block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
                 return true;
             }
         }

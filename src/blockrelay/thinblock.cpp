@@ -797,7 +797,7 @@ bool CXThinBlock::process(CNode *pfrom,
     {
         // Since we can't process this thinblock then clear out the data from memory and request a full block
         thindata.ClearThinBlockData(pfrom, header.GetHash());
-        thinrelay.RequestBlock(pfrom,  header.GetHash());
+        thinrelay.RequestBlock(pfrom, header.GetHash());
         return error("Still missing transactions for xthinblock: re-requesting a full block");
     }
 

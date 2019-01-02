@@ -5,8 +5,8 @@
 #include "parallel.h"
 
 #include "blockrelay/blockrelay_common.h"
-#include "blockrelay/graphene.h"
 #include "blockrelay/compactblock.h"
+#include "blockrelay/graphene.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "dosman.h"
