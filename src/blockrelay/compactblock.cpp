@@ -1193,17 +1193,25 @@ void SendCompactBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
         uint64_t nSizeCompactBlock = ::GetSerializeSize(compactBlock, SER_NETWORK, PROTOCOL_VERSION);
 
         // Send a compact block
-        compactdata.UpdateOutBound(nSizeCompactBlock, nSizeBlock);
-        pfrom->PushMessage(NetMsgType::CMPCTBLOCK, compactBlock);
-        LOG(CMPCT, "Sent compact block - compactblock size: %d vs block size: %d peer: %s\n", nSizeCompactBlock,
-            nSizeBlock, pfrom->GetLogName());
+        if (nSizeCompactBlock < nSizeBlock)
+        {
+            compactdata.UpdateOutBound(nSizeCompactBlock, nSizeBlock);
+            pfrom->PushMessage(NetMsgType::CMPCTBLOCK, compactBlock);
+            LOG(CMPCT, "Sent compact block - compactblock size: %d vs block size: %d peer: %s\n", nSizeCompactBlock,
+                nSizeBlock, pfrom->GetLogName());
 
-        compactdata.UpdateCompactBlock(nSizeCompactBlock);
-        compactdata.UpdateFullTx(::GetSerializeSize(compactBlock.prefilledtxn, SER_NETWORK, PROTOCOL_VERSION));
-        pfrom->blocksSent += 1;
+            compactdata.UpdateCompactBlock(nSizeCompactBlock);
+            compactdata.UpdateFullTx(::GetSerializeSize(compactBlock.prefilledtxn, SER_NETWORK, PROTOCOL_VERSION));
+            pfrom->blocksSent += 1;
+        }
+        else // send full block
+        {
+            pfrom->PushMessage(NetMsgType::BLOCK, *pblock);
+            LOG(CMPCT, "Sent regular block instead - compactblock size: %d vs block size: %d , peer: %s\n",
+                nSizeCompactBlock, nSizeBlock, pfrom->GetLogName());
+        }
     }
 }
-
 
 bool IsCompactBlockValid(CNode *pfrom, const CompactBlock &compactBlock)
 {
@@ -1213,13 +1221,13 @@ bool IsCompactBlockValid(CNode *pfrom, const CompactBlock &compactBlock)
     CValidationState state;
     if (!CheckBlockHeader(compactBlock.header, state, true))
     {
-        return error("Received invalid header for compactblock %s from peer %s", compactBlock.header.GetHash().ToString(),
-            pfrom->GetLogName());
+        return error("Received invalid header for compactblock %s from peer %s",
+            compactBlock.header.GetHash().ToString(), pfrom->GetLogName());
     }
     if (state.Invalid())
     {
-        return error("Received invalid header for compactblock %s from peer %s", compactBlock.header.GetHash().ToString(),
-            pfrom->GetLogName());
+        return error("Received invalid header for compactblock %s from peer %s",
+            compactBlock.header.GetHash().ToString(), pfrom->GetLogName());
     }
 
     return true;

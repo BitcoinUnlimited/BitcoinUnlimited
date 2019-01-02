@@ -49,7 +49,7 @@ static std::string NetMessage(std::deque<CSerializeData> &_vSendMsg)
     if (ssCommand.str().compare("getdata"))
     {
         CDataStream ssInv(SER_NETWORK, PROTOCOL_VERSION);
-        ssInv.insert(ssInv.begin(), &data[25], &data[61]);
+        ssInv.insert(ssInv.begin(), &data[24], &data[60]);
 
         CInv inv;
         ssInv >> inv;
@@ -124,7 +124,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-compactblocks", true);
     thinrelay.AddThinTypePeers(&dummyNodeGraphene);
     thinrelay.AddThinTypePeers(&dummyNodeXthin);
-    thinrelay.AddThinTypePeers(&dummyNodeCmpct);
+    thinrelay.AddThinTypePeers(&dummyNodeCmpct, true);
     thinrelay.AddThinTypePeers(&dummyNodeNone);
 
     requester.RequestBlock(&dummyNodeXthin, inv);
@@ -188,7 +188,6 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-thinblocks", true);
     SetBoolArg("-use-compactblocks", false);
     thinrelay.AddThinTypePeers(&dummyNodeNone);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
 
     requester.RequestBlock(&dummyNodeNone, inv);
     BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
@@ -204,7 +203,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-grapheneblocks", false);
     SetBoolArg("-use-thinblocks", false);
     SetBoolArg("-use-compactblocks", true);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
+    thinrelay.AddThinTypePeers(&dummyNodeNone);
 
     requester.RequestBlock(&dummyNodeNone, inv);
     BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
@@ -531,7 +530,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-grapheneblocks", false);
     SetBoolArg("-use-thinblocks", false);
     SetBoolArg("-use-compactblocks", true);
-    thinrelay.AddThinTypePeers(&dummyNodeCmpct);
+    thinrelay.AddThinTypePeers(&dummyNodeCmpct, true);
     thinrelay.AddThinTypePeers(&dummyNodeNone);
 
     requester.RequestBlock(&dummyNodeCmpct, inv);
@@ -549,7 +548,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
     SetBoolArg("-use-compactblocks", true);
-    thinrelay.AddThinTypePeers(&dummyNodeCmpct);
+    thinrelay.AddThinTypePeers(&dummyNodeCmpct, true);
     thinrelay.AddThinTypePeers(&dummyNodeNone);
 
     requester.RequestBlock(&dummyNodeCmpct, inv);
@@ -576,7 +575,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-compactblocks", true);
     thinrelay.AddThinTypePeers(&dummyNodeGraphene);
     thinrelay.AddThinTypePeers(&dummyNodeXthin);
-    thinrelay.AddThinTypePeers(&dummyNodeCmpct);
+    thinrelay.AddThinTypePeers(&dummyNodeCmpct, true);
     thinrelay.AddThinTypePeers(&dummyNodeNone);
 
     requester.RequestBlock(&dummyNodeNone, inv);
@@ -590,6 +589,8 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.RemoveThinTypePeers(&dummyNodeGraphene);
     thinrelay.RemoveThinTypePeers(&dummyNodeXthin);
     thinrelay.RemoveThinTypePeers(&dummyNodeNone);
+    thinrelay.RemoveThinTypePeers(&dummyNodeCmpct);
+
 
     /******************************
      * Check full blocks are downloaded when graphene is off but thin type timer is exceeded
@@ -603,7 +604,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-compactblocks", true);
     thinrelay.AddThinTypePeers(&dummyNodeGraphene);
     thinrelay.AddThinTypePeers(&dummyNodeXthin);
-    thinrelay.AddThinTypePeers(&dummyNodeCmpct);
+thinrelay.AddThinTypePeers(&dummyNodeCmpct, true);
     thinrelay.AddThinTypePeers(&dummyNodeNone);
 
     // Set mocktime
@@ -801,7 +802,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-compactblocks", true);
     thinrelay.AddThinTypePeers(&dummyNodeGraphene);
     thinrelay.AddThinTypePeers(&dummyNodeXthin);
-    thinrelay.AddThinTypePeers(&dummyNodeCmpct);
+    thinrelay.AddThinTypePeers(&dummyNodeCmpct, true);
     thinrelay.AddThinTypePeers(&dummyNodeNone);
 
     // Set mocktime

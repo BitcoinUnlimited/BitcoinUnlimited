@@ -207,6 +207,7 @@ class MyTest (BitcoinTestFramework):
         waitFor(15, lambda: self.nodes[2].getblockcount() == ctorForkTipCount)
         waitFor(15, lambda: self.nodes[3].getblockcount() == ctorForkTipCount)
 
+        print ("got here last ")
         # done, clean up
         stop_nodes([rollbackNode])
 
