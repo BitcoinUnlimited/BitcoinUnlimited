@@ -765,6 +765,7 @@ BOOST_AUTO_TEST_CASE(util_Logging)
         LOG(THIN, "missing args %s %d\n");
         LOG(THIN, "wrong order args %s %d\n", 3, "hello");
         LOG(THIN, "null arg %s\n", NULL);
+        LOG(THIN, "test no CR");
         BOOST_CHECK(IsStringTrue("true"));
         BOOST_CHECK(IsStringTrue("enable"));
         BOOST_CHECK(IsStringTrue("1"));

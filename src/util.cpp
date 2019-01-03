@@ -332,10 +332,8 @@ void OpenDebugLog()
     vMsgsBeforeOpenLog = NULL;
 }
 
-/**
- * fStartedNewLine is a state variable held by the calling context that will
- * suppress printing of the timestamp when multiple calls are made that don't
- * end in a newline. Initialize it to true, and hold it, in the calling context.
+/** All logs are automatically CR terminated.  If you want to construct a single-line log out of multiple calls, don't.
+    Make your own temporary.  You can make a multi-line log by adding \n in your temporary.
  */
 static std::string LogTimestampStr(const std::string &str, std::string &logbuf)
 {
@@ -355,14 +353,14 @@ static std::string LogTimestampStr(const std::string &str, std::string &logbuf)
         logbuf += str;
     }
 
-    if (logbuf.size() && logbuf[logbuf.size() - 1] == '\n')
+    if (logbuf.size() && logbuf[logbuf.size() - 1] != '\n')
     {
-        std::string result = logbuf;
-        logbuf.clear();
-        return result;
+        logbuf += '\n';
     }
-    else
-        return "";
+
+    std::string result = logbuf;
+    logbuf.clear();
+    return result;
 }
 
 static void MonitorLogfile()
