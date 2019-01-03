@@ -1118,31 +1118,10 @@ def Test():
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
     }
 
-    flags = []
-    # you may want these additional flags:
-    flags.append("--nocleanup")
-    flags.append("--noshutdown")
-
-    # Execution is much faster if a ramdisk is used, so use it if one exists in a typical location
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmpdir=/ramdisk/test/t")
-
-    # Out-of-source builds are awkward to start because they need an additional flag
-    # automatically add this flag during testing for common out-of-source locations
-    here = os.path.dirname(os.path.abspath(__file__))
-    if not os.path.exists(os.path.abspath(here + "/../../src/bitcoind")):
-        dbg = os.path.abspath(here + "/../../debug/src/bitcoind")
-        rel = os.path.abspath(here + "/../../release/src/bitcoind")
-        if os.path.exists(dbg):
-            print("Running from the debug directory (%s)" % dbg)
-            flags.append("--srcdir=%s" % os.path.dirname(dbg))
-        elif os.path.exists(rel):
-            print("Running from the release directory (%s)" % rel)
-            flags.append("--srcdir=%s" % os.path.dirname(rel))
-
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)
 
-    
+
 
 if __name__ == '__main__':
 
@@ -1168,4 +1147,3 @@ if __name__ == '__main__':
 
 
     p.main ()
-

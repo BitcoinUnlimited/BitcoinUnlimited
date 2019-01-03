@@ -211,6 +211,7 @@ testScripts = [ RpcTest(t) for t in [
     'mempool_spendcoinbase',
     'mempool_reorg',
     'mempool_limit',
+    'mempool_persist',
     'httpbasics',
     'multi_rpc',
     'zapwallettxes',
@@ -234,7 +235,8 @@ testScripts = [ RpcTest(t) for t in [
     'importprunedfunds',
     'thinblocks',
     'checkdatasig_activation',
-    'xversion'
+    'xversion',
+    'sighashmatch'
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [

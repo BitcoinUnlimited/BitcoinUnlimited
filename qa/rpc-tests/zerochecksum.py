@@ -16,33 +16,7 @@ from test_framework.util import *
 from test_framework.mininode import NetworkThread
 from test_framework.nodemessages import *
 from test_framework.bumessages import *
-from test_framework.bunode import BasicBUCashNode, BUProtocolHandler
-
-class NodeProtoHandler(BUProtocolHandler):
-    def __init__(self):
-        self.remote_xversion = None
-        self.pong_received = 0
-        BUProtocolHandler.__init__(self)
-
-    def on_version(self, conn, message):
-        self.show_debug_msg("version received\n")
-        self.remoteVersion = message.nVersion
-
-    def on_verack(self, conn, message):
-        self.show_debug_msg("verack received\n")
-        self.verack_received = True
-
-    def on_xverack(self, conn, message):
-        self.show_debug_msg("xverack received\n")
-        self.xverack_received = True
-
-    def on_xversion(self, conn, message):
-        self.show_debug_msg("xversion received\n")
-        self.remote_xversion = message
-
-    def on_pong(self, conn, message):
-        self.show_debug_msg("pong received\n")
-        self.pong_received += 1
+from test_framework.bunode import BasicBUCashNode, VersionlessProtoHandler
 
 
 class MyTest(BitcoinTestFramework):
@@ -75,7 +49,7 @@ class MyTest(BitcoinTestFramework):
         self.pynode = pynode = BasicBUCashNode()
 
         self.hndlr = pynode.connect(0, '127.0.0.1', p2p_port(0), self.nodes[0],
-                       protohandler =NodeProtoHandler(),
+                       protohandler =VersionlessProtoHandler(),
                        send_initial_version = send_initial_version)
 
         return pynode.cnxns[0]
@@ -109,7 +83,7 @@ class MyTest(BitcoinTestFramework):
             if len(self.hndlr.exceptions):
                 return
             conn.send_message(msg_ping())
-            conn.wait_for(lambda : conn.pong_received)
+            conn.wait_for(lambda : conn.pong_counter)
             # check that we are getting 0-value checksums from the BU node
             if chksum_zero_recv:
                 assert(self.hndlr.num0Checksums > 0)
@@ -145,15 +119,6 @@ def Test():
     }
 
     # you may want these flags:
-    flags = ["--nocleanup", "--noshutdown"]
-
-    # Execution is much faster if a ramdisk is used, so use it if one exists in a typical location
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmpdir=/ramdisk/test/ma")
-
-    # Out-of-source builds are awkward to start because they need an additional flag
-    # automatically add this flag during testing for common out-of-source locations
-    binpath = findBitcoind()
-    flags.append("--srcdir=%s" % binpath)
-    # start the test
+    flags = standardFlags()
+    flags.extend(["--nocleanup", "--noshutdown"])
     t.main(flags, bitcoinConf, None)

@@ -41,8 +41,6 @@ import traceback
 from .nodemessages import *
 from .bumessages import *
 
-BIP0031_VERSION = 60000
-
 MAX_INV_SZ = 50000
 MAX_BLOCK_SIZE = 1000000
 
@@ -83,13 +81,14 @@ class NodeConnCB(object):
     # This can be called from the testing thread, so it needs to acquire the
     # global lock.
     def wait_for(self, test_function):
-        while True:
+        for i in range(200):
             if self.disconnected:
                 raise DisconnectedError()
             with mininode_lock:
                 if test_function():
                     return
             time.sleep(0.05)
+        raise TimeoutError("Waiting for %s timed out." % repr(test_function))
 
     def wait_for_verack(self):
         self.wait_for(lambda : self.verack_received)
@@ -147,8 +146,7 @@ class NodeConnCB(object):
     def on_getheaders(self, conn, message): pass
 
     def on_ping(self, conn, message):
-        if conn.ver_send > BIP0031_VERSION:
-            conn.send_message(msg_pong(message.nonce))
+        conn.send_message(msg_pong(message.nonce))
 
     def on_reject(self, conn, message): pass
 
@@ -435,9 +433,6 @@ class NodeConn(asyncore.dispatcher):
             self.last_sent = time.time()
 
     def got_message(self, message):
-        if message.command == b"version":
-            if message.nVersion <= BIP0031_VERSION:
-                self.messagemap[b'ping'] = msg_ping_prebip31
         if self.last_sent + 30 * 60 < time.time():
             self.send_message(self.messagemap[b'ping']())
         self.show_debug_msg("Recv %s" % repr(message))

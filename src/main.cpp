@@ -714,7 +714,6 @@ void MainCleanup()
 {
     {
         WRITELOCK(cs_mapBlockIndex); // BU apply the appropriate lock so no contention during destruction
-        // block headers
         BlockMap::iterator it1 = mapBlockIndex.begin();
         for (; it1 != mapBlockIndex.end(); it1++)
             delete (*it1).second;
@@ -722,8 +721,8 @@ void MainCleanup()
     }
 
     {
-        WRITELOCK(orphanpool.cs); // BU apply the appropriate lock so no contention during destruction
         // orphan transactions
+        WRITELOCK(orphanpool.cs);
         orphanpool.mapOrphanTransactions.clear();
         orphanpool.mapOrphanTransactionsByPrev.clear();
     }

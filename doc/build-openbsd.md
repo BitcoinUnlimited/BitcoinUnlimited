@@ -49,7 +49,7 @@ BOOST_PREFIX="${BITCOIN_ROOT}/boost"
 mkdir -p $BOOST_PREFIX
 
 # Fetch the source and verify that it is not tampered with
-wget http://heanet.dl.sourceforge.net/project/boost/boost/1.59.0/boost_1_59_0.tar.bz2
+wget https://kent.dl.sourceforge.net/project/boost/boost/1.59.0/boost_1_59_0.tar.bz2
 echo '727a932322d94287b62abb1bd2d41723eec4356a7728909e38adb65ca25241ca  boost_1_59_0.tar.bz2' | sha256 -c
 # MUST output: (SHA256) boost_1_59_0.tar.bz2: OK
 tar -xjf boost_1_59_0.tar.bz2
@@ -84,7 +84,7 @@ BDB_PREFIX="${BITCOIN_ROOT}/db4"
 mkdir -p $BDB_PREFIX
 
 # Fetch the source and verify that it is not tampered with
-wget 'http://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz'
+wget 'https://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz'
 echo '12edc0df75bf9abd7f82f821795bcee50f42cb2e5f76a6a281b85732798364ef  db-4.8.30.NC.tar.gz' | sha256 -c
 # MUST output: (SHA256) db-4.8.30.NC.tar.gz: OK
 tar -xzf db-4.8.30.NC.tar.gz

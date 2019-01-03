@@ -135,7 +135,8 @@ static const char *FEE_ESTIMATES_FILENAME = "fee_estimates.dat";
 // shutdown thing.
 //
 
-volatile bool fRequestShutdown = false;
+std::atomic<bool> fRequestShutdown{false};
+std::atomic<bool> fDumpMempoolLater{false};
 
 void StartShutdown() { fRequestShutdown = true; }
 bool ShutdownRequested() { return fRequestShutdown; }
@@ -222,6 +223,10 @@ void Shutdown()
     StopNode();
     StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
+    if (fDumpMempoolLater && GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
+    {
+        DumpMempool();
+    }
 
     if (fFeeEstimatesInitialized)
     {
@@ -462,6 +467,12 @@ void ThreadImport(std::vector<fs::path> vImportFiles)
     {
         LOGA("Stopping after block import\n");
         StartShutdown();
+    }
+
+    if (GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
+    {
+        LoadMempool();
+        fDumpMempoolLater = !fRequestShutdown;
     }
 }
 
@@ -1220,6 +1231,27 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     if (!est_filein.IsNull())
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
+
+    // Set EB and MAX_OPS_PER_SCRIPT for the SV chain
+    if (IsSv2018Scheduled())
+    {
+        if (IsSv2018Enabled(Params().GetConsensus(), chainActive.Tip()))
+        {
+            maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
+            excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
+            settingsToUserAgentString();
+        }
+    }
+
+    // Set enableCanonicalTxOrder for the BCH early in the bootstrap phase
+    if (IsNov152018Scheduled())
+    {
+        if (IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
+        {
+            enableCanonicalTxOrder = true;
+        }
+    }
+
 
 // ********************************************************* Step 7: load wallet
 

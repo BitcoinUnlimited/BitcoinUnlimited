@@ -53,7 +53,7 @@ public:
     CGrapheneSet *pGrapheneSet;
 
 public:
-    CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx);
+    CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx, uint64_t nSenderMempoolPlusBlock);
     CGrapheneBlock() : pGrapheneSet(nullptr) {}
     ~CGrapheneBlock();
     /**

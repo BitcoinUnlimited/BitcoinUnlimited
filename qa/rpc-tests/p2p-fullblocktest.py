@@ -9,7 +9,7 @@ from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.blocktools import *
 import time
 from test_framework.key import CECKey
-from test_framework.script import CScript, SignatureHash, SIGHASH_ALL, OP_TRUE, OP_FALSE
+from test_framework.script import CScript, SIGHASH_ALL, OP_TRUE, OP_FALSE
 
 class PreviousSpendableOutput(object):
     def __init__(self, tx = CTransaction(), n = -1):
@@ -85,7 +85,7 @@ class FullBlockTest(ComparisonTestFramework):
                 scriptSig = CScript([OP_TRUE])
             else:
                 # We have to actually sign it
-                (sighash, err) = SignatureHash(spend.tx.vout[spend.n].scriptPubKey, tx, 0, SIGHASH_ALL)
+                (sighash, err) = tx.SignatureHashLegacy(spend.tx.vout[spend.n].scriptPubKey, 0, SIGHASH_ALL)
                 scriptSig = CScript([self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL]))])
             tx.vin[0].scriptSig = scriptSig
             # Now add the transaction to the block

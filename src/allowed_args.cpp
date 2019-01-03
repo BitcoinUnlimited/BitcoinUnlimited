@@ -305,6 +305,9 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
 #ifndef WIN32
         .addArg("pid=<file>", requiredStr, strprintf(_("Specify pid file (default: %s)"), BITCOIN_PID_FILENAME))
 #endif
+        .addArg("persistmempool={true,false,0,1}", optionalBool,
+            strprintf(_("Whether to save the mempool on shutdown and load on restart (default: %u)"),
+                    DEFAULT_PERSIST_MEMPOOL))
         .addArg("prune=<n>", requiredInt,
             strprintf(_("Reduce storage requirements by pruning (deleting) old blocks. This mode is incompatible with "
                         "-txindex and -rescan. "
@@ -653,7 +656,10 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
             _("Enable thin block bloom filter targeting which helps to keep the size of bloom filters to a minumum "
               "although it can impact performance. (default: 0)"))
         .addArg("use-grapheneblocks", optionalBool,
-            strprintf(_("Enable graphene to speed up the relay of blocks (default: %d)"), DEFAULT_USE_GRAPHENE_BLOCKS));
+            strprintf(_("Enable graphene to speed up the relay of blocks (default: %d)"), DEFAULT_USE_GRAPHENE_BLOCKS))
+        .addArg("preferential-timer=<millisec>", requiredInt,
+            strprintf(_("Set graphene and thinblock preferential timer duration (default: %u). Use 0 to disable it."),
+                    DEFAULT_PREFERENTIAL_TIMER));
 }
 
 static void addBlockCreationOptions(AllowedArgs &allowedArgs)

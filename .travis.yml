@@ -95,7 +95,8 @@ install:
     - if [ -n "$PPA2" ]; then for i in `seq 0 4`; do sudo add-apt-repository "$PPA2" -y 2>&1|tee /dev/stderr|grep -q "imported" && break; sleep 30; done; fi
     - if [ -n "$DPKG_ADD_ARCH" ]; then sudo dpkg --add-architecture "$DPKG_ADD_ARCH" ; fi
     - if [ -n "$PACKAGES" ]; then travis_retry sudo apt-get update; fi
-    - if [ -n "$PACKAGES" ]; then travis_retry sudo apt-get install --no-install-recommends --no-upgrade -qq libdb4.8-dev libdb4.8++-dev $PACKAGES; fi
+    - if [ -n "$PACKAGES" ]; then travis_retry sudo apt-get install --no-install-recommends --no-upgrade -qq $PACKAGES; fi
+    - if { [ -n "$DEP_OPTS" ] && [[ $DEP_OPTS =~ .*NO_WALLET=1.* ]]; }; then echo "Skip Berkeley DB installation"; else travis_retry sudo apt-get install --no-install-recommends --no-upgrade -qq libdb4.8-dev libdb4.8++-dev; fi
     - if [ -n "$PACKAGES" ]; then travis_retry sudo apt-get install -y -qq libboost1.58-dev ; fi
     - if [ -n "$PACKAGES" ]; then travis_retry sudo apt-get install -y -qq libboost1.58-tools-dev libboost-system1.58-dev libboost-filesystem1.58-dev libboost-program-options1.58-dev libboost-thread1.58-dev libboost-test1.58-dev; fi
 

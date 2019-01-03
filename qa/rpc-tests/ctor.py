@@ -25,9 +25,7 @@ class MyTest (BitcoinTestFramework):
     def setup_network(self, split=False):
         self.nodes = start_nodes(4, self.options.tmpdir)
         # Now interconnect the nodes
-        connect_nodes_bi(self.nodes,0,1)
-        connect_nodes_bi(self.nodes,0,2)
-        connect_nodes_bi(self.nodes,1,2)
+        connect_nodes_full(self.nodes[:3])
         connect_nodes_bi(self.nodes,2,3)
         self.is_network_split=False
         self.sync_blocks()
@@ -226,27 +224,5 @@ def Test():
         FORK_CFG: 0 # start with automatic fork off
     }
 
-
-    flags = []
-    # you may want these additional flags:
-    # flags.append("--nocleanup")
-    # flags.append("--noshutdown")
-
-    # Execution is much faster if a ramdisk is used, so use it if one exists in a typical location
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmpdir=/ramdisk/test/ma")
-
-    # Out-of-source builds are awkward to start because they need an additional flag
-    # automatically add this flag during testing for common out-of-source locations
-    here = os.path.dirname(os.path.abspath(__file__))
-    if not os.path.exists(os.path.abspath(here + "/../../src/bitcoind")):
-        dbg = os.path.abspath(here + "/../../debug/src/bitcoind")
-        rel = os.path.abspath(here + "/../../release/src/bitcoind")
-        if os.path.exists(dbg):
-            print("Running from the debug directory (%s)" % dbg)
-            flags.append("--srcdir=%s" % os.path.dirname(dbg))
-        elif os.path.exists(rel):
-            print("Running from the release directory (%s)" % rel)
-            flags.append("--srcdir=%s" % os.path.dirname(rel))
-
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)

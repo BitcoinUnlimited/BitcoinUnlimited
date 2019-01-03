@@ -590,7 +590,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
     // LOG(MEMPOOL, "Mempool: Considering Tx %s\n", tx->GetHash().ToString());
 
-    if (!CheckTransaction(*tx, state))
+    if (!CheckTransaction(tx, state))
     {
         if (state.GetDebugMessage() == "")
             state.SetDebugMessage("CheckTransaction failed");
@@ -610,7 +610,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         fRequireStandard = true;
     else if (allowedTx == TransactionClass::NONSTANDARD)
         fRequireStandard = false;
-    if (fRequireStandard && !IsStandardTx(*tx, reason))
+    if (fRequireStandard && !IsStandardTx(tx, reason))
     {
         state.SetDebugMessage("IsStandardTx failed");
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
@@ -724,11 +724,11 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         }
 
         // Check for non-standard pay-to-script-hash in inputs
-        if (fRequireStandard && !AreInputsStandard(*tx, view))
+        if (fRequireStandard && !AreInputsStandard(tx, view))
             return state.Invalid(false, REJECT_NONSTANDARD, "bad-txns-nonstandard-inputs");
 
-        nSigOps = GetLegacySigOpCount(*tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
-        nSigOps += GetP2SHSigOpCount(*tx, view, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+        nSigOps = GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+        nSigOps += GetP2SHSigOpCount(tx, view, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
 
         CAmount nValueOut = tx->GetValueOut();
         CAmount nFees = nValueIn - nValueOut;
@@ -909,7 +909,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         unsigned char sighashType = 0;
         if (!CheckInputs(
-                *tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr, &sighashType))
+                tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr, &sighashType))
         {
             LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", tx->GetHash().ToString().c_str());
             if (state.GetDebugMessage() == "")
@@ -928,8 +928,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(*tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | cds_flag | svflag,
-                maxScriptOps.Value(), true, nullptr, nullptr, &sighashType2))
+        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | cds_flag | svflag, maxScriptOps.Value(),
+                true, nullptr, nullptr, &sighashType2))
         {
             if (state.GetDebugMessage() == "")
                 state.SetDebugMessage("CheckInputs failed against mandatory but not standard flags");
@@ -1045,7 +1045,6 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
                     txd.tx = orphanTx;
                     txd.nodeId = fromPeer;
                     txd.nodeName = "orphan";
-                    txd.whitelisted = false;
                     LOG(MEMPOOL, "Resubmitting orphan tx: %s\n", orphanTx->GetHash().ToString().c_str());
                     EnqueueTxForAdmission(txd);
                 }

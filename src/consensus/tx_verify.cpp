@@ -125,43 +125,43 @@ bool SequenceLocks(const CTransactionRef &tx, int flags, std::vector<int> *prevH
 // previous outputs are the most relevant, but not actually checked.
 // The purpose of this is to limit the outputs of transactions so that other transactions' "prevout"
 // is reasonably sized.
-unsigned int GetLegacySigOpCount(const CTransaction &tx, const uint32_t flags)
+unsigned int GetLegacySigOpCount(const CTransactionRef &tx, const uint32_t flags)
 {
     unsigned int nSigOps = 0;
-    for (const auto &txin : tx.vin)
+    for (const auto &txin : tx->vin)
     {
         nSigOps += txin.scriptSig.GetSigOpCount(flags, false);
     }
-    for (const auto &txout : tx.vout)
+    for (const auto &txout : tx->vout)
     {
         nSigOps += txout.scriptPubKey.GetSigOpCount(flags, false);
     }
     return nSigOps;
 }
 
-unsigned int GetP2SHSigOpCount(const CTransaction &tx, const CCoinsViewCache &inputs, const uint32_t flags)
+unsigned int GetP2SHSigOpCount(const CTransactionRef &tx, const CCoinsViewCache &inputs, const uint32_t flags)
 {
-    if ((flags && SCRIPT_VERIFY_P2SH) == 0 || tx.IsCoinBase())
+    if ((flags && SCRIPT_VERIFY_P2SH) == 0 || tx->IsCoinBase())
         return 0;
 
     unsigned int nSigOps = 0;
     {
-        for (unsigned int i = 0; i < tx.vin.size(); i++)
+        for (unsigned int i = 0; i < tx->vin.size(); i++)
         {
-            CoinAccessor coin(inputs, tx.vin[i].prevout);
+            CoinAccessor coin(inputs, tx->vin[i].prevout);
             if (coin && coin->out.scriptPubKey.IsPayToScriptHash())
-                nSigOps += coin->out.scriptPubKey.GetSigOpCount(flags, tx.vin[i].scriptSig);
+                nSigOps += coin->out.scriptPubKey.GetSigOpCount(flags, tx->vin[i].scriptSig);
         }
     }
     return nSigOps;
 }
 
-bool CheckTransaction(const CTransaction &tx, CValidationState &state)
+bool CheckTransaction(const CTransactionRef &tx, CValidationState &state)
 {
     // Basic checks that don't depend on any context
-    if (tx.vin.empty())
+    if (tx->vin.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vin-empty");
-    if (tx.vout.empty())
+    if (tx->vout.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty");
     // Check that the transaction doesn't have an excessive number of sigops
     unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
@@ -175,7 +175,7 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
 
     // Check for negative or overflow output values
     CAmount nValueOut = 0;
-    for (const CTxOut &txout : tx.vout)
+    for (const CTxOut &txout : tx->vout)
     {
         if (txout.nValue < 0)
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-vout-negative");
@@ -188,22 +188,22 @@ bool CheckTransaction(const CTransaction &tx, CValidationState &state)
 
     // Check for duplicate inputs
     std::set<COutPoint> vInOutPoints;
-    for (const CTxIn &txin : tx.vin)
+    for (const CTxIn &txin : tx->vin)
     {
         if (vInOutPoints.count(txin.prevout))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputs-duplicate");
         vInOutPoints.insert(txin.prevout);
     }
 
-    if (tx.IsCoinBase())
+    if (tx->IsCoinBase())
     {
         // BU convert 100 to a constant so we can use it during generation
-        if (tx.vin[0].scriptSig.size() < 2 || tx.vin[0].scriptSig.size() > MAX_COINBASE_SCRIPTSIG_SIZE)
+        if (tx->vin[0].scriptSig.size() < 2 || tx->vin[0].scriptSig.size() > MAX_COINBASE_SCRIPTSIG_SIZE)
             return state.DoS(100, false, REJECT_INVALID, "bad-cb-length");
     }
     else
     {
-        for (const CTxIn &txin : tx.vin)
+        for (const CTxIn &txin : tx->vin)
             if (txin.prevout.IsNull())
                 return state.DoS(10, false, REJECT_INVALID, "bad-txns-prevout-null");
     }
@@ -233,20 +233,20 @@ static int GetSpendHeight(const CCoinsViewCache &inputs)
     throw std::runtime_error("GetSpendHeight(): best block does not exist");
 }
 
-bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, const CCoinsViewCache &inputs)
+bool Consensus::CheckTxInputs(const CTransactionRef &tx, CValidationState &state, const CCoinsViewCache &inputs)
 {
     // This doesn't trigger the DoS code on purpose; if it did, it would make it easier
     // for an attacker to attempt to split the network.
-    if (!inputs.HaveInputs(tx))
+    if (!inputs.HaveInputs(*tx))
         return state.Invalid(false, 0, "", "Inputs unavailable");
 
     CAmount nValueIn = 0;
     CAmount nFees = 0;
     int nSpendHeight = -1;
     {
-        for (unsigned int i = 0; i < tx.vin.size(); i++)
+        for (unsigned int i = 0; i < tx->vin.size(); i++)
         {
-            const COutPoint &prevout = tx.vin[i].prevout;
+            const COutPoint &prevout = tx->vin[i].prevout;
             Coin coin;
             inputs.GetCoin(prevout, coin); // Make a copy so I don't hold the utxo lock
             assert(!coin.IsSpent());
@@ -285,12 +285,12 @@ bool Consensus::CheckTxInputs(const CTransaction &tx, CValidationState &state, c
         }
     }
 
-    if (nValueIn < tx.GetValueOut())
+    if (nValueIn < tx->GetValueOut())
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-belowout", false,
-            strprintf("value in (%s) < value out (%s)", FormatMoney(nValueIn), FormatMoney(tx.GetValueOut())));
+            strprintf("value in (%s) < value out (%s)", FormatMoney(nValueIn), FormatMoney(tx->GetValueOut())));
 
     // Tally transaction fees
-    CAmount nTxFee = nValueIn - tx.GetValueOut();
+    CAmount nTxFee = nValueIn - tx->GetValueOut();
     if (nTxFee < 0)
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-fee-negative");
     nFees += nTxFee;

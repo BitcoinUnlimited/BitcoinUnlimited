@@ -58,7 +58,7 @@ void CheckBlockIndex(const Consensus::Params &consensusParams);
  * This does not modify the UTXO set. If pvChecks is not NULL, script checks are pushed onto it
  * instead of being performed inline.
  */
-bool CheckInputs(const CTransaction &tx,
+bool CheckInputs(const CTransactionRef &tx,
     CValidationState &state,
     const CCoinsViewCache &view,
     bool fScriptChecks,

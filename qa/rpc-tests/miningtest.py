@@ -54,13 +54,13 @@ class MyTest (BitcoinTestFramework):
 
         # ask for a valid coinbase size
         c = node.getminingcandidate(1050)
-		
+
         # ask for a coinbase size that is too big
         expectException(lambda: node.getminingcandidate(1000000000000000), JSONRPCException)
-               
+
         # ask for a coinbase size that is too small
         expectException(lambda: node.getminingcandidate(-1), JSONRPCException)
-        
+
         # the most awful mining algorithm: just submit with an arbitrary nonce
         # (works because testnet accepts almost anything)
         nonce = 0
@@ -127,7 +127,7 @@ class MyTest (BitcoinTestFramework):
         #    of txns currently in the mempool.
         self.nodes[0].generate(5);
         self.sync_all()
-        
+
         # Add a few txns to the mempool and mine them with the default fee
         self.nodes[0].set("minlimitertxfee=0")
         self.nodes[1].set("minlimitertxfee=0")
@@ -176,26 +176,5 @@ def Test():
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
 
-    flags = []
-    # you may want these additional flags:
-    # flags.append("--nocleanup")
-    # flags.append("--noshutdown")
-
-    # Execution is much faster if a ramdisk is used, so use it if one exists in a typical location
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmppfx=/ramdisk/test")
-
-    # Out-of-source builds are awkward to start because they need an additional flag
-    # automatically add this flag during testing for common out-of-source locations
-    here = os.path.dirname(os.path.abspath(__file__))
-    if not os.path.exists(os.path.abspath(here + "/../../src/bitcoind")):
-        dbg = os.path.abspath(here + "/../../debug/src/bitcoind")
-        rel = os.path.abspath(here + "/../../release/src/bitcoind")
-        if os.path.exists(dbg):
-            print("Running from the debug directory (%s)" % dbg)
-            flags.append("--srcdir=%s" % os.path.dirname(dbg))
-        elif os.path.exists(rel):
-            print("Running from the release directory (%s)" % rel)
-            flags.append("--srcdir=%s" % os.path.dirname(rel))
-
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)

@@ -6,7 +6,7 @@ import test_framework.loginit
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.blocktools import *
-from test_framework.util import findBitcoind
+from test_framework.util import findBitcoind, standardFlags
 import time, os
 
 
@@ -17,7 +17,7 @@ In this test we connect to one node over p2p, and test tx requests.
 # Use the ComparisonTestFramework with 1 node: only use --testbinary.
 class InvalidTxRequestTest(ComparisonTestFramework):
 
-    ''' Can either run this test as 1 node with expected answers, or two and compare them. 
+    ''' Can either run this test as 1 node with expected answers, or two and compare them.
         Change the "outcome" variable from each TestInstance object to only do the comparison. '''
     def __init__(self):
         self.num_nodes = 1
@@ -80,9 +80,5 @@ def Test():
         "debug": ["rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"],
     }
 
-    flags = [] # ["--nocleanup", "--noshutdown"]
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmppfx=/ramdisk/test")
-    binpath = findBitcoind()
-    flags.append("--srcdir=%s" % binpath)
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)

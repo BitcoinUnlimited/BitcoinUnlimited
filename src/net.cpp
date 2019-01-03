@@ -359,6 +359,11 @@ ConnectionStateIncoming operator|(const ConnectionStateIncoming &a, const Connec
     return (ConnectionStateIncoming)((uint64_t)a | (uint64_t)b);
 }
 
+ConnectionStateOutgoing operator|(const ConnectionStateOutgoing &a, const ConnectionStateOutgoing &b)
+{
+    return (ConnectionStateOutgoing)((uint64_t)a | (uint64_t)b);
+}
+
 std::string toString(const ConnectionStateIncoming &state) { return toString((uint64_t)state, bitMeaningsCSI); }
 std::ostream &operator<<(std::ostream &os, const ConnectionStateIncoming &state) { return (os << toString(state)); }
 std::string toString(const ConnectionStateOutgoing &state) { return toString((uint64_t)state, bitMeaningsCSO); }
@@ -1389,7 +1394,7 @@ void ThreadSocketHandler()
                     if (ignoreNetTimeouts.Value() == false)
                         pnode->fDisconnect = true;
                 }
-                else if (nTime - pnode->nLastRecv > (pnode->nVersion > BIP0031_VERSION ? TIMEOUT_INTERVAL : 90 * 60))
+                else if (nTime - pnode->nLastRecv > TIMEOUT_INTERVAL)
                 {
                     LOG(NET, "Node %s socket receive timeout: %is\n", pnode->GetLogName(), nTime - pnode->nLastRecv);
                     if (ignoreNetTimeouts.Value() == false)
@@ -2581,7 +2586,7 @@ void RelayTransaction(const CTransactionRef &ptx, const bool fRespend)
         {
             // Relaying double spends to SPV clients is an easy attack vector,
             // and therefore only relay txns that are not potential double spends.
-            if (!fRespend && pnode->pfilter->IsRelevantAndUpdate(*ptx))
+            if (!fRespend && pnode->pfilter->IsRelevantAndUpdate(ptx))
                 pnode->PushInventory(inv);
         }
         else
@@ -2974,7 +2979,7 @@ void CNode::BeginMessage(const char *pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSen
     ENTER_CRITICAL_SECTION(cs_vSend);
     assert(ssSend.size() == 0);
     ssSend << CMessageHeader(GetMagic(Params()), pszCommand, 0);
-    LOG(NET, "sending msg: %s ", SanitizeString(pszCommand));
+    LOG(NET, "sending msg: %s to %s\n", SanitizeString(pszCommand), GetLogName());
     currentCommand = pszCommand;
 }
 

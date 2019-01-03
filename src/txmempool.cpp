@@ -9,6 +9,7 @@
 #include "consensus/consensus.h"
 #include "consensus/tx_verify.h"
 #include "consensus/validation.h"
+#include "init.h"
 #include "main.h"
 #include "parallel.h"
 #include "policy/fees.h"
@@ -1017,7 +1018,8 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
             // Use the largest maxOps since this code is not meant to validate that constraint
             // takes cs_main so comment out for now
             // TODO: put back when not taking main:
-            // assert(CheckInputs(tx, state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, NULL));
+            // assert(CheckInputs(
+            //    MakeTransactionRef(tx), state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, nullptr));
             UpdateCoins(tx, state, mempoolDuplicate, 1000000);
         }
     }
@@ -1036,7 +1038,8 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         else
         {
             // Use the largest maxOps since this code is not meant to validate that constraint
-            assert(CheckInputs(entry->GetTx(), state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, NULL));
+            assert(CheckInputs(
+                entry->GetSharedTx(), state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, nullptr));
             UpdateCoins(entry->GetTx(), state, mempoolDuplicate, 1000000);
             stepsSinceLastRemove = 0;
         }
@@ -1143,6 +1146,24 @@ CTransactionRef CTxMemPool::get(const uint256 &hash) const
 {
     READLOCK(cs);
     return _get(hash);
+}
+
+static TxMempoolInfo GetInfo(CTxMemPool::indexed_transaction_set::const_iterator it)
+{
+    return TxMempoolInfo{
+        it->GetSharedTx(), it->GetTime(), CFeeRate(it->GetFee(), it->GetTxSize()), it->GetModifiedFee() - it->GetFee()};
+}
+
+std::vector<TxMempoolInfo> CTxMemPool::AllTxMempoolInfo() const
+{
+    AssertLockHeld(cs);
+    std::vector<TxMempoolInfo> vInfo;
+    vInfo.reserve(mapTx.size());
+    for (indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
+    {
+        vInfo.push_back(GetInfo(it));
+    }
+    return vInfo;
 }
 
 void CTxMemPool::PrioritiseTransaction(const uint256 hash,
@@ -1438,7 +1459,7 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpends
 
 void CTxMemPool::UpdateTransactionsPerSecond()
 {
-    boost::mutex::scoped_lock lock(cs_txPerSec);
+    std::lock_guard<std::mutex> lock(cs_txPerSec);
 
     static int64_t nLastTime = GetTime();
     double nSecondsToAverage = 60; // Length of time in seconds to smooth the tx rate over
@@ -1461,4 +1482,135 @@ void CTxMemPool::UpdateTransactionsPerSecond()
 SaltedTxidHasher::SaltedTxidHasher()
     : k0(GetRand(std::numeric_limits<uint64_t>::max())), k1(GetRand(std::numeric_limits<uint64_t>::max()))
 {
+}
+
+// Version is current unix epoch time. Nov 1, 2018 at 12am
+static const uint64_t MEMPOOL_DUMP_VERSION = 1541030400;
+
+bool LoadMempool(void)
+{
+    int64_t nExpiryTimeout = GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
+    FILE *filestr = fopen((GetDataDir() / "mempool.dat").string().c_str(), "rb");
+    CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
+    if (file.IsNull())
+    {
+        LOGA("Failed to open mempool file from disk. Continuing anyway.\n");
+        return false;
+    }
+
+    int64_t count = 0;
+    int64_t skipped = 0;
+    int64_t nNow = GetTime();
+
+    try
+    {
+        uint64_t version;
+        file >> version;
+        if (version != MEMPOOL_DUMP_VERSION)
+        {
+            return false;
+        }
+        uint64_t num;
+        file >> num;
+        double prioritydummy = 0;
+        while (num--)
+        {
+            CTransaction tx;
+            int64_t nTime;
+            int64_t nFeeDelta;
+            file >> tx;
+            file >> nTime;
+            file >> nFeeDelta;
+
+            CAmount amountdelta = nFeeDelta;
+            if (amountdelta)
+            {
+                mempool.PrioritiseTransaction(tx.GetHash(), tx.GetHash().ToString(), prioritydummy, amountdelta);
+            }
+            if (nTime + nExpiryTimeout > nNow)
+            {
+                CTxInputData txd;
+                txd.tx = MakeTransactionRef(tx);
+                EnqueueTxForAdmission(txd);
+                ++count;
+            }
+            else
+            {
+                ++skipped;
+            }
+
+            if (ShutdownRequested())
+                return false;
+        }
+        std::map<uint256, CAmount> mapDeltas;
+        file >> mapDeltas;
+
+        for (const auto &i : mapDeltas)
+        {
+            mempool.PrioritiseTransaction(i.first, i.first.ToString(), prioritydummy, i.second);
+        }
+    }
+    catch (const std::exception &e)
+    {
+        LOGA("Failed to deserialize mempool data on disk: %s. Continuing anyway.\n", e.what());
+        return false;
+    }
+
+    LOGA("Imported mempool transactions from disk: %i successes, %i expired\n", count, skipped);
+    return true;
+}
+
+bool DumpMempool(void)
+{
+    int64_t start = GetTimeMicros();
+
+    std::map<uint256, CAmount> mapDeltas;
+    std::vector<TxMempoolInfo> vInfo;
+
+    {
+        READLOCK(mempool.cs);
+        for (const auto &i : mempool.mapDeltas)
+        {
+            mapDeltas[i.first] = i.second.first;
+        }
+        vInfo = mempool.AllTxMempoolInfo();
+    }
+
+    int64_t mid = GetTimeMicros();
+
+    try
+    {
+        FILE *filestr = fopen((GetDataDir() / "mempool.dat.new").string().c_str(), "wb");
+        if (!filestr)
+        {
+            return false;
+        }
+
+        CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
+
+        uint64_t version = MEMPOOL_DUMP_VERSION;
+        file << version;
+
+        file << (uint64_t)vInfo.size();
+        for (const auto &i : vInfo)
+        {
+            file << *(i.tx);
+            file << (int64_t)i.nTime;
+            file << (int64_t)i.feeDelta;
+            mapDeltas.erase(i.tx->GetHash());
+        }
+
+        file << mapDeltas;
+        FileCommit(file.Get());
+        file.fclose();
+        RenameOver(GetDataDir() / "mempool.dat.new", GetDataDir() / "mempool.dat");
+        int64_t last = GetTimeMicros();
+        LOGA("Dumped mempool: %gs to copy, %gs to dump\n", (mid - start) * 0.000001, (last - mid) * 0.000001);
+    }
+    catch (const std::exception &e)
+    {
+        LOGA("Failed to dump mempool: %s. Continuing anyway.\n", e.what());
+        return false;
+    }
+    return true;
 }

@@ -28,10 +28,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         #proxy = AuthServiceProxy(url)
         #proxy.url = url # store URL on proxy for info
         #self.nodes.append(proxy)
-
-        connect_nodes_bi(self.nodes,0,1)
-        connect_nodes_bi(self.nodes,1,2)
-        connect_nodes_bi(self.nodes,0,2)
+        connect_nodes_full(self.nodes)
 
         self.is_network_split=False
         self.sync_all()
@@ -179,9 +176,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         wait_bitcoinds()
         # restart the node with a flag that forces the behavior to be more like mainnet -- don't accept nonstandard tx
         self.nodes = start_nodes(3, self.options.tmpdir, [ ["--acceptnonstdtxn=0"], [], [], []])
-        connect_nodes_bi(self.nodes,0,1)
-        connect_nodes_bi(self.nodes,1,2)
-        connect_nodes_bi(self.nodes,0,2)
+        connect_nodes_full(self.nodes)
 
         wallet = self.nodes[0].listunspent()
         wallet.sort(key=lambda x: x["amount"], reverse=False)
@@ -271,10 +266,5 @@ def Test():
         "debug": ["rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"],
     }
 
-    flags = [] # ["--nocleanup", "--noshutdown"]
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmpdir=/ramdisk/test/t")
-    binpath = findBitcoind()
-    flags.append("--srcdir=%s" % binpath)
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)
-

@@ -73,7 +73,7 @@ If that doesn't work, you can install all boost development packages with:
 
     sudo apt-get install libboost-all-dev
 
-BerkeleyDB is required for the wallet. db4.8 packages are available [here](https://launchpad.net/~bitcoin/+archive/bitcoin).
+BerkeleyDB is required for the wallet. db4.8 packages are available [here](https://launchpad.net/~bitcoin-unlimited/+archive/ubuntu/bu-ppa).
 You can add the repository and install using the following commands:
 
     sudo add-apt-repository ppa:bitcoin-unlimited/bu-ppa
@@ -143,7 +143,7 @@ BDB_PREFIX="${BITCOIN_ROOT}/db4"
 mkdir -p $BDB_PREFIX
 
 # Fetch the source and verify that it is not tampered with
-wget 'http://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz'
+wget 'https://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz'
 echo '12edc0df75bf9abd7f82f821795bcee50f42cb2e5f76a6a281b85732798364ef  db-4.8.30.NC.tar.gz' | sha256sum -c
 # -> db-4.8.30.NC.tar.gz: OK
 tar -xzvf db-4.8.30.NC.tar.gz

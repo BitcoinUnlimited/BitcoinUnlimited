@@ -27,7 +27,7 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
 
 CMemPoolInfo::CMemPoolInfo(uint64_t _nTx) : nTx(_nTx) {}
 CMemPoolInfo::CMemPoolInfo() { this->nTx = 0; }
-CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx)
+CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx, uint64_t nSenderMempoolPlusBlock)
 {
     header = pblock->GetBlockHeader();
     nBlockTxs = pblock->vtx.size();
@@ -41,7 +41,7 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPool
             vAdditionalTxs.push_back(tx);
     }
 
-    pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, blockHashes, true);
+    pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, true);
 }
 
 CGrapheneBlock::~CGrapheneBlock()
@@ -1182,12 +1182,14 @@ std::string CGrapheneBlockData::ReRequestedTxToString()
 bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
 {
     // Base time used to calculate the random timeout value.
-    static int64_t nTimeToWait = 10000;
+    static uint64_t nTimeToWait = GetArg("-preferential-timer", DEFAULT_PREFERENTIAL_TIMER);
+    if (nTimeToWait == 0)
+        return false;
 
     LOCK(cs_mapGrapheneBlockTimer);
     if (!mapGrapheneBlockTimer.count(hash))
     {
-        // The timeout limit is a random number betwee 8 and 12 seconds.
+        // The timeout limit is a random number belonging to graphene-timer +/- 20%
         // This way a node connected to this one may download the block
         // before the other node and thus be able to serve the other with
         // a graphene block, rather than both nodes timing out and downloading
@@ -1195,9 +1197,11 @@ bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
         // where we receive full blocks from peers that don't support graphene.
         //
         // To make the timeout random we adjust the start time of the timer forward
-        // or backward by a random amount plus or minus 2 seconds.
+        // or backward by a random amount plus or minus 20% of preferential timer in milliseconds.
         FastRandomContext insecure_rand(false);
-        uint64_t nOffset = nTimeToWait - (8000 + (insecure_rand.rand64() % 4000) + 1);
+        uint64_t nStartInterval = nTimeToWait * 0.8;
+        uint64_t nIntervalLen = 2 * (nTimeToWait * 0.2);
+        int64_t nOffset = nTimeToWait - (nStartInterval + (insecure_rand.rand64() % nIntervalLen) + 1);
         mapGrapheneBlockTimer[hash] = std::make_pair(GetTimeMillis() + nOffset, false);
         LOG(GRAPHENE, "Starting Preferential Graphene Block timer (%d millis)\n", nTimeToWait + nOffset);
     }
@@ -1210,7 +1214,7 @@ bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
         if (iter != mapGrapheneBlockTimer.end())
         {
             int64_t elapsed = GetTimeMillis() - iter->second.first;
-            if (elapsed > nTimeToWait)
+            if (elapsed > (int64_t)nTimeToWait)
             {
                 // Only print out the log entry once.  Because the graphene timer will be hit
                 // many times when requesting a block we don't want to fill up the log file.
@@ -1396,7 +1400,10 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
     {
         try
         {
-            CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx);
+            uint64_t nSenderMempoolPlusBlock =
+                GetGrapheneMempoolInfo().nTx + pblock->vtx.size() - 1; // exclude coinbase
+
+            CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx, nSenderMempoolPlusBlock);
             int nSizeBlock = pblock->GetBlockSize();
             int nSizeGrapheneBlock = ::GetSerializeSize(grapheneBlock, SER_NETWORK, PROTOCOL_VERSION);
 

@@ -110,9 +110,5 @@ def Test():
         "debug": ["rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"],
     }
 
-    flags = [] # ["--nocleanup", "--noshutdown"]
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmpdir=/ramdisk/test/ma")
-    binpath = findBitcoind()
-    flags.append("--srcdir=%s" % binpath)
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)

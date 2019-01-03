@@ -354,13 +354,9 @@ static void handleAddressAfterInit(CNode *pfrom)
                 pfrom->PushAddress(addr, insecure_rand);
             }
         }
-
         // Get recent addresses
-        if (pfrom->fOneShot || pfrom->nVersion >= CADDR_TIME_VERSION || addrman.size() < 1000)
-        {
-            pfrom->PushMessage(NetMsgType::GETADDR);
-            pfrom->fGetAddr = true;
-        }
+        pfrom->PushMessage(NetMsgType::GETADDR);
+        pfrom->fGetAddr = true;
         addrman.Good(pfrom->addr);
     }
     else
@@ -604,7 +600,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     {
         if (!ensureConnectionState(strCommand,
                 ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION | ConnectionStateIncoming::READY,
-                ConnectionStateOutgoing::READY, pfrom))
+                ConnectionStateOutgoing::READY | ConnectionStateOutgoing::SENT_VERSION, pfrom))
             return false;
 
         // Each connection can only send one version message
@@ -664,6 +660,73 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CheckAndRequestExpeditedBlocks(pfrom);
     }
 
+    // XVERSION NOTICE: If you read this code as a reference to implement
+    // xversion, *please* refrain from sending 'sendheaders' or
+    // 'filtersizexthin' during the initial handshake to allow further
+    // simplification and streamlining of the connection handshake down the
+    // road. Allowing receipt of 'sendheaders'/'filtersizexthin' here is to
+    // allow connection with BUCash 1.5.0.x nodes that introduced parallelized
+    // message processing but not the state machine for (x)version
+    // serialization.  This is valid protocol behavior (as in not breaking any
+    // existing implementation) but likely still makes sense to be phased out
+    // down the road.
+    else if (strCommand == NetMsgType::SENDHEADERS)
+    {
+        CNodeStateAccessor(nodestate, pfrom->GetId())->fPreferHeaders = true;
+    }
+
+    else if (strCommand == NetMsgType::FILTERSIZEXTHIN)
+    {
+        if (pfrom->ThinBlockCapable())
+        {
+            vRecv >> pfrom->nXthinBloomfilterSize;
+
+            // As a safeguard don't allow a smaller max bloom filter size than the default max size.
+            if (!pfrom->nXthinBloomfilterSize || (pfrom->nXthinBloomfilterSize < SMALLEST_MAX_BLOOM_FILTER_SIZE))
+            {
+                pfrom->PushMessage(
+                    NetMsgType::REJECT, strCommand, REJECT_INVALID, std::string("filter size was too small"));
+                LOG(NET, "Disconnecting %s: bloom filter size too small\n", pfrom->GetLogName());
+                pfrom->fDisconnect = true;
+                return false;
+            }
+        }
+        else
+        {
+            pfrom->fDisconnect = true;
+            return false;
+        }
+    }
+
+    // XVERSION notice: Reply to pings before initial xversion handshake is
+    // complete. This behavior should also not be relied upon and it is likely
+    // better to phase this out later (requiring only proper, expected
+    // messages during the initial (x)version handshake).
+    else if (strCommand == NetMsgType::PING)
+    {
+        // take the lock exclusively to force a serialization point
+        CSharedUnlocker unl(pfrom->csMsgSerializer);
+        {
+            WRITELOCK(pfrom->csMsgSerializer);
+            uint64_t nonce = 0;
+            vRecv >> nonce;
+            // although PONG was enabled in BIP31, all clients should handle it at this point
+            // and unknown messages are silently dropped.  So for simplicity, always respond with PONG
+            // Echo the message back with the nonce. This allows for two useful features:
+            //
+            // 1) A remote node can quickly check if the connection is operational
+            // 2) Remote nodes can measure the latency of the network thread. If this node
+            //    is overloaded it won't respond to pings quickly and the remote node can
+            //    avoid sending us more work, like chain download requests.
+            //
+            // The nonce stops the remote getting confused between different pings: without
+            // it, if the remote node sends a ping once per second and this node takes 5
+            // seconds to respond to each, the 5th ping the remote sends would appear to
+            // return very quickly.
+            pfrom->PushMessage(NetMsgType::PONG, nonce);
+        }
+    }
+
     // ------------------------- END INITIAL COMMAND SET PROCESSING
     else if (!pfrom->successfullyConnected())
     {
@@ -678,9 +741,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         std::vector<CAddress> vAddr;
         vRecv >> vAddr;
 
-        // Don't want addr from older versions unless seeding
-        if (pfrom->nVersion < CADDR_TIME_VERSION && addrman.size() > 1000)
-            return true;
         if (vAddr.size() > 1000)
         {
             dosMan.Misbehaving(pfrom, 20);
@@ -717,8 +777,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     std::multimap<uint256, CNode *> mapMix;
                     for (CNode *pnode : vNodes)
                     {
-                        if (pnode->nVersion < CADDR_TIME_VERSION)
-                            continue;
                         unsigned int nPointer;
                         memcpy(&nPointer, &pnode, sizeof(nPointer));
                         uint256 hashKey = ArithToUint256(UintToArith256(hashRand) ^ nPointer);
@@ -743,11 +801,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             LOG(NET, "Disconnecting %s: one shot\n", pfrom->GetLogName());
             pfrom->fDisconnect = true;
         }
-    }
-
-    else if (strCommand == NetMsgType::SENDHEADERS)
-    {
-        CNodeStateAccessor(nodestate, pfrom->GetId())->fPreferHeaders = true;
     }
 
     // Processing this message type for statistics purposes only, BU currently doesn't support CB protocol
@@ -1573,7 +1626,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     continue; // another thread removed since queryHashes, maybe...
 
                 LOCK(pfrom->cs_filter);
-                if (!pfrom->pfilter->IsRelevantAndUpdate(*ptx))
+                if (!pfrom->pfilter->IsRelevantAndUpdate(ptx))
                     continue;
             }
             vInv.push_back(inv);
@@ -1586,34 +1639,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (vInv.size() > 0)
             pfrom->PushMessage(NetMsgType::INV, vInv);
     }
-
-
-    else if (strCommand == NetMsgType::PING)
-    {
-        if (pfrom->nVersion > BIP0031_VERSION)
-        {
-            // take the lock exclusively to force a serialization point
-            CSharedUnlocker unl(pfrom->csMsgSerializer);
-            {
-                WRITELOCK(pfrom->csMsgSerializer);
-                uint64_t nonce = 0;
-                vRecv >> nonce;
-                // Echo the message back with the nonce. This allows for two useful features:
-                //
-                // 1) A remote node can quickly check if the connection is operational
-                // 2) Remote nodes can measure the latency of the network thread. If this node
-                //    is overloaded it won't respond to pings quickly and the remote node can
-                //    avoid sending us more work, like chain download requests.
-                //
-                // The nonce stops the remote getting confused between different pings: without
-                // it, if the remote node sends a ping once per second and this node takes 5
-                // seconds to respond to each, the 5th ping the remote sends would appear to
-                // return very quickly.
-                pfrom->PushMessage(NetMsgType::PONG, nonce);
-            }
-        }
-    }
-
 
     else if (strCommand == NetMsgType::PONG)
     {
@@ -1734,28 +1759,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->fRelayTxes = true;
     }
 
-    else if (strCommand == NetMsgType::FILTERSIZEXTHIN)
-    {
-        if (pfrom->ThinBlockCapable())
-        {
-            vRecv >> pfrom->nXthinBloomfilterSize;
-
-            // As a safeguard don't allow a smaller max bloom filter size than the default max size.
-            if (!pfrom->nXthinBloomfilterSize || (pfrom->nXthinBloomfilterSize < SMALLEST_MAX_BLOOM_FILTER_SIZE))
-            {
-                pfrom->PushMessage(
-                    NetMsgType::REJECT, strCommand, REJECT_INVALID, std::string("filter size was too small"));
-                LOG(NET, "Disconnecting %s: bloom filter size too small\n", pfrom->GetLogName());
-                pfrom->fDisconnect = true;
-                return false;
-            }
-        }
-        else
-        {
-            pfrom->fDisconnect = true;
-            return false;
-        }
-    }
 
     else if (strCommand == NetMsgType::REJECT)
     {
@@ -2021,17 +2024,8 @@ bool SendMessages(CNode *pto)
             }
             pto->fPingQueued = false;
             pto->nPingUsecStart = GetTimeMicros();
-            if (pto->nVersion > BIP0031_VERSION)
-            {
-                pto->nPingNonceSent = nonce;
-                pto->PushMessage(NetMsgType::PING, nonce);
-            }
-            else
-            {
-                // Peer is too old to support ping command with nonce, pong will never arrive.
-                pto->nPingNonceSent = 0;
-                pto->PushMessage(NetMsgType::PING);
-            }
+            pto->nPingNonceSent = nonce;
+            pto->PushMessage(NetMsgType::PING, nonce);
         }
 
         // Check to see if there are any thinblocks or graphene blocks in flight that have gone beyond the
