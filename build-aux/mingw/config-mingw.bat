@@ -93,6 +93,8 @@ REM Install required msys base package (provide access to msys sh shell)
 echo Updating base MinGW
 %MINGW_GET% update
 %MINGW_GET% install msys-base-bin
+REM Install patch utility so we can apply code patches where necessary
+%MINGW_GET% install msys-patch
 
 REM Verify that MSYS was correctly installed and updated by previous steps
 if not exist "%MSYS_SH%" (
