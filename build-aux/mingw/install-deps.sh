@@ -278,36 +278,44 @@ make $MAKE_CORES
 # Qt (Download, unpack, and rename - build requires Windows CMD)
 cd "$DEPS_ROOT"
 # don't download if already downloaded
-if [ ! -e qttools-opensource-src-5.3.2.7z ]
+if [ ! -e qttools-opensource-src-5.7.1.7z ]
 then
-	wget --no-check-certificate http://download.qt-project.org/archive/qt/5.3/5.3.2/submodules/qttools-opensource-src-5.3.2.7z -O "$DEPS_ROOT/qttools-opensource-src-5.3.2.7z"
+	wget --no-check-certificate http://download.qt-project.org/archive/qt/5.7/5.7.1/submodules/qttools-opensource-src-5.7.1.7z -O "$DEPS_ROOT/qttools-opensource-src-5.7.1.7z"
 	# Verify downloaded file's hash (provided on Qt site)
 	# v5.3.2 sha256=e3d026c8bd48ad41c3eec8e45ee4a3b9e39475438ce45dde90dc010164fc95c9
-	check_hash e3d026c8bd48ad41c3eec8e45ee4a3b9e39475438ce45dde90dc010164fc95c9 "$DEPS_ROOT/qttools-opensource-src-5.3.2.7z"
+	# v5.7.1 sha256=904b1fb861c5b4923c0db1f1c1a06528a7c45c2170e13ca3eafbe10a54c366b4
+	check_hash 904b1fb861c5b4923c0db1f1c1a06528a7c45c2170e13ca3eafbe10a54c366b4 "$DEPS_ROOT/qttools-opensource-src-5.7.1.7z"
 fi
 # don't extract if already extracted
 cd "$PATH_DEPS/Qt"
-if [ ! -d "qttools-opensource-src-5.3.2" ]
+if [ ! -d "qttools-opensource-src-5.7.1" ]
 then
 	cd "$DEPS_ROOT"
-	"$CMD_7ZIP" x qttools-opensource-src-5.3.2.7z -aoa -o"$PATH_DEPS/Qt"
+	"$CMD_7ZIP" x qttools-opensource-src-5.7.1.7z -aoa -o"$PATH_DEPS/Qt"
 fi
 
 cd "$DEPS_ROOT"
 # don't download if already downloaded
-if [ ! -e qtbase-opensource-src-5.3.2.7z ]
+if [ ! -e qtbase-opensource-src-5.7.1.7z ]
 then
-	wget --no-check-certificate http://download.qt-project.org/archive/qt/5.3/5.3.2/submodules/qtbase-opensource-src-5.3.2.7z -O "$DEPS_ROOT/qtbase-opensource-src-5.3.2.7z"
+	wget --no-check-certificate http://download.qt-project.org/archive/qt/5.7/5.7.1/submodules/qtbase-opensource-src-5.7.1.7z -O "$DEPS_ROOT/qtbase-opensource-src-5.7.1.7z"
 	# Verify downloaded file's hash (provided on Qt site)
 	# v5.3.2 sha256=e7898f6a3f1b1ae19df120cbb1bf811b9699e441162c67ede0e97118093e6a7e
-	check_hash e7898f6a3f1b1ae19df120cbb1bf811b9699e441162c67ede0e97118093e6a7e "$DEPS_ROOT/qtbase-opensource-src-5.3.2.7z"
+	# v5.7.1 sha256=a160e9c1403204f6a5c3a921de8530c3ff2e64f6608f259716f35f830e77f4d0
+	check_hash a160e9c1403204f6a5c3a921de8530c3ff2e64f6608f259716f35f830e77f4d0 "$DEPS_ROOT/qtbase-opensource-src-5.7.1.7z"
 fi
 # don't extract if already extracted
 cd "$PATH_DEPS/Qt"
-if [ ! -d "5.3.2" ]
+if [ ! -d "5.7.1" ]
 then
 	cd "$DEPS_ROOT"
-	"$CMD_7ZIP" x qtbase-opensource-src-5.3.2.7z -aoa -o"$PATH_DEPS/Qt"
+	"$CMD_7ZIP" x qtbase-opensource-src-5.7.1.7z -aoa -o"$PATH_DEPS/Qt"
 	cd "$PATH_DEPS/Qt"
-	mv qtbase-opensource-src-5.3.2 5.3.2
+	mv qtbase-opensource-src-5.7.1 5.7.1
 fi
+
+# Qt 5.7.1 needs a configuration change for static library builds
+cd "$PATH_DEPS/Qt/5.7.1/mkspecs/features"
+patch --forward ./default_post.prf "$BITCOIN_GIT_ROOT/depends/patches/qt/fix_qt571_win32_qmake.patch"
+cd "$DEPS_ROOT"
+

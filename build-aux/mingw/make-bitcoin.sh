@@ -66,7 +66,7 @@ then
 		exit -1
 	fi
 fi
-CHECK_PATH="$PATH_DEPS/Qt/5.3.2/lib/libQt5Core.a"
+CHECK_PATH="$PATH_DEPS/Qt/5.7.1/lib/libQt5Core.a"
 if [ ! -e "$CHECK_PATH" ]
 then
 	echo Qt dependency is missing.  Please run config-mingw.bat.
@@ -130,16 +130,17 @@ if [ -z "$SKIP_CONFIGURE" ]; then
 	-L$PATH_DEPS/miniupnpc \
 	-L$PATH_DEPS/protobuf-2.6.1/src/.libs \
 	-L$PATH_DEPS/libpng-1.6.36/.libs \
+	-L$PATH_DEPS/QT/5.7.1/lib \
 	-L$PATH_DEPS/qrencode-4.0.2/.libs" \
 	BOOST_ROOT="$PATH_DEPS/boost_1_68_0" \
 	./configure \
 	$ENABLE_DEBUG \
 	--disable-upnp-default \
 	$DISABLE_TESTS \
-	--with-qt-incdir="$PATH_DEPS/Qt/5.3.2/include" \
-	--with-qt-libdir="$PATH_DEPS/Qt/5.3.2/lib" \
-	--with-qt-plugindir="$PATH_DEPS/Qt/5.3.2/plugins" \
-	--with-qt-bindir="$PATH_DEPS/Qt/5.3.2/bin" \
+	--with-qt-incdir="$PATH_DEPS/Qt/5.7.1/include" \
+	--with-qt-libdir="$PATH_DEPS/Qt/5.7.1/lib" \
+	--with-qt-plugindir="$PATH_DEPS/Qt/5.7.1/plugins" \
+	--with-qt-bindir="$PATH_DEPS/Qt/5.7.1/bin" \
 	--with-protoc-bindir="$PATH_DEPS/protobuf-2.6.1/src"
 fi
 

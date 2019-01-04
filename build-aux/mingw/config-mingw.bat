@@ -215,11 +215,11 @@ if %errorlevel% neq 0 (
 )
 
 REM Qt 5
-echo Building Qt 5.3.2...
-cd "%PATH_DEPS%\Qt\5.3.2"
+echo Building Qt 5.7.1...
+cd "%PATH_DEPS%\Qt\5.7.1"
 set "INCLUDE=%PATH_DEPS%\libpng-1.6.36;%PATH_DEPS%\openssl-1.0.2o\include"
 set "LIB=%PATH_DEPS%\libpng-1.6.36\.libs;%PATH_DEPS%\openssl-1.0.2o"
-call configure.bat -release -opensource -confirm-license -static -make libs -no-sql-sqlite -no-opengl -system-zlib -qt-pcre -no-icu -no-gif -system-libpng -no-libjpeg -no-freetype -no-angle -no-vcproj -openssl -no-dbus -no-audio-backend -no-wmf-backend -no-qml-debug
+call configure.bat -release -opensource -confirm-license -static -make libs -nomake tests -nomake examples -no-sql-sqlite -no-opengl -qt-zlib -qt-pcre -no-icu -no-gif -qt-libpng -qt-libjpeg -no-freetype -no-angle -openssl -no-dbus -no-audio-backend -no-wmf-backend -no-qml-debug -I "%PATH_DEPS%\openssl-1.0.2o\include" -L "%PATH_DEPS%\openssl-1.0.2o"
 REM Check to see if configure.bat failed
 if %errorlevel% neq 0 (
 	echo ERROR: Configuring Qt failed!
@@ -235,9 +235,9 @@ if %errorlevel% neq 0 (
 )
 
 echo Building Qt Tools...
-set "PATH=%PATH%;%PATH_DEPS%\Qt\5.3.2\bin"
-set "PATH=%PATH%;%PATH_DEPS%\Qt\qttools-opensource-src-5.3.2"
-cd "%PATH_DEPS%\Qt\qttools-opensource-src-5.3.2"
+set "PATH=%PATH%;%PATH_DEPS%\Qt\5.7.1\bin"
+set "PATH=%PATH%;%PATH_DEPS%\Qt\qttools-opensource-src-5.7.1"
+cd "%PATH_DEPS%\Qt\qttools-opensource-src-5.7.1"
 qmake qttools.pro
 REM Check to see if qmake failed
 if %errorlevel% neq 0 (
