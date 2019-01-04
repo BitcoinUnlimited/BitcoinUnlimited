@@ -30,8 +30,7 @@ static const char DB_FLAG = 'F';
 static const char DB_REINDEX_FLAG = 'R';
 static const char DB_LAST_BLOCK = 'l';
 
-static const char DB_BLK_SIZE_QUARTER = 'Q';
-static const char DB_BLK_SIZE_YEAR = 'Y';
+static const char DB_BLK_SIZE = 'S';
 
 namespace
 {
@@ -258,23 +257,18 @@ size_t CCoinsViewDB::TotalWriteBufferSize() const
     return db.TotalWriteBufferSize();
 }
 
-bool CCoinsViewDB::GetBlockSizes(uint64_t &quarter_size_total, uint64_t &year_size_total)
+bool CCoinsViewDB::GetBlockSize(const int &nHeight, uint64_t &nBlockSize)
 {
-    if(!db.Read(DB_BLK_SIZE_QUARTER, quarter_size_total))
-    {
-        return false;
-    }
-    if(!db.Read(DB_BLK_SIZE_YEAR, year_size_total))
+    if(!db.Read(make_pair(DB_BLK_SIZE, nHeight), nBlockSize))
     {
         return false;
     }
     return true;
 }
 
-void CCoinsViewDB::WriteBlockSizes(const uint64_t &quarter_size_total, const uint64_t &year_size_total)
+void CCoinsViewDB::WriteBlockSize(const int &nHeight, const uint64_t &nBlockSize)
 {
-    db.Write(DB_BLK_SIZE_QUARTER, quarter_size_total);
-    db.Write(DB_BLK_SIZE_YEAR, year_size_total);
+    db.Write(make_pair(DB_BLK_SIZE, nHeight), nBlockSize);
 }
 
 CBlockTreeDB::CBlockTreeDB(size_t nCacheSize, string folder, bool fMemory, bool fWipe)
