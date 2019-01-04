@@ -128,6 +128,8 @@ if "%BUILD_32_BIT%" NEQ "" (
 	set "TOOLCHAIN_BIN=%TOOL_CHAIN_ROOT%\mingw32\bin"
 	set "PATH_DEPS=%DEPS_ROOT%\x86"
 	set "BUILD_OUTPUT=%BITCOIN_GIT_ROOT%\build-output\x86"
+	REM For 32-bit builds Boost 1.68 errors if we don't limit address model to 32
+	set "BOOST_BITS=address-model=32"
 	
 	GOTO BUILD_START
 )
@@ -142,6 +144,8 @@ if "%BUILD_64_BIT%" NEQ "" (
 	set "TOOLCHAIN_BIN=%TOOL_CHAIN_ROOT%\mingw64\bin"
 	set "PATH_DEPS=%DEPS_ROOT%\x64"
 	set "BUILD_OUTPUT=%BITCOIN_GIT_ROOT%\build-output\x64"
+	REM For 64-bit builds Boost 1.68 is fine with default address model settings
+	set "BOOST_BITS=address-model=64"
 	
 	set HAS_BUILT_64_BIT=TRUE
 	
@@ -178,7 +182,7 @@ set "PATH=%TOOLCHAIN_BIN%;%BASE_PATH%"
 
 REM Boost
 echo Building Boost...
-cd "%PATH_DEPS%\boost_1_61_0"
+cd "%PATH_DEPS%\boost_1_68_0"
 call bootstrap.bat gcc
 REM Check to see if bootstrap.bat failed
 if %errorlevel% neq 0 (
@@ -186,7 +190,7 @@ if %errorlevel% neq 0 (
 	pause
 	exit /b %errorlevel%
 )
-b2 --build-type=complete --with-chrono --with-filesystem --with-program_options --with-system --with-thread %BOOST_ENABLE_TESTS% toolset=gcc variant=release link=static threading=multi runtime-link=static stage
+b2 --build-type=complete %BOOST_BITS% --with-chrono --with-filesystem --with-program_options --with-system --with-thread %BOOST_ENABLE_TESTS% toolset=gcc variant=release link=static threading=multi runtime-link=static stage
 REM Check to see if b2 failed
 if %errorlevel% neq 0 (
 	echo ERROR: Building Boost failed!

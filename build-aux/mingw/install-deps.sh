@@ -116,21 +116,23 @@ make $MAKE_CORES
 # Boost (Download and unpack - build requires Windows CMD)
 cd "$DEPS_ROOT"
 # don't download if already downloaded
-if [ ! -e boost_1_61_0.zip ]
+if [ ! -e boost_1_68_0.zip ]
 then
-	wget --no-check-certificate https://sourceforge.net/projects/boost/files/boost/1.61.0/boost_1_61_0.zip/download -O "$DEPS_ROOT/boost_1_61_0.zip"
+	wget --no-check-certificate https://sourceforge.net/projects/boost/files/boost/1.68.0/boost_1_68_0.zip/download -O "$DEPS_ROOT/boost_1_68_0.zip"
 	# Verify downloaded file's hash
-	# sha1=f56f449a203e5009cf6ea16691a022d4928e37f7
+	# v1.61.0 sha1=f56f449a203e5009cf6ea16691a022d4928e37f7
+	# v1.68.0 sha1=c4cd90922d22ca17d9b8330441637397395e5812
 	# NOTE: The sha256 has was self computed, but the sha1 provided by the publisher was verified first
 	# v1.61.0 sha256=02d420e6908016d4ac74dfc712eec7d9616a7fc0da78b0a1b5b937536b2e01e8
-	check_hash 02d420e6908016d4ac74dfc712eec7d9616a7fc0da78b0a1b5b937536b2e01e8 "$DEPS_ROOT/boost_1_61_0.zip"
+	# v1.68.0 sha256=3B1DB0B67079266C40B98329D85916E910BBADFC3DB3E860C049056788D4D5CD
+	check_hash 3B1DB0B67079266C40B98329D85916E910BBADFC3DB3E860C049056788D4D5CD "$DEPS_ROOT/boost_1_68_0.zip"
 fi
 # don't extract if already extracted
 cd "$PATH_DEPS"
-if [ ! -d boost_1_61_0 ]
+if [ ! -d boost_1_68_0 ]
 then
 	cd "$DEPS_ROOT"
-	"$CMD_7ZIP" x boost_1_61_0.zip -aoa -o"$PATH_DEPS"
+	"$CMD_7ZIP" x boost_1_68_0.zip -aoa -o"$PATH_DEPS"
 fi
 
 
