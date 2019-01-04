@@ -1,4 +1,4 @@
-Bitcoin Unlimited 0.12.1b
+Bitcoin Unlimited
 =========================
 
 Setup
