@@ -4,6 +4,7 @@
 
 #include "parallel.h"
 
+#include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
@@ -562,22 +563,9 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     CValidationState state;
 
     // Indicate that the block was fully received. At this point we have either a block or a fully reconstructed
-    // graphene
-    // or thinblock but we still need to maintain a map*BlocksInFlight entry so that we don't re-request a full block
-    // from the same node while the block is processing.
-    if (IsThinBlocksEnabled())
-    {
-        LOCK(pfrom->cs_mapthinblocksinflight);
-        if (pfrom->mapThinBlocksInFlight.count(inv.hash))
-            pfrom->mapThinBlocksInFlight[inv.hash].fReceived = true;
-    }
-    else if (IsGrapheneBlockEnabled())
-    {
-        LOCK(pfrom->cs_mapgrapheneblocksinflight);
-        if (pfrom->mapGrapheneBlocksInFlight.count(inv.hash))
-            pfrom->mapGrapheneBlocksInFlight[inv.hash].fReceived = true;
-    }
-
+    // thin type block but we still need to maintain a map*BlocksInFlight entry so that we don't re-request a
+    // full block from the same node while the block is processing.
+    thinrelay.ThinTypeBlockWasReceived(pfrom, inv.hash);
 
     boost::thread::id this_id(boost::this_thread::get_id());
     PV->InitThread(this_id, pfrom, pblock, inv, nSizeBlock); // initialize the mapBlockValidationThread entries
@@ -647,76 +635,27 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
         }
     }
 
-    // When we request a graphene or thin block we may get back a regular block if it is smaller than
+    // When we request a thin type block we may get back a regular block if it is smaller than
     // either of the former.  Therefore we have to remove the thin or graphene block in flight if it
-    // exists and we also need to check that the block didn't arrive from some other peer.  This code
-    // ALSO cleans up the graphene or thin block that was passed to us (&block), so do not use it after
-    // this.
-    if (IsThinBlocksEnabled())
+    // exists and we also need to check that the block didn't arrive from some other peer.
     {
-        int nTotalThinBlocksInFlight = 0;
-        {
-            LOCK2(cs_vNodes, pfrom->cs_mapthinblocksinflight);
+        // Clear thinblock data and thinblock in flight
+        thindata.ClearThinBlockData(pfrom, inv.hash);
+        graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
 
-            // Erase this thinblock from the tracking map now that we're done with it.
-            if (pfrom->mapThinBlocksInFlight.count(inv.hash))
-            {
-                // Clear thinblock data and thinblock in flight
-                thindata.ClearThinBlockData(pfrom, inv.hash);
-            }
-
-            // Count up any other remaining nodes with thinblocks in flight.
-            for (CNode *pnode : vNodes)
-            {
-                if (pnode->mapThinBlocksInFlight.size() > 0)
-                    nTotalThinBlocksInFlight++;
-            }
-            pfrom->firstBlock += 1; // update statistics, requires cs_vNodes
-        }
-
-        // When we no longer have any thinblocks in flight then clear our any data
-        // just to make sure we don't somehow get growth over time.
-        if (nTotalThinBlocksInFlight == 0)
-        {
-            thindata.ResetThinBlockBytes();
-
-            LOCK(cs_xval);
-            setPreVerifiedTxHash.clear();
-            setUnVerifiedOrphanTxHash.clear();
-        }
+        pfrom->firstBlock += 1;
     }
-    if (IsGrapheneBlockEnabled())
+
+    // When we no longer have any thinblocks in flight then clear our any data
+    // just to make sure we don't somehow get growth over time.
+    if (thinrelay.TotalThinTypeBlocksInFlight() == 0)
     {
-        int nTotalGrapheneBlocksInFlight = 0;
-        {
-            LOCK2(cs_vNodes, pfrom->cs_mapgrapheneblocksinflight);
+        thindata.ResetThinBlockBytes();
+        graphenedata.ResetGrapheneBlockBytes();
 
-            // Erase this graphene block from the tracking map now that we're done with it.
-            if (pfrom->mapGrapheneBlocksInFlight.count(inv.hash))
-            {
-                // Clear graphene block data and graphene block in flight
-                graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
-            }
-
-            // Count up any other remaining nodes with graphene blocks in flight.
-            for (CNode *pnode : vNodes)
-            {
-                if (pnode->mapGrapheneBlocksInFlight.size() > 0)
-                    nTotalGrapheneBlocksInFlight++;
-            }
-            pfrom->firstBlock += 1; // update statistics, requires cs_vNodes
-        }
-
-        // When we no longer have any graphene blocks in flight then clear our any data
-        // just to make sure we don't somehow get growth over time.
-        if (nTotalGrapheneBlocksInFlight == 0)
-        {
-            graphenedata.ResetGrapheneBlockBytes();
-
-            LOCK(cs_xval);
-            setPreVerifiedTxHash.clear();
-            setUnVerifiedOrphanTxHash.clear();
-        }
+        LOCK(cs_xval);
+        setPreVerifiedTxHash.clear();
+        setUnVerifiedOrphanTxHash.clear();
     }
 
 

@@ -355,30 +355,6 @@ class CNode
 #endif
 
 public:
-    struct CThinBlockInFlight
-    {
-        int64_t nRequestTime;
-        bool fReceived;
-
-        CThinBlockInFlight()
-        {
-            nRequestTime = GetTime();
-            fReceived = false;
-        }
-    };
-
-    struct CGrapheneBlockInFlight
-    {
-        int64_t nRequestTime;
-        bool fReceived;
-
-        CGrapheneBlockInFlight()
-        {
-            nRequestTime = GetTime();
-            fReceived = false;
-        }
-    };
-
     // This is shared-locked whenever messages are processed.
     // Take it exclusive-locked to finish all ongoing processing
     CSharedCriticalSection csMsgSerializer;
@@ -473,6 +449,7 @@ public:
     bool fShouldBan;
 
     // BUIP010 Xtreme Thinblocks: begin section
+    CCriticalSection cs_xthinblock;
     CBlock thinBlock;
     std::vector<uint256> thinBlockHashes;
     std::vector<uint64_t> xThinBlockHashes;
@@ -480,10 +457,6 @@ public:
     uint64_t nLocalThinBlockBytes; // the bytes used in creating this thinblock, updated dynamically
     int nSizeThinBlock; // Original on-wire size of the block. Just used for reporting
     int thinBlockWaitingForTxns; // if -1 then not currently waiting
-
-    // thin blocks in flight and the time they were requested.
-    CCriticalSection cs_mapthinblocksinflight;
-    std::map<uint256, CThinBlockInFlight> mapThinBlocksInFlight GUARDED_BY(cs_mapthinblocksinflight);
 
     std::atomic<double> nGetXBlockTxCount; // Count how many get_xblocktx requests are made
     std::atomic<uint64_t> nGetXBlockTxLastTime; // The last time a get_xblocktx request was made
@@ -503,10 +476,6 @@ public:
     int grapheneBlockWaitingForTxns; // if -1 then not currently waiting
     CCriticalSection cs_grapheneadditionaltxs; // lock grapheneAdditionalTxs
     std::vector<CTransactionRef> grapheneAdditionalTxs; // entire transactions included in graphene block
-
-    // graphene blocks in flight and the time they were requested.
-    CCriticalSection cs_mapgrapheneblocksinflight;
-    std::map<uint256, CGrapheneBlockInFlight> mapGrapheneBlocksInFlight GUARDED_BY(cs_mapgrapheneblocksinflight);
 
     std::atomic<double> nGetGrapheneBlockTxCount; // Count how many get_xblocktx requests are made
     std::atomic<uint64_t> nGetGrapheneBlockTxLastTime; // The last time a get_xblocktx request was made

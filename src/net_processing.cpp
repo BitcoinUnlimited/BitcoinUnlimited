@@ -7,6 +7,7 @@
 #include "net_processing.h"
 
 #include "addrman.h"
+#include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
@@ -379,23 +380,6 @@ static void enableSendHeaders(CNode *pfrom)
         pfrom->PushMessage(NetMsgType::SENDHEADERS);
 }
 
-static bool CheckForDownloadTimeout(CNode *pto, bool fReceived, int64_t &nRequestTime)
-{
-    // Use a timeout of 6 times the retry inverval before disconnecting.  This way only a max of 6
-    // re-requested thinblocks or graphene blocks could be in memory at any one time.
-    if (!fReceived && (GetTime() - nRequestTime) > 6 * blkReqRetryInterval / 1000000)
-    {
-        if (!pto->fWhitelisted && Params().NetworkIDString() != "regtest")
-        {
-            LOG(THIN, "ERROR: Disconnecting peer %s due to thinblock download timeout exceeded (%d secs)\n",
-                pto->GetLogName(), (GetTime() - nRequestTime));
-            pto->fDisconnect = true;
-            return true;
-        }
-    }
-    return false;
-}
-
 bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived)
 {
     int64_t receiptTime = GetTime();
@@ -454,6 +438,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CAddress addrMe;
         uint64_t nNonce = 1;
         vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
+
+        // Update thin type peer counters. This should be at the top here before we have any
+        // potential disconnects, because on disconnect the counters will then get decremented.
+        thinrelay.AddThinTypePeers(pfrom);
 
         if (pfrom->nVersion < MIN_PEER_PROTO_VERSION)
         {
@@ -814,6 +802,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // BCH network currently only supports version 1 (v2 is segwit support on BTC)
         // May need to be updated in the future if other clients deploy a new version
         pfrom->fSupportsCompactBlocks = nVersion == 1;
+
+        // Increment compact block peer counter.
+        thinrelay.AddCompactBlockPeer(pfrom);
     }
 
     else if (strCommand == NetMsgType::INV)
@@ -2028,32 +2019,11 @@ bool SendMessages(CNode *pto)
             pto->PushMessage(NetMsgType::PING, nonce);
         }
 
-        // Check to see if there are any thinblocks or graphene blocks in flight that have gone beyond the
-        // timeout interval. If so then we need to disconnect them so that the thinblock data is nullified.
+        // Check to see if there are any thin type blocks in flight that have gone beyond the
+        // timeout interval. If so then we need to disconnect them so that the thintype data is nullified.
         // We could null the associated data here but that would possibly cause a node to be banned later if
-        // the thinblock or graphene block finally did show up, so instead we just disconnect this slow node.
-        {
-            LOCK(pto->cs_mapthinblocksinflight);
-            if (!pto->mapThinBlocksInFlight.empty())
-            {
-                for (auto &item : pto->mapThinBlocksInFlight)
-                {
-                    if (CheckForDownloadTimeout(pto, item.second.fReceived, item.second.nRequestTime))
-                        break;
-                }
-            }
-        }
-        {
-            LOCK(pto->cs_mapgrapheneblocksinflight);
-            if (!pto->mapGrapheneBlocksInFlight.empty())
-            {
-                for (auto &item : pto->mapGrapheneBlocksInFlight)
-                {
-                    if (CheckForDownloadTimeout(pto, item.second.fReceived, item.second.nRequestTime))
-                        break;
-                }
-            }
-        }
+        // the thin type block finally did show up, so instead we just disconnect this slow node.
+        thinrelay.CheckForThinTypeDownloadTimeout(pto);
 
         // Check for block download timeout and disconnect node if necessary. Does not require cs_main.
         int64_t nNow = GetTimeMicros();

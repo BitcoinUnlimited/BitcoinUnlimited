@@ -3,7 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "blockrelay/graphene.h"
-#include "blockrelay/thinblock.h"
+#include "blockrelay/blockrelay_common.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "connmgr.h"
@@ -86,8 +86,8 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     LOG(GRAPHENE, "Received grblocktx for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
     {
         // Do not process unrequested grblocktx unless from an expedited node.
-        LOCK(pfrom->cs_mapgrapheneblocksinflight);
-        if (!pfrom->mapGrapheneBlocksInFlight.count(inv.hash) && !connmgr->IsExpeditedUpstream(pfrom))
+        if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::GRAPHENEBLOCK) &&
+            !connmgr->IsExpeditedUpstream(pfrom))
         {
             dosMan.Misbehaving(pfrom, 10);
             return error(
@@ -404,8 +404,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
                 pfrom->GetLogName(), nSizeGrapheneBlock);
 
             // Do not process unrequested grapheneblocks.
-            LOCK(pfrom->cs_mapgrapheneblocksinflight);
-            if (!pfrom->mapGrapheneBlocksInFlight.count(inv.hash))
+            if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::GRAPHENEBLOCK))
             {
                 dosMan.Misbehaving(pfrom, 10);
                 return error(
@@ -1173,78 +1172,12 @@ std::string CGrapheneBlockData::ReRequestedTxToString()
     return ss.str();
 }
 
-// Preferential Graphene Block Timer:
-// The purpose of the timer is to ensure that we more often download an GRAPHENEBLOCK rather than a full block.
-// The timer is started when we receive the first announcement indicating there is a new block to download.  If the
-// block inventory is from a non GRAPHENE node then we will continue to wait for block announcements until either we
-// get one from an GRAPHENE capable node or the timer is exceeded.  If the timer is exceeded before receiving an
-// announcement from an GRAPHENE node then we just download a full block instead of a graphene block.
-bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
-{
-    // Base time used to calculate the random timeout value.
-    static uint64_t nTimeToWait = GetArg("-preferential-timer", DEFAULT_PREFERENTIAL_TIMER);
-    if (nTimeToWait == 0)
-        return false;
-
-    LOCK(cs_mapGrapheneBlockTimer);
-    if (!mapGrapheneBlockTimer.count(hash))
-    {
-        // The timeout limit is a random number belonging to graphene-timer +/- 20%
-        // This way a node connected to this one may download the block
-        // before the other node and thus be able to serve the other with
-        // a graphene block, rather than both nodes timing out and downloading
-        // a thinblock instead. This can happen at the margins of the BU network
-        // where we receive full blocks from peers that don't support graphene.
-        //
-        // To make the timeout random we adjust the start time of the timer forward
-        // or backward by a random amount plus or minus 20% of preferential timer in milliseconds.
-        FastRandomContext insecure_rand(false);
-        uint64_t nStartInterval = nTimeToWait * 0.8;
-        uint64_t nIntervalLen = 2 * (nTimeToWait * 0.2);
-        int64_t nOffset = nTimeToWait - (nStartInterval + (insecure_rand.rand64() % nIntervalLen) + 1);
-        mapGrapheneBlockTimer[hash] = std::make_pair(GetTimeMillis() + nOffset, false);
-        LOG(GRAPHENE, "Starting Preferential Graphene Block timer (%d millis)\n", nTimeToWait + nOffset);
-    }
-    else
-    {
-        // Check that we have not exceeded time limit.
-        // If we have then we want to return false so that we can
-        // proceed to download a regular block instead.
-        auto iter = mapGrapheneBlockTimer.find(hash);
-        if (iter != mapGrapheneBlockTimer.end())
-        {
-            int64_t elapsed = GetTimeMillis() - iter->second.first;
-            if (elapsed > (int64_t)nTimeToWait)
-            {
-                // Only print out the log entry once.  Because the graphene timer will be hit
-                // many times when requesting a block we don't want to fill up the log file.
-                if (!iter->second.second)
-                {
-                    iter->second.second = true;
-                    LOG(GRAPHENE, "Preferential Graphene Block timer exceeded\n");
-                }
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-// The timer is cleared as soon as we request a block or graphene block.
-void CGrapheneBlockData::ClearGrapheneBlockTimer(const uint256 &hash)
-{
-    LOCK(cs_mapGrapheneBlockTimer);
-    if (mapGrapheneBlockTimer.count(hash))
-    {
-        mapGrapheneBlockTimer.erase(hash);
-        LOG(GRAPHENE, "Clearing Preferential Graphene Block timer\n");
-    }
-}
-
 // After a graphene block is finished processing or if for some reason we have to pre-empt the rebuilding
 // of a graphene block then we clear out the graphene block data which can be substantial.
 void CGrapheneBlockData::ClearGrapheneBlockData(CNode *pnode)
 {
+    LOCK(pnode->cs_graphene);
+
     // Remove bytes from counter
     graphenedata.DeleteGrapheneBlockBytes(pnode->nLocalGrapheneBlockBytes, pnode);
     pnode->nLocalGrapheneBlockBytes = 0;
@@ -1264,7 +1197,7 @@ void CGrapheneBlockData::ClearGrapheneBlockData(CNode *pnode, const uint256 &has
 {
     // We must make sure to clear the graphene block data first before clearing the graphene block in flight.
     ClearGrapheneBlockData(pnode);
-    ClearGrapheneBlockInFlight(pnode, hash);
+    thinrelay.ClearThinTypeBlockInFlight(pnode, hash);
 }
 
 void CGrapheneBlockData::ClearGrapheneBlockStats()
@@ -1339,25 +1272,7 @@ void CGrapheneBlockData::FillGrapheneQuickStats(GrapheneQuickStats &stats)
     stats.nLast24hRerequestTx = mapGrapheneBlocksInBoundReRequestedTx.size();
 }
 
-bool HaveGrapheneNodes()
-{
-    LOCK(cs_vNodes);
-    for (CNode *pnode : vNodes)
-        if (pnode->GrapheneCapable())
-            return true;
-    return false;
-}
-
 bool IsGrapheneBlockEnabled() { return GetBoolArg("-use-grapheneblocks", DEFAULT_USE_GRAPHENE_BLOCKS); }
-bool CanGrapheneBlockBeDownloaded(CNode *pto)
-{
-    LOCK(pto->cs_mapgrapheneblocksinflight);
-    if (pto->mapGrapheneBlocksInFlight.size() < 1 && pto->GrapheneCapable())
-        return true;
-
-    return false;
-}
-
 bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom)
 {
     CNode *pLargest = nullptr;
@@ -1379,19 +1294,6 @@ bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom)
     }
 
     return false;
-}
-
-void ClearGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash)
-{
-    LOCK(pfrom->cs_mapgrapheneblocksinflight);
-    pfrom->mapGrapheneBlocksInFlight.erase(hash);
-}
-
-void AddGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash)
-{
-    LOCK(pfrom->cs_mapgrapheneblocksinflight);
-    pfrom->mapGrapheneBlocksInFlight.insert(
-        std::pair<uint256, CNode::CGrapheneBlockInFlight>(hash, CNode::CGrapheneBlockInFlight()));
 }
 
 void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CMemPoolInfo &mempoolinfo)
@@ -1538,14 +1440,16 @@ CMemPoolInfo GetGrapheneMempoolInfo()
 }
 void RequestFailoverBlock(CNode *pfrom, uint256 blockHash)
 {
-    if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable())
+    if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable() &&
+        !thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::XTHINBLOCK))
     {
         LOG(GRAPHENE, "Requesting xthin block as failover from peer %s\n", pfrom->GetLogName());
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         CBloomFilter filterMemPool;
         CInv inv2(MSG_XTHINBLOCK, blockHash);
 
-        AddThinBlockInFlight(pfrom, inv2.hash);
+        if (!thinrelay.AddThinTypeBlockInFlight(pfrom, inv2.hash, NetMsgType::XTHINBLOCK))
+            return;
 
         std::vector<uint256> vOrphanHashes;
         {
