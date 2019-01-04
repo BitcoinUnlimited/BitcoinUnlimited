@@ -13,7 +13,7 @@ bool IsThinBlockEnabled();
 bool IsGrapheneBlockEnabled();
 
 // Update the counters for how many peers we have connected.
-void ThinTypeRelay::AddThinTypePeers(CNode *pfrom, bool fCmpct)
+void ThinTypeRelay::AddThinTypePeers(CNode *pfrom)
 {
     if (pfrom)
     {
@@ -22,12 +22,12 @@ void ThinTypeRelay::AddThinTypePeers(CNode *pfrom, bool fCmpct)
         if (pfrom->nServices & NODE_GRAPHENE)
             nGraphenePeers++;
     }
-    if (fCmpct)
-    {
-        nCompactBlockPeers++;
-    }
 }
-
+void ThinTypeRelay::AddCompactBlockPeer(CNode *pfrom)
+{
+    if (pfrom && pfrom->fSupportsCompactBlocks)
+        nCompactBlockPeers++;
+}
 void ThinTypeRelay::RemoveThinTypePeers(CNode *pfrom)
 {
     if (pfrom)

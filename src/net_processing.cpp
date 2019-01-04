@@ -804,7 +804,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->fSupportsCompactBlocks = nVersion == 1;
 
         // Increment compact block peer counter.
-        thinrelay.AddThinTypePeers(nullptr, true);
+        thinrelay.AddCompactBlockPeer(pfrom);
     }
 
     else if (strCommand == NetMsgType::INV)

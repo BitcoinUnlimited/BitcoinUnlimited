@@ -44,7 +44,8 @@ private:
     std::atomic<int32_t> nCompactBlockPeers{0};
 
 public:
-    void AddThinTypePeers(CNode *pfrom, bool fCmpct = false);
+    void AddThinTypePeers(CNode *pfrom);
+    void AddCompactBlockPeer(CNode *pfrom);
     void RemoveThinTypePeers(CNode *pfrom);
     bool HasBlockRelayTimerExpired(const uint256 &hash);
     bool IsBlockRelayTimerEnabled();
