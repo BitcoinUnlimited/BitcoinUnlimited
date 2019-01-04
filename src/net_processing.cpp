@@ -458,7 +458,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         // Update thin type peer counters. This should be at the top here before we have any
         // potential disconnects, because on disconnect the counters will then get decremented.
-        thinrelay.AddThinTypePeers(pfrom);
+        thinrelay.AddPeers(pfrom);
 
         if (pfrom->nVersion < MIN_PEER_PROTO_VERSION)
         {
@@ -2117,7 +2117,7 @@ bool SendMessages(CNode *pto)
         // timeout interval. If so then we need to disconnect them so that the thintype data is nullified.
         // We could null the associated data here but that would possibly cause a node to be banned later if
         // the thin type block finally did show up, so instead we just disconnect this slow node.
-        thinrelay.CheckForThinTypeDownloadTimeout(pto);
+        thinrelay.CheckForDownloadTimeout(pto);
 
         // Check for block download timeout and disconnect node if necessary. Does not require cs_main.
         int64_t nNow = GetTimeMicros();

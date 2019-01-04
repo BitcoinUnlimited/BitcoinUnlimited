@@ -44,18 +44,18 @@ private:
     std::atomic<int32_t> nCompactBlockPeers{0};
 
 public:
-    void AddThinTypePeers(CNode *pfrom);
+    void AddPeers(CNode *pfrom);
     void AddCompactBlockPeer(CNode *pfrom);
-    void RemoveThinTypePeers(CNode *pfrom);
+    void RemovePeers(CNode *pfrom);
     bool HasBlockRelayTimerExpired(const uint256 &hash);
     bool IsBlockRelayTimerEnabled();
     void ClearBlockRelayTimer(const uint256 &hash);
-    bool IsThinTypeBlockInFlight(CNode *pfrom, const std::string thinType);
-    unsigned int TotalThinTypeBlocksInFlight();
-    void ThinTypeBlockWasReceived(CNode *pfrom, const uint256 &hash);
-    bool AddThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType);
-    void ClearThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash);
-    void CheckForThinTypeDownloadTimeout(CNode *pfrom);
+    bool IsBlockInFlight(CNode *pfrom, const std::string thinType);
+    unsigned int TotalBlocksInFlight();
+    void BlockWasReceived(CNode *pfrom, const uint256 &hash);
+    bool AddBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType);
+    void ClearBlockInFlight(CNode *pfrom, const uint256 &hash);
+    void CheckForDownloadTimeout(CNode *pfrom);
     void RequestBlock(CNode *pfrom, const uint256 &hash);
 };
 extern ThinTypeRelay thinrelay;

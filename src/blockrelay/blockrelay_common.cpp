@@ -14,7 +14,7 @@ bool IsGrapheneBlockEnabled();
 bool IsCompactBlocksEnabled();
 
 // Update the counters for how many peers we have connected.
-void ThinTypeRelay::AddThinTypePeers(CNode *pfrom)
+void ThinTypeRelay::AddPeers(CNode *pfrom)
 {
     if (pfrom)
     {
@@ -29,7 +29,7 @@ void ThinTypeRelay::AddCompactBlockPeer(CNode *pfrom)
     if (pfrom && pfrom->fSupportsCompactBlocks)
         nCompactBlockPeers++;
 }
-void ThinTypeRelay::RemoveThinTypePeers(CNode *pfrom)
+void ThinTypeRelay::RemovePeers(CNode *pfrom)
 {
     if (pfrom)
     {
@@ -176,7 +176,7 @@ void ThinTypeRelay::ClearBlockRelayTimer(const uint256 &hash)
     }
 }
 
-bool ThinTypeRelay::IsThinTypeBlockInFlight(CNode *pfrom, const std::string thinType)
+bool ThinTypeRelay::IsBlockInFlight(CNode *pfrom, const std::string thinType)
 {
     LOCK(cs_inflight);
     // first check that we are in bounds.
@@ -197,13 +197,13 @@ bool ThinTypeRelay::IsThinTypeBlockInFlight(CNode *pfrom, const std::string thin
     return false;
 }
 
-unsigned int ThinTypeRelay::TotalThinTypeBlocksInFlight()
+unsigned int ThinTypeRelay::TotalBlocksInFlight()
 {
     LOCK(cs_inflight);
     return mapThinTypeBlocksInFlight.size();
 }
 
-void ThinTypeRelay::ThinTypeBlockWasReceived(CNode *pfrom, const uint256 &hash)
+void ThinTypeRelay::BlockWasReceived(CNode *pfrom, const uint256 &hash)
 {
     LOCK(cs_inflight);
     std::pair<std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator,
@@ -218,10 +218,10 @@ void ThinTypeRelay::ThinTypeBlockWasReceived(CNode *pfrom, const uint256 &hash)
     }
 }
 
-bool ThinTypeRelay::AddThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType)
+bool ThinTypeRelay::AddBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType)
 {
     LOCK(cs_inflight);
-    if (IsThinTypeBlockInFlight(pfrom, thinType))
+    if (IsBlockInFlight(pfrom, thinType))
         return false;
 
     mapThinTypeBlocksInFlight.insert(
@@ -229,7 +229,7 @@ bool ThinTypeRelay::AddThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash, 
     return true;
 }
 
-void ThinTypeRelay::ClearThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash)
+void ThinTypeRelay::ClearBlockInFlight(CNode *pfrom, const uint256 &hash)
 {
     LOCK(cs_inflight);
     std::pair<std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator,
@@ -248,7 +248,7 @@ void ThinTypeRelay::ClearThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash
     }
 }
 
-void ThinTypeRelay::CheckForThinTypeDownloadTimeout(CNode *pfrom)
+void ThinTypeRelay::CheckForDownloadTimeout(CNode *pfrom)
 {
     LOCK(cs_inflight);
     if (mapThinTypeBlocksInFlight.size() == 0)

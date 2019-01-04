@@ -566,7 +566,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     // Indicate that the block was fully received. At this point we have either a block or a fully reconstructed
     // thin type block but we still need to maintain a map*BlocksInFlight entry so that we don't re-request a
     // full block from the same node while the block is processing.
-    thinrelay.ThinTypeBlockWasReceived(pfrom, inv.hash);
+    thinrelay.BlockWasReceived(pfrom, inv.hash);
 
     boost::thread::id this_id(boost::this_thread::get_id());
     PV->InitThread(this_id, pfrom, pblock, inv, nSizeBlock); // initialize the mapBlockValidationThread entries
@@ -647,7 +647,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
 
     // When we no longer have any thinblocks in flight then clear our any data
     // just to make sure we don't somehow get growth over time.
-    if (thinrelay.TotalThinTypeBlocksInFlight() == 0)
+    if (thinrelay.TotalBlocksInFlight() == 0)
     {
         thindata.ResetThinBlockBytes();
         graphenedata.ResetGrapheneBlockBytes();

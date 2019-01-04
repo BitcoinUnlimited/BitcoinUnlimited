@@ -97,7 +97,7 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Ban a node for sending unrequested thinblocks unless from an expedited node.
     {
-        if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::XTHINBLOCK) && !connmgr->IsExpeditedUpstream(pfrom))
+        if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::XTHINBLOCK) && !connmgr->IsExpeditedUpstream(pfrom))
         {
             dosMan.Misbehaving(pfrom, 100);
             return error("unrequested thinblock from peer %s", pfrom->GetLogName());
@@ -305,7 +305,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     LOG(THIN, "received xblocktx for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
     {
         // Do not process unrequested xblocktx unless from an expedited node.
-        if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::XTHINBLOCK) && !connmgr->IsExpeditedUpstream(pfrom))
+        if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::XTHINBLOCK) && !connmgr->IsExpeditedUpstream(pfrom))
         {
             dosMan.Misbehaving(pfrom, 10);
             return error(
@@ -606,7 +606,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         if (nHops > 0 && connmgr->IsExpeditedUpstream(pfrom))
         {
             // If we can't add this xthin then we've already requested it
-            if (!thinrelay.AddThinTypeBlockInFlight(pfrom, inv.hash, NetMsgType::XTHINBLOCK))
+            if (!thinrelay.AddBlockInFlight(pfrom, inv.hash, NetMsgType::XTHINBLOCK))
                 return true;
 
             LOG(THIN, "Received new expedited %s %s from peer %s hop %d size %d bytes\n", strCommand,
@@ -618,8 +618,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
                 pfrom->GetLogName(), nSizeThinBlock);
 
             // Do not process unrequested xthinblocks unless from an expedited node.
-            if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::XTHINBLOCK) &&
-                !connmgr->IsExpeditedUpstream(pfrom))
+            if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::XTHINBLOCK) && !connmgr->IsExpeditedUpstream(pfrom))
             {
                 dosMan.Misbehaving(pfrom, 10);
                 return error(
@@ -1321,7 +1320,7 @@ void CThinBlockData::ClearThinBlockData(CNode *pnode, const uint256 &hash)
 {
     // We must make sure to clear the thinblock data first before clearing the thinblock in flight.
     ClearThinBlockData(pnode);
-    thinrelay.ClearThinTypeBlockInFlight(pnode, hash);
+    thinrelay.ClearBlockInFlight(pnode, hash);
 }
 
 void CThinBlockData::ClearThinBlockStats()

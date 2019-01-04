@@ -157,7 +157,7 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         nSizeCompactBlock);
 
     // Ban a node for sending unrequested compact blocks
-    if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::CMPCTBLOCK))
+    if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::CMPCTBLOCK))
     {
         dosMan.Misbehaving(pfrom, 100);
         return error("unrequested compact block from peer %s", pfrom->GetLogName());
@@ -519,7 +519,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     LOG(CMPCT, "received compactReReqResponse for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
     {
         // Do not process unrequested xblocktx unless from an expedited node.
-        if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::CMPCTBLOCK) && !connmgr->IsExpeditedUpstream(pfrom))
+        if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::CMPCTBLOCK) && !connmgr->IsExpeditedUpstream(pfrom))
         {
             dosMan.Misbehaving(pfrom, 10);
             return error("Received compactReReqResponse %s from peer %s but was unrequested", inv.hash.ToString(),
@@ -1092,7 +1092,7 @@ void CCompactBlockData::ClearCompactBlockData(CNode *pnode, const uint256 &hash)
 {
     // We must make sure to clear the compactblock data first before clearing the compactblock in flight.
     ClearCompactBlockData(pnode);
-    thinrelay.ClearThinTypeBlockInFlight(pnode, hash);
+    thinrelay.ClearBlockInFlight(pnode, hash);
 }
 
 void CCompactBlockData::ClearCompactBlockStats()
