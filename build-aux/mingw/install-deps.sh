@@ -212,23 +212,29 @@ make $MAKE_CORES
 # Libpng (Download, unpack, build, and rename-copy)
 cd "$DEPS_ROOT"
 # don't download if already downloaded
-if [ ! -e libpng-1.6.16.tar.gz ]
+if [ ! -e libpng-1.6.36.tar.gz ]
 then
-	wget --no-check-certificate http://download.sourceforge.net/libpng/libpng-1.6.16.tar.gz -O "$DEPS_ROOT/libpng-1.6.16.tar.gz"
+	wget --no-check-certificate http://download.sourceforge.net/libpng/libpng-1.6.36.tar.gz -O "$DEPS_ROOT/libpng-1.6.36.tar.gz"
 	# Verify downloaded file's hash
-	# sha1=50f3b31d013a31e2cac70db177094f6a7618b8be
+	# v1.6.16 sha1=50f3b31d013a31e2cac70db177094f6a7618b8be
+	# v1.6.36 sha1=65184fe3b20d5dd1a132f271b1b76a0a2dd79447
 	# NOTE: The sha256 has was self computed, but the sha1 provided by the publisher was verified first
-	# v1.61.0 sha256=02f96b6bad5a381d36d7ba7a5d9be3b06f7fe6c274da00707509c23592a073ad
-	check_hash 02f96b6bad5a381d36d7ba7a5d9be3b06f7fe6c274da00707509c23592a073ad "$DEPS_ROOT/libpng-1.6.16.tar.gz"
+	# v1.6.16 sha256=02f96b6bad5a381d36d7ba7a5d9be3b06f7fe6c274da00707509c23592a073ad
+	# v1.6.36 sha256=CA13C548BDE5FB6FF7117CC0BDAB38808ACB699C0ECCB613F0E4697826E1FD7D
+	check_hash CA13C548BDE5FB6FF7117CC0BDAB38808ACB699C0ECCB613F0E4697826E1FD7D "$DEPS_ROOT/libpng-1.6.36.tar.gz"
 fi
 # don't extract if already extracted
 cd "$PATH_DEPS"
-if [ ! -d libpng-1.6.16 ]
+if [ ! -d libpng-1.6.36 ]
 then
 	cd "$DEPS_ROOT"
-	tar -xvf libpng-1.6.16.tar.gz -C "$PATH_DEPS"
+	tar -xvf libpng-1.6.36.tar.gz -C "$PATH_DEPS"
 fi
-cd "$PATH_DEPS/libpng-1.6.16"
+cd "$PATH_DEPS/libpng-1.6.36"
+# Apply patch to fix handling of carriage returns in scripts/dfn.awk
+# otherwise MinGW builds on Windows systems will fail
+patch -p1 --forward scripts/dfn.awk "$BITCOIN_GIT_ROOT/depends/patches/libpng/mingw-line-ending-fix.patch"
+
 ./configure --disable-shared
 make $MAKE_CORES
 cp .libs/libpng16.a .libs/libpng.a
@@ -256,9 +262,9 @@ then
 	tar -xvf qrencode-3.4.4.tar.gz -C "$PATH_DEPS"
 fi
 cd "$PATH_DEPS/qrencode-3.4.4"
-LIBS="../libpng-1.6.16/.libs/libpng.a $LIBZ_STATIC_LIB" \
-png_CFLAGS="-I../libpng-1.6.16" \
-png_LIBS="-L../libpng-1.6.16/.libs" \
+LIBS="../libpng-1.6.36/.libs/libpng.a $LIBZ_STATIC_LIB" \
+png_CFLAGS="-I../libpng-1.6.36" \
+png_LIBS="-L../libpng-1.6.36/.libs" \
 ./configure --enable-static --disable-shared --without-tools
 make $MAKE_CORES
 #pause for debugging purposes

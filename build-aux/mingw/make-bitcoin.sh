@@ -34,7 +34,7 @@ then
 	echo Protobuf dependency is missing.  Please run config-mingw.bat.
 	exit -1
 fi
-CHECK_PATH="$PATH_DEPS/libpng-1.6.16/.libs/libpng.a"
+CHECK_PATH="$PATH_DEPS/libpng-1.6.36/.libs/libpng.a"
 if [ ! -e "$CHECK_PATH" ]
 then
 	echo LibPNG dependency is missing.  Please run config-mingw.bat.
@@ -108,14 +108,14 @@ if [ -z "$SKIP_CONFIGURE" ]; then
 	-I$PATH_DEPS/libevent-2.0.22/include \
 	-I$PATH_DEPS \
 	-I$PATH_DEPS/protobuf-2.6.1/src \
-	-I$PATH_DEPS/libpng-1.6.16 \
+	-I$PATH_DEPS/libpng-1.6.36 \
 	-I$PATH_DEPS/qrencode-3.4.4" \
 	LDFLAGS="-L$PATH_DEPS/db-4.8.30.NC/build_unix \
 	-L$PATH_DEPS/openssl-1.0.2o \
 	-L$PATH_DEPS/libevent-2.0.22/.libs \
 	-L$PATH_DEPS/miniupnpc \
 	-L$PATH_DEPS/protobuf-2.6.1/src/.libs \
-	-L$PATH_DEPS/libpng-1.6.16/.libs \
+	-L$PATH_DEPS/libpng-1.6.36/.libs \
 	-L$PATH_DEPS/qrencode-3.4.4/.libs" \
 	BOOST_ROOT="$PATH_DEPS/boost_1_61_0" \
 	./configure \
