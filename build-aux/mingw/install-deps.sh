@@ -245,23 +245,25 @@ cp .libs/libpng16.a .libs/libpng.a
 # Qrencode (Download, unpack, and build)
 cd "$DEPS_ROOT"
 # don't download if already downloaded
-if [ ! -e qrencode-3.4.4.tar.gz ]
+if [ ! -e qrencode-4.0.2.tar.gz ]
 then
-	wget --no-check-certificate http://fukuchi.org/works/qrencode/qrencode-3.4.4.tar.gz -O "$DEPS_ROOT/qrencode-3.4.4.tar.gz"
+	wget --no-check-certificate http://fukuchi.org/works/qrencode/qrencode-4.0.2.tar.gz -O "$DEPS_ROOT/qrencode-4.0.2.tar.gz"
 	# Verify downloaded file's hash
-	# sha512=2c7a5bb6a51993a4d44a8e4ef30a3d3e43c55dc726fb7d702cde306a5bfcea1faa5a1bd851aa57c7550c81dadb4cc1cf6ea8afa7b5fa4e9b9c5ed7d9bb6b68cc
+	# v3.4.4 sha512=2c7a5bb6a51993a4d44a8e4ef30a3d3e43c55dc726fb7d702cde306a5bfcea1faa5a1bd851aa57c7550c81dadb4cc1cf6ea8afa7b5fa4e9b9c5ed7d9bb6b68cc
+	# v4.0.2 sha512=c3e3834574ec059a4b571427b29d6f5f26bd806fd7498b9bba778f4eceab6ebe5733eef0f3c4f6af91eb3f2e9310f93f6d7b337c28e85c72db7e59bd79be77a9
 	# NOTE: The sha256 has was self computed, but the sha512 provided by the publisher was verified first
 	# v3.4.4 sha256=e794e26a96019013c0e3665cb06b18992668f352c5553d0a553f5d144f7f2a72
-	check_hash e794e26a96019013c0e3665cb06b18992668f352c5553d0a553f5d144f7f2a72 "$DEPS_ROOT/qrencode-3.4.4.tar.gz"
+	# v4.0.2 sha256=DBABE79C07614625D1F74D8C0AE2EE5358C4E27EAB8FD8FE31F9365F821A3B1D
+	check_hash DBABE79C07614625D1F74D8C0AE2EE5358C4E27EAB8FD8FE31F9365F821A3B1D "$DEPS_ROOT/qrencode-4.0.2.tar.gz"
 fi
 # don't extract if already extracted
 cd "$PATH_DEPS"
-if [ ! -d qrencode-3.4.4 ]
+if [ ! -d qrencode-4.0.2 ]
 then
 	cd "$DEPS_ROOT"
-	tar -xvf qrencode-3.4.4.tar.gz -C "$PATH_DEPS"
+	tar -xvf qrencode-4.0.2.tar.gz -C "$PATH_DEPS"
 fi
-cd "$PATH_DEPS/qrencode-3.4.4"
+cd "$PATH_DEPS/qrencode-4.0.2"
 LIBS="../libpng-1.6.36/.libs/libpng.a $LIBZ_STATIC_LIB" \
 png_CFLAGS="-I../libpng-1.6.36" \
 png_LIBS="-L../libpng-1.6.36/.libs" \
