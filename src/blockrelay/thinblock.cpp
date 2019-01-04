@@ -620,7 +620,9 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         // If this is an expedited block then add and entry to mapThinBlocksInFlight.
         if (nHops > 0 && connmgr->IsExpeditedUpstream(pfrom))
         {
-            thinrelay.AddThinTypeBlockInFlight(pfrom, inv.hash, NetMsgType::XTHINBLOCK);
+            // If we can't add this xthin then we've already requested it
+            if (!thinrelay.AddThinTypeBlockInFlight(pfrom, inv.hash, NetMsgType::XTHINBLOCK))
+                return true;
 
             LOG(THIN, "Received new expedited %s %s from peer %s hop %d size %d bytes\n", strCommand,
                 inv.hash.ToString(), pfrom->GetLogName(), nHops, nSizeThinBlock);

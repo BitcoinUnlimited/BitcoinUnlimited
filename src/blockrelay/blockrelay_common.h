@@ -52,7 +52,7 @@ public:
     bool IsThinTypeBlockInFlight(CNode *pfrom, const std::string thinType);
     unsigned int TotalThinTypeBlocksInFlight();
     void ThinTypeBlockWasReceived(CNode *pfrom, const uint256 &hash);
-    void AddThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType);
+    bool AddThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType);
     void ClearThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash);
     void CheckForThinTypeDownloadTimeout(CNode *pfrom);
 };

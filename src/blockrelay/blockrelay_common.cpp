@@ -178,11 +178,15 @@ void ThinTypeRelay::ThinTypeBlockWasReceived(CNode *pfrom, const uint256 &hash)
     }
 }
 
-void ThinTypeRelay::AddThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType)
+bool ThinTypeRelay::AddThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType)
 {
     LOCK(cs_inflight);
+    if (IsThinTypeBlockInFlight(pfrom, thinType))
+        return false;
+
     mapThinTypeBlocksInFlight.insert(
         std::pair<const NodeId, CThinTypeBlockInFlight>(pfrom->GetId(), {hash, GetTime(), false, thinType}));
+    return true;
 }
 
 void ThinTypeRelay::ClearThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash)

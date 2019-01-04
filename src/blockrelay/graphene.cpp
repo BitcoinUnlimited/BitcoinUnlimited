@@ -1448,7 +1448,8 @@ void RequestFailoverBlock(CNode *pfrom, uint256 blockHash)
         CBloomFilter filterMemPool;
         CInv inv2(MSG_XTHINBLOCK, blockHash);
 
-        thinrelay.AddThinTypeBlockInFlight(pfrom, inv2.hash, NetMsgType::XTHINBLOCK);
+        if (!thinrelay.AddThinTypeBlockInFlight(pfrom, inv2.hash, NetMsgType::XTHINBLOCK))
+            return;
 
         std::vector<uint256> vOrphanHashes;
         {
