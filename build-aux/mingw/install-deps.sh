@@ -16,11 +16,11 @@ TOOLCHAIN_ROOT=${TOOLCHAIN_BIN%/*}
 if [ "$(basename $TOOLCHAIN_ROOT)" = "mingw32" ]
 then
 	LIBZ_STATIC_LIB="$TOOLCHAIN_ROOT/i686-w64-mingw32/lib/libz.a"
-	# OpenSSL 1.0.1 requires correctly specifying the version of MinGW
+	# OpenSSL 1.0.2 requires correctly specifying the version of MinGW
 	LIB_SSL_MINGW=mingw
 else
 	LIBZ_STATIC_LIB="$TOOLCHAIN_ROOT/x86_64-w64-mingw32/lib/libz.a"
-	# OpenSSL 1.0.1 requires correctly specifying the version of MinGW
+	# OpenSSL 1.0.2 requires correctly specifying the version of MinGW
 	LIB_SSL_MINGW=mingw64
 fi
 
@@ -66,22 +66,24 @@ gcc -std=gnu99 -g -O2 -Wall -Wextra -Werror -Wno-unused-variable -Wno-unused-par
 # Open SSL (Download, unpack, and build)
 cd "$DEPS_ROOT"
 # don't download if already downloaded
-if [ ! -e openssl-1.0.1k.tar.gz ]
+if [ ! -e openssl-1.0.2o.tar.gz ]
 then
-	wget --no-check-certificate https://www.openssl.org/source/openssl-1.0.1k.tar.gz -O "$DEPS_ROOT/openssl-1.0.1k.tar.gz"
-	# Verify downloaded file's hash (from depends packages)
+	wget --no-check-certificate https://www.openssl.org/source/openssl-1.0.2o.tar.gz -O "$DEPS_ROOT/openssl-1.0.2o.tar.gz"
+	# Verify downloaded file's hash (v1.0.1k from depends packages, v1.0.2o from OpenSSL website)
 	# v1.0.1k sha256=8f9faeaebad088e772f4ef5e38252d472be4d878c6b3a2718c10a4fcebe7a41c
-	check_hash 8f9faeaebad088e772f4ef5e38252d472be4d878c6b3a2718c10a4fcebe7a41c "$DEPS_ROOT/openssl-1.0.1k.tar.gz"
+	# v1.0.2o sha256=ec3f5c9714ba0fd45cb4e087301eb1336c317e0d20b575a125050470e8089e4d
+	check_hash ec3f5c9714ba0fd45cb4e087301eb1336c317e0d20b575a125050470e8089e4d "$DEPS_ROOT/openssl-1.0.2o.tar.gz"
 fi
 # don't extract if already extracted
 cd "$PATH_DEPS"
-if [ ! -d openssl-1.0.1k ]
+if [ ! -d openssl-1.0.2o ]
 then
 	cd "$DEPS_ROOT"
-	tar xvfz openssl-1.0.1k.tar.gz -C "$PATH_DEPS"
+	tar xvfz openssl-1.0.2o.tar.gz -C "$PATH_DEPS"
 fi
-cd "$PATH_DEPS/openssl-1.0.1k"
+cd "$PATH_DEPS/openssl-1.0.2o"
 ./Configure no-zlib no-shared no-dso no-krb5 no-camellia no-capieng no-cast no-cms no-dtls1 no-gost no-gmp no-heartbeats no-idea no-jpake no-md2 no-mdc2 no-rc5 no-rdrand no-rfc3779 no-rsax no-sctp no-seed no-sha0 no-static_engine no-whirlpool no-rc2 no-rc4 no-ssl2 no-ssl3 $LIB_SSL_MINGW
+make $MAKE_CORES depend
 make $MAKE_CORES
 #pause for debugging purposes
 #read -rsp $'Press any key to continue...\n' -n 1 key

@@ -213,8 +213,8 @@ if %errorlevel% neq 0 (
 REM Qt 5
 echo Building Qt 5.3.2...
 cd "%PATH_DEPS%\Qt\5.3.2"
-set "INCLUDE=%PATH_DEPS%\libpng-1.6.16;%PATH_DEPS%\openssl-1.0.1k\include"
-set "LIB=%PATH_DEPS%\libpng-1.6.16\.libs;%PATH_DEPS%\openssl-1.0.1k"
+set "INCLUDE=%PATH_DEPS%\libpng-1.6.16;%PATH_DEPS%\openssl-1.0.2o\include"
+set "LIB=%PATH_DEPS%\libpng-1.6.16\.libs;%PATH_DEPS%\openssl-1.0.2o"
 call configure.bat -release -opensource -confirm-license -static -make libs -no-sql-sqlite -no-opengl -system-zlib -qt-pcre -no-icu -no-gif -system-libpng -no-libjpeg -no-freetype -no-angle -no-vcproj -openssl -no-dbus -no-audio-backend -no-wmf-backend -no-qml-debug
 REM Check to see if configure.bat failed
 if %errorlevel% neq 0 (
