@@ -163,6 +163,7 @@ if [ -n "$STRIP" ]; then
 	echo 'Stripping exeutables'
 	strip src/bitcoin-tx.exe
 	strip src/bitcoin-cli.exe
+	strip src/bitcoin-miner.exe
 	strip src/bitcoind.exe
 	strip src/qt/bitcoin-qt.exe
 fi
