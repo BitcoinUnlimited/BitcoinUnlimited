@@ -24,7 +24,6 @@ env:
     - PYTHON_DEBUG=1
     - WINEDEBUG=fixme-all
     - PPA=ppa:bitcoin-unlimited/bu-ppa
-    - PPA2=ppa:sickpig/boost
 
 matrix:
   include:
@@ -33,7 +32,8 @@ matrix:
       addons:
         apt:
           sources:
-            - llvm-toolchain-trusty-5.0
+            - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-5.0 main'
+              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
           packages:
             - clang-5.0
       env:
@@ -96,13 +96,12 @@ before_install:
 
 install:
     - if [ -n "$PPA" ]; then for i in `seq 0 4`; do sudo add-apt-repository "$PPA" -y 2>&1|tee /dev/stderr|grep -q "imported" && break; sleep 30; done; fi
-    - if [ -n "$PPA2" ]; then for i in `seq 0 4`; do sudo add-apt-repository "$PPA2" -y 2>&1|tee /dev/stderr|grep -q "imported" && break; sleep 30; done; fi
     - if [ -n "$DPKG_ADD_ARCH" ]; then sudo dpkg --add-architecture "$DPKG_ADD_ARCH" ; fi
     - if [ -n "$PACKAGES" ]; then travis_retry sudo apt-get update; fi
     - if [ -n "$PACKAGES" ]; then travis_retry sudo apt-get install --no-install-recommends --no-upgrade -qq $PACKAGES; fi
     - if { [ -n "$DEP_OPTS" ] && [[ $DEP_OPTS =~ .*NO_WALLET=1.* ]]; }; then echo "Skip Berkeley DB installation"; else travis_retry sudo apt-get install --no-install-recommends --no-upgrade -qq libdb4.8-dev libdb4.8++-dev; fi
-    - if [ -n "$PACKAGES" ]; then travis_retry sudo apt-get install -y -qq libboost1.58-dev ; fi
-    - if [ -n "$PACKAGES" ]; then travis_retry sudo apt-get install -y -qq libboost1.58-tools-dev libboost-system1.58-dev libboost-filesystem1.58-dev libboost-program-options1.58-dev libboost-thread1.58-dev libboost-test1.58-dev; fi
+    - if [ -n "$PACKAGES" ]; then travis_retry sudo apt-get install -y -qq libboost-dev ; fi
+    - if [ -n "$PACKAGES" ]; then travis_retry sudo apt-get install -y -qq libboost-tools-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libboost-thread-dev libboost-test-dev; fi
 
 before_script:
     - unset CC; unset CXX
