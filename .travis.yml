@@ -27,7 +27,7 @@ env:
     - LINTER_DEB_URL=https://www.bitcoinunlimited.info/depends-sources/
     - PYTHON_DEBUG=1
     - WINEDEBUG=fixme-all
-    - DOCKER_PACKAGES="build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache"
+    - DOCKER_PACKAGES="build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache python3"
     - LC_ALL=C.UTF-8
 
 matrix:
