@@ -118,7 +118,7 @@ UniValue importprivkey(const UniValue &params, bool fHelp)
     // Whether to perform rescan after import
     bool fRescanLocal = true;
     if (params.size() > 2)
-        fRescan = params[2].get_bool();
+        fRescanLocal = params[2].get_bool();
 
     if (fRescanLocal && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
