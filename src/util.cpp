@@ -119,6 +119,7 @@ std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::str
         std::sort(result.begin(), result.end());
         result.erase(std::unique(result.begin(), result.end()), result.end());
     }
+    std::reverse(result.begin(), result.end());
     return result;
 }
 
