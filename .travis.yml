@@ -122,6 +122,7 @@ script:
     - echo "BITCOIN_CONFIG=$BITCOIN_CONFIG"
     - echo "GOAL=$GOAL"
     - ../configure $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG 2>&1 > configure.out || ( cat configure.out && cat config.log && false)
+    - grep PYTHON config.log
     - if [ "$USE_CLANG" = "true" ]; then
          cat configure.out;
          head config.log;
