@@ -235,7 +235,8 @@ class NodeConn(asyncore.dispatcher):
         b"mempool": msg_mempool,
         b"sendheaders": msg_sendheaders,
         b"xversion" : msg_xversion,
-        b"xverack" : msg_xverack
+        b"xverack" : msg_xverack,
+        b"xupdate" : msg_xupdate
     }, bumessagemap)
 
     BTC_MAGIC_BYTES = {

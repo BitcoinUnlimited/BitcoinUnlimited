@@ -14,7 +14,7 @@
 
 #parsing marker (KEY for now)
 #   key name
-#    type of key ('i'nitial or 'c'hangeable?) (only i supported for now)
+#    type of key ('i'nitial or 'c'hangeable)
 #                                             16 bit prefix (currently)
 #                                                                      16 bit suffix  <value type>
 

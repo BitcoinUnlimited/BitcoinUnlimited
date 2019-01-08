@@ -647,6 +647,25 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // This step done after final handshake
         CheckAndRequestExpeditedBlocks(pfrom);
     }
+    else if (strCommand == NetMsgType::XUPDATE)
+    {
+        CXVersionMessage xUpdate;
+        vRecv >> xUpdate;
+        // check for peer trying to change non-changeable key
+        for (auto entry : xUpdate.xmap)
+        {
+            auto iter = XVer::mapKeyType.find(entry.first);
+            if (iter == XVer::mapKeyType.end())
+            {
+                continue;
+            }
+            else if (iter->second == XVer::keyType::changeable)
+            {
+                LOCK(pfrom->cs_xversion);
+                pfrom->xVersion.xmap[entry.first] = xUpdate.xmap[entry.first];
+            }
+        }
+    }
 
     // XVERSION NOTICE: If you read this code as a reference to implement
     // xversion, *please* refrain from sending 'sendheaders' or

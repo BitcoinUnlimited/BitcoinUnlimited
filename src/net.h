@@ -406,6 +406,8 @@ public:
     //! used to make processing serial when version handshake is taking place
     CCriticalSection csSerialPhase;
 
+    //! the intial xversion message sent in the handshake
+    CCriticalSection cs_xversion;
     CXVersionMessage xVersion;
 
     // strSubVer is whatever byte array we read from the wire. However, this field is intended
