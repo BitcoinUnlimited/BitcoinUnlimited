@@ -203,7 +203,6 @@ void ThreadCommitToMempool()
 
             CORRAL(txProcessingCorral, CORRAL_TX_COMMITMENT);
             {
-                LOCK(cs_main);
                 CommitTxToMempool();
                 LOG(MEMPOOL, "MemoryPool sz %u txn, %u kB\n", mempool.size(), mempool.DynamicMemoryUsage() / 1000);
                 LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
