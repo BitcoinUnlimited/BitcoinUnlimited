@@ -49,6 +49,8 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
         grapheneSetVersion = 1;
     }
 
+    FillShortTxIDSelector();
+
     std::vector<uint256> blockHashes;
     for (auto &tx : pblock->vtx)
     {
@@ -1514,6 +1516,13 @@ uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &t
     // but are instead unchanged from the default initialization value.
     DbgAssert(!(shorttxidk0 == 0 && shorttxidk1 == 0), );
 
+    static_assert(SHORTTXIDS_LENGTH == 8, "shorttxids calculation assumes 8-byte shorttxids");
+    return SipHashUint256(shorttxidk0, shorttxidk1, txhash) & 0xffffffffffffffL;
+}
+
+// Generate cheap hash from seeds using SipHash
+uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256& txhash) {
+    //return txhash.GetCheapHash();
     static_assert(SHORTTXIDS_LENGTH == 8, "shorttxids calculation assumes 8-byte shorttxids");
     return SipHashUint256(shorttxidk0, shorttxidk1, txhash) & 0xffffffffffffffL;
 }
