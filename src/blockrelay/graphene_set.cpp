@@ -17,6 +17,8 @@
 CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     uint64_t nSenderUniverseItems,
     const std::vector<uint256> &_itemHashes,
+    uint64_t _shorttxidk0,
+    uint64_t _shorttxidk1,
     bool _ordered,
     bool fDeterministic)
 {
@@ -24,6 +26,9 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
 
     // Below is the parameter "m" from the graphene paper
     nReceiverUniverseItems = _nReceiverUniverseItems;
+
+    shorttxidk0 = _shorttxidk0;
+    shorttxidk1 = _shorttxidk1;
 
     // Below is the parameter "n" from the graphene paper
     uint64_t nItems = _itemHashes.size();
@@ -108,6 +113,13 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
 
         encodedRank = CGrapheneSet::EncodeRank(sortedIdxs, nBits);
     }
+}
+
+
+uint64_t CGrapheneSet::GetShortID(const uint256& txhash) const {
+    //return txhash.GetCheapHash();
+    static_assert(SHORTTXIDS_LENGTH == 8, "shorttxids calculation assumes 8-byte shorttxids");
+    return SipHashUint256(shorttxidk0, shorttxidk1, txhash) & 0xffffffffffffffL;
 }
 
 

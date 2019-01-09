@@ -29,10 +29,13 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
 
 CMemPoolInfo::CMemPoolInfo(uint64_t _nTx) : nTx(_nTx) {}
 CMemPoolInfo::CMemPoolInfo() { this->nTx = 0; }
-CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx, uint64_t nSenderMempoolPlusBlock)
+CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx, uint64_t nSenderMempoolPlusBlock) :
+    nonce(GetRand(std::numeric_limits<uint64_t>::max()))
 {
     header = pblock->GetBlockHeader();
     nBlockTxs = pblock->vtx.size();
+
+    FillShortTxIDSelector();
 
     std::vector<uint256> blockHashes;
     for (auto &tx : pblock->vtx)
@@ -44,9 +47,9 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPool
     }
 
     if (enableCanonicalTxOrder.Value())
-        pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, false);
+        pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0, shorttxidk1, false);
     else
-        pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, true);
+        pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0, shorttxidk1, true);
 }
 
 CGrapheneBlock::~CGrapheneBlock()
@@ -56,6 +59,17 @@ CGrapheneBlock::~CGrapheneBlock()
         delete pGrapheneSet;
         pGrapheneSet = nullptr;
     }
+}
+
+void CGrapheneBlock::FillShortTxIDSelector() const {
+    CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
+    stream << header << nonce;
+    CSHA256 hasher;
+    hasher.Write((unsigned char*)&(*stream.begin()), stream.end() - stream.begin());
+    uint256 shorttxidhash;
+    hasher.Finalize(shorttxidhash.begin());
+    shorttxidk0 = shorttxidhash.GetUint64(0);
+    shorttxidk1 = shorttxidhash.GetUint64(1);
 }
 
 CGrapheneBlockTx::CGrapheneBlockTx(uint256 blockHash, std::vector<CTransaction> &vTx)
@@ -1462,4 +1476,11 @@ void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash)
         LOG(GRAPHENE, "Requesting full block as failover from peer %s\n", pfrom->GetLogName());
         thinrelay.RequestBlock(pfrom, blockhash);
     }
+}
+
+// Generate cheap hash from seeds using SipHash
+uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256& txhash) {
+    //return txhash.GetCheapHash();
+    static_assert(SHORTTXIDS_LENGTH == 8, "shorttxids calculation assumes 8-byte shorttxids");
+    return SipHashUint256(shorttxidk0, shorttxidk1, txhash) & 0xffffffffffffffL;
 }

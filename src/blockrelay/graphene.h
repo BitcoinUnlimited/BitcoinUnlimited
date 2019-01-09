@@ -22,6 +22,7 @@
 #include <vector>
 
 const unsigned char MIN_MEMPOOL_INFO_BYTES = 8;
+const uint8_t SHORTTXIDS_LENGTH = 8;
 
 class CDataStream;
 class CNode;
@@ -46,6 +47,10 @@ public:
 
 class CGrapheneBlock
 {
+private:
+    mutable uint64_t shorttxidk0, shorttxidk1;
+    uint64_t nonce;
+
 public:
     CBlockHeader header;
     std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
@@ -56,6 +61,8 @@ public:
     CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx, uint64_t nSenderMempoolPlusBlock);
     CGrapheneBlock() : pGrapheneSet(nullptr) {}
     ~CGrapheneBlock();
+    // Create seeds for SipHash using the nonce generated in the constructor
+    void FillShortTxIDSelector() const;
     /**
      * Handle an incoming Graphene block
      * Once the block is validated apart from the Merkle root, forward the Xpedited block with a hop count of nHops.
@@ -72,6 +79,9 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
+        READWRITE(shorttxidk0);
+        READWRITE(shorttxidk1);
+        READWRITE(nonce);
         READWRITE(header);
         READWRITE(vAdditionalTxs);
         READWRITE(nBlockTxs);
@@ -303,5 +313,7 @@ bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header);
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);
 CMemPoolInfo GetGrapheneMempoolInfo();
 void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash);
+// Generate cheap hash from seeds using SipHash
+uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256& txhash);
 
 #endif // BITCOIN_GRAPHENE_H

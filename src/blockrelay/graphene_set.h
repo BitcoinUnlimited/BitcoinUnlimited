@@ -33,11 +33,14 @@ const float IBLT_DEFAULT_OVERHEAD = 1.5;
 class CGrapheneSet
 {
 private:
+    mutable uint64_t shorttxidk0, shorttxidk1;
     bool ordered;
     uint64_t nReceiverUniverseItems;
     std::vector<unsigned char> encodedRank;
     CBloomFilter *pSetFilter;
     CIblt *pSetIblt;
+
+    static const uint8_t SHORTTXIDS_LENGTH = 8;
 
     std::vector<uint64_t> ArgSort(const std::vector<uint64_t> &items)
     {
@@ -51,12 +54,17 @@ private:
 
 public:
     // The default constructor is for 2-phase construction via deserialization
-    CGrapheneSet() : ordered(false), nReceiverUniverseItems(0), pSetFilter(nullptr), pSetIblt(nullptr) {}
+    CGrapheneSet() : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), pSetFilter(nullptr), pSetIblt(nullptr) {}
     CGrapheneSet(size_t _nReceiverUniverseItems,
         uint64_t nSenderUniverseItems,
         const std::vector<uint256> &_itemHashes,
+        uint64_t _shorttxidk0,
+        uint64_t _shorttxidk1,
         bool _ordered = false,
         bool fDeterministic = false);
+
+    // Generate cheap hash from seeds using SipHash
+    uint64_t GetShortID(const uint256& txhash) const;
 
     /* Optimal symmetric difference between block txs and receiver mempool txs passing
      * though filter to use for IBLT.
@@ -133,6 +141,8 @@ public:
         READWRITE(nReceiverUniverseItems);
         if (nReceiverUniverseItems > LARGE_MEM_POOL_SIZE)
             throw std::runtime_error("nReceiverUniverseItems exceeds threshold for excessive mempool size");
+        READWRITE(shorttxidk0);
+        READWRITE(shorttxidk1);
         READWRITE(encodedRank);
         if (!pSetFilter)
             pSetFilter = new CBloomFilter();
