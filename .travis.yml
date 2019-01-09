@@ -86,7 +86,7 @@ matrix:
     #Cross-Mac
     - compiler: gcc
       env:
-        - HOST=x86_64-apple-darwin11 PACKAGES="cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python-dev clang-3.8 libc++-dev" BITCOIN_CONFIG="--enable-reduce-exports" OSX_SDK=10.11 GOAL="deploy"
+        - HOST=x86_64-apple-darwin11 PACKAGES="python3 cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python-dev clang-3.8 libc++-dev" BITCOIN_CONFIG="--enable-reduce-exports" OSX_SDK=10.11 GOAL="deploy"
 
 before_install:
     - export PATH=$(echo $PATH | tr ':' "\n" | sed '/\/opt\/python/d' | tr "\n" ":" | sed "s|::|:|g")
