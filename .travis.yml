@@ -123,6 +123,10 @@ script:
     - echo "BITCOIN_CONFIG=$BITCOIN_CONFIG"
     - echo "GOAL=$GOAL"
     - ../configure $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG 2>&1 > configure.out || ( cat configure.out && cat config.log && false)
+    - if [ "$HOST" = "x86_64-w64-mingw32" ]; then
+          sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix ;
+          sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix ;
+      fi
     - grep PYTHON config.log
     - if [ "$USE_CLANG" = "true" ]; then
          cat configure.out;
