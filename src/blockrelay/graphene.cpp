@@ -148,10 +148,10 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     size_t idx = 0;
     for (const CTransaction &tx : grapheneBlockTx.vMissingTx)
     {
-        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
+        pfrom->mapMissingTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx.GetHash())] = MakeTransactionRef(tx);
 
         uint256 hash = tx.GetHash();
-        uint64_t cheapHash = hash.GetCheapHash();
+        uint64_t cheapHash = GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash);
 
         // Insert in arbitrary order if canonical ordering is enabled and xversion is recent enough
         if (enableCanonicalTxOrder.Value() && pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) >= 1)
@@ -281,7 +281,7 @@ bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         {
             for (auto &tx : block.vtx)
             {
-                uint64_t cheapHash = tx->GetHash().GetCheapHash();
+                uint64_t cheapHash = GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx->GetHash());
 
                 if (grapheneRequestBlockTx.setCheapHashesToRequest.count(cheapHash))
                     vTx.push_back(*tx);
@@ -431,6 +431,8 @@ bool CGrapheneBlock::process(CNode *pfrom,
     pfrom->grapheneBlock.nTime = header.nTime;
     pfrom->grapheneBlock.hashMerkleRoot = header.hashMerkleRoot;
     pfrom->grapheneBlock.hashPrevBlock = header.hashPrevBlock;
+    pfrom->shorttxidk0 = shorttxidk0;
+    pfrom->shorttxidk1 = shorttxidk1;
 
     {
         LOCK(pfrom->cs_grapheneadditionaltxs);
@@ -458,7 +460,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
         READLOCK(orphanpool.cs);
         for (auto &kv : orphanpool.mapOrphanTransactions)
         {
-            uint64_t cheapHash = kv.first.GetCheapHash();
+            uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first);
             auto ir = mapPartialTxHash.insert(std::make_pair(cheapHash, kv.first));
             if (!ir.second)
                 collision = true; // insert returns false if no insertion
@@ -472,7 +474,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
             for (const uint256 &hash : memPoolHashes)
             {
-                uint64_t cheapHash = hash.GetCheapHash();
+                uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash);
 
                 auto ir = mapPartialTxHash.insert(std::make_pair(cheapHash, hash));
                 if (!ir.second)
@@ -487,7 +489,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
             for (auto &tx : vAdditionalTxs)
             {
                 const uint256 &hash = tx->GetHash();
-                uint64_t cheapHash = hash.GetCheapHash();
+                uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash);
 
                 if (tx->IsCoinBase())
                     coinbase = tx;
@@ -511,10 +513,10 @@ bool CGrapheneBlock::process(CNode *pfrom,
                 std::vector<uint64_t> blockCheapHashes = pGrapheneSet->Reconcile(mapPartialTxHash);
 
                 // Ensure coinbase is first
-                if (blockCheapHashes[0] != coinbase->GetHash().GetCheapHash())
+                if (blockCheapHashes[0] != GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash()))
                 {
                     auto it =
-                        std::find(blockCheapHashes.begin(), blockCheapHashes.end(), coinbase->GetHash().GetCheapHash());
+                        std::find(blockCheapHashes.begin(), blockCheapHashes.end(), GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash()));
 
                     if (it == blockCheapHashes.end())
                     {
@@ -526,7 +528,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
                     auto idx = std::distance(blockCheapHashes.begin(), it);
 
                     blockCheapHashes[idx] = blockCheapHashes[0];
-                    blockCheapHashes[0] = coinbase->GetHash().GetCheapHash();
+                    blockCheapHashes[0] = GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash());
                 }
 
                 // Sort out what hashes we have from the complete set of cheapHashes
@@ -733,7 +735,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
                     inMemPool = true;
             }
 
-            bool inMissingTx = pfrom->mapMissingTx.count(hash.GetCheapHash()) > 0;
+            bool inMissingTx = pfrom->mapMissingTx.count(GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash)) > 0;
             bool inAdditionalTxs = mapAdditionalTxs.count(hash) > 0;
             bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
 
@@ -752,7 +754,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             }
             else if (inMissingTx)
             {
-                ptx = pfrom->mapMissingTx[hash.GetCheapHash()];
+                ptx = pfrom->mapMissingTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash)];
                 pfrom->grapheneBlock.setUnVerifiedTxns.insert(hash);
             }
         }

@@ -33,9 +33,9 @@ const float IBLT_DEFAULT_OVERHEAD = 1.5;
 class CGrapheneSet
 {
 private:
-    mutable uint64_t shorttxidk0, shorttxidk1;
     bool ordered;
     uint64_t nReceiverUniverseItems;
+    mutable uint64_t shorttxidk0, shorttxidk1;
     std::vector<unsigned char> encodedRank;
     CBloomFilter *pSetFilter;
     CIblt *pSetIblt;
@@ -139,10 +139,10 @@ public:
     {
         READWRITE(ordered);
         READWRITE(nReceiverUniverseItems);
-        if (nReceiverUniverseItems > LARGE_MEM_POOL_SIZE)
-            throw std::runtime_error("nReceiverUniverseItems exceeds threshold for excessive mempool size");
         READWRITE(shorttxidk0);
         READWRITE(shorttxidk1);
+        if (nReceiverUniverseItems > LARGE_MEM_POOL_SIZE)
+            throw std::runtime_error("nReceiverUniverseItems exceeds threshold for excessive mempool size");
         READWRITE(encodedRank);
         if (!pSetFilter)
             pSetFilter = new CBloomFilter();
