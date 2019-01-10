@@ -159,6 +159,13 @@ script:
     - echo "BITCOIN_CONFIG=$BITCOIN_CONFIG"
     - echo "GOAL=$GOAL"
     - DOCKER_EXEC ../configure --cache-file=config.cache $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG || ( cat config.log && false)
+    - if [ "$HOST" = "x86_64-apple-darwin11" ]; then
+        DOCKER_EXEC echo $TRAVIS_BUILD_DIR ;
+        DOCKER_EXEC python3 --version ;
+        docker exec $DOCKER_ID bash -c "$TRAVIS_BUILD_DIR/contrib/devtools/xversionkeys.py > $TRAVIS_BUILD_DIR/src/xversionkeys.h < $TRAVIS_BUILD_DIR/src/xversionkeys.dat" ;
+        DOCKER_EXEC cat $TRAVIS_BUILD_DIR/src/xversionkeys.h ;
+        DOCKER_EXEC cat $TRAVIS_BUILD_DIR/src/xversionkeys.dat ;
+      fi
     - if [ "$RUN_FORMATTING_CHECK" = "true" ]; then DOCKER_EXEC make $MAKEJOBS check-formatting VERBOSE=1; fi
     - DOCKER_EXEC make $MAKEJOBS $GOAL || ( echo "Build failure. Verbose build follows." && DOCKER_EXEC make $GOAL V=1 ; false ) ;
     - if [ "$RUN_TESTS" = "true" ] && { [ "$HOST" = "i686-w64-mingw32" ] || [ "$HOST" = "x86_64-w64-mingw32" ]; }; then
