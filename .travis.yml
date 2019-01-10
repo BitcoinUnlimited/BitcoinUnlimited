@@ -90,6 +90,7 @@ matrix:
 
 before_install:
     - export PATH=$(echo $PATH | tr ':' "\n" | sed '/\/opt\/python/d' | tr "\n" ":" | sed "s|::|:|g")
+    - export PATH=$(echo $PATH | tr ':' "\n" | sed '/\/opt\/pyenv/d' | tr "\n" ":" | sed "s|::|:|g")
     #  temp fix with riak repo, by the way we don't need riak at all
     - sudo rm -vf /etc/apt/sources.list.d/*riak*
     - sudo apt-get update
