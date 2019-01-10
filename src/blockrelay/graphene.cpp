@@ -49,7 +49,9 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
         grapheneSetVersion = 1;
     }
 
-    FillShortTxIDSelector();
+    useSipHash = _useSipHash;
+    if (useSipHash)
+        FillShortTxIDSelector();
 
     std::vector<uint256> blockHashes;
     for (auto &tx : pblock->vtx)
@@ -1349,6 +1351,8 @@ bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom)
 
 void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CMemPoolInfo &mempoolinfo)
 {
+    pfrom->useSipHash = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) >= 2;
+
     if (inv.type == MSG_GRAPHENEBLOCK)
     {
         try
