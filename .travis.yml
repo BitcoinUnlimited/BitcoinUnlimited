@@ -139,7 +139,10 @@ script:
          CXXFLAGS="-std=c++11 -Werror" make $MAKEJOBS $GOAL;
       fi
     - if [ "USE_CLANG" = "false" ]; then export LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/depends/$HOST/lib; fi
-    - if [ "$RUN_TESTS" = "true" ] && { [ "$HOST" = "i686-w64-mingw32" ] || [ "$HOST" = "x86_64-w64-mingw32" ]; }; then travis_wait 30 make $MAKEJOBS check VERBOSE=1; fi
+    - if [ "$RUN_TESTS" = "true" ] && { [ "$HOST" = "i686-w64-mingw32" ] || [ "$HOST" = "x86_64-w64-mingw32" ]; }; then
+        export DISPLAY= ;
+        travis_wait 30 make $MAKEJOBS check VERBOSE=1;
+      fi
     - if [ "$RUN_TESTS" = "true" ] && ! { [ "$HOST" = "i686-w64-mingw32" ] || [ "$HOST" = "x86_64-w64-mingw32" ]; }; then travis_wait make $MAKEJOBS check VERBOSE=1; fi
     - if [ "$RUN_TESTS" = "true" ]; then qa/pull-tester/rpc-tests.py --coverage --no-ipv6-rpc-listen; fi
 after_script:
