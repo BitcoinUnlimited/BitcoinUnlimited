@@ -48,18 +48,20 @@ public:
 class CGrapheneBlock
 {
 private:
-    mutable uint64_t shorttxidk0, shorttxidk1;
     uint64_t nonce;
 
 public:
+    mutable uint64_t shorttxidk0, shorttxidk1;
     CBlockHeader header;
     std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
     uint64_t nBlockTxs;
     CGrapheneSet *pGrapheneSet;
+    bool useSipHash;
 
 public:
-    CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx, uint64_t nSenderMempoolPlusBlock);
-    CGrapheneBlock() : pGrapheneSet(nullptr) {}
+    CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx, uint64_t nSenderMempoolPlusBlock, bool _useSipHash);
+    CGrapheneBlock() : pGrapheneSet(nullptr), useSipHash(true) {}
+    CGrapheneBlock(bool _useSipHash) : pGrapheneSet(nullptr) { useSipHash = _useSipHash; }
     ~CGrapheneBlock();
     // Create seeds for SipHash using the nonce generated in the constructor
     void FillShortTxIDSelector() const;
@@ -79,9 +81,11 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
-        READWRITE(shorttxidk0);
-        READWRITE(shorttxidk1);
-        READWRITE(nonce);
+        if (useSipHash) {
+            READWRITE(shorttxidk0);
+            READWRITE(shorttxidk1);
+            READWRITE(nonce);
+        }
         READWRITE(header);
         READWRITE(vAdditionalTxs);
         READWRITE(nBlockTxs);
@@ -90,7 +94,7 @@ public:
         if (nBlockTxs > (excessiveBlockSize * maxMessageSizeMultiplier / 100))
             throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
         if (!pGrapheneSet)
-            pGrapheneSet = new CGrapheneSet();
+            pGrapheneSet = new CGrapheneSet(useSipHash);
         READWRITE(*pGrapheneSet);
     }
     uint64_t GetAdditionalTxSerializationSize()
@@ -314,6 +318,6 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
 CMemPoolInfo GetGrapheneMempoolInfo();
 void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash);
 // Generate cheap hash from seeds using SipHash
-uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256& txhash);
+uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256& txhash, bool useSipHash);
 
 #endif // BITCOIN_GRAPHENE_H

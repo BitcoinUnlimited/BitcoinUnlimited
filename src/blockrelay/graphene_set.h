@@ -36,6 +36,7 @@ private:
     bool ordered;
     uint64_t nReceiverUniverseItems;
     mutable uint64_t shorttxidk0, shorttxidk1;
+    bool useSipHash;
     std::vector<unsigned char> encodedRank;
     CBloomFilter *pSetFilter;
     CIblt *pSetIblt;
@@ -54,12 +55,14 @@ private:
 
 public:
     // The default constructor is for 2-phase construction via deserialization
-    CGrapheneSet() : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), pSetFilter(nullptr), pSetIblt(nullptr) {}
+    CGrapheneSet() : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), useSipHash(true), pSetFilter(nullptr), pSetIblt(nullptr) {}
+    CGrapheneSet(bool _useSipHash) : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), pSetFilter(nullptr), pSetIblt(nullptr) { useSipHash = _useSipHash; }
     CGrapheneSet(size_t _nReceiverUniverseItems,
         uint64_t nSenderUniverseItems,
         const std::vector<uint256> &_itemHashes,
         uint64_t _shorttxidk0,
         uint64_t _shorttxidk1,
+        bool _useSipHash,
         bool _ordered = false,
         bool fDeterministic = false);
 
@@ -139,8 +142,10 @@ public:
     {
         READWRITE(ordered);
         READWRITE(nReceiverUniverseItems);
-        READWRITE(shorttxidk0);
-        READWRITE(shorttxidk1);
+        if (useSipHash) {
+            READWRITE(shorttxidk0);
+            READWRITE(shorttxidk1);
+        }
         if (nReceiverUniverseItems > LARGE_MEM_POOL_SIZE)
             throw std::runtime_error("nReceiverUniverseItems exceeds threshold for excessive mempool size");
         READWRITE(encodedRank);
