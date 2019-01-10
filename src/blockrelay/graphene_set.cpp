@@ -118,7 +118,8 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
 }
 
 
-uint64_t CGrapheneSet::GetShortID(const uint256& txhash) const {
+uint64_t CGrapheneSet::GetShortID(const uint256 &txhash) const
+{
     if (!useSipHash)
         return txhash.GetCheapHash();
 

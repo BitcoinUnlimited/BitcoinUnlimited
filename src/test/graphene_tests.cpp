@@ -104,7 +104,8 @@ BOOST_AUTO_TEST_CASE(graphene_set_decodes_multiple_sizes)
                 receiverItems.push_back(SerializeHash(GetHash(nNumHashes)));
             }
 
-            CGrapheneSet senderGrapheneSet(receiverItems.size(), receiverItems.size(), senderItems, 0, 0, false, true, true);
+            CGrapheneSet senderGrapheneSet(
+                receiverItems.size(), receiverItems.size(), senderItems, 0, 0, false, true, true);
             std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
 
             BOOST_CHECK_EQUAL_COLLECTIONS(reconciledCheapHashes.begin(), reconciledCheapHashes.end(),
@@ -120,7 +121,8 @@ BOOST_AUTO_TEST_CASE(graphene_set_decodes_multiple_sizes)
                 receiverItems.push_back(SerializeHash(GetHash(nNumHashes)));
             }
 
-            CGrapheneSet senderGrapheneSet(receiverItems.size(), receiverItems.size(), senderItems, 0, 0, false, true, true);
+            CGrapheneSet senderGrapheneSet(
+                receiverItems.size(), receiverItems.size(), senderItems, 0, 0, false, true, true);
             std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
 
             BOOST_CHECK_EQUAL_COLLECTIONS(reconciledCheapHashes.begin(), reconciledCheapHashes.end(),

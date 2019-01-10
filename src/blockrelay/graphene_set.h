@@ -55,8 +55,17 @@ private:
 
 public:
     // The default constructor is for 2-phase construction via deserialization
-    CGrapheneSet() : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), useSipHash(true), pSetFilter(nullptr), pSetIblt(nullptr) {}
-    CGrapheneSet(bool _useSipHash) : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), pSetFilter(nullptr), pSetIblt(nullptr) { useSipHash = _useSipHash; }
+    CGrapheneSet()
+        : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), useSipHash(true),
+          pSetFilter(nullptr), pSetIblt(nullptr)
+    {
+    }
+    CGrapheneSet(bool _useSipHash)
+        : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), pSetFilter(nullptr),
+          pSetIblt(nullptr)
+    {
+        useSipHash = _useSipHash;
+    }
     CGrapheneSet(size_t _nReceiverUniverseItems,
         uint64_t nSenderUniverseItems,
         const std::vector<uint256> &_itemHashes,
@@ -67,7 +76,7 @@ public:
         bool fDeterministic = false);
 
     // Generate cheap hash from seeds using SipHash
-    uint64_t GetShortID(const uint256& txhash) const;
+    uint64_t GetShortID(const uint256 &txhash) const;
 
     /* Optimal symmetric difference between block txs and receiver mempool txs passing
      * though filter to use for IBLT.
@@ -142,7 +151,8 @@ public:
     {
         READWRITE(ordered);
         READWRITE(nReceiverUniverseItems);
-        if (useSipHash) {
+        if (useSipHash)
+        {
             READWRITE(shorttxidk0);
             READWRITE(shorttxidk1);
         }
