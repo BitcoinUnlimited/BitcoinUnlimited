@@ -1525,7 +1525,8 @@ uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &t
 }
 
 // Generate cheap hash from seeds using SipHash
-uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256& txhash, bool useSipHash) {
+uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &txhash, bool useSipHash)
+{
     if (!useSipHash)
         return txhash.GetCheapHash();
 
