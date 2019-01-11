@@ -19,8 +19,8 @@
 #include "tweak.h"
 #include "uahf_fork.h"
 #include "univalue/include/univalue.h"
-#include <thread>
 #include <list>
+#include <thread>
 #include <vector>
 
 enum

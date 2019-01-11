@@ -856,7 +856,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
         {
-            if(shutdown_threads.load() == true)
+            if (shutdown_threads.load() == true)
             {
                 return false;
             }

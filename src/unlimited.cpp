@@ -48,11 +48,11 @@
 
 #include <atomic>
 #include <boost/lexical_cast.hpp>
-#include <thread>
 #include <inttypes.h>
 #include <iomanip>
 #include <limits>
 #include <queue>
+#include <thread>
 
 using namespace std;
 

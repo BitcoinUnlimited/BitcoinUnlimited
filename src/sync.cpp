@@ -8,8 +8,8 @@
 #include "util.h"
 #include "utilstrencodings.h"
 
+#include <boost/thread/tss.hpp> // for boost::thread_specific_ptr
 #include <stdio.h>
-
 #include <thread>
 
 #ifdef DEBUG_LOCKCONTENTION

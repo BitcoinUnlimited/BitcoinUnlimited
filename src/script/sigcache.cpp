@@ -12,8 +12,15 @@
 #include "uint256.h"
 #include "util.h"
 
-#include <thread>
 #include <boost/unordered_set.hpp>
+#include <thread>
+
+// std::shared_mutex not available until c++17, should upgrade when possible
+// std::shared_lock not available until c++14,  should upgrade when possible
+//#include <shared_mutex>
+#include <boost/thread/lock_types.hpp>
+#include <boost/thread/locks.hpp>
+#include <boost/thread/shared_mutex.hpp>
 
 namespace
 {

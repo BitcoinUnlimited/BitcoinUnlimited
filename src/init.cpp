@@ -70,8 +70,8 @@
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
-#include <thread>
 #include <openssl/crypto.h>
+#include <thread>
 
 #if ENABLE_ZMQ
 #include "zmq/zmqnotificationinterface.h"
@@ -1315,7 +1315,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         for (const std::string &strFile : mapMultiArgs["-loadblock"])
             vImportFiles.push_back(strFile);
     }
-    threadGroup.create_thread("importing",boost::bind(&ThreadImport, vImportFiles));
+    threadGroup.create_thread("importing", boost::bind(&ThreadImport, vImportFiles));
 
     LOGA("Waiting for genesis block to be imported...\n");
     CBlockIndex *tip = nullptr;

@@ -24,6 +24,8 @@
 #include "validation/validation.h"
 #include "xversionkeys.h"
 
+#include <iomanip>
+
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
 
 CMemPoolInfo::CMemPoolInfo(uint64_t _nTx) : nTx(_nTx) {}

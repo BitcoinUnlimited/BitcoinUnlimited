@@ -19,8 +19,8 @@
 #include <sys/stat.h>
 #endif
 
-#include <thread>
 #include <boost/version.hpp>
+#include <thread>
 
 using namespace std;
 

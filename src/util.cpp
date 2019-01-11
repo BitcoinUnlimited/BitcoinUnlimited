@@ -89,15 +89,15 @@
 #include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
 #include <boost/program_options/detail/config_file.hpp>
 #include <boost/program_options/parsers.hpp>
-#include <thread>
+#include <list>
+#include <map>
 #include <openssl/conf.h>
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
-#include <thread>
-#include <map>
 #include <set>
+#include <thread>
+#include <thread>
 #include <vector>
-#include <list>
 // std::scopted_lock not available until c++17, use boost for now
 #include <boost/thread/mutex.hpp>
 

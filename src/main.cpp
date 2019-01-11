@@ -63,8 +63,8 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/scope_exit.hpp>
-#include <thread>
 #include <sstream>
+#include <thread>
 
 #if defined(NDEBUG)
 #error "Bitcoin cannot be compiled without assertions."

@@ -10,7 +10,6 @@
 
 #include "utiltime.h"
 
-#include <thread>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <chrono>
 #include <thread>
@@ -78,11 +77,7 @@ int64_t GetLogTimeMicros()
     return GetTimeMicros();
 }
 
-void MilliSleep(int64_t n)
-{
-    std::this_thread::sleep_for(std::chrono::milliseconds(n));
-}
-
+void MilliSleep(int64_t n) { std::this_thread::sleep_for(std::chrono::milliseconds(n)); }
 std::string DateTimeStrFormat(const char *pszFormat, int64_t nTime)
 {
     // std::locale takes ownership of the pointer
