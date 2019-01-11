@@ -1,7 +1,7 @@
 sudo: required
 dist: xenial
 os: linux
-language: generic
+language: minimal
 cache:
   ccache: true
   directories:
