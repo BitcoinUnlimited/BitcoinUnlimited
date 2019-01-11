@@ -183,7 +183,7 @@ std::string minerComment;
 
 CLeakyBucket receiveShaper(DEFAULT_MAX_RECV_BURST, DEFAULT_AVE_RECV);
 CLeakyBucket sendShaper(DEFAULT_MAX_SEND_BURST, DEFAULT_AVE_SEND);
-boost::chrono::steady_clock CLeakyBucket::clock;
+std::chrono::steady_clock CLeakyBucket::clock;
 
 // Variables for statistics tracking, must be before the "requester" singleton instantiation
 const char *sampleNames[] = {"sec10", "min5", "hourly", "daily", "monthly"};
