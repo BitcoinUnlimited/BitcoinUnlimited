@@ -8,12 +8,12 @@
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/bind.hpp>
-#include <thread>
 #include <iostream>
 #include <istream>
 #include <ostream>
 #include <stdint.h>
 #include <string>
+#include <thread>
 #include <univalue.h>
 
 using namespace std;

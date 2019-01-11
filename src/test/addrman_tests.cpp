@@ -199,7 +199,7 @@ BOOST_AUTO_TEST_CASE(addrman_new_collisions)
 
     for (unsigned int i = 1; i < 18; i++)
     {
-        CService addr = CService("250.1.1." + boost::to_string(i));
+        CService addr = CService("250.1.1." + std::to_string(i));
         addrman.Add(CAddress(addr), source);
 
         // Test 13: No collision in new table yet.

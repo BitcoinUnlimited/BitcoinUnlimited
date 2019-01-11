@@ -21,9 +21,9 @@
 #include "wallet/wallet.h"
 
 #include <boost/scoped_ptr.hpp>
-#include <thread>
 #include <boost/version.hpp>
 #include <fstream>
+#include <thread>
 
 using namespace std;
 

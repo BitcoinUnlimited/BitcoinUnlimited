@@ -30,9 +30,9 @@
 #include "validation/validation.h"
 #include "validationinterface.h"
 
-#include <thread>
 #include <boost/tuple/tuple.hpp>
 #include <queue>
+#include <thread>
 
 using namespace std;
 

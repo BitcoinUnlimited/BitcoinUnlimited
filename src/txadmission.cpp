@@ -77,7 +77,7 @@ void StartTxAdmission(thread_group &threadGroup)
     }
 
     // Start tx commitment thread
-    threadGroup.create_thread("txCommitment",&ThreadCommitToMempool);
+    threadGroup.create_thread("txCommitment", &ThreadCommitToMempool);
 }
 
 void StopTxAdmission()

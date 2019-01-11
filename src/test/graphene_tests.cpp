@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <iomanip>
 
 size_t ProjectedGrapheneSizeBytes(uint64_t nBlockTxs, uint64_t nExcessTxs, uint64_t nSymDiff)
 {

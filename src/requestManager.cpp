@@ -33,8 +33,8 @@
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
 #include <boost/lexical_cast.hpp>
-#include <thread>
 #include <inttypes.h>
+#include <thread>
 
 
 using namespace std;

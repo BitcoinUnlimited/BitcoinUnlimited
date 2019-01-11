@@ -46,11 +46,12 @@
 
 #include <atomic>
 #include <boost/lexical_cast.hpp>
-#include <thread>
+#include <boost/thread/tss.hpp> // for boost::thread_specific_ptr
 #include <inttypes.h>
 #include <iomanip>
 #include <list>
 #include <queue>
+#include <thread>
 
 using namespace std;
 

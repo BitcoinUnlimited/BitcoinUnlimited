@@ -1725,19 +1725,19 @@ void _DumpData()
 
 void DumpData(int64_t seconds_between_runs)
 {
-    if(seconds_between_runs == 0)
+    if (seconds_between_runs == 0)
     {
         _DumpData();
         return;
     }
-    while(shutdown_threads.load() == false)
+    while (shutdown_threads.load() == false)
     {
         // this has the potential to be a long sleep. so do it in chunks incase of node shutdown
         int64_t nStart = GetTime();
         int64_t nEnd = nStart + seconds_between_runs;
-        while(nStart < nEnd)
+        while (nStart < nEnd)
         {
-            if(shutdown_threads.load() == true)
+            if (shutdown_threads.load() == true)
             {
                 break;
             }
@@ -1790,7 +1790,7 @@ void ThreadOpenConnections()
                 }
             }
             MilliSleep(500);
-            if(shutdown_threads.load() == true)
+            if (shutdown_threads.load() == true)
             {
                 return;
             }
@@ -2131,7 +2131,7 @@ void ThreadOpenAddedConnections()
             OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), false, &grant);
             MilliSleep(500);
         }
-        if(shutdown_threads.load() == true)
+        if (shutdown_threads.load() == true)
         {
             return;
         }
@@ -2139,7 +2139,7 @@ void ThreadOpenAddedConnections()
         // nodes reconnect quickly after the remote peers restart
         MilliSleep(15000);
 
-        if(shutdown_threads.load() == true)
+        if (shutdown_threads.load() == true)
         {
             return;
         }
