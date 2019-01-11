@@ -9,7 +9,7 @@
 #include "util.h"
 
 #include <boost/lexical_cast.hpp>
-#include <boost/thread.hpp>
+#include <thread>
 #include <iomanip>
 
 using namespace std;

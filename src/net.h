@@ -21,6 +21,7 @@
 #include "random.h"
 #include "streams.h"
 #include "sync.h"
+#include "threadgroup.h"
 #include "uint256.h"
 #include "util.h" // FIXME: reduce scope
 
@@ -40,7 +41,6 @@
 #include "xversionmessage.h"
 
 class CAddrMan;
-class CScheduler;
 class CSubNet;
 class CNode;
 class CNodeRef;
@@ -120,7 +120,7 @@ bool OpenNetworkConnection(const CAddress &addrConnect,
 void MapPort(bool fUseUPnP);
 unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string &strError, bool fWhitelisted = false);
-void StartNode(boost::thread_group &threadGroup, CScheduler &scheduler);
+void StartNode(thread_group &threadGroup);
 bool StopNode();
 int SocketSendData(CNode *pnode);
 

@@ -8,7 +8,7 @@
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/bind.hpp>
-#include <boost/thread.hpp>
+#include <thread>
 #include <iostream>
 #include <istream>
 #include <ostream>

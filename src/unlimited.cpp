@@ -48,7 +48,7 @@
 
 #include <atomic>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread.hpp>
+#include <thread>
 #include <inttypes.h>
 #include <iomanip>
 #include <limits>

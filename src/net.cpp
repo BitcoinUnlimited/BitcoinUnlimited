@@ -25,7 +25,6 @@
 #include "iblt.h"
 #include "primitives/transaction.h"
 #include "requestManager.h"
-#include "scheduler.h"
 #include "ui_interface.h"
 #include "unlimited.h"
 #include "utilstrencodings.h"
@@ -47,7 +46,7 @@ extern CTweak<bool> ignoreNetTimeouts;
 
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread.hpp>
+#include <thread>
 
 #include <math.h>
 
@@ -1254,7 +1253,10 @@ void ThreadSocketHandler()
         }
 
         int nSelect = select(have_fds ? hSocketMax + 1 : 0, &fdsetRecv, &fdsetSend, &fdsetError, &timeout);
-        boost::this_thread::interruption_point();
+        if (shutdown_threads.load() == true)
+        {
+            return;
+        }
 
         if (nSelect == SOCKET_ERROR)
         {
@@ -1295,7 +1297,10 @@ void ThreadSocketHandler()
 
         for (CNode *pnode : vNodesCopy)
         {
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return;
+            }
 
             //
             // Receive
@@ -1710,12 +1715,36 @@ void DumpAddresses()
     LOG(NET, "Flushed %d addresses to peers.dat  %dms\n", addrman.size(), GetTimeMillis() - nStart);
 }
 
-void DumpData()
+void _DumpData()
 {
     DumpAddresses();
 
     // Request dos manager to write it's ban list to disk
     dosMan.DumpBanlist();
+}
+
+void DumpData(int64_t seconds_between_runs)
+{
+    if(seconds_between_runs == 0)
+    {
+        _DumpData();
+        return;
+    }
+    while(shutdown_threads.load() == false)
+    {
+        // this has the potential to be a long sleep. so do it in chunks incase of node shutdown
+        int64_t nStart = GetTime();
+        int64_t nEnd = nStart + seconds_between_runs;
+        while(nStart < nEnd)
+        {
+            if(shutdown_threads.load() == true)
+            {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+        }
+        _DumpData();
+    }
 }
 
 void static ProcessOneShot()
@@ -1761,6 +1790,10 @@ void ThreadOpenConnections()
                 }
             }
             MilliSleep(500);
+            if(shutdown_threads.load() == true)
+            {
+                return;
+            }
         }
     }
 
@@ -1773,7 +1806,7 @@ void ThreadOpenConnections()
     // Minimum time before next feeler connection (in microseconds).
     int64_t nNextFeeler = PoissonNextSend(nStart * 1000 * 1000, FEELER_INTERVAL);
 
-    while (true)
+    while (shutdown_threads.load() == false)
     {
         ProcessOneShot();
 
@@ -1856,6 +1889,10 @@ void ThreadOpenConnections()
                         break;
                     }
                 }
+                if (shutdown_threads.load() == true)
+                {
+                    return;
+                }
             }
         }
 
@@ -1872,7 +1909,10 @@ void ThreadOpenConnections()
             MilliSleep(60000);
             continue;
         }
-        boost::this_thread::interruption_point();
+        if (shutdown_threads.load() == true)
+        {
+            return;
+        }
 
         // Add seed nodes if DNS seeds are all down (an infrastructure attack?).
         if (addrman.size() == 0 && (GetTime() - nStart > 60))
@@ -1923,7 +1963,7 @@ void ThreadOpenConnections()
 
         int64_t nANow = GetAdjustedTime();
         int nTries = 0;
-        while (true)
+        while (shutdown_threads.load() == false)
         {
             CAddrInfo addr = addrman.SelectTriedCollision();
 
@@ -2009,7 +2049,7 @@ void ThreadOpenAddedConnections()
 
     if (HaveNameProxy())
     {
-        while (true)
+        while (shutdown_threads.load() == false)
         {
             list<string> lAddresses(0);
             {
@@ -2091,9 +2131,18 @@ void ThreadOpenAddedConnections()
             OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), false, &grant);
             MilliSleep(500);
         }
+        if(shutdown_threads.load() == true)
+        {
+            return;
+        }
         // Retry every 15 seconds.  It is important to check often to make sure the Xpedited Relay network
         // nodes reconnect quickly after the remote peers restart
         MilliSleep(15000);
+
+        if(shutdown_threads.load() == true)
+        {
+            return;
+        }
     }
 }
 
@@ -2108,7 +2157,10 @@ bool OpenNetworkConnection(const CAddress &addrConnect,
     //
     // Initiate outbound network connection
     //
-    boost::this_thread::interruption_point();
+    if (shutdown_threads.load() == true)
+    {
+        return false;
+    }
     {
         // BU: Add lock on cs_vNodes as FindNode now requries it to prevent potential use-after-free errors
         LOCK(cs_vNodes);
@@ -2123,7 +2175,10 @@ bool OpenNetworkConnection(const CAddress &addrConnect,
     }
 
     CNode *pnode = ConnectNode(addrConnect, pszDest, fCountFailure);
-    boost::this_thread::interruption_point();
+    if (shutdown_threads.load() == true)
+    {
+        return false;
+    }
 
     if (!pnode)
         return false;
@@ -2169,7 +2224,7 @@ void ThreadMessageHandler()
     boost::mutex condition_mutex;
     boost::unique_lock<boost::mutex> lock(condition_mutex);
 
-    while (true)
+    while (shutdown_threads.load() == false)
     {
         vector<CNode *> vNodesCopy;
         {
@@ -2215,7 +2270,10 @@ void ThreadMessageHandler()
                 if (lockSerial)
                     fSleep &= threadProcessMessages(pnode);
             }
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return;
+            }
 
             // Put transaction and block requests into the request manager
             // and all other requests into the send queue.
@@ -2231,7 +2289,10 @@ void ThreadMessageHandler()
                 if (lockSerial)
                     g_signals.SendMessages(pnode);
             }
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return;
+            }
         }
 
         // From the request manager, make requests for transactions and blocks. We do this before potentially
@@ -2360,7 +2421,7 @@ bool BindListenPort(const CService &addrBind, string &strError, bool fWhiteliste
     return true;
 }
 
-void static Discover(boost::thread_group &threadGroup)
+void static Discover(thread_group &threadGroup)
 {
     if (!fDiscover)
         return;
@@ -2415,7 +2476,7 @@ void static Discover(boost::thread_group &threadGroup)
 #endif
 }
 
-void StartNode(boost::thread_group &threadGroup, CScheduler &scheduler)
+void StartNode(thread_group &threadGroup)
 {
     uiInterface.InitMessage(_("Loading addresses..."));
     // Load addresses from peers.dat
@@ -2466,28 +2527,29 @@ void StartNode(boost::thread_group &threadGroup, CScheduler &scheduler)
     // Start threads
     //
 
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "dnsseed", &ThreadAddressSeeding));
+    threadGroup.create_thread("dnsseed", &ThreadAddressSeeding);
 
     // Map ports with UPnP
     MapPort(GetBoolArg("-upnp", DEFAULT_UPNP));
 
     // Send and receive from sockets, accept connections
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "net", &ThreadSocketHandler));
+    threadGroup.create_thread("netSocketHandler", &ThreadSocketHandler);
 
     // Initiate outbound connections from -addnode
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "addcon", &ThreadOpenAddedConnections));
+    threadGroup.create_thread("openAddedConnections", &ThreadOpenAddedConnections);
 
     // Initiate outbound connections
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "opencon", &ThreadOpenConnections));
+    threadGroup.create_thread("openConnections", &ThreadOpenConnections);
 
     // Process messages
     for (unsigned int i = 0; i < numMsgHandlerThreads.Value(); i++)
     {
-        threadGroup.create_thread(boost::bind(&TraceThreads<void (*)()>, strprintf("msg%d", i), &ThreadMessageHandler));
+        std::string name = "messageHandler" + std::to_string(i);
+        threadGroup.create_thread(name, &ThreadMessageHandler);
     }
 
     // Dump network addresses
-    scheduler.scheduleEvery(&DumpData, DUMP_ADDRESSES_INTERVAL);
+    threadGroup.create_thread("dumpAddresses", &DumpData, DUMP_ADDRESSES_INTERVAL);
 }
 
 bool StopNode()
@@ -2500,7 +2562,7 @@ bool StopNode()
 
     if (fAddressesInitialized)
     {
-        DumpData();
+        DumpData(0);
         fAddressesInitialized = false;
     }
 

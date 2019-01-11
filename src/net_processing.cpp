@@ -82,7 +82,10 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
         const CInv inv = vInv.front();
         vInv.pop_front();
         {
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return;
+            }
             if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK)
             {
                 bool fSend = false;
@@ -759,7 +762,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         FastRandomContext insecure_rand;
         for (CAddress &addr : vAddr)
         {
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return false;
+            }
 
             if (addr.nTime <= 100000000 || addr.nTime > nNow + 10 * 60)
                 addr.nTime = nNow - 5 * 24 * 60 * 60;
@@ -850,7 +856,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
         {
-            boost::this_thread::interruption_point();
+            if(shutdown_threads.load() == true)
+            {
+                return false;
+            }
 
             const CInv &inv = vInv[nInv];
             if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK)) || inv.hash.IsNull())
@@ -1856,7 +1865,7 @@ bool ProcessMessages(CNode *pfrom)
 
     int msgsProcessed = 0;
     // Don't bother if send buffer is too full to respond anyway
-    while ((!pfrom->fDisconnect) && (pfrom->nSendSize < SendBufferSize()))
+    while ((!pfrom->fDisconnect) && (pfrom->nSendSize < SendBufferSize()) && (shutdown_threads.load() == false))
     {
         READLOCK(pfrom->csMsgSerializer);
         CNetMessage msg;
@@ -1933,7 +1942,10 @@ bool ProcessMessages(CNode *pfrom)
         try
         {
             fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return false;
+            }
         }
         catch (const std::ios_base::failure &e)
         {

@@ -10,7 +10,7 @@
 #include "main.h"
 #include "sync.h"
 #include "util.h"
-#include <boost/thread.hpp>
+#include <boost/thread/tss.hpp>
 
 // BU add lockstack stuff here for bitcoin-cli, because I need to carefully
 // order it in globals.cpp for bitcoind and bitcoin-qt

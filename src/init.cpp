@@ -35,9 +35,9 @@
 #include "policy/policy.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
-#include "scheduler.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
+#include "threadgroup.h"
 #include "torcontrol.h"
 #include "txadmission.h"
 #include "txdb.h"
@@ -70,7 +70,7 @@
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
-#include <boost/thread.hpp>
+#include <thread>
 #include <openssl/crypto.h>
 
 #if ENABLE_ZMQ
@@ -168,7 +168,7 @@ public:
 static CCoinsViewErrorCatcher *pcoinscatcher = NULL;
 static boost::scoped_ptr<ECCVerifyHandle> globalVerifyHandle;
 
-void Interrupt(boost::thread_group &threadGroup)
+void Interrupt(thread_group &threadGroup)
 {
     // Interrupt Parallel Block Validation threads if there are any running.
     if (PV)
@@ -183,6 +183,9 @@ void Interrupt(boost::thread_group &threadGroup)
     InterruptREST();
     InterruptTorControl();
     threadGroup.interrupt_all();
+    // stop TxAdmission needs to be done before threadGroup tries to join_all
+    // we only join_all after Interrupt so call StopTxAdmission here
+    StopTxAdmission();
 }
 
 void Shutdown()
@@ -493,7 +496,7 @@ bool InitSanityCheck(void)
     return true;
 }
 
-bool AppInitServers(boost::thread_group &threadGroup)
+bool AppInitServers(thread_group &threadGroup)
 {
     RPCServer::OnStopped(&OnRPCStopped);
     RPCServer::OnPreCommand(&OnRPCPreCommand);
@@ -615,7 +618,7 @@ void InitLogging()
 /** Initialize bitcoin.
  *  @pre Parameters should be parsed and config file should be read.
  */
-bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &scheduler)
+bool AppInit2(Config &config, thread_group &threadGroup)
 {
     // ********************************************************* Step 1: setup
 
@@ -981,10 +984,6 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     // Create the parallel block validator
     PV.reset(new CParallelValidation());
 
-    // Start the lightweight task scheduler thread
-    CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
-    threadGroup.create_thread(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
-
     /* Start the RPC server already.  It will be started in "warmup" mode
      * and not really process calls already (but it will signify connections
      * that the server is there and will be ready later).  Warmup mode will
@@ -1316,7 +1315,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         for (const std::string &strFile : mapMultiArgs["-loadblock"])
             vImportFiles.push_back(strFile);
     }
-    threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
+    threadGroup.create_thread("importing",boost::bind(&ThreadImport, vImportFiles));
 
     LOGA("Waiting for genesis block to be imported...\n");
     CBlockIndex *tip = nullptr;
@@ -1522,9 +1521,9 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 #endif
 
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
-        StartTorControl(threadGroup, scheduler);
+        StartTorControl(threadGroup);
 
-    StartNode(threadGroup, scheduler);
+    StartNode(threadGroup);
 
 // Monitor the chain, and alert if we get blocks much quicker or slower than expected
 // The "bad chain alert" scheduler has been disabled because the current system gives far
@@ -1549,7 +1548,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         pwalletMain->ReacceptWalletTransactions();
 
         // Run a thread to flush wallet periodically
-        threadGroup.create_thread(boost::bind(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile)));
+        threadGroup.create_thread("flushWallet", &ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile));
     }
 #endif
 

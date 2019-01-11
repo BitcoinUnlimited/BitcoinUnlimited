@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/thread/thread.hpp>
 
 using namespace std;
@@ -61,7 +62,7 @@ static inline uint256 IncomingConflictHash(const COutPoint &prevout)
     return hash;
 }
 
-void StartTxAdmission(boost::thread_group &threadGroup)
+void StartTxAdmission(thread_group &threadGroup)
 {
     if (txCommitQ == nullptr)
         txCommitQ = new std::map<uint256, CTxCommitData>();
@@ -71,11 +72,12 @@ void StartTxAdmission(boost::thread_group &threadGroup)
     // Start incoming transaction processing threads
     for (unsigned int i = 0; i < numTxAdmissionThreads.Value(); i++)
     {
-        threadGroup.create_thread(boost::bind(&TraceThreads<void (*)()>, strprintf("tx%d", i), &ThreadTxAdmission));
+        std::string name = "txadmission" + std::to_string(i);
+        threadGroup.create_thread(name, &ThreadTxAdmission);
     }
 
     // Start tx commitment thread
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "txcommit", &ThreadCommitToMempool));
+    threadGroup.create_thread("txCommitment",&ThreadCommitToMempool);
 }
 
 void StopTxAdmission()
@@ -188,18 +190,25 @@ unsigned int TxAlreadyHave(const CInv &inv)
 
 void ThreadCommitToMempool()
 {
-    while (!ShutdownRequested())
+    while (shutdown_threads.load() == false)
     {
         {
             boost::unique_lock<boost::mutex> lock(csCommitQ);
             do
             {
                 cvCommitQ.timed_wait(lock, boost::posix_time::milliseconds(2000));
+                if (shutdown_threads.load() == true)
+                {
+                    return;
+                }
             } while (txCommitQ->empty() && txDeferQ.empty());
         }
 
         {
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return;
+            }
 
             CORRAL(txProcessingCorral, CORRAL_TX_COMMITMENT);
             {
@@ -353,10 +362,13 @@ void ThreadTxAdmission()
     // Process at most this many transactions before letting the commit thread take over
     const int maxTxPerRound = 200;
 
-    while (!ShutdownRequested())
+    while (shutdown_threads.load() == false)
     {
         bool acceptedSomething = false;
-        boost::this_thread::interruption_point();
+        if (shutdown_threads.load() == true)
+        {
+            return;
+        }
 
         bool fMissingInputs = false;
         CValidationState state;
@@ -365,13 +377,18 @@ void ThreadTxAdmission()
 
         {
             CCriticalBlock lock(csTxInQ, "csTxInQ", __FILE__, __LINE__);
-            while (txInQ.empty() && !ShutdownRequested())
+            while (txInQ.empty() && shutdown_threads.load() == false)
             {
+                if (shutdown_threads.load() == true)
+                {
+                    return;
+                }
                 cvTxInQ.wait(csTxInQ);
-                boost::this_thread::interruption_point();
             }
-            if (ShutdownRequested())
-                break;
+            if (shutdown_threads.load() == true)
+            {
+                return;
+            }
         }
 
         {

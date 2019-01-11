@@ -30,7 +30,7 @@
 
 #include "init.h"
 #include "rpc/server.h"
-#include "scheduler.h"
+#include "threadgroup.h"
 #include "ui_interface.h"
 #include "util.h"
 
@@ -40,7 +40,7 @@
 
 #include <stdint.h>
 
-#include <boost/thread.hpp>
+#include <thread>
 
 #include <QApplication>
 #include <QDebug>
@@ -167,8 +167,7 @@ Q_SIGNALS:
     void runawayException(const QString &message);
 
 private:
-    boost::thread_group threadGroup;
-    CScheduler scheduler;
+    thread_group threadGroup;
 
     /// Pass fatal exception message to UI thread
     void handleRunawayException(const std::exception *e);
@@ -251,7 +250,7 @@ void BitcoinCore::initialize(Config *cfg)
     try
     {
         qDebug() << __func__ << ": Running AppInit2 in thread";
-        int rv = AppInit2(config, threadGroup, scheduler);
+        int rv = AppInit2(config, threadGroup);
         Q_EMIT initializeResult(rv);
     }
     catch (const std::exception &e)

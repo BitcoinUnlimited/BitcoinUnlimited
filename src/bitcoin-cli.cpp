@@ -17,7 +17,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 
-#include <boost/thread.hpp>
+#include <boost/thread/tss.hpp>
 
 #include <stdio.h>
 

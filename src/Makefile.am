@@ -183,6 +183,7 @@ BITCOIN_CORE_H = \
   support/cleanse.h \
   support/pagelocker.h \
   sync.h \
+  threadgroup.h \
   threadsafety.h \
   timedata.h \
   torcontrol.h \

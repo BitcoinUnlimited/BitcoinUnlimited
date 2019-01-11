@@ -28,7 +28,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/assign/list_of.hpp>
-#include <boost/thread.hpp>
+#include <boost/thread/tss.hpp>
 
 using namespace std;
 

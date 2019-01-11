@@ -23,7 +23,7 @@
 #endif
 
 #include <boost/lexical_cast.hpp>
-#include <boost/thread.hpp>
+#include <thread>
 
 #include <QDataWidgetMapper>
 #include <QDir>

@@ -12,7 +12,7 @@
 #include "uint256.h"
 #include "util.h"
 
-#include <boost/thread.hpp>
+#include <thread>
 #include <boost/unordered_set.hpp>
 
 namespace

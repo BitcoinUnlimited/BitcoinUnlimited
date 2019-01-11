@@ -31,7 +31,7 @@
 
 #include <memory>
 
-#include <boost/thread.hpp>
+#include <thread>
 
 FastRandomContext insecure_rand_ctx(true);
 

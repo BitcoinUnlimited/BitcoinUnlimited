@@ -30,7 +30,7 @@
 #include "validation/validation.h"
 #include "validationinterface.h"
 
-#include <boost/thread.hpp>
+#include <thread>
 #include <boost/tuple/tuple.hpp>
 #include <queue>
 

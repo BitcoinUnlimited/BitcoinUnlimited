@@ -19,7 +19,7 @@
 #include <sys/stat.h>
 #endif
 
-#include <boost/thread.hpp>
+#include <thread>
 #include <boost/version.hpp>
 
 using namespace std;

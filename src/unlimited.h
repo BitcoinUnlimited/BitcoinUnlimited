@@ -19,7 +19,7 @@
 #include "tweak.h"
 #include "uahf_fork.h"
 #include "univalue/include/univalue.h"
-#include <boost/thread.hpp>
+#include <thread>
 #include <list>
 #include <vector>
 
