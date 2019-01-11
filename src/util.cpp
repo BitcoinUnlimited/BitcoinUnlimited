@@ -178,9 +178,11 @@ std::string LogGetAllString(bool fEnabled)
             continue;
 
         if (LogAcceptCategory(x.first))
+        {
             allCategories += "on ";
-        if (fEnabled)
-            enabledCategories += (std::string)x.second + " ";
+            if (fEnabled)
+                enabledCategories += (std::string)x.second + " ";
+        }
         else
             allCategories += "   ";
 
