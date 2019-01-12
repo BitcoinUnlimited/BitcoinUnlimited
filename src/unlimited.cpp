@@ -1697,8 +1697,6 @@ UniValue setlog(const UniValue &params, bool fHelp)
             HelpExampleCli("log", "\"tor\" ") + HelpExampleCli("log", "\"ALL\" "));
     }
 
-    // LOGA("LOG: Before mask: 0x%llx\n", Logging::categoriesEnabled);
-
     try
     {
         if (nparm > 0)
@@ -1742,8 +1740,6 @@ UniValue setlog(const UniValue &params, bool fHelp)
         LOG(ALL, "LOG: Something went wrong in setlog function \n");
         ret = UniValue("Something went wrong. That is all we know.");
     }
-
-    // LOGA("LOG: After  mask: 0x%llx\n", Logging::categoriesEnabled);
 
     return ret;
 }
