@@ -261,26 +261,6 @@ bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     CInv inv(MSG_TX, grapheneRequestBlockTx.blockhash);
     LOG(GRAPHENE, "Received get_grblocktx for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
 
-    // Check for Misbehaving and DOS
-    // If they make more than 20 requests in 10 minutes then disconnect them
-    if (Params().NetworkIDString() != "regtest")
-    {
-        if (pfrom->nGetGrapheneBlockTxLastTime <= 0)
-            pfrom->nGetGrapheneBlockTxLastTime = GetTime();
-        uint64_t nNow = GetTime();
-        double tmp = pfrom->nGetGrapheneBlockTxCount;
-        while (!pfrom->nGetGrapheneBlockTxCount.compare_exchange_weak(
-            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneBlockTxLastTime)) + 1)))
-            ;
-        pfrom->nGetGrapheneBlockTxLastTime = nNow;
-        LOG(GRAPHENE, "nGetGrapheneTxCount is %f\n", pfrom->nGetGrapheneBlockTxCount);
-        if (pfrom->nGetGrapheneBlockTxCount >= 20)
-        {
-            dosMan.Misbehaving(pfrom, 100); // If they exceed the limit then disconnect them
-            return error("DOS: Misbehaving - requesting too many grblocktx: %s\n", inv.hash.ToString());
-        }
-    }
-
     CBlockIndex *blkHdr = LookupBlockIndex(inv.hash);
     if (!blkHdr)
     {
@@ -1434,28 +1414,6 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
     {
         dosMan.Misbehaving(pfrom, 100);
         return error("Graphene block message received from a non graphene block node, peer %s\n", pfrom->GetLogName());
-    }
-
-    // Check for Misbehaving and DOS
-    // If they make more than 20 requests in 10 minutes then disconnect them
-    {
-        if (pfrom->nGetGrapheneLastTime <= 0)
-            pfrom->nGetGrapheneLastTime = GetTime();
-        uint64_t nNow = GetTime();
-        double tmp = pfrom->nGetGrapheneCount;
-        while (!pfrom->nGetGrapheneCount.compare_exchange_weak(
-            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneLastTime)) + 1)))
-            ;
-        pfrom->nGetGrapheneLastTime = nNow;
-        LOG(GRAPHENE, "nGetGrapheneCount is %f\n", pfrom->nGetGrapheneCount);
-        if (chainparams.NetworkIDString() == "main") // other networks have variable mining rates
-        {
-            if (pfrom->nGetGrapheneCount >= 20)
-            {
-                dosMan.Misbehaving(pfrom, 100); // If they exceed the limit then disconnect them
-                return error("sending too many GET_GRAPHENE messages");
-            }
-        }
     }
 
     CMemPoolInfo mempoolinfo;

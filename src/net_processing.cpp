@@ -285,42 +285,6 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
     }
 }
 
-
-static bool BasicThinblockChecks(CNode *pfrom, const CChainParams &chainparams)
-{
-    if (!pfrom->ThinBlockCapable())
-    {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("Thinblock message received from a non thinblock node, peer=%d", pfrom->GetId());
-    }
-
-    // Check for Misbehaving and DOS
-    // If they make more than 20 requests in 10 minutes then disconnect them
-    if (Params().NetworkIDString() != "regtest")
-    {
-        uint64_t nNow = GetTime();
-        if (pfrom->nGetXthinLastTime <= 0)
-            pfrom->nGetXthinLastTime = nNow;
-        double tmp = pfrom->nGetXthinCount;
-        while (!pfrom->nGetXthinCount.compare_exchange_weak(
-            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXthinLastTime)) + 1)))
-            ;
-        pfrom->nGetXthinLastTime = nNow;
-        LOG(THIN, "nGetXthinCount is %f\n", pfrom->nGetXthinCount);
-        if (chainparams.NetworkIDString() == "main") // other networks have variable mining rates
-        {
-            if (pfrom->nGetXthinCount >= 20)
-            {
-                dosMan.Misbehaving(pfrom, 50); // If they exceed the limit then disconnect them
-                return error("requesting too many getdata thinblocks");
-            }
-        }
-    }
-
-    return true;
-}
-
-
 static bool ensureConnectionState(const std::string msg,
     const ConnectionStateIncoming &expected_incoming,
     const ConnectionStateOutgoing &expected_outgoing,
@@ -978,7 +942,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             // Make basic checks
             if (inv.type == MSG_THINBLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) < 2)
             {
-                if (!BasicThinblockChecks(pfrom, chainparams))
+                if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
+                    return false;
+            }
+            else if (inv.type == MSG_CMPCT_BLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) >= 2)
+            {
+                if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
                     return false;
             }
 
@@ -1433,10 +1402,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CheckBlockIndex(chainparams.GetConsensus());
     }
 
-    // BUIP010 Xtreme Thinblocks: begin section
+    // Handle Xthinblocks and Thinblocks
     else if (strCommand == NetMsgType::GET_XTHIN && !fImporting && !fReindex && IsThinBlocksEnabled())
     {
-        if (!BasicThinblockChecks(pfrom, chainparams))
+        if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
         CBloomFilter filterMemPool;
@@ -1477,7 +1446,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     }
     else if (strCommand == NetMsgType::GET_THIN && !fImporting && !fReindex && IsThinBlocksEnabled())
     {
-        if (!BasicThinblockChecks(pfrom, chainparams))
+        if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
         CInv inv;
@@ -1546,6 +1515,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::GET_XBLOCKTX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsThinBlocksEnabled())
     {
+        if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
+            return false;
+
         LOCK(pfrom->cs_xthinblock);
         return CXRequestThinBlockTx::HandleMessage(vRecv, pfrom);
     }
@@ -1557,11 +1529,13 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         LOCK(pfrom->cs_xthinblock);
         return CXThinBlockTx::HandleMessage(vRecv, pfrom);
     }
-    // BUIP010 Xtreme Thinblocks: end section
 
-    // BUIPXXX Graphene blocks: begin section
+    // Handle Graphene blocks
     else if (strCommand == NetMsgType::GET_GRAPHENE && !fImporting && !fReindex && IsGrapheneBlockEnabled())
     {
+        if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
+            return false;
+
         LOCK(pfrom->cs_graphene);
         return HandleGrapheneBlockRequest(vRecv, pfrom, chainparams);
     }
@@ -1577,6 +1551,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::GET_GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsGrapheneBlockEnabled())
     {
+        if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
+            return false;
+
         LOCK(pfrom->cs_graphene);
         return CRequestGrapheneBlockTx::HandleMessage(vRecv, pfrom);
     }
@@ -1588,7 +1565,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         LOCK(pfrom->cs_graphene);
         return CGrapheneBlockTx::HandleMessage(vRecv, pfrom);
     }
-    // BUIPXXX Graphene blocks: end section
 
     // Handle Compact Blocks
     else if (strCommand == NetMsgType::CMPCTBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
@@ -1600,6 +1576,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::GETBLOCKTXN && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsCompactBlocksEnabled())
     {
+        if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
+            return false;
+
         LOCK(pfrom->cs_compactblock);
         return CompactReRequest::HandleMessage(vRecv, pfrom);
     }

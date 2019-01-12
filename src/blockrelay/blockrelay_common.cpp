@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "blockrelay/blockrelay_common.h"
+#include "dosman.h"
 #include "net.h"
 #include "random.h"
 #include "requestManager.h"
@@ -284,4 +285,33 @@ void ThinTypeRelay::RequestBlock(CNode *pfrom, const uint256 &hash)
     std::vector<CInv> vGetData;
     vGetData.push_back(CInv(MSG_BLOCK, hash));
     pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+}
+
+bool ThinTypeRelay::CheckForRequestDOS(CNode *pfrom, const CChainParams &chainparams)
+{
+    // Check for Misbehaving and DOS
+    // If they make more than MAX_THINTYPE_OBJECT_REQUESTS requests in 10 minutes then disconnect them
+    if (chainparams.NetworkIDString() != "regtest")
+    {
+        uint64_t nNow = GetTime();
+        if (nLastRequest <= 0)
+            nLastRequest = nNow;
+        double tmp = nNumRequests;
+        while (!nNumRequests.compare_exchange_weak(
+            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - nLastRequest)) + 1)))
+            ;
+        nLastRequest = nNow;
+        LOG(THIN | GRAPHENE | CMPCT, "Number of thin object requests is %f\n", nNumRequests);
+
+        // Other networks have variable mining rates, so only apply these rules to mainnet.
+        if (chainparams.NetworkIDString() == "main")
+        {
+            if (nNumRequests >= MAX_THINTYPE_OBJECT_REQUESTS)
+            {
+                dosMan.Misbehaving(pfrom, 50);
+                return error("%s is misbehaving. Making too many thin type requests.", pfrom->GetLogName());
+            }
+        }
+    }
+    return true;
 }
