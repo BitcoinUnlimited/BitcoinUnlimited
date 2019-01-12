@@ -1748,6 +1748,22 @@ UniValue setlog(const UniValue &params, bool fHelp)
     return ret;
 }
 
+UniValue getdebugcategories(const UniValue &params, bool fHelp)
+{
+    UniValue ret = UniValue("");
+
+    if (fHelp || (params.size() != 0))
+    {
+        throw runtime_error("getlog"
+                            "\nReturn a list of active debug categories\n"
+                            "\nThis rpc has no arguments a part from the help on\n" +
+                            HelpExampleCli("getdebugcategories", "") + HelpExampleRpc("getdebugcategories", ""));
+    }
+
+    ret = UniValue(Logging::LogGetAllString(true));
+    return ret;
+}
+
 /** Mining-Candidate begin */
 
 /** Oustanding candidates are removed 30 sec after a new block has been found*/
@@ -2024,6 +2040,7 @@ static const CRPCCommand commands[] =
 #endif
     { "util",               "getaddressforms",        &getaddressforms,        true  },
     { "util",               "log",                    &setlog,                 true  },
+    { "util",               "getdebugcategories",     &getdebugcategories,     true  },
     /* Coin generation */
     { "generating",         "getgenerate",            &getgenerate,            true  },
     { "generating",         "setgenerate",            &setgenerate,            true  },
