@@ -188,6 +188,10 @@ std::string LogGetAllString(bool fEnabled)
 
         allCategories += (std::string)x.second + "\n";
     }
+    // strip last char from enabledCategories if it is eqaul to a blank space
+    if (enabledCategories.length() > 0)
+        enabledCategories.pop_back();
+
     return fEnabled ? enabledCategories : allCategories;
 }
 
