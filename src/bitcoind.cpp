@@ -33,17 +33,18 @@
  *
  * \section intro_sec Introduction
  *
- * This is the developer documentation of Bitcoin Unlimited 
- * (https://www.bitcoinunlimited.info/). Bitcoin Unlimited is a client for the 
+ * This is the developer documentation of Bitcoin Unlimited
+ * (https://www.bitcoinunlimited.info/). Bitcoin Unlimited is a client for the
  * digital currency called Bitcoin Cash, which enables instant payments to anyone,
  * anywhere in the world. Bitcoin Cash uses peer-to-peer technology to operate
- *  with no central authority: managing transactions and issuing money are
- *  carried out collectively by the network.
+ * with no central authority: managing transactions and issuing money are
+ * carried out collectively by the network.
  *
  * The software is a community-driven open source project, released under the MIT license.
  *
  * \section Navigation
- * Use the buttons <code>Namespaces</code>, <code>Classes</code> or <code>Files</code> at the top of the page to start
+ * Use the buttons <code>Namespaces</code>, <code>Classes</code> or <code>Files</code> at 
+the top of the page to start
  navigating the code.
  */
 
