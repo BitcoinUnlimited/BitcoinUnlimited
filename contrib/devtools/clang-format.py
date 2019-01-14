@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 Wrapper script for clang-format
 
@@ -13,7 +13,7 @@ import os
 import sys
 import subprocess
 import difflib
-import StringIO
+from io import StringIO
 import pdb
 import tempfile
 
@@ -29,12 +29,11 @@ def check_clang_format_version(clang_format_exe):
     try:
         output = subprocess.check_output([clang_format_exe, '-version'])
         for ver in tested_versions:
-            if ver in output:
-                #print>>sys.stderr, "Detected clang-format version " + ver
+            if ver in output.decode('utf8'):
                 return
         raise RuntimeError("Untested version: " + output)
     except Exception as e:
-        print 'Could not verify version of ' + clang_format_exe + '.'
+        print('Could not verify version of ' + clang_format_exe + '.')
         raise e
 
 def check_command_line_args(argv):
@@ -43,11 +42,11 @@ def check_command_line_args(argv):
 
     if(len(argv) < len(required_args) + 1):
         for word in (['Usage:', argv[0]] + required_args):
-            print word,
-        print ''
+            print(word, end =' ')
+        print('')
         for word in (['E.g:', argv[0]] + example_args):
-            print word,
-        print ''
+            print(word, end = ' ')
+        print('')
         sys.exit(1)
 
 def run_clang_check(clang_format_exe, files):
@@ -66,14 +65,14 @@ def run_clang_check(clang_format_exe, files):
             subprocess.check_call([trailing_comment_exe, str(max_col_len)], stdin=open(target,"rb"), stdout=trailingCommentFile, stderr=subprocess.STDOUT)
             trailingCommentFile.seek(0)
             subprocess.check_call([clang_format_exe,'-style=file','-assume-filename=%s' % target], stdin=trailingCommentFile, stdout=formattedFile, stderr=subprocess.STDOUT)
-            with open(target,"rb") as f: inputContents = f.readlines()
+            with open(target,"rb") as f: inputContents = [ x.decode('utf8') for x in f.readlines() ]
             formattedFile.seek(0)
-            formattedContents = formattedFile.readlines()
+            formattedContents = [ x.decode('utf8') for x in formattedFile.readlines() ]
             for l in difflib.unified_diff(inputContents,formattedContents, target, target+"_formatted"):
                 sys.stdout.write(l)
                 changed.add(target)
         else:
-            print "Skip " + target
+            print("Skip " + target)
     if nonexistent:
         print("\nNonexistent files: " + ",".join(nonexistent))
     if changed:
@@ -103,16 +102,16 @@ def run_clang_format(clang_format_exe, files, stdout=False):
                                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
                 sout, serr = cfe_pipe.communicate()
-                sys.stdout.write(sout)
-                sys.stderr.write(serr)
+                sys.stdout.write(sout.decode())
+                sys.stderr.write(serr.decode())
             else:
-                print "Format " + target
+                print("Format " + target)
                 subprocess.check_call([trailing_comment_exe, str(max_col_len), target])
                 subprocess.check_call([clang_format_exe, '-i', '-style=file', target],
                                       stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
 
         else:
-            print "Skip " + target
+            print("Skip " + target)
 
 def main(argv):
     global trailing_comment_exe
