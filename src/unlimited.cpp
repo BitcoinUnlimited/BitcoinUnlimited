@@ -585,6 +585,9 @@ void UnlimitedSetup(void)
             checkpoints.fTransactionsPerDay = 280000.0;
         }
     }
+
+    // Initialize templates used in validating transactions
+    InitTemplates();
 }
 
 FILE *blockReceiptLog = nullptr;

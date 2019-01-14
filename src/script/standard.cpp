@@ -16,6 +16,10 @@ using namespace std;
 
 typedef vector<unsigned char> valtype;
 
+// Templates
+static std::mutex cs_templates;
+static multimap<txnouttype, CScript> mTemplates;
+
 bool fAcceptDatacarrier = DEFAULT_ACCEPT_DATACARRIER;
 unsigned nMaxDatacarrierBytes = MAX_OP_RETURN_RELAY;
 
@@ -44,13 +48,10 @@ const char *GetTxnOutputType(txnouttype t)
     return NULL;
 }
 
-/**
- * Return public keys or hashes from scriptPubKey, for 'standard' transaction types.
- */
-bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsigned char> > &vSolutionsRet)
+// Called during startup to initialize the templates.
+void InitTemplates()
 {
-    // Templates
-    static multimap<txnouttype, CScript> mTemplates;
+    std::lock_guard<std::mutex> lock(cs_templates);
     if (mTemplates.empty())
     {
         // Standard tx, sender provides pubkey, receiver adds signature
@@ -71,7 +72,13 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsi
         // LabelPublc OP_RETURN data size format small
         mTemplates.insert(make_pair(TX_LABELPUBLIC, CScript() << OP_RETURN << OP_BIGINTEGER << OP_DATA));
     }
+}
 
+/**
+ * Return public keys or hashes from scriptPubKey, for 'standard' transaction types.
+ */
+bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsigned char> > &vSolutionsRet)
+{
     vSolutionsRet.clear();
     // LOGA("Freeze Solve: %s \n ", ::ScriptToAsmStr(scriptPubKey));
 

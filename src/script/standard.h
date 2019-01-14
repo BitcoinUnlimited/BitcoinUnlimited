@@ -92,5 +92,6 @@ CScript GetScriptForMultisig(int nRequired, const std::vector<CPubKey> &keys);
 CScript GetScriptForFreeze(CScriptNum nLockTime, const CPubKey &pubKey);
 CScript GetScriptLabelPublic(const std::string &labelPublic);
 
+void InitTemplates();
 
 #endif // BITCOIN_SCRIPT_STANDARD_H
