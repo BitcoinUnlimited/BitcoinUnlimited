@@ -44,10 +44,10 @@ def check_command_line_args(argv):
 
     if(len(argv) < len(required_args) + 1):
         for word in (['Usage:', argv[0]] + required_args):
-            print(word),
+            print(word, end =' ')
         print('')
         for word in (['E.g:', argv[0]] + example_args):
-            print(word),
+            print(word, end = ' ')
         print('')
         sys.exit(1)
 
