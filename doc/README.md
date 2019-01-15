@@ -1,4 +1,4 @@
-Bitcoin Unlimited 0.12.1b
+Bitcoin Unlimited
 =========================
 
 Setup
@@ -53,7 +53,6 @@ The Bitcoin repo's [root README](/README.md) contains relevant information on th
 - [Multiwallet Qt Development](multiwallet-qt.md)
 - [Release Notes](release-notes.md)
 - [Release Process](release-process.md)
-- [Source Code Documentation (External Link)](https://dev.visucore.com/bitcoin/doxygen/)
 - [Translation Process](translation_process.md)
 - [Translation Strings Policy](translation_strings_policy.md)
 - [Unit Tests](unit-tests.md)
