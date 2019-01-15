@@ -201,6 +201,124 @@ public:
     }
 };
 
+typedef std::vector<unsigned char> StackDataType;
+
+class ScriptMachine
+{
+protected:
+    unsigned int flags;
+    std::vector<StackDataType> stack;
+    std::vector<StackDataType> altstack;
+    const CScript *script;
+    const BaseSignatureChecker &checker;
+    ScriptError error;
+
+    unsigned char sighashtype;
+
+    CScript::const_iterator pc;
+    CScript::const_iterator pbegin;
+    CScript::const_iterator pend;
+    CScript::const_iterator pbegincodehash;
+
+    unsigned int nOpCount;
+    unsigned int maxOps;
+
+    std::vector<bool> vfExec;
+
+public:
+    ScriptMachine(const ScriptMachine &from)
+        : checker(from.checker), pc(from.pc), pbegin(from.pbegin), pend(from.pend), pbegincodehash(from.pbegincodehash)
+    {
+        flags = from.flags;
+        stack = from.stack;
+        altstack = from.altstack;
+        script = from.script;
+        error = from.error;
+        sighashtype = from.sighashtype;
+        nOpCount = from.nOpCount;
+        vfExec = from.vfExec;
+        maxOps = from.maxOps;
+        nOpCount = 0;
+    }
+
+    ScriptMachine(unsigned int _flags, const BaseSignatureChecker &_checker, unsigned int maxOpsIn)
+        : flags(_flags), script(nullptr), checker(_checker), pc(CScript().end()), pbegin(CScript().end()),
+          pend(CScript().end()), pbegincodehash(CScript().end()), nOpCount(0), maxOps(maxOpsIn)
+    {
+    }
+
+    // Execute the passed script starting at the current machine state (stack and altstack are not cleared).
+    bool Eval(const CScript &_script);
+
+    // Start a stepwise execution of a script, starting at the current machine state
+    // If BeginStep succeeds, you must keep script alive until EndStep() returns
+    bool BeginStep(const CScript &_script);
+    // Execute the next instruction of a script (you must have previously BeginStep()ed).
+    bool Step();
+    // Do final checks once the script is complete.
+    bool EndStep();
+    // Return true if there are more steps in this script
+    bool isMoreSteps() { return (pc < pend); }
+    // Return the current offset from the beginning of the script. -1 if ended
+    int getPos();
+
+    // Returns info about the next instruction to be run:
+    // first bool is true if the instruction will be executed (false if this is passing across a not-taken branch)
+    std::tuple<bool, opcodetype, StackDataType, ScriptError> Peek();
+
+    // Remove all items from the altstack
+    void ClearAltStack() { altstack.clear(); }
+    // Remove all items from the stack
+    void ClearStack() { stack.clear(); }
+    // clear all state
+    void Reset()
+    {
+        altstack.clear();
+        stack.clear();
+        vfExec.clear();
+        nOpCount = 0;
+    }
+
+    // Set the main stack to the passed data
+    void setStack(std::vector<StackDataType> &stk) { stack = stk; }
+    // Overwrite a stack entry with the passed data.  0 is the stack top, -1 is a special number indicating to push
+    // an item onto the stack top.
+    void setStackItem(int idx, const StackDataType &item)
+    {
+        if (idx == -1)
+            stack.push_back(item);
+        else
+        {
+            stack[stack.size() - idx - 1] = item;
+        }
+    }
+
+    // Overwrite an altstack entry with the passed data.  0 is the stack top, -1 is a special number indicating to push
+    // the item onto the top.
+    void setAltStackItem(int idx, const StackDataType &item)
+    {
+        if (idx == -1)
+            altstack.push_back(item);
+        else
+        {
+            altstack[altstack.size() - idx - 1] = item;
+        }
+    }
+
+    // Set the alt stack to the passed data
+    void setAltStack(std::vector<StackDataType> &stk) { altstack = stk; }
+    // Get the main stack
+    const std::vector<StackDataType> &getStack() { return stack; }
+    // Get the alt stack
+    const std::vector<StackDataType> &getAltStack() { return altstack; }
+    // Get any error that may have occurred
+    const ScriptError &getError() { return error; }
+    // Get the bitwise OR of all sighashtype bytes that occurred in the script
+    unsigned char getSigHashType() { return sighashtype; }
+    // Return the number of instructions executed since the last Reset()
+    unsigned int getOpCount() { return nOpCount; }
+};
+
 bool EvalScript(std::vector<std::vector<unsigned char> > &stack,
     const CScript &script,
     unsigned int flags,
