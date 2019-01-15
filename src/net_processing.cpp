@@ -160,14 +160,15 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                             pfrom->blocksSent += 1;
                             pfrom->PushMessage(NetMsgType::BLOCK, block);
                         }
-                        else if (inv.type == MSG_THINBLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) < 2)
+                        else if (inv.type == MSG_THINBLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) < 2 &&
+                                 pfrom->ThinBlockCapable())
                         {
                             // TODO: This code path enables backward compatibility for older BU nodes
                             // and can be removed in the future.
                             LOG(THIN, "Sending thinblock via getdata message\n");
                             SendXThinBlock(MakeBlockRef(block), pfrom, inv);
                         }
-                        else if (inv.type == MSG_CMPCT_BLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) >= 2)
+                        else if (inv.type == MSG_CMPCT_BLOCK)
                         {
                             LOG(CMPCT, "Sending compactblock via getdata message\n");
                             SendCompactBlock(MakeBlockRef(block), pfrom, inv);
@@ -940,12 +941,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
 
             // Make basic checks
-            if (inv.type == MSG_THINBLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) < 2)
-            {
-                if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
-                    return false;
-            }
-            else if (inv.type == MSG_CMPCT_BLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) >= 2)
+            if (inv.type == MSG_CMPCT_BLOCK || inv.type == MSG_THINBLOCK)
             {
                 if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
                     return false;
