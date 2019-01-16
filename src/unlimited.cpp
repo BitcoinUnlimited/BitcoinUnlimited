@@ -1683,22 +1683,26 @@ UniValue setlog(const UniValue &params, bool fHelp)
     int nparm = params.size();
     bool action = false;
 
-    if (fHelp || nparm < 1 || nparm > 2)
+    if (fHelp || nparm > 2)
     {
         throw runtime_error(
             "log \"category|all\" \"on|off\""
             "\nTurn categories on or off\n"
+            "\nWith no arguments it returns a list of currently on log categories\n"
             "\nArguments:\n"
             "1. \"category|all\" (string, required) Category or all categories\n"
             "2. \"on\"           (string, optional) Turn a category, or all categories, on\n"
             "2. \"off\"          (string, optional) Turn a category, or all categories, off\n"
             "2.                (string, optional) No argument. Show a category, or all categories, state: on|off\n" +
             HelpExampleCli("log", "\"NET\" on") + HelpExampleCli("log", "\"all\" off") +
-            HelpExampleCli("log", "\"tor\" ") + HelpExampleCli("log", "\"ALL\" "));
+            HelpExampleCli("log", "\"tor\" ") + HelpExampleCli("log", "\"ALL\" ") + HelpExampleCli("log", " "));
     }
 
     try
     {
+        if (nparm == 0)
+            ret = UniValue(Logging::LogGetAllString(true));
+
         if (nparm > 0)
         {
             std::string category;
@@ -1741,22 +1745,6 @@ UniValue setlog(const UniValue &params, bool fHelp)
         ret = UniValue("Something went wrong. That is all we know.");
     }
 
-    return ret;
-}
-
-UniValue getdebugcategories(const UniValue &params, bool fHelp)
-{
-    UniValue ret = UniValue("");
-
-    if (fHelp || (params.size() != 0))
-    {
-        throw runtime_error("getlog"
-                            "\nReturn a list of active debug categories\n"
-                            "\nThis rpc has no arguments a part from the help on\n" +
-                            HelpExampleCli("getdebugcategories", "") + HelpExampleRpc("getdebugcategories", ""));
-    }
-
-    ret = UniValue(Logging::LogGetAllString(true));
     return ret;
 }
 
@@ -2036,7 +2024,6 @@ static const CRPCCommand commands[] =
 #endif
     { "util",               "getaddressforms",        &getaddressforms,        true  },
     { "util",               "log",                    &setlog,                 true  },
-    { "util",               "getdebugcategories",     &getdebugcategories,     true  },
     /* Coin generation */
     { "generating",         "getgenerate",            &getgenerate,            true  },
     { "generating",         "setgenerate",            &setgenerate,            true  },

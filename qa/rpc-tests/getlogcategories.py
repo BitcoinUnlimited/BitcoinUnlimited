@@ -17,7 +17,7 @@ import random
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 
-class GetDebugCategories (BitcoinTestFramework):
+class GetLogCategories (BitcoinTestFramework):
 
     def setup_chain(self,bitcoinConfDict=None, wallets=None):
         print("Initializing test directory "+self.options.tmpdir)
@@ -57,15 +57,15 @@ class GetDebugCategories (BitcoinTestFramework):
         self.is_network_split = False
 
     def run_test (self):
-        cat0 = self.nodes[0].getdebugcategories()
-        cat1 = self.nodes[1].getdebugcategories()
-        cat2 = self.nodes[2].getdebugcategories()
-        cat3 = self.nodes[3].getdebugcategories()
-        cat4 = self.nodes[4].getdebugcategories()
-        cat5 = self.nodes[5].getdebugcategories()
-        cat6 = self.nodes[6].getdebugcategories()
-        cat7 = self.nodes[7].getdebugcategories()
-        cat8 = self.nodes[8].getdebugcategories()
+        cat0 = self.nodes[0].log()
+        cat1 = self.nodes[1].log()
+        cat2 = self.nodes[2].log()
+        cat3 = self.nodes[3].log()
+        cat4 = self.nodes[4].log()
+        cat5 = self.nodes[5].log()
+        cat6 = self.nodes[6].log()
+        cat7 = self.nodes[7].log()
+        cat8 = self.nodes[8].log()
 
         exp0 = "coindb tor addrman libevent http rpc partitioncheck bench prune reindex mempoolrej blk evict parallel rand req bloom estimatefee lck proxy dbase selectcoins zmq qt ibd respend weakblocks"
         exp1 = "libevent http partitioncheck bench prune reindex mempoolrej blk evict parallel rand req bloom estimatefee lck proxy dbase selectcoins zmq qt ibd respend weakblocks"
@@ -91,11 +91,11 @@ class GetDebugCategories (BitcoinTestFramework):
         wait_bitcoinds()
 
 if __name__ == '__main__':
-    GetDebugCategories().main()
+    GetLogCategories().main()
 
 # Create a convenient function for an interactive python debugging session
 def Test():
-    t = GetDebugCategories()
+    t = GetLogCategories()
     bitcoinConf = {}
     flags = standardFlags()
     t.main(flags, bitcoinConf, None)
