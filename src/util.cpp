@@ -94,7 +94,8 @@
 #include <openssl/rand.h>
 #include <thread>
 
-std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args)
+std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args,
+    bool removeDuplicates /* false */)
 {
     std::vector<std::string> result;
     for (std::string arg : args)
@@ -111,6 +112,14 @@ std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::str
                 arg_nospace += c;
         result.push_back(arg_nospace);
     }
+
+    // remove duplicates from the list of debug categories
+    if (removeDuplicates)
+    {
+        std::sort(result.begin(), result.end());
+        result.erase(std::unique(result.begin(), result.end()), result.end());
+    }
+    std::reverse(result.begin(), result.end());
     return result;
 }
 
@@ -156,50 +165,77 @@ std::string LogGetLabel(uint64_t category)
 
     return label;
 }
-
-std::string LogGetAllString()
+// Return a string rapresentation of all debug categories and their current status,
+// one category per line. If enabled is true it returns only the list of enabled
+// debug categories concatenated in a single line.
+std::string LogGetAllString(bool fEnabled)
 {
-    string ret = "";
+    string allCategories = "";
+    string enabledCategories = "";
     for (auto &x : logLabelMap)
     {
         if (x.first == ALL || x.first == NONE)
             continue;
 
-        // ret += (std::string)x.second;
         if (LogAcceptCategory(x.first))
-            ret += "on ";
+        {
+            allCategories += "on ";
+            if (fEnabled)
+                enabledCategories += (std::string)x.second + " ";
+        }
         else
-            ret += "   ";
+            allCategories += "   ";
 
-        ret += (std::string)x.second;
-        ret += "\n";
+        allCategories += (std::string)x.second + "\n";
     }
+    // strip last char from enabledCategories if it is eqaul to a blank space
+    if (enabledCategories.length() > 0)
+        enabledCategories.pop_back();
 
-    return ret;
+    return fEnabled ? enabledCategories : allCategories;
 }
 
 void LogInit()
 {
     string category = "";
-    uint64_t catg = Logging::NONE;
-    const vector<string> categories = splitByCommasAndRemoveSpaces(mapMultiArgs["-debug"]);
+    uint64_t catg = NONE;
+    const vector<string> categories = splitByCommasAndRemoveSpaces(mapMultiArgs["-debug"], true);
 
     // enable all when given -debug=1 or -debug
     if (categories.size() == 1 && (categories[0] == "" || categories[0] == "1"))
     {
-        Logging::LogToggleCategory(Logging::ALL, true);
-        return;
+        LogToggleCategory(ALL, true);
     }
-    for (string const &cat : categories)
+    else
     {
-        category = boost::algorithm::to_lower_copy(cat);
-        catg = LogFindCategory(category);
+        for (string const &cat : categories)
+        {
+            category = boost::algorithm::to_lower_copy(cat);
 
-        if (catg == NONE) // Not a valid category
-            continue;
+            // remove the category from the list of enables one
+            // if label is suffixed with a dash
+            bool toggle_flag = true;
 
-        LogToggleCategory(catg, true);
+            if (category.length() > 0 && category.at(0) == '-')
+            {
+                toggle_flag = false;
+                category.erase(0, 1);
+            }
+
+            if (category == "" || category == "1")
+            {
+                category = "all";
+            }
+
+            catg = LogFindCategory(category);
+
+            if (catg == NONE) // Not a valid category
+                continue;
+
+            LogToggleCategory(catg, toggle_flag);
+        }
     }
+    LOGA("List of enabled categories: %s\n", LogGetAllString(true));
 }
 }
 

@@ -111,7 +111,8 @@ int LogPrintStr(const std::string &str);
 // Takes a std::vector of strings and splits individual arguments further up if
 // they contain commas. Also removes space from the output strings.
 // For example, ["a", "b,c", "d"] becomes ["a", "b", "c", "d"]
-extern std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args);
+extern std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args,
+    bool removeDuplicates = false);
 
 // Logging API:
 // Use the two macros
@@ -231,7 +232,7 @@ std::string LogGetLabel(uint64_t category);
  * Formatted for display.
  * returns all categories and states
  */
-std::string LogGetAllString();
+std::string LogGetAllString(bool fEnabled = false);
 
 /**
  * Initialize

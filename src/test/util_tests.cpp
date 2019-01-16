@@ -811,17 +811,32 @@ BOOST_AUTO_TEST_CASE(splitbycommaandremovespaces)
     const std::vector<std::string> r = splitByCommasAndRemoveSpaces(inp1);
 
     BOOST_CHECK_EQUAL(r.size(), 4);
-    BOOST_CHECK_EQUAL(r[0], "one");
-    BOOST_CHECK_EQUAL(r[1], "two");
-    BOOST_CHECK_EQUAL(r[2], "three");
-    BOOST_CHECK_EQUAL(r[3], "four");
+    BOOST_CHECK_EQUAL(r[3], "one");
+    BOOST_CHECK_EQUAL(r[2], "two");
+    BOOST_CHECK_EQUAL(r[1], "three");
+    BOOST_CHECK_EQUAL(r[0], "four");
 
     const std::vector<std::string> r2 = splitByCommasAndRemoveSpaces(r);
     BOOST_CHECK_EQUAL(r.size(), 4);
-    BOOST_CHECK_EQUAL(r[0], "one");
-    BOOST_CHECK_EQUAL(r[1], "two");
-    BOOST_CHECK_EQUAL(r[2], "three");
-    BOOST_CHECK_EQUAL(r[3], "four");
+    BOOST_CHECK_EQUAL(r[3], "one");
+    BOOST_CHECK_EQUAL(r[2], "two");
+    BOOST_CHECK_EQUAL(r[1], "three");
+    BOOST_CHECK_EQUAL(r[0], "four");
+
+    std::vector<std::string> inp2{"one", "two, two  ", "f o u r"};
+    const std::vector<std::string> r3 = splitByCommasAndRemoveSpaces(inp2, true);
+    BOOST_CHECK_EQUAL(r3.size(), 3);
+    BOOST_CHECK_EQUAL(r3[2], "four");
+    BOOST_CHECK_EQUAL(r3[1], "one");
+    BOOST_CHECK_EQUAL(r3[0], "two");
+
+    std::vector<std::string> inp3{"1", "2", "3", "-4"};
+    const std::vector<std::string> r4 = splitByCommasAndRemoveSpaces(inp3, true);
+    BOOST_CHECK_EQUAL(r4.size(), 4);
+    BOOST_CHECK_EQUAL(r4[0], "3");
+    BOOST_CHECK_EQUAL(r4[1], "2");
+    BOOST_CHECK_EQUAL(r4[2], "1");
+    BOOST_CHECK_EQUAL(r4[3], "-4");
 }
 
 BOOST_AUTO_TEST_CASE(enum_toString)

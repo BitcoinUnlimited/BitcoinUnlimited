@@ -236,7 +236,8 @@ testScripts = [ RpcTest(t) for t in [
     'thinblocks',
     'checkdatasig_activation',
     'xversion',
-    'sighashmatch'
+    'sighashmatch',
+    'getlogcategories'
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
