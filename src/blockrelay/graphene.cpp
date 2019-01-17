@@ -544,7 +544,10 @@ bool CGrapheneBlock::process(CNode *pfrom,
         }
 
         if (coinbase == NULL)
-            throw std::runtime_error("No coinbase transaction found in graphene block");
+        {
+            LOG(GRAPHENE, "Error: No coinbase transaction found in graphene block, peer=%s", pfrom->GetLogName());
+            return false;
+        }
 
         if (!collision)
         {
@@ -559,7 +562,11 @@ bool CGrapheneBlock::process(CNode *pfrom,
                         std::find(blockCheapHashes.begin(), blockCheapHashes.end(), coinbase->GetHash().GetCheapHash());
 
                     if (it == blockCheapHashes.end())
-                        throw std::runtime_error("No coinbase transaction found in graphene block");
+                    {
+                        LOG(GRAPHENE, "Error: No coinbase transaction found in graphene block, peer=%s",
+                            pfrom->GetLogName());
+                        return false;
+                    }
 
                     auto idx = std::distance(blockCheapHashes.begin(), it);
 
