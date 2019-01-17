@@ -116,67 +116,14 @@ matrix:
         - OSX_SDK=10.11 GOAL="deploy"
 
 before_install:
-    - export PATH=$(echo $PATH | tr ':' "\n" | sed '/\/opt\/python/d' | tr "\n" ":" | sed "s|::|:|g")
-
+    - source .travis/before_install.sh
 install:
-    - travis_retry docker pull "$DOCKER_NAME_TAG"
-    - env | grep -E '^(CCACHE_|WINEDEBUG|LC_ALL|BOOST_TEST_RANDOM|CONFIG_SHELL)' | tee /tmp/env
-    - if [[ $HOST = *-mingw32 ]]; then
-        DOCKER_ADMIN="--cap-add SYS_ADMIN";
-      fi
-    - DOCKER_ID=$(docker run $DOCKER_ADMIN -idt --mount type=bind,src=$TRAVIS_BUILD_DIR,dst=$TRAVIS_BUILD_DIR --mount type=bind,src=$CCACHE_DIR,dst=$CCACHE_DIR -w $TRAVIS_BUILD_DIR --env-file /tmp/env $DOCKER_NAME_TAG)
-    - DOCKER_EXEC () {
-        docker exec $DOCKER_ID bash -c "cd $PWD && $*";
-      }
-    - if [ -n "$DPKG_ADD_ARCH" ]; then
-        DOCKER_EXEC dpkg --add-architecture "$DPKG_ADD_ARCH";
-      fi
-    - travis_retry DOCKER_EXEC apt-get update
-    - travis_retry DOCKER_EXEC apt-get install --no-install-recommends --no-upgrade -qq $PACKAGES $DOCKER_PACKAGES
-    - if [ $RUN_FORMATTING_CHECK = "true" ]; then
-        curl --location $LINTER_DEB_URL/libllvm3.8_3.8.1-27ubuntu1_amd64.deb -o llvm-3.8.deb;
-        curl --location $LINTER_DEB_URL/clang-format-3.8_3.8.1-27ubuntu1_amd64.deb -o clang-format-3.8.deb;
-        DOCKER_EXEC dpkg -i llvm-3.8.deb clang-format-3.8.deb;
-      fi
+    - source .travis/install.sh
 before_script:
-    - unset CC; unset CXX
-    - if [ "$CHECK_DOC" = 1 ]; then DOCKER_EXEC contrib/devtools/check-doc.py; fi
-    - mkdir -p depends/SDKs depends/sdk-sources
-    - if [ -n "$OSX_SDK" -a ! -f depends/sdk-sources/MacOSX${OSX_SDK}.sdk.tar.gz ]; then curl --location --fail $SDK_URL/MacOSX${OSX_SDK}.sdk.tar.gz -o depends/sdk-sources/MacOSX${OSX_SDK}.sdk.tar.gz; fi
-    - if [ -n "$OSX_SDK" -a -f depends/sdk-sources/MacOSX${OSX_SDK}.sdk.tar.gz ]; then tar -C depends/SDKs -xf depends/sdk-sources/MacOSX${OSX_SDK}.sdk.tar.gz; fi
-    - echo "USE_CLANG=$USE_CLANG"
-    - if [[ $HOST = *-mingw32 ]]; then DOCKER_EXEC update-alternatives --set $HOST-g++ \$\(which $HOST-g++-posix\); fi
-    - if [ "$USE_CLANG" = "false" ]; then DOCKER_EXEC CONFIG_SHELL= make $MAKEJOBS -C depends HOST=$HOST $DEP_OPTS; fi #use sys libraries for clang
+    - source .travis/before_script.sh
 script:
-    - export TRAVIS_COMMIT_LOG=`git log --format=fuller -1`
-    - if [ -n "$USE_SHELL" ]; then export CONFIG_SHELL="$USE_SHELL"; fi
-    - OUTDIR=$BASE_OUTDIR/$TRAVIS_PULL_REQUEST/$TRAVIS_JOB_NUMBER-$HOST
-    - BITCOIN_CONFIG_ALL="--disable-dependency-tracking --prefix=$TRAVIS_BUILD_DIR/depends/$HOST --bindir=$OUTDIR/bin --libdir=$OUTDIR/lib";
-    - if [ "$USE_CLANG" = "false" ]; then DOCKER_EXEC ccache --max-size=$CCACHE_SIZE; fi
-    - test -n "$USE_SHELL" && DOCKER_EXEC "$CONFIG_SHELL" -c "./autogen.sh 2>&1 > autogen.out" || ./autogen.sh 2>&1 > autogen.out || (cat autogen.out && false)
-    - mkdir build && cd build
-    - echo "BITCOIN_CONFIG_ALL=$BITCOIN_CONFIG_ALL"
-    - echo "BITCOIN_CONFIG=$BITCOIN_CONFIG"
-    - echo "GOAL=$GOAL"
-    - DOCKER_EXEC ../configure --cache-file=config.cache $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG || ( cat config.log && false)
-    - if [ "$HOST" = "x86_64-apple-darwin11" ]; then
-        docker exec $DOCKER_ID bash -c "$TRAVIS_BUILD_DIR/contrib/devtools/xversionkeys.py > $TRAVIS_BUILD_DIR/src/xversionkeys.h < $TRAVIS_BUILD_DIR/src/xversionkeys.dat" ;
-      fi
-    - if [ "$RUN_FORMATTING_CHECK" = "true" ]; then DOCKER_EXEC make $MAKEJOBS check-formatting VERBOSE=1; fi
-    - DOCKER_EXEC make $MAKEJOBS $GOAL || ( echo "Build failure. Verbose build follows." && DOCKER_EXEC make $GOAL V=1 ; false ) ;
-    - if [ "$RUN_TESTS" = "true" ] && { [ "$HOST" = "i686-w64-mingw32" ] || [ "$HOST" = "x86_64-w64-mingw32" ]; }; then
-        travis_wait 50 DOCKER_EXEC LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/depends/$HOST/lib make $MAKEJOBS check VERBOSE=1;
-      fi
-    - if [ "$RUN_TESTS" = "true" ] && ! { [ "$HOST" = "i686-w64-mingw32" ] || [ "$HOST" = "x86_64-w64-mingw32" ]; }; then
-        DOCKER_EXEC LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/depends/$HOST/lib make $MAKEJOBS check VERBOSE=1;
-      fi
-    - if [ "$RUN_TESTS" = "true" ]; then DOCKER_EXEC qa/pull-tester/rpc-tests.py --coverage --no-ipv6-rpc-listen; fi
+    - source .travis/script.sh
 after_script:
-    - echo $TRAVIS_COMMIT_RANGE
-    - echo $TRAVIS_COMMIT_LOG
-
+    - source .travis/after_script.sh
 after_failure:
-    - for i in `find /home/travis/ -name debug.log`; do echo $i; echo "-----"; tail -100 $i; done
-    - for i in `find /tmp/ -name debug.log`; do echo $i; echo "-----"; tail -100 $i; done
-    - for i in `find /home/travis/ -name bitcoin.conf`; do echo $i; echo "-----"; cat $i; done
-    - for i in `find /tmp/ -name bitcoin.conf`; do echo $i; echo "-----"; cat $i; done
+    - source .travis/after_failure.sh
