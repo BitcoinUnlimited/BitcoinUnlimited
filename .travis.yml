@@ -122,6 +122,6 @@ before_script:
 script:
     - if [ $SECONDS -gt 1200 ]; then set +o errexit; echo "Travis early exit to cache current state"; false; else set -o errexit; source .travis/script.sh; fi
 after_script:
-    - set -o errexit; source .travis/after_script.sh
+    - set -o errexit; cd $TRAVIS_BUILD_DIR; source .travis/after_script.sh
 after_failure:
-    - set -o errexit; source .travis/after_failure.sh
+    - set -o errexit; cd $TRAVIS_BUILD_DIR; source .travis/after_failure.sh
