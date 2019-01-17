@@ -28,7 +28,6 @@ env:
     - PYTHON_DEBUG=1
     - WINEDEBUG=fixme-all
     - DOCKER_PACKAGES="build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache python3"
-    - LC_ALL=C.UTF-8
 
 matrix:
   include:

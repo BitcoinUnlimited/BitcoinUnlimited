@@ -5,7 +5,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-export LC_ALL=C
+export LC_ALL=C.UTF-8
 
 export TRAVIS_COMMIT_LOG=`git log --format=fuller -1`
 if [ -n "$USE_SHELL" ]; then export CONFIG_SHELL="$USE_SHELL"; fi
