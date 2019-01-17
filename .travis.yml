@@ -48,7 +48,7 @@ matrix:
         - CXX=g++ CC=gcc
         - HOST=x86_64-unknown-linux-gnu
         - PACKAGES="libedit2 python python3-zmq"
-        - DEP_OPTS="NO_QT=1 NO_UPNP=1 DEBUG=1"
+        - DEP_OPTS="NO_UPNP=1 DEBUG=1"
         - RUN_TESTS=true
         - RUN_FORMATTING_CHECK=true
         - GOAL="install"
@@ -59,7 +59,6 @@ matrix:
         - CXX=g++ CC=gcc
         - HOST=aarch64-linux-gnu
         - PACKAGES="g++-aarch64-linux-gnu"
-        - DEP_OPTS="NO_QT=1"
         - GOAL="install"
         - BITCOIN_CONFIG="--enable-glibc-back-compat --enable-reduce-exports CXXFLAGS=-Wno-psabi"
     #ARM32
@@ -68,7 +67,7 @@ matrix:
         - CXX=g++ CC=gcc
         - HOST=arm-linux-gnueabihf
         - PACKAGES="g++-arm-linux-gnueabihf"
-        - DEP_OPTS="NO_QT=1" GOAL="install"
+        - GOAL="install"
         - BITCOIN_CONFIG="--enable-glibc-back-compat --enable-reduce-exports"
     #Win32
     - compiler: gcc
@@ -121,7 +120,7 @@ install:
 before_script:
     - set -o errexit; source .travis/before_script.sh
 script:
-    - set -o errexit; source .travis/script.sh
+    - if [ $SECONDS -gt 1200 ]; then set +o errexit; echo "Travis early exit to cache current state"; false; else set -o errexit; source .travis/script.sh; fi
 after_script:
     - set -o errexit; source .travis/after_script.sh
 after_failure:
