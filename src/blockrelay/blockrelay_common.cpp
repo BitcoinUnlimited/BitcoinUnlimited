@@ -107,64 +107,21 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
 
 bool ThinTypeRelay::IsBlockRelayTimerEnabled()
 {
-    // Only engage the timer if at least one thin type relay is active. If all three types
-    // are either all active, or all inactive, then we do not need the timer. Generally speaking
-    // all three type will be active and we can return early.
+    // Only engage the timer if one or more, but not all, thin type relays are active.
+    // If all types are active, or all inactive, then we do not need the timer.
+    // Generally speaking all types will be active and we can return early.
     if (IsThinBlocksEnabled() && IsGrapheneBlockEnabled() && IsCompactBlocksEnabled())
         return false;
-    else if (!IsThinBlocksEnabled() && !IsGrapheneBlockEnabled() && !IsCompactBlocksEnabled())
+    if (!IsThinBlocksEnabled() && !IsGrapheneBlockEnabled() && !IsCompactBlocksEnabled())
         return false;
 
-    // Under certain conditions the thin relay timer is not relevant. These are all variants of
-    // having a thin type enabled but not having those type of peers, or the reverse, having a
-    // thin type disabled but then having those peers connected.
-    bool fHaveThinBlockPeers = false;
-    bool fHaveGraphenePeers = false;
-    bool fHaveCompactBlockPeers = false;
-    if (nThinBlockPeers > 0)
-        fHaveThinBlockPeers = true;
-    if (nGraphenePeers > 0)
-        fHaveGraphenePeers = true;
-    if (nCompactBlockPeers > 0)
-        fHaveCompactBlockPeers = true;
+    // The thin relay timer is only relevant if we have a specific thin relay type active
+    // AND we have peers connected which also support that thin relay type
+    bool fThinBlockPossible = IsThinBlocksEnabled() && nThinBlockPeers > 0;
+    bool fGraphenePossible = IsGrapheneBlockEnabled() && nGraphenePeers > 0;
+    bool fCompactBlockPossible = IsCompactBlocksEnabled() && nCompactBlockPeers > 0;
 
-    if (!fHaveGraphenePeers && !fHaveThinBlockPeers && !fHaveCompactBlockPeers)
-        return false;
-    else if (IsGrapheneBlockEnabled() && !fHaveGraphenePeers && !IsThinBlocksEnabled() && fHaveThinBlockPeers &&
-             !IsCompactBlocksEnabled() && fHaveCompactBlockPeers)
-        return false;
-    else if (IsGrapheneBlockEnabled() && !fHaveGraphenePeers && !IsThinBlocksEnabled() && fHaveThinBlockPeers &&
-             IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
-        return false;
-    else if (IsGrapheneBlockEnabled() && !fHaveGraphenePeers && !IsThinBlocksEnabled() && fHaveThinBlockPeers &&
-             !IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
-        return false;
-    else if (!IsGrapheneBlockEnabled() && fHaveGraphenePeers && IsThinBlocksEnabled() && !fHaveThinBlockPeers &&
-             !IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
-        return false;
-    else if (!IsGrapheneBlockEnabled() && fHaveGraphenePeers && IsThinBlocksEnabled() && !fHaveThinBlockPeers &&
-             !IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
-        return false;
-    else if (!IsGrapheneBlockEnabled() && fHaveGraphenePeers && !IsThinBlocksEnabled() && !fHaveThinBlockPeers &&
-             !IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
-        return false;
-    else if (!IsGrapheneBlockEnabled() && !fHaveGraphenePeers && IsThinBlocksEnabled() && !fHaveThinBlockPeers &&
-             !IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
-        return false;
-    else if (!IsGrapheneBlockEnabled() && !fHaveGraphenePeers && !IsThinBlocksEnabled() && fHaveThinBlockPeers &&
-             !IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
-        return false;
-    else if (!IsGrapheneBlockEnabled() && !fHaveGraphenePeers && !IsThinBlocksEnabled() && fHaveThinBlockPeers &&
-             IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
-        return false;
-    else if (!IsGrapheneBlockEnabled() && fHaveGraphenePeers && IsThinBlocksEnabled() && !fHaveThinBlockPeers &&
-             IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
-        return false;
-    else if (!IsGrapheneBlockEnabled() && fHaveGraphenePeers && !IsThinBlocksEnabled() && !fHaveThinBlockPeers &&
-             IsCompactBlocksEnabled() && !fHaveCompactBlockPeers)
-        return false;
-
-    return true;
+    return fThinBlockPossible || fGraphenePossible || fCompactBlockPossible;
 }
 // The timer is cleared as soon as we request a block or thinblock.
 void ThinTypeRelay::ClearBlockRelayTimer(const uint256 &hash)
