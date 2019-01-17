@@ -116,14 +116,14 @@ matrix:
         - OSX_SDK=10.11 GOAL="deploy"
 
 before_install:
-    - source .travis/before_install.sh
+    - set -o errexit; source .travis/before_install.sh
 install:
-    - source .travis/install.sh
+    - set -o errexit; source .travis/install.sh
 before_script:
-    - source .travis/before_script.sh
+    - set -o errexit; source .travis/before_script.sh
 script:
-    - source .travis/script.sh
+    - set -o errexit; source .travis/script.sh
 after_script:
-    - source .travis/after_script.sh
+    - set -o errexit; source .travis/after_script.sh
 after_failure:
-    - source .travis/after_failure.sh
+    - set -o errexit; source .travis/after_failure.sh
