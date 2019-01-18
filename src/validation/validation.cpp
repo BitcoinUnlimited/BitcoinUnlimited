@@ -3309,7 +3309,7 @@ bool ActivateBestChain(CValidationState &returnedState,
                 pindexMostWork = LookupBlockIndex(pblock->GetHash());
                 if (!pindexMostWork)
                 {
-                    LOGA("Could not find block in mapBlockIndex: %s\n", pblock->GetHash().ToString());
+                    LOG(BLK, "Could not find block in mapBlockIndex: %s\n", pblock->GetHash().ToString());
                     return false;
                 }
 

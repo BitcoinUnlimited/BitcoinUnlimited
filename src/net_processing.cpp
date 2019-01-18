@@ -106,16 +106,17 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                                      *pindexBestHeader, *mi, *pindexBestHeader, consensusParams) < nOneMonth);
                         if (!fSend)
                         {
-                            LOGA("%s: ignoring request from peer=%s for old block that isn't in the main chain\n",
+                            LOG(NET, "%s: ignoring request from peer=%s for old block that isn't in the main chain\n",
                                 __func__, pfrom->GetLogName());
                         }
                         else
-                        { // BU: don't relay excessive blocks that are not on the active chain
+                        {
+                            // BU: don't relay excessive blocks that are not on the active chain
                             if (mi->nStatus & BLOCK_EXCESSIVE)
                                 fSend = false;
                             if (!fSend)
-                                LOGA("%s: ignoring request from peer=%s for excessive block of height %d not on "
-                                     "the main chain\n",
+                                LOG(NET, "%s: ignoring request from peer=%s for excessive block of height %d not on "
+                                         "the main chain\n",
                                     __func__, pfrom->GetLogName(), mi->nHeight);
                         }
                         // BU: in the future we can throttle old block requests by setting send=false if we are out of
@@ -1901,8 +1902,8 @@ bool ProcessMessages(CNode *pfrom)
         CMessageHeader &hdr = msg.hdr;
         if (!hdr.IsValid(pfrom->GetMagic(chainparams)))
         {
-            LOGA(
-                "PROCESSMESSAGE: ERRORS IN HEADER %s peer=%s\n", SanitizeString(hdr.GetCommand()), pfrom->GetLogName());
+            LOG(NET, "PROCESSMESSAGE: ERRORS IN HEADER %s peer=%s\n", SanitizeString(hdr.GetCommand()),
+                pfrom->GetLogName());
             continue;
         }
         std::string strCommand = hdr.GetCommand();
@@ -1920,7 +1921,7 @@ bool ProcessMessages(CNode *pfrom)
             unsigned int nChecksum = ReadLE32((unsigned char *)&hash);
             if (nChecksum != hdr.nChecksum)
             {
-                LOGA("%s(%s, %u bytes): CHECKSUM ERROR nChecksum=%08x hdr.nChecksum=%08x\n", __func__,
+                LOG(NET, "%s(%s, %u bytes): CHECKSUM ERROR nChecksum=%08x hdr.nChecksum=%08x\n", __func__,
                     SanitizeString(strCommand), nMessageSize, nChecksum, hdr.nChecksum);
                 continue;
             }
@@ -1939,15 +1940,15 @@ bool ProcessMessages(CNode *pfrom)
             if (strstr(e.what(), "end of data"))
             {
                 // Allow exceptions from under-length message on vRecv
-                LOGA("%s(%s, %u bytes): Exception '%s' caught, normally caused by a message being shorter than "
-                     "its stated length\n",
+                LOG(NET, "%s(%s, %u bytes): Exception '%s' caught, normally caused by a message being shorter than "
+                         "its stated length\n",
                     __func__, SanitizeString(strCommand), nMessageSize, e.what());
             }
             else if (strstr(e.what(), "size too large"))
             {
                 // Allow exceptions from over-long size
-                LOGA("%s(%s, %u bytes): Exception '%s' caught\n", __func__, SanitizeString(strCommand), nMessageSize,
-                    e.what());
+                LOG(NET, "%s(%s, %u bytes): Exception '%s' caught\n", __func__, SanitizeString(strCommand),
+                    nMessageSize, e.what());
             }
             else
             {
@@ -1964,11 +1965,11 @@ bool ProcessMessages(CNode *pfrom)
         }
         catch (...)
         {
-            PrintExceptionContinue(NULL, "ProcessMessages()");
+            PrintExceptionContinue(nullptr, "ProcessMessages()");
         }
 
         if (!fRet)
-            LOGA("%s(%s, %u bytes) FAILED peer %s\n", __func__, SanitizeString(strCommand), nMessageSize,
+            LOG(NET, "%s(%s, %u bytes) FAILED peer %s\n", __func__, SanitizeString(strCommand), nMessageSize,
                 pfrom->GetLogName());
 
         if (msgsProcessed > 2000)
