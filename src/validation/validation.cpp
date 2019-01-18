@@ -3444,7 +3444,7 @@ bool ProcessNewBlock(CValidationState &state,
 
     int64_t end = GetTimeMicros();
 
-    if (Logging::LogAcceptCategory(Logging::BENCH))
+    if (Logging::LogAcceptCategory(BENCH))
     {
         uint64_t maxTxSizeLocal = 0;
         uint64_t maxVin = 0;

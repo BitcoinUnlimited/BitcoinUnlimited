@@ -144,7 +144,7 @@ void DebugMessageHandler(QtMsgType type, const QMessageLogContext &context, cons
 {
     Q_UNUSED(context);
     // If the type is QtDebugMsg then log in the QT category, otherwise always log
-    uint64_t category = (type == QtDebugMsg) ? Logging::QT : Logging::ALL;
+    uint64_t category = (type == QtDebugMsg) ? QT : ALL;
     LOG(category, "GUI: %s\n", msg.toStdString());
 }
 
