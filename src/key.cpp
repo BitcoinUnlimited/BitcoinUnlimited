@@ -190,7 +190,7 @@ CPubKey CKey::GetPubKey() const
     return result;
 }
 
-bool CKey::Sign(const uint256 &hash, std::vector<unsigned char> &vchSig, uint32_t test_case) const
+bool CKey::SignECDSA(const uint256 &hash, std::vector<unsigned char> &vchSig, uint32_t test_case) const
 {
     if (!fValid)
         return false;
@@ -219,8 +219,8 @@ bool CKey::VerifyPubKey(const CPubKey &pubkey) const
     uint256 hash;
     CHash256().Write((unsigned char *)str.data(), str.size()).Write(rnd, sizeof(rnd)).Finalize(hash.begin());
     std::vector<unsigned char> vchSig;
-    Sign(hash, vchSig);
-    return pubkey.Verify(hash, vchSig);
+    SignECDSA(hash, vchSig);
+    return pubkey.VerifyECDSA(hash, vchSig);
 }
 
 bool CKey::SignCompact(const uint256 &hash, std::vector<unsigned char> &vchSig) const

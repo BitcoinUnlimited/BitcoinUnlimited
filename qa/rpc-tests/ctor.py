@@ -90,7 +90,11 @@ class MyTest (BitcoinTestFramework):
         ct = self.nodes[2].getchaintips()
         tip = next(x for x in ct if x["status"] == "active")
         assert_equal(tip["height"], 101)
-        invalid = next(x for x in ct if x["status"] == "invalid")
+        try:
+            invalid = next(x for x in ct if x["status"] == "invalid")
+        except Exception as e:
+            pdb.set_trace()
+            print(str(e))
         assert_equal(invalid["height"], 102)
 
         # Now generate a CTOR block

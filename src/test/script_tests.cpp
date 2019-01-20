@@ -283,7 +283,7 @@ private:
         uint32_t iter = 0;
         do
         {
-            key.Sign(hash, vchSig, iter++);
+            key.SignECDSA(hash, vchSig, iter++);
             if ((lenS == 33) != (vchSig[5 + vchSig[3]] == 33))
             {
                 NegateSignatureS(vchSig);
@@ -1185,7 +1185,7 @@ CScript sign_multisig(const CScript &scriptPubKey, std::vector<CKey> keys, const
     for (const CKey &key : keys)
     {
         vector<unsigned char> vchSig;
-        BOOST_CHECK(key.Sign(hash, vchSig));
+        BOOST_CHECK(key.SignECDSA(hash, vchSig));
         vchSig.push_back(sighashType);
         result << vchSig;
     }
@@ -1396,17 +1396,17 @@ BOOST_AUTO_TEST_CASE(script_combineSigs)
     vector<unsigned char> sig1;
     uint256 hash1 = SignatureHash(scriptPubKey, txTo, 0, SIGHASH_ALL | SIGHASH_FORKID, 0);
     BOOST_CHECK(hash1 != SIGNATURE_HASH_ERROR);
-    BOOST_CHECK(keys[0].Sign(hash1, sig1));
+    BOOST_CHECK(keys[0].SignECDSA(hash1, sig1));
     sig1.push_back(SIGHASH_ALL | SIGHASH_FORKID);
     vector<unsigned char> sig2;
     uint256 hash2 = SignatureHash(scriptPubKey, txTo, 0, SIGHASH_NONE | SIGHASH_FORKID, 0);
     BOOST_CHECK(hash2 != SIGNATURE_HASH_ERROR);
-    BOOST_CHECK(keys[1].Sign(hash2, sig2));
+    BOOST_CHECK(keys[1].SignECDSA(hash2, sig2));
     sig2.push_back(SIGHASH_NONE | SIGHASH_FORKID);
     vector<unsigned char> sig3;
     uint256 hash3 = SignatureHash(scriptPubKey, txTo, 0, SIGHASH_SINGLE | SIGHASH_FORKID, 0);
     BOOST_CHECK(hash3 != SIGNATURE_HASH_ERROR);
-    BOOST_CHECK(keys[2].Sign(hash3, sig3));
+    BOOST_CHECK(keys[2].SignECDSA(hash3, sig3));
     sig3.push_back(SIGHASH_SINGLE | SIGHASH_FORKID);
 
     // Not fussy about order (or even existence) of placeholders or signatures:
@@ -1587,7 +1587,7 @@ CTransaction tx1x1(const COutPoint &utxo,
     std::vector<unsigned char> vchSig;
     uint256 hash = SignatureHash(prevOutScript, tx, 0, sighashType, amt, 0);
     BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
-    if (!key.Sign(hash, vchSig))
+    if (!key.SignECDSA(hash, vchSig))
     {
         assert(0);
     }
@@ -1614,7 +1614,7 @@ public:
     {
         CPubKey pub = CPubKey(vchPubKey);
         uint256 hash = pub.GetHash();
-        if (!pub.Verify(hash, scriptSig))
+        if (!pub.VerifyECDSA(hash, scriptSig))
             return false;
         return true;
     }

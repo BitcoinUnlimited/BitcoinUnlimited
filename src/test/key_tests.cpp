@@ -118,30 +118,30 @@ BOOST_AUTO_TEST_CASE(key_test1)
 
         vector<unsigned char> sign1, sign2, sign1C, sign2C;
 
-        BOOST_CHECK(key1.Sign(hashMsg, sign1));
-        BOOST_CHECK(key2.Sign(hashMsg, sign2));
-        BOOST_CHECK(key1C.Sign(hashMsg, sign1C));
-        BOOST_CHECK(key2C.Sign(hashMsg, sign2C));
+        BOOST_CHECK(key1.SignECDSA(hashMsg, sign1));
+        BOOST_CHECK(key2.SignECDSA(hashMsg, sign2));
+        BOOST_CHECK(key1C.SignECDSA(hashMsg, sign1C));
+        BOOST_CHECK(key2C.SignECDSA(hashMsg, sign2C));
 
-        BOOST_CHECK(pubkey1.Verify(hashMsg, sign1));
-        BOOST_CHECK(!pubkey1.Verify(hashMsg, sign2));
-        BOOST_CHECK(pubkey1.Verify(hashMsg, sign1C));
-        BOOST_CHECK(!pubkey1.Verify(hashMsg, sign2C));
+        BOOST_CHECK(pubkey1.VerifyECDSA(hashMsg, sign1));
+        BOOST_CHECK(!pubkey1.VerifyECDSA(hashMsg, sign2));
+        BOOST_CHECK(pubkey1.VerifyECDSA(hashMsg, sign1C));
+        BOOST_CHECK(!pubkey1.VerifyECDSA(hashMsg, sign2C));
 
-        BOOST_CHECK(!pubkey2.Verify(hashMsg, sign1));
-        BOOST_CHECK(pubkey2.Verify(hashMsg, sign2));
-        BOOST_CHECK(!pubkey2.Verify(hashMsg, sign1C));
-        BOOST_CHECK(pubkey2.Verify(hashMsg, sign2C));
+        BOOST_CHECK(!pubkey2.VerifyECDSA(hashMsg, sign1));
+        BOOST_CHECK(pubkey2.VerifyECDSA(hashMsg, sign2));
+        BOOST_CHECK(!pubkey2.VerifyECDSA(hashMsg, sign1C));
+        BOOST_CHECK(pubkey2.VerifyECDSA(hashMsg, sign2C));
 
-        BOOST_CHECK(pubkey1C.Verify(hashMsg, sign1));
-        BOOST_CHECK(!pubkey1C.Verify(hashMsg, sign2));
-        BOOST_CHECK(pubkey1C.Verify(hashMsg, sign1C));
-        BOOST_CHECK(!pubkey1C.Verify(hashMsg, sign2C));
+        BOOST_CHECK(pubkey1C.VerifyECDSA(hashMsg, sign1));
+        BOOST_CHECK(!pubkey1C.VerifyECDSA(hashMsg, sign2));
+        BOOST_CHECK(pubkey1C.VerifyECDSA(hashMsg, sign1C));
+        BOOST_CHECK(!pubkey1C.VerifyECDSA(hashMsg, sign2C));
 
-        BOOST_CHECK(!pubkey2C.Verify(hashMsg, sign1));
-        BOOST_CHECK(pubkey2C.Verify(hashMsg, sign2));
-        BOOST_CHECK(!pubkey2C.Verify(hashMsg, sign1C));
-        BOOST_CHECK(pubkey2C.Verify(hashMsg, sign2C));
+        BOOST_CHECK(!pubkey2C.VerifyECDSA(hashMsg, sign1));
+        BOOST_CHECK(pubkey2C.VerifyECDSA(hashMsg, sign2));
+        BOOST_CHECK(!pubkey2C.VerifyECDSA(hashMsg, sign1C));
+        BOOST_CHECK(pubkey2C.VerifyECDSA(hashMsg, sign2C));
 
         // compact signatures (with key recovery)
 
@@ -170,13 +170,13 @@ BOOST_AUTO_TEST_CASE(key_test1)
     std::vector<unsigned char> detsig, detsigc;
     string strMsg = "Very deterministic message";
     uint256 hashMsg = Hash(strMsg.begin(), strMsg.end());
-    BOOST_CHECK(key1.Sign(hashMsg, detsig));
-    BOOST_CHECK(key1C.Sign(hashMsg, detsigc));
+    BOOST_CHECK(key1.SignECDSA(hashMsg, detsig));
+    BOOST_CHECK(key1C.SignECDSA(hashMsg, detsigc));
     BOOST_CHECK(detsig == detsigc);
     BOOST_CHECK(detsig == ParseHex("304402205dbbddda71772d95ce91cd2d14b592cfbc1dd0aabd6a394b6c2d377bbe59d31d022014ddda2"
                                    "1494a4e221f0824f0b8b924c43fa43c0ad57dccdaa11f81a6bd4582f6"));
-    BOOST_CHECK(key2.Sign(hashMsg, detsig));
-    BOOST_CHECK(key2C.Sign(hashMsg, detsigc));
+    BOOST_CHECK(key2.SignECDSA(hashMsg, detsig));
+    BOOST_CHECK(key2C.SignECDSA(hashMsg, detsigc));
     BOOST_CHECK(detsig == detsigc);
     BOOST_CHECK(detsig == ParseHex("3044022052d8a32079c11e79db95af63bb9600c5b04f21a9ca33dc129c2bfa8ac9dc1cd5022061d8ae5"
                                    "e0f6c1a16bde3719c64c2fd70e404b6428ab9a69566962e8771b5944d"));
