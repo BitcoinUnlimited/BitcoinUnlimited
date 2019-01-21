@@ -68,7 +68,7 @@ CGrapheneBlock::~CGrapheneBlock()
     }
 }
 
-void CGrapheneBlock::FillShortTxIDSelector() const
+void CGrapheneBlock::FillShortTxIDSelector()
 {
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
     stream << header << nonce;

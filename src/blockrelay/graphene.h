@@ -51,7 +51,7 @@ private:
     uint64_t nonce;
 
 public:
-    mutable uint64_t shorttxidk0, shorttxidk1;
+    uint64_t shorttxidk0, shorttxidk1;
     CBlockHeader header;
     std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
     uint64_t nBlockTxs;
@@ -67,7 +67,7 @@ public:
     CGrapheneBlock(bool _useSipHash) : pGrapheneSet(nullptr) { useSipHash = _useSipHash; }
     ~CGrapheneBlock();
     // Create seeds for SipHash using the nonce generated in the constructor
-    void FillShortTxIDSelector() const;
+    void FillShortTxIDSelector();
     /**
      * Handle an incoming Graphene block
      * Once the block is validated apart from the Merkle root, forward the Xpedited block with a hop count of nHops.
