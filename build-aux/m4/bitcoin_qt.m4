@@ -139,12 +139,6 @@ AC_DEFUN([BITCOIN_QT_CONFIGURE],[
       _BITCOIN_QT_CHECK_STATIC_PLUGINS([Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)],[-lqwindows])
       AC_DEFINE(QT_QPA_PLATFORM_WINDOWS, 1, [Define this symbol if the qt platform is windows])
     elif test "x$TARGET_OS" = xlinux; then
-
-      PKG_CHECK_MODULES([X11XCB], [x11-xcb], [QT_LIBS="$X11XCB_LIBS $QT_LIBS"])
-      if ${PKG_CONFIG} --exists "Qt5Core >= 5.5" 2>/dev/null; then
-        PKG_CHECK_MODULES([QTXCBQPA], [Qt5XcbQpa], [QT_LIBS="$QTXCBQPA_LIBS $QT_LIBS"])
-      fi
-
       _BITCOIN_QT_CHECK_STATIC_PLUGINS([Q_IMPORT_PLUGIN(QXcbIntegrationPlugin)],[-lqxcb -lxcb-static])
       AC_DEFINE(QT_QPA_PLATFORM_XCB, 1, [Define this symbol if the qt platform is xcb])
     elif test "x$TARGET_OS" = xdarwin; then
@@ -153,7 +147,6 @@ AC_DEFUN([BITCOIN_QT_CONFIGURE],[
       AC_DEFINE(QT_QPA_PLATFORM_COCOA, 1, [Define this symbol if the qt platform is cocoa])
     fi
   fi
-
   CPPFLAGS=$TEMP_CPPFLAGS
   CXXFLAGS=$TEMP_CXXFLAGS
   ])
