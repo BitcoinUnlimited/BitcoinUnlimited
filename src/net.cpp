@@ -2527,29 +2527,28 @@ void StartNode(thread_group &threadGroup)
     // Start threads
     //
 
-    threadGroup.create_thread("dnsseed", &ThreadAddressSeeding);
+    threadGroup.create_thread(&ThreadAddressSeeding);
 
     // Map ports with UPnP
     MapPort(GetBoolArg("-upnp", DEFAULT_UPNP));
 
     // Send and receive from sockets, accept connections
-    threadGroup.create_thread("netSocketHandler", &ThreadSocketHandler);
+    threadGroup.create_thread(&ThreadSocketHandler);
 
     // Initiate outbound connections from -addnode
-    threadGroup.create_thread("openAddedConnections", &ThreadOpenAddedConnections);
+    threadGroup.create_thread(&ThreadOpenAddedConnections);
 
     // Initiate outbound connections
-    threadGroup.create_thread("openConnections", &ThreadOpenConnections);
+    threadGroup.create_thread(&ThreadOpenConnections);
 
     // Process messages
     for (unsigned int i = 0; i < numMsgHandlerThreads.Value(); i++)
     {
-        std::string name = "messageHandler" + std::to_string(i);
-        threadGroup.create_thread(name, &ThreadMessageHandler);
+        threadGroup.create_thread(&ThreadMessageHandler);
     }
 
     // Dump network addresses
-    threadGroup.create_thread("dumpAddresses", &DumpData, DUMP_ADDRESSES_INTERVAL);
+    threadGroup.create_thread(&DumpData, DUMP_ADDRESSES_INTERVAL);
 }
 
 bool StopNode()

@@ -1315,7 +1315,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         for (const std::string &strFile : mapMultiArgs["-loadblock"])
             vImportFiles.push_back(strFile);
     }
-    threadGroup.create_thread("importing", boost::bind(&ThreadImport, vImportFiles));
+    threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
 
     LOGA("Waiting for genesis block to be imported...\n");
     CBlockIndex *tip = nullptr;
@@ -1548,7 +1548,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         pwalletMain->ReacceptWalletTransactions();
 
         // Run a thread to flush wallet periodically
-        threadGroup.create_thread("flushWallet", &ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile));
+        threadGroup.create_thread(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile));
     }
 #endif
 
