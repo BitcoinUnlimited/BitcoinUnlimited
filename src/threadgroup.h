@@ -31,6 +31,7 @@ public:
                 threads[i].join();
             }
         }
+        threads.clear();
     }
 };
 
