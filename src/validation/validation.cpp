@@ -174,7 +174,7 @@ bool AcceptBlockHeader(const CBlockHeader &block,
     AssertLockHeld(cs_main);
     // Check for duplicate
     uint256 hash = block.GetHash();
-    CBlockIndex *pindex = NULL;
+    CBlockIndex *pindex = nullptr;
     if (hash != chainparams.GetConsensus().hashGenesisBlock)
     {
         pindex = LookupBlockIndex(hash);
@@ -212,7 +212,7 @@ bool AcceptBlockHeader(const CBlockHeader &block,
         if (!ContextualCheckBlockHeader(block, state, pindexPrev))
             return false;
     }
-    if (pindex == NULL)
+    if (pindex == nullptr)
         pindex = AddToBlockIndex(block);
 
     // If the block belongs to the set of check-pointed blocks but it has a mismatched hash,
