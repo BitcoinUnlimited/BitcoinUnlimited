@@ -72,12 +72,11 @@ void StartTxAdmission(thread_group &threadGroup)
     // Start incoming transaction processing threads
     for (unsigned int i = 0; i < numTxAdmissionThreads.Value(); i++)
     {
-        std::string name = "txadmission" + std::to_string(i);
-        threadGroup.create_thread(name, &ThreadTxAdmission);
+        threadGroup.create_thread(&ThreadTxAdmission);
     }
 
     // Start tx commitment thread
-    threadGroup.create_thread("txCommitment", &ThreadCommitToMempool);
+    threadGroup.create_thread(&ThreadCommitToMempool);
 }
 
 void StopTxAdmission()
