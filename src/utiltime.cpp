@@ -14,6 +14,10 @@
 #include <chrono>
 #include <thread>
 
+#ifdef WIN32
+#include <windows.h> // for Sleep()
+#endif
+
 static int64_t nMockTime = 0; //! For unit testing
 
 int64_t GetTime()
@@ -77,7 +81,15 @@ int64_t GetLogTimeMicros()
     return GetTimeMicros();
 }
 
-void MilliSleep(int64_t n) { std::this_thread::sleep_for(std::chrono::milliseconds(n)); }
+void MilliSleep(int64_t n)
+{
+#ifdef WIN32
+    Sleep(n);
+#else
+    std::this_thread::sleep_for(std::chrono::milliseconds(n));
+#endif
+}
+
 std::string DateTimeStrFormat(const char *pszFormat, int64_t nTime)
 {
     // std::locale takes ownership of the pointer
