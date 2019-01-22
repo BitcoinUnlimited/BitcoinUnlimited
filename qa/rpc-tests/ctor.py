@@ -212,7 +212,10 @@ class MyTest (BitcoinTestFramework):
 
 
 if __name__ == '__main__':
-    MyTest ().main (bitcoinConfDict={"limitdescendantsize": 50,FORK_CFG: 0})
+    MyTest ().main (bitcoinConfDict={"limitdescendantsize": 50,
+                                     FORK_CFG: 0,
+                                     "use-thinblocks": 1, 
+                                     "use-grapheneblocks": 0})
 
 # Create a convenient function for an interactive python debugging session
 def Test():
