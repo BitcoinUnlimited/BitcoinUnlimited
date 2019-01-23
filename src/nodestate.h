@@ -9,6 +9,8 @@
 
 #include "main.h" // for cs_main
 #include "net.h" // For NodeId
+#include "requestManager.h"
+
 
 /**
 * Maintain validation-specific state about nodes, protected by cs_main, instead
@@ -68,11 +70,7 @@ public:
     void RemoveNodeState(const NodeId id);
 
     /** Clear the entire nodestate map */
-    void Clear()
-    {
-        LOCK(cs);
-        mapNodeState.clear();
-    }
+    void Clear();
 
     /** Is mapNodestate empty */
     bool Empty()

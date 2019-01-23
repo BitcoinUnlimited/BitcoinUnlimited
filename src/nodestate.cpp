@@ -7,6 +7,8 @@
 #include "nodestate.h"
 #include "main.h"
 
+extern std::atomic<int> nPreferredDownload;
+
 /**
 * Default constructor initializing all local member variables to "null" values
 */
@@ -60,6 +62,23 @@ void CState::InitializeNodeState(const CNode *pnode)
 */
 void CState::RemoveNodeState(const NodeId id)
 {
-    LOCK(cs);
+    LOCK2(cs, requester.cs_objDownloader);
     mapNodeState.erase(id);
+
+    // Remove any other types of nodestate
+    requester.RemoveNodeState(id);
+
+    // Do a consistency check after the last peer is removed.
+    if (mapNodeState.empty())
+    {
+        DbgAssert(requester.MapBlocksInFlightEmpty(), requester.MapBlocksInFlightClear());
+        DbgAssert(requester.mapRequestManagerNodeState.empty(), requester.mapRequestManagerNodeState.clear());
+        DbgAssert(nPreferredDownload.load() == 0, nPreferredDownload.store(0));
+    }
+}
+
+void CState::Clear()
+{
+    LOCK(cs);
+    mapNodeState.clear();
 }

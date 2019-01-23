@@ -122,16 +122,17 @@ protected:
 #ifdef DEBUG
     friend UniValue getstructuresizes(const UniValue &params, bool fHelp);
 #endif
-    // map of transactions
+    friend class CState;
+
+    // maps and iterators all GUARDED_BY cs_objDownloader
     typedef std::map<uint256, CUnknownObj> OdMap;
     OdMap mapTxnInfo;
     OdMap mapBlkInfo;
     std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
     std::map<NodeId, CRequestManagerNodeState> mapRequestManagerNodeState;
-    CCriticalSection cs_objDownloader; // protects mapTxnInfo, mapBlkInfo and mapBlocksInFlight
-
     OdMap::iterator sendIter;
     OdMap::iterator sendBlkIter;
+    CCriticalSection cs_objDownloader;
 
     int inFlight;
     CStatHistory<int> inFlightTxns;
@@ -221,6 +222,12 @@ public:
     bool MapBlocksInFlightEmpty();
     void MapBlocksInFlightClear();
 
+    void MapNodestateClear()
+    {
+        LOCK(cs_objDownloader);
+        mapRequestManagerNodeState.clear();
+    }
+
     // Methods for handling mapRequestManagerNodeState which is protected.
     void GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, NodeId nodeid);
     int GetNumBlocksInFlight(NodeId nodeid);
@@ -233,11 +240,7 @@ public:
     }
 
     // Remove a request manager node from the nodestate map.
-    void RemoveNodeState(NodeId nodeid)
-    {
-        LOCK(cs_objDownloader);
-        mapRequestManagerNodeState.erase(nodeid);
-    }
+    void RemoveNodeState(NodeId nodeid);
 
     // Check for block download timeout and disconnect node if necessary.
     void DisconnectOnDownloadTimeout(CNode *pnode, const Consensus::Params &consensusParams, int64_t nNow);
