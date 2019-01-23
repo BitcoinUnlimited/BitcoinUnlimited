@@ -87,6 +87,12 @@ set "PATH=%MSYS_BIN%;%MINGW_BIN%;%BASE_PATH%"
 REM Remember the path without the toolchain prepended so we can easily switch toolchains
 set "OLD_PATH=%PATH%"
 
+REM Updates utilities executable wrappers aliasing git and python in case the user changed
+REM the paths in SET_ENV_VARS.bat.  This way the full config-mingw-bat script doesn't need
+REM to be re-run just to update these utility alias paths.
+echo Updating utilities...
+%MSYS_SH% "%INST_DIR%\install-utils.sh"
+
 REM Since the build procedure is the same for x86 and x64 except for the toolchain and deps path
 REM Just set the variable for these paths here based on build mode
 REM This allows building both 32-bit and 64-bit in a single run
