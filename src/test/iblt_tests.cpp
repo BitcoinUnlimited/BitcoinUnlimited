@@ -38,6 +38,45 @@ BOOST_AUTO_TEST_CASE(iblt_handles_small_quantities)
 	BOOST_CHECK(allPassed);
 }
 
+BOOST_AUTO_TEST_CASE(iblt_arbitrary_salt)
+{
+    uint32_t salt = 17;
+    size_t nItems = 2;
+    CIblt t(nItems, salt);
+
+    t.insert(0, ParseHex("00000000"));
+    t.insert(1, ParseHex("00000001"));
+    bool gotResult;
+    std::vector<uint8_t> result;
+
+    gotResult = t.get(0, result);
+    BOOST_CHECK(gotResult && result == ParseHex("00000000"));
+
+    gotResult = t.get(1, result);
+    BOOST_CHECK(gotResult && result == ParseHex("00000001"));
+}
+
+BOOST_AUTO_TEST_CASE(iblt_salted_reset)
+{
+    size_t nHash = 1;
+    uint32_t salt = 17;
+    bool gotResult;
+    std::vector<uint8_t> result;
+    CIblt t(nHash, salt);
+
+    t.insert(0, ParseHex("00000000"));
+    gotResult = t.get(0, result);
+    BOOST_CHECK(gotResult && result == ParseHex("00000000"));
+
+    t.reset();
+    t.resize(20);
+    t.insert(1, ParseHex("00000001"));
+    t.insert(11, ParseHex("00000011"));
+
+    gotResult = t.get(1, result);
+    BOOST_CHECK(gotResult && result == ParseHex("00000001"));
+}
+
 BOOST_AUTO_TEST_CASE(iblt_reset)
 {
     CIblt t;

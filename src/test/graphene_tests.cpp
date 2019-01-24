@@ -183,7 +183,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_approx_opt_close_to_optimal)
     float totalBytesBrute =
         (float)ProjectedGrapheneSizeBytes(n, m - mu, grapheneSet.BruteForceSymDiff(n, m, m - mu, 0));
 
-    BOOST_CHECK_CLOSE(totalBytesApprox, totalBytesBrute, 10);
+    BOOST_CHECK_CLOSE(totalBytesApprox, totalBytesBrute, 15);
 }
 
 BOOST_AUTO_TEST_CASE(graphene_set_decodes_empty_intersection)
