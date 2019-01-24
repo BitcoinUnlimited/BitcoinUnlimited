@@ -1,0 +1,10 @@
+--- old/qtbase/mkspecs/features/default_post.prf
++++ new/qtbase/mkspecs/features/default_post.prf
+@@ -67,6 +67,7 @@
+
+ dll:win32: QMAKE_LFLAGS += $$QMAKE_LFLAGS_DLL
+ static:mac: QMAKE_LFLAGS += $$QMAKE_LFLAGS_STATIC_LIB
++static:win32: QMAKE_LFLAGS += $$QMAKE_LFLAGS_STATIC_LIB
+ staticlib:unix {
+     QMAKE_CFLAGS += $$QMAKE_CFLAGS_STATIC_LIB
+     QMAKE_CXXFLAGS += $$QMAKE_CXXFLAGS_STATIC_LIB
