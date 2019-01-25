@@ -491,7 +491,6 @@ public:
     std::vector<CTransactionRef> grapheneAdditionalTxs; // entire transactions included in graphene block
     uint64_t shorttxidk0; // Used for generating cheap hash from SipHash
     uint64_t shorttxidk1;
-    bool useSipHash;
 
     std::atomic<double> nGetGrapheneBlockTxCount; // Count how many get_xblocktx requests are made
     std::atomic<uint64_t> nGetGrapheneBlockTxLastTime; // The last time a get_xblocktx request was made
