@@ -143,8 +143,13 @@ void CIblt::resize(size_t _expectedNumEntries)
 
 uint32_t CIblt::saltedHashValue(size_t hashFuncIdx, const std::vector<uint8_t> &kvec) const
 {
-    uint32_t seed = mapHashIdxSeeds.at(hashFuncIdx);
-    return MurmurHash3(seed, kvec) & KEYCHECK_MASK;
+    if (version > 0)
+    {
+        uint32_t seed = mapHashIdxSeeds.at(hashFuncIdx);
+        return MurmurHash3(seed, kvec) & KEYCHECK_MASK;
+    }
+    else
+        return MurmurHash3(hashFuncIdx, kvec);
 }
 
 void CIblt::_insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> &v)

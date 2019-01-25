@@ -122,9 +122,12 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
-        READWRITE(salt);
-        if (salt > VALS_32 / n_hash)
-            throw std::ios_base::failure("salt * n_hash must fit in uint32_t");
+        if (version > 0)
+        {
+            READWRITE(salt);
+            if (salt > VALS_32 / n_hash)
+                throw std::ios_base::failure("salt * n_hash must fit in uint32_t");
+        }
 
         READWRITE(COMPACTSIZE(version));
         if (ser_action.ForRead() && version != 0)
