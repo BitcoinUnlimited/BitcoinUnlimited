@@ -368,8 +368,8 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
     // Is there a previous block or header to connect with?
     if (!LookupBlockIndex(grapheneBlock.header.hashPrevBlock))
     {
-        return error("Graphene block from peer %s will not connect, unknown previous block %s", pfrom->GetLogName(),
-            grapheneBlock.header.hashPrevBlock.ToString());
+        return error(GRAPHENE, "Graphene block from peer %s will not connect, unknown previous block %s",
+            pfrom->GetLogName(), grapheneBlock.header.hashPrevBlock.ToString());
     }
 
     {

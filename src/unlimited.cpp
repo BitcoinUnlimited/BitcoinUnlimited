@@ -1679,7 +1679,7 @@ UniValue setlog(const UniValue &params, bool fHelp)
     // Don't use them in other places.
 
     UniValue ret = UniValue("");
-    uint64_t catg = Logging::NONE;
+    uint64_t catg = NONE;
     int nparm = params.size();
     bool action = false;
 
@@ -1709,14 +1709,14 @@ UniValue setlog(const UniValue &params, bool fHelp)
             std::string data = params[0].get_str();
             std::transform(data.begin(), data.end(), std::back_inserter(category), ::tolower);
             catg = Logging::LogFindCategory(category);
-            if (catg == Logging::NONE)
+            if (catg == NONE)
                 return UniValue("Category not found: " + params[0].get_str()); // quit
         }
 
         switch (nparm)
         {
         case 1:
-            if (catg == Logging::ALL)
+            if (catg == ALL)
                 ret = UniValue(Logging::LogGetAllString());
             else
                 ret = UniValue(Logging::LogAcceptCategory(catg) ? "on" : "off");
