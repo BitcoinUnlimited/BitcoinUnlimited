@@ -32,15 +32,19 @@ CMemPoolInfo::CMemPoolInfo() { this->nTx = 0; }
 CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     uint64_t nReceiverMemPoolTx,
     uint64_t nSenderMempoolPlusBlock,
-    bool _useSipHash)
+    uint64_t _version)
     : nonce(GetRand(std::numeric_limits<uint64_t>::max()))
 {
     header = pblock->GetBlockHeader();
     nBlockTxs = pblock->vtx.size();
+    uint64_t grapheneSetVersion = 0;
 
-    useSipHash = _useSipHash;
-    if (useSipHash)
+    version = _version;
+    if (version >= 2)
+    {
         FillShortTxIDSelector();
+        grapheneSetVersion = 1;
+    }
 
     std::vector<uint256> blockHashes;
     for (auto &tx : pblock->vtx)
@@ -52,11 +56,11 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     }
 
     if (enableCanonicalTxOrder.Value())
-        pGrapheneSet = new CGrapheneSet(
-            nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0, shorttxidk1, useSipHash, false);
+        pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0,
+            shorttxidk1, grapheneSetVersion, false);
     else
-        pGrapheneSet = new CGrapheneSet(
-            nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0, shorttxidk1, useSipHash, true);
+        pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0,
+            shorttxidk1, grapheneSetVersion, true);
 }
 
 CGrapheneBlock::~CGrapheneBlock()
@@ -156,11 +160,12 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     size_t idx = 0;
     for (const CTransaction &tx : grapheneBlockTx.vMissingTx)
     {
-        pfrom->mapMissingTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx.GetHash(), pfrom->useSipHash)] =
-            MakeTransactionRef(tx);
+        pfrom->mapMissingTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx.GetHash(),
+            pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED))] = MakeTransactionRef(tx);
 
         uint256 hash = tx.GetHash();
-        uint64_t cheapHash = GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash, pfrom->useSipHash);
+        uint64_t cheapHash = GetShortID(
+            pfrom->shorttxidk0, pfrom->shorttxidk1, hash, pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
 
         // Insert in arbitrary order if canonical ordering is enabled and xversion is recent enough
         if (enableCanonicalTxOrder.Value() && pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) >= 1)
@@ -290,8 +295,8 @@ bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         {
             for (auto &tx : block.vtx)
             {
-                uint64_t cheapHash =
-                    GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx->GetHash(), pfrom->useSipHash);
+                uint64_t cheapHash = GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx->GetHash(),
+                    pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
 
                 if (grapheneRequestBlockTx.setCheapHashesToRequest.count(cheapHash))
                     vTx.push_back(*tx);
@@ -328,8 +333,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
     int nSizeGrapheneBlock = vRecv.size();
     CInv inv(MSG_BLOCK, uint256());
 
-    pfrom->useSipHash = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) >= 2;
-    CGrapheneBlock grapheneBlock(pfrom->useSipHash);
+    CGrapheneBlock grapheneBlock(pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
     vRecv >> grapheneBlock;
 
     // Message consistency checking (FIXME: some redundancy here with AcceptBlockHeader)
@@ -471,7 +475,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
         READLOCK(orphanpool.cs);
         for (auto &kv : orphanpool.mapOrphanTransactions)
         {
-            uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first, useSipHash);
+            uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first, version);
             auto ir = mapPartialTxHash.insert(std::make_pair(cheapHash, kv.first));
             if (!ir.second)
                 collision = true; // insert returns false if no insertion
@@ -485,7 +489,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
             for (const uint256 &hash : memPoolHashes)
             {
-                uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash, useSipHash);
+                uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash, version);
 
                 auto ir = mapPartialTxHash.insert(std::make_pair(cheapHash, hash));
                 if (!ir.second)
@@ -500,7 +504,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
             for (auto &tx : vAdditionalTxs)
             {
                 const uint256 &hash = tx->GetHash();
-                uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash, useSipHash);
+                uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash, version);
 
                 if (tx->IsCoinBase())
                     coinbase = tx;
@@ -524,10 +528,10 @@ bool CGrapheneBlock::process(CNode *pfrom,
                 std::vector<uint64_t> blockCheapHashes = pGrapheneSet->Reconcile(mapPartialTxHash);
 
                 // Ensure coinbase is first
-                if (blockCheapHashes[0] != GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash(), useSipHash))
+                if (blockCheapHashes[0] != GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash(), version))
                 {
                     auto it = std::find(blockCheapHashes.begin(), blockCheapHashes.end(),
-                        GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash(), useSipHash));
+                        GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash(), version));
 
                     if (it == blockCheapHashes.end())
                     {
@@ -539,7 +543,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
                     auto idx = std::distance(blockCheapHashes.begin(), it);
 
                     blockCheapHashes[idx] = blockCheapHashes[0];
-                    blockCheapHashes[0] = GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash(), useSipHash);
+                    blockCheapHashes[0] = GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash(), version);
                 }
 
                 // Sort out what hashes we have from the complete set of cheapHashes
@@ -746,8 +750,8 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
                     inMemPool = true;
             }
 
-            bool inMissingTx = pfrom->mapMissingTx.count(
-                                   GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash, pfrom->useSipHash)) > 0;
+            bool inMissingTx = pfrom->mapMissingTx.count(GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash,
+                                   pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED))) > 0;
             bool inAdditionalTxs = mapAdditionalTxs.count(hash) > 0;
             bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
 
@@ -766,7 +770,8 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             }
             else if (inMissingTx)
             {
-                ptx = pfrom->mapMissingTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash, pfrom->useSipHash)];
+                ptx = pfrom->mapMissingTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash,
+                    pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED))];
                 pfrom->grapheneBlock.setUnVerifiedTxns.insert(hash);
             }
         }
@@ -1339,8 +1344,6 @@ bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom)
 
 void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CMemPoolInfo &mempoolinfo)
 {
-    pfrom->useSipHash = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) >= 2;
-
     if (inv.type == MSG_GRAPHENEBLOCK)
     {
         try
@@ -1348,8 +1351,8 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
             uint64_t nSenderMempoolPlusBlock =
                 GetGrapheneMempoolInfo().nTx + pblock->vtx.size() - 1; // exclude coinbase
 
-            CGrapheneBlock grapheneBlock(
-                MakeBlockRef(*pblock), mempoolinfo.nTx, nSenderMempoolPlusBlock, pfrom->useSipHash);
+            CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx, nSenderMempoolPlusBlock,
+                pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
             pfrom->shorttxidk0 = grapheneBlock.shorttxidk0;
             pfrom->shorttxidk1 = grapheneBlock.shorttxidk1;
             int nSizeBlock = pblock->GetBlockSize();
@@ -1498,9 +1501,9 @@ void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash)
 }
 
 // Generate cheap hash from seeds using SipHash
-uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &txhash, bool useSipHash)
+uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &txhash, uint64_t grapheneVersion)
 {
-    if (!useSipHash)
+    if (grapheneVersion < 2)
         return txhash.GetCheapHash();
 
     static_assert(SHORTTXIDS_LENGTH == 8, "shorttxids calculation assumes 8-byte shorttxids");

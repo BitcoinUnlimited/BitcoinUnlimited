@@ -36,7 +36,7 @@ private:
     bool ordered;
     uint64_t nReceiverUniverseItems;
     mutable uint64_t shorttxidk0, shorttxidk1;
-    bool useSipHash;
+    uint64_t version;
     std::vector<unsigned char> encodedRank;
     CBloomFilter *pSetFilter;
     CIblt *pSetIblt;
@@ -56,22 +56,22 @@ private:
 public:
     // The default constructor is for 2-phase construction via deserialization
     CGrapheneSet()
-        : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), useSipHash(true),
-          pSetFilter(nullptr), pSetIblt(nullptr)
+        : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), version(1), pSetFilter(nullptr),
+          pSetIblt(nullptr)
     {
     }
-    CGrapheneSet(bool _useSipHash)
+    CGrapheneSet(bool _version)
         : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), pSetFilter(nullptr),
           pSetIblt(nullptr)
     {
-        useSipHash = _useSipHash;
+        version = _version;
     }
     CGrapheneSet(size_t _nReceiverUniverseItems,
         uint64_t nSenderUniverseItems,
         const std::vector<uint256> &_itemHashes,
         uint64_t _shorttxidk0,
         uint64_t _shorttxidk1,
-        bool _useSipHash,
+        uint64_t _version,
         bool _ordered = false,
         bool fDeterministic = false);
 
@@ -151,7 +151,7 @@ public:
     {
         READWRITE(ordered);
         READWRITE(nReceiverUniverseItems);
-        if (useSipHash)
+        if (version > 0)
         {
             READWRITE(shorttxidk0);
             READWRITE(shorttxidk1);
