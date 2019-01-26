@@ -66,6 +66,8 @@ typedef enum ScriptError_t {
 
     /* misc */
     SCRIPT_ERR_NONCOMPRESSED_PUBKEY,
+    SCRIPT_ERR_NUMBER_OVERFLOW,
+    SCRIPT_ERR_NUMBER_BAD_ENCODING,
 
     SCRIPT_ERR_ERROR_COUNT
 } ScriptError;

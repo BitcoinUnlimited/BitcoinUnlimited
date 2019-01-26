@@ -10,6 +10,22 @@
 #include <cmath>
 #include <iostream>
 
+size_t ProjectedGrapheneSizeBytes(uint64_t nBlockTxs, uint64_t nExcessTxs, uint64_t nSymDiff)
+{
+    const int SERIALIZATION_OVERHEAD = 11;
+    FastRandomContext insecure_rand(true);
+    auto fpr = [nExcessTxs](int a) { return a / float(nExcessTxs); };
+
+    CBloomFilter filter(
+        nBlockTxs, fpr(nSymDiff), insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
+    CIblt iblt(nSymDiff);
+
+    size_t filterBytes = ::GetSerializeSize(filter, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
+    size_t ibltBytes = ::GetSerializeSize(iblt, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
+
+    return filterBytes + ibltBytes;
+}
+
 // Create a deterministic hash by providing an index
 uint256 GetHash(unsigned int nIndex)
 {
@@ -31,7 +47,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_encodes_and_decodes)
 
     // unordered graphene sets
     {
-        CGrapheneSet senderGrapheneSet(6, senderItems, false, true);
+        CGrapheneSet senderGrapheneSet(6, 6, senderItems, false, true);
         std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
 
         std::vector<uint64_t> senderCheapHashes;
@@ -48,7 +64,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_encodes_and_decodes)
 
     // ordered graphene sets
     {
-        CGrapheneSet senderGrapheneSet(6, senderItems, true, true);
+        CGrapheneSet senderGrapheneSet(6, 6, senderItems, true, true);
         std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
 
         std::vector<uint64_t> senderCheapHashes;
@@ -87,7 +103,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_decodes_multiple_sizes)
                 receiverItems.push_back(SerializeHash(GetHash(nNumHashes)));
             }
 
-            CGrapheneSet senderGrapheneSet(receiverItems.size(), senderItems, true, true);
+            CGrapheneSet senderGrapheneSet(receiverItems.size(), receiverItems.size(), senderItems, true, true);
             std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
 
             BOOST_CHECK_EQUAL_COLLECTIONS(reconciledCheapHashes.begin(), reconciledCheapHashes.end(),
@@ -103,48 +119,89 @@ BOOST_AUTO_TEST_CASE(graphene_set_decodes_multiple_sizes)
                 receiverItems.push_back(SerializeHash(GetHash(nNumHashes)));
             }
 
-            CGrapheneSet senderGrapheneSet(receiverItems.size(), senderItems, true, true);
+            CGrapheneSet senderGrapheneSet(receiverItems.size(), receiverItems.size(), senderItems, true, true);
             std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
 
             BOOST_CHECK_EQUAL_COLLECTIONS(reconciledCheapHashes.begin(), reconciledCheapHashes.end(),
                 senderCheapHashes.begin(), senderCheapHashes.end());
         }
-
     }
 }
 
-BOOST_AUTO_TEST_CASE(graphene_set_finds_optimal_settings)
+BOOST_AUTO_TEST_CASE(graphene_set_finds_brute_force_opt_for_small_blocks)
 {
-    const int SERIALIZATION_OVERHEAD = 11;
-    FastRandomContext insecure_rand(true);
     CGrapheneSet grapheneSet;
 
-    int m = 5000;
-    int mu = 2999;
-    int n = 3000;
-
-    auto fpr = [m, mu](int a) { return a / float(m - mu); };
+    int n = (int)std::floor(APPROX_ITEMS_THRESH / 2);
+    int mu = 100;
+    int m = (int)std::floor(n / 8) + mu;
 
     int best_a = 1;
     size_t best_size = std::numeric_limits<size_t>::max();
     int a = 1;
     for (a = 1; a < m - mu; a++)
     {
-        CBloomFilter filter(n, fpr(a), insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
-        CIblt iblt(a);
+        size_t totalBytes = ProjectedGrapheneSizeBytes(n, m - mu, a);
 
-        size_t filterBytes = ::GetSerializeSize(filter, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
-        size_t ibltBytes = ::GetSerializeSize(iblt, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
-        size_t total = filterBytes + ibltBytes;
-
-        if (total < best_size)
+        if (totalBytes < best_size)
         {
-            best_size = total;
+            best_size = totalBytes;
             best_a = a;
         }
     }
 
-    BOOST_CHECK_EQUAL(grapheneSet.OptimalSymDiff(n, m), best_a);
+    BOOST_CHECK_EQUAL(grapheneSet.OptimalSymDiff(n, m, m - mu, 1), best_a);
+}
+
+BOOST_AUTO_TEST_CASE(graphene_set_finds_approx_opt_for_large_blocks)
+{
+    int n = 4 * APPROX_ITEMS_THRESH;
+    int mu = 1000;
+    int m = APPROX_ITEMS_THRESH + mu;
+    CGrapheneSet grapheneSet;
+    auto approxSymDiff = [n]() {
+        return std::max(
+            1.0, std::round(FILTER_CELL_SIZE * n / (8 * IBLT_CELL_SIZE * IBLT_DEFAULT_OVERHEAD * LN2SQUARED)));
+    };
+
+    BOOST_CHECK_EQUAL(approxSymDiff(), grapheneSet.OptimalSymDiff(n, m, m - mu, 0));
+}
+
+BOOST_AUTO_TEST_CASE(graphene_set_approx_opt_close_to_optimal)
+{
+    int n = APPROX_ITEMS_THRESH;
+    int mu = 100;
+    int m = (int)std::ceil(n / APPROX_EXCESS_RATE) + mu;
+    CGrapheneSet grapheneSet;
+
+    float totalBytesApprox = (float)ProjectedGrapheneSizeBytes(n, m - mu, grapheneSet.ApproxOptimalSymDiff(n));
+    float totalBytesBrute =
+        (float)ProjectedGrapheneSizeBytes(n, m - mu, grapheneSet.BruteForceSymDiff(n, m, m - mu, 0));
+
+    BOOST_CHECK_CLOSE(totalBytesApprox, totalBytesBrute, 10);
+}
+
+BOOST_AUTO_TEST_CASE(graphene_set_decodes_empty_intersection)
+{
+    uint256 senderArr[] = {SerializeHash(-7), SerializeHash(-2), SerializeHash(-4), SerializeHash(-1),
+        SerializeHash(-5), SerializeHash(-11), SerializeHash(3), SerializeHash(1), SerializeHash(2), SerializeHash(7),
+        SerializeHash(11), SerializeHash(4)};
+    std::vector<uint256> senderItems(senderArr, senderArr + sizeof(senderArr) / sizeof(uint256));
+
+    // includes no transactions from block
+    uint256 receiverArr[] = {SerializeHash(-7), SerializeHash(-2), SerializeHash(-4), SerializeHash(-1),
+        SerializeHash(-5), SerializeHash(-11)};
+    std::vector<uint256> receiverItems(receiverArr, receiverArr + sizeof(receiverArr) / sizeof(uint256));
+
+    CGrapheneSet senderGrapheneSet(6, 12, senderItems, true, true);
+    std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
+
+    std::vector<uint64_t> senderCheapHashes;
+    for (uint256 item : senderItems)
+        senderCheapHashes.push_back(item.GetCheapHash());
+
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        reconciledCheapHashes.begin(), reconciledCheapHashes.end(), senderCheapHashes.begin(), senderCheapHashes.end());
 }
 
 BOOST_AUTO_TEST_CASE(graphene_set_can_serde)
@@ -153,7 +210,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_can_serde)
     CDataStream ss(SER_DISK, 0);
 
     senderItems.push_back(SerializeHash(3));
-    CGrapheneSet sentGrapheneSet(1, senderItems, true);
+    CGrapheneSet sentGrapheneSet(1, 1, senderItems, true);
     CGrapheneSet receivedGrapheneSet;
 
     ss << sentGrapheneSet;

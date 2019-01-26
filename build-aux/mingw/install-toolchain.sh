@@ -67,12 +67,14 @@ then
 	DOWNLOAD_32="$DEPS_ROOT/toolchain_x86.7z"
 	if [ ! -e "$DOWNLOAD_32" ]
 	then
-		wget --no-check-certificate http://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win32/Personal%20Builds/mingw-builds/4.9.2/threads-posix/dwarf/i686-4.9.2-release-posix-dwarf-rt_v3-rev1.7z/download --output-document="$DOWNLOAD_32"
+		wget --no-check-certificate https://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win32/Personal%20Builds/mingw-builds/7.3.0/threads-posix/dwarf/i686-7.3.0-release-posix-dwarf-rt_v5-rev0.7z/download --output-document="$DOWNLOAD_32"
 		# Verify downloaded file's hash
-		# sha1=a315254e0e85cfa170939e8c6890a7df1dc6bd20
+		# v4.9.2 v3 rev1 sha1=a315254e0e85cfa170939e8c6890a7df1dc6bd20
+		# v7.3.0 v5 rev0 sha1=96e11c754b379c093e1cb3133f71db5b9f3e0532
 		# NOTE: The sha256 has was self computed, but the sha1 provided by the publisher was verified first
 		# v4.9.2 v3 rev1 sha256=f6de32350a28f4b6c30eec26dbfee65f112300d51e37e4d2007b0598bef9bb79
-		check_hash f6de32350a28f4b6c30eec26dbfee65f112300d51e37e4d2007b0598bef9bb79 "$DOWNLOAD_32"
+		# v7.3.0 v5 rev0 sha256=0475B097AD645AE25438AE3470AF7E16E218EC1BD617B73E50B6A6C9622589A7
+		check_hash 0475B097AD645AE25438AE3470AF7E16E218EC1BD617B73E50B6A6C9622589A7 "$DOWNLOAD_32"
 	fi
 	# don't extract if already extracted
 	cd "$TOOLCHAIN_ROOT"
@@ -91,12 +93,14 @@ then
 	DOWNLOAD_64="$DEPS_ROOT/toolchain_x64.7z"
 	if [ ! -e "$DOWNLOAD_64" ]
 	then
-		wget --no-check-certificate http://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win64/Personal%20Builds/mingw-builds/4.9.2/threads-posix/seh/x86_64-4.9.2-release-posix-seh-rt_v3-rev1.7z/download --output-document="$DOWNLOAD_64"
+		wget --no-check-certificate https://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win64/Personal%20Builds/mingw-builds/7.3.0/threads-posix/seh/x86_64-7.3.0-release-posix-seh-rt_v5-rev0.7z/download --output-document="$DOWNLOAD_64"
 		# Verify downloaded file's hash
-		# sha1=c160858ddba88110077c9f853a38b254ca0bdb1b
+		# v4.9.2 v3 rev1 sha1=c160858ddba88110077c9f853a38b254ca0bdb1b
+		# v7.3.0 v5 rev0 sha1=0fce15036400568babd10d65b247e9576515da2c
 		# NOTE: The sha256 has was self computed, but the sha1 provided by the publisher was verified first
 		# v4.9.2 v3 rev1 sha256=58626ce6d93199784ef7fe73790ebbdbf5a157be8d30ae396d437748e69c0cf3
-		check_hash 58626ce6d93199784ef7fe73790ebbdbf5a157be8d30ae396d437748e69c0cf3 "$DOWNLOAD_64"
+		# v7.3.0 v5 rev0 sha256=784D25B00E7CF27AA64ABE2363B315400C27526BFCE672FDEE97137F71823D03
+		check_hash 784D25B00E7CF27AA64ABE2363B315400C27526BFCE672FDEE97137F71823D03 "$DOWNLOAD_64"
 	fi
 	# don't extract if already extracted
 	cd "$TOOLCHAIN_ROOT"

@@ -9,6 +9,7 @@
 // purposes.
 
 #include "addrman.h"
+#include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene.h"
 #include "blockrelay/thinblock.h"
 #include "chain.h"
@@ -71,9 +72,10 @@ int64_t nTimeOffset = 0;
 
 CCriticalSection cs_rpcWarmup;
 
-CCriticalSection cs_main;
 CSharedCriticalSection cs_mapBlockIndex;
-BlockMap mapBlockIndex GUARDED_BY(cs_main);
+BlockMap mapBlockIndex GUARDED_BY(cs_mapBlockIndex);
+
+CCriticalSection cs_main;
 CChain chainActive GUARDED_BY(cs_main); // however, chainActive.Tip() is lock free
 // BU variables moved to globals.cpp
 // - moved CCriticalSection cs_main;
@@ -399,8 +401,10 @@ CStatHistory<uint64_t> nTxValidationTime("txValidationTime", STAT_OP_MAX | STAT_
 CCriticalSection cs_blockvalidationtime;
 CStatHistory<uint64_t> nBlockValidationTime("blockValidationTime", STAT_OP_MAX | STAT_INDIVIDUAL);
 
-CThinBlockData thindata; // Singleton class
-CGrapheneBlockData graphenedata; // Singleton class
+// Single classes for gather thin type block relay statistics
+CThinBlockData thindata;
+CGrapheneBlockData graphenedata;
+ThinTypeRelay thinrelay;
 
 uint256 bitcoinCashForkBlockHash = uint256S("000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec");
 

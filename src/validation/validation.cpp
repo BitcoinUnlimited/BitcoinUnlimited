@@ -174,7 +174,7 @@ bool AcceptBlockHeader(const CBlockHeader &block,
     AssertLockHeld(cs_main);
     // Check for duplicate
     uint256 hash = block.GetHash();
-    CBlockIndex *pindex = NULL;
+    CBlockIndex *pindex = nullptr;
     if (hash != chainparams.GetConsensus().hashGenesisBlock)
     {
         pindex = LookupBlockIndex(hash);
@@ -212,7 +212,7 @@ bool AcceptBlockHeader(const CBlockHeader &block,
         if (!ContextualCheckBlockHeader(block, state, pindexPrev))
             return false;
     }
-    if (pindex == NULL)
+    if (pindex == nullptr)
         pindex = AddToBlockIndex(block);
 
     // If the block belongs to the set of check-pointed blocks but it has a mismatched hash,
@@ -248,8 +248,6 @@ void PruneBlockIndexCandidates()
     {
         setBlockIndexCandidates.erase(it++);
     }
-    // Either the current tip or a successor of it we're working towards is left in setBlockIndexCandidates.
-    assert(!setBlockIndexCandidates.empty());
 }
 
 CBlockIndex *AddToBlockIndex(const CBlockHeader &block)
@@ -2875,9 +2873,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
             {
                 CTxInputData txd;
                 txd.tx = ptx;
-                txd.nodeId = -1;
                 txd.nodeName = "rollback";
-                txd.whitelisted = false;
                 EnqueueTxForAdmission(txd);
             }
         }
@@ -3313,7 +3309,7 @@ bool ActivateBestChain(CValidationState &returnedState,
                 pindexMostWork = LookupBlockIndex(pblock->GetHash());
                 if (!pindexMostWork)
                 {
-                    LOGA("Could not find block in mapBlockIndex: %s\n", pblock->GetHash().ToString());
+                    LOG(BLK, "Could not find block in mapBlockIndex: %s\n", pblock->GetHash().ToString());
                     return false;
                 }
 
@@ -3448,7 +3444,7 @@ bool ProcessNewBlock(CValidationState &state,
 
     int64_t end = GetTimeMicros();
 
-    if (Logging::LogAcceptCategory(Logging::BENCH))
+    if (Logging::LogAcceptCategory(BENCH))
     {
         uint64_t maxTxSizeLocal = 0;
         uint64_t maxVin = 0;

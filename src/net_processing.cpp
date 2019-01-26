@@ -7,6 +7,7 @@
 #include "net_processing.h"
 
 #include "addrman.h"
+#include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
@@ -65,10 +66,8 @@ bool PeerHasHeader(const CNodeState *state, CBlockIndex *pindex)
     return false;
 }
 
-bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParams, std::deque<CInv> &vInv)
+void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParams, std::deque<CInv> &vInv)
 {
-    bool gotWorkDone = false;
-
     std::vector<CInv> vNotFound;
 
     while (!vInv.empty())
@@ -84,7 +83,6 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
         vInv.pop_front();
         {
             boost::this_thread::interruption_point();
-            gotWorkDone = true;
             if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK)
             {
                 bool fSend = false;
@@ -108,16 +106,17 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                                      *pindexBestHeader, *mi, *pindexBestHeader, consensusParams) < nOneMonth);
                         if (!fSend)
                         {
-                            LOGA("%s: ignoring request from peer=%s for old block that isn't in the main chain\n",
+                            LOG(NET, "%s: ignoring request from peer=%s for old block that isn't in the main chain\n",
                                 __func__, pfrom->GetLogName());
                         }
                         else
-                        { // BU: don't relay excessive blocks that are not on the active chain
+                        {
+                            // BU: don't relay excessive blocks that are not on the active chain
                             if (mi->nStatus & BLOCK_EXCESSIVE)
                                 fSend = false;
                             if (!fSend)
-                                LOGA("%s: ignoring request from peer=%s for excessive block of height %d not on "
-                                     "the main chain\n",
+                                LOG(NET, "%s: ignoring request from peer=%s for excessive block of height %d not on "
+                                         "the main chain\n",
                                     __func__, pfrom->GetLogName(), mi->nHeight);
                         }
                         // BU: in the future we can throttle old block requests by setting send=false if we are out of
@@ -275,7 +274,6 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
         // having to download the entire memory pool.
         pfrom->PushMessage(NetMsgType::NOTFOUND, vNotFound);
     }
-    return gotWorkDone;
 }
 
 
@@ -379,23 +377,6 @@ static void enableSendHeaders(CNode *pfrom)
         pfrom->PushMessage(NetMsgType::SENDHEADERS);
 }
 
-static bool CheckForDownloadTimeout(CNode *pto, bool fReceived, int64_t &nRequestTime)
-{
-    // Use a timeout of 6 times the retry inverval before disconnecting.  This way only a max of 6
-    // re-requested thinblocks or graphene blocks could be in memory at any one time.
-    if (!fReceived && (GetTime() - nRequestTime) > 6 * blkReqRetryInterval / 1000000)
-    {
-        if (!pto->fWhitelisted && Params().NetworkIDString() != "regtest")
-        {
-            LOG(THIN, "ERROR: Disconnecting peer %s due to thinblock download timeout exceeded (%d secs)\n",
-                pto->GetLogName(), (GetTime() - nRequestTime));
-            pto->fDisconnect = true;
-            return true;
-        }
-    }
-    return false;
-}
-
 bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived)
 {
     int64_t receiptTime = GetTime();
@@ -454,6 +435,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CAddress addrMe;
         uint64_t nNonce = 1;
         vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
+
+        // Update thin type peer counters. This should be at the top here before we have any
+        // potential disconnects, because on disconnect the counters will then get decremented.
+        thinrelay.AddThinTypePeers(pfrom);
 
         if (pfrom->nVersion < MIN_PEER_PROTO_VERSION)
         {
@@ -558,6 +543,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CXVersionMessage xver;
         xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
         xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
+        xver.set_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED, 1);
         pfrom->PushMessage(NetMsgType::XVERSION, xver);
 
 
@@ -658,6 +644,25 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         // This step done after final handshake
         CheckAndRequestExpeditedBlocks(pfrom);
+    }
+    else if (strCommand == NetMsgType::XUPDATE)
+    {
+        CXVersionMessage xUpdate;
+        vRecv >> xUpdate;
+        // check for peer trying to change non-changeable key
+        for (auto entry : xUpdate.xmap)
+        {
+            auto iter = XVer::mapKeyType.find(entry.first);
+            if (iter == XVer::mapKeyType.end())
+            {
+                continue;
+            }
+            else if (iter->second == XVer::keyType::changeable)
+            {
+                LOCK(pfrom->cs_xversion);
+                pfrom->xVersion.xmap[entry.first] = xUpdate.xmap[entry.first];
+            }
+        }
     }
 
     // XVERSION NOTICE: If you read this code as a reference to implement
@@ -814,6 +819,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // BCH network currently only supports version 1 (v2 is segwit support on BTC)
         // May need to be updated in the future if other clients deploy a new version
         pfrom->fSupportsCompactBlocks = nVersion == 1;
+
+        // Increment compact block peer counter.
+        thinrelay.AddCompactBlockPeer(pfrom);
     }
 
     else if (strCommand == NetMsgType::INV)
@@ -1837,13 +1845,12 @@ bool ProcessMessages(CNode *pfrom)
     //  (x) data
     //
     bool fOk = true;
-    bool gotWorkDone = false;
 
     {
         TRY_LOCK(pfrom->csRecvGetData, locked);
         if (locked && !pfrom->vRecvGetData.empty())
         {
-            gotWorkDone |= ProcessGetData(pfrom, chainparams.GetConsensus(), pfrom->vRecvGetData);
+            ProcessGetData(pfrom, chainparams.GetConsensus(), pfrom->vRecvGetData);
         }
     }
 
@@ -1872,7 +1879,6 @@ bool ProcessMessages(CNode *pfrom)
             pfrom->vRecvMsg.pop_front();
             pfrom->currentRecvMsgSize -= msg.size();
             msgsProcessed++;
-            gotWorkDone = true;
         }
 
         // if (fDebug)
@@ -1897,8 +1903,8 @@ bool ProcessMessages(CNode *pfrom)
         CMessageHeader &hdr = msg.hdr;
         if (!hdr.IsValid(pfrom->GetMagic(chainparams)))
         {
-            LOGA(
-                "PROCESSMESSAGE: ERRORS IN HEADER %s peer=%s\n", SanitizeString(hdr.GetCommand()), pfrom->GetLogName());
+            LOG(NET, "PROCESSMESSAGE: ERRORS IN HEADER %s peer=%s\n", SanitizeString(hdr.GetCommand()),
+                pfrom->GetLogName());
             continue;
         }
         std::string strCommand = hdr.GetCommand();
@@ -1916,7 +1922,7 @@ bool ProcessMessages(CNode *pfrom)
             unsigned int nChecksum = ReadLE32((unsigned char *)&hash);
             if (nChecksum != hdr.nChecksum)
             {
-                LOGA("%s(%s, %u bytes): CHECKSUM ERROR nChecksum=%08x hdr.nChecksum=%08x\n", __func__,
+                LOG(NET, "%s(%s, %u bytes): CHECKSUM ERROR nChecksum=%08x hdr.nChecksum=%08x\n", __func__,
                     SanitizeString(strCommand), nMessageSize, nChecksum, hdr.nChecksum);
                 continue;
             }
@@ -1935,15 +1941,15 @@ bool ProcessMessages(CNode *pfrom)
             if (strstr(e.what(), "end of data"))
             {
                 // Allow exceptions from under-length message on vRecv
-                LOGA("%s(%s, %u bytes): Exception '%s' caught, normally caused by a message being shorter than "
-                     "its stated length\n",
+                LOG(NET, "%s(%s, %u bytes): Exception '%s' caught, normally caused by a message being shorter than "
+                         "its stated length\n",
                     __func__, SanitizeString(strCommand), nMessageSize, e.what());
             }
             else if (strstr(e.what(), "size too large"))
             {
                 // Allow exceptions from over-long size
-                LOGA("%s(%s, %u bytes): Exception '%s' caught\n", __func__, SanitizeString(strCommand), nMessageSize,
-                    e.what());
+                LOG(NET, "%s(%s, %u bytes): Exception '%s' caught\n", __func__, SanitizeString(strCommand),
+                    nMessageSize, e.what());
             }
             else
             {
@@ -1960,11 +1966,11 @@ bool ProcessMessages(CNode *pfrom)
         }
         catch (...)
         {
-            PrintExceptionContinue(NULL, "ProcessMessages()");
+            PrintExceptionContinue(nullptr, "ProcessMessages()");
         }
 
         if (!fRet)
-            LOGA("%s(%s, %u bytes) FAILED peer %s\n", __func__, SanitizeString(strCommand), nMessageSize,
+            LOG(NET, "%s(%s, %u bytes) FAILED peer %s\n", __func__, SanitizeString(strCommand), nMessageSize,
                 pfrom->GetLogName());
 
         if (msgsProcessed > 2000)
@@ -2028,32 +2034,11 @@ bool SendMessages(CNode *pto)
             pto->PushMessage(NetMsgType::PING, nonce);
         }
 
-        // Check to see if there are any thinblocks or graphene blocks in flight that have gone beyond the
-        // timeout interval. If so then we need to disconnect them so that the thinblock data is nullified.
+        // Check to see if there are any thin type blocks in flight that have gone beyond the
+        // timeout interval. If so then we need to disconnect them so that the thintype data is nullified.
         // We could null the associated data here but that would possibly cause a node to be banned later if
-        // the thinblock or graphene block finally did show up, so instead we just disconnect this slow node.
-        {
-            LOCK(pto->cs_mapthinblocksinflight);
-            if (!pto->mapThinBlocksInFlight.empty())
-            {
-                for (auto &item : pto->mapThinBlocksInFlight)
-                {
-                    if (CheckForDownloadTimeout(pto, item.second.fReceived, item.second.nRequestTime))
-                        break;
-                }
-            }
-        }
-        {
-            LOCK(pto->cs_mapgrapheneblocksinflight);
-            if (!pto->mapGrapheneBlocksInFlight.empty())
-            {
-                for (auto &item : pto->mapGrapheneBlocksInFlight)
-                {
-                    if (CheckForDownloadTimeout(pto, item.second.fReceived, item.second.nRequestTime))
-                        break;
-                }
-            }
-        }
+        // the thin type block finally did show up, so instead we just disconnect this slow node.
+        thinrelay.CheckForThinTypeDownloadTimeout(pto);
 
         // Check for block download timeout and disconnect node if necessary. Does not require cs_main.
         int64_t nNow = GetTimeMicros();

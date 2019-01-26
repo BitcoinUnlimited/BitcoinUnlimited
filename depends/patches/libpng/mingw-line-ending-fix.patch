@@ -1,0 +1,23 @@
+--- scripts/dfn.awk.orig
++++ scripts/dfn.awk
+@@ -106,6 +106,10 @@ $1 ~ /^PNG_DFN_END_SORT/{
+    #	#define name "John Smith"
+    #
+    while (1) {
++      # Remove trailing CR
++   sub(/$/, "", line)
++
++   
+       # While there is an @" remove it and the next "@
+       if (line ~ /@"/) {
+          if (line ~ /@".*"@/) {
+@@ -172,9 +176,6 @@ $1 ~ /^PNG_DFN_END_SORT/{
+    # editorial consistency
+    sub(/ *$/, "", line)
+ 
+-   # Remove trailing CR
+-   sub(/$/, "", line)
+-
+    if (sort) {
+       if (split(line, parts) < sort) {
+          print "line", lineno ": missing sort field:", line

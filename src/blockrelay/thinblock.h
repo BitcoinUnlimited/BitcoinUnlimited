@@ -177,9 +177,6 @@ private:
     /* The sum total of all bytes for thinblocks currently in process of being reconstructed */
     std::atomic<uint64_t> nThinBlockBytes{0};
 
-    CCriticalSection cs_mapThinBlockTimer; // locks mapThinBlockTimer
-    std::map<uint256, std::pair<uint64_t, bool> > mapThinBlockTimer;
-
     CCriticalSection cs_thinblockstats; // locks everything below this point
 
     CStatHistory<uint64_t> nOriginalSize;
@@ -273,9 +270,6 @@ public:
     std::string ThinBlockToString();
     std::string FullTxToString();
 
-    bool CheckThinblockTimer(const uint256 &hash);
-    void ClearThinBlockTimer(const uint256 &hash);
-
     void ClearThinBlockData(CNode *pfrom);
     void ClearThinBlockData(CNode *pfrom, const uint256 &hash);
     void ClearThinBlockStats();
@@ -290,12 +284,8 @@ public:
 extern CThinBlockData thindata; // Singleton class
 
 
-bool HaveThinblockNodes();
 bool IsThinBlocksEnabled();
-bool CanThinBlockBeDownloaded(CNode *pto);
 bool ClearLargestThinBlockAndDisconnect(CNode *pfrom);
-void ClearThinBlockInFlight(CNode *pfrom, const uint256 &hash);
-void AddThinBlockInFlight(CNode *pfrom, const uint256 &hash);
 void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
 bool IsThinBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header);
 void BuildSeededBloomFilter(CBloomFilter &memPoolFilter,

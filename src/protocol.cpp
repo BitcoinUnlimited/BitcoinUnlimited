@@ -54,9 +54,10 @@ const char *XPEDITEDREQUEST = "req_xpedited";
 const char *XPEDITEDBLK = "Xb";
 const char *XPEDITEDTxn = "Xt";
 const char *BUVERSION = "buversion";
+const char *BUVERACK = "buverack";
 const char *XVERSION = "xversion";
 const char *XVERACK = "xverack";
-const char *BUVERACK = "buverack";
+const char *XUPDATE = "xupdate";
 const char *SENDCMPCT = "sendcmpct";
 };
 
@@ -79,7 +80,7 @@ const static std::string allNetMessageTypes[] = {
     NetMsgType::XTHINBLOCK, NetMsgType::XBLOCKTX, NetMsgType::GET_XBLOCKTX, NetMsgType::GET_XTHIN,
     NetMsgType::GRAPHENEBLOCK, NetMsgType::GRAPHENETX, NetMsgType::GET_GRAPHENETX, NetMsgType::GET_GRAPHENE,
     NetMsgType::XPEDITEDREQUEST, NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTxn, NetMsgType::BUVERSION,
-    NetMsgType::BUVERACK, NetMsgType::SENDCMPCT,
+    NetMsgType::BUVERACK, NetMsgType::XVERSION, NetMsgType::XVERACK, NetMsgType::XUPDATE, NetMsgType::SENDCMPCT,
 };
 const static std::vector<std::string> allNetMessageTypesVec(allNetMessageTypes,
     allNetMessageTypes + ARRAYLEN(allNetMessageTypes));

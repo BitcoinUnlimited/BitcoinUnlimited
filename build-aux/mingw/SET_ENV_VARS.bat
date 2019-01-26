@@ -35,7 +35,7 @@ REM If you have installed the GitHub Desktop app this includes a copy of git.exe
 REM 
 REM   example git install path from GitHub Desktop:
 REM C:\Users\username\AppData\Local\GitHub\PortableGit_d7effa1a4a322478cd29c826b52a0c118ad3db11\mingw32\bin\git.exe
-REM set GIT_EXE="C:\Users\Justaphf\AppData\Local\GitHub\PortableGit_d7effa1a4a322478cd29c826b52a0c118ad3db11\mingw32\bin\git.exe"
+REM set GIT_EXE="C:\Program Files\Git\cmd\git.exe"
 
 REM Set Python installation path(s) (optional)
 REM If python has been installed and this path is provided, a wrapper script will be "installed" for

@@ -2937,7 +2937,6 @@ CNode::~CNode()
             pfilter = nullptr; // BU
         }
 
-        // BUIP010 - Xtreme Thinblocks - begin section
         if (pThinBlockFilter)
         {
             delete pThinBlockFilter;
@@ -2945,25 +2944,14 @@ CNode::~CNode()
         }
     }
 
-    mapThinBlocksInFlight.clear();
     thinBlockWaitingForTxns = -1;
     thinBlock.SetNull();
+    grapheneBlockWaitingForTxns = -1;
+    grapheneBlock.SetNull();
 
     // We must set this to false on disconnect otherwise we will have trouble reconnecting -addnode nodes
     // if the remote peer restarts.
     fAutoOutbound = false;
-
-    // BUIP010 - Xtreme Thinblocks - end section
-
-    // BUIPXXX - Graphene blocks - begin section
-    mapGrapheneBlocksInFlight.clear();
-    grapheneBlockWaitingForTxns = -1;
-    grapheneBlock.SetNull();
-
-    fAutoOutbound = false;
-
-    // BUIPXXX - Graphene blocks - end section
-
 
     addrFromPort = 0;
 

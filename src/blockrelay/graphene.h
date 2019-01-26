@@ -53,7 +53,7 @@ public:
     CGrapheneSet *pGrapheneSet;
 
 public:
-    CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx);
+    CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx, uint64_t nSenderMempoolPlusBlock);
     CGrapheneBlock() : pGrapheneSet(nullptr) {}
     ~CGrapheneBlock();
     /**
@@ -178,9 +178,6 @@ private:
     /* The sum total of all bytes for graphene blocks currently in process of being reconstructed */
     std::atomic<uint64_t> nGrapheneBlockBytes{0};
 
-    CCriticalSection cs_mapGrapheneBlockTimer; // locks mapGrapheneBlockTimer
-    std::map<uint256, std::pair<uint64_t, bool> > mapGrapheneBlockTimer;
-
     CCriticalSection cs_graphenestats; // locks everything below this point
 
     CStatHistory<uint64_t> nOriginalSize;
@@ -285,9 +282,6 @@ public:
     std::string ValidationTimeToString();
     std::string ReRequestedTxToString();
 
-    bool CheckGrapheneBlockTimer(const uint256 &hash);
-    void ClearGrapheneBlockTimer(const uint256 &hash);
-
     void ClearGrapheneBlockData(CNode *pfrom);
     void ClearGrapheneBlockData(CNode *pfrom, const uint256 &hash);
     void ClearGrapheneBlockStats();
@@ -302,12 +296,8 @@ public:
 extern CGrapheneBlockData graphenedata; // Singleton class
 
 
-bool HaveGrapheneNodes();
 bool IsGrapheneBlockEnabled();
-bool CanGrapheneBlockBeDownloaded(CNode *pto);
 bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom);
-void ClearGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash);
-void AddGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash);
 void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CMemPoolInfo &mempoolinfo);
 bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header);
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);

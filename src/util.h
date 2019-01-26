@@ -111,7 +111,8 @@ int LogPrintStr(const std::string &str);
 // Takes a std::vector of strings and splits individual arguments further up if
 // they contain commas. Also removes space from the output strings.
 // For example, ["a", "b,c", "d"] becomes ["a", "b", "c", "d"]
-extern std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args);
+extern std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args,
+    bool removeDuplicates = false);
 
 // Logging API:
 // Use the two macros
@@ -119,17 +120,6 @@ extern std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<s
 // LOGA(...)
 // located further down.
 // (Do not use the Logging functions directly)
-namespace Logging
-{
-extern uint64_t categoriesEnabled;
-
-/*
-To add a new log category:
-1) Create a unique 1 bit category mask. (Easiest is to 2* the last enum entry.)
-   Put it at the end of enum below.
-2) Add an category/string pair to LOGLABELMAP macro below.
-*/
-
 // Log Categories:
 // 64 Bits: (Define unique bits, not 'normal' numbers)
 enum
@@ -177,6 +167,17 @@ enum
     RESPEND = 0x20000000,
     WB = 0x40000000 // weak blocks
 };
+
+namespace Logging
+{
+extern uint64_t categoriesEnabled;
+
+/*
+To add a new log category:
+1) Create a unique 1 bit category mask. (Easiest is to 2* the last enum entry.)
+   Put it at the end of enum below.
+2) Add an category/string pair to LOGLABELMAP macro below.
+*/
 
 // Add corresponding lower case string for the category:
 #define LOGLABELMAP                                                                                             \
@@ -231,7 +232,7 @@ std::string LogGetLabel(uint64_t category);
  * Formatted for display.
  * returns all categories and states
  */
-std::string LogGetAllString();
+std::string LogGetAllString(bool fEnabled = false);
 
 /**
  * Initialize
@@ -356,12 +357,23 @@ std::string FormatStringFromLogArgs(const char *fmt, const Args &... args)
     return fmt;
 }
 
+
 template <typename... Args>
 bool error(const char *fmt, const Args &... args)
 {
     LogPrintStr("ERROR: " + tfm::format(fmt, args...) + "\n");
     return false;
 }
+
+
+template <typename... Args>
+inline bool error(uint64_t ctgr, const char *fmt, const Args &... args)
+{
+    if (Logging::LogAcceptCategory(ctgr))
+        LogPrintStr("ERROR: " + tfm::format(fmt, args...) + "\n");
+    return false;
+}
+
 
 /**
  Format an amount of bytes with a unit symbol attached, such as MB, KB, GB.
@@ -513,7 +525,7 @@ void TraceThreads(const std::string &name, Callable func)
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, name.c_str());
+        PrintExceptionContinue(nullptr, name.c_str());
         LogFlush();
         throw;
     }
