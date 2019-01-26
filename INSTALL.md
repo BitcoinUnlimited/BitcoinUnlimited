@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Installing Bitcoin Unlimited
 
 This document describes how to install and configure Bitcoin Unlimited.
@@ -177,3 +178,12 @@ This can also be added to the config file with
  - [Slack Channel](https://bitcoinunlimited.slack.com/)
 
 
+=======
+# Building Bitcoin
+
+See [README.md](README.md#quick-installation-instructions) for Quick Installation Instructions.
+
+See doc/build-*.md for instructions on building the Bitcoin Unlimited 
+`bitcoind`, the intended-for-services, no-graphical-interface, 
+implementation of Bitcoin.
+>>>>>>> Remove word "reference", link to README.md
