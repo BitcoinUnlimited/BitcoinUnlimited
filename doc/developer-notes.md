@@ -48,8 +48,9 @@ class Class
   The fully-automatic way:
   ========================
   Add the following to your $HOME/.gitconfig or .git/config in the Bitcoin directory:
+  
   ```
-[filter "bitcoin-clang-format"]
+  [filter "bitcoin-clang-format"]
         clean = "contrib/devtools/clang-format.py format-stdout-if-wanted clang-format-3.8 %f"
         smudge = cat
   ```
