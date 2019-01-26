@@ -66,6 +66,10 @@ They are not complete guides, but include notes on the necessary libraries, comp
 - [Files](doc/files.md)
 - [Fuzz-testing](doc/fuzzing.md)
 
+<<<<<<< HEAD
+=======
+When you first run the node it must first sync the current blockchain.  All block headers are first retrieved and then each block is downloaded, checked and the UTXO finally updated.  This process can take from hours to *weeks* depending on the node configuration, and therefore, node configuration is crucial.
+>>>>>>> Headers more pretty
 
 # Online resources
 
@@ -77,9 +81,24 @@ They are not complete guides, but include notes on the necessary libraries, comp
 
 
 
+<<<<<<< HEAD
 # License
 
 Bitcoin Unlimited is released under the terms of the [MIT software license](http://www.opensource.org/licenses/mit-license.php). See [COPYING](COPYING) for more
 information.
 This product includes software developed by the OpenSSL Project for use in the [OpenSSL Toolkit](https://www.openssl.org/). This product includes
 cryptographic software written by Eric Young ([eay@cryptsoft.com](mailto:eay@cryptsoft.com)), and UPnP software written by Thomas Bernard.
+=======
+##### dbcache:
+
+As stated above, this setting is crucial to a fast initial sync.  You can set this value from the command line by running
+`bitcoind -dbcache=<your size in MB>`, for example, a 1GB dbcache would be `bitcoind -dbcache=1000`.  Similarly you can also add the setting to the bitcoin.conf file located in your installation folder. In the config file a simlilar entry would be `dbcache=1000`.  When entering the size
+try to give it the maximum that your system can afford while still leaving enough memory for other processes.
+
+##### maxoutconnections:
+
+It is generally fine to leave the default outbound connection settings for doing a sync, however, at times some users
+have reported issues with not being able to find enough useful connections. If that happens you can change this setting to override the default.
+For instance `bitcoind -maxoutconnections=30` will give you 30 outbound connections and should be more than enough in the event that the
+node is having difficulty.
+>>>>>>> Headers more pretty
