@@ -47,9 +47,9 @@ double GetDifficulty(const CBlockIndex *blockindex)
 {
     // Floating point number that is a multiple of the minimum difficulty,
     // minimum difficulty = 1.0.
-    if (blockindex == NULL)
+    if (blockindex == nullptr)
     {
-        if (chainActive.Tip() == NULL)
+        if (chainActive.Tip() == nullptr)
             return 1.0;
         else
             blockindex = chainActive.Tip();
@@ -161,7 +161,6 @@ UniValue getblockcount(const UniValue &params, bool fHelp)
                             "n    (numeric) The current block count\n"
                             "\nExamples:\n" +
                             HelpExampleCli("getblockcount", "") + HelpExampleRpc("getblockcount", ""));
-    LOCK(cs_main);
     return chainActive.Height();
 }
 
@@ -175,7 +174,6 @@ UniValue getbestblockhash(const UniValue &params, bool fHelp)
                             "\nExamples\n" +
                             HelpExampleCli("getbestblockhash", "") + HelpExampleRpc("getbestblockhash", ""));
 
-    LOCK(cs_main);
     return chainActive.Tip()->GetBlockHash().GetHex();
 }
 
@@ -190,7 +188,6 @@ UniValue getdifficulty(const UniValue &params, bool fHelp)
             "\nExamples:\n" +
             HelpExampleCli("getdifficulty", "") + HelpExampleRpc("getdifficulty", ""));
 
-    LOCK(cs_main);
     return GetDifficulty();
 }
 
