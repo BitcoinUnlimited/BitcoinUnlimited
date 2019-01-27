@@ -22,6 +22,7 @@ However, Bitcoin Unlimited has a very different philosophy than Core.
 It follows a philosophy and is administered by a formal process described in the [Articles of Federation](https://www.bitcoinunlimited.info/resources/BUarticles.pdf).
 In short, we believe in market-driven decision making, emergent consensus, and giving our users choices.
 
+<<<<<<< HEAD
 
 # Installing
 
@@ -107,6 +108,8 @@ node is having difficulty.
 =======
 =======
 >>>>>>> Move setup and Initial Node Operations to INSTALL.md
+=======
+>>>>>>> Move quick installs to INSTALL.md
 
 # License
 
