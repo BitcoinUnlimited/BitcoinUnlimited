@@ -8,24 +8,6 @@ Setup
 - [Getting the most out of Xtreme thinblocks](bu-xthin.md)
 - [Setting up an Xpedited Relay Network](bu-xpedited-forwarding.md)
 
-Running
----------------------
-The following are some helpful notes on how to run Bitcoin on your native platform.
-
-### Unix
-
-Unpack the files into a directory and run:
-
-- `bin/bitcoin-qt` (GUI) or
-- `bin/bitcoind` (headless)
-
-### Windows
-
-Unpack the files into a directory, and then run bitcoin-qt.exe.
-
-### macOS
-
-Drag Bitcoin-Unlimited to your applications folder, and then run Bitcoin-Unlimited.
 
 ### Need Help?
 
