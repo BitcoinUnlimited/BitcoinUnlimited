@@ -94,7 +94,8 @@
 #include <openssl/rand.h>
 #include <thread>
 
-std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args)
+std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args,
+    bool removeDuplicates /* false */)
 {
     std::vector<std::string> result;
     for (std::string arg : args)
@@ -111,6 +112,14 @@ std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::str
                 arg_nospace += c;
         result.push_back(arg_nospace);
     }
+
+    // remove duplicates from the list of debug categories
+    if (removeDuplicates)
+    {
+        std::sort(result.begin(), result.end());
+        result.erase(std::unique(result.begin(), result.end()), result.end());
+    }
+    std::reverse(result.begin(), result.end());
     return result;
 }
 
@@ -156,50 +165,77 @@ std::string LogGetLabel(uint64_t category)
 
     return label;
 }
-
-std::string LogGetAllString()
+// Return a string rapresentation of all debug categories and their current status,
+// one category per line. If enabled is true it returns only the list of enabled
+// debug categories concatenated in a single line.
+std::string LogGetAllString(bool fEnabled)
 {
-    string ret = "";
+    string allCategories = "";
+    string enabledCategories = "";
     for (auto &x : logLabelMap)
     {
         if (x.first == ALL || x.first == NONE)
             continue;
 
-        // ret += (std::string)x.second;
         if (LogAcceptCategory(x.first))
-            ret += "on ";
+        {
+            allCategories += "on ";
+            if (fEnabled)
+                enabledCategories += (std::string)x.second + " ";
+        }
         else
-            ret += "   ";
+            allCategories += "   ";
 
-        ret += (std::string)x.second;
-        ret += "\n";
+        allCategories += (std::string)x.second + "\n";
     }
+    // strip last char from enabledCategories if it is eqaul to a blank space
+    if (enabledCategories.length() > 0)
+        enabledCategories.pop_back();
 
-    return ret;
+    return fEnabled ? enabledCategories : allCategories;
 }
 
 void LogInit()
 {
     string category = "";
-    uint64_t catg = Logging::NONE;
-    const vector<string> categories = splitByCommasAndRemoveSpaces(mapMultiArgs["-debug"]);
+    uint64_t catg = NONE;
+    const vector<string> categories = splitByCommasAndRemoveSpaces(mapMultiArgs["-debug"], true);
 
     // enable all when given -debug=1 or -debug
     if (categories.size() == 1 && (categories[0] == "" || categories[0] == "1"))
     {
-        Logging::LogToggleCategory(Logging::ALL, true);
-        return;
+        LogToggleCategory(ALL, true);
     }
-    for (string const &cat : categories)
+    else
     {
-        category = boost::algorithm::to_lower_copy(cat);
-        catg = LogFindCategory(category);
+        for (string const &cat : categories)
+        {
+            category = boost::algorithm::to_lower_copy(cat);
 
-        if (catg == NONE) // Not a valid category
-            continue;
+            // remove the category from the list of enables one
+            // if label is suffixed with a dash
+            bool toggle_flag = true;
 
-        LogToggleCategory(catg, true);
+            if (category.length() > 0 && category.at(0) == '-')
+            {
+                toggle_flag = false;
+                category.erase(0, 1);
+            }
+
+            if (category == "" || category == "1")
+            {
+                category = "all";
+            }
+
+            catg = LogFindCategory(category);
+
+            if (catg == NONE) // Not a valid category
+                continue;
+
+            LogToggleCategory(catg, toggle_flag);
+        }
     }
+    LOGA("List of enabled categories: %s\n", LogGetAllString(true));
 }
 }
 
@@ -332,10 +368,8 @@ void OpenDebugLog()
     vMsgsBeforeOpenLog = NULL;
 }
 
-/**
- * fStartedNewLine is a state variable held by the calling context that will
- * suppress printing of the timestamp when multiple calls are made that don't
- * end in a newline. Initialize it to true, and hold it, in the calling context.
+/** All logs are automatically CR terminated.  If you want to construct a single-line log out of multiple calls, don't.
+    Make your own temporary.  You can make a multi-line log by adding \n in your temporary.
  */
 static std::string LogTimestampStr(const std::string &str, std::string &logbuf)
 {
@@ -355,14 +389,14 @@ static std::string LogTimestampStr(const std::string &str, std::string &logbuf)
         logbuf += str;
     }
 
-    if (logbuf.size() && logbuf[logbuf.size() - 1] == '\n')
+    if (logbuf.size() && logbuf[logbuf.size() - 1] != '\n')
     {
-        std::string result = logbuf;
-        logbuf.clear();
-        return result;
+        logbuf += '\n';
     }
-    else
-        return "";
+
+    std::string result = logbuf;
+    logbuf.clear();
+    return result;
 }
 
 static void MonitorLogfile()
@@ -391,8 +425,8 @@ void LogFlush()
 int LogPrintStr(const std::string &str)
 {
     int ret = 0; // Returns total number of characters written
-    thread_local std::string logbuf;
-    string strTimestamped = LogTimestampStr(str, logbuf);
+    std::string logbuf;
+    std::string strTimestamped = LogTimestampStr(str, logbuf);
 
     if (!strTimestamped.size())
         return 0;

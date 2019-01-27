@@ -197,7 +197,7 @@ struct StartupShutdown
                 /* To enable this, add
                    -- --log_bitcoin console
                    to the end of the test_bitcoin argument list. */
-                Logging::LogToggleCategory(Logging::ALL, true);
+                Logging::LogToggleCategory(ALL, true);
                 fPrintToConsole = true;
                 fPrintToDebugLog = false;
             }

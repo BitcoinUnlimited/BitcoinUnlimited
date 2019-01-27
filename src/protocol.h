@@ -309,6 +309,9 @@ extern const char *XVERSION;
  * @since protocol version FIXME.
  */
 extern const char *XVERACK;
+
+
+extern const char *XUPDATE;
 };
 
 

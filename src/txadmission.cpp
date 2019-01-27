@@ -203,7 +203,6 @@ void ThreadCommitToMempool()
 
             CORRAL(txProcessingCorral, CORRAL_TX_COMMITMENT);
             {
-                LOCK(cs_main);
                 CommitTxToMempool();
                 LOG(MEMPOOL, "MemoryPool sz %u txn, %u kB\n", mempool.size(), mempool.DynamicMemoryUsage() / 1000);
                 LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
@@ -1045,7 +1044,6 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
                     txd.tx = orphanTx;
                     txd.nodeId = fromPeer;
                     txd.nodeName = "orphan";
-                    txd.whitelisted = false;
                     LOG(MEMPOOL, "Resubmitting orphan tx: %s\n", orphanTx->GetHash().ToString().c_str());
                     EnqueueTxForAdmission(txd);
                 }

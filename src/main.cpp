@@ -8,6 +8,7 @@
 
 #include "addrman.h"
 #include "arith_uint256.h"
+#include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
@@ -144,6 +145,10 @@ void InitializeNode(const CNode *pnode)
 
 void FinalizeNode(NodeId nodeid)
 {
+    // Decrement thin type peer counters
+    thinrelay.RemoveThinTypePeers(connmgr->FindNodeFromId(nodeid).get());
+
+    // Update node state
     {
         CNodeStateAccessor state(nodestate, nodeid);
         DbgAssert(state != nullptr, return );
@@ -714,7 +719,6 @@ void MainCleanup()
 {
     {
         WRITELOCK(cs_mapBlockIndex); // BU apply the appropriate lock so no contention during destruction
-        // block headers
         BlockMap::iterator it1 = mapBlockIndex.begin();
         for (; it1 != mapBlockIndex.end(); it1++)
             delete (*it1).second;
@@ -722,8 +726,8 @@ void MainCleanup()
     }
 
     {
-        WRITELOCK(orphanpool.cs); // BU apply the appropriate lock so no contention during destruction
         // orphan transactions
+        WRITELOCK(orphanpool.cs);
         orphanpool.mapOrphanTransactions.clear();
         orphanpool.mapOrphanTransactionsByPrev.clear();
     }

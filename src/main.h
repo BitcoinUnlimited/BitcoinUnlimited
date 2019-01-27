@@ -142,6 +142,9 @@ static const bool DEFAULT_PERMIT_BAREMULTISIG = true;
 static const unsigned int DEFAULT_BYTES_PER_SIGOP = 20;
 static const bool DEFAULT_CHECKPOINTS_ENABLED = true;
 
+/** Default -persistmempool */
+static const bool DEFAULT_PERSIST_MEMPOOL = true;
+
 static const bool DEFAULT_TESTSAFEMODE = false;
 
 /** Maximum number of headers to announce when relaying blocks with headers message.*/
@@ -149,6 +152,7 @@ static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 8;
 
 static const bool DEFAULT_PEERBLOOMFILTERS = true;
 static const bool DEFAULT_USE_THINBLOCKS = true;
+static const uint64_t DEFAULT_PREFERENTIAL_TIMER = 1000;
 static const bool DEFAULT_USE_GRAPHENE_BLOCKS = true;
 
 static const bool DEFAULT_REINDEX = false;
@@ -350,6 +354,5 @@ public:
     ~CMainCleanup();
 };
 #endif
-
 
 #endif // BITCOIN_MAIN_H

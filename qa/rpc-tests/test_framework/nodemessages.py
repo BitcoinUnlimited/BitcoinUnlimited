@@ -581,6 +581,11 @@ class CTransaction(object):
         self.hash = encode(hash256(self.serialize())[::-1], 'hex_codec').decode('ascii')
         return self.hash
 
+    def getHash(self):
+        if self.sha256 is None:
+            self.rehash()
+        return self.sha256
+
     def is_valid(self):
         self.calc_sha256()
         for tout in self.vout:
@@ -1070,6 +1075,34 @@ class msg_xverack(object):
 
     def __repr__(self):
         return "msg_xverack()"
+
+class msg_xupdate(object):
+    command = b"xupdate"
+
+    def __init__(self, xver = {}):
+        self.xver = xver
+
+    def deserialize(self, f):
+        map_size = CompactSize().deserialize(f)
+        self.xver = {}
+        for i in range(map_size):
+            key = CompactSize().deserialize(f)
+            val_size = CompactSize().deserialize(f)
+            value = f.read(val_size)
+            self.xver[key] = value
+
+    def serialize(self):
+        res = CompactSize(len(self.xver)).serialize()
+        for k, v in self.xver.items():
+            res += CompactSize(k).serialize()
+            if type(v) is int:  # serialize integers in compact format inside the vector
+                v = CompactSize(v).serialize()
+            res += CompactSize(len(v)).serialize()
+            res += v
+        return res
+
+    def __repr__(self):
+        return "msg_xupdate(%s)" % repr(self.xver)
 
 
 class msg_addr(object):

@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "blockrelay/blockrelay_common.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
@@ -95,8 +96,7 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Ban a node for sending unrequested thinblocks unless from an expedited node.
     {
-        LOCK(pfrom->cs_mapthinblocksinflight);
-        if (!pfrom->mapThinBlocksInFlight.count(inv.hash) && !connmgr->IsExpeditedUpstream(pfrom))
+        if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::XTHINBLOCK) && !connmgr->IsExpeditedUpstream(pfrom))
         {
             dosMan.Misbehaving(pfrom, 100);
             return error("unrequested thinblock from peer %s", pfrom->GetLogName());
@@ -309,8 +309,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     LOG(THIN, "received xblocktx for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
     {
         // Do not process unrequested xblocktx unless from an expedited node.
-        LOCK(pfrom->cs_mapthinblocksinflight);
-        if (!pfrom->mapThinBlocksInFlight.count(inv.hash) && !connmgr->IsExpeditedUpstream(pfrom))
+        if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::XTHINBLOCK) && !connmgr->IsExpeditedUpstream(pfrom))
         {
             dosMan.Misbehaving(pfrom, 10);
             return error(
@@ -621,7 +620,9 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         // If this is an expedited block then add and entry to mapThinBlocksInFlight.
         if (nHops > 0 && connmgr->IsExpeditedUpstream(pfrom))
         {
-            AddThinBlockInFlight(pfrom, inv.hash);
+            // If we can't add this xthin then we've already requested it
+            if (!thinrelay.AddThinTypeBlockInFlight(pfrom, inv.hash, NetMsgType::XTHINBLOCK))
+                return true;
 
             LOG(THIN, "Received new expedited %s %s from peer %s hop %d size %d bytes\n", strCommand,
                 inv.hash.ToString(), pfrom->GetLogName(), nHops, nSizeThinBlock);
@@ -632,8 +633,8 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
                 pfrom->GetLogName(), nSizeThinBlock);
 
             // Do not process unrequested xthinblocks unless from an expedited node.
-            LOCK(pfrom->cs_mapthinblocksinflight);
-            if (!pfrom->mapThinBlocksInFlight.count(inv.hash) && !connmgr->IsExpeditedUpstream(pfrom))
+            if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::XTHINBLOCK) &&
+                !connmgr->IsExpeditedUpstream(pfrom))
             {
                 dosMan.Misbehaving(pfrom, 10);
                 return error(
@@ -1316,74 +1317,12 @@ std::string CThinBlockData::FullTxToString()
     return ss.str();
 }
 
-// Preferential Thinblock Timer:
-// The purpose of the timer is to ensure that we more often download an XTHINBLOCK rather than a full block.
-// The timer is started when we receive the first announcement indicating there is a new block to download.  If the
-// block inventory is from a non XTHIN node then we will continue to wait for block announcements until either we
-// get one from an XTHIN capable node or the timer is exceeded.  If the timer is exceeded before receiving an
-// announcement from an XTHIN node then we just download a full block instead of an xthin.
-bool CThinBlockData::CheckThinblockTimer(const uint256 &hash)
-{
-    // Base time used to calculate the random timeout value.
-    static uint64_t nTimeToWait = 1000;
-
-    LOCK(cs_mapThinBlockTimer);
-    if (!mapThinBlockTimer.count(hash))
-    {
-        // The timeout limit is a random number between 0.8 and 1.2 seconds.
-        // This way a node connected to this one may download the block
-        // before the other node and thus be able to serve the other with
-        // a graphene block, rather than both nodes timing out and downloading
-        // a thinblock instead. This can happen at the margins of the BU network
-        // where we receive full blocks from peers that don't support graphene.
-        //
-        // To make the timeout random we adjust the start time of the timer forward
-        // or backward by a random amount plus or minus 0.2 seconds.
-        FastRandomContext insecure_rand(false);
-        uint64_t nOffset = nTimeToWait - (800 + (insecure_rand.rand64() % 400) + 1);
-        mapThinBlockTimer[hash] = std::make_pair(GetTimeMillis() + nOffset, false);
-        LOG(THIN, "Starting Preferential Thinblock timer (%d millis)\n", nTimeToWait + nOffset);
-    }
-    else
-    {
-        // Check that we have not exceeded the 10 second limit.
-        // If we have then we want to return false so that we can
-        // proceed to download a regular block instead.
-        auto iter = mapThinBlockTimer.find(hash);
-        if (iter != mapThinBlockTimer.end())
-        {
-            int64_t elapsed = GetTimeMillis() - iter->second.first;
-            if (elapsed > (int64_t)nTimeToWait)
-            {
-                // Only print out the log entry once.  Because the thinblock timer will be hit
-                // many times when requesting a block we don't want to fill up the log file.
-                if (!iter->second.second)
-                {
-                    iter->second.second = true;
-                    LOG(THIN, "Preferential Thinblock timer exceeded - downloading regular block instead\n");
-                }
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-// The timer is cleared as soon as we request a block or thinblock.
-void CThinBlockData::ClearThinBlockTimer(const uint256 &hash)
-{
-    LOCK(cs_mapThinBlockTimer);
-    if (mapThinBlockTimer.count(hash))
-    {
-        mapThinBlockTimer.erase(hash);
-        LOG(THIN, "Clearing Preferential Thinblock timer\n");
-    }
-}
-
 // After a thinblock is finished processing or if for some reason we have to pre-empt the rebuilding
 // of a thinblock then we clear out the thinblock data which can be substantial.
 void CThinBlockData::ClearThinBlockData(CNode *pnode)
 {
+    LOCK(pnode->cs_xthinblock);
+
     // Remove bytes from counter
     thindata.DeleteThinBlockBytes(pnode->nLocalThinBlockBytes, pnode);
     pnode->nLocalThinBlockBytes = 0;
@@ -1403,7 +1342,7 @@ void CThinBlockData::ClearThinBlockData(CNode *pnode, const uint256 &hash)
 {
     // We must make sure to clear the thinblock data first before clearing the thinblock in flight.
     ClearThinBlockData(pnode);
-    ClearThinBlockInFlight(pnode, hash);
+    thinrelay.ClearThinTypeBlockInFlight(pnode, hash);
 }
 
 void CThinBlockData::ClearThinBlockStats()
@@ -1475,27 +1414,7 @@ void CThinBlockData::FillThinBlockQuickStats(ThinBlockQuickStats &stats)
     stats.nLast24hRerequestTx = mapThinBlocksInBoundReRequestedTx.size();
 }
 
-bool HaveThinblockNodes()
-{
-    {
-        LOCK(cs_vNodes);
-        for (CNode *pnode : vNodes)
-            if (pnode->ThinBlockCapable())
-                return true;
-    }
-    return false;
-}
-
 bool IsThinBlocksEnabled() { return GetBoolArg("-use-thinblocks", true); }
-bool CanThinBlockBeDownloaded(CNode *pto)
-{
-    LOCK(pto->cs_mapthinblocksinflight);
-    if (pto->mapThinBlocksInFlight.size() < 1 && pto->ThinBlockCapable())
-        return true;
-
-    return false;
-}
-
 bool ClearLargestThinBlockAndDisconnect(CNode *pfrom)
 {
     CNode *pLargest = nullptr;
@@ -1517,19 +1436,6 @@ bool ClearLargestThinBlockAndDisconnect(CNode *pfrom)
     }
 
     return false;
-}
-
-void ClearThinBlockInFlight(CNode *pfrom, const uint256 &hash)
-{
-    LOCK(pfrom->cs_mapthinblocksinflight);
-    pfrom->mapThinBlocksInFlight.erase(hash);
-}
-
-void AddThinBlockInFlight(CNode *pfrom, const uint256 &hash)
-{
-    LOCK(pfrom->cs_mapthinblocksinflight);
-    pfrom->mapThinBlocksInFlight.insert(
-        std::pair<uint256, CNode::CThinBlockInFlight>(hash, CNode::CThinBlockInFlight()));
 }
 
 void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
