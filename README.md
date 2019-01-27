@@ -40,6 +40,7 @@ For info on building Bitcoin Unlimited from sources, see
 
 They are not complete guides, but include notes on the necessary libraries, compile flags, etc.
 
+<<<<<<< HEAD
 # Running / setup
 
 - [Getting the most out of Xtreme thinblocks](bu-xthin.md)
@@ -104,6 +105,8 @@ node is having difficulty.
 <<<<<<< HEAD
 >>>>>>> Headers more pretty
 =======
+=======
+>>>>>>> Move setup and Initial Node Operations to INSTALL.md
 
 # License
 
