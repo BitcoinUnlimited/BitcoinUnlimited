@@ -101,4 +101,14 @@ It is generally fine to leave the default outbound connection settings for doing
 have reported issues with not being able to find enough useful connections. If that happens you can change this setting to override the default.
 For instance `bitcoind -maxoutconnections=30` will give you 30 outbound connections and should be more than enough in the event that the
 node is having difficulty.
+<<<<<<< HEAD
 >>>>>>> Headers more pretty
+=======
+
+# License
+
+Bitcoin Unlimited is released under the terms of the [MIT software license](http://www.opensource.org/licenses/mit-license.php). See [COPYING](COPYING) for more
+information.
+This product includes software developed by the OpenSSL Project for use in the [OpenSSL Toolkit](https://www.openssl.org/). This product includes
+cryptographic software written by Eric Young ([eay@cryptsoft.com](mailto:eay@cryptsoft.com)), and UPnP software written by Thomas Bernard.
+>>>>>>> Licens info in /README.md only
