@@ -367,5 +367,11 @@ node is having difficulty.
 
 # Getting help
 
+ - [Issue Tracker](https://github.com/BitcoinUnlimited/BitcoinUnlimited/issues)
+ - [The Bitcoin Forum](https://www.bitco.in/forum)
+ - [Reddit /r/btc](https://www.reddit.com/r/btc)
+ - [Reddit /r/bitcoin_unlimited](https://www.reddit.com/r/bitcoin_unlimited)
+ - [Slack Channel](https://bitcoinunlimited.slack.com/)
+
 
 >>>>>>> Make INSTALL.md file more informative
