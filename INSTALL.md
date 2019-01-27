@@ -279,12 +279,14 @@ See doc/build-*.md for detailed instructions on building the Bitcoin Unlimited s
 - `bitcoind`, the intended-for-services, no-graphical-interface, implementation of Bitcoin and 
 - `bitcoin-qt`, the GUI.
 
+Once you have finished the process you can find the relevant binary files (`bitcoind`, `bitcoin-qt` and `bitcoin-cli`) in `/src/`.
 
-## Quick installation Instructions
 
-## Ubuntu
+## Dependencies
 
-If you're compiling from source on a Ubuntu like system:
+Make sure you have installed the [Dependencies](doc/Dependencies.md).
+
+If you're compiling from source on a Ubuntu like system, you can get all the required dependencies with the commands below
 
 ```sh
 sudo apt-get install git build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils libboost-all-dev
@@ -299,38 +301,29 @@ sudo apt-get install software-properties-common
 sudo add-apt-repository ppa:bitcoin-unlimited/bu-ppa
 sudo apt-get update
 sudo apt-get install libdb4.8-dev libdb4.8++-dev
-
-mkdir -p ~/src
-cd ~/src
-git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git bu-src
-cd bu-src
-git checkout release
-./autogen.sh
-./configure
-make
-sudo make install
 ```
-## Fetching the code and compile it
 
+
+## Fetching the code and compile it
 
 ```sh
 mkdir -p ~/src
 cd ~/src
 git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git bu-src
 cd bu-src
-git checkout release   # or git checkout origin/dev
+git checkout release 	# or git checkout origin/dev
 ./autogen.sh
 
-# if you want a plain bitcoind binary without GUI without wallet support, use this configure line:
+# if you want a plain bitcoind binary without GUI and without wallet support, use this configure line:
 ./configure --disable-wallet --without-gui
 
-# otherwise if you need bitcoin-qt just issue a plain
+# otherwise if you need bitcoin-qt just issue
 ./configure
 
 export NUMCPUS=`grep -c '^processor' /proc/cpuinfo`
 make -j$NUMCPUS
-sudo make install #(will place them in /usr/local/bin, this is step is to be considered optional.)
-```
+sudo make install #(will place them in /usr/local/bin, this step is to be considered optional.)
+``````
 
 ## Miscellaneous
 
