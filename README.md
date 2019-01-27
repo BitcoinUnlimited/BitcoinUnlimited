@@ -111,6 +111,54 @@ node is having difficulty.
 =======
 >>>>>>> Move quick installs to INSTALL.md
 
+# Installing
+
+For info on installing Bitcoin Unlimited see [INSTALL.md](INSTALL.md)
+
+# Building
+
+For info on building Bitcoin Unlimited from sources, see
+- [Dependencies](doc/dependencies.md)
+- [Unix Build Notes](doc/build-unix.md)
+- [Windows Build Notes](doc/build-windows.md)
+- [OpenBSD Build Notes](doc/build-openbsd.md)
+- [macOS Build Notes](doc/build-macos.md)
+- [Deterministic macOS DMG Notes](doc/README_macos.md)
+- [Gitian Building Guide](doc/gitian-building.md)
+
+They are not complete guides, but include notes on the necessary libraries, compile flags, etc.
+
+# Running / setup
+
+- [Getting the most out of Xtreme thinblocks](bu-xthin.md)
+- [Setting up an Xpedited Relay Network](bu-xpedited-forwarding.md)
+
+
+# Development
+
+
+The Bitcoin repo's [root README](/README.md) contains relevant information on the development process and automated testing.
+
+- [Developer Notes](developer-notes.md)
+- [Multiwallet Qt Development](multiwallet-qt.md)
+- [Release Notes](release-notes.md)
+- [Release Process](release-process.md)
+- [Translation Process](translation_process.md)
+- [Translation Strings Policy](translation_strings_policy.md)
+- [Unit Tests](unit-tests.md)
+- [Unauthenticated REST Interface](REST-interface.md)
+- [Shared Libraries](shared-libraries.md)
+- [BIPS](bips.md)
+
+
+## Miscellaneous
+- [Assets Attribution](assets-attribution.md)
+- [Files](files.md)
+- [Fuzz-testing](fuzzing.md)
+- [Tor Support](tor.md)
+- [Init Scripts (systemd/upstart/openrc)](init.md)
+
+
 # License
 
 Bitcoin Unlimited is released under the terms of the [MIT software license](http://www.opensource.org/licenses/mit-license.php). See [COPYING](COPYING) for more
