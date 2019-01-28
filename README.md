@@ -139,9 +139,10 @@ They are not complete guides, but include notes on the necessary libraries, comp
 # Development
 
 
-The Bitcoin repo's [root README](/README.md) contains relevant information on the development process and automated testing.
+
 
 - [Developer Notes](doc/developer-notes.md)
+- [Contributing](CONTRIBUTING.md)
 - [Multiwallet Qt Development](doc/multiwallet-qt.md)
 - [Release Notes](doc/release-notes.md)
 - [Release Process](doc/release-process.md)
