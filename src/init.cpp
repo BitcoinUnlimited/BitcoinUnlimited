@@ -1454,7 +1454,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         {
             struct in_addr inaddr_any;
             inaddr_any.s_addr = INADDR_ANY;
-            bool bound = Bind(CService(in6addr_any, GetListenPort()), BF_NONE);
+            bool bound = Bind(CService((in6_addr)IN6ADDR_ANY_INIT, GetListenPort()), BF_NONE);
             fBindFailure |= !bound;
             fBound |= bound;
 
