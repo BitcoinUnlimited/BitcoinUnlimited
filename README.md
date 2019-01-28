@@ -132,31 +132,27 @@ They are not complete guides, but include notes on the necessary libraries, comp
 
 - [Getting the most out of Xtreme thinblocks](bu-xthin.md)
 - [Setting up an Xpedited Relay Network](bu-xpedited-forwarding.md)
-
+- [Tor Support](doc/tor.md)
+- [Init Scripts (systemd/upstart/openrc)](doc/init.md)
+- [Using Bitcoin Unlimited for Mining](doc/miner.md)
 
 # Development
 
 
 The Bitcoin repo's [root README](/README.md) contains relevant information on the development process and automated testing.
 
-- [Developer Notes](developer-notes.md)
-- [Multiwallet Qt Development](multiwallet-qt.md)
-- [Release Notes](release-notes.md)
-- [Release Process](release-process.md)
-- [Translation Process](translation_process.md)
-- [Translation Strings Policy](translation_strings_policy.md)
-- [Unit Tests](unit-tests.md)
-- [Unauthenticated REST Interface](REST-interface.md)
-- [Shared Libraries](shared-libraries.md)
-- [BIPS](bips.md)
-
-
-## Miscellaneous
-- [Assets Attribution](assets-attribution.md)
-- [Files](files.md)
-- [Fuzz-testing](fuzzing.md)
-- [Tor Support](tor.md)
-- [Init Scripts (systemd/upstart/openrc)](init.md)
+- [Developer Notes](doc/developer-notes.md)
+- [Multiwallet Qt Development](doc/multiwallet-qt.md)
+- [Release Notes](doc/release-notes.md)
+- [Release Process](doc/release-process.md)
+- [Translation Process](doc/translation_process.md)
+- [Translation Strings Policy](doc/translation_strings_policy.md)
+- [Unit Tests](doc/unit-tests.md)
+- [Unauthenticated REST Interface](doc/REST-interface.md)
+- [Shared Libraries](doc/shared-libraries.md)
+- [Assets Attribution](contrib/debian/copyright)
+- [Files](doc/files.md)
+- [Fuzz-testing](doc/fuzzing.md)
 
 
 # License
