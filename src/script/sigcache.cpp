@@ -47,6 +47,21 @@ public:
 };
 
 /**
+ * Declare which flags absolutely do not affect VerifySignature() result.
+ * We this to reduce unnecessary cache misses (such as when policy and consensus
+ * flags differ on unrelated aspects).
+ */
+static const uint32_t INVARIANT_FLAGS =
+    SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC | SCRIPT_VERIFY_DERSIG |
+    SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_NULLDUMMY | SCRIPT_VERIFY_SIGPUSHONLY |
+    SCRIPT_VERIFY_MINIMALDATA | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS |
+    SCRIPT_VERIFY_CLEANSTACK | SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY |
+    SCRIPT_VERIFY_CHECKSEQUENCEVERIFY | SCRIPT_VERIFY_MINIMALIF |
+    SCRIPT_VERIFY_NULLFAIL | SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE |
+    SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_ENABLE_REPLAY_PROTECTION |
+    SCRIPT_ENABLE_CHECKDATASIG;
+
+/**
  * Valid signature cache, to avoid doing expensive ECDSA signature checking
  * twice for every transaction (once when accepted into memory pool, and
  * again when accepted into the block chain)
@@ -54,7 +69,8 @@ public:
 class CSignatureCache
 {
 private:
-    //! Entries are SHA256(nonce || signature hash || public key || signature):
+    //! Entries are SHA256(nonce || flags || signature hash || public key ||
+    //! signature):
     uint256 nonce;
     typedef CuckooCache::cache<uint256, SignatureCacheHasher> map_type;
     map_type setValid;
@@ -62,13 +78,15 @@ private:
 
 public:
     CSignatureCache() { GetRandBytes(nonce.begin(), 32); }
-    void ComputeEntry(uint256 &entry,
-        const uint256 &hash,
-        const std::vector<unsigned char> &vchSig,
-        const CPubKey &pubkey)
+
+    void ComputeEntry(uint256 &entry, const std::vector<uint8_t> &vchSig,
+                      const CPubKey &pubkey, const uint256 &hash,
+                      uint32_t flags)
     {
+        flags &= ~INVARIANT_FLAGS;
         CSHA256()
             .Write(nonce.begin(), 32)
+            .Write(reinterpret_cast<uint8_t *>(&flags), sizeof(flags))
             .Write(hash.begin(), 32)
             .Write(&pubkey[0], pubkey.size())
             .Write(&vchSig[0], vchSig.size())
@@ -109,17 +127,66 @@ void InitSignatureCache()
         (nElems * sizeof(uint256)) >> 20, nMaxCacheSize >> 20, nElems);
 }
 
+template <typename F>
+bool RunMemoizedCheck(const std::vector<uint8_t> &vchSig, const CPubKey &pubkey,
+                      const uint256 &sighash, uint32_t flags, bool storeOrErase,
+                      const F &fun) {
+    uint256 entry;
+    signatureCache.ComputeEntry(entry, vchSig, pubkey, sighash, flags);
+    if (signatureCache.Get(entry, !storeOrErase)) {
+        return true;
+    }
+
+    if (!fun()) return false;
+    
+    if (storeOrErase)
+    {
+        signatureCache.Set(entry);
+    }
+    return true;
+}
+
+bool CachingTransactionSignatureChecker::IsCached(const std::vector<uint8_t> &vchSig, const CPubKey &pubkey,
+                                                  const uint256 &sighash) const
+{
+    return RunMemoizedCheck(vchSig, pubkey, sighash, nFlags, true, [] { return false; });
+}
+
+
+#if 0 // TODO
 bool CachingTransactionSignatureChecker::VerifySignature(const std::vector<unsigned char> &vchSig,
     const CPubKey &pubkey,
     const uint256 &sighash) const
 {
     uint256 entry;
     signatureCache.ComputeEntry(entry, sighash, vchSig, pubkey);
-    if (signatureCache.Get(entry, !store))
+
+    if (signatureCache.Get(entry))
+    {
+        if (!store)
+        {
+            signatureCache.Erase(entry);
+        }
         return true;
+    }
+
     if (!TransactionSignatureChecker::VerifySignature(vchSig, pubkey, sighash))
         return false;
+
     if (store)
+    {
         signatureCache.Set(entry);
+    }
     return true;
 }
+#endif
+
+bool CachingTransactionSignatureChecker::VerifySignature(
+    const std::vector<uint8_t> &vchSig, const CPubKey &pubkey,
+    const uint256 &sighash) const
+{
+    return RunMemoizedCheck(vchSig, pubkey, sighash, nFlags, store, [&] {
+        return TransactionSignatureChecker::VerifySignature(vchSig, pubkey, sighash);
+    });
+}
+
