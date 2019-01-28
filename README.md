@@ -57,6 +57,7 @@ They are not complete guides, but include notes on the necessary libraries, comp
 
 - [Developer Notes](doc/developer-notes.md)
 - [Contributing](CONTRIBUTING.md)
+- [BUIP, BIP and Bitcoin Cash Specifications](doc/bips-buips-specifications.md)
 - [Multiwallet Qt Development](doc/multiwallet-qt.md)
 - [Release Notes](doc/release-notes.md)
 - [Release Process](doc/release-process.md)
