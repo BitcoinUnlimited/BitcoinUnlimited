@@ -238,7 +238,7 @@ private:
     boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket_;
     boost::asio::streambuf response_;
     std::string content_;
-    boost::scoped_ptr<boost::asio::deadline_timer> timer_;
+    std::unique_ptr<boost::asio::deadline_timer> timer_;
     std::string url_path_;
     std::string url_host_;
     std::string cert_hostname_;
