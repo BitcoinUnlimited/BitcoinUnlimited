@@ -365,9 +365,9 @@ For example, a 1GB dbcache would be
 bitcoind -dbcache=1000
 ```
 Similarly you can also add the setting to the bitcoin.conf file located in your installation folder. In the config file a simlilar entry would be
-```
-> dbcache=1000
-```
+
+ > `dbcache=1000`
+
 When entering the size
 try to give it the maximum that your system can afford while still leaving enough memory for other processes.
 
@@ -378,10 +378,14 @@ have reported issues with not being able to find enough useful connections. If t
 For instance
 
 ```
-> bitcoind -maxoutconnections=30
+bitcoind -maxoutconnections=30
 ```
+
 will give you 30 outbound connections and should be more than enough in the event that the
 node is having difficulty.
+
+This can also be added to the config file with
+ > `maxoutconnections=30`
 
 
 # Getting help
