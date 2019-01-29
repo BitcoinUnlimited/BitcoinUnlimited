@@ -53,7 +53,7 @@ UniValue gettweak(const UniValue &params, bool fHelp)
     {
         for (CTweakMap::iterator item = tweaks.begin(); item != tweaks.end(); ++item)
         {
-            ret.push_back(Pair(item->second->GetName(), item->second->Get()));
+            ret.pushKV(item->second->GetName(), item->second->Get());
         }
     }
 
@@ -74,9 +74,9 @@ UniValue gettweak(const UniValue &params, bool fHelp)
             if (wildmatch(match_str, item->first))
             {
                 if (help)
-                    ret.push_back(Pair(item->second->GetName(), item->second->GetHelp()));
+                    ret.pushKV(item->second->GetName(), item->second->GetHelp());
                 else
-                    ret.push_back(Pair(item->second->GetName(), item->second->Get()));
+                    ret.pushKV(item->second->GetName(), item->second->Get());
             }
         }
     }

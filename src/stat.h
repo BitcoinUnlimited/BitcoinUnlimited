@@ -632,9 +632,9 @@ public:
     operator UniValue() const
     {
         UniValue ret(UniValue::VOBJ);
-        ret.push_back(Pair("min", (UniValue)min));
-        ret.push_back(Pair("val", (UniValue)val));
-        ret.push_back(Pair("max", (UniValue)max));
+        ret.pushKV("min", (UniValue)min);
+        ret.pushKV("val", (UniValue)val);
+        ret.pushKV("max", (UniValue)max);
         return ret;
     }
 };
