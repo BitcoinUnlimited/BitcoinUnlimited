@@ -427,15 +427,6 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
     if (params.size() > 1)
         fVerbose = (params[1].get_int() != 0);
 
-    CBlockIndex *pblockindex = nullptr;
-    pblockindex = LookupBlockIndex(hashBlock);
-    if (!pblockindex)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-
-    CBlock block;
-    if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
-
     int64_t ancestorcount = 0;
     if (params.size() > 2)
     {
@@ -446,14 +437,45 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
         }
     }
 
+    CBlockIndex *pblockindex = nullptr;
     UniValue resultSet(UniValue::VARR);
     int64_t fetched = 0;
-    while (fetched < 1 + ancestorcount)
+    bool foundOne = false;
+    int64_t limit = acestorcount + 1;
+    while (fetched < limit)
     {
+        pblockindex = LookupBlockIndex(hashBlock);
+        if (!pblockindex)
+        {
+            if (foundOne)
+            {
+                break;
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+            }
+        }
+
+        CBlock block;
+        if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+        {
+            if (foundOne)
+            {
+                break;
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+            }
+        }
+
         UniValue blockResults(UniValue::VARR);
         getRawTransactionsBlock(blockResults, block, fVerbose, true);
         resultSet.push_back(blockResults);
         fetched++;
+        foundOne = true;
+        pblockindex = pblockindex->pprev;
     }
     return resultSet;
 }
