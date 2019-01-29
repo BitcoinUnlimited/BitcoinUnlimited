@@ -218,6 +218,246 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
     return result;
 }
 
+void getRawTransactionsBlock(UniValue &arrayObject, const CBlock &block, bool fVerbose, bool includeBlockHash = false)
+{
+    if (includeBlockHash)
+    {
+        arrayObject.push_back(Pair("block_hash", block.GetHash().GetHex()));
+    }
+    for (auto tx : block.vtx)
+    {
+        string strHex = EncodeHexTx(*tx);
+
+        if (!fVerbose)
+        {
+            arrayObject.push_back(Pair(tx->GetHash().GetHex(), strHex));
+            continue;
+        }
+
+        UniValue result(UniValue::VOBJ);
+        result.push_back(Pair("hex", strHex));
+        TxToJSON(*tx, block.GetHash(), result);
+        arrayObject.push_back(result);
+    }
+}
+
+UniValue getrawtransactions(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 2)
+        throw runtime_error(
+            "getrawtransactions \"blockhash\" ( verbose )\n"
+            "\nReturn the raw transaction data for a given block.\n"
+            "\nIf verbose=0, each tx is a string that is serialized, hex-encoded data.\n"
+            "If verbose is non-zero, returns an array of Objects with information about each tx in the block.\n"
+
+            "\nArguments:\n"
+            "1. \"hashblock\" (string, required) The block hash\n"
+            "2. verbose       (numeric, optional, default=0) If 0, return an array of txid:hexstring, other return an "
+            "array of tx json object\n"
+
+            "\nResult (if verbose is not set or set to 0):\n"
+            "[\n"
+            "  \"data\",      (string) The serialized, hex-encoded data for 'txid'\n"
+            "  ...\n"
+            "]\n"
+
+            "\nResult (if verbose > 0):\n"
+            "[\n"
+            "  {\n"
+            "    \"hex\" : \"data\",       (string) The serialized, hex-encoded data for 'txid'\n"
+            "    \"txid\" : \"id\",        (string) The transaction id (same as provided)\n"
+            "    \"size\" : n,             (numeric) The transaction size\n"
+            "    \"version\" : n,          (numeric) The version\n"
+            "    \"locktime\" : ttt,       (numeric) The lock time\n"
+            "    \"vin\" : [               (array of json objects)\n"
+            "       {\n"
+            "         \"txid\": \"id\",    (string) The transaction id\n"
+            "         \"vout\": n,         (numeric) \n"
+            "         \"scriptSig\": {     (json object) The script\n"
+            "           \"asm\": \"asm\",  (string) asm\n"
+            "           \"hex\": \"hex\"   (string) hex\n"
+            "         },\n"
+            "         \"sequence\": n      (numeric) The script sequence number\n"
+            "       }\n"
+            "       ,...\n"
+            "      ],\n"
+            "    \"vout\" : [              (array of json objects)\n"
+            "       {\n"
+            "         \"value\" : x.xxx,            (numeric) The value in " +
+            CURRENCY_UNIT +
+            "\n"
+            "         \"n\" : n,                    (numeric) index\n"
+            "         \"scriptPubKey\" : {          (json object)\n"
+            "           \"asm\" : \"asm\",          (string) the asm\n"
+            "           \"hex\" : \"hex\",          (string) the hex\n"
+            "           \"reqSigs\" : n,            (numeric) The required sigs\n"
+            "           \"type\" : \"pubkeyhash\",  (string) The type, eg 'pubkeyhash'\n"
+            "           \"addresses\" : [           (json array of string)\n"
+            "             \"bitcoinaddress\"        (string) bitcoin address\n"
+            "             ,...\n"
+            "           ]\n"
+            "         }\n"
+            "       }\n"
+            "      ,...\n"
+            "      ],\n"
+            "    \"blockhash\" : \"hash\",   (string) the block hash\n"
+            "    \"confirmations\" : n,      (numeric) The confirmations\n"
+            "    \"time\" : ttt,             (numeric) The transaction time in seconds since epoch (Jan 1 1970 GMT)\n"
+            "    \"blocktime\" : ttt         (numeric) The block time in seconds since epoch (Jan 1 1970 GMT)\n"
+            "  },\n"
+            "  ...\n"
+            "]\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getrawtransactions", "\"hashblock\"") +
+            HelpExampleCli("getrawtransactions", "\"hashblock\" 1") +
+            HelpExampleRpc("getrawtransactions", "\"hashblock\", 1"));
+
+    LOCK(cs_main);
+
+    uint256 hashBlock = ParseHashV(params[0], "parameter 1");
+
+    bool fVerbose = false;
+    if (params.size() > 1)
+        fVerbose = (params[1].get_int() != 0);
+
+    CBlockIndex *pblockindex = nullptr;
+    pblockindex = LookupBlockIndex(hashBlock);
+    if (!pblockindex)
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+
+    CBlock block;
+    if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+
+    UniValue resultSet(UniValue::VARR);
+    getRawTransactionsBlock(resultSet, block, fVerbose);
+
+    return resultSet;
+}
+
+UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 3)
+        throw runtime_error(
+            "getrawtransactionssince \"blockhash\" ( verbose ) ( ancestorcount )\n"
+            "\nReturn the raw transaction data for a given block and its ancestorcount ancestors.\n"
+            "\nIf verbose=0, each tx is a string that is serialized, hex-encoded data.\n"
+            "If verbose is non-zero, returns an array of Objects with information about each tx in the block.\n"
+
+            "\nArguments:\n"
+            "1. \"hashblock\" (string, required) The block hash\n"
+            "2. verbose       (numeric, optional, default=0) If 0, return an array of txid:hexstring, other return an "
+            "array of tx json object\n"
+            "3. childcount    (numeric, optional, default=0) If >0, Fetch information for ancestorcount generations of "
+            "parent blocks of hashblock in addition to the information for hashblock"
+
+            "\nResult (if verbose is not set or set to 0):\n"
+            "[\n"
+            "  {\n"
+            "    \"block_hash\" : \"hash\",   (string) the block hash\n"
+            "    \"data\"      (string) The serialized, hex-encoded data for 'txid'\n"
+            "  },\n"
+            "  ...\n"
+            "]\n"
+
+            "\nResult (if verbose > 0):\n"
+            "[\n"
+            "  {\n"
+            "    \"block_hash\" : \"hash\",   (string) the block hash\n"
+            "    [\n"
+            "      {\n"
+            "      \"hex\" : \"data\",       (string) The serialized, hex-encoded data for 'txid'\n"
+            "      \"txid\" : \"id\",        (string) The transaction id (same as provided)\n"
+            "      \"size\" : n,             (numeric) The transaction size\n"
+            "      \"version\" : n,          (numeric) The version\n"
+            "      \"locktime\" : ttt,       (numeric) The lock time\n"
+            "      \"vin\" : [               (array of json objects)\n"
+            "         {\n"
+            "           \"txid\": \"id\",    (string) The transaction id\n"
+            "           \"vout\": n,         (numeric) \n"
+            "           \"scriptSig\": {     (json object) The script\n"
+            "             \"asm\": \"asm\",  (string) asm\n"
+            "             \"hex\": \"hex\"   (string) hex\n"
+            "           },\n"
+            "           \"sequence\": n      (numeric) The script sequence number\n"
+            "         }\n"
+            "         ,...\n"
+            "        ],\n"
+            "      \"vout\" : [              (array of json objects)\n"
+            "         {\n"
+            "           \"value\" : x.xxx,            (numeric) The value in " +
+            CURRENCY_UNIT +
+            "\n"
+            "           \"n\" : n,                    (numeric) index\n"
+            "           \"scriptPubKey\" : {          (json object)\n"
+            "             \"asm\" : \"asm\",          (string) the asm\n"
+            "             \"hex\" : \"hex\",          (string) the hex\n"
+            "             \"reqSigs\" : n,            (numeric) The required sigs\n"
+            "             \"type\" : \"pubkeyhash\",  (string) The type, eg 'pubkeyhash'\n"
+            "             \"addresses\" : [           (json array of string)\n"
+            "               \"bitcoinaddress\"        (string) bitcoin address\n"
+            "               ,...\n"
+            "             ]\n"
+            "           }\n"
+            "         }\n"
+            "         ,...\n"
+            "        ],\n"
+            "      \"blockhash\" : \"hash\",   (string) the block hash\n"
+            "      \"confirmations\" : n,      (numeric) The confirmations\n"
+            "      \"time\" : ttt,             (numeric) The transaction time in seconds since epoch (Jan 1 1970 GMT)\n"
+            "      \"blocktime\" : ttt         (numeric) The block time in seconds since epoch (Jan 1 1970 GMT)\n"
+            "      },\n"
+            "      ...\n"
+            "    ],\n"
+            "    ...\n"
+            "  },\n"
+            "  ..."
+            "]\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getrawtransactionssince", "\"hashblock\"") +
+            HelpExampleCli("getrawtransactionssince", "\"hashblock\" 1") +
+            HelpExampleCli("getrawtransactionssince", "\"hashblock\" 1 10") +
+            HelpExampleRpc("getrawtransactionssince", "\"hashblock\", 1 10"));
+
+    LOCK(cs_main);
+
+    uint256 hashBlock = ParseHashV(params[0], "parameter 1");
+
+    bool fVerbose = false;
+    if (params.size() > 1)
+        fVerbose = (params[1].get_int() != 0);
+
+    CBlockIndex *pblockindex = nullptr;
+    pblockindex = LookupBlockIndex(hashBlock);
+    if (!pblockindex)
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+
+    CBlock block;
+    if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+
+    int64_t ancestorcount = 0;
+    if (params.size() > 2)
+    {
+        int64_t arg = params[2].get_int64();
+        if (arg > 0)
+        {
+            ancestorcount = arg;
+        }
+    }
+
+    UniValue resultSet(UniValue::VARR);
+    int64_t fetched = 0;
+    while (fetched < 1 + ancestorcount)
+    {
+        UniValue blockResults(UniValue::VARR);
+        getRawTransactionsBlock(blockResults, block, fVerbose, true);
+        resultSet.push_back(blockResults);
+        fetched++;
+    }
+    return resultSet;
+}
+
 UniValue gettxoutproof(const UniValue &params, bool fHelp)
 {
     if (fHelp || (params.size() != 1 && params.size() != 2))
@@ -1061,6 +1301,8 @@ static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
     //  --------------------- ------------------------  -----------------------  ----------
     {"rawtransactions", "getrawtransaction", &getrawtransaction, true},
+    {"rawtransactions", "getrawtransactions", &getrawtransactions, true},
+    {"rawtransactions", "getrawtransactionssince", &getrawtransactionssince, true},
     {"rawtransactions", "createrawtransaction", &createrawtransaction, true},
     {"rawtransactions", "decoderawtransaction", &decoderawtransaction, true},
     {"rawtransactions", "decodescript", &decodescript, true},
