@@ -506,18 +506,18 @@ static UniValue GetCompactBlockStats()
 {
     UniValue obj(UniValue::VOBJ);
     bool enabled = IsCompactBlocksEnabled();
-    obj.push_back(Pair("enabled", enabled));
+    obj.pushKV("enabled", enabled);
     if (enabled)
     {
-        obj.push_back(Pair("summary", compactdata.ToString()));
-        obj.push_back(Pair("mempool_limiter", compactdata.MempoolLimiterBytesSavedToString()));
-        obj.push_back(Pair("inbound_percent", compactdata.InBoundPercentToString()));
-        obj.push_back(Pair("outbound_percent", compactdata.OutBoundPercentToString()));
-        obj.push_back(Pair("response_time", compactdata.ResponseTimeToString()));
-        obj.push_back(Pair("validation_time", compactdata.ValidationTimeToString()));
-        obj.push_back(Pair("compact_block_size", compactdata.CompactBlockToString()));
-        obj.push_back(Pair("compact_full_tx", compactdata.FullTxToString()));
-        obj.push_back(Pair("rerequested", compactdata.ReRequestedTxToString()));
+        obj.pushKV("summary", compactdata.ToString());
+        obj.pushKV("mempool_limiter", compactdata.MempoolLimiterBytesSavedToString());
+        obj.pushKV("inbound_percent", compactdata.InBoundPercentToString());
+        obj.pushKV("outbound_percent", compactdata.OutBoundPercentToString());
+        obj.pushKV("response_time", compactdata.ResponseTimeToString());
+        obj.pushKV("validation_time", compactdata.ValidationTimeToString());
+        obj.pushKV("compact_block_size", compactdata.CompactBlockToString());
+        obj.pushKV("compact_full_tx", compactdata.FullTxToString());
+        obj.pushKV("rerequested", compactdata.ReRequestedTxToString());
     }
     return obj;
 }
