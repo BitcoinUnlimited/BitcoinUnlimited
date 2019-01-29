@@ -138,12 +138,10 @@ They are not complete guides, but include notes on the necessary libraries, comp
 
 # Development
 
-
-
-
 - [Developer Notes](doc/developer-notes.md)
 - [Contributing](CONTRIBUTING.md)
 - [BUIP, BIP and Bitcoin Cash Specifications](doc/bips-buips-specifications.md)
+- [Bitcoin Unlimited Improvement Proposal Archive](https://github.com/BitcoinUnlimited/BUIP)
 - [Multiwallet Qt Development](doc/multiwallet-qt.md)
 - [Release Notes](doc/release-notes.md)
 - [Release Process](doc/release-process.md)
@@ -155,6 +153,16 @@ They are not complete guides, but include notes on the necessary libraries, comp
 - [Assets Attribution](contrib/debian/copyright)
 - [Files](doc/files.md)
 - [Fuzz-testing](doc/fuzzing.md)
+
+
+# Online resources
+
+ - [Issue Tracker](https://github.com/BitcoinUnlimited/BitcoinUnlimited/issues)
+ - [The Bitcoin Forum](https://www.bitco.in/forum)
+ - [Reddit /r/btc](https://www.reddit.com/r/btc)
+ - [Reddit /r/bitcoin_unlimited](https://www.reddit.com/r/bitcoin_unlimited)
+ - [Slack Channel](https://bitcoinunlimited.slack.com/)
+
 
 
 # License
