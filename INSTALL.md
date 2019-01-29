@@ -362,10 +362,12 @@ bitcoind -dbcache=<your size in MB>
 ```
 For example, a 1GB dbcache would be 
 ```
-bitcoind -dbcache=1000```
+bitcoind -dbcache=1000
+```
 Similarly you can also add the setting to the bitcoin.conf file located in your installation folder. In the config file a simlilar entry would be
 ```
-> dbcache=1000```
+> dbcache=1000
+```
 When entering the size
 try to give it the maximum that your system can afford while still leaving enough memory for other processes.
 
@@ -374,6 +376,7 @@ try to give it the maximum that your system can afford while still leaving enoug
 It is generally fine to leave the default outbound connection settings for doing a sync, however, at times some users
 have reported issues with not being able to find enough useful connections. If that happens you can change this setting to override the default.
 For instance
+
 ```
 > bitcoind -maxoutconnections=30
 ```
