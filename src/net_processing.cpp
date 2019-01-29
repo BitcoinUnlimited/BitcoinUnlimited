@@ -2388,6 +2388,8 @@ bool SendMessages(CNode *pto)
             }
         }
 
+        // If the chain is not entirely sync'd then look for new blocks to download.
+        if (!IsChainSyncd())
         {
             TRY_LOCK(cs_main, locked);
             if (locked)

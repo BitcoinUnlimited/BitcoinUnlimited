@@ -939,7 +939,13 @@ void CRequestManager::UpdateBlockAvailability(NodeId nodeid, const uint256 &hash
 
 void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
 {
-    int nBlocksInFlight = mapRequestManagerNodeState[pto->GetId()].nBlocksInFlight;
+    AssertLockHeld(cs_main);
+
+    int nBlocksInFlight = 0;
+    {
+        LOCK(cs_objDownloader);
+        nBlocksInFlight = mapRequestManagerNodeState[pto->GetId()].nBlocksInFlight;
+    }
     if (!pto->fDisconnectRequest && !pto->fDisconnect && !pto->fClient &&
         nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
     {
