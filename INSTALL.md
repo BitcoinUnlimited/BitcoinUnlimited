@@ -1,5 +1,8 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 61001e420b913309345a38fd358d18afee70fae4
 # Installing Bitcoin Unlimited
 
 This document describes how to install and configure Bitcoin Unlimited.
@@ -12,6 +15,9 @@ files for your system.
 
 If you are moving from another Bitcoin compatible implementations (Core, Classic, XT, ABC) to BU, make sure to follow this plan before moving:
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 61001e420b913309345a38fd358d18afee70fae4
 
 - backup your wallet (if any)
 - make a backup of the `~/.bitcoin` dir
@@ -111,6 +117,9 @@ make -j$NUMCPUS
 sudo make install #(will place them in /usr/local/bin, this step is to be considered optional.)
 ```
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 61001e420b913309345a38fd358d18afee70fae4
 
 ## Miscellaneous
 
@@ -181,6 +190,7 @@ This can also be added to the config file with
  - [Slack Channel](https://bitcoinunlimited.slack.com/)
 
 
+<<<<<<< HEAD
 =======
 # Building Bitcoin
 =======
@@ -398,3 +408,5 @@ This can also be added to the config file with
 
 
 >>>>>>> Make INSTALL.md file more informative
+=======
+>>>>>>> 61001e420b913309345a38fd358d18afee70fae4

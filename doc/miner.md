@@ -1,11 +1,14 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 [Website](https://www.bitcoinunlimited.info)  | [Download](https://www.bitcoinunlimited.info/download) | [Setup](../doc/README.md)  |  [Xthin](bu-xthin.md)  |  [Xpedited](bu-xpedited-forwarding.md)  |   [Miner](miner.md)
 
 >>>>>>> Fix links
 =======
 >>>>>>> Remove top links, minor cleanup
+=======
+>>>>>>> 61001e420b913309345a38fd358d18afee70fae4
 Using Bitcoin Unlimited for Mining
 ==================================
 
