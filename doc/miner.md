@@ -1,5 +1,3 @@
-[Website](https://www.bitcoinunlimited.info)  | [Download](https://www.bitcoinunlimited.info/download) | [Setup](../doc/README.md)  |  [Xthin](bu-xthin.md)  |  [Xpedited](bu-xpedited-forwarding.md)  |   [Miner](miner.md)
-
 Using Bitcoin Unlimited for Mining
 ==================================
 
@@ -282,8 +280,8 @@ Filling a new node's transaction memory pool
 When you restart bitcoind, the memory pool starts empty.  If a block is found quickly, this could result in a block with few transactions.  It is possible to "prime" a new instance of bitcoind with the memory pool of a different Bitcoin Unlimited node.  To do so, go to the CLI on the node that has a full mempool, connect to your new node, and push the transactions to it.
 
 ```sh
-`bitcoin-cli addnode <new node's IP:port> onetry`
-`bitcoin-cli pushtx <new node's IP:port>`
+bitcoin-cli addnode <new node's IP:port> onetry
+bitcoin-cli pushtx <new node's IP:port>
 ```
 
 Validating unsolved blocks
@@ -294,6 +292,6 @@ Bitcoin Unlimited can be used to validate block templates received from other Bi
 The block validation RPC uses the same call syntax as the "submitblock" RPC, and returns a JSONRPCException if the block validation fails.  See "qa/rpc-tests/validateblocktemplate.py" for detailed python examples.
 
 ```sh
-`bitcoin-cli validateblocktemplate <hex encoded block>`
+bitcoin-cli validateblocktemplate <hex encoded block>
 ```
 
