@@ -312,8 +312,6 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
             HelpExampleCli("getrawtransactions", "\"hashblock\" 1") +
             HelpExampleRpc("getrawtransactions", "\"hashblock\", 1"));
 
-    LOCK(cs_main);
-
     uint256 hashBlock = ParseHashV(params[0], "parameter 1");
 
     bool fVerbose = false;
@@ -418,8 +416,6 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             HelpExampleCli("getrawtransactionssince", "\"hashblock\" 1") +
             HelpExampleCli("getrawtransactionssince", "\"hashblock\" 1 10") +
             HelpExampleRpc("getrawtransactionssince", "\"hashblock\", 1 10"));
-
-    LOCK(cs_main);
 
     uint256 hashBlock = ParseHashV(params[0], "parameter 1");
 
