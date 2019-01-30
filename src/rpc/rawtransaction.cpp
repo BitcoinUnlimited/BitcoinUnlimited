@@ -619,20 +619,21 @@ UniValue gettxoutproofs(const UniValue &params, bool fHelp)
 
     for (auto txid : setTxids)
     {
-        std::set<uint256> setTxid;
-        setTxid.insert(txid);
-        unsigned int ntxFound = 0;
+        bool ntxFound = false;
         for (const auto &tx : block.vtx)
         {
-            if (setTxids.count(tx->GetHash()))
+            if (txid == tx->GetHash())
             {
-                ntxFound++;
+                ntxFound = true;
+                break;
             }
         }
-        if (ntxFound != 1)
+        if (!ntxFound)
         {
             continue;
         }
+        std::set<uint256> setTxid;
+        setTxid.insert(txid);
         CDataStream ssMB(SER_NETWORK, PROTOCOL_VERSION);
         CMerkleBlock mb(block, setTxid);
         ssMB << mb;
