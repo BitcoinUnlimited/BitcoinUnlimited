@@ -85,7 +85,7 @@ To get more help on how to use the RPC commands you can type in "bitcoin-cli hel
 then simply type "help expedited".
 
 
-## 3. Putting limits on forwarding
+## Putting limits on forwarding
 
 
 By default the maximum number of recipients that can request forwarding from your node is set to 3.  If you wish to limit that or reduce that
