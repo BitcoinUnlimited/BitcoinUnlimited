@@ -241,7 +241,7 @@ void getRawTransactionsBlock(UniValue &arrayObject, const CBlock &block, bool fV
     }
 }
 
-UniValue getrawtransactions(const UniValue &params, bool fHelp)
+UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error(
@@ -441,7 +441,7 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
     UniValue resultSet(UniValue::VARR);
     int64_t fetched = 0;
     bool foundOne = false;
-    int64_t limit = acestorcount + 1;
+    int64_t limit = ancestorcount + 1;
     while (fetched < limit)
     {
         pblockindex = LookupBlockIndex(hashBlock);
@@ -1323,7 +1323,7 @@ static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
     //  --------------------- ------------------------  -----------------------  ----------
     {"rawtransactions", "getrawtransaction", &getrawtransaction, true},
-    {"rawtransactions", "getrawtransactions", &getrawtransactions, true},
+    {"rawtransactions", "getrawblocktransactions", &getrawblocktransactions, true},
     {"rawtransactions", "getrawtransactionssince", &getrawtransactionssince, true},
     {"rawtransactions", "createrawtransaction", &createrawtransaction, true},
     {"rawtransactions", "decoderawtransaction", &decoderawtransaction, true},
