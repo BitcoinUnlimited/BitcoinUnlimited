@@ -222,7 +222,7 @@ void getRawTransactionsBlock(UniValue &arrayObject, const CBlock &block, bool fV
 {
     if (includeBlockHash)
     {
-        arrayObject.push_back(Pair("block_hash", block.GetHash().GetHex()));
+        arrayObject.pushKV("block_hash", block.GetHash().GetHex());
     }
     for (auto tx : block.vtx)
     {
@@ -230,12 +230,12 @@ void getRawTransactionsBlock(UniValue &arrayObject, const CBlock &block, bool fV
 
         if (!fVerbose)
         {
-            arrayObject.push_back(Pair(tx->GetHash().GetHex(), strHex));
+            arrayObject.pushKV(tx->GetHash().GetHex(), strHex);
             continue;
         }
 
         UniValue result(UniValue::VOBJ);
-        result.push_back(Pair("hex", strHex));
+        result.pushKV("hex", strHex);
         TxToJSON(*tx, block.GetHash(), result);
         arrayObject.push_back(result);
     }
@@ -637,7 +637,7 @@ UniValue gettxoutproofs(const UniValue &params, bool fHelp)
         CMerkleBlock mb(block, setTxid);
         ssMB << mb;
         std::string strHex = HexStr(ssMB.begin(), ssMB.end());
-        resultSet.push_back(Pair(txid.ToString(), strHex));
+        resultSet.pushKV(txid.ToString(), strHex);
     }
     return resultSet;
 }
