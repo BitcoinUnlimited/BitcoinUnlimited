@@ -629,7 +629,7 @@ UniValue gettxoutproofs(const UniValue &params, bool fHelp)
                 ntxFound++;
             }
         }
-        if(ntxFound != 1)
+        if (ntxFound != 1)
         {
             continue;
         }
@@ -637,7 +637,7 @@ UniValue gettxoutproofs(const UniValue &params, bool fHelp)
         CMerkleBlock mb(block, setTxid);
         ssMB << mb;
         std::string strHex = HexStr(ssMB.begin(), ssMB.end());
-        resultSet.push_back(Pair(txid.ToString(),strHex));
+        resultSet.push_back(Pair(txid.ToString(), strHex));
     }
     return resultSet;
 }
@@ -1410,8 +1410,7 @@ static const CRPCCommand commands[] = {
     {"rawtransactions", "enqueuerawtransaction", &enqueuerawtransaction, false},
     {"rawtransactions", "signrawtransaction", &signrawtransaction, false}, /* uses wallet if enabled */
 
-    {"blockchain", "gettxoutproof", &gettxoutproof, true},
-    {"blockchain", "gettxoutproofs", &gettxoutproofs, true},
+    {"blockchain", "gettxoutproof", &gettxoutproof, true}, {"blockchain", "gettxoutproofs", &gettxoutproofs, true},
     {"blockchain", "verifytxoutproof", &verifytxoutproof, true},
 };
 
