@@ -564,6 +564,84 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
     return strHex;
 }
 
+UniValue gettxoutproofs(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 2)
+        throw runtime_error(
+            "gettxoutproofs [\"txid\",...] ( blockhash )\n"
+            "\nReturns a hex-encoded proof that \"txid\" was included in a block.\n"
+            "\nNOTE: By default this function only works sometimes. This is when there is an\n"
+            "unspent output in the utxo for this transaction. To make it always work,\n"
+            "you need to maintain a transaction index, using the -txindex command line option or\n"
+            "specify the block in which the transaction is included in manually (by blockhash).\n"
+            "\nReturn the raw transaction data.\n"
+            "\nArguments:\n"
+            "1. \"txids\"       (string) A json array of txids to filter\n"
+            "    [\n"
+            "      \"txid\"     (string) A transaction hash\n"
+            "      ,...\n"
+            "    ]\n"
+            "2. \"block hash\"  (string) Looks for txid in the block with this hash\n"
+            "\nResult:\n"
+            "[\n"
+            "   \"txid\":\"data\",           (string) A string that is a serialized, hex-encoded data for the proof.\n"
+            "   ..."
+            "]\n");
+
+    set<uint256> setTxids;
+    uint256 oneTxid;
+    UniValue txids = params[0].get_array();
+    for (unsigned int idx = 0; idx < txids.size(); idx++)
+    {
+        const UniValue &txid = txids[idx];
+        if (txid.get_str().length() != 64 || !IsHex(txid.get_str()))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid txid ") + txid.get_str());
+        uint256 hash(uint256S(txid.get_str()));
+        if (setTxids.count(hash))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated txid: ") + txid.get_str());
+        setTxids.insert(hash);
+        oneTxid = hash;
+    }
+
+    CBlockIndex *pblockindex = nullptr;
+
+    uint256 hashBlock;
+    hashBlock = uint256S(params[1].get_str());
+    pblockindex = LookupBlockIndex(hashBlock);
+    if (!pblockindex)
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+
+    CBlock block;
+    if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+
+    UniValue resultSet(UniValue::VARR);
+
+    for (auto txid : setTxids)
+    {
+        std::set<uint256> setTxid;
+        setTxid.insert(txid);
+        unsigned int ntxFound = 0;
+        for (const auto &tx : block.vtx)
+        {
+            if (setTxids.count(tx->GetHash()))
+            {
+                ntxFound++;
+            }
+        }
+        if(ntxFound != 1)
+        {
+            continue;
+        }
+        CDataStream ssMB(SER_NETWORK, PROTOCOL_VERSION);
+        CMerkleBlock mb(block, setTxid);
+        ssMB << mb;
+        std::string strHex = HexStr(ssMB.begin(), ssMB.end());
+        resultSet.push_back(Pair(txid.ToString(),strHex));
+    }
+    return resultSet;
+}
+
 UniValue verifytxoutproof(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
@@ -1332,7 +1410,9 @@ static const CRPCCommand commands[] = {
     {"rawtransactions", "enqueuerawtransaction", &enqueuerawtransaction, false},
     {"rawtransactions", "signrawtransaction", &signrawtransaction, false}, /* uses wallet if enabled */
 
-    {"blockchain", "gettxoutproof", &gettxoutproof, true}, {"blockchain", "verifytxoutproof", &verifytxoutproof, true},
+    {"blockchain", "gettxoutproof", &gettxoutproof, true},
+    {"blockchain", "gettxoutproofs", &gettxoutproofs, true},
+    {"blockchain", "verifytxoutproof", &verifytxoutproof, true},
 };
 
 void RegisterRawTransactionRPCCommands(CRPCTable &table)
