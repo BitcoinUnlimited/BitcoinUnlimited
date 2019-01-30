@@ -91,20 +91,32 @@ CIblt::CIblt()
     version = 0;
 }
 
-CIblt::CIblt(size_t _expectedNumEntries) : version(0), n_hash(0), is_modified(false), salt(0)
+CIblt::CIblt(uint64_t _version)
 {
+    salt = 0;
+    n_hash = 1;
+    is_modified = false;
+
+    CIblt::version = _version;
+}
+
+CIblt::CIblt(size_t _expectedNumEntries, uint64_t _version) : n_hash(0), is_modified(false), salt(0)
+{
+    CIblt::version = _version;
     CIblt::resize(_expectedNumEntries);
 }
 
-CIblt::CIblt(size_t _expectedNumEntries, uint32_t _salt) : version(0), n_hash(0), is_modified(false)
+CIblt::CIblt(size_t _expectedNumEntries, uint32_t _salt, uint64_t _version) : n_hash(0), is_modified(false)
 {
+    CIblt::version = _version;
     CIblt::salt = _salt;
     CIblt::resize(_expectedNumEntries);
 }
 
-CIblt::CIblt(const CIblt &other) : version(0), n_hash(0), is_modified(false)
+CIblt::CIblt(const CIblt &other) : n_hash(0), is_modified(false)
 {
     salt = other.salt;
+    version = other.version;
     n_hash = other.n_hash;
     hashTable = other.hashTable;
     mapHashIdxSeeds = other.mapHashIdxSeeds;
@@ -351,3 +363,15 @@ std::string CIblt::DumpTable() const
 
 size_t CIblt::OptimalNHash(size_t expectedNumEntries) { return CIbltParams::Lookup(expectedNumEntries).numhashes; }
 float CIblt::OptimalOverhead(size_t expectedNumEntries) { return CIbltParams::Lookup(expectedNumEntries).overhead; }
+uint8_t CIblt::MaxNHash()
+{
+    uint8_t maxHashes = 4;
+
+    for (auto &pair : CIbltParams::paramMap)
+    {
+        if (pair.second.numhashes > maxHashes)
+            maxHashes = pair.second.numhashes;
+    }
+
+    return maxHashes;
+}

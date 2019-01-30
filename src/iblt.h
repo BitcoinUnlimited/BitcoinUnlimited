@@ -73,11 +73,12 @@ class CIblt
 public:
     // Default constructor builds a 0 size IBLT, so is meant for two-phase construction.  Call resize() before use
     CIblt();
+    CIblt(uint64_t version);
     // Pass the expected number of entries in the IBLT table. If the number of entries exceeds
     // the expected, then the decode failure rate will increase dramatically.
-    CIblt(size_t _expectedNumEntries);
+    CIblt(size_t _expectedNumEntries, uint64_t _version);
     // IBLTs with different salts are guaranteed to use different hash functions.
-    CIblt(size_t _expectedNumEntries, uint32_t salt);
+    CIblt(size_t _expectedNumEntries, uint32_t salt, uint64_t _version);
     // Copy constructor
     CIblt(const CIblt &other);
     ~CIblt();
@@ -113,6 +114,8 @@ public:
     // Returns the optimal ratio of memory cells to expected entries.
     // OptimalOverhead()*expectedNumEntries <= allocated memory cells
     static float OptimalOverhead(size_t expectedNumEntries);
+    // Returns the maximum number of hash functions for any number of entries.
+    static uint8_t MaxNHash();
 
     // For debugging:
     std::string DumpTable() const;
@@ -122,16 +125,18 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
+        READWRITE(COMPACTSIZE(version));
+
         if (version > 0)
         {
+            READWRITE(mapHashIdxSeeds);
             READWRITE(salt);
             if (salt > VALS_32 / n_hash)
                 throw std::ios_base::failure("salt * n_hash must fit in uint32_t");
         }
 
-        READWRITE(COMPACTSIZE(version));
-        if (ser_action.ForRead() && version != 0)
-            throw std::ios_base::failure("Only IBLT version zero is currently known.");
+        if (ser_action.ForRead() && version > 1)
+            throw std::ios_base::failure("No IBLT version exceeding 1 is currently known.");
 
         READWRITE(n_hash);
         if (ser_action.ForRead() && n_hash == 0)
@@ -140,7 +145,6 @@ public:
         }
         READWRITE(is_modified);
         READWRITE(hashTable);
-        READWRITE(mapHashIdxSeeds);
     }
 
     // Returns true if any elements have been inserted into the IBLT since creation or reset

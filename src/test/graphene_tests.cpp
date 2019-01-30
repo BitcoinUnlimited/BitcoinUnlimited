@@ -1,6 +1,9 @@
+#include "blockrelay/graphene.h"
 #include "blockrelay/graphene_set.h"
 #include "bloom.h"
 #include "hash.h"
+#include "primitives/block.h"
+#include "primitives/transaction.h"
 #include "serialize.h"
 #include "streams.h"
 #include "test/test_bitcoin.h"
@@ -21,7 +24,7 @@ size_t ProjectedGrapheneSizeBytes(uint64_t nBlockTxs, uint64_t nExcessTxs, uint6
 
     CBloomFilter filter(
         nBlockTxs, fpr(nSymDiff), insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
-    CIblt iblt(nSymDiff);
+    CIblt iblt(nSymDiff, 0);
 
     size_t filterBytes = ::GetSerializeSize(filter, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
     size_t ibltBytes = ::GetSerializeSize(iblt, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
@@ -50,7 +53,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_encodes_and_decodes)
 
     // unordered graphene sets
     {
-        CGrapheneSet senderGrapheneSet(6, 6, senderItems, 0, 0, 0, false, true);
+        CGrapheneSet senderGrapheneSet(6, 6, senderItems, 0, 0, 0, 0, false, true);
         std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
 
         std::vector<uint64_t> senderCheapHashes;
@@ -67,7 +70,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_encodes_and_decodes)
 
     // ordered graphene sets
     {
-        CGrapheneSet senderGrapheneSet(6, 6, senderItems, 0, 0, 0, true, true);
+        CGrapheneSet senderGrapheneSet(6, 6, senderItems, 0, 0, 0, 0, true, true);
         std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
 
         std::vector<uint64_t> senderCheapHashes;
@@ -107,7 +110,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_decodes_multiple_sizes)
             }
 
             CGrapheneSet senderGrapheneSet(
-                receiverItems.size(), receiverItems.size(), senderItems, 0, 0, 0, true, true);
+                receiverItems.size(), receiverItems.size(), senderItems, 0, 0, 0, 0, true, true);
             std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
 
             BOOST_CHECK_EQUAL_COLLECTIONS(reconciledCheapHashes.begin(), reconciledCheapHashes.end(),
@@ -124,7 +127,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_decodes_multiple_sizes)
             }
 
             CGrapheneSet senderGrapheneSet(
-                receiverItems.size(), receiverItems.size(), senderItems, 0, 0, 0, true, true);
+                receiverItems.size(), receiverItems.size(), senderItems, 0, 0, 0, 0, true, true);
             std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
 
             BOOST_CHECK_EQUAL_COLLECTIONS(reconciledCheapHashes.begin(), reconciledCheapHashes.end(),
@@ -198,7 +201,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_decodes_empty_intersection)
         SerializeHash(-5), SerializeHash(-11)};
     std::vector<uint256> receiverItems(receiverArr, receiverArr + sizeof(receiverArr) / sizeof(uint256));
 
-    CGrapheneSet senderGrapheneSet(6, 12, senderItems, 0, 0, 0, true, true);
+    CGrapheneSet senderGrapheneSet(6, 12, senderItems, 0, 0, 0, 0, true, true);
     std::vector<uint64_t> reconciledCheapHashes = senderGrapheneSet.Reconcile(receiverItems);
 
     std::vector<uint64_t> senderCheapHashes;
@@ -215,8 +218,8 @@ BOOST_AUTO_TEST_CASE(graphene_set_can_serde)
     CDataStream ss(SER_DISK, 0);
 
     senderItems.push_back(SerializeHash(3));
-    CGrapheneSet sentGrapheneSet(1, 1, senderItems, 0, 0, 0, false, true);
-    CGrapheneSet receivedGrapheneSet(0);
+    CGrapheneSet sentGrapheneSet(1, 1, senderItems, 0, 0, 0, 0, false, true);
+    CGrapheneSet receivedGrapheneSet(false);
 
     ss << sentGrapheneSet;
     ss >> receivedGrapheneSet;
@@ -252,6 +255,29 @@ BOOST_AUTO_TEST_CASE(item_rank_encodes_and_decodes)
     std::vector<uint64_t> outputItems = CGrapheneSet::DecodeRank(encoded, inputItems.size(), nBits);
 
     BOOST_CHECK_EQUAL_COLLECTIONS(outputItems.begin(), outputItems.end(), inputItems.begin(), inputItems.end());
+}
+
+BOOST_AUTO_TEST_CASE(graphene_block_can_serde)
+{
+    CBlock block;
+    CTransaction tx;
+    CDataStream stream(
+        ParseHex("01000000010b26e9b7735eb6aabdf358bab62f9816a21ba9ebdb719d5299e88607d722c190000000008b4830450220070aca4"
+                 "4506c5cef3a16ed519d7c3c39f8aab192c4e1c90d065f37b8a4af6141022100a8e160b856c2d43d27d8fba71e5aef6405b864"
+                 "3ac4cb7cb3c462aced7f14711a0141046d11fee51b0e60666d5049a9101a72741df480b96ee26488a4d3466b95c9a40ac5eee"
+                 "f87e10a5cd336c19a84565f80fa6c547957b7700ff4dfbdefe76036c339ffffffff021bff3d11000000001976a91404943fdd"
+                 "508053c75000106d3bc6e2754dbcff1988ac2f15de00000000001976a914a266436d2965547608b9e15d9032a7b9d64fa4318"
+                 "8ac00000000"),
+        SER_DISK, CLIENT_VERSION);
+    stream >> tx;
+    const CTransactionRef ptx = MakeTransactionRef(tx);
+    block.vtx.push_back(ptx);
+    CGrapheneBlock senderGrapheneBlock(MakeBlockRef(block), 5, 6, 2);
+    CGrapheneBlock receiverGrapheneBlock(2);
+    CDataStream ss(SER_DISK, 0);
+
+    ss << senderGrapheneBlock;
+    ss >> receiverGrapheneBlock;
 }
 
 BOOST_AUTO_TEST_SUITE_END()

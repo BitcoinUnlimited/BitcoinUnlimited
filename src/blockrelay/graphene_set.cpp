@@ -20,6 +20,7 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     uint64_t _shorttxidk0,
     uint64_t _shorttxidk1,
     uint64_t _version,
+    uint32_t ibltEntropy,
     bool _ordered,
     bool fDeterministic)
 {
@@ -30,6 +31,7 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
 
     shorttxidk0 = _shorttxidk0;
     shorttxidk1 = _shorttxidk1;
+    ibltSalt = ibltEntropy % CIblt::MaxNHash();
     version = _version;
 
     // Below is the parameter "n" from the graphene paper
@@ -79,7 +81,7 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
 
     // Construct IBLT
     uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
-    pSetIblt = new CIblt(nIbltCells);
+    pSetIblt = new CIblt(nIbltCells, ibltSalt, version >= 2);
     std::map<uint64_t, uint256> mapCheapHashes;
 
     LOG(GRAPHENE, "constructed IBLT with %d cells\n", nIbltCells);
