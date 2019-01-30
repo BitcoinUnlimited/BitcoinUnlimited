@@ -73,7 +73,7 @@ If that doesn't work, you can install all boost development packages with:
 
     sudo apt-get install libboost-all-dev
 
-BerkeleyDB is required for the wallet. db4.8 packages are available [here](https://launchpad.net/~bitcoin-unlimited/+archive/ubuntu/bu-ppa).
+BerkeleyDB is required for the wallet. db4.8 packages are available [here](https://launchpad.net/~bitcoin-unlimited/+archive/ubuntu/bucash).
 You can add the repository and install using the following commands:
 
     sudo add-apt-repository ppa:bitcoin-unlimited/bu-ppa
