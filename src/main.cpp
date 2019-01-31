@@ -148,7 +148,7 @@ void FinalizeNode(NodeId nodeid)
     // Decrement thin type peer counters
     thinrelay.RemoveThinTypePeers(connmgr->FindNodeFromId(nodeid).get());
 
-    // Update node state
+    // Update block sync counters
     {
         CNodeStateAccessor state(nodestate, nodeid);
         DbgAssert(state != nullptr, return );
@@ -159,26 +159,8 @@ void FinalizeNode(NodeId nodeid)
         nPreferredDownload.fetch_sub(state->fPreferredDownload);
     }
 
-    LOCK(cs_main);
-    std::vector<uint256> vBlocksInFlight;
-    requester.GetBlocksInFlight(vBlocksInFlight, nodeid);
-    for (const uint256 &hash : vBlocksInFlight)
-    {
-        // Erase mapblocksinflight entries for this node.
-        requester.MapBlocksInFlightErase(hash, nodeid);
-
-        // Reset all requests times to zero so that we can immediately re-request these blocks
-        requester.ResetLastBlockRequestTime(hash);
-    }
-
+    // Remove nodestate tracking
     nodestate.RemoveNodeState(nodeid);
-    requester.RemoveNodeState(nodeid);
-    if (nodestate.Empty())
-    {
-        // Do a consistency check after the last peer is removed.  Force consistent state if production code
-        DbgAssert(requester.MapBlocksInFlightEmpty(), requester.MapBlocksInFlightClear());
-        DbgAssert(nPreferredDownload.load() == 0, nPreferredDownload.store(0));
-    }
 }
 
 } // anon namespace

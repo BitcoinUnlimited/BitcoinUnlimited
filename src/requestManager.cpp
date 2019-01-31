@@ -1311,6 +1311,22 @@ int CRequestManager::GetNumBlocksInFlight(NodeId nodeid)
     return mapRequestManagerNodeState[nodeid].nBlocksInFlight;
 }
 
+void CRequestManager::RemoveNodeState(NodeId nodeid)
+{
+    LOCK(cs_objDownloader);
+    std::vector<uint256> vBlocksInFlight;
+    GetBlocksInFlight(vBlocksInFlight, nodeid);
+    for (const uint256 &hash : vBlocksInFlight)
+    {
+        // Erase mapblocksinflight entries for this node.
+        MapBlocksInFlightErase(hash, nodeid);
+
+        // Reset all requests times to zero so that we can immediately re-request these blocks
+        ResetLastBlockRequestTime(hash);
+    }
+    mapRequestManagerNodeState.erase(nodeid);
+}
+
 void CRequestManager::DisconnectOnDownloadTimeout(CNode *pnode, const Consensus::Params &consensusParams, int64_t nNow)
 {
     // In case there is a block that has been in flight from this peer for 2 + 0.5 * N times the block interval
