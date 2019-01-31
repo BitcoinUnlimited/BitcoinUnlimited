@@ -187,7 +187,7 @@ class ScriptError(IntEnum):
     SCRIPT_ERR_CHECKDATASIGVERIFY = 18
     SCRIPT_ERR_NUMEQUALVERIFY = 19
     SCRIPT_ERR_BAD_OPCODE = 20
-    
+
     SCRIPT_ERR_DISABLED_OPCODE = 21
     SCRIPT_ERR_INVALID_STACK_OPERATION = 22
     SCRIPT_ERR_INVALID_ALTSTACK_OPERATION = 23
@@ -261,7 +261,8 @@ class ScriptMachine:
         self.script = None
 
     def __del__(self):
-        if self.smId: self.cleanup()
+        if hasattr(self, 'smId'):
+            if self.smId: self.cleanup()
 
     def clone(self):
         sm = ScriptMachine(self.flags, nocreate=True)
@@ -289,7 +290,7 @@ class ScriptMachine:
             script = unhexlify(script)
         ret = cashlib.SmEval(self.smId, script, len(script))
         return ret
-    
+
     def begin(self, script):
         """Start stepping through the provided script"""
         if self.smId==0: raise Error("accessed inactive script machine")
@@ -299,7 +300,7 @@ class ScriptMachine:
         self.curPos = 0
         self.script = script
         return ret
-    
+
     def step(self):
         """Step forward 1 instruction"""
         if self.smId==0: raise Error("accessed inactive script machine")
@@ -314,7 +315,7 @@ class ScriptMachine:
     def error(self):
         if self.smId==0: raise Error("accessed inactive script machine")
         return (ScriptError(cashlib.SmGetError(self.smId)), cashlib.SmPos(self.smId))
-    
+
     def pos(self):
         return self.curPos
 
@@ -326,7 +327,7 @@ class ScriptMachine:
 
     def altstack(self):
         return self.stack(self.ALTSTACK)
-    
+
     def stack(self, which = None):
         """Returns the machine's stack (main stack by default) as a list of byte arrays, index 0 is the stack top"""
         if self.smId==0: raise Error("accessed inactive script machine")
