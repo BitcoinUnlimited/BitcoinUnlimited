@@ -218,29 +218,6 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
     return result;
 }
 
-void getRawTransactionsBlock(UniValue &arrayObject, const CBlock &block, bool fVerbose, bool includeBlockHash = false)
-{
-    if (includeBlockHash)
-    {
-        arrayObject.pushKV("block_hash", block.GetHash().GetHex());
-    }
-    for (auto tx : block.vtx)
-    {
-        string strHex = EncodeHexTx(*tx);
-
-        if (!fVerbose)
-        {
-            arrayObject.pushKV(tx->GetHash().GetHex(), strHex);
-            continue;
-        }
-
-        UniValue result(UniValue::VOBJ);
-        result.pushKV("hex", strHex);
-        TxToJSON(*tx, block.GetHash(), result);
-        arrayObject.push_back(result);
-    }
-}
-
 UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
@@ -257,7 +234,7 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
 
             "\nResult (if verbose is not set or set to 0):\n"
             "[\n"
-            "  \"data\",      (string) The serialized, hex-encoded data for 'txid'\n"
+            "  \"txid\" : \"data\",      (string) The serialized, hex-encoded data for 'txid'\n"
             "  ...\n"
             "]\n"
 
@@ -328,8 +305,21 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
 
     UniValue resultSet(UniValue::VARR);
-    getRawTransactionsBlock(resultSet, block, fVerbose);
+    for (auto tx : block.vtx)
+    {
+        string strHex = EncodeHexTx(*tx);
 
+        if (!fVerbose)
+        {
+            resultSet.pushKV(tx->GetHash().GetHex(), strHex);
+            continue;
+        }
+
+        UniValue result(UniValue::VOBJ);
+        result.pushKV("hex", strHex);
+        TxToJSON(*tx, block.GetHash(), result);
+        resultSet.push_back(result);
+    }
     return resultSet;
 }
 
@@ -337,8 +327,8 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 3)
         throw runtime_error(
-            "getrawtransactionssince \"blockhash\" ( verbose ) ( ancestorcount )\n"
-            "\nReturn the raw transaction data for a given block and its ancestorcount ancestors.\n"
+            "getrawtransactionssince \"blockhash\" ( verbose ) ( count )\n"
+            "\nReturn the raw transaction data for a <count> blocks starting with blockhash and moving towards the tip.\n"
             "\nIf verbose=0, each tx is a string that is serialized, hex-encoded data.\n"
             "If verbose is non-zero, returns an array of Objects with information about each tx in the block.\n"
 
@@ -346,14 +336,17 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             "1. \"hashblock\" (string, required) The block hash\n"
             "2. verbose       (numeric, optional, default=0) If 0, return an array of txid:hexstring, other return an "
             "array of tx json object\n"
-            "3. childcount    (numeric, optional, default=0) If >0, Fetch information for ancestorcount generations of "
-            "parent blocks of hashblock in addition to the information for hashblock"
+            "3. count    (numeric, optional, default=1) Fetch information for <count> blocks "
+            "starting with <hashblock> and moving towards the chain tip\n"
 
             "\nResult (if verbose is not set or set to 0):\n"
             "[\n"
             "  {\n"
             "    \"block_hash\" : \"hash\",   (string) the block hash\n"
-            "    \"data\"      (string) The serialized, hex-encoded data for 'txid'\n"
+            "    \"transactions\" : [\n"
+            "        \"txid\" : \"data\",      (string) The serialized, hex-encoded data for 'txid'\n"
+            "        ...\n"
+            "    ]\n"
             "  },\n"
             "  ...\n"
             "]\n"
@@ -362,7 +355,7 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             "[\n"
             "  {\n"
             "    \"block_hash\" : \"hash\",   (string) the block hash\n"
-            "    [\n"
+            "    \"transactions\" : [\n"
             "      {\n"
             "      \"hex\" : \"data\",       (string) The serialized, hex-encoded data for 'txid'\n"
             "      \"txid\" : \"id\",        (string) The transaction id (same as provided)\n"
@@ -417,61 +410,68 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             HelpExampleCli("getrawtransactionssince", "\"hashblock\" 1 10") +
             HelpExampleRpc("getrawtransactionssince", "\"hashblock\", 1 10"));
 
+    LOCK(cs_main);
+
     uint256 hashBlock = ParseHashV(params[0], "parameter 1");
 
     bool fVerbose = false;
     if (params.size() > 1)
         fVerbose = (params[1].get_int() != 0);
 
-    int64_t ancestorcount = 0;
+    int64_t limit = 1;
     if (params.size() > 2)
     {
         int64_t arg = params[2].get_int64();
-        if (arg > 0)
+        if (arg > 1)
         {
-            ancestorcount = arg;
+            limit = arg;
         }
     }
 
-    CBlockIndex *pblockindex = nullptr;
+    CBlockIndex *pblockindex = LookupBlockIndex(hashBlock);
+    if (!pblockindex)
+    {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+    }
+    int hashBlockHeight = pblockindex->nHeight;
     UniValue resultSet(UniValue::VARR);
     int64_t fetched = 0;
-    bool foundOne = false;
-    int64_t limit = ancestorcount + 1;
     while (fetched < limit)
     {
-        pblockindex = LookupBlockIndex(hashBlock);
+        pblockindex = chainActive[hashBlockHeight + fetched];
         if (!pblockindex)
         {
-            if (foundOne)
-            {
-                break;
-            }
-            else
-            {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-            }
+            break;
         }
-
         CBlock block;
         if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
         {
-            if (foundOne)
-            {
-                break;
-            }
-            else
-            {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
-            }
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
         }
 
         UniValue blockResults(UniValue::VARR);
-        getRawTransactionsBlock(blockResults, block, fVerbose, true);
+        blockResults.pushKV("block_hash", block.GetHash().GetHex());
+
+        UniValue txarray(UniValue::VARR);
+        for (auto tx : block.vtx)
+        {
+            string strHex = EncodeHexTx(*tx);
+
+            if (!fVerbose)
+            {
+                txarray.pushKV(tx->GetHash().GetHex(), strHex);
+                continue;
+            }
+
+            UniValue result(UniValue::VOBJ);
+            result.pushKV("hex", strHex);
+            TxToJSON(*tx, block.GetHash(), result);
+            txarray.push_back(result);
+        }
+        blockResults.pushKV("tansactions", txarray);
+
         resultSet.push_back(blockResults);
         fetched++;
-        foundOne = true;
-        pblockindex = pblockindex->pprev;
     }
     return resultSet;
 }
