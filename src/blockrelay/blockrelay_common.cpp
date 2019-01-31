@@ -59,6 +59,9 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
     if (nTimeToWait == 0)
         return true;
 
+    if (!IsBlockRelayTimerEnabled())
+        return true;
+
     LOCK(cs_blockrelaytimer);
     if (!mapBlockRelayTimer.count(hash))
     {

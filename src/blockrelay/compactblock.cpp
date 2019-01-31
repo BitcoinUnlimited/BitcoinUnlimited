@@ -341,7 +341,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
             }
         }
     } // End locking orphanpool.cs, mempool.cs and cs_xval
-    LOG(CMPCT, "Total in memory compactblockbytes size is %ld bytes\n", compactdata.GetCompactBlockBytes());
+    LOG(CMPCT, "Total in memory compactblock size is %ld bytes\n", compactdata.GetCompactBlockBytes());
 
     // These must be checked outside of the mempool.cs lock or deadlock may occur.
     // A merkle root mismatch here does not cause a ban because and expedited node will forward an xthin
@@ -1065,7 +1065,7 @@ void CCompactBlockData::ClearCompactBlockData(CNode *pnode)
     pnode->vShortCompactBlockHashes.clear();
     pnode->mapMissingTx.clear();
 
-    LOG(CMPCT, "Total in memory compactblockbytes size after clearing a compactblock is %ld bytes\n",
+    LOG(CMPCT, "Total in memory compactblock size after clearing a compactblock is %ld bytes\n",
         compactdata.GetCompactBlockBytes());
 }
 
