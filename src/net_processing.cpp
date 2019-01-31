@@ -1914,8 +1914,10 @@ bool ProcessMessages(CNode *pfrom)
 
         CDataStream &vRecv = msg.vRecv;
 
-        // Checksum
-        // For optimization a 0 checksum means no checksum calculated -- TCP already has one.
+#if 0 // Do not waste my CPU calculating a checksum provided by an untrusted node
+      // TCP already has one that is sufficient for network errors.  The checksum does not increase security since
+      // an attacker can always provide a bad message with a good checksum.
+      // This code is removed by comment so it is clear that it is a deliberate omission.
         if (hdr.nChecksum != 0)
         {
             uint256 hash = Hash(vRecv.begin(), vRecv.begin() + nMessageSize);
@@ -1927,6 +1929,7 @@ bool ProcessMessages(CNode *pfrom)
                 continue;
             }
         }
+#endif
 
         // Process message
         bool fRet = false;
