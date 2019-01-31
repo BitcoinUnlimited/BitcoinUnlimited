@@ -328,7 +328,8 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 3)
         throw runtime_error(
             "getrawtransactionssince \"blockhash\" ( verbose ) ( count )\n"
-            "\nReturn the raw transaction data for a <count> blocks starting with blockhash and moving towards the tip.\n"
+            "\nReturn the raw transaction data for a <count> blocks starting with blockhash and moving towards the "
+            "tip.\n"
             "\nIf verbose=0, each tx is a string that is serialized, hex-encoded data.\n"
             "If verbose is non-zero, returns an array of Objects with information about each tx in the block.\n"
 
