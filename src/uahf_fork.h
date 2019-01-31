@@ -35,6 +35,4 @@ extern bool UAHFforkAtNextBlock(int height);
 // Is the fork active on the next block?
 extern bool IsUAHFforkActiveOnNextBlock(int height);
 
-extern CTweak<bool> walletSignWithForkSig;
-
 #endif
