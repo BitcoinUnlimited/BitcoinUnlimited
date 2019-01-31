@@ -12,6 +12,7 @@
 #include "consensus/consensus.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
+#include "dosman.h"
 #include "leakybucket.h"
 #include "main.h"
 #include "net.h"
@@ -88,6 +89,8 @@ CRequestManagerNodeState::CRequestManagerNodeState()
 {
     nDownloadingSince = 0;
     nBlocksInFlight = 0;
+    nNumRequests = 0;
+    nLastRequest = 0;
 }
 
 CRequestManager::CRequestManager()
@@ -921,6 +924,36 @@ void CRequestManager::SendRequests()
         }
         mapBatchTxnRequests.clear();
     }
+}
+
+bool CRequestManager::CheckForRequestDOS(CNode *pfrom, const CChainParams &chainparams)
+{
+    LOCK(cs_objDownloader);
+
+    // Check for Misbehaving and DOS
+    // If they make more than MAX_THINTYPE_OBJECT_REQUESTS requests in 10 minutes then disconnect them
+    if (chainparams.NetworkIDString() != "regtest")
+    {
+        std::map<NodeId, CRequestManagerNodeState>::iterator it = mapRequestManagerNodeState.find(pfrom->GetId());
+        DbgAssert(it != mapRequestManagerNodeState.end(), return false);
+        CRequestManagerNodeState *state = &it->second;
+
+        uint64_t nNow = GetTime();
+        state->nNumRequests = std::pow(1.0 - 1.0 / 600.0, (double)(nNow - state->nLastRequest)) + 1;
+        state->nLastRequest = nNow;
+        LOG(THIN | GRAPHENE | CMPCT, "Number of thin object requests is %f\n", state->nNumRequests);
+
+        // Other networks have variable mining rates, so only apply these rules to mainnet.
+        if (chainparams.NetworkIDString() == "main")
+        {
+            if (state->nNumRequests >= MAX_THINTYPE_OBJECT_REQUESTS)
+            {
+                dosMan.Misbehaving(pfrom, 50);
+                return error("%s is misbehaving. Making too many thin type requests.", pfrom->GetLogName());
+            }
+        }
+    }
+    return true;
 }
 
 // Check whether the last unknown block a peer advertised is not yet known.

@@ -43,11 +43,6 @@ private:
     std::atomic<int32_t> nGraphenePeers{0};
     std::atomic<int32_t> nCompactBlockPeers{0};
 
-    std::atomic<double> nNumRequests{0}; // Count how many thin type objects were requested
-    std::atomic<uint64_t> nLastRequest{0}; // The last time a thin type object was requested
-    uint8_t MAX_THINTYPE_OBJECT_REQUESTS = 40; // Max requests per peer in a 10 minute window
-
-
 public:
     void AddPeers(CNode *pfrom);
     void AddCompactBlockPeer(CNode *pfrom);
@@ -62,7 +57,6 @@ public:
     void ClearBlockInFlight(CNode *pfrom, const uint256 &hash);
     void CheckForDownloadTimeout(CNode *pfrom);
     void RequestBlock(CNode *pfrom, const uint256 &hash);
-    bool CheckForRequestDOS(CNode *pfrom, const CChainParams &chainparams);
 };
 extern ThinTypeRelay thinrelay;
 

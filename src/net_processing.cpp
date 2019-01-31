@@ -943,7 +943,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             // Make basic checks
             if (inv.type == MSG_CMPCT_BLOCK || inv.type == MSG_THINBLOCK)
             {
-                if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
+                if (!requester.CheckForRequestDOS(pfrom, chainparams))
                     return false;
             }
 
@@ -1401,7 +1401,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     // Handle Xthinblocks and Thinblocks
     else if (strCommand == NetMsgType::GET_XTHIN && !fImporting && !fReindex && IsThinBlocksEnabled())
     {
-        if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
         CBloomFilter filterMemPool;
@@ -1442,7 +1442,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     }
     else if (strCommand == NetMsgType::GET_THIN && !fImporting && !fReindex && IsThinBlocksEnabled())
     {
-        if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
         CInv inv;
@@ -1511,7 +1511,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::GET_XBLOCKTX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsThinBlocksEnabled())
     {
-        if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
         LOCK(pfrom->cs_xthinblock);
@@ -1529,7 +1529,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     // Handle Graphene blocks
     else if (strCommand == NetMsgType::GET_GRAPHENE && !fImporting && !fReindex && IsGrapheneBlockEnabled())
     {
-        if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
         LOCK(pfrom->cs_graphene);
@@ -1547,7 +1547,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::GET_GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsGrapheneBlockEnabled())
     {
-        if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
         LOCK(pfrom->cs_graphene);
@@ -1572,7 +1572,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::GETBLOCKTXN && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsCompactBlocksEnabled())
     {
-        if (!thinrelay.CheckForRequestDOS(pfrom, chainparams))
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
         LOCK(pfrom->cs_compactblock);

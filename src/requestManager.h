@@ -31,6 +31,11 @@ successful receipt, "requester.Rejected(...)" to indicate a bad object (request 
 #include "nodestate.h"
 #include "stat.h"
 
+#include <atomic>
+
+// Max requests allowed in a 10 minute window
+static const uint8_t MAX_THINTYPE_OBJECT_REQUESTS = 40;
+
 // When should I request a tx from someone else (in microseconds). cmdline/bitcoin.conf: -txretryinterval
 extern unsigned int txReqRetryInterval;
 extern unsigned int MIN_TX_REQUEST_RETRY_INTERVAL;
@@ -109,6 +114,10 @@ struct CRequestManagerNodeState
 
     // How many blocks are currently in flight and requested by this node.
     int nBlocksInFlight;
+
+    // Track how many thin type objects were requested for this peer
+    double nNumRequests;
+    uint64_t nLastRequest;
 
     CRequestManagerNodeState();
 };
@@ -197,6 +206,9 @@ public:
     void ResetLastBlockRequestTime(const uint256 &hash);
 
     void SendRequests();
+
+    // Check whether the limit for thintype object requests has been exceeded
+    bool CheckForRequestDOS(CNode *pfrom, const CChainParams &chainparams);
 
     // Check whether the last unknown block a peer advertised is not yet known.
     void ProcessBlockAvailability(NodeId nodeid);
