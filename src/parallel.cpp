@@ -652,10 +652,6 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
         thindata.ResetThinBlockBytes();
         graphenedata.ResetGrapheneBlockBytes();
         compactdata.ResetCompactBlockBytes();
-
-        LOCK(cs_xval);
-        setPreVerifiedTxHash.clear();
-        setUnVerifiedOrphanTxHash.clear();
     }
 
 

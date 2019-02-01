@@ -6,6 +6,7 @@
 
 #include "validation.h"
 
+#include "blockrelay/blockrelay_common.h"
 #include "blockstorage/blockstorage.h"
 #include "blockstorage/sequential_files.h"
 #include "checkpoints.h"
@@ -1952,8 +1953,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
     bool fScriptChecks,
     CAmount &nFees,
     CBlockUndo &blockundo,
-    std::vector<std::pair<uint256, CDiskTxPos> > &vPos,
-    std::vector<uint256> &vHashesToDelete)
+    std::vector<std::pair<uint256, CDiskTxPos> > &vPos)
 {
     nFees = 0;
     int64_t nTime2 = GetTimeMicros();
@@ -2077,13 +2077,8 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                 // happen if this were a regular block or when a tx is found within the returning XThinblock.
                 uint256 hash = tx.GetHash();
                 {
-                    {
-                        LOCK(cs_xval);
-                        inOrphanCache = setUnVerifiedOrphanTxHash.count(hash);
-                        inVerifiedCache = setPreVerifiedTxHash.count(hash);
-                    } /* We don't want to hold the lock while inputs are being checked or we'll slow down the competing
-                         thread, if there is one */
-
+                    inOrphanCache = block.setUnVerifiedOrphanTxHash.count(hash);
+                    inVerifiedCache = block.setPreVerifiedTxHash.count(hash);
                     if ((inOrphanCache) || (!inVerifiedCache && !inOrphanCache))
                     {
                         if (inOrphanCache)
@@ -2100,10 +2095,6 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                         }
                         control.Add(vChecks);
                         nChecked++;
-                    }
-                    else
-                    {
-                        vHashesToDelete.push_back(hash);
                     }
                 }
             }
@@ -2169,8 +2160,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     bool fScriptChecks,
     CAmount &nFees,
     CBlockUndo &blockundo,
-    std::vector<std::pair<uint256, CDiskTxPos> > &vPos,
-    std::vector<uint256> &vHashesToDelete)
+    std::vector<std::pair<uint256, CDiskTxPos> > &vPos)
 {
     nFees = 0;
     int64_t nTime2 = GetTimeMicros();
@@ -2325,13 +2315,8 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                 // happen if this were a regular block or when a tx is found within the returning XThinblock.
                 uint256 hash = tx.GetHash();
                 {
-                    {
-                        LOCK(cs_xval);
-                        inOrphanCache = setUnVerifiedOrphanTxHash.count(hash);
-                        inVerifiedCache = setPreVerifiedTxHash.count(hash);
-                    } /* We don't want to hold the lock while inputs are being checked or we'll slow down the competing
-                         thread, if there is one */
-
+                    inOrphanCache = block.setUnVerifiedOrphanTxHash.count(hash);
+                    inVerifiedCache = block.setPreVerifiedTxHash.count(hash);
                     if ((inOrphanCache) || (!inVerifiedCache && !inOrphanCache))
                     {
                         if (inOrphanCache)
@@ -2348,10 +2333,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                         }
                         control.Add(vChecks);
                         nChecked++;
-                    }
-                    else
-                    {
-                        vHashesToDelete.push_back(hash);
                     }
                 }
             }
@@ -2460,10 +2441,6 @@ bool ConnectBlock(const CBlock &block,
                 (uint32_t)pindex->nHeight > pindexBestHeader.load()->nHeight - (144 * checkScriptDays.Value());
     }
 
-    // Create a vector for storing hashes that will be deleted from the unverified and perverified txn sets.
-    // We will delete these hashes only if and when this block is the one that is accepted saving us the unnecessary
-    // repeated locking and unlocking of cs_xval.
-    std::vector<uint256> vHashesToDelete;
     CAmount nFees = 0;
     CBlockUndo blockundo;
     std::vector<std::pair<uint256, CDiskTxPos> > vPos;
@@ -2487,13 +2464,13 @@ bool ConnectBlock(const CBlock &block,
     if (canonical)
     {
         if (!ConnectBlockCanonicalOrdering(block, state, pindex, view, chainparams, fJustCheck, fParallel,
-                fScriptChecks, nFees, blockundo, vPos, vHashesToDelete))
+                fScriptChecks, nFees, blockundo, vPos))
             return false;
     }
     else
     {
         if (!ConnectBlockDependencyOrdering(block, state, pindex, view, chainparams, fJustCheck, fParallel,
-                fScriptChecks, nFees, blockundo, vPos, vHashesToDelete))
+                fScriptChecks, nFees, blockundo, vPos))
             return false;
     }
 
@@ -2574,15 +2551,6 @@ bool ConnectBlock(const CBlock &block,
         txRecentlyInBlock.insert(ptx->GetHash());
     }
 
-    // Delete hashes from unverified and preverified sets that will no longer be needed after the block is accepted.
-    {
-        LOCK(cs_xval);
-        for (const uint256 &hash : vHashesToDelete)
-        {
-            setPreVerifiedTxHash.erase(hash);
-            setUnVerifiedOrphanTxHash.erase(hash);
-        }
-    }
     return true;
 }
 

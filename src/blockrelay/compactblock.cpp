@@ -257,9 +257,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
             mapPartialTxHash[cheapHash] = mi.first;
         }
 
-        LOCK(cs_xval);
         mempool.queryHashes(memPoolHashes);
-
         for (uint64_t i = 0; i < memPoolHashes.size(); i++)
         {
             uint64_t cheapHash = GetShortID(memPoolHashes[i]);
@@ -334,7 +332,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
                 }
             }
         }
-    } // End locking orphanpool.cs, mempool.cs and cs_xval
+    } // End locking orphanpool.cs, mempool.cs
     LOG(CMPCT, "Total in memory compactblock size is %ld bytes\n", compactdata.GetCompactBlockBytes());
 
     // These must be checked outside of the mempool.cs lock or deadlock may occur.
@@ -553,7 +551,6 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // With compactblocks the vTxHashes contains only the first 8 bytes of the tx hash.
     {
         READLOCK(orphanpool.cs);
-        LOCK(cs_xval);
         if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
             return false;
     }
@@ -601,7 +598,6 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount)
 {
     AssertLockHeld(orphanpool.cs);
-    AssertLockHeld(cs_xval);
 
     // We must have all the full tx hashes by this point.  We first check for any duplicate
     // transaction ids.  This is a possible attack vector and has been used in the past.
@@ -665,10 +661,10 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
             if (inOrphanCache)
             {
                 ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                setUnVerifiedOrphanTxHash.insert(hash);
+                pfrom->compactBlock.setUnVerifiedOrphanTxHash.insert(hash);
             }
             else if ((inMemPool || inCommitQ) && fXVal)
-                setPreVerifiedTxHash.insert(hash);
+                pfrom->compactBlock.setPreVerifiedTxHash.insert(hash);
             else if (inMissingTx)
                 ptx = pfrom->mapMissingTx[nShortId];
         }
@@ -679,16 +675,13 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         // to see if we've exceeded any limits and if so clear out data and return.
         if (compactdata.AddCompactBlockBytes(nTxSize, pfrom) > maxAllowedSize)
         {
-            LEAVE_CRITICAL_SECTION(cs_xval); // maintain locking order with vNodes
             if (ClearLargestCompactBlockAndDisconnect(pfrom))
             {
-                ENTER_CRITICAL_SECTION(cs_xval);
                 return error(
                     "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
                     pfrom->compactBlock.GetHash().ToString(), pfrom->nLocalCompactBlockBytes, maxAllowedSize,
                     pfrom->GetLogName());
             }
-            ENTER_CRITICAL_SECTION(cs_xval);
         }
         if (pfrom->nLocalCompactBlockBytes > maxAllowedSize)
         {

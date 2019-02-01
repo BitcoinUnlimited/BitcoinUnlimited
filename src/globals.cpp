@@ -148,10 +148,6 @@ proxyType proxyInfo[NET_MAX];
 proxyType nameProxy;
 CCriticalSection cs_proxyInfos;
 
-CCriticalSection cs_xval;
-set<uint256> setPreVerifiedTxHash GUARDED_BY(cs_xval);
-set<uint256> setUnVerifiedOrphanTxHash GUARDED_BY(cs_xval);
-
 CCriticalSection cs_vNodes;
 CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
@@ -426,7 +422,6 @@ public:
         printf("cs_main %p\n", &cs_main);
         printf("csBestBlock %p\n", &csBestBlock);
         printf("cs_proxyInfos %p\n", &cs_proxyInfos);
-        printf("cs_xval %p\n", &cs_xval);
         printf("cs_vNodes %p\n", &cs_vNodes);
         printf("cs_mapLocalHost %p\n", &cs_mapLocalHost);
         printf("CNode::cs_totalBytesRecv %p\n", &CNode::cs_totalBytesRecv);

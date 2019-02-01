@@ -74,13 +74,25 @@ private:
     mutable uint64_t nBlockSize; // Serialized block size in bytes
 
 public:
+    // Xpress Validation: (memory only)
+    // Transactions that have already been accepted into the memory pool do not need to be
+    // re-verified and can avoid having to do a second and expensive CheckInputs() when
+    // processing a new block.
+    std::set<uint256> setPreVerifiedTxHash;
+
+    // Xpress Validation: (memory only)
+    // Orphans that are added to the thinblock must be verifed since they have never been
+    // accepted into the memory pool.
+    std::set<uint256> setUnVerifiedOrphanTxHash;
+
+public:
     // network and disk
     std::vector<CTransactionRef> vtx;
 
     // memory only
     // 0.11: mutable std::vector<uint256> vMerkleTree;
     mutable bool fChecked;
-    mutable bool fExcessive; // BU: is the block "excessive" (bigger than this node prefers to accept)
+    mutable bool fExcessive; // Is the block "excessive"
 
     CBlock() { SetNull(); }
     CBlock(const CBlockHeader &header)

@@ -169,11 +169,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     LOG(GRAPHENE, "Merkle Root check passed for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
 
     // Xpress Validation - only perform xval if the chaintip matches the last blockhash in the graphene block
-    bool fXVal;
-    {
-        LOCK(cs_main);
-        fXVal = (pfrom->grapheneBlock.hashPrevBlock == chainActive.Tip()->GetBlockHash()) ? true : false;
-    }
+    bool fXVal = (pfrom->grapheneBlock.hashPrevBlock == chainActive.Tip()->GetBlockHash()) ? true : false;
 
     int missingCount = 0;
     int unnecessaryCount = 0;
@@ -181,7 +177,6 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
     {
         READLOCK(orphanpool.cs);
-        LOCK(cs_xval);
         if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
             return false;
     }
@@ -415,11 +410,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
         return false;
 
     // Xpress Validation - only perform xval if the chaintip matches the last blockhash in the graphene block
-    bool fXVal;
-    {
-        LOCK(cs_main);
-        fXVal = (header.hashPrevBlock == chainActive.Tip()->GetBlockHash()) ? true : false;
-    }
+    bool fXVal = (header.hashPrevBlock == chainActive.Tip()->GetBlockHash()) ? true : false;
 
     graphenedata.ClearGrapheneBlockData(pfrom);
     pfrom->nSizeGrapheneBlock = nSizeGrapheneBlock;
@@ -466,7 +457,6 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
         // We don't have to keep the lock on mempool.cs here to do mempool.queryHashes
         // but we take the lock anyway so we don't have to re-lock again later.
-        LOCK(cs_xval);
         if (!collision)
         {
             mempool.queryHashes(memPoolHashes);
@@ -590,7 +580,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
                 }
             }
         }
-    } // End locking cs_orphancache, mempool.cs and cs_xval
+    } // End locking cs_orphancache, mempool.cs
     LOG(GRAPHENE, "Total in-memory graphene bytes size is %ld bytes\n", graphenedata.GetGrapheneBlockBytes());
 
     // This must be checked outside of the above section or deadlock may occur.
@@ -673,7 +663,6 @@ bool CGrapheneBlock::process(CNode *pfrom,
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount)
 {
     AssertLockHeld(orphanpool.cs);
-    AssertLockHeld(cs_xval);
 
     // We must have all the full tx hashes by this point.  We first check for any repeating
     // sequences in transaction id's.  This is a possible attack vector and has been used in the past.
@@ -748,10 +737,10 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
             else if (inOrphanCache)
             {
                 ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                setUnVerifiedOrphanTxHash.insert(hash);
+                pfrom->grapheneBlock.setUnVerifiedOrphanTxHash.insert(hash);
             }
             else if ((inMemPool || inCommitQ) && fXVal)
-                setPreVerifiedTxHash.insert(hash);
+                pfrom->grapheneBlock.setPreVerifiedTxHash.insert(hash);
             else if (inMissingTx)
                 ptx = pfrom->mapMissingTx[hash.GetCheapHash()];
         }
@@ -762,16 +751,13 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         // to see if we've exceeded any limits and if so clear out data and return.
         if (graphenedata.AddGrapheneBlockBytes(nTxSize, pfrom) > maxAllowedSize)
         {
-            LEAVE_CRITICAL_SECTION(cs_xval); // maintain locking order with vNodes
             if (ClearLargestGrapheneBlockAndDisconnect(pfrom))
             {
-                ENTER_CRITICAL_SECTION(cs_xval);
                 return error(
                     "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
                     pfrom->grapheneBlock.GetHash().ToString(), pfrom->nLocalGrapheneBlockBytes, maxAllowedSize,
                     pfrom->GetLogName());
             }
-            ENTER_CRITICAL_SECTION(cs_xval);
         }
         if (pfrom->nLocalGrapheneBlockBytes > maxAllowedSize)
         {
