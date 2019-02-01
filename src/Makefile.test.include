@@ -88,6 +88,8 @@ BITCOIN_TESTS =\
   test/hash_tests.cpp \
   test/iblt_tests.cpp \
   test/key_tests.cpp \
+  test/lcg_tests.cpp \
+  test/lcg.h \
   test/limitedmap_tests.cpp \
   test/dbwrapper_tests.cpp \
   test/main_tests.cpp \
@@ -106,6 +108,7 @@ BITCOIN_TESTS =\
   test/reverselock_tests.cpp \
   test/rpc_tests.cpp \
   test/sanity_tests.cpp \
+  test/schnorr_tests.cpp \
   test/script_P2SH_tests.cpp \
   test/script_tests.cpp \
   test/scriptnum_tests.cpp \

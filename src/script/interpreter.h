@@ -153,6 +153,8 @@ uint256 SignatureHash(const CScript &scriptCode,
 
 class BaseSignatureChecker
 {
+protected:
+    unsigned int nFlags = SCRIPT_ENABLE_SIGHASH_FORKID;
 public:
     //! Verifies a signature given the pubkey, signature and sighash
     virtual bool VerifySignature(const std::vector<uint8_t> &vchSig,
@@ -180,15 +182,15 @@ protected:
     const CAmount amount;
     mutable size_t nBytesHashed;
     mutable size_t nSigops;
-    unsigned int nFlags;
 
 public:
     TransactionSignatureChecker(const CTransaction *txToIn,
         unsigned int nInIn,
         const CAmount &amountIn,
         unsigned int flags = SCRIPT_ENABLE_SIGHASH_FORKID)
-        : txTo(txToIn), nIn(nInIn), amount(amountIn), nBytesHashed(0), nSigops(0), nFlags(flags)
+        : txTo(txToIn), nIn(nInIn), amount(amountIn), nBytesHashed(0), nSigops(0)
     {
+        nFlags = flags;
     }
     bool CheckSig(const std::vector<unsigned char> &scriptSig,
         const std::vector<unsigned char> &vchPubKey,
