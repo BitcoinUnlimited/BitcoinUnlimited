@@ -550,6 +550,10 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
             "  \"relayfee\": x.xxxxxxxx,              (numeric) minimum relay fee for non-free transactions in " +
             CURRENCY_UNIT +
             "/kB\n"
+            "  \"minlimitertxfee\": x.xxxx,           (numeric) fee (in satoshi/byte) below which transactions are "
+            "considered free and subject to limitfreerelay\n"
+            "  \"maxlimitertxfee\": x.xxxx,           (numeric) fee (in satoshi/byte) above which transactions are "
+            "always relayed\n"
             "  \"localaddresses\": [                  (array) list of local addresses\n"
             "    {\n"
             "      \"address\": \"xxxx\",               (string) network address\n"
@@ -559,6 +563,7 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
             "  ,...\n"
             "  ]\n"
             "  \"thinblockstats\": \"...\"              (string) thin block related statistics \n"
+            "  \"compactblockstats\": \"...\"           (string) compact block related statistics \n"
             "  \"grapheneblockstats\": \"...\"          (string) graphene block related statistics \n"
             "  \"warnings\": \"...\"                    (string) any network warnings (such as alert messages) \n"
             "}\n"
@@ -593,8 +598,8 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
     }
     obj.pushKV("localaddresses", localAddresses);
     obj.pushKV("thinblockstats", GetThinBlockStats());
-    obj.pushKV("grapheneblockstats", GetGrapheneStats());
     obj.pushKV("compactblockstats", GetCompactBlockStats());
+    obj.pushKV("grapheneblockstats", GetGrapheneStats());
     obj.pushKV("warnings", GetWarnings("statusbar"));
     return obj;
 }
