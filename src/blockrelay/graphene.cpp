@@ -737,12 +737,15 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
             else if (inOrphanCache)
             {
                 ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                pfrom->grapheneBlock.setUnVerifiedOrphanTxHash.insert(hash);
+                pfrom->grapheneBlock.setUnVerifiedTxns.insert(hash);
             }
             else if ((inMemPool || inCommitQ) && fXVal)
-                pfrom->grapheneBlock.setPreVerifiedTxHash.insert(hash);
+                pfrom->grapheneBlock.setVerifiedTxns.insert(hash);
             else if (inMissingTx)
+            {
                 ptx = pfrom->mapMissingTx[hash.GetCheapHash()];
+                pfrom->grapheneBlock.setUnVerifiedTxns.insert(hash);
+            }
         }
         if (!ptx)
             missingCount++;

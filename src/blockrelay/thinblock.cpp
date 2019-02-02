@@ -824,12 +824,15 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
             if (inOrphanCache)
             {
                 ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                pfrom->thinBlock.setUnVerifiedOrphanTxHash.insert(hash);
+                pfrom->thinBlock.setUnVerifiedTxns.insert(hash);
             }
             else if ((inMemPool || inCommitQ) && fXVal)
-                pfrom->thinBlock.setPreVerifiedTxHash.insert(hash);
+                pfrom->thinBlock.setVerifiedTxns.insert(hash);
             else if (inMissingTx)
+            {
                 ptx = pfrom->mapMissingTx[hash.GetCheapHash()];
+                pfrom->thinBlock.setUnVerifiedTxns.insert(hash);
+            }
         }
         if (!ptx)
             missingCount++;

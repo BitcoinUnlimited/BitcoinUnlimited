@@ -78,12 +78,12 @@ public:
     // Transactions that have already been accepted into the memory pool do not need to be
     // re-verified and can avoid having to do a second and expensive CheckInputs() when
     // processing a new block.
-    std::set<uint256> setPreVerifiedTxHash;
+    std::set<uint256> setVerifiedTxns;
 
     // Xpress Validation: (memory only)
-    // Orphans that are added to the thinblock must be verifed since they have never been
-    // accepted into the memory pool.
-    std::set<uint256> setUnVerifiedOrphanTxHash;
+    // However Orphans or Missing transactions that have been re-requested must be verifed
+    // because their inputs have never been checked.
+    std::set<uint256> setUnVerifiedTxns;
 
 public:
     // network and disk

@@ -2073,12 +2073,12 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();
 
-                // Only check inputs when the tx hash in not in the setPreVerifiedTxHash as would only
+                // Only check inputs when the tx hash in not in the setVerifiedTxns as would only
                 // happen if this were a regular block or when a tx is found within the returning XThinblock.
                 uint256 hash = tx.GetHash();
                 {
-                    inOrphanCache = block.setUnVerifiedOrphanTxHash.count(hash);
-                    inVerifiedCache = block.setPreVerifiedTxHash.count(hash);
+                    inOrphanCache = block.setUnVerifiedTxns.count(hash);
+                    inVerifiedCache = block.setVerifiedTxns.count(hash);
                     if ((inOrphanCache) || (!inVerifiedCache && !inOrphanCache))
                     {
                         if (inOrphanCache)
@@ -2311,12 +2311,12 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();
 
-                // Only check inputs when the tx hash in not in the setPreVerifiedTxHash as would only
+                // Only check inputs when the tx hash in not in the setVerifiedTxns as would only
                 // happen if this were a regular block or when a tx is found within the returning XThinblock.
                 uint256 hash = tx.GetHash();
                 {
-                    inOrphanCache = block.setUnVerifiedOrphanTxHash.count(hash);
-                    inVerifiedCache = block.setPreVerifiedTxHash.count(hash);
+                    inOrphanCache = block.setUnVerifiedTxns.count(hash);
+                    inVerifiedCache = block.setVerifiedTxns.count(hash);
                     if ((inOrphanCache) || (!inVerifiedCache && !inOrphanCache))
                     {
                         if (inOrphanCache)
