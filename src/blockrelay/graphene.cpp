@@ -24,7 +24,7 @@
 #include "validation/validation.h"
 #include "xversionkeys.h"
 
-static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
+static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount);
 
 CMemPoolInfo::CMemPoolInfo(uint64_t _nTx) : nTx(_nTx) {}
 CMemPoolInfo::CMemPoolInfo() { this->nTx = 0; }
@@ -168,16 +168,13 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
     LOG(GRAPHENE, "Merkle Root check passed for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
 
-    // Xpress Validation - only perform xval if the chaintip matches the last blockhash in the graphene block
-    bool fXVal = (pfrom->grapheneBlock.hashPrevBlock == chainActive.Tip()->GetBlockHash()) ? true : false;
-
     int missingCount = 0;
     int unnecessaryCount = 0;
     // Look for each transaction in our various pools and buffers.
     // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
     {
         READLOCK(orphanpool.cs);
-        if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
+        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
             return false;
     }
 
@@ -409,9 +406,6 @@ bool CGrapheneBlock::process(CNode *pfrom,
     if (PV->IsAlreadyValidating(pfrom->id))
         return false;
 
-    // Xpress Validation - only perform xval if the chaintip matches the last blockhash in the graphene block
-    bool fXVal = (header.hashPrevBlock == chainActive.Tip()->GetBlockHash()) ? true : false;
-
     graphenedata.ClearGrapheneBlockData(pfrom);
     pfrom->nSizeGrapheneBlock = nSizeGrapheneBlock;
 
@@ -575,7 +569,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
                     fMerkleRootCorrect = false;
                 else
                 {
-                    if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
+                    if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
                         return false;
                 }
             }
@@ -660,7 +654,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
     return true;
 }
 
-static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount)
+static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount)
 {
     AssertLockHeld(orphanpool.cs);
 
@@ -733,15 +727,13 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
                 unnecessaryCount++;
 
             if (inAdditionalTxs)
+            {
                 ptx = mapAdditionalTxs[hash];
+            }
             else if (inOrphanCache)
             {
                 ptx = orphanpool.mapOrphanTransactions[hash].ptx;
                 pfrom->grapheneBlock.setUnVerifiedTxns.insert(hash);
-            }
-            else if ((inMemPool || inCommitQ) && fXVal)
-            {
-                pfrom->grapheneBlock.setVerifiedTxns.insert(hash);
             }
             else if (inMissingTx)
             {
@@ -777,6 +769,9 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct ordering.
         pfrom->grapheneBlock.vtx.emplace_back(ptx);
     }
+    // Now that we've rebuild the block successfully we can set the XVal flag which is used in
+    // ConnectBlock() to determine which if any inputs we can skip the checking of inputs.
+    pfrom->grapheneBlock.fXVal = true;
 
     return true;
 }

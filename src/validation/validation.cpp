@@ -2010,8 +2010,6 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
 
 
         // Start checking Inputs
-        bool fUnVerified = true;
-        bool fVerified = false;
         // When in parallel mode then unlock cs_main for this loop to give any other threads
         // a chance to process in parallel. This is crucial for parallel validation to work.
         // NOTE: the only place where cs_main is needed is if we hit PV->ChainWorkHasChanged, which
@@ -2073,13 +2071,12 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();
 
-                // Only check inputs when the tx hash in not in the setVerifiedTxns as would only
-                // happen if this were a regular block or when a tx is found within the returning XThinblock.
                 uint256 hash = tx.GetHash();
                 {
-                    fUnVerified = block.setUnVerifiedTxns.count(hash);
-                    fVerified = block.setVerifiedTxns.count(hash);
-                    if ((fUnVerified) || (!fVerified && !fUnVerified))
+                    // If XVal is not on then check all inputs, otherwise only check
+                    // transactions that were not previously verified in the mempool.
+                    bool fUnVerified = block.setUnVerifiedTxns.count(hash);
+                    if ((block.fXVal && fUnVerified) || !block.fXVal)
                     {
                         if (fUnVerified)
                             nUnVerifiedChecked++;
@@ -2118,7 +2115,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             if (GetArg("-pvtest", false))
                 MilliSleep(1000);
         }
-        LOG(THIN, "Number of CheckInputs() performed: %d  Orphan count: %d\n", nChecked, nUnVerifiedChecked);
+        LOG(THIN, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
 
 
         // Wait for all sig check threads to finish before updating utxo
@@ -2251,8 +2248,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
         }
 
         // Start checking Inputs
-        bool fUnVerified = true;
-        bool fVerified = false;
         // When in parallel mode then unlock cs_main for this loop to give any other threads
         // a chance to process in parallel. This is crucial for parallel validation to work.
         // NOTE: the only place where cs_main is needed is if we hit PV->ChainWorkHasChanged, which
@@ -2311,13 +2306,12 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();
 
-                // Only check inputs when the tx hash in not in the setVerifiedTxns as would only
-                // happen if this were a regular block or when a tx is found within the returning XThinblock.
                 uint256 hash = tx.GetHash();
                 {
-                    fUnVerified = block.setUnVerifiedTxns.count(hash);
-                    fVerified = block.setVerifiedTxns.count(hash);
-                    if ((fUnVerified) || (!fVerified && !fUnVerified))
+                    // If XVal is not on then check all inputs, otherwise only check
+                    // transactions that were not previously verified in the mempool.
+                    bool fUnVerified = block.setUnVerifiedTxns.count(hash);
+                    if ((block.fXVal && fUnVerified) || !block.fXVal)
                     {
                         if (fUnVerified)
                             nUnVerifiedChecked++;
@@ -2358,7 +2352,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             if (GetArg("-pvtest", false))
                 MilliSleep(1000);
         }
-        LOG(THIN, "Number of CheckInputs() performed: %d  Orphan count: %d\n", nChecked, nUnVerifiedChecked);
+        LOG(THIN, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
 
 
         // Wait for all sig check threads to finish before updating utxo

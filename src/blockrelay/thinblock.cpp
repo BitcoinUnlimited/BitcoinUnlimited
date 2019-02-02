@@ -31,7 +31,7 @@
 #include "xversionkeys.h"
 
 static bool DEFAULT_BLOOM_FILTER_TARGETING = true;
-static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
+static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount);
 
 CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter)
 {
@@ -114,13 +114,6 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
 bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
 {
-    // Xpress Validation - only perform xval if the chaintip matches the last blockhash in the thinblock
-    bool fXVal;
-    {
-        LOCK(cs_main);
-        fXVal = (header.hashPrevBlock == chainActive.Tip()->GetBlockHash()) ? true : false;
-    }
-
     thindata.ClearThinBlockData(pfrom);
     pfrom->nSizeThinBlock = nSizeThinBlock;
 
@@ -152,7 +145,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
         int missingCount = 0;
         int unnecessaryCount = 0;
 
-        if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
+        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
             return false;
 
         pfrom->thinBlockWaitingForTxns = missingCount;
@@ -342,16 +335,13 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
     LOG(THIN, "Merkle Root check passed for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
 
-    // Xpress Validation - only perform xval if the chaintip matches the last blockhash in the thinblock
-    bool fXVal = (pfrom->thinBlock.hashPrevBlock == chainActive.Tip()->GetBlockHash()) ? true : false;
-
     int missingCount = 0;
     int unnecessaryCount = 0;
     // Look for each transaction in our various pools and buffers.
     // With xThinBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
     {
         READLOCK(orphanpool.cs);
-        if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
+        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
             return false;
     }
 
@@ -591,9 +581,6 @@ bool CXThinBlock::process(CNode *pfrom,
     if (PV->IsAlreadyValidating(pfrom->id))
         return false;
 
-    // Xpress Validation - only perform xval if the chaintip matches the last blockhash in the thinblock
-    bool fXVal = (header.hashPrevBlock == chainActive.Tip()->GetBlockHash()) ? true : false;
-
     thindata.ClearThinBlockData(pfrom);
     pfrom->nSizeThinBlock = nSizeThinBlock;
 
@@ -688,7 +675,7 @@ bool CXThinBlock::process(CNode *pfrom,
                 }
                 else
                 {
-                    if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
+                    if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
                         return false;
                 }
             }
@@ -759,7 +746,7 @@ bool CXThinBlock::process(CNode *pfrom,
     return true;
 }
 
-static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount)
+static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount)
 {
     AssertLockHeld(orphanpool.cs);
 
@@ -826,10 +813,6 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
                 ptx = orphanpool.mapOrphanTransactions[hash].ptx;
                 pfrom->thinBlock.setUnVerifiedTxns.insert(hash);
             }
-            else if ((inMemPool || inCommitQ) && fXVal)
-            {
-                pfrom->thinBlock.setVerifiedTxns.insert(hash);
-            }
             else if (inMissingTx)
             {
                 ptx = pfrom->mapMissingTx[hash.GetCheapHash()];
@@ -864,6 +847,10 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct ordering.
         pfrom->thinBlock.vtx.emplace_back(ptx);
     }
+    // Now that we've rebuild the block successfully we can set the XVal flag which is used in
+    // ConnectBlock() to determine which if any inputs we can skip the checking of inputs.
+    pfrom->thinBlock.fXVal = true;
+
     return true;
 }
 
