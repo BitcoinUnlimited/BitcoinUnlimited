@@ -2463,14 +2463,14 @@ bool ConnectBlock(const CBlock &block,
 
     if (canonical)
     {
-        if (!ConnectBlockCanonicalOrdering(block, state, pindex, view, chainparams, fJustCheck, fParallel,
-                fScriptChecks, nFees, blockundo, vPos))
+        if (!ConnectBlockCanonicalOrdering(
+                block, state, pindex, view, chainparams, fJustCheck, fParallel, fScriptChecks, nFees, blockundo, vPos))
             return false;
     }
     else
     {
-        if (!ConnectBlockDependencyOrdering(block, state, pindex, view, chainparams, fJustCheck, fParallel,
-                fScriptChecks, nFees, blockundo, vPos))
+        if (!ConnectBlockDependencyOrdering(
+                block, state, pindex, view, chainparams, fJustCheck, fParallel, fScriptChecks, nFees, blockundo, vPos))
             return false;
     }
 
