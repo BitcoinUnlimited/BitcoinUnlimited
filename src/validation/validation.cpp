@@ -1978,7 +1978,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
     CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
     int nChecked = 0;
-    int nOrphansChecked = 0;
+    int nUnVerifiedChecked = 0;
     const arith_uint256 nStartingChainWork = chainActive.Tip()->nChainWork;
 
     // Section for boost scoped lock on the scriptcheck_mutex
@@ -2010,8 +2010,8 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
 
 
         // Start checking Inputs
-        bool inOrphanCache;
-        bool inVerifiedCache;
+        bool fUnVerified = true;
+        bool fVerified = false;
         // When in parallel mode then unlock cs_main for this loop to give any other threads
         // a chance to process in parallel. This is crucial for parallel validation to work.
         // NOTE: the only place where cs_main is needed is if we hit PV->ChainWorkHasChanged, which
@@ -2077,12 +2077,12 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                 // happen if this were a regular block or when a tx is found within the returning XThinblock.
                 uint256 hash = tx.GetHash();
                 {
-                    inOrphanCache = block.setUnVerifiedTxns.count(hash);
-                    inVerifiedCache = block.setVerifiedTxns.count(hash);
-                    if ((inOrphanCache) || (!inVerifiedCache && !inOrphanCache))
+                    fUnVerified = block.setUnVerifiedTxns.count(hash);
+                    fVerified = block.setVerifiedTxns.count(hash);
+                    if ((fUnVerified) || (!fVerified && !fUnVerified))
                     {
-                        if (inOrphanCache)
-                            nOrphansChecked++;
+                        if (fUnVerified)
+                            nUnVerifiedChecked++;
 
                         std::vector<CScriptCheck> vChecks;
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
@@ -2118,7 +2118,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             if (GetArg("-pvtest", false))
                 MilliSleep(1000);
         }
-        LOG(THIN, "Number of CheckInputs() performed: %d  Orphan count: %d\n", nChecked, nOrphansChecked);
+        LOG(THIN, "Number of CheckInputs() performed: %d  Orphan count: %d\n", nChecked, nUnVerifiedChecked);
 
 
         // Wait for all sig check threads to finish before updating utxo
@@ -2185,7 +2185,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
     int nChecked = 0;
-    int nOrphansChecked = 0;
+    int nUnVerifiedChecked = 0;
     const arith_uint256 nStartingChainWork = chainActive.Tip()->nChainWork;
 
     // Section for boost scoped lock on the scriptcheck_mutex
@@ -2251,8 +2251,8 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
         }
 
         // Start checking Inputs
-        bool inOrphanCache;
-        bool inVerifiedCache;
+        bool fUnVerified = true;
+        bool fVerified = false;
         // When in parallel mode then unlock cs_main for this loop to give any other threads
         // a chance to process in parallel. This is crucial for parallel validation to work.
         // NOTE: the only place where cs_main is needed is if we hit PV->ChainWorkHasChanged, which
@@ -2315,12 +2315,12 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                 // happen if this were a regular block or when a tx is found within the returning XThinblock.
                 uint256 hash = tx.GetHash();
                 {
-                    inOrphanCache = block.setUnVerifiedTxns.count(hash);
-                    inVerifiedCache = block.setVerifiedTxns.count(hash);
-                    if ((inOrphanCache) || (!inVerifiedCache && !inOrphanCache))
+                    fUnVerified = block.setUnVerifiedTxns.count(hash);
+                    fVerified = block.setVerifiedTxns.count(hash);
+                    if ((fUnVerified) || (!fVerified && !fUnVerified))
                     {
-                        if (inOrphanCache)
-                            nOrphansChecked++;
+                        if (fUnVerified)
+                            nUnVerifiedChecked++;
 
                         std::vector<CScriptCheck> vChecks;
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
@@ -2358,7 +2358,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             if (GetArg("-pvtest", false))
                 MilliSleep(1000);
         }
-        LOG(THIN, "Number of CheckInputs() performed: %d  Orphan count: %d\n", nChecked, nOrphansChecked);
+        LOG(THIN, "Number of CheckInputs() performed: %d  Orphan count: %d\n", nChecked, nUnVerifiedChecked);
 
 
         // Wait for all sig check threads to finish before updating utxo

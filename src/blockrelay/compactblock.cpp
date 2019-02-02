@@ -664,7 +664,9 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
                 pfrom->compactBlock.setUnVerifiedTxns.insert(hash);
             }
             else if ((inMemPool || inCommitQ) && fXVal)
+            {
                 pfrom->compactBlock.setVerifiedTxns.insert(hash);
+            }
             else if (inMissingTx)
             {
                 ptx = pfrom->mapMissingTx[nShortId];
