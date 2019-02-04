@@ -84,5 +84,10 @@ class MerkleBlockTest(BitcoinTestFramework):
         # ...or if we have a -txindex
         assert_equal(self.nodes[2].verifytxoutproof(self.nodes[3].gettxoutproof([txid_spent])), [txid_spent])
 
+        # ensure we get the same data for fetching multiple proofs at a time that we get for each one individually
+        proofsresult = self.nodes[2].gettxoutproofs([txid1, txid2], blockhash)
+        assert_equal(proofsresult[txid1], self.nodes[2].gettxoutproof([txid1], blockhash))
+        assert_equal(proofsresult[txid2], self.nodes[2].gettxoutproof([txid2], blockhash))
+
 if __name__ == '__main__':
     MerkleBlockTest().main()
