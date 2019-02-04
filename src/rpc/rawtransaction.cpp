@@ -233,13 +233,13 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
             "array of tx json object\n"
 
             "\nResult (if verbose is not set or set to 0):\n"
-            "[\n"
+            "{\n"
             "  \"txid\" : \"data\",      (string) The serialized, hex-encoded data for 'txid'\n"
             "  ...\n"
-            "]\n"
+            "}\n"
 
             "\nResult (if verbose > 0):\n"
-            "[\n"
+            "{\n"
             "  {\n"
             "    \"hex\" : \"data\",       (string) The serialized, hex-encoded data for 'txid'\n"
             "    \"txid\" : \"id\",        (string) The transaction id (same as provided)\n"
@@ -283,7 +283,7 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
             "    \"blocktime\" : ttt         (numeric) The block time in seconds since epoch (Jan 1 1970 GMT)\n"
             "  },\n"
             "  ...\n"
-            "]\n"
+            "}\n"
             "\nExamples:\n" +
             HelpExampleCli("getrawtransactions", "\"hashblock\"") +
             HelpExampleCli("getrawtransactions", "\"hashblock\" 1") +
@@ -304,7 +304,7 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
     if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
 
-    UniValue resultSet(UniValue::VARR);
+    UniValue resultSet(UniValue::VOBJ);
     for (auto tx : block.vtx)
     {
         string strHex = EncodeHexTx(*tx);
@@ -341,23 +341,18 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             "starting with <hashblock> and moving towards the chain tip\n"
 
             "\nResult (if verbose is not set or set to 0):\n"
-            "[\n"
-            "  {\n"
-            "    \"block_hash\" : \"hash\",   (string) the block hash\n"
-            "    \"transactions\" : [\n"
+            "{\n"
+            "  \"hash\" : {    (string) the block hash\n"
             "        \"txid\" : \"data\",      (string) The serialized, hex-encoded data for 'txid'\n"
             "        ...\n"
-            "    ]\n"
             "  },\n"
             "  ...\n"
-            "]\n"
+            "}\n"
 
             "\nResult (if verbose > 0):\n"
-            "[\n"
-            "  {\n"
-            "    \"block_hash\" : \"hash\",   (string) the block hash\n"
-            "    \"transactions\" : [\n"
-            "      {\n"
+            "{\n"
+            "  \"hash\" : {   (string) the block hash\n"
+            "    \"txid\" : {                (string) The transaction id (same as provided)\n"
             "      \"hex\" : \"data\",       (string) The serialized, hex-encoded data for 'txid'\n"
             "      \"txid\" : \"id\",        (string) The transaction id (same as provided)\n"
             "      \"size\" : n,             (numeric) The transaction size\n"
@@ -398,13 +393,11 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             "      \"confirmations\" : n,      (numeric) The confirmations\n"
             "      \"time\" : ttt,             (numeric) The transaction time in seconds since epoch (Jan 1 1970 GMT)\n"
             "      \"blocktime\" : ttt         (numeric) The block time in seconds since epoch (Jan 1 1970 GMT)\n"
-            "      },\n"
-            "      ...\n"
-            "    ],\n"
+            "    },\n"
             "    ...\n"
             "  },\n"
-            "  ..."
-            "]\n"
+            "  ...\n"
+            "}\n"
             "\nExamples:\n" +
             HelpExampleCli("getrawtransactionssince", "\"hashblock\"") +
             HelpExampleCli("getrawtransactionssince", "\"hashblock\" 1") +
@@ -435,13 +428,14 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
     }
     int hashBlockHeight = pblockindex->nHeight;
-    UniValue resultSet(UniValue::VARR);
+    UniValue resultSet(UniValue::VOBJ);
     int64_t fetched = 0;
     while (fetched < limit)
     {
         pblockindex = chainActive[hashBlockHeight + fetched];
         if (!pblockindex)
         {
+            // we are now past the tip
             break;
         }
         CBlock block;
@@ -449,31 +443,24 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
         {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
         }
-
-        UniValue blockResults(UniValue::VARR);
-        blockResults.pushKV("block_hash", block.GetHash().GetHex());
-
-        UniValue txarray(UniValue::VARR);
+        UniValue blockResults(UniValue::VOBJ);
         for (auto tx : block.vtx)
         {
             string strHex = EncodeHexTx(*tx);
-
             if (!fVerbose)
             {
-                txarray.pushKV(tx->GetHash().GetHex(), strHex);
+                blockResults.pushKV(tx->GetHash().ToString(), strHex);
                 continue;
             }
-
-            UniValue result(UniValue::VOBJ);
-            result.pushKV("hex", strHex);
-            TxToJSON(*tx, block.GetHash(), result);
-            txarray.push_back(result);
+            UniValue txDetails(UniValue::VOBJ);
+            txDetails.pushKV("hex", strHex);
+            TxToJSON(*tx, block.GetHash(), txDetails);
+            blockResults.pushKV(tx->GetHash().ToString(), txDetails);
         }
-        blockResults.pushKV("tansactions", txarray);
-
-        resultSet.push_back(blockResults);
+        resultSet.pushKV(block.GetHash().GetHex(), blockResults);
         fetched++;
     }
+
     return resultSet;
 }
 
@@ -580,10 +567,10 @@ UniValue gettxoutproofs(const UniValue &params, bool fHelp)
             "    ]\n"
             "2. \"block hash\"  (string) Looks for txid in the block with this hash\n"
             "\nResult:\n"
-            "[\n"
+            "{\n"
             "   \"txid\":\"data\",           (string) A string that is a serialized, hex-encoded data for the proof.\n"
             "   ..."
-            "]\n");
+            "}\n");
 
     set<uint256> setTxids;
     uint256 oneTxid;
@@ -612,20 +599,20 @@ UniValue gettxoutproofs(const UniValue &params, bool fHelp)
     if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
 
-    UniValue resultSet(UniValue::VARR);
+    UniValue resultSet(UniValue::VOBJ);
 
-    for (auto txid : setTxids)
+    bool ntxFound = false;
+    for (const auto &txid : setTxids)
     {
-        bool ntxFound = false;
         for (const auto &tx : block.vtx)
         {
-            if (txid == tx->GetHash())
+            if (setTxids.count(tx->GetHash()))
             {
                 ntxFound = true;
                 break;
             }
         }
-        if (!ntxFound)
+        if (ntxFound == false)
         {
             continue;
         }
@@ -636,6 +623,7 @@ UniValue gettxoutproofs(const UniValue &params, bool fHelp)
         ssMB << mb;
         std::string strHex = HexStr(ssMB.begin(), ssMB.end());
         resultSet.pushKV(txid.ToString(), strHex);
+        ntxFound = false;
     }
     return resultSet;
 }
