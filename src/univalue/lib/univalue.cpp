@@ -107,8 +107,7 @@ bool UniValue::setObject()
 
 bool UniValue::push_back(const UniValue& val_)
 {
-    if (typ != VARR)
-        return false;
+    assert(typ == VARR);
 
     values.push_back(val_);
     return true;
@@ -116,8 +115,7 @@ bool UniValue::push_back(const UniValue& val_)
 
 bool UniValue::push_backV(const std::vector<UniValue>& vec)
 {
-    if (typ != VARR)
-        return false;
+    assert(typ == VARR);
 
     values.insert(values.end(), vec.begin(), vec.end());
 
@@ -132,8 +130,7 @@ void UniValue::__pushKV(const std::string& key, const UniValue& val_)
 
 bool UniValue::pushKV(const std::string& key, const UniValue& val_)
 {
-    if (typ != VOBJ)
-        return false;
+    assert(typ == VOBJ);
 
     size_t idx;
     if (findKey(key, idx))
@@ -145,8 +142,7 @@ bool UniValue::pushKV(const std::string& key, const UniValue& val_)
 
 bool UniValue::pushKVs(const UniValue& obj)
 {
-    if (typ != VOBJ || obj.typ != VOBJ)
-        return false;
+    assert(typ == VOBJ && obj.typ == VOBJ);
 
     for (size_t i = 0; i < obj.keys.size(); i++)
         __pushKV(obj.keys[i], obj.values.at(i));
@@ -239,4 +235,3 @@ const UniValue& find_value(const UniValue& obj, const std::string& name)
 
     return NullUniValue;
 }
-
