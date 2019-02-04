@@ -357,7 +357,7 @@ void SyncStorage(const CChainParams &chainparams)
             }
 
             index = LookupBlockIndex(item.second.GetBlockHash());
-            if (index)
+            if (!index)
             {
                 CBlockIndex *pindexNew = InsertBlockIndex(item.second.GetBlockHash());
                 pindexNew->pprev = InsertBlockIndex(item.second.hashPrev);
