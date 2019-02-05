@@ -641,7 +641,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     // exists and we also need to check that the block didn't arrive from some other peer.
     {
         // Remove thinblock data and thinblock in flight
-        thinrelay.ClearThinTypeBlockInFlight(pfrom, inv.hash);
+        thinrelay.ClearBlockInFlight(pfrom, inv.hash);
         pfrom->firstBlock += 1;
     }
 
