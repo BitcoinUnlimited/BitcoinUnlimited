@@ -2260,13 +2260,12 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
             LOCK(inode.cs_filter);
             if (inode.pfilter)
             {
-                node.push_back(
-                    Pair("pfilter", (int64_t)::GetSerializeSize(*inode.pfilter, SER_NETWORK, PROTOCOL_VERSION)));
+                node.pushKV("pfilter", (int64_t)::GetSerializeSize(*inode.pfilter, SER_NETWORK, PROTOCOL_VERSION));
             }
             if (inode.pThinBlockFilter)
             {
                 node.pushKV("pThinBlockFilter",
-                    (int64_t)::GetSerializeSize(*inode.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION)));
+                    (int64_t)::GetSerializeSize(*inode.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION));
             }
         }
         node.pushKV("thinblock.vtx", (int64_t)inode.thinBlock.vtx.size());
