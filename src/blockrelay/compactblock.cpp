@@ -510,6 +510,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Get the full hashes from the compactReReqResponse and add them to the compactBlockHashes vector.  These should
     // be all the missing or null hashes that we re-requested.
+    DbgAssert(pfrom->vCompactBlockHashes.size() == pfrom->vShortCompactBlockHashes.size(), return false);
     int count = 0;
     for (size_t i = 0; i < pfrom->vCompactBlockHashes.size(); i++)
     {
