@@ -437,6 +437,9 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
     else
     {
+        if (hdr->nHeight < (chainActive.Tip()->nHeight - DEFAULT_BLOCKS_FROM_TIP))
+            return error(THIN, "get_xblocktx request too far from the tip");
+
         CBlock block;
         const Consensus::Params &consensusParams = Params().GetConsensus();
         if (!ReadBlockFromDisk(block, hdr, consensusParams))

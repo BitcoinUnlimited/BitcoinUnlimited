@@ -441,6 +441,9 @@ bool CompactReRequest::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
     else
     {
+        if (hdr->nHeight < (chainActive.Tip()->nHeight - DEFAULT_BLOCKS_FROM_TIP))
+            return error(CMPCT, "getblocktxn request too far from the tip");
+
         CBlock block;
         const Consensus::Params &consensusParams = Params().GetConsensus();
         if (!ReadBlockFromDisk(block, hdr, consensusParams))

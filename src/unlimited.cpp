@@ -1416,7 +1416,7 @@ void IsChainNearlySyncdInit()
     }
     else
     {
-        if (chainActive.Height() < pindexBestHeader.load()->nHeight - 2)
+        if (chainActive.Height() < pindexBestHeader.load()->nHeight - DEFAULT_BLOCKS_FROM_TIP)
             fIsChainNearlySyncd.store(false);
         else
             fIsChainNearlySyncd.store(true);

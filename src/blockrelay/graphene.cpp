@@ -249,19 +249,21 @@ bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     CInv inv(MSG_TX, grapheneRequestBlockTx.blockhash);
     LOG(GRAPHENE, "Received get_grblocktx for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
 
-    CBlockIndex *blkHdr = LookupBlockIndex(inv.hash);
-    if (!blkHdr)
+    std::vector<CTransaction> vTx;
+    CBlockIndex *hdr = LookupBlockIndex(inv.hash);
+    if (!hdr)
     {
         dosMan.Misbehaving(pfrom, 20);
         return error("Requested block is not available");
     }
-
-    std::vector<CTransaction> vTx;
-
+    else
     {
+        if (hdr->nHeight < (chainActive.Tip()->nHeight - DEFAULT_BLOCKS_FROM_TIP))
+            return error(GRAPHENE, "get_grblocktx request too far from the tip");
+
         CBlock block;
         const Consensus::Params &consensusParams = Params().GetConsensus();
-        if (!ReadBlockFromDisk(block, blkHdr, consensusParams))
+        if (!ReadBlockFromDisk(block, hdr, consensusParams))
         {
             // We do not assign misbehavior for not being able to read a block from disk because we already
             // know that the block is in the block index from the step above. Secondly, a failure to read may
