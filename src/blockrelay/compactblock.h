@@ -48,7 +48,7 @@ class CompactReRequest
 public:
     // A CompactReRequest message
     uint256 blockhash;
-    std::vector<uint16_t> indexes;
+    std::vector<uint32_t> indexes;
 
     /**
      * Handle an incoming thin block.  The block is fully validated, and if any transactions are missing, we fall
@@ -77,17 +77,17 @@ public:
                 {
                     uint64_t index = 0;
                     READWRITE(COMPACTSIZE(index));
-                    if (index > std::numeric_limits<uint16_t>::max())
-                        throw std::ios_base::failure("index overflowed 16 bits");
+                    if (index > std::numeric_limits<uint32_t>::max())
+                        throw std::ios_base::failure("index overflowed 32 bits");
                     indexes[i] = index;
                 }
             }
 
-            uint16_t offset = 0;
+            uint32_t offset = 0;
             for (size_t j = 0; j < indexes.size(); j++)
             {
-                if (uint64_t(indexes[j]) + uint64_t(offset) > std::numeric_limits<uint16_t>::max())
-                    throw std::ios_base::failure("indexes overflowed 16 bits");
+                if (uint64_t(indexes[j]) + uint64_t(offset) > std::numeric_limits<uint32_t>::max())
+                    throw std::ios_base::failure("indexes overflowed 32 bits");
                 indexes[j] = indexes[j] + offset;
                 offset = indexes[j] + 1;
             }
@@ -111,12 +111,12 @@ public:
 
     CompactReReqResponse() {}
     CompactReReqResponse(const CompactReRequest &req) : blockhash(req.blockhash), txn(req.indexes.size()) {}
-    CompactReReqResponse(const CBlock &block, const std::vector<uint16_t> &indexes)
+    CompactReReqResponse(const CBlock &block, const std::vector<uint32_t> &indexes)
     {
         blockhash = block.GetHash();
         if (indexes.size() > block.vtx.size())
             throw std::invalid_argument("request more transactions than are in a block");
-        for (uint16_t i : indexes)
+        for (uint32_t i : indexes)
         {
             if (i >= block.vtx.size())
                 throw std::invalid_argument("out of bound tx in rerequest");
@@ -163,7 +163,7 @@ public:
 struct PrefilledTransaction
 {
     // Used as an offset since last prefilled tx in CompactBlock,
-    uint16_t index;
+    uint32_t index;
     CTransaction tx;
 
     ADD_SERIALIZE_METHODS;
@@ -173,8 +173,8 @@ struct PrefilledTransaction
     {
         uint64_t idx = index;
         READWRITE(COMPACTSIZE(idx));
-        if (idx > std::numeric_limits<uint16_t>::max())
-            throw std::ios_base::failure("index overflowed 16-bits");
+        if (idx > std::numeric_limits<uint32_t>::max())
+            throw std::ios_base::failure("index overflowed 32-bits");
         index = idx;
         READWRITE(REF(TransactionCompressor(tx)));
     }

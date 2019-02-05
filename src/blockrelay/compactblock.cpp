@@ -96,17 +96,17 @@ void validateCompactBlock(const CompactBlock &cmpctblock)
     if (cmpctblock.header.IsNull() || (cmpctblock.shorttxids.empty() && cmpctblock.prefilledtxn.empty()))
         throw std::invalid_argument("empty data in compact block");
 
-    int32_t lastprefilledindex = -1;
+    int64_t lastprefilledindex = -1;
     for (size_t i = 0; i < cmpctblock.prefilledtxn.size(); i++)
     {
         if (cmpctblock.prefilledtxn[i].tx.IsNull())
             throw std::invalid_argument("null tx in compact block");
 
-        lastprefilledindex += cmpctblock.prefilledtxn[i].index + 1; // index is a uint16_t, so cant overflow here
-        if (lastprefilledindex > std::numeric_limits<uint16_t>::max())
+        lastprefilledindex += static_cast<uint64_t>(cmpctblock.prefilledtxn[i].index) + 1; // index is a uint32_t, so cant overflow here
+        if (lastprefilledindex > std::numeric_limits<uint32_t>::max())
             throw std::invalid_argument("tx index overflows");
 
-        if (static_cast<uint32_t>(lastprefilledindex) > cmpctblock.shorttxids.size() + i)
+        if (static_cast<uint64_t>(lastprefilledindex) > cmpctblock.shorttxids.size() + i)
         {
             // If we are inserting a tx at an index greater than our full list of shorttxids
             // plus the number of prefilled txn we've inserted, then we have txn for which we
@@ -370,7 +370,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
 
         // find the index in the block associated with the hash
         uint64_t nIndex = 0;
-        std::vector<uint16_t> vIndexesToRequest;
+        std::vector<uint32_t> vIndexesToRequest;
         for (auto cheaphash : pfrom->vShortCompactBlockHashes)
         {
             if (setHashesToRequest.find(cheaphash) != setHashesToRequest.end())

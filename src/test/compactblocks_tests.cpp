@@ -109,13 +109,13 @@ BOOST_AUTO_TEST_CASE(validate_compact_block)
     d.prefilledtxn.push_back(d.prefilledtxn[0]);
     assert(d.prefilledtxn.size() == size_t(2));
     d.prefilledtxn.at(0).index = 1;
-    d.prefilledtxn.at(1).index = std::numeric_limits<uint16_t>::max();
+    d.prefilledtxn.at(1).index = std::numeric_limits<uint32_t>::max();
     BOOST_CHECK_EXCEPTION(
         validateCompactBlock(d), std::invalid_argument, HasReason("tx index overflows"));
 
     // too high index
     CompactBlock e = a;
-    e.prefilledtxn.at(0).index = std::numeric_limits<uint16_t>::max() / 2;
+    e.prefilledtxn.at(0).index = std::numeric_limits<uint32_t>::max() / 2;
     BOOST_CHECK_EXCEPTION(
         validateCompactBlock(e), std::invalid_argument, HasReason("invalid index for tx"));
 
