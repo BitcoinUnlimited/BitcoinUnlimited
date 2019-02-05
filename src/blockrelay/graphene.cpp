@@ -65,12 +65,6 @@ CGrapheneBlockTx::CGrapheneBlockTx(uint256 blockHash, std::vector<CTransaction> 
 
 bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
-    if (!pfrom->GrapheneCapable())
-    {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("Graphene block tx message received from a non GRAPHENE node, peer=%s", pfrom->GetLogName());
-    }
-
     std::string strCommand = NetMsgType::GRAPHENETX;
     size_t msgSize = vRecv.size();
     CGrapheneBlockTx grapheneBlockTx;
@@ -240,12 +234,6 @@ CRequestGrapheneBlockTx::CRequestGrapheneBlockTx(uint256 blockHash, std::set<uin
 
 bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
-    if (!pfrom->GrapheneCapable())
-    {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("get_grblocktx message received from a non GRAPHENE node, peer=%s", pfrom->GetLogName());
-    }
-
     CRequestGrapheneBlockTx grapheneRequestBlockTx;
     vRecv >> grapheneRequestBlockTx;
 
@@ -318,12 +306,6 @@ bool CGrapheneBlock::CheckBlockHeader(const CBlockHeader &block, CValidationStat
  */
 bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string strCommand, unsigned nHops)
 {
-    if (!pfrom->GrapheneCapable())
-    {
-        dosMan.Misbehaving(pfrom, 5);
-        return error("%s message received from a non GRAPHENE node, peer=%s", strCommand, pfrom->GetLogName());
-    }
-
     int nSizeGrapheneBlock = vRecv.size();
     CInv inv(MSG_BLOCK, uint256());
 
@@ -1410,12 +1392,6 @@ bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header)
 
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams)
 {
-    if (!pfrom->GrapheneCapable())
-    {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("Graphene block message received from a non graphene block node, peer %s\n", pfrom->GetLogName());
-    }
-
     CMemPoolInfo mempoolinfo;
     CInv inv;
     vRecv >> inv >> mempoolinfo;

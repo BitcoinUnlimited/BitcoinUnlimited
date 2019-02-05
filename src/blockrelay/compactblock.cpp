@@ -124,12 +124,6 @@ void validateCompactBlock(const CompactBlock &cmpctblock)
 
 bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
-    if (!pfrom->CompactBlockCapable())
-    {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("Compact block message received from a non compactblock node, peer=%s", pfrom->GetLogName());
-    }
-
     CompactBlock compactBlock;
     vRecv >> compactBlock;
 
@@ -423,12 +417,6 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
 
 bool CompactReRequest::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
-    if (!pfrom->CompactBlockCapable())
-    {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("getblocktxn message received from a non compactblock node, peer=%s", pfrom->GetLogName());
-    }
-
     CompactReRequest compactReRequest;
     vRecv >> compactReRequest;
 
@@ -473,12 +461,6 @@ bool CompactReRequest::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
 bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
-    if (!pfrom->CompactBlockCapable())
-    {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("compactrereqresponse message received from a non CMPCT node, peer=%s", pfrom->GetLogName());
-    }
-
     std::string strCommand = NetMsgType::BLOCKTXN;
     size_t msgSize = vRecv.size();
     CompactReReqResponse compactReReqResponse;

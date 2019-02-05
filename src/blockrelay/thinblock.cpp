@@ -59,12 +59,6 @@ CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter)
  */
 bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
-    if (!pfrom->ThinBlockCapable())
-    {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("Thinblock message received from a non thinblock node, peer=%s", pfrom->GetLogName());
-    }
-
     CThinBlock thinBlock;
     vRecv >> thinBlock;
 
@@ -280,12 +274,6 @@ CXThinBlockTx::CXThinBlockTx(uint256 blockHash, std::vector<CTransaction> &vTx)
 
 bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
-    if (!pfrom->ThinBlockCapable())
-    {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("xblocktx message received from a non XTHIN node, peer=%s", pfrom->GetLogName());
-    }
-
     std::string strCommand = NetMsgType::XBLOCKTX;
     size_t msgSize = vRecv.size();
     CXThinBlockTx thinBlockTx;
@@ -425,12 +413,6 @@ CXRequestThinBlockTx::CXRequestThinBlockTx(uint256 blockHash, std::set<uint64_t>
 
 bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
-    if (!pfrom->ThinBlockCapable())
-    {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("get_xblocktx message received from a non XTHIN node, peer=%s", pfrom->GetLogName());
-    }
-
     CXRequestThinBlockTx thinRequestBlockTx;
     vRecv >> thinRequestBlockTx;
 
@@ -501,12 +483,6 @@ bool CXThinBlock::CheckBlockHeader(const CBlockHeader &block, CValidationState &
  */
 bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string strCommand, unsigned nHops)
 {
-    if (!pfrom->ThinBlockCapable())
-    {
-        dosMan.Misbehaving(pfrom, 5);
-        return error("%s message received from a non XTHIN node, peer=%s", strCommand, pfrom->GetLogName());
-    }
-
     int nSizeThinBlock = vRecv.size();
     CInv inv(MSG_BLOCK, uint256());
 
