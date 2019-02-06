@@ -78,7 +78,8 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Message consistency checking
     CInv inv(MSG_GRAPHENEBLOCK, grapheneBlockTx.blockhash);
-    if (grapheneBlockTx.vMissingTx.empty() || grapheneBlockTx.blockhash.IsNull())
+    if (grapheneBlockTx.vMissingTx.empty() || grapheneBlockTx.blockhash.IsNull() ||
+        pfrom->grapheneBlockHashes.size() < grapheneBlockTx.vMissingTx.size())
     {
         graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
 
