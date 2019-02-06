@@ -641,7 +641,6 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     {
         // Remove thinblock data and thinblock in flight
         thinrelay.ClearThinTypeBlockInFlight(pfrom, inv.hash);
-        thinrelay.ClearThinTypeBlockInFlight(pfrom, inv.hash);
         pfrom->firstBlock += 1;
     }
 
