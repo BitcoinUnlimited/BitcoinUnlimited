@@ -212,9 +212,6 @@ void CRequestManager::AskFor(const std::vector<CInv> &objArray, CNode *from, uns
 
 void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *from, unsigned int priority)
 {
-    // must maintain correct locking order:  cs_main, then cs_objDownloader, then cs_vNodes.
-    LOCK(cs_main);
-
     // This is block and peer that was selected in FindNextBlocksToDownload() so we want to add it as a block
     // source first so that it gets requested first.
     if (from)
