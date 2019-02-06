@@ -639,9 +639,9 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     // either of the former.  Therefore we have to remove the thin or graphene block in flight if it
     // exists and we also need to check that the block didn't arrive from some other peer.
     {
-        // Clear thinblock data and thinblock in flight
-        thindata.ClearThinBlockData(pfrom, inv.hash);
-        graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
+        // Remove thinblock data and thinblock in flight
+        thinrelay.ClearThinTypeBlockInFlight(pfrom, inv.hash);
+        thinrelay.ClearThinTypeBlockInFlight(pfrom, inv.hash);
 
         pfrom->firstBlock += 1;
     }
