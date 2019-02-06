@@ -217,21 +217,34 @@ void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *
 
     // This is block and peer that was selected in FindNextBlocksToDownload() so we want to add it as a block
     // source first so that it gets requested first.
-    LOCK(cs_objDownloader);
     if (from)
         AskFor(objArray, from, priority);
 
+    // We can't hold cs_vNodes in the for loop below because it is out of order with cs_objDownloader which is
+    // taken in ProcessBlockAvailability.  We can't take cs_objDownloader earlier because it deadlocks with the
+    // CNodeStateAccessor. So make a copy of vNodes here
+    std::vector<CNode *> vNodesCopy;
+
+    {
+        LOCK(cs_vNodes);
+        vNodesCopy = vNodes;
+        for (CNode *pnode : vNodesCopy)
+        {
+            pnode->AddRef();
+        }
+    }
+
+
     // Add the other peers as potential sources in the event the RequestManager needs to make a re-request
     // for this block. Only add NETWORK nodes that have block availability.
-    LOCK(cs_vNodes);
-    for (CNode *pnode : vNodes)
+    for (CNode *pnode : vNodesCopy)
     {
-        // skip the peer we added above
-        if (pnode == from)
+        // skip the peer we added above and skip non NETWORK nodes
+        if ((pnode == from) || (pnode->fClient))
+        {
+            pnode->Release();
             continue;
-        // skip non NETWORK nodes
-        if (pnode->fClient)
-            continue;
+        }
 
         // Make sure pindexBestKnownBlock is up to date.
         ProcessBlockAvailability(pnode->id);
@@ -246,6 +259,7 @@ void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *
                 AskFor(objArray, pnode, priority);
             }
         }
+        pnode->Release(); // Release the refs we took
     }
 }
 
