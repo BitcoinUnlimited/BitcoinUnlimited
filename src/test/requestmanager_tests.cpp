@@ -95,7 +95,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     dummyNodeCmpct.state_incoming = ConnectionStateIncoming::READY;
     dummyNodeCmpct.state_outgoing = ConnectionStateOutgoing::READY;
     dummyNodeCmpct.fSupportsCompactBlocks = true;
-    dummyNodeGraphene.id = 3;
+    dummyNodeCmpct.id = 3;
     dummyNodeNone.nVersion = MIN_PEER_PROTO_VERSION;
     dummyNodeNone.state_incoming = ConnectionStateIncoming::READY;
     dummyNodeNone.state_outgoing = ConnectionStateOutgoing::READY;
@@ -948,5 +948,6 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
 
     // Final cleanup: Unset mocktime
     SetMockTime(0);
+    requester.MapBlocksInFlightClear();
 }
 BOOST_AUTO_TEST_SUITE_END()

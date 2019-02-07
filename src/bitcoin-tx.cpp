@@ -28,15 +28,17 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/assign/list_of.hpp>
-#include <boost/thread/tss.hpp>
 
 using namespace std;
 
+#ifdef DEBUG_LOCKORDER
+#include <boost/thread/tss.hpp>
 // BU add lockstack stuff here for bitcoin-cli, because I need to carefully
 // order it in globals.cpp for bitcoind and bitcoin-qt
 boost::mutex dd_mutex;
 std::map<std::pair<void *, void *>, LockStack> lockorders;
 boost::thread_specific_ptr<LockStack> lockstack;
+#endif
 
 static bool fCreateBlank;
 static map<string, UniValue> registers;
