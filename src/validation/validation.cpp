@@ -2076,7 +2076,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                     // If XVal is not on then check all inputs, otherwise only check
                     // transactions that were not previously verified in the mempool.
                     bool fUnVerified = block.setUnVerifiedTxns.count(hash);
-                    if ((block.fXVal && fUnVerified) || !block.fXVal)
+                    if (fUnVerified || !block.fXVal)
                     {
                         if (fUnVerified)
                             nUnVerifiedChecked++;
@@ -2311,7 +2311,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                     // If XVal is not on then check all inputs, otherwise only check
                     // transactions that were not previously verified in the mempool.
                     bool fUnVerified = block.setUnVerifiedTxns.count(hash);
-                    if ((block.fXVal && fUnVerified) || !block.fXVal)
+                    if (fUnVerified || !block.fXVal)
                     {
                         if (fUnVerified)
                             nUnVerifiedChecked++;
