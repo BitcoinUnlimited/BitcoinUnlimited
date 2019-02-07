@@ -5,6 +5,7 @@
 #include "parallel.h"
 
 #include "blockrelay/blockrelay_common.h"
+#include "blockrelay/compactblock.h"
 #include "blockrelay/graphene.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
@@ -565,7 +566,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     // Indicate that the block was fully received. At this point we have either a block or a fully reconstructed
     // thin type block but we still need to maintain a map*BlocksInFlight entry so that we don't re-request a
     // full block from the same node while the block is processing.
-    thinrelay.ThinTypeBlockWasReceived(pfrom, inv.hash);
+    thinrelay.BlockWasReceived(pfrom, inv.hash);
 
     boost::thread::id this_id(boost::this_thread::get_id());
     PV->InitThread(this_id, pfrom, pblock, inv, nSizeBlock); // initialize the mapBlockValidationThread entries
@@ -639,19 +640,18 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     // either of the former.  Therefore we have to remove the thin or graphene block in flight if it
     // exists and we also need to check that the block didn't arrive from some other peer.
     {
-        // Clear thinblock data and thinblock in flight
-        thindata.ClearThinBlockData(pfrom, inv.hash);
-        graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
-
+        // Remove thinblock data and thinblock in flight
+        thinrelay.ClearBlockInFlight(pfrom, inv.hash);
         pfrom->firstBlock += 1;
     }
 
     // When we no longer have any thinblocks in flight then clear our any data
     // just to make sure we don't somehow get growth over time.
-    if (thinrelay.TotalThinTypeBlocksInFlight() == 0)
+    if (thinrelay.TotalBlocksInFlight() == 0)
     {
         thindata.ResetThinBlockBytes();
         graphenedata.ResetGrapheneBlockBytes();
+        compactdata.ResetCompactBlockBytes();
 
         LOCK(cs_xval);
         setPreVerifiedTxHash.clear();

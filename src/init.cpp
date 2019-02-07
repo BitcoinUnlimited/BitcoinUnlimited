@@ -166,7 +166,7 @@ public:
 };
 
 static CCoinsViewErrorCatcher *pcoinscatcher = NULL;
-static boost::scoped_ptr<ECCVerifyHandle> globalVerifyHandle;
+static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
 void Interrupt(thread_group &threadGroup)
 {
@@ -970,16 +970,17 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         // Set the number of threads to half the available Cores.
         int nThreads = std::max(GetNumCores() / 2, 1);
         numMsgHandlerThreads.Set(nThreads);
-        LOGA("Using %d message handler threads\n", numMsgHandlerThreads.Value());
     }
+    LOGA("Using %d message handler threads\n", numMsgHandlerThreads.Value());
+
     // Setup the number of transaction mempool admission threads
     if (numTxAdmissionThreads.Value() == 0)
     {
         // Set the number of threads to half the available Cores.
         int nThreads = std::max(GetNumCores() / 2, 1);
         numTxAdmissionThreads.Set(nThreads);
-        LOGA("Using %d transaction admission threads\n", numTxAdmissionThreads.Value());
     }
+    LOGA("Using %d transaction admission threads\n", numTxAdmissionThreads.Value());
 
     // Create the parallel block validator
     PV.reset(new CParallelValidation());
@@ -1453,7 +1454,8 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         {
             struct in_addr inaddr_any;
             inaddr_any.s_addr = INADDR_ANY;
-            bool bound = Bind(CService(in6addr_any, GetListenPort()), BF_NONE);
+            struct in6_addr inaddr6_any = IN6ADDR_ANY_INIT;
+            bool bound = Bind(CService(inaddr6_any, GetListenPort()), BF_NONE);
             fBindFailure |= !bound;
             fBound |= bound;
 

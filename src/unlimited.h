@@ -47,6 +47,9 @@ enum
     // if the blockchain is this far (in seconds) behind the current time, only request headers from a single
     // peer.  This makes IBD more efficient.
     SINGLE_PEER_REQUEST_MODE_AGE = (24 * 60 * 60),
+
+    // How many blocks from tip do we consider than chain to be "nearly" synced.
+    DEFAULT_BLOCKS_FROM_TIP = 2,
 };
 
 class CBlock;

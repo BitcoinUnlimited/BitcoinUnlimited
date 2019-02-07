@@ -10,6 +10,8 @@
 
 #include "utiltime.h"
 
+#include <atomic>
+
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <chrono>
 #include <thread>
@@ -18,19 +20,22 @@
 #include <windows.h> // for Sleep()
 #endif
 
-static int64_t nMockTime = 0; //! For unit testing
+static std::atomic<int64_t> nMockTime(0);
 
 int64_t GetTime()
 {
-    if (nMockTime)
-        return nMockTime;
+    int64_t mocktime = nMockTime.load(std::memory_order_relaxed);
+    if (mocktime)
+    {
+        return mocktime;
+    }
 
     time_t now = time(nullptr);
     assert(now > 0);
     return now;
 }
 
-void SetMockTime(int64_t nMockTimeIn) { nMockTime = nMockTimeIn; }
+void SetMockTime(int64_t nMockTimeIn) { nMockTime.store(nMockTimeIn, std::memory_order_relaxed); }
 int64_t GetTimeMillis()
 {
     if (nMockTime)
@@ -75,8 +80,11 @@ uint64_t GetStopwatch()
 /** Return a time useful for the debug log */
 int64_t GetLogTimeMicros()
 {
-    if (nMockTime)
-        return nMockTime * 1000000;
+    int64_t mocktime = nMockTime.load(std::memory_order_relaxed);
+    if (mocktime)
+    {
+        return mocktime * 1000000;
+    }
 
     return GetTimeMicros();
 }

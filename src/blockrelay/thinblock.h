@@ -287,6 +287,7 @@ extern CThinBlockData thindata; // Singleton class
 bool IsThinBlocksEnabled();
 bool ClearLargestThinBlockAndDisconnect(CNode *pfrom);
 void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
+void RequestThinBlock(CNode *pfrom, const uint256 &hash);
 bool IsThinBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header);
 void BuildSeededBloomFilter(CBloomFilter &memPoolFilter,
     std::vector<uint256> &vOrphanHashes,

@@ -7,6 +7,7 @@
 #ifndef BITCOIN_NET_H
 #define BITCOIN_NET_H
 
+#include "blockrelay/compactblock.h"
 #include "bloom.h"
 #include "chainparams.h"
 #include "compat.h"
@@ -459,11 +460,6 @@ public:
     uint64_t nLocalThinBlockBytes; // the bytes used in creating this thinblock, updated dynamically
     int nSizeThinBlock; // Original on-wire size of the block. Just used for reporting
     int thinBlockWaitingForTxns; // if -1 then not currently waiting
-
-    std::atomic<double> nGetXBlockTxCount; // Count how many get_xblocktx requests are made
-    std::atomic<uint64_t> nGetXBlockTxLastTime; // The last time a get_xblocktx request was made
-    std::atomic<double> nGetXthinCount; // Count how many get_xthin requests are made
-    std::atomic<uint64_t> nGetXthinLastTime; // The last time a get_xthin request was made
     uint32_t nXthinBloomfilterSize; // The maximum xthin bloom filter size (in bytes) that our peer will accept.
     // BUIP010 Xtreme Thinblocks: end section
 
@@ -478,13 +474,24 @@ public:
     int grapheneBlockWaitingForTxns; // if -1 then not currently waiting
     CCriticalSection cs_grapheneadditionaltxs; // lock grapheneAdditionalTxs
     std::vector<CTransactionRef> grapheneAdditionalTxs; // entire transactions included in graphene block
-
-    std::atomic<double> nGetGrapheneBlockTxCount; // Count how many get_xblocktx requests are made
-    std::atomic<uint64_t> nGetGrapheneBlockTxLastTime; // The last time a get_xblocktx request was made
-    std::atomic<double> nGetGrapheneCount; // Count how many get_graphene requests are made
-    std::atomic<uint64_t> nGetGrapheneLastTime; // The last time a get_graphene request was made
     uint32_t nGrapheneBloomfilterSize; // The maximum graphene bloom filter size (in bytes) that our peer will accept.
     // BUIPXXX Graphene blocks: end section
+
+    // Compact Blocks : begin
+    CCriticalSection cs_compactblock;
+    CBlock compactBlock;
+    std::map<uint64_t, CTransactionRef> mapMissingCompactBlockTx;
+    uint64_t nLocalCompactBlockBytes; // the bytes used in creating this cmpctblock, updated dynamically
+    uint64_t nSizeCompactBlock; // Original on-wire size of the block. Just used for reporting
+    int compactBlockWaitingForTxns; // if -1 then not currently waiting
+
+    std::vector<uint64_t> vShortCompactBlockHashes;
+    std::vector<uint256> vCompactBlockHashes;
+
+    uint64_t shorttxidk0;
+    uint64_t shorttxidk1;
+
+    // Compact Blocks : end
 
     CCriticalSection cs_nAvgBlkResponseTime;
     double nAvgBlkResponseTime;
@@ -631,6 +638,13 @@ public:
     bool GrapheneCapable()
     {
         if (nServices & NODE_GRAPHENE)
+            return true;
+        return false;
+    }
+
+    bool CompactBlockCapable()
+    {
+        if (fSupportsCompactBlocks)
             return true;
         return false;
     }

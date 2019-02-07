@@ -171,7 +171,8 @@ enum
 
     GRAPHENE = 0x10000000,
     RESPEND = 0x20000000,
-    WB = 0x40000000 // weak blocks
+    WB = 0x40000000, // weak blocks
+    CMPCT = 0x80000000 // compact blocks
 };
 
 namespace Logging
@@ -194,7 +195,7 @@ To add a new log category:
             {MEMPOOLREJ, "mempoolrej"}, {BLK, "blk"}, {EVICT, "evict"}, {PARALLEL, "parallel"}, {RAND, "rand"}, \
             {REQ, "req"}, {BLOOM, "bloom"}, {LCK, "lck"}, {PROXY, "proxy"}, {DBASE, "dbase"},                   \
             {SELECTCOINS, "selectcoins"}, {ESTIMATEFEE, "estimatefee"}, {QT, "qt"}, {IBD, "ibd"},               \
-            {GRAPHENE, "graphene"}, {RESPEND, "respend"}, {WB, "weakblocks"},                                   \
+            {GRAPHENE, "graphene"}, {RESPEND, "respend"}, {WB, "weakblocks"}, {CMPCT, "cmpctblock"},            \
         {                                                                                                       \
             ZMQ, "zmq"                                                                                          \
         }                                                                                                       \

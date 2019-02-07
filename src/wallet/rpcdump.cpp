@@ -101,9 +101,10 @@ UniValue importprivkey(const UniValue &params, bool fHelp)
             "\nExamples:\n"
             "\nDump a private key\n" +
             HelpExampleCli("dumpprivkey", "\"myaddress\"") + "\nImport the private key with rescan\n" +
-            HelpExampleCli("importprivkey", "\"mykey\"") + "\nImport using a label and without rescan\n" +
-            HelpExampleCli("importprivkey", "\"mykey\" \"testing\" false") + "\nAs a JSON-RPC call\n" +
-            HelpExampleRpc("importprivkey", "\"mykey\", \"testing\", false"));
+            HelpExampleCli("importprivkey", "\"mykey\"") + "\nImport using rescan and label\n" +
+            HelpExampleCli("importprivkey", "\"mykey\" \"mylabel\"") + "\nImport without rescan (must use a label)\n" +
+            HelpExampleCli("importprivkey", "\"mykey\" \"mylabel\" false") + "\nAs a JSON-RPC call\n" +
+            HelpExampleRpc("importprivkey", "\"mykey\", \"mylabel\", false"));
 
 
     LOCK2(cs_main, pwalletMain->cs_wallet);

@@ -67,12 +67,6 @@ CGrapheneBlockTx::CGrapheneBlockTx(uint256 blockHash, std::vector<CTransaction> 
 
 bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
-    if (!pfrom->GrapheneCapable())
-    {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("Graphene block tx message received from a non GRAPHENE node, peer=%s", pfrom->GetLogName());
-    }
-
     std::string strCommand = NetMsgType::GRAPHENETX;
     size_t msgSize = vRecv.size();
     CGrapheneBlockTx grapheneBlockTx;
@@ -80,7 +74,8 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Message consistency checking
     CInv inv(MSG_GRAPHENEBLOCK, grapheneBlockTx.blockhash);
-    if (grapheneBlockTx.vMissingTx.empty() || grapheneBlockTx.blockhash.IsNull())
+    if (grapheneBlockTx.vMissingTx.empty() || grapheneBlockTx.blockhash.IsNull() ||
+        pfrom->grapheneBlockHashes.size() < grapheneBlockTx.vMissingTx.size())
     {
         graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
 
@@ -92,8 +87,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     LOG(GRAPHENE, "Received grblocktx for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
     {
         // Do not process unrequested grblocktx unless from an expedited node.
-        if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::GRAPHENEBLOCK) &&
-            !connmgr->IsExpeditedUpstream(pfrom))
+        if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::GRAPHENEBLOCK) && !connmgr->IsExpeditedUpstream(pfrom))
         {
             dosMan.Misbehaving(pfrom, 10);
             return error(
@@ -102,12 +96,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
 
     // Check if we've already received this block and have it on disk
-    bool fAlreadyHave = false;
-    {
-        LOCK(cs_main);
-        fAlreadyHave = AlreadyHaveBlock(inv);
-    }
-    if (fAlreadyHave)
+    if (AlreadyHaveBlock(inv))
     {
         requester.AlreadyReceived(pfrom, inv);
         graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
@@ -247,12 +236,6 @@ CRequestGrapheneBlockTx::CRequestGrapheneBlockTx(uint256 blockHash, std::set<uin
 
 bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
-    if (!pfrom->GrapheneCapable())
-    {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("get_grblocktx message received from a non GRAPHENE node, peer=%s", pfrom->GetLogName());
-    }
-
     CRequestGrapheneBlockTx grapheneRequestBlockTx;
     vRecv >> grapheneRequestBlockTx;
 
@@ -268,39 +251,21 @@ bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     CInv inv(MSG_TX, grapheneRequestBlockTx.blockhash);
     LOG(GRAPHENE, "Received get_grblocktx for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
 
-    // Check for Misbehaving and DOS
-    // If they make more than 20 requests in 10 minutes then disconnect them
-    if (Params().NetworkIDString() != "regtest")
-    {
-        if (pfrom->nGetGrapheneBlockTxLastTime <= 0)
-            pfrom->nGetGrapheneBlockTxLastTime = GetTime();
-        uint64_t nNow = GetTime();
-        double tmp = pfrom->nGetGrapheneBlockTxCount;
-        while (!pfrom->nGetGrapheneBlockTxCount.compare_exchange_weak(
-            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneBlockTxLastTime)) + 1)))
-            ;
-        pfrom->nGetGrapheneBlockTxLastTime = nNow;
-        LOG(GRAPHENE, "nGetGrapheneTxCount is %f\n", pfrom->nGetGrapheneBlockTxCount);
-        if (pfrom->nGetGrapheneBlockTxCount >= 20)
-        {
-            dosMan.Misbehaving(pfrom, 100); // If they exceed the limit then disconnect them
-            return error("DOS: Misbehaving - requesting too many grblocktx: %s\n", inv.hash.ToString());
-        }
-    }
-
-    CBlockIndex *blkHdr = LookupBlockIndex(inv.hash);
-    if (!blkHdr)
+    std::vector<CTransaction> vTx;
+    CBlockIndex *hdr = LookupBlockIndex(inv.hash);
+    if (!hdr)
     {
         dosMan.Misbehaving(pfrom, 20);
         return error("Requested block is not available");
     }
-
-    std::vector<CTransaction> vTx;
-
+    else
     {
+        if (hdr->nHeight < (chainActive.Tip()->nHeight - DEFAULT_BLOCKS_FROM_TIP))
+            return error(GRAPHENE, "get_grblocktx request too far from the tip");
+
         CBlock block;
         const Consensus::Params &consensusParams = Params().GetConsensus();
-        if (!ReadBlockFromDisk(block, blkHdr, consensusParams))
+        if (!ReadBlockFromDisk(block, hdr, consensusParams))
         {
             // We do not assign misbehavior for not being able to read a block from disk because we already
             // know that the block is in the block index from the step above. Secondly, a failure to read may
@@ -345,12 +310,6 @@ bool CGrapheneBlock::CheckBlockHeader(const CBlockHeader &block, CValidationStat
  */
 bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string strCommand, unsigned nHops)
 {
-    if (!pfrom->GrapheneCapable())
-    {
-        dosMan.Misbehaving(pfrom, 5);
-        return error("%s message received from a non GRAPHENE node, peer=%s", strCommand, pfrom->GetLogName());
-    }
-
     int nSizeGrapheneBlock = vRecv.size();
     CInv inv(MSG_BLOCK, uint256());
 
@@ -420,10 +379,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
         // Request full block if this one isn't extending the best chain
         if (pIndex->nChainWork <= chainActive.Tip()->nChainWork)
         {
-            std::vector<CInv> vGetData;
-            vGetData.push_back(inv);
-            pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-
+            thinrelay.RequestBlock(pfrom, inv.hash);
             graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
 
             LOGA("%s %s from peer %s received but does not extend longest chain; requesting full block\n", strCommand,
@@ -436,7 +392,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
                 pfrom->GetLogName(), nSizeGrapheneBlock);
 
             // Do not process unrequested grapheneblocks.
-            if (!thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::GRAPHENEBLOCK))
+            if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::GRAPHENEBLOCK))
             {
                 dosMan.Misbehaving(pfrom, 10);
                 return error(
@@ -1269,7 +1225,7 @@ void CGrapheneBlockData::ClearGrapheneBlockData(CNode *pnode, const uint256 &has
 {
     // We must make sure to clear the graphene block data first before clearing the graphene block in flight.
     ClearGrapheneBlockData(pnode);
-    thinrelay.ClearThinTypeBlockInFlight(pnode, hash);
+    thinrelay.ClearBlockInFlight(pnode, hash);
 }
 
 void CGrapheneBlockData::ClearGrapheneBlockStats()
@@ -1440,34 +1396,6 @@ bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header)
 
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams)
 {
-    if (!pfrom->GrapheneCapable())
-    {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("Graphene block message received from a non graphene block node, peer %s\n", pfrom->GetLogName());
-    }
-
-    // Check for Misbehaving and DOS
-    // If they make more than 20 requests in 10 minutes then disconnect them
-    {
-        if (pfrom->nGetGrapheneLastTime <= 0)
-            pfrom->nGetGrapheneLastTime = GetTime();
-        uint64_t nNow = GetTime();
-        double tmp = pfrom->nGetGrapheneCount;
-        while (!pfrom->nGetGrapheneCount.compare_exchange_weak(
-            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetGrapheneLastTime)) + 1)))
-            ;
-        pfrom->nGetGrapheneLastTime = nNow;
-        LOG(GRAPHENE, "nGetGrapheneCount is %f\n", pfrom->nGetGrapheneCount);
-        if (chainparams.NetworkIDString() == "main") // other networks have variable mining rates
-        {
-            if (pfrom->nGetGrapheneCount >= 20)
-            {
-                dosMan.Misbehaving(pfrom, 100); // If they exceed the limit then disconnect them
-                return error("sending too many GET_GRAPHENE messages");
-            }
-        }
-    }
-
     CMemPoolInfo mempoolinfo;
     CInv inv;
     vRecv >> inv >> mempoolinfo;
@@ -1510,18 +1438,17 @@ CMemPoolInfo GetGrapheneMempoolInfo()
     }
     return CMemPoolInfo(mempool.size() + orphanpool.GetOrphanPoolSize() + nCommitQ);
 }
-void RequestFailoverBlock(CNode *pfrom, uint256 blockHash)
+void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash)
 {
-    if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable() &&
-        !thinrelay.IsThinTypeBlockInFlight(pfrom, NetMsgType::XTHINBLOCK))
+    if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable())
     {
-        LOG(GRAPHENE, "Requesting xthin block as failover from peer %s\n", pfrom->GetLogName());
+        if (!thinrelay.AddBlockInFlight(pfrom, blockhash, NetMsgType::XTHINBLOCK))
+            return;
+
+        LOG(GRAPHENE | THIN, "Requesting xthin block as failover from peer %s\n", pfrom->GetLogName());
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         CBloomFilter filterMemPool;
-        CInv inv2(MSG_XTHINBLOCK, blockHash);
-
-        if (!thinrelay.AddThinTypeBlockInFlight(pfrom, inv2.hash, NetMsgType::XTHINBLOCK))
-            return;
+        CInv inv(MSG_XTHINBLOCK, blockhash);
 
         std::vector<uint256> vOrphanHashes;
         {
@@ -1529,16 +1456,25 @@ void RequestFailoverBlock(CNode *pfrom, uint256 blockHash)
             for (auto &mi : orphanpool.mapOrphanTransactions)
                 vOrphanHashes.emplace_back(mi.first);
         }
-        BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
-        ss << inv2;
+        BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv.hash, pfrom);
+        ss << inv;
         ss << filterMemPool;
         pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
+    }
+    else if (IsCompactBlocksEnabled() && pfrom->CompactBlockCapable())
+    {
+        if (!thinrelay.AddBlockInFlight(pfrom, blockhash, NetMsgType::CMPCTBLOCK))
+            return;
+
+        LOG(GRAPHENE | CMPCT, "Requesting a compact block as failover from peer %s\n", pfrom->GetLogName());
+        CInv inv(MSG_CMPCT_BLOCK, blockhash);
+        std::vector<CInv> vGetData;
+        vGetData.push_back(inv);
+        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
     }
     else
     {
         LOG(GRAPHENE, "Requesting full block as failover from peer %s\n", pfrom->GetLogName());
-        std::vector<CInv> vGetData;
-        vGetData.push_back(CInv(MSG_BLOCK, blockHash));
-        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+        thinrelay.RequestBlock(pfrom, blockhash);
     }
 }

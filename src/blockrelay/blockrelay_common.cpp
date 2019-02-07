@@ -11,9 +11,10 @@
 
 bool IsThinBlockEnabled();
 bool IsGrapheneBlockEnabled();
+bool IsCompactBlocksEnabled();
 
 // Update the counters for how many peers we have connected.
-void ThinTypeRelay::AddThinTypePeers(CNode *pfrom)
+void ThinTypeRelay::AddPeers(CNode *pfrom)
 {
     if (pfrom)
     {
@@ -28,7 +29,7 @@ void ThinTypeRelay::AddCompactBlockPeer(CNode *pfrom)
     if (pfrom && pfrom->fSupportsCompactBlocks)
         nCompactBlockPeers++;
 }
-void ThinTypeRelay::RemoveThinTypePeers(CNode *pfrom)
+void ThinTypeRelay::RemovePeers(CNode *pfrom)
 {
     if (pfrom)
     {
@@ -58,10 +59,13 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
     if (nTimeToWait == 0)
         return true;
 
+    if (!IsBlockRelayTimerEnabled())
+        return true;
+
     LOCK(cs_blockrelaytimer);
     if (!mapBlockRelayTimer.count(hash))
     {
-        // The timeout limit is a random number belonging to graphene-timer +/- 20%
+        // The timeout limit is a random number +/- 20%.
         // This way a node connected to this one may download the block
         // before the other node and thus be able to serve the other with
         // a graphene block, rather than both nodes timing out and downloading
@@ -75,7 +79,7 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
         uint64_t nIntervalLen = 2 * (nTimeToWait * 0.2);
         int64_t nOffset = nTimeToWait - (nStartInterval + (insecure_rand.rand64() % nIntervalLen) + 1);
         mapBlockRelayTimer.emplace(hash, std::make_pair(GetTimeMillis() + nOffset, false));
-        LOG(GRAPHENE, "Starting Preferential block relay timer (%d millis)\n", nTimeToWait + nOffset);
+        LOG(THIN | GRAPHENE | CMPCT, "Starting Preferential Block Relay timer (%d millis)\n", nTimeToWait + nOffset);
     }
     else
     {
@@ -88,12 +92,13 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
             int64_t elapsed = GetTimeMillis() - iter->second.first;
             if (elapsed > (int64_t)nTimeToWait)
             {
-                // Only print out the log entry once.  Because the graphene timer will be hit
+                // Only print out the log entry once.  Because the thinblock timer will be hit
                 // many times when requesting a block we don't want to fill up the log file.
                 if (!iter->second.second)
                 {
                     iter->second.second = true;
-                    LOG(GRAPHENE | THIN, "Preferential block relay timer exceeded\n");
+                    LOG(THIN | GRAPHENE | CMPCT,
+                        "Preferential BlockRelay timer exceeded - downloading regular block instead\n");
                 }
                 return true;
             }
@@ -104,26 +109,21 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
 
 bool ThinTypeRelay::IsBlockRelayTimerEnabled()
 {
-    // Only engage the timer if at least one thin type relay is active.
-    if (!IsThinBlocksEnabled() && !IsGrapheneBlockEnabled())
+    // Only engage the timer if one or more, but not all, thin type relays are active.
+    // If all types are active, or all inactive, then we do not need the timer.
+    // Generally speaking all types will be active and we can return early.
+    if (IsThinBlocksEnabled() && IsGrapheneBlockEnabled() && IsCompactBlocksEnabled())
+        return false;
+    if (!IsThinBlocksEnabled() && !IsGrapheneBlockEnabled() && !IsCompactBlocksEnabled())
         return false;
 
-    // Under certain conditions the thin relay timer is not relevant.
-    bool fHaveThinBlockPeers = false;
-    bool fHaveGraphenePeers = false;
-    if (nThinBlockPeers > 0)
-        fHaveThinBlockPeers = true;
-    if (nGraphenePeers > 0)
-        fHaveGraphenePeers = true;
+    // The thin relay timer is only relevant if we have a specific thin relay type active
+    // AND we have peers connected which also support that thin relay type
+    bool fThinBlockPossible = IsThinBlocksEnabled() && nThinBlockPeers > 0;
+    bool fGraphenePossible = IsGrapheneBlockEnabled() && nGraphenePeers > 0;
+    bool fCompactBlockPossible = IsCompactBlocksEnabled() && nCompactBlockPeers > 0;
 
-    if (!fHaveGraphenePeers && !fHaveThinBlockPeers)
-        return false;
-    else if (IsGrapheneBlockEnabled() && !fHaveGraphenePeers && !IsThinBlocksEnabled() && fHaveThinBlockPeers)
-        return false;
-    else if (!IsGrapheneBlockEnabled() && fHaveGraphenePeers && IsThinBlocksEnabled() && !fHaveThinBlockPeers)
-        return false;
-
-    return true;
+    return fThinBlockPossible || fGraphenePossible || fCompactBlockPossible;
 }
 // The timer is cleared as soon as we request a block or thinblock.
 void ThinTypeRelay::ClearBlockRelayTimer(const uint256 &hash)
@@ -132,11 +132,11 @@ void ThinTypeRelay::ClearBlockRelayTimer(const uint256 &hash)
     if (mapBlockRelayTimer.count(hash))
     {
         mapBlockRelayTimer.erase(hash);
-        LOG(THIN | GRAPHENE, "Clearing Preferential BlockRelay timer\n");
+        LOG(THIN | GRAPHENE | CMPCT, "Clearing Preferential BlockRelay timer\n");
     }
 }
 
-bool ThinTypeRelay::IsThinTypeBlockInFlight(CNode *pfrom, const std::string thinType)
+bool ThinTypeRelay::IsBlockInFlight(CNode *pfrom, const std::string thinType)
 {
     LOCK(cs_inflight);
     // first check that we are in bounds.
@@ -157,13 +157,13 @@ bool ThinTypeRelay::IsThinTypeBlockInFlight(CNode *pfrom, const std::string thin
     return false;
 }
 
-unsigned int ThinTypeRelay::TotalThinTypeBlocksInFlight()
+unsigned int ThinTypeRelay::TotalBlocksInFlight()
 {
     LOCK(cs_inflight);
     return mapThinTypeBlocksInFlight.size();
 }
 
-void ThinTypeRelay::ThinTypeBlockWasReceived(CNode *pfrom, const uint256 &hash)
+void ThinTypeRelay::BlockWasReceived(CNode *pfrom, const uint256 &hash)
 {
     LOCK(cs_inflight);
     std::pair<std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator,
@@ -178,10 +178,10 @@ void ThinTypeRelay::ThinTypeBlockWasReceived(CNode *pfrom, const uint256 &hash)
     }
 }
 
-bool ThinTypeRelay::AddThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType)
+bool ThinTypeRelay::AddBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType)
 {
     LOCK(cs_inflight);
-    if (IsThinTypeBlockInFlight(pfrom, thinType))
+    if (IsBlockInFlight(pfrom, thinType))
         return false;
 
     mapThinTypeBlocksInFlight.insert(
@@ -189,7 +189,7 @@ bool ThinTypeRelay::AddThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash, 
     return true;
 }
 
-void ThinTypeRelay::ClearThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash)
+void ThinTypeRelay::ClearBlockInFlight(CNode *pfrom, const uint256 &hash)
 {
     LOCK(cs_inflight);
     std::pair<std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator,
@@ -208,7 +208,7 @@ void ThinTypeRelay::ClearThinTypeBlockInFlight(CNode *pfrom, const uint256 &hash
     }
 }
 
-void ThinTypeRelay::CheckForThinTypeDownloadTimeout(CNode *pfrom)
+void ThinTypeRelay::CheckForDownloadTimeout(CNode *pfrom)
 {
     LOCK(cs_inflight);
     if (mapThinTypeBlocksInFlight.size() == 0)
@@ -227,7 +227,7 @@ void ThinTypeRelay::CheckForThinTypeDownloadTimeout(CNode *pfrom)
         {
             if (!pfrom->fWhitelisted && Params().NetworkIDString() != "regtest")
             {
-                LOG(THIN | GRAPHENE,
+                LOG(THIN | GRAPHENE | CMPCT,
                     "ERROR: Disconnecting peer %s due to thinblock download timeout exceeded (%d secs)\n",
                     pfrom->GetLogName(), (GetTime() - range.first->second.nRequestTime));
                 pfrom->fDisconnect = true;
@@ -237,4 +237,11 @@ void ThinTypeRelay::CheckForThinTypeDownloadTimeout(CNode *pfrom)
 
         range.first++;
     }
+}
+
+void ThinTypeRelay::RequestBlock(CNode *pfrom, const uint256 &hash)
+{
+    std::vector<CInv> vGetData;
+    vGetData.push_back(CInv(MSG_BLOCK, hash));
+    pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
 }

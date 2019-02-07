@@ -509,6 +509,10 @@ void UnloadBlockIndex()
     }
 
     nPreferredDownload.store(0);
+    nodestate.Clear();
+    requester.MapBlocksInFlightClear();
+    requester.MapNodestateClear();
+    mempool.clear();
 
     {
         LOCK(cs_main);
@@ -520,14 +524,11 @@ void UnloadBlockIndex()
         chainActive.SetTip(nullptr);
         pindexBestInvalid = nullptr;
         pindexBestHeader = nullptr;
-        mempool.clear();
         mapBlocksUnlinked.clear();
         vinfoBlockFile.clear();
         mapBlockSource.clear();
-        requester.MapBlocksInFlightClear();
         setDirtyBlockIndex.clear();
         setDirtyFileInfo.clear();
-        nodestate.Clear();
         versionbitscache.Clear();
         for (int b = 0; b < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; b++)
         {
@@ -546,7 +547,6 @@ void UnloadBlockIndex()
     }
 
     fHavePruned = false;
-
     recentRejects.reset();
 }
 
