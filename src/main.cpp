@@ -146,7 +146,7 @@ void InitializeNode(const CNode *pnode)
 void FinalizeNode(NodeId nodeid)
 {
     // Decrement thin type peer counters
-    thinrelay.RemoveThinTypePeers(connmgr->FindNodeFromId(nodeid).get());
+    thinrelay.RemovePeers(connmgr->FindNodeFromId(nodeid).get());
 
     // Update block sync counters
     {

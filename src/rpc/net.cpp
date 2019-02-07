@@ -458,7 +458,6 @@ static UniValue GetNetworksInfo()
     return networks;
 }
 
-// BitcoinUnlimited BUIP010 : Start
 static UniValue GetThinBlockStats()
 {
     UniValue obj(UniValue::VOBJ);
@@ -480,9 +479,7 @@ static UniValue GetThinBlockStats()
     }
     return obj;
 }
-// BitcoinUnlimited BUIP010 : End
 
-// BitcoinUnlimited BUIPXXX : Start
 static UniValue GetGrapheneStats()
 {
     UniValue obj(UniValue::VOBJ);
@@ -504,7 +501,26 @@ static UniValue GetGrapheneStats()
     }
     return obj;
 }
-// BitcoinUnlimited BUIPXXX : End
+
+static UniValue GetCompactBlockStats()
+{
+    UniValue obj(UniValue::VOBJ);
+    bool enabled = IsCompactBlocksEnabled();
+    obj.pushKV("enabled", enabled);
+    if (enabled)
+    {
+        obj.pushKV("summary", compactdata.ToString());
+        obj.pushKV("mempool_limiter", compactdata.MempoolLimiterBytesSavedToString());
+        obj.pushKV("inbound_percent", compactdata.InBoundPercentToString());
+        obj.pushKV("outbound_percent", compactdata.OutBoundPercentToString());
+        obj.pushKV("response_time", compactdata.ResponseTimeToString());
+        obj.pushKV("validation_time", compactdata.ValidationTimeToString());
+        obj.pushKV("compact_block_size", compactdata.CompactBlockToString());
+        obj.pushKV("compact_full_tx", compactdata.FullTxToString());
+        obj.pushKV("rerequested", compactdata.ReRequestedTxToString());
+    }
+    return obj;
+}
 
 UniValue getnetworkinfo(const UniValue &params, bool fHelp)
 {
@@ -534,6 +550,10 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
             "  \"relayfee\": x.xxxxxxxx,              (numeric) minimum relay fee for non-free transactions in " +
             CURRENCY_UNIT +
             "/kB\n"
+            "  \"minlimitertxfee\": x.xxxx,           (numeric) fee (in satoshi/byte) below which transactions are "
+            "considered free and subject to limitfreerelay\n"
+            "  \"maxlimitertxfee\": x.xxxx,           (numeric) fee (in satoshi/byte) above which transactions are "
+            "always relayed\n"
             "  \"localaddresses\": [                  (array) list of local addresses\n"
             "    {\n"
             "      \"address\": \"xxxx\",               (string) network address\n"
@@ -543,6 +563,7 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
             "  ,...\n"
             "  ]\n"
             "  \"thinblockstats\": \"...\"              (string) thin block related statistics \n"
+            "  \"compactblockstats\": \"...\"           (string) compact block related statistics \n"
             "  \"grapheneblockstats\": \"...\"          (string) graphene block related statistics \n"
             "  \"warnings\": \"...\"                    (string) any network warnings (such as alert messages) \n"
             "}\n"
@@ -576,12 +597,9 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
         }
     }
     obj.pushKV("localaddresses", localAddresses);
-    // BitcoinUnlimited BUIP010: Start
     obj.pushKV("thinblockstats", GetThinBlockStats());
-    // BitcoinUnlimited BUIP010: End
-    //// BitcoinUnlimited BUIPXXX: Start
+    obj.pushKV("compactblockstats", GetCompactBlockStats());
     obj.pushKV("grapheneblockstats", GetGrapheneStats());
-    // BitcoinUnlimited BUIPXXX: End
     obj.pushKV("warnings", GetWarnings("statusbar"));
     return obj;
 }

@@ -45,10 +45,10 @@ class GetLogCategories (BitcoinTestFramework):
         self.is_network_split = False
 
     def run_test (self):
-        exp0 = "coindb tor addrman libevent http rpc partitioncheck bench prune reindex mempoolrej blk evict parallel rand req bloom estimatefee lck proxy dbase selectcoins zmq qt ibd respend weakblocks"
-        exp1 = "libevent http partitioncheck bench prune reindex mempoolrej blk evict parallel rand req bloom estimatefee lck proxy dbase selectcoins zmq qt ibd respend weakblocks"
-        exp2 = "libevent http partitioncheck bench prune reindex mempoolrej parallel rand req bloom estimatefee dbase selectcoins zmq qt ibd respend weakblocks"
-        exp3 = "libevent http partitioncheck bench prune reindex mempoolrej parallel req bloom estimatefee dbase selectcoins respend weakblocks"
+        exp0 = "coindb tor addrman libevent http rpc partitioncheck bench prune reindex mempoolrej blk evict parallel rand req bloom estimatefee lck proxy dbase selectcoins zmq qt ibd respend weakblocks cmpctblock"
+        exp1 = "libevent http partitioncheck bench prune reindex mempoolrej blk evict parallel rand req bloom estimatefee lck proxy dbase selectcoins zmq qt ibd respend weakblocks cmpctblock"
+        exp2 = "libevent http partitioncheck bench prune reindex mempoolrej parallel rand req bloom estimatefee dbase selectcoins zmq qt ibd respend weakblocks cmpctblock"
+        exp3 = "libevent http partitioncheck bench prune reindex mempoolrej parallel req bloom estimatefee dbase selectcoins respend weakblocks cmpctblock"
         exp4 = exp1
         exp5 = exp0
         exp6 = ""

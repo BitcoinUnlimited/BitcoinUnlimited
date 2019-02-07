@@ -21,8 +21,13 @@
 # this is the listening
 KEY i BU_LISTEN_PORT                            0x0002                   0x0000         u64c
 KEY i BU_GRAPHENE_VERSION_SUPPORTED             0x0002                   0x0001         u64c
+
 # BU_MSG_CHECKSUM: if 0, use the standard checksum.  If 1, you may send this client messages with the checksum field==0 and the checksum won't be checked (TCP has a checksum)
 KEY i BU_MSG_IGNORE_CHECKSUM                    0x0002                   0x0002         u64c
+
+# XTHIN version
+KEY i BU_XTHIN_VERSION                          0x0002                   0x0003         u64c
+
 # KEY i ABC_...                                0x0000                   ...
 # KEY i XT_DOUBLESPEND_FORWARDING_SCHEME       0x0003                   ...            vector
 # ...

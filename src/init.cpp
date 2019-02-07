@@ -967,16 +967,17 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         // Set the number of threads to half the available Cores.
         int nThreads = std::max(GetNumCores() / 2, 1);
         numMsgHandlerThreads.Set(nThreads);
-        LOGA("Using %d message handler threads\n", numMsgHandlerThreads.Value());
     }
+    LOGA("Using %d message handler threads\n", numMsgHandlerThreads.Value());
+
     // Setup the number of transaction mempool admission threads
     if (numTxAdmissionThreads.Value() == 0)
     {
         // Set the number of threads to half the available Cores.
         int nThreads = std::max(GetNumCores() / 2, 1);
         numTxAdmissionThreads.Set(nThreads);
-        LOGA("Using %d transaction admission threads\n", numTxAdmissionThreads.Value());
     }
+    LOGA("Using %d transaction admission threads\n", numTxAdmissionThreads.Value());
 
     // Create the parallel block validator
     PV.reset(new CParallelValidation());
