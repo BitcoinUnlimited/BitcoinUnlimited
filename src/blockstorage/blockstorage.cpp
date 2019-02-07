@@ -327,8 +327,6 @@ void SyncStorage(const CChainParams &chainparams)
 
         for (const std::pair<int, CDiskBlockIndex> &item : indexByHeight)
         {
-            bool needData = true;
-            bool needUndo = true;
             CBlockIndex *index;
             if (item.second.GetBlockHash() == chainparams.GetConsensus().hashGenesisBlock)
             {
@@ -357,7 +355,7 @@ void SyncStorage(const CChainParams &chainparams)
             }
 
             index = LookupBlockIndex(item.second.GetBlockHash());
-            if (index)
+            if (!index)
             {
                 CBlockIndex *pindexNew = InsertBlockIndex(item.second.GetBlockHash());
                 pindexNew->pprev = InsertBlockIndex(item.second.hashPrev);
@@ -378,7 +376,7 @@ void SyncStorage(const CChainParams &chainparams)
             }
 
             // Update the block data
-            if (needData && index->nStatus & BLOCK_HAVE_DATA && !index->GetBlockPos().IsNull())
+            if (index->nStatus & BLOCK_HAVE_DATA && !index->GetBlockPos().IsNull())
             {
                 CBlock block_seq;
                 if (!ReadBlockFromDiskSequential(block_seq, index->GetBlockPos(), chainparams.GetConsensus()))
@@ -396,7 +394,7 @@ void SyncStorage(const CChainParams &chainparams)
             }
 
             // Update the undo data
-            if (needUndo && index->nStatus & BLOCK_HAVE_UNDO && !index->GetUndoPos().IsNull())
+            if (index->nStatus & BLOCK_HAVE_UNDO && !index->GetUndoPos().IsNull())
             {
                 CBlockUndo blockundo;
 
