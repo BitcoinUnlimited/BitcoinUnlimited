@@ -160,12 +160,12 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     size_t idx = 0;
     for (const CTransaction &tx : grapheneBlockTx.vMissingTx)
     {
-        pfrom->mapMissingTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx.GetHash(),
+        pfrom->mapMissingTx[GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, tx.GetHash(),
             pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED))] = MakeTransactionRef(tx);
 
         uint256 hash = tx.GetHash();
-        uint64_t cheapHash = GetShortID(
-            pfrom->shorttxidk0, pfrom->shorttxidk1, hash, pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
+        uint64_t cheapHash = GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash,
+            pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
 
         // Insert in arbitrary order if canonical ordering is enabled and xversion is recent enough
         if (enableCanonicalTxOrder.Value() && pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) >= 1)
@@ -295,7 +295,7 @@ bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         {
             for (auto &tx : block.vtx)
             {
-                uint64_t cheapHash = GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx->GetHash(),
+                uint64_t cheapHash = GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, tx->GetHash(),
                     pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
 
                 if (grapheneRequestBlockTx.setCheapHashesToRequest.count(cheapHash))
@@ -446,8 +446,8 @@ bool CGrapheneBlock::process(CNode *pfrom,
     pfrom->grapheneBlock.nTime = header.nTime;
     pfrom->grapheneBlock.hashMerkleRoot = header.hashMerkleRoot;
     pfrom->grapheneBlock.hashPrevBlock = header.hashPrevBlock;
-    pfrom->shorttxidk0 = shorttxidk0;
-    pfrom->shorttxidk1 = shorttxidk1;
+    pfrom->gr_shorttxidk0 = shorttxidk0;
+    pfrom->gr_shorttxidk1 = shorttxidk1;
 
     {
         LOCK(pfrom->cs_grapheneadditionaltxs);
@@ -750,7 +750,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
                     inMemPool = true;
             }
 
-            bool inMissingTx = pfrom->mapMissingTx.count(GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash,
+            bool inMissingTx = pfrom->mapMissingTx.count(GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash,
                                    pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED))) > 0;
             bool inAdditionalTxs = mapAdditionalTxs.count(hash) > 0;
             bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
@@ -770,7 +770,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             }
             else if (inMissingTx)
             {
-                ptx = pfrom->mapMissingTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash,
+                ptx = pfrom->mapMissingTx[GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash,
                     pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED))];
                 pfrom->grapheneBlock.setUnVerifiedTxns.insert(hash);
             }
@@ -1353,8 +1353,8 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
 
             CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx, nSenderMempoolPlusBlock,
                 pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
-            pfrom->shorttxidk0 = grapheneBlock.shorttxidk0;
-            pfrom->shorttxidk1 = grapheneBlock.shorttxidk1;
+            pfrom->gr_shorttxidk0 = grapheneBlock.shorttxidk0;
+            pfrom->gr_shorttxidk1 = grapheneBlock.shorttxidk1;
             int nSizeBlock = pblock->GetBlockSize();
             int nSizeGrapheneBlock = ::GetSerializeSize(grapheneBlock, SER_NETWORK, PROTOCOL_VERSION);
 
