@@ -12,6 +12,7 @@ These are steps that as to be executed once and that don't need to be repeated f
 ```bash
 sudo apt install git apt-cacher-ng ruby docker.io
 sudo usermod -a -G docker $USER
+exec su -l $USER  #make effective the usermod command
 cd ~/src
 git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git
 git clone https://github.com/devrandom/gitian-builder.git
