@@ -1083,7 +1083,14 @@ void Snapshot::Load(void)
     LOCK(cs);
     tipHeight = chainActive.Height();
     tip = chainActive.Tip();
-    tipMedianTimePast = tip->GetMedianTimePast();
+    if (tip)
+    {
+        tipMedianTimePast = tip->GetMedianTimePast();
+    }
+    else
+    {
+        tipMedianTimePast = 0; // MTP does not matter, we are in IBD
+    }
     adjustedTime = GetAdjustedTime();
     coins = pcoinsTip; // TODO pcoinsTip can change
     if (cvMempool)

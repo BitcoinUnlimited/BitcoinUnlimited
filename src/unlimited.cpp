@@ -2188,8 +2188,8 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         if (max < temp)
             max = temp;
     }
-    ret.pushKV("requester.mapTxnInfo.maxobj", max);
-    ret.pushKV("requester.mapTxnInfo.totobj", size);
+    ret.pushKV("requester.mapTxnInfo.maxobj", (uint64_t)max);
+    ret.pushKV("requester.mapTxnInfo.totobj", (uint64_t)size);
 
     max = 0;
     size = 0;
@@ -2200,8 +2200,8 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         if (max < temp)
             max = temp;
     }
-    ret.pushKV("requester.mapBlkInfo.maxobj", max);
-    ret.pushKV("requester.mapBlkInfo.totobj", size);
+    ret.pushKV("requester.mapBlkInfo.maxobj", (uint64_t)max);
+    ret.pushKV("requester.mapBlkInfo.totobj", (uint64_t)size);
 
     ret.pushKV("mapBlockIndex", (int64_t)mapBlockIndex.size());
     // CChain
