@@ -1,3 +1,37 @@
+# Table of Contents
+
+* [Developer Notes](#developer-notes)
+  * [Formatting](#formatting)
+    * [The fully-automatic way:](#the-fully-automatic-way:)
+    * [The semi-automatic way:](#the-semi-automatic-way:)
+  * [Doxygen comments](#doxygen-comments)
+  * [Development tips and tricks](#development-tips-and-tricks)
+    * [compiling for debugging](#compiling-for-debugging)
+    * [debug.log](#debug.log)
+    * [testnet and regtest modes](#testnet-and-regtest-modes)
+    * [DEBUG_LOCKORDER](#debug_lockorder)
+    * [Memory Profiling](#memory-profiling)
+  * [Locking/mutex usage notes](#locking/mutex-usage-notes)
+  * [Threads](#threads)
+  * [Ignoring IDE/editor files](#ignoring-ide/editor-files)
+* [Development guidelines](#development-guidelines)
+  * [General Bitcoin Unlimited](#general-bitcoin-unlimited)
+  * [Wallet](#wallet)
+  * [General C++](#general-c++)
+  * [C++ data structures](#c++-data-structures)
+  * [Strings and formatting](#strings-and-formatting)
+  * [Threads and synchronization](#threads-and-synchronization)
+  * [Source code organization](#source-code-organization)
+  * [GUI](#gui)
+  * [Subtrees](#subtrees)
+  * [Upgrading LevelDB](#upgrading-leveldb)
+    * [File Descriptor Counts](#file-descriptor-counts)
+    * [Consensus Compatibility](#consensus-compatibility)
+  * [Git and GitHub tips](#git-and-github-tips)
+  * [Scripted diffs](#scripted-diffs)
+  * [RPC interface guidelines](#rpc-interface-guidelines)
+
+
 # Developer Notes
 
 ## Formatting
