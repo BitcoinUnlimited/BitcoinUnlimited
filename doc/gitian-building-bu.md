@@ -22,9 +22,13 @@ bin/make-base-vm --suite bionic --arch amd64 --docker
 Build the binaries
 ------------------
 
+These are the commands to actually roduce the executable:
+
+```bash
 cd ~/src/gitian-builder
 export USE_DOCKER=1
 bin/gbuild -j 4 -m 10000 --url bitcoin=https://github.com/BitcoinUnlimited/BitcoinUnlimited.git --commit bitcoin=dev ../BitcoinUnlimited/contrib/gitian-descriptors/gitian-linux.yml
+```
 
 Your binaries will be ready to be used in `build/out/` folder.
 
