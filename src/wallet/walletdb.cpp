@@ -21,9 +21,9 @@
 #include "wallet/wallet.h"
 
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread.hpp>
 #include <boost/version.hpp>
 #include <fstream>
+#include <thread>
 
 using namespace std;
 
@@ -914,6 +914,11 @@ void ThreadFlushWalletDB(const string &strFile)
     {
         MilliSleep(500);
 
+        if (shutdown_threads.load() == true)
+        {
+            break;
+        }
+
         if (nLastSeen != nWalletDBUpdated)
         {
             nLastSeen = nWalletDBUpdated;
@@ -936,7 +941,10 @@ void ThreadFlushWalletDB(const string &strFile)
 
                 if (nRefCount == 0)
                 {
-                    boost::this_thread::interruption_point();
+                    if (shutdown_threads.load() == true)
+                    {
+                        break;
+                    }
                     map<string, int>::iterator mi2 = bitdb.mapFileUseCount.find(strFile);
                     if (mi2 != bitdb.mapFileUseCount.end())
                     {
@@ -953,6 +961,10 @@ void ThreadFlushWalletDB(const string &strFile)
                     }
                 }
             }
+        }
+        if (shutdown_threads.load() == true)
+        {
+            break;
         }
     }
 }

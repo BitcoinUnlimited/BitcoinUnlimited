@@ -9,7 +9,7 @@
 #include "txdb.h"
 #include "txmempool.h"
 
-#include <boost/thread.hpp>
+#include <thread>
 
 /** Basic testing setup.
  * This just configures logging and chain parameters.

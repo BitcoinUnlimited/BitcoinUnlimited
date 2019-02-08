@@ -34,7 +34,10 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
     CValidationState state;
     for (CBlockIndex *pindex = chainActive.Tip(); pindex && pindex->pprev; pindex = pindex->pprev)
     {
-        boost::this_thread::interruption_point();
+        if (shutdown_threads.load() == true)
+        {
+            return false;
+        }
         uiInterface.ShowProgress(_("Verifying blocks..."),
             std::max(1, std::min(99, (int)(((double)(chainActive.Height() - pindex->nHeight)) / (double)nCheckDepth *
                                            (nCheckLevel >= 4 ? 50 : 100)))));
@@ -101,7 +104,10 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
         CBlockIndex *pindex = pindexState;
         while (pindex != chainActive.Tip())
         {
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return false;
+            }
             uiInterface.ShowProgress(_("Verifying blocks..."),
                 std::max(1, std::min(99, 100 - (int)(((double)(chainActive.Height() - pindex->nHeight)) /
                                                      (double)nCheckDepth * 50))));

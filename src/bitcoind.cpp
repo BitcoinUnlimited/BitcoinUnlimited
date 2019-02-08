@@ -17,13 +17,12 @@
 #include "init.h"
 #include "noui.h"
 #include "rpc/server.h"
-#include "scheduler.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utilstrencodings.h"
 
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/thread.hpp>
+#include <thread>
 
 #include <stdio.h>
 
@@ -49,7 +48,7 @@
 
 static bool fDaemon;
 
-void WaitForShutdown(boost::thread_group *threadGroup)
+void WaitForShutdown(thread_group *threadGroup)
 {
     bool fShutdown = ShutdownRequested();
     // Tell the main threads to shutdown.
@@ -71,8 +70,7 @@ void WaitForShutdown(boost::thread_group *threadGroup)
 //
 bool AppInit(int argc, char *argv[])
 {
-    boost::thread_group threadGroup;
-    CScheduler scheduler;
+    thread_group threadGroup;
 
     auto &config = const_cast<Config &>(GetConfig());
 
@@ -249,7 +247,7 @@ bool AppInit(int argc, char *argv[])
         }
 
         InitParameterInteraction();
-        fRet = AppInit2(config, threadGroup, scheduler);
+        fRet = AppInit2(config, threadGroup);
     }
     catch (const std::exception &e)
     {

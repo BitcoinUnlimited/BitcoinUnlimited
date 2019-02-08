@@ -66,7 +66,7 @@ bool DecodeHexTx(CTransaction &tx, const std::string &strHexTx)
 
 /** Convert binary data to a hex string.  The provided result buffer must be 2*length+1 bytes.
  */
-extern "C" int Bin2Hex(unsigned char *val, int length, char *result, unsigned int resultLen)
+SLAPI int Bin2Hex(unsigned char *val, int length, char *result, unsigned int resultLen)
 {
     std::string s = GetHex(val, length);
     if (s.size() >= resultLen)
@@ -77,7 +77,7 @@ extern "C" int Bin2Hex(unsigned char *val, int length, char *result, unsigned in
 
 
 /** Return random bytes from cryptographically acceptable random sources */
-extern "C" int RandomBytes(unsigned char *buf, int num)
+SLAPI int RandomBytes(unsigned char *buf, int num)
 {
     if (RAND_bytes(buf, num) != 1)
     {
@@ -88,7 +88,7 @@ extern "C" int RandomBytes(unsigned char *buf, int num)
 }
 
 /** Given a private key, return its corresponding public key */
-extern "C" int GetPubKey(unsigned char *keyData, unsigned char *result, unsigned int resultLen)
+SLAPI int GetPubKey(unsigned char *keyData, unsigned char *result, unsigned int resultLen)
 {
     if (!sigInited)
     {
@@ -112,7 +112,7 @@ extern "C" int GetPubKey(unsigned char *keyData, unsigned char *result, unsigned
     The transaction (txData) must contain the COutPoint (tx hash and vout) of all relevant inputs,
     however, it is not necessary to provide the spend script.
 */
-extern "C" int SignTx(unsigned char *txData,
+SLAPI int SignTx(unsigned char *txData,
     int txbuflen,
     unsigned int inputIdx,
     int64_t inputAmount,
@@ -194,7 +194,7 @@ public:
 
 // Create a ScriptMachine with no transaction context -- useful for tests and debugging
 // This ScriptMachine can't CHECKSIG or CHECKSIGVERIFY
-extern "C" void *CreateNoContextScriptMachine(unsigned int flags)
+SLAPI void *CreateNoContextScriptMachine(unsigned int flags)
 {
     ScriptMachineData *smd = new ScriptMachineData();
     smd->checker = std::make_shared<BaseSignatureChecker>();
@@ -205,7 +205,7 @@ extern "C" void *CreateNoContextScriptMachine(unsigned int flags)
 // Create a ScriptMachine operating in the context of a particular transaction and input.
 // The transaction, input index, and input amount are used in CHECKSIG and CHECKSIGVERIFY to generate the hash that
 // the signature validates.
-extern "C" void *CreateScriptMachine(unsigned int flags,
+SLAPI void *CreateScriptMachine(unsigned int flags,
     unsigned int inputIdx,
     int64_t inputAmount,
     unsigned char *txData,
@@ -239,7 +239,7 @@ extern "C" void *CreateScriptMachine(unsigned int flags,
 }
 
 // Release a ScriptMachine context
-extern "C" void SmRelease(void *smId)
+SLAPI void SmRelease(void *smId)
 {
     ScriptMachineData *smd = (ScriptMachineData *)smId;
     if (!smd)
@@ -248,7 +248,7 @@ extern "C" void SmRelease(void *smId)
 }
 
 // Copy the provided ScriptMachine, returning a new ScriptMachine id that exactly matches the current one
-extern "C" void *SmClone(void *smId)
+SLAPI void *SmClone(void *smId)
 {
     ScriptMachineData *from = (ScriptMachineData *)smId;
     ScriptMachineData *to = new ScriptMachineData();
@@ -261,7 +261,7 @@ extern "C" void *SmClone(void *smId)
 
 
 // Evaluate a script within the context of this script machine
-extern "C" bool SmEval(void *smId, unsigned char *scriptBuf, unsigned int scriptLen)
+SLAPI bool SmEval(void *smId, unsigned char *scriptBuf, unsigned int scriptLen)
 {
     ScriptMachineData *smd = (ScriptMachineData *)smId;
 
@@ -271,7 +271,7 @@ extern "C" bool SmEval(void *smId, unsigned char *scriptBuf, unsigned int script
 }
 
 // Step-by-step interface: start evaluating a script within the context of this script machine
-extern "C" bool SmBeginStep(void *smId, unsigned char *scriptBuf, unsigned int scriptLen)
+SLAPI bool SmBeginStep(void *smId, unsigned char *scriptBuf, unsigned int scriptLen)
 {
     ScriptMachineData *smd = (ScriptMachineData *)smId;
     // shared_ptr will auto-release the old one
@@ -281,7 +281,7 @@ extern "C" bool SmBeginStep(void *smId, unsigned char *scriptBuf, unsigned int s
 }
 
 // Step-by-step interface: execute the next instruction in the script
-extern "C" unsigned int SmStep(void *smId)
+SLAPI unsigned int SmStep(void *smId)
 {
     ScriptMachineData *smd = (ScriptMachineData *)smId;
     unsigned int ret = smd->sm->Step();
@@ -289,7 +289,7 @@ extern "C" unsigned int SmStep(void *smId)
 }
 
 // Step-by-step interface: get the current position in this script, specified in bytes offset from the script start
-extern "C" int SmPos(void *smId)
+SLAPI int SmPos(void *smId)
 {
     ScriptMachineData *smd = (ScriptMachineData *)smId;
     return smd->sm->getPos();
@@ -297,7 +297,7 @@ extern "C" int SmPos(void *smId)
 
 
 // Step-by-step interface: End script evaluation
-extern "C" bool SmEndStep(void *smId)
+SLAPI bool SmEndStep(void *smId)
 {
     ScriptMachineData *smd = (ScriptMachineData *)smId;
     bool ret = smd->sm->EndStep();
@@ -306,7 +306,7 @@ extern "C" bool SmEndStep(void *smId)
 
 
 // Revert the script machine to initial conditions
-extern "C" void SmReset(void *smId)
+SLAPI void SmReset(void *smId)
 {
     ScriptMachineData *smd = (ScriptMachineData *)smId;
     smd->sm->Reset();
@@ -315,11 +315,7 @@ extern "C" void SmReset(void *smId)
 
 // Get a stack item, 0 = stack, 1 = altstack,  pass a buffer at least 520 bytes in size
 // returns length of the item or -1 if no item.  0 is the stack top
-extern "C" void SmSetStackItem(void *smId,
-    unsigned int stack,
-    int index,
-    const unsigned char *value,
-    unsigned int valsize)
+SLAPI void SmSetStackItem(void *smId, unsigned int stack, int index, const unsigned char *value, unsigned int valsize)
 {
     ScriptMachineData *smd = (ScriptMachineData *)smId;
 
@@ -338,7 +334,7 @@ extern "C" void SmSetStackItem(void *smId,
 
 // Get a stack item, 0 = stack, 1 = altstack,  pass a buffer at least 520 bytes in size
 // returns length of the item or -1 if no item.  0 is the stack top
-extern "C" int SmGetStackItem(void *smId, unsigned int stack, unsigned int index, unsigned char *result)
+SLAPI int SmGetStackItem(void *smId, unsigned int stack, unsigned int index, unsigned char *result)
 {
     ScriptMachineData *smd = (ScriptMachineData *)smId;
 
@@ -352,7 +348,7 @@ extern "C" int SmGetStackItem(void *smId, unsigned int stack, unsigned int index
 }
 
 // Returns the last error generated during script evaluation (if any)
-extern "C" unsigned int SmGetError(void *smId)
+SLAPI unsigned int SmGetError(void *smId)
 {
     ScriptMachineData *smd = (ScriptMachineData *)smId;
     return (unsigned int)smd->sm->getError();

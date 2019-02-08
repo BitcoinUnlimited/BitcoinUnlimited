@@ -13,9 +13,12 @@
 #include <atomic>
 
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/thread.hpp>
+#include <chrono>
+#include <thread>
 
-using namespace std;
+#ifdef WIN32
+#include <windows.h> // for Sleep()
+#endif
 
 static std::atomic<int64_t> nMockTime(0);
 
@@ -54,6 +57,7 @@ int64_t GetTimeMicros()
     return now;
 }
 
+
 #ifdef WIN32
 uint64_t GetStopwatch() { return 1000 * GetTimeMicros(); }
 #elif MAC_OSX
@@ -87,18 +91,10 @@ int64_t GetLogTimeMicros()
 
 void MilliSleep(int64_t n)
 {
-/**
- * Boost's sleep_for was uninterruptable when backed by nanosleep from 1.50
- * until fixed in 1.52. Use the deprecated sleep method for the broken case.
- * See: https://svn.boost.org/trac/boost/ticket/7238
- */
-#if defined(HAVE_WORKING_BOOST_SLEEP_FOR)
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(n));
-#elif defined(HAVE_WORKING_BOOST_SLEEP)
-    boost::this_thread::sleep(boost::posix_time::milliseconds(n));
+#ifdef WIN32
+    Sleep(n);
 #else
-// should never get here
-#error missing boost sleep implementation
+    std::this_thread::sleep_for(std::chrono::milliseconds(n));
 #endif
 }
 

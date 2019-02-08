@@ -47,11 +47,12 @@
 
 #include <atomic>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread.hpp>
+#include <boost/thread/tss.hpp> // for boost::thread_specific_ptr
 #include <inttypes.h>
 #include <iomanip>
 #include <list>
 #include <queue>
+#include <thread>
 
 using namespace std;
 
@@ -184,7 +185,7 @@ std::string minerComment;
 
 CLeakyBucket receiveShaper(DEFAULT_MAX_RECV_BURST, DEFAULT_AVE_RECV);
 CLeakyBucket sendShaper(DEFAULT_MAX_SEND_BURST, DEFAULT_AVE_SEND);
-boost::chrono::steady_clock CLeakyBucket::clock;
+std::chrono::steady_clock CLeakyBucket::clock;
 
 // Variables for statistics tracking, must be before the "requester" singleton instantiation
 const char *sampleNames[] = {"sec10", "min5", "hourly", "daily", "monthly"};
@@ -411,6 +412,8 @@ ThinTypeRelay thinrelay;
 uint256 bitcoinCashForkBlockHash = uint256S("000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec");
 
 map<int64_t, CMiningCandidate> miningCandidatesMap GUARDED_BY(cs_main);
+
+std::atomic<bool> shutdown_threads{false};
 
 #ifdef ENABLE_MUTRACE
 class CPrintSomePointers

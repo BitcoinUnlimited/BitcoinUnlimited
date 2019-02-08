@@ -80,8 +80,6 @@ public:
     }
 };
 
-class CState;
-
 class CNodeStateAccessor
 {
     CCriticalSection *cs;

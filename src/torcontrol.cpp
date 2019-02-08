@@ -749,7 +749,7 @@ static void TorControlThread()
     event_base_dispatch(base);
 }
 
-void StartTorControl(boost::thread_group &threadGroup, CScheduler &scheduler)
+void StartTorControl(thread_group &threadGroup)
 {
     assert(!base);
 #ifdef WIN32

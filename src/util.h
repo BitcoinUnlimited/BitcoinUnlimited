@@ -31,6 +31,12 @@
 #include <boost/signals2/signal.hpp>
 #include <boost/thread/exceptions.hpp>
 
+// Preface any Shared Library API definition with this macro.  This will ensure that the function is available for
+// external linkage.
+// For example:
+// SLAPI int myExportedFunc(unsigned char *buf, int num);
+#define SLAPI extern "C" __attribute__((visibility("default")))
+
 #ifdef DEBUG
 #define DEBUG_ASSERTION
 #define DEBUG_PAUSE
