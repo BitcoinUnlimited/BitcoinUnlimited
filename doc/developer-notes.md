@@ -1,8 +1,6 @@
-Developer Notes
-===============
+# Developer Notes
 
-Formatting
------------
+## Formatting
 
 Various coding styles have been used during the history of the codebase,
 and the result is not very consistent. However, we're now trying to converge to
@@ -45,32 +43,32 @@ class Class
 
 - To auto-format a file:
 
-  The fully-automatic way:
-  ========================
-  Add the following to your $HOME/.gitconfig or .git/config in the Bitcoin directory:
+### The fully-automatic way:
+
+Add the following to your $HOME/.gitconfig or .git/config in the Bitcoin directory:
   
-  ```
-  [filter "bitcoin-clang-format"]
-        clean = "contrib/devtools/clang-format.py format-stdout-if-wanted clang-format-3.8 %f"
-        smudge = cat
-  ```
+```
+[filter "bitcoin-clang-format"]
+    clean = "contrib/devtools/clang-format.py format-stdout-if-wanted clang-format-3.8 %f"
+    smudge = cat
+```
 
-  The semi-automatic way:
-  =======================
-   Formatting happens in two passes.  First a python script is run that finds trailing comments that exceed 120 characters
-   and moves them up to the prior line.  Second clang-format-3.8 is executed.
+### The semi-automatic way:
 
-   The first step is to install clang-format.  You likely need to install this exact version or formatting may be slightly different.
+Formatting happens in two passes.  First a python script is run that finds trailing comments that exceed 120 characters
+and moves them up to the prior line.  Second clang-format-3.8 is executed.
+
+The first step is to install clang-format.  You likely need to install this exact version or formatting may be slightly different.
 ```bash
 sudo apt-get install clang-format-3.8
 ```
 
-   Next, run the wrapper script to format your files:
+Next, run the wrapper script to format your files:
 
 ```bash
 ./contrib/devtools/clang-format.py format clang-format-3.8 <filenames...>
 ```
-   Do not fix other people's formatting issues in your PR, since it distracts from the content!  Let the BitcoinUnlimitedJanitor clean up other people's mess.
+Do not fix other people's formatting issues in your PR, since it distracts from the content!  Let the BitcoinUnlimitedJanitor clean up other people's mess.
 
 
 - To check proper formatting of a file:
@@ -113,8 +111,7 @@ make check-formatting
 ```
 
 
-Doxygen comments
------------------
+## Doxygen comments
 
 To facilitate the generation of documentation, use doxygen-compatible comment blocks for functions, methods and fields.
 
@@ -166,15 +163,14 @@ Not OK (used plenty in the current source, but not picked up):
 A full list of comment syntaxes picked up by doxygen can be found at http://www.stack.nl/~dimitri/doxygen/manual/docblocks.html,
 but if possible use one of the above styles.
 
-Development tips and tricks
----------------------------
+## Development tips and tricks
 
-**compiling for debugging**
+### compiling for debugging
 
 Run configure with the --enable-debug option, then make. Or run configure with
 CXXFLAGS="-g -ggdb -O0" or whatever debug flags you need.
 
-**debug.log**
+### debug.log
 
 If the code is behaving strangely, take a look in the debug.log file in the data directory;
 error and debugging messages are written there.
@@ -185,7 +181,7 @@ on all categories (and give you a very large debug.log file).
 The Qt code routes qDebug() output to debug.log under category "qt": run with -debug=qt
 to see it.
 
-**testnet and regtest modes**
+### testnet and regtest modes
 
 Run with the -testnet option to run with "play bitcoins" on the test network, if you
 are testing multi-machine code that needs to operate across the internet.
@@ -194,14 +190,14 @@ If you are testing something that can run on one machine, run with the -regtest 
 In regression test mode, blocks can be created on-demand; see qa/rpc-tests/ for tests
 that run in -regtest mode.
 
-**DEBUG_LOCKORDER**
+### DEBUG_LOCKORDER
 
 Bitcoin Unlimited is a multithreaded application, and deadlocks or other multithreading bugs
 can be very difficult to track down. Compiling with -DDEBUG_LOCKORDER (configure
 CXXFLAGS="-DDEBUG_LOCKORDER -g") inserts run-time checks to keep track of which locks
 are held, and adds warnings to the debug.log file if inconsistencies are detected.
 
-**Memory Profiling**
+### Memory Profiling
 
 *Currently only available on Linux*
 
@@ -220,8 +216,7 @@ For detailed instructions on how to use gperftools please read the gperftools
 documentation.
 
 
-Locking/mutex usage notes
--------------------------
+## Locking/mutex usage notes
 
 The code is multi-threaded, and uses mutexes and the
 LOCK/TRY_LOCK macros to protect data structures.
@@ -237,8 +232,7 @@ between the various components is a goal, with any necessary locking
 done by the components (e.g. see the self-contained CKeyStore class
 and its cs_KeyStore lock for example).
 
-Threads
--------
+## Threads
 
 - ThreadScriptCheck : Verifies block scripts.
 
@@ -270,8 +264,7 @@ Threads
 
 - Shutdown : Does an orderly shutdown of everything.
 
-Ignoring IDE/editor files
---------------------------
+## Ignoring IDE/editor files
 
 In closed-source environments in which everyone uses the same IDE it is common
 to add temporary files it produces to the project-wide `.gitignore` file.
@@ -302,14 +295,12 @@ If a set of tools is used by the build system or scripts the repository (for
 example, lcov) it is perfectly acceptable to add its files to `.gitignore`
 and commit them.
 
-Development guidelines
-============================
+# Development guidelines
 
 A few non-style-related recommendations for developers, as well as points to
 pay attention to for reviewers of Bitcoin Unlimited code.
 
-General Bitcoin Unlimited
-----------------------
+## General Bitcoin Unlimited
 
 - New features should be exposed on RPC first, then can be made available in the GUI
 
@@ -325,8 +316,7 @@ General Bitcoin Unlimited
   - *Explanation*: If the test suite is to be updated for a change, this has to
     be done first 
 
-Wallet
--------
+## Wallet
 
 - Make sure that no crashes happen with run-time option `-disablewallet`.
 
@@ -339,8 +329,7 @@ Wallet
 
   - *Rationale*: Otherwise compilation of the disable-wallet build will fail in environments without BerkeleyDB
 
-General C++
--------------
+## General C++
 
 - Assertions should not have side-effects
 
@@ -359,8 +348,7 @@ General C++
 
   - *Rationale*: This avoids memory and resource leaks, and ensures exception safety
 
-C++ data structures
---------------------
+## C++ data structures
 
 - Never use the `std::map []` syntax when reading from a map, but instead use `.find()`
 
@@ -399,8 +387,7 @@ C++ data structures
   - *Rationale*: Easier to understand what is happening, thus easier to spot mistakes, even for those
   that are not language lawyers
 
-Strings and formatting
-------------------------
+## Strings and formatting
 
 - Be careful of `LOG` versus `LOGA`. `LOG` takes a `category` argument, `LOGA` does not.
 
@@ -421,8 +408,7 @@ Strings and formatting
 
   - *Rationale*: Bitcoin Unlimited uses tinyformat, which is type safe. Leave them out to avoid confusion
 
-Threads and synchronization
-----------------------------
+## Threads and synchronization
 
 - Build and run tests with `-DDEBUG_LOCKORDER` to verify that no potential
   deadlocks are introduced. As of 0.12, this is defined by default when
@@ -450,8 +436,7 @@ TRY_LOCK(cs_vNodes, lockNodes);
 }
 ```
 
-Source code organization
---------------------------
+## Source code organization
 
 - Implementation code should go into the `.cpp` file and not the `.h`, unless necessary due to template usage or
   when performance due to inlining is critical
@@ -463,8 +448,7 @@ Source code organization
 
   - *Rationale*: Avoids symbol conflicts
 
-GUI
------
+## GUI
 
 - Do not display or manipulate dialogs in model code (classes `*Model`)
 
@@ -472,8 +456,7 @@ GUI
     should not interact with the user. That's where View classes come in. The converse also
     holds: try to not directly access core data structures from Views.
 
-Subtrees
-----------
+## Subtrees
 
 Several parts of the repository are subtrees of software maintained elsewhere.
 
@@ -505,8 +488,7 @@ Current subtrees include:
 - src/univalue
   - Upstream at https://github.com/jgarzik/univalue ; report important PRs to Core to avoid delay.
 
-Upgrading LevelDB
----------------------
+## Upgrading LevelDB
 
 Extra care must be taken when upgrading LevelDB. This section explains issues
 you must be aware of.
@@ -552,8 +534,7 @@ would be to revert the upstream fix before applying the updates to Bitcoin's
 copy of LevelDB. In general you should be wary of any upstream changes affecting
 what data is returned from LevelDB queries.
 
-Git and GitHub tips
----------------------
+## Git and GitHub tips
 
 - For resolving merge/rebase conflicts, it can be useful to enable diff3 style using
   `git config merge.conflictstyle diff3`. Instead of
@@ -600,8 +581,7 @@ Git and GitHub tips
   or `git fetch upstream-pull`. Afterwards, you can use `upstream-pull/NUMBER/head` in arguments to `git show`,
   `git checkout` and anywhere a commit id would be acceptable to see the changes from pull request NUMBER.
 
-Scripted diffs
---------------
+## Scripted diffs
 
 For reformatting and refactoring commits where the changes can be easily automated using a bash script, we use
 scripted-diff commits. The bash script is included in the commit message and our Travis CI job checks that
@@ -620,8 +600,7 @@ The scripted-diff is verified by the tool `contrib/devtools/commit-script-check.
 
 Commit [`bb81e173`](https://github.com/bitcoin/bitcoin/commit/bb81e173) is an example of a scripted-diff.
 
-RPC interface guidelines
---------------------------
+## RPC interface guidelines
 
 A few guidelines for introducing and reviewing new RPC interfaces:
 
