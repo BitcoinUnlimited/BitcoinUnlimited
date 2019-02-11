@@ -576,6 +576,7 @@ if test x$use_glibc_compat != xno; then
   AC_DEFINE_UNQUOTED(FDELT_TYPE, $fdelt_type,[parameter and return value type for __fdelt_chk])
   AX_CHECK_LINK_FLAG([[-Wl,--wrap=__divmoddi4]], [COMPAT_LDFLAGS="$COMPAT_LDFLAGS -Wl,--wrap=__divmoddi4"])
   AX_CHECK_LINK_FLAG([[-Wl,--wrap=log2f]], [COMPAT_LDFLAGS="$COMPAT_LDFLAGS -Wl,--wrap=log2f"])
+  AX_CHECK_LINK_FLAG([[-Wl,--wrap=logf]], [COMPAT_LDFLAGS="$COMPAT_LDFLAGS -Wl,--wrap=logf"])
 else
   AC_SEARCH_LIBS([clock_gettime],[rt])
 fi
