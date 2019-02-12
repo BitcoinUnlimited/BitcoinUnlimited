@@ -96,6 +96,7 @@ struct ListenSocket
 bool fDiscover = true;
 bool fListen = true;
 uint64_t nLocalServices = NODE_NETWORK;
+bool computeOptimizeGraphene = false;
 // BU moved to globals.cpp: CCriticalSection cs_mapLocalHost;
 // BU moved to globals.cpp: map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfLimited[NET_MAX] = {};

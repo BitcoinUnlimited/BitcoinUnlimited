@@ -840,6 +840,9 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     // BUIPXXX Graphene Blocks: begin section initialize Graphene service
     if (GetBoolArg("-use-grapheneblocks", DEFAULT_USE_GRAPHENE_BLOCKS))
         nLocalServices |= NODE_GRAPHENE;
+
+    if (GetBoolArg("-compute-optimize-graphene", COMPUTE_OPTIMIZE_GRAPHENE))
+        computeOptimizeGraphene = true;
     // BUIPXXX Graphene Blocks: end section
 
     // UAHF - BitcoinCash service bit

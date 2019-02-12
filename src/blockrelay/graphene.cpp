@@ -32,7 +32,8 @@ CMemPoolInfo::CMemPoolInfo() { this->nTx = 0; }
 CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     uint64_t nReceiverMemPoolTx,
     uint64_t nSenderMempoolPlusBlock,
-    uint64_t _version)
+    uint64_t _version,
+    bool _computeOptimized)
     : // Use cryptographically strong pseudorandom number because
       // we will extract SipHash secret key from this
       sipHashNonce(GetRand(std::numeric_limits<uint64_t>::max())),
@@ -43,6 +44,7 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     uint64_t grapheneSetVersion = 0;
 
     version = _version;
+    computeOptimized = _computeOptimized;
     if (version >= 2)
         FillShortTxIDSelector();
 
@@ -50,8 +52,10 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
         grapheneSetVersion = 0;
     if (version == 2)
         grapheneSetVersion = 1;
-    else if (version >= 3)
+    else if (version == 3)
         grapheneSetVersion = 2;
+    else if (version == 4)
+        grapheneSetVersion = 3;
 
     std::vector<uint256> blockHashes;
     for (auto &tx : pblock->vtx)
@@ -64,10 +68,10 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
 
     if (enableCanonicalTxOrder.Value())
         pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0,
-            shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, false);
+            shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, false);
     else
         pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0,
-            shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, true);
+            shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, true);
 }
 
 CGrapheneBlock::~CGrapheneBlock()
@@ -1349,7 +1353,7 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
                 GetGrapheneMempoolInfo().nTx + pblock->vtx.size() - 1; // exclude coinbase
 
             CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx, nSenderMempoolPlusBlock,
-                pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
+                pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED), computeOptimizeGraphene);
             pfrom->gr_shorttxidk0 = grapheneBlock.shorttxidk0;
             pfrom->gr_shorttxidk1 = grapheneBlock.shorttxidk1;
             int nSizeBlock = pblock->GetBlockSize();

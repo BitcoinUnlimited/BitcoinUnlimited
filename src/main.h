@@ -154,6 +154,7 @@ static const bool DEFAULT_PEERBLOOMFILTERS = true;
 static const bool DEFAULT_USE_THINBLOCKS = true;
 static const uint64_t DEFAULT_PREFERENTIAL_TIMER = 1000;
 static const bool DEFAULT_USE_GRAPHENE_BLOCKS = true;
+static const bool COMPUTE_OPTIMIZE_GRAPHENE = false;
 static const bool DEFAULT_USE_COMPACT_BLOCKS = true;
 
 static const bool DEFAULT_REINDEX = false;
