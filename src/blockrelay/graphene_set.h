@@ -60,7 +60,7 @@ public:
           pSetIblt(nullptr)
     {
     }
-    CGrapheneSet(bool _version)
+    CGrapheneSet(uint64_t _version)
         : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), pSetFilter(nullptr),
           pSetIblt(nullptr)
     {
