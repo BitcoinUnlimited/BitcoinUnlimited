@@ -489,14 +489,6 @@ public:
     int grapheneBlockWaitingForTxns; // if -1 then not currently waiting
     CCriticalSection cs_grapheneadditionaltxs; // lock grapheneAdditionalTxs
     std::vector<CTransactionRef> grapheneAdditionalTxs; // entire transactions included in graphene block
-    uint64_t shorttxidk0; // Used for generating cheap hash from SipHash
-    uint64_t shorttxidk1;
-
-    std::atomic<double> nGetGrapheneBlockTxCount; // Count how many get_xblocktx requests are made
-    std::atomic<uint64_t> nGetGrapheneBlockTxLastTime; // The last time a get_xblocktx request was made
-    std::atomic<double> nGetGrapheneCount; // Count how many get_graphene requests are made
-    std::atomic<uint64_t> nGetGrapheneLastTime; // The last time a get_graphene request was made
-    uint32_t nGrapheneBloomfilterSize; // The maximum graphene bloom filter size (in bytes) that our peer will accept.
     uint64_t gr_shorttxidk0;
     uint64_t gr_shorttxidk1;
     // BUIPXXX Graphene blocks: end section

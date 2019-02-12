@@ -44,10 +44,14 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
 
     version = _version;
     if (version >= 2)
-    {
         FillShortTxIDSelector();
+
+    if (version < 2)
+        grapheneSetVersion = 0;
+    if (version == 2)
         grapheneSetVersion = 1;
-    }
+    else if (version >= 3)
+        grapheneSetVersion = 2;
 
     std::vector<uint256> blockHashes;
     for (auto &tx : pblock->vtx)
