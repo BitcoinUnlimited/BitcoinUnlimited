@@ -106,7 +106,10 @@ static int AppInitRawTx(int argc, char *argv[])
         strUsage += AllowedArgs::HelpMessageOpt("nversion=N", _("Set TX version to N"));
         strUsage += AllowedArgs::HelpMessageOpt("outaddr=VALUE:ADDRESS", _("Add address-based output to TX"));
         strUsage += AllowedArgs::HelpMessageOpt("outdata=[VALUE:]DATA", _("Add data-based output to TX"));
-        strUsage += AllowedArgs::HelpMessageOpt("outscript=VALUE:SCRIPT", _("Add raw script output to TX"));
+        strUsage += AllowedArgs::HelpMessageOpt("outscript=VALUE:SCRIPT[:FLAGS]",
+            _("Add raw script output to TX") + ". " +
+                _("Optionally add the \"S\" flag to wrap the script in a P2SH output."));
+
         strUsage += AllowedArgs::HelpMessageOpt("sign=SIGHASH-FLAGS",
             _("Add zero or more signatures to transaction") + ". " + _("This command requires JSON registers:") +
                 _("prevtxs=JSON object") + ", " + _("privatekeys=JSON object") + ". " +
