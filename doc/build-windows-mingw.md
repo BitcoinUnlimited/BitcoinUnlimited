@@ -1,5 +1,4 @@
-Building Bitcoin on Native Windows
-==================================
+# Building Bitcoin on Native Windows
 
 This document describes the installation of the mysys and mingw tools as well as 
 the build dependencies and then finally the compilation of the Bitcoin binaries.
@@ -10,8 +9,7 @@ NOTE: These instructions will allow you to build bitcoin as either 32-bit or 64-
       build instructions have been noted inline at each instruction step.
 	  
 	  
-Semi-Automated Development Environment Configuration Scripts
-------------------------------------------------------------
+## Semi-Automated Development Environment Configuration Scripts
 
 There now exists a set of scripts which automates most of the steps covered in
 this guide.  This set of scripts, plus instructions for configuring them to
@@ -19,8 +17,7 @@ perform a semi-automated installation of the development environment may be foun
 here [build-aux/mingw/readme.md](/build-aux/mingw/readme.md)
 
 
-Prepare your build system
--------------------------
+## Prepare your build system
 
 1.1 Install msys shell:
 http://sourceforge.net/projects/mingw/files/Installer/mingw-get-setup.exe/download
@@ -237,8 +234,7 @@ set BOOST_ROOT=/c/deps/boost_1_61_0
 
 
 
-Build bitcoin
--------------
+## Build bitcoin
 
 From the mysys shell prompt cd to the root of the source code directory
 and type the following command (for example, cd c:/bitcoin and NOT c:/bitcoin/src):

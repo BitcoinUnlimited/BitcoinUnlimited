@@ -1,11 +1,11 @@
-UNIX BUILD NOTES
-====================
+# UNIX BUILD NOTES
+
 Some notes on how to build Bitcoin Unlimited in Unix.
 
 (for OpenBSD specific instructions, see [build-openbsd.md](build-openbsd.md))
 
-Note
----------------------
+## Note
+
 Always use absolute paths to configure and compile bitcoin and the dependencies,
 for example, when specifying the path of the dependency:
 
@@ -14,8 +14,7 @@ for example, when specifying the path of the dependency:
 Here BDB_PREFIX must absolute path - it is defined using $(pwd) which ensures
 the usage of the absolute path.
 
-To Build
----------------------
+## To Build
 
 ```bash
 ./autogen.sh
@@ -26,8 +25,7 @@ make install # optional
 
 This will build bitcoin-qt as well if the dependencies are met.
 
-Dependencies
----------------------
+## Dependencies
 
 These dependencies are required:
 
@@ -50,15 +48,14 @@ Optional dependencies:
 
 For the versions used, see [dependencies.md](dependencies.md)
 
-System requirements
---------------------
+## System requirements
 
 C++ compilers are memory-hungry. It is recommended to have at least 1 GB of
 memory available when compiling Bitcoin Unlimited. With 512MB of memory or less
 compilation will take much longer due to swap thrashing.
 
-Dependency Build Instructions: Ubuntu & Debian
-----------------------------------------------
+## Dependency Build Instructions: Ubuntu & Debian
+
 Build requirements:
 
     sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
@@ -95,8 +92,7 @@ ZMQ dependencies:
 
     sudo apt-get install libzmq3-dev (provides ZMQ API 4.x)
 
-Dependencies for the GUI: Ubuntu & Debian
------------------------------------------
+## Dependencies for the GUI: Ubuntu & Debian
 
 If you want to build Bitcoin-Qt, make sure that the required packages for Qt development
 are installed. Qt 5.3 or higher is necessary to build the GUI (QT 4 is not supported).
@@ -113,14 +109,13 @@ libqrencode (optional) can be installed with:
 Once these are installed, they will be found by configure and a bitcoin-qt executable will be
 built by default.
 
-Notes
------
+## Notes
+
 The release is built with GCC and then "strip bitcoind" to strip the debug
 symbols, which reduces the executable size by about 90%.
 
 
-miniupnpc
----------
+## miniupnpc
 
 [miniupnpc](http://miniupnp.free.fr/) may be used for UPnP port mapping.  It can be downloaded from [here](
 http://miniupnp.tuxfamily.org/files/).  UPnP support is compiled in and
@@ -131,8 +126,8 @@ turned off by default.  See the configure options for upnp behavior desired:
 	--enable-upnp-default    UPnP support turned on by default at runtime
 
 
-Berkeley DB
------------
+## Berkeley DB
+
 It is recommended to use Berkeley DB 4.8. If you have to build it yourself:
 
 ```bash
@@ -162,8 +157,8 @@ cd $BITCOIN_ROOT
 
 **Note**: You only need Berkeley DB if the wallet is enabled (see the section *Disable-Wallet mode* below).
 
-Boost
------
+## Boost
+
 If you need to build Boost yourself:
 
 	sudo su
@@ -171,8 +166,8 @@ If you need to build Boost yourself:
 	./bjam install
 
 
-Security
---------
+## Security
+
 To help make your Bitcoin installation more secure by making certain attacks impossible to
 exploit even if a vulnerability is found, binaries are hardened by default.
 This can be disabled with:
@@ -220,8 +215,8 @@ Hardening enables the following features:
 
     The STK RW- means that the stack is readable and writeable but not executable.
 
-Disable-wallet mode
---------------------
+## Disable-wallet mode
+
 When the intention is to run only a P2P node without a wallet, bitcoin may be compiled in
 disable-wallet mode with:
 
@@ -232,14 +227,13 @@ In this case there is no dependency on Berkeley DB 4.8.
 Mining is also possible in disable-wallet mode, but only using the `getblocktemplate` RPC
 call not `getwork`.
 
-Additional Configure Flags
---------------------------
+## Additional Configure Flags
+
 A list of additional configure flags can be displayed with:
 
     ./configure --help
 
-Produce Static Binaries
------------------------
+## Produce Static Binaries
 
 If you want to build statically linked binaries so that you could compile in one machine
 and deploy in same parch/platform boxes without the need of installing all the dependencies
@@ -255,8 +249,8 @@ just follow these steps:
 in the above commands we are statically compiling headless 64 bit Linux binaries. If you want to compile
 32 bit binaries just use `i686-pc-linux-gnu` rather than `x86_64-pc-linux-gnu`
 
-ARM Cross-compilation
--------------------
+## ARM Cross-compilation
+
 These steps can be performed on, for example, an Ubuntu VM. The depends system
 will also work on other Linux distributions, however the commands for
 installing the toolchain will be different.

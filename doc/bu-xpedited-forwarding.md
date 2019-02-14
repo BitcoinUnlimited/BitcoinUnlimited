@@ -1,7 +1,6 @@
 [Website](https://www.bitcoinunlimited.info)  | [Download](https://www.bitcoinunlimited.info/download) | [Setup](../README.md)  |  [Xthin](bu-xthin.md)  |  [Xpedited](bu-xpedited-forwarding.md)  |   [Miner](miner.md)
 
-How to setup and get the best results using Xpedited forwarding
-==============================================================
+#How to setup and get the best results using Xpedited forwarding
 
 ## What is Xpedited Forwarding
 

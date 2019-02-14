@@ -1,10 +1,8 @@
-Mac macOS Build Instructions and Notes
-====================================
+# Mac macOS Build Instructions and Notes
 The commands in this guide should be executed in a Terminal application.
 The built-in one is located in `/Applications/Utilities/Terminal.app`.
 
-Preparation
------------
+## Preparation
 Install the macOS command line tools:
 
 `xcode-select --install`
@@ -13,8 +11,7 @@ When the popup appears, click `Install`.
 
 Then install [Homebrew](http://brew.sh).
 
-Dependencies
-----------------------
+## Dependencies
 
     brew install automake berkeley-db4 libtool boost --c++11 miniupnpc openssl pkg-config protobuf --c++11 qt5 libevent
 
@@ -26,8 +23,7 @@ If you want to build the disk image with `make deploy` (.dmg / optional), you ne
 
 NOTE: Must build with QT 5.3 or higher. Building with Qt4 is not supported.
 
-Build Bitcoin Unlimited
-------------------------
+## Build Bitcoin Unlimited
 
 1. Clone the Bitcoin source code and cd into `BitcoinUnlimited`
 
@@ -52,8 +48,7 @@ Build Bitcoin Unlimited
 
         make deploy
 
-Running
--------
+## Running
 
 Bitcoin Unlimited is now available at `./src/bitcoind`
 
@@ -69,15 +64,14 @@ You can monitor the download process by looking at the debug.log file:
 
     tail -f $HOME/Library/Application\ Support/Bitcoin/debug.log
 
-Other commands:
--------
+## Other commands:
 
     ./src/bitcoind -daemon # Starts the Bitcoin daemon.
     ./src/bitcoin-cli --help # Outputs a list of command-line options.
     ./src/bitcoin-cli help # Outputs a list of RPC commands when the daemon is running.
 
-Using Qt Creator as IDE
-------------------------
+## Using Qt Creator as IDE
+
 You can use Qt Creator as an IDE, for Bitcoin development.
 Download and install the community edition of [Qt Creator](https://www.qt.io/download/).
 Uncheck everything except Qt Creator during the installation process.
@@ -93,8 +87,7 @@ Uncheck everything except Qt Creator during the installation process.
 9. Select LLDB as debugger (you might need to set the path to your installation)
 10. Start debugging with Qt Creator
 
-Notes
------
+## Notes
 
 * Tested on OS X 10.8 through macOS 10.12 on 64-bit Intel processors only.
 

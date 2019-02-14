@@ -1,5 +1,4 @@
-WINDOWS BUILD NOTES
-====================
+# WINDOWS BUILD NOTES
 
 Below are some notes on how to build Bitcoin Unlimited for Windows.
 
@@ -9,8 +8,7 @@ While there are potentially a number of ways to build on Windows, using the Wind
 
 A second alternative way of building on Windows using msys / mingw-w64 is documented in 'build-windows-mingw.md'.
 
-Compiling with Windows Subsystem For Linux
--------------------------------------------
+## Compiling with Windows Subsystem For Linux
 
 With Windows 10, Microsoft has released a new feature named the [Windows Subsystem for Linux](https://msdn.microsoft.com/commandline/wsl/about).  This feature allows you to run a bash shell directly on Windows in an Ubuntu-based environment.  Within this environment you can cross compile for Windows without the need for a separate Linux VM or server.
 
@@ -38,8 +36,7 @@ After the bash shell is active, you can follow the instructions below, starting
 with the "Cross-compilation" section. Compiling the 64-bit version is
 recommended but it is possible to compile the 32-bit version.
 
-Cross-compilation
--------------------
+## Cross-compilation
 
 These steps can be performed on, for example, an Ubuntu VM. The depends system will also work on other Linux distributions, however the commands for installing the toolchain will be different.
 
@@ -85,8 +82,7 @@ Then build using:
 
 For further documentation on the depends system see [README.md](../depends/README.md) in the depends directory.
 
-Installation
--------------
+## Installation
 
 After building using the Windows subsystem it can be useful to copy the compiled
 executables to a directory on the Windows drive in the same directory structure

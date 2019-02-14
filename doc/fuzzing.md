@@ -1,5 +1,4 @@
-Fuzz-testing Bitcoin
-====================
+#Fuzz-testing Bitcoin
 
 A special test harness `test_bitcoin_fuzzy` is provided to provide an easy
 entry point for fuzzers and the like. In this document we'll describe how to
@@ -9,8 +8,7 @@ Compared to Bitcoin Core, this test harness has been updated to both
 remove some redundant code as well as to provide entry points for fuzzing
 single data structures.
 
-Building AFL
--------------
+## Building AFL
 
 It is recommended to always use the latest version of afl:
 ```
@@ -30,8 +28,7 @@ For fast fuzzing (see below), the `afl-clang-fast` and
 `afl-clang-fast++` AFL drivers should be build and used. They are in
 the `llvm_mode` subdirectory of AFL.
 
-Instrumentation
-----------------
+## Instrumentation
 
 To build Bitcoin using AFL instrumentation (this assumes that the
 `AFLPATH` was set as above):
@@ -57,8 +54,7 @@ simple experiments show so as well), that AFL still is a lot quicker
 to discover input structure this way.
 
 
-Preparing fuzzing
-------------------
+## Preparing fuzzing
 
 AFL needs an input directory with examples, and an output directory where it
 will place examples that it found. These can be anywhere in the file system,
@@ -79,8 +75,7 @@ be available from:
 
 Extract these (or other starting inputs) into the `inputs` directory before starting fuzzing.
 
-Fuzzing
---------
+## Fuzzing
 
 To start the actual fuzzing and to fuzz all fuzz cases at once:
 ```
@@ -114,8 +109,7 @@ it will (pretty much) behave like it would have been compiled without
 fuzzer options. It can, however, be used this way to retest test cases
 from the fuzzer.
 
-Extending
----------
+## Extending
 
 The code has been updated to be more easily extensible. In test_bitcoin_fuzzy.cpp, 
 simply derive a class from `FuzzTest` or, alternatively, `FuzzTestNet` (in case you want

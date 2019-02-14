@@ -1,5 +1,4 @@
-Reduce Traffic
-==============
+# Reduce Traffic
 
 Some node operators need to deal with bandwidth caps imposed by their ISPs.
 
@@ -10,7 +9,7 @@ The default settings can result in relatively significant traffic consumption.
 
 Ways to reduce traffic:
 
-## 1. Use the traffic shaping options
+## Use the traffic shaping options
 
 Bitcoin Unlimited adds traffic shaping which is controlled by the following
 parameters (these can also be regulated in the GUI):
@@ -29,7 +28,7 @@ parameters (these can also be regulated in the GUI):
 
   -sendavg: The maximum rate that data can be sent in kB/s
 
-## 2. Use `-maxuploadtarget=<MiB per day>`
+## Use `-maxuploadtarget=<MiB per day>`
 
 A major component of the traffic is caused by serving historic blocks to other nodes
 during the initial blocks download phase (syncing up a new node).
@@ -43,13 +42,13 @@ historic blocks. **The recommended minimum is 144 * <excessive block size> per d
 Whitelisted peers will never be disconnected, although their traffic counts for
 calculating the target.
 
-## 3. Disable "listening" (`-listen=0`)
+## Disable "listening" (`-listen=0`)
 
 Disabling listening will result in fewer nodes connected (remember the maximum of 8
 outbound peers). Fewer nodes will result in less traffic usage as you are relaying
 blocks and transactions to fewer nodes.
 
-## 4. Reduce maximum connections (`-maxconnections=<num>`)
+## Reduce maximum connections (`-maxconnections=<num>`)
 
 Reducing the maximum connected nodes to a minimum could be desirable if traffic
 limits are tiny. Keep in mind that bitcoin's trustless model works best if you are

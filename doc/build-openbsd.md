@@ -1,13 +1,11 @@
-OpenBSD build guide
-======================
+# OpenBSD build guide
 (updated for OpenBSD 5.7)
 
 This guide describes how to build bitcoind and command-line utilities on OpenBSD.
 
 As OpenBSD is most common as a server OS, we will not bother with the GUI.
 
-Preparation
--------------
+## Preparation
 
 Run the following as root to install the base dependencies for building:
 
@@ -21,8 +19,7 @@ ln -sf /usr/local/bin/python2.7 /usr/local/bin/python2
 
 See [dependencies.md](dependencies.md) for a complete overview.
 
-GCC
--------
+## GCC
 
 The default C++ compiler that comes with OpenBSD 5.9 is g++ 4.2. This version is old (from 2007), and is not able to compile the current version of Bitcoin Core, primarily as it has no C++11 support, but even before there were issues. So here we will be installing a newer compiler:
 
@@ -127,8 +124,7 @@ gmake
 gmake check
 ```
 
-Clang (not currently working)
-------------------------------
+## Clang (not currently working)
 
 Using a newer g++ results in linking the new code to a new libstdc++.
 Libraries built with the old g++, will still import the old library.

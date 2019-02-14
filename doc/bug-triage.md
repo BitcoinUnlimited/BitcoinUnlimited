@@ -1,5 +1,4 @@
-Triage of bugs
-====================================
+# Triage of bugs
 
 Occasionally, you may encounter a failing test, or a user reporting a
 bug.
@@ -21,8 +20,7 @@ find the Git commit which first introduced the problem (well, this works
 about those now).
 
 
-Running a git bisection
-------------------------------------
+## Running a git bisection
 
 The `git bisect` command can run an automatic bisection if we provide it
 with a command or script that can assess whether a revision is defective.

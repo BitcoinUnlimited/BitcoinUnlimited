@@ -1,11 +1,9 @@
-XVersionMessage: BCH node extended version and configuration fields
-===================================================================
+# XVersionMessage: BCH node extended version and configuration fields
 
 DRAFT specification
 Version: 0.0.3
 
-Overview
---------
+## Overview
 
 Using the `version` message in the Bitcoin protocol (for more details,
 see https://en.bitcoin.it/wiki/Protocol_documentation#version), peers

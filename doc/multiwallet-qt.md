@@ -1,5 +1,4 @@
-Multiwallet Qt Development and Integration Strategy
-===================================================
+# Multiwallet Qt Development and Integration Strategy
 
 In order to support loading of multiple wallets in bitcoin-qt, a few changes in the UI architecture will be needed.
 Fortunately, only four of the files in the existing project are affected by this change.
@@ -14,8 +13,8 @@ Only requiring some minor changes is bitcoin.cpp.
 
 Finally, two new headers and source files will have to be added to bitcoin-qt.pro.
 
-Changes to class BitcoinGUI
----------------------------
+## Changes to class BitcoinGUI
+
 The principal change to the BitcoinGUI class concerns the QStackedWidget instance called centralWidget.
 This widget owns five page views: overviewPage, transactionsPage, addressBookPage, receiveCoinsPage, and sendCoinsPage.
 
@@ -30,8 +29,8 @@ that takes the place of what used to be centralWidget in BitcoinGUI. The purpose
 refinements of the wallet controls with minimal need for further modifications to BitcoinGUI, thus greatly simplifying
 merges while reducing the risk of breaking top-level stuff.
 
-Changes to bitcoin.cpp
-----------------------
+## Changes to bitcoin.cpp
+
 bitcoin.cpp is the entry point into bitcoin-qt, and as such, will require some minor modifications to provide hooks for
 multiple wallet support. Most importantly will be the way it instantiates WalletModels and passes them to the
 singleton BitcoinGUI instance called window. Formerly, BitcoinGUI kept a pointer to a single instance of a WalletModel.

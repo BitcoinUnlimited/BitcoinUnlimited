@@ -1,5 +1,4 @@
-About Bitcoin unit tests
-====================================
+# About Bitcoin unit tests
 
 The Bitcoin software currently includes couple of types of unit tests:
 
@@ -11,16 +10,13 @@ This document currently focuses on the C++ unit tests, but there is some
 info on Python doctests at the end.
 
 
-Compiling C++ unit tests
-------------------------------------
+## Compiling C++ unit tests
 
 C++ Unit tests will be automatically compiled if dependencies were met
 in `./configure` and tests were not explicitly disabled.
 
 
-
-Running unit tests sequentially
-------------------------------------
+## Running unit tests sequentially
 
 After configuring, the C++ unit tests can be run with `make check`.
 This runs tests of several libraries.
@@ -44,8 +40,7 @@ the above options.
 You can run these tests manually by launching `src/qt/test/test_bitcoin-qt`.
 
 
-Running Boost unit tests in parallel
----------------------------------------
+## Running Boost unit tests in parallel
 
 There is a wrapper tool in contrib/testtools/gtest-parallel-bitcoin
 which can execute the Boost-based C++ unit tests in parallel
@@ -84,8 +79,7 @@ If you have enough free CPU cores, this script can reduce the runtime of
 the C++ unit test suite to approximately that of the slowest test.
 
 
-Adding more C++ unit tests
-------------------------------------
+## Adding more C++ unit tests
 
 To add more C++ tests, add `BOOST_AUTO_TEST_CASE` functions to the existing
 .cpp files in the `test/` directory or add new .cpp files that
@@ -96,8 +90,7 @@ To add more bitcoin-qt tests, add them to the `src/qt/test/` directory and
 the `src/qt/test/test_main.cpp` file.
 
 
-Running Python module doctests
-------------------------------------
+## Running Python module doctests
 
 A Python module which supports doctests usually contains code like this
 for when it is invoked as a standalone program:
@@ -117,12 +110,11 @@ If there is a failure in tests, it will be reported, otherwise the
 command should return silently with exit code 0.
 
 
-Adding Python doctests
-------------------------------------
+## Adding Python doctests
 
 There is lots of good documentation about this out there.
 Good places to start:
 
-https://docs.python.org/3/library/doctest.html
-https://en.wikipedia.org/wiki/Doctest
+[https://docs.python.org/3/library/doctest.html](https://docs.python.org/3/library/doctest.html)
+[https://en.wikipedia.org/wiki/Doctest](https://en.wikipedia.org/wiki/Doctest)
 

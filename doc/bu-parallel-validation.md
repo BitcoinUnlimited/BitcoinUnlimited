@@ -1,9 +1,7 @@
-Parallel Block Validation
-==========================================================
+# Parallel Block Validation
 
 
-1. What is Parallel Block Validation?
--------------------------------------
+## What is Parallel Block Validation?
 
 Essentially Parallel Validation is a simple concept. Rather than validating each block within the main processing thread, we
 instead create a separate thread to do the block validation.  If more than one block arrives to be processed then
@@ -20,11 +18,9 @@ or are interrupted depend again on the rules of which block has the most proof o
 for a more detailed understanding of this potential problem.
 
 
-2. The internals
-----------------
+## The internals
 
 The following describes the internal mechanisms used to achieve parallel validation.
-
 
 2a) Script Check Queues:  A total of four script check queues are created with their own thread group which are used to validate
 signatures.  Each new block that arrives will be assigned one of those queues during the validation process.
@@ -63,14 +59,12 @@ enabled on the reads and writes to both the UTXO db cache as well as the in memo
 in place will also allow us to implement multi-threading for transaction validation in a future release.
 
 
-3. IBD and new blocks
-----------------------
+## IBD and new blocks
 
 Parallel Validation is in effect at all times during both IBD and when new blocks arrive.
 
 
-4. How is mining affected
---------------------------
+## How is mining affected
 
 Mining is not affected by Parallel Validation.  When new blocks are created locally they bypass parallel validation.  In other words, the `cs_main` locks
 are not unlocked and then locked, giving priority to mined blocks and allowing the validation process to be completed as quickly as possible.  Whether parallel validation
@@ -80,8 +74,7 @@ NOTE: Miners will still use parallel validation if a block arrives from an exter
 mine themselves.
 
 
-5. Special Cases and possible attacks
--------------------------------------
+## Special Cases and possible attacks
 
 a) Parallel Validation when two separate chains are being mined.
 
