@@ -2,7 +2,7 @@ m4_define([libunivalue_major_version], [1])
 m4_define([libunivalue_minor_version], [1])
 m4_define([libunivalue_micro_version], [3])
 m4_define([libunivalue_interface_age], [3])
-# If you need a modifier for the version number. 
+# If you need a modifier for the version number.
 # Normally empty, but can be used to make "fixup" releases.
 m4_define([libunivalue_extraversion], [])
 
@@ -45,6 +45,17 @@ AC_SUBST(LIBUNIVALUE_AGE)
 LT_INIT
 LT_LANG([C++])
 
+# Enable debug
+AC_ARG_ENABLE([debug],
+    [AS_HELP_STRING([--enable-debug],
+                    [use debug compiler flags and macros (default is no)])],
+    [enable_debug=$enableval],
+    [enable_debug=no])
+
+if test "x$enable_debug" = xyes; then
+    CPPFLAGS="$CPPFLAGS -DDEBUG"
+fi
+
 case $host in
   *mingw*)
     LIBTOOL_APP_LDFLAGS="$LIBTOOL_APP_LDFLAGS -all-static"
@@ -66,4 +77,3 @@ AC_CONFIG_FILES([
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
 AC_SUBST(BUILD_EXEEXT)
 AC_OUTPUT
-

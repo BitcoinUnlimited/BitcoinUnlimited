@@ -12,6 +12,7 @@
 
 #include "random.h"
 #include "sync.h"
+#include "threadgroup.h"
 #include "util.h"
 #include "utilstrencodings.h"
 
@@ -163,7 +164,10 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr> &vIP, unsign
         // 2 seconds looks fine in our situation.
         struct timespec ts = {2, 0};
         gai_suspend(&query, 1, &ts);
-        boost::this_thread::interruption_point();
+        if (shutdown_threads.load() == true)
+        {
+            return false;
+        }
 
         nErr = gai_error(query);
         if (0 == nErr)
@@ -311,7 +315,10 @@ bool static InterruptibleRecv(char *data, size_t len, int timeout, SOCKET &hSock
                 return false;
             }
         }
-        boost::this_thread::interruption_point();
+        if (shutdown_threads.load() == true)
+        {
+            return false;
+        }
         curTime = GetTimeMillis();
     }
     return len == 0;

@@ -4,6 +4,7 @@
 
 #include "fastfilter.h"
 #include "net.h"
+#include "threadgroup.h"
 #include "txmempool.h"
 #include <queue>
 
@@ -130,7 +131,7 @@ extern std::map<uint256, CTxCommitData> *txCommitQ;
 CTransactionRef CommitQGet(uint256 hash);
 
 /** Start the transaction mempool admission threads */
-void StartTxAdmission(boost::thread_group &threadGroup);
+void StartTxAdmission(thread_group &threadGroup);
 /** Stop the transaction mempool admission threads (assumes that ShutdownRequested() will return true) */
 void StopTxAdmission();
 /** Wait for the currently enqueued transactions to be flushed.  If new tx keep coming in, you may wait a while */

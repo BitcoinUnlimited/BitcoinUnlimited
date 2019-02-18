@@ -8,9 +8,9 @@
 #include "util.h"
 #include "utilstrencodings.h"
 
+#include <boost/thread/tss.hpp> // for boost::thread_specific_ptr
 #include <stdio.h>
-
-#include <boost/thread.hpp>
+#include <thread>
 
 #ifdef DEBUG_LOCKCONTENTION
 void PrintLockContention(const char *pszName, const char *pszFile, unsigned int nLine)

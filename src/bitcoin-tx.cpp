@@ -28,15 +28,17 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/assign/list_of.hpp>
-#include <boost/thread.hpp>
 
 using namespace std;
 
+#ifdef DEBUG_LOCKORDER
+#include <boost/thread/tss.hpp>
 // BU add lockstack stuff here for bitcoin-cli, because I need to carefully
 // order it in globals.cpp for bitcoind and bitcoin-qt
 boost::mutex dd_mutex;
 std::map<std::pair<void *, void *>, LockStack> lockorders;
 boost::thread_specific_ptr<LockStack> lockstack;
+#endif
 
 static bool fCreateBlank;
 static map<string, UniValue> registers;
@@ -104,7 +106,10 @@ static int AppInitRawTx(int argc, char *argv[])
         strUsage += AllowedArgs::HelpMessageOpt("nversion=N", _("Set TX version to N"));
         strUsage += AllowedArgs::HelpMessageOpt("outaddr=VALUE:ADDRESS", _("Add address-based output to TX"));
         strUsage += AllowedArgs::HelpMessageOpt("outdata=[VALUE:]DATA", _("Add data-based output to TX"));
-        strUsage += AllowedArgs::HelpMessageOpt("outscript=VALUE:SCRIPT", _("Add raw script output to TX"));
+        strUsage += AllowedArgs::HelpMessageOpt("outscript=VALUE:SCRIPT[:FLAGS]",
+            _("Add raw script output to TX") + ". " +
+                _("Optionally add the \"S\" flag to wrap the script in a P2SH output."));
+
         strUsage += AllowedArgs::HelpMessageOpt("sign=SIGHASH-FLAGS",
             _("Add zero or more signatures to transaction") + ". " + _("This command requires JSON registers:") +
                 _("prevtxs=JSON object") + ", " + _("privatekeys=JSON object") + ". " +

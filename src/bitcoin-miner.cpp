@@ -20,8 +20,6 @@
 #include "util.h"
 #include "utilstrencodings.h"
 
-#include <boost/thread.hpp>
-
 #include <cstdlib>
 #include <stdio.h>
 
@@ -34,11 +32,14 @@
 
 using namespace std;
 
-// BU add lockstack stuff here for bitcoin-miner, because I need to carefully
+#ifdef DEBUG_LOCKORDER
+#include <boost/thread/tss.hpp>
+// BU add lockstack stuff here for bitcoin-cli, because I need to carefully
 // order it in globals.cpp for bitcoind and bitcoin-qt
 boost::mutex dd_mutex;
 std::map<std::pair<void *, void *>, LockStack> lockorders;
 boost::thread_specific_ptr<LockStack> lockstack;
+#endif
 
 // Internal miner
 //

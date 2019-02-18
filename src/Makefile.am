@@ -5,6 +5,7 @@
 DIST_SUBDIRS = secp256k1 univalue
 
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS) $(HARDENED_LDFLAGS)
+AM_LIBTOOLFLAGS = --preserve-dup-deps
 if ENABLE_GPERF
 AM_CXXFLAGS = -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free $(HARDENED_CXXFLAGS)
 AM_CPPFLAGS = -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free $(HARDENED_CPPFLAGS)
@@ -173,7 +174,6 @@ BITCOIN_CORE_H = \
   respend/respendlogger.h \
   respend/respendrelayer.h \
   respend/respenddetector.h \
-  scheduler.h \
   script/sigcache.h \
   script/sign.h \
   script/standard.h \
@@ -184,6 +184,7 @@ BITCOIN_CORE_H = \
   support/cleanse.h \
   support/pagelocker.h \
   sync.h \
+  threadgroup.h \
   threadsafety.h \
   timedata.h \
   torcontrol.h \
@@ -439,7 +440,6 @@ libbitcoin_common_a_SOURCES = \
   netaddress.cpp \
   netbase.cpp \
   protocol.cpp \
-  scheduler.cpp \
   script/sign.cpp \
   script/standard.cpp \
   versionbits.cpp \

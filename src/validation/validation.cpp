@@ -360,7 +360,10 @@ bool LoadBlockIndexDB()
         LOG(PRUNE, "%s \n", e.code().message());
     }
 
-    boost::this_thread::interruption_point();
+    if (shutdown_threads.load() == true)
+    {
+        return false;
+    }
 
     // Gather data necessary to perform the following checks
     std::vector<std::pair<int, CBlockIndex *> > vSortedByHeight;
@@ -3223,7 +3226,10 @@ bool ActivateBestChain(CValidationState &returnedState,
     bool fOneDone = false;
     do
     {
-        boost::this_thread::interruption_point();
+        if (shutdown_threads.load() == true)
+        {
+            return false;
+        }
         if (ShutdownRequested())
         {
             return false;

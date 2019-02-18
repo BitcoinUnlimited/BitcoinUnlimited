@@ -126,13 +126,12 @@ requestManager.cpp
 requestManager.h
 rest.cpp
 reverselock.h
-scheduler.cpp
-scheduler.h
 serialize.h
 stat.h
 streams.h
 sync.cpp
 sync.h
+threadgroup.h
 threadsafety.h
 timedata.cpp
 timedata.h
@@ -326,7 +325,6 @@ test/requestmanager_tests.cpp
 test/reverselock_tests.cpp
 test/rpc_tests.cpp
 test/sanity_tests.cpp
-test/scheduler_tests.cpp
 test/scriptnum10.h
 test/scriptnum_tests.cpp
 test/script_P2SH_tests.cpp

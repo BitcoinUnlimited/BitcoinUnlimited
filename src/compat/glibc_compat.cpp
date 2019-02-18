@@ -57,14 +57,20 @@ extern "C" int64_t __wrap___divmoddi4(int64_t u, int64_t v, int64_t *rp)
 }
 #endif
 
+extern "C" float logf_old(float x);
 extern "C" float log2f_old(float x);
 #ifdef __i386__
+__asm(".symver logf_old,logf@GLIBC_2.0");
 __asm(".symver log2f_old,log2f@GLIBC_2.1");
 #elif defined(__amd64__)
+__asm(".symver logf_old,logf@GLIBC_2.2.5");
 __asm(".symver log2f_old,log2f@GLIBC_2.2.5");
 #elif defined(__arm__)
+__asm(".symver logf_old,logf@GLIBC_2.4");
 __asm(".symver log2f_old,log2f@GLIBC_2.4");
 #elif defined(__aarch64__)
+__asm(".symver logf_old,logf@GLIBC_2.17");
 __asm(".symver log2f_old,log2f@GLIBC_2.17");
 #endif
+extern "C" float __wrap_logf(float x) { return logf_old(x); }
 extern "C" float __wrap_log2f(float x) { return log2f_old(x); }

@@ -16,7 +16,7 @@
 #include "util.h"
 #include <vector>
 
-#include <boost/thread.hpp>
+#include <thread>
 
 /**
  * Class that keeps track of number of signature operations

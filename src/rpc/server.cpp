@@ -25,7 +25,7 @@
 #include <boost/iostreams/stream.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/signals2/signal.hpp>
-#include <boost/thread.hpp>
+#include <thread>
 
 using namespace RPCServer;
 using namespace std;

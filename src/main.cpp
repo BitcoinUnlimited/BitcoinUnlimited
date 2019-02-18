@@ -63,8 +63,8 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/scope_exit.hpp>
-#include <boost/thread.hpp>
 #include <sstream>
+#include <thread>
 
 #if defined(NDEBUG)
 #error "Bitcoin cannot be compiled without assertions."
@@ -501,7 +501,10 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
         uint64_t nRewind = blkdat.GetPos();
         while (!blkdat.eof())
         {
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return false;
+            }
 
             blkdat.SetPos(nRewind);
             nRewind++; // start one byte further next time, in case of failure
