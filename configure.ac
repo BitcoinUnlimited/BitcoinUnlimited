@@ -1102,6 +1102,9 @@ unset PKG_CONFIG_LIBDIR
 PKG_CONFIG_LIBDIR="$PKGCONFIG_LIBDIR_TEMP"
 
 ac_configure_args="${ac_configure_args} --disable-shared --with-pic --with-bignum=no --enable-module-recovery --disable-jni"
+if test "x$enable_debug" = xyes; then
+    ac_configure_args="${ac_configure_args} --enable-debug"
+fi
 AC_CONFIG_SUBDIRS([src/secp256k1 src/univalue])
 
 AC_OUTPUT
