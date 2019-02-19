@@ -220,17 +220,28 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
 
 UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)
+
+    bool fVerbose = false;
+
+    // check for param  --verbose or -v
+    string::size_type params_offset = 0;
+    if (params[0].isStr() && (params[0].get_str() == "--verbose" || params[0].get_str() == "-v"))
+    {
+        fVerbose = true;
+        ++params_offset;
+    }
+
+    if (fHelp || params.size() != 1 + params_offset)
         throw runtime_error(
-            "getrawblocktransactions \"blockhash\" ( verbose )\n"
+            "getrawblocktransactions\n"
             "\nReturn the raw transaction data for a given block.\n"
             "\nIf verbose=0, each tx is a string that is serialized, hex-encoded data.\n"
             "If verbose is non-zero, returns an array of Objects with information about each tx in the block.\n"
 
             "\nArguments:\n"
-            "1. \"hashblock\" (string, required) The block hash\n"
-            "2. verbose       (numeric, optional, default=0) If 0, return an array of txid:hexstring, other return an "
+            "1. \"-v\" or \"--verbose\" (string, optional, default=false) return an array of txid:hexstring, other return an "
             "array of tx json object\n"
+            "2. \"hashblock\" (string, required) The block hash\n"
 
             "\nResult (if verbose is not set or set to 0):\n"
             "{\n"
@@ -289,11 +300,7 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
             HelpExampleCli("getrawblocktransactions", "\"hashblock\" 1") +
             HelpExampleRpc("getrawblocktransactions", "\"hashblock\", 1"));
 
-    uint256 hashBlock = ParseHashV(params[0], "parameter 1");
-
-    bool fVerbose = false;
-    if (params.size() > 1)
-        fVerbose = (params[1].get_int() != 0);
+    uint256 hashBlock = ParseHashV(params[0 + params_offset], "parameter 1");
 
     CBlockIndex *pblockindex = nullptr;
     pblockindex = LookupBlockIndex(hashBlock);
@@ -325,18 +332,28 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
 
 UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 3)
+    bool fVerbose = false;
+
+    // check for param  --verbose or -v
+    string::size_type params_offset = 0;
+    if (params[0].isStr() && (params[0].get_str() == "--verbose" || params[0].get_str() == "-v"))
+    {
+        fVerbose = true;
+        ++params_offset;
+    }
+
+    if (fHelp || params.size() < (1 + params_offset) || params.size() > (2 + params_offset))
         throw runtime_error(
-            "getrawtransactionssince \"blockhash\" ( verbose ) ( count )\n"
+            "getrawtransactionssince\n"
             "\nReturn the raw transaction data for <count> blocks starting with blockhash and moving towards the "
             "tip.\n"
             "\nIf verbose=0, each tx is a string that is serialized, hex-encoded data.\n"
             "If verbose is non-zero, returns an array of Objects with information about each tx in the block.\n"
 
             "\nArguments:\n"
-            "1. \"hashblock\" (string, required) The block hash\n"
-            "2. verbose       (numeric, optional, default=0) If 0, return an array of txid:hexstring, other return an "
+            "1. \"-v\" or \"--verbose\" (string, optional, default=false) return an array of txid:hexstring, other return an "
             "array of tx json object\n"
+            "2. \"hashblock\" (string, required) The block hash\n"
             "3. count    (numeric, optional, default=1) Fetch information for <count> blocks "
             "starting with <hashblock> and moving towards the chain tip\n"
 
@@ -400,22 +417,18 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             "}\n"
             "\nExamples:\n" +
             HelpExampleCli("getrawtransactionssince", "\"hashblock\"") +
-            HelpExampleCli("getrawtransactionssince", "\"hashblock\" 1") +
-            HelpExampleCli("getrawtransactionssince", "\"hashblock\" 1 10") +
-            HelpExampleRpc("getrawtransactionssince", "\"hashblock\", 1 10"));
+            HelpExampleCli("getrawtransactionssince", "-v \"hashblock\"") +
+            HelpExampleCli("getrawtransactionssince", "-v \"hashblock\" 10") +
+            HelpExampleRpc("getrawtransactionssince", "-v \"hashblock\", 10"));
 
     LOCK(cs_main);
 
-    uint256 hashBlock = ParseHashV(params[0], "parameter 1");
-
-    bool fVerbose = false;
-    if (params.size() > 1)
-        fVerbose = (params[1].get_int() != 0);
+    uint256 hashBlock = ParseHashV(params[0 + params_offset], "parameter 1");
 
     int64_t limit = 1;
-    if (params.size() > 2)
+    if (params.size() > 1 + params_offset)
     {
-        int64_t arg = params[2].get_int64();
+        int64_t arg = params[1 + params_offset].get_int64();
         if (arg > 1)
         {
             limit = arg;
