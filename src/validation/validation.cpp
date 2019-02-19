@@ -27,8 +27,6 @@
 
 #include <boost/scope_exit.hpp>
 
-uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &consensusparams);
-
 struct CBlockIndexWorkComparator
 {
     bool operator()(CBlockIndex *pa, CBlockIndex *pb) const

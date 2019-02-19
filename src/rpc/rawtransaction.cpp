@@ -28,6 +28,7 @@
 #include "txmempool.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
+#include "validation/validatetx.h"
 #include "validation/validation.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
@@ -1498,6 +1499,88 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
     return hashTx.GetHex();
 }
 
+UniValue validaterawtransaction(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 3)
+    {
+        throw std::runtime_error(
+            "validaterawtransaction \"hexstring\" ( allowhighfees, allownonstandard )\n"
+            "\nValidates raw transaction (serialized, hex-encoded) to local node without broadcasting it.\n"
+            "\nAlso see createrawtransaction and signrawtransaction calls.\n"
+            "\nArguments:\n"
+            "1. \"hexstring\"    (string, required) The hex string of the raw transaction)\n"
+            "2. allowhighfees    (boolean, optional, default=false) Allow high fees\n"
+            "3. allownonstandard (string 'standard', 'nonstandard', 'default', optional, default='default')\n"
+            "                    Force standard or nonstandard transaction check\n"
+            "\nResult:\n"
+            "\"hex\"             (string) The transaction hash in hex\n"
+            "\nExamples:\n"
+            "\nCreate a transaction\n" +
+            HelpExampleCli("createrawtransaction",
+                "\"[{\\\"txid\\\" : \\\"mytxid\\\",\\\"vout\\\":0}]\" \"{\\\"myaddress\\\":0.01}\"") +
+            "Sign the transaction, and get back the hex\n" + HelpExampleCli("signrawtransaction", "\"myhex\"") +
+            "\nSend the transaction (signed hex)\n" + HelpExampleCli("sendrawtransaction", "\"signedhex\"") +
+            "\nAs a json rpc call\n" + HelpExampleRpc("validaterawtransaction", "\"signedhex\""));
+    }
+
+    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VBOOL)(UniValue::VSTR));
+
+    // parse hex string from parameter
+    CTransaction tx;
+    if (!DecodeHexTx(tx, params[0].get_str()))
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+    CTransactionRef ptx(MakeTransactionRef(std::move(tx)));
+    const uint256 &hashTx = ptx->GetHash();
+
+    bool fOverrideFees = false;
+    TransactionClass txClass = TransactionClass::DEFAULT;
+
+    // 2nd parameter allows high fees
+    if (params.size() > 1)
+    {
+        fOverrideFees = params[1].get_bool();
+    }
+    // 3rd parameter must be the transaction class
+    if (params.size() > 2)
+    {
+        txClass = ParseTransactionClass(params[2].get_str());
+        if (txClass == TransactionClass::INVALID)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid transaction class");
+    }
+
+    CCoinsViewCache &view = *pcoinsTip;
+    bool fHaveChain = false;
+    {
+        for (size_t o = 0; !fHaveChain && o < tx.vout.size(); o++)
+        {
+            CoinAccessor existingCoin(view, COutPoint(hashTx, o));
+            fHaveChain = !existingCoin->IsSpent();
+        }
+    }
+    UniValue result(UniValue::VOBJ);
+    bool fHaveMempool = mempool.exists(hashTx);
+    if (!fHaveMempool && !fHaveChain)
+    {
+        CValidationState state;
+        bool fMissingInputs;
+        result = VerifyTransactionWithMemoryPool(
+            mempool, state, std::move(ptx), false, &fMissingInputs, false, fOverrideFees, txClass);
+    }
+    else if (fHaveChain)
+    {
+        throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "transaction already in block chain");
+    }
+    if (result.exists("futureMinable") && result["futureMinable"].isTrue() && result.exists("standard") &&
+        result["standard"].isTrue())
+    {
+        result.pushKV("valid", true);
+    }
+    else
+    {
+        result.pushKV("valid", false);
+    }
+    return result;
+}
 
 UniValue enqueuerawtransaction(const UniValue &params, bool fHelp)
 {
@@ -1552,6 +1635,7 @@ static const CRPCCommand commands[] = {
     {"rawtransactions", "decoderawtransaction", &decoderawtransaction, true},
     {"rawtransactions", "decodescript", &decodescript, true},
     {"rawtransactions", "sendrawtransaction", &sendrawtransaction, false},
+    {"rawtransactions", "validaterawtransaction", validaterawtransaction, false},
     {"rawtransactions", "enqueuerawtransaction", &enqueuerawtransaction, false},
     {"rawtransactions", "signrawtransaction", &signrawtransaction, false}, /* uses wallet if enabled */
 

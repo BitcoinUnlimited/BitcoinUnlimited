@@ -9,6 +9,7 @@
 #include "primitives/transaction.h"
 
 #include <stdint.h>
+#include <univalue.h>
 #include <vector>
 
 class CBlockIndex;
@@ -71,5 +72,7 @@ bool EvaluateSequenceLocks(const CBlockIndex &block, std::pair<int, int64_t> loc
  * Consensus critical. Takes as input a list of heights at which tx's inputs (in order) confirmed.
  */
 bool SequenceLocks(const CTransactionRef &tx, int flags, std::vector<int> *prevHeights, const CBlockIndex &block);
+
+uint64_t GetTransactionSigOpCount(const CTransaction &tx, const CCoinsViewCache &coins, const uint32_t flags);
 
 #endif // BITCOIN_CONSENSUS_TX_VERIFY_H

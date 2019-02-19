@@ -112,6 +112,8 @@ bool ReceivedBlockTransactions(const CBlock &block,
     CBlockIndex *pindexNew,
     const CDiskBlockPos &pos);
 
+uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &consensusparams);
+
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
  *  In case pfClean is provided, operation will try to be tolerant about errors, and *pfClean
  *  will be true if no problems were found. Otherwise, the return value will be false in case
