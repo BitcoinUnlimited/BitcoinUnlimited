@@ -356,6 +356,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
 
     t.vout[0].scriptPubKey = CScript() << OP_1;
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+    BOOST_CHECK(CTransaction(t).HasData() == false);
 
     // MAX_OP_RETURN_RELAY-byte TX_NULL_DATA (standard)
     nMaxDatacarrierBytes = MAX_OP_RETURN_RELAY;
@@ -384,6 +385,12 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY + 1, t.vout[0].scriptPubKey.size());
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
+    BOOST_CHECK(CTransaction(t).HasData(2969406055) == false); // dataID (first data after op_return) too long
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("678afdb0");
+    BOOST_CHECK(CTransaction(t).HasData() == true);
+    BOOST_CHECK(CTransaction(t).HasData(2969406055) == true);
+    BOOST_CHECK(CTransaction(t).HasData(12345678) == false); // wrong dataID
+
     // Data payload can be encoded in any way...
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("");
     BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
@@ -393,6 +400,9 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << OP_RESERVED << -1 << 0 << ParseHex("01") << 2 << 3 << 4 << 5 << 6
                                        << 7 << 8 << 9 << 10 << 11 << 12 << 13 << 14 << 15 << 16;
     BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+    BOOST_CHECK(CTransaction(t).HasData() == true);
+    BOOST_CHECK(CTransaction(t).HasData(1) == false);
+
     t.vout[0].scriptPubKey =
         CScript() << OP_RETURN << 0 << ParseHex("01") << 2
                   << ParseHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
@@ -411,11 +421,12 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout.resize(2);
     t.vout[0].scriptPubKey =
         CScript() << OP_RETURN
-                  << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38");
+                  << ParseHex("04578afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38");
     t.vout[1].scriptPubKey =
         CScript() << OP_RETURN
                   << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38");
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+    BOOST_CHECK(CTransaction(t).HasData() == true);
 
     t.vout[0].scriptPubKey =
         CScript() << OP_RETURN
@@ -426,6 +437,17 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout[0].scriptPubKey = CScript() << OP_RETURN;
     t.vout[1].scriptPubKey = CScript() << OP_RETURN;
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+    BOOST_CHECK(CTransaction(t).HasData() == true);
+    BOOST_CHECK(CTransaction(t).HasData(1) == false);
+
+    // Check two op_returns... this is nonstandard but we should still find that it has data
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("04578afd");
+    t.vout[1].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afd");
+
+    BOOST_CHECK(CTransaction(t).HasData() == true);
+    BOOST_CHECK(CTransaction(t).HasData(4253701892) == true); // make sure both vouts are checked
+    BOOST_CHECK(CTransaction(t).HasData(4253705988) == true);
+    BOOST_CHECK(CTransaction(t).HasData(4253705989) == false);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

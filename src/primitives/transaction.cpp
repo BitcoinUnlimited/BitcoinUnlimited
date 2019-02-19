@@ -161,3 +161,29 @@ size_t CTransaction::GetTxSize() const
         nTxSize = ::GetSerializeSize(*this, SER_NETWORK, CTransaction::CURRENT_VERSION);
     return nTxSize;
 }
+
+
+bool CTransaction::HasData()
+{
+    for (auto out : vout)
+    {
+        if ((out.scriptPubKey.size() >= 1) && (out.scriptPubKey[0] == OP_RETURN))
+            return true;
+    }
+    return false;
+}
+
+bool CTransaction::HasData(uint32_t dataID)
+{
+    for (auto out : vout)
+    {
+        if ((out.scriptPubKey.size() >= 6) && (out.scriptPubKey[0] == OP_RETURN) &&
+            (out.scriptPubKey[1] == 4)) // IDs must be 4 bytes so check that the pushdata opcode is correct
+        {
+            uint32_t thisProto = ReadLE32(&out.scriptPubKey[2]);
+            if (thisProto == dataID)
+                return true;
+        }
+    }
+    return false;
+}
