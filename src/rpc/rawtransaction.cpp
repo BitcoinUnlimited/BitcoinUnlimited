@@ -222,7 +222,7 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error(
-            "getrawtransactions \"blockhash\" ( verbose )\n"
+            "getrawblocktransactions \"blockhash\" ( verbose )\n"
             "\nReturn the raw transaction data for a given block.\n"
             "\nIf verbose=0, each tx is a string that is serialized, hex-encoded data.\n"
             "If verbose is non-zero, returns an array of Objects with information about each tx in the block.\n"
@@ -285,9 +285,9 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
             "  ...\n"
             "}\n"
             "\nExamples:\n" +
-            HelpExampleCli("getrawtransactions", "\"hashblock\"") +
-            HelpExampleCli("getrawtransactions", "\"hashblock\" 1") +
-            HelpExampleRpc("getrawtransactions", "\"hashblock\", 1"));
+            HelpExampleCli("getrawblocktransactions", "\"hashblock\"") +
+            HelpExampleCli("getrawblocktransactions", "\"hashblock\" 1") +
+            HelpExampleRpc("getrawblocktransactions", "\"hashblock\", 1"));
 
     uint256 hashBlock = ParseHashV(params[0], "parameter 1");
 
