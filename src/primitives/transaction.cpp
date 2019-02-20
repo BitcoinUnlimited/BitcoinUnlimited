@@ -165,7 +165,7 @@ size_t CTransaction::GetTxSize() const
 
 bool CTransaction::HasData()
 {
-    for (auto out : vout)
+    for (auto &out : vout)
     {
         if ((out.scriptPubKey.size() >= 1) && (out.scriptPubKey[0] == OP_RETURN))
             return true;
@@ -175,7 +175,7 @@ bool CTransaction::HasData()
 
 bool CTransaction::HasData(uint32_t dataID)
 {
-    for (auto out : vout)
+    for (auto &out : vout)
     {
         if ((out.scriptPubKey.size() >= 6) && (out.scriptPubKey[0] == OP_RETURN) &&
             (out.scriptPubKey[1] == 4)) // IDs must be 4 bytes so check that the pushdata opcode is correct
