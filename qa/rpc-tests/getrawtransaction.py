@@ -53,7 +53,7 @@ class GetRawTransactionTest (BitcoinTestFramework):
         self.sync_blocks()
 
         # intentionally ask for more blocks than can be returned for testing
-        rawtransactionssince = self.nodes[1].getrawtransactionssince(startinghash[0], 0, 10)
+        rawtransactionssince = self.nodes[1].getrawtransactionssince(startinghash[0], 10)
         for hash ,txs in blockTxids.items():
             assert_not_equal(rawtransactionssince.get(hash, False), False)
             for txid in txs:
@@ -61,7 +61,7 @@ class GetRawTransactionTest (BitcoinTestFramework):
         assert_equal(rawtransactionssince.get("notarealhash", False), False)
 
         for hash ,txs in blockTxids.items():
-            assert_equal(self.nodes[0].getrawblocktransactions(hash, 0), rawtransactionssince[hash])
+            assert_equal(self.nodes[0].getrawblocktransactions(hash), rawtransactionssince[hash])
 
 
 if __name__ == '__main__':

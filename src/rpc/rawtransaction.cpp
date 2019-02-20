@@ -220,7 +220,6 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
 
 UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
 {
-
     bool fVerbose = false;
 
     // check for param  --verbose or -v
@@ -239,7 +238,8 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
             "If verbose is non-zero, returns an array of Objects with information about each tx in the block.\n"
 
             "\nArguments:\n"
-            "1. \"-v\" or \"--verbose\" (string, optional, default=false) return an array of txid:hexstring, other return an "
+            "1. \"-v\" or \"--verbose\" (string, optional, default=false) return an array of txid:hexstring, other "
+            "return an "
             "array of tx json object\n"
             "2. \"hashblock\" (string, required) The block hash\n"
 
@@ -351,7 +351,8 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             "If verbose is non-zero, returns an array of Objects with information about each tx in the block.\n"
 
             "\nArguments:\n"
-            "1. \"-v\" or \"--verbose\" (string, optional, default=false) return an array of txid:hexstring, other return an "
+            "1. \"-v\" or \"--verbose\" (string, optional, default=false) return an array of txid:hexstring, other "
+            "return an "
             "array of tx json object\n"
             "2. \"hashblock\" (string, required) The block hash\n"
             "3. count    (numeric, optional, default=1) Fetch information for <count> blocks "
