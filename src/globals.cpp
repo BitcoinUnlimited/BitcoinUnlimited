@@ -252,6 +252,8 @@ CTweak<uint64_t> pruneIntervalTweak("prune.pruneInterval",
     "How much block data (in MiB) is written to disk before trying to prune our block storage",
     DEFAULT_PRUNE_INTERVAL);
 
+CTweak<uint32_t> netMagic("net.magic", "network prefix override. If 0 use the default", 0);
+
 CTweakRef<uint64_t> ebTweak("net.excessiveBlock",
     "Excessive block size in bytes",
     &excessiveBlockSize,

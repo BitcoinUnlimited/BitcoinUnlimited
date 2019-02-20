@@ -104,6 +104,9 @@ extern CTweak<uint64_t> checkScriptDays;
 // Allow getblocktemplate to succeed even if this node chain tip blocks are old or this node is not connected
 extern CTweak<bool> unsafeGetBlockTemplate;
 
+// Let node operators to use another set of network magic bits
+extern CTweak<uint32_t> netMagic;
+
 // The maximum number of allowed script operations (consensus param)
 extern CTweak<uint64_t> maxScriptOps;
 
