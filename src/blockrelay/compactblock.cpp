@@ -38,7 +38,7 @@
 #include "validation/validation.h"
 
 
-static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount);
+static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount);
 
 
 uint64_t GetShortID(const uint64_t &shorttxidk0, const uint64_t &shorttxidk1, const uint256 &txhash)
@@ -175,9 +175,6 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
 bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
 {
-    // Xpress Validation - only perform xval if the chaintip matches the last blockhash in the compactblock
-    bool fXVal = (header.hashPrevBlock == chainActive.Tip()->GetBlockHash()) ? true : false;
-
     compactdata.ClearCompactBlockData(pfrom);
     pfrom->nSizeCompactBlock = nSizeCompactBlock;
 
@@ -258,9 +255,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
             mapPartialTxHash[cheapHash] = mi.first;
         }
 
-        LOCK(cs_xval);
         mempool.queryHashes(memPoolHashes);
-
         for (uint64_t i = 0; i < memPoolHashes.size(); i++)
         {
             uint64_t cheapHash = GetShortID(memPoolHashes[i]);
@@ -330,12 +325,12 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
                 }
                 else
                 {
-                    if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
+                    if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
                         return false;
                 }
             }
         }
-    } // End locking orphanpool.cs, mempool.cs and cs_xval
+    } // End locking orphanpool.cs, mempool.cs
     LOG(CMPCT, "Total in memory compactblock size is %ld bytes\n", compactdata.GetCompactBlockBytes());
 
     // These must be checked outside of the mempool.cs lock or deadlock may occur.
@@ -545,17 +540,13 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
     LOG(CMPCT, "Merkle Root check passed for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
 
-    // Xpress Validation - only perform xval if the chaintip matches the last blockhash in the compactblock
-    bool fXVal = (pfrom->compactBlock.hashPrevBlock == chainActive.Tip()->GetBlockHash()) ? true : false;
-
     int missingCount = 0;
     int unnecessaryCount = 0;
     // Look for each transaction in our various pools and buffers.
     // With compactblocks the vTxHashes contains only the first 8 bytes of the tx hash.
     {
         READLOCK(orphanpool.cs);
-        LOCK(cs_xval);
-        if (!ReconstructBlock(pfrom, fXVal, missingCount, unnecessaryCount))
+        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
             return false;
     }
 
@@ -599,10 +590,9 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     return true;
 }
 
-static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount)
+static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount)
 {
     AssertLockHeld(orphanpool.cs);
-    AssertLockHeld(cs_xval);
 
     // We must have all the full tx hashes by this point.  We first check for any duplicate
     // transaction ids.  This is a possible attack vector and has been used in the past.
@@ -666,12 +656,13 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
             if (inOrphanCache)
             {
                 ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                setUnVerifiedOrphanTxHash.insert(hash);
+                pfrom->compactBlock.setUnVerifiedTxns.insert(hash);
             }
-            else if ((inMemPool || inCommitQ) && fXVal)
-                setPreVerifiedTxHash.insert(hash);
             else if (inMissingTx)
+            {
                 ptx = pfrom->mapMissingTx[nShortId];
+                pfrom->compactBlock.setUnVerifiedTxns.insert(hash);
+            }
         }
         if (!ptx)
             missingCount++;
@@ -680,16 +671,13 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         // to see if we've exceeded any limits and if so clear out data and return.
         if (compactdata.AddCompactBlockBytes(nTxSize, pfrom) > maxAllowedSize)
         {
-            LEAVE_CRITICAL_SECTION(cs_xval); // maintain locking order with vNodes
             if (ClearLargestCompactBlockAndDisconnect(pfrom))
             {
-                ENTER_CRITICAL_SECTION(cs_xval);
                 return error(
                     "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
                     pfrom->compactBlock.GetHash().ToString(), pfrom->nLocalCompactBlockBytes, maxAllowedSize,
                     pfrom->GetLogName());
             }
-            ENTER_CRITICAL_SECTION(cs_xval);
         }
         if (pfrom->nLocalCompactBlockBytes > maxAllowedSize)
         {
@@ -704,6 +692,10 @@ static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, 
         // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct ordering.
         pfrom->compactBlock.vtx.emplace_back(ptx);
     }
+    // Now that we've rebuild the block successfully we can set the XVal flag which is used in
+    // ConnectBlock() to determine which if any inputs we can skip the checking of inputs.
+    pfrom->compactBlock.fXVal = true;
+
     return true;
 }
 

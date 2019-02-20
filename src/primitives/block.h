@@ -74,13 +74,22 @@ private:
     mutable uint64_t nBlockSize; // Serialized block size in bytes
 
 public:
+    // Xpress Validation: (memory only)
+    // However Orphans or Missing transactions that have been re-requested must be verifed
+    // because their inputs have never been checked.
+    std::set<uint256> setUnVerifiedTxns;
+
+    // Xpress Validation: (memory only)
+    bool fXVal;
+
+public:
     // network and disk
     std::vector<CTransactionRef> vtx;
 
     // memory only
     // 0.11: mutable std::vector<uint256> vMerkleTree;
     mutable bool fChecked;
-    mutable bool fExcessive; // BU: is the block "excessive" (bigger than this node prefers to accept)
+    mutable bool fExcessive; // Is the block "excessive"
 
     CBlock() { SetNull(); }
     CBlock(const CBlockHeader &header)
@@ -161,6 +170,7 @@ public:
         // vMerkleTree.clear();
         fChecked = false;
         fExcessive = false;
+        fXVal = false;
         nBlockSize = 0;
     }
 

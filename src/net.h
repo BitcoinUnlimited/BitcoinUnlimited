@@ -491,6 +491,9 @@ public:
     uint64_t shorttxidk0;
     uint64_t shorttxidk1;
 
+    // Whether this peer supports CompactBlocks
+    std::atomic<bool> fSupportsCompactBlocks;
+
     // Compact Blocks : end
 
     CCriticalSection cs_nAvgBlkResponseTime;
@@ -498,9 +501,6 @@ public:
     std::atomic<int64_t> nMaxBlocksInTransit;
 
     unsigned short addrFromPort;
-
-    //! Whether this peer supports CompactBlocks (for statistics only, BU doesn't support CB protocol)
-    std::atomic<bool> fSupportsCompactBlocks;
 
 protected:
     // Basic fuzz-testing
