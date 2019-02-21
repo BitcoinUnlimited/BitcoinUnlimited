@@ -163,7 +163,7 @@ size_t CTransaction::GetTxSize() const
 }
 
 
-bool CTransaction::HasData()
+bool CTransaction::HasData() const
 {
     for (auto &out : vout)
     {
@@ -173,7 +173,7 @@ bool CTransaction::HasData()
     return false;
 }
 
-bool CTransaction::HasData(uint32_t dataID)
+bool CTransaction::HasData(uint32_t dataID) const
 {
     for (auto &out : vout)
     {
