@@ -218,6 +218,11 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
     return result;
 }
 
+bool is_digits(const std::string &str)
+{
+    return std::all_of(str.begin(), str.end(), ::isdigit); // C++11
+}
+
 UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
 {
     bool fVerbose = false;
@@ -230,7 +235,7 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
         ++params_offset;
     }
 
-    if (fHelp || params.size() != 1 + params_offset)
+    if (fHelp || params.size() < (1 + params_offset) || params.size() > (2 + params_offset))
         throw runtime_error(
             "getrawblocktransactions\n"
             "\nReturn the raw transaction data for a given block.\n"
@@ -241,17 +246,18 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
             "1. \"-v\" or \"--verbose\" (string, optional, default=false) return an array of txid:hexstring, other "
             "return an "
             "array of tx json object\n"
-            "2. \"hashblock\" (string, required) The block hash\n"
+            "2. \"hashblock\"  (string, required) The block hash\n"
+            "3. \"protocol_id\" (string, optional) The protocol id to search OP_RETURN for. Use * as a wildcard for any id. If this param is entered we will not return any transactions that do not meet the protocol id criteria\n"
 
-            "\nResult (if verbose is not set or set to 0):\n"
+            "\nResult (if verbose is not set):\n"
             "{\n"
             "  \"txid\" : \"data\",      (string) The serialized, hex-encoded data for 'txid'\n"
             "  ...\n"
             "}\n"
 
-            "\nResult (if verbose > 0):\n"
+            "\nResult (if verbose is set):\n"
             "{\n"
-            "  {\n"
+            "  \"txid\" : {                (string) The transaction id (same as provided)\n"
             "    \"hex\" : \"data\",       (string) The serialized, hex-encoded data for 'txid'\n"
             "    \"txid\" : \"id\",        (string) The transaction id (same as provided)\n"
             "    \"size\" : n,             (numeric) The transaction size\n"
@@ -302,6 +308,24 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
 
     uint256 hashBlock = ParseHashV(params[0 + params_offset], "parameter 1");
 
+    std::string str_protocol_id = "";
+    bool fAll = false;
+    uint32_t protocol_id = 0;
+    bool has_protocol = params.size() > (1 + params_offset);
+    if (has_protocol)
+    {
+        str_protocol_id = params[1+ params_offset].get_str();
+        fAll = (str_protocol_id == "*");
+        if (!fAll)
+        {
+            if (!is_digits(str_protocol_id))
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid protocol id");
+            }
+            protocol_id = std::stoi(str_protocol_id);
+        }
+    }
+
     CBlockIndex *pblockindex = nullptr;
     pblockindex = LookupBlockIndex(hashBlock);
     if (!pblockindex)
@@ -314,6 +338,17 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
     UniValue resultSet(UniValue::VOBJ);
     for (auto tx : block.vtx)
     {
+        if (has_protocol)
+        {
+            if (fAll && !tx->HasData())
+            {
+                continue;
+            }
+            else if (!fAll && !tx->HasData(protocol_id))
+            {
+                continue;
+            }
+        }
         string strHex = EncodeHexTx(*tx);
 
         if (!fVerbose)
@@ -325,7 +360,7 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
         UniValue result(UniValue::VOBJ);
         result.pushKV("hex", strHex);
         TxToJSON(*tx, block.GetHash(), result);
-        resultSet.push_back(result);
+        resultSet.pushKV(tx->GetHash().ToString(),result);
     }
     return resultSet;
 }
@@ -342,7 +377,7 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
         ++params_offset;
     }
 
-    if (fHelp || params.size() < (1 + params_offset) || params.size() > (2 + params_offset))
+    if (fHelp || params.size() < (1 + params_offset) || params.size() > (3 + params_offset))
         throw runtime_error(
             "getrawtransactionssince\n"
             "\nReturn the raw transaction data for <count> blocks starting with blockhash and moving towards the "
@@ -357,6 +392,8 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             "2. \"hashblock\" (string, required) The block hash\n"
             "3. count    (numeric, optional, default=1) Fetch information for <count> blocks "
             "starting with <hashblock> and moving towards the chain tip\n"
+            "4. \"protocol_id\" (string, optional) The protocol id to search OP_RETURN for. Use * as a wildcard for any id. If this param is entered we will not return any transactions that do not meet the protocol id criteria\n"
+
 
             "\nResult (if verbose is not set or set to 0):\n"
             "{\n"
@@ -436,6 +473,24 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
         }
     }
 
+    std::string str_protocol_id = "";
+    bool fAll = false;
+    uint32_t protocol_id = 0;
+    bool has_protocol = params.size() > (2 + params_offset);
+    if (has_protocol)
+    {
+        str_protocol_id = params[2 + params_offset].get_str();
+        fAll = (str_protocol_id == "*");
+        if (!fAll)
+        {
+            if (!is_digits(str_protocol_id))
+            {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid protocol id");
+            }
+            protocol_id = std::stoi(str_protocol_id);
+        }
+    }
+
     CBlockIndex *pblockindex = LookupBlockIndex(hashBlock);
     if (!pblockindex)
     {
@@ -460,6 +515,17 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
         UniValue blockResults(UniValue::VOBJ);
         for (auto tx : block.vtx)
         {
+            if (has_protocol)
+            {
+                if (fAll && !tx->HasData())
+                {
+                    continue;
+                }
+                else if (!fAll && !tx->HasData(protocol_id))
+                {
+                    continue;
+                }
+            }
             string strHex = EncodeHexTx(*tx);
             if (!fVerbose)
             {
