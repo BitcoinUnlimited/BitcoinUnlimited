@@ -247,7 +247,9 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
             "return an "
             "array of tx json object\n"
             "2. \"hashblock\"  (string, required) The block hash\n"
-            "3. \"protocol_id\" (string, optional) The protocol id to search OP_RETURN for. Use * as a wildcard for any id. If this param is entered we will not return any transactions that do not meet the protocol id criteria\n"
+            "3. \"protocol_id\" (string, optional) The protocol id to search OP_RETURN for. Use * as a wildcard for "
+            "any id. If this param is entered we will not return any transactions that do not meet the protocol id "
+            "criteria\n"
 
             "\nResult (if verbose is not set):\n"
             "{\n"
@@ -314,7 +316,7 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
     bool has_protocol = params.size() > (1 + params_offset);
     if (has_protocol)
     {
-        str_protocol_id = params[1+ params_offset].get_str();
+        str_protocol_id = params[1 + params_offset].get_str();
         fAll = (str_protocol_id == "*");
         if (!fAll)
         {
@@ -360,7 +362,7 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
         UniValue result(UniValue::VOBJ);
         result.pushKV("hex", strHex);
         TxToJSON(*tx, block.GetHash(), result);
-        resultSet.pushKV(tx->GetHash().ToString(),result);
+        resultSet.pushKV(tx->GetHash().ToString(), result);
     }
     return resultSet;
 }
@@ -392,7 +394,9 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             "2. \"hashblock\" (string, required) The block hash\n"
             "3. count    (numeric, optional, default=1) Fetch information for <count> blocks "
             "starting with <hashblock> and moving towards the chain tip\n"
-            "4. \"protocol_id\" (string, optional) The protocol id to search OP_RETURN for. Use * as a wildcard for any id. If this param is entered we will not return any transactions that do not meet the protocol id criteria\n"
+            "4. \"protocol_id\" (string, optional) The protocol id to search OP_RETURN for. Use * as a wildcard for "
+            "any id. If this param is entered we will not return any transactions that do not meet the protocol id "
+            "criteria\n"
 
 
             "\nResult (if verbose is not set or set to 0):\n"

@@ -11,7 +11,7 @@ import sys
 if sys.version_info[0] < 3:
     raise "Use Python 3"
 import logging
-
+import binascii
 import json
 
 from test_framework.test_framework import BitcoinTestFramework
@@ -39,10 +39,11 @@ class GetRawTransactionTest (BitcoinTestFramework):
         startinghash = self.nodes[0].generate(1)
 
         blockTxids = {}
-
         blocks = 0
-        while blocks < 5:
+        while blocks < 7:
             txids = []
+            if blocks == 0:
+                self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 0.001)
             txids.append(self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1))
             txids.append(self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1))
             txids.append(self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1))
@@ -62,6 +63,31 @@ class GetRawTransactionTest (BitcoinTestFramework):
 
         for hash ,txs in blockTxids.items():
             assert_equal(self.nodes[0].getrawblocktransactions(hash), rawtransactionssince[hash])
+
+        unspents = self.nodes[1].listunspent()
+        index = 0
+        while index < len(unspents):
+            if unspents[index]['satoshi'] == 100000:
+                break
+            index = index + 1
+        data = "TestData............................7894561230"
+        tx = self.nodes[1].createrawtransaction([{"txid": unspents[index]['txid'], "vout": unspents[index]['vout']}], {"data": data.encode().hex()})
+        signedtx = self.nodes[1].signrawtransaction(tx)['hex']
+        self.nodes[1].sendrawtransaction(signedtx)
+        opblockhash = self.nodes[1].generate(1)[0]
+        self.sync_blocks()
+        k = 0
+        while k < 5:
+            self.nodes[0].generate(1)
+            k = k + 1
+        self.sync_blocks()
+        #print(self.nodes[0].getrawblocktransactions("-v", opblockhash))
+        # we should get at least 1 entry when checking for any data because of our op return tx.
+        assert_not_equal(self.nodes[0].getrawblocktransactions(opblockhash , "*"), {})
+        assert_not_equal(self.nodes[0].getrawtransactionssince(opblockhash , 1, "*"), {})
+        assert_equal(self.nodes[0].getrawblocktransactions(opblockhash , "*"), self.nodes[0].getrawtransactionssince(opblockhash , 1, "*")[opblockhash])
+
+
 
 
 if __name__ == '__main__':
