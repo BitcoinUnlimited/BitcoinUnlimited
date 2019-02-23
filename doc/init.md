@@ -91,9 +91,6 @@ check ownership and permissions and make it executable.  Test it with
 Drop bitcoind.conf in /etc/init.  Test by running `service bitcoind start`
 it will automatically start on reboot.
 
-NOTE: This script is incompatible with CentOS 5 and Amazon Linux 2014 as they
-use old versions of Upstart and do not supply the start-stop-daemon utility.
-
 ### CentOS
 
 Copy bitcoind.init to /etc/init.d/bitcoind. Test by running `service bitcoind start`.
