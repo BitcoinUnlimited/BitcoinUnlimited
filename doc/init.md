@@ -70,7 +70,7 @@ Lock file:           `~/Library/Application Support/Bitcoin/.lock`
 
 ## Installing Service Configuration
 
-### systemd
+### systemd (for Debian/Ubuntu based distributions)
 
 Installing this .service file consists of just copying it to
 /usr/lib/systemd/system directory, followed by the command
@@ -86,7 +86,7 @@ check ownership and permissions and make it executable.  Test it with
 `/etc/init.d/bitcoind start` and configure it to run on startup with
 `rc-update add bitcoind`
 
-### Upstart (for Debian/Ubuntu based distributions)
+### Upstart
 
 Drop bitcoind.conf in /etc/init.  Test by running `service bitcoind start`
 it will automatically start on reboot.
