@@ -42,7 +42,9 @@ These steps can be performed on, for example, an Ubuntu VM. The depends system w
 
 First, install the general dependencies:
 
-    sudo apt-get install build-essential libtool autotools-dev automake pkg-config bsdmainutils curl
+```bash
+sudo apt-get install build-essential libtool autotools-dev automake pkg-config bsdmainutils curl
+```
 
 A host toolchain (`build-essential`) is necessary because some dependency
 packages (such as `protobuf`) need to build host utilities that are used in the
@@ -54,31 +56,39 @@ See also: [dependencies.md](dependencies.md).
 
 To build executables for Windows 64-bit, install the following dependencies:
 
-    sudo apt-get install g++-mingw-w64-x86-64 mingw-w64-x86-64-dev
+```bash
+sudo apt-get install g++-mingw-w64-x86-64 mingw-w64-x86-64-dev
+```
 
 Then build using:
 
-    cd depends
-    make HOST=x86_64-w64-mingw32
-    cd ..
-    ./autogen.sh # not required when building from tarball
-    CONFIG_SITE=$PWD/depends/x86_64-w64-mingw32/share/config.site ./configure --prefix=/
-    make
+```bash
+cd depends
+make HOST=x86_64-w64-mingw32
+cd ..
+./autogen.sh # not required when building from tarball
+CONFIG_SITE=$PWD/depends/x86_64-w64-mingw32/share/config.site ./configure --prefix=/
+make
+```
 
 ## Building for 32-bit Windows
 
 To build executables for Windows 32-bit, install the following dependencies:
 
-    sudo apt-get install g++-mingw-w64-i686 mingw-w64-i686-dev 
+```bash
+sudo apt-get install g++-mingw-w64-i686 mingw-w64-i686-dev 
+```
 
 Then build using:
 
-    cd depends
-    make HOST=i686-w64-mingw32
-    cd ..
-    ./autogen.sh # not required when building from tarball
-    CONFIG_SITE=$PWD/depends/i686-w64-mingw32/share/config.site ./configure --prefix=/
-    make
+```bash
+cd depends
+make HOST=i686-w64-mingw32
+cd ..
+./autogen.sh # not required when building from tarball
+CONFIG_SITE=$PWD/depends/i686-w64-mingw32/share/config.site ./configure --prefix=/
+make
+```
 
 For further documentation on the depends system see [README.md](../depends/README.md) in the depends directory.
 
@@ -89,4 +99,6 @@ executables to a directory on the Windows drive in the same directory structure
 as they appear in the release `.zip` archive. This can be done in the following
 way. This will install to `c:\workspace\bitcoin`, for example:
 
-    make install DESTDIR=/mnt/c/workspace/bitcoin
+```bash
+make install DESTDIR=/mnt/c/workspace/bitcoin
+```

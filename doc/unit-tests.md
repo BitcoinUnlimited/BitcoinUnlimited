@@ -26,7 +26,7 @@ To run the bitcoin unit test suite sequentially, launch
 
 You can run it with the `--help` option to get a list of parameters
 supported by the Boost Test framework.  Some of these are very useful,
-specifically '--run_test=<name>' to run a particular subset of tests, e.g.
+specifically `--run_test=<name>` to run a particular subset of tests, e.g.
 
     $ src/test/test_bitcoin --run_test=transaction_tests
 
@@ -55,7 +55,7 @@ it the name of the test executable, e.g.
     $ gtest-parallel-bitcoin src/test/test_bitcoin
 
 It works by extracting the list of tests contained in the executable
-using the '--list_content' command line parameter, and then running the
+using the `--list_content` command line parameter, and then running the
 tests individually in parallel.
 
 Running with `--help` provides help about the command line options.
@@ -64,7 +64,7 @@ execution.
 The `--print_test_times` will print a detailed breakdown of all test times.
 
 The wrapper creates and maintains a score database of test execution times
-in ~/.gtest-parallel-bitcoin-times .
+in `~/.gtest-parallel-bitcoin-times` .
 When it executes tests in repeated runs, it does so in order from longest
 to shortest test.
 
@@ -95,9 +95,11 @@ the `src/qt/test/test_main.cpp` file.
 A Python module which supports doctests usually contains code like this
 for when it is invoked as a standalone program:
 
+```python
     if __name__ == "__main__":
         import doctest
         doctest.testmod()
+```
 
 Otherwise, check for presence of import of the 'doctest' in general.
 
