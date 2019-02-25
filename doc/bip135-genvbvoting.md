@@ -43,7 +43,9 @@ Lines beginning with hashes or semicolons will be treated as comment lines and
 ignored.
 Data lines will consist of the following comma-separated fields:
 
-    `network,bit,name,starttime,timeout,windowsize,threshold,minlockedblocks,minlockedtime,gbtforce`
+```
+network,bit,name,starttime,timeout,windowsize,threshold,minlockedblocks,minlockedtime,gbtforce
+```
 
 The expected data types of these fields are:
 
@@ -85,7 +87,7 @@ The built-in defaults can be dumped out in CSV format (suitable for creating
 a forks.csv) by running bitcoind with the `-dumpforks` option. This will dump
 the data and terminate the client.
 
-A sample 'forks.csv' has been committed in config/forks.csv .
+A sample `forks.csv` has been committed in `config/forks.csv` .
 Currently this is not installed, since the client's built-in defaults
 make it unnecessary for a forks.csv file to be deployed unless the
 user wishes to modify deployments. Typically though, this will be
@@ -113,12 +115,12 @@ with explicit DEPLOYMENT_UNASSIGNED_BIT_x values, and some instructions
 close by on how to manage these when introducing new deployments.
 
 init.cpp has been adapted to display help for the two new options
-(-forks=<filepath> and -dumpforks), and to call the CSV reading
+(`-forks=<filepath>` and `-dumpforks`), and to call the CSV reading
 procedure (refer to the new module forks_csv.{h,cpp} and its
 tests in forkscsv_tests.cpp).
 
 The "unknown versions" test in main.cpp had to be ripped out and
-replaced by a new test, and subsequently p2p-versionbits-warning.py
+replaced by a new test, and subsequently `p2p-versionbits-warning.py`
 had to be revised as well.
 
 The new unknown versions check still reports the same error,
@@ -127,7 +129,7 @@ activation states of the unknown deployments.
 It reports when a new signal is first detected, and reports it
 at 25, 50, 70, 90 and 95 percent, and also if it becomes lost
 again (all this is counted over the last 100 blocks).
-There are information log messages for these events in the debug.log,
+There are information log messages for these events in the `debug.log`,
 but no warnings / RPC error messages, to keep this reference
 implementation small.
 
@@ -140,16 +142,16 @@ each 'configured' deployment - which means those which have a name
 and valid settings (i.e. nonzero window size etc).
 
 This RPC interface is also used by the new regression test
-for this BIP, which is bip135-genvbvoting-forks.py .
-The old bip9-softforks.py is retained to prove backward compatibility.
+for this BIP, which is `bip135-genvbvoting-forks.py` .
+The old `bip9-softforks.py` is retained to prove backward compatibility.
 The same method has been followed for unit tests:
-The old versionbits_tests.cpp has been retained mostly unchanged -
+The old `versionbits_tests.cpp` has been retained mostly unchanged -
 only minimal necessary adaptations where needed to compile, and
 a fixup for the time period disjointness subtest which was broken.
-The new functionality is unit tested in genversionbits_tests.cpp.
+The new functionality is unit tested in `genversionbits_tests.cpp`.
 
 The CSV reading is done by a new vendor package which has been
-pulled into the project as a subtree (see src/fast-cpp-csv-parser/).
+pulled into the project as a subtree (see `src/fast-cpp-csv-parser/`).
 
 
 ## Test plan
@@ -163,7 +165,7 @@ machine, reading and validating contents of the forks.csv file).
 ### Regression tests
 
 
-The bip135-genvbvoting-forks.py test exercises a variety of settings on bits 1-21.
+The `bip135-genvbvoting-forks.py` test exercises a variety of settings on bits 1-21.
 
 The existing regression tests sufficiently test the timeout transitions of
 BIP9 which remain compatible.
