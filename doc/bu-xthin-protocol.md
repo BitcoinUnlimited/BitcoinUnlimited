@@ -1,13 +1,10 @@
-Detailed Protocol Design for Xtreme Thin blocks (Xthinblocks)
-=============================================================
+# Detailed Protocol Design for Xtreme Thin blocks (Xthinblocks)
 
 The following is the updated and current design spec for Xthinblocks and may be slightly different than the original BUIP010
 proposal which was voted on.
 
 
-1. Summary
----------------------------------
----------------------------------
+## Summary
 
 In order to scale the Bitcoin network, a faster less bandwidth intensive method is needed in order to send larger blocks. The 
 thinblock strategy is designed to speed up the relay of blocks by using the transactions that already exist in the requester's 
@@ -20,9 +17,7 @@ uses a 64 bit transaction hash which further reduces thinblock size; in doing so
 to 25KB thinblock.
 
 
-2. High Level Design
---------------------
---------------------
+## High Level Design
 
 For various reasons memory pools are not in perfect sync which makes it difficult to reconstruct blocks in a fast and reliable 
 manner and with a single round trip. Creating a bloom filter at the time of sending the getdata request is an easy and fast way 
@@ -89,13 +84,10 @@ This is done using a GETDATA with an inventory message containing the MSG_THINBL
 normal block is requested.
 
 
-3. Detailed Protocol Specification
-----------------------------------
-----------------------------------
+## Detailed Protocol Specification
 
 
-XTHIN Service Bit
------------------
+### XTHIN Service Bit
 
 
         NODE_XTHIN = (1 << 4),
@@ -103,8 +95,7 @@ XTHIN Service Bit
 
 
 
-New p2p  message types
-----------------------
+### New p2p  message types
 
 The p2p message format is as follows:
 
@@ -125,8 +116,7 @@ Xthinblocks. These strings must to be inserted into the 12 byte command string o
     get_xthin
 
 
-New Enumerated message types
-----------------------------
+### New Enumerated message types
 
 Two new enumerated messages types are added.  MSG_THINBLOCK and MSG_XTHINBLOCK and are used
 for creating inventory messages which are either requested by GETDATA for the MSG_THINBLOCK, or
@@ -138,13 +128,12 @@ MSG_THINBLOCK == 4  and MSG_XTHINBLOCK == 5
 
 
 
-New P2P message construction:
------------------------------
+### New P2P message construction:
 
 The following is a description of how to construct each of the new p2p message types.
 
 
-### **NetMsgType::GET_XTHIN**
+#### **NetMsgType::GET_XTHIN**
   
 Constructed by concatenating an inventory message of type MSG_XTHINBLOCK and the bloom filter generated in BuildSeededBloomFilter() and
 then sending the datastream as a NetMsgType::GET_XTHIN.
@@ -180,7 +169,7 @@ Construction of `GET_XTHIN` is as follows:
 
 
 
-### **NetMsgType::XTHINBLOCK**
+#### **NetMsgType::XTHINBLOCK**
  
 An xthinblock contains the block header followed by all the transaction hashes in the block, but only the first 64 bits of the hash is included. Finally
 after checking the block against the bloom filter provided in the GET_XTHIN message, we attach any missing transactions that we believe the requesting
@@ -198,7 +187,7 @@ Construction of `XTHINBLOCK` is as follows:
 
 
 
-### **NetMsgType::THINBLOCK**
+#### **NetMsgType::THINBLOCK**
  
 A thinblock contains the block header followed by all the full transaction hashes in the block. Finally after checking the 
 block against the bloom filter provided in the GET_XTHIN message, we attach any missing transactions that we believe the requesting
@@ -217,7 +206,7 @@ Construction of `THINBLOCK` is as follows:
 
 
 
-### **NetMsgType::GET_XBLOCKTX**
+#### **NetMsgType::GET_XBLOCKTX**
   
 This message is used to re-request any missing transactions that were not in the mempool but are still needed in order to reconstruct
 the block.
@@ -230,7 +219,7 @@ Construction of `GET_XBLOCKTX` is as follows:
 
 
 
-### **NetMsgType::XBLOCKTX**
+#### **NetMsgType::XBLOCKTX**
  
 This message is used to send back the transactions that were re-requested and missing from the requesting peer's memory pool
 
@@ -242,8 +231,7 @@ Construction of `XBLOCKTX` is as follows:
 
 
 
-Order and logic of P2P message requests
----------------------------------------
+## Order and logic of P2P message requests
 
 - `NODE A:`  receives block announcement from NODE B by an INV message and then creates and issues a GET_XTHIN to NODE B
 
@@ -269,8 +257,7 @@ Order and logic of P2P message requests
 
 
 
-The Importance of the Orphan Cache
-----------------------------------
+## The Importance of the Orphan Cache
 
 Orphans are transactions which arrive before their parent transaction arrives.  As such they are not eligible to be accepted into the memory pool
 and are cached separately in a temporary Orphan Cache.  Once the parent arrives the orphaned transactions can then be moved from the orphan cache
@@ -291,8 +278,7 @@ no longer exist and helps to keep the size of the orphan cache to a minimum.
 
 
 
-Bloom Filtering for Xthinblocks
--------------------------------
+## Bloom Filtering for Xthinblocks
 
 A simple bloom filter is used as a compact way to make the node we are requesting an Xthinblock from aware of the contents of our own memory pool. Before
 sending the `GET_XTHIN` message request we create a bloom filter by first getting all the transaction hashes in our own memory pool as well as the
@@ -315,8 +301,7 @@ then we add it to the `XTHINBLOCK`. Once all transactions in the block have been
 NOTE:  We always add the `coinbase` transaction to the `XTHINBLOCK`.  It is the first transaction which shows up in a block.
 
 
-Bloom Filter Targeting (BU v12.1 and above)
--------------------------------------------
+## Bloom Filter Targeting (BU v12.1 and above)
 
 Beginning in v12.1 we have almost completely re-designed BuildSeededBloomFilter().  There are two notable changes in how the bloom filter is
 created.

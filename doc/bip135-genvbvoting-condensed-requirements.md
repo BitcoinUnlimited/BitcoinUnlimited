@@ -1,4 +1,4 @@
-==BIP-GENVBVOTING concise requirements specification==
+# BIP-GENVBVOTING concise requirements specification
 
 This is a condensed form of the requirements from BIP-GENVBVOTING.
 It is intended for checking completeness and test status.
@@ -6,8 +6,7 @@ It is intended for checking completeness and test status.
 REQ-* are requirements, OPT-REQ-* are optional requirements (not mandatory for compliance with BIP-GENVBVOTING).
 
 
-
-===Backward compatibility===
+### Backward compatibility
 
 REQ-FULL-COMPAT: This specification SHALL enable strict backward compatibility with existing BIP9-based deployments through suitable parameter configuration.
 Rationale: To preserve compatibility with BIP9 through configurability.
@@ -19,7 +18,7 @@ Rationale: This permits each bit to be configured independently for each chain (
 
 
 
-===Fork deployment parameters===
+### Fork deployment parameters
 
 REQ-PARAM-BIT-RANGE: The 'bit' value SHALL be an integer in the range 0..28 .
 
@@ -37,7 +36,7 @@ REQ-PARAM-MINLOCKEDTIME-RANGE: The 'minlockedtime' value SHALL be an integer gre
 
 
 
-===Signaling bits===
+### Signaling bits
 
 REQ-BITS-RANGE: The signaling bits SHALL comprise the 29 least significant bits of the
 nVersion block header field. nVersion is a 32-bit field which is treated as
@@ -54,15 +53,14 @@ bits MUST be treated as if they are 0.
 
 
 
-===States===
+### States
 
 REQ-ANCESTORS-DETERMINE-BLOCK-STATE: A block's state SHALL never depend on its own nVersion, but only on that of its ancestors.
 
 REQ-GENESIS-DEFINED: The genesis block for any chain SHALL by definition be in the DEFINED state for a configured deployment.
 
 
-
-===State transitions===
+### State transitions
 
 REQ-STATE-TRANSITION-SYNC: State transitions from STARTED->LOCKED_IN and from LOCKED_IN->ACTIVE SHALL only be allowed when the block height is an even multiple of the deployment's 'windowsize'.
 
@@ -78,7 +76,7 @@ Note 2: The default for both 'minlockedblocks' and 'minlockedtime' are zero, imp
 
 
 
-===Tallying===
+### Tallying
 
 REQ-SIGNAL-1-FOR-SUPPORT: A signaling bit value of '1' SHALL indicate support of a fork and SHALL count towards its tally on a chain.
 
@@ -91,14 +89,12 @@ REQ-TALLY-AFTER-STARTED: Once a deployment has STARTED, the signal for that depl
 REQ-TALLY-ON-HEAD-CHANGE: The signaling bits SHALL be tallied whenever the head of the active chain changes, including after reorganizations.
 
 
-
-===New consensus rules===
+### New consensus rules
 
 REQ-NEW-CONSENSUS-ON-ACTIVE: New consensus rules deployed by a fork SHALL be enforced starting with the first block that has ACTIVE state.
 
 
-
-===Optional operator notifications===
+### Optional operator notifications
 
 OPT-REQ-NOTIFY-ON-TRANSITIONS: An implementation SHOULD notify the operator when a deployment transitions to STARTED, LOCKED_IN, ACTIVE or FAILED states.
 
@@ -118,6 +114,5 @@ OPT-REQ-CONFIGURABLE-UNKNOWN-ALERTS: Since parameters of unconfigured deployment
 
 
 
-==License==
-
+## License
 This requirements specification is dual-licensed under the Creative Commons CC0 1.0 Universal and GNU All-Permissive licenses.

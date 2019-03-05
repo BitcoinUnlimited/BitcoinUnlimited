@@ -1,5 +1,4 @@
-TOR SUPPORT IN BITCOIN
-======================
+# TOR SUPPORT IN BITCOIN
 
 It is possible to run Bitcoin as a Tor hidden service, and connect to such services.
 
@@ -7,8 +6,7 @@ The following directions assume you have a Tor proxy running on port 9050. Many 
 configure Tor.
 
 
-1. Run bitcoin behind a Tor proxy
----------------------------------
+## Run bitcoin behind a Tor proxy
 
 The first step is running Bitcoin behind a Tor proxy. This will already make all
 outgoing connections be anonymized, but more is possible.
@@ -34,8 +32,7 @@ In a typical situation, this suffices to run behind a Tor proxy:
 	./bitcoin -proxy=127.0.0.1:9050
 
 
-2. Run a bitcoin hidden server
-------------------------------
+## Run a bitcoin hidden server
 
 If you configure your Tor system accordingly, it is possible to make your node also
 reachable from the Tor network. Add these lines to your /etc/tor/torrc (or equivalent
@@ -88,8 +85,7 @@ for normal IPv4/IPv6 communication, use:
 
 	./bitcoin -onion=127.0.0.1:9050 -externalip=57qr3yd1nyntf5k.onion -discover
 
-3. Automatically listen on Tor
---------------------------------
+## Automatically listen on Tor
 
 Starting with Tor version 0.2.7.1 it is possible, through Tor's control socket
 API, to create and destroy 'ephemeral' hidden services programmatically.

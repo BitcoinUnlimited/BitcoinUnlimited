@@ -1,5 +1,4 @@
-Dependencies
-============
+# Dependencies
 
 These are the dependencies currently used by Bitcoin Unlimited. You can find instructions for installing them in the `build-*.md` file for your platform.
 

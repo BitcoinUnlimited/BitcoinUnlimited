@@ -1,9 +1,8 @@
-How to setup and get the best results using Xpedited forwarding
-==============================================================
+[Website](https://www.bitcoinunlimited.info)  | [Download](https://www.bitcoinunlimited.info/download) | [Setup](../README.md)  |  [Xthin](bu-xthin.md)  |  [Xpedited](bu-xpedited-forwarding.md)  |   [Miner](miner.md)
 
+# How to setup and get the best results using Xpedited forwarding
 
-1. What is Xpedited Forwarding
----------------------------------
+## What is Xpedited Forwarding
 
 Xpedited Forwarding is a decentralised rapid block propagation system designed to replace the centralised Relay Network.  Anyone
 can participate in or easily setup their own Xpedited Network.
@@ -18,8 +17,7 @@ It's important to note that the block is verified and accepted only after being 
 (INV, GET, response) is reduced to a single send.  This allows for a much faster propagation through the network.
 
 
-2. Setting up an Xpedited connection
---------------------------------------
+## Setting up an Xpedited connection
 
 Xpedited connections can only be set up by the node that will be receiving the Xpedited data.
 
@@ -32,8 +30,7 @@ The recommended method is to add entries in your bitcoin.conf file.  With this m
 will be restarted when either your node or the other is restarted.
 
 
-2a. Setting up an Xpedited connection using bitcoin.conf
---------------------------------------------------------
+### Setting up an Xpedited connection using bitcoin.conf
 
 Two bitcoin.conf entries need to be made.  One is the `addnode` connection which opens the connection to the remote peer and the 
 second is the `expeditedblock` entry which makes the request to begin the receipt of Xpedited blocks from this peer.
@@ -61,8 +58,7 @@ You can have muliple `addnode` and expedited entries up to a maximum of 8 connec
 	expeditedblock=145.33.233.45:8333
 
 
-2b. Setting up an Xpedited connection with RPC
-----------------------------------------------
+### Setting up an Xpedited connection with RPC
 
 You can also setup connections using the RPC interface, however once you restart your node the Xpedited forwarding will no longer be in effect
 and you will have to re-request forwarding unless you use a script of some kind to send the forwarding requests.
@@ -90,8 +86,8 @@ To get more help on how to use the RPC commands you can type in "bitcoin-cli hel
 then simply type "help expedited".
 
 
-3. Putting limits on forwarding
--------------------------------
+## Putting limits on forwarding
+
 
 By default the maximum number of recipients that can request forwarding from your node is set to 3.  If you wish to limit that or reduce that
 you can use the following settings.
