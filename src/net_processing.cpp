@@ -330,8 +330,8 @@ static void handleAddressAfterInit(CNode *pfrom)
             }
         }
         // Get recent addresses
-        pfrom->PushMessage(NetMsgType::GETADDR);
         pfrom->fGetAddr = true;
+        pfrom->PushMessage(NetMsgType::GETADDR);
         addrman.Good(pfrom->addr);
     }
     else
@@ -735,6 +735,17 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     }
     else if (strCommand == NetMsgType::ADDR)
     {
+        if (!pfrom->fGetAddr)
+        {
+            // Today unsolicited ADDRs are not illegal, but we should consider misbehaving on this if we add logic to
+            // unmisbehaving over time, because a few unsolicited ADDRs are ok from a DOS perspective but lots are not.
+            // However, we may never want to process unsolicited ADDRs because what possible value is there to allow
+            // a node to jam entries into everyone else's address table.
+            // dosMan.Misbehaving(pfrom, 1);
+            return false;
+        }
+        pfrom->fGetAddr = false;
+
         std::vector<CAddress> vAddr;
         vRecv >> vAddr;
 
@@ -760,7 +771,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 addr.nTime = nNow - 5 * 24 * 60 * 60;
             pfrom->AddAddressKnown(addr);
             bool fReachable = IsReachable(addr);
-            if (addr.nTime > nSince && !pfrom->fGetAddr && vAddr.size() <= 10 && addr.IsRoutable())
+            if (addr.nTime > nSince && vAddr.size() <= 10 && addr.IsRoutable())
             {
                 // Relay to a limited number of other nodes
                 {
@@ -794,8 +805,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 vAddrOk.push_back(addr);
         }
         addrman.Add(vAddrOk, pfrom->addr, 2 * 60 * 60);
-        if (vAddr.size() < 1000)
-            pfrom->fGetAddr = false;
         if (pfrom->fOneShot)
         {
             LOG(NET, "Disconnecting %s: one shot\n", pfrom->GetLogName());

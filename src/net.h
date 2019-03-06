@@ -518,7 +518,6 @@ public:
     // flood relay
     std::vector<CAddress> vAddrToSend GUARDED_BY(cs_vSend);
     CRollingBloomFilter addrKnown;
-    bool fGetAddr;
     std::set<uint256> setKnown;
     int64_t nNextAddrSend;
     int64_t nNextLocalAddrSend;
@@ -543,6 +542,8 @@ public:
     int64_t nMinPingUsecTime;
     // Whether a ping is requested.
     bool fPingQueued;
+    // Whether an ADDR was requested.
+    bool fGetAddr;
 
     // BU instrumentation
     // track the number of bytes sent to this node
