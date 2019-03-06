@@ -1277,7 +1277,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             // During the process of IBD we need to update block availability for every connected peer. To do that we
             // request, from each NODE_NETWORK peer, a header that matches the last blockhash found in this recent set
-            // of headers. Once the reqeusted header is received then the block availability for this peer will get
+            // of headers. Once the requested header is received then the block availability for this peer will get
             // updated.
             if (IsInitialBlockDownload())
             {
