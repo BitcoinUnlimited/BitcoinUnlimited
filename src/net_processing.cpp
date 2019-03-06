@@ -23,6 +23,7 @@
 #include "txadmission.h"
 #include "validation/validation.h"
 #include "validationinterface.h"
+#include "version.h"
 #include "xversionkeys.h"
 
 extern std::atomic<int64_t> nTimeBestReceived;
@@ -804,7 +805,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     }
 
     // Ignore this message if sent from a node advertising a version earlier than the first CB release (70014)
-    else if (strCommand == NetMsgType::SENDCMPCT && pfrom->nVersion >= 70014)
+    else if (strCommand == NetMsgType::SENDCMPCT && pfrom->nVersion >= COMPACTBLOCKS_VERSION)
     {
         bool fHighBandwidth = false;
         uint64_t nVersion = 0;
