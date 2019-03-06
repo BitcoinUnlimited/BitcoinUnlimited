@@ -803,7 +803,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
     }
 
-    // Processing this message type for statistics purposes only, BU currently doesn't support CB protocol
     // Ignore this message if sent from a node advertising a version earlier than the first CB release (70014)
     else if (strCommand == NetMsgType::SENDCMPCT && pfrom->nVersion >= 70014)
     {
