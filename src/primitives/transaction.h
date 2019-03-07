@@ -233,10 +233,10 @@ public:
     bool IsEquivalentTo(const CTransaction &tx) const;
 
     //* Return true if this transaction contains at least one OP_RETURN output.
-    bool HasData();
+    bool HasData() const;
     //* Return true if this transaction contains at least one OP_RETURN output, with the specified data ID
     // the data ID is defined as a 4 byte pushdata containing a little endian 4 byte integer.
-    bool HasData(uint32_t dataID);
+    bool HasData(uint32_t dataID) const;
 
     // Return sum of txouts.
     CAmount GetValueOut() const;
