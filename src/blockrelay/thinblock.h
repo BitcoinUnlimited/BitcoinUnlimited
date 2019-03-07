@@ -26,6 +26,10 @@ class CNode;
 
 class CThinBlock
 {
+private:
+    // memory only
+    mutable uint64_t nSize; // Serialized thinblock size in bytes
+
 public:
     CBlockHeader header;
     std::vector<uint256> vTxHashes; // List of all transaction ids in the block
@@ -33,7 +37,7 @@ public:
 
 public:
     CThinBlock(const CBlock &block, const CBloomFilter &filter);
-    CThinBlock() {}
+    CThinBlock() : nSize(0) {}
     /**
      * Handle an incoming thin block.  The block is fully validated, and if any transactions are missing, we fall
      * back to requesting a full block.
@@ -54,11 +58,22 @@ public:
     }
 
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, int nSizeThinBlock);
+    bool process(CNode *pfrom);
+
+    uint64_t GetSize() const
+    {
+        if (nSize == 0)
+            nSize = ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+        return nSize;
+    }
 };
 
 class CXThinBlock
 {
+private:
+    // memory only
+    mutable uint64_t nSize; // Serialized thinblock size in bytes
+
 public:
     CBlockHeader header;
     std::vector<uint64_t> vTxHashes; // List of all transaction ids in the block
@@ -69,7 +84,7 @@ public:
     // Use the filter to determine which txns the client has
     CXThinBlock(const CBlock &block, const CBloomFilter *filter);
     CXThinBlock(const CBlock &block); // Assume client has all of the transactions (except coinbase)
-    CXThinBlock() {}
+    CXThinBlock() : nSize(0), collision(false){}
     /**
      * Handle an incoming Xthin or Xpedited block
      * Once the block is validated apart from the Merkle root, forward the Xpedited block with a hop count of nHops.
@@ -93,8 +108,15 @@ public:
         READWRITE(vMissingTx);
     }
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, int nSizeThinbBlock, std::string strCommand);
+    bool process(CNode *pfrom, std::string strCommand);
     bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state);
+
+    uint64_t GetSize() const
+    {
+        if (nSize == 0)
+            nSize = ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+        return nSize;
+    }
 };
 
 // This class is used to respond to requests for missing transactions after sending an XThin block.

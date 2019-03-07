@@ -17,6 +17,9 @@ const uint32_t BASE_VERSION = 0x20000000;
 const uint32_t FORK_BIT_2MB = 0x10000000; // Vote for 2MB fork
 const bool DEFAULT_2MB_VOTE = false;
 
+class CXThinBlock;
+class CThinBlock;
+
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
  * requirements.  When they solve the proof-of-work, they broadcast the block
@@ -75,12 +78,16 @@ private:
 
 public:
     // Xpress Validation: (memory only)
-    // However Orphans or Missing transactions that have been re-requested must be verifed
-    // because their inputs have never been checked.
+    // Orphans, or Missing transactions that have been re-requested, are stored here.
     std::set<uint256> setUnVerifiedTxns;
 
     // Xpress Validation: (memory only)
     bool fXVal;
+
+public:
+    // thinrelay block types
+    std::shared_ptr<CThinBlock> thinblock;
+    std::shared_ptr<CXThinBlock> xthinblock;
 
 public:
     // network and disk

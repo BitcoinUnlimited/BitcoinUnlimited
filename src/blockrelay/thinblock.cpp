@@ -33,7 +33,7 @@
 
 static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount);
 
-CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter)
+CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter) : nSize(0)
 {
     header = block.GetBlockHeader();
 
@@ -59,8 +59,12 @@ CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter)
  */
 bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
-    CThinBlock thinBlock;
-    vRecv >> thinBlock;
+    // Deserialize and store thinblock
+    CThinBlock temp;
+    vRecv >> temp;
+    pfrom->thinBlock.thinblock = std::make_shared<CThinBlock>(std::forward<CThinBlock>(temp));
+
+    CThinBlock &thinBlock = *pfrom->thinBlock.thinblock;
 
     // Message consistency checking
     if (!IsThinBlockValid(pfrom, thinBlock.vMissingTx, thinBlock.header))
@@ -85,9 +89,8 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
 
     CInv inv(MSG_BLOCK, thinBlock.header.GetHash());
-    int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);
     LOG(THIN, "received thinblock %s from peer %s of %d bytes\n", inv.hash.ToString(), pfrom->GetLogName(),
-        nSizeThinBlock);
+        thinBlock.GetSize());
 
     // Ban a node for sending unrequested thinblocks unless from an expedited node.
     {
@@ -109,13 +112,12 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         return true;
     }
 
-    return thinBlock.process(pfrom, nSizeThinBlock);
+    return thinBlock.process(pfrom);
 }
 
-bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
+bool CThinBlock::process(CNode *pfrom)
 {
     thindata.ClearThinBlockData(pfrom);
-    pfrom->nSizeThinBlock = nSizeThinBlock;
 
     pfrom->thinBlock.nVersion = header.nVersion;
     pfrom->thinBlock.nBits = header.nBits;
@@ -164,13 +166,13 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
         pfrom->thinBlockWaitingForTxns = -1;
         int blockSize = pfrom->thinBlock.GetBlockSize();
         float nCompressionRatio = 0.0;
-        if (nSizeThinBlock > 0)
-            nCompressionRatio = (float)blockSize / (float)nSizeThinBlock;
+        if (this->GetSize() > 0)
+            nCompressionRatio = (float)blockSize / (float)this->GetSize();
         LOG(THIN, "Reassembled thinblock for %s (%d bytes). Message was %d bytes, compression ratio %3.2f peer=%s\n",
-            pfrom->thinBlock.GetHash().ToString(), blockSize, nSizeThinBlock, nCompressionRatio, pfrom->GetLogName());
+            pfrom->thinBlock.GetHash().ToString(), blockSize, this->GetSize(), nCompressionRatio, pfrom->GetLogName());
 
         // Update run-time statistics of thin block bandwidth savings
-        thindata.UpdateInBound(nSizeThinBlock, blockSize);
+        thindata.UpdateInBound(this->GetSize(), blockSize);
         LOG(THIN, "thin block stats: %s\n", thindata.ToString());
 
         // create a non-deleting shared pointer to wrap pfrom->thinBlock.  We know that thinBlock will outlast the
@@ -193,7 +195,7 @@ bool CThinBlock::process(CNode *pfrom, int nSizeThinBlock)
 }
 
 
-CXThinBlock::CXThinBlock(const CBlock &block, const CBloomFilter *filter)
+CXThinBlock::CXThinBlock(const CBlock &block, const CBloomFilter *filter) : nSize(0), collision(false)
 {
     header = block.GetBlockHeader();
     this->collision = false;
@@ -220,7 +222,7 @@ CXThinBlock::CXThinBlock(const CBlock &block, const CBloomFilter *filter)
     }
 }
 
-CXThinBlock::CXThinBlock(const CBlock &block)
+CXThinBlock::CXThinBlock(const CBlock &block) : nSize(0), collision(false)
 {
     header = block.GetBlockHeader();
     this->collision = false;
@@ -367,13 +369,13 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         int blockSize = pfrom->thinBlock.GetBlockSize();
         LOG(THIN, "Reassembled xblocktx for %s (%d bytes). Message was %d bytes (thinblock) and %d bytes "
                   "(re-requested tx), compression ratio %3.2f, peer=%s\n",
-            pfrom->thinBlock.GetHash().ToString(), blockSize, pfrom->nSizeThinBlock, nSizeThinBlockTx,
-            ((float)blockSize) / ((float)pfrom->nSizeThinBlock + (float)nSizeThinBlockTx), pfrom->GetLogName());
+            pfrom->thinBlock.GetHash().ToString(), blockSize, pfrom->thinBlock.xthinblock->GetSize(), nSizeThinBlockTx,
+            ((float)blockSize) / ((float)pfrom->thinBlock.xthinblock->GetSize() + (float)nSizeThinBlockTx), pfrom->GetLogName());
 
         // Update run-time statistics of thin block bandwidth savings.
         // We add the original thinblock size with the size of transactions that were re-requested.
         // This is NOT double counting since we never accounted for the original thinblock due to the re-request.
-        thindata.UpdateInBound(nSizeThinBlockTx + pfrom->nSizeThinBlock, blockSize);
+        thindata.UpdateInBound(nSizeThinBlockTx + pfrom->thinBlock.xthinblock->GetSize(), blockSize);
         LOG(THIN, "thin block stats: %s\n", thindata.ToString());
 
         // create a non-deleting shared pointer to wrap pfrom->thinBlock.  We know that thinBlock will outlast the
@@ -465,12 +467,13 @@ bool CXThinBlock::CheckBlockHeader(const CBlockHeader &block, CValidationState &
  */
 bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string strCommand, unsigned nHops)
 {
-    int nSizeThinBlock = vRecv.size();
+    // Deserialize and store xthinblock
+    CXThinBlock temp;
+    vRecv >> temp;
+    pfrom->thinBlock.xthinblock = std::make_shared<CXThinBlock>(std::forward<CXThinBlock>(temp));
+
+    CXThinBlock &thinBlock = *pfrom->thinBlock.xthinblock;
     CInv inv(MSG_BLOCK, uint256());
-
-    CXThinBlock thinBlock;
-    vRecv >> thinBlock;
-
     {
         // Message consistency checking (FIXME: some redundancy here with AcceptBlockHeader)
         if (!IsThinBlockValid(pfrom, thinBlock.vMissingTx, thinBlock.header))
@@ -519,7 +522,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
             thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
             LOG(THIN, "Received xthinblock but returning because we already have block data %s from peer %s hop"
                       " %d size %d bytes\n",
-                inv.hash.ToString(), pfrom->GetLogName(), nHops, nSizeThinBlock);
+                inv.hash.ToString(), pfrom->GetLogName(), nHops, thinBlock.GetSize());
             return true;
         }
 
@@ -541,12 +544,12 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
                 return true;
 
             LOG(THIN, "Received new expedited %s %s from peer %s hop %d size %d bytes\n", strCommand,
-                inv.hash.ToString(), pfrom->GetLogName(), nHops, nSizeThinBlock);
+                inv.hash.ToString(), pfrom->GetLogName(), nHops, thinBlock.GetSize());
         }
         else
         {
             LOG(THIN, "Received %s %s from peer %s. Size %d bytes.\n", strCommand, inv.hash.ToString(),
-                pfrom->GetLogName(), nSizeThinBlock);
+                pfrom->GetLogName(), thinBlock.GetSize());
 
             // Do not process unrequested xthinblocks unless from an expedited node.
             if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::XTHINBLOCK) && !connmgr->IsExpeditedUpstream(pfrom))
@@ -561,12 +564,11 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
     // Send expedited block without checking merkle root.
     SendExpeditedBlock(thinBlock, nHops, pfrom);
 
-    return thinBlock.process(pfrom, nSizeThinBlock, strCommand);
+    return thinBlock.process(pfrom, strCommand);
 }
 
-bool CXThinBlock::process(CNode *pfrom,
-    int nSizeThinBlock,
-    std::string strCommand) // TODO: request from the "best" txn source not necessarily from the block source
+bool CXThinBlock::process(CNode *pfrom, std::string strCommand)
+// TODO: request from the "best" txn source not necessarily from the block source
 {
     // In PV we must prevent two thinblocks from simulaneously processing from that were recieved from the
     // same peer. This would only happen as in the example of an expedited block coming in
@@ -575,7 +577,6 @@ bool CXThinBlock::process(CNode *pfrom,
         return false;
 
     thindata.ClearThinBlockData(pfrom);
-    pfrom->nSizeThinBlock = nSizeThinBlock;
 
     pfrom->thinBlock.nVersion = header.nVersion;
     pfrom->thinBlock.nBits = header.nBits;
@@ -726,11 +727,11 @@ bool CXThinBlock::process(CNode *pfrom,
     pfrom->thinBlockWaitingForTxns = -1;
     int blockSize = pfrom->thinBlock.GetBlockSize();
     LOG(THIN, "Reassembled xthinblock for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
-        pfrom->thinBlock.GetHash().ToString(), blockSize, pfrom->nSizeThinBlock,
-        ((float)blockSize) / ((float)pfrom->nSizeThinBlock), pfrom->GetLogName());
+        pfrom->thinBlock.GetHash().ToString(), blockSize, pfrom->thinBlock.xthinblock->GetSize(),
+        ((float)blockSize) / ((float)pfrom->thinBlock.xthinblock->GetSize()), pfrom->GetLogName());
 
     // Update run-time statistics of thin block bandwidth savings
-    thindata.UpdateInBound(pfrom->nSizeThinBlock, blockSize);
+    thindata.UpdateInBound(pfrom->thinBlock.xthinblock->GetSize(), blockSize);
     LOG(THIN, "thin block stats: %s\n", thindata.ToString().c_str());
 
     // Process the full block
@@ -1348,8 +1349,9 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
             LOCK(pfrom->cs_filter);
             xThinBlock = CXThinBlock(*pblock, pfrom->pThinBlockFilter);
         }
-        int nSizeBlock = pblock->GetBlockSize();
+
         // If there is a cheapHash collision in this block then send a normal thinblock
+        uint64_t nSizeBlock = pblock->GetBlockSize();
         if (xThinBlock.collision == true)
         {
             CThinBlock thinBlock;
@@ -1357,37 +1359,35 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
                 LOCK(pfrom->cs_filter);
                 thinBlock = CThinBlock(*pblock, *pfrom->pThinBlockFilter);
             }
-            int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);
-            if (nSizeThinBlock < nSizeBlock)
+            if (thinBlock.GetSize() < nSizeBlock)
             {
                 pfrom->PushMessage(NetMsgType::THINBLOCK, thinBlock);
-                thindata.UpdateOutBound(nSizeThinBlock, nSizeBlock);
+                thindata.UpdateOutBound(thinBlock.GetSize(), nSizeBlock);
                 LOG(THIN, "TX HASH COLLISION: Sent thinblock - size: %d vs block size: %d => tx hashes: %d "
                           "transactions: %d  peer: %s\n",
-                    nSizeThinBlock, nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(),
+                    thinBlock.GetSize(), nSizeBlock, thinBlock.vTxHashes.size(), thinBlock.vMissingTx.size(),
                     pfrom->GetLogName());
             }
             else
             {
                 pfrom->PushMessage(NetMsgType::BLOCK, *pblock);
-                LOG(THIN, "Sent regular block instead - xthinblock size: %d vs block size: %d => tx hashes: %d "
+                LOG(THIN, "Sent regular block instead - thinblock size: %d vs block size: %d => tx hashes: %d "
                           "transactions: %d  peer: %s\n",
-                    nSizeThinBlock, nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(),
+                    thinBlock.GetSize(), nSizeBlock, thinBlock.vTxHashes.size(), thinBlock.vMissingTx.size(),
                     pfrom->GetLogName());
             }
         }
         else // Send an xThinblock
         {
-            // Only send a thinblock if smaller than a regular block
-            int nSizeThinBlock = ::GetSerializeSize(xThinBlock, SER_NETWORK, PROTOCOL_VERSION);
-            if (nSizeThinBlock < nSizeBlock)
+            // Only send an xthinblock if smaller than a regular block
+            if (xThinBlock.GetSize() < nSizeBlock)
             {
-                thindata.UpdateOutBound(nSizeThinBlock, nSizeBlock);
+                thindata.UpdateOutBound(xThinBlock.GetSize(), nSizeBlock);
                 pfrom->PushMessage(NetMsgType::XTHINBLOCK, xThinBlock);
                 LOG(THIN, "Sent xthinblock - size: %d vs block size: %d => tx hashes: %d transactions: %d peer: %s\n",
-                    nSizeThinBlock, nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(),
+                    xThinBlock.GetSize(), nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(),
                     pfrom->GetLogName());
-                thindata.UpdateThinBlock(nSizeThinBlock);
+                thindata.UpdateThinBlock(xThinBlock.GetSize());
                 thindata.UpdateFullTx(::GetSerializeSize(xThinBlock.vMissingTx, SER_NETWORK, PROTOCOL_VERSION));
             }
             else
@@ -1395,7 +1395,7 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
                 pfrom->PushMessage(NetMsgType::BLOCK, *pblock);
                 LOG(THIN, "Sent regular block instead - xthinblock size: %d vs block size: %d => tx hashes: %d "
                           "transactions: %d  peer: %s\n",
-                    nSizeThinBlock, nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(),
+                    xThinBlock.GetSize(), nSizeBlock, xThinBlock.vTxHashes.size(), xThinBlock.vMissingTx.size(),
                     pfrom->GetLogName());
             }
         }
@@ -1407,14 +1407,14 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
             LOCK(pfrom->cs_filter);
             thinBlock = CThinBlock(*pblock, *pfrom->pThinBlockFilter);
         }
-        int nSizeBlock = pblock->GetBlockSize();
-        int nSizeThinBlock = ::GetSerializeSize(thinBlock, SER_NETWORK, PROTOCOL_VERSION);
-        if (nSizeThinBlock < nSizeBlock)
-        { // Only send a thinblock if smaller than a regular block
-            thindata.UpdateOutBound(nSizeThinBlock, nSizeBlock);
+        uint64_t nSizeBlock = pblock->GetBlockSize();
+        if (thinBlock.GetSize() < nSizeBlock)
+        {
+            // Only send a thinblock if smaller than a regular block
+            thindata.UpdateOutBound(thinBlock.GetSize(), nSizeBlock);
             pfrom->PushMessage(NetMsgType::THINBLOCK, thinBlock);
             LOG(THIN, "Sent thinblock - size: %d vs block size: %d => tx hashes: %d transactions: %d  peer: %s\n",
-                nSizeThinBlock, nSizeBlock, thinBlock.vTxHashes.size(), thinBlock.vMissingTx.size(),
+                thinBlock.GetSize(), nSizeBlock, thinBlock.vTxHashes.size(), thinBlock.vMissingTx.size(),
                 pfrom->GetLogName());
         }
         else
@@ -1422,7 +1422,7 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
             pfrom->PushMessage(NetMsgType::BLOCK, *pblock);
             LOG(THIN, "Sent regular block instead - thinblock size: %d vs block size: %d => tx hashes: %d "
                       "transactions: %d  peer: %s\n",
-                nSizeThinBlock, nSizeBlock, thinBlock.vTxHashes.size(), thinBlock.vMissingTx.size(),
+                thinBlock.GetSize(), nSizeBlock, thinBlock.vTxHashes.size(), thinBlock.vMissingTx.size(),
                 pfrom->GetLogName());
         }
     }

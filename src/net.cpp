@@ -2942,7 +2942,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
 
     // xthinblocks
     nLocalThinBlockBytes = 0;
-    nSizeThinBlock = 0;
     thinBlockWaitingForTxns = -1;
     nXthinBloomfilterSize = 0;
     addrFromPort = 0;

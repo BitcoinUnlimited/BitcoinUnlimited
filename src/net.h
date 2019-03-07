@@ -476,7 +476,6 @@ public:
     std::vector<uint64_t> xThinBlockHashes;
     std::map<uint64_t, CTransactionRef> mapMissingTx;
     uint64_t nLocalThinBlockBytes; // the bytes used in creating this thinblock, updated dynamically
-    int nSizeThinBlock; // Original on-wire size of the block. Just used for reporting
     int thinBlockWaitingForTxns; // if -1 then not currently waiting
     uint32_t nXthinBloomfilterSize; // The maximum xthin bloom filter size (in bytes) that our peer will accept.
     // BUIP010 Xtreme Thinblocks: end section
