@@ -32,16 +32,17 @@ private:
 
 public:
     // memory only
-    mutable unsigned int nWaitingFor;
+    mutable unsigned int nWaitingFor; // number of txns we are still needing to recontruct the block
+    mutable uint64_t nCurrentBlockSize; // In memory block size calculated during reconstruction
 
 public:
     CBlockHeader header;
-    std::vector<uint256> vTxHashes; // List of all transaction ids in the block
+    std::vector<uint256> vTxHashes; // List of all 256 bit transaction ids in the block
     std::vector<CTransaction> vMissingTx; // vector of transactions that did not match the bloom filter
 
 public:
     CThinBlock(const CBlock &block, const CBloomFilter &filter);
-    CThinBlock() : nSize(0), nWaitingFor(0) {}
+    CThinBlock() : nSize(0), nWaitingFor(0), nCurrentBlockSize(0) {}
     /**
      * Handle an incoming thin block.  The block is fully validated, and if any transactions are missing, we fall
      * back to requesting a full block.
@@ -80,8 +81,12 @@ private:
 
 public:
     // memory only
-    mutable unsigned int nWaitingFor;
+    mutable unsigned int nWaitingFor; // number of txns we are still needing to recontruct the block
+    mutable uint64_t nCurrentBlockSize; // In memory block size calculated during reconstruction
     bool collision;
+
+    // memory only
+    std::vector<uint256> vTxHashes256; // List of all 256 bit transaction hashes in the block
 
 public:
     CBlockHeader header;
@@ -92,7 +97,7 @@ public:
     // Use the filter to determine which txns the client has
     CXThinBlock(const CBlock &block, const CBloomFilter *filter);
     CXThinBlock(const CBlock &block); // Assume client has all of the transactions (except coinbase)
-    CXThinBlock() : nSize(0), nWaitingFor(0), collision(false) {}
+    CXThinBlock() : nSize(0), nWaitingFor(0), nCurrentBlockSize(0), collision(false) {}
     /**
      * Handle an incoming Xthin or Xpedited block
      * Once the block is validated apart from the Merkle root, forward the Xpedited block with a hop count of nHops.
