@@ -483,7 +483,7 @@ public:
     CBlock grapheneBlock;
     std::vector<uint256> grapheneBlockHashes;
     std::map<uint64_t, uint32_t> grapheneMapHashOrderIndex;
-    std::map<uint64_t, CTransaction> mapGrapheneMissingTx;
+    std::map<uint64_t, CTransactionRef> mapGrapheneMissingTx;
     uint64_t nLocalGrapheneBlockBytes; // the bytes used in creating this graphene block, updated dynamically
     int nSizeGrapheneBlock; // Original on-wire size of the block. Just used for reporting
     int grapheneBlockWaitingForTxns; // if -1 then not currently waiting

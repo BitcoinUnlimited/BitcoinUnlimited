@@ -190,7 +190,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
     // Because the list of shorttxids is not complete (missing the prefilled transaction hashes), we need
     // to first create the full list of compactblock shortid hashes, in proper order.
     //
-    // Also, create the mapMissingTx from all the supplied tx's in the compact block
+    // Also, create the mapMissingCompactBlockTx from all the supplied tx's in the compact block
 
     // Reconstruct the list of shortid's and in the correct order taking into account the prefilled txns.
     if (prefilledtxn.empty())
@@ -207,7 +207,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
             {
                 uint64_t shorthash = GetShortID(prefilled.tx.GetHash());
                 pfrom->vShortCompactBlockHashes.push_back(shorthash);
-                pfrom->mapMissingTx[shorthash] = MakeTransactionRef(prefilled.tx);
+                pfrom->mapMissingCompactBlockTx[shorthash] = MakeTransactionRef(prefilled.tx);
                 continue;
             }
 
@@ -225,7 +225,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
 
             // Add the prefilled txn and then get the next one
             pfrom->vShortCompactBlockHashes.push_back(GetShortID(prefilled.tx.GetHash()));
-            pfrom->mapMissingTx[GetShortID(prefilled.tx.GetHash())] = MakeTransactionRef(prefilled.tx);
+            pfrom->mapMissingCompactBlockTx[GetShortID(prefilled.tx.GetHash())] = MakeTransactionRef(prefilled.tx);
         }
 
         // Add the remaining shorttxids, if any.
@@ -263,7 +263,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
                 _collision = true;
             mapPartialTxHash[cheapHash] = memPoolHashes[i];
         }
-        for (auto &mi : pfrom->mapMissingTx)
+        for (auto &mi : pfrom->mapMissingCompactBlockTx)
         {
             uint64_t cheapHash = mi.first;
             // Check for cheap hash collision. Only mark as collision if the full hash is not the same,
@@ -356,7 +356,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
     pfrom->compactBlockWaitingForTxns = missingCount;
     LOG(CMPCT, "compactblock waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n",
         pfrom->compactBlockWaitingForTxns, unnecessaryCount, pfrom->compactBlock.vtx.size(),
-        pfrom->mapMissingTx.size());
+        pfrom->mapMissingCompactBlockTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
@@ -500,9 +500,9 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         return true;
     }
 
-    // Create the mapMissingTx from all the supplied tx's in the compactblock
+    // Create the mapMissingCompactBlockTx from all the supplied tx's in the compactblock
     for (const CTransaction &tx : compactReReqResponse.txn)
-        pfrom->mapMissingTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx.GetHash())] = MakeTransactionRef(tx);
+        pfrom->mapMissingCompactBlockTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx.GetHash())] = MakeTransactionRef(tx);
 
     // Get the full hashes from the compactReReqResponse and add them to the compactBlockHashes vector.  These should
     // be all the missing or null hashes that we re-requested.
@@ -513,8 +513,8 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         if (pfrom->vCompactBlockHashes[i].IsNull())
         {
             std::map<uint64_t, CTransactionRef>::iterator val =
-                pfrom->mapMissingTx.find(pfrom->vShortCompactBlockHashes[i]);
-            if (val != pfrom->mapMissingTx.end())
+                pfrom->mapMissingCompactBlockTx.find(pfrom->vShortCompactBlockHashes[i]);
+            if (val != pfrom->mapMissingCompactBlockTx.end())
             {
                 pfrom->vCompactBlockHashes[i] = val->second->GetHash();
             }
@@ -647,7 +647,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             }
 
             uint64_t nShortId = GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash);
-            bool inMissingTx = pfrom->mapMissingTx.count(nShortId) > 0;
+            bool inMissingTx = pfrom->mapMissingCompactBlockTx.count(nShortId) > 0;
             bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
 
             if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx))
@@ -660,7 +660,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             }
             else if (inMissingTx)
             {
-                ptx = pfrom->mapMissingTx[nShortId];
+                ptx = pfrom->mapMissingCompactBlockTx[nShortId];
                 pfrom->compactBlock.setUnVerifiedTxns.insert(hash);
             }
         }
@@ -1042,7 +1042,7 @@ void CCompactBlockData::ClearCompactBlockData(CNode *pnode)
     pnode->compactBlock.SetNull();
     pnode->vCompactBlockHashes.clear();
     pnode->vShortCompactBlockHashes.clear();
-    pnode->mapMissingTx.clear();
+    pnode->mapMissingCompactBlockTx.clear();
 
     LOG(CMPCT, "Total in memory compactblock size after clearing a compactblock is %ld bytes\n",
         compactdata.GetCompactBlockBytes());
