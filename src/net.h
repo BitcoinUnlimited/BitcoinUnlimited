@@ -470,14 +470,14 @@ public:
     bool fShouldBan;
 
     // BUIP010 Xtreme Thinblocks: begin section
+    uint32_t nXthinBloomfilterSize; // The maximum xthin bloom filter size (in bytes) that our peer will accept.
+
     CCriticalSection cs_xthinblock;
     CBlock thinBlock;
     std::vector<uint256> thinBlockHashes;
     std::vector<uint64_t> xThinBlockHashes;
     std::map<uint64_t, CTransactionRef> mapMissingTx;
     uint64_t nLocalThinBlockBytes; // the bytes used in creating this thinblock, updated dynamically
-    int thinBlockWaitingForTxns; // if -1 then not currently waiting
-    uint32_t nXthinBloomfilterSize; // The maximum xthin bloom filter size (in bytes) that our peer will accept.
     // BUIP010 Xtreme Thinblocks: end section
 
     // BUIPXXX Graphene blocks: begin section

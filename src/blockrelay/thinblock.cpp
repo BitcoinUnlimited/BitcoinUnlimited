@@ -33,7 +33,7 @@
 
 static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount);
 
-CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter) : nSize(0)
+CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter) : nSize(0), nWaitingFor(0)
 {
     header = block.GetBlockHeader();
 
@@ -127,6 +127,8 @@ bool CThinBlock::process(CNode *pfrom)
     pfrom->thinBlock.hashPrevBlock = header.hashPrevBlock;
     pfrom->thinBlockHashes = vTxHashes;
 
+    unsigned int &nWaitingForTxns = pfrom->thinBlock.thinblock->nWaitingFor;
+
     // Check that the merkleroot matches the merkleroot calculated from the hashes provided.
     bool mutated;
     uint256 merkleroot = ComputeMerkleRoot(vTxHashes, &mutated);
@@ -150,20 +152,19 @@ bool CThinBlock::process(CNode *pfrom)
         if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
             return false;
 
-        pfrom->thinBlockWaitingForTxns = missingCount;
+        nWaitingForTxns = missingCount;
         LOG(THIN, "Thinblock %s waiting for: %d, unnecessary: %d, total txns: %d received txns: %d peer=%s\n",
-            pfrom->thinBlock.GetHash().ToString(), pfrom->thinBlockWaitingForTxns, unnecessaryCount,
-            pfrom->thinBlock.vtx.size(), pfrom->mapMissingTx.size(), pfrom->GetLogName());
+            pfrom->thinBlock.GetHash().ToString(), nWaitingForTxns, unnecessaryCount, pfrom->thinBlock.vtx.size(),
+            pfrom->mapMissingTx.size(), pfrom->GetLogName());
     } // end lock orphanpool.cs, mempool.cs
     LOG(THIN, "Total in memory thinblockbytes size is %ld bytes\n", thindata.GetThinBlockBytes());
 
     // Clear out data we no longer need before processing block.
     pfrom->thinBlockHashes.clear();
 
-    if (pfrom->thinBlockWaitingForTxns == 0)
+    if (nWaitingForTxns == 0)
     {
         // We have all the transactions now that are in this block: try to reassemble and process.
-        pfrom->thinBlockWaitingForTxns = -1;
         int blockSize = pfrom->thinBlock.GetBlockSize();
         float nCompressionRatio = 0.0;
         if (this->GetSize() > 0)
@@ -179,15 +180,15 @@ bool CThinBlock::process(CNode *pfrom)
         // thread because the thread has a node reference.
         PV->HandleBlockMessage(pfrom, NetMsgType::THINBLOCK, MakeBlockRef(pfrom->thinBlock), GetInv());
     }
-    else if (pfrom->thinBlockWaitingForTxns > 0)
+    else if (nWaitingForTxns > 0)
     {
         // This marks the end of the transactions we've received. If we get this and we have NOT been able to
         // finish reassembling the block, we need to re-request the full regular block
-        LOG(THIN, "Missing %d Thinblock transactions, re-requesting a regular block from peer=%s\n",
-            pfrom->thinBlockWaitingForTxns, pfrom->GetLogName());
+        LOG(THIN, "Missing %d Thinblock transactions, re-requesting a regular block from peer=%s\n", nWaitingForTxns,
+            pfrom->GetLogName());
         thinrelay.RequestBlock(pfrom, header.GetHash());
 
-        thindata.UpdateInBoundReRequestedTx(pfrom->thinBlockWaitingForTxns);
+        thindata.UpdateInBoundReRequestedTx(nWaitingForTxns);
         thindata.ClearThinBlockData(pfrom, header.GetHash());
     }
 
@@ -195,7 +196,7 @@ bool CThinBlock::process(CNode *pfrom)
 }
 
 
-CXThinBlock::CXThinBlock(const CBlock &block, const CBloomFilter *filter) : nSize(0), collision(false)
+CXThinBlock::CXThinBlock(const CBlock &block, const CBloomFilter *filter) : nSize(0), nWaitingFor(0), collision(false)
 {
     header = block.GetBlockHeader();
     this->collision = false;
@@ -370,7 +371,8 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         LOG(THIN, "Reassembled xblocktx for %s (%d bytes). Message was %d bytes (thinblock) and %d bytes "
                   "(re-requested tx), compression ratio %3.2f, peer=%s\n",
             pfrom->thinBlock.GetHash().ToString(), blockSize, pfrom->thinBlock.xthinblock->GetSize(), nSizeThinBlockTx,
-            ((float)blockSize) / ((float)pfrom->thinBlock.xthinblock->GetSize() + (float)nSizeThinBlockTx), pfrom->GetLogName());
+            ((float)blockSize) / ((float)pfrom->thinBlock.xthinblock->GetSize() + (float)nSizeThinBlockTx),
+            pfrom->GetLogName());
 
         // Update run-time statistics of thin block bandwidth savings.
         // We add the original thinblock size with the size of transactions that were re-requested.
@@ -599,6 +601,7 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand)
     std::map<uint64_t, uint256> mapPartialTxHash;
     std::vector<uint256> memPoolHashes;
     std::set<uint64_t> setHashesToRequest;
+    unsigned int &nWaitingForTxns = pfrom->thinBlock.xthinblock->nWaitingFor;
 
     bool fMerkleRootCorrect = true;
     {
@@ -696,20 +699,20 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand)
         return true;
     }
 
-    pfrom->thinBlockWaitingForTxns = missingCount;
-    LOG(THIN, "xthinblock waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n",
-        pfrom->thinBlockWaitingForTxns, unnecessaryCount, pfrom->thinBlock.vtx.size(), pfrom->mapMissingTx.size());
+    nWaitingForTxns = missingCount;
+    LOG(THIN, "xthinblock waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n", nWaitingForTxns,
+        unnecessaryCount, pfrom->thinBlock.vtx.size(), pfrom->mapMissingTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
     if (setHashesToRequest.size() > 0)
     {
-        pfrom->thinBlockWaitingForTxns = setHashesToRequest.size();
+        nWaitingForTxns = setHashesToRequest.size();
         CXRequestThinBlockTx thinBlockTx(header.GetHash(), setHashesToRequest);
         pfrom->PushMessage(NetMsgType::GET_XBLOCKTX, thinBlockTx);
 
         // Update run-time statistics of thin block bandwidth savings
-        thindata.UpdateInBoundReRequestedTx(pfrom->thinBlockWaitingForTxns);
+        thindata.UpdateInBoundReRequestedTx(nWaitingForTxns);
         return true;
     }
 
@@ -724,7 +727,6 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand)
     }
 
     // We now have all the transactions now that are in this block
-    pfrom->thinBlockWaitingForTxns = -1;
     int blockSize = pfrom->thinBlock.GetBlockSize();
     LOG(THIN, "Reassembled xthinblock for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
         pfrom->thinBlock.GetHash().ToString(), blockSize, pfrom->thinBlock.xthinblock->GetSize(),
@@ -1230,7 +1232,6 @@ void CThinBlockData::ClearThinBlockData(CNode *pnode)
     pnode->nLocalThinBlockBytes = 0;
 
     // Clear out thinblock data we no longer need
-    pnode->thinBlockWaitingForTxns = -1;
     pnode->thinBlock.SetNull();
     pnode->xThinBlockHashes.clear();
     pnode->thinBlockHashes.clear();
