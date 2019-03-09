@@ -141,7 +141,7 @@ bool CThinBlock::process(CNode *pfrom)
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
     for (const CTransaction &tx : vMissingTx)
-        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
+        pfrom->thinBlock.thinblock->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     {
         READLOCK(orphanpool.cs);
@@ -154,7 +154,7 @@ bool CThinBlock::process(CNode *pfrom)
         nWaitingForTxns = missingCount;
         LOG(THIN, "Thinblock %s waiting for: %d, unnecessary: %d, total txns: %d received txns: %d peer=%s\n",
             pfrom->thinBlock.GetHash().ToString(), nWaitingForTxns, unnecessaryCount, pfrom->thinBlock.vtx.size(),
-            pfrom->mapMissingTx.size(), pfrom->GetLogName());
+            pfrom->thinBlock.thinblock->mapMissingTx.size(), pfrom->GetLogName());
     } // end lock orphanpool.cs, mempool.cs
     LOG(THIN, "Total in memory thinblockbytes size is %ld bytes\n", thindata.GetThinBlockBytes());
 
@@ -304,7 +304,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
     for (const CTransaction &tx : thinBlockTx.vMissingTx)
-        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
+        pfrom->thinBlock.xthinblock->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     // Get the full hashes from the xblocktx and add them to the thinBlockHashes vector.  These should
     // be all the missing or null hashes that we re-requested.
@@ -315,8 +315,8 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         if (vFullTxHashes[i].IsNull())
         {
             std::map<uint64_t, CTransactionRef>::iterator val =
-                pfrom->mapMissingTx.find(pfrom->thinBlock.xthinblock->vTxHashes[i]);
-            if (val != pfrom->mapMissingTx.end())
+                pfrom->thinBlock.xthinblock->mapMissingTx.find(pfrom->thinBlock.xthinblock->vTxHashes[i]);
+            if (val != pfrom->thinBlock.xthinblock->mapMissingTx.end())
             {
                 vFullTxHashes[i] = val->second->GetHash();
             }
@@ -591,7 +591,7 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand)
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
     for (const CTransaction &tx : vMissingTx)
-        pfrom->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
+        pfrom->thinBlock.xthinblock->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
     // We need to check all transaction sources (orphan list, mempool, and new (incoming) transactions in this block)
@@ -625,7 +625,7 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand)
                 _collision = true;
             mapPartialTxHash[cheapHash] = memPoolHashes[i];
         }
-        for (auto &mi : pfrom->mapMissingTx)
+        for (auto &mi : pfrom->thinBlock.xthinblock->mapMissingTx)
         {
             uint64_t cheapHash = mi.first;
             // Check for cheap hash collision. Only mark as collision if the full hash is not the same,
@@ -703,7 +703,7 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand)
 
     nWaitingForTxns = missingCount;
     LOG(THIN, "xthinblock waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n", nWaitingForTxns,
-        unnecessaryCount, pfrom->thinBlock.vtx.size(), pfrom->mapMissingTx.size());
+        unnecessaryCount, pfrom->thinBlock.vtx.size(), pfrom->thinBlock.xthinblock->mapMissingTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
@@ -780,6 +780,12 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
     uint64_t maxAllowedSize = nTxSize * maxMessageSizeMultiplier * excessiveBlockSize / 158;
 
     // Look for each transaction in our various pools and buffers.
+    std::map<uint64_t, CTransactionRef> *mapMissing;
+    if (strCommand == NetMsgType::XTHINBLOCK)
+        mapMissing = &pfrom->thinBlock.xthinblock->mapMissingTx;
+    else
+        mapMissing = &pfrom->thinBlock.thinblock->mapMissingTx;
+
     for (const uint256 &hash : *vHashes)
     {
         // Replace the truncated hash with the full hash value if it exists
@@ -805,7 +811,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
                     inMemPool = true;
             }
 
-            bool inMissingTx = pfrom->mapMissingTx.count(hash.GetCheapHash()) > 0;
+            bool inMissingTx = mapMissing->count(hash.GetCheapHash()) > 0;
             bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
 
             if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx))
@@ -818,7 +824,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             }
             else if (inMissingTx)
             {
-                ptx = pfrom->mapMissingTx[hash.GetCheapHash()];
+                ptx = (*mapMissing)[hash.GetCheapHash()];
                 pfrom->thinBlock.setUnVerifiedTxns.insert(hash);
             }
         }
@@ -1240,7 +1246,6 @@ void CThinBlockData::ClearThinBlockData(CNode *pnode)
 
     // Clear out thinblock data we no longer need
     pnode->thinBlock.SetNull();
-    pnode->mapMissingTx.clear();
 
     LOG(THIN, "Total in memory thinblockbytes size after clearing a thinblock is %ld bytes\n",
         thindata.GetThinBlockBytes());

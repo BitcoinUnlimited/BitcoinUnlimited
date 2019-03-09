@@ -35,6 +35,8 @@ public:
     mutable unsigned int nWaitingFor; // number of txns we are still needing to recontruct the block
     mutable uint64_t nCurrentBlockSize; // In memory block size calculated during reconstruction
 
+    std::map<uint64_t, CTransactionRef> mapMissingTx;
+
 public:
     CBlockHeader header;
     std::vector<uint256> vTxHashes; // List of all 256 bit transaction ids in the block
@@ -87,6 +89,7 @@ public:
 
     // memory only
     std::vector<uint256> vTxHashes256; // List of all 256 bit transaction hashes in the block
+    std::map<uint64_t, CTransactionRef> mapMissingTx;
 
 public:
     CBlockHeader header;

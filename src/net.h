@@ -474,7 +474,6 @@ public:
 
     CCriticalSection cs_xthinblock;
     CBlock thinBlock;
-    std::map<uint64_t, CTransactionRef> mapMissingTx;
     uint64_t nLocalThinBlockBytes; // the bytes used in creating this thinblock, updated dynamically
     // BUIP010 Xtreme Thinblocks: end section
 
