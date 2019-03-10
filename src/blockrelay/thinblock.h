@@ -33,7 +33,6 @@ private:
 public:
     // memory only
     mutable unsigned int nWaitingFor; // number of txns we are still needing to recontruct the block
-    mutable uint64_t nCurrentBlockSize; // In memory block size calculated during reconstruction
 
     std::map<uint64_t, CTransactionRef> mapMissingTx;
 
@@ -44,7 +43,7 @@ public:
 
 public:
     CThinBlock(const CBlock &block, const CBloomFilter &filter);
-    CThinBlock() : nSize(0), nWaitingFor(0), nCurrentBlockSize(0) {}
+    CThinBlock() : nSize(0), nWaitingFor(0) {}
     /**
      * Handle an incoming thin block.  The block is fully validated, and if any transactions are missing, we fall
      * back to requesting a full block.
@@ -84,7 +83,7 @@ private:
 public:
     // memory only
     mutable unsigned int nWaitingFor; // number of txns we are still needing to recontruct the block
-    mutable uint64_t nCurrentBlockSize; // In memory block size calculated during reconstruction
+    uint64_t nBlockBytes; // the bytes used in re-assembling the block, updated dynamically
     bool collision;
 
     // memory only
@@ -100,7 +99,7 @@ public:
     // Use the filter to determine which txns the client has
     CXThinBlock(const CBlock &block, const CBloomFilter *filter);
     CXThinBlock(const CBlock &block); // Assume client has all of the transactions (except coinbase)
-    CXThinBlock() : nSize(0), nWaitingFor(0), nCurrentBlockSize(0), collision(false) {}
+    CXThinBlock() : nSize(0), nWaitingFor(0), collision(false) {}
     /**
      * Handle an incoming Xthin or Xpedited block
      * Once the block is validated apart from the Merkle root, forward the Xpedited block with a hop count of nHops.
@@ -317,8 +316,8 @@ public:
     void ClearThinBlockData(CNode *pfrom, const uint256 &hash);
     void ClearThinBlockStats();
 
-    uint64_t AddThinBlockBytes(uint64_t, CNode *pfrom);
-    void DeleteThinBlockBytes(uint64_t, CNode *pfrom);
+    uint64_t AddThinBlockBytes(uint64_t bytes, CNode *pfrom);
+    void DeleteThinBlockBytes(uint64_t bytes);
     void ResetThinBlockBytes();
     uint64_t GetThinBlockBytes();
 

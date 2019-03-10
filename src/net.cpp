@@ -2941,9 +2941,15 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nMinPingUsecTime = std::numeric_limits<int64_t>::max();
 
     // xthinblocks
-    nLocalThinBlockBytes = 0;
     nXthinBloomfilterSize = 0;
     addrFromPort = 0;
+
+    // Initialize the pointers held in CBlock. We have to do this here rather than in the CBlock
+    // constructor.
+    CXThinBlock xthin;
+    CThinBlock thin;
+    thinBlock.xthinblock = std::make_shared<CXThinBlock>(std::forward<CXThinBlock>(xthin));
+    thinBlock.thinblock = std::make_shared<CThinBlock>(std::forward<CThinBlock>(thin));
 
     // graphene
     nLocalGrapheneBlockBytes = 0;

@@ -85,9 +85,12 @@ public:
     bool fXVal;
 
 public:
-    // thinrelay block types
+    // thinrelay block types: (memory only)
     std::shared_ptr<CThinBlock> thinblock;
     std::shared_ptr<CXThinBlock> xthinblock;
+
+    // Track the current block size during reconstruction: (memory only)
+    uint64_t nCurrentBlockSize;
 
 public:
     // network and disk
@@ -179,6 +182,7 @@ public:
         fExcessive = false;
         fXVal = false;
         nBlockSize = 0;
+        nCurrentBlockSize = 0;
     }
 
     CBlockHeader GetBlockHeader() const
