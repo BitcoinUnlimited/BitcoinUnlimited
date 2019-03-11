@@ -45,29 +45,30 @@ BOOST_AUTO_TEST_CASE(test_thinblock_byte_tracking)
 
     CAddress addr1(ipaddress(0xa0b0c001, 10000));
     CNode dummyNode1(INVALID_SOCKET, addr1, "", true);
- 
+
     CXThinBlock xthin;
-    dummyNode1.thinBlock.xthinblock = std::make_shared<CXThinBlock>(xthin);
+    std::shared_ptr<CBlock_ThinRelay> pblock = std::make_shared<CBlock_ThinRelay>(CBlock_ThinRelay());
+    pblock->xthinblock = std::make_shared<CXThinBlock>(xthin);
 
     thindata.ResetThinBlockBytes();
     BOOST_CHECK(0 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(0 == dummyNode1.thinBlock.nCurrentBlockSize);
+    BOOST_CHECK(0 == pblock->nCurrentBlockSize);
 
-    thindata.AddThinBlockBytes(0, &dummyNode1);
+    thindata.AddThinBlockBytes(0, pblock);
     BOOST_CHECK(0 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(0 == dummyNode1.thinBlock.nCurrentBlockSize);
+    BOOST_CHECK(0 == pblock->nCurrentBlockSize);
 
-    thindata.AddThinBlockBytes(1000, &dummyNode1);
+    thindata.AddThinBlockBytes(1000, pblock);
     BOOST_CHECK(1000 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(1000 == dummyNode1.thinBlock.nCurrentBlockSize);
+    BOOST_CHECK(1000 == pblock->nCurrentBlockSize);
 
-    thindata.AddThinBlockBytes(449932, &dummyNode1);
+    thindata.AddThinBlockBytes(449932, pblock);
     BOOST_CHECK(450932 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(450932 == dummyNode1.thinBlock.nCurrentBlockSize);
+    BOOST_CHECK(450932 == pblock->nCurrentBlockSize);
 
     thindata.DeleteThinBlockBytes(0);
     BOOST_CHECK(450932 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(450932 == dummyNode1.thinBlock.nCurrentBlockSize);
+    BOOST_CHECK(450932 == pblock->nCurrentBlockSize);
 
     thindata.DeleteThinBlockBytes(1);
     BOOST_CHECK(450931 == thindata.GetThinBlockBytes());
@@ -89,10 +90,11 @@ BOOST_AUTO_TEST_CASE(test_thinblock_byte_tracking)
 
     CAddress addr2(ipaddress(0xa0b0c002, 10000));
     CNode dummyNode2(INVALID_SOCKET, addr2, "", true);
+    pblock->SetNull();
 
-    thindata.AddThinBlockBytes(1000, &dummyNode2);
+    thindata.AddThinBlockBytes(1000, pblock);
     BOOST_CHECK(437992 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(1000 == dummyNode2.thinBlock.nCurrentBlockSize);
+    BOOST_CHECK(1000 == pblock->nCurrentBlockSize);
 
     thindata.DeleteThinBlockBytes(0);
     BOOST_CHECK(437992 == thindata.GetThinBlockBytes());

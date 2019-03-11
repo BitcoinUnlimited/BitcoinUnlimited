@@ -12,6 +12,7 @@
 
 class CNode;
 class uint256;
+class CBlock_ThinRelay;
 
 struct CThinTypeBlockInFlight
 {
@@ -25,6 +26,7 @@ class ThinTypeRelay
 {
 public:
     CCriticalSection cs_inflight;
+    CCriticalSection cs_reconstruct;
 
 private:
     // block relay timer
@@ -33,6 +35,10 @@ private:
 
     // thin type blocks in flight and the time they were requested.
     std::multimap<const NodeId, CThinTypeBlockInFlight> mapThinTypeBlocksInFlight GUARDED_BY(cs_inflight);
+
+    // blocks that are currently being reconstructed.
+    std::map<NodeId, std::pair<uint256, std::shared_ptr<CBlock_ThinRelay> > > mapBlocksReconstruct GUARDED_BY(
+        cs_reconstruct);
 
     // put a cap on the total number of thin type blocks we can have in flight. This lowers any possible
     // attack surface.
@@ -57,6 +63,12 @@ public:
     void ClearBlockInFlight(CNode *pfrom, const uint256 &hash);
     void CheckForDownloadTimeout(CNode *pfrom);
     void RequestBlock(CNode *pfrom, const uint256 &hash);
+
+    // Accessor methods to the blocks that we're reconstructing from thintype blocks such as
+    // xthins or graphene.
+    std::shared_ptr<CBlock_ThinRelay> SetBlockToReconstruct(CNode *pfrom, const uint256 &hash);
+    std::shared_ptr<CBlock_ThinRelay> GetBlockToReconstruct(CNode *pfrom);
+    void ClearBlockToReconstruct(CNode *pfrom);
 };
 extern ThinTypeRelay thinrelay;
 

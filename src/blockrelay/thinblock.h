@@ -64,7 +64,7 @@ public:
     }
 
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom);
+    bool process(CNode *pfrom, std::shared_ptr<CBlock_ThinRelay> &pblock);
 
     uint64_t GetSize() const
     {
@@ -123,7 +123,7 @@ public:
         READWRITE(vMissingTx);
     }
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, std::string strCommand);
+    bool process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlock_ThinRelay> &pblock);
     bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state);
 
     uint64_t GetSize() const
@@ -312,11 +312,11 @@ public:
     std::string ThinBlockToString();
     std::string FullTxToString();
 
-    void ClearThinBlockData(CNode *pfrom);
-    void ClearThinBlockData(CNode *pfrom, const uint256 &hash);
+    void ClearThinBlockBytes(std::shared_ptr<CBlock_ThinRelay> &pblock);
+    void ClearThinBlockData(CNode *pnode, std::shared_ptr<CBlock_ThinRelay> &pblock);
     void ClearThinBlockStats();
 
-    uint64_t AddThinBlockBytes(uint64_t bytes, CNode *pfrom);
+    uint64_t AddThinBlockBytes(uint64_t bytes, std::shared_ptr<CBlock_ThinRelay> &pblock);
     void DeleteThinBlockBytes(uint64_t bytes);
     void ResetThinBlockBytes();
     uint64_t GetThinBlockBytes();

@@ -31,7 +31,11 @@
 #include "validation/validation.h"
 #include "xversionkeys.h"
 
-static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount, const std::vector<uint256> &vHashes);
+static bool ReconstructBlock(CNode *pfrom,
+    int &missingCount,
+    int &unnecessaryCount,
+    const std::vector<uint256> &vHashes,
+    std::shared_ptr<CBlock_ThinRelay> &pblock);
 
 CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter) : nSize(0), nWaitingFor(0)
 {
@@ -60,11 +64,12 @@ CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter) : nSize(
 bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
     // Deserialize and store thinblock
-    CThinBlock temp;
-    vRecv >> temp;
-    pfrom->thinBlock.thinblock = std::make_shared<CThinBlock>(std::forward<CThinBlock>(temp));
+    CThinBlock tmp;
+    vRecv >> tmp;
+    auto pblock = thinrelay.SetBlockToReconstruct(pfrom, tmp.header.GetHash());
+    pblock->thinblock = std::make_shared<CThinBlock>(std::forward<CThinBlock>(tmp));
 
-    CThinBlock &thinBlock = *pfrom->thinBlock.thinblock;
+    CThinBlock &thinBlock = *pblock->thinblock;
 
     // Message consistency checking
     if (!IsThinBlockValid(pfrom, thinBlock.vMissingTx, thinBlock.header))
@@ -105,35 +110,33 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (AlreadyHaveBlock(inv))
     {
         requester.AlreadyReceived(pfrom, inv);
-        thindata.ClearThinBlockData(pfrom, inv.hash);
+        thindata.ClearThinBlockData(pfrom, pblock);
 
         LOG(THIN, "Received thinblock but returning because we already have this block %s on disk, peer=%s\n",
             inv.hash.ToString(), pfrom->GetLogName());
         return true;
     }
 
-    return thinBlock.process(pfrom);
+    return thinBlock.process(pfrom, pblock);
 }
 
-bool CThinBlock::process(CNode *pfrom)
+bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlock_ThinRelay> &pblock)
 {
-    thindata.ClearThinBlockData(pfrom);
+    pblock->nVersion = header.nVersion;
+    pblock->nBits = header.nBits;
+    pblock->nNonce = header.nNonce;
+    pblock->nTime = header.nTime;
+    pblock->hashMerkleRoot = header.hashMerkleRoot;
+    pblock->hashPrevBlock = header.hashPrevBlock;
 
-    pfrom->thinBlock.nVersion = header.nVersion;
-    pfrom->thinBlock.nBits = header.nBits;
-    pfrom->thinBlock.nNonce = header.nNonce;
-    pfrom->thinBlock.nTime = header.nTime;
-    pfrom->thinBlock.hashMerkleRoot = header.hashMerkleRoot;
-    pfrom->thinBlock.hashPrevBlock = header.hashPrevBlock;
-
-    unsigned int &nWaitingForTxns = pfrom->thinBlock.thinblock->nWaitingFor;
+    unsigned int &nWaitingForTxns = pblock->thinblock->nWaitingFor;
 
     // Check that the merkleroot matches the merkleroot calculated from the hashes provided.
     bool mutated;
     uint256 merkleroot = ComputeMerkleRoot(vTxHashes, &mutated);
     if (header.hashMerkleRoot != merkleroot || mutated)
     {
-        thindata.ClearThinBlockData(pfrom, header.GetHash());
+        thindata.ClearThinBlockData(pfrom, pblock);
 
         dosMan.Misbehaving(pfrom, 100);
         return error("Thinblock merkle root does not match computed merkle root, peer=%s", pfrom->GetLogName());
@@ -141,43 +144,43 @@ bool CThinBlock::process(CNode *pfrom)
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
     for (const CTransaction &tx : vMissingTx)
-        pfrom->thinBlock.thinblock->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
+        pblock->thinblock->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     {
         READLOCK(orphanpool.cs);
         int missingCount = 0;
         int unnecessaryCount = 0;
 
-        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pfrom->thinBlock.thinblock->vTxHashes))
+        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock->thinblock->vTxHashes, pblock))
             return false;
 
         nWaitingForTxns = missingCount;
         LOG(THIN, "Thinblock %s waiting for: %d, unnecessary: %d, total txns: %d received txns: %d peer=%s\n",
-            pfrom->thinBlock.GetHash().ToString(), nWaitingForTxns, unnecessaryCount, pfrom->thinBlock.vtx.size(),
-            pfrom->thinBlock.thinblock->mapMissingTx.size(), pfrom->GetLogName());
+            pblock->GetHash().ToString(), nWaitingForTxns, unnecessaryCount, pblock->vtx.size(),
+            pblock->thinblock->mapMissingTx.size(), pfrom->GetLogName());
     } // end lock orphanpool.cs, mempool.cs
     LOG(THIN, "Total in memory thinblockbytes size is %ld bytes\n", thindata.GetThinBlockBytes());
 
     // Clear out data we no longer need before processing block.
-    pfrom->thinBlock.thinblock->vTxHashes.clear();
+    pblock->thinblock->vTxHashes.clear();
 
     if (nWaitingForTxns == 0)
     {
         // We have all the transactions now that are in this block: try to reassemble and process.
-        int blockSize = pfrom->thinBlock.GetBlockSize();
+        int blockSize = pblock->GetBlockSize();
         float nCompressionRatio = 0.0;
         if (this->GetSize() > 0)
             nCompressionRatio = (float)blockSize / (float)this->GetSize();
         LOG(THIN, "Reassembled thinblock for %s (%d bytes). Message was %d bytes, compression ratio %3.2f peer=%s\n",
-            pfrom->thinBlock.GetHash().ToString(), blockSize, this->GetSize(), nCompressionRatio, pfrom->GetLogName());
+            pblock->GetHash().ToString(), blockSize, this->GetSize(), nCompressionRatio, pfrom->GetLogName());
 
         // Update run-time statistics of thin block bandwidth savings
         thindata.UpdateInBound(this->GetSize(), blockSize);
         LOG(THIN, "thin block stats: %s\n", thindata.ToString());
 
-        // create a non-deleting shared pointer to wrap pfrom->thinBlock.  We know that thinBlock will outlast the
+        // create a non-deleting shared pointer to wrap pblock->  We know that thinBlock will outlast the
         // thread because the thread has a node reference.
-        PV->HandleBlockMessage(pfrom, NetMsgType::THINBLOCK, MakeBlockRef(pfrom->thinBlock), GetInv());
+        PV->HandleBlockMessage(pfrom, NetMsgType::THINBLOCK, pblock, GetInv());
     }
     else if (nWaitingForTxns > 0)
     {
@@ -188,7 +191,7 @@ bool CThinBlock::process(CNode *pfrom)
         thinrelay.RequestBlock(pfrom, header.GetHash());
 
         thindata.UpdateInBoundReRequestedTx(nWaitingForTxns);
-        thindata.ClearThinBlockData(pfrom, header.GetHash());
+        thindata.ClearThinBlockData(pfrom, pblock);
     }
 
     return true;
@@ -269,11 +272,17 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     CXThinBlockTx thinBlockTx;
     vRecv >> thinBlockTx;
 
+    // Get already partially reconstructed block from memory. This block was created when the xthinblock
+    // was first received.
+    std::shared_ptr<CBlock_ThinRelay> pblock = thinrelay.GetBlockToReconstruct(pfrom);
+    if (pblock == nullptr)
+        return error("No block available to reconstruct for xblocktx");
+
     // Message consistency checking
     CInv inv(MSG_XTHINBLOCK, thinBlockTx.blockhash);
     if (thinBlockTx.vMissingTx.empty() || thinBlockTx.blockhash.IsNull())
     {
-        thindata.ClearThinBlockData(pfrom, inv.hash);
+        thindata.ClearThinBlockData(pfrom, pblock);
 
         dosMan.Misbehaving(pfrom, 100);
         return error("incorrectly constructed xblocktx or inconsistent thinblock data received.  Banning peer=%s",
@@ -295,7 +304,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (AlreadyHaveBlock(inv))
     {
         requester.AlreadyReceived(pfrom, inv);
-        thindata.ClearThinBlockData(pfrom, inv.hash);
+        thindata.ClearThinBlockData(pfrom, pblock);
 
         LOG(THIN, "Received xblocktx but returning because we already have this block %s on disk, peer=%s\n",
             inv.hash.ToString(), pfrom->GetLogName());
@@ -304,19 +313,19 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
     for (const CTransaction &tx : thinBlockTx.vMissingTx)
-        pfrom->thinBlock.xthinblock->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
+        pblock->xthinblock->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     // Get the full hashes from the xblocktx and add them to the thinBlockHashes vector.  These should
     // be all the missing or null hashes that we re-requested.
-    std::vector<uint256> &vFullTxHashes = pfrom->thinBlock.xthinblock->vTxHashes256;
+    std::vector<uint256> &vFullTxHashes = pblock->xthinblock->vTxHashes256;
     int count = 0;
     for (size_t i = 0; i < vFullTxHashes.size(); i++)
     {
         if (vFullTxHashes[i].IsNull())
         {
             std::map<uint64_t, CTransactionRef>::iterator val =
-                pfrom->thinBlock.xthinblock->mapMissingTx.find(pfrom->thinBlock.xthinblock->vTxHashes[i]);
-            if (val != pfrom->thinBlock.xthinblock->mapMissingTx.end())
+                pblock->xthinblock->mapMissingTx.find(pblock->xthinblock->vTxHashes[i]);
+            if (val != pblock->xthinblock->mapMissingTx.end())
             {
                 vFullTxHashes[i] = val->second->GetHash();
             }
@@ -330,9 +339,9 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // root in the block header matches the merkleroot calculated from the hashes provided.
     bool mutated;
     uint256 merkleroot = ComputeMerkleRoot(vFullTxHashes, &mutated);
-    if (pfrom->thinBlock.hashMerkleRoot != merkleroot || mutated)
+    if (pblock->hashMerkleRoot != merkleroot || mutated)
     {
-        thindata.ClearThinBlockData(pfrom, inv.hash);
+        thindata.ClearThinBlockData(pfrom, pblock);
 
         dosMan.Misbehaving(pfrom, 100);
         return error("Merkle root for %s does not match computed merkle root, peer=%s", inv.hash.ToString(),
@@ -346,7 +355,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // With xThinBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
     {
         READLOCK(orphanpool.cs);
-        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pfrom->thinBlock.xthinblock->vTxHashes256))
+        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock->xthinblock->vTxHashes256, pblock))
             return false;
     }
 
@@ -356,7 +365,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (missingCount > 0)
     {
         // Since we can't process this thinblock then clear out the data from memory
-        thindata.ClearThinBlockData(pfrom, inv.hash);
+        thindata.ClearThinBlockData(pfrom, pblock);
 
         thinrelay.RequestBlock(pfrom, inv.hash);
         return error("Still missing transactions after reconstructing block, peer=%s: re-requesting a full block",
@@ -369,22 +378,21 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
         // for compression statistics, we have to add up the size of xthinblock and the re-requested thinBlockTx.
         int nSizeThinBlockTx = msgSize;
-        int blockSize = pfrom->thinBlock.GetBlockSize();
+        int blockSize = pblock->GetBlockSize();
         LOG(THIN, "Reassembled xblocktx for %s (%d bytes). Message was %d bytes (thinblock) and %d bytes "
                   "(re-requested tx), compression ratio %3.2f, peer=%s\n",
-            pfrom->thinBlock.GetHash().ToString(), blockSize, pfrom->thinBlock.xthinblock->GetSize(), nSizeThinBlockTx,
-            ((float)blockSize) / ((float)pfrom->thinBlock.xthinblock->GetSize() + (float)nSizeThinBlockTx),
-            pfrom->GetLogName());
+            pblock->GetHash().ToString(), blockSize, pblock->xthinblock->GetSize(), nSizeThinBlockTx,
+            ((float)blockSize) / ((float)pblock->xthinblock->GetSize() + (float)nSizeThinBlockTx), pfrom->GetLogName());
 
         // Update run-time statistics of thin block bandwidth savings.
         // We add the original thinblock size with the size of transactions that were re-requested.
         // This is NOT double counting since we never accounted for the original thinblock due to the re-request.
-        thindata.UpdateInBound(nSizeThinBlockTx + pfrom->thinBlock.xthinblock->GetSize(), blockSize);
+        thindata.UpdateInBound(nSizeThinBlockTx + pblock->xthinblock->GetSize(), blockSize);
         LOG(THIN, "thin block stats: %s\n", thindata.ToString());
 
-        // create a non-deleting shared pointer to wrap pfrom->thinBlock.  We know that thinBlock will outlast the
+        // create a non-deleting shared pointer to wrap pblock->  We know that thinBlock will outlast the
         // thread because the thread has a node reference.
-        PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->thinBlock), inv2);
+        PV->HandleBlockMessage(pfrom, strCommand, pblock, inv2);
     }
 
     return true;
@@ -471,13 +479,14 @@ bool CXThinBlock::CheckBlockHeader(const CBlockHeader &block, CValidationState &
  */
 bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string strCommand, unsigned nHops)
 {
-    // Deserialize and store xthinblock
-    CXThinBlock temp;
-    vRecv >> temp;
-    pfrom->thinBlock.xthinblock = std::make_shared<CXThinBlock>(std::forward<CXThinBlock>(temp));
+    // Deserialize xthinblock and store a block to reconstruct
+    CXThinBlock tmp;
+    vRecv >> tmp;
+    auto pblock = thinrelay.SetBlockToReconstruct(pfrom, tmp.header.GetHash());
+    pblock->xthinblock = std::make_shared<CXThinBlock>(std::forward<CXThinBlock>(tmp));
 
-    CXThinBlock &thinBlock = *pfrom->thinBlock.xthinblock;
-    CInv inv(MSG_BLOCK, uint256());
+    CXThinBlock &thinBlock = *pblock->xthinblock;
+    CInv inv(MSG_BLOCK, thinBlock.header.GetHash());
     {
         // Message consistency checking (FIXME: some redundancy here with AcceptBlockHeader)
         if (!IsThinBlockValid(pfrom, thinBlock.vMissingTx, thinBlock.header))
@@ -485,7 +494,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
             dosMan.Misbehaving(pfrom, 100);
             LOGA("Received an invalid %s from peer %s\n", strCommand, pfrom->GetLogName());
 
-            thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
+            thindata.ClearThinBlockData(pfrom, pblock);
             return false;
         }
 
@@ -501,7 +510,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         CBlockIndex *pIndex = nullptr;
         if (!AcceptBlockHeader(thinBlock.header, state, Params(), &pIndex))
         {
-            thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
+            thindata.ClearThinBlockData(pfrom, pblock);
             LOGA("Received an invalid %s header from peer %s\n", strCommand, pfrom->GetLogName());
             return false;
         }
@@ -510,7 +519,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         if (!pIndex)
         {
             LOGA("INTERNAL ERROR: pIndex null in CXThinBlock::HandleMessage");
-            thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
+            thindata.ClearThinBlockData(pfrom, pblock);
             return true;
         }
 
@@ -523,7 +532,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
             // Tell the Request Manager we received this block
             requester.AlreadyReceived(pfrom, inv);
 
-            thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
+            thindata.ClearThinBlockData(pfrom, pblock);
             LOG(THIN, "Received xthinblock but returning because we already have block data %s from peer %s hop"
                       " %d size %d bytes\n",
                 inv.hash.ToString(), pfrom->GetLogName(), nHops, thinBlock.GetSize());
@@ -534,7 +543,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         if (pIndex->nChainWork <= chainActive.Tip()->nChainWork)
         {
             thinrelay.RequestBlock(pfrom, thinBlock.header.GetHash());
-            thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
+            thindata.ClearThinBlockData(pfrom, pblock);
             LOGA("%s %s from peer %s received but does not extend longest chain; requesting full block\n", strCommand,
                 inv.hash.ToString(), pfrom->GetLogName());
             return true;
@@ -568,10 +577,10 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
     // Send expedited block without checking merkle root.
     SendExpeditedBlock(thinBlock, nHops, pfrom);
 
-    return thinBlock.process(pfrom, strCommand);
+    return thinBlock.process(pfrom, strCommand, pblock);
 }
 
-bool CXThinBlock::process(CNode *pfrom, std::string strCommand)
+bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlock_ThinRelay> &pblock)
 // TODO: request from the "best" txn source not necessarily from the block source
 {
     // In PV we must prevent two thinblocks from simulaneously processing from that were recieved from the
@@ -580,18 +589,16 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand)
     if (PV->IsAlreadyValidating(pfrom->id))
         return false;
 
-    thindata.ClearThinBlockData(pfrom);
-
-    pfrom->thinBlock.nVersion = header.nVersion;
-    pfrom->thinBlock.nBits = header.nBits;
-    pfrom->thinBlock.nNonce = header.nNonce;
-    pfrom->thinBlock.nTime = header.nTime;
-    pfrom->thinBlock.hashMerkleRoot = header.hashMerkleRoot;
-    pfrom->thinBlock.hashPrevBlock = header.hashPrevBlock;
+    pblock->nVersion = header.nVersion;
+    pblock->nBits = header.nBits;
+    pblock->nNonce = header.nNonce;
+    pblock->nTime = header.nTime;
+    pblock->hashMerkleRoot = header.hashMerkleRoot;
+    pblock->hashPrevBlock = header.hashPrevBlock;
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
     for (const CTransaction &tx : vMissingTx)
-        pfrom->thinBlock.xthinblock->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
+        pblock->xthinblock->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
     // We need to check all transaction sources (orphan list, mempool, and new (incoming) transactions in this block)
@@ -602,8 +609,8 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand)
     std::map<uint64_t, uint256> mapPartialTxHash;
     std::vector<uint256> memPoolHashes;
     std::set<uint64_t> setHashesToRequest;
-    unsigned int &nWaitingForTxns = pfrom->thinBlock.xthinblock->nWaitingFor;
-    std::vector<uint256> &vFullTxHashes = pfrom->thinBlock.xthinblock->vTxHashes256;
+    unsigned int &nWaitingForTxns = pblock->xthinblock->nWaitingFor;
+    std::vector<uint256> &vFullTxHashes = pblock->xthinblock->vTxHashes256;
 
     bool fMerkleRootCorrect = true;
     {
@@ -625,7 +632,7 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand)
                 _collision = true;
             mapPartialTxHash[cheapHash] = memPoolHashes[i];
         }
-        for (auto &mi : pfrom->thinBlock.xthinblock->mapMissingTx)
+        for (auto &mi : pblock->xthinblock->mapMissingTx)
         {
             uint64_t cheapHash = mi.first;
             // Check for cheap hash collision. Only mark as collision if the full hash is not the same,
@@ -674,7 +681,8 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand)
                 }
                 else
                 {
-                    if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pfrom->thinBlock.xthinblock->vTxHashes256))
+                    if (!ReconstructBlock(
+                            pfrom, missingCount, unnecessaryCount, pblock->xthinblock->vTxHashes256, pblock))
                         return false;
                 }
             }
@@ -691,19 +699,20 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand)
     if (_collision || !fMerkleRootCorrect)
     {
         if (!fMerkleRootCorrect)
+        {
             return error(
                 "mismatched merkle root on xthinblock: rerequesting a thinblock, peer=%s", pfrom->GetLogName());
+        }
         else
+        {
+            RequestThinBlock(pfrom, header.GetHash());
             return error("TX HASH COLLISION for xthinblock: re-requesting a thinblock, peer=%s", pfrom->GetLogName());
-
-        RequestThinBlock(pfrom, header.GetHash());
-        thindata.ClearThinBlockData(pfrom, header.GetHash());
-        return true;
+        }
     }
 
     nWaitingForTxns = missingCount;
     LOG(THIN, "xthinblock waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n", nWaitingForTxns,
-        unnecessaryCount, pfrom->thinBlock.vtx.size(), pfrom->thinBlock.xthinblock->mapMissingTx.size());
+        unnecessaryCount, pblock->vtx.size(), pblock->xthinblock->mapMissingTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
@@ -723,28 +732,32 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand)
     if (missingCount > 0)
     {
         // Since we can't process this thinblock then clear out the data from memory and request a full block
-        thindata.ClearThinBlockData(pfrom, header.GetHash());
+        thindata.ClearThinBlockData(pfrom, pblock);
         thinrelay.RequestBlock(pfrom, header.GetHash());
         return error("Still missing transactions for xthinblock: re-requesting a full block");
     }
 
     // We now have all the transactions now that are in this block
-    int blockSize = pfrom->thinBlock.GetBlockSize();
+    int blockSize = pblock->GetBlockSize();
     LOG(THIN, "Reassembled xthinblock for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
-        pfrom->thinBlock.GetHash().ToString(), blockSize, pfrom->thinBlock.xthinblock->GetSize(),
-        ((float)blockSize) / ((float)pfrom->thinBlock.xthinblock->GetSize()), pfrom->GetLogName());
+        pblock->GetHash().ToString(), blockSize, pblock->xthinblock->GetSize(),
+        ((float)blockSize) / ((float)pblock->xthinblock->GetSize()), pfrom->GetLogName());
 
     // Update run-time statistics of thin block bandwidth savings
-    thindata.UpdateInBound(pfrom->thinBlock.xthinblock->GetSize(), blockSize);
+    thindata.UpdateInBound(pblock->xthinblock->GetSize(), blockSize);
     LOG(THIN, "thin block stats: %s\n", thindata.ToString().c_str());
 
     // Process the full block
-    PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->thinBlock), GetInv());
+    PV->HandleBlockMessage(pfrom, strCommand, pblock, GetInv());
 
     return true;
 }
 
-static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount, const std::vector<uint256> &vHashes)
+static bool ReconstructBlock(CNode *pfrom,
+    int &missingCount,
+    int &unnecessaryCount,
+    const std::vector<uint256> &vHashes,
+    std::shared_ptr<CBlock_ThinRelay> &pblock)
 {
     AssertLockHeld(orphanpool.cs);
 
@@ -754,7 +767,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
         std::set<uint256> setHashes(vHashes.begin(), vHashes.end());
         if (setHashes.size() != vHashes.size())
         {
-            thindata.ClearThinBlockData(pfrom, pfrom->thinBlock.GetBlockHeader().GetHash());
+            thindata.ClearThinBlockData(pfrom, pblock);
 
             dosMan.Misbehaving(pfrom, 10);
             return error("Duplicate transaction ids, peer=%s", pfrom->GetLogName());
@@ -774,9 +787,11 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
     uint64_t maxAllowedSize = nTxSize * maxMessageSizeMultiplier * excessiveBlockSize / 158;
 
     // Look for each transaction in our various pools and buffers.
-    std::map<uint64_t, CTransactionRef> mapMissing = pfrom->thinBlock.xthinblock->mapMissingTx;
-    mapMissing.insert(pfrom->thinBlock.thinblock->mapMissingTx.begin(), pfrom->thinBlock.thinblock->mapMissingTx.end());
-
+    std::map<uint64_t, CTransactionRef> mapMissing;
+    if (pblock->xthinblock != nullptr)
+        mapMissing.insert(pblock->xthinblock->mapMissingTx.begin(), pblock->xthinblock->mapMissingTx.end());
+    if (pblock->thinblock != nullptr)
+        mapMissing.insert(pblock->thinblock->mapMissingTx.begin(), pblock->thinblock->mapMissingTx.end());
     for (const uint256 &hash : vHashes)
     {
         // Replace the truncated hash with the full hash value if it exists
@@ -811,12 +826,12 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             if (inOrphanCache)
             {
                 ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                pfrom->thinBlock.setUnVerifiedTxns.insert(hash);
+                pblock->setUnVerifiedTxns.insert(hash);
             }
             else if (inMissingTx)
             {
                 ptx = mapMissing[hash.GetCheapHash()];
-                pfrom->thinBlock.setUnVerifiedTxns.insert(hash);
+                pblock->setUnVerifiedTxns.insert(hash);
             }
         }
         if (!ptx)
@@ -824,33 +839,33 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
 
         // In order to prevent a memory exhaustion attack we track transaction bytes used to create Block
         // to see if we've exceeded any limits and if so clear out data and return.
-        if (thindata.AddThinBlockBytes(nTxSize, pfrom) > maxAllowedSize)
+        if (thindata.AddThinBlockBytes(nTxSize, pblock) > maxAllowedSize)
         {
             if (ClearLargestThinBlockAndDisconnect(pfrom))
             {
-                uint64_t nBlockBytes = pfrom->thinBlock.nCurrentBlockSize;
+                uint64_t nBlockBytes = pblock->nCurrentBlockSize;
                 return error(
                     "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                    pfrom->thinBlock.GetHash().ToString(), nBlockBytes, maxAllowedSize, pfrom->GetLogName());
+                    pblock->GetHash().ToString(), nBlockBytes, maxAllowedSize, pfrom->GetLogName());
             }
         }
 
-        uint64_t nBlockBytes = pfrom->thinBlock.nCurrentBlockSize;
+        uint64_t nBlockBytes = pblock->nCurrentBlockSize;
         if (nBlockBytes > maxAllowedSize)
         {
-            thindata.ClearThinBlockData(pfrom, pfrom->thinBlock.GetBlockHeader().GetHash());
+            thindata.ClearThinBlockData(pfrom, pblock);
             pfrom->fDisconnect = true;
             return error(
                 "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                pfrom->thinBlock.GetHash().ToString(), nBlockBytes, maxAllowedSize, pfrom->GetLogName());
+                pblock->GetHash().ToString(), nBlockBytes, maxAllowedSize, pfrom->GetLogName());
         }
 
         // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct ordering.
-        pfrom->thinBlock.vtx.emplace_back(ptx);
+        pblock->vtx.emplace_back(ptx);
     }
     // Now that we've rebuilt the block successfully we can set the XVal flag which is used in
     // ConnectBlock() to determine which if any inputs we can skip the checking of inputs.
-    pfrom->thinBlock.fXVal = true;
+    pblock->fXVal = true;
 
     return true;
 }
@@ -1227,26 +1242,25 @@ std::string CThinBlockData::FullTxToString()
 }
 
 // After a thinblock is finished processing or if for some reason we have to pre-empt the rebuilding
-// of a thinblock then we clear out the thinblock data which can be substantial.
-void CThinBlockData::ClearThinBlockData(CNode *pnode)
+// of a thinblock then we clear out the thinblock bytes from the total.
+void CThinBlockData::ClearThinBlockBytes(std::shared_ptr<CBlock_ThinRelay> &pblock)
 {
-    LOCK(pnode->cs_xthinblock);
-
     // Remove bytes from counter
-    thindata.DeleteThinBlockBytes(pnode->thinBlock.nCurrentBlockSize);
-
-    // Clear out block data we no longer need
-    pnode->thinBlock.SetNull();
+    if (pblock != nullptr)
+        thindata.DeleteThinBlockBytes(pblock->nCurrentBlockSize);
 
     LOG(THIN, "Total in memory thinblockbytes size after clearing a thinblock is %ld bytes\n",
         thindata.GetThinBlockBytes());
 }
 
-void CThinBlockData::ClearThinBlockData(CNode *pnode, const uint256 &hash)
+void CThinBlockData::ClearThinBlockData(CNode *pnode, std::shared_ptr<CBlock_ThinRelay> &pblock)
 {
     // We must make sure to clear the thinblock data first before clearing the thinblock in flight.
-    ClearThinBlockData(pnode);
-    thinrelay.ClearBlockInFlight(pnode, hash);
+    ClearThinBlockBytes(pblock);
+    thinrelay.ClearBlockToReconstruct(pnode);
+    thinrelay.ClearBlockInFlight(pnode, pblock->GetBlockHeader().GetHash());
+    if (pblock != nullptr)
+        pblock->SetNull();
 }
 
 void CThinBlockData::ClearThinBlockStats()
@@ -1273,9 +1287,9 @@ void CThinBlockData::ClearThinBlockStats()
     mapFullTx.clear();
 }
 
-uint64_t CThinBlockData::AddThinBlockBytes(uint64_t bytes, CNode *pfrom)
+uint64_t CThinBlockData::AddThinBlockBytes(uint64_t bytes, std::shared_ptr<CBlock_ThinRelay> &pblock)
 {
-    pfrom->thinBlock.nCurrentBlockSize += bytes;
+    pblock->nCurrentBlockSize += bytes;
     uint64_t ret = nThinBlockBytes.fetch_add(bytes) + bytes;
     return ret;
 }
@@ -1317,28 +1331,34 @@ void CThinBlockData::FillThinBlockQuickStats(ThinBlockQuickStats &stats)
 bool IsThinBlocksEnabled() { return GetBoolArg("-use-thinblocks", true); }
 bool ClearLargestThinBlockAndDisconnect(CNode *pfrom)
 {
-    CNode *pLargest = nullptr;
+    CNode *pLargestNode = nullptr;
     uint64_t nLargestBytes = 0;
+    std::shared_ptr<CBlock_ThinRelay> pLargestBlock = nullptr;
 
     LOCK(cs_vNodes);
     for (CNode *pnode : vNodes)
     {
-        uint64_t nBytes = pnode->thinBlock.nCurrentBlockSize;
-        if ((pnode->fDisconnect == false) && ((pLargest == nullptr) || (nBytes > nLargestBytes)))
+        std::shared_ptr<CBlock_ThinRelay> pblock = thinrelay.GetBlockToReconstruct(pnode);
+        if (pblock == nullptr)
+            continue;
+
+        uint64_t nBytes = pblock->nCurrentBlockSize;
+        if ((pnode->fDisconnect == false) && ((pLargestNode == nullptr) || (nBytes > nLargestBytes)))
         {
-            pLargest = pnode;
+            pLargestNode = pnode;
+            pLargestBlock = pblock;
             nLargestBytes = nBytes;
         }
     }
 
-    if (pLargest != nullptr)
+    if (pLargestNode != nullptr)
     {
-        thindata.ClearThinBlockData(pLargest, pLargest->thinBlock.GetBlockHeader().GetHash());
-        pLargest->fDisconnect = true;
+        thindata.ClearThinBlockData(pLargestNode, pLargestBlock);
+        pLargestNode->fDisconnect = true;
 
         // If the our node is currently using up the most thinblock bytes then return true so that we
         // can stop processing this thinblock and let the disconnection happen.
-        if (pfrom == pLargest)
+        if (pfrom == pLargestNode)
             return true;
     }
 

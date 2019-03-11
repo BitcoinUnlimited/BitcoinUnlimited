@@ -85,14 +85,6 @@ public:
     bool fXVal;
 
 public:
-    // thinrelay block types: (memory only)
-    std::shared_ptr<CThinBlock> thinblock;
-    std::shared_ptr<CXThinBlock> xthinblock;
-
-    // Track the current block size during reconstruction: (memory only)
-    uint64_t nCurrentBlockSize;
-
-public:
     // network and disk
     std::vector<CTransactionRef> vtx;
 
@@ -182,7 +174,6 @@ public:
         fExcessive = false;
         fXVal = false;
         nBlockSize = 0;
-        nCurrentBlockSize = 0;
     }
 
     CBlockHeader GetBlockHeader() const
@@ -204,6 +195,26 @@ public:
     uint64_t GetBlockSize() const;
 };
 
+// Used for thin type blocks that we want to reconstruct
+class CBlock_ThinRelay : public CBlock
+{
+public:
+    // thinrelay block types: (memory only)
+    std::shared_ptr<CThinBlock> thinblock;
+    std::shared_ptr<CXThinBlock> xthinblock;
+
+    // Track the current block size during reconstruction: (memory only)
+    uint64_t nCurrentBlockSize;
+
+    CBlock_ThinRelay() { SetNull(); }
+    void SetNull()
+    {
+        CBlock::SetNull();
+        nCurrentBlockSize = 0;
+        thinblock = nullptr;
+        xthinblock = nullptr;
+    }
+};
 
 /** Describes a place in the block chain to another node such that if the
  * other node doesn't have the same branch, it can find a recent common trunk.

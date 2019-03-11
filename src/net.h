@@ -473,7 +473,6 @@ public:
     std::atomic<uint32_t> nXthinBloomfilterSize; // Max xthin bloom filter size (in bytes) that our peer will accept.
 
     CCriticalSection cs_xthinblock;
-    CBlock thinBlock;
     // BUIP010 Xtreme Thinblocks: end section
 
     // BUIPXXX Graphene blocks: begin section

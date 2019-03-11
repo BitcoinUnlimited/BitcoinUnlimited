@@ -1798,8 +1798,8 @@ void ThreadOpenConnections()
         }
     }
 
-    // NOTE: If we are in the block above, then no seeding should occur as "-connect" and "-connect-thinblock"
-    // are intended as "only make outbound connections to the configured nodes".
+    // NOTE: If we are in the block above, then no seeding should occur as "-connect""
+    // is intended as "only make outbound connections to the configured nodes".
 
     // Initiate network connections
     int64_t nStart = GetTime();
@@ -2944,13 +2944,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nXthinBloomfilterSize = 0;
     addrFromPort = 0;
 
-    // Initialize the pointers held in CBlock. We have to do this here rather than in the CBlock
-    // constructor.
-    CXThinBlock xthin;
-    CThinBlock thin;
-    thinBlock.xthinblock = std::make_shared<CXThinBlock>(std::forward<CXThinBlock>(xthin));
-    thinBlock.thinblock = std::make_shared<CThinBlock>(std::forward<CThinBlock>(thin));
-
     // graphene
     nLocalGrapheneBlockBytes = 0;
     nSizeGrapheneBlock = 0;
@@ -3029,7 +3022,6 @@ CNode::~CNode()
         }
     }
 
-    thinBlock.SetNull();
     grapheneBlockWaitingForTxns = -1;
     grapheneBlock.SetNull();
 
