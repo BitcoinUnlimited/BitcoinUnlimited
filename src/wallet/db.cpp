@@ -69,6 +69,13 @@ bool CDBEnv::Open(const fs::path &pathIn)
     if (fDbEnvInit)
         return true;
 
+    if (!fs::is_directory(pathIn))
+    {
+        std::stringstream err;
+        err << "CDBEnv::Open: " << pathIn << " is not a directory.";
+        throw std::invalid_argument(err.str());
+    }
+
     boost::this_thread::interruption_point();
 
     strPath = pathIn.string();
