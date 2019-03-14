@@ -49,11 +49,11 @@ class CGrapheneBlock
 {
 private:
     // Entropy used for SipHash secret key; this is distinct from the block nonce
-    uint64_t nonce;
+    uint64_t sipHashNonce;
 
 public:
     // These describe, in two parts, the 128-bit secret key used for SipHash
-    // Note that they are populated by FillShortTxIDSelector, which uses header and nonce
+    // Note that they are populated by FillShortTxIDSelector, which uses header and sipHashNonce
     uint64_t shorttxidk0, shorttxidk1;
     CBlockHeader header;
     std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
@@ -69,8 +69,8 @@ public:
     CGrapheneBlock() : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(2) {}
     CGrapheneBlock(uint64_t _version) : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr) { version = _version; }
     ~CGrapheneBlock();
-    // Create seeds for SipHash using the nonce generated in the constructor
-    // Note that this must be called any time members header or nonce are changed
+    // Create seeds for SipHash using the sipHashNonce generated in the constructor
+    // Note that this must be called any time members header or sipHashNonce are changed
     void FillShortTxIDSelector();
     /**
      * Handle an incoming Graphene block
@@ -92,7 +92,7 @@ public:
         {
             READWRITE(shorttxidk0);
             READWRITE(shorttxidk1);
-            READWRITE(nonce);
+            READWRITE(sipHashNonce);
         }
         READWRITE(header);
         READWRITE(vAdditionalTxs);

@@ -34,8 +34,9 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     uint64_t nSenderMempoolPlusBlock,
     uint64_t _version)
     : shorttxidk0(0), shorttxidk1(0),
-      nonce(GetRand(std::numeric_limits<uint64_t>::max())) // Use cryptographically strong pseudorandom number because
-                                                           // we will extract SipHash secret key from this
+      sipHashNonce(
+          GetRand(std::numeric_limits<uint64_t>::max())) // Use cryptographically strong pseudorandom number because
+// we will extract SipHash secret key from this
 {
     header = pblock->GetBlockHeader();
     nBlockTxs = pblock->vtx.size();
@@ -77,7 +78,7 @@ CGrapheneBlock::~CGrapheneBlock()
 void CGrapheneBlock::FillShortTxIDSelector()
 {
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
-    stream << header << nonce;
+    stream << header << sipHashNonce;
     CSHA256 hasher;
     hasher.Write((unsigned char *)&(*stream.begin()), stream.end() - stream.begin());
     uint256 shorttxidhash;
