@@ -66,8 +66,8 @@ public:
         uint64_t nReceiverMemPoolTx,
         uint64_t nSenderMempoolPlusBlock,
         uint64_t _version);
-    CGrapheneBlock() : pGrapheneSet(nullptr), version(2) {}
-    CGrapheneBlock(uint64_t _version) : pGrapheneSet(nullptr) { version = _version; }
+    CGrapheneBlock() : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(2) {}
+    CGrapheneBlock(uint64_t _version) : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr) { version = _version; }
     ~CGrapheneBlock();
     // Create seeds for SipHash using the nonce generated in the constructor
     // Note that this must be called any time members header or nonce are changed

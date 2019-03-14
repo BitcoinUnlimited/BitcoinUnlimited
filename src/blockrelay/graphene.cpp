@@ -33,7 +33,8 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     uint64_t nReceiverMemPoolTx,
     uint64_t nSenderMempoolPlusBlock,
     uint64_t _version)
-    : nonce(GetRand(std::numeric_limits<uint64_t>::max())) // Use cryptographically strong pseudorandom number because
+    : shorttxidk0(0), shorttxidk1(0),
+      nonce(GetRand(std::numeric_limits<uint64_t>::max())) // Use cryptographically strong pseudorandom number because
                                                            // we will extract SipHash secret key from this
 {
     header = pblock->GetBlockHeader();
