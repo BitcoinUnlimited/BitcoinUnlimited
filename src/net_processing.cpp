@@ -735,16 +735,17 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     }
     else if (strCommand == NetMsgType::ADDR)
     {
-        if (!pfrom->fGetAddr)
+        // Ignore unsolicited ADDRs from remote initiated connections to avoid malicious flooding of our address
+        // table.
+        // The purpose of using exchange here is to atomically set to false and also get whether I asked for an addr
+        if (!pfrom->fGetAddr.exchange(0) && pfrom->fInbound)
         {
-            // Today unsolicited ADDRs are not illegal, but we should consider misbehaving on this if we add logic to
-            // unmisbehaving over time, because a few unsolicited ADDRs are ok from a DOS perspective but lots are not.
-            // However, we may never want to process unsolicited ADDRs because what possible value is there to allow
-            // a node to jam entries into everyone else's address table.
+            //
+            // Today unsolicited ADDRs are not illegal, but we should consider misbehaving on this (if we add logic to
+            // unmisbehaving over time), because a few unsolicited ADDRs are ok from a DOS perspective but lots are not.
             // dosMan.Misbehaving(pfrom, 1);
-            return false;
+            return true;
         }
-        pfrom->fGetAddr = false;
 
         std::vector<CAddress> vAddr;
         vRecv >> vAddr;
@@ -2130,29 +2131,33 @@ bool SendMessages(CNode *pto)
         //
         // Message: addr
         //
-        if (pto->nNextAddrSend < nNow)
+        if ((pto->nNextAddrSend < nNow) && pto->fInbound)
         {
-            LOCK(pto->cs_vSend);
-            pto->nNextAddrSend = PoissonNextSend(nNow, AVG_ADDRESS_BROADCAST_INTERVAL);
-            std::vector<CAddress> vAddr;
-            vAddr.reserve(pto->vAddrToSend.size());
-            for (const CAddress &addr : pto->vAddrToSend)
+            // If pto connected to this node, pto will pay attention to unsolicited ADDRs, so send
+            if (pto->fInbound)
             {
-                if (!pto->addrKnown.contains(addr.GetKey()))
+                LOCK(pto->cs_vSend);
+                pto->nNextAddrSend = PoissonNextSend(nNow, AVG_ADDRESS_BROADCAST_INTERVAL);
+                std::vector<CAddress> vAddr;
+                vAddr.reserve(pto->vAddrToSend.size());
+                for (const CAddress &addr : pto->vAddrToSend)
                 {
-                    pto->addrKnown.insert(addr.GetKey());
-                    vAddr.push_back(addr);
-                    // receiver rejects addr messages larger than 1000
-                    if (vAddr.size() >= 1000)
+                    if (!pto->addrKnown.contains(addr.GetKey()))
                     {
-                        pto->PushMessage(NetMsgType::ADDR, vAddr);
-                        vAddr.clear();
+                        pto->addrKnown.insert(addr.GetKey());
+                        vAddr.push_back(addr);
+                        // receiver rejects addr messages larger than 1000
+                        if (vAddr.size() >= 1000)
+                        {
+                            pto->PushMessage(NetMsgType::ADDR, vAddr);
+                            vAddr.clear();
+                        }
                     }
                 }
+                if (!vAddr.empty())
+                    pto->PushMessage(NetMsgType::ADDR, vAddr);
             }
             pto->vAddrToSend.clear();
-            if (!vAddr.empty())
-                pto->PushMessage(NetMsgType::ADDR, vAddr);
         }
 
         CNodeState statem(CAddress(), "");

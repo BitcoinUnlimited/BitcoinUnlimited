@@ -380,7 +380,7 @@ public:
     int nRecvVersion;
 
     // BU connection de-prioritization
-    // Total bytes sent and received
+    //! Total bytes sent and received
     uint64_t nActivityBytes;
 
     int64_t nLastSend;
@@ -413,15 +413,25 @@ public:
     CCriticalSection cs_xversion;
     CXVersionMessage xVersion;
 
-    // strSubVer is whatever byte array we read from the wire. However, this field is intended
-    // to be printed out, displayed to humans in various forms and so on. So we sanitize it and
-    // store the sanitized version in cleanSubVer. The original should be used when dealing with
-    // the network or wire types and the cleaned string used when displayed or logged.
+    //! strSubVer is whatever byte array we read from the wire. However, this field is intended
+    //! to be printed out, displayed to humans in various forms and so on. So we sanitize it and
+    //! store the sanitized version in cleanSubVer. The original should be used when dealing with
+    //! the network or wire types and the cleaned string used when displayed or logged.
     std::string strSubVer, cleanSubVer;
-    bool fWhitelisted; // This peer can bypass DoS banning.
-    bool fFeeler; // If true this node is being used as a short lived feeler.
+
+    //! This peer can bypass DoS banning.
+    bool fWhitelisted;
+    //! If true this node is being used as a short lived feeler.
+    bool fFeeler;
     bool fOneShot;
     bool fClient;
+
+    //! If true a remote node initiated the connection.  If false, we initiated.
+    //! The protocol is slightly asymmetric:
+    //! initial version exchange
+    //! stop ADDR flooding in preparation for a network-wide eclipse attack
+    //! stop connection slot attack via eviction of stale (connected but no data) inbound connections
+    //! stop fingerprinting by seeding fake addresses and checking for them later by ignoring outbound getaddr
     bool fInbound;
     bool fAutoOutbound; // any outbound node not connected with -addnode, connect-thinblock or -connect
     bool fNetworkNode; // any outbound node
@@ -543,7 +553,7 @@ public:
     // Whether a ping is requested.
     bool fPingQueued;
     // Whether an ADDR was requested.
-    bool fGetAddr;
+    std::atomic<bool> fGetAddr;
 
     // BU instrumentation
     // track the number of bytes sent to this node

@@ -330,7 +330,7 @@ class msg_get_xthin(object):
 class msg_get_thin(object):
     command = b"get_thin"
 
-    def __init__(self, inv=None, filter=None):
+    def __init__(self, inv=None):
         self.inv = inv
 
     def deserialize(self, f):
