@@ -364,7 +364,6 @@ class TestClass(BitcoinTestFramework):
         except JSONRPCException as e:
             pass
 
-        pdb.set_trace()
         # Attempt unsolicited ADDRs
         port = 0
         while port < 65000:
