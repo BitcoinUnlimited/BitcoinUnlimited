@@ -1509,6 +1509,11 @@ uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &t
     if (grapheneVersion < 2)
         return txhash.GetCheapHash();
 
+    // If both shorttxidk0 and shorttxidk1 are equal to 0, then it is very likely
+    // that the values have not been properly instantiated using FillShortTxIDSelector,
+    // but are instead unchanged from the default initialization value.
+    DbgAssert(!(shorttxidk0 == 0 && shorttxidk1 == 0), );
+
     static_assert(SHORTTXIDS_LENGTH == 8, "shorttxids calculation assumes 8-byte shorttxids");
     return SipHashUint256(shorttxidk0, shorttxidk1, txhash) & 0xffffffffffffffL;
 }
