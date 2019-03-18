@@ -957,7 +957,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         entry.sighashType = sighashType | sighashType2;
 
         // This code denies old style tx from entering the mempool as soon as we fork
-        if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) && !IsTxUAHFOnly(entry))
+        if (!IsTxUAHFOnly(entry))
         {
             return state.Invalid(false, REJECT_WRONG_FORK, "txn-uses-old-sighash-algorithm");
         }
