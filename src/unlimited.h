@@ -17,8 +17,8 @@
 #include "script/script_error.h"
 #include "stat.h"
 #include "tweak.h"
-#include "uahf_fork.h"
 #include "univalue/include/univalue.h"
+#include "validation/forks.h"
 #include <list>
 #include <thread>
 #include <vector>

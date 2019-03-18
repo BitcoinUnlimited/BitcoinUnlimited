@@ -25,7 +25,6 @@
 #include "script/standard.h"
 #include "txadmission.h"
 #include "txmempool.h"
-#include "uahf_fork.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
 #include "validation/validation.h"

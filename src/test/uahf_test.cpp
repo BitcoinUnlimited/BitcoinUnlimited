@@ -16,8 +16,8 @@
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/sign.h"
-#include "uahf_fork.h"
 #include "utilstrencodings.h"
+#include "validation/forks.h"
 
 #include <map>
 #include <string>
