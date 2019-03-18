@@ -44,7 +44,6 @@
 #include "txdb.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
-#include "uahf_fork.h"
 #include "ui_interface.h"
 #include "undo.h"
 #include "util.h"

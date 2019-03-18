@@ -27,7 +27,6 @@
 #include "timedata.h"
 #include "txadmission.h"
 #include "txmempool.h"
-#include "uahf_fork.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilmoneystr.h"

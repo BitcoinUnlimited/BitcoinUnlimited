@@ -145,8 +145,6 @@ txdb.cpp
 txdb.h
 txmempool.cpp
 txmempool.h
-uahf_fork.cpp
-uahf_fork.h
 ui_interface.h
 uint256.cpp
 uint256.h

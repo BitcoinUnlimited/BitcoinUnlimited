@@ -15,8 +15,8 @@
 #include "txadmission.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
-#include "uahf_fork.h"
 #include "utiltime.h"
+#include "validation/forks.h"
 
 #include <boost/test/unit_test.hpp>
 
