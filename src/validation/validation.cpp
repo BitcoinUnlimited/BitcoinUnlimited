@@ -1408,24 +1408,6 @@ bool ContextualCheckBlock(const CBlock &block,
         }
     }
 
-    // UAHF enforce that the fork block is > 1MB
-    // (note subsequent blocks can be <= 1MB...)
-    // An exception is added -- if the fork block is block 1 then it can be <= 1MB.  This allows test chains to
-    // fork without having to create a large block so long as the fork time is in the past.
-    // TODO: check if we can remove the second conditions since on regtest uahHeight is 0
-    if (pindexPrev && UAHFforkAtNextBlock(pindexPrev->nHeight) && (pindexPrev->nHeight > 1))
-    {
-        DbgAssert(block.GetBlockSize(), );
-        if (block.GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
-        {
-            uint256 hash = block.GetHash();
-            return state.DoS(100,
-                error("%s: UAHF fork block (%s, height %d) must exceed %d, but this block is %d bytes", __func__,
-                                 hash.ToString(), nHeight, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, block.GetBlockSize()),
-                REJECT_INVALID, "bad-blk-too-small");
-        }
-    }
-
     CBlockIndex indexDummy(block);
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev == nullptr ? 1 : pindexPrev->nHeight + 1;
