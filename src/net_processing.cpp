@@ -760,11 +760,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             for (CAddress &addr : vAddr)
             {
                 // server listen port will be different.  We want to compare IPs and then use provided port
-                LOG(NET, "ADDR %s from %s\n", addr.ToString(), pfrom->addr.ToString());
-
                 if ((CNetAddr)addr == (CNetAddr)pfrom->addr)
                 {
-                    LOG(NET, "ADDR match\n");
                     ownAddr = addr;
                     reportedOwnAddr = true;
                     break;

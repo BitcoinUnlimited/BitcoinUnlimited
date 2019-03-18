@@ -364,6 +364,7 @@ class TestClass(BitcoinTestFramework):
         except JSONRPCException as e:
             pass
 
+        pdb.set_trace()
         # Attempt unsolicited ADDRs
         port = 0
         while port < 65000:
@@ -396,4 +397,5 @@ def Test():
 
     flags = standardFlags()
     flags[0] = "--tmpdir=/ramdisk/test/t"
+    flags.append("--nocleanup")
     t.main(flags, bitcoinConf, None)
