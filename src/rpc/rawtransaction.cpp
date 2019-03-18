@@ -124,6 +124,7 @@ void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry)
                 entry.pushKV("confirmations", 0);
         }
     }
+    entry.pushKV("hex", EncodeHexTx(tx));
 }
 
 UniValue getrawtransaction(const UniValue &params, bool fHelp)
