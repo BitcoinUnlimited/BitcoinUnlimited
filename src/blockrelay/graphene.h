@@ -22,6 +22,7 @@
 #include <vector>
 
 const unsigned char MIN_MEMPOOL_INFO_BYTES = 8;
+const uint8_t SHORTTXIDS_LENGTH = 8;
 
 class CDataStream;
 class CNode;
@@ -46,16 +47,31 @@ public:
 
 class CGrapheneBlock
 {
+private:
+    // Entropy used for SipHash secret key; this is distinct from the block nonce
+    uint64_t sipHashNonce;
+
 public:
+    // These describe, in two parts, the 128-bit secret key used for SipHash
+    // Note that they are populated by FillShortTxIDSelector, which uses header and sipHashNonce
+    uint64_t shorttxidk0, shorttxidk1;
     CBlockHeader header;
     std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
     uint64_t nBlockTxs;
     CGrapheneSet *pGrapheneSet;
+    uint64_t version;
 
 public:
-    CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx, uint64_t nSenderMempoolPlusBlock);
-    CGrapheneBlock() : pGrapheneSet(nullptr) {}
+    CGrapheneBlock(const CBlockRef pblock,
+        uint64_t nReceiverMemPoolTx,
+        uint64_t nSenderMempoolPlusBlock,
+        uint64_t _version);
+    CGrapheneBlock() : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(2) {}
+    CGrapheneBlock(uint64_t _version) : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr) { version = _version; }
     ~CGrapheneBlock();
+    // Create seeds for SipHash using the sipHashNonce generated in the constructor
+    // Note that this must be called any time members header or sipHashNonce are changed
+    void FillShortTxIDSelector();
     /**
      * Handle an incoming Graphene block
      * Once the block is validated apart from the Merkle root, forward the Xpedited block with a hop count of nHops.
@@ -72,6 +88,12 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
+        if (version >= 2)
+        {
+            READWRITE(shorttxidk0);
+            READWRITE(shorttxidk1);
+            READWRITE(sipHashNonce);
+        }
         READWRITE(header);
         READWRITE(vAdditionalTxs);
         READWRITE(nBlockTxs);
@@ -80,7 +102,7 @@ public:
         if (nBlockTxs > (excessiveBlockSize * maxMessageSizeMultiplier / 100))
             throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
         if (!pGrapheneSet)
-            pGrapheneSet = new CGrapheneSet();
+            pGrapheneSet = new CGrapheneSet(version >= 2);
         READWRITE(*pGrapheneSet);
     }
     uint64_t GetAdditionalTxSerializationSize()
@@ -303,5 +325,7 @@ bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header);
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);
 CMemPoolInfo GetGrapheneMempoolInfo();
 void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash);
+// Generate cheap hash from seeds using SipHash
+uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &txhash, uint64_t grapheneVersion);
 
 #endif // BITCOIN_GRAPHENE_H
