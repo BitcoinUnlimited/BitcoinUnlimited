@@ -238,6 +238,7 @@ public:
     double dPingTime;
     double dPingWait;
     double dPingMin;
+    //! What this peer sees as my address
     std::string addrLocal;
     //! Whether this peer supports CompactBlocks (for statistics only, BU doesn't support CB protocol)
     bool fSupportsCompactBlocks;
@@ -387,16 +388,18 @@ public:
     int64_t nLastRecv;
     int64_t nTimeConnected;
     int64_t nTimeOffset;
+    //! The address of the remote peer
     CAddress addr;
 
     //! set to true if this node is ok with no message checksum
     bool skipChecksum;
 
-    //! The address the remote peer advertised it its version message
+    //! The address the remote peer advertised in its version message
     CAddress addrFrom_advertised;
 
     std::string addrName;
     const char *currentCommand; // if in the middle of the send, this is the command type
+    //! The the remote peer sees us as this address (may be different than our IP due to NAT)
     CService addrLocal;
     int nVersion;
 

@@ -735,18 +735,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     }
     else if (strCommand == NetMsgType::ADDR)
     {
-        // Ignore unsolicited ADDRs from remote initiated connections to avoid malicious flooding of our address
-        // table.
-        // The purpose of using exchange here is to atomically set to false and also get whether I asked for an addr
-        if (!pfrom->fGetAddr.exchange(0) && pfrom->fInbound)
-        {
-            //
-            // Today unsolicited ADDRs are not illegal, but we should consider misbehaving on this (if we add logic to
-            // unmisbehaving over time), because a few unsolicited ADDRs are ok from a DOS perspective but lots are not.
-            // dosMan.Misbehaving(pfrom, 1);
-            return true;
-        }
-
         std::vector<CAddress> vAddr;
         vRecv >> vAddr;
 
@@ -754,6 +742,47 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         {
             dosMan.Misbehaving(pfrom, 20);
             return error("message addr size() = %u", vAddr.size());
+        }
+
+        // To avoid malicious flooding of our address table, only allow unsolicited ADDR messages to
+        // insert the connecting IP.  We need to allow this IP to be inserted, or there is no way for that node
+        // to tell the network about itself if its behind a NAT.
+
+        // Digression about how things work behind a NAT:
+        //     Node A periodically ADDRs node B with the address that B reported to A as A's own
+        //     address (in the VERSION message).
+        //
+        // The purpose of using exchange here is to atomically set to false and also get whether I asked for an addr
+        if (!pfrom->fGetAddr.exchange(0) && pfrom->fInbound)
+        {
+            bool reportedOwnAddr = false;
+            CAddress ownAddr;
+            for (CAddress &addr : vAddr)
+            {
+                // server listen port will be different.  We want to compare IPs and then use provided port
+                LOG(NET, "ADDR %s from %s\n", addr.ToString(), pfrom->addr.ToString());
+
+                if ((CNetAddr)addr == (CNetAddr)pfrom->addr)
+                {
+                    LOG(NET, "ADDR match\n");
+                    ownAddr = addr;
+                    reportedOwnAddr = true;
+                    break;
+                }
+            }
+            if (reportedOwnAddr)
+            {
+                vAddr.resize(1); // Get rid of every address the remote node tried to inject except itself.
+                vAddr[0] = ownAddr;
+            }
+            else
+            {
+                // Today unsolicited ADDRs are not illegal, but we should consider misbehaving on this (if we add logic
+                // to unmisbehaving over time), because a few unsolicited ADDRs are ok from a DOS perspective but lots
+                // are not.
+                // dosMan.Misbehaving(pfrom, 1);
+                return true; // We don't want to process any other addresses, but giving them is not an error
+            }
         }
 
         // Store the new addresses
@@ -2131,32 +2160,28 @@ bool SendMessages(CNode *pto)
         //
         // Message: addr
         //
-        if ((pto->nNextAddrSend < nNow) && pto->fInbound)
+        if (pto->nNextAddrSend < nNow)
         {
-            // If pto connected to this node, pto will pay attention to unsolicited ADDRs, so send
-            if (pto->fInbound)
+            LOCK(pto->cs_vSend);
+            pto->nNextAddrSend = PoissonNextSend(nNow, AVG_ADDRESS_BROADCAST_INTERVAL);
+            std::vector<CAddress> vAddr;
+            vAddr.reserve(pto->vAddrToSend.size());
+            for (const CAddress &addr : pto->vAddrToSend)
             {
-                LOCK(pto->cs_vSend);
-                pto->nNextAddrSend = PoissonNextSend(nNow, AVG_ADDRESS_BROADCAST_INTERVAL);
-                std::vector<CAddress> vAddr;
-                vAddr.reserve(pto->vAddrToSend.size());
-                for (const CAddress &addr : pto->vAddrToSend)
+                if (!pto->addrKnown.contains(addr.GetKey()))
                 {
-                    if (!pto->addrKnown.contains(addr.GetKey()))
+                    pto->addrKnown.insert(addr.GetKey());
+                    vAddr.push_back(addr);
+                    // receiver rejects addr messages larger than 1000
+                    if (vAddr.size() >= 1000)
                     {
-                        pto->addrKnown.insert(addr.GetKey());
-                        vAddr.push_back(addr);
-                        // receiver rejects addr messages larger than 1000
-                        if (vAddr.size() >= 1000)
-                        {
-                            pto->PushMessage(NetMsgType::ADDR, vAddr);
-                            vAddr.clear();
-                        }
+                        pto->PushMessage(NetMsgType::ADDR, vAddr);
+                        vAddr.clear();
                     }
                 }
-                if (!vAddr.empty())
-                    pto->PushMessage(NetMsgType::ADDR, vAddr);
             }
+            if (!vAddr.empty())
+                pto->PushMessage(NetMsgType::ADDR, vAddr);
             pto->vAddrToSend.clear();
         }
 
