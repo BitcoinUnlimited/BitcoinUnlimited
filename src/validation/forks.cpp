@@ -66,16 +66,6 @@ bool IsUAHFforkActiveOnNextBlock(int height)
     return false;
 }
 
-// return true only if 1st condition is true (Median past time > fork time)
-// and not the 2nd, i.e. we are at precisely [consensusParams.uahfHeight-1,consensusParams.uahfHeight-1]
-// state: fork enabled
-bool UAHFforkAtNextBlock(int height)
-{
-    const Consensus::Params &consensusParams = Params().GetConsensus();
-    if (height == (consensusParams.uahfHeight - 1))
-        return true;
-    return false;
-}
 // For pindexTip use the current chainActive.Tip().
 
 bool IsDAAEnabled(const Consensus::Params &consensusparams, int nHeight)

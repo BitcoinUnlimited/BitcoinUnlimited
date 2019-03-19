@@ -32,9 +32,6 @@ bool IsTxProbablyNewSigHash(const CTransaction &tx);
 // was the fork activated on this or any prior block?
 bool UAHFforkActivated(int height);
 
-// Is the next block the fork block?
-bool UAHFforkAtNextBlock(int height);
-
 // Is the fork active on the next block?
 bool IsUAHFforkActiveOnNextBlock(int height);
 
