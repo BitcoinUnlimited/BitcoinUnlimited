@@ -1016,6 +1016,8 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
             "  \"difficulty\": xxxxxx,     (numeric) the current difficulty\n"
             "  \"mediantime\": xxxxxx,     (numeric) median time for the current best block\n"
             "  \"verificationprogress\": xxxx, (numeric) estimate of verification progress [0..1]\n"
+            "  \"initialblockdownload\": xxxx, (bool) (debug information) estimate of whether this node is in Initial "
+            "Block Download mode.\n"
             "  \"chainwork\": \"xxxx\"     (string) total amount of work in active chain, in hexadecimal\n"
             "  \"pruned\": xx,             (boolean) if the blocks are subject to pruning\n"
             "  \"pruneheight\": xxxxxx,    (numeric) lowest-height complete block stored\n"
@@ -1074,6 +1076,7 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     obj.pushKV("mediantime", (int64_t)chainActive.Tip()->GetMedianTimePast());
     obj.pushKV(
         "verificationprogress", Checkpoints::GuessVerificationProgress(Params().Checkpoints(), chainActive.Tip()));
+    obj.pushKV("initialblockdownload", IsInitialBlockDownload());
     obj.pushKV("chainwork", chainActive.Tip()->nChainWork.GetHex());
     obj.pushKV("pruned", fPruneMode);
 
