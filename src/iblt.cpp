@@ -155,7 +155,7 @@ uint32_t CIblt::saltedHashValue(size_t hashFuncIdx, const std::vector<uint8_t> &
     if (version > 0)
     {
         uint32_t seed = mapHashIdxSeeds.at(hashFuncIdx);
-        return MurmurHash3(seed, kvec) & KEYCHECK_MASK;
+        return MurmurHash3(seed, kvec);
     }
     else
         return MurmurHash3(hashFuncIdx, kvec);
