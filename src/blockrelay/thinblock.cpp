@@ -31,7 +31,6 @@
 #include "validation/validation.h"
 #include "xversionkeys.h"
 
-static bool DEFAULT_BLOOM_FILTER_TARGETING = true;
 static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount);
 
 CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter)

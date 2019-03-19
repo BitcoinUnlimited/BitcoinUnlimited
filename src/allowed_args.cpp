@@ -654,7 +654,8 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
                     SMALLEST_MAX_BLOOM_FILTER_SIZE))
         .addArg("use-bloom-filter-targeting", optionalBool,
             _("Enable thin block bloom filter targeting which helps to keep the size of bloom filters to a minumum "
-              "although it can impact performance. (default: 0)"))
+              "although it can impact performance. (default: %d)"),
+            DEFAULT_BLOOM_FILTER_TARGETING)
         .addArg("use-grapheneblocks", optionalBool,
             strprintf(_("Enable graphene to speed up the relay of blocks (default: %d)"), DEFAULT_USE_GRAPHENE_BLOCKS))
         .addArg("use-compactblocks", optionalBool,
