@@ -138,12 +138,9 @@ void CIblt::resize(size_t _expectedNumEntries)
 
     CIblt::n_hash = OptimalNHash(_expectedNumEntries);
 
-    if (salt > VALS_32 / n_hash)
-        throw std::runtime_error("salt * n_hash must fit in uint32_t");
-
     // set hash seeds from salt
     for (size_t i = 0; i < n_hash; i++)
-        mapHashIdxSeeds[i] = salt * n_hash + i;
+        mapHashIdxSeeds[i] = salt % (0xffffffff - n_hash) + i;
 
     // reduce probability of failure by increasing by overhead factor
     size_t nEntries = (size_t)(_expectedNumEntries * OptimalOverhead(_expectedNumEntries));

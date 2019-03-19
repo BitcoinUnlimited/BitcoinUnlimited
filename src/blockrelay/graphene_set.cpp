@@ -31,7 +31,7 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
 
     shorttxidk0 = _shorttxidk0;
     shorttxidk1 = _shorttxidk1;
-    ibltSalt = ibltEntropy % (uint8_t)std::max(1, (int)CIblt::MaxNHash());
+    ibltSalt = ibltEntropy;
     version = _version;
 
     // Below is the parameter "n" from the graphene paper

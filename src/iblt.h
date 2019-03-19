@@ -29,8 +29,6 @@ SOFTWARE.
 #include <set>
 #include <vector>
 
-static const size_t VALS_32 = 4294967295;
-
 //
 // Invertible Bloom Lookup Table implementation
 // References:
@@ -77,7 +75,7 @@ public:
     // Pass the expected number of entries in the IBLT table. If the number of entries exceeds
     // the expected, then the decode failure rate will increase dramatically.
     CIblt(size_t _expectedNumEntries, uint64_t _version);
-    // IBLTs with different salts are guaranteed to use different hash functions.
+    // The salt value is used to create a distinct hash seed for each hash function.
     CIblt(size_t _expectedNumEntries, uint32_t salt, uint64_t _version);
     // Copy constructor
     CIblt(const CIblt &other);
@@ -131,8 +129,6 @@ public:
         {
             READWRITE(mapHashIdxSeeds);
             READWRITE(salt);
-            if (salt > VALS_32 / n_hash)
-                throw std::ios_base::failure("salt * n_hash must fit in uint32_t");
         }
 
         if (ser_action.ForRead() && version > 1)
