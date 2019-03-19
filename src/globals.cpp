@@ -74,25 +74,22 @@ int64_t nTimeOffset = 0;
 
 CCriticalSection cs_rpcWarmup;
 
+std::atomic<CBlockIndex *> pindexBestHeader{nullptr};
+
 CSharedCriticalSection cs_mapBlockIndex;
 /** Current block index entries */
 BlockMap mapBlockIndex GUARDED_BY(cs_mapBlockIndex);
 /** Dirty block index entries. */
 std::set<CBlockIndex *> setDirtyBlockIndex GUARDED_BY(cs_mapBlockIndex);
+CBlockIndex *pindexBestInvalid GUARDED_BY(cs_mapBlockIndex) = nullptr;
 
 CCriticalSection cs_main;
 CChain chainActive GUARDED_BY(cs_main); // however, chainActive.Tip() is lock free
-// BU variables moved to globals.cpp
-// - moved CCriticalSection cs_main;
-// - moved BlockMap mapBlockIndex;
-// - movedCChain chainActive;
-std::atomic<CBlockIndex *> pindexBestHeader{nullptr};
 CFeeRate minRelayTxFee GUARDED_BY(cs_main) = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
 // The allowed size of the in memory UTXO cache
 int64_t nCoinCacheMaxSize GUARDED_BY(cs_main) = 0;
 /** A cache to store headers that have arrived but can not yet be connected **/
 std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders GUARDED_BY(cs_main);
-CBlockIndex *pindexBestInvalid GUARDED_BY(cs_main) = nullptr;
 /**
  * Every received block is assigned a unique and increasing identifier, so we
  * know which one to give priority in case of a fork.

@@ -99,7 +99,6 @@ extern CCriticalSection cs_mapInboundConnectionTracker;
 
 extern CCriticalSection cs_LastBlockFile;
 
-extern CBlockIndex *pindexBestInvalid;
 extern std::map<uint256, NodeId> mapBlockSource;
 extern std::set<int> setDirtyFileInfo;
 extern uint64_t nBlockSequenceId;

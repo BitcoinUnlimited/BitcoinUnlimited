@@ -516,11 +516,6 @@ void UnloadBlockIndex()
     mempool.clear();
 
     {
-        WRITELOCK(cs_mapBlockIndex);
-        setDirtyBlockIndex.clear();
-    }
-
-    {
         LOCK(cs_main);
         nBlockSequenceId = 1;
         nSyncStarted = 0;
@@ -528,8 +523,6 @@ void UnloadBlockIndex()
         mapUnConnectedHeaders.clear();
         setBlockIndexCandidates.clear();
         chainActive.SetTip(nullptr);
-        pindexBestInvalid = nullptr;
-        pindexBestHeader = nullptr;
         mapBlocksUnlinked.clear();
         vinfoBlockFile.clear();
         mapBlockSource.clear();
@@ -541,8 +534,11 @@ void UnloadBlockIndex()
         }
     }
 
+    pindexBestHeader.store(nullptr);
     {
         WRITELOCK(cs_mapBlockIndex);
+        setDirtyBlockIndex.clear();
+        pindexBestInvalid = nullptr;
 
         for (BlockMap::value_type &entry : mapBlockIndex)
         {
@@ -1124,15 +1120,16 @@ int32_t UnlimitedComputeBlockVersion(const CBlockIndex *pindexPrev, const Consen
 CBlockIndex *FindMostWorkChain()
 {
     AssertLockHeld(cs_main);
+    WRITELOCK(cs_mapBlockIndex);
     do
     {
-        CBlockIndex *pindexNew = NULL;
+        CBlockIndex *pindexNew = nullptr;
 
         // Find the best candidate header.
         {
             std::set<CBlockIndex *, CBlockIndexWorkComparator>::reverse_iterator it = setBlockIndexCandidates.rbegin();
             if (it == setBlockIndexCandidates.rend())
-                return NULL;
+                return nullptr;
             pindexNew = *it;
         }
 
@@ -1206,7 +1203,7 @@ CBlockIndex *FindMostWorkChain()
         if (fFailedChain || fMissingData || (fRecentExcessive && !fOldExcessive))
         {
             // Candidate chain is not usable (either invalid or missing data)
-            if (fFailedChain && (pindexBestInvalid == NULL || pindexNew->nChainWork > pindexBestInvalid->nChainWork))
+            if (fFailedChain && (pindexBestInvalid == nullptr || pindexNew->nChainWork > pindexBestInvalid->nChainWork))
                 pindexBestInvalid = pindexNew;
             CBlockIndex *pindexFailed = pindexNew;
             // Remove the entire chain from the set.
@@ -1233,7 +1230,7 @@ CBlockIndex *FindMostWorkChain()
         if (!fInvalidAncestor)
             return pindexNew;
     } while (true);
-    DbgAssert(0, return NULL); // should never get here
+    DbgAssert(0, return nullptr); // should never get here
 }
 
 bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensusParams, CBlockIndex *pindex)
@@ -1332,6 +1329,8 @@ void CheckForkWarningConditions()
 
 void InvalidChainFound(CBlockIndex *pindexNew)
 {
+    READLOCK(cs_mapBlockIndex);
+
     if (!pindexBestInvalid || pindexNew->nChainWork > pindexBestInvalid->nChainWork)
         pindexBestInvalid = pindexNew;
 
