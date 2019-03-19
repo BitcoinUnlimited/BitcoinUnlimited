@@ -238,6 +238,7 @@ public:
     double dPingTime;
     double dPingWait;
     double dPingMin;
+    //! What this peer sees as my address
     std::string addrLocal;
     //! Whether this peer supports CompactBlocks (for statistics only, BU doesn't support CB protocol)
     bool fSupportsCompactBlocks;
@@ -380,23 +381,25 @@ public:
     int nRecvVersion;
 
     // BU connection de-prioritization
-    // Total bytes sent and received
+    //! Total bytes sent and received
     uint64_t nActivityBytes;
 
     int64_t nLastSend;
     int64_t nLastRecv;
     int64_t nTimeConnected;
     int64_t nTimeOffset;
+    //! The address of the remote peer
     CAddress addr;
 
     //! set to true if this node is ok with no message checksum
     bool skipChecksum;
 
-    //! The address the remote peer advertised it its version message
+    //! The address the remote peer advertised in its version message
     CAddress addrFrom_advertised;
 
     std::string addrName;
     const char *currentCommand; // if in the middle of the send, this is the command type
+    //! The the remote peer sees us as this address (may be different than our IP due to NAT)
     CService addrLocal;
     int nVersion;
 
@@ -413,15 +416,25 @@ public:
     CCriticalSection cs_xversion;
     CXVersionMessage xVersion;
 
-    // strSubVer is whatever byte array we read from the wire. However, this field is intended
-    // to be printed out, displayed to humans in various forms and so on. So we sanitize it and
-    // store the sanitized version in cleanSubVer. The original should be used when dealing with
-    // the network or wire types and the cleaned string used when displayed or logged.
+    //! strSubVer is whatever byte array we read from the wire. However, this field is intended
+    //! to be printed out, displayed to humans in various forms and so on. So we sanitize it and
+    //! store the sanitized version in cleanSubVer. The original should be used when dealing with
+    //! the network or wire types and the cleaned string used when displayed or logged.
     std::string strSubVer, cleanSubVer;
-    bool fWhitelisted; // This peer can bypass DoS banning.
-    bool fFeeler; // If true this node is being used as a short lived feeler.
+
+    //! This peer can bypass DoS banning.
+    bool fWhitelisted;
+    //! If true this node is being used as a short lived feeler.
+    bool fFeeler;
     bool fOneShot;
     bool fClient;
+
+    //! If true a remote node initiated the connection.  If false, we initiated.
+    //! The protocol is slightly asymmetric:
+    //! initial version exchange
+    //! stop ADDR flooding in preparation for a network-wide eclipse attack
+    //! stop connection slot attack via eviction of stale (connected but no data) inbound connections
+    //! stop fingerprinting by seeding fake addresses and checking for them later by ignoring outbound getaddr
     bool fInbound;
     bool fAutoOutbound; // any outbound node not connected with -addnode, connect-thinblock or -connect
     bool fNetworkNode; // any outbound node
@@ -520,7 +533,6 @@ public:
     // flood relay
     std::vector<CAddress> vAddrToSend GUARDED_BY(cs_vSend);
     CRollingBloomFilter addrKnown;
-    bool fGetAddr;
     std::set<uint256> setKnown;
     int64_t nNextAddrSend;
     int64_t nNextLocalAddrSend;
@@ -545,6 +557,8 @@ public:
     int64_t nMinPingUsecTime;
     // Whether a ping is requested.
     bool fPingQueued;
+    // Whether an ADDR was requested.
+    std::atomic<bool> fGetAddr;
 
     // BU instrumentation
     // track the number of bytes sent to this node

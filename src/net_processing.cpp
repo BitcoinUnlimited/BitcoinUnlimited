@@ -330,8 +330,8 @@ static void handleAddressAfterInit(CNode *pfrom)
             }
         }
         // Get recent addresses
-        pfrom->PushMessage(NetMsgType::GETADDR);
         pfrom->fGetAddr = true;
+        pfrom->PushMessage(NetMsgType::GETADDR);
         addrman.Good(pfrom->addr);
     }
     else
@@ -744,6 +744,44 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             return error("message addr size() = %u", vAddr.size());
         }
 
+        // To avoid malicious flooding of our address table, only allow unsolicited ADDR messages to
+        // insert the connecting IP.  We need to allow this IP to be inserted, or there is no way for that node
+        // to tell the network about itself if its behind a NAT.
+
+        // Digression about how things work behind a NAT:
+        //     Node A periodically ADDRs node B with the address that B reported to A as A's own
+        //     address (in the VERSION message).
+        //
+        // The purpose of using exchange here is to atomically set to false and also get whether I asked for an addr
+        if (!pfrom->fGetAddr.exchange(0) && pfrom->fInbound)
+        {
+            bool reportedOwnAddr = false;
+            CAddress ownAddr;
+            for (CAddress &addr : vAddr)
+            {
+                // server listen port will be different.  We want to compare IPs and then use provided port
+                if ((CNetAddr)addr == (CNetAddr)pfrom->addr)
+                {
+                    ownAddr = addr;
+                    reportedOwnAddr = true;
+                    break;
+                }
+            }
+            if (reportedOwnAddr)
+            {
+                vAddr.resize(1); // Get rid of every address the remote node tried to inject except itself.
+                vAddr[0] = ownAddr;
+            }
+            else
+            {
+                // Today unsolicited ADDRs are not illegal, but we should consider misbehaving on this (if we add logic
+                // to unmisbehaving over time), because a few unsolicited ADDRs are ok from a DOS perspective but lots
+                // are not.
+                // dosMan.Misbehaving(pfrom, 1);
+                return true; // We don't want to process any other addresses, but giving them is not an error
+            }
+        }
+
         // Store the new addresses
         std::vector<CAddress> vAddrOk;
         int64_t nNow = GetAdjustedTime();
@@ -760,7 +798,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 addr.nTime = nNow - 5 * 24 * 60 * 60;
             pfrom->AddAddressKnown(addr);
             bool fReachable = IsReachable(addr);
-            if (addr.nTime > nSince && !pfrom->fGetAddr && vAddr.size() <= 10 && addr.IsRoutable())
+            if (addr.nTime > nSince && vAddr.size() <= 10 && addr.IsRoutable())
             {
                 // Relay to a limited number of other nodes
                 {
@@ -794,8 +832,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 vAddrOk.push_back(addr);
         }
         addrman.Add(vAddrOk, pfrom->addr, 2 * 60 * 60);
-        if (vAddr.size() < 1000)
-            pfrom->fGetAddr = false;
         if (pfrom->fOneShot)
         {
             LOG(NET, "Disconnecting %s: one shot\n", pfrom->GetLogName());
@@ -2141,9 +2177,9 @@ bool SendMessages(CNode *pto)
                     }
                 }
             }
-            pto->vAddrToSend.clear();
             if (!vAddr.empty())
                 pto->PushMessage(NetMsgType::ADDR, vAddr);
+            pto->vAddrToSend.clear();
         }
 
         CNodeState statem(CAddress(), "");

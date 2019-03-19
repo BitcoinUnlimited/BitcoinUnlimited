@@ -116,11 +116,11 @@ class BUProtocolHandler(NodeConnCB):
                     self.send_message(msg)
                     self.show_debug_msg("requested block")
                 if self.requestOnInv & REQ_THINBLOCK:
-                    msg = msg_getdata(CInv(CInv.MSG_THINBLOCK, inv.hash))
+                    msg = msg_get_thin(CInv(CInv.MSG_THINBLOCK, inv.hash))
                     self.send_message(msg)
                     self.show_debug_msg("requested thinblock")
                 if self.requestOnInv & REQ_XTHINBLOCK:
-                    msg = msg_getdata(CInv(CInv.MSG_XTHINBLOCK, inv.hash))
+                    msg = msg_get_xthin(CInv(CInv.MSG_XTHINBLOCK, inv.hash))
                     self.send_message(msg)
                     self.show_debug_msg("requested xthinblock")
 
@@ -157,6 +157,13 @@ class BUProtocolHandler(NodeConnCB):
 
     def on_close(self, conn):
         self.disconnected = True
+
+    def send_addrs(self, addrList):
+        maddr = msg_addr()
+        for a in addrList:
+            ca = CAddress(a.split(":")[0],int(a.split(":")[1]))
+            maddr.addrs.append(ca)
+        self.connection.send_message(maddr)
 
     # Test whether the last announcement we received had the
     # right header or the right inv
@@ -357,6 +364,15 @@ class TestClass(BitcoinTestFramework):
         except JSONRPCException as e:
             pass
 
+        # Attempt unsolicited ADDRs
+        port = 0
+        while port < 65000:
+            addrs = []
+            for p in range(port, port+1000):
+                addrs.append("127.0.0.1:%d" % p)
+            pybu.cnxns[0].send_addrs(addrs)
+            port +=1000
+
         # ok this mined block should make thin & xthin blocks
         node.generate(1)
 
@@ -372,8 +388,13 @@ if __name__ == '__main__':
 
 def Test():
     t = TestClass()
+    t.drop_to_pdb = True
     bitcoinConf = {
-        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],  # "lck"
-        "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
+        "debug": ["blk", "mempool", "net", "req"],
+        "logtimemicros": 1
     }
-    t.main(["--tmppfx=/ramdisk/test", "--nocleanup", "--noshutdown"], bitcoinConf, None)  # , "--tracerpc"])
+
+    flags = standardFlags()
+    flags[0] = "--tmpdir=/ramdisk/test/t"
+    flags.append("--nocleanup")
+    t.main(flags, bitcoinConf, None)
