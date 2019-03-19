@@ -223,10 +223,6 @@ void ThreadCommitToMempool()
                 pcoinsTip->Trim(nCoinCacheMaxSize);
             }
 
-            // CheckInputs needs cs_main (for static int GetSpendHeight(const CCoinsViewCache &inputs)), but it has
-            // improper order with mempool so skip assert until cs_main dependency removed
-            // LOCK(cs_main);
-
             mempool.check(pcoinsTip);
         }
     }
