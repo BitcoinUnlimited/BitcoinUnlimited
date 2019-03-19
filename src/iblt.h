@@ -152,6 +152,8 @@ public:
 protected:
     void _insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> &v);
 
+    // This salt is used to seed the IBLT hash functions. When its value (passed in via constructor)
+    // is derived from a pseudo-random value, the IBLT hash functions themselves become randomized.
     uint32_t salt;
     uint64_t version;
     uint8_t n_hash;
