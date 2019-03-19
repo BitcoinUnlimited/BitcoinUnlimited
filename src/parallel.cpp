@@ -559,122 +559,139 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
 
 void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef pblock, const CInv inv)
 {
-    uint64_t nSizeBlock = pblock->GetBlockSize();
-    int64_t startTime = GetTimeMicros();
-    CValidationState state;
-
-    // Indicate that the block was fully received. At this point we have either a block or a fully reconstructed
-    // thin type block but we still need to maintain a map*BlocksInFlight entry so that we don't re-request a
-    // full block from the same node while the block is processing.
-    thinrelay.BlockWasReceived(pfrom, inv.hash);
-
     boost::thread::id this_id(boost::this_thread::get_id());
-    PV->InitThread(this_id, pfrom, pblock, inv, nSizeBlock); // initialize the mapBlockValidationThread entries
 
-    // Process all blocks from whitelisted peers, even if not requested,
-    // unless we're still syncing with the network.
-    // Such an unrequested block may still be processed, subject to the
-    // conditions in AcceptBlock().
-    bool forceProcessing = pfrom->fWhitelisted && !IsInitialBlockDownload();
-    const CChainParams &chainparams = Params();
-    if (PV->Enabled())
+    try
     {
-        ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, true);
-    }
-    else
-    {
-        LOCK(cs_main); // locking cs_main here prevents any other thread from beginning starting a block validation.
-        ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, false);
-    }
+        uint64_t nSizeBlock = pblock->GetBlockSize();
+        int64_t startTime = GetTimeMicros();
+        CValidationState state;
 
-    int nDoS;
-    if (state.IsInvalid(nDoS))
-    {
-        LOGA("Invalid block due to %s\n", state.GetRejectReason().c_str());
-        if (!strCommand.empty())
+        // Indicate that the block was fully received. At this point we have either a block or a fully reconstructed
+        // thin type block but we still need to maintain a map*BlocksInFlight entry so that we don't re-request a
+        // full block from the same node while the block is processing.
+        thinrelay.BlockWasReceived(pfrom, inv.hash);
+
+        PV->InitThread(this_id, pfrom, pblock, inv, nSizeBlock); // initialize the mapBlockValidationThread entries
+
+        // Process all blocks from whitelisted peers, even if not requested,
+        // unless we're still syncing with the network.
+        // Such an unrequested block may still be processed, subject to the
+        // conditions in AcceptBlock().
+        bool forceProcessing = pfrom->fWhitelisted && !IsInitialBlockDownload();
+        const CChainParams &chainparams = Params();
+        if (PV->Enabled())
         {
-            pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
-                state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
-            if (nDoS > 0)
-                dosMan.Misbehaving(pfrom, nDoS);
-        }
-
-        // the current fork is bad due to this block so reset the best header to the best fully-validated block
-        // so we can download another fork of headers (and blocks).
-        LOCK(cs_main);
-        CBlockIndex *mostWork = FindMostWorkChain();
-        CBlockIndex *tip = chainActive.Tip();
-        if (mostWork && tip && (mostWork->nChainWork > tip->nChainWork))
-        {
-            pindexBestHeader = mostWork;
+            ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, true);
         }
         else
         {
-            pindexBestHeader = tip;
+            // locking cs_main here prevents any other thread from beginning starting a block validation.
+            LOCK(cs_main);
+            ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, false);
         }
-    }
-    else
-    {
-        LargestBlockSeen(nSizeBlock); // update largest block seen
 
-        double nValidationTime = (double)(GetTimeMicros() - startTime) / 1000000.0;
-        if ((strCommand != NetMsgType::BLOCK) && (IsThinBlocksEnabled() || IsGrapheneBlockEnabled()))
+        int nDoS;
+        if (state.IsInvalid(nDoS))
         {
-            LOG(THIN | GRAPHENE, "Processed Block %s reconstructed from (%s) in %.2f seconds, peer=%s\n",
-                inv.hash.ToString(), strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0,
-                pfrom->GetLogName());
+            LOGA("Invalid block due to %s\n", state.GetRejectReason().c_str());
+            if (!strCommand.empty())
+            {
+                pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
+                    state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
+                if (nDoS > 0)
+                    dosMan.Misbehaving(pfrom, nDoS);
+            }
 
-            if (strCommand != NetMsgType::GRAPHENEBLOCK)
-                thindata.UpdateValidationTime(nValidationTime);
+            // the current fork is bad due to this block so reset the best header to the best fully-validated block
+            // so we can download another fork of headers (and blocks).
+            LOCK(cs_main);
+            CBlockIndex *mostWork = FindMostWorkChain();
+            CBlockIndex *tip = chainActive.Tip();
+            if (mostWork && tip && (mostWork->nChainWork > tip->nChainWork))
+            {
+                pindexBestHeader = mostWork;
+            }
             else
-                graphenedata.UpdateValidationTime(nValidationTime);
+            {
+                pindexBestHeader = tip;
+            }
         }
         else
         {
-            LOG(THIN | GRAPHENE, "Processed Regular Block %s in %.2f seconds, peer=%s\n", inv.hash.ToString(),
-                (double)(GetTimeMicros() - startTime) / 1000000.0, pfrom->GetLogName());
+            LargestBlockSeen(nSizeBlock); // update largest block seen
+
+            double nValidationTime = (double)(GetTimeMicros() - startTime) / 1000000.0;
+            if ((strCommand != NetMsgType::BLOCK) && (IsThinBlocksEnabled() || IsGrapheneBlockEnabled()))
+            {
+                LOG(THIN | GRAPHENE, "Processed Block %s reconstructed from (%s) in %.2f seconds, peer=%s\n",
+                    inv.hash.ToString(), strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0,
+                    pfrom->GetLogName());
+
+                if (strCommand != NetMsgType::GRAPHENEBLOCK)
+                    thindata.UpdateValidationTime(nValidationTime);
+                else
+                    graphenedata.UpdateValidationTime(nValidationTime);
+            }
+            else
+            {
+                LOG(THIN | GRAPHENE, "Processed Regular Block %s in %.2f seconds, peer=%s\n", inv.hash.ToString(),
+                    (double)(GetTimeMicros() - startTime) / 1000000.0, pfrom->GetLogName());
+            }
         }
-    }
 
-    // When we request a thin type block we may get back a regular block if it is smaller than
-    // either of the former.  Therefore we have to remove the thin or graphene block in flight if it
-    // exists and we also need to check that the block didn't arrive from some other peer.
+        // When we request a thin type block we may get back a regular block if it is smaller than
+        // either of the former.  Therefore we have to remove the thin or graphene block in flight if it
+        // exists and we also need to check that the block didn't arrive from some other peer.
+        {
+            // Remove thinblock data and thinblock in flight
+            thinrelay.ClearBlockInFlight(pfrom, inv.hash);
+            pfrom->firstBlock += 1;
+        }
+
+        // When we no longer have any thinblocks in flight then clear our any data
+        // just to make sure we don't somehow get growth over time.
+        if (thinrelay.TotalBlocksInFlight() == 0)
+        {
+            thindata.ResetThinBlockBytes();
+            graphenedata.ResetGrapheneBlockBytes();
+            compactdata.ResetCompactBlockBytes();
+        }
+
+        // Erase any txns from the orphan cache that are no longer needed
+        PV->ClearOrphanCache(pblock);
+
+        // If chain is nearly caught up then flush the state after a block is finished processing and the
+        // performance timings have been updated.  This way we don't include the flush time in our time to
+        // process the block advance the tip.
+        if (IsChainNearlySyncd())
+            FlushStateToDisk(state, FLUSH_STATE_ALWAYS);
+    }
+    catch (const std::exception &e)
     {
-        // Remove thinblock data and thinblock in flight
-        thinrelay.ClearBlockInFlight(pfrom, inv.hash);
-        pfrom->firstBlock += 1;
+        LOGA("Exception thrown in PV thread: %s\n", e.what());
     }
 
-    // When we no longer have any thinblocks in flight then clear our any data
-    // just to make sure we don't somehow get growth over time.
-    if (thinrelay.TotalBlocksInFlight() == 0)
+    // Use a separate try catch block here.  In the event that the upper block throws an exception we'll still be
+    // able to clean up the semaphore, tracking map and node reference.
+    try
     {
-        thindata.ResetThinBlockBytes();
-        graphenedata.ResetGrapheneBlockBytes();
-        compactdata.ResetCompactBlockBytes();
+        // Clear thread data - this must be done before the thread completes or else some other new
+        // thread may grab the same thread id and we would end up deleting the entry for the new thread instead.
+        PV->Erase(this_id);
+
+        // release semaphores depending on whether this was IBD or not.  We can not use IsChainNearlySyncd()
+        // because the return value will switch over when IBD is nearly finished and we may end up not releasing
+        // the correct semaphore.
+        PV->Post();
+
+        // Remove the CNode reference we aquired just before we launched this thread.
+        pfrom->Release();
     }
-
-
-    // Erase any txns from the orphan cache that are no longer needed
-    PV->ClearOrphanCache(pblock);
-
-    // Clear thread data - this must be done before the thread completes or else some other new
-    // thread may grab the same thread id and we would end up deleting the entry for the new thread instead.
-    PV->Erase(this_id);
-
-    // release semaphores depending on whether this was IBD or not.  We can not use IsChainNearlySyncd()
-    // because the return value will switch over when IBD is nearly finished and we may end up not releasing
-    // the correct semaphore.
-    PV->Post();
-
-    // Remove the CNode reference we aquired just before we launched this thread.
-    pfrom->Release();
-
-    // If chain is nearly caught up then flush the state after a block is finished processing and the
-    // performance timings have been updated.  This way we don't include the flush time in our time to
-    // process the block advance the tip.
-    if (IsChainNearlySyncd())
-        FlushStateToDisk(state, FLUSH_STATE_ALWAYS);
+    catch (const std::exception &e)
+    {
+        LOGA("Exception thrown in PV thread while cleaning up: %s\n", e.what());
+    }
 }
 
 
