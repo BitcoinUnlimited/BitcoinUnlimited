@@ -102,7 +102,14 @@ public:
         if (nBlockTxs > (excessiveBlockSize * maxMessageSizeMultiplier / 100))
             throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
         if (!pGrapheneSet)
-            pGrapheneSet = new CGrapheneSet(version >= 2);
+        {
+            if (version > 2)
+                pGrapheneSet = new CGrapheneSet(2);
+            else if (version == 2)
+                pGrapheneSet = new CGrapheneSet(1);
+            else
+                pGrapheneSet = new CGrapheneSet(0);
+        }
         READWRITE(*pGrapheneSet);
     }
     uint64_t GetAdditionalTxSerializationSize()

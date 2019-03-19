@@ -37,6 +37,7 @@ private:
     uint64_t nReceiverUniverseItems;
     mutable uint64_t shorttxidk0, shorttxidk1;
     uint64_t version;
+    uint32_t ibltSalt;
     std::vector<unsigned char> encodedRank;
     CBloomFilter *pSetFilter;
     CIblt *pSetIblt;
@@ -56,12 +57,12 @@ private:
 public:
     // The default constructor is for 2-phase construction via deserialization
     CGrapheneSet()
-        : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), version(1), pSetFilter(nullptr),
-          pSetIblt(nullptr)
+        : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), version(1), ibltSalt(0),
+          pSetFilter(nullptr), pSetIblt(nullptr)
     {
     }
     CGrapheneSet(uint64_t _version)
-        : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), pSetFilter(nullptr),
+        : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), ibltSalt(0), pSetFilter(nullptr),
           pSetIblt(nullptr)
     {
         version = _version;
@@ -71,7 +72,8 @@ public:
         const std::vector<uint256> &_itemHashes,
         uint64_t _shorttxidk0,
         uint64_t _shorttxidk1,
-        uint64_t _version,
+        uint64_t _version = 1,
+        uint32_t ibltEntropy = 0,
         bool _ordered = false,
         bool fDeterministic = false);
 
@@ -156,6 +158,8 @@ public:
             READWRITE(shorttxidk0);
             READWRITE(shorttxidk1);
         }
+        if (version >= 2)
+            READWRITE(ibltSalt);
         if (nReceiverUniverseItems > LARGE_MEM_POOL_SIZE)
             throw std::runtime_error("nReceiverUniverseItems exceeds threshold for excessive mempool size");
         READWRITE(encodedRank);

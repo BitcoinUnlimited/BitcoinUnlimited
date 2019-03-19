@@ -44,10 +44,14 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
 
     version = _version;
     if (version >= 2)
-    {
         FillShortTxIDSelector();
+
+    if (version < 2)
+        grapheneSetVersion = 0;
+    if (version == 2)
         grapheneSetVersion = 1;
-    }
+    else if (version >= 3)
+        grapheneSetVersion = 2;
 
     std::vector<uint256> blockHashes;
     for (auto &tx : pblock->vtx)
@@ -60,10 +64,10 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
 
     if (enableCanonicalTxOrder.Value())
         pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0,
-            shorttxidk1, grapheneSetVersion, false);
+            shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, false);
     else
         pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0,
-            shorttxidk1, grapheneSetVersion, true);
+            shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, true);
 }
 
 CGrapheneBlock::~CGrapheneBlock()
