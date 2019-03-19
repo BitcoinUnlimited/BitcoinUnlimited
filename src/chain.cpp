@@ -136,7 +136,7 @@ void CBlockIndex::BuildSkip()
  * Instead we use 'x' to indicate the first block mined after the time based trigger fired.
  * A fork is considered to be enabled at height x-1 and activated at height x.
  * We chose this naming scheme because usually block 'x' has to satisfy additional conditions
- * on e.g. block size in the UAHF case.
+ * on e.g. block size in the UAHF (Aug, 1st 2017 protocol upgrade) case.
  *
  * The following helper will check if a given block belongs to 4 different intervals, namely:
  *

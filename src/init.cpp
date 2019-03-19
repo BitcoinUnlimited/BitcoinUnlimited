@@ -842,7 +842,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         nLocalServices |= NODE_GRAPHENE;
     // BUIPXXX Graphene Blocks: end section
 
-    // UAHF - BitcoinCash service bit
+    // BitcoinCash service bit
     nLocalServices |= NODE_BITCOIN_CASH;
 
     nMaxTipAge = GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);

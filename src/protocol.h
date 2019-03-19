@@ -366,11 +366,9 @@ enum
     // make xthin requests
     NODE_XTHIN = (1 << 4),
 
-    // UAHF
-    // NODE_BITCOIN_CASH means the node supports the UAHF hard fork.  This is intended to be just
-    // a temporary service bit until the fork actually happens.  After the for it can be
-    // removed.
-    // If this is turned off then the node will not follow the UAHF hardfork
+    // NODE_BITCOIN_CASH means the node supports the BCH chain.  This is intended to be just
+    // a temporary service bit until the fork actually happens.  Once the split between BTC
+    // and BCH chain is stable it can be removed.
     NODE_BITCOIN_CASH = (1 << 5),
 
     // NODE_GRAPHENE means the node supports Graphene blocks
