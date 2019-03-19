@@ -16,6 +16,11 @@
 #include <atomic>
 #include <vector>
 
+// Bloom filter targeting attempts to reduce the size of the xthin bloom filters by
+// prediciting which transactions are likely to get included in the the block. This is
+// only useful when the memory pool is consistently much larger than the mined block size.
+static const bool DEFAULT_BLOOM_FILTER_TARGETING = true;
+
 class CDataStream;
 class CNode;
 
