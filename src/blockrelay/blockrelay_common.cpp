@@ -272,7 +272,7 @@ std::shared_ptr<CBlock_ThinRelay> ThinTypeRelay::GetBlockToReconstruct(CNode *pf
         return iter->second.second;
     }
     else
-        return std::shared_ptr<CBlock_ThinRelay>{};
+        return nullptr;
 }
 
 void ThinTypeRelay::ClearBlockToReconstruct(CNode *pfrom)
