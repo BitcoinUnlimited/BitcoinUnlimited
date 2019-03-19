@@ -34,6 +34,8 @@ static const int THINBLOCKS_VERSION = 80001;
 //! Expedited Relay enabled in this version
 static const int EXPEDITED_VERSION = 80002;
 
+//! Per BIP 152 nodes SHOULD check for a protocol version of >= 70014 before sending sendcmpct messages
+static const int COMPACTBLOCKS_VERSION = 70014;
 
 /**
  * unused network protocol versions

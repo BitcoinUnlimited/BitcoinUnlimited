@@ -23,6 +23,7 @@
 #include "txadmission.h"
 #include "validation/validation.h"
 #include "validationinterface.h"
+#include "version.h"
 #include "xversionkeys.h"
 
 extern std::atomic<int64_t> nTimeBestReceived;
@@ -839,9 +840,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
     }
 
-    // Processing this message type for statistics purposes only, BU currently doesn't support CB protocol
     // Ignore this message if sent from a node advertising a version earlier than the first CB release (70014)
-    else if (strCommand == NetMsgType::SENDCMPCT && pfrom->nVersion >= 70014)
+    else if (strCommand == NetMsgType::SENDCMPCT && pfrom->nVersion >= COMPACTBLOCKS_VERSION)
     {
         bool fHighBandwidth = false;
         uint64_t nVersion = 0;
@@ -1313,7 +1313,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             // During the process of IBD we need to update block availability for every connected peer. To do that we
             // request, from each NODE_NETWORK peer, a header that matches the last blockhash found in this recent set
-            // of headers. Once the reqeusted header is received then the block availability for this peer will get
+            // of headers. Once the requested header is received then the block availability for this peer will get
             // updated.
             if (IsInitialBlockDownload())
             {

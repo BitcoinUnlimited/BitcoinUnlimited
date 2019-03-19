@@ -630,7 +630,7 @@ void CRequestManager::SendRequests()
     bool fBatchBlockRequests = IsInitialBlockDownload();
     std::map<CNode *, std::vector<CInv> > mapBatchBlockRequests;
 
-    // Batch any transaction reqeusts when possible. The process of batching and requesting batched transactions
+    // Batch any transaction requests when possible. The process of batching and requesting batched transactions
     // is simlilar to batched block requests, however, we don't make the distinction of whether we're in the process
     // of syncing the chain, as we do with block requests.
     std::map<CNode *, std::vector<CInv> > mapBatchTxnRequests;
