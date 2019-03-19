@@ -801,8 +801,6 @@ void CacheSizeCalculations(int64_t _nTotalCache,
 
 void AdjustCoinCacheSize()
 {
-    AssertLockHeld(cs_main);
-
     // If the operator has not set a dbcache and initial sync is complete then revert back to the default
     // value for dbcache. This will cause the current coins cache to be immediately trimmed to size.
     if (!IsInitialBlockDownload() && !GetArg("-dbcache", 0) && chainActive.Tip())
