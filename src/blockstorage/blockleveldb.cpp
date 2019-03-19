@@ -171,7 +171,10 @@ uint64_t CBlockLevelDB::PruneDB(uint64_t nLastBlockWeCanPrune)
         pindexOldest->nFile = 0;
         pindexOldest->nDataPos = 0;
         pindexOldest->nUndoPos = 0;
-        setDirtyBlockIndex.insert(pindexOldest);
+        {
+            WRITELOCK(cs_mapBlockIndex);
+            setDirtyBlockIndex.insert(pindexOldest);
+        }
         prunedCount = prunedCount + 1;
         pindexOldest = chainActive.Next(pindexOldest);
     }

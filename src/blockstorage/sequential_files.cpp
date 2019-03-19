@@ -165,7 +165,10 @@ void PruneOneBlockFile(const int fileNumber)
             pindex->nFile = 0;
             pindex->nDataPos = 0;
             pindex->nUndoPos = 0;
-            setDirtyBlockIndex.insert(pindex);
+            {
+                WRITELOCK(cs_mapBlockIndex);
+                setDirtyBlockIndex.insert(pindex);
+            }
 
             // Prune from mapBlocksUnlinked -- any block we prune would have
             // to be downloaded again in order to consider its chain, at which

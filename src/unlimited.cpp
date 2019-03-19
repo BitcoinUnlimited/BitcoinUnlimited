@@ -2059,8 +2059,6 @@ UniValue validatechainhistory(const UniValue &params, bool fHelp)
 
     LOGA("validatechainhistory starting at %d %s\n", pos->nHeight, pos->phashBlock->ToString());
 
-    LOCK(cs_main); // modifying contents of CBlockIndex
-
     while (pos && !failedChain)
     {
         // LOGA("validate %d %s\n", pos->nHeight, pos->phashBlock->ToString());
@@ -2074,16 +2072,21 @@ UniValue validatechainhistory(const UniValue &params, bool fHelp)
     if (failedChain)
     {
         ret = UniValue("Chain has a bad ancestor");
-        while (!stk.empty())
         {
-            pos = stk.top();
-            if (pos)
+            WRITELOCK(cs_mapBlockIndex);
+            while (!stk.empty())
             {
-                pos->nStatus |= BLOCK_FAILED_CHILD;
+                pos = stk.top();
+                if (pos)
+                {
+                    pos->nStatus |= BLOCK_FAILED_CHILD;
+                }
+                setDirtyBlockIndex.insert(pos);
+                stk.pop();
             }
-            setDirtyBlockIndex.insert(pos);
-            stk.pop();
         }
+
+        LOCK(cs_main);
         FlushStateToDisk();
         pindexBestHeader = FindMostWorkChain();
     }
@@ -2338,7 +2341,10 @@ void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
                 if ((blk->nStatus & BLOCK_FAILED_CHILD) == 0)
                 {
                     blk->nStatus |= BLOCK_FAILED_CHILD;
-                    setDirtyBlockIndex.insert(blk);
+                    {
+                        WRITELOCK(cs_mapBlockIndex);
+                        setDirtyBlockIndex.insert(blk);
+                    }
                     dirty = true;
                 }
             }

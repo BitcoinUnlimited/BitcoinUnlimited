@@ -278,7 +278,10 @@ void SyncStorage(const CChainParams &chainparams)
                     pindexBest = index;
                 }
             }
-            setDirtyBlockIndex.insert(index);
+            {
+                WRITELOCK(cs_mapBlockIndex);
+                setDirtyBlockIndex.insert(index);
+            }
             blocksToRemove.push_back(index);
             if (blocksToRemove.size() % 10000 == 0)
             {
@@ -427,7 +430,10 @@ void SyncStorage(const CChainParams &chainparams)
                     pindexBest = index;
                 }
             }
-            setDirtyBlockIndex.insert(index);
+            {
+                WRITELOCK(cs_mapBlockIndex);
+                setDirtyBlockIndex.insert(index);
+            }
             if (lastFinishedFile <= loadedblockfile && index->nHeight > (int)blockfiles[lastFinishedFile].nHeightLast)
             {
                 fs::remove(GetDataDir() / "blocks" / strprintf("blk%05u.dat", lastFinishedFile));
@@ -626,13 +632,15 @@ bool FlushStateToDiskInternal(CValidationState &state,
                 setDirtyFileInfo.erase(it++);
             }
             std::vector<const CBlockIndex *> vBlocks;
-            vBlocks.reserve(setDirtyBlockIndex.size());
-            for (std::set<CBlockIndex *>::iterator it = setDirtyBlockIndex.begin(); it != setDirtyBlockIndex.end();)
             {
-                vBlocks.push_back(*it);
-                setDirtyBlockIndex.erase(it++);
+                WRITELOCK(cs_mapBlockIndex);
+                vBlocks.reserve(setDirtyBlockIndex.size());
+                for (std::set<CBlockIndex *>::iterator it = setDirtyBlockIndex.begin(); it != setDirtyBlockIndex.end();)
+                {
+                    vBlocks.push_back(*it);
+                    setDirtyBlockIndex.erase(it++);
+                }
             }
-
 
             // we write different info depending on block storage system
             if (!pblockdb) // sequential files

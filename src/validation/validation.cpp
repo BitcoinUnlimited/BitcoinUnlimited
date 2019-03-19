@@ -516,6 +516,11 @@ void UnloadBlockIndex()
     mempool.clear();
 
     {
+        WRITELOCK(cs_mapBlockIndex);
+        setDirtyBlockIndex.clear();
+    }
+
+    {
         LOCK(cs_main);
         nBlockSequenceId = 1;
         nSyncStarted = 0;
@@ -528,7 +533,6 @@ void UnloadBlockIndex()
         mapBlocksUnlinked.clear();
         vinfoBlockFile.clear();
         mapBlockSource.clear();
-        setDirtyBlockIndex.clear();
         setDirtyFileInfo.clear();
         versionbitscache.Clear();
         for (int b = 0; b < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; b++)
@@ -995,7 +999,7 @@ bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex)
 
     int nHeight = pindex->nHeight;
 
-    READLOCK(cs_mapBlockIndex);
+    WRITELOCK(cs_mapBlockIndex);
     // Remove the invalidity flag from this block and all its descendants.
     BlockMap::iterator it = mapBlockIndex.begin();
     while (it != mapBlockIndex.end())
@@ -1012,14 +1016,14 @@ bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex)
             if (it->second == pindexBestInvalid)
             {
                 // Reset invalid block marker if it was pointing to one of those.
-                pindexBestInvalid = NULL;
+                pindexBestInvalid = nullptr;
             }
         }
         it++;
     }
 
     // Remove the invalidity flag from all ancestors too.
-    while (pindex != NULL)
+    while (pindex != nullptr)
     {
         if (pindex->nStatus & BLOCK_FAILED_MASK)
         {
@@ -1238,14 +1242,20 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
 
     // Mark the block itself as invalid.
     pindex->nStatus |= BLOCK_FAILED_VALID;
-    setDirtyBlockIndex.insert(pindex);
+    {
+        WRITELOCK(cs_mapBlockIndex);
+        setDirtyBlockIndex.insert(pindex);
+    }
     setBlockIndexCandidates.erase(pindex);
 
     while (chainActive.Contains(pindex))
     {
         CBlockIndex *pindexWalk = chainActive.Tip();
         pindexWalk->nStatus |= BLOCK_FAILED_CHILD;
-        setDirtyBlockIndex.insert(pindexWalk);
+        {
+            WRITELOCK(cs_mapBlockIndex);
+            setDirtyBlockIndex.insert(pindexWalk);
+        }
         setBlockIndexCandidates.erase(pindexWalk);
         // ActivateBestChain considers blocks already in chainActive
         // unconditionally valid already, so force disconnect away from it.
@@ -1516,7 +1526,10 @@ bool ReceivedBlockTransactions(const CBlock &block,
     }
 
     pindexNew->RaiseValidity(BLOCK_VALID_TRANSACTIONS);
-    setDirtyBlockIndex.insert(pindexNew);
+    {
+        WRITELOCK(cs_mapBlockIndex);
+        setDirtyBlockIndex.insert(pindexNew);
+    }
 
     if (pindexNew->pprev == NULL || pindexNew->pprev->nChainTx)
     {
@@ -1612,7 +1625,10 @@ bool AcceptBlock(const CBlock &block,
         if (state.IsInvalid() && !state.CorruptionPossible())
         {
             pindex->nStatus |= BLOCK_FAILED_VALID;
-            setDirtyBlockIndex.insert(pindex);
+            {
+                WRITELOCK(cs_mapBlockIndex);
+                setDirtyBlockIndex.insert(pindex);
+            }
             // Now mark every block index on every chain that contains pindex as child of invalid
             MarkAllContainingChainsInvalid(pindex);
         }
@@ -2498,7 +2514,10 @@ bool ConnectBlock(const CBlock &block,
         }
 
         pindex->RaiseValidity(BLOCK_VALID_SCRIPTS);
-        setDirtyBlockIndex.insert(pindex);
+        {
+            WRITELOCK(cs_mapBlockIndex);
+            setDirtyBlockIndex.insert(pindex);
+        }
     }
 
     if (fTxIndex)
@@ -2559,7 +2578,10 @@ void InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state)
     if (!state.CorruptionPossible())
     {
         pindex->nStatus |= BLOCK_FAILED_VALID;
-        setDirtyBlockIndex.insert(pindex);
+        {
+            WRITELOCK(cs_mapBlockIndex);
+            setDirtyBlockIndex.insert(pindex);
+        }
         setBlockIndexCandidates.erase(pindex);
         InvalidChainFound(pindex);
 

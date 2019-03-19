@@ -75,7 +75,10 @@ int64_t nTimeOffset = 0;
 CCriticalSection cs_rpcWarmup;
 
 CSharedCriticalSection cs_mapBlockIndex;
+/** Current block index entries */
 BlockMap mapBlockIndex GUARDED_BY(cs_mapBlockIndex);
+/** Dirty block index entries. */
+std::set<CBlockIndex *> setDirtyBlockIndex GUARDED_BY(cs_mapBlockIndex);
 
 CCriticalSection cs_main;
 CChain chainActive GUARDED_BY(cs_main); // however, chainActive.Tip() is lock free
@@ -104,8 +107,6 @@ uint64_t nBlockSequenceId GUARDED_BY(cs_main) = 1;
 std::map<uint256, NodeId> mapBlockSource GUARDED_BY(cs_main);
 /** Dirty block file entries. */
 std::set<int> setDirtyFileInfo GUARDED_BY(cs_main);
-/** Dirty block index entries. */
-std::set<CBlockIndex *> setDirtyBlockIndex GUARDED_BY(cs_main);
 
 /**
  * Filter for transactions that were recently rejected by
