@@ -50,7 +50,7 @@ uint64_t GetShortID(const uint64_t &shorttxidk0, const uint64_t &shorttxidk1, co
 #define MIN_TRANSACTION_SIZE (::GetSerializeSize(CTransaction(), SER_NETWORK, PROTOCOL_VERSION))
 
 CompactBlock::CompactBlock(const CBlock &block, const CRollingFastFilter<4 * 1024 * 1024> *inventoryKnown)
-    : nonce(GetRand(std::numeric_limits<uint64_t>::max())), header(block)
+    : nonce(GetRand(std::numeric_limits<uint64_t>::max())), nWaitingFor(0), header(block)
 {
     FillShortTxIDSelector();
 
@@ -118,11 +118,9 @@ void validateCompactBlock(const CompactBlock &cmpctblock)
 }
 
 /**
- * Handle an incoming compactblock.  The block is fully validated, and if any transactions are missing, we fall
- * back to requesting a full block.
+ * Handle an incoming compactblock.  The block is fully validated, and if any
+ * transactions are missing we re-request them.
  */
-
-
 bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
     CompactBlock compactBlock;

@@ -191,6 +191,14 @@ private:
     void FillShortTxIDSelector() const;
 
 public:
+    // memory only
+    mutable unsigned int nWaitingFor; // Number of txns we are still needing to recontruct the block
+
+    // memory only
+    std::vector<uint256> vTxHashes256; // List of all 256 bit transaction hashes in the block
+    std::map<uint64_t, CTransactionRef> mapMissingTx; // Map of transactions that were re-requested
+
+public:
     static const int SHORTTXIDS_LENGTH = 6;
 
     std::vector<uint64_t> shorttxids;
@@ -203,8 +211,8 @@ public:
     CompactBlock(const CBlock &block, const CRollingFastFilter<4 * 1024 * 1024> *inventoryKnown = nullptr);
 
     /**
-     * Handle an incoming thin block.  The block is fully validated, and if any transactions are missing, we fall
-     * back to requesting a full block.
+     * Handle an incoming compactblock.  The block is fully validated, and if any
+     * transactions are missing we re-request them.
      * @param[in] vRecv        The raw binary message
      * @param[in] pFrom        The node the message was from
      * @return True if handling succeeded
