@@ -33,7 +33,6 @@ private:
 public:
     // memory only
     mutable unsigned int nWaitingFor; // number of txns we are still needing to recontruct the block
-
     std::map<uint64_t, CTransactionRef> mapMissingTx;
 
 public:
@@ -83,7 +82,6 @@ private:
 public:
     // memory only
     mutable unsigned int nWaitingFor; // number of txns we are still needing to recontruct the block
-    uint64_t nBlockBytes; // the bytes used in re-assembling the block, updated dynamically
     bool collision;
 
     // memory only
