@@ -29,6 +29,13 @@ enum ThresholdState
     THRESHOLD_FAILED
 };
 
+// used in pushBackThresholdStatus to determine when/how to insert the bit id
+enum VersionBitBIP
+{
+    BIP_009, // Version bits with timeout and delay
+    BIP_135 // Generalized version bits voting
+};
+
 // A map that gives the state for blocks whose height is a multiple of Period().
 // The map is indexed by the block's parent, however, so all keys in the map
 // will either be NULL or a block with (height + 1) % Period() == 0.

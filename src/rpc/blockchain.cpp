@@ -936,10 +936,17 @@ static UniValue SoftForkDesc(const std::string &name,
     return rv;
 }
 
-static UniValue BIP9SoftForkDesc(const Consensus::Params &consensusParams, Consensus::DeploymentPos id)
+
+static void pushBackThresholdStatus(UniValue &rv,
+    const Consensus::Params &consensusParams,
+    const ThresholdState thresholdState,
+    Consensus::DeploymentPos id,
+    VersionBitBIP versionBitBIP)
 {
-    UniValue rv(UniValue::VOBJ);
-    const ThresholdState thresholdState = VersionBitsTipState(consensusParams, id);
+    if (versionBitBIP == BIP_135)
+    {
+        rv.pushKV("bit", (int)id);
+    }
     switch (thresholdState)
     {
     case THRESHOLD_DEFINED:
@@ -958,12 +965,20 @@ static UniValue BIP9SoftForkDesc(const Consensus::Params &consensusParams, Conse
         rv.pushKV("status", "failed");
         break;
     }
-    if (THRESHOLD_STARTED == thresholdState)
+    if (versionBitBIP == BIP_009 && THRESHOLD_STARTED == thresholdState)
     {
         rv.pushKV("bit", consensusParams.vDeployments[id].bit);
     }
     rv.pushKV("startTime", consensusParams.vDeployments[id].nStartTime);
     rv.pushKV("timeout", consensusParams.vDeployments[id].nTimeout);
+}
+
+static UniValue BIP9SoftForkDesc(const Consensus::Params &consensusParams, Consensus::DeploymentPos id)
+{
+    UniValue rv(UniValue::VOBJ);
+    const ThresholdState thresholdState = VersionBitsTipState(consensusParams, id);
+    pushBackThresholdStatus(rv, consensusParams, thresholdState, id, BIP_009);
+
     return rv;
 }
 
@@ -971,28 +986,8 @@ static UniValue BIP9SoftForkDesc(const Consensus::Params &consensusParams, Conse
 static UniValue BIP135ForkDesc(const Consensus::Params &consensusParams, Consensus::DeploymentPos id)
 {
     UniValue rv(UniValue::VOBJ);
-    rv.pushKV("bit", (int)id);
     const ThresholdState thresholdState = VersionBitsTipState(consensusParams, id);
-    switch (thresholdState)
-    {
-    case THRESHOLD_DEFINED:
-        rv.pushKV("status", "defined");
-        break;
-    case THRESHOLD_STARTED:
-        rv.pushKV("status", "started");
-        break;
-    case THRESHOLD_LOCKED_IN:
-        rv.pushKV("status", "locked_in");
-        break;
-    case THRESHOLD_ACTIVE:
-        rv.pushKV("status", "active");
-        break;
-    case THRESHOLD_FAILED:
-        rv.pushKV("status", "failed");
-        break;
-    }
-    rv.pushKV("startTime", consensusParams.vDeployments[id].nStartTime);
-    rv.pushKV("timeout", consensusParams.vDeployments[id].nTimeout);
+    pushBackThresholdStatus(rv, consensusParams, thresholdState, id, BIP_135);
     rv.pushKV("windowsize", consensusParams.vDeployments[id].windowsize);
     rv.pushKV("threshold", consensusParams.vDeployments[id].threshold);
     rv.pushKV("minlockedblocks", consensusParams.vDeployments[id].minlockedblocks);
