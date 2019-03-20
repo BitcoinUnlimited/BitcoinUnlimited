@@ -218,8 +218,7 @@ bool CKey::SignSchnorr(const uint256 &hash, std::vector<uint8_t> &vchSig, uint32
     uint8_t extra_entropy[32] = {0};
     WriteLE32(extra_entropy, test_case);
 
-    int ret = secp256k1_schnorr_sign(
-        secp256k1_context_sign, &vchSig[0], hash.begin(), begin(),
+    int ret = secp256k1_schnorr_sign(secp256k1_context_sign, &vchSig[0], hash.begin(), begin(),
         secp256k1_nonce_function_rfc6979, test_case ? extra_entropy : nullptr);
     assert(ret);
     return true;

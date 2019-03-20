@@ -181,7 +181,7 @@ if ENABLE_ZMQ:
 #Tests
 testScripts = [ RpcTest(t) for t in [
     'bip135basic',
-#    'ctor',
+    'ctor',
     'mining_ctor',
     Disabled('nov152018_forkactivation','Nov 2018 already activated'),
      Disabled('blockstorage','fixme'),

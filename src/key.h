@@ -123,8 +123,7 @@ public:
      * Create a Schnorr signature.
      * The test_case parameter tweaks the deterministic nonce.
      */
-    bool SignSchnorr(const uint256 &hash, std::vector<uint8_t> &vchSig,
-                     uint32_t test_case = 0) const;
+    bool SignSchnorr(const uint256 &hash, std::vector<uint8_t> &vchSig, uint32_t test_case = 0) const;
 
     /**
      * Create a compact signature (65 bytes), which allows reconstructing the used public key.

@@ -1849,8 +1849,8 @@ bool ScriptMachine::Step()
 }
 
 bool BaseSignatureChecker::VerifySignature(const std::vector<uint8_t> &vchSig,
-                                           const CPubKey &pubkey,
-                                           const uint256 &sighash) const
+    const CPubKey &pubkey,
+    const uint256 &sighash) const
 {
     return pubkey.VerifyECDSA(sighash, vchSig);
 }

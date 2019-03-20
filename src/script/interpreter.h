@@ -144,8 +144,8 @@ class BaseSignatureChecker
 public:
     //! Verifies a signature given the pubkey, signature and sighash
     virtual bool VerifySignature(const std::vector<uint8_t> &vchSig,
-                                 const CPubKey &vchPubKey,
-                                 const uint256 &sighash) const;
+        const CPubKey &vchPubKey,
+        const uint256 &sighash) const;
 
     //! Verifies a signature given the pubkey, signature, script, and transaction (member var)
     virtual bool CheckSig(const std::vector<unsigned char> &scriptSig,
