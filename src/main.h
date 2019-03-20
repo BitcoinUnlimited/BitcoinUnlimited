@@ -274,7 +274,8 @@ bool GetTransaction(const uint256 &hash,
     CTransactionRef &tx,
     const Consensus::Params &params,
     uint256 &hashBlock,
-    bool fAllowSlow = false);
+    bool fAllowSlow = false,
+    const CBlockIndex *blockIndex = nullptr);
 
 /** Get statistics from node state */
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats);
