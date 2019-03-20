@@ -47,7 +47,7 @@ BOOST_AUTO_TEST_CASE(test_thinblock_byte_tracking)
     CNode dummyNode1(INVALID_SOCKET, addr1, "", true);
 
     CXThinBlock xthin;
-    std::shared_ptr<CBlock_ThinRelay> pblock = std::make_shared<CBlock_ThinRelay>(CBlock_ThinRelay());
+    std::shared_ptr<CBlockThinRelay> pblock = std::make_shared<CBlockThinRelay>(CBlockThinRelay());
     pblock->xthinblock = std::make_shared<CXThinBlock>(xthin);
 
     thindata.ResetThinBlockBytes();

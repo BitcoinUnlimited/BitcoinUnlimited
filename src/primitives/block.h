@@ -196,7 +196,7 @@ public:
 };
 
 // Used for thin type blocks that we want to reconstruct
-class CBlock_ThinRelay : public CBlock
+class CBlockThinRelay : public CBlock
 {
 public:
     // thinrelay block types: (memory only)
@@ -206,7 +206,7 @@ public:
     // Track the current block size during reconstruction: (memory only)
     uint64_t nCurrentBlockSize;
 
-    CBlock_ThinRelay() { SetNull(); }
+    CBlockThinRelay() { SetNull(); }
     void SetNull()
     {
         CBlock::SetNull();

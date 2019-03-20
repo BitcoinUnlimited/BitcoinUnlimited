@@ -247,21 +247,21 @@ void ThinTypeRelay::RequestBlock(CNode *pfrom, const uint256 &hash)
     pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
 }
 
-std::shared_ptr<CBlock_ThinRelay> ThinTypeRelay::SetBlockToReconstruct(CNode *pfrom, const uint256 &hash)
+std::shared_ptr<CBlockThinRelay> ThinTypeRelay::SetBlockToReconstruct(CNode *pfrom, const uint256 &hash)
 {
     // Make sure we are starting with a fresh instance.
     LOCK(cs_reconstruct);
     ClearBlockToReconstruct(pfrom);
 
     // Store and empty block which can be used later
-    std::shared_ptr<CBlock_ThinRelay> pblock;
-    pblock = std::make_shared<CBlock_ThinRelay>(CBlock_ThinRelay());
+    std::shared_ptr<CBlockThinRelay> pblock;
+    pblock = std::make_shared<CBlockThinRelay>(CBlockThinRelay());
     mapBlocksReconstruct.insert(
         std::make_pair(pfrom->GetId(), std::make_pair(pblock->GetBlockHeader().GetHash(), pblock)));
     return pblock;
 }
 
-std::shared_ptr<CBlock_ThinRelay> ThinTypeRelay::GetBlockToReconstruct(CNode *pfrom)
+std::shared_ptr<CBlockThinRelay> ThinTypeRelay::GetBlockToReconstruct(CNode *pfrom)
 {
     // Retrieve a current instance of a block being reconstructed. This is typically used
     // when we have received the response of a re-request for more transactions.

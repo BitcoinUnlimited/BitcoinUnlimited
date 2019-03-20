@@ -12,7 +12,7 @@
 
 class CNode;
 class uint256;
-class CBlock_ThinRelay;
+class CBlockThinRelay;
 
 struct CThinTypeBlockInFlight
 {
@@ -37,7 +37,7 @@ private:
     std::multimap<const NodeId, CThinTypeBlockInFlight> mapThinTypeBlocksInFlight GUARDED_BY(cs_inflight);
 
     // blocks that are currently being reconstructed.
-    std::map<NodeId, std::pair<uint256, std::shared_ptr<CBlock_ThinRelay> > > mapBlocksReconstruct GUARDED_BY(
+    std::map<NodeId, std::pair<uint256, std::shared_ptr<CBlockThinRelay> > > mapBlocksReconstruct GUARDED_BY(
         cs_reconstruct);
 
     // put a cap on the total number of thin type blocks we can have in flight. This lowers any possible
@@ -66,8 +66,8 @@ public:
 
     // Accessor methods to the blocks that we're reconstructing from thintype blocks such as
     // xthins or graphene.
-    std::shared_ptr<CBlock_ThinRelay> SetBlockToReconstruct(CNode *pfrom, const uint256 &hash);
-    std::shared_ptr<CBlock_ThinRelay> GetBlockToReconstruct(CNode *pfrom);
+    std::shared_ptr<CBlockThinRelay> SetBlockToReconstruct(CNode *pfrom, const uint256 &hash);
+    std::shared_ptr<CBlockThinRelay> GetBlockToReconstruct(CNode *pfrom);
     void ClearBlockToReconstruct(CNode *pfrom);
 };
 extern ThinTypeRelay thinrelay;

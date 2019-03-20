@@ -35,7 +35,7 @@ static bool ReconstructBlock(CNode *pfrom,
     int &missingCount,
     int &unnecessaryCount,
     const std::vector<uint256> &vHashes,
-    std::shared_ptr<CBlock_ThinRelay> &pblock);
+    std::shared_ptr<CBlockThinRelay> &pblock);
 
 CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter) : nSize(0), nWaitingFor(0)
 {
@@ -120,7 +120,7 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     return thinBlock.process(pfrom, pblock);
 }
 
-bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlock_ThinRelay> &pblock)
+bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pblock)
 {
     pblock->nVersion = header.nVersion;
     pblock->nBits = header.nBits;
@@ -274,7 +274,7 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Get already partially reconstructed block from memory. This block was created when the xthinblock
     // was first received.
-    std::shared_ptr<CBlock_ThinRelay> pblock = thinrelay.GetBlockToReconstruct(pfrom);
+    std::shared_ptr<CBlockThinRelay> pblock = thinrelay.GetBlockToReconstruct(pfrom);
     if (pblock == nullptr)
         return error("No block available to reconstruct for xblocktx");
 
@@ -580,7 +580,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
     return thinBlock.process(pfrom, strCommand, pblock);
 }
 
-bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlock_ThinRelay> &pblock)
+bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> &pblock)
 // TODO: request from the "best" txn source not necessarily from the block source
 {
     // In PV we must prevent two thinblocks from simulaneously processing from that were recieved from the
@@ -757,7 +757,7 @@ static bool ReconstructBlock(CNode *pfrom,
     int &missingCount,
     int &unnecessaryCount,
     const std::vector<uint256> &vHashes,
-    std::shared_ptr<CBlock_ThinRelay> &pblock)
+    std::shared_ptr<CBlockThinRelay> &pblock)
 {
     AssertLockHeld(orphanpool.cs);
 
@@ -1243,7 +1243,7 @@ std::string CThinBlockData::FullTxToString()
 
 // After a thinblock is finished processing or if for some reason we have to pre-empt the rebuilding
 // of a thinblock then we clear out the thinblock bytes from the total.
-void CThinBlockData::ClearThinBlockBytes(std::shared_ptr<CBlock_ThinRelay> &pblock)
+void CThinBlockData::ClearThinBlockBytes(std::shared_ptr<CBlockThinRelay> &pblock)
 {
     // Remove bytes from counter
     if (pblock != nullptr)
@@ -1253,7 +1253,7 @@ void CThinBlockData::ClearThinBlockBytes(std::shared_ptr<CBlock_ThinRelay> &pblo
         thindata.GetThinBlockBytes());
 }
 
-void CThinBlockData::ClearThinBlockData(CNode *pnode, std::shared_ptr<CBlock_ThinRelay> &pblock)
+void CThinBlockData::ClearThinBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> &pblock)
 {
     // We must make sure to clear the thinblock data first before clearing the thinblock in flight.
     ClearThinBlockBytes(pblock);
@@ -1287,7 +1287,7 @@ void CThinBlockData::ClearThinBlockStats()
     mapFullTx.clear();
 }
 
-uint64_t CThinBlockData::AddThinBlockBytes(uint64_t bytes, std::shared_ptr<CBlock_ThinRelay> &pblock)
+uint64_t CThinBlockData::AddThinBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRelay> &pblock)
 {
     pblock->nCurrentBlockSize += bytes;
     uint64_t ret = nThinBlockBytes.fetch_add(bytes) + bytes;
@@ -1333,12 +1333,12 @@ bool ClearLargestThinBlockAndDisconnect(CNode *pfrom)
 {
     CNode *pLargestNode = nullptr;
     uint64_t nLargestBytes = 0;
-    std::shared_ptr<CBlock_ThinRelay> pLargestBlock = nullptr;
+    std::shared_ptr<CBlockThinRelay> pLargestBlock = nullptr;
 
     LOCK(cs_vNodes);
     for (CNode *pnode : vNodes)
     {
-        std::shared_ptr<CBlock_ThinRelay> pblock = thinrelay.GetBlockToReconstruct(pnode);
+        std::shared_ptr<CBlockThinRelay> pblock = thinrelay.GetBlockToReconstruct(pnode);
         if (pblock == nullptr)
             continue;
 
