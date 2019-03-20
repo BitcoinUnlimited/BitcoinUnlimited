@@ -78,10 +78,11 @@ private:
 
 public:
     // Xpress Validation: (memory only)
-    // Orphans, or Missing transactions that have been re-requested, are stored here.
+    //! Orphans, or Missing transactions that have been re-requested, are stored here.
     std::set<uint256> setUnVerifiedTxns;
 
     // Xpress Validation: (memory only)
+    //! A flag which when true indicates that Xpress validation is enabled for this block.
     bool fXVal;
 
 public:
@@ -195,15 +196,19 @@ public:
     uint64_t GetBlockSize() const;
 };
 
-// Used for thin type blocks that we want to reconstruct
+/**
+ * Used for thin type blocks that we want to reconstruct into a full block. All the data
+ * necessary to recreate the block are held within the thinrelay objects which are subsequently
+ * stored within this class as smart pointers.
+ */
 class CBlockThinRelay : public CBlock
 {
 public:
-    // thinrelay block types: (memory only)
+    //! thinrelay block types: (memory only)
     std::shared_ptr<CThinBlock> thinblock;
     std::shared_ptr<CXThinBlock> xthinblock;
 
-    // Track the current block size during reconstruction: (memory only)
+    //! Track the current block size during reconstruction: (memory only)
     uint64_t nCurrentBlockSize;
 
     CBlockThinRelay() { SetNull(); }
