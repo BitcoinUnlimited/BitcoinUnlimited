@@ -123,8 +123,13 @@ void validateCompactBlock(const CompactBlock &cmpctblock)
  */
 bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
-    CompactBlock compactBlock;
-    vRecv >> compactBlock;
+    // Deserialize xthinblock and store a block to reconstruct
+    CompactBlock tmp;
+    vRecv >> tmp;
+    auto pblock = thinrelay.SetBlockToReconstruct(pfrom, tmp.header.GetHash());
+    pblock->cmpctblock = std::make_shared<CompactBlock>(std::forward<CompactBlock>(tmp));
+
+    CompactBlock &compactBlock = *pblock->cmpctblock;
 
     // Message consistency checking
     IsCompactBlockValid(pfrom, compactBlock);
