@@ -492,10 +492,9 @@ public:
 
     // Compact Blocks : begin
     CCriticalSection cs_compactblock;
-    CBlock compactBlock;
+    CBlockThinRelay compactBlock;
     std::map<uint64_t, CTransactionRef> mapMissingCompactBlockTx;
     uint64_t nLocalCompactBlockBytes; // the bytes used in creating this cmpctblock, updated dynamically
-    int compactBlockWaitingForTxns; // if -1 then not currently waiting
 
     std::vector<uint64_t> vShortCompactBlockHashes;
     std::vector<uint256> vCompactBlockHashes;

@@ -2951,7 +2951,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
 
     // compact blocks
     nLocalCompactBlockBytes = 0;
-    compactBlockWaitingForTxns = -1;
     shorttxidk0 = 0;
     shorttxidk1 = 0;
 

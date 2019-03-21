@@ -172,11 +172,11 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         return true;
     }
 
-    return compactBlock.process(pfrom);
+    return compactBlock.process(pfrom, pblock);
 }
 
 
-bool CompactBlock::process(CNode *pfrom)
+bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pblock)
 {
     compactdata.ClearCompactBlockData(pfrom);
 
@@ -244,6 +244,7 @@ bool CompactBlock::process(CNode *pfrom)
     std::map<uint64_t, uint256> mapPartialTxHash;
     std::vector<uint256> memPoolHashes;
     std::set<uint64_t> setHashesToRequest;
+    unsigned int nWaitingForTxns = pblock->cmpctblock->nWaitingFor;
 
     bool fMerkleRootCorrect = true;
     {
@@ -355,16 +356,15 @@ bool CompactBlock::process(CNode *pfrom)
         return true;
     }
 
-    pfrom->compactBlockWaitingForTxns = missingCount;
-    LOG(CMPCT, "compactblock waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n",
-        pfrom->compactBlockWaitingForTxns, unnecessaryCount, pfrom->compactBlock.vtx.size(),
-        pfrom->mapMissingCompactBlockTx.size());
+    nWaitingForTxns = missingCount;
+    LOG(CMPCT, "compactblock waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n", nWaitingForTxns,
+        unnecessaryCount, pfrom->compactBlock.vtx.size(), pfrom->mapMissingCompactBlockTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
     if (setHashesToRequest.size() > 0)
     {
-        pfrom->compactBlockWaitingForTxns = setHashesToRequest.size();
+        nWaitingForTxns = setHashesToRequest.size();
 
         // find the index in the block associated with the hash
         uint64_t nIndex = 0;
@@ -381,7 +381,7 @@ bool CompactBlock::process(CNode *pfrom)
         pfrom->PushMessage(NetMsgType::GETBLOCKTXN, compactReRequest);
 
         // Update run-time statistics of compact block bandwidth savings
-        compactdata.UpdateInBoundReRequestedTx(pfrom->compactBlockWaitingForTxns);
+        compactdata.UpdateInBoundReRequestedTx(nWaitingForTxns);
         return true;
     }
 
@@ -397,7 +397,6 @@ bool CompactBlock::process(CNode *pfrom)
     }
 
     // We now have all the transactions now that are in this block
-    pfrom->compactBlockWaitingForTxns = -1;
     int blockSize = pfrom->compactBlock.GetBlockSize();
     LOG(CMPCT, "Reassembled compactblock for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
         pfrom->compactBlock.GetHash().ToString(), blockSize, this->GetSize(),
@@ -1044,7 +1043,6 @@ void CCompactBlockData::ClearCompactBlockData(CNode *pnode)
     pnode->nLocalCompactBlockBytes = 0;
 
     // Clear out compactblock data we no longer need
-    pnode->compactBlockWaitingForTxns = -1;
     pnode->compactBlock.SetNull();
     pnode->vCompactBlockHashes.clear();
     pnode->vShortCompactBlockHashes.clear();
