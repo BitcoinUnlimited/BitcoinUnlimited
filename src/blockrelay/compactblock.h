@@ -186,6 +186,9 @@ public:
     mutable uint64_t shorttxidk0, shorttxidk1;
 
 private:
+    // memory only
+    mutable uint64_t nSize; // Serialized thinblock size in bytes
+
     uint64_t nonce;
 
     void FillShortTxIDSelector() const;
@@ -218,12 +221,19 @@ public:
      * @return True if handling succeeded
      */
     static bool HandleMessage(CDataStream &vRecv, CNode *pfrom);
-    bool process(CNode *pfrom, uint64_t nSizeCompactBlock);
+    bool process(CNode *pfrom);
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
     uint64_t GetShortID(const uint256 &txhash) const;
 
     size_t BlockTxCount() const { return shorttxids.size() + prefilledtxn.size(); }
     ADD_SERIALIZE_METHODS;
+
+    uint64_t GetSize() const
+    {
+        if (nSize == 0)
+            nSize = ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+        return nSize;
+    }
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)

@@ -495,7 +495,6 @@ public:
     CBlock compactBlock;
     std::map<uint64_t, CTransactionRef> mapMissingCompactBlockTx;
     uint64_t nLocalCompactBlockBytes; // the bytes used in creating this cmpctblock, updated dynamically
-    uint64_t nSizeCompactBlock; // Original on-wire size of the block. Just used for reporting
     int compactBlockWaitingForTxns; // if -1 then not currently waiting
 
     std::vector<uint64_t> vShortCompactBlockHashes;
