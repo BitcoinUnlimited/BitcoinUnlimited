@@ -145,8 +145,6 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // request a failover block instead.
     if ((int)grapheneBlockTx.vMissingTx.size() < pfrom->grapheneBlockWaitingForTxns)
     {
-        graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
-
         RequestFailoverBlock(pfrom, grapheneBlockTx.blockhash);
         return error("Still missing transactions from those returned by sender, peer=%s: re-requesting failover block",
             pfrom->GetLogName());
@@ -219,9 +217,6 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // while we were retreiving missing transactions.
     if (missingCount > 0)
     {
-        // Since we can't process this graphene block then clear out the data from memory
-        graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
-
         RequestFailoverBlock(pfrom, grapheneBlockTx.blockhash);
         return error("Still missing transactions after reconstructing block, peer=%s: re-requesting failover block",
             pfrom->GetLogName());
@@ -595,7 +590,6 @@ bool CGrapheneBlock::process(CNode *pfrom,
                 LOG(GRAPHENE, "Graphene set could not be reconciled; requesting failover for peer %s: %s\n",
                     pfrom->GetLogName(), e.what());
 
-                graphenedata.ClearGrapheneBlockData(pfrom, header.GetHash());
                 graphenedata.IncrementDecodeFailures();
             }
 
@@ -633,7 +627,6 @@ bool CGrapheneBlock::process(CNode *pfrom,
     if (collision || !fMerkleRootCorrect)
     {
         RequestFailoverBlock(pfrom, header.GetHash());
-        graphenedata.ClearGrapheneBlockData(pfrom, header.GetHash());
 
         if (!fMerkleRootCorrect)
             return error(
@@ -665,9 +658,6 @@ bool CGrapheneBlock::process(CNode *pfrom,
     // and re-request failover block (This should never happen because we just checked the various pools).
     if (missingCount > 0)
     {
-        // Since we can't process this graphene block then clear out the data from memory
-        graphenedata.ClearGrapheneBlockData(pfrom, header.GetHash());
-
         RequestFailoverBlock(pfrom, header.GetHash());
         return error("Still missing transactions for graphene block: re-requesting failover block");
     }
@@ -1468,6 +1458,14 @@ CMemPoolInfo GetGrapheneMempoolInfo()
 }
 void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash)
 {
+    // Since we were unable process this graphene block then clear out the data and the graphene
+    // block in flight.
+    //
+    // This must be done before we request the failover block otherwise it will still appear
+    // as though we have a graphene block in flight, which could prevent us from receiving
+    // the new thinblock or compactblock, if such is requested.
+    graphenedata.ClearGrapheneBlockData(pfrom, blockhash);
+
     if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable())
     {
         if (!thinrelay.AddBlockInFlight(pfrom, blockhash, NetMsgType::XTHINBLOCK))
