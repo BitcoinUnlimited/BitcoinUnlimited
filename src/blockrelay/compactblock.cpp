@@ -38,7 +38,10 @@
 #include "validation/validation.h"
 
 
-static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount);
+static bool ReconstructBlock(CNode *pfrom,
+    int &missingCount,
+    int &unnecessaryCount,
+    std::shared_ptr<CBlockThinRelay> &pblock);
 
 
 uint64_t GetShortID(const uint64_t &shorttxidk0, const uint64_t &shorttxidk1, const uint256 &txhash)
@@ -124,7 +127,7 @@ void validateCompactBlock(const CompactBlock &cmpctblock)
  */
 bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
-    // Deserialize xthinblock and store a block to reconstruct
+    // Deserialize compactblock and store a block to reconstruct
     CompactBlock tmp;
     vRecv >> tmp;
     auto pblock = thinrelay.SetBlockToReconstruct(pfrom, tmp.header.GetHash());
@@ -192,7 +195,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
     // Because the list of shorttxids is not complete (missing the prefilled transaction hashes), we need
     // to first create the full list of compactblock shortid hashes, in proper order.
     //
-    // Also, create the mapMissingCompactBlockTx from all the supplied tx's in the compact block
+    // Also, create the mapMissingTx from all the supplied tx's in the compact block
 
     // Reconstruct the list of shortid's and in the correct order taking into account the prefilled txns.
     if (prefilledtxn.empty())
@@ -209,7 +212,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
             {
                 uint64_t shorthash = GetShortID(prefilled.tx.GetHash());
                 pfrom->vShortCompactBlockHashes.push_back(shorthash);
-                pfrom->mapMissingCompactBlockTx[shorthash] = MakeTransactionRef(prefilled.tx);
+                pblock->cmpctblock->mapMissingTx[shorthash] = MakeTransactionRef(prefilled.tx);
                 continue;
             }
 
@@ -227,7 +230,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
 
             // Add the prefilled txn and then get the next one
             pfrom->vShortCompactBlockHashes.push_back(GetShortID(prefilled.tx.GetHash()));
-            pfrom->mapMissingCompactBlockTx[GetShortID(prefilled.tx.GetHash())] = MakeTransactionRef(prefilled.tx);
+            pblock->cmpctblock->mapMissingTx[GetShortID(prefilled.tx.GetHash())] = MakeTransactionRef(prefilled.tx);
         }
 
         // Add the remaining shorttxids, if any.
@@ -266,7 +269,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
                 _collision = true;
             mapPartialTxHash[cheapHash] = memPoolHashes[i];
         }
-        for (auto &mi : pfrom->mapMissingCompactBlockTx)
+        for (auto &mi : pblock->cmpctblock->mapMissingTx)
         {
             uint64_t cheapHash = mi.first;
             // Check for cheap hash collision. Only mark as collision if the full hash is not the same,
@@ -328,7 +331,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
                 }
                 else
                 {
-                    if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
+                    if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
                         return false;
                 }
             }
@@ -358,7 +361,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
 
     nWaitingForTxns = missingCount;
     LOG(CMPCT, "compactblock waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n", nWaitingForTxns,
-        unnecessaryCount, pfrom->compactBlock.vtx.size(), pfrom->mapMissingCompactBlockTx.size());
+        unnecessaryCount, pfrom->compactBlock.vtx.size(), pblock->cmpctblock->mapMissingTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
@@ -504,9 +507,9 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         return true;
     }
 
-    // Create the mapMissingCompactBlockTx from all the supplied tx's in the compactblock
+    // Create the mapMissingTx from all the supplied tx's in the compactblock
     for (const CTransaction &tx : compactReReqResponse.txn)
-        pfrom->mapMissingCompactBlockTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx.GetHash())] =
+        pblock->cmpctblock->mapMissingTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx.GetHash())] =
             MakeTransactionRef(tx);
 
     // Get the full hashes from the compactReReqResponse and add them to the compactBlockHashes vector.  These should
@@ -518,8 +521,8 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         if (pfrom->vCompactBlockHashes[i].IsNull())
         {
             std::map<uint64_t, CTransactionRef>::iterator val =
-                pfrom->mapMissingCompactBlockTx.find(pfrom->vShortCompactBlockHashes[i]);
-            if (val != pfrom->mapMissingCompactBlockTx.end())
+                pblock->cmpctblock->mapMissingTx.find(pfrom->vShortCompactBlockHashes[i]);
+            if (val != pblock->cmpctblock->mapMissingTx.end())
             {
                 pfrom->vCompactBlockHashes[i] = val->second->GetHash();
             }
@@ -551,7 +554,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // With compactblocks the vTxHashes contains only the first 8 bytes of the tx hash.
     {
         READLOCK(orphanpool.cs);
-        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
+        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
             return false;
     }
 
@@ -595,7 +598,10 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     return true;
 }
 
-static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount)
+static bool ReconstructBlock(CNode *pfrom,
+    int &missingCount,
+    int &unnecessaryCount,
+    std::shared_ptr<CBlockThinRelay> &pblock)
 {
     AssertLockHeld(orphanpool.cs);
 
@@ -652,7 +658,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             }
 
             uint64_t nShortId = GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash);
-            bool inMissingTx = pfrom->mapMissingCompactBlockTx.count(nShortId) > 0;
+            bool inMissingTx = pblock->cmpctblock->mapMissingTx.count(nShortId) > 0;
             bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
 
             if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx))
@@ -665,7 +671,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             }
             else if (inMissingTx)
             {
-                ptx = pfrom->mapMissingCompactBlockTx[nShortId];
+                ptx = pblock->cmpctblock->mapMissingTx[nShortId];
                 pfrom->compactBlock.setUnVerifiedTxns.insert(hash);
             }
         }
@@ -680,17 +686,17 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             {
                 return error(
                     "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                    pfrom->compactBlock.GetHash().ToString(), pfrom->nLocalCompactBlockBytes, maxAllowedSize,
+                    pfrom->compactBlock.GetHash().ToString(), pfrom->compactBlock.nCurrentBlockSize, maxAllowedSize,
                     pfrom->GetLogName());
             }
         }
-        if (pfrom->nLocalCompactBlockBytes > maxAllowedSize)
+        if (pfrom->compactBlock.nCurrentBlockSize > maxAllowedSize)
         {
             compactdata.ClearCompactBlockData(pfrom, pfrom->compactBlock.GetBlockHeader().GetHash());
             pfrom->fDisconnect = true;
             return error(
                 "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                pfrom->compactBlock.GetHash().ToString(), pfrom->nLocalCompactBlockBytes, maxAllowedSize,
+                pfrom->compactBlock.GetHash().ToString(), pfrom->compactBlock.nCurrentBlockSize, maxAllowedSize,
                 pfrom->GetLogName());
         }
 
@@ -1039,14 +1045,10 @@ std::string CCompactBlockData::FullTxToString()
 void CCompactBlockData::ClearCompactBlockData(CNode *pnode)
 {
     // Remove bytes from counter
-    compactdata.DeleteCompactBlockBytes(pnode->nLocalCompactBlockBytes, pnode);
-    pnode->nLocalCompactBlockBytes = 0;
+    compactdata.DeleteCompactBlockBytes(pnode->compactBlock.nCurrentBlockSize, pnode);
 
     // Clear out compactblock data we no longer need
     pnode->compactBlock.SetNull();
-    pnode->vCompactBlockHashes.clear();
-    pnode->vShortCompactBlockHashes.clear();
-    pnode->mapMissingCompactBlockTx.clear();
 
     LOG(CMPCT, "Total in memory compactblock size after clearing a compactblock is %ld bytes\n",
         compactdata.GetCompactBlockBytes());
@@ -1083,7 +1085,7 @@ void CCompactBlockData::ClearCompactBlockStats()
 
 uint64_t CCompactBlockData::AddCompactBlockBytes(uint64_t bytes, CNode *pfrom)
 {
-    pfrom->nLocalCompactBlockBytes += bytes;
+    pfrom->compactBlock.nCurrentBlockSize += bytes;
     uint64_t ret = nCompactBlockBytes.fetch_add(bytes) + bytes;
 
     return ret;
@@ -1091,9 +1093,6 @@ uint64_t CCompactBlockData::AddCompactBlockBytes(uint64_t bytes, CNode *pfrom)
 
 void CCompactBlockData::DeleteCompactBlockBytes(uint64_t bytes, CNode *pfrom)
 {
-    if (bytes <= pfrom->nLocalCompactBlockBytes)
-        pfrom->nLocalCompactBlockBytes -= bytes;
-
     if (bytes <= nCompactBlockBytes)
     {
         nCompactBlockBytes.fetch_sub(bytes);
@@ -1131,7 +1130,7 @@ bool ClearLargestCompactBlockAndDisconnect(CNode *pfrom)
     LOCK(cs_vNodes);
     for (CNode *pnode : vNodes)
     {
-        if ((pLargest == nullptr) || (pnode->nLocalCompactBlockBytes > pLargest->nLocalCompactBlockBytes))
+        if ((pLargest == nullptr) || (pnode->compactBlock.nCurrentBlockSize > pLargest->compactBlock.nCurrentBlockSize))
             pLargest = pnode;
     }
     if (pLargest != nullptr)

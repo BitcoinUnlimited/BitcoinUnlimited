@@ -2950,7 +2950,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     grapheneBlockWaitingForTxns = -1;
 
     // compact blocks
-    nLocalCompactBlockBytes = 0;
     shorttxidk0 = 0;
     shorttxidk1 = 0;
 
