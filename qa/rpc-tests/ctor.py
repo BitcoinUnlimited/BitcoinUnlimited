@@ -97,6 +97,7 @@ class MyTest (BitcoinTestFramework):
         # we need to generate another block so the CTOR chain exceeds the DTOR
         self.nodes[2].generate(1)
         sync_blocks_to(103, self.nodes[2:])
+        time.sleep(2) # wait for the rollback to begin before getbestblockhash() is called
         waitFor(10, lambda: self.nodes[0].getbestblockhash() == dtorBlock)
         ct = self.nodes[0].getchaintips()
         tip = next(x for x in ct if x["status"] == "active")
