@@ -8,7 +8,7 @@
 #include <system_error>
 #include <thread>
 #include <condition_variable>
-#include <set>
+#include <map>
 #include <mutex>
 #include <cassert>
 
@@ -42,9 +42,11 @@ private:
     // the write_gate is locked (blocked) when threads have read ownership
     std::condition_variable _write_gate;
 
-    uint64_t _read_counter;
-    // this set is currently unused
-    std::set<std::thread::id> _read_owner_ids;
+    // holds a list of owner ids that have shared ownership and the number of times they locked it
+    std::map<std::thread::id, uint64_t> _read_owner_ids;
+    // holds a list of owner ids that have been auto unlocked due to promoting and the number of
+    // times they were auto unlocked
+    std::map<std::thread::id, uint64_t> _auto_unlocked_ids;
 
     uint64_t _write_counter;
     std::thread::id _write_owner_id;
@@ -52,19 +54,20 @@ private:
 private:
     bool check_for_write_lock(const std::thread::id &locking_thread_id);
     bool unlock_if_write_lock(const std::thread::id &locking_thread_id);
+    void lock_shared_internal(const std::thread::id &locking_thread_id);
+    void unlock_shared_internal(const std::thread::id &locking_thread_id);
 
 public:
     recursive_shared_mutex()
     {
-        _read_counter = 0;
+        _read_owner_ids.clear();
+        _auto_unlocked_ids.clear();
         _write_counter = 0;
         _write_owner_id = NON_THREAD_ID;
     }
 
     ~recursive_shared_mutex()
     {
-
-      //assert( _read_counter == 0 && _write_counter == 0 );
     }
 
     recursive_shared_mutex(const recursive_shared_mutex&) = delete;

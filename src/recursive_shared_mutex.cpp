@@ -1,5 +1,10 @@
 #include "recursive_shared_mutex.h"
 
+////////////////////////
+///
+/// Private Functions
+///
+
 bool recursive_shared_mutex::check_for_write_lock(const std::thread::id &locking_thread_id)
 {
     if(_write_owner_id == locking_thread_id && _write_counter < SANE_LOCK_LIMIT)
@@ -20,6 +25,48 @@ bool recursive_shared_mutex::unlock_if_write_lock(const std::thread::id &locking
     return false;
 }
 
+void recursive_shared_mutex::lock_shared_internal(const std::thread::id &locking_thread_id)
+{
+    auto it = _read_owner_ids.find(locking_thread_id);
+    if (it == _read_owner_ids.end())
+    {
+        _read_owner_ids.emplace(locking_thread_id, 1);
+    }
+    else
+    {
+        it->second = it->second + 1;
+    }
+}
+
+void recursive_shared_mutex::lock_shared_internal(const std::thread::id &locking_thread_id, const uint64_t &count)
+{
+    auto it = _read_owner_ids.find(locking_thread_id);
+    if (it == _read_owner_ids.end())
+    {
+        _read_owner_ids.emplace(locking_thread_id, count);
+    }
+    else
+    {
+        it->second = it->second + count;
+    }
+}
+
+void recursive_shared_mutex::unlock_shared_internal(const std::thread::id &locking_thread_id)
+{
+    auto it = _read_owner_ids.find(locking_thread_id);
+    assert(it != _read_owner_ids.end());
+    it->second = it->second - 1;
+    if(it->second == 0)
+    {
+        _read_owner_ids.erase(it);
+    }
+}
+
+////////////////////////
+///
+/// Public Functions
+///
+
 void recursive_shared_mutex::lock(const std::thread::id &locking_thread_id)
 {
     std::unique_lock<std::mutex> _lock(_mutex);
@@ -32,7 +79,7 @@ void recursive_shared_mutex::lock(const std::thread::id &locking_thread_id)
         // Wait until we can set the write-entered.
         _read_gate.wait(_lock, [=]
             {
-                return _write_counter == 0 && (_read_counter < SANE_LOCK_LIMIT);
+                return _write_counter == 0;
             }
         );
 
@@ -40,7 +87,7 @@ void recursive_shared_mutex::lock(const std::thread::id &locking_thread_id)
         // Then wait until there are no more readers.
         _write_gate.wait(_lock, [=]
             {
-                return _read_counter == 0 && (_write_counter < SANE_LOCK_LIMIT);
+                return _read_owner_ids.size() == 0;
             }
         );
 
@@ -58,7 +105,7 @@ bool recursive_shared_mutex::try_lock(const std::thread::id &locking_thread_id)
         return true;
     }
     // checking _write_owner_id might be redundant here with the mutex already being locked
-    else if (_lock.owns_lock() && _write_counter == 0 && _read_counter == 0)
+    else if (_lock.owns_lock() && _write_counter == 0 && _read_owner_ids.size() == 0)
     {
         _write_counter++;
         _write_owner_id = locking_thread_id;
@@ -93,10 +140,10 @@ void recursive_shared_mutex::lock_shared(const std::thread::id &locking_thread_i
     }
     _read_gate.wait(_lock, [=]
         {
-            return (_write_counter == 0) && (_read_counter < SANE_LOCK_LIMIT);
+            return _write_counter == 0;
         }
     );
-    _read_counter++;
+    lock_shared_internal(locking_thread_id);
 }
 
 bool recursive_shared_mutex::try_lock_shared(const std::thread::id &locking_thread_id)
@@ -110,9 +157,9 @@ bool recursive_shared_mutex::try_lock_shared(const std::thread::id &locking_thre
     {
         return false;
     }
-    if (_write_counter == 0 && _read_counter < SANE_LOCK_LIMIT)
+    if (_write_counter == 0)
     {
-        _read_counter++;
+        lock_shared_internal(locking_thread_id);
         return true;
     }
     return false;
@@ -125,11 +172,11 @@ void recursive_shared_mutex::unlock_shared(const std::thread::id &locking_thread
         return;
     }
     std::lock_guard<std::mutex> _lock(_mutex);
-    assert( _read_counter > 0 );
-    _read_counter--;
+    assert( _read_owner_ids.size() > 0 );
+    unlock_shared_internal(locking_thread_id);
     if (_write_counter != 0)
     {
-        if (_read_counter == 0)
+        if (_read_owner_ids.size() == 0)
         {
             _write_gate.notify_one();
         }
