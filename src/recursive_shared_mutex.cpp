@@ -54,7 +54,13 @@ void recursive_shared_mutex::lock_shared_internal(const std::thread::id &locking
 void recursive_shared_mutex::unlock_shared_internal(const std::thread::id &locking_thread_id)
 {
     auto it = _read_owner_ids.find(locking_thread_id);
-    assert(it != _read_owner_ids.end());
+    //assert(it != _read_owner_ids.end());
+
+    if (it == _read_owner_ids.end())
+    {
+        throw std::logic_error( "can not unlock_shared more times than we locked for shared ownership" );
+    }
+
     it->second = it->second - 1;
     if (it->second == 0)
     {
