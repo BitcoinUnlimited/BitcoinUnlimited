@@ -166,6 +166,7 @@ BITCOIN_CORE_H = \
   pow.h \
   protocol.h \
   random.h \
+  recursive_shared_mutex.h \
   reverse_iterator.h \
   reverselock.h \
   rpc/client.h \
@@ -463,6 +464,7 @@ libbitcoin_util_a_SOURCES = \
   compat/strnlen.cpp \
   fs.cpp \
   random.cpp \
+  recursive_shared_mutex.cpp \
   rpc/protocol.cpp \
   support/cleanse.cpp \
   sync.cpp \
