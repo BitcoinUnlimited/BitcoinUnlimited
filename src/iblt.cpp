@@ -100,7 +100,7 @@ CIblt::CIblt(uint64_t _version)
     CIblt::version = _version;
 }
 
-CIblt::CIblt(size_t _expectedNumEntries, uint64_t _version) : n_hash(0), is_modified(false), salt(0)
+CIblt::CIblt(size_t _expectedNumEntries, uint64_t _version) : salt(0), n_hash(0), is_modified(false)
 {
     CIblt::version = _version;
     CIblt::resize(_expectedNumEntries);
