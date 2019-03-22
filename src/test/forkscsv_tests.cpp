@@ -20,6 +20,10 @@ BOOST_AUTO_TEST_CASE(forkscsv_read_and_dumpforks_test)
 {
     CChainParams& params = ModifiableParams();
 
+    // Set up the testdummy bits for this test
+    VersionBitsDeploymentInfo[Consensus::DEPLOYMENT_TESTDUMMY].name = "testdummy";
+    VersionBitsDeploymentInfo[Consensus::DEPLOYMENT_TESTDUMMY].gbt_force = false;
+
     // read of emptiness should be ok for now.
     // In a better implementation, overall file validation should warn the user
     // if no data lines were found in the file.

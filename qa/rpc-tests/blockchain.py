@@ -15,6 +15,7 @@ import test_framework.loginit
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.authproxy import JSONRPCException
 from test_framework.util import *
+from test_framework.loginit import logging
 
 
 class BlockchainTest(BitcoinTestFramework):
@@ -27,6 +28,7 @@ class BlockchainTest(BitcoinTestFramework):
         - reconsidermostworkchain
         - getmempoolinfo
         - getorphanpoolinfo
+        - getraworphanpool
 
     """
 
@@ -43,11 +45,34 @@ class BlockchainTest(BitcoinTestFramework):
         self.sync_all()
 
     def run_test(self):
+        self._test_getblockchaininfo()
         self._test_gettxoutsetinfo()
         self._test_getblockheader()
         self._test_rollbackchain_and_reconsidermostworkchain()
         self._test_transaction_pools()
         self.nodes[0].verifychain(4, 0)
+
+    def _test_getblockchaininfo(self):
+        logging.info("Test getblockchaininfo")
+
+        keys = [
+            'bestblockhash',
+            'bip135_forks',
+            'bip9_softforks',
+            'blocks',
+            'chain',
+            'chainwork',
+            'difficulty',
+            'headers',
+            'initialblockdownload',
+            'mediantime',
+            'pruned',
+            'softforks',
+            'verificationprogress',
+        ]
+        res = self.nodes[0].getblockchaininfo()
+
+        assert_equal(sorted(res.keys()), keys)
 
     def _test_gettxoutsetinfo(self):
         node = self.nodes[0]
@@ -229,7 +254,6 @@ class BlockchainTest(BitcoinTestFramework):
         # fork2 the active chain.  Then do a reconsidermostworkchain which should make
         # fork3 the active chain, and disregarding fork1 which is longer than fork2 but
         # shorter than fork3.
-        
         logging.info ("Test that reconsidermostworkchain() works")
 
         # rollback to before fork 1 and 2, and then mine another longer fork 3
@@ -282,6 +306,9 @@ class BlockchainTest(BitcoinTestFramework):
         res2 = node.getorphanpoolinfo()
         assert_equal(res2['size'], 0)
         assert_equal(res2['bytes'], 0)
+
+        res3 = node.getraworphanpool()
+        assert_equal(len(res3), 0)
 
 
 if __name__ == '__main__':

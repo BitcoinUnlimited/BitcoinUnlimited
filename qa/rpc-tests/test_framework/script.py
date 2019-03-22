@@ -17,6 +17,7 @@ Functionality to build scripts, as well as SignatureHash().
 from sys import stdout
 from .mininode import CTransaction, CTxOut, hash256
 from binascii import hexlify
+from .constants import (SIGHASH_ALL, SIGHASH_NONE, SIGHASH_SINGLE, SIGHASH_FORKID, SIGHASH_ANYONECANPAY)
 
 import sys
 bchr = chr
@@ -232,6 +233,8 @@ OP_CHECKSIG = CScriptOp(0xac)
 OP_CHECKSIGVERIFY = CScriptOp(0xad)
 OP_CHECKMULTISIG = CScriptOp(0xae)
 OP_CHECKMULTISIGVERIFY = CScriptOp(0xaf)
+OP_CHECKDATASIG = CScriptOp(0xba)
+OP_CHECKDATASIGVERIFY = CScriptOp(0xbb)
 
 # expansion
 OP_NOP1 = CScriptOp(0xb0)
@@ -360,6 +363,8 @@ VALID_OPCODES = {
     OP_CHECKSIGVERIFY,
     OP_CHECKMULTISIG,
     OP_CHECKMULTISIGVERIFY,
+    OP_CHECKDATASIG,
+    OP_CHECKDATASIGVERIFY,
 
     OP_NOP1,
     OP_CHECKLOCKTIMEVERIFY,
@@ -480,6 +485,8 @@ OPCODE_NAMES.update({
     OP_CHECKSIGVERIFY : 'OP_CHECKSIGVERIFY',
     OP_CHECKMULTISIG : 'OP_CHECKMULTISIG',
     OP_CHECKMULTISIGVERIFY : 'OP_CHECKMULTISIGVERIFY',
+    OP_CHECKDATASIG : 'OP_CHECKDATASIG',
+    OP_CHECKDATASIGVERIFY : 'OP_CHECKDATASIGVERIFY',
     OP_NOP1 : 'OP_NOP1',
     OP_CHECKLOCKTIMEVERIFY : 'OP_CHECKLOCKTIMEVERIFY',
     OP_CHECKSEQUENCEVERIFY : 'OP_CHECKSEQUENCEVERIFY',
@@ -599,6 +606,8 @@ OPCODES_BY_NAME = {
     'OP_CHECKSIGVERIFY' : OP_CHECKSIGVERIFY,
     'OP_CHECKMULTISIG' : OP_CHECKMULTISIG,
     'OP_CHECKMULTISIGVERIFY' : OP_CHECKMULTISIGVERIFY,
+    'OP_CHECKDATASIG' : OP_CHECKDATASIG,
+    'OP_CHECKDATASIGVERIFY' : OP_CHECKDATASIGVERIFY,
     'OP_NOP1' : OP_NOP1,
     'OP_CHECKLOCKTIMEVERIFY' : OP_CHECKLOCKTIMEVERIFY,
     'OP_CHECKSEQUENCEVERIFY' : OP_CHECKSEQUENCEVERIFY,
@@ -782,11 +791,9 @@ class CScript(bytes):
                     yield CScriptOp(opcode)
 
     def __repr__(self):
-        # For Python3 compatibility add b before strings so testcases don't
-        # need to change
         def _repr(o):
             if isinstance(o, bytes):
-                return b"x('%s')" % hexlify(o).decode('ascii')
+                return "x('%s')" % hexlify(o).decode('ascii')
             else:
                 return repr(o)
 
@@ -842,7 +849,8 @@ class CScript(bytes):
         n = 0
         lastOpcode = OP_INVALIDOPCODE
         for (opcode, data, sop_idx) in self.raw_iter():
-            if opcode in (OP_CHECKSIG, OP_CHECKSIGVERIFY):
+            if opcode in (OP_CHECKSIG, OP_CHECKSIGVERIFY,
+                          OP_CHECKDATASIG, OP_CHECKDATASIGVERIFY):
                 n += 1
             elif opcode in (OP_CHECKMULTISIG, OP_CHECKMULTISIGVERIFY):
                 if fAccurate and (OP_1 <= lastOpcode <= OP_16):
@@ -851,12 +859,6 @@ class CScript(bytes):
                     n += 20
             lastOpcode = opcode
         return n
-
-
-SIGHASH_ALL = 1
-SIGHASH_NONE = 2
-SIGHASH_SINGLE = 3
-SIGHASH_ANYONECANPAY = 0x80
 
 def FindAndDelete(script, sig):
     """Consensus critical, see FindAndDelete() in Satoshi codebase"""
@@ -876,52 +878,8 @@ def FindAndDelete(script, sig):
     return CScript(r)
 
 
-def SignatureHash(script, txTo, inIdx, hashtype):
-    """Consensus-correct SignatureHash
-
-    Returns (hash, err) to precisely match the consensus-critical behavior of
-    the SIGHASH_SINGLE bug. (inIdx is *not* checked for validity)
-    """
-    HASH_ONE = b'\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
-
-    if inIdx >= len(txTo.vin):
-        return (HASH_ONE, "inIdx %d out of range (%d)" % (inIdx, len(txTo.vin)))
-    txtmp = CTransaction(txTo)
-
-    for txin in txtmp.vin:
-        txin.scriptSig = b''
-    txtmp.vin[inIdx].scriptSig = FindAndDelete(script, CScript([OP_CODESEPARATOR]))
-
-    if (hashtype & 0x1f) == SIGHASH_NONE:
-        txtmp.vout = []
-
-        for i in range(len(txtmp.vin)):
-            if i != inIdx:
-                txtmp.vin[i].nSequence = 0
-
-    elif (hashtype & 0x1f) == SIGHASH_SINGLE:
-        outIdx = inIdx
-        if outIdx >= len(txtmp.vout):
-            return (HASH_ONE, "outIdx %d out of range (%d)" % (outIdx, len(txtmp.vout)))
-
-        tmp = txtmp.vout[outIdx]
-        txtmp.vout = []
-        for i in range(outIdx):
-            txtmp.vout.append(CTxOut())
-        txtmp.vout.append(tmp)
-
-        for i in range(len(txtmp.vin)):
-            if i != inIdx:
-                txtmp.vin[i].nSequence = 0
-
-    if hashtype & SIGHASH_ANYONECANPAY:
-        tmp = txtmp.vin[inIdx]
-        txtmp.vin = []
-        txtmp.vin.append(tmp)
-
-    s = txtmp.serialize()
-    s += struct.pack(b"<I", hashtype)
-
-    hash = hash256(s)
-
-    return (hash, None)
+## py.test code
+def testScriptRepr():
+    x = CScript([OP_CHECKDATASIG])+b"\x11\x22\x33"
+    # make sure repr doesn't fail
+    assert "112233" in repr(x)

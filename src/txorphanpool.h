@@ -33,9 +33,9 @@ public:
         uint64_t nOrphanTxSize;
     };
 
-    CCriticalSection cs;
-    std::map<uint256, COrphanTx> mapOrphanTransactions;
-    std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev;
+    CSharedCriticalSection cs;
+    std::map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs);
+    std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs);
 
     CTxOrphanPool();
 
@@ -54,19 +54,22 @@ public:
     //! Limit the orphan pool size by either number of transactions or the max orphan pool size allowed.
     unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t nMaxBytes);
 
+    //! Return all the transaction hashes for transactions currently in the orphan pool.
+    void QueryHashes(std::vector<uint256> &vHashes);
+
     //! Set the last orphan check time (used primarily in testing)
     void SetLastOrphanCheck(int64_t nTime) { nLastOrphanCheck = nTime; }
     //! Orphan pool current number of transactions
     uint64_t GetOrphanPoolSize()
     {
-        LOCK(cs);
+        READLOCK(cs);
         return mapOrphanTransactions.size();
     }
 
     //! Orphan pool bytes used
     uint64_t GetOrphanPoolBytes()
     {
-        LOCK(cs);
+        READLOCK(cs);
         return nBytesOrphanPool;
     }
 };

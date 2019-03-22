@@ -16,7 +16,7 @@
 #include "util.h"
 #include <vector>
 
-#include <boost/thread.hpp>
+#include <thread>
 
 /**
  * Class that keeps track of number of signature operations
@@ -63,13 +63,14 @@ protected:
     const CTransaction *ptxTo;
     unsigned int nIn;
     unsigned int nFlags;
+    unsigned int maxOps;
     bool cacheStore;
     ScriptError error;
 
 public:
     unsigned char sighashType;
     CScriptCheck()
-        : resourceTracker(nullptr), amount(0), ptxTo(0), nIn(0), nFlags(0), cacheStore(false),
+        : resourceTracker(nullptr), amount(0), ptxTo(0), nIn(0), nFlags(0), maxOps(0xffffffff), cacheStore(false),
           error(SCRIPT_ERR_UNKNOWN_ERROR), sighashType(0)
     {
     }
@@ -80,9 +81,11 @@ public:
         const CTransaction &txToIn,
         unsigned int nInIn,
         unsigned int nFlagsIn,
+        unsigned int maxOpsIn,
         bool cacheIn)
         : resourceTracker(resourceTrackerIn), scriptPubKey(scriptPubKeyIn), amount(amountIn), ptxTo(&txToIn),
-          nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn), error(SCRIPT_ERR_UNKNOWN_ERROR), sighashType(0)
+          nIn(nInIn), nFlags(nFlagsIn), maxOps(maxOpsIn), cacheStore(cacheIn), error(SCRIPT_ERR_UNKNOWN_ERROR),
+          sighashType(0)
     {
     }
 
@@ -99,6 +102,7 @@ public:
         std::swap(cacheStore, check.cacheStore);
         std::swap(error, check.error);
         std::swap(sighashType, check.sighashType);
+        std::swap(maxOps, check.maxOps);
     }
 
     ScriptError GetScriptError() const { return error; }

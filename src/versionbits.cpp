@@ -9,122 +9,93 @@
 
 // bip135 begin fill out entire table
 struct ForkDeploymentInfo VersionBitsDeploymentInfo[Consensus::MAX_VERSION_BITS_DEPLOYMENTS] = {
-    {
-        /*.name =*/(char *)"csv",
+    {/*.name =*/(char *)"", // unallocated bit 0
         /*.gbt_force =*/true,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 1
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 2
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 3
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 4
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 5
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 6
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 7
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 8
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 9
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 10
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 11
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 12
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 13
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 14
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 15
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 16
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 17
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 18
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 19
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 20
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 21
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 22
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 23
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 24
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 25
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 26
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"", // unallocated bit 27
-        /*.gbt_force =*/false,
-    },
-    {
-        /*.name =*/(char *)"testdummy", // unallocated bit 28
-        /*.gbt_force =*/false,
-    }};
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 1
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 2
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 3
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 4
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 5
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 6
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 7
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 8
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 9
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 10
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 11
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 12
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 13
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 14
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 15
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 16
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 17
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 18
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 19
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 20
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 21
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 22
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 23
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 24
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 25
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 26
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 27
+        /*.gbt_force =*/true,
+        /*myVote = */ false},
+    {/*.name =*/(char *)"", // unallocated bit 28
+        /*.gbt_force =*/true,
+        /*myVote = */ false}};
 // bip135 end
 
 
@@ -134,6 +105,52 @@ bool AbstractThresholdConditionChecker::backAtDefined(ThresholdConditionCache &c
     return (cache.count(pindex) && cache[pindex] == THRESHOLD_DEFINED);
 }
 
+bool AssignBip135Vote(const std::string &feature, int vote)
+{
+    for (int i = 0; i < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++)
+    {
+        if (feature == VersionBitsDeploymentInfo[i].name)
+        {
+            // -1 means check existence but don't set
+            if (vote != -1)
+                VersionBitsDeploymentInfo[i].myVote = vote;
+            return true;
+        }
+    }
+    return false;
+}
+
+void ClearBip135Votes()
+{
+    for (int i = 0; i < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++)
+    {
+        VersionBitsDeploymentInfo[i].myVote = false;
+    }
+}
+
+bool AssignBip135Votes(const std::string &features, int vote)
+{
+    bool ret = true;
+    std::string::size_type start = 0;
+    std::string::size_type pos = 0;
+
+    do
+    {
+        pos = features.find(',', start);
+        std::string feature = features.substr(start, pos - start);
+        // trim spaces from front and back
+        auto spacePos = feature.find_first_not_of(" ");
+        if (spacePos != 0 && spacePos != std::string::npos)
+            feature.erase(0, spacePos);
+        spacePos = feature.find_last_not_of(" ");
+        if (spacePos != std::string::npos)
+            feature.erase(spacePos + 1);
+
+        ret &= AssignBip135Vote(feature, vote);
+        start = pos + 1; // skip the comma
+    } while (pos != std::string::npos);
+    return ret;
+}
 
 // major adaptations to generalize and support new grace period parameters
 ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex *pindexPrev,

@@ -13,6 +13,7 @@
 #include "tweak.h"
 #include "uint256.h"
 
+#include <atomic>
 #include <memory>
 
 extern CTweak<unsigned int> nDustThreshold;
@@ -175,6 +176,8 @@ private:
     /** Memory only. */
     const uint256 hash;
     void UpdateHash() const;
+    mutable std::atomic<size_t> nTxSize; // Serialized transaction size in bytes.
+
 
 public:
     // Default transaction version.
@@ -203,6 +206,7 @@ public:
     CTransaction(const CMutableTransaction &tx);
     CTransaction(CMutableTransaction &&tx);
 
+    CTransaction(const CTransaction &tx);
     CTransaction &operator=(const CTransaction &tx);
 
     ADD_SERIALIZE_METHODS;
@@ -228,24 +232,30 @@ public:
     // True if only scriptSigs are different
     bool IsEquivalentTo(const CTransaction &tx) const;
 
+    //* Return true if this transaction contains at least one OP_RETURN output.
+    bool HasData() const;
+    //* Return true if this transaction contains at least one OP_RETURN output, with the specified data ID
+    // the data ID is defined as a 4 byte pushdata containing a little endian 4 byte integer.
+    bool HasData(uint32_t dataID) const;
+
     // Return sum of txouts.
     CAmount GetValueOut() const;
     // GetValueIn() is a method on CCoinsViewCache, because
     // inputs must be known to compute value in.
 
     // Compute priority, given priority of inputs and (optionally) tx size
-    double ComputePriority(double dPriorityInputs, unsigned int nTxSize = 0) const;
+    double ComputePriority(double dPriorityInputs, unsigned int nSize = 0) const;
 
     // Compute modified tx size for priority calculation (optionally given tx size)
-    unsigned int CalculateModifiedSize(unsigned int nTxSize = 0) const;
+    unsigned int CalculateModifiedSize(unsigned int nSize = 0) const;
 
     bool IsCoinBase() const { return (vin.size() == 1 && vin[0].prevout.IsNull()); }
     friend bool operator==(const CTransaction &a, const CTransaction &b) { return a.hash == b.hash; }
     friend bool operator!=(const CTransaction &a, const CTransaction &b) { return a.hash != b.hash; }
     std::string ToString() const;
 
-    // Return the size the transaction in bytes.
-    uint32_t GetTxSize() const;
+    // Return the size of the transaction in bytes.
+    size_t GetTxSize() const;
 };
 
 /** A mutable version of CTransaction. */

@@ -7,6 +7,8 @@
 #include "nodestate.h"
 #include "main.h"
 
+extern std::atomic<int> nPreferredDownload;
+
 /**
 * Default constructor initializing all local member variables to "null" values
 */
@@ -31,11 +33,52 @@ CNodeState::CNodeState(CAddress addrIn, std::string addrNameIn) : address(addrIn
 * @param[in] pnode  The NodeId to return CNodeState* for
 * @return CNodeState* matching the NodeId, or nullptr if NodeId is not matched
 */
-CNodeState *State(NodeId nId)
+CNodeState *CState::_GetNodeState(const NodeId id)
 {
-    LOCK(cs_main);
-    std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(nId);
+    std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(id);
     if (it == mapNodeState.end())
         return nullptr;
     return &it->second;
+}
+
+/**
+* Initialize the CNodeState for the specified NodeId.
+*
+* @param[in] pnode  The NodeId
+* @return none
+*/
+void CState::InitializeNodeState(const CNode *pnode)
+{
+    LOCK(cs);
+    mapNodeState.emplace_hint(mapNodeState.end(), std::piecewise_construct, std::forward_as_tuple(pnode->GetId()),
+        std::forward_as_tuple(pnode->addr, pnode->addrName));
+}
+
+/**
+* Remove the CNodeState for the specified NodeId.
+*
+* @param[in] pnode  The NodeId
+* @return none
+*/
+void CState::RemoveNodeState(const NodeId id)
+{
+    LOCK2(cs, requester.cs_objDownloader);
+    mapNodeState.erase(id);
+
+    // Remove any other types of nodestate
+    requester.RemoveNodeState(id);
+
+    // Do a consistency check after the last peer is removed.
+    if (mapNodeState.empty())
+    {
+        DbgAssert(requester.MapBlocksInFlightEmpty(), requester.MapBlocksInFlightClear());
+        DbgAssert(requester.mapRequestManagerNodeState.empty(), requester.mapRequestManagerNodeState.clear());
+        DbgAssert(nPreferredDownload.load() == 0, nPreferredDownload.store(0));
+    }
+}
+
+void CState::Clear()
+{
+    LOCK(cs);
+    mapNodeState.clear();
 }

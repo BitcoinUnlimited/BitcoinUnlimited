@@ -113,7 +113,7 @@ class ForkTest (BitcoinTestFramework):
         self.nodes = []
         self.nodes.append(start_node(0, self.options.tmpdir, ["-mocktime=%d" % (cur_time + 10)]))
         self.nodes.append(start_node(1, self.options.tmpdir, ["-mocktime=%d" % (cur_time + 10)]))
- 
+
         # Now interconnect the nodes
         connect_nodes_bi(self.nodes, 0, 1)
         self.is_network_split = False
@@ -143,17 +143,5 @@ def Test():
 
     # you may want these additional flags:
     # "--srcdir=<out-of-source-build-dir>/debug/src"
-    flags = []
-    if os.path.isdir("/ramdisk/test"):  # execution is much faster if a ramdisk is used
-        flags.append("--tmppfx=/ramdisk/test")
-
-    here = os.path.dirname(os.path.abspath(__file__))
-    if not os.path.exists(os.path.abspath(here + "/../../src/bitcoind")):
-        dbg = os.path.abspath(here + "/../../debug/src/bitcoind")
-        rel = os.path.abspath(here + "/../../release/src/bitcoind")
-        if os.path.exists(dbg):
-            flags.append("--srcdir=%s" % os.path.dirname(dbg))
-        elif os.path.exists(rel):
-            flags.append("--srcdir=%s" % os.path.dirname(rel))
-
-    t.main(flags , bitcoinConf, None)
+    flags = standardFlags()
+    t.main(flags, bitcoinConf, None)

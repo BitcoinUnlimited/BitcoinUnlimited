@@ -974,6 +974,9 @@ QString formatServicesStr(quint64 mask, const QStringList &additionalServices)
             case NODE_WEAKBLOCKS:
                 strList.append("WB");
                 break;
+            case NODE_CF:
+                strList.append("CF");
+                break;
             default:
                 strList.append(QString("%1[%2]").arg("UNKNOWN").arg(check));
             }

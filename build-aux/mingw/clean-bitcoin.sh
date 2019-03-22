@@ -14,7 +14,7 @@ cd "$BITCOIN_GIT_ROOT"
 
 #define and export BOOST_ROOT prior to any calls that require
 #executing ./configure (this may include `make clean`) depending on current system state
-export BOOST_ROOT="$PATH_DEPS/boost_1_61_0"
+export BOOST_ROOT="$PATH_DEPS/boost_1_68_0"
 
 #if the clean parameter was passed call clean prior to make
 echo 'Cleaning build...'

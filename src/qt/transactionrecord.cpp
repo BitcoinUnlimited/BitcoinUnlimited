@@ -9,6 +9,8 @@
 #include "dstencode.h"
 #include "main.h"
 #include "timedata.h"
+#include "txadmission.h"
+#include "validation/validation.h"
 
 #include <stdint.h>
 
@@ -207,10 +209,7 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     // Determine transaction status
 
     // Find the block the tx is in
-    CBlockIndex *pindex = NULL;
-    BlockMap::iterator mi = mapBlockIndex.find(wtx.hashBlock);
-    if (mi != mapBlockIndex.end())
-        pindex = (*mi).second;
+    CBlockIndex *pindex = LookupBlockIndex(wtx.hashBlock);
 
     // Sort order, unrecorded transactions sort to the top
     status.sortKey = strprintf("%010d-%01d-%010u-%03d", (pindex ? pindex->nHeight : std::numeric_limits<int>::max()),
@@ -219,7 +218,7 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     status.depth = wtx.GetDepthInMainChain();
     status.cur_num_blocks = chainActive.Height();
 
-    if (!CheckFinalTx(wtx))
+    if (!CheckFinalTx(MakeTransactionRef(wtx)))
     {
         if (wtx.nLockTime < LOCKTIME_THRESHOLD)
         {
@@ -282,11 +281,6 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     }
 }
 
-bool TransactionRecord::statusUpdateNeeded()
-{
-    AssertLockHeld(cs_main);
-    return status.cur_num_blocks != chainActive.Height();
-}
-
+bool TransactionRecord::statusUpdateNeeded() { return status.cur_num_blocks != chainActive.Height(); }
 QString TransactionRecord::getTxID() const { return QString::fromStdString(hash.ToString()); }
 int TransactionRecord::getOutputIndex() const { return idx; }

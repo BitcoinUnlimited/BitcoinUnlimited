@@ -36,11 +36,14 @@ from threading import RLock
 from threading import Thread
 import logging
 import copy
+import traceback
 
 from .nodemessages import *
 from .bumessages import *
 
-BIP0031_VERSION = 60000
+import math
+from .siphash import siphash256
+
 
 MAX_INV_SZ = 50000
 MAX_BLOCK_SIZE = 1000000
@@ -61,6 +64,8 @@ mininode_socket_map = dict()
 class NodeConnCB(object):
     def __init__(self):
         self.verack_received = False
+        self.xverack_received = False
+        self.xver = {}
         # deliver_sleep_time is helpful for debugging race conditions in p2p
         # tests; it causes message delivery to sleep for the specified time
         # before acquiring the global lock and delivering the next message.
@@ -79,14 +84,21 @@ class NodeConnCB(object):
     # Tests may want to use this as a signal that the test can begin.
     # This can be called from the testing thread, so it needs to acquire the
     # global lock.
-    def wait_for_verack(self):
-        while True:
+    def wait_for(self, test_function):
+        for i in range(200):
             if self.disconnected:
                 raise DisconnectedError()
             with mininode_lock:
-                if self.verack_received:
+                if test_function():
                     return
             time.sleep(0.05)
+        raise TimeoutError("Waiting for %s timed out." % repr(test_function))
+
+    def wait_for_verack(self):
+        self.wait_for(lambda : self.verack_received)
+
+    def wait_for_xverack(self):
+        self.wait_for(lambda : self.xverack_received)
 
     def deliver(self, conn, message):
         deliver_sleep = self.get_deliver_sleep_time()
@@ -98,6 +110,7 @@ class NodeConnCB(object):
                 getattr(self, fn)(conn, message)
             except:
                 print("ERROR delivering %s (%s) to %s" % (repr(message), sys.exc_info()[0], fn))
+                traceback.print_exc()
 
     def on_version(self, conn, message):
         if message.nVersion >= 209:
@@ -137,8 +150,7 @@ class NodeConnCB(object):
     def on_getheaders(self, conn, message): pass
 
     def on_ping(self, conn, message):
-        if conn.ver_send > BIP0031_VERSION:
-            conn.send_message(msg_pong(message.nonce))
+        conn.send_message(msg_pong(message.nonce))
 
     def on_reject(self, conn, message): pass
 
@@ -149,6 +161,24 @@ class NodeConnCB(object):
     def on_mempool(self, conn): pass
 
     def on_pong(self, conn, message): pass
+
+    def on_sendheaders(self, conn, message): pass
+
+    def on_sendcmpct(self, conn, message): pass
+
+    def on_cmpctblock(self, conn, message): pass
+
+    def on_getblocktxn(self, conn, message): pass
+
+    def on_blocktxn(self, conn, message): pass
+
+    def on_xverack(self, conn, message):
+        self.xverack_received = True
+        conn.send_message(msg_xverack())
+
+    def on_xversion(self, conn, message):
+        conn.xver = message
+
 
 # More useful callbacks and functions for NodeConnCB's which have a single NodeConn
 
@@ -164,8 +194,12 @@ class SingleNodeConnCB(NodeConnCB):
         self.connection = conn
 
     # Wrapper for the NodeConn's send_message function
-    def send_message(self, message):
-        self.connection.send_message(message)
+    def send_message(self, message, pushbuf = False):
+        self.connection.send_message(message, pushbuf)
+
+    def send_and_ping(self, message):
+        self.send_message(message)
+        self.sync_with_ping()
 
     def on_pong(self, conn, message):
         self.last_pong = message
@@ -218,6 +252,13 @@ class NodeConn(asyncore.dispatcher):
         b"reject": msg_reject,
         b"mempool": msg_mempool,
         b"sendheaders": msg_sendheaders,
+        b"xversion" : msg_xversion,
+        b"xverack" : msg_xverack,
+        b"xupdate" : msg_xupdate,
+        b"sendcmpct": msg_sendcmpct,
+        b"cmpctblock": msg_cmpctblock,
+        b"getblocktxn": msg_getblocktxn,
+        b"blocktxn": msg_blocktxn
     }, bumessagemap)
 
     BTC_MAGIC_BYTES = {
@@ -232,7 +273,7 @@ class NodeConn(asyncore.dispatcher):
         "regtest": b"\xda\xb5\xbf\xfa",
     }
 
-    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=1, bitcoinCash=True):
+    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=1, bitcoinCash=True, send_initial_version = True):
         self.bitcoinCash = bitcoinCash
         if self.bitcoinCash:
             self.MAGIC_BYTES = self.CASH_MAGIC_BYTES
@@ -253,14 +294,18 @@ class NodeConn(asyncore.dispatcher):
         self.cb = callback
         self.disconnect = False
         self.curIndex = 0
-        # stuff version msg into sendbuf
-        vt = msg_version()
-        vt.nServices = services
-        vt.addrTo.ip = self.dstaddr
-        vt.addrTo.port = self.dstport
-        vt.addrFrom.ip = "0.0.0.0"
-        vt.addrFrom.port = 0
-        self.send_message(vt, True)
+        self.allow0Checksum = False
+        self.produce0Checksum = False
+        self.num0Checksums = 0
+        if send_initial_version:
+            # stuff version msg into sendbuf
+            vt = msg_version()
+            vt.nServices = services
+            vt.addrTo.ip = self.dstaddr
+            vt.addrTo.port = self.dstport
+            vt.addrFrom.ip = "0.0.0.0"
+            vt.addrFrom.port = 0
+            self.send_message(vt, True)
         print('MiniNode: Connecting to Bitcoin Node IP # ' + dstaddr + ':'
               + str(dstport))
         try:
@@ -268,6 +313,7 @@ class NodeConn(asyncore.dispatcher):
         except:
             self.handle_close()
         self.rpc = rpc
+        self.exceptions = []
 
     def show_debug_msg(self, msg):
         self.log.debug(msg)
@@ -362,7 +408,13 @@ class NodeConn(asyncore.dispatcher):
                     th = sha256(msg)
                     h = sha256(th)
                     if checksum != h[:4]:
-                        raise ValueError("got bad checksum " + repr(self.recvbuf))
+                        if checksum == b'\x00\x00\x00\x00':
+                            if self.allow0Checksum:
+                                self.num0Checksums += 1
+                            else:
+                                raise ValueError("got zero checksum")
+                        else:
+                            raise ValueError("got bad checksum " + repr(self.recvbuf))
                     self.recvbuf = self.recvbuf[4 + 12 + 4 + 4 + msglen:]
                 if command in self.messagemap:
                     f = BytesIO(msg)
@@ -376,6 +428,7 @@ class NodeConn(asyncore.dispatcher):
                     # pdb.set_trace()
         except Exception as e:
             print('got_data:', repr(e))
+            self.exceptions.append(e)
             #import traceback
             #traceback.print_tb(sys.exc_info()[2])
             #pdb.post_mortem(e.__traceback__)
@@ -391,18 +444,18 @@ class NodeConn(asyncore.dispatcher):
         tmsg += b"\x00" * (12 - len(command))
         tmsg += struct.pack("<I", len(data))
         if self.ver_send >= 209:
-            th = sha256(data)
-            h = sha256(th)
-            tmsg += h[:4]
+            if self.produce0Checksum:
+                tmsg += b"\x00" * 4
+            else:
+                th = sha256(data)
+                h = sha256(th)
+                tmsg += h[:4]
         tmsg += data
         with mininode_lock:
             self.sendbuf += tmsg
             self.last_sent = time.time()
 
     def got_message(self, message):
-        if message.command == b"version":
-            if message.nVersion <= BIP0031_VERSION:
-                self.messagemap[b'ping'] = msg_ping_prebip31
         if self.last_sent + 30 * 60 < time.time():
             self.send_message(self.messagemap[b'ping']())
         self.show_debug_msg("Recv %s" % repr(message))

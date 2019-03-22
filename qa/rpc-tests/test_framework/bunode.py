@@ -25,6 +25,7 @@ class BUProtocolHandler(NodeConnCB):
         self.last_headers = None
         self.last_block = None
         self.ping_counter = 1
+        self.pong_counter = 0
         self.last_pong = msg_pong(0)
         self.last_getdata = []
         self.sleep_time = 0.05
@@ -32,6 +33,7 @@ class BUProtocolHandler(NodeConnCB):
         self.last_getheaders = None
         self.disconnected = False
         self.remoteVersion = 0
+        self.remote_xversion = None
         self.buverack_received = False
         self.parent = None
         self.requestOnInv = 0
@@ -77,6 +79,14 @@ class BUProtocolHandler(NodeConnCB):
         self.show_debug_msg("BU version ACK\n")
         self.buverack_received = True
 
+    def on_xverack(self, conn, message):
+        self.show_debug_msg("xverack received\n")
+        self.xverack_received = True
+
+    def on_xversion(self, conn, message):
+        self.show_debug_msg("xversion received\n")
+        self.remote_xversion = message
+
     def add_connection(self, conn):
         self.connection = conn
 
@@ -102,8 +112,8 @@ class BUProtocolHandler(NodeConnCB):
         self.connection.send_message(msg)
 
     # Wrapper for the NodeConn's send_message function
-    def send_message(self, message):
-        self.connection.send_message(message)
+    def send_message(self, message, pushbuf = False):
+        self.connection.send_message(message, pushbuf)
 
     def on_inv(self, conn, message):
         self.last_inv.append(message)
@@ -150,6 +160,7 @@ class BUProtocolHandler(NodeConnCB):
 
     def on_pong(self, conn, message):
         self.last_pong = message
+        self.pong_counter += 1
         if self.parent and hasattr(self.parent, "on_pong"):
             self.parent.on_pong(self,message)
 
@@ -276,6 +287,21 @@ class BUProtocolHandler(NodeConnCB):
         getblocks_message.locator.vHave = locator
         self.send_message(getblocks_message)
 
+
+class VersionlessProtoHandler(BUProtocolHandler):
+    """ Variant of the BUProtocolHandler that avoids auto-sending and reacting to
+version messages. Useful for testing that part of the P2P handshake. """
+    def __init__(self):
+        BUProtocolHandler.__init__(self)
+
+    def on_version(self, conn, message):
+        self.show_debug_msg("version received\n")
+        self.remoteVersion = message.nVersion
+
+    def on_verack(self, conn, message):
+        self.show_debug_msg("verack received\n")
+        self.verack_received = True
+
 class BasicBUCashNode():
     def __init__(self):
         self.cnxns = {}
@@ -283,13 +309,14 @@ class BasicBUCashNode():
         self.nthin = 0
         self.nxthin = 0
 
-    def connect(self, id, ip, port, rpc=None, protohandler=None):
+    def connect(self, id, ip, port, rpc=None, protohandler=None, send_initial_version = True):
         if not protohandler:
             protohandler = BUProtocolHandler()
-        conn = NodeConn(ip, port, rpc, protohandler, bitcoinCash=True)
+        conn = NodeConn(ip, port, rpc, protohandler, bitcoinCash=True, send_initial_version = send_initial_version)
         protohandler.add_connection(conn)
         protohandler.add_parent(self)
         self.cnxns[id] = protohandler
+        return conn
 
     def on_block(self, frm, message):
         print("got block")

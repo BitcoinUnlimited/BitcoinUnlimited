@@ -22,6 +22,7 @@
 #include "rpc/server.h"
 #include "script/sigcache.h"
 #include "test/testutil.h"
+#include "txadmission.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
@@ -31,7 +32,7 @@
 
 #include <boost/program_options.hpp>
 #include <boost/test/unit_test.hpp>
-#include <boost/thread.hpp>
+#include <thread>
 
 FastRandomContext insecure_rand_ctx(true);
 
@@ -64,6 +65,7 @@ TestingSetup::TestingSetup(const std::string &chainName) : BasicTestingSetup(cha
     pblocktree = new CBlockTreeDB(1 << 20, "", true);
     pcoinsdbview = new CCoinsViewDB(1 << 23, true);
     pcoinsTip = new CCoinsViewCache(pcoinsdbview);
+    txCommitQ = new std::map<uint256, CTxCommitData>();
     bool worked = InitBlockIndex(chainparams);
     assert(worked);
 
@@ -85,6 +87,12 @@ TestingSetup::~TestingSetup()
     delete pblocktree;
     fs::remove_all(pathTemp);
 }
+
+struct NumericallyLessTxHashComparator
+{
+public:
+    bool operator()(const CTransactionRef &a, const CTransactionRef &b) const { return a->GetHash() < b->GetHash(); }
+};
 
 TestChain100Setup::TestChain100Setup() : TestingSetup(CBaseChainParams::REGTEST)
 {
@@ -115,6 +123,9 @@ CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransa
     block.vtx.resize(1);
     for (const CMutableTransaction &tx : txns)
         block.vtx.push_back(MakeTransactionRef(tx));
+
+    // enfore LTOR ordering of transactions
+    std::sort(block.vtx.begin() + 1, block.vtx.end(), NumericallyLessTxHashComparator());
 
     // IncrementExtraNonce creates a valid coinbase and merkleRoot
     unsigned int extraNonce = 0;
@@ -154,6 +165,13 @@ void StartShutdown() { exit(0); }
 bool ShutdownRequested() { return false; }
 using namespace boost::program_options;
 
+CService ipaddress(uint32_t i, uint32_t port)
+{
+    struct in_addr s;
+    s.s_addr = i;
+    return CService(CNetAddr(s), port);
+}
+
 struct StartupShutdown
 {
     StartupShutdown()
@@ -181,7 +199,7 @@ struct StartupShutdown
                 /* To enable this, add
                    -- --log_bitcoin console
                    to the end of the test_bitcoin argument list. */
-                Logging::LogToggleCategory(Logging::ALL, true);
+                Logging::LogToggleCategory(ALL, true);
                 fPrintToConsole = true;
                 fPrintToDebugLog = false;
             }

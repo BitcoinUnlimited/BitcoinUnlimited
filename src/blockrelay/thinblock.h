@@ -16,6 +16,11 @@
 #include <atomic>
 #include <vector>
 
+// Bloom filter targeting attempts to reduce the size of the xthin bloom filters by
+// prediciting which transactions are likely to get included in the the block. This is
+// only useful when the memory pool is consistently much larger than the mined block size.
+static const bool DEFAULT_BLOOM_FILTER_TARGETING = true;
+
 class CDataStream;
 class CNode;
 
@@ -61,7 +66,8 @@ public:
     bool collision;
 
 public:
-    CXThinBlock(const CBlock &block, const CBloomFilter *filter); // Use the filter to determine which txns the client has
+    // Use the filter to determine which txns the client has
+    CXThinBlock(const CBlock &block, const CBloomFilter *filter);
     CXThinBlock(const CBlock &block); // Assume client has all of the transactions (except coinbase)
     CXThinBlock() {}
     /**
@@ -176,9 +182,6 @@ private:
     /* The sum total of all bytes for thinblocks currently in process of being reconstructed */
     std::atomic<uint64_t> nThinBlockBytes{0};
 
-    CCriticalSection cs_mapThinBlockTimer; // locks mapThinBlockTimer
-    std::map<uint256, std::pair<uint64_t, bool> > mapThinBlockTimer;
-
     CCriticalSection cs_thinblockstats; // locks everything below this point
 
     CStatHistory<uint64_t> nOriginalSize;
@@ -272,9 +275,6 @@ public:
     std::string ThinBlockToString();
     std::string FullTxToString();
 
-    bool CheckThinblockTimer(const uint256 &hash);
-    void ClearThinBlockTimer(const uint256 &hash);
-
     void ClearThinBlockData(CNode *pfrom);
     void ClearThinBlockData(CNode *pfrom, const uint256 &hash);
     void ClearThinBlockStats();
@@ -289,31 +289,15 @@ public:
 extern CThinBlockData thindata; // Singleton class
 
 
-bool HaveThinblockNodes();
 bool IsThinBlocksEnabled();
-bool CanThinBlockBeDownloaded(CNode *pto);
 bool ClearLargestThinBlockAndDisconnect(CNode *pfrom);
-void ClearThinBlockInFlight(CNode *pfrom, const uint256 &hash);
-void AddThinBlockInFlight(CNode *pfrom, const uint256 &hash);
 void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
+void RequestThinBlock(CNode *pfrom, const uint256 &hash);
 bool IsThinBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header);
 void BuildSeededBloomFilter(CBloomFilter &memPoolFilter,
     std::vector<uint256> &vOrphanHashes,
     uint256 hash,
     CNode *pfrom,
     bool fDeterministic = false);
-
-// Xpress Validation: begin
-// Transactions that have already been accepted into the memory pool do not need to be
-// re-verified and can avoid having to do a second and expensive CheckInputs() when
-// processing a new block.  (Protected by cs_xval)
-extern std::set<uint256> setPreVerifiedTxHash;
-
-// Orphans that are added to the thinblock must be verifed since they have never been
-// accepted into the memory pool.  (Protected by cs_xval)
-extern std::set<uint256> setUnVerifiedOrphanTxHash;
-
-extern CCriticalSection cs_xval;
-// Xpress Validation: end
 
 #endif // BITCOIN_THINBLOCK_H

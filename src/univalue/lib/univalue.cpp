@@ -10,8 +10,6 @@
 
 #include "univalue.h"
 
-using namespace std;
-
 const UniValue NullUniValue;
 
 void UniValue::clear()
@@ -37,15 +35,15 @@ bool UniValue::setBool(bool val_)
     return true;
 }
 
-static bool validNumStr(const string& s)
+static bool validNumStr(const std::string& s)
 {
-    string tokenVal;
+    std::string tokenVal;
     unsigned int consumed;
     enum jtokentype tt = getJsonToken(tokenVal, consumed, s.data(), s.data() + s.size());
     return (tt == JTOK_NUMBER);
 }
 
-bool UniValue::setNumStr(const string& val_)
+bool UniValue::setNumStr(const std::string& val_)
 {
     if (!validNumStr(val_))
         return false;
@@ -58,7 +56,7 @@ bool UniValue::setNumStr(const string& val_)
 
 bool UniValue::setInt(uint64_t val_)
 {
-    ostringstream oss;
+    std::ostringstream oss;
 
     oss << val_;
 
@@ -67,7 +65,7 @@ bool UniValue::setInt(uint64_t val_)
 
 bool UniValue::setInt(int64_t val_)
 {
-    ostringstream oss;
+    std::ostringstream oss;
 
     oss << val_;
 
@@ -76,7 +74,7 @@ bool UniValue::setInt(int64_t val_)
 
 bool UniValue::setFloat(double val_)
 {
-    ostringstream oss;
+    std::ostringstream oss;
 
     oss << std::setprecision(16) << val_;
 
@@ -85,7 +83,7 @@ bool UniValue::setFloat(double val_)
     return ret;
 }
 
-bool UniValue::setStr(const string& val_)
+bool UniValue::setStr(const std::string& val_)
 {
     clear();
     typ = VSTR;
@@ -109,18 +107,28 @@ bool UniValue::setObject()
 
 bool UniValue::push_back(const UniValue& val_)
 {
+#ifdef DEBUG
+    assert(typ == VARR);
+#else
     if (typ != VARR)
+    {
         return false;
-
+    }
+#endif
     values.push_back(val_);
     return true;
 }
 
 bool UniValue::push_backV(const std::vector<UniValue>& vec)
 {
+#ifdef DEBUG
+    assert(typ == VARR);
+#else
     if (typ != VARR)
+    {
         return false;
-
+    }
+#endif
     values.insert(values.end(), vec.begin(), vec.end());
 
     return true;
@@ -134,9 +142,14 @@ void UniValue::__pushKV(const std::string& key, const UniValue& val_)
 
 bool UniValue::pushKV(const std::string& key, const UniValue& val_)
 {
+#ifdef DEBUG
+    assert(typ == VOBJ);
+#else
     if (typ != VOBJ)
+    {
         return false;
-
+    }
+#endif
     size_t idx;
     if (findKey(key, idx))
         values[idx] = val_;
@@ -147,9 +160,14 @@ bool UniValue::pushKV(const std::string& key, const UniValue& val_)
 
 bool UniValue::pushKVs(const UniValue& obj)
 {
+#ifdef DEBUG
+    assert(typ == VOBJ && obj.typ == VOBJ);
+#else
     if (typ != VOBJ || obj.typ != VOBJ)
+    {
         return false;
-
+    }
+#endif
     for (size_t i = 0; i < obj.keys.size(); i++)
         __pushKV(obj.keys[i], obj.values.at(i));
 
@@ -241,4 +259,3 @@ const UniValue& find_value(const UniValue& obj, const std::string& name)
 
     return NullUniValue;
 }
-

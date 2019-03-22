@@ -36,6 +36,12 @@ inline bool AllowFree(double dPriority)
 /** Fake height value used in Coin to signify they are only in the memory pool (since 0.8) */
 static const uint32_t MEMPOOL_HEIGHT = 0x7FFFFFFF;
 
+/** Dump the mempool to disk. */
+bool DumpMempool();
+
+/** Load the mempool from disk. */
+bool LoadMempool();
+
 struct LockPoints
 {
     // Will be set to the blockchain height and median time past
@@ -75,7 +81,6 @@ class CTxMemPoolEntry
 private:
     CTransactionRef tx;
     CAmount nFee; //! Cached to avoid expensive parent-transaction lookups
-    size_t nTxSize; //! ... and avoid recomputing tx size
     size_t nModSize; //! ... and modified size for priority
     size_t nUsageSize; //! ... and total memory usage
     int64_t nTime; //! Local time when entering the mempool
@@ -128,7 +133,7 @@ public:
      */
     double GetPriority(unsigned int currentHeight) const;
     const CAmount &GetFee() const { return nFee; }
-    size_t GetTxSize() const { return nTxSize; }
+    size_t GetTxSize() const { return this->tx->GetTxSize(); }
     int64_t GetTime() const { return nTime; }
     unsigned int GetHeight() const { return entryHeight; }
     bool WasClearAtEntry() const { return hadNoDependencies; }
@@ -463,7 +468,7 @@ private:
 
     void trackPackageRemoved(const CFeeRate &rate);
 
-    boost::mutex cs_txPerSec;
+    std::mutex cs_txPerSec;
     double nTxPerSec; // BU: tx's per second accepted into the mempool
 
 public:
@@ -669,12 +674,12 @@ public:
     /** BU: Every transaction that is accepted into the mempool will call this method to update the current value*/
     void UpdateTransactionsPerSecond();
 
-    unsigned long size()
+    unsigned long size() const
     {
         READLOCK(cs);
         return mapTx.size();
     }
-    unsigned long _size() { return mapTx.size(); }
+    unsigned long _size() const { return mapTx.size(); }
     uint64_t GetTotalTxSize()
     {
         READLOCK(cs);
@@ -689,7 +694,7 @@ public:
     bool _exists(const uint256 &hash) const { return (mapTx.count(hash) != 0); }
     double TransactionsPerSecond()
     {
-        boost::mutex::scoped_lock lock(cs_txPerSec);
+        std::lock_guard<std::mutex> lock(cs_txPerSec);
         return nTxPerSec;
     }
 
@@ -703,7 +708,7 @@ public:
     CTransactionRef get(const uint256 &hash) const;
     CTransactionRef _get(const uint256 &hash) const;
     TxMempoolInfo info(const uint256 &hash) const;
-    std::vector<TxMempoolInfo> infoAll() const;
+    std::vector<TxMempoolInfo> AllTxMempoolInfo() const;
 
     /** Estimate fee rate needed to get into the next nBlocks
      *  If no answer can be given at nBlocks, return an estimate

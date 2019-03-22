@@ -22,8 +22,8 @@ namespace Checkpoints
 //! Return conservative estimate of total number of blocks, 0 if unknown
 int GetTotalBlocksEstimate(const CCheckpointData &data);
 
-//! Returns last CBlockIndex* in mapBlockIndex that is a checkpoint
-CBlockIndex *GetLastCheckpoint(const CCheckpointData &data);
+//! Unused: Returns last CBlockIndex* in mapBlockIndex that is a checkpoint
+// CBlockIndex *GetLastCheckpoint(const CCheckpointData &data);
 
 double GuessVerificationProgress(const CCheckpointData &data, CBlockIndex *pindex, bool fSigchecks = true);
 

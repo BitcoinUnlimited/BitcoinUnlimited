@@ -8,6 +8,7 @@
 #endif
 
 #include "chainparams.h"
+#include "chainparams.h"
 #include "clientversion.h"
 #include "config.h"
 #include "forks_csv.h"
@@ -17,13 +18,13 @@
 #include "init.h"
 #include "noui.h"
 #include "rpc/server.h"
-#include "scheduler.h"
+#include "unlimited.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utilstrencodings.h"
 
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/thread.hpp>
+#include <thread>
 
 #include <stdio.h>
 
@@ -33,22 +34,23 @@
  *
  * \section intro_sec Introduction
  *
- //www.bitcoin.org/),
- * This is the developer documentation of the reference client for an experimental new digital currency called Bitcoin
- (https:
- * which enables instant payments to anyone, anywhere in the world. Bitcoin uses peer-to-peer technology to operate
- * with no central authority: managing transactions and issuing money are carried out collectively by the network.
+ * This is the developer documentation of Bitcoin Unlimited
+ * (https://www.bitcoinunlimited.info/). Bitcoin Unlimited is a client for the
+ * digital currency called Bitcoin Cash, which enables instant payments to anyone,
+ * anywhere in the world. Bitcoin Cash uses peer-to-peer technology to operate
+ * with no central authority: managing transactions and issuing money are
+ * carried out collectively by the network.
  *
  * The software is a community-driven open source project, released under the MIT license.
  *
  * \section Navigation
  * Use the buttons <code>Namespaces</code>, <code>Classes</code> or <code>Files</code> at the top of the page to start
- navigating the code.
+ * navigating the code.
  */
 
 static bool fDaemon;
 
-void WaitForShutdown(boost::thread_group *threadGroup)
+void WaitForShutdown(thread_group *threadGroup)
 {
     bool fShutdown = ShutdownRequested();
     // Tell the main threads to shutdown.
@@ -70,8 +72,7 @@ void WaitForShutdown(boost::thread_group *threadGroup)
 //
 bool AppInit(int argc, char *argv[])
 {
-    boost::thread_group threadGroup;
-    CScheduler scheduler;
+    thread_group threadGroup;
 
     auto &config = const_cast<Config &>(GetConfig());
 
@@ -203,8 +204,52 @@ bool AppInit(int argc, char *argv[])
 
         // Set this early so that parameter interactions go to console
         InitLogging();
+
+        // Print command line as well as argument maps into log file
+        {
+            std::string cmdline_log;
+            for (int i = 0; i < argc; i++)
+                cmdline_log += tfm::format("%s ", argv[i]);
+            LOGA("Command line: %s\n", cmdline_log);
+
+            LOGA("Single entry arguments:\n");
+            for (const auto &arg : mapArgs)
+            {
+                std::string strKey = arg.first;
+                std::string strValue = arg.second;
+                if (strKey == "-rpcpassword" || strKey == "-rpcuser")
+                {
+                    // don't print username or password to the log file
+                    strValue = "xxxxxxxx";
+                }
+                LOGA(tfm::format("        %s='%s'\n", strKey, strValue));
+            }
+            LOGA("\n");
+            bool print_multi_args = false;
+            for (const auto &arg : mapMultiArgs)
+                if (arg.second.size() > 1)
+                {
+                    print_multi_args = true;
+                    break;
+                }
+            if (print_multi_args)
+            {
+                LOGA("Multiple entry arguments:\n");
+                for (const auto &arg : mapMultiArgs)
+                {
+                    if (arg.second.size() < 2)
+                        continue;
+                    std::string entry_log = tfm::format("        %s = [", arg.first);
+                    for (const auto &entry : arg.second)
+                        entry_log += tfm::format("'%s', ", entry);
+                    LOGA(entry_log.substr(0, entry_log.size() - 2) + "]\n");
+                }
+                LOGA("\n");
+            }
+        }
+
         InitParameterInteraction();
-        fRet = AppInit2(config, threadGroup, scheduler);
+        fRet = AppInit2(config, threadGroup);
     }
     catch (const std::exception &e)
     {

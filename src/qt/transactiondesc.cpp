@@ -15,6 +15,7 @@
 #include "main.h"
 #include "script/script.h"
 #include "timedata.h"
+#include "txadmission.h"
 #include "util.h"
 #include "wallet/db.h"
 #include "wallet/wallet.h"
@@ -25,7 +26,7 @@
 QString TransactionDesc::FormatTxStatus(const CWalletTx &wtx)
 {
     AssertLockHeld(cs_main);
-    if (!CheckFinalTx(wtx))
+    if (!CheckFinalTx(MakeTransactionRef(wtx)))
     {
         if (wtx.nLockTime < LOCKTIME_THRESHOLD)
             return tr("Open for %n more block(s)", "", wtx.nLockTime - chainActive.Height());

@@ -21,9 +21,9 @@
 #include "wallet/wallet.h"
 
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread.hpp>
 #include <boost/version.hpp>
 #include <fstream>
+#include <thread>
 
 using namespace std;
 
@@ -395,7 +395,7 @@ bool ReadKeyValue(CWallet *pwallet,
             CWalletTx wtx;
             ssValue >> wtx;
             CValidationState state;
-            if (!(CheckTransaction(wtx, state) && (wtx.GetHash() == hash) && state.IsValid()))
+            if (!(CheckTransaction(MakeTransactionRef(wtx), state) && (wtx.GetHash() == hash) && state.IsValid()))
                 return false;
 
             // Undo serialize changes in 31600
@@ -914,6 +914,11 @@ void ThreadFlushWalletDB(const string &strFile)
     {
         MilliSleep(500);
 
+        if (shutdown_threads.load() == true)
+        {
+            break;
+        }
+
         if (nLastSeen != nWalletDBUpdated)
         {
             nLastSeen = nWalletDBUpdated;
@@ -936,7 +941,10 @@ void ThreadFlushWalletDB(const string &strFile)
 
                 if (nRefCount == 0)
                 {
-                    boost::this_thread::interruption_point();
+                    if (shutdown_threads.load() == true)
+                    {
+                        break;
+                    }
                     map<string, int>::iterator mi2 = bitdb.mapFileUseCount.find(strFile);
                     if (mi2 != bitdb.mapFileUseCount.end())
                     {
@@ -953,6 +961,10 @@ void ThreadFlushWalletDB(const string &strFile)
                     }
                 }
             }
+        }
+        if (shutdown_threads.load() == true)
+        {
+            break;
         }
     }
 }
@@ -1057,7 +1069,7 @@ bool CWalletDB::Recover(CDBEnv &dbenv, const std::string &filename, bool fOnlyKe
     }
     LOGA("Salvage(aggressive) found %u records\n", salvagedData.size());
 
-    boost::scoped_ptr<Db> pdbCopy(new Db(dbenv.dbenv, 0));
+    std::unique_ptr<Db> pdbCopy(new Db(dbenv.dbenv, 0));
     int ret = pdbCopy->open(nullptr, // Txn pointer
         filename.c_str(), // Filename
         "main", // Logical db name

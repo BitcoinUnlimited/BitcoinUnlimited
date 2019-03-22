@@ -14,6 +14,7 @@
 #include "compressor.h"
 #include "consensus/merkle.h"
 #include "net.h"
+#include "policy/policy.h"
 #include "primitives/block.h"
 #include "protocol.h"
 #include "pubkey.h"
@@ -25,6 +26,7 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include "version.h"
+#include "xversionmessage.h"
 
 #include <cstdio>
 #include <stdint.h>
@@ -339,7 +341,6 @@ protected:
         unsigned int flags;
 
         *ds >> flags;
-        *ds >> stack;
         *ds >> scriptsig_raw;
         *ds >> scriptpubkey_raw;
 
@@ -348,9 +349,10 @@ protected:
 
         ScriptError error;
         unsigned char sighashtype;
-        CScript script_sig(scriptsig_raw), script_pubkey(scriptpubkey_raw);
-        const bool result =
-            VerifyScript(script_sig, script_pubkey, flags, BaseSignatureChecker(), &error, &sighashtype);
+        CScript script_sig(scriptsig_raw.begin(), scriptsig_raw.end());
+        CScript script_pubkey(scriptpubkey_raw.begin(), scriptpubkey_raw.end());
+        const bool result = VerifyScript(
+            script_sig, script_pubkey, flags, MAX_OPS_PER_SCRIPT, BaseSignatureChecker(), &error, &sighashtype);
 
         if (produce_output)
         {
@@ -526,7 +528,8 @@ protected:
 
         try
         {
-            gs = std::make_shared<CGrapheneSet>(nReceiverUniverseItems, itemHashes, ordered, fDeterministic);
+            gs = std::make_shared<CGrapheneSet>(
+                nReceiverUniverseItems, nReceiverUniverseItems, itemHashes, 0, 0, true, ordered, fDeterministic);
 
             while (!ds->empty())
             {
@@ -571,6 +574,9 @@ int main(int argc, char **argv)
 {
     ECCVerifyHandle globalVerifyHandle;
 
+    /* Make a couple things determinstic for fuzzing */
+    xversion_deterministic_hashing = true;
+
     FuzzDeserNet<CBlock> fuzz_cblock("cblock");
     FuzzDeserNet<CTransaction> fuzz_ctransaction("ctransaction");
     FuzzDeserNet<CBlockLocator> fuzz_cblocklocator("cblocklocator");
@@ -606,6 +612,8 @@ int main(int argc, char **argv)
 
     FuzzAPICIblt fuzz_api_iblt;
     FuzzAPICGrapheneSet fuzz_api_graphene_set;
+
+    FuzzDeserNet<CXVersionMessage> fuzz_cxversionmessage("cxversionmessage");
 
     // command line arguments can be used to constrain more and
     // more specifically to a particular test

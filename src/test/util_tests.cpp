@@ -765,6 +765,7 @@ BOOST_AUTO_TEST_CASE(util_Logging)
         LOG(THIN, "missing args %s %d\n");
         LOG(THIN, "wrong order args %s %d\n", 3, "hello");
         LOG(THIN, "null arg %s\n", NULL);
+        LOG(THIN, "test no CR");
         BOOST_CHECK(IsStringTrue("true"));
         BOOST_CHECK(IsStringTrue("enable"));
         BOOST_CHECK(IsStringTrue("1"));
@@ -810,17 +811,49 @@ BOOST_AUTO_TEST_CASE(splitbycommaandremovespaces)
     const std::vector<std::string> r = splitByCommasAndRemoveSpaces(inp1);
 
     BOOST_CHECK_EQUAL(r.size(), 4);
-    BOOST_CHECK_EQUAL(r[0], "one");
-    BOOST_CHECK_EQUAL(r[1], "two");
-    BOOST_CHECK_EQUAL(r[2], "three");
-    BOOST_CHECK_EQUAL(r[3], "four");
+    BOOST_CHECK_EQUAL(r[3], "one");
+    BOOST_CHECK_EQUAL(r[2], "two");
+    BOOST_CHECK_EQUAL(r[1], "three");
+    BOOST_CHECK_EQUAL(r[0], "four");
 
     const std::vector<std::string> r2 = splitByCommasAndRemoveSpaces(r);
     BOOST_CHECK_EQUAL(r.size(), 4);
-    BOOST_CHECK_EQUAL(r[0], "one");
-    BOOST_CHECK_EQUAL(r[1], "two");
-    BOOST_CHECK_EQUAL(r[2], "three");
-    BOOST_CHECK_EQUAL(r[3], "four");
+    BOOST_CHECK_EQUAL(r[3], "one");
+    BOOST_CHECK_EQUAL(r[2], "two");
+    BOOST_CHECK_EQUAL(r[1], "three");
+    BOOST_CHECK_EQUAL(r[0], "four");
+
+    std::vector<std::string> inp2{"one", "two, two  ", "f o u r"};
+    const std::vector<std::string> r3 = splitByCommasAndRemoveSpaces(inp2, true);
+    BOOST_CHECK_EQUAL(r3.size(), 3);
+    BOOST_CHECK_EQUAL(r3[2], "four");
+    BOOST_CHECK_EQUAL(r3[1], "one");
+    BOOST_CHECK_EQUAL(r3[0], "two");
+
+    std::vector<std::string> inp3{"1", "2", "3", "-4"};
+    const std::vector<std::string> r4 = splitByCommasAndRemoveSpaces(inp3, true);
+    BOOST_CHECK_EQUAL(r4.size(), 4);
+    BOOST_CHECK_EQUAL(r4[0], "3");
+    BOOST_CHECK_EQUAL(r4[1], "2");
+    BOOST_CHECK_EQUAL(r4[2], "1");
+    BOOST_CHECK_EQUAL(r4[3], "-4");
+}
+
+BOOST_AUTO_TEST_CASE(enum_toString)
+{
+    std::map<uint64_t, std::string> map1 = {{1, "ONE"}, {2, "TWO"}, {4, "FOUR"}};
+    std::map<uint64_t, std::string> map2 = {{1, "ONE"}, {2, "TWO"}, {4, "FOUR"}, {7, "ALL"}};
+
+    BOOST_CHECK_EQUAL(toString(0, {}), "");
+    BOOST_CHECK_EQUAL(toString(1, {}), "");
+    BOOST_CHECK_EQUAL(toString(123, {}), "");
+    BOOST_CHECK_EQUAL(toString(1, {{1, "1"}}), "1");
+    BOOST_CHECK_EQUAL(toString(1, map1), "ONE");
+    BOOST_CHECK_EQUAL(toString(3, map1), "ONE | TWO");
+    BOOST_CHECK_EQUAL(toString(5, map1), "ONE | FOUR");
+    BOOST_CHECK_EQUAL(toString(6, map2), "TWO | FOUR");
+    BOOST_CHECK_EQUAL(toString(7, map1), "ONE | TWO | FOUR");
+    BOOST_CHECK_EQUAL(toString(7, map2), "ALL");
 }
 
 BOOST_AUTO_TEST_SUITE_END()

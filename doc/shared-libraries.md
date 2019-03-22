@@ -1,5 +1,4 @@
-Shared Libraries
-================
+# Shared Libraries
 
 ## bitcoinconsensus
 

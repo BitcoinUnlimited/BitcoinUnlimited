@@ -1,4 +1,5 @@
-Bitcoin Unlimited 0.12.1b
+Bitcoin Unlimited
+=================
 
 Intro
 -----
@@ -17,6 +18,10 @@ However, it downloads and stores the entire history of Bitcoin transactions;
 depending on the speed of your computer and network connection, the synchronization
 process can take anywhere from a few hours to a day or more.
 
-See the bitcoin wiki at:
-  https://en.bitcoin.it/wiki/Main_Page
-for more help and information.
+
+Online resources
+----------------
+
+The Bitcoin Unlimited website: https://www.bitcoinunlimited.info/
+The Bitcoin Forum: https://www.bitco.in/forum
+

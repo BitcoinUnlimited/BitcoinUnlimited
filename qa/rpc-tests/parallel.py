@@ -102,17 +102,17 @@ class ParallelTest (BitcoinTestFramework):
         # Mine some blocks on node2 which we will need at the end to generate a few transactions from that node
         # in order to create the small block with just a few transactions in it.
         self.nodes[2].generate(2)
-        self.sync_all()
+        self.sync_blocks()
 
         # Mine the rest on node0 where we will generate the bigger block.
         self.nodes[0].generate(100)
-        self.sync_all()
+        self.sync_blocks()
 
         self.nodes[0].generate(1)
-        self.sync_all()
+        self.sync_blocks()
 
         self.nodes[2].generate(100)
-        self.sync_all()
+        self.sync_blocks()
 
 
         #stop nodes
@@ -126,13 +126,15 @@ class ParallelTest (BitcoinTestFramework):
         self.nodes.append(start_node(3, self.options.tmpdir, ["-pvtest=0"]))
 
         # Send tx's which do not propagate
+        addr2 = self.nodes[2].getnewaddress()
         for i in range(50):
-            self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), "0.01")
+            self.nodes[0].sendtoaddress(addr2, "0.01")
 
         # Send a few transactions from node2 that will get mined so that we will have at least
         # a few inputs to check when the two competing blocks enter parallel validation.
+        addr0 = self.nodes[0].getnewaddress()
         for i in range(5):
-            self.nodes[2].sendtoaddress(self.nodes[0].getnewaddress(), "0.01")
+            self.nodes[2].sendtoaddress(addr0, "0.01")
 
 
         # Have node0 and node2 mine the same block which will compete to advance the chaintip when
@@ -210,7 +212,7 @@ class ParallelTest (BitcoinTestFramework):
         # Send some transactions and Mine a block on node 2.
         # This should cause node0 and node3 to re-org and all chains should now match.
         for i in range(5):
-            self.nodes[2].sendtoaddress(self.nodes[2].getnewaddress(), .01)
+            self.nodes[2].sendtoaddress(addr2, .01)
         print ("Mine another block on node2 which causes a reorg on node0 and node3...")
         self.nodes[2].generate(1)
         sync_blocks(self.nodes)
@@ -266,17 +268,18 @@ class ParallelTest (BitcoinTestFramework):
 
         print ("Send more transactions...")
         num_range = 50
+        addrs = [ x.getnewaddress() for x in self.nodes]
         for i in range(num_range):
-            self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 0.01)
+            self.nodes[0].sendtoaddress(addrs[0], 0.01)
         num_range = 10
         for i in range(num_range):
-            self.nodes[2].sendtoaddress(self.nodes[2].getnewaddress(), 0.01)
+            self.nodes[2].sendtoaddress(addrs[2], 0.01)
         for i in range(num_range):
-            self.nodes[3].sendtoaddress(self.nodes[3].getnewaddress(), 0.01)
+            self.nodes[3].sendtoaddress(addrs[3], 0.01)
         for i in range(num_range):
-            self.nodes[4].sendtoaddress(self.nodes[4].getnewaddress(), 0.01)
+            self.nodes[4].sendtoaddress(addrs[4], 0.01)
         for i in range(num_range):
-            self.nodes[5].sendtoaddress(self.nodes[5].getnewaddress(), 0.01)
+            self.nodes[5].sendtoaddress(addrs[5], 0.01)
 
         # Mine 5 competing blocks.
         print ("Mine 5 competing blocks...")
@@ -351,11 +354,11 @@ class ParallelTest (BitcoinTestFramework):
         print ("Send more transactions...")
         num_range = 15
         for i in range(num_range):
-            self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 0.01)
+            self.nodes[0].sendtoaddress(addrs[0], 0.01)
         for i in range(num_range):
-            self.nodes[1].sendtoaddress(self.nodes[1].getnewaddress(), 0.01)
+            self.nodes[1].sendtoaddress(addrs[1], 0.01)
         for i in range(num_range):
-            self.nodes[2].sendtoaddress(self.nodes[2].getnewaddress(), 0.01)
+            self.nodes[2].sendtoaddress(addrs[2], 0.01)
 
         # Mine a block on each node
         print ("Mine a block on each node..")
@@ -433,9 +436,9 @@ class ParallelTest (BitcoinTestFramework):
         print ("Send more transactions...")
         num_range = 15
         for i in range(num_range):
-            self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 0.01)
+            self.nodes[0].sendtoaddress(addrs[0], 0.01)
         for i in range(num_range):
-            self.nodes[1].sendtoaddress(self.nodes[1].getnewaddress(), 0.01)
+            self.nodes[1].sendtoaddress(addrs[1], 0.01)
 
         # Mine a block on each node
         print ("Mine a block on each node..")
@@ -517,13 +520,13 @@ class ParallelTest (BitcoinTestFramework):
         print ("Send more transactions...")
         num_range = 15
         for i in range(num_range):
-            self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 0.01)
+            self.nodes[0].sendtoaddress(addrs[0], 0.01)
         for i in range(num_range):
-            self.nodes[1].sendtoaddress(self.nodes[1].getnewaddress(), 0.01)
+            self.nodes[1].sendtoaddress(addrs[1], 0.01)
         for i in range(num_range):
-            self.nodes[3].sendtoaddress(self.nodes[1].getnewaddress(), 0.01)
+            self.nodes[3].sendtoaddress(addrs[1], 0.01)
         for i in range(num_range):
-            self.nodes[4].sendtoaddress(self.nodes[1].getnewaddress(), 0.01)
+            self.nodes[4].sendtoaddress(addrs[1], 0.01)
 
         # Mine a block on each node
         print ("Mine a block on each node..")
@@ -1115,31 +1118,10 @@ def Test():
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
     }
 
-    flags = []
-    # you may want these additional flags:
-    flags.append("--nocleanup")
-    flags.append("--noshutdown")
-
-    # Execution is much faster if a ramdisk is used, so use it if one exists in a typical location
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmppfx=/ramdisk/test")
-
-    # Out-of-source builds are awkward to start because they need an additional flag
-    # automatically add this flag during testing for common out-of-source locations
-    here = os.path.dirname(os.path.abspath(__file__))
-    if not os.path.exists(os.path.abspath(here + "/../../src/bitcoind")):
-        dbg = os.path.abspath(here + "/../../debug/src/bitcoind")
-        rel = os.path.abspath(here + "/../../release/src/bitcoind")
-        if os.path.exists(dbg):
-            print("Running from the debug directory (%s)" % dbg)
-            flags.append("--srcdir=%s" % os.path.dirname(dbg))
-        elif os.path.exists(rel):
-            print("Running from the release directory (%s)" % rel)
-            flags.append("--srcdir=%s" % os.path.dirname(rel))
-
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)
 
-    
+
 
 if __name__ == '__main__':
 
@@ -1165,4 +1147,3 @@ if __name__ == '__main__':
 
 
     p.main ()
-

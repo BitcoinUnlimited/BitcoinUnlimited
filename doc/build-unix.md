@@ -1,21 +1,22 @@
-UNIX BUILD NOTES
-====================
+# UNIX BUILD NOTES
+
 Some notes on how to build Bitcoin Unlimited in Unix.
 
 (for OpenBSD specific instructions, see [build-openbsd.md](build-openbsd.md))
 
-Note
----------------------
+## Note
+
 Always use absolute paths to configure and compile bitcoin and the dependencies,
 for example, when specifying the path of the dependency:
 
-	../dist/configure --enable-cxx --disable-shared --with-pic --prefix=$BDB_PREFIX
+```bash
+../dist/configure --enable-cxx --disable-shared --with-pic --prefix=$BDB_PREFIX
+```
 
 Here BDB_PREFIX must absolute path - it is defined using $(pwd) which ensures
 the usage of the absolute path.
 
-To Build
----------------------
+## To Build
 
 ```bash
 ./autogen.sh
@@ -26,8 +27,7 @@ make install # optional
 
 This will build bitcoin-qt as well if the dependencies are met.
 
-Dependencies
----------------------
+## Dependencies
 
 These dependencies are required:
 
@@ -50,35 +50,42 @@ Optional dependencies:
 
 For the versions used, see [dependencies.md](dependencies.md)
 
-System requirements
---------------------
+## System requirements
 
 C++ compilers are memory-hungry. It is recommended to have at least 1 GB of
 memory available when compiling Bitcoin Unlimited. With 512MB of memory or less
 compilation will take much longer due to swap thrashing.
 
-Dependency Build Instructions: Ubuntu & Debian
-----------------------------------------------
+## Dependency Build Instructions: Ubuntu & Debian
+
 Build requirements:
 
-    sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
+```bash
+sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
+```
 
 On at least Ubuntu 14.04+ and Debian 7+ there are generic names for the
 individual boost development packages, so the following can be used to only
 install necessary parts of boost:
 
-    sudo apt-get install libboost-system-dev libboost-filesystem-dev libboost-chrono-dev libboost-program-options-dev libboost-test-dev libboost-thread-dev
+```bash
+sudo apt-get install libboost-system-dev libboost-filesystem-dev libboost-chrono-dev libboost-program-options-dev libboost-test-dev libboost-thread-dev
+```
 
 If that doesn't work, you can install all boost development packages with:
 
-    sudo apt-get install libboost-all-dev
+```bash
+sudo apt-get install libboost-all-dev
+```
 
-BerkeleyDB is required for the wallet. db4.8 packages are available [here](https://launchpad.net/~bitcoin/+archive/bitcoin).
+BerkeleyDB is required for the wallet. db4.8 packages are available [here](https://launchpad.net/~bitcoin-unlimited/+archive/ubuntu/bucash).
 You can add the repository and install using the following commands:
 
-    sudo add-apt-repository ppa:bitcoin-unlimited/bu-ppa
-    sudo apt-get update
-    sudo apt-get install libdb4.8-dev libdb4.8++-dev
+```bash
+sudo add-apt-repository ppa:bitcoin-unlimited/bu-ppa
+sudo apt-get update
+sudo apt-get install libdb4.8-dev libdb4.8++-dev
+```
 
 Ubuntu and Debian have their own libdb-dev and libdb++-dev packages, but these will install
 BerkeleyDB 5.1 or later, which break binary wallet compatibility with the distributed executables which
@@ -89,14 +96,17 @@ See the section "Disable-wallet mode" to build Bitcoin Unlimited without wallet.
 
 Optional:
 
-    sudo apt-get install libminiupnpc-dev (see --with-miniupnpc and --enable-upnp-default)
+```bash
+sudo apt-get install libminiupnpc-dev (see --with-miniupnpc and --enable-upnp-default)
+```
 
 ZMQ dependencies:
 
-    sudo apt-get install libzmq3-dev (provides ZMQ API 4.x)
+```bash
+sudo apt-get install libzmq3-dev (provides ZMQ API 4.x)
+```
 
-Dependencies for the GUI: Ubuntu & Debian
------------------------------------------
+## Dependencies for the GUI: Ubuntu & Debian
 
 If you want to build Bitcoin-Qt, make sure that the required packages for Qt development
 are installed. Qt 5.3 or higher is necessary to build the GUI (QT 4 is not supported).
@@ -104,35 +114,40 @@ To build without GUI pass `--without-gui`.
 
 To build with Qt 5.3 or higher you need the following:
 
-    sudo apt-get install libqt5gui5 libqt5core5a libqt5dbus5 qttools5-dev qttools5-dev-tools libprotobuf-dev protobuf-compiler
+```bash
+sudo apt-get install libqt5gui5 libqt5core5a libqt5dbus5 qttools5-dev qttools5-dev-tools libprotobuf-dev protobuf-compiler
+```
 
 libqrencode (optional) can be installed with:
 
-    sudo apt-get install libqrencode-dev
+```bash
+sudo apt-get install libqrencode-dev
+```
 
 Once these are installed, they will be found by configure and a bitcoin-qt executable will be
 built by default.
 
-Notes
------
+## Notes
+
 The release is built with GCC and then "strip bitcoind" to strip the debug
 symbols, which reduces the executable size by about 90%.
 
 
-miniupnpc
----------
+## miniupnpc
 
 [miniupnpc](http://miniupnp.free.fr/) may be used for UPnP port mapping.  It can be downloaded from [here](
 http://miniupnp.tuxfamily.org/files/).  UPnP support is compiled in and
 turned off by default.  See the configure options for upnp behavior desired:
 
-	--without-miniupnpc      No UPnP support miniupnp not required
-	--disable-upnp-default   (the default) UPnP support turned off by default at runtime
-	--enable-upnp-default    UPnP support turned on by default at runtime
+```bash
+--without-miniupnpc      #No UPnP support miniupnp not required
+--disable-upnp-default   #(the default) UPnP support turned off by default at runtime
+--enable-upnp-default    #UPnP support turned on by default at runtime
+```
 
 
-Berkeley DB
------------
+## Berkeley DB
+
 It is recommended to use Berkeley DB 4.8. If you have to build it yourself:
 
 ```bash
@@ -143,7 +158,7 @@ BDB_PREFIX="${BITCOIN_ROOT}/db4"
 mkdir -p $BDB_PREFIX
 
 # Fetch the source and verify that it is not tampered with
-wget 'http://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz'
+wget 'https://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz'
 echo '12edc0df75bf9abd7f82f821795bcee50f42cb2e5f76a6a281b85732798364ef  db-4.8.30.NC.tar.gz' | sha256sum -c
 # -> db-4.8.30.NC.tar.gz: OK
 tar -xzvf db-4.8.30.NC.tar.gz
@@ -162,25 +177,27 @@ cd $BITCOIN_ROOT
 
 **Note**: You only need Berkeley DB if the wallet is enabled (see the section *Disable-Wallet mode* below).
 
-Boost
------
+## Boost
+
 If you need to build Boost yourself:
+```bash
+sudo su
+./bootstrap.sh
+./bjam install
+```
 
-	sudo su
-	./bootstrap.sh
-	./bjam install
+## Security
 
-
-Security
---------
 To help make your Bitcoin installation more secure by making certain attacks impossible to
 exploit even if a vulnerability is found, binaries are hardened by default.
 This can be disabled with:
 
 Hardening Flags:
 
-	./configure --enable-hardening
-	./configure --disable-hardening
+```bash
+./configure --enable-hardening
+./configure --disable-hardening
+```
 
 
 Hardening enables the following features:
@@ -197,7 +214,9 @@ Hardening enables the following features:
 
     To test that you have built PIE executable, install scanelf, part of paxutils, and use:
 
-    	scanelf -e ./bitcoin
+```bash
+scanelf -e ./bitcoin
+```
 
     The output should contain:
 
@@ -220,43 +239,48 @@ Hardening enables the following features:
 
     The STK RW- means that the stack is readable and writeable but not executable.
 
-Disable-wallet mode
---------------------
+## Disable-wallet mode
+
 When the intention is to run only a P2P node without a wallet, bitcoin may be compiled in
 disable-wallet mode with:
 
-    ./configure --disable-wallet
+```bash
+./configure --disable-wallet
+```
 
 In this case there is no dependency on Berkeley DB 4.8.
 
 Mining is also possible in disable-wallet mode, but only using the `getblocktemplate` RPC
 call not `getwork`.
 
-Additional Configure Flags
---------------------------
+## Additional Configure Flags
+
 A list of additional configure flags can be displayed with:
 
-    ./configure --help
+```bash
+./configure --help
+```
 
-Produce Static Binaries
------------------------
+## Produce Static Binaries
 
 If you want to build statically linked binaries so that you could compile in one machine
 and deploy in same parch/platform boxes without the need of installing all the dependencies
 just follow these steps:
 
-    git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git BU
-    cd BU/depends
-    make HOST=x86_64-pc-linux-gnu NO_QT=1 -j4
-    cd ..
-    ./configure --prefix=$PWD/depends/x86_64-pc-linux-gnu --without-gui
-    make -j4
+```bash
+git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git BU
+cd BU/depends
+make HOST=x86_64-pc-linux-gnu NO_QT=1 -j4
+cd ..
+./configure --prefix=$PWD/depends/x86_64-pc-linux-gnu --without-gui
+make -j4
+```
 
 in the above commands we are statically compiling headless 64 bit Linux binaries. If you want to compile
 32 bit binaries just use `i686-pc-linux-gnu` rather than `x86_64-pc-linux-gnu`
 
-ARM Cross-compilation
--------------------
+## ARM Cross-compilation
+
 These steps can be performed on, for example, an Ubuntu VM. The depends system
 will also work on other Linux distributions, however the commands for
 installing the toolchain will be different.
@@ -264,15 +288,19 @@ installing the toolchain will be different.
 Make sure you install the build requirements mentioned above.
 Then, install the toolchain and curl:
 
-    sudo apt-get install g++-arm-linux-gnueabihf curl
+```bash
+sudo apt-get install g++-arm-linux-gnueabihf curl
+```
 
 To build executables for ARM:
 
-    cd depends
-    make HOST=arm-linux-gnueabihf NO_QT=1
-    cd ..
-    ./configure --prefix=$PWD/depends/arm-linux-gnueabihf --enable-glibc-back-compat --enable-reduce-exports LDFLAGS=-static-libstdc++
-    make
+```bash
+cd depends
+make HOST=arm-linux-gnueabihf NO_QT=1
+cd ..
+./configure --prefix=$PWD/depends/arm-linux-gnueabihf --enable-glibc-back-compat --enable-reduce-exports LDFLAGS=-static-libstdc++
+make
+```
 
 
 For further documentation on the depends system see [README.md](../depends/README.md) in the depends directory.

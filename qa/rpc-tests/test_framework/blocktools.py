@@ -7,11 +7,11 @@ import pdb
 import binascii
 
 from .mininode import *
-from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, OP_RETURN
+from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, OP_RETURN, OP_NOP
 from .util import BTC
 
 # Create a block (with regtest difficulty)
-def create_block(hashprev, coinbase, nTime=None, txns=None):
+def create_block(hashprev, coinbase, nTime=None, txns=None, ctor=True):
     block = CBlock()
     if nTime is None:
         import time
@@ -23,6 +23,8 @@ def create_block(hashprev, coinbase, nTime=None, txns=None):
     if coinbase:
         block.vtx.append(coinbase)
     if txns:
+        if ctor:
+            txns.sort(key=lambda x: x.hash)
         block.vtx += txns
     block.hashMerkleRoot = block.calc_merkle_root()
     block.calc_sha256()
@@ -57,22 +59,29 @@ def create_coinbase(height, pubkey = None):
     if (pubkey != None):
         coinbaseoutput.scriptPubKey = CScript([pubkey, OP_CHECKSIG])
     else:
-        coinbaseoutput.scriptPubKey = CScript([OP_TRUE])
+        coinbaseoutput.scriptPubKey = CScript([OP_NOP])
     coinbase.vout = [ coinbaseoutput ]
+
+    # Make sure the coinbase is at least 100 bytes
+    coinbase_size = len(coinbase.serialize())
+    if coinbase_size < 100:
+        coinbase.vin[0].scriptSig += b'x' * (100 - coinbase_size)
+
     coinbase.calc_sha256()
     return coinbase
 
 # Create a transaction with an anyone-can-spend output, that spends the
 # nth output of prevtx.  pass a single integer value to make one output,
 # or a list to create multiple outputs
-def create_transaction(prevtx, n, sig, value):
+PADDED_ANY_SPEND =  b'\x61'*50 # add a bunch of OP_NOPs to make sure this tx is long enough
+def create_transaction(prevtx, n, sig, value, out=PADDED_ANY_SPEND):
     if not type(value) is list:
         value = [value]
     tx = CTransaction()
     assert(n < len(prevtx.vout))
     tx.vin.append(CTxIn(COutPoint(prevtx.sha256, n), sig, 0xffffffff))
     for v in value:
-        tx.vout.append(CTxOut(v, b""))
+        tx.vout.append(CTxOut(v, out))
     tx.calc_sha256()
     return tx
 

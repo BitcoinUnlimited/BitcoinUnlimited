@@ -61,18 +61,11 @@ int ClientModel::getNumConnections(unsigned int flags) const
     return nNum;
 }
 
-int ClientModel::getNumBlocks() const
-{
-    LOCK(cs_main);
-    return chainActive.Height();
-}
-
+int ClientModel::getNumBlocks() const { return chainActive.Height(); }
 quint64 ClientModel::getTotalBytesRecv() const { return CNode::GetTotalBytesRecv(); }
 quint64 ClientModel::getTotalBytesSent() const { return CNode::GetTotalBytesSent(); }
 QDateTime ClientModel::getLastBlockDate() const
 {
-    LOCK(cs_main);
-
     if (chainActive.Tip())
         lastBlockTime = chainActive.Tip()->GetBlockTime();
     else
@@ -93,7 +86,6 @@ double ClientModel::getVerificationProgress(const CBlockIndex *tipIn) const
     CBlockIndex *tip = const_cast<CBlockIndex *>(tipIn);
     if (!tip)
     {
-        LOCK(cs_main);
         tip = chainActive.Tip();
     }
     return Checkpoints::GuessVerificationProgress(Params().Checkpoints(), tip);
@@ -120,6 +112,9 @@ void ClientModel::updateTimer2()
 
     thindata.FillThinBlockQuickStats(thinStats);
     Q_EMIT thinBlockPropagationStatsChanged(thinStats);
+
+    compactdata.FillCompactBlockQuickStats(compactStats);
+    Q_EMIT compactBlockPropagationStatsChanged(compactStats);
 
     graphenedata.FillGrapheneQuickStats(grapheneStats);
     Q_EMIT grapheneBlockPropagationStatsChanged(grapheneStats);

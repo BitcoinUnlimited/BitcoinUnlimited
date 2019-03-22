@@ -4,6 +4,7 @@
 
 #include "fastfilter.h"
 #include "net.h"
+#include "threadgroup.h"
 #include "txmempool.h"
 #include <queue>
 
@@ -60,6 +61,8 @@ public:
     NodeId nodeId; // hold the id so I don't keep a ref to the node
     bool whitelisted;
     std::string nodeName;
+
+    CTxInputData() : nodeId(-1), whitelisted(false), nodeName("none") {}
 };
 
 // Tracks data about transactions that are ready to be committed to the mempool
@@ -104,23 +107,31 @@ extern CRollingFastFilter<4 * 1024 * 1024> txRecentlyInBlock;
 extern CFastFilter<4 * 1024 * 1024> incomingConflicts;
 
 // Transactions that are available to be added to the mempool, and protection
+// Guarded by csTxInQ
 extern CCriticalSection csTxInQ;
 extern CCond cvTxInQ;
 extern std::queue<CTxInputData> txInQ;
 
 // Transactions that cannot be processed in this round (may potentially conflict with other tx)
+// Guarded by csTxInQ
 extern std::queue<CTxInputData> txDeferQ;
+
+// Transactions that arrive when the chain is not syncd can be place here at times when we've received
+// the block announcement but havn't yet downloaded the block and updated the tip. In this case there can
+// be txns that are perfectly valid yet are flagged as being non-final or has too many ancestors.
+// Guarded by csTxInQ
+extern std::queue<CTxInputData> txWaitNextBlockQ;
 
 // Transactions that are validated and can be committed to the mempool, and protection
 extern CWaitableCriticalSection csCommitQ;
 extern CConditionVariable cvCommitQ;
-extern std::map<uint256, CTxCommitData> txCommitQ;
+extern std::map<uint256, CTxCommitData> *txCommitQ;
 
 // returns a transaction ref, if it exists in the commitQ
 CTransactionRef CommitQGet(uint256 hash);
 
 /** Start the transaction mempool admission threads */
-void StartTxAdmission(boost::thread_group &threadGroup);
+void StartTxAdmission(thread_group &threadGroup);
 /** Stop the transaction mempool admission threads (assumes that ShutdownRequested() will return true) */
 void StopTxAdmission();
 /** Wait for the currently enqueued transactions to be flushed.  If new tx keep coming in, you may wait a while */
@@ -162,6 +173,31 @@ unsigned int TxAlreadyHave(const CInv &inv);
 // threads from adding new tx into the q.
 void CommitTxToMempool();
 
+/**
+ * Check if transaction will be final in the next block to be created.
+ *
+ * Calls IsFinalTx() with current block height and appropriate block time.
+ *
+ * See consensus/consensus.h for flag definitions.
+ */
+bool CheckFinalTx(const CTransactionRef &tx, int flags = -1, const Snapshot *ss = nullptr);
+
+/*
+ * Check if transaction will be BIP 68 final in the next block to be created.
+ *
+ * Simulates calling SequenceLocks() with data from the tip of the current active chain.
+ * Optionally stores in LockPoints the resulting height and time calculated and the hash
+ * of the block needed for calculation or skips the calculation and uses the LockPoints
+ * passed in for evaluation.
+ * The LockPoints should not be considered valid if CheckSequenceLocks returns false.
+ *
+ * See consensus/consensus.h for flag definitions.
+ */
+bool CheckSequenceLocks(const CTransactionRef &tx,
+    int flags,
+    LockPoints *lp = nullptr,
+    bool useExistingLockPoints = false,
+    const Snapshot *ss = nullptr);
 
 // This needs to be held whenever the chain state changes (block added or chain rewind) so that
 // transactions are not processed during chain state updates and so once the chain state is updated we can

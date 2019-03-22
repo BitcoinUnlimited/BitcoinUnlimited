@@ -19,13 +19,11 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.extra_args = [["-minlimitertxfee=1"], ["-minlimitertxfee=1"],["-minlimitertxfee=1"],["-minlimitertxfee=1"]]
         self.nodes = start_nodes(4, self.options.tmpdir, self.extra_args)
 
-        connect_nodes_bi(self.nodes,0,1)
-        connect_nodes_bi(self.nodes,1,2)
-        connect_nodes_bi(self.nodes,0,2)
+        connect_nodes_full(self.nodes[:3])
         connect_nodes_bi(self.nodes,0,3)
 
         self.is_network_split=False
-        self.sync_all()
+        self.sync_blocks()
 
     def run_test(self):
         print("Mining blocks...")
@@ -47,9 +45,9 @@ class RawTransactionsTest(BitcoinTestFramework):
             feeTolerance = 0.00000001
 
         self.nodes[2].generate(1)
-        self.sync_all()
+        self.sync_blocks()
         self.nodes[0].generate(121)
-        self.sync_all()
+        self.sync_blocks()
 
         watchonly_address = self.nodes[0].getnewaddress()
         watchonly_pubkey = self.nodes[0].validateaddress(watchonly_address)["pubkey"]
@@ -62,9 +60,8 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 1.0)
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 5.0)
 
-        self.sync_all()
         self.nodes[0].generate(1)
-        self.sync_all()
+        self.sync_blocks()
 
         ###############
         # simple test #
@@ -466,7 +463,7 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         signedTx = self.nodes[2].signrawtransaction(fundedTx['hex'])
         txId = self.nodes[2].enqueuerawtransaction(signedTx['hex'], "flush")
-        
+
         self.sync_all()
         self.nodes[1].generate(1)
         self.sync_all()
@@ -487,9 +484,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         for node in self.nodes:
             node.settxfee(min_relay_tx_fee)
 
-        connect_nodes_bi(self.nodes,0,1)
-        connect_nodes_bi(self.nodes,1,2)
-        connect_nodes_bi(self.nodes,0,2)
+        connect_nodes_full(self.nodes[:3])
         connect_nodes_bi(self.nodes,0,3)
         self.is_network_split=False
         self.sync_all()
@@ -684,9 +679,5 @@ def Test():
         "keypool":1
     }
 
-    flags = [] # ["--nocleanup", "--noshutdown"]
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmppfx=/ramdisk/test")
-    binpath = findBitcoind()
-    flags.append("--srcdir=%s" % binpath)
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)

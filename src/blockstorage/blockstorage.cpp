@@ -180,10 +180,11 @@ void SyncStorage(const CChainParams &chainparams)
                 }
                 continue;
             }
-            BlockMap::iterator it;
-            it = mapBlockIndex.find(item.second.GetBlockHash());
-            if (it == mapBlockIndex.end())
+
+            index = LookupBlockIndex(item.second.GetBlockHash());
+            if (!index)
             {
+                // TODO only one thread should create a new pindex at a time.
                 CBlockIndex *pindexNew = InsertBlockIndex(item.second.GetBlockHash());
                 pindexNew->pprev = InsertBlockIndex(item.second.hashPrev);
                 pindexNew->nHeight = item.second.nHeight;
@@ -198,10 +199,6 @@ void SyncStorage(const CChainParams &chainparams)
                 pindexNew->nStatus = item.second.nStatus;
                 pindexNew->nTx = item.second.nTx;
                 index = pindexNew;
-            }
-            else
-            {
-                index = it->second;
             }
 
             // Update the block data
@@ -330,8 +327,6 @@ void SyncStorage(const CChainParams &chainparams)
 
         for (const std::pair<int, CDiskBlockIndex> &item : indexByHeight)
         {
-            bool needData = true;
-            bool needUndo = true;
             CBlockIndex *index;
             if (item.second.GetBlockHash() == chainparams.GetConsensus().hashGenesisBlock)
             {
@@ -358,9 +353,9 @@ void SyncStorage(const CChainParams &chainparams)
                 }
                 continue;
             }
-            BlockMap::iterator iter;
-            iter = mapBlockIndex.find(item.second.GetBlockHash());
-            if (iter == mapBlockIndex.end())
+
+            index = LookupBlockIndex(item.second.GetBlockHash());
+            if (!index)
             {
                 CBlockIndex *pindexNew = InsertBlockIndex(item.second.GetBlockHash());
                 pindexNew->pprev = InsertBlockIndex(item.second.hashPrev);
@@ -379,13 +374,9 @@ void SyncStorage(const CChainParams &chainparams)
                 pindexNew->nTx = item.second.nTx;
                 index = pindexNew;
             }
-            else
-            {
-                index = iter->second;
-            }
 
             // Update the block data
-            if (needData && index->nStatus & BLOCK_HAVE_DATA && !index->GetBlockPos().IsNull())
+            if (index->nStatus & BLOCK_HAVE_DATA && !index->GetBlockPos().IsNull())
             {
                 CBlock block_seq;
                 if (!ReadBlockFromDiskSequential(block_seq, index->GetBlockPos(), chainparams.GetConsensus()))
@@ -403,7 +394,7 @@ void SyncStorage(const CChainParams &chainparams)
             }
 
             // Update the undo data
-            if (needUndo && index->nStatus & BLOCK_HAVE_UNDO && !index->GetUndoPos().IsNull())
+            if (index->nStatus & BLOCK_HAVE_UNDO && !index->GetUndoPos().IsNull())
             {
                 CBlockUndo blockundo;
 

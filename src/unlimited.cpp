@@ -35,6 +35,7 @@
 #include "timedata.h"
 #include "tinyformat.h"
 #include "tweak.h"
+#include "txadmission.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "ui_interface.h"
@@ -47,11 +48,11 @@
 
 #include <atomic>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread.hpp>
 #include <inttypes.h>
 #include <iomanip>
 #include <limits>
 #include <queue>
+#include <thread>
 
 using namespace std;
 
@@ -202,22 +203,72 @@ std::string SubverValidator(const std::string &value, std::string *item, bool va
     return std::string();
 }
 
-
-// Push all transactions in the mempool to another node
-void UnlimitedPushTxns(CNode *dest);
-
-int32_t UnlimitedComputeBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Params &params, uint32_t nTime)
+std::string Bip135VoteValidator(const std::string &value, std::string *item, bool validate)
 {
-    if (blockVersion != 0) // BU: allow override of block version
+    if (validate)
     {
-        return blockVersion;
+        bool categoriesValid = AssignBip135Votes(value, -1);
+        if (!categoriesValid)
+            return std::string("Invalid/unknown features specified");
     }
-
-    int32_t nVersion = ComputeBlockVersion(pindexPrev, params);
-
-    return nVersion;
+    else // Do what is needed to use the new value already stored in item
+    {
+        ClearBip135Votes();
+        AssignBip135Votes(*item, 1);
+        SignalBlockTemplateChange();
+    }
+    return std::string();
 }
 
+// Ensure that only one fork can be active at a time, update the UA string, and convert values of 1 to the
+// fork time default.
+std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool validate)
+{
+    if (validate)
+    {
+        if (value != 0 && miningSvForkTime.Value() != 0)
+        {
+            std::ostringstream ret;
+            ret << "Only one fork can be enabled at a time";
+            return ret.str();
+        }
+    }
+    else // If it was just turned "on" then set to the default activation time.
+    {
+        if (*item == 1)
+        {
+            *item = Params().GetConsensus().nov2018ActivationTime;
+        }
+        settingsToUserAgentString();
+    }
+    return std::string();
+}
+
+// Ensure that only one fork can be active at a time, update the UA string, and convert values of 1 to the
+// fork time default.
+std::string ForkTimeValidatorSV(const uint64_t &value, uint64_t *item, bool validate)
+{
+    if (validate)
+    {
+        if (value != 0 && miningForkTime.Value() != 0)
+        {
+            std::ostringstream ret;
+            ret << "Only one fork can be enabled at a time";
+            return ret.str();
+        }
+    }
+    else // If it was just turned "on" then set to the default activation time.
+    {
+        if (*item == 1)
+        {
+            *item = Params().GetConsensus().nov2018ActivationTime;
+        }
+        settingsToUserAgentString();
+    }
+    return std::string();
+}
+// Push all transactions in the mempool to another node
+void UnlimitedPushTxns(CNode *dest);
 
 void UpdateSendStats(CNode *pfrom, const char *strCommand, int msgSize, int64_t nTime)
 {
@@ -377,7 +428,7 @@ void UnlimitedPushTxns(CNode *dest)
         ptx = mempool.get(hash);
         if (ptx == nullptr)
             continue; // another thread removed since queryHashes, maybe...
-        if ((dest->pfilter && dest->pfilter->IsRelevantAndUpdate(*ptx)) || (!dest->pfilter))
+        if ((dest->pfilter && dest->pfilter->IsRelevantAndUpdate(ptx)) || (!dest->pfilter))
             vInv.push_back(inv);
         if (vInv.size() == MAX_INV_SZ)
         {
@@ -392,6 +443,10 @@ void UnlimitedPushTxns(CNode *dest)
 void settingsToUserAgentString()
 {
     BUComments.clear();
+
+    std::string flavor;
+    if (miningSvForkTime.Value() != 0)
+        BUComments.push_back("SV");
 
     std::stringstream ebss;
     ebss << (excessiveBlockSize / 100000);
@@ -418,6 +473,19 @@ void UnlimitedSetup(void)
     excessiveBlockSize = GetArg("-excessiveblocksize", excessiveBlockSize);
     excessiveAcceptDepth = GetArg("-excessiveacceptdepth", excessiveAcceptDepth);
     LoadTweaks(); // The above options are deprecated so the same parameter defined as a tweak will override them
+
+    // If the user configures it to 1, assume this means default
+    if (miningForkTime.Value() == 1)
+        miningForkTime = Params().GetConsensus().nov2018ActivationTime;
+    if (miningSvForkTime.Value() == 1)
+        miningSvForkTime = Params().GetConsensus().nov2018ActivationTime;
+
+    if (miningForkTime.Value() != 0 && miningSvForkTime.Value() != 0)
+    {
+        LOGA("Both the SV and ABC forks are enabled.  You must choose one.");
+        printf("Both the SV and ABC forks are enabled.  You must choose one.\n");
+        exit(1);
+    }
 
     if (maxGeneratedBlock > excessiveBlockSize)
     {
@@ -476,6 +544,47 @@ void UnlimitedSetup(void)
     // Start Internal CPU miner
     // Generate coins in the background
     GenerateBitcoins(GetBoolArg("-gen", DEFAULT_GENERATE), GetArg("-genproclimit", DEFAULT_GENERATE_THREADS), Params());
+
+
+    // Modify checkpoints depending on whether BCH or SV fork
+    if (Params().NetworkIDString() == "main")
+    {
+        CCheckpointData &checkpoints = ModifiableParams().ModifiableCheckpoints();
+        if (nMiningSvForkTime == 0)
+        {
+            // Nov 15th 2018 activate LTOR, DSV op_code
+            checkpoints.mapCheckpoints[556767] =
+                uint256S("0000000000000000004626ff6e3b936941d341c5932ece4357eeccac44e6d56c");
+            // * UNIX timestamp of last checkpoint block
+            checkpoints.nTimeLastCheckpoint = 1542304936;
+            // * total number of transactions between genesis and last checkpoint
+            checkpoints.nTransactionsLastCheckpoint = 265567564;
+            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
+            checkpoints.fTransactionsPerDay = 280000.0;
+        }
+        else if (nMiningSvForkTime != 0)
+        {
+            // Nov 15th 2018 SV fork, 128MB blocks, re-enable bitcoin 0.1.0 op_codes
+            checkpoints.mapCheckpoints[556767] =
+                uint256S("000000000000000001d956714215d96ffc00e0afda4cd0a96c96f8d802b1662b");
+            // * UNIX timestamp of last checkpoint block
+            checkpoints.nTimeLastCheckpoint = 1542305817;
+            // * total number of transactions between genesis and last checkpoint
+            checkpoints.nTransactionsLastCheckpoint = 265615408;
+            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
+            checkpoints.fTransactionsPerDay = 280000.0;
+        }
+        else
+        {
+            // unknown scenario, dont update these values or add a new checkpoint
+            // * UNIX timestamp of last checkpoint block
+            checkpoints.nTimeLastCheckpoint = 1526410186;
+            // * total number of transactions between genesis and last checkpoint
+            checkpoints.nTransactionsLastCheckpoint = 249416375;
+            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
+            checkpoints.fTransactionsPerDay = 280000.0;
+        }
+    }
 }
 
 FILE *blockReceiptLog = nullptr;
@@ -958,8 +1067,8 @@ UniValue getexcessiveblock(const UniValue &params, bool fHelp)
                             HelpExampleCli("getexcessiveblock", "") + HelpExampleRpc("getexcessiveblock", ""));
 
     UniValue ret(UniValue::VOBJ);
-    ret.push_back(Pair("excessiveBlockSize", (uint64_t)excessiveBlockSize));
-    ret.push_back(Pair("excessiveAcceptDepth", (uint64_t)excessiveAcceptDepth));
+    ret.pushKV("excessiveBlockSize", (uint64_t)excessiveBlockSize);
+    ret.pushKV("excessiveAcceptDepth", (uint64_t)excessiveAcceptDepth);
     return ret;
 }
 
@@ -1160,14 +1269,14 @@ UniValue gettrafficshaping(const UniValue &params, bool fHelp)
     sendShaper.get(&max, &avg);
     if (avg != std::numeric_limits<long long>::max() || max != std::numeric_limits<long long>::max())
     {
-        ret.push_back(Pair("sendBurst", max / 1024));
-        ret.push_back(Pair("sendAve", avg / 1024));
+        ret.pushKV("sendBurst", max / 1024);
+        ret.pushKV("sendAve", avg / 1024);
     }
     receiveShaper.get(&max, &avg);
     if (avg != std::numeric_limits<long long>::max() || max != std::numeric_limits<long long>::max())
     {
-        ret.push_back(Pair("recvBurst", max / 1024));
-        ret.push_back(Pair("recvAve", avg / 1024));
+        ret.pushKV("recvBurst", max / 1024);
+        ret.pushKV("recvAve", avg / 1024);
     }
     return ret;
 }
@@ -1259,7 +1368,7 @@ void IsInitialBlockDownloadInit(bool *fInit)
 
     const CChainParams &chainParams = Params();
     LOCK(cs_main);
-    if (!pindexBestHeader)
+    if (!pindexBestHeader.load())
     {
         // Not nearly synced if we don't have any blocks!
         fIsInitialBlockDownload.store(true);
@@ -1285,9 +1394,9 @@ void IsInitialBlockDownloadInit(bool *fInit)
         return;
     }
 
-    bool state =
-        (chainActive.Height() < pindexBestHeader->nHeight - 24 * 6 ||
-            std::max(chainActive.Tip()->GetBlockTime(), pindexBestHeader->GetBlockTime()) < GetTime() - nMaxTipAge);
+    bool state = (chainActive.Height() < pindexBestHeader.load()->nHeight - 24 * 6 ||
+                  std::max(chainActive.Tip()->GetBlockTime(), pindexBestHeader.load()->GetBlockTime()) <
+                      GetTime() - nMaxTipAge);
     if (!state)
         fInitialSyncComplete = true;
     fIsInitialBlockDownload.store(state);
@@ -1300,14 +1409,14 @@ bool IsInitialBlockDownload() { return fIsInitialBlockDownload.load(); }
 void IsChainNearlySyncdInit()
 {
     LOCK(cs_main);
-    if (!pindexBestHeader)
+    if (!pindexBestHeader.load())
     {
         // Not nearly synced if we don't have any blocks!
         fIsChainNearlySyncd.store(false);
     }
     else
     {
-        if (chainActive.Height() < pindexBestHeader->nHeight - 2)
+        if (chainActive.Height() < pindexBestHeader.load()->nHeight - DEFAULT_BLOCKS_FROM_TIP)
             fIsChainNearlySyncd.store(false);
         else
             fIsChainNearlySyncd.store(true);
@@ -1315,6 +1424,13 @@ void IsChainNearlySyncdInit()
 }
 
 bool IsChainNearlySyncd() { return fIsChainNearlySyncd.load(); }
+// Used for unit tests to artificially set the state of chain sync
+void IsChainNearlySyncdSet(bool fSync) { fIsChainNearlySyncd.store(fSync); }
+bool IsChainSyncd()
+{
+    // lock free since both are atomics
+    return pindexBestHeader.load() == chainActive.Tip();
+}
 uint64_t LargestBlockSeen(uint64_t nBlockSize)
 {
     // C++98 lacks the capability to do static initialization properly
@@ -1386,9 +1502,9 @@ bool TestConservativeBlockValidity(CValidationState &state,
     // NOTE: CheckBlockHeader is called by CheckBlock
     if (!ContextualCheckBlockHeader(block, state, pindexPrev))
         return false;
-    if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot, true))
+    if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot))
         return false;
-    if (!ContextualCheckBlock(block, state, pindexPrev))
+    if (!ContextualCheckBlock(block, state, pindexPrev, true))
         return false;
     if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true))
         return false;
@@ -1523,11 +1639,11 @@ UniValue getstat(const UniValue &params, bool fHelp)
         UniValue ustat(UniValue::VOBJ);
         if (seriesStr == "now")
         {
-            ustat.push_back(Pair("now", base->GetNow()));
+            ustat.pushKV("now", base->GetNow());
         }
         else if (seriesStr == "total")
         {
-            ustat.push_back(Pair("total", base->GetTotal()));
+            ustat.pushKV("total", base->GetTotal());
         }
         else
         {
@@ -1540,14 +1656,14 @@ UniValue getstat(const UniValue &params, bool fHelp)
                 UniValue metaData(UniValue::VARR);
                 metaData.push_back("Series:" + seriesStr);
                 metaData.push_back("SampleSize:" + boost::lexical_cast<std::string>(count));
-                ustat.push_back(Pair(metaStr, metaData));
-                ustat.push_back(Pair(seriesStr, series[0]));
-                ustat.push_back(Pair("timestamp", series[1]));
+                ustat.pushKV(metaStr, metaData);
+                ustat.pushKV(seriesStr, series[0]);
+                ustat.pushKV("timestamp", series[1]);
             }
             else
             {
                 series = base->GetSeries(seriesStr, count);
-                ustat.push_back(Pair(seriesStr, series));
+                ustat.pushKV(seriesStr, series);
             }
         }
 
@@ -1563,42 +1679,44 @@ UniValue setlog(const UniValue &params, bool fHelp)
     // Don't use them in other places.
 
     UniValue ret = UniValue("");
-    uint64_t catg = Logging::NONE;
+    uint64_t catg = NONE;
     int nparm = params.size();
     bool action = false;
 
-    if (fHelp || nparm < 1 || nparm > 2)
+    if (fHelp || nparm > 2)
     {
         throw runtime_error(
             "log \"category|all\" \"on|off\""
             "\nTurn categories on or off\n"
+            "\nWith no arguments it returns a list of currently on log categories\n"
             "\nArguments:\n"
             "1. \"category|all\" (string, required) Category or all categories\n"
             "2. \"on\"           (string, optional) Turn a category, or all categories, on\n"
             "2. \"off\"          (string, optional) Turn a category, or all categories, off\n"
             "2.                (string, optional) No argument. Show a category, or all categories, state: on|off\n" +
             HelpExampleCli("log", "\"NET\" on") + HelpExampleCli("log", "\"all\" off") +
-            HelpExampleCli("log", "\"tor\" ") + HelpExampleCli("log", "\"ALL\" "));
+            HelpExampleCli("log", "\"tor\" ") + HelpExampleCli("log", "\"ALL\" ") + HelpExampleCli("log", " "));
     }
-
-    // LOGA("LOG: Before mask: 0x%llx\n", Logging::categoriesEnabled);
 
     try
     {
+        if (nparm == 0)
+            ret = UniValue(Logging::LogGetAllString(true));
+
         if (nparm > 0)
         {
             std::string category;
             std::string data = params[0].get_str();
             std::transform(data.begin(), data.end(), std::back_inserter(category), ::tolower);
             catg = Logging::LogFindCategory(category);
-            if (catg == Logging::NONE)
+            if (catg == NONE)
                 return UniValue("Category not found: " + params[0].get_str()); // quit
         }
 
         switch (nparm)
         {
         case 1:
-            if (catg == Logging::ALL)
+            if (catg == ALL)
                 ret = UniValue(Logging::LogGetAllString());
             else
                 ret = UniValue(Logging::LogAcceptCategory(catg) ? "on" : "off");
@@ -1626,8 +1744,6 @@ UniValue setlog(const UniValue &params, bool fHelp)
         LOG(ALL, "LOG: Something went wrong in setlog function \n");
         ret = UniValue("Something went wrong. That is all we know.");
     }
-
-    // LOGA("LOG: After  mask: 0x%llx\n", Logging::categoriesEnabled);
 
     return ret;
 }
@@ -1697,18 +1813,18 @@ static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
     // Save candidate so can be looked up:
     id++;
     AddMiningCandidate(candid, id);
-    ret.push_back(Pair("id", id));
+    ret.pushKV("id", id);
 
-    ret.push_back(Pair("prevhash", block.hashPrevBlock.GetHex()));
+    ret.pushKV("prevhash", block.hashPrevBlock.GetHex());
 
     {
         const CTransaction *tran = block.vtx[0].get();
-        ret.push_back(Pair("coinbase", EncodeHexTx(*tran)));
+        ret.pushKV("coinbase", EncodeHexTx(*tran));
     }
 
-    ret.push_back(Pair("version", block.nVersion));
-    ret.push_back(Pair("nBits", strprintf("%08x", block.nBits)));
-    ret.push_back(Pair("time", block.GetBlockTime()));
+    ret.pushKV("version", block.nVersion);
+    ret.pushKV("nBits", strprintf("%08x", block.nBits));
+    ret.pushKV("time", block.GetBlockTime());
 
     // merkleProof:
     {
@@ -1718,7 +1834,7 @@ static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
         {
             merkleProof.push_back(i.GetHex());
         }
-        ret.push_back(Pair("merkleProof", merkleProof));
+        ret.pushKV("merkleProof", merkleProof);
 
         // merklePath parameter:
         // If the coinbase is ever allowed to be anywhere in the hash tree via a hard fork, we will need to communicate
@@ -1728,7 +1844,7 @@ static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
         // Hash256(concatentate(running hash, next hash in proof)), if the bit is 1, the proof calculates
         // Hash256(concatentate(next hash in proof, running hash))
 
-        // ret.push_back(Pair("merklePath", 0));
+        // ret.pushKV("merklePath", 0);
     }
 
     return ret;
@@ -1740,7 +1856,6 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
     UniValue ret(UniValue::VOBJ);
     CMiningCandidate candid;
     int64_t coinbaseSize = -1; // If -1 then not used to set coinbase size
-    LOCK(cs_main);
 
     if (fHelp || params.size() > 1)
     {
@@ -1929,25 +2044,23 @@ UniValue validatechainhistory(const UniValue &params, bool fHelp)
                             "\nUpdates a chain's valid/invalid status based on parent blocks.\n");
 
     std::stack<CBlockIndex *> stk;
-    CBlockIndex *pos = pindexBestHeader;
+    CBlockIndex *pos = pindexBestHeader.load();
     bool failedChain = false;
     UniValue ret = NullUniValue;
-
-    LOCK(cs_main);
 
     if (params.size() >= 1)
     {
         std::string strHash = params[0].get_str();
         uint256 hash(uint256S(strHash));
 
-        if (mapBlockIndex.count(hash) == 0)
+        if ((pos = LookupBlockIndex(hash)) == 0)
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-
-        CBlock block;
-        pos = mapBlockIndex[hash];
     }
 
     LOGA("validatechainhistory starting at %d %s\n", pos->nHeight, pos->phashBlock->ToString());
+
+    LOCK(cs_main); // modifying contents of CBlockIndex
+
     while (pos && !failedChain)
     {
         // LOGA("validate %d %s\n", pos->nHeight, pos->phashBlock->ToString());
@@ -2007,26 +2120,24 @@ UniValue validateblocktemplate(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
 
     CBlockIndex *pindexPrev = nullptr;
+
+    pindexPrev = LookupBlockIndex(block.hashPrevBlock);
+    if (!pindexPrev)
+        throw runtime_error("invalid block: unknown parent");
+
+    if (pindexPrev != chainActive.Tip())
     {
-        LOCK(cs_main);
+        throw runtime_error("invalid block: does not build on chain tip");
+    }
 
-        BlockMap::iterator i = mapBlockIndex.find(block.hashPrevBlock);
-        if (i == mapBlockIndex.end())
-        {
-            throw runtime_error("invalid block: unknown parent");
-        }
+    DbgAssert(pindexPrev, throw runtime_error("invalid block: unknown parent"));
 
-        pindexPrev = i->second;
+    const CChainParams &chainparams = Params();
+    CValidationState state;
 
-        if (pindexPrev != chainActive.Tip())
-        {
-            throw runtime_error("invalid block: does not build on chain tip");
-        }
+    {
+        LOCK(cs_main); // to freeze the state during block validity test
 
-        DbgAssert(pindexPrev, throw runtime_error("invalid block: unknown parent"));
-
-        const CChainParams &chainparams = Params();
-        CValidationState state;
         if (block.GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
         {
             if (!TestConservativeBlockValidity(state, chainparams, block, pindexPrev, false, true))
@@ -2059,12 +2170,15 @@ extern std::map<std::pair<void *, void *>, LockStack> lockorders;
 extern std::vector<std::string> vUseDNSSeeds;
 extern std::list<CNode *> vNodesDisconnected;
 extern std::set<CNetAddr> setservAddNodeAddresses;
+extern std::map<uint256, CTxCommitData> *txCommitQ;
+extern std::queue<CTxInputData> txDeferQ;
+extern std::queue<CTxInputData> txInQ;
 extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
-    ret.push_back(Pair("time", GetTime()));
-    ret.push_back(Pair("requester.mapTxnInfo", (uint64_t)requester.mapTxnInfo.size()));
-    ret.push_back(Pair("requester.mapBlkInfo", (uint64_t)requester.mapBlkInfo.size()));
+    ret.pushKV("time", GetTime());
+    ret.pushKV("requester.mapTxnInfo", (uint64_t)requester.mapTxnInfo.size());
+    ret.pushKV("requester.mapBlkInfo", (uint64_t)requester.mapBlkInfo.size());
     unsigned long int max = 0;
     unsigned long int size = 0;
     for (CRequestManager::OdMap::iterator i = requester.mapTxnInfo.begin(); i != requester.mapTxnInfo.end(); i++)
@@ -2074,8 +2188,8 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         if (max < temp)
             max = temp;
     }
-    ret.push_back(Pair("requester.mapTxnInfo.maxobj", max));
-    ret.push_back(Pair("requester.mapTxnInfo.totobj", size));
+    ret.pushKV("requester.mapTxnInfo.maxobj", (uint64_t)max);
+    ret.pushKV("requester.mapTxnInfo.totobj", (uint64_t)size);
 
     max = 0;
     size = 0;
@@ -2086,40 +2200,40 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         if (max < temp)
             max = temp;
     }
-    ret.push_back(Pair("requester.mapBlkInfo.maxobj", max));
-    ret.push_back(Pair("requester.mapBlkInfo.totobj", size));
+    ret.pushKV("requester.mapBlkInfo.maxobj", (uint64_t)max);
+    ret.pushKV("requester.mapBlkInfo.totobj", (uint64_t)size);
 
-    ret.push_back(Pair("mapBlockIndex", (int64_t)mapBlockIndex.size()));
+    ret.pushKV("mapBlockIndex", (int64_t)mapBlockIndex.size());
     // CChain
-    {
-        LOCK(cs_xval);
-        ret.push_back(Pair("setPreVerifiedTxHash", (int64_t)setPreVerifiedTxHash.size()));
-        ret.push_back(Pair("setUnVerifiedOrphanTxHash", (int64_t)setUnVerifiedOrphanTxHash.size()));
-    }
-    ret.push_back(Pair("mapLocalHost", (int64_t)mapLocalHost.size()));
-    ret.push_back(Pair("CDoSManager::vWhitelistedRange", (int64_t)dosMan.vWhitelistedRange.size()));
-    ret.push_back(Pair("mapInboundConnectionTracker", (int64_t)mapInboundConnectionTracker.size()));
-    ret.push_back(Pair("vUseDNSSeeds", (int64_t)vUseDNSSeeds.size()));
-    ret.push_back(Pair("vAddedNodes", (int64_t)vAddedNodes.size()));
-    ret.push_back(Pair("setservAddNodeAddresses", (int64_t)setservAddNodeAddresses.size()));
-    ret.push_back(Pair("statistics", (int64_t)statistics.size()));
-    ret.push_back(Pair("tweaks", (int64_t)tweaks.size()));
-    ret.push_back(Pair("mapRelay", (int64_t)mapRelay.size()));
-    ret.push_back(Pair("vRelayExpiration", (int64_t)vRelayExpiration.size()));
-    ret.push_back(Pair("vNodes", (int64_t)vNodes.size()));
-    ret.push_back(Pair("vNodesDisconnected", (int64_t)vNodesDisconnected.size()));
+    ret.pushKV("mapLocalHost", (int64_t)mapLocalHost.size());
+    ret.pushKV("CDoSManager::vWhitelistedRange", (int64_t)dosMan.vWhitelistedRange.size());
+    ret.pushKV("mapInboundConnectionTracker", (int64_t)mapInboundConnectionTracker.size());
+    ret.pushKV("vUseDNSSeeds", (int64_t)vUseDNSSeeds.size());
+    ret.pushKV("vAddedNodes", (int64_t)vAddedNodes.size());
+    ret.pushKV("setservAddNodeAddresses", (int64_t)setservAddNodeAddresses.size());
+    ret.pushKV("statistics", (int64_t)statistics.size());
+    ret.pushKV("tweaks", (int64_t)tweaks.size());
+    ret.pushKV("mapRelay", (int64_t)mapRelay.size());
+    ret.pushKV("vRelayExpiration", (int64_t)vRelayExpiration.size());
+    ret.pushKV("vNodes", (int64_t)vNodes.size());
+    ret.pushKV("vNodesDisconnected", (int64_t)vNodesDisconnected.size());
     // CAddrMan
-    ret.push_back(Pair("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size()));
-    ret.push_back(Pair("mapOrphanTransactionsByPrev", (int64_t)orphanpool.mapOrphanTransactionsByPrev.size()));
+    ret.pushKV("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size());
+    ret.pushKV("mapOrphanTransactionsByPrev", (int64_t)orphanpool.mapOrphanTransactionsByPrev.size());
 
     uint32_t nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream;
     connmgr->ExpeditedNodeCounts(nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream);
-    ret.push_back(Pair("xpeditedBlk", (uint64_t)nExpeditedBlocks));
-    ret.push_back(Pair("xpeditedBlkUp", (uint64_t)nExpeditedUpstream));
-    ret.push_back(Pair("xpeditedTxn", (uint64_t)nExpeditedTxs));
+    ret.pushKV("xpeditedBlk", (uint64_t)nExpeditedBlocks);
+    ret.pushKV("xpeditedBlkUp", (uint64_t)nExpeditedUpstream);
+    ret.pushKV("xpeditedTxn", (uint64_t)nExpeditedTxs);
+
+    if (txCommitQ)
+        ret.pushKV("txCommitQ", (uint64_t)txCommitQ->size());
+    ret.pushKV("txInQ", (uint64_t)txInQ.size());
+    ret.pushKV("txDeferQ", (uint64_t)txDeferQ.size());
 
 #ifdef DEBUG_LOCKORDER
-    ret.push_back(Pair("lockorders", (uint64_t)lockorders.size()));
+    ret.pushKV("lockorders", (uint64_t)lockorders.size());
 #endif
 
     LOCK(cs_vNodes);
@@ -2134,34 +2248,33 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         UniValue node(UniValue::VOBJ);
         disconnected += (inode.fDisconnect) ? 1 : 0;
 
-        node.push_back(Pair("vSendMsg", (int64_t)inode.vSendMsg.size()));
-        node.push_back(Pair("vRecvGetData", (int64_t)inode.vRecvGetData.size()));
-        node.push_back(Pair("vRecvMsg", (int64_t)inode.vRecvMsg.size()));
+        node.pushKV("vSendMsg", (int64_t)inode.vSendMsg.size());
+        node.pushKV("vRecvGetData", (int64_t)inode.vRecvGetData.size());
+        node.pushKV("vRecvMsg", (int64_t)inode.vRecvMsg.size());
         {
             LOCK(inode.cs_filter);
             if (inode.pfilter)
             {
-                node.push_back(
-                    Pair("pfilter", (int64_t)::GetSerializeSize(*inode.pfilter, SER_NETWORK, PROTOCOL_VERSION)));
+                node.pushKV("pfilter", (int64_t)::GetSerializeSize(*inode.pfilter, SER_NETWORK, PROTOCOL_VERSION));
             }
             if (inode.pThinBlockFilter)
             {
-                node.push_back(Pair("pThinBlockFilter",
-                    (int64_t)::GetSerializeSize(*inode.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION)));
+                node.pushKV("pThinBlockFilter",
+                    (int64_t)::GetSerializeSize(*inode.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION));
             }
         }
-        node.push_back(Pair("thinblock.vtx", (int64_t)inode.thinBlock.vtx.size()));
+        node.pushKV("thinblock.vtx", (int64_t)inode.thinBlock.vtx.size());
         uint64_t thinBlockSize = ::GetSerializeSize(inode.thinBlock, SER_NETWORK, PROTOCOL_VERSION);
         totalThinBlockSize += thinBlockSize;
-        node.push_back(Pair("thinblock.size", thinBlockSize));
-        node.push_back(Pair("thinBlockHashes", (int64_t)inode.thinBlockHashes.size()));
-        node.push_back(Pair("xThinBlockHashes", (int64_t)inode.xThinBlockHashes.size()));
-        node.push_back(Pair("vAddrToSend", (int64_t)inode.vAddrToSend.size()));
-        node.push_back(Pair("vInventoryToSend", (int64_t)inode.vInventoryToSend.size()));
-        ret.push_back(Pair(inode.addrName, node));
+        node.pushKV("thinblock.size", thinBlockSize);
+        node.pushKV("thinBlockHashes", (int64_t)inode.thinBlockHashes.size());
+        node.pushKV("xThinBlockHashes", (int64_t)inode.xThinBlockHashes.size());
+        node.pushKV("vAddrToSend", (int64_t)inode.vAddrToSend.size());
+        node.pushKV("vInventoryToSend", (int64_t)inode.vInventoryToSend.size());
+        ret.pushKV(inode.addrName, node);
     }
-    ret.push_back(Pair("totalThinBlockSize", totalThinBlockSize));
-    ret.push_back(Pair("disconnectedNodes", disconnected));
+    ret.pushKV("totalThinBlockSize", totalThinBlockSize);
+    ret.pushKV("disconnectedNodes", disconnected);
 
     return ret;
 }
@@ -2268,9 +2381,9 @@ UniValue getaddressforms(const UniValue &params, bool fHelp)
     std::string bitpayAddr = EncodeBitpayAddr(dest);
 
     UniValue node(UniValue::VOBJ);
-    node.push_back(Pair("legacy", legacyAddr));
-    node.push_back(Pair("bitcoincash", cashAddr));
-    node.push_back(Pair("bitpay", bitpayAddr));
+    node.pushKV("legacy", legacyAddr);
+    node.pushKV("bitcoincash", cashAddr);
+    node.pushKV("bitpay", bitpayAddr);
     return node;
 }
 

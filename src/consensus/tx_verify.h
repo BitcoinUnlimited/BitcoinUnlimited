@@ -5,18 +5,19 @@
 #ifndef BITCOIN_CONSENSUS_TX_VERIFY_H
 #define BITCOIN_CONSENSUS_TX_VERIFY_H
 
+#include "primitives/transaction.h"
+
 #include <stdint.h>
 #include <vector>
 
 class CBlockIndex;
 class CCoinsViewCache;
-class CTransaction;
 class CValidationState;
 
 /** Transaction validation functions */
 
 /** Context-independent validity checks */
-bool CheckTransaction(const CTransaction &tx, CValidationState &state);
+bool CheckTransaction(const CTransactionRef &tx, CValidationState &state);
 
 namespace Consensus
 {
@@ -25,7 +26,7 @@ namespace Consensus
  * This does not modify the UTXO set. This does not check scripts and sigs.
  * Preconditions: tx.IsCoinBase() is false.
  */
-bool CheckTxInputs(const CTransaction &tx, CValidationState &state, const CCoinsViewCache &inputs);
+bool CheckTxInputs(const CTransactionRef &tx, CValidationState &state, const CCoinsViewCache &inputs);
 } // namespace Consensus
 
 /** Auxiliary functions for transaction validation (ideally should not be exposed) */
@@ -35,7 +36,7 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state, const CCoins
  * @return number of sigops this transaction's outputs will produce when spent
  * @see CTransaction::FetchInputs
  */
-unsigned int GetLegacySigOpCount(const CTransaction &tx);
+unsigned int GetLegacySigOpCount(const CTransactionRef &tx, const uint32_t flags);
 
 /**
  * Count ECDSA signature operations in pay-to-script-hash inputs.
@@ -44,13 +45,13 @@ unsigned int GetLegacySigOpCount(const CTransaction &tx);
  * @return maximum number of sigops required to validate this transaction's inputs
  * @see CTransaction::FetchInputs
  */
-unsigned int GetP2SHSigOpCount(const CTransaction &tx, const CCoinsViewCache &mapInputs);
+unsigned int GetP2SHSigOpCount(const CTransactionRef &tx, const CCoinsViewCache &mapInputs, const uint32_t flags);
 
 /**
  * Check if transaction is final and can be included in a block with the
  * specified height and time. Consensus critical.
  */
-bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime);
+bool IsFinalTx(const CTransactionRef &tx, int nBlockHeight, int64_t nBlockTime);
 
 /**
  * Calculates the block height and previous block's median time past at
@@ -58,7 +59,7 @@ bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime);
  * Also removes from the vector of input heights any entries which did not
  * correspond to sequence locked inputs as they do not affect the calculation.
  */
-std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx,
+std::pair<int, int64_t> CalculateSequenceLocks(const CTransactionRef &tx,
     int flags,
     std::vector<int> *prevHeights,
     const CBlockIndex &block);
@@ -68,6 +69,6 @@ bool EvaluateSequenceLocks(const CBlockIndex &block, std::pair<int, int64_t> loc
  * Check if transaction is final per BIP 68 sequence numbers and can be included in a block.
  * Consensus critical. Takes as input a list of heights at which tx's inputs (in order) confirmed.
  */
-bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int> *prevHeights, const CBlockIndex &block);
+bool SequenceLocks(const CTransactionRef &tx, int flags, std::vector<int> *prevHeights, const CBlockIndex &block);
 
 #endif // BITCOIN_CONSENSUS_TX_VERIFY_H

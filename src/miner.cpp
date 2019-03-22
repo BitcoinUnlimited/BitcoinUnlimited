@@ -30,9 +30,9 @@
 #include "validation/validation.h"
 #include "validationinterface.h"
 
-#include <boost/thread.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <queue>
+#include <thread>
 
 using namespace std;
 
@@ -163,7 +163,16 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _n
     {
         COINBASE_FLAGS.resize(MAX_COINBASE_SCRIPTSIG_SIZE - tx.vin[0].scriptSig.size());
     }
+
     tx.vin[0].scriptSig = tx.vin[0].scriptSig + COINBASE_FLAGS;
+
+    // Make sure the coinbase is big enough.
+    uint64_t nCoinbaseSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
+    if (nCoinbaseSize < MIN_TX_SIZE && IsNov152018Scheduled() &&
+        IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
+    {
+        tx.vin[0].scriptSig << std::vector<uint8_t>(MIN_TX_SIZE - nCoinbaseSize - 1);
+    }
 
     return MakeTransactionRef(std::move(tx));
 }
@@ -183,6 +192,15 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
 
     return tmpl;
 }
+
+struct NumericallyLessTxHashComparator
+{
+public:
+    bool operator()(const CTxMemPoolEntry *a, const CTxMemPoolEntry *b) const
+    {
+        return a->GetTx().GetHash() < b->GetTx().GetHash();
+    }
+};
 
 std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn,
     bool blockstreamCoreCompatible,
@@ -216,17 +234,43 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
             pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
 
         const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
-
         nLockTimeCutoff =
             (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
 
-        addPriorityTxs(pblocktemplate.get());
-        addScoreTxs(pblocktemplate.get());
+        std::vector<const CTxMemPoolEntry *> vtxe;
+        addPriorityTxs(&vtxe);
+        addScoreTxs(&vtxe);
 
         nLastBlockTx = nBlockTx;
         nLastBlockSize = nBlockSize;
         LOGA("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
             nBlockSigOps);
+
+        bool canonical = enableCanonicalTxOrder.Value();
+        if (IsNov152018Scheduled())
+        {
+            if (IsNov152018Enabled(chainparams.GetConsensus(), pindexPrev))
+            {
+                canonical = true;
+            }
+            else
+            {
+                canonical = false;
+            }
+        }
+
+        // sort tx if there are any and the feature is enabled
+        if (canonical)
+        {
+            std::sort(vtxe.begin(), vtxe.end(), NumericallyLessTxHashComparator());
+        }
+
+        for (auto &txe : vtxe)
+        {
+            pblocktemplate->block.vtx.push_back(txe->GetSharedTx());
+            pblocktemplate->vTxFees.push_back(txe->GetFee());
+            pblocktemplate->vTxSigOps.push_back(txe->GetSigOpCount());
+        }
 
         // Create coinbase transaction.
         pblock->vtx[0] =
@@ -238,7 +282,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
         pblock->nNonce = 0;
-        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(*pblock->vtx[0]);
+        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0], STANDARD_CHECKDATASIG_VERIFY_FLAGS);
     }
 
     CValidationState state;
@@ -338,17 +382,23 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
     // Must check that lock times are still valid
     // This can be removed once MTP is always enforced
     // as long as reorgs keep the mempool consistent.
-    if (!IsFinalTx(iter->GetTx(), nHeight, nLockTimeCutoff))
+    if (!IsFinalTx(iter->GetSharedTx(), nHeight, nLockTimeCutoff))
         return false;
+
+    // Make sure tx size is acceptable after Nov 15, 2018 fork
+    if (IsNov152018Scheduled() && IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
+    {
+        if (iter->GetTxSize() < MIN_TX_SIZE)
+            return false;
+    }
 
     return true;
 }
 
-void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, CTxMemPool::txiter iter)
+void BlockAssembler::AddToBlock(std::vector<const CTxMemPoolEntry *> *vtxe, CTxMemPool::txiter iter)
 {
-    pblocktemplate->block.vtx.push_back(iter->GetSharedTx());
-    pblocktemplate->vTxFees.push_back(iter->GetFee());
-    pblocktemplate->vTxSigOps.push_back(iter->GetSigOpCount());
+    const CTxMemPoolEntry &tmp = *iter;
+    vtxe->push_back(&tmp);
     nBlockSize += iter->GetTxSize();
     ++nBlockTx;
     nBlockSigOps += iter->GetSigOpCount();
@@ -367,7 +417,7 @@ void BlockAssembler::AddToBlock(CBlockTemplate *pblocktemplate, CTxMemPool::txit
     }
 }
 
-void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
+void BlockAssembler::addScoreTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
 {
     std::priority_queue<CTxMemPool::txiter, std::vector<CTxMemPool::txiter>, ScoreCompare> clearedTxs;
     CTxMemPool::setEntries waitSet;
@@ -409,7 +459,7 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
         // If this tx fits in the block add it, otherwise keep looping
         if (TestForBlock(iter))
         {
-            AddToBlock(pblocktemplate, iter);
+            AddToBlock(vtxe, iter);
 
             // This tx was successfully added, so
             // add transactions that depend on this one to the priority queue to try again
@@ -425,7 +475,7 @@ void BlockAssembler::addScoreTxs(CBlockTemplate *pblocktemplate)
     }
 }
 
-void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
+void BlockAssembler::addPriorityTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
 {
     // How much of the block should be dedicated to high-priority transactions,
     // included regardless of the fees they pay
@@ -480,7 +530,7 @@ void BlockAssembler::addPriorityTxs(CBlockTemplate *pblocktemplate)
         // If this tx fits in the block add it, otherwise keep looping
         if (TestForBlock(iter))
         {
-            AddToBlock(pblocktemplate, iter);
+            AddToBlock(vtxe, iter);
 
             // If now that this txs is added we've surpassed our desired priority size
             // or have dropped below the AllowFreeThreshold, then we're done adding priority txs
@@ -525,6 +575,14 @@ void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce)
     }
     txCoinbase.vin[0].scriptSig = script + COINBASE_FLAGS;
     assert(txCoinbase.vin[0].scriptSig.size() <= MAX_COINBASE_SCRIPTSIG_SIZE);
+
+    // Make sure the coinbase is big enough
+    uint64_t nCoinbaseSize = ::GetSerializeSize(txCoinbase, SER_NETWORK, PROTOCOL_VERSION);
+    if (nCoinbaseSize < MIN_TX_SIZE && IsNov152018Scheduled() &&
+        IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
+    {
+        txCoinbase.vin[0].scriptSig << std::vector<uint8_t>(MIN_TX_SIZE - nCoinbaseSize - 1);
+    }
 
     pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
     pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);

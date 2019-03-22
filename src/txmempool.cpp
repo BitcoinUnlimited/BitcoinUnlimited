@@ -9,11 +9,13 @@
 #include "consensus/consensus.h"
 #include "consensus/tx_verify.h"
 #include "consensus/validation.h"
+#include "init.h"
 #include "main.h"
 #include "parallel.h"
 #include "policy/fees.h"
 #include "streams.h"
 #include "timedata.h"
+#include "txadmission.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -26,7 +28,6 @@ CTxMemPoolEntry::CTxMemPoolEntry()
     : tx(), nFee(), nTime(0), entryPriority(0), entryHeight(0), hadNoDependencies(0), inChainInputValue(0),
       spendsCoinbase(false), sigOpCount(0), lockPoints()
 {
-    nTxSize = 0;
     nModSize = 0;
     nUsageSize = 0;
     nCountWithDescendants = 0;
@@ -48,12 +49,11 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx,
       hadNoDependencies(poolHasNoInputsOf), inChainInputValue(_inChainInputValue), spendsCoinbase(_spendsCoinbase),
       sigOpCount(_sigOps), lockPoints(lp)
 {
-    nTxSize = ::GetSerializeSize(*tx, SER_NETWORK, PROTOCOL_VERSION);
-    nModSize = tx->CalculateModifiedSize(nTxSize);
+    nModSize = tx->CalculateModifiedSize(tx->GetTxSize());
     nUsageSize = RecursiveDynamicUsage(*tx);
 
     nCountWithDescendants = 1;
-    nSizeWithDescendants = nTxSize;
+    nSizeWithDescendants = tx->GetTxSize();
     nModFeesWithDescendants = nFee;
     CAmount nValueIn = tx->GetValueOut() + nFee;
     assert(inChainInputValue <= nValueIn);
@@ -61,7 +61,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx,
     feeDelta = 0;
 
     nCountWithAncestors = 1;
-    nSizeWithAncestors = nTxSize;
+    nSizeWithAncestors = tx->GetTxSize();
     nModFeesWithAncestors = nFee;
     nSigOpCountWithAncestors = sigOpCount;
 }
@@ -721,18 +721,18 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
     list<CTransaction> transactionsToRemove;
     for (indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
     {
-        const CTransaction &tx = it->GetTx();
+        const CTransactionRef tx = it->GetSharedTx();
         LockPoints lp = it->GetLockPoints();
         bool validLP = TestLockPointValidity(&lp);
         if (!CheckFinalTx(tx, flags) || !CheckSequenceLocks(tx, flags, &lp, validLP))
         {
             // Note if CheckSequenceLocks fails the LockPoints may still be invalid
             // So it's critical that we remove the tx and not depend on the LockPoints.
-            transactionsToRemove.push_back(tx);
+            transactionsToRemove.push_back(*tx);
         }
         else if (it->GetSpendsCoinbase())
         {
-            for (const CTxIn &txin : tx.vin)
+            for (const CTxIn &txin : tx->vin)
             {
                 indexed_transaction_set::const_iterator it2 = mapTx.find(txin.prevout.hash);
                 if (it2 != mapTx.end())
@@ -743,7 +743,7 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
                 if (coin->IsSpent() ||
                     (coin->IsCoinBase() && ((signed long)nMemPoolHeight) - coin->nHeight < COINBASE_MATURITY))
                 {
-                    transactionsToRemove.push_back(tx);
+                    transactionsToRemove.push_back(*tx);
                     break;
                 }
             }
@@ -785,33 +785,104 @@ void CTxMemPool::_removeConflicts(const CTransaction &tx, std::list<CTransaction
     }
 }
 
-/**
- * Called when a block is connected. Removes from mempool and updates the miner fee estimator.
- */
+
+// transactions need to be removed from the mempool in ancestor-first order so that
+// descendant/ancestor counts remain correct.  This is accomplished by looking at the
+// data in mapLinks and only removing transactions with no ancestors.
+// If a transaction has an ancestor, it is placed on a deferred map: ancestor->descendant list.
+// Whenever a tx is removed from the mempool, any of its descendants are placed back onto the
+// queue of tx that are removable.
 void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
     unsigned int nBlockHeight,
     std::list<CTransactionRef> &conflicts,
     bool fCurrentEstimate)
 {
-    WRITELOCK(cs);
-    std::vector<CTxMemPoolEntry> entries;
-    for (const auto &tx : vtx)
-    {
-        uint256 hash = tx->GetHash();
+    typedef std::map<txiter, std::vector<txiter>, CompareIteratorByHash> DeferredMap;
 
-        indexed_transaction_set::iterator i = mapTx.find(hash);
-        if (i != mapTx.end())
-            entries.push_back(*i);
-    }
+    WRITELOCK(cs);
+    std::vector<txiter> entriesToRemove;
+    std::vector<CTxMemPoolEntry> entries;
+
+    DeferredMap deferred;
+    std::queue<txiter> ready;
+
     for (const auto &tx : vtx)
     {
-        txiter it = mapTx.find(tx->GetHash());
-        if (it != mapTx.end())
+        setEntries descendants;
+        uint256 hash = tx->GetHash();
+        txiter i = mapTx.find(hash);
+        if (i == mapTx.end())
+            continue; // not in the mempool
+        ready.push(i);
+    }
+
+    while (!ready.empty())
+    {
+        txiter nextTx = ready.front();
+        ready.pop();
+
+        const auto &links = mapLinks.find(nextTx);
+        if (links == mapLinks.end())
         {
+            DbgAssert(!"should never happen", );
+            continue;
+        }
+        if (links->second.parents.empty()) // This tx has no ancestors, so its ready to be removed
+        {
+            entries.push_back(*nextTx); // save tx for estimator adjustment at the bottom
+
+            // place any tx that were deferred because this tx was required back onto the ready Q
+            DeferredMap::iterator deferredSet = deferred.find(nextTx);
+            if (deferredSet != deferred.end())
+            {
+                for (auto j = deferredSet->second.begin(); j != deferredSet->second.end(); ++j)
+                {
+                    ready.push(*j);
+                }
+                deferred.erase(deferredSet);
+            }
+            // Remove this tx from the mempool
             setEntries stage;
-            stage.insert(it);
+            stage.insert(nextTx); // nextTx is invalid now
             _RemoveStaged(stage, true);
         }
+        else // This tx has ancestors, so put it in the deferred queue waiting for them
+        {
+            auto tmp = links->second.parents.begin();
+            if (tmp != links->second.parents.end())
+            {
+                txiter t = *tmp;
+                std::vector<txiter> &vec = deferred[t];
+                vec.push_back(nextTx);
+            }
+            else // an empty txiter should never be part of the parents
+            {
+                DbgAssert("tx parents is corrupt!", {
+                    links->second.parents.clear();
+                    ready.push(nextTx);
+                });
+            }
+        }
+
+        // If we run out of tx in the ready queue, grab everything that was deferred
+        // and put them back in the ready q
+        if (ready.empty() && !deferred.empty())
+        {
+            DbgAssert(!"Impossible tx topology", );
+            for (auto i = deferred.begin(); i != deferred.end(); ++i)
+            {
+                for (auto j = i->second.begin(); j != i->second.end(); ++j)
+                {
+                    ready.push(*j);
+                }
+            }
+            deferred.clear();
+        }
+    }
+
+    // Remove conflicting tx
+    for (const auto &tx : vtx)
+    {
         _removeConflicts(*tx, conflicts);
         _ClearPrioritisation(tx->GetHash());
     }
@@ -851,7 +922,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
     uint64_t checkTotal = 0;
     uint64_t innerUsage = 0;
 
-    WRITELOCK(cs);
+    READLOCK(cs);
     LOG(MEMPOOL, "Checking mempool with %u transactions and %u inputs\n", (unsigned int)mapTx.size(),
         (unsigned int)mapNextTx.size());
 
@@ -944,7 +1015,9 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         else
         {
             CValidationState state;
-            assert(CheckInputs(tx, state, mempoolDuplicate, false, 0, false, NULL));
+            // Use the largest maxOps since this code is not meant to validate that constraint
+            assert(CheckInputs(
+                it->GetSharedTx(), state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, nullptr));
             UpdateCoins(tx, state, mempoolDuplicate, 1000000);
         }
     }
@@ -962,7 +1035,9 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         }
         else
         {
-            assert(CheckInputs(entry->GetTx(), state, mempoolDuplicate, false, 0, false, NULL));
+            // Use the largest maxOps since this code is not meant to validate that constraint
+            assert(CheckInputs(
+                entry->GetSharedTx(), state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, nullptr));
             UpdateCoins(entry->GetTx(), state, mempoolDuplicate, 1000000);
             stepsSinceLastRemove = 0;
         }
@@ -1069,6 +1144,24 @@ CTransactionRef CTxMemPool::get(const uint256 &hash) const
 {
     READLOCK(cs);
     return _get(hash);
+}
+
+static TxMempoolInfo GetInfo(CTxMemPool::indexed_transaction_set::const_iterator it)
+{
+    return TxMempoolInfo{
+        it->GetSharedTx(), it->GetTime(), CFeeRate(it->GetFee(), it->GetTxSize()), it->GetModifiedFee() - it->GetFee()};
+}
+
+std::vector<TxMempoolInfo> CTxMemPool::AllTxMempoolInfo() const
+{
+    AssertLockHeld(cs);
+    std::vector<TxMempoolInfo> vInfo;
+    vInfo.reserve(mapTx.size());
+    for (indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
+    {
+        vInfo.push_back(GetInfo(it));
+    }
+    return vInfo;
 }
 
 void CTxMemPool::PrioritiseTransaction(const uint256 hash,
@@ -1364,7 +1457,7 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpends
 
 void CTxMemPool::UpdateTransactionsPerSecond()
 {
-    boost::mutex::scoped_lock lock(cs_txPerSec);
+    std::lock_guard<std::mutex> lock(cs_txPerSec);
 
     static int64_t nLastTime = GetTime();
     double nSecondsToAverage = 60; // Length of time in seconds to smooth the tx rate over
@@ -1387,4 +1480,135 @@ void CTxMemPool::UpdateTransactionsPerSecond()
 SaltedTxidHasher::SaltedTxidHasher()
     : k0(GetRand(std::numeric_limits<uint64_t>::max())), k1(GetRand(std::numeric_limits<uint64_t>::max()))
 {
+}
+
+// Version is current unix epoch time. Nov 1, 2018 at 12am
+static const uint64_t MEMPOOL_DUMP_VERSION = 1541030400;
+
+bool LoadMempool(void)
+{
+    int64_t nExpiryTimeout = GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
+    FILE *filestr = fopen((GetDataDir() / "mempool.dat").string().c_str(), "rb");
+    CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
+    if (file.IsNull())
+    {
+        LOGA("Failed to open mempool file from disk. Continuing anyway.\n");
+        return false;
+    }
+
+    int64_t count = 0;
+    int64_t skipped = 0;
+    int64_t nNow = GetTime();
+
+    try
+    {
+        uint64_t version;
+        file >> version;
+        if (version != MEMPOOL_DUMP_VERSION)
+        {
+            return false;
+        }
+        uint64_t num;
+        file >> num;
+        double prioritydummy = 0;
+        while (num--)
+        {
+            CTransaction tx;
+            int64_t nTime;
+            int64_t nFeeDelta;
+            file >> tx;
+            file >> nTime;
+            file >> nFeeDelta;
+
+            CAmount amountdelta = nFeeDelta;
+            if (amountdelta)
+            {
+                mempool.PrioritiseTransaction(tx.GetHash(), tx.GetHash().ToString(), prioritydummy, amountdelta);
+            }
+            if (nTime + nExpiryTimeout > nNow)
+            {
+                CTxInputData txd;
+                txd.tx = MakeTransactionRef(tx);
+                EnqueueTxForAdmission(txd);
+                ++count;
+            }
+            else
+            {
+                ++skipped;
+            }
+
+            if (ShutdownRequested())
+                return false;
+        }
+        std::map<uint256, CAmount> mapDeltas;
+        file >> mapDeltas;
+
+        for (const auto &i : mapDeltas)
+        {
+            mempool.PrioritiseTransaction(i.first, i.first.ToString(), prioritydummy, i.second);
+        }
+    }
+    catch (const std::exception &e)
+    {
+        LOGA("Failed to deserialize mempool data on disk: %s. Continuing anyway.\n", e.what());
+        return false;
+    }
+
+    LOGA("Imported mempool transactions from disk: %i successes, %i expired\n", count, skipped);
+    return true;
+}
+
+bool DumpMempool(void)
+{
+    int64_t start = GetTimeMicros();
+
+    std::map<uint256, CAmount> mapDeltas;
+    std::vector<TxMempoolInfo> vInfo;
+
+    {
+        READLOCK(mempool.cs);
+        for (const auto &i : mempool.mapDeltas)
+        {
+            mapDeltas[i.first] = i.second.first;
+        }
+        vInfo = mempool.AllTxMempoolInfo();
+    }
+
+    int64_t mid = GetTimeMicros();
+
+    try
+    {
+        FILE *filestr = fopen((GetDataDir() / "mempool.dat.new").string().c_str(), "wb");
+        if (!filestr)
+        {
+            return false;
+        }
+
+        CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
+
+        uint64_t version = MEMPOOL_DUMP_VERSION;
+        file << version;
+
+        file << (uint64_t)vInfo.size();
+        for (const auto &i : vInfo)
+        {
+            file << *(i.tx);
+            file << (int64_t)i.nTime;
+            file << (int64_t)i.feeDelta;
+            mapDeltas.erase(i.tx->GetHash());
+        }
+
+        file << mapDeltas;
+        FileCommit(file.Get());
+        file.fclose();
+        RenameOver(GetDataDir() / "mempool.dat.new", GetDataDir() / "mempool.dat");
+        int64_t last = GetTimeMicros();
+        LOGA("Dumped mempool: %gs to copy, %gs to dump\n", (mid - start) * 0.000001, (last - mid) * 0.000001);
+    }
+    catch (const std::exception &e)
+    {
+        LOGA("Failed to dump mempool: %s. Continuing anyway.\n", e.what());
+        return false;
+    }
+    return true;
 }

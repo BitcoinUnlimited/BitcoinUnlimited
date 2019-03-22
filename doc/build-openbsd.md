@@ -1,13 +1,11 @@
-OpenBSD build guide
-======================
+# OpenBSD build guide
 (updated for OpenBSD 5.7)
 
 This guide describes how to build bitcoind and command-line utilities on OpenBSD.
 
 As OpenBSD is most common as a server OS, we will not bother with the GUI.
 
-Preparation
--------------
+## Preparation
 
 Run the following as root to install the base dependencies for building:
 
@@ -21,8 +19,7 @@ ln -sf /usr/local/bin/python2.7 /usr/local/bin/python2
 
 See [dependencies.md](dependencies.md) for a complete overview.
 
-GCC
--------
+## GCC
 
 The default C++ compiler that comes with OpenBSD 5.9 is g++ 4.2. This version is old (from 2007), and is not able to compile the current version of Bitcoin Core, primarily as it has no C++11 support, but even before there were issues. So here we will be installing a newer compiler:
 
@@ -42,14 +39,14 @@ Do not use `pkg_add boost`! The boost version installed thus is compiled using t
 
 This makes it necessary to build boost, or at least the parts used by Bitcoin Unlimited, manually:
 
-```
+```bash
 # Pick some path to install boost to, here we create a directory within the bitcoin directory
 BITCOIN_ROOT=$(pwd)
 BOOST_PREFIX="${BITCOIN_ROOT}/boost"
 mkdir -p $BOOST_PREFIX
 
 # Fetch the source and verify that it is not tampered with
-wget http://heanet.dl.sourceforge.net/project/boost/boost/1.59.0/boost_1_59_0.tar.bz2
+wget https://kent.dl.sourceforge.net/project/boost/boost/1.59.0/boost_1_59_0.tar.bz2
 echo '727a932322d94287b62abb1bd2d41723eec4356a7728909e38adb65ca25241ca  boost_1_59_0.tar.bz2' | sha256 -c
 # MUST output: (SHA256) boost_1_59_0.tar.bz2: OK
 tar -xjf boost_1_59_0.tar.bz2
@@ -84,7 +81,7 @@ BDB_PREFIX="${BITCOIN_ROOT}/db4"
 mkdir -p $BDB_PREFIX
 
 # Fetch the source and verify that it is not tampered with
-wget 'http://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz'
+wget 'https://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz'
 echo '12edc0df75bf9abd7f82f821795bcee50f42cb2e5f76a6a281b85732798364ef  db-4.8.30.NC.tar.gz' | sha256 -c
 # MUST output: (SHA256) db-4.8.30.NC.tar.gz: OK
 tar -xzf db-4.8.30.NC.tar.gz
@@ -127,8 +124,7 @@ gmake
 gmake check
 ```
 
-Clang (not currently working)
-------------------------------
+## Clang (not currently working)
 
 Using a newer g++ results in linking the new code to a new libstdc++.
 Libraries built with the old g++, will still import the old library.

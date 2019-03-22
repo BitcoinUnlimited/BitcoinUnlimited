@@ -29,12 +29,11 @@ class MyTest (BitcoinTestFramework):
         self.nodes = start_nodes(2, self.options.tmpdir)
         connect_nodes_bi(self.nodes, 0, 1)
         self.is_network_split = False
-        self.sync_all()
+        sync_blocks(self.nodes)
 
     def run_test(self):
 
         node = self.nodes[0]
-
         node.generate(100)
         # generate enough blocks so that nodes[0] has a balance
 
@@ -55,13 +54,13 @@ class MyTest (BitcoinTestFramework):
 
         # ask for a valid coinbase size
         c = node.getminingcandidate(1050)
-		
+
         # ask for a coinbase size that is too big
         expectException(lambda: node.getminingcandidate(1000000000000000), JSONRPCException)
-               
+
         # ask for a coinbase size that is too small
         expectException(lambda: node.getminingcandidate(-1), JSONRPCException)
-        
+
         # the most awful mining algorithm: just submit with an arbitrary nonce
         # (works because testnet accepts almost anything)
         nonce = 0
@@ -101,12 +100,13 @@ class MyTest (BitcoinTestFramework):
 
         # change the coinbase
         tx = CTransaction().deserialize(c["coinbase"])
-        tx.vout[0].scriptPubKey = CScript([OP_1])
-
+        tx.vout[0].scriptPubKey = CScript(([OP_NOP] * 50) + [OP_1])  # 50 no-ops because tx must be 100 bytes or more
         nonce = 0
         c["id"] = id
         while 1:
             nonce += 1
+            if (nonce&127)==0:
+                logging.info("simple mining nonce: " + str(nonce))
             c = node.getminingcandidate()
             del c["merkleProof"]
             del c["prevhash"]
@@ -121,13 +121,13 @@ class MyTest (BitcoinTestFramework):
         blockhex = node.getblock(node.getbestblockhash(), False)
         block = CBlock()
         block.deserialize(BytesIO(unhexlify(blockhex)))
-        assert_equal(block.vtx[0].vout[0].scriptPubKey, CScript([OP_1]))
+        assert_equal(block.vtx[0].vout[0].scriptPubKey, CScript(([OP_NOP] * 50) + [OP_1]))
 
         #### Test that a dynamic relay policy change does not effect the mining
         #    of txns currently in the mempool.
         self.nodes[0].generate(5);
         self.sync_all()
-        
+
         # Add a few txns to the mempool and mine them with the default fee
         self.nodes[0].set("minlimitertxfee=0")
         self.nodes[1].set("minlimitertxfee=0")
@@ -176,26 +176,5 @@ def Test():
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
 
-    flags = []
-    # you may want these additional flags:
-    # flags.append("--nocleanup")
-    # flags.append("--noshutdown")
-
-    # Execution is much faster if a ramdisk is used, so use it if one exists in a typical location
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmppfx=/ramdisk/test")
-
-    # Out-of-source builds are awkward to start because they need an additional flag
-    # automatically add this flag during testing for common out-of-source locations
-    here = os.path.dirname(os.path.abspath(__file__))
-    if not os.path.exists(os.path.abspath(here + "/../../src/bitcoind")):
-        dbg = os.path.abspath(here + "/../../debug/src/bitcoind")
-        rel = os.path.abspath(here + "/../../release/src/bitcoind")
-        if os.path.exists(dbg):
-            print("Running from the debug directory (%s)" % dbg)
-            flags.append("--srcdir=%s" % os.path.dirname(dbg))
-        elif os.path.exists(rel):
-            print("Running from the release directory (%s)" % rel)
-            flags.append("--srcdir=%s" % os.path.dirname(rel))
-
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)

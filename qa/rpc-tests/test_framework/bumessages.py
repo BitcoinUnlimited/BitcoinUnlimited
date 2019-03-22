@@ -6,7 +6,6 @@ class msg_buversion(object):
 
     def __init__(self, addrFromPort=None):
         self.addrFromPort = addrFromPort
-        pass
 
     def deserialize(self, f):
         self.addrFromPort = struct.unpack("<H", f.read(2))[0]
@@ -18,7 +17,10 @@ class msg_buversion(object):
         return r
 
     def __repr__(self):
-        return "msg_buversion(addrFromPort=%d)" % (self.addrFromPort)
+        if self.addrFromPort is not None:
+            return "msg_buversion(addrFromPort=%d)" % (self.addrFromPort)
+        else:
+            return "msg_buversion(addrFromPort=None)"
 
 
 class msg_buverack(object):
@@ -168,11 +170,11 @@ class CThinBlock(CBlockHeader):
 
 
 class CBloomFilter:
-    def __init__(self, vData=None):
+    def __init__(self, vData=b"", hashFuncs=0, tweak=0, flags = 0):
         self.vData = vData
-        self.nHashFuncs = None
-        self.nTweak = None
-        self.nFlags = None
+        self.nHashFuncs = hashFuncs
+        self.nTweak = tweak
+        self.nFlags = flags
 
     def deserialize(self, f):
         self.vData = deser_string(f)
@@ -183,7 +185,7 @@ class CBloomFilter:
 
     def serialize(self):
         r = b""
-        r += ser_string(f, self.vData)
+        r += ser_string(self.vData)
         r += struct.pack("<I", self.nHashFuncs)
         r += struct.pack("<I", self.nTweak)
         r += struct.pack("<B", self.nFlags)
@@ -307,7 +309,7 @@ class msg_get_xthin(object):
 
     def __init__(self, inv=None, filter=None):
         self.inv = inv
-        self.filter = filter
+        self.filter = filter if filter != None else CBloomFilter()
 
     def deserialize(self, f):
         self.inv = CInv()
@@ -324,6 +326,25 @@ class msg_get_xthin(object):
 
     def __repr__(self):
         return "%s(inv=%s,filter=%s)" % (self.__class__.__name__, repr(self.inv), repr(self.filter))
+
+class msg_get_thin(object):
+    command = b"get_thin"
+
+    def __init__(self, inv=None):
+        self.inv = inv
+
+    def deserialize(self, f):
+        self.inv = CInv()
+        self.inv.deserialize(f)
+        return self
+
+    def serialize(self):
+        r = b""
+        r += self.inv.serialize()
+        return r
+
+    def __repr__(self):
+        return "%s(inv=%s)" % (self.__class__.__name__, repr(self.inv))
 
 
 class msg_filterload(object):
@@ -440,3 +461,9 @@ bumessagemap = {
     msg_Xb.command: msg_Xb,
     msg_req_xpedited.command: msg_req_xpedited,
 }
+
+# py.test
+
+def testRepr():
+    assert "=None" in repr(msg_buversion())
+    assert "=12345" in repr(msg_buversion(12345))

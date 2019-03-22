@@ -5,13 +5,12 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "script.h"
+#include "interpreter.h"
 
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 
 #include <algorithm>
-
-bool enableDataSigVerify = false;
 
 using namespace std;
 
@@ -235,7 +234,7 @@ const char *GetOpName(opcodetype opcode)
     case OP_CHECKMULTISIGVERIFY:
         return "OP_CHECKMULTISIGVERIFY";
 
-    // expanson
+    // expansion
     case OP_NOP1:
         return "OP_NOP1";
     case OP_CHECKLOCKTIMEVERIFY:
@@ -256,6 +255,11 @@ const char *GetOpName(opcodetype opcode)
         return "OP_NOP9";
     case OP_NOP10:
         return "OP_NOP10";
+
+    case OP_CHECKDATASIG:
+        return "OP_CHECKDATASIG";
+    case OP_CHECKDATASIGVERIFY:
+        return "OP_CHECKDATASIGVERIFY";
 
     case OP_INVALIDOPCODE:
         return "OP_INVALIDOPCODE";
@@ -358,7 +362,7 @@ bool CScriptNum::MinimallyEncode(std::vector<uint8_t> &data)
     return true;
 }
 
-unsigned int CScript::GetSigOpCount(bool fAccurate) const
+unsigned int CScript::GetSigOpCount(const uint32_t flags, bool fAccurate) const
 {
     unsigned int n = 0;
     const_iterator pc = begin();
@@ -368,8 +372,9 @@ unsigned int CScript::GetSigOpCount(bool fAccurate) const
         opcodetype opcode;
         if (!GetOp(pc, opcode))
             break;
-        if (opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY ||
-            (enableDataSigVerify && (opcode == OP_DATASIGVERIFY)))
+        if (opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY)
+            n++;
+        if ((flags & SCRIPT_ENABLE_CHECKDATASIG) && (opcode == OP_CHECKDATASIG || opcode == OP_CHECKDATASIGVERIFY))
             n++;
         else if (opcode == OP_CHECKMULTISIG || opcode == OP_CHECKMULTISIGVERIFY)
         {
@@ -383,10 +388,10 @@ unsigned int CScript::GetSigOpCount(bool fAccurate) const
     return n;
 }
 
-unsigned int CScript::GetSigOpCount(const CScript &scriptSig) const
+unsigned int CScript::GetSigOpCount(const uint32_t flags, const CScript &scriptSig) const
 {
-    if (!IsPayToScriptHash())
-        return GetSigOpCount(true);
+    if ((flags & SCRIPT_VERIFY_P2SH) == 0 || !IsPayToScriptHash())
+        return GetSigOpCount(flags, true);
 
     // This is a pay-to-script-hash scriptPubKey;
     // get the last item that the scriptSig
@@ -404,7 +409,7 @@ unsigned int CScript::GetSigOpCount(const CScript &scriptSig) const
 
     /// ... and return its opcount:
     CScript subscript(data.begin(), data.end());
-    return subscript.GetSigOpCount(true);
+    return subscript.GetSigOpCount(flags, true);
 }
 
 bool CScript::IsPayToScriptHash() const

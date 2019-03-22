@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018 The Bitcoin SV developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,6 +10,7 @@
 
 #include "crypto/common.h"
 #include "prevector.h"
+#include "script_error.h"
 
 #include <assert.h>
 #include <climits>
@@ -19,14 +21,13 @@
 #include <string>
 #include <vector>
 
-// Set to true to enable OP_DATASIGVERIFY
-extern bool enableDataSigVerify;
-
 // Maximum number of bytes pushable to the stack
 static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520;
 
 // Maximum number of non-push operations per script
 static const int MAX_OPS_PER_SCRIPT = 201;
+static const int SV_MAX_OPS_PER_SCRIPT = 500;
+
 
 // Maximum number of public keys per multisig
 static const int MAX_PUBKEYS_PER_MULTISIG = 20;
@@ -169,7 +170,6 @@ enum opcodetype
     OP_CHECKSIGVERIFY = 0xad,
     OP_CHECKMULTISIG = 0xae,
     OP_CHECKMULTISIGVERIFY = 0xaf,
-    OP_DATASIGVERIFY = 0xbb,
 
     // expansion
     OP_NOP1 = 0xb0,
@@ -184,6 +184,10 @@ enum opcodetype
     OP_NOP8 = 0xb7,
     OP_NOP9 = 0xb8,
     OP_NOP10 = 0xb9,
+
+    // More crypto
+    OP_CHECKDATASIG = 0xba,
+    OP_CHECKDATASIGVERIFY = 0xbb,
 
     // The first op_code value after all defined opcodes
     FIRST_UNDEFINED_OP_VALUE,
@@ -204,7 +208,8 @@ const char *GetOpName(opcodetype opcode);
 class scriptnum_error : public std::runtime_error
 {
 public:
-    explicit scriptnum_error(const std::string &str) : std::runtime_error(str) {}
+    ScriptError errNum;
+    explicit scriptnum_error(ScriptError errnum, const std::string &str) : std::runtime_error(str), errNum(errnum) {}
 };
 
 class CScriptNum
@@ -227,11 +232,11 @@ public:
     {
         if (vch.size() > nMaxNumSize)
         {
-            throw scriptnum_error("script number overflow");
+            throw scriptnum_error(SCRIPT_ERR_NUMBER_OVERFLOW, "script number overflow");
         }
         if (fRequireMinimal && !IsMinimallyEncoded(vch, nMaxNumSize))
         {
-            throw scriptnum_error("non-minimally encoded script number");
+            throw scriptnum_error(SCRIPT_ERR_NUMBER_BAD_ENCODING, "non-minimally encoded script number");
         }
         m_value = set_vch(vch);
     }
@@ -259,6 +264,8 @@ public:
     inline CScriptNum operator-(const CScriptNum &rhs) const { return operator-(rhs.m_value); }
     inline CScriptNum operator/(const int64_t &rhs) const { return CScriptNum(m_value / rhs); }
     inline CScriptNum operator/(const CScriptNum &rhs) const { return operator/(rhs.m_value); }
+    inline CScriptNum operator*(const int64_t &rhs) const { return CScriptNum(m_value * rhs); }
+    inline CScriptNum operator*(const CScriptNum &rhs) const { return operator*(rhs.m_value); }
     inline CScriptNum operator%(const int64_t &rhs) const { return CScriptNum(m_value % rhs); }
     inline CScriptNum operator%(const CScriptNum &rhs) const { return operator%(rhs.m_value); }
     inline CScriptNum &operator+=(const CScriptNum &rhs) { return operator+=(rhs.m_value); }
@@ -599,13 +606,13 @@ public:
      * counted more accurately, assuming they are of the form
      *  ... OP_N CHECKMULTISIG ...
      */
-    unsigned int GetSigOpCount(bool fAccurate) const;
+    unsigned int GetSigOpCount(const uint32_t flags, bool fAccurate) const;
 
     /**
      * Accurately count sigOps, including sigOps in
      * pay-to-script-hash transactions:
      */
-    unsigned int GetSigOpCount(const CScript &scriptSig) const;
+    unsigned int GetSigOpCount(const uint32_t flags, const CScript &scriptSig) const;
 
     bool IsPayToScriptHash() const;
 

@@ -9,7 +9,6 @@
 #include "config/bitcoin-config.h"
 #endif
 
-#include <boost/chrono/chrono.hpp>
 #include <limits>
 
 // Variables for traffic shaping
@@ -26,21 +25,21 @@ static const int64_t RECV_SHAPER_MIN_FRAG = 256;
 class CLeakyBucket
 {
 protected:
-    typedef boost::chrono::steady_clock CClock;
+    typedef std::chrono::steady_clock CClock;
 
     int64_t level; // Current level of the bucket
     int64_t max; // Maximum quantity allowed
     int64_t fill; // Average rate per second
     static CClock clock;
-    boost::chrono::time_point<CClock> lastFill;
+    std::chrono::time_point<CClock> lastFill;
 
     // This function is called internally to fill the leaky bucket based on the time difference between now and the last
     // time the function was called.
     void fillIt()
     {
-        boost::chrono::time_point<CClock> now = clock.now();
+        std::chrono::time_point<CClock> now = clock.now();
         CClock::duration elapsed(now - lastFill);
-        int64_t msElapsed = boost::chrono::duration_cast<boost::chrono::milliseconds>(elapsed).count();
+        int64_t msElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
         // note in practice msElapsed can be < 0, something to do with hyperthreading so reduce don't eliminate this
         // conditional
         if (msElapsed > 100)

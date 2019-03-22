@@ -18,6 +18,7 @@ static const unsigned char REJECT_NONSTANDARD = 0x40;
 static const unsigned char REJECT_DUST = 0x41;
 static const unsigned char REJECT_INSUFFICIENTFEE = 0x42;
 static const unsigned char REJECT_CHECKPOINT = 0x43;
+static const unsigned char REJECT_WAITING = 0x44;
 
 /** Capture information about block/transaction validation */
 class CValidationState
@@ -84,6 +85,7 @@ public:
     unsigned int GetRejectCode() const { return chRejectCode; }
     std::string GetRejectReason() const { return strRejectReason; }
     std::string GetDebugMessage() const { return strDebugMessage; }
+    void SetDebugMessage(const std::string &s) { strDebugMessage = s; }
 };
 
 #endif // BITCOIN_CONSENSUS_VALIDATION_H

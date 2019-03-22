@@ -304,7 +304,12 @@ public:
 
         const CBlockIndex *pindex = this;
         for (int i = 0; i < nMedianTimeSpan && pindex; i++, pindex = pindex->pprev)
-            *(--pbegin) = pindex->GetBlockTime();
+        {
+            if (pindex)
+            {
+                *(--pbegin) = pindex->GetBlockTime();
+            }
+        }
 
         std::sort(pbegin, pend);
         return pbegin[(pend - pbegin) / 2];

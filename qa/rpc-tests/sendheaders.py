@@ -11,7 +11,7 @@ from test_framework.blocktools import create_block, create_coinbase
 '''
 SendHeadersTest -- test behavior of headers messages to announce blocks.
 
-Setup: 
+Setup:
 
 - Two nodes, two p2p connections to node0. One p2p connection should only ever
   receive inv's (omitted from testing description below, this is our control).
@@ -125,8 +125,8 @@ class BaseNode(NodeConnCB):
         self.connection.send_message(msg)
 
     # Wrapper for the NodeConn's send_message function
-    def send_message(self, message):
-        self.connection.send_message(message)
+    def send_message(self, message, pushbuf = False):
+        self.connection.send_message(message, pushbuf)
 
     def on_inv(self, conn, message):
         self.last_inv.append(message)
@@ -206,7 +206,7 @@ class BaseNode(NodeConnCB):
             time.sleep(self.sleep_time)
             timeout -= self.sleep_time
         raise AssertionError("Sync failed to complete")
-        
+
     # The request manager does not deal with vectors of GETDATA requests but rather one GETDATA per
     # hash, therefore we need to be able to sync_getdata one message at a time rather than in batches.
     def sync_getdata(self, hash_list, timeout=60):
@@ -286,7 +286,7 @@ class SendHeadersTest(BitcoinTestFramework):
         # Currently there are mininode syncronization issues when Parallel Validation is turned on
         # and therefore have -parallel=0 when running these tests.
         self.nodes = []
-        args = [["-debug", "-logtimemicros=1", "-parallel=0", "-use-thinblocks=0", "-use-grapheneblocks=0"]]*2
+        args = [["-debug", "-logtimemicros=1", "-parallel=0", "-use-thinblocks=0", "-use-grapheneblocks=0", "-use-compactblocks=0"]]*2
         self.nodes = start_nodes(2, self.options.tmpdir, args)
         connect_nodes(self.nodes[0], 1)
 
@@ -340,6 +340,13 @@ class SendHeadersTest(BitcoinTestFramework):
         # Test logic begins here
         inv_node.wait_for_verack()
         test_node.wait_for_verack()
+
+        inv_node.send_message(msg_xversion(), True)
+        test_node.send_message(msg_xversion(), True)
+
+        # Test logic begins here
+        inv_node.wait_for_xverack()
+        test_node.wait_for_xverack()
 
         tip = int(self.nodes[0].getbestblockhash(), 16)
 
@@ -454,7 +461,7 @@ class SendHeadersTest(BitcoinTestFramework):
             assert_equal(inv_node.check_last_announcement(inv=new_block_hashes), True)
             assert_equal(test_node.check_last_announcement(headers=new_block_hashes), True)
 
-            block_time += 8 
+            block_time += 8
 
             # Mine a too-large reorg - we will receive only the first 8 inv's for the 9 block hashes mined.
             # which represents the MAX_BLOCKS_TO_ANNOUNCE=8
@@ -493,7 +500,7 @@ class SendHeadersTest(BitcoinTestFramework):
                     test_node.get_data([tip])
                     test_node.wait_for_block(tip)
                     # This time, try sending either a getheaders to trigger resumption
-                    # of headers announcements, or mine a new block and inv it, also 
+                    # of headers announcements, or mine a new block and inv it, also
                     # triggering resumption of headers announcements.
                     if j == 0:
                         test_node.get_headers(locator=[tip], hashstop=0)
@@ -878,26 +885,5 @@ def Test():
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
 
-    flags = []
-    # you may want these additional flags:
-    # flags.append("--nocleanup")
-    # flags.append("--noshutdown")
-
-    # Execution is much faster if a ramdisk is used, so use it if one exists in a typical location
-    if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmppfx=/ramdisk/test")
-
-    # Out-of-source builds are awkward to start because they need an additional flag
-    # automatically add this flag during testing for common out-of-source locations
-    here = os.path.dirname(os.path.abspath(__file__))
-    if not os.path.exists(os.path.abspath(here + "/../../src/bitcoind")):
-        dbg = os.path.abspath(here + "/../../debug/src/bitcoind")
-        rel = os.path.abspath(here + "/../../release/src/bitcoind")
-        if os.path.exists(dbg):
-            print("Running from the debug directory (%s)" % dbg)
-            flags.append("--srcdir=%s" % os.path.dirname(dbg))
-        elif os.path.exists(rel):
-            print("Running from the release directory (%s)" % rel)
-            flags.append("--srcdir=%s" % os.path.dirname(rel))
-
+    flags = standardFlags()
     t.main(flags, bitcoinConf, None)

@@ -44,4 +44,14 @@ BOOST_AUTO_TEST_CASE(parse_push_test) {
     BOOST_CHECK_THROW(ParseScript("0x02 'ab'"), std::runtime_error);
 }
 
+void TestFormatRoundTrip(const std::string &script) {
+    BOOST_CHECK_EQUAL(script, FormatScript(ParseScript(script)));
+}
+
+BOOST_AUTO_TEST_CASE(format_script_test) {
+    TestFormatRoundTrip("0 1 5 CHECKDATASIG CHECKSIG XOR NOP5 NOP10 "
+                        "CHECKDATASIGVERIFY DEPTH RETURN VERIFY SPLIT INVERT "
+                        "EQUAL HASH256 GREATERTHANOREQUAL RSHIFT");
+}
+
 BOOST_AUTO_TEST_SUITE_END()

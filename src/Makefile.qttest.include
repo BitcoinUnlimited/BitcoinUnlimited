@@ -7,11 +7,11 @@ TESTS += qt/test/test_bitcoin-qt
 
 TEST_QT_MOC_CPP = \
   qt/test/moc_bitcoinaddressvalidatortests.cpp \
-  qt/test/moc_guiutiltests.cpp \
   qt/test/moc_uritests.cpp
 
 if ENABLE_WALLET
-TEST_QT_MOC_CPP += qt/test/moc_paymentservertests.cpp
+TEST_QT_MOC_CPP += qt/test/moc_paymentservertests.cpp \
+  qt/test/moc_guiutiltests.cpp
 endif
 
 TEST_QT_H = \
@@ -26,12 +26,12 @@ qt_test_test_bitcoin_qt_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(BITCOIN_
 
 qt_test_test_bitcoin_qt_SOURCES = \
   qt/test/bitcoinaddressvalidatortests.cpp \
-  qt/test/guiutiltests.cpp \
   qt/test/test_main.cpp \
   qt/test/uritests.cpp \
   $(TEST_QT_H)
 if ENABLE_WALLET
 qt_test_test_bitcoin_qt_SOURCES += \
+  qt/test/guiutiltests.cpp \
   qt/test/paymentservertests.cpp
 endif
 

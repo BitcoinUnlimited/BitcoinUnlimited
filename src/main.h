@@ -73,7 +73,7 @@ static const CAmount HIGH_MAX_TX_FEE = 100 * HIGH_TX_FEE_PER_KB;
  *  limit by number if transactions if they wish by modifying -maxorphantx=<n> if
  *  the have a need to.
  */
-static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 120000;
+static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 1000000;
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
 static const unsigned int DEFAULT_ANCESTOR_LIMIT = 25;
 /** Default for -limitancestorsize, maximum kilobytes of tx + all in-mempool ancestors */
@@ -142,6 +142,9 @@ static const bool DEFAULT_PERMIT_BAREMULTISIG = true;
 static const unsigned int DEFAULT_BYTES_PER_SIGOP = 20;
 static const bool DEFAULT_CHECKPOINTS_ENABLED = true;
 
+/** Default -persistmempool */
+static const bool DEFAULT_PERSIST_MEMPOOL = true;
+
 static const bool DEFAULT_TESTSAFEMODE = false;
 
 /** Maximum number of headers to announce when relaying blocks with headers message.*/
@@ -149,7 +152,9 @@ static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 8;
 
 static const bool DEFAULT_PEERBLOOMFILTERS = true;
 static const bool DEFAULT_USE_THINBLOCKS = true;
-static const bool DEFAULT_USE_GRAPHENE_BLOCKS = false;
+static const uint64_t DEFAULT_PREFERENTIAL_TIMER = 1000;
+static const bool DEFAULT_USE_GRAPHENE_BLOCKS = true;
+static const bool DEFAULT_USE_COMPACT_BLOCKS = true;
 
 static const bool DEFAULT_REINDEX = false;
 static const bool DEFAULT_DISCOVER = true;
@@ -171,10 +176,13 @@ struct BlockHasher
     size_t operator()(const uint256 &hash) const { return hash.GetCheapHash(); }
 };
 
+extern CTweak<bool> enableCanonicalTxOrder;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
 typedef boost::unordered_map<uint256, CBlockIndex *, BlockHasher> BlockMap;
+extern CSharedCriticalSection cs_mapBlockIndex;
 extern BlockMap mapBlockIndex;
+
 extern uint64_t nLastBlockTx;
 extern uint64_t nLastBlockSize;
 extern CWaitableCriticalSection csBestBlock;
@@ -196,7 +204,7 @@ extern CTweak<CAmount> maxTxFee;
 extern int64_t nMaxTipAge;
 
 /** Best header we've seen so far (used for getheaders queries' starting points). */
-extern CBlockIndex *pindexBestHeader;
+extern std::atomic<CBlockIndex *> pindexBestHeader;
 
 /** Used to determine whether it is time to check the orphan pool for any txns that can be evicted. */
 extern int64_t nLastOrphanCheck;
@@ -243,25 +251,10 @@ void UnregisterNodeSignals(CNodeSignals &nodeSignals);
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 /** Import blocks from an external file */
 bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskBlockPos *dbp = nullptr);
-/** Process protocol messages received from a given node */
-bool ProcessMessages(CNode *pfrom);
 /** Do we already have this transaction or has it been seen in a block */
 bool AlreadyHaveTx(const CInv &inv);
 /** Do we already have this block on disk */
 bool AlreadyHaveBlock(const CInv &inv);
-
-/** Process a single protocol messages received from a given node */
-bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived);
-
-/**
- * Send queued protocol messages to be sent to a give node.
- *
- * @param[in]   pto             The node which we are sending messages to.
- */
-bool SendMessages(CNode *pto);
-// BU: moves to parallel.h
-/** Run an instance of the script checking thread */
-// void ThreadScriptCheck();
 
 /** Try to detect Partition (network isolation) attacks against us */
 void PartitionCheck(bool (*initialDownloadCheck)(),
@@ -281,7 +274,8 @@ bool GetTransaction(const uint256 &hash,
     CTransactionRef &tx,
     const Consensus::Params &params,
     uint256 &hashBlock,
-    bool fAllowSlow = false);
+    bool fAllowSlow = false,
+    const CBlockIndex *blockIndex = nullptr);
 
 /** Get statistics from node state */
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats);
@@ -305,15 +299,6 @@ struct CNodeStateStats
     int nCommonHeight;
     std::vector<int> vHeightInFlight;
 };
-
-/**
- * Check if transaction will be final in the next block to be created.
- *
- * Calls IsFinalTx() with current block height and appropriate block time.
- *
- * See consensus/consensus.h for flag definitions.
- */
-bool CheckFinalTx(const CTransaction &tx, int flags = -1);
 
 /**
  * Test whether the LockPoints height and time are still valid on the current chain
@@ -371,6 +356,5 @@ public:
     ~CMainCleanup();
 };
 #endif
-
 
 #endif // BITCOIN_MAIN_H

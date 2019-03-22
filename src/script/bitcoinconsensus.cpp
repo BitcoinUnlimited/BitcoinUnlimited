@@ -76,6 +76,7 @@ static int verify_script(const unsigned char *scriptPubKey,
     unsigned int txToLen,
     unsigned int nIn,
     unsigned int flags,
+    unsigned int maxOps,
     bitcoinconsensus_error *err)
 {
     try
@@ -85,13 +86,13 @@ static int verify_script(const unsigned char *scriptPubKey,
         stream >> tx;
         if (nIn >= tx.vin.size())
             return set_error(err, bitcoinconsensus_ERR_TX_INDEX);
-        if (GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) != txToLen)
+        if (tx.GetTxSize() != txToLen)
             return set_error(err, bitcoinconsensus_ERR_TX_SIZE_MISMATCH);
 
         // Regardless of the verification result, the tx did not error.
         set_error(err, bitcoinconsensus_ERR_OK);
 
-        return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags,
+        return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags, maxOps,
             TransactionSignatureChecker(&tx, nIn, amount, flags), NULL);
     }
     catch (const std::exception &)
@@ -107,10 +108,11 @@ int bitcoinconsensus_verify_script_with_amount(const unsigned char *scriptPubKey
     unsigned int txToLen,
     unsigned int nIn,
     unsigned int flags,
+    unsigned int maxOps,
     bitcoinconsensus_error *err)
 {
     CAmount am(amount);
-    return ::verify_script(scriptPubKey, scriptPubKeyLen, am, txTo, txToLen, nIn, flags, err);
+    return ::verify_script(scriptPubKey, scriptPubKeyLen, am, txTo, txToLen, nIn, flags, maxOps, err);
 }
 
 int bitcoinconsensus_verify_script(const unsigned char *scriptPubKey,
@@ -119,10 +121,11 @@ int bitcoinconsensus_verify_script(const unsigned char *scriptPubKey,
     unsigned int txToLen,
     unsigned int nIn,
     unsigned int flags,
+    unsigned int maxOps,
     bitcoinconsensus_error *err)
 {
     CAmount am(0);
-    return ::verify_script(scriptPubKey, scriptPubKeyLen, am, txTo, txToLen, nIn, flags, err);
+    return ::verify_script(scriptPubKey, scriptPubKeyLen, am, txTo, txToLen, nIn, flags, maxOps, err);
 }
 
 unsigned int bitcoinconsensus_version()

@@ -20,4 +20,8 @@ static inline uint32_t insecure_rand(void)
     return insecure_rand_ctx.rand32();
 }
 
+static inline uint256 InsecureRand256(void) {
+    return GetRandHash();
+}
+
 #endif

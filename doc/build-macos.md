@@ -1,38 +1,41 @@
-Mac macOS Build Instructions and Notes
-====================================
+# Mac macOS Build Instructions and Notes
 The commands in this guide should be executed in a Terminal application.
 The built-in one is located in `/Applications/Utilities/Terminal.app`.
 
-Preparation
------------
+## Preparation
 Install the macOS command line tools:
 
-`xcode-select --install`
+```bash
+xcode-select --install
+```
 
 When the popup appears, click `Install`.
 
 Then install [Homebrew](http://brew.sh).
 
-Dependencies
-----------------------
+## Dependencies
 
-    brew install automake berkeley-db4 libtool boost --c++11 miniupnpc openssl pkg-config protobuf --c++11 qt5 libevent
+```bash
+brew install automake berkeley-db4 libtool boost --c++11 miniupnpc openssl pkg-config protobuf --c++11 qt5 libevent
+```
 
 See [dependencies.md](dependencies.md) for a complete overview.
 
 If you want to build the disk image with `make deploy` (.dmg / optional), you need RSVG
 
-    brew install librsvg
+```bash
+brew install librsvg
+```
 
 NOTE: Must build with QT 5.3 or higher. Building with Qt4 is not supported.
 
-Build Bitcoin Unlimited
-------------------------
+## Build Bitcoin Unlimited
 
 1. Clone the Bitcoin source code and cd into `BitcoinUnlimited`
-
-        git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git
-        cd BitcoinUnlimited
+    ```bash
+    git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git
+    cd BitcoinUnlimited
+    ```
 
 2.  Build:
 
@@ -40,50 +43,60 @@ Build Bitcoin Unlimited
 
     You can disable the GUI build by passing `--without-gui` to configure.
 
-        ./autogen.sh
-        ./configure
-        make
+    ```bash
+    ./autogen.sh
+    ./configure
+    make
+    ```
 
 3.  It is recommended to build and run the unit tests:
 
-        make check
+    ```bash
+    make check
+    ```
 
 4.  You can also create a .dmg that contains the .app bundle (optional):
 
-        make deploy
+    ```bash
+    make deploy
+    ```
 
-Running
--------
+## Running
 
 Bitcoin Unlimited is now available at `./src/bitcoind`
 
 Before running, it's recommended you create an RPC configuration file.
 
-    echo -e "rpcuser=bitcoinrpc\nrpcpassword=$(xxd -l 16 -p /dev/urandom)" > "/Users/${USER}/Library/Application Support/Bitcoin/bitcoin.conf"
+```bash
+echo -e "rpcuser=bitcoinrpc\nrpcpassword=$(xxd -l 16 -p /dev/urandom)" > "/Users/${USER}/Library/Application Support/Bitcoin/bitcoin.conf"
 
-    chmod 600 "/Users/${USER}/Library/Application Support/Bitcoin/bitcoin.conf"
+chmod 600 "/Users/${USER}/Library/Application Support/Bitcoin/bitcoin.conf"
+```
 
 The first time you run bitcoind, it will start downloading the blockchain. This process could take several hours.
 
 You can monitor the download process by looking at the debug.log file:
 
-    tail -f $HOME/Library/Application\ Support/Bitcoin/debug.log
+```bash
+tail -f $HOME/Library/Application\ Support/Bitcoin/debug.log
+```
 
-Other commands:
--------
+## Other commands:
 
-    ./src/bitcoind -daemon # Starts the Bitcoin daemon.
-    ./src/bitcoin-cli --help # Outputs a list of command-line options.
-    ./src/bitcoin-cli help # Outputs a list of RPC commands when the daemon is running.
+```bash
+./src/bitcoind -daemon # Starts the Bitcoin daemon.
+./src/bitcoin-cli --help # Outputs a list of command-line options.
+./src/bitcoin-cli help # Outputs a list of RPC commands when the daemon is running.
+```
 
-Using Qt Creator as IDE
-------------------------
+## Using Qt Creator as IDE
+
 You can use Qt Creator as an IDE, for Bitcoin development.
 Download and install the community edition of [Qt Creator](https://www.qt.io/download/).
 Uncheck everything except Qt Creator during the installation process.
 
 1. Make sure you installed everything through Homebrew mentioned above
-2. Do a proper ./configure --enable-debug
+2. Do a proper `./configure --enable-debug`
 3. In Qt Creator do "New Project" -> Import Project -> Import Existing Project
 4. Enter "bitcoin-qt" as project name, enter src/qt as location
 5. Leave the file selection as it is
@@ -93,8 +106,7 @@ Uncheck everything except Qt Creator during the installation process.
 9. Select LLDB as debugger (you might need to set the path to your installation)
 10. Start debugging with Qt Creator
 
-Notes
------
+## Notes
 
 * Tested on OS X 10.8 through macOS 10.12 on 64-bit Intel processors only.
 

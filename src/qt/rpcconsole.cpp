@@ -397,6 +397,8 @@ void RPCConsole::setClientModel(ClientModel *model)
         connect(model, SIGNAL(transactionsPerSecondChanged(double)), this, SLOT(setTransactionsPerSecond(double)));
         connect(model, SIGNAL(thinBlockPropagationStatsChanged(const ThinBlockQuickStats &)), this,
             SLOT(setThinBlockPropagationStats(const ThinBlockQuickStats &)));
+        connect(model, SIGNAL(compactBlockPropagationStatsChanged(const CompactBlockQuickStats &)), this,
+            SLOT(setCompactBlockPropagationStats(const CompactBlockQuickStats &)));
         connect(model, SIGNAL(grapheneBlockPropagationStatsChanged(const GrapheneQuickStats &)), this,
             SLOT(setGrapheneBlockPropagationStats(const GrapheneQuickStats &)));
 
@@ -689,6 +691,35 @@ void RPCConsole::setThinBlockPropagationStats(const ThinBlockQuickStats &thin)
     text += QString::number(thin.fLast24hRerequestTxPercent, 'f', 1) + "%)";
 
     ui->blocksXThin24hAverages->setText(text);
+}
+
+void RPCConsole::setCompactBlockPropagationStats(const CompactBlockQuickStats &compact)
+{
+    if (!IsCompactBlocksEnabled())
+    {
+        ui->blocksCompactTotals->setText(tr("Disabled"));
+        ui->blocksCompact24hAverages->setText(tr("Disabled"));
+        return;
+    }
+
+    // Total: n (Sent: i / Received: r) saved bw
+    QString text = QString::number(compact.nTotalOutbound + compact.nTotalInbound) + " (Sent: ";
+    text += QString::number(compact.nTotalOutbound) + " / Received: ";
+    text += QString::number(compact.nTotalInbound) + ") saved ";
+    text += QString::fromStdString(formatInfoUnit(compact.nTotalBandwidthSavings));
+
+    ui->blocksCompactTotals->setText(text);
+
+    // 24-hour Average: n (Sent: i / Received: r), Compression (i% / r%), ReRequests f (f%)
+    text = QString::number(compact.nLast24hOutbound + compact.nLast24hInbound) + " (Sent: ";
+    text += QString::number(compact.nLast24hOutbound) + " / Received: ";
+    text += QString::number(compact.nLast24hInbound) + "), Compression (";
+    text += QString::number(compact.fLast24hOutboundCompression, 'f', 1) + "% / ";
+    text += QString::number(compact.fLast24hInboundCompression, 'f', 1) + "%), ReRequests ";
+    text += QString::number(compact.nLast24hRerequestTx) + " (";
+    text += QString::number(compact.fLast24hRerequestTxPercent, 'f', 1) + "%)";
+
+    ui->blocksCompact24hAverages->setText(text);
 }
 
 void RPCConsole::setGrapheneBlockPropagationStats(const GrapheneQuickStats &graphene)

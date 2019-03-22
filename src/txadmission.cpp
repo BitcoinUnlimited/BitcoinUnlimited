@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/thread/thread.hpp>
 
 using namespace std;
@@ -37,19 +38,11 @@ void ThreadCommitToMempool();
 void ThreadTxAdmission();
 void ProcessOrphans(std::vector<uint256> &vWorkQueue);
 
-bool CheckFinalTx(const CTransaction &tx, int flags, const Snapshot &ss);
-bool CheckSequenceLocks(const CTransaction &tx,
-    int flags,
-    LockPoints *lp,
-    bool useExistingLockPoints,
-    const Snapshot &ss);
-
-
 CTransactionRef CommitQGet(uint256 hash)
 {
     boost::unique_lock<boost::mutex> lock(csCommitQ);
-    std::map<uint256, CTxCommitData>::iterator it = txCommitQ.find(hash);
-    if (it == txCommitQ.end())
+    std::map<uint256, CTxCommitData>::iterator it = txCommitQ->find(hash);
+    if (it == txCommitQ->end())
         return nullptr;
     return it->second.entry.GetSharedTx();
 }
@@ -57,25 +50,33 @@ CTransactionRef CommitQGet(uint256 hash)
 static inline uint256 IncomingConflictHash(const COutPoint &prevout)
 {
     uint256 hash = prevout.hash;
-    unsigned char *first = hash.begin();
-    *first ^= (unsigned char)(prevout.n & 255);
-    first += 8;
-    *first ^= (unsigned char)(prevout.n & 255);
+    uint32_t *first = (uint32_t *)hash.begin();
+    *first ^= (uint32_t)(prevout.n & 65535);
+    first += 2;
+    *first ^= (uint32_t)(prevout.n & 65535);
+    first += 2;
+    *first ^= (uint32_t)(prevout.n & 65535);
+    first += 2;
+    *first ^= (uint32_t)(prevout.n & 65535);
+
     return hash;
 }
 
-void StartTxAdmission(boost::thread_group &threadGroup)
+void StartTxAdmission(thread_group &threadGroup)
 {
+    if (txCommitQ == nullptr)
+        txCommitQ = new std::map<uint256, CTxCommitData>();
+
     txHandlerSnap.Load(); // Get an initial view for the transaction processors
 
     // Start incoming transaction processing threads
     for (unsigned int i = 0; i < numTxAdmissionThreads.Value(); i++)
     {
-        threadGroup.create_thread(boost::bind(&TraceThreads<void (*)()>, strprintf("tx%d", i), &ThreadTxAdmission));
+        threadGroup.create_thread(&ThreadTxAdmission);
     }
 
     // Start tx commitment thread
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "txcommit", &ThreadCommitToMempool));
+    threadGroup.create_thread(&ThreadCommitToMempool);
 }
 
 void StopTxAdmission()
@@ -105,7 +106,7 @@ void FlushTxAdmission()
             do // wait for the commit thread to commit everything
             {
                 cvCommitQ.timed_wait(lock, boost::posix_time::milliseconds(100));
-            } while (!txCommitQ.empty());
+            } while (!txCommitQ->empty());
         }
 
         { // block everything and check
@@ -116,7 +117,7 @@ void FlushTxAdmission()
             }
             {
                 boost::unique_lock<boost::mutex> lock(csCommitQ);
-                empty &= txCommitQ.empty();
+                empty &= txCommitQ->empty();
             }
         }
     }
@@ -136,16 +137,24 @@ void EnqueueTxForAdmission(CTxInputData &txd)
             break;
         }
     }
+
+    // If there is no conflict then the transaction is ready for validation and can be placed in the processing
+    // queue. However, if there is a conflict then this could be a double spend, so defer the transaction until the
+    // transaction it conflicts with has been fully processed.
     if (!conflict)
     {
         // LOG(MEMPOOL, "Enqueue for processing %x\n", txd.tx->GetHash().ToString());
-        txInQ.push(txd); // add this transaction onto the processing queue
+        txInQ.push(txd); // add this transaction onto the processing queue.
         cvTxInQ.notify_one();
     }
     else
     {
-        // LOG(MEMPOOL, "Fastfilter collision, deferred %x\n", txd.tx->GetHash().ToString());
+        LOG(MEMPOOL, "Fastfilter collision, deferred %x\n", txd.tx->GetHash().ToString());
         txDeferQ.push(txd);
+
+        // By notifying the commitQ, the deferred queue can be processed right way which helps
+        // to forward double spends as quickly as possible.
+        cvCommitQ.notify_one();
     }
 }
 
@@ -162,8 +171,8 @@ unsigned int TxAlreadyHave(const CInv &inv)
             return 2;
         {
             boost::unique_lock<boost::mutex> lock(csCommitQ);
-            const auto &elem = txCommitQ.find(inv.hash);
-            if (elem != txCommitQ.end())
+            const auto &elem = txCommitQ->find(inv.hash);
+            if (elem != txCommitQ->end())
             {
                 return 5;
             }
@@ -180,33 +189,45 @@ unsigned int TxAlreadyHave(const CInv &inv)
 
 void ThreadCommitToMempool()
 {
-    while (!ShutdownRequested())
+    while (shutdown_threads.load() == false)
     {
         {
             boost::unique_lock<boost::mutex> lock(csCommitQ);
             do
             {
                 cvCommitQ.timed_wait(lock, boost::posix_time::milliseconds(2000));
-            } while (txCommitQ.empty() && txDeferQ.empty());
+                if (shutdown_threads.load() == true)
+                {
+                    return;
+                }
+            } while (txCommitQ->empty() && txDeferQ.empty());
         }
 
         {
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return;
+            }
 
             CORRAL(txProcessingCorral, CORRAL_TX_COMMITMENT);
-            LOCK(cs_main);
-            CommitTxToMempool();
-            mempool.check(pcoinsTip);
-            LOG(MEMPOOL, "MemoryPool sz %u txn, %u kB\n", mempool.size(), mempool.DynamicMemoryUsage() / 1000);
-            // BU - Xtreme Thinblocks - trim the orphan pool by entry time and do not allow it to be overidden.
-            LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
-                GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+            {
+                CommitTxToMempool();
+                LOG(MEMPOOL, "MemoryPool sz %u txn, %u kB\n", mempool.size(), mempool.DynamicMemoryUsage() / 1000);
+                LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
+                    GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
 
-            CValidationState state;
-            FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
-            // The flush to disk above is only periodic therefore we need to continuously trim any excess from the
-            // cache.
-            pcoinsTip->Trim(nCoinCacheMaxSize);
+                CValidationState state;
+                FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
+                // The flush to disk above is only periodic therefore we need to continuously trim any excess from the
+                // cache.
+                pcoinsTip->Trim(nCoinCacheMaxSize);
+            }
+
+            // CheckInputs needs cs_main (for static int GetSpendHeight(const CCoinsViewCache &inputs)), but it has
+            // improper order with mempool so skip assert until cs_main dependency removed
+            // LOCK(cs_main);
+
+            mempool.check(pcoinsTip);
         }
     }
 }
@@ -229,27 +250,45 @@ void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
 void CommitTxToMempool()
 {
     std::vector<uint256> vWhatChanged;
+    std::map<uint256, CTxCommitData> *q;
     {
+        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        LOG(MEMPOOL, "txadmission committing %d tx\n", txCommitQ->size());
+        q = txCommitQ;
+        txCommitQ = new std::map<uint256, CTxCommitData>();
+    }
+
+    // These transactions have already been validated so store them directly into the mempool.
+    for (auto &it : *q)
+    {
+        CTxCommitData &data = it.second;
+        mempool.addUnchecked(it.first, data.entry, !IsInitialBlockDownload());
+        vWhatChanged.push_back(data.hash);
+        // Update txn per second only when a txn is valid and accepted to the mempool
+        mempool.UpdateTransactionsPerSecond();
+
+        // Indicate that this tx was fully processed/accepted and can now be removed from the
+        // request manager.
+        CInv inv(MSG_TX, data.hash);
+        requester.Received(inv, nullptr);
+    }
+
 #ifdef ENABLE_WALLET
+    {
         // cs_main is taken again in SyncWithWallets but must be locked before csCommitQ
         // to maintain correct locking order.
         LOCK(cs_main);
-#endif
-        boost::unique_lock<boost::mutex> lock(csCommitQ);
-        for (auto &it : txCommitQ)
+
+        for (auto &it : *q)
         {
-            // This transaction has already been validated so store it directly into the mempool.
             CTxCommitData &data = it.second;
-            mempool.addUnchecked(it.first, data.entry, !IsInitialBlockDownload());
-#ifdef ENABLE_WALLET
             SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
-#endif
-            vWhatChanged.push_back(data.hash);
-            // Update txn per second only when a txn is valid and accepted to the mempool
-            mempool.UpdateTransactionsPerSecond();
         }
-        txCommitQ.clear();
     }
+#endif
+    q->clear();
+    delete q;
+
 
     std::map<uint256, CTxInputData> mapWasDeferred;
     {
@@ -262,6 +301,13 @@ void CommitTxToMempool()
         {
             txDeferQ.push(txInQ.front());
             txInQ.pop();
+        }
+        // If the chain is now syncd and there are txns in the wait queue then add these also to the deferred queue.
+        // The wait queue is not very active and it will typically have just 1 or 2 txns in it, if any at all.
+        while (IsChainSyncd() && !txWaitNextBlockQ.empty())
+        {
+            txDeferQ.push(txWaitNextBlockQ.front());
+            txWaitNextBlockQ.pop();
         }
 
         // Move the previously deferred txns into active processing.
@@ -312,12 +358,16 @@ void CommitTxToMempool()
 
 void ThreadTxAdmission()
 {
-    // Process at least this many transactions before letting the commit thread take over
-    const int minTxPerRound = 200;
+    // Process at most this many transactions before letting the commit thread take over
+    const int maxTxPerRound = 200;
 
-    while (!ShutdownRequested())
+    while (shutdown_threads.load() == false)
     {
-        boost::this_thread::interruption_point();
+        bool acceptedSomething = false;
+        if (shutdown_threads.load() == true)
+        {
+            return;
+        }
 
         bool fMissingInputs = false;
         CValidationState state;
@@ -326,26 +376,39 @@ void ThreadTxAdmission()
 
         {
             CCriticalBlock lock(csTxInQ, "csTxInQ", __FILE__, __LINE__);
-            while (txInQ.empty() && !ShutdownRequested())
+            while (txInQ.empty() && shutdown_threads.load() == false)
             {
+                if (shutdown_threads.load() == true)
+                {
+                    return;
+                }
                 cvTxInQ.wait(csTxInQ);
-                boost::this_thread::interruption_point();
             }
-            if (ShutdownRequested())
-                break;
+            if (shutdown_threads.load() == true)
+            {
+                return;
+            }
         }
 
         {
             CORRAL(txProcessingCorral, CORRAL_TX_PROCESSING);
 
-            for (unsigned int txPerRoundCount = 0; txPerRoundCount < minTxPerRound; txPerRoundCount++)
+            for (unsigned int txPerRoundCount = 0; txPerRoundCount < maxTxPerRound; txPerRoundCount++)
             {
-                { // tx must be popped within the TX_PROCESSING corral or the state break between processing
-                    // and commitment will not be clean
+                // tx must be popped within the TX_PROCESSING corral or the state break between processing
+                // and commitment will not be clean
+                {
                     CCriticalBlock lock(csTxInQ, "csTxInQ", __FILE__, __LINE__);
                     if (txInQ.empty())
-                        continue; // abort back into wait loop if another thread got my tx
-                    txd = txInQ.front(); // make copy so I can pop & release
+                    {
+                        // speed up tx chunk processing when there is nothing else to do
+                        if (acceptedSomething)
+                            cvCommitQ.notify_all();
+                        break;
+                    }
+
+                    // Make a copy so we can pop and release
+                    txd = txInQ.front();
                     txInQ.pop();
                 }
 
@@ -359,36 +422,46 @@ void ThreadTxAdmission()
                     if (ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false,
                             false, TransactionClass::DEFAULT, vCoinsToUncache, &isRespend))
                     {
+                        acceptedSomething = true;
                         RelayTransaction(tx);
 
-                        // LOG(MEMPOOL, "AcceptToMemoryPool: peer=%s: accepted %s onto Q\n", txd.nodeName,
-                        //    tx->GetHash().ToString());
+                        // LOG(MEMPOOL, "Accepted tx: peer=%s: accepted %s onto Q\n", txd.nodeName,
+                        //     tx->GetHash().ToString());
+                    }
+                    else if (state.GetRejectCode() == REJECT_WAITING)
+                    {
+                        // If the chain is not sync'd entirely then we'll defer this tx until
+                        // the new block is processed.
+                        LOCK(csTxInQ);
+                        if (txWaitNextBlockQ.size() <= (10 * excessiveBlockSize / 1000000))
+                        {
+                            txWaitNextBlockQ.push(txd);
+                            LOG(MEMPOOL, "Tx %s is waiting on next block, reason:%s\n", tx->GetHash().ToString(),
+                                state.GetRejectReason());
+                        }
+                        else
+                            LOG(MEMPOOL, "WaitNexBlockQueue is full - tx:%s reason:%s\n", tx->GetHash().ToString(),
+                                state.GetRejectReason());
                     }
                     else
                     {
+                        LOG(MEMPOOL, "Rejected tx: %s(%d) %s: %s. peer %s  hash %s \n", state.GetRejectReason(),
+                            state.GetRejectCode(), fMissingInputs ? "orphan" : "", state.GetDebugMessage(),
+                            txd.nodeName, tx->GetHash().ToString());
+
                         if (fMissingInputs)
                         {
-                            // If we've forked and this is probably not a valid tx, then skip adding it to the orphan
-                            // pool
-                            if (!chainActive.Tip()->IsforkActiveOnNextBlock(miningForkTime.Value()) ||
-                                IsTxProbablyNewSigHash(*tx))
-                            {
-                                LOCK(orphanpool.cs); // WRITELOCK
-                                orphanpool.AddOrphanTx(tx, txd.nodeId);
+                            WRITELOCK(orphanpool.cs);
+                            orphanpool.AddOrphanTx(tx, txd.nodeId);
 
-                                // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
-                                static unsigned int nMaxOrphanTx = (unsigned int)std::max(
-                                    (int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
-                                static uint64_t nMaxOrphanPoolSize = (uint64_t)std::max(
-                                    (int64_t)0, (GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000 / 10));
-                                unsigned int nEvicted = orphanpool.LimitOrphanTxSize(nMaxOrphanTx, nMaxOrphanPoolSize);
-                                if (nEvicted > 0)
-                                    LOG(MEMPOOL, "mapOrphan overflow, removed %u tx\n", nEvicted);
-                            }
-                            else
-                            {
-                                LOG(MEMPOOL, "rejected orphan as likely contains old sighash");
-                            }
+                            // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
+                            static const unsigned int nMaxOrphanTx = (unsigned int)std::max(
+                                (int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
+                            static const uint64_t nMaxOrphanPoolSize = (uint64_t)std::max(
+                                (int64_t)0, (GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000 / 10));
+                            unsigned int nEvicted = orphanpool.LimitOrphanTxSize(nMaxOrphanTx, nMaxOrphanPoolSize);
+                            if (nEvicted > 0)
+                                LOG(MEMPOOL, "mapOrphan overflow, removed %u tx\n", nEvicted);
                         }
                         else
                         {
@@ -423,9 +496,14 @@ void ThreadTxAdmission()
                             for (const COutPoint &remove : vCoinsToUncache)
                                 pcoinsTip->Uncache(remove);
                         }
+
+                        // Mark tx as received if invalid or an orphan. If it's a valid Tx we mark it received
+                        // only when it's finally accepted into the mempool.
+                        requester.Received(inv, nullptr);
                     }
+
                     int nDoS = 0;
-                    if (state.IsInvalid(nDoS))
+                    if (state.IsInvalid(nDoS) && state.GetRejectCode() != REJECT_WAITING)
                     {
                         LOG(MEMPOOL, "%s from peer=%s was not accepted: %s\n", tx->GetHash().ToString(), txd.nodeName,
                             FormatStateMessage(state));
@@ -445,9 +523,6 @@ void ThreadTxAdmission()
                             }
                         }
                     }
-
-                    // Mark tx as received regardless of whether it was a valid tx, orphan or invalid.
-                    requester.Received(inv, nullptr);
                 }
             }
         }
@@ -522,10 +597,20 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
     const CChainParams &chainparams = Params();
 
+    const uint32_t cds_flag =
+        IsNov152018Enabled(chainparams.GetConsensus(), chainActive.Tip()) ? SCRIPT_ENABLE_CHECKDATASIG : 0;
+    const uint32_t svflag =
+        IsSv2018Enabled(chainparams.GetConsensus(), chainActive.Tip()) ? SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES : 0;
+    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | cds_flag | svflag;
+
     // LOG(MEMPOOL, "Mempool: Considering Tx %s\n", tx->GetHash().ToString());
 
-    if (!CheckTransaction(*tx, state))
+    if (!CheckTransaction(tx, state))
+    {
+        if (state.GetDebugMessage() == "")
+            state.SetDebugMessage("CheckTransaction failed");
         return false;
+    }
 
     // Coinbase is only valid in a block, not as a loose transaction
     if (tx->IsCoinBase())
@@ -540,8 +625,11 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         fRequireStandard = true;
     else if (allowedTx == TransactionClass::NONSTANDARD)
         fRequireStandard = false;
-    if (fRequireStandard && !IsStandardTx(*tx, reason))
+    if (fRequireStandard && !IsStandardTx(tx, reason))
+    {
+        state.SetDebugMessage("IsStandardTx failed");
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
+    }
 
     // Don't relay version 2 transactions until CSV is active, and we can be
     // sure that such transactions will be mined (unless we're on
@@ -555,8 +643,20 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     // Only accept nLockTime-using transactions that can be mined in the next
     // block; we don't want our mempool filled up with transactions that can't
     // be mined yet.
-    if (!CheckFinalTx(*tx, STANDARD_LOCKTIME_VERIFY_FLAGS))
-        return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
+    if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &ss))
+    {
+        if (!IsChainSyncd() && IsChainNearlySyncd())
+            return state.DoS(0, false, REJECT_WAITING, "non-final");
+        else
+            return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
+    }
+
+    // Make sure tx size is acceptable after Nov 15, 2018 fork
+    if (IsNov152018Scheduled() && IsNov152018Enabled(chainparams.GetConsensus(), chainActive.Tip()))
+    {
+        if (tx->GetTxSize() < MIN_TX_SIZE)
+            return state.DoS(0, false, REJECT_INVALID, "txn-undersize");
+    }
 
     // is it already in the memory pool?
     uint256 hash = tx->GetHash();
@@ -615,6 +715,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 }
                 if (*pfMissingInputs == true)
                 {
+                    state.SetDebugMessage("Inputs are missing");
                     return false; // state.Invalid(false, REJECT_MISSING_INPUTS, "bad-txns-missing-inputs", "Inputs
                     // unavailable in ParallelAcceptToMemoryPool", false);
                 }
@@ -633,16 +734,16 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             // be mined yet.
             // Must keep pool.cs for this unless we change CheckSequenceLocks to take a
             // CoinsViewCache instead of create its own
-            if (!CheckSequenceLocks(*tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp, false, ss))
+            if (!CheckSequenceLocks(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp, false, &ss))
                 return state.DoS(0, false, REJECT_NONSTANDARD, "non-BIP68-final");
         }
 
         // Check for non-standard pay-to-script-hash in inputs
-        if (fRequireStandard && !AreInputsStandard(*tx, view))
+        if (fRequireStandard && !AreInputsStandard(tx, view))
             return state.Invalid(false, REJECT_NONSTANDARD, "bad-txns-nonstandard-inputs");
 
-        nSigOps = GetLegacySigOpCount(*tx);
-        nSigOps += GetP2SHSigOpCount(*tx, view);
+        nSigOps = GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+        nSigOps += GetP2SHSigOpCount(tx, view, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
 
         CAmount nValueOut = tx->GetValueOut();
         CAmount nFees = nValueIn - nValueOut;
@@ -823,9 +924,11 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         unsigned char sighashType = 0;
         if (!CheckInputs(
-                *tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS, true, &resourceTracker, nullptr, &sighashType))
+                tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr, &sighashType))
         {
             LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", tx->GetHash().ToString().c_str());
+            if (state.GetDebugMessage() == "")
+                state.SetDebugMessage("CheckInputs failed");
             return false;
         }
         entry.UpdateRuntimeSigOps(resourceTracker.GetSigOps(), resourceTracker.GetSighashBytes());
@@ -840,8 +943,12 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(*tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true, nullptr, nullptr, &sighashType2))
+        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | cds_flag | svflag, maxScriptOps.Value(),
+                true, nullptr, nullptr, &sighashType2))
         {
+            if (state.GetDebugMessage() == "")
+                state.SetDebugMessage("CheckInputs failed against mandatory but not standard flags");
+
             return error(
                 "%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
                 __func__, hash.ToString(), FormatStateMessage(state));
@@ -850,7 +957,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         entry.sighashType = sighashType | sighashType2;
 
         // This code denies old style tx from entering the mempool as soon as we fork
-        if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) && !IsTxUAHFOnly(entry))
+        if (!IsTxUAHFOnly(entry))
         {
             return state.Invalid(false, REJECT_WRONG_FORK, "txn-uses-old-sighash-algorithm");
         }
@@ -868,13 +975,17 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             if (!pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize,
                     nLimitDescendants, nLimitDescendantSize, errString))
             {
-                return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
+                // If the chain is not sync'd entirely then we'll defer this tx until the new block is processed.
+                if (!IsChainSyncd() && IsChainNearlySyncd())
+                    return state.DoS(0, false, REJECT_WAITING, "too-long-mempool-chain");
+                else
+                    return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
             }
         }
 
         {
             boost::unique_lock<boost::mutex> lock(csCommitQ);
-            txCommitQ[eData.hash] = eData;
+            (*txCommitQ)[eData.hash] = eData;
         }
     }
     uint64_t interval = (GetStopwatch() - start) / 1000;
@@ -915,7 +1026,7 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
 
     // Recursively process any orphan transactions that depended on this one
     {
-        LOCK(orphanpool.cs); // TODO READLOCK()
+        READLOCK(orphanpool.cs);
         std::set<NodeId> setMisbehaving;
         for (unsigned int i = 0; i < vWorkQueue.size(); i++)
         {
@@ -949,7 +1060,6 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
                     txd.tx = orphanTx;
                     txd.nodeId = fromPeer;
                     txd.nodeName = "orphan";
-                    txd.whitelisted = false;
                     LOG(MEMPOOL, "Resubmitting orphan tx: %s\n", orphanTx->GetHash().ToString().c_str());
                     EnqueueTxForAdmission(txd);
                 }
@@ -959,7 +1069,7 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
     }
 
     {
-        LOCK(orphanpool.cs); // TODO WRITELOCK
+        WRITELOCK(orphanpool.cs);
         for (auto hash : vEraseQueue)
             orphanpool.EraseOrphanTx(hash);
         //  BU: Xtreme thinblocks - purge orphans that are too old
@@ -973,7 +1083,14 @@ void Snapshot::Load(void)
     LOCK(cs);
     tipHeight = chainActive.Height();
     tip = chainActive.Tip();
-    tipMedianTimePast = tip->GetMedianTimePast();
+    if (tip)
+    {
+        tipMedianTimePast = tip->GetMedianTimePast();
+    }
+    else
+    {
+        tipMedianTimePast = 0; // MTP does not matter, we are in IBD
+    }
     adjustedTime = GetAdjustedTime();
     coins = pcoinsTip; // TODO pcoinsTip can change
     if (cvMempool)
@@ -984,15 +1101,17 @@ void Snapshot::Load(void)
     cvMempool = new CCoinsViewMemPool(coins, mempool);
 }
 
-bool CheckSequenceLocks(const CTransaction &tx,
+bool CheckSequenceLocks(const CTransactionRef &tx,
     int flags,
     LockPoints *lp,
     bool useExistingLockPoints,
-    const Snapshot &ss)
+    const Snapshot *ss)
 {
+    if (ss == nullptr)
+        AssertLockHeld(cs_main);
     AssertLockHeld(mempool.cs);
 
-    CBlockIndex *tip = ss.tip;
+    CBlockIndex *tip = (ss != nullptr) ? ss->tip : chainActive.Tip();
     CBlockIndex index;
     index.pprev = tip;
     // CheckSequenceLocks() uses chainActive.Height()+1 to evaluate
@@ -1013,12 +1132,13 @@ bool CheckSequenceLocks(const CTransaction &tx,
     else
     {
         // pcoinsTip contains the UTXO set for chainActive.Tip()
-        CCoinsViewMemPool &viewMemPool(*ss.cvMempool);
+        CCoinsViewMemPool tmpView(pcoinsTip, mempool);
+        CCoinsViewMemPool &viewMemPool = (ss != nullptr) ? *ss->cvMempool : tmpView;
         std::vector<int> prevheights;
-        prevheights.resize(tx.vin.size());
-        for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++)
+        prevheights.resize(tx->vin.size());
+        for (size_t txinIndex = 0; txinIndex < tx->vin.size(); txinIndex++)
         {
-            const CTxIn &txin = tx.vin[txinIndex];
+            const CTxIn &txin = tx->vin[txinIndex];
             Coin coin;
             if (!viewMemPool.GetCoin(txin.prevout, coin))
             {
@@ -1067,7 +1187,7 @@ bool CheckSequenceLocks(const CTransaction &tx,
     return EvaluateSequenceLocks(index, lockPair);
 }
 
-bool CheckFinalTx(const CTransaction &tx, int flags, const Snapshot &ss)
+bool CheckFinalTx(const CTransactionRef &tx, int flags, const Snapshot *ss)
 {
     // By convention a negative value for flags indicates that the
     // current network-enforced consensus rules should be used. In
@@ -1083,14 +1203,15 @@ bool CheckFinalTx(const CTransaction &tx, int flags, const Snapshot &ss)
     // evaluated is what is used. Thus if we want to know if a
     // transaction can be part of the *next* block, we need to call
     // IsFinalTx() with one more than chainActive.Height().
-    const int nBlockHeight = ss.tipHeight + 1;
+    const int nBlockHeight = (ss != nullptr) ? ss->tipHeight + 1 : chainActive.Height() + 1;
 
     // BIP113 will require that time-locked transactions have nLockTime set to
     // less than the median time of the previous block they're contained in.
     // When the next block is created its previous block will be the current
     // chain tip, so we use that to calculate the median time passed to
     // IsFinalTx() if LOCKTIME_MEDIAN_TIME_PAST is set.
-    const int64_t nBlockTime = (flags & LOCKTIME_MEDIAN_TIME_PAST) ? ss.tipMedianTimePast : GetAdjustedTime();
+    const int64_t nMedianTimePast = (ss != nullptr) ? ss->tipMedianTimePast : chainActive.Tip()->GetMedianTimePast();
+    const int64_t nBlockTime = (flags & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : GetAdjustedTime();
 
     return IsFinalTx(tx, nBlockHeight, nBlockTime);
 }

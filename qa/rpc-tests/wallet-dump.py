@@ -4,8 +4,7 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import (start_nodes, start_node, assert_equal, bitcoind_processes)
-
+from test_framework.util import (start_nodes, start_node, assert_equal, bitcoind_processes, assert_raises_rpc_error)
 
 def read_dump(file_name, addrs, hd_master_addr_old):
     """
@@ -99,6 +98,9 @@ class WalletDumpTest(BitcoinTestFramework):
         assert_equal(found_addr, test_addr_count)
         assert_equal(found_addr_chg, 90 + 1 + 50)  # old reserve keys are marked as change now
         assert_equal(found_addr_rsv, 90 + 1)  # keypool size (TODO: fix off-by-one)
+
+        # Overwriting should fail
+        assert_raises_rpc_error(-8, "already exists", self.nodes[0].dumpwallet, tmpdir + "/node0/wallet.unencrypted.dump")
 
 if __name__ == '__main__':
     WalletDumpTest().main ()

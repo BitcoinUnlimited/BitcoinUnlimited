@@ -26,7 +26,6 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
-
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #endif
@@ -48,6 +47,24 @@ const int64_t DEFAULT_AVE_SEND = std::numeric_limits<int64_t>::max();
 
 namespace AllowedArgs
 {
+#ifdef ENABLE_WALLET
+bool walletParamOptional = false;
+#else
+bool walletParamOptional = true;
+#endif
+
+#ifdef ENABLE_ZMQ
+bool zmqParamOptional = false;
+#else
+bool zmqParamOptional = true;
+#endif
+
+#ifdef USE_UPNP
+bool upnpParamOptional = false;
+#else
+bool upnpParamOptional = true;
+#endif
+
 enum HelpMessageMode
 {
     HMM_BITCOIND,
@@ -74,15 +91,17 @@ AllowedArgs &AllowedArgs::addHeader(const std::string &strHeader, bool debug)
 
 AllowedArgs &AllowedArgs::addDebugArg(const std::string &strArgsDefinition,
     CheckValueFunc checkValueFunc,
-    const std::string &strHelp)
+    const std::string &strHelp,
+    bool disabledParam /*= false */)
 {
-    return addArg(strArgsDefinition, checkValueFunc, strHelp, true);
+    return addArg(strArgsDefinition, checkValueFunc, strHelp, disabledParam, true);
 }
 
 AllowedArgs &AllowedArgs::addArg(const std::string &strArgsDefinition,
     CheckValueFunc checkValueFunc,
     const std::string &strHelp,
-    bool debug)
+    bool disabledParam /*= false */,
+    bool debug /*=false */)
 {
     std::string strArgs = strArgsDefinition;
     std::string strExampleValue;
@@ -116,11 +135,24 @@ AllowedArgs &AllowedArgs::addArg(const std::string &strArgsDefinition,
         std::string(msgIndent, ' ') + FormatParagraph(strHelp, screenWidth - msgIndent, msgIndent) + "\n\n";
     m_helpList.push_back(HelpComponent{helpText, debug});
 
+    m_optional[strArg] = disabledParam;
+
     return *this;
 }
 
 void AllowedArgs::checkArg(const std::string &strArg, const std::string &strValue) const
 {
+    if (m_optional.count(strArg) && m_optional.at(strArg))
+    {
+        // Put a warning to stdout and in debug.log to notify the user that this parameter has no effect
+        // on the current session. TODO: use a warning dialog if running bitcoin-qt
+        std::string str =
+            strprintf(_("Option %s is not in effect due to missing feature disabled a compile time."), strArg);
+        LOGA(str);
+        printf("%s\n", str.c_str());
+        return;
+    }
+
     if (!m_args.count(strArg))
     {
         if (m_permit_unrecognized)
@@ -273,6 +305,9 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
 #ifndef WIN32
         .addArg("pid=<file>", requiredStr, strprintf(_("Specify pid file (default: %s)"), BITCOIN_PID_FILENAME))
 #endif
+        .addArg("persistmempool={true,false,0,1}", optionalBool,
+            strprintf(_("Whether to save the mempool on shutdown and load on restart (default: %u)"),
+                    DEFAULT_PERSIST_MEMPOOL))
         .addArg("prune=<n>", requiredInt,
             strprintf(_("Reduce storage requirements by pruning (deleting) old blocks. This mode is incompatible with "
                         "-txindex and -rescan. "
@@ -361,12 +396,11 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
         .addArg("txretryinterval", requiredInt,
             strprintf(_("Time to wait before requesting a tx from a different peer, in microseconds (default: %u)"),
                     DEFAULT_MIN_TX_REQUEST_RETRY_INTERVAL))
-#ifdef USE_UPNP
 #if USE_UPNP
-        .addArg("upnp", optionalBool, _("Use UPnP to map the listening port (default: 1 when listening and no -proxy)"))
+        .addArg("upnp", optionalBool, _("Use UPnP to map the listening port (default: 1 when listening and no -proxy)"),
+            upnpParamOptional)
 #else
-        .addArg("upnp", optionalBool, _("Use UPnP to map the listening port (default: 0)"))
-#endif
+        .addArg("upnp", optionalBool, _("Use UPnP to map the listening port (default: 0)"), upnpParamOptional)
 #endif
         .addArg("usednsseed=<host>", requiredStr, _("Add a custom DNS seed to use.  If at least one custom DNS seed "
                                                     "is set, the default DNS seeds will be ignored."))
@@ -389,73 +423,86 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
                 DEFAULT_MAX_UPLOAD_TARGET));
 }
 
+#ifdef ENABLE_WALLET
 static void addWalletOptions(AllowedArgs &allowedArgs)
 {
-#ifdef ENABLE_WALLET
     allowedArgs.addHeader(_("Wallet options:"))
-        .addArg("disablewallet", optionalBool, _("Do not load the wallet and disable wallet RPC calls"))
-        .addArg(
-            "keypool=<n>", requiredInt, strprintf(_("Set key pool size to <n> (default: %u)"), DEFAULT_KEYPOOL_SIZE))
+        .addArg("disablewallet", optionalBool, _("Do not load the wallet and disable wallet RPC calls"),
+            walletParamOptional)
+        .addArg("keypool=<n>", requiredInt,
+            strprintf(_("Set key pool size to <n> (default: %u)"), DEFAULT_KEYPOOL_SIZE), walletParamOptional)
         .addArg(
             "fallbackfee=<amt>", requiredAmount,
             strprintf(
                 _("A fee rate (in %s/kB) that will be used when fee estimation has insufficient data (default: %s)"),
-                CURRENCY_UNIT, FormatMoney(DEFAULT_FALLBACK_FEE)))
+                CURRENCY_UNIT, FormatMoney(DEFAULT_FALLBACK_FEE)),
+            walletParamOptional)
         .addArg(
             "mintxfee=<amt>", requiredAmount,
             strprintf(
                 _("Fees (in %s/kB) smaller than this are considered zero fee for transaction creation (default: %s)"),
-                CURRENCY_UNIT, FormatMoney(DEFAULT_TRANSACTION_MINFEE)))
+                CURRENCY_UNIT, FormatMoney(DEFAULT_TRANSACTION_MINFEE)),
+            walletParamOptional)
         .addArg("paytxfee=<amt>", requiredAmount,
             strprintf(_("Fee (in %s/kB) to add to transactions you send (default: %s)"), CURRENCY_UNIT,
                     FormatMoney(DEFAULT_TRANSACTION_FEE)))
-        .addArg("rescan", optionalBool, _("Rescan the block chain for missing wallet transactions on startup"))
-        .addArg(
-            "salvagewallet", optionalBool, _("Attempt to recover private keys from a corrupt wallet.dat on startup"))
+        .addArg("rescan", optionalBool, _("Rescan the block chain for missing wallet transactions on startup"),
+            walletParamOptional)
+        .addArg("salvagewallet", optionalBool,
+            _("Attempt to recover private keys from a corrupt wallet.dat on startup"), walletParamOptional)
         .addArg("sendfreetransactions", optionalBool,
             strprintf(_("Send transactions as zero-fee transactions if possible (default: %u)"),
-                    DEFAULT_SEND_FREE_TRANSACTIONS))
+                    DEFAULT_SEND_FREE_TRANSACTIONS),
+            walletParamOptional)
         .addArg("spendzeroconfchange", optionalBool,
             strprintf(_("Spend unconfirmed change when sending transactions (default: %u)"),
-                    DEFAULT_SPEND_ZEROCONF_CHANGE))
+                    DEFAULT_SPEND_ZEROCONF_CHANGE),
+            walletParamOptional)
         .addArg("txconfirmtarget=<n>", requiredInt,
             strprintf(_("If paytxfee is not set, include enough fee so transactions begin confirmation on average "
                         "within n blocks (default: %u)"),
-                    DEFAULT_TX_CONFIRM_TARGET))
+                    DEFAULT_TX_CONFIRM_TARGET),
+            walletParamOptional)
         .addArg("maxtxfee=<amt>", requiredAmount,
             strprintf(_("Maximum total fees (in %s) to use in a single wallet transaction; setting this too low may "
                         "abort large transactions (default: %s)"),
-                    CURRENCY_UNIT, FormatMoney(DEFAULT_TRANSACTION_MAXFEE)))
-        .addArg("upgradewallet", optionalInt, _("Upgrade wallet to latest format on startup"))
+                    CURRENCY_UNIT, FormatMoney(DEFAULT_TRANSACTION_MAXFEE)),
+            walletParamOptional)
+        .addArg("upgradewallet", optionalInt, _("Upgrade wallet to latest format on startup"), walletParamOptional)
         .addArg("usehd", optionalBool,
             _("Use hierarchical deterministic key generation (HD) after bip32. Only has effect during "
               "wallet creation/first start") +
-                " " + strprintf(_("(default: %u)"), DEFAULT_USE_HD_WALLET))
+                " " + strprintf(_("(default: %u)"), DEFAULT_USE_HD_WALLET),
+            walletParamOptional)
         .addArg("wallet=<file>", requiredStr,
-            _("Specify wallet file (within data directory)") + " " + strprintf(_("(default: %s)"), "wallet.dat"))
+            _("Specify wallet file (within data directory)") + " " + strprintf(_("(default: %s)"), "wallet.dat"),
+            walletParamOptional)
         .addArg("walletbroadcast", optionalBool,
-            _("Make the wallet broadcast transactions") + " " + strprintf(_("(default: %u)"), DEFAULT_WALLETBROADCAST))
+            _("Make the wallet broadcast transactions") + " " + strprintf(_("(default: %u)"), DEFAULT_WALLETBROADCAST),
+            walletParamOptional)
         .addArg("walletnotify=<cmd>", requiredStr,
-            _("Execute command when a wallet transaction changes (%s in cmd is replaced by TxID)"))
+            _("Execute command when a wallet transaction changes (%s in cmd is replaced by TxID)"), walletParamOptional)
         .addArg("zapwallettxes=<mode>", optionalInt,
             _("Delete all wallet transactions and only recover those parts of the blockchain through -rescan on "
               "startup") +
                 " " +
-                _("(1 = keep tx meta data e.g. account owner and payment request information, 2 = drop tx meta data)"))
+                _("(1 = keep tx meta data e.g. account owner and payment request information, 2 = drop tx meta data)"),
+            walletParamOptional)
         .addArg("usecashaddr", optionalBool,
-            _("Use Bitcoin Cash Address for destination encoding (Activates by default Jan 14, 2017)"));
-#endif
+            _("Use Bitcoin Cash Address for destination encoding (Activates by default Jan 14, 2017)"),
+            walletParamOptional);
 }
+#endif
 
 static void addZmqOptions(AllowedArgs &allowedArgs)
 {
-#if ENABLE_ZMQ
     allowedArgs.addHeader(_("ZeroMQ notification options:"))
-        .addArg("zmqpubhashblock=<address>", requiredStr, _("Enable publish hash block in <address>"))
-        .addArg("zmqpubhashtx=<address>", requiredStr, _("Enable publish hash transaction in <address>"))
-        .addArg("zmqpubrawblock=<address>", requiredStr, _("Enable publish raw block in <address>"))
-        .addArg("zmqpubrawtx=<address>", requiredStr, _("Enable publish raw transaction in <address>"));
-#endif
+        .addArg("zmqpubhashblock=<address>", requiredStr, _("Enable publish hash block in <address>"), zmqParamOptional)
+        .addArg(
+            "zmqpubhashtx=<address>", requiredStr, _("Enable publish hash transaction in <address>"), zmqParamOptional)
+        .addArg("zmqpubrawblock=<address>", requiredStr, _("Enable publish raw block in <address>"), zmqParamOptional)
+        .addArg(
+            "zmqpubrawtx=<address>", requiredStr, _("Enable publish raw transaction in <address>"), zmqParamOptional);
 }
 
 static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
@@ -481,7 +528,8 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
 #ifdef ENABLE_WALLET
         .addDebugArg("dblogsize=<n>", requiredInt,
             strprintf("Flush wallet database activity from memory to disk log every <n> megabytes (default: %u)",
-                         DEFAULT_WALLET_DBLOGSIZE))
+                         DEFAULT_WALLET_DBLOGSIZE),
+            walletParamOptional)
 #endif
         .addDebugArg("disablesafemode", optionalBool,
             strprintf("Disable safemode, override a real safe mode event (default: %u)", DEFAULT_DISABLE_SAFEMODE))
@@ -492,7 +540,8 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
             strprintf("Slow down input checking to 1 every second (default: %u)", DEFAULT_PV_TESTMODE))
 #ifdef ENABLE_WALLET
         .addDebugArg("flushwallet", optionalBool,
-            strprintf("Run a thread to flush wallet periodically (default: %u)", DEFAULT_FLUSHWALLET))
+            strprintf("Run a thread to flush wallet periodically (default: %u)", DEFAULT_FLUSHWALLET),
+            walletParamOptional)
 #endif
         .addDebugArg("stopafterblockimport", optionalBool,
             strprintf("Stop running after importing blocks from disk (default: %u)", DEFAULT_STOPAFTERBLOCKIMPORT))
@@ -545,7 +594,8 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
                          DEFAULT_PRINTPRIORITY))
 #ifdef ENABLE_WALLET
         .addDebugArg("privdb", optionalBool,
-            strprintf("Sets the DB_PRIVATE flag in the wallet db environment (default: %u)", DEFAULT_WALLET_PRIVDB))
+            strprintf("Sets the DB_PRIVATE flag in the wallet db environment (default: %u)", DEFAULT_WALLET_PRIVDB),
+            walletParamOptional)
 #endif
         .addArg(
             "shrinkdebugfile", optionalBool, _("Shrink debug.log file on client startup (default: 1 when no -debug)"));
@@ -604,9 +654,17 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
                     SMALLEST_MAX_BLOOM_FILTER_SIZE))
         .addArg("use-bloom-filter-targeting", optionalBool,
             _("Enable thin block bloom filter targeting which helps to keep the size of bloom filters to a minumum "
-              "although it can impact performance. (default: 0)"))
+              "although it can impact performance. (default: %d)"),
+            DEFAULT_BLOOM_FILTER_TARGETING)
         .addArg("use-grapheneblocks", optionalBool,
-            strprintf(_("Enable graphene to speed up the relay of blocks (default: %d)"), DEFAULT_USE_GRAPHENE_BLOCKS));
+            strprintf(_("Enable graphene to speed up the relay of blocks (default: %d)"), DEFAULT_USE_GRAPHENE_BLOCKS))
+        .addArg("use-compactblocks", optionalBool,
+            strprintf(_("Enable compact blocks to speed up the relay of blocks (default: %d)"),
+                    DEFAULT_USE_COMPACT_BLOCKS))
+        .addArg("preferential-timer=<millisec>", requiredInt,
+            strprintf(_("Set graphene, thinblock and compactblock preferential timer duration (default: %u). Use 0 to "
+                        "disable it."),
+                    DEFAULT_PREFERENTIAL_TIMER));
 }
 
 static void addBlockCreationOptions(AllowedArgs &allowedArgs)
@@ -706,7 +764,9 @@ static void addAllNodeOptions(AllowedArgs &allowedArgs, HelpMessageMode mode, CT
     addConfigurationLocationOptions(allowedArgs);
     addGeneralOptions(allowedArgs, mode);
     addConnectionOptions(allowedArgs);
+#ifdef ENABLE_WALLET
     addWalletOptions(allowedArgs);
+#endif
     addZmqOptions(allowedArgs);
     addDebuggingOptions(allowedArgs, mode);
     addChainSelectionOptions(allowedArgs);

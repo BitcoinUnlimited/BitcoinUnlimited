@@ -27,7 +27,11 @@ protected:
     uint8_t data[WIDTH];
 
 public:
-    base_blob() { memset(data, 0, sizeof(data)); }
+    base_blob()
+    {
+        static_assert((BITS & 7) == 0, "Number of bits must fit in byte boundaries");
+        memset(data, 0, sizeof(data));
+    }
     explicit base_blob(const std::vector<unsigned char> &vch);
 
     bool IsNull() const
@@ -39,19 +43,35 @@ public:
     }
 
     void SetNull() { memset(data, 0, sizeof(data)); }
-    friend inline bool operator==(const base_blob &a, const base_blob &b)
+    //! Compare in lexical (string) byte ordering
+    inline int LexicalCompare(const base_blob &other) const { return memcmp(data, other.data, sizeof(data)); }
+    //! Numerical comparison returns -1 if this is < other, 1 if this > other, 0 if equal
+    inline int Compare(const base_blob &other) const
     {
-        return memcmp(a.data, b.data, sizeof(a.data)) == 0;
-    }
-    friend inline bool operator!=(const base_blob &a, const base_blob &b)
-    {
-        return memcmp(a.data, b.data, sizeof(a.data)) != 0;
-    }
-    friend inline bool operator<(const base_blob &a, const base_blob &b)
-    {
-        return memcmp(a.data, b.data, sizeof(a.data)) < 0;
+        for (size_t i = 0; i < sizeof(data); i++)
+        {
+            uint8_t a = data[sizeof(data) - 1 - i];
+            uint8_t b = other.data[sizeof(data) - 1 - i];
+            if (a > b)
+            {
+                return 1;
+            }
+            if (a < b)
+            {
+                return -1;
+            }
+        }
+        return 0;
     }
 
+    //! Check equality (lexical compare is used since it is faster)
+    friend inline bool operator==(const base_blob &a, const base_blob &b) { return a.LexicalCompare(b) == 0; }
+    //! Check for non-equality (lexical compare is used since it is faster)
+    friend inline bool operator!=(const base_blob &a, const base_blob &b) { return a.LexicalCompare(b) != 0; }
+    //! Returns true if a is numerically less than b
+    friend inline bool operator<(const base_blob &a, const base_blob &b) { return a.Compare(b) < 0; }
+    //! Returns true if a is numerically greater than b
+    friend inline bool operator>(const base_blob &a, const base_blob &b) { return a.Compare(b) > 0; }
     std::string GetHex() const;
     void SetHex(const char *psz);
     void SetHex(const std::string &str);
@@ -62,6 +82,15 @@ public:
     const unsigned char *begin() const { return &data[0]; }
     const unsigned char *end() const { return &data[WIDTH]; }
     unsigned int size() const { return sizeof(data); }
+    void reverse()
+    {
+        uint8_t tmp[WIDTH];
+        for (int i = 0; i < WIDTH; i++)
+            tmp[i] = data[WIDTH - 1 - i];
+        for (int i = 0; i < WIDTH; i++)
+            data[i] = tmp[i];
+    }
+
     uint64_t GetUint64(int pos) const
     {
         const uint8_t *ptr = data + pos * 8;
@@ -103,7 +132,7 @@ public:
 class uint256 : public base_blob<256>
 {
 public:
-    uint256() {}
+    uint256() : base_blob<256>() {}
     uint256(const base_blob<256> &b) : base_blob<256>(b) {}
     explicit uint256(const std::vector<unsigned char> &vch) : base_blob<256>(vch) {}
     /** A cheap hash function that just returns 64 bits from the result, it can be

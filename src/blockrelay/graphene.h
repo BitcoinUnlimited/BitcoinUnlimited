@@ -22,6 +22,7 @@
 #include <vector>
 
 const unsigned char MIN_MEMPOOL_INFO_BYTES = 8;
+const uint8_t SHORTTXIDS_LENGTH = 8;
 
 class CDataStream;
 class CNode;
@@ -46,16 +47,31 @@ public:
 
 class CGrapheneBlock
 {
+private:
+    // Entropy used for SipHash secret key; this is distinct from the block nonce
+    uint64_t sipHashNonce;
+
 public:
+    // These describe, in two parts, the 128-bit secret key used for SipHash
+    // Note that they are populated by FillShortTxIDSelector, which uses header and sipHashNonce
+    uint64_t shorttxidk0, shorttxidk1;
     CBlockHeader header;
     std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
     uint64_t nBlockTxs;
     CGrapheneSet *pGrapheneSet;
+    uint64_t version;
 
 public:
-    CGrapheneBlock(const CBlockRef pblock, uint64_t nReceiverMemPoolTx);
-    CGrapheneBlock() : pGrapheneSet(nullptr) {}
+    CGrapheneBlock(const CBlockRef pblock,
+        uint64_t nReceiverMemPoolTx,
+        uint64_t nSenderMempoolPlusBlock,
+        uint64_t _version);
+    CGrapheneBlock() : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(2) {}
+    CGrapheneBlock(uint64_t _version) : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr) { version = _version; }
     ~CGrapheneBlock();
+    // Create seeds for SipHash using the sipHashNonce generated in the constructor
+    // Note that this must be called any time members header or sipHashNonce are changed
+    void FillShortTxIDSelector();
     /**
      * Handle an incoming Graphene block
      * Once the block is validated apart from the Merkle root, forward the Xpedited block with a hop count of nHops.
@@ -72,15 +88,28 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
+        if (version >= 2)
+        {
+            READWRITE(shorttxidk0);
+            READWRITE(shorttxidk1);
+            READWRITE(sipHashNonce);
+        }
         READWRITE(header);
         READWRITE(vAdditionalTxs);
         READWRITE(nBlockTxs);
         // This logic assumes a smallest transaction size of 100 bytes.  This is optimistic for realistic transactions
         // and the downside for pathological blocks is just that graphene won't work so we fall back to xthin
-        if (nBlockTxs > excessiveBlockSize / 100)
+        if (nBlockTxs > (excessiveBlockSize * maxMessageSizeMultiplier / 100))
             throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
         if (!pGrapheneSet)
-            pGrapheneSet = new CGrapheneSet();
+        {
+            if (version > 2)
+                pGrapheneSet = new CGrapheneSet(2);
+            else if (version == 2)
+                pGrapheneSet = new CGrapheneSet(1);
+            else
+                pGrapheneSet = new CGrapheneSet(0);
+        }
         READWRITE(*pGrapheneSet);
     }
     uint64_t GetAdditionalTxSerializationSize()
@@ -177,9 +206,6 @@ class CGrapheneBlockData
 private:
     /* The sum total of all bytes for graphene blocks currently in process of being reconstructed */
     std::atomic<uint64_t> nGrapheneBlockBytes{0};
-
-    CCriticalSection cs_mapGrapheneBlockTimer; // locks mapGrapheneBlockTimer
-    std::map<uint256, std::pair<uint64_t, bool> > mapGrapheneBlockTimer;
 
     CCriticalSection cs_graphenestats; // locks everything below this point
 
@@ -285,9 +311,6 @@ public:
     std::string ValidationTimeToString();
     std::string ReRequestedTxToString();
 
-    bool CheckGrapheneBlockTimer(const uint256 &hash);
-    void ClearGrapheneBlockTimer(const uint256 &hash);
-
     void ClearGrapheneBlockData(CNode *pfrom);
     void ClearGrapheneBlockData(CNode *pfrom, const uint256 &hash);
     void ClearGrapheneBlockStats();
@@ -302,16 +325,14 @@ public:
 extern CGrapheneBlockData graphenedata; // Singleton class
 
 
-bool HaveGrapheneNodes();
 bool IsGrapheneBlockEnabled();
-bool CanGrapheneBlockBeDownloaded(CNode *pto);
 bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom);
-void ClearGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash);
-void AddGrapheneBlockInFlight(CNode *pfrom, const uint256 &hash);
 void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CMemPoolInfo &mempoolinfo);
 bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header);
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);
 CMemPoolInfo GetGrapheneMempoolInfo();
-void RequestFailoverBlock(CNode *pfrom, uint256 blockHash);
+void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash);
+// Generate cheap hash from seeds using SipHash
+uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &txhash, uint64_t grapheneVersion);
 
 #endif // BITCOIN_GRAPHENE_H

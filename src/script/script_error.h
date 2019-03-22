@@ -32,6 +32,7 @@ typedef enum ScriptError_t {
     SCRIPT_ERR_EQUALVERIFY,
     SCRIPT_ERR_CHECKMULTISIGVERIFY,
     SCRIPT_ERR_CHECKSIGVERIFY,
+    SCRIPT_ERR_CHECKDATASIGVERIFY,
     SCRIPT_ERR_NUMEQUALVERIFY,
 
     /* Logical/Format/Canonical errors */
@@ -62,6 +63,11 @@ typedef enum ScriptError_t {
 
     /* softfork safeness */
     SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS,
+
+    /* misc */
+    SCRIPT_ERR_NONCOMPRESSED_PUBKEY,
+    SCRIPT_ERR_NUMBER_OVERFLOW,
+    SCRIPT_ERR_NUMBER_BAD_ENCODING,
 
     SCRIPT_ERR_ERROR_COUNT
 } ScriptError;

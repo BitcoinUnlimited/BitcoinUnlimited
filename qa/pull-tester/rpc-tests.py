@@ -180,15 +180,17 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
-    'blockstorage',
+    'bip135basic',
+    'ctor',
+    'mining_ctor',
+    Disabled('nov152018_forkactivation','Nov 2018 already activated'),
+     Disabled('blockstorage','fixme'),
     'miningtest',
-    'grapheneblocks',
     'cashlibtest',
     'tweak',
     'notify',
     Disabled('may152018_forkactivation_1','May 2018 already activated, use it as template to test future upgrade activation'),
     Disabled('may152018_forkactivation_2','May 2018 already activated, use it as template to test future upgrade activation'),
-    'bip68-112-113-p2p',
     'validateblocktemplate',
     'parallel',
     'wallet',
@@ -208,6 +210,7 @@ testScripts = [ RpcTest(t) for t in [
     'mempool_spendcoinbase',
     'mempool_reorg',
     'mempool_limit',
+    'mempool_persist',
     'httpbasics',
     'multi_rpc',
     'zapwallettxes',
@@ -215,7 +218,6 @@ testScripts = [ RpcTest(t) for t in [
     'merkle_blocks',
     'fundrawtransaction',
     'signrawtransactions',
-    'walletbackup',
     'nodehandling',
     'reindex',
     'decodescript',
@@ -230,10 +232,20 @@ testScripts = [ RpcTest(t) for t in [
     'abandonconflict',
     'p2p-versionbits-warning',
     'importprunedfunds',
-    'thinblocks'
+    'compactblocks_1',
+    'compactblocks_2',
+    'grapheneblocks',
+    'thinblocks',
+    'checkdatasig_activation',
+    'xversion',
+    'sighashmatch',
+    'getlogcategories',
+    'getrawtransaction'
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
+    'walletbackup',
+    'bip68-112-113-p2p',
     'limits',
     'weirdtx',
     'txPerf',
@@ -512,11 +524,13 @@ class RPCTestHandler:
                     stderr_filtered = stderr.replace("Error: Unable to start HTTP server. See debug log for details.", "")
                     stderr_filtered = re.sub(r"Error: Unable to bind to 0.0.0.0:[0-9]+ on this computer\. Bitcoin Unlimited Cash Edition is probably already running\.",
                                              "", stderr_filtered)
+                    invalid_index = re.compile(r'.*?\n.*?EXCEPTION.*?\n.*?invalid index for tx.*?\n.*?ProcessMessages.*?\n', re.MULTILINE)
+                    stderr_filtered = invalid_index.sub("", stderr_filtered)
+
                     stderr_filtered = stderr_filtered.replace("Error: Failed to listen on any port. Use -listen=0 if you want this.", "")
                     stderr_filtered = stderr_filtered.replace("Error: Failed to listen on all P2P ports. Failing as requested by -bindallorfail.", "")
                     stderr_filtered = stderr_filtered.replace(" ", "")
                     stderr_filtered = stderr_filtered.replace("\n", "")
-
                     passed = stderr_filtered == "" and proc.returncode == 0
                     self.num_running -= 1
                     self.jobs.remove(j)

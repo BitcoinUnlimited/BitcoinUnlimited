@@ -1,5 +1,4 @@
-Triage of bugs
-====================================
+# Triage of bugs
 
 Occasionally, you may encounter a failing test, or a user reporting a
 bug.
@@ -21,8 +20,7 @@ find the Git commit which first introduced the problem (well, this works
 about those now).
 
 
-Running a git bisection
-------------------------------------
+## Running a git bisection
 
 The `git bisect` command can run an automatic bisection if we provide it
 with a command or script that can assess whether a revision is defective.
@@ -39,7 +37,7 @@ in your copy, e.g. the number of cores, and whether to reconfigure between
 revisions. The latter is important if the build system can change
 dramatically during the bisection. In that case the bisect.sh needs to run
 a full autogen/configure before building each revision, otherwise a simple
-'make' will fail. If in doubt, set the reconfiguration variable to 1.
+`make` will fail. If in doubt, set the reconfiguration variable to 1.
 
 To start a bisection, check out the revision which is known to be bad.
 If you need to, re-run the test manually to convince yourself, using
@@ -84,13 +82,13 @@ because the revision did not build.
 
 If the revision cannot be assessed (because broken build state) then you
 can use 'git bisect skip' to skip such revisions - but read up on the
-syntax with 'git help bisect' first.
+syntax with `git help bisect` first.
 
 Introducing skipped revisions can lead git to not be able to tell which
 revision is the first bad one. Sometimes it may output multiple
 candidates.
 
-You can do a 'git bisect reset' and start over if your bisection script
+You can do a `git bisect reset` and start over if your bisection script
 did not perform adequately (e.g. if the timeout is too short and you
 suspect that iterations which would have passed were shot down due to
 the timeout.

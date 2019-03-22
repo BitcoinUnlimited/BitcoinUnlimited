@@ -22,8 +22,8 @@
 #endif
 
 #include <boost/lexical_cast.hpp>
-#include <boost/thread.hpp>
 #include <limits>
+#include <thread>
 
 #include <QDataWidgetMapper>
 #include <QDir>
@@ -109,8 +109,6 @@ UnlimitedDialog::UnlimitedDialog(QWidget *parent, UnlimitedModel *mdl)
 
     // Block Size text field validators
     ui.miningMaxBlock->setValidator(new QIntValidator(0, INT_MAX, this));
-    ui.excessiveBlockSize->setValidator(new QIntValidator(0, INT_MAX, this));
-    ui.excessiveAcceptDepth->setValidator(new QIntValidator(0, INT_MAX, this));
 }
 
 
@@ -129,11 +127,7 @@ void UnlimitedDialog::setMapper()
 
     /* blocksize */
     mapper.addMapping(ui.miningMaxBlock, UnlimitedModel::MaxGeneratedBlock);
-    mapper.addMapping(ui.excessiveBlockSize, UnlimitedModel::ExcessiveBlockSize);
-    mapper.addMapping(ui.excessiveAcceptDepth, UnlimitedModel::ExcessiveAcceptDepth);
     connect(ui.miningMaxBlock, SIGNAL(textChanged(const QString &)), this, SLOT(validateBlockSize()));
-    connect(ui.excessiveBlockSize, SIGNAL(textChanged(const QString &)), this, SLOT(validateBlockSize()));
-    connect(ui.excessiveAcceptDepth, SIGNAL(textChanged(const QString &)), this, SLOT(validateBlockSize()));
 
     mapper.toFirst();
 }
@@ -180,19 +174,17 @@ void UnlimitedDialog::validateBlockSize()
     ui.statusLabel->setStyleSheet("QLabel { color: red; }");
 
     int mmb = ui.miningMaxBlock->text().toInt();
-    int ebs = ui.excessiveBlockSize->text().toInt();
+    int ebs = excessiveBlockSize;
 
     if (!MiningAndExcessiveBlockValidatorRule(ebs, mmb))
     {
         ui.statusLabel->setText(tr("Mined block size cannot be larger then excessive block size!"));
         ui.miningMaxBlock->setStyleSheet("QLineEdit {  background-color: red; }");
-        ui.excessiveBlockSize->setStyleSheet("QLineEdit { background-color: red; }");
         ui.okButton->setEnabled(false);
     }
     else
     {
         ui.statusLabel->clear();
-        ui.excessiveBlockSize->setStyleSheet("");
         ui.miningMaxBlock->setStyleSheet("");
         ui.okButton->setEnabled(true);
     }
