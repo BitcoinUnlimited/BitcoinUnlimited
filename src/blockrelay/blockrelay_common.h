@@ -64,6 +64,9 @@ public:
     void CheckForDownloadTimeout(CNode *pfrom);
     void RequestBlock(CNode *pfrom, const uint256 &hash);
 
+    // Find the largest block being reconstructed and disconnect it.
+    bool ClearLargestBlockAndDisconnect(CNode *pfrom);
+
     // Accessor methods to the blocks that we're reconstructing from thintype blocks such as
     // xthins or graphene.
     std::shared_ptr<CBlockThinRelay> SetBlockToReconstruct(CNode *pfrom, const uint256 &hash);

@@ -280,3 +280,39 @@ void ThinTypeRelay::ClearBlockToReconstruct(CNode *pfrom)
     LOCK(cs_reconstruct);
     mapBlocksReconstruct.erase(pfrom->GetId());
 }
+
+bool ThinTypeRelay::ClearLargestBlockAndDisconnect(CNode *pfrom)
+{
+    CNode *pLargestNode = nullptr;
+    uint64_t nLargestBytes = 0;
+    std::shared_ptr<CBlockThinRelay> pLargestBlock = nullptr;
+
+    LOCK(cs_vNodes);
+    for (CNode *pnode : vNodes)
+    {
+        std::shared_ptr<CBlockThinRelay> pblock = thinrelay.GetBlockToReconstruct(pnode);
+        if (pblock == nullptr)
+            continue;
+
+        uint64_t nBytes = pblock->nCurrentBlockSize;
+        if ((pnode->fDisconnect == false) && ((pLargestNode == nullptr) || (nBytes > nLargestBytes)))
+        {
+            pLargestNode = pnode;
+            pLargestBlock = pblock;
+            nLargestBytes = nBytes;
+        }
+    }
+
+    if (pLargestNode != nullptr)
+    {
+        thindata.ClearThinBlockData(pLargestNode, pLargestBlock);
+        pLargestNode->fDisconnect = true;
+
+        // If the our node is currently using up the most thinblock bytes then return true so that we
+        // can stop processing this thinblock and let the disconnection happen.
+        if (pfrom == pLargestNode)
+            return true;
+    }
+
+    return false;
+}

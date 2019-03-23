@@ -841,7 +841,7 @@ static bool ReconstructBlock(CNode *pfrom,
         // to see if we've exceeded any limits and if so clear out data and return.
         if (thindata.AddThinBlockBytes(nTxSize, pblock) > maxAllowedSize)
         {
-            if (ClearLargestThinBlockAndDisconnect(pfrom))
+            if (thinrelay.ClearLargestBlockAndDisconnect(pfrom))
             {
                 uint64_t nBlockBytes = pblock->nCurrentBlockSize;
                 return error(
@@ -1329,42 +1329,6 @@ void CThinBlockData::FillThinBlockQuickStats(ThinBlockQuickStats &stats)
 }
 
 bool IsThinBlocksEnabled() { return GetBoolArg("-use-thinblocks", true); }
-bool ClearLargestThinBlockAndDisconnect(CNode *pfrom)
-{
-    CNode *pLargestNode = nullptr;
-    uint64_t nLargestBytes = 0;
-    std::shared_ptr<CBlockThinRelay> pLargestBlock = nullptr;
-
-    LOCK(cs_vNodes);
-    for (CNode *pnode : vNodes)
-    {
-        std::shared_ptr<CBlockThinRelay> pblock = thinrelay.GetBlockToReconstruct(pnode);
-        if (pblock == nullptr)
-            continue;
-
-        uint64_t nBytes = pblock->nCurrentBlockSize;
-        if ((pnode->fDisconnect == false) && ((pLargestNode == nullptr) || (nBytes > nLargestBytes)))
-        {
-            pLargestNode = pnode;
-            pLargestBlock = pblock;
-            nLargestBytes = nBytes;
-        }
-    }
-
-    if (pLargestNode != nullptr)
-    {
-        thindata.ClearThinBlockData(pLargestNode, pLargestBlock);
-        pLargestNode->fDisconnect = true;
-
-        // If the our node is currently using up the most thinblock bytes then return true so that we
-        // can stop processing this thinblock and let the disconnection happen.
-        if (pfrom == pLargestNode)
-            return true;
-    }
-
-    return false;
-}
-
 void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
 {
     if (inv.type == MSG_XTHINBLOCK)

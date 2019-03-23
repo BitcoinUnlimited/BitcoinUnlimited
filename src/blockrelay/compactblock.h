@@ -407,7 +407,6 @@ extern CCompactBlockData compactdata; // Singleton class
 
 
 bool IsCompactBlocksEnabled();
-bool ClearLargestCompactBlockAndDisconnect(CNode *pfrom);
 void SendCompactBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
 bool IsCompactBlockValid(CNode *pfrom, const CompactBlock &cmpctblock);
 
