@@ -492,8 +492,8 @@ public:
 
     // Compact Blocks : begin
     CCriticalSection cs_compactblock;
-    CBlockThinRelay compactBlock;
 
+    // Store the compactblock salt to be used for this peer
     uint64_t shorttxidk0;
     uint64_t shorttxidk1;
 
