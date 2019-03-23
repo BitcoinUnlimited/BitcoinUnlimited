@@ -297,11 +297,11 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
             {
                 if (mapPartialTxHash.find(cheapHash) != mapPartialTxHash.end())
                 {
-                    pfrom->vCompactBlockHashes.push_back(mapPartialTxHash[cheapHash]);
+                    pblock->cmpctblock->vTxHashes256.push_back(mapPartialTxHash[cheapHash]);
                 }
                 else
                 {
-                    pfrom->vCompactBlockHashes.push_back(nullhash); // placeholder
+                    pblock->cmpctblock->vTxHashes256.push_back(nullhash); // placeholder
                     setHashesToRequest.insert(cheapHash);
 
                     // If there are more hashes to request than available indices then we will not be able to
@@ -324,7 +324,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
             if (setHashesToRequest.empty())
             {
                 bool mutated;
-                uint256 merkleroot = ComputeMerkleRoot(pfrom->vCompactBlockHashes, &mutated);
+                uint256 merkleroot = ComputeMerkleRoot(pblock->cmpctblock->vTxHashes256, &mutated);
                 if (header.hashMerkleRoot != merkleroot || mutated)
                 {
                     fMerkleRootCorrect = false;
@@ -514,17 +514,17 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Get the full hashes from the compactReReqResponse and add them to the compactBlockHashes vector.  These should
     // be all the missing or null hashes that we re-requested.
-    DbgAssert(pfrom->vCompactBlockHashes.size() == pfrom->vShortCompactBlockHashes.size(), return false);
+    DbgAssert(pblock->cmpctblock->vTxHashes256.size() == pfrom->vShortCompactBlockHashes.size(), return false);
     int count = 0;
-    for (size_t i = 0; i < pfrom->vCompactBlockHashes.size(); i++)
+    for (size_t i = 0; i < pblock->cmpctblock->vTxHashes256.size(); i++)
     {
-        if (pfrom->vCompactBlockHashes[i].IsNull())
+        if (pblock->cmpctblock->vTxHashes256[i].IsNull())
         {
             std::map<uint64_t, CTransactionRef>::iterator val =
                 pblock->cmpctblock->mapMissingTx.find(pfrom->vShortCompactBlockHashes[i]);
             if (val != pblock->cmpctblock->mapMissingTx.end())
             {
-                pfrom->vCompactBlockHashes[i] = val->second->GetHash();
+                pblock->cmpctblock->vTxHashes256[i] = val->second->GetHash();
             }
             count++;
         }
@@ -537,7 +537,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // root in the block header matches the merkleroot calculated from the hashes provided.
     bool mutated;
 
-    uint256 merkleroot = ComputeMerkleRoot(pfrom->vCompactBlockHashes, &mutated);
+    uint256 merkleroot = ComputeMerkleRoot(pblock->cmpctblock->vTxHashes256, &mutated);
     if (pfrom->compactBlock.hashMerkleRoot != merkleroot || mutated)
     {
         compactdata.ClearCompactBlockData(pfrom, inv.hash);
@@ -608,8 +608,8 @@ static bool ReconstructBlock(CNode *pfrom,
     // We must have all the full tx hashes by this point.  We first check for any duplicate
     // transaction ids.  This is a possible attack vector and has been used in the past.
     {
-        std::set<uint256> setHashes(pfrom->vCompactBlockHashes.begin(), pfrom->vCompactBlockHashes.end());
-        if (setHashes.size() != pfrom->vCompactBlockHashes.size())
+        std::set<uint256> setHashes(pblock->cmpctblock->vTxHashes256.begin(), pblock->cmpctblock->vTxHashes256.end());
+        if (setHashes.size() != pblock->cmpctblock->vTxHashes256.size())
         {
             compactdata.ClearCompactBlockData(pfrom, pfrom->compactBlock.GetBlockHeader().GetHash());
 
@@ -632,7 +632,7 @@ static bool ReconstructBlock(CNode *pfrom,
 
     // Look for each transaction in our various pools and buffers.
     // With compactblocks the vTxHashes contains only the first 8 bytes of the tx hash.
-    for (const uint256 &hash : pfrom->vCompactBlockHashes)
+    for (const uint256 &hash : pblock->cmpctblock->vTxHashes256)
     {
         // Replace the truncated hash with the full hash value if it exists
         CTransactionRef ptx = nullptr;

@@ -495,7 +495,6 @@ public:
     CBlockThinRelay compactBlock;
 
     std::vector<uint64_t> vShortCompactBlockHashes;
-    std::vector<uint256> vCompactBlockHashes;
 
     uint64_t shorttxidk0;
     uint64_t shorttxidk1;
