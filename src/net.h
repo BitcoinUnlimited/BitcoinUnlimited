@@ -494,8 +494,6 @@ public:
     CCriticalSection cs_compactblock;
     CBlockThinRelay compactBlock;
 
-    std::vector<uint64_t> vShortCompactBlockHashes;
-
     uint64_t shorttxidk0;
     uint64_t shorttxidk1;
 

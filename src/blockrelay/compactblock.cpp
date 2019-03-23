@@ -200,7 +200,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
     // Reconstruct the list of shortid's and in the correct order taking into account the prefilled txns.
     if (prefilledtxn.empty())
     {
-        pfrom->vShortCompactBlockHashes = shorttxids;
+        pblock->cmpctblock->vTxHashes = shorttxids;
     }
     else
     {
@@ -211,7 +211,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
             if (prefilled.index == 0)
             {
                 uint64_t shorthash = GetShortID(prefilled.tx.GetHash());
-                pfrom->vShortCompactBlockHashes.push_back(shorthash);
+                pblock->cmpctblock->vTxHashes.push_back(shorthash);
                 pblock->cmpctblock->mapMissingTx[shorthash] = MakeTransactionRef(prefilled.tx);
                 continue;
             }
@@ -221,7 +221,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
             {
                 if (iterShortID != shorttxids.end())
                 {
-                    pfrom->vShortCompactBlockHashes.push_back(*iterShortID);
+                    pblock->cmpctblock->vTxHashes.push_back(*iterShortID);
                     iterShortID++;
                 }
                 else
@@ -229,13 +229,13 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
             }
 
             // Add the prefilled txn and then get the next one
-            pfrom->vShortCompactBlockHashes.push_back(GetShortID(prefilled.tx.GetHash()));
+            pblock->cmpctblock->vTxHashes.push_back(GetShortID(prefilled.tx.GetHash()));
             pblock->cmpctblock->mapMissingTx[GetShortID(prefilled.tx.GetHash())] = MakeTransactionRef(prefilled.tx);
         }
 
         // Add the remaining shorttxids, if any.
-        std::vector<uint64_t>::iterator it = pfrom->vShortCompactBlockHashes.end();
-        pfrom->vShortCompactBlockHashes.insert(it, iterShortID, shorttxids.end());
+        std::vector<uint64_t>::iterator it = pblock->cmpctblock->vTxHashes.end();
+        pblock->cmpctblock->vTxHashes.insert(it, iterShortID, shorttxids.end());
     }
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
@@ -293,7 +293,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
         {
             // Start gathering the full tx hashes. If some are not available then add them to setHashesToRequest.
             uint256 nullhash;
-            for (const uint64_t &cheapHash : pfrom->vShortCompactBlockHashes)
+            for (const uint64_t &cheapHash : pblock->cmpctblock->vTxHashes)
             {
                 if (mapPartialTxHash.find(cheapHash) != mapPartialTxHash.end())
                 {
@@ -372,7 +372,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
         // find the index in the block associated with the hash
         uint64_t nIndex = 0;
         std::vector<uint32_t> vIndexesToRequest;
-        for (auto cheaphash : pfrom->vShortCompactBlockHashes)
+        for (auto cheaphash : pblock->cmpctblock->vTxHashes)
         {
             if (setHashesToRequest.find(cheaphash) != setHashesToRequest.end())
                 vIndexesToRequest.push_back(nIndex);
@@ -514,14 +514,14 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Get the full hashes from the compactReReqResponse and add them to the compactBlockHashes vector.  These should
     // be all the missing or null hashes that we re-requested.
-    DbgAssert(pblock->cmpctblock->vTxHashes256.size() == pfrom->vShortCompactBlockHashes.size(), return false);
+    DbgAssert(pblock->cmpctblock->vTxHashes256.size() == pblock->cmpctblock->vTxHashes.size(), return false);
     int count = 0;
     for (size_t i = 0; i < pblock->cmpctblock->vTxHashes256.size(); i++)
     {
         if (pblock->cmpctblock->vTxHashes256[i].IsNull())
         {
             std::map<uint64_t, CTransactionRef>::iterator val =
-                pblock->cmpctblock->mapMissingTx.find(pfrom->vShortCompactBlockHashes[i]);
+                pblock->cmpctblock->mapMissingTx.find(pblock->cmpctblock->vTxHashes[i]);
             if (val != pblock->cmpctblock->mapMissingTx.end())
             {
                 pblock->cmpctblock->vTxHashes256[i] = val->second->GetHash();
