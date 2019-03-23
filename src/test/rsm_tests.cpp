@@ -104,6 +104,34 @@ void epsilon()
     BOOST_CHECK_EQUAL(rsm.try_lock(std::this_thread::get_id()), false);
 }
 
+void zeta()
+{
+    rsm.lock_shared(std::this_thread::get_id());
+    // give time for theta to lock shared, eta to lock, and theta to ask for promotion
+    MilliSleep(4000);
+    rsm.unlock_shared(std::this_thread::get_id());
+}
+
+void eta()
+{
+    rsm.lock(std::this_thread::get_id());
+    rsm_guarded_vector.push_back(4);
+    rsm.unlock(std::this_thread::get_id());
+
+}
+
+void theta()
+{
+    rsm.lock_shared(std::this_thread::get_id());
+    // give time for eta to get in line to lock exclusive
+    MilliSleep(500);
+    bool promoted = rsm.try_promotion(std::this_thread::get_id());
+    BOOST_CHECK_EQUAL(promoted, true);
+    rsm_guarded_vector.push_back(7);
+    rsm.unlock(std::this_thread::get_id());
+    rsm.unlock_shared(std::this_thread::get_id());
+}
+
 BOOST_AUTO_TEST_CASE(RsmTest)
 {
     std::thread first (alpha);
@@ -145,6 +173,29 @@ BOOST_AUTO_TEST_CASE(RsmTest)
         BOOST_CHECK_EQUAL(i, rsm_guarded_vector[i]);
     }
     rsm.unlock_shared(std::this_thread::get_id());
+    // end delta epsilon thread test. the next test only uses zeta, eta, theta
+    // first reset the vector
+    rsm.lock(std::this_thread::get_id());
+    rsm_guarded_vector.clear();
+    rsm.unlock(std::this_thread::get_id());
+
+    // test promotions
+    std::thread sixth (zeta);
+    MilliSleep(250);
+    std::thread eighth (theta);
+    MilliSleep(250);
+    std::thread seventh (eta);
+
+    sixth.join();
+    seventh.join();
+    eighth.join();
+
+    // 7 was added by the promoted thread, it should appear first in the vector
+    rsm.lock_shared(std::this_thread::get_id());
+    BOOST_CHECK_EQUAL(7, rsm_guarded_vector[0]);
+    BOOST_CHECK_EQUAL(4, rsm_guarded_vector[1]);
+    rsm.unlock_shared(std::this_thread::get_id());
+
 }
 
 BOOST_AUTO_TEST_SUITE_END()

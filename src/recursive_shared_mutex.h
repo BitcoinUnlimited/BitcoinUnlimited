@@ -42,6 +42,10 @@ private:
     // the write_gate is locked (blocked) when threads have read ownership
     std::condition_variable _write_gate;
 
+    // promotion_gates
+    std::condition_variable _promotion_read_gate;
+    std::condition_variable _promotion_write_gate;
+
     // holds a list of owner ids that have shared ownership and the number of times they locked it
     std::map<std::thread::id, uint64_t> _read_owner_ids;
     // holds a list of owner ids that have been auto unlocked due to promoting and the number of
@@ -49,7 +53,9 @@ private:
     std::map<std::thread::id, uint64_t> _auto_unlocked_ids;
 
     uint64_t _write_counter;
+    uint64_t _write_promotion_counter;
     std::thread::id _write_owner_id;
+    std::thread::id _promotion_candidate_id;
 
 private:
     bool check_for_write_lock(const std::thread::id &locking_thread_id);
@@ -71,7 +77,9 @@ public:
         _read_owner_ids.clear();
         _auto_unlocked_ids.clear();
         _write_counter = 0;
+        _write_promotion_counter = 0;
         _write_owner_id = NON_THREAD_ID;
+        _promotion_candidate_id = NON_THREAD_ID;
     }
 
     ~recursive_shared_mutex()
@@ -82,6 +90,7 @@ public:
     recursive_shared_mutex& operator=(const recursive_shared_mutex&) = delete;
 
     void lock(const std::thread::id &locking_thread_id);
+    bool try_promotion(const std::thread::id &locking_thread_id);
     bool try_lock(const std::thread::id &locking_thread_id);
     void unlock(const std::thread::id &locking_thread_id);
     void lock_shared(const std::thread::id &locking_thread_id);
