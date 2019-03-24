@@ -1086,21 +1086,21 @@ void CCompactBlockData::ClearCompactBlockStats()
 uint64_t CCompactBlockData::AddCompactBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRelay> &pblock)
 {
     pblock->nCurrentBlockSize += bytes;
-    uint64_t ret = nCompactBlockBytes.fetch_add(bytes) + bytes;
+    uint64_t ret = thinrelay.nTotalBlockBytes.fetch_add(bytes) + bytes;
 
     return ret;
 }
 
 void CCompactBlockData::DeleteCompactBlockBytes(uint64_t bytes)
 {
-    if (bytes <= nCompactBlockBytes)
+    if (bytes <= thinrelay.nTotalBlockBytes)
     {
-        nCompactBlockBytes.fetch_sub(bytes);
+        thinrelay.nTotalBlockBytes.fetch_sub(bytes);
     }
 }
 
-void CCompactBlockData::ResetCompactBlockBytes() { nCompactBlockBytes.store(0); }
-uint64_t CCompactBlockData::GetCompactBlockBytes() { return nCompactBlockBytes.load(); }
+void CCompactBlockData::ResetCompactBlockBytes() { thinrelay.nTotalBlockBytes.store(0); }
+uint64_t CCompactBlockData::GetCompactBlockBytes() { return thinrelay.nTotalBlockBytes.load(); }
 void CCompactBlockData::FillCompactBlockQuickStats(CompactBlockQuickStats &stats)
 {
     if (!IsCompactBlocksEnabled())

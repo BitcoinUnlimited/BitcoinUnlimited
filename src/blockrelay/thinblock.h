@@ -214,8 +214,6 @@ struct ThinBlockQuickStats
 class CThinBlockData
 {
 private:
-    /* The sum total of all bytes for thinblocks currently in process of being reconstructed */
-    std::atomic<uint64_t> nThinBlockBytes{0};
 
     CCriticalSection cs_thinblockstats; // locks everything below this point
 

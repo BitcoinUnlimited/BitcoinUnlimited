@@ -1290,20 +1290,20 @@ void CThinBlockData::ClearThinBlockStats()
 uint64_t CThinBlockData::AddThinBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRelay> &pblock)
 {
     pblock->nCurrentBlockSize += bytes;
-    uint64_t ret = nThinBlockBytes.fetch_add(bytes) + bytes;
+    uint64_t ret = thinrelay.nTotalBlockBytes.fetch_add(bytes) + bytes;
     return ret;
 }
 
 void CThinBlockData::DeleteThinBlockBytes(uint64_t bytes)
 {
-    if (bytes <= nThinBlockBytes)
+    if (bytes <= thinrelay.nTotalBlockBytes)
     {
-        nThinBlockBytes.fetch_sub(bytes);
+        thinrelay.nTotalBlockBytes.fetch_sub(bytes);
     }
 }
 
-void CThinBlockData::ResetThinBlockBytes() { nThinBlockBytes.store(0); }
-uint64_t CThinBlockData::GetThinBlockBytes() { return nThinBlockBytes.load(); }
+void CThinBlockData::ResetThinBlockBytes() { thinrelay.nTotalBlockBytes.store(0); }
+uint64_t CThinBlockData::GetThinBlockBytes() { return thinrelay.nTotalBlockBytes.load(); }
 void CThinBlockData::FillThinBlockQuickStats(ThinBlockQuickStats &stats)
 {
     if (!IsThinBlocksEnabled())

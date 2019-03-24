@@ -304,8 +304,6 @@ struct CompactBlockQuickStats
 class CCompactBlockData
 {
 private:
-    /* The sum total of all bytes for compactblocks currently in process of being reconstructed */
-    std::atomic<uint64_t> nCompactBlockBytes{0};
 
     CCriticalSection cs_compactblockstats; // locks everything below this point
 

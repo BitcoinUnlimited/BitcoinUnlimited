@@ -25,10 +25,14 @@ struct CThinTypeBlockInFlight
 class ThinTypeRelay
 {
 public:
+    /* The sum total of all bytes for thintype blocks currently in process of being reconstructed */
+    std::atomic<uint64_t> nTotalBlockBytes{0};
+
     CCriticalSection cs_inflight;
     CCriticalSection cs_reconstruct;
 
 private:
+
     // block relay timer
     CCriticalSection cs_blockrelaytimer;
     std::map<uint256, std::pair<uint64_t, bool> > mapBlockRelayTimer GUARDED_BY(cs_blockrelaytimer);
