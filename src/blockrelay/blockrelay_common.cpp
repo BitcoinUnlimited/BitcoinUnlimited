@@ -305,7 +305,7 @@ bool ThinTypeRelay::ClearLargestBlockAndDisconnect(CNode *pfrom)
 
     if (pLargestNode != nullptr)
     {
-        thindata.ClearThinBlockData(pLargestNode, pLargestBlock);
+        thinrelay.ClearAllBlockData(pLargestNode, pLargestBlock);
         pLargestNode->fDisconnect = true;
 
         // If the our node is currently using up the most thinblock bytes then return true so that we
@@ -316,3 +316,47 @@ bool ThinTypeRelay::ClearLargestBlockAndDisconnect(CNode *pfrom)
 
     return false;
 }
+
+uint64_t ThinTypeRelay::AddTotalBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRelay> &pblock)
+{
+    pblock->nCurrentBlockSize += bytes;
+    uint64_t ret = nTotalBlockBytes.fetch_add(bytes) + bytes;
+
+    return ret;
+}
+
+void ThinTypeRelay::DeleteTotalBlockBytes(uint64_t bytes)
+{
+    if (bytes <= nTotalBlockBytes)
+    {
+        nTotalBlockBytes.fetch_sub(bytes);
+    }
+}
+
+// After a thintype block is finished processing or if for some reason we have to pre-empt the rebuilding
+// of a thintype block then we clear out the thinblock bytes from the total.
+void ThinTypeRelay::ClearBlockBytes(std::shared_ptr<CBlockThinRelay> &pblock)
+{
+    // Remove bytes from counter
+    if (pblock != nullptr)
+        DeleteTotalBlockBytes(pblock->nCurrentBlockSize);
+
+    LOG(THIN | CMPCT | GRAPHENE, "Total in memory blockbytes after clearing a thintype block is %ld bytes\n",
+        GetTotalBlockBytes());
+}
+
+void ThinTypeRelay::ClearAllBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> &pblock)
+{
+    // We must make sure to clear the block data first before clearing the thinblock in flight.
+    uint256 hash = pblock->GetBlockHeader().GetHash();
+    ClearBlockBytes(pblock);
+    ClearBlockToReconstruct(pnode);
+    if (pblock != nullptr)
+        pblock->SetNull();
+
+    // Now clear the block in flight.
+    ClearBlockInFlight(pnode, hash);
+}
+
+void ThinTypeRelay::ResetTotalBlockBytes() { nTotalBlockBytes.store(0); }
+uint64_t ThinTypeRelay::GetTotalBlockBytes() { return nTotalBlockBytes.load(); }

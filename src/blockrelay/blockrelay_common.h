@@ -25,13 +25,12 @@ struct CThinTypeBlockInFlight
 class ThinTypeRelay
 {
 public:
-    /* The sum total of all bytes for thintype blocks currently in process of being reconstructed */
-    std::atomic<uint64_t> nTotalBlockBytes{0};
-
     CCriticalSection cs_inflight;
     CCriticalSection cs_reconstruct;
 
 private:
+    /* The sum total of all bytes for thintype blocks currently in process of being reconstructed */
+    std::atomic<uint64_t> nTotalBlockBytes{0};
 
     // block relay timer
     CCriticalSection cs_blockrelaytimer;
@@ -76,6 +75,15 @@ public:
     std::shared_ptr<CBlockThinRelay> SetBlockToReconstruct(CNode *pfrom, const uint256 &hash);
     std::shared_ptr<CBlockThinRelay> GetBlockToReconstruct(CNode *pfrom);
     void ClearBlockToReconstruct(CNode *pfrom);
+
+    // Accessor methods for tracking total block bytes for all blocks currently in the process
+    // of being reconstructed.
+    uint64_t AddTotalBlockBytes(uint64_t, std::shared_ptr<CBlockThinRelay> &pblock);
+    void DeleteTotalBlockBytes(uint64_t bytes);
+    void ClearBlockBytes(std::shared_ptr<CBlockThinRelay> &pblock);
+    void ClearAllBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> &pblock);
+    void ResetTotalBlockBytes();
+    uint64_t GetTotalBlockBytes();
 };
 extern ThinTypeRelay thinrelay;
 

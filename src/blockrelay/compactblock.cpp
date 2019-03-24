@@ -168,7 +168,7 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (AlreadyHaveBlock(inv))
     {
         requester.AlreadyReceived(pfrom, inv);
-        compactdata.ClearCompactBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         LOG(CMPCT, "Received compactblock but returning because we already have this block %s on disk, peer=%s\n",
             inv.hash.ToString(), pfrom->GetLogName());
@@ -309,7 +309,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
                     if (setHashesToRequest.size() > std::numeric_limits<uint16_t>::max())
                     {
                         // Since we can't process this compactblock then clear out the data from memory
-                        compactdata.ClearCompactBlockData(pfrom, pblock);
+                        thinrelay.ClearAllBlockData(pfrom, pblock);
 
                         thinrelay.RequestBlock(pfrom, header.GetHash());
                         return error("Too many re-requested hashes for compactblock: requesting a full block");
@@ -337,7 +337,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
             }
         }
     } // End locking orphanpool.cs, mempool.cs
-    LOG(CMPCT, "Total in memory compactblock size is %ld bytes\n", compactdata.GetCompactBlockBytes());
+    LOG(CMPCT, "Total in memory compactblock size is %ld bytes\n", thinrelay.GetTotalBlockBytes());
 
     // These must be checked outside of the mempool.cs lock or deadlock may occur.
     // A merkle root mismatch here does not cause a ban because and expedited node will forward an xthin
@@ -354,7 +354,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
             return error(
                 "TX HASH COLLISION for compactblock: re-requesting a full block, peer=%s", pfrom->GetLogName());
 
-        compactdata.ClearCompactBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
         thinrelay.RequestBlock(pfrom, header.GetHash());
         return true;
     }
@@ -393,7 +393,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
     if (missingCount > 0)
     {
         // Since we can't process this compactblock then clear out the data from memory
-        compactdata.ClearCompactBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         thinrelay.RequestBlock(pfrom, header.GetHash());
         return error("Still missing transactions for compactblock: re-requesting a full block");
@@ -476,7 +476,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     CInv inv(MSG_CMPCT_BLOCK, compactReReqResponse.blockhash);
     if (compactReReqResponse.txn.empty() || compactReReqResponse.blockhash.IsNull())
     {
-        compactdata.ClearCompactBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         dosMan.Misbehaving(pfrom, 100);
         return error(
@@ -499,7 +499,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (AlreadyHaveBlock(inv))
     {
         requester.AlreadyReceived(pfrom, inv);
-        compactdata.ClearCompactBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         LOG(CMPCT,
             "Received compactReReqResponse but returning because we already have this block %s on disk, peer=%s\n",
@@ -540,7 +540,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     uint256 merkleroot = ComputeMerkleRoot(pblock->cmpctblock->vTxHashes256, &mutated);
     if (pblock->hashMerkleRoot != merkleroot || mutated)
     {
-        compactdata.ClearCompactBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         dosMan.Misbehaving(pfrom, 100);
         return error("Merkle root for %s does not match computed merkle root, peer=%s", inv.hash.ToString(),
@@ -564,7 +564,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (missingCount > 0)
     {
         // Since we can't process this compactblock then clear out the data from memory
-        compactdata.ClearCompactBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         thinrelay.RequestBlock(pfrom, inv.hash);
         return error("Still missing transactions after reconstructing block, peer=%s: re-requesting a full block",
@@ -609,7 +609,7 @@ static bool ReconstructBlock(CNode *pfrom,
         std::set<uint256> setHashes(pblock->cmpctblock->vTxHashes256.begin(), pblock->cmpctblock->vTxHashes256.end());
         if (setHashes.size() != pblock->cmpctblock->vTxHashes256.size())
         {
-            compactdata.ClearCompactBlockData(pfrom, pblock);
+            thinrelay.ClearAllBlockData(pfrom, pblock);
 
             dosMan.Misbehaving(pfrom, 10);
             return error("Duplicate transaction ids, peer=%s", pfrom->GetLogName());
@@ -678,7 +678,7 @@ static bool ReconstructBlock(CNode *pfrom,
 
         // In order to prevent a memory exhaustion attack we track transaction bytes used to create Block
         // to see if we've exceeded any limits and if so clear out data and return.
-        if (compactdata.AddCompactBlockBytes(nTxSize, pblock) > maxAllowedSize)
+        if (thinrelay.AddTotalBlockBytes(nTxSize, pblock) > maxAllowedSize)
         {
             if (thinrelay.ClearLargestBlockAndDisconnect(pfrom))
             {
@@ -690,7 +690,7 @@ static bool ReconstructBlock(CNode *pfrom,
         }
         if (pblock->nCurrentBlockSize > maxAllowedSize)
         {
-            compactdata.ClearCompactBlockData(pfrom, pblock);
+            thinrelay.ClearAllBlockData(pfrom, pblock);
             pfrom->fDisconnect = true;
             return error(
                 "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
@@ -1038,30 +1038,6 @@ std::string CCompactBlockData::FullTxToString()
     return ss.str();
 }
 
-// After a compactblock is finished processing or if for some reason we have to pre-empt the rebuilding
-// of a compactblock then we clear out the compactblock data which can be substantial.
-void CCompactBlockData::ClearCompactBlockBytes(std::shared_ptr<CBlockThinRelay> &pblock)
-{
-   // Remove bytes from counter
-    if (pblock != nullptr)
-        compactdata.DeleteCompactBlockBytes(pblock->nCurrentBlockSize);
-
-    LOG(CMPCT, "Total in memory compactblock size after clearing a compactblock is %ld bytes\n",
-        compactdata.GetCompactBlockBytes());
-}
-
-
-void CCompactBlockData::ClearCompactBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> &pblock)
-{
-    // We must make sure to clear the thinblock data first before clearing the thinblock in flight.
-    ClearCompactBlockBytes(pblock);
-    thinrelay.ClearBlockToReconstruct(pnode);
-    thinrelay.ClearBlockInFlight(pnode, pblock->GetBlockHeader().GetHash());
-
-    if (pblock != nullptr)
-        pblock->SetNull();
-}
-
 void CCompactBlockData::ClearCompactBlockStats()
 {
     LOCK(cs_compactblockstats);
@@ -1083,24 +1059,6 @@ void CCompactBlockData::ClearCompactBlockStats()
     mapFullTx.clear();
 }
 
-uint64_t CCompactBlockData::AddCompactBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRelay> &pblock)
-{
-    pblock->nCurrentBlockSize += bytes;
-    uint64_t ret = thinrelay.nTotalBlockBytes.fetch_add(bytes) + bytes;
-
-    return ret;
-}
-
-void CCompactBlockData::DeleteCompactBlockBytes(uint64_t bytes)
-{
-    if (bytes <= thinrelay.nTotalBlockBytes)
-    {
-        thinrelay.nTotalBlockBytes.fetch_sub(bytes);
-    }
-}
-
-void CCompactBlockData::ResetCompactBlockBytes() { thinrelay.nTotalBlockBytes.store(0); }
-uint64_t CCompactBlockData::GetCompactBlockBytes() { return thinrelay.nTotalBlockBytes.load(); }
 void CCompactBlockData::FillCompactBlockQuickStats(CompactBlockQuickStats &stats)
 {
     if (!IsCompactBlocksEnabled())

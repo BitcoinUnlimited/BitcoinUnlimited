@@ -214,7 +214,6 @@ struct ThinBlockQuickStats
 class CThinBlockData
 {
 private:
-
     CCriticalSection cs_thinblockstats; // locks everything below this point
 
     CStatHistory<uint64_t> nOriginalSize;
@@ -308,14 +307,7 @@ public:
     std::string ThinBlockToString();
     std::string FullTxToString();
 
-    void ClearThinBlockBytes(std::shared_ptr<CBlockThinRelay> &pblock);
-    void ClearThinBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> &pblock);
     void ClearThinBlockStats();
-
-    uint64_t AddThinBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRelay> &pblock);
-    void DeleteThinBlockBytes(uint64_t bytes);
-    void ResetThinBlockBytes();
-    uint64_t GetThinBlockBytes();
 
     void FillThinBlockQuickStats(ThinBlockQuickStats &stats);
 };

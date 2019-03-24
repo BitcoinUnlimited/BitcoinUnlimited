@@ -390,14 +390,7 @@ public:
     std::string CompactBlockToString();
     std::string FullTxToString();
 
-    void ClearCompactBlockBytes(std::shared_ptr<CBlockThinRelay> &pblock);
-    void ClearCompactBlockData(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pblock);
     void ClearCompactBlockStats();
-
-    uint64_t AddCompactBlockBytes(uint64_t, std::shared_ptr<CBlockThinRelay> &pblock);
-    void DeleteCompactBlockBytes(uint64_t bytes);
-    void ResetCompactBlockBytes();
-    uint64_t GetCompactBlockBytes();
 
     void FillCompactBlockQuickStats(CompactBlockQuickStats &stats);
 };
