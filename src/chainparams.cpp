@@ -20,7 +20,8 @@
 #include "chainparamsseeds.h"
 
 uint64_t nMiningSvForkTime = 0;
-uint64_t nMiningForkTime = 1542300000;
+// FIXME This need to be update every new fork
+uint64_t nMiningForkTime = 1557921600;
 
 CBlock CreateGenesisBlock(CScript prefix,
     const std::string &comment,
@@ -139,7 +140,10 @@ public:
         // May, 15 2018 hard fork
         consensus.may2018Height = 530359;
         // Nov, 15 2018 hard fork
-        consensus.nov2018ActivationTime = 1542300000;
+        consensus.nov2018Height = 556766;
+        consensus.sv2018Height = 556766;
+        // Wed, 15 May 2019 12:00:00 UTC hard fork activation time
+        consensus.may2019ActivationTime = 1557921600;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -270,7 +274,10 @@ public:
         // May, 15 2018 hard fork
         consensus.may2018Height = 0;
         // Nov, 15 2018 hard fork
-        consensus.nov2018ActivationTime = 1542300000;
+        consensus.nov2018Height = 0;
+        consensus.sv2018Height = 0;
+        // Wed, 15 May 2019 12:00:00 UTC hard fork activation time
+        consensus.may2019ActivationTime = 1557921600;
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -341,7 +348,10 @@ public:
         // May, 15 2018 hard fork
         consensus.may2018Height = 1233070;
         // Nov 15, 2018 hard fork
-        consensus.nov2018ActivationTime = 1542300000;
+        consensus.nov2018Height = 1267996;
+        consensus.sv2018Height = 0; // FIXME still to be determine
+        // Wed, 15 May 2019 12:00:00 UTC hard fork activation time
+        consensus.may2019ActivationTime = 1557921600;
 
 
         pchMessageStart[0] = 0x0b;
@@ -446,10 +456,13 @@ public:
         consensus.uahfHeight = 0;
         // Nov, 13 hard fork is always on on regtest.
         consensus.daaHeight = 0;
-        // May, 15 2018 hard fork is always 0 on regtest
+        // May, 15 2018 hard fork is always active on regtest
         consensus.may2018Height = 0;
-        // Nov, 15 2018 hard fork
-        consensus.nov2018ActivationTime = 1542300000;
+        // Nov, 15 2018 hard fork is always active on regtest
+        consensus.nov2018Height = 0;
+        consensus.sv2018Height = 0;
+        // Wed, 15 May 2019 12:00:00 UTC hard fork activation time
+        consensus.may2019ActivationTime = 1557921600;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;
