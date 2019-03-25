@@ -154,6 +154,8 @@ unlimited.cpp
 unlimited.h
 util.cpp
 util.h
+utilhttp.cpp
+utilhttp.h
 utilmoneystr.cpp
 utilmoneystr.h
 utilstrencodings.cpp
@@ -351,6 +353,7 @@ test/uahf_test.cpp
 test/uint256_tests.cpp
 test/univalue_tests.cpp
 test/util_tests.cpp
+test/utilhttp_tests.cpp
 test/versionbits_tests.cpp
 wallet/crypter.cpp
 wallet/crypter.h
