@@ -35,8 +35,9 @@ public:
 
     bool IsCached(const std::vector<uint8_t> &vchSig, const CPubKey &vchPubKey, const uint256 &sighash) const;
 
-    bool VerifySignature(const std::vector<uint8_t> &vchSig, const CPubKey &pubkey, const uint256 &sighash)
-        const override;
+    bool VerifySignature(const std::vector<uint8_t> &vchSig,
+        const CPubKey &pubkey,
+        const uint256 &sighash) const override;
 };
 
 void InitSignatureCache();

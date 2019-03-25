@@ -52,13 +52,11 @@ public:
  * flags differ on unrelated aspects).
  */
 static const uint32_t INVARIANT_FLAGS =
-    SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC | SCRIPT_VERIFY_DERSIG |
-    SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_NULLDUMMY | SCRIPT_VERIFY_SIGPUSHONLY |
-    SCRIPT_VERIFY_MINIMALDATA | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS |
-    SCRIPT_VERIFY_CLEANSTACK | SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY |
-    SCRIPT_VERIFY_CHECKSEQUENCEVERIFY | SCRIPT_VERIFY_MINIMALIF |
-    SCRIPT_VERIFY_NULLFAIL | SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE |
-    SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_ENABLE_REPLAY_PROTECTION |
+    SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC | SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S |
+    SCRIPT_VERIFY_NULLDUMMY | SCRIPT_VERIFY_SIGPUSHONLY | SCRIPT_VERIFY_MINIMALDATA |
+    SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS | SCRIPT_VERIFY_CLEANSTACK | SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY |
+    SCRIPT_VERIFY_CHECKSEQUENCEVERIFY | SCRIPT_VERIFY_MINIMALIF | SCRIPT_VERIFY_NULLFAIL |
+    SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_ENABLE_REPLAY_PROTECTION |
     SCRIPT_ENABLE_CHECKDATASIG;
 
 /**
@@ -78,10 +76,11 @@ private:
 
 public:
     CSignatureCache() { GetRandBytes(nonce.begin(), 32); }
-
-    void ComputeEntry(uint256 &entry, const std::vector<uint8_t> &vchSig,
-                      const CPubKey &pubkey, const uint256 &hash,
-                      uint32_t flags)
+    void ComputeEntry(uint256 &entry,
+        const std::vector<uint8_t> &vchSig,
+        const CPubKey &pubkey,
+        const uint256 &hash,
+        uint32_t flags)
     {
         flags &= ~INVARIANT_FLAGS;
         CSHA256()
@@ -128,17 +127,23 @@ void InitSignatureCache()
 }
 
 template <typename F>
-bool RunMemoizedCheck(const std::vector<uint8_t> &vchSig, const CPubKey &pubkey,
-                      const uint256 &sighash, uint32_t flags, bool storeOrErase,
-                      const F &fun) {
+bool RunMemoizedCheck(const std::vector<uint8_t> &vchSig,
+    const CPubKey &pubkey,
+    const uint256 &sighash,
+    uint32_t flags,
+    bool storeOrErase,
+    const F &fun)
+{
     uint256 entry;
     signatureCache.ComputeEntry(entry, vchSig, pubkey, sighash, flags);
-    if (signatureCache.Get(entry, !storeOrErase)) {
+    if (signatureCache.Get(entry, !storeOrErase))
+    {
         return true;
     }
 
-    if (!fun()) return false;
-    
+    if (!fun())
+        return false;
+
     if (storeOrErase)
     {
         signatureCache.Set(entry);
@@ -146,8 +151,9 @@ bool RunMemoizedCheck(const std::vector<uint8_t> &vchSig, const CPubKey &pubkey,
     return true;
 }
 
-bool CachingTransactionSignatureChecker::IsCached(const std::vector<uint8_t> &vchSig, const CPubKey &pubkey,
-                                                  const uint256 &sighash) const
+bool CachingTransactionSignatureChecker::IsCached(const std::vector<uint8_t> &vchSig,
+    const CPubKey &pubkey,
+    const uint256 &sighash) const
 {
     return RunMemoizedCheck(vchSig, pubkey, sighash, nFlags, true, [] { return false; });
 }
@@ -181,12 +187,10 @@ bool CachingTransactionSignatureChecker::VerifySignature(const std::vector<unsig
 }
 #endif
 
-bool CachingTransactionSignatureChecker::VerifySignature(
-    const std::vector<uint8_t> &vchSig, const CPubKey &pubkey,
+bool CachingTransactionSignatureChecker::VerifySignature(const std::vector<uint8_t> &vchSig,
+    const CPubKey &pubkey,
     const uint256 &sighash) const
 {
-    return RunMemoizedCheck(vchSig, pubkey, sighash, nFlags, store, [&] {
-        return TransactionSignatureChecker::VerifySignature(vchSig, pubkey, sighash);
-    });
+    return RunMemoizedCheck(vchSig, pubkey, sighash, nFlags, store,
+        [&] { return TransactionSignatureChecker::VerifySignature(vchSig, pubkey, sighash); });
 }
-
