@@ -38,23 +38,16 @@ bool IsUAHFforkActiveOnNextBlock(int height);
 /** Check is Cash HF has activated. */
 bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
-bool IsNov152018Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
-
-/** Test if this node is configured to follow the Nov 15 fork (consensus.forkNov2018Time is nonzero),
+/** Test if this node is configured to follow the BCH chain (miningForkTime tweak is nonzero),
     or whether the operator is enabling/disabling features manually. */
-bool IsNov152018Scheduled();
+bool AreWeOnBCHChain();
+
+/** Check if the next will be the first block where the new set of rules will be enforced */
+bool IsMay152019Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
 /** Test if fork is active */
-bool IsNov152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
-
+bool IsMay152019Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
 /** Test if this node is configured to follow the Bitcoin SV defined hard fork */
-bool IsSv2018Scheduled();
-
-/** Test if SV fork is active */
-bool IsSv2018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
-
-/** Test if SV fork is happening on the next block */
-bool IsSv2018Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
-
+bool AreWeOnSVChain();
 #endif

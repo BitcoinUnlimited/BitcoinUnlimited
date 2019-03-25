@@ -82,8 +82,8 @@ bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *p
     return IsDAAEnabled(consensusparams, pindexTip->nHeight);
 }
 
-bool IsNov152018Scheduled() { return miningForkTime.Value() != 0; }
-bool IsNov152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+bool AreWeOnBCHChain() { return miningForkTime.Value() != 0; }
+bool IsMay152019Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
 {
     if (pindexTip == nullptr)
     {
@@ -92,7 +92,7 @@ bool IsNov152018Enabled(const Consensus::Params &consensusparams, const CBlockIn
     return pindexTip->IsforkActiveOnNextBlock(miningForkTime.Value());
 }
 
-bool IsNov152018Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+bool IsMay152019Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
 {
     if (pindexTip == nullptr)
     {
@@ -102,21 +102,4 @@ bool IsNov152018Next(const Consensus::Params &consensusparams, const CBlockIndex
 }
 
 
-bool IsSv2018Scheduled() { return miningSvForkTime.Value() != 0; }
-bool IsSv2018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
-{
-    if (pindexTip == nullptr)
-    {
-        return false;
-    }
-    return pindexTip->IsforkActiveOnNextBlock(miningSvForkTime.Value());
-}
-
-bool IsSv2018Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
-{
-    if (pindexTip == nullptr)
-    {
-        return false;
-    }
-    return pindexTip->forkAtNextBlock(miningSvForkTime.Value());
-}
+bool AreWeOnSVChain() { return miningSvForkTime.Value() != 0; }
