@@ -104,20 +104,13 @@ class MaxUploadTest(BitcoinTestFramework):
     def __init__(self):
         self.utxo = []
         self.txouts = gen_return_txouts()
- 
-    def add_options(self, parser):
-        parser.add_option("--testbinary", dest="testbinary",
-                          default=os.getenv("BITCOIND", "bitcoind"),
-                          help="bitcoind binary to test")
+        self.num_nodes = 1
+        self.setup_clean_chain = True
 
-    def setup_chain(self):
-        initialize_chain_clean(self.options.tmpdir, 2)
 
-    def setup_network(self):
         # Start a node with maxuploadtarget of 200*EB (MB/24h)
         # some other attributes defined below have been factored out of
         # other methods in this class.
-        self.nodes = []
         # an overhead factor approximates how the traffic with bigger blocks
         self.overhead_factor_a = 10  # percent
         print ("overhead_factor = %s %%" % self.overhead_factor_a)
@@ -135,11 +128,12 @@ class MaxUploadTest(BitcoinTestFramework):
         # roughly how many 66k transactions we need to create a big block
         self.num_transactions = int(EXCESSIVE_BLOCKSIZE / 66000) - 1
         print ("num txs in big block = %s" % self.num_transactions)
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug",
-                                                              "-use-thinblocks=0", # turned off to predict size of transmitted data
-                                                              "-excessiveblocksize=%s" % EXCESSIVE_BLOCKSIZE,
-                                                              "-maxuploadtarget=%s" % self.maxuploadtarget,
-                                                              "-blockmaxsize=%s" % self.blockmaxsize]))
+
+        self.extra_args = [[
+                          "-use-thinblocks=0", # turned off to predict size of transmitted data
+                          "-excessiveblocksize=%s" % EXCESSIVE_BLOCKSIZE,
+                          "-maxuploadtarget=%s" % self.maxuploadtarget,
+                          "-blockmaxsize=%s" % self.blockmaxsize]]
 
     def mine_big_block(self, node, address):
         # Want to create a big block
@@ -160,8 +154,7 @@ class MaxUploadTest(BitcoinTestFramework):
             newtx = rawtx[0:92]
             newtx = newtx + self.txouts
             newtx = newtx + rawtx[94:]
-            # Appears to be ever so slightly faster to sign with SIGHASH_NONE
-            signresult = node.signrawtransaction(newtx,None,None,"NONE")
+            signresult = node.signrawtransaction(newtx)
             txid = node.sendrawtransaction(signresult["hex"], True)
         # Mine a big sized block which will be these transactions we just created
         node.generate(1)
@@ -249,7 +242,7 @@ class MaxUploadTest(BitcoinTestFramework):
         assert_equal(len(self.nodes[0].getpeerinfo()), 3)
         print ("Peer 0 still connected after downloading old block %d times" % (successcount - compensation))
 
-        # At most a couple more tries should succeed (depending on how long 
+        # At most a couple more tries should succeed (depending on how long
         # the test has been running so far).
         i = 1
         while True:
