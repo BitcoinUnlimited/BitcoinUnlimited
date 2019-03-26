@@ -402,8 +402,8 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
     // We now have all the transactions now that are in this block
     int blockSize = pblock->GetBlockSize();
     LOG(CMPCT, "Reassembled compactblock for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
-        pblock->GetHash().ToString(), blockSize, this->GetSize(),
-        ((float)blockSize) / ((float)this->GetSize()), pfrom->GetLogName());
+        pblock->GetHash().ToString(), blockSize, this->GetSize(), ((float)blockSize) / ((float)this->GetSize()),
+        pfrom->GetLogName());
 
     // Update run-time statistics of compact block bandwidth savings
     compactdata.UpdateInBound(this->GetSize(), blockSize);
@@ -419,7 +419,6 @@ bool CompactReRequest::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
     CompactReRequest compactReRequest;
     vRecv >> compactReRequest;
-
     // Message consistency checking
     if (compactReRequest.indexes.empty() || compactReRequest.blockhash.IsNull())
     {
@@ -468,9 +467,9 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     size_t msgSize = vRecv.size();
     CompactReReqResponse compactReReqResponse;
     vRecv >> compactReReqResponse;
-
     auto pblock = thinrelay.GetBlockToReconstruct(pfrom);
-    CompactBlock &compactBlock = *pblock->cmpctblock;
+    if (pblock == nullptr)
+        return error("No block available to reconstruct for blocktxn");
 
     // Message consistency checking
     CInv inv(MSG_CMPCT_BLOCK, compactReReqResponse.blockhash);
@@ -576,18 +575,19 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         CInv inv2(CInv(MSG_BLOCK, compactReReqResponse.blockhash));
 
         // for compression statistics, we have to add up the size of compactblock and the re-requested Txns.
-        int nSizeCompactBlockTx = msgSize;
-        int blockSize = pblock->GetBlockSize();
+        uint64_t nSizeCompactBlockTx = msgSize;
+        uint64_t nBlockSize = pblock->GetBlockSize();
+        uint64_t nCmpctBlkSize = pblock->cmpctblock->GetSize();
         LOG(CMPCT,
             "Reassembled compactReReqResponse for %s (%d bytes). Message was %d bytes (compactblock) and %d bytes "
             "(re-requested tx), compression ratio %3.2f, peer=%s\n",
-            pblock->GetHash().ToString(), blockSize, compactBlock.GetSize(), nSizeCompactBlockTx,
-            ((float)blockSize) / ((float)compactBlock.GetSize() + (float)nSizeCompactBlockTx), pfrom->GetLogName());
+            pblock->GetHash().ToString(), nBlockSize, nCmpctBlkSize, nSizeCompactBlockTx,
+            ((float)nBlockSize) / ((float)nCmpctBlkSize + (float)nSizeCompactBlockTx), pfrom->GetLogName());
 
         // Update run-time statistics of compactblock bandwidth savings.
         // We add the original compactblock size with the size of transactions that were re-requested.
         // This is NOT double counting since we never accounted for the original compactblock due to the re-request.
-        compactdata.UpdateInBound(nSizeCompactBlockTx + compactBlock.GetSize(), blockSize);
+        compactdata.UpdateInBound(nSizeCompactBlockTx + nCmpctBlkSize, nBlockSize);
         LOG(CMPCT, "compactblock stats: %s\n", compactdata.ToString());
 
         PV->HandleBlockMessage(pfrom, strCommand, pblock, inv2);
@@ -684,8 +684,7 @@ static bool ReconstructBlock(CNode *pfrom,
             {
                 return error(
                     "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                    pblock->GetHash().ToString(), pblock->nCurrentBlockSize, maxAllowedSize,
-                    pfrom->GetLogName());
+                    pblock->GetHash().ToString(), pblock->nCurrentBlockSize, maxAllowedSize, pfrom->GetLogName());
             }
         }
         if (pblock->nCurrentBlockSize > maxAllowedSize)
@@ -694,8 +693,7 @@ static bool ReconstructBlock(CNode *pfrom,
             pfrom->fDisconnect = true;
             return error(
                 "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                pblock->GetHash().ToString(), pblock->nCurrentBlockSize, maxAllowedSize,
-                pfrom->GetLogName());
+                pblock->GetHash().ToString(), pblock->nCurrentBlockSize, maxAllowedSize, pfrom->GetLogName());
         }
 
         // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct ordering.
