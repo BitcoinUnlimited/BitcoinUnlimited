@@ -154,7 +154,7 @@ SLAPI int SignTx(unsigned char *txData,
     size_t nHashedOut = 0;
     uint256 sighash = SignatureHash(priorScript, tx, inputIdx, nHashType, inputAmount, &nHashedOut);
     std::vector<unsigned char> sig;
-    if (!key.Sign(sighash, sig))
+    if (!key.SignECDSA(sighash, sig))
     {
         return 0;
     }

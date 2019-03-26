@@ -14,8 +14,14 @@
 #include "pubkey.h"
 #include "script/script.h"
 #include "uint256.h"
-
 const std::string strMessageMagic = "Bitcoin Signed Message:\n";
+
+extern uint256 SignatureHashLegacy(const CScript &scriptCode,
+    const CTransaction &txTo,
+    unsigned int nIn,
+    uint32_t nHashType,
+    const CAmount &amount,
+    size_t *nHashedOut);
 
 using namespace std;
 
@@ -1673,7 +1679,7 @@ bool ScriptMachine::Step()
                         uint256 messagehash(vchHash);
 
                         CPubKey pubkey(vchPubKey);
-                        fSuccess = pubkey.Verify(messagehash, vchSig);
+                        fSuccess = pubkey.VerifyECDSA(messagehash, vchSig);
                     }
 
                     if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) && vchSig.size())
@@ -1842,20 +1848,12 @@ bool ScriptMachine::Step()
     return set_success(serror);
 }
 
-bool TransactionSignatureChecker::VerifySignature(const std::vector<unsigned char> &vchSig,
+bool BaseSignatureChecker::VerifySignature(const std::vector<uint8_t> &vchSig,
     const CPubKey &pubkey,
     const uint256 &sighash) const
 {
-    return pubkey.Verify(sighash, vchSig);
+    return pubkey.VerifyECDSA(sighash, vchSig);
 }
-
-extern uint256 SignatureHashLegacy(const CScript &scriptCode,
-    const CTransaction &txTo,
-    unsigned int nIn,
-    uint32_t nHashType,
-    const CAmount &amount,
-    size_t *nHashedOut);
-
 
 bool TransactionSignatureChecker::CheckSig(const vector<unsigned char> &vchSigIn,
     const vector<unsigned char> &vchPubKey,
