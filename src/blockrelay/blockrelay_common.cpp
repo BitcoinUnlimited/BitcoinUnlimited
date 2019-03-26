@@ -256,6 +256,12 @@ std::shared_ptr<CBlockThinRelay> ThinTypeRelay::SetBlockToReconstruct(CNode *pfr
     // Store and empty block which can be used later
     std::shared_ptr<CBlockThinRelay> pblock;
     pblock = std::make_shared<CBlockThinRelay>(CBlockThinRelay());
+
+    // Initialize the thintype pointers
+    pblock->thinblock = std::make_shared<CThinBlock>(CThinBlock());
+    pblock->xthinblock = std::make_shared<CXThinBlock>(CXThinBlock());
+    pblock->cmpctblock = std::make_shared<CompactBlock>(CompactBlock());
+
     mapBlocksReconstruct.insert(
         std::make_pair(pfrom->GetId(), std::make_pair(pblock->GetBlockHeader().GetHash(), pblock)));
     return pblock;
