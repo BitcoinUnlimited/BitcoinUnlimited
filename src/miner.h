@@ -20,6 +20,7 @@ class CScript;
 class CWallet;
 
 extern CScript COINBASE_FLAGS;
+extern CCriticalSection cs_coinbaseFlags;
 
 namespace Consensus
 {

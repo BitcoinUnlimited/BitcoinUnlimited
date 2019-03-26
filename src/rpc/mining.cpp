@@ -474,7 +474,10 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
 
     UniValue aux(UniValue::VOBJ);
     // COINBASE_FLAGS were assigned in CreateNewBlock() in the steps above.  Now we can use it here.
-    aux.pushKV("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end()));
+    {
+        LOCK(cs_coinbaseFlags);
+        aux.pushKV("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end()));
+    }
 
     arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
 

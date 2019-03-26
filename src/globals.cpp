@@ -107,6 +107,10 @@ std::set<int> setDirtyFileInfo GUARDED_BY(cs_main);
 /** Dirty block index entries. */
 std::set<CBlockIndex *> setDirtyBlockIndex GUARDED_BY(cs_main);
 
+/** Flags for coinbase transactions we create */
+CCriticalSection cs_coinbaseFlags;
+CScript COINBASE_FLAGS;
+
 /**
  * Filter for transactions that were recently rejected by
  * AcceptToMemoryPool. These are not rerequested until the chain tip
