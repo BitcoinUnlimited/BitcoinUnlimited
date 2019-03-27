@@ -496,21 +496,21 @@ static bool CheckSignatureEncodingSigHashChoice(const vector<unsigned char> &vch
 
     if (flags & SCRIPT_ENABLE_SCHNORR)
     {
-        if (vchSig.size() == 64 + (check_sighash==true) ? 1:0)  // 64 sig length plus 1 sighashtype
-         {
-             // In a generic-signature context, 64-byte signatures are interpreted
-             // as Schnorr signatures (always correctly encoded) when flag set.
-             if (check_sighash && ((flags & SCRIPT_VERIFY_STRICTENC) != 0))
-             {
-                 if (!IsDefinedHashtypeSignature(vchSig))
-                     return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
+        if (vchSig.size() == 64 + (check_sighash == true) ? 1 : 0) // 64 sig length plus 1 sighashtype
+        {
+            // In a generic-signature context, 64-byte signatures are interpreted
+            // as Schnorr signatures (always correctly encoded) when flag set.
+            if (check_sighash && ((flags & SCRIPT_VERIFY_STRICTENC) != 0))
+            {
+                if (!IsDefinedHashtypeSignature(vchSig))
+                    return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
 
-                 // schnorr sigs must use forkid sighash if forkid flag set
-                 if ((flags & SCRIPT_ENABLE_SIGHASH_FORKID) && ((vchSig[64] & SIGHASH_FORKID) == 0))
-                     return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
-             }
-             return true;
-         }
+                // schnorr sigs must use forkid sighash if forkid flag set
+                if ((flags & SCRIPT_ENABLE_SIGHASH_FORKID) && ((vchSig[64] & SIGHASH_FORKID) == 0))
+                    return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
+            }
+            return true;
+        }
     }
 
     if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC)) != 0)
@@ -1606,15 +1606,16 @@ bool ScriptMachine::Step()
 
                         // If schnorr is enabled, then no signature can be 64 + 1 bytes because multisig does
                         // not support schnorr, and all 64 byte signatures are assumed to be schnorr.
-    if (flags & SCRIPT_ENABLE_SCHNORR)
-    {
-        if (vchSig.size() == 65)  // 64 sig length plus 1 sighashtype
-         {
-             // 64-byte signatures are not allowed for ECDSA if schnorr is possible
-             if (serror) *serror = SCRIPT_ERR_SIG_BADLENGTH;
-             return false;
-         }
-    }
+                        if (flags & SCRIPT_ENABLE_SCHNORR)
+                        {
+                            if (vchSig.size() == 65) // 64 sig length plus 1 sighashtype
+                            {
+                                // 64-byte signatures are not allowed for ECDSA if schnorr is possible
+                                if (serror)
+                                    *serror = SCRIPT_ERR_SIG_BADLENGTH;
+                                return false;
+                            }
+                        }
 
                         // Note how this makes the exact order of pubkey/signature evaluation
                         // distinguishable by CHECKMULTISIG NOT if the STRICTENC flag is set.
@@ -1883,9 +1884,12 @@ bool BaseSignatureChecker::VerifySignature(const std::vector<uint8_t> &vchSig,
     const CPubKey &pubkey,
     const uint256 &sighash) const
 {
-    if ((nFlags & SCRIPT_ENABLE_SCHNORR) && (vchSig.size() == 64)) {
+    if ((nFlags & SCRIPT_ENABLE_SCHNORR) && (vchSig.size() == 64))
+    {
         return pubkey.VerifySchnorr(sighash, vchSig);
-    } else {
+    }
+    else
+    {
         return pubkey.VerifyECDSA(sighash, vchSig);
     }
 }

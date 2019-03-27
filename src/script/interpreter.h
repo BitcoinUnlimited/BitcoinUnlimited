@@ -155,6 +155,7 @@ class BaseSignatureChecker
 {
 protected:
     unsigned int nFlags = SCRIPT_ENABLE_SIGHASH_FORKID;
+
 public:
     //! Verifies a signature given the pubkey, signature and sighash
     virtual bool VerifySignature(const std::vector<uint8_t> &vchSig,
