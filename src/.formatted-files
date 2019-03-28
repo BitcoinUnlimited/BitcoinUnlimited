@@ -414,6 +414,7 @@ respend/test/respendrelayer_tests.cpp
 rpc/blockchain.cpp
 rpc/client.cpp
 rpc/client.h
+rpc/electrum.cpp
 rpc/mining.cpp
 rpc/misc.cpp
 rpc/net.cpp
