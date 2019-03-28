@@ -22,6 +22,7 @@
 #include "connmgr.h"
 #include "consensus/validation.h"
 #include "dosman.h"
+#include "electrum/electrumserver.h"
 #include "forks_csv.h"
 #include "fs.h"
 #include "httprpc.h"
@@ -217,6 +218,7 @@ void Shutdown()
     StopREST();
     StopRPC();
     StopHTTPServer();
+    electrum::ElectrumServer::Instance().Stop();
 #ifdef ENABLE_WALLET
     if (pwalletMain)
         pwalletMain->Flush(false);
@@ -496,7 +498,7 @@ bool InitSanityCheck(void)
     return true;
 }
 
-bool AppInitServers(thread_group &threadGroup)
+bool AppInitServers(thread_group &threadGroup, int rpcport, const std::string &network)
 {
     RPCServer::OnStopped(&OnRPCStopped);
     RPCServer::OnPreCommand(&OnRPCPreCommand);
@@ -510,6 +512,10 @@ bool AppInitServers(thread_group &threadGroup)
         return false;
     if (!StartHTTPServer())
         return false;
+    if (!electrum::ElectrumServer::Instance().Start(rpcport, network))
+    {
+        return false;
+    }
     return true;
 }
 
@@ -995,8 +1001,10 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     if (fServer)
     {
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
-        if (!AppInitServers(threadGroup))
-            return InitError(_("Unable to start HTTP server. See debug log for details."));
+        if (!AppInitServers(threadGroup, BaseParams().RPCPort(), chainparams.NetworkIDString()))
+        {
+            return InitError(_("Unable to start RPC services. See debug log for details."));
+        }
     }
 
     int64_t nStart;
