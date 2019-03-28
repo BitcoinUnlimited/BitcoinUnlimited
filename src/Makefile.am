@@ -132,6 +132,7 @@ BITCOIN_CORE_H = \
   consensus/tx_verify.h \
   core_io.h \
   core_memusage.h \
+  cuckoocache.h \
   dosman.h \
   dstencode.h \
   expedited.h \
