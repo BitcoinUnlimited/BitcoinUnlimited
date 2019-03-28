@@ -6,7 +6,9 @@
 
 #include <boost/test/unit_test.hpp>
 
-BOOST_AUTO_TEST_CASE(lcg_tests) {
+BOOST_AUTO_TEST_SUITE(lcg_tests);
+
+BOOST_AUTO_TEST_CASE(lcg_test1) {
     {
         MMIXLinearCongruentialGenerator lcg;
         // We want that the first iteration is 0 which is a helpful special
@@ -45,3 +47,5 @@ BOOST_AUTO_TEST_CASE(lcg_tests) {
         BOOST_CHECK_EQUAL(lcg.next(), 0x6b00b1df);
     }
 }
+
+BOOST_AUTO_TEST_SUITE_END();
