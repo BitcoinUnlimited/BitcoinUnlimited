@@ -77,19 +77,16 @@ class TestManager(NodeConnCB):
 
 
 class MaxBlocksInFlightTest(BitcoinTestFramework):
+
+    def __init__(self):
+        self.num_nodes = 1
+        self.extra_args = [["-whitelist=127.0.0.1", "-debug=net"]]
+        self.setup_clean_chain = True
+
     def add_options(self, parser):
         parser.add_option("--testbinary", dest="testbinary",
                           default=os.getenv("BITCOIND", "bitcoind"),
                           help="Binary to test max block requests behavior")
-
-    def setup_chain(self):
-        print("Initializing test directory "+self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir, 1)
-
-    def setup_network(self):
-        self.nodes = start_nodes(1, self.options.tmpdir,
-                                 extra_args=[['-debug', '-whitelist=127.0.0.1']],
-                                 binary=[self.options.testbinary])
 
     def run_test(self):
         test = TestManager()

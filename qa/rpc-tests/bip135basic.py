@@ -26,7 +26,7 @@ class BIP135VoteTest(BitcoinTestFramework):
 
     def __init__(self):
         super().__init__()
-        self.setup_clean_chain = True
+        self.setup_clean_chain = False
         self.num_nodes = 1
         self.defined_forks = ["bip135test%d" % i for i in range(0, 8)]
 
