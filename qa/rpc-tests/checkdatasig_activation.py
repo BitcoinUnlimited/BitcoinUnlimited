@@ -98,9 +98,9 @@ class CheckDataSigActivationTest(ComparisonTestFramework):
         # good signatures
         node.importprivatekeys("no-rescan", 'cU4WAhpniFvwT8Z13MjNyE1tkzp8n7wDPwwe8WzqqBAejZXq948J')
         sig = node.signdata('bchreg:qq3srvg7hrzf9wu5h33du5l7n3fpx7jw5gdhhk390u',"string", "foo")
-        assert_equal(sig, '3045022100C4EB26D78AE898C72EF959A96DE51B423563E384A72B580493C9195F8811D36602201CC6561EAFAC7C9BC55B80D2605C1EBF9ACAB9AD80F0A08247370D2ED2B9408A')
+        assert_equal(sig, '3045022100C548DFF1354117D260B03E167BD25B5F79F6AB17219CAF5FC9CA1C94F0B9BB3C022049D9521CC04A0AD4DE42F81A1623D1F179A47B21B814AB7FBC2FF192AF023ECF')
         sig2 = node.signdata('bchreg:qq3srvg7hrzf9wu5h33du5l7n3fpx7jw5gdhhk390u',"hex", "0102030405060708090a")
-        assert_equal(sig2, '304502210085626204B90AF4B62546037A89786B279BBB59D003A6D767630386B173905C8A0220740EC7B0743E94C4B9427FCCE1E1CB327CB0605501BF447E697E0206E14FBE58')
+        assert_equal(sig2, '3044022061E179B30A3B6ACD31F21A77ACB162FBB998473ACE4AAA56CC808FFD2415963B0220793AF5402AD9534D2D5F26248421499520E6B571C4BE31B90CBBFF602C0A7FDC')
 
         # If I use the "hash" format and calculate the sha256 myself, it ought to create the same signature as "signdata"
         assert_equal(sig, node.signdata('bchreg:qq3srvg7hrzf9wu5h33du5l7n3fpx7jw5gdhhk390u',"hash", hexlify(sha256(b"foo")).decode()))
