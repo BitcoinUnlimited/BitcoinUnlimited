@@ -19,11 +19,22 @@ DOCKER_EXEC () {
 if [ -n "$DPKG_ADD_ARCH" ]; then
   DOCKER_EXEC dpkg --add-architecture "$DPKG_ADD_ARCH";
 fi
-travis_retry DOCKER_EXEC apt-get update
-travis_retry DOCKER_EXEC apt-get install --no-install-recommends --no-upgrade -qq $PACKAGES $DOCKER_PACKAGES
+if [ $DIST = "DEB" ]; then
+  travis_retry DOCKER_EXEC apt-get update
+  travis_retry DOCKER_EXEC apt-get install --no-install-recommends --no-upgrade -qq $PACKAGES $DOCKER_PACKAGES
+fi
+if [ $DIST = "RPM" ]; then
+  travis_retry DOCKER_EXEC yum update -y
+  travis_retry DOCKER_EXEC yum groupinstall -y development
+  travis_retry DOCKER_EXEC yum install -y https://centos7.iuscommunity.org/ius-release.rpm
+  # this is temporary until the default compiler on centos/rhel supports c++14
+  travis_retry DOCKER_EXEC yum install -y centos-release-scl
+  travis_retry DOCKER_EXEC yum install -y $PACKAGES $DOCKER_PACKAGES
+  # this is temporary until the default compiler on centos/rhel supports c++14
+  travis_retry DOCKER_EXEC scl enable devtoolset-6 bash
+fi
 if [ $RUN_FORMATTING_CHECK = "true" ]; then
   curl --location $LINTER_DEB_URL/libllvm3.8_3.8.1-27ubuntu1_amd64.deb -o llvm-3.8.deb;
   curl --location $LINTER_DEB_URL/clang-format-3.8_3.8.1-27ubuntu1_amd64.deb -o clang-format-3.8.deb;
   DOCKER_EXEC dpkg -i llvm-3.8.deb clang-format-3.8.deb;
 fi
-

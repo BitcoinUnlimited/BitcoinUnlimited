@@ -7,6 +7,12 @@
 
 export LC_ALL=C.UTF-8
 
+if [ $DIST = "RPM" ]; then
+  # this is temporary until the default compiler on centos/rhel supports c++14
+  DOCKER_EXEC ln -fs  /opt/rh/devtoolset-6/root/bin/g++ /usr/bin/g++
+  DOCKER_EXEC ln -fs /usr/bin/python3.6 /usr/bin/python3
+  DOCKER_EXEC ln -fs /usr/bin/python3 /usr/bin/python
+fi
 BEGIN_FOLD autogen
 export TRAVIS_COMMIT_LOG=`git log --format=fuller -1`
 if [ -n "$USE_SHELL" ]; then export CONFIG_SHELL="$USE_SHELL"; fi
