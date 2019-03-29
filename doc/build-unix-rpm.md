@@ -61,7 +61,7 @@ compilation will take much longer due to swap thrashing.
 Build requirements:
 
 ```bash
-## sudo yum groupinstall development
+sudo yum groupinstall development
 sudo yum install https://centos7.iuscommunity.org/ius-release.rpm
 sudo yum install centos-release-scl
 sudo yum install libtool libevent-devel autoconf automake openssl-devel boost-devel python36u libdb4-devel libdb4-cxx-devel
