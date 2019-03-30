@@ -86,7 +86,7 @@ sudo ln -fs /user/bin/python2 /usr/bin/python
 
 If the build continues to fail due to xversionkeys.h run the following inside the src folder and report the issue to the development team:
 ```bash
-python3 ../contrib/devtools/xversionkeys.py > ./src/xversionkeys.h < ./xversionkeys.dat
+python3 ../contrib/devtools/xversionkeys.py > ./xversionkeys.h < ./xversionkeys.dat
 
 ```
 
