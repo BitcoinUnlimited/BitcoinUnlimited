@@ -89,6 +89,10 @@ enum
     // See BIP112 for details
     SCRIPT_VERIFY_CHECKSEQUENCEVERIFY = (1U << 10),
 
+    // Require the argument of OP_IF/NOTIF to be exactly 0x01 or empty vector
+    //
+    SCRIPT_VERIFY_MINIMALIF = (1U << 13),
+
     // Signature(s) must be empty vector if an CHECK(MULTI)SIG operation failed
     SCRIPT_VERIFY_NULLFAIL = (1U << 14),
 
@@ -111,8 +115,16 @@ enum
     //
     SCRIPT_ENABLE_CHECKDATASIG = (1U << 18),
 
+    // Are Schnorr signatures enabled for OP_CHECK(DATA)SIG(VERIFY) and
+    // 65-byte signatures banned for OP_CHECKMULTISIG(VERIFY)?
+    //
+    SCRIPT_ENABLE_SCHNORR = (1U << 19),
+
+    // Allows the recovery of coins sent to p2sh segwit addresses
+    SCRIPT_ALLOW_SEGWIT_RECOVERY = (1U << 20),
+
     // Are OP_INVERT, OP_MUL, OP_LSHIFT, OP_RSHIFT enabled?
-    SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES = (1U << 19)
+    SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES = (1U << 21),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);
@@ -141,6 +153,9 @@ uint256 SignatureHash(const CScript &scriptCode,
 
 class BaseSignatureChecker
 {
+protected:
+    unsigned int nFlags = SCRIPT_ENABLE_SIGHASH_FORKID;
+
 public:
     //! Verifies a signature given the pubkey, signature and sighash
     virtual bool VerifySignature(const std::vector<uint8_t> &vchSig,
@@ -162,21 +177,21 @@ public:
 
 class TransactionSignatureChecker : public BaseSignatureChecker
 {
-private:
+protected:
     const CTransaction *txTo;
     unsigned int nIn;
     const CAmount amount;
     mutable size_t nBytesHashed;
     mutable size_t nSigops;
-    unsigned int nFlags;
 
 public:
     TransactionSignatureChecker(const CTransaction *txToIn,
         unsigned int nInIn,
         const CAmount &amountIn,
         unsigned int flags = SCRIPT_ENABLE_SIGHASH_FORKID)
-        : txTo(txToIn), nIn(nInIn), amount(amountIn), nBytesHashed(0), nSigops(0), nFlags(flags)
+        : txTo(txToIn), nIn(nInIn), amount(amountIn), nBytesHashed(0), nSigops(0)
     {
+        nFlags = flags;
     }
     bool CheckSig(const std::vector<unsigned char> &scriptSig,
         const std::vector<unsigned char> &vchPubKey,

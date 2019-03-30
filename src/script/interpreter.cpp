@@ -493,6 +493,26 @@ static bool CheckSignatureEncodingSigHashChoice(const vector<unsigned char> &vch
     {
         return true;
     }
+
+    if (flags & SCRIPT_ENABLE_SCHNORR)
+    {
+        if (vchSig.size() == 64 + (check_sighash == true) ? 1 : 0) // 64 sig length plus 1 sighashtype
+        {
+            // In a generic-signature context, 64-byte signatures are interpreted
+            // as Schnorr signatures (always correctly encoded) when flag set.
+            if (check_sighash && ((flags & SCRIPT_VERIFY_STRICTENC) != 0))
+            {
+                if (!IsDefinedHashtypeSignature(vchSig))
+                    return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
+
+                // schnorr sigs must use forkid sighash if forkid flag set
+                if ((flags & SCRIPT_ENABLE_SIGHASH_FORKID) && ((vchSig[64] & SIGHASH_FORKID) == 0))
+                    return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
+            }
+            return true;
+        }
+    }
+
     if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC)) != 0)
     {
         if (check_sighash)
@@ -1584,6 +1604,19 @@ bool ScriptMachine::Step()
                         valtype &vchSig = stacktop(-isig);
                         valtype &vchPubKey = stacktop(-ikey);
 
+                        // If schnorr is enabled, then no signature can be 64 + 1 bytes because multisig does
+                        // not support schnorr, and all 64 byte signatures are assumed to be schnorr.
+                        if (flags & SCRIPT_ENABLE_SCHNORR)
+                        {
+                            if (vchSig.size() == 65) // 64 sig length plus 1 sighashtype
+                            {
+                                // 64-byte signatures are not allowed for ECDSA if schnorr is possible
+                                if (serror)
+                                    *serror = SCRIPT_ERR_SIG_BADLENGTH;
+                                return false;
+                            }
+                        }
+
                         // Note how this makes the exact order of pubkey/signature evaluation
                         // distinguishable by CHECKMULTISIG NOT if the STRICTENC flag is set.
                         // See the script_(in)valid tests for details.
@@ -1677,9 +1710,8 @@ bool ScriptMachine::Step()
                         valtype vchHash(32);
                         CSHA256().Write(vchMessage.data(), vchMessage.size()).Finalize(vchHash.data());
                         uint256 messagehash(vchHash);
-
                         CPubKey pubkey(vchPubKey);
-                        fSuccess = pubkey.VerifyECDSA(messagehash, vchSig);
+                        fSuccess = checker.VerifySignature(vchSig, pubkey, messagehash);
                     }
 
                     if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) && vchSig.size())
@@ -1852,7 +1884,14 @@ bool BaseSignatureChecker::VerifySignature(const std::vector<uint8_t> &vchSig,
     const CPubKey &pubkey,
     const uint256 &sighash) const
 {
-    return pubkey.VerifyECDSA(sighash, vchSig);
+    if ((nFlags & SCRIPT_ENABLE_SCHNORR) && (vchSig.size() == 64))
+    {
+        return pubkey.VerifySchnorr(sighash, vchSig);
+    }
+    else
+    {
+        return pubkey.VerifyECDSA(sighash, vchSig);
+    }
 }
 
 bool TransactionSignatureChecker::CheckSig(const vector<unsigned char> &vchSigIn,

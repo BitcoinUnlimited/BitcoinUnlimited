@@ -50,7 +50,7 @@ typedef enum ScriptError_t {
     SCRIPT_ERR_NEGATIVE_LOCKTIME,
     SCRIPT_ERR_UNSATISFIED_LOCKTIME,
 
-    /* BIP62 */
+    /* BIP62 (Malleability) */
     SCRIPT_ERR_SIG_HASHTYPE,
     SCRIPT_ERR_SIG_DER,
     SCRIPT_ERR_MINIMALDATA,
@@ -60,6 +60,10 @@ typedef enum ScriptError_t {
     SCRIPT_ERR_PUBKEYTYPE,
     SCRIPT_ERR_CLEANSTACK,
     SCRIPT_ERR_SIG_NULLFAIL,
+
+    /* Schnorr */
+    SCRIPT_ERR_SIG_BADLENGTH,
+    SCRIPT_ERR_MUST_USE_FORKID,
 
     /* softfork safeness */
     SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS,
