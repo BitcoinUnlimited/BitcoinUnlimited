@@ -44,17 +44,8 @@ std::string getLabelPublic(const CScript &scriptPubKey)
     {
         if (whichType == TX_LABELPUBLIC)
         {
-            CScriptNum labelPublic0(vSolutions[0], true, 5);
-            // vSolutions[1] small format contains data size
-            CScript labelPublic1(vSolutions[1]);
-
-            if (labelPublic0 == OP_PUSHDATA1)
-                return ""; // TODO long formats not implemented yet
-            else if (labelPublic0 == OP_PUSHDATA2)
-                return ""; // TODO long formats not implemented yet
-            else
-                // small format
-                return std::string(labelPublic1.begin() + 1, labelPublic1.end());
+            CScript labelPublic(vSolutions[1]);
+            return std::string(labelPublic.begin() + 1, labelPublic.end());
         }
     }
 
