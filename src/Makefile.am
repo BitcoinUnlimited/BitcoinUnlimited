@@ -196,6 +196,7 @@ BITCOIN_CORE_H = \
   ui_interface.h \
   undo.h \
   unlimited.h \
+  utilhttp.h \
   stat.h \
   tweak.h \
   requestManager.h \
@@ -292,6 +293,7 @@ libbitcoin_server_a_SOURCES = \
   txorphanpool.cpp \
   tweak.cpp \
   unlimited.cpp \
+  utilhttp.cpp \
   requestManager.cpp \
   validation/forks.cpp \
   validation/validation.cpp \
