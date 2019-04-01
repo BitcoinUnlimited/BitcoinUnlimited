@@ -52,8 +52,11 @@ bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType)
     {
         return true; // CLTV Freeze are standard enable(disable)
     }
-    else if (whichType == TX_NULL_DATA && (!fAcceptDatacarrier || scriptPubKey.size() > nMaxDatacarrierBytes))
-        return false;
+    else if (whichType == TX_NULL_DATA || whichType == TX_LABELPUBLIC)
+    {
+        if (!fAcceptDatacarrier || scriptPubKey.size() > nMaxDatacarrierBytes)
+            return false;
+    }
 
     return whichType != TX_NONSTANDARD;
 }

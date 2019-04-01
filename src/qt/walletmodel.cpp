@@ -225,6 +225,11 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
                 scriptPubKey = GetScriptLabelPublic(rcp.labelPublic.toStdString());
                 // remove duplicate address as rcp.adddress was copied in SendCoinsDialog::on_sendButton_clicked()
                 --nAddresses;
+
+                // Make sure scriptPubKey is within size constraints and that we are configured
+                // to foward OP_RETURN transactions.
+                if (!fAcceptDatacarrier || scriptPubKey.size() > nMaxDatacarrierBytes)
+                    return LabelPublicExceedsLimits;
             }
 
             CRecipient recipient = {scriptPubKey, rcp.amount, rcp.fSubtractFeeFromAmount};
