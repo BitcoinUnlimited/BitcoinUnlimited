@@ -110,7 +110,7 @@ bool IsStandardTx(const CTransactionRef &tx, std::string &reason)
             return false;
         }
 
-        if (whichType == TX_NULL_DATA)
+        if ((whichType == TX_NULL_DATA) || (whichType == TX_LABELPUBLIC))
             nDataOut++;
         else if ((whichType == TX_MULTISIG) && (!fIsBareMultisigStd))
         {
