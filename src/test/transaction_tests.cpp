@@ -358,6 +358,39 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
     BOOST_CHECK(CTransaction(t).HasData() == false);
 
+    // Check max LabelPublic: MAX_OP_RETURN_RELAY-2 byte TX_NULL_DATA
+    nMaxDatacarrierBytes = MAX_OP_RETURN_RELAY;
+    uint64_t someNumber = 1;
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << CScriptNum(someNumber)
+                                       << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
+                                                   "2312");
+    BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY, t.vout[0].scriptPubKey.size());
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+
+
+    // Check max LabelPublic: MAX_OP_RETURN_RELAY-byte TX_NULL_DATA
+    // MAX_OP_RETURN_RELAY+1-2 -byte TX_NULL_DATA (non-standard)
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << CScriptNum(someNumber)
+                                       << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
+                                                   "2312ac");
+    BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY + 1, t.vout[0].scriptPubKey.size());
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+
+
     // MAX_OP_RETURN_RELAY-byte TX_NULL_DATA (standard)
     nMaxDatacarrierBytes = MAX_OP_RETURN_RELAY;
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
